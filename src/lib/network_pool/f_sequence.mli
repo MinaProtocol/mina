@@ -20,7 +20,7 @@
 *)
 open Core
 
-type 'e t
+type 'e t [@@deriving compare, equal, sexp_of]
 
 val is_empty : 'e t -> bool
 
@@ -38,15 +38,13 @@ val foldl : ('a -> 'e -> 'a) -> 'a -> 'e t -> 'a
 
 val foldr : ('e -> 'a -> 'a) -> 'a -> 'e t -> 'a
 
+val findi : 'a t -> f:('a -> bool) -> int option
+
 val iter : 'e t -> f:('e -> unit) -> unit
 
 val to_seq : 'e t -> 'e Sequence.t
 
 val to_list : 'e t -> 'e list
-
-val sexp_of_t : ('e -> Sexp.t) -> 'e t -> Sexp.t
-
-val equal : ('e -> 'e -> bool) -> 'e t -> 'e t -> bool
 
 val empty : 'e t
 
@@ -61,4 +59,4 @@ val snoc : 'e t -> 'e -> 'e t
     contain all elements with index >= i *)
 val split_at : 'e t -> int -> 'e t * 'e t
 
-val find : 'e t -> f:('e -> sexp_bool) -> 'e sexp_option
+val find : 'e t -> f:('e -> bool) -> 'e option

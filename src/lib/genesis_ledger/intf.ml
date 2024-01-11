@@ -3,7 +3,7 @@ open Signature_lib
 open Core_kernel
 
 module Timing = struct
-  type t = (int, int, int) Account_timing.Poly.t
+  type t = (int, int, int, int) Account_timing.Poly.t
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -23,15 +23,17 @@ module Timing = struct
         ; cliff_time
         ; cliff_amount
         ; vesting_increment
-        ; vesting_period }
+        ; vesting_period
+        }
 end
 
 module Public_accounts = struct
   type account_data =
-    { pk: Public_key.Compressed.t
-    ; balance: int
-    ; delegate: Public_key.Compressed.t option
-    ; timing: Timing.t }
+    { pk : Public_key.Compressed.t
+    ; balance : int
+    ; delegate : Public_key.Compressed.t option
+    ; timing : Timing.t
+    }
 
   module type S = sig
     val name : string
@@ -42,10 +44,11 @@ end
 
 module Private_accounts = struct
   type account_data =
-    { pk: Public_key.Compressed.t
-    ; sk: Private_key.t
-    ; balance: int
-    ; timing: Timing.t }
+    { pk : Public_key.Compressed.t
+    ; sk : Private_key.t
+    ; balance : int
+    ; timing : Timing.t
+    }
 
   module type S = sig
     val name : string
@@ -73,13 +76,13 @@ end
 module type Ledger_input_intf = sig
   include Accounts_intf
 
-  val directory : [`Ephemeral | `New | `Path of string]
+  val directory : [ `Ephemeral | `New | `Path of string ]
 
   val depth : int
 end
 
 module type S = sig
-  val t : Ledger.t Lazy.t
+  val t : Mina_ledger.Ledger.t Lazy.t
 
   val depth : int
 

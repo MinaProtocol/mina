@@ -2,10 +2,10 @@
  (name state_or_error)
  (public_name state_or_error)
  (library_flags -linkall)
- (inline_tests)
- (libraries core ppx_fields_conv)
+ (inline_tests (flags -verbose -show-counts))
+ (libraries core_kernel ppx_fields_conv)
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_jane ppx_version ppx_deriving.eq ppx_deriving.make ppx_deriving_yojson))
+  (pps ppx_jane ppx_version ppx_compare ppx_deriving.make ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))
  (synopsis "State monad with or_error"))

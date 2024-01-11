@@ -7,8 +7,9 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 let Cmd = ../../Lib/Cmds.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 
-let OpamInit = ../../Command/OpamInit.dhall
+let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let Command = ../../Command/Base.dhall
 
@@ -31,12 +32,13 @@ in  Pipeline.build
                 [ dirtyDhallDir, S.strictlyStart (S.contains "src/") ]
               , path = "Lint"
               , name = "OCaml"
+              , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint ]
               }
       , steps =
         [ Command.build
             Command.Config::{
             , commands =
-                OpamInit.andThenRunInDocker
+                RunInToolchain.runInToolchain
                   ([] : List Text)
                   (     "./buildkite/scripts/lint-check-format.sh && "
                     ++  "./scripts/require-ppxs.py"

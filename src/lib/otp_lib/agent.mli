@@ -12,7 +12,7 @@ type ('flag, 'a) t = 'a t_ constraint 'flag = _ flag
 
 val create : f:('a -> 'b) -> 'a -> (read_write flag, 'b) t
 
-val get : (_ flag, 'a) t -> 'a * [> `Different | `Same]
+val get : (_ flag, 'a) t -> 'a * [> `Different | `Same ]
 
 val update : (read_write flag, 'a) t -> 'a -> unit
 

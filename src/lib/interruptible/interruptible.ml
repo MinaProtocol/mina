@@ -3,7 +3,7 @@ open Async_kernel
 
 module T = struct
   type ('a, 's) t =
-    {interruption_signal: 's Ivar.t; d: ('a, 's) Deferred.Result.t}
+    { interruption_signal : 's Ivar.t; d : ('a, 's) Deferred.Result.t }
 
   let map_signal t ~f =
     let interruption_signal =
@@ -16,7 +16,7 @@ module T = struct
               Ivar.fill_if_empty interruption_signal (f signal) ) ;
           interruption_signal
     in
-    {interruption_signal; d= Deferred.Result.map_error ~f t.d}
+    { interruption_signal; d = Deferred.Result.map_error ~f t.d }
 
   let map t ~f =
     match Ivar.peek t.interruption_signal with
@@ -28,7 +28,8 @@ module T = struct
           let%map res =
             Deferred.choose
               [ Deferred.choice (Ivar.read t.interruption_signal) Result.fail
-              ; Deferred.choice t.d Fn.id ]
+              ; Deferred.choice t.d Fn.id
+              ]
           in
           (* If the interruption signal fires between [t.d] resolving and the
              scheduler running this code to call [f], we prefer the signal and
@@ -40,12 +41,14 @@ module T = struct
           | Some e ->
               Error e
         in
-        {interruption_signal= t.interruption_signal; d}
+        { interruption_signal = t.interruption_signal; d }
     | Some e ->
         (* The interruption signal has already triggered, resolve to the
            signal's value.
         *)
-        {interruption_signal= t.interruption_signal; d= Deferred.Result.fail e}
+        { interruption_signal = t.interruption_signal
+        ; d = Deferred.Result.fail e
+        }
 
   let bind t ~f =
     let t : (('a, 's) t, 's) t = map ~f t in
@@ -86,25 +89,28 @@ module T = struct
         | None ->
             (* The computation we bound hasn't resolved, interrupt it. *)
             Ivar.fill_if_empty t.interruption_signal signal ) ;
-    {interruption_signal; d= Deferred.Result.bind t.d ~f:(fun t' -> t'.d)}
+    { interruption_signal; d = Deferred.Result.bind t.d ~f:(fun t' -> t'.d) }
 
   let return a =
-    {interruption_signal= Ivar.create (); d= Deferred.Result.return a}
+    { interruption_signal = Ivar.create (); d = Deferred.Result.return a }
 
-  let don't_wait_for {d; _} =
+  let don't_wait_for { d; _ } =
     don't_wait_for @@ Deferred.map d ~f:(function Ok () -> () | Error _ -> ())
 
   let finally t ~f =
-    { interruption_signal= t.interruption_signal
-    ; d= Deferred.map t.d ~f:(fun r -> f () ; r) }
+    { interruption_signal = t.interruption_signal
+    ; d = Deferred.map t.d ~f:(fun r -> f () ; r)
+    }
 
   let uninterruptible d =
-    {interruption_signal= Ivar.create (); d= Deferred.map d ~f:(fun x -> Ok x)}
+    { interruption_signal = Ivar.create ()
+    ; d = Deferred.map d ~f:(fun x -> Ok x)
+    }
 
   let lift d interrupt =
     let interruption_signal = Ivar.create () in
     Deferred.upon interrupt (Ivar.fill_if_empty interruption_signal) ;
-    {interruption_signal; d= Deferred.map d ~f:(fun x -> Ok x)}
+    { interruption_signal; d = Deferred.map d ~f:(fun x -> Ok x) }
 
   let force t =
     (* We use [map] here to prefer interrupt signals even where the underlying
@@ -158,9 +164,9 @@ module Deferred_let_syntax = struct
 end
 
 let%test_unit "monad gets interrupted" =
-  Async.Thread_safe.block_on_async_exn (fun () ->
+  Run_in_thread.block_on_async_exn (fun () ->
       let r = ref 0 in
-      let wait i = Async.after (Core.Time.Span.of_ms i) in
+      let wait i = after (Time_ns.Span.of_ms i) in
       let ivar = Ivar.create () in
       don't_wait_for
         (let open Let_syntax in
@@ -176,9 +182,9 @@ let%test_unit "monad gets interrupted" =
       assert (!r = 1) )
 
 let%test_unit "monad gets interrupted within nested binds" =
-  Async.Thread_safe.block_on_async_exn (fun () ->
+  Run_in_thread.block_on_async_exn (fun () ->
       let r = ref 0 in
-      let wait i = Async.after (Core.Time.Span.of_ms i) in
+      let wait i = after (Time_ns.Span.of_ms i) in
       let ivar = Ivar.create () in
       let rec go () =
         let open Let_syntax in
@@ -196,9 +202,9 @@ let%test_unit "monad gets interrupted within nested binds" =
       assert (!r = 1) )
 
 let%test_unit "interruptions still run finally blocks" =
-  Async.Thread_safe.block_on_async_exn (fun () ->
+  Run_in_thread.block_on_async_exn (fun () ->
       let r = ref 0 in
-      let wait i = Async.after (Core.Time.Span.of_ms i) in
+      let wait i = after (Time_ns.Span.of_ms i) in
       let ivar = Ivar.create () in
       let rec go () =
         let open Let_syntax in
@@ -216,10 +222,10 @@ let%test_unit "interruptions still run finally blocks" =
       assert (!r = 2) )
 
 let%test_unit "interruptions branches do not cancel each other" =
-  Async.Thread_safe.block_on_async_exn (fun () ->
+  Run_in_thread.block_on_async_exn (fun () ->
       let r = ref 0 in
       let s = ref 0 in
-      let wait i = Async.after (Core.Time.Span.of_ms i) in
+      let wait i = after (Time_ns.Span.of_ms i) in
       let ivar_r = Ivar.create () in
       let ivar_s = Ivar.create () in
       let rec go r =

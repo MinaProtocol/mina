@@ -2,5 +2,5 @@
 
 . lib.sh
 
-req /mempool '{ network_identifier: { blockchain: "coda", network: "debug" }, metadata: {} }'
+req /mempool '{ network_identifier: { blockchain: "mina", network: "debug" }, metadata: {} }'
 

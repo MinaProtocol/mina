@@ -1,8 +1,0 @@
-(library
- (name command_line_tests)
- (public_name command_line_tests)
- (inline_tests)
- (libraries core async cache_dir)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_deriving.eq))
-)

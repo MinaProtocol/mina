@@ -55,8 +55,8 @@ variable "seed_count" {
 
 locals {
   testnet_name = "devnet2"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.0.4-8202b60-devnet-0f2032c"
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.0.4-8202b60"
+  mina_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.0.4-8202b60-devnet-0f2032c"
+  mina_archive_image = "gcr.io/o1labs-192920/coda-archive:1.0.4-8202b60"
   seed_region = "us-east4"
   seed_zone = "us-east4-b"
 
@@ -83,11 +83,11 @@ module "testnet_east" {
   k8s_context    = "gke_o1labs-192920_us-east4_coda-infra-east4"
   testnet_name   = local.testnet_name
 
-  coda_image         = local.coda_image
-  coda_archive_image = local.coda_archive_image
-  coda_agent_image   = "codaprotocol/coda-user-agent:0.1.8"
-  coda_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
-  coda_points_image  = "codaprotocol/coda-points-hack:32b.4"
+  mina_image         = local.mina_image
+  mina_archive_image = local.mina_archive_image
+  mina_agent_image   = "codaprotocol/coda-user-agent:0.1.8"
+  mina_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
+  mina_points_image  = "codaprotocol/coda-points-hack:32b.4"
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.3"
 
   archive_node_count  = 3
@@ -115,8 +115,8 @@ module "testnet_east" {
   ]
 
 
-  coda_faucet_amount = "10000000000"
-  coda_faucet_fee    = "100000000"
+  mina_faucet_amount = "10000000000"
+  mina_faucet_fee    = "100000000"
 
   agent_min_fee = "0.05"
   agent_max_fee = "0.1"
@@ -133,13 +133,30 @@ module "testnet_east" {
   block_producer_key_pass           = "naughty blue worm"
   block_producer_starting_host_port = 10501
 
-  snark_worker_replicas = 5
-  snark_worker_fee      = "0.025"
-  snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
-  snark_worker_host_port = 10401
-  whale_count           = var.whale_count
-  fish_count            = var.fish_count
+  snark_coordinators = [
+    {
+      snark_worker_replicas = 5
+      snark_worker_fee      = "0.025"
+      snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
+      snark_coordinators_host_port = 10401
+    }
+  ]
+
+  whales= [
+    for i in range(var.whale_count):{
+      duplicates = 1
+    }
+  ]
+  
+  fishes= [
+    for i in range(var.fish_count):{
+      duplicates = 1
+    }
+  ]
+  
   seed_count            = var.seed_count
+
+  plain_node_count = 0
 
   upload_blocks_to_gcloud         = true
   restart_nodes                   = false
