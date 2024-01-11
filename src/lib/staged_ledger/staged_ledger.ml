@@ -4609,7 +4609,7 @@ let%test_module "staged ledger tests" =
                   (Staged_ledger_diff.forget diff)
                   ~logger ~verifier ~get_completed_work:(Fn.const None)
                   ~current_state_view ~state_and_body_hash ~coinbase_receiver
-                  ~supercharge_coinbase:false
+                  ~supercharge_coinbase:false ~zkapps_per_block
               with
               | Ok _x -> (
                   let valid_command_1_with_status =
@@ -4656,6 +4656,7 @@ let%test_module "staged ledger tests" =
                       ~logger ~verifier ~get_completed_work:(Fn.const None)
                       ~current_state_view ~state_and_body_hash
                       ~coinbase_receiver ~supercharge_coinbase:false
+                      ~zkapps_per_block
                   with
                   | Ok _x ->
                       assert false
