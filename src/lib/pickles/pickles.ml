@@ -44,6 +44,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Step_main_inputs = Step_main_inputs
   module Step_verifier = Step_verifier
   module Proof_cache = Proof_cache
+  module Cache = Cache
+  module Storables = Compile.Storables
   module Ro = Ro
 
   type chunking_data = Verify.Instance.chunking_data =
@@ -310,20 +312,21 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let compile_with_wrap_main_override_promise =
     Compile.compile_with_wrap_main_override_promise
 
-  let compile_promise ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain
-      ?num_chunks ~public_input ~auxiliary_typ ~branches ~max_proofs_verified
-      ~name ?constraint_constants ?commits ~choices () =
-    compile_with_wrap_main_override_promise ?self ?cache ?proof_cache ?disk_keys
+  let compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ?constraint_constants ?commits ~choices ()
+      ~max_proofs_verified ~name ?constraint_constants ?commits ~choices () =
+    compile_with_wrap_main_override_promise ?self ?cache ?storables ?proof_cache
+      ?disk_keys ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
+      ~branches ~max_proofs_verified ~name ?constraint_constants ?commits
+      ~choices ()
 
-  let compile ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain
-      ?num_chunks ~public_input ~auxiliary_typ ~branches ~max_proofs_verified
-      ~name ?constraint_constants ?commits ~choices () =
+  let compile ?self ?cache ?storables ?proof_cache ?disk_keys
+      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
+      ~max_proofs_verified ~name ?constraint_constants ?commits ~choices () =
     let self, cache_handle, proof_module, provers =
-      compile_promise ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain
-        ?num_chunks ~public_input ~auxiliary_typ ~branches ~max_proofs_verified
-        ~name ?constraint_constants ?commits ~choices ()
+      compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
+        ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
+        ~max_proofs_verified ~name ?constraint_constants ?commits ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -987,7 +990,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         module Lazy_keys = struct
           type t =
-            (Impls.Step.Keypair.t * Dirty.t) Lazy.t
+            (Impls.Step.Proving_key.t * Dirty.t) Lazy.t
             * (Kimchi_bindings.Protocol.VerifierIndex.Fp.t * Dirty.t) Lazy.t
 
           (* TODO Think this is right.. *)
@@ -1206,7 +1209,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     ((* TODO *) Plonk_verification_key_evals.map
                        ~f:(fun x -> [| x |])
                        wrap_vk.commitments )
-                  (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
+                  (fst (Lazy.force step_pk))
                   wrap_vk.index
               in
               let pairing_vk = fst (Lazy.force step_vk) in
@@ -1701,7 +1704,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     wrap_main A_value.to_field_elements ~pairing_vk
                     ~step_domains:b.domains
                     ~pairing_plonk_indices:(Lazy.force step_vks) ~wrap_domains
-                    (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
+                    (fst (Lazy.force wrap_pk))
                     proof
                 in
                 Proof.T

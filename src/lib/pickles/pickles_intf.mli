@@ -16,6 +16,7 @@ module type S = sig
   module Step_verifier = Step_verifier
   module Common = Common
   module Proof_cache = Proof_cache
+  module Cache = Cache
   module Ro = Ro
 
   module type Statement_intf = sig
@@ -36,7 +37,7 @@ module type S = sig
     [%%versioned:
     module Stable : sig
       module V2 : sig
-        type t [@@deriving to_yojson]
+        type t [@@deriving to_yojson, of_yojson]
       end
     end]
 
@@ -278,6 +279,10 @@ module type S = sig
     val generate_or_load : t -> Dirty.t
   end
 
+  module Storables : sig
+    type t = Compile.Storables.t
+  end
+
   module Side_loaded : sig
     module Verification_key : sig
       [%%versioned:
@@ -369,6 +374,7 @@ module type S = sig
   val compile_promise :
        ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
+    -> ?storables:Storables.t
     -> ?proof_cache:Proof_cache.t
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
@@ -425,6 +431,7 @@ module type S = sig
   val compile :
        ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
+    -> ?storables:Storables.t
     -> ?proof_cache:Proof_cache.t
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
