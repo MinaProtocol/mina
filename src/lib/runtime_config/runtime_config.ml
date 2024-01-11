@@ -1038,16 +1038,34 @@ let to_yojson x = Json_layout.to_yojson (to_json_layout x)
 
 let to_yojson_without_accounts x =
   let layout = to_json_layout x in
-  let num_accounts =
-    let%bind.Option ledger = layout.ledger in
-    let%map.Option accounts = ledger.accounts in
-    List.length accounts
+  let genesis_accounts =
+    let%bind.Option { accounts; _ } = layout.ledger in
+    Option.map ~f:List.length accounts
+  in
+  let staking_accounts =
+    let%bind.Option { staking; _ } = layout.epoch_data in
+    Option.map ~f:List.length staking.accounts
+  in
+  let next_accounts =
+    let%bind.Option { next; _ } = layout.epoch_data in
+    let%bind.Option { accounts; _ } = next in
+    Option.map ~f:List.length accounts
   in
   let layout =
     let f ledger = { ledger with Json_layout.Ledger.accounts = None } in
-    { layout with ledger = Option.map ~f layout.ledger }
+    { layout with
+      ledger = Option.map ~f layout.ledger
+    ; epoch_data =
+        Option.map layout.epoch_data ~f:(fun { staking; next } ->
+            { Json_layout.Epoch_data.staking = { staking with accounts = None }
+            ; next = Option.map next ~f:(fun n -> { n with accounts = None })
+            } )
+    }
   in
-  (Json_layout.to_yojson layout, num_accounts)
+  ( Json_layout.to_yojson layout
+  , `Accounts_omitted
+      (`Genesis genesis_accounts, `Staking staking_accounts, `Next next_accounts)
+  )
 
 let of_yojson json = Result.bind ~f:of_json_layout (Json_layout.of_yojson json)
 
