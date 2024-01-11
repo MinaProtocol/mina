@@ -448,6 +448,7 @@ let protocol_state =
       "k": "290",
       "slots_per_epoch": "7140",
       "slots_per_sub_window": "7",
+      "grace_period_slots": "2160",
       "delta": "0",
       "genesis_state_timestamp": "1680823801000"
     }

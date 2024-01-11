@@ -110,21 +110,23 @@ module Network_config = struct
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
       =
-    let { requires_graphql
-        ; genesis_ledger
-        ; epoch_data
-        ; block_producers
-        ; snark_coordinator
-        ; snark_worker_fee
-        ; num_archive_nodes
-        ; log_precomputed_blocks (* ; num_plain_nodes *)
-        ; proof_config
-        ; Test_config.k
-        ; delta
-        ; slots_per_epoch
-        ; slots_per_sub_window
-        ; txpool_max_size
-        } =
+    let ({ requires_graphql
+         ; genesis_ledger
+         ; epoch_data
+         ; block_producers
+         ; snark_coordinator
+         ; snark_worker_fee
+         ; num_archive_nodes
+         ; log_precomputed_blocks (* ; num_plain_nodes *)
+         ; proof_config
+         ; k
+         ; delta
+         ; slots_per_epoch
+         ; slots_per_sub_window
+         ; grace_period_slots
+         ; txpool_max_size
+         }
+          : Test_config.t ) =
       test_config
     in
     let user_from_env = Option.value (Unix.getenv "USER") ~default:"auto" in
@@ -240,6 +242,7 @@ module Network_config = struct
             ; delta = Some delta
             ; slots_per_epoch = Some slots_per_epoch
             ; slots_per_sub_window = Some slots_per_sub_window
+            ; grace_period_slots = Some grace_period_slots
             ; genesis_state_timestamp =
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
             }
