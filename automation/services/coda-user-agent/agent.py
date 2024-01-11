@@ -24,7 +24,7 @@ def getenv_currency(env_var: str, lower_bound: Currency, upper_bound: Currency) 
     return getenv_default_map(env_var, Currency, Currency.random(lower_bound, upper_bound))
 
 CODA_PUBLIC_KEY = getenv_str("CODA_PUBLIC_KEY", "4vsRCVyVkSRs89neWnKPrnz4FRPmXXrWtbsAQ31hUTSi41EkbptYaLkzmxezQEGCgZnjqY2pQ6mdeCytu7LrYMGx9NiUNNJh8XfJYbzprhhJmm1ZjVbW9ZLRvhWBXRqes6znuF7fWbECrCpQ")
-CODA_PRIVKEY_PASS = getenv_str("CODA_PRIVKEY_PASS", "naughty blue worm")
+MINA_PRIVKEY_PASS = getenv_str("MINA_PRIVKEY_PASS", "naughty blue worm")
 AGENT_MIN_FEE = getenv_currency("AGENT_MIN_FEE", Currency("0.06"), Currency("0.1"))
 AGENT_MAX_FEE = getenv_currency("AGENT_MAX_FEE", AGENT_MIN_FEE, AGENT_MIN_FEE + Currency("0.2"))
 AGENT_MIN_TX = getenv_currency("AGENT_MIN_TX", Currency("0.0015"), Currency("0.005"))
@@ -110,7 +110,7 @@ class Agent(object):
 
 
 def main():
-    agent = Agent(CODA_CLIENT_ARGS, CODA_PUBLIC_KEY, CODA_PRIVKEY_PASS)
+    agent = Agent(CODA_CLIENT_ARGS, CODA_PUBLIC_KEY, MINA_PRIVKEY_PASS)
     schedule.every(AGENT_SEND_EVERY_MINS).minutes.do(agent.send_transaction_batch)
     print("Sending a transaction every {} minutes.".format(AGENT_SEND_EVERY_MINS))
     while True:

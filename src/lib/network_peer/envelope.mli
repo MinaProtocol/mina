@@ -1,14 +1,14 @@
 open Core
 
 module Sender : sig
-  type t = Local | Remote of Peer.t [@@deriving sexp, eq, yojson, compare]
+  type t = Local | Remote of Peer.t [@@deriving sexp, equal, yojson, compare]
 
   val remote_exn : t -> Peer.t
 end
 
 module Incoming : sig
-  type 'a t = {data: 'a; sender: Sender.t; received_at: Time.t}
-  [@@deriving eq, sexp, yojson, compare]
+  type 'a t = { data : 'a; sender : Sender.t; received_at : Time.t }
+  [@@deriving equal, sexp, yojson, compare]
 
   val sender : 'a t -> Sender.t
 
@@ -21,6 +21,8 @@ module Incoming : sig
   val wrap_peer : data:'a -> sender:Peer.t -> 'a t
 
   val map : f:('a -> 'b) -> 'a t -> 'b t
+
+  val lift_error : ('a, 'e) Result.t t -> ('a t, 'e) Result.t
 
   val local : 'a -> 'a t
 

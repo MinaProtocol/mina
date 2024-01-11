@@ -6,7 +6,7 @@ module Writer : sig
 end
 
 module Reader : sig
-  type 'a t = {pipe: 'a Pipe.Reader.t; mutable has_reader: bool}
+  type 'a t = { pipe : 'a Pipe.Reader.t; mutable has_reader : bool }
 end
 
 val create : unit -> 'a Reader.t * 'a Writer.t
@@ -85,8 +85,7 @@ val fork2 : 'a Reader.t -> 'a Reader.t * 'a Reader.t
 
 val fork3 : 'a Reader.t -> 'a Reader.t * 'a Reader.t * 'a Reader.t
 
-val fork4 :
-  'a Reader.t -> 'a Reader.t * 'a Reader.t * 'a Reader.t * 'a Reader.t
+val fork4 : 'a Reader.t -> 'a Reader.t * 'a Reader.t * 'a Reader.t * 'a Reader.t
 
 val fork5 :
      'a Reader.t
@@ -103,12 +102,12 @@ val fork6 :
 
 val partition_map2 :
      'a Reader.t
-  -> f:('a -> [`Fst of 'b | `Snd of 'c])
+  -> f:('a -> [ `Fst of 'b | `Snd of 'c ])
   -> 'b Reader.t * 'c Reader.t
 
 val partition_map3 :
      'a Reader.t
-  -> f:('a -> [`Fst of 'b | `Snd of 'c | `Trd of 'd])
+  -> f:('a -> [ `Fst of 'b | `Snd of 'c | `Trd of 'd ])
   -> 'b Reader.t * 'c Reader.t * 'd Reader.t
 
 val filter_map_unordered :
@@ -119,15 +118,17 @@ val filter_map_unordered :
 
 val latest_ref : 'a Reader.t -> initial:'a -> 'a ref
 
-val values_available : 'a Reader.t -> [`Eof | `Ok] Deferred.t
+val values_available : 'a Reader.t -> [ `Eof | `Ok ] Deferred.t
 
 val peek : 'a Reader.t -> 'a option
 
-val read_now : 'a Reader.t -> [`Eof | `Nothing_available | `Ok of 'a]
+val read_now : 'a Reader.t -> [ `Eof | `Nothing_available | `Ok of 'a ]
 
 val read' :
-  ?max_queue_length:int -> 'a Reader.t -> [`Eof | `Ok of 'a Queue.t] Deferred.t
+     ?max_queue_length:int
+  -> 'a Reader.t
+  -> [ `Eof | `Ok of 'a Queue.t ] Deferred.t
 
-val read : 'a Reader.t -> [`Eof | `Ok of 'a] Deferred.t
+val read : 'a Reader.t -> [ `Eof | `Ok of 'a ] Deferred.t
 
 val read_exn : 'a Reader.t -> 'a Deferred.t

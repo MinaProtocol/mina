@@ -5,11 +5,11 @@
     different functors*)
 
 open Pipe_lib
-open Async
+open Async_kernel
 
 module Make
     (Incremental : Incremental.S) (Name : sig
-        val t : string
+      val t : string
     end) =
 struct
   include Incremental
@@ -19,7 +19,7 @@ struct
       Strict_pipe.(
         create
           ~name:("Mina_incremental__" ^ Name.t)
-          (Buffered (`Capacity 1, `Overflow Drop_head)))
+          (Buffered (`Capacity 1, `Overflow (Drop_head ignore))))
     in
     Observer.on_update_exn observer ~f:(function
       | Initialized value ->
@@ -43,7 +43,7 @@ struct
     don't_wait_for
       (Deferred.map deferred ~f:(fun () ->
            Var.set var `Filled ;
-           stabilize () )) ;
+           stabilize () ) ) ;
     var
 
   let of_ivar (ivar : unit Ivar.t) = of_deferred (Ivar.read ivar)

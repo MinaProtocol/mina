@@ -55,8 +55,8 @@ variable "seed_count" {
 
 locals {
   testnet_name = "mainnet"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.1.2-0975867-mainnet-6a9354a"
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.1.2-0975867"
+  mina_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.1.2-0975867-mainnet-6a9354a"
+  mina_archive_image = "gcr.io/o1labs-192920/coda-archive:1.1.2-0975867"
   seed_region = "us-east1"
   seed_zone = "us-east1-b"
 
@@ -83,8 +83,8 @@ module "mainnet" {
   k8s_context    = "gke_o1labs-192920_us-east1_coda-infra-east"
   testnet_name   = local.testnet_name
 
-  coda_image         = local.coda_image
-  coda_archive_image = local.coda_archive_image
+  mina_image         = local.mina_image
+  mina_archive_image = local.mina_archive_image
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.5"
 
   block_producer_key_pass = "naughty blue worm"
@@ -116,10 +116,21 @@ module "mainnet" {
   log_level           = "Info"
   log_txn_pool_gossip = false
 
-  snark_worker_replicas = 0
-  whale_count           = var.whale_count
-  fish_count            = var.fish_count
+  snark_coordinators = []
+
+  whales= [
+    for i in range(var.whale_count):{
+      duplicates = 1
+    }
+  ]
+  
+  fishes= [
+    for i in range(var.fish_count):{
+      duplicates = 1
+    }
+  ]
   seed_count            = var.seed_count
+  plain_node_count = 0
 
   upload_blocks_to_gcloud         = true
   restart_nodes                   = false

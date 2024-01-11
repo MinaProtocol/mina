@@ -1,8 +1,8 @@
-testnetName: "coda-testnet"
+testnetName: "mina-testnet"
 name: "watchdog"
 
-coda:
-  image: codaprotocol/coda-daemon:0.0.12-beta-develop-589b507
+mina:
+  image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet
   ports:
     client: "8301"
     graphql: "3085"
@@ -10,7 +10,7 @@ coda:
     p2p: "10909"
   uploadBlocksToGCloud: false
 
-image: gcr.io/o1labs-192920/watchdog:0.3.7
+image: gcr.io/o1labs-192920/watchdog:0.4.13
 
 restartEveryMins: ""
 restartNodes: ""

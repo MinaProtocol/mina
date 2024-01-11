@@ -1,23 +1,31 @@
-<a href="https://minaprotocol.com">
-	<img width="200" src="https://minaprotocol.com/static/Mina_Wordmark_Github.png" alt="Mina Logo" />
-</a>
-<hr/>
+### Build status
 
-Mina is the first cryptocurrency with a lightweight, constant-sized blockchain. This is the main source code repository for the Mina project. It contains code for the OCaml protocol implementation, [website](https://minaprotocol.com), and wallet. Enjoy!
+| Develop | Berkeley | Compatible | 
+| ------- | -------- | ---------- |
+| [![Build status - develop](https://badge.buildkite.com/0c47452f3ea619d3217d388e0de522b218db28c3e161887a9a.svg?branch=develop)](https://buildkite.com/o-1-labs-2/mina-end-to-end-nightlies) | [![Build status - berkeley](https://badge.buildkite.com/0c47452f3ea619d3217d388e0de522b218db28c3e161887a9a.svg?branch=berkeley)](https://buildkite.com/o-1-labs-2/mina-end-to-end-nightlies) | [![Build status - compatible](https://badge.buildkite.com/0c47452f3ea619d3217d388e0de522b218db28c3e161887a9a.svg?branch=compatible)](https://buildkite.com/o-1-labs-2/mina-end-to-end-nightlies)
+
+<a href="https://minaprotocol.com">
+  <img src="https://github.com/MinaProtocol/docs/blob/main/public/static/img/svg/mina-wordmark-redviolet.svg?raw=true&sanitize=true" width="350" alt="Mina logo">
+</a>
+
+# Mina
+
+Mina is the first cryptocurrency with a lightweight, constant-sized blockchain. This is the main source code repository for the Mina project and contains code for the OCaml protocol implementation, the [Mina Protocol website](https://minaprotocol.com), and wallet. Enjoy!
 
 ## Notes
 
-- Mina is still under active development, and APIs are still evolving. If you do build upon the APIs, be aware that breaking changes may occur.
-- There is a live testnet of the Mina protocol currently running - [sign up here to join the testnet](http://bit.ly/TestnetForm).
+Mina is still under active development and APIs are evolving. If you build on the APIs, be aware that breaking changes can occur.
+
+The Mina implementation of the Rosetta API offers a more stable and useful interface for retrieving the blockchain's state. Rosetta is run as a separate process and it relies on an archive being connected to a node. The source code for the archive and Rosetta implementation are in [src/app/archive](https://github.com/MinaProtocol/mina/tree/develop/src/app/archive) and [src/app/rosetta](https://github.com/MinaProtocol/mina/tree/develop/src/app/rosetta). Be sure to follow updates in the project if these resources are relocated. 
 
 ## What is Mina?
 
 ### Mina Walkthrough
 
-- [Overview of Mina](https://minaprotocol.com/docs/)
-- [Getting Started](https://minaprotocol.com/docs/getting-started/)
-- [My First Transaction](https://minaprotocol.com/docs/my-first-transaction/)
-- [Become a Node Operator](https://minaprotocol.com/docs/node-operator/)
+- [Mina Protocol](https://docs.minaprotocol.com/) documentation
+- [Installing and using a third-party wallet](https://docs.minaprotocol.com/using-mina/install-a-wallet)
+- [Sending a Payment using Mina's CLI](https://docs.minaprotocol.com/node-operators/sending-a-payment)
+- [Become a Node Operator](https://minaprotocol.com/docs/getting-started/)
 
 ### Technical Papers
 
@@ -29,26 +37,26 @@ Mina is the first cryptocurrency with a lightweight, constant-sized blockchain. 
 
 ## Contributing
 
-Read the [Contributing Guide](https://minaprotocol.com/docs/contributing/) for information on how to make both technical and non-technical contributions.
+For information on how to make technical and non-technical contributions, see the repository contributing guidelines in [CONTRIBUTING](https://github.com/MinaProtocol/mina/blob/develop/CONTRIBUTING.md) and the [Contributing Guide](https://docs.minaprotocol.com/node-developers/contributing) docs.
 
 ## Developers
 
-The [Developer docs](https://minaprotocol.com/docs/developers/) contain all the information needed to begin contributing code to Mina, and using Mina APIs to build applications.
+The [Node Developers](https://docs.minaprotocol.com/node-developers) docs contain helpful information about contributing code to Mina and using Mina APIs to build applications.
 
-#### Quick Links:
+### Quick Links
 
-- [Developer readme](README-dev.md)
+- [Developer README](README-dev.md)
 - [Running a demo node](docs/demo.md)
-- [Directory structure](frontend/website-redesign/docs/developers/directory-structure.mdx)
-- [Lifecycle of a payment](frontend/website-redesign/docs/architecture/lifecycle-payment.mdx)
+- [Lifecycle of a payment](https://docs.minaprotocol.com/node-operators/lifecycle-of-a-payment)
 
 ## Community
 
-- Join the public [Discord server](https://bit.ly/MinaDiscord)! Please come by if you need help or have any questions.
-- Get the latest updates by [signing up for the Mina newsletter](https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+just+want+to+learn+more!).
+- Join the public Mina Protocol [Discord server](https://discord.gg/minaprotocol). Please come by if you need help or have any questions.
+- Participate in our [online communities](https://docs.minaprotocol.com/participate/online-communities).
+- Get the latest updates by signing up for the Mina newsletter. Select [SIGN UP FOR NEWSLETTER](https://minaprotocol.com/) on the home page of the Mina Protocol website.
 
 ## License
 
-This repository is distributed under the terms of the Apache 2.0 license,
-available in the LICENSE file and online at https://www.apache.org/licenses/LICENSE-2.0. Commits older than 2018-10-03 do
-not have a LICENSE file or this notice, but are distributed under the same terms.
+[Apache 2.0](LICENSE)
+
+Commits older than 2018-10-03 do not have a [LICENSE](LICENSE) file or this notice, but are distributed under the same terms.

@@ -1,5 +1,5 @@
 (executable
  (name decoder)
- (libraries mina_base)
+ (libraries mina_base yojson)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version)))

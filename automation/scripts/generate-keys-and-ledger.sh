@@ -5,12 +5,14 @@ TESTNET=new-net
 COMMUNITY_KEYFILE=""
 RESET=false
 
-WHALE_COUNT=1
-FISH_COUNT=1
+WHALE_COUNT_UNIQUE=1
+WHALE_COUNT_TOTAL=1
+FISH_COUNT_UNIQUE=1
+FISH_COUNT_TOTAL=1
 SEED_COUNT=1
 EXTRA_COUNT=1 # Extra community keys to be handed out manually
 
-CODA_DAEMON_IMAGE="codaprotocol/coda-daemon:0.4.2-renaming-mina-binary-and-mina-config-a46b9ef"
+MINA_DAEMON_IMAGE="minaprotocol/mina-daemon:1.3.0beta1-develop-7af1312-buster-devnet"
 
 WHALE_AMOUNT=2250000
 FISH_AMOUNT=20000
@@ -28,11 +30,17 @@ while [ $# -gt 0 ]; do
     --reset=*)
       RESET="${1#*=}"
       ;;
-    --wc=*)
-      WHALE_COUNT="${1#*=}"
+    --wu=*)
+      WHALE_COUNT_UNIQUE="${1#*=}"
       ;;
-    --fc=*)
-      FISH_COUNT="${1#*=}"
+    --wt=*)
+      WHALE_COUNT_TOTAL="${1#*=}"
+      ;;
+    --fu=*)
+      FISH_COUNT_UNIQUE="${1#*=}"
+      ;;
+    --ft=*)
+      FISH_COUNT_TOTAL="${1#*=}"
       ;;
     --sc=*)
       SEED_COUNT="${1#*=}"
@@ -61,6 +69,11 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd "${SCRIPTPATH}/../"
 PATH=$PATH:$(pwd)/bin
 
+if [[ -s $ARTIFACT_PATH/genesis_ledger.json ]]; then
+  echo "exiting because a genesis ledger already exists in the testnet dir"
+  exit 0
+fi
+
 if $RESET; then
   echo "resetting keys and genesis_ledger"
   ls keys/keysets/* | grep -v "bots_keyfiles" | xargs -I % rm "%"
@@ -76,30 +89,34 @@ rm -rf ./keys/genesis && mkdir ./keys/genesis
 set -eo pipefail
 set -e
 
-privkey_pass="naughty blue worm"
+privkey_pass="naughty red vampire"
 
 function generate_key_files {
 
-  COUNT=$1
-  name_prefix=$2
-  output_dir="$3"
+  COUNT_UNIQUE=$1
+  COUNT_TOTAL=$2
+  name_prefix=$3
+  output_dir="$4"
   mkdir -p $output_dir
 
-  for k in $(seq 1 $COUNT); do
+  for k in $(seq 1 $COUNT_UNIQUE); do
     docker run \
       -v "${output_dir}:/keys:z" \
-      --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
-      -c "CODA_PRIVKEY_PASS='${privkey_pass}' mina advanced generate-keypair -privkey-path /keys/${name_prefix}_account_${k}"
+      --entrypoint /bin/bash $MINA_DAEMON_IMAGE \
+      -c "MINA_PRIVKEY_PASS='${privkey_pass}' mina advanced generate-keypair -privkey-path /keys/${name_prefix}_account_${k}"
+  done
+
+  for k in $(seq 1 $COUNT_TOTAL); do
     docker run \
       --mount type=bind,source=${output_dir},target=/keys \
-      --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
-      -c "CODA_LIBP2P_PASS='${privkey_pass}' mina advanced generate-libp2p-keypair -privkey-path /keys/${name_prefix}_libp2p_${k}"
+      --entrypoint /bin/bash $MINA_DAEMON_IMAGE \
+      -c "MINA_LIBP2P_PASS='${privkey_pass}' mina libp2p generate-keypair -privkey-path /keys/${name_prefix}_libp2p_${k}"
   done
 
   # ensure proper r+w permissions for access to keys external to container
   docker run \
     -v "${output_dir}:/keys:z" \
-    --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
+    --entrypoint /bin/bash $MINA_DAEMON_IMAGE \
     -c "chmod -R +rw /keys"
 }
 
@@ -153,13 +170,11 @@ else
   online_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_online-whale-keyfiles"
   offline_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_offline-whale-keyfiles"
 
-  generate_key_files $WHALE_COUNT "online_whale" $online_output_dir
-  generate_key_files $WHALE_COUNT "offline_whale" $offline_output_dir
+  generate_key_files $WHALE_COUNT_UNIQUE $WHALE_COUNT_TOTAL "online_whale" $online_output_dir
+  generate_key_files $WHALE_COUNT_UNIQUE $WHALE_COUNT_TOTAL "offline_whale" $offline_output_dir
 
   build_keyset_from_testnet_keys $online_output_dir "online-whales"
   build_keyset_from_testnet_keys $offline_output_dir "offline-whales"
-
-
 fi
 
 online_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_online-whale-keyfiles"
@@ -177,12 +192,11 @@ else
   online_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_online-fish-keyfiles"
   offline_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_offline-fish-keyfiles"
 
-  generate_key_files $FISH_COUNT "online_fish" $online_output_dir
-  generate_key_files $FISH_COUNT "offline_fish" $offline_output_dir
+  generate_key_files $FISH_COUNT_UNIQUE $FISH_COUNT_TOTAL "online_fish" $online_output_dir
+  generate_key_files $FISH_COUNT_UNIQUE $FISH_COUNT_TOTAL "offline_fish" $offline_output_dir
 
   build_keyset_from_testnet_keys $online_output_dir "online-fish"
   build_keyset_from_testnet_keys $offline_output_dir "offline-fish"
-
 fi
 
 online_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_online-fish-keyfiles"
@@ -200,7 +214,7 @@ echo "using existing seed keys"
 else
   online_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_seed-keyfiles"
 
-  generate_key_files $SEED_COUNT "online_seeds" $online_output_dir
+  generate_key_files $SEED_COUNT $SEED_COUNT  "online_seeds" $online_output_dir
 
   build_keyset_from_testnet_keys $online_output_dir "online-seeds"
 
@@ -246,7 +260,7 @@ if [[ -s "keys/testnet-keys/${TESTNET}_extra-fish-keyfiles/extra_fish_account_1.
 echo "using existing fish keys"
 else
   output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_extra-fish-keyfiles"
-  generate_key_files $EXTRA_COUNT "extra_fish" $output_dir
+  generate_key_files $EXTRA_COUNT $EXTRA_COUNT "extra_fish" $output_dir
 
   build_keyset_from_testnet_keys $output_dir "extra-fish"
 fi
@@ -264,36 +278,43 @@ else
 fi
 # ================================================================================
 
-generate_keyset_from_file "o1-keys.txt" "online-o1" "employee"
+# o1-keys.txt was out-of-date and now does not exist
+# create a new o1-keys.txt and uncomment this to add employee keys to a future network
+# generate_keyset_from_file "o1-keys.txt" "online-o1" "employee"
 
 # ================================================================================
 
 # Bots
+
+echo "generating bots keys"
 
 if [ -d keys/testnet-keys/bots_keyfiles ];
 then
   echo "Bots keys already present, not generating new ones"
 else
   output_dir="$(pwd)/keys/testnet-keys/bots_keyfiles/"
-  generate_key_files 2 "bots_keyfiles" "${output_dir}"
+  generate_key_files 2 2 "bots_keyfiles" "${output_dir}"
+
+  build_keyset_from_testnet_keys "${output_dir}" "bots_keyfiles"
+
   mv ${output_dir}/bots_keyfiles_account_1.pub ${output_dir}/echo_service.pub
   mv ${output_dir}/bots_keyfiles_account_1 ${output_dir}/echo_service
   mv ${output_dir}/bots_keyfiles_account_2.pub ${output_dir}/faucet_service.pub
   mv ${output_dir}/bots_keyfiles_account_2 ${output_dir}/faucet_service
-
-  build_keyset_from_testnet_keys "${output_dir}" "bots_keyfiles"
 fi
 
 # ================================================================================
 
 # GENESIS
 
+echo "making genesis ledger"
+
 if [[ -s "terraform/testnets/${TESTNET}/genesis_ledger.json" ]] ; then
   echo "-- genesis_ledger.json already exists for this testnet, refusing to overwrite. Delete \'terraform/testnets/${TESTNET}/genesis_ledger.json\' to force re-creation."
   exit
 fi
 
-#if $COMMUNITY_ENABLED ; then 
+#if $COMMUNITY_ENABLED ; then
 #    echo "-- Creating genesis ledger with 'coda-network genesis' --"
 #else
 #  echo "-- Creating genesis ledger with 'coda-network genesis' without community keys --"
@@ -358,9 +379,9 @@ ${TESTNET}_extra-fish
 add_another_to_prompt ${TESTNET}_offline-whales ${WHALE_AMOUNT} ${TESTNET}_online-whales
 add_another_to_prompt ${TESTNET}_offline-fish ${FISH_AMOUNT} ${TESTNET}_online-fish
 add_another_to_prompt ${TESTNET}_online-fish ${FISH_AMOUNT} ${TESTNET}_online-fish
-add_another_to_prompt ${TESTNET}_online-o1 ${FISH_AMOUNT} ${TESTNET}_online-o1
+# add_another_to_prompt ${TESTNET}_online-o1 ${FISH_AMOUNT} ${TESTNET}_online-o1
 
-if [ -d keys/keysets/${TESTNET}_bots_keyfiles ];
+if [ -s keys/keysets/${TESTNET}_bots_keyfiles ];
 then
   add_another_to_prompt ${TESTNET}_bots_keyfiles 50000 ${TESTNET}_bots_keyfiles
 else

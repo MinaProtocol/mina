@@ -33,34 +33,32 @@ let parser_from_of_yojson of_yojson js =
   | Error modl ->
       let logger = Logger.create () in
       [%log error] "Could not parse JSON using of_yojson"
-        ~metadata:[("module", `String modl); ("json", js)] ;
+        ~metadata:[ ("module", `String modl); ("json", js) ] ;
       failwithf "Could not parse JSON using %s.of_yojson" modl ()
 
-let valid_commands_with_statuses :
-    Mina_base.User_command.Valid.t Mina_base.With_status.t list parser =
-  function
+let transaction_hashes_with_statuses = function
   | `List cmds ->
       let cmd_or_errors =
         List.map cmds
           ~f:
             (Mina_base.With_status.of_yojson
-               Mina_base.User_command.Valid.of_yojson)
+               Mina_transaction.Transaction_hash.of_yojson )
       in
       List.fold cmd_or_errors ~init:[] ~f:(fun accum cmd_or_err ->
           match (accum, cmd_or_err) with
           | _, Error err ->
               let logger = Logger.create () in
               [%log error]
-                ~metadata:[("error", `String err)]
+                ~metadata:[ ("error", `String err) ]
                 "Failed to parse JSON for user command status" ;
               (* fail on any error *)
               failwith
-                "valid_commands_with_statuses: unable to parse JSON for user \
-                 command"
+                "transaction_hashes_with_statuses: unable to parse JSON for \
+                 user command"
           | cmds, Ok cmd ->
               cmd :: cmds )
   | _ ->
-      failwith "valid_commands_with_statuses: expected `List"
+      failwith "transaction_hashes_with_statuses: expected `List"
 
 let rec find (parser : 'a parser) (json : Yojson.Safe.t) (path : string list) :
     'a Or_error.t =
@@ -78,7 +76,7 @@ let rec find (parser : 'a parser) (json : Yojson.Safe.t) (path : string list) :
               "failed to find path using key '%s' in json object { %s }" key
               (String.concat ~sep:", "
                  (List.map assoc ~f:(fun (s, json) ->
-                      sprintf "\"%s\":%s" s (Yojson.Safe.to_string json) )))
+                      sprintf "\"%s\":%s" s (Yojson.Safe.to_string json) ) ) )
       in
       find parser entry path'
   | _ ->

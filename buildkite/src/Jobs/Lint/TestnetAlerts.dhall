@@ -7,6 +7,8 @@ let S = ../../Lib/SelectFiles.dhall
 let Cmd = ../../Lib/Cmds.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
@@ -19,13 +21,14 @@ Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
       dirtyWhen = [
-        S.exactly "automation/terraform/modules/testnet-alerts/templates/testnet-alert-rules.yml" "tpl",
         S.exactly "automation/terraform/monitoring/o1-testnet-alerts" "tf",
+        S.strictlyStart (S.contains "automation/terraform/modules/testnet-alerts"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Lint/TestnetAlerts"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Release/TestnetAlerts")
       ],
       path = "Lint",
-      name = "TestnetAlerts"
+      name = "TestnetAlerts",
+      tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint ]
     },
     steps = [
       Command.build

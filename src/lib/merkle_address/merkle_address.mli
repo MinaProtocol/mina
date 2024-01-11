@@ -1,15 +1,17 @@
 open Core_kernel
 
-type t [@@deriving sexp, hash, eq, compare, to_yojson]
+type t [@@deriving sexp, hash, equal, compare, to_yojson]
 
 module Stable : sig
   module V1 : sig
     type nonrec t = t
-    [@@deriving sexp, bin_io, hash, eq, compare, to_yojson, version]
+    [@@deriving sexp, bin_io, hash, equal, compare, to_yojson, version]
   end
 
   module Latest : module type of V1
 end
+
+include Comparable.S_binable with type t := t
 
 include Hashable.S_binable with type t := t
 
@@ -55,7 +57,7 @@ module Range : sig
   type nonrec t = t * t
 
   val fold :
-       ?stop:[`Inclusive | `Exclusive]
+       ?stop:[ `Inclusive | `Exclusive ]
     -> t
     -> init:'a
     -> f:(Stable.Latest.t -> 'a -> 'a)
@@ -74,3 +76,7 @@ val height : ledger_depth:int -> t -> int
 val to_int : t -> int
 
 val of_int_exn : ledger_depth:int -> int -> t
+
+val same_height_ancestors : t -> t -> t * t
+
+val is_further_right : than:t -> t -> bool

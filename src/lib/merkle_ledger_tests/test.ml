@@ -49,21 +49,18 @@ let%test_module "Database integration test" =
       Quickcheck.test ~trials:5 ~sexp_of:[%sexp_of: Balance.t list]
         gen_non_zero_balances ~f:(fun balances ->
           let account_ids = Account_id.gen_accounts num_accounts in
-          let accounts =
-            List.map2_exn account_ids balances ~f:Account.create
-          in
+          let accounts = List.map2_exn account_ids balances ~f:Account.create in
           DB.with_ledger ~depth:Depth.depth ~f:(fun db ->
               let enumerate_dir_combinations max_depth =
                 Sequence.range 0 (max_depth - 1)
-                |> Sequence.fold ~init:[[]] ~f:(fun acc _ ->
+                |> Sequence.fold ~init:[ [] ] ~f:(fun acc _ ->
                        acc
                        @ List.map acc ~f:(List.cons Direction.Left)
                        @ List.map acc ~f:(List.cons Direction.Right) )
               in
               List.iter accounts ~f:(fun account ->
                   let account_id = Account.identifier account in
-                  ignore @@ DB.get_or_create_account_exn db account_id account
-              ) ;
+                  ignore @@ DB.get_or_create_account db account_id account ) ;
               let binary_tree = Binary_tree.set_accounts accounts in
               Sequence.iter
                 (enumerate_dir_combinations Depth.depth |> Sequence.of_list)

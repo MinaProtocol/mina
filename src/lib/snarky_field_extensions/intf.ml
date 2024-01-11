@@ -9,7 +9,7 @@ module type Traversable_applicative = sig
 
   open Impl
 
-  val sequence : ('a, 's) Checked.t t -> ('a t, 's) Checked.t
+  val sequence : 'a Checked.t t -> 'a t Checked.t
 end
 
 module type Basic = sig
@@ -52,9 +52,9 @@ module type Basic = sig
 
   val scale : t -> Field.t -> t
 
-  val mul_field : t -> Field.Var.t -> (t, _) Checked.t
+  val mul_field : t -> Field.Var.t -> t Checked.t
 
-  val assert_r1cs : t -> t -> t -> (unit, _) Checked.t
+  val assert_r1cs : t -> t -> t -> unit Checked.t
 
   val ( + ) : t -> t -> t
 
@@ -62,16 +62,16 @@ module type Basic = sig
 
   val negate : t -> t
 
-  val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
+  val if_ : Boolean.var -> then_:t -> else_:t -> t Checked.t
 
   (* These definitions are shadowed in the below interface *)
-  val assert_square : [`Define | `Custom of t -> t -> (unit, _) Checked.t]
+  val assert_square : [ `Define | `Custom of t -> t -> unit Checked.t ]
 
-  val ( * ) : [`Define | `Custom of t -> t -> (t, _) Checked.t]
+  val ( * ) : [ `Define | `Custom of t -> t -> t Checked.t ]
 
-  val square : [`Define | `Custom of t -> (t, _) Checked.t]
+  val square : [ `Define | `Custom of t -> t Checked.t ]
 
-  val inv_exn : [`Define | `Custom of t -> (t, _) Checked.t]
+  val inv_exn : [ `Define | `Custom of t -> t Checked.t ]
 
   val real_part : 'a t_ -> 'a
 end
@@ -81,21 +81,21 @@ module type S = sig
 
   open Impl
 
-  val equal : t -> t -> (Boolean.var, _) Checked.t
+  val equal : t -> t -> Boolean.var Checked.t
 
-  val assert_square : t -> t -> (unit, _) Checked.t
+  val assert_square : t -> t -> unit Checked.t
 
-  val assert_equal : t -> t -> (unit, _) Checked.t
+  val assert_equal : t -> t -> unit Checked.t
 
-  val ( * ) : t -> t -> (t, _) Checked.t
+  val ( * ) : t -> t -> t Checked.t
 
-  val square : t -> (t, _) Checked.t
+  val square : t -> t Checked.t
 
   (* This function MUST NOT be called on two arguments which are both potentially
-   zero *)
-  val div_unsafe : t -> t -> (t, _) Checked.t
+     zero *)
+  val div_unsafe : t -> t -> t Checked.t
 
-  val inv_exn : t -> (t, _) Checked.t
+  val inv_exn : t -> t Checked.t
 
   val zero : t
 

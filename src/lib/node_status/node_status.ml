@@ -13,11 +13,11 @@ let get_node_status_from_peers (net : Mina_networking.t)
   | None ->
       Mina_networking.peers net >>= run
   | Some peers -> (
-    match Option.all (List.map ~f:Mina_net2.Multiaddr.to_peer peers) with
-    | Some peers ->
-        run peers
-    | None ->
-        Deferred.return
-          (List.map peers ~f:(fun _ ->
-               Or_error.error_string
-                 "Could not parse peers in node status request" )) )
+      match Option.all (List.map ~f:Mina_net2.Multiaddr.to_peer peers) with
+      | Some peers ->
+          run peers
+      | None ->
+          Deferred.return
+            (List.map peers ~f:(fun _ ->
+                 Or_error.error_string
+                   "Could not parse peers in node status request" ) ) )
