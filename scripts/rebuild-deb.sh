@@ -256,6 +256,17 @@ build_deb mina-batch-txn
 
 ##################################### END BATCH TXN TOOL PACKAGE #######################################
 
+##################################### GENERATE RUNTIME GENESIS LEDGER PACKAGE #######################################
+
+create_control_file runtime_genesis_ledger "${SHARED_DEPS}" 'Runtime config exporter for mina.'
+
+# Binaries
+cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/runtime_genesis_ledger"
+
+build_deb runtime_genesis_ledger
+
+##################################### END RUNTIME GENESIS LEDGER PACKAGE #######################################
+
 ##################################### GENERATE TEST SUITE PACKAGE #######################################
 
 
