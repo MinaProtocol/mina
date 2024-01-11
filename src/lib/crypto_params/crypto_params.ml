@@ -2,6 +2,8 @@ let () = Pickles.Backend.Tock.Keypair.set_urs_info Cache_dir.cache
 
 let () = Pickles.Backend.Tick.Keypair.set_urs_info Cache_dir.cache
 
+let () = Pickles.Backend.Bn254.Keypair.set_urs_info Cache_dir.cache
+
 module Tock = struct
   module Full = Pickles.Impls.Wrap
   module Run = Pickles.Impls.Wrap
