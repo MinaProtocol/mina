@@ -94,10 +94,10 @@ module TextFormat_0_0_4 = struct
   let output f =
     MetricFamilyMap.iter (fun metric samples ->
         let { MetricInfo.name; metric_type; help; label_names } = metric in
-        Fmt.pf f "#HELP %a %a@.#TYPE %a %a@.%a" MetricName.pp name
+        Fmt.pf f "@[<v>#HELP %a %a@,#TYPE %a %a@,%a@]" MetricName.pp name
           output_unquoted help MetricName.pp name output_metric_type metric_type
           (LabelSetMap.pp ~sep:Fmt.nop (output_metric ~name ~label_names))
-          samples)
+          samples )
 end
 
 module type Histogram = sig
@@ -131,8 +131,6 @@ module Runtime = struct
 
   let current_gc = ref (Gc.stat ())
 
-  let current_jemalloc = ref (Jemalloc.get_memory_stats ())
-
   let gc_stat_interval_mins = ref 15.
 
   let gc_allocated_bytes = ref (Gc.allocated_bytes ())
@@ -140,7 +138,6 @@ module Runtime = struct
   let rec gc_stat () =
     let%bind () = after (Time_ns.Span.of_min !gc_stat_interval_mins) in
     current_gc := Gc.stat () ;
-    current_jemalloc := Jemalloc.get_memory_stats () ;
     gc_allocated_bytes := Gc.allocated_bytes () ;
     gc_stat ()
 
@@ -222,28 +219,6 @@ module Runtime = struct
       (fun () -> float_of_int !current_gc.Gc.Stat.stack_size)
       ~help:"Current stack size."
 
-  let jemalloc_active_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_active_bytes"
-      (fun () -> float_of_int !current_jemalloc.active)
-      ~help:"active memory in bytes"
-
-  let jemalloc_resident_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_resident_bytes"
-      (fun () -> float_of_int !current_jemalloc.resident)
-      ~help:
-        "resident memory in bytes (may be zero depending on jemalloc compile \
-         options)"
-
-  let jemalloc_allocated_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_allocated_bytes"
-      (fun () -> float_of_int !current_jemalloc.allocated)
-      ~help:"memory allocated to heap objects in bytes"
-
-  let jemalloc_mapped_bytes =
-    simple_metric ~metric_type:Gauge "jemalloc_mapped_bytes"
-      (fun () -> float_of_int !current_jemalloc.mapped)
-      ~help:"memory mapped into process address space in bytes"
-
   let process_cpu_seconds_total =
     simple_metric ~metric_type:Counter "process_cpu_seconds_total" Sys.time
       ~help:"Total user and system CPU time spent in seconds."
@@ -251,7 +226,7 @@ module Runtime = struct
   let process_uptime_ms_total =
     simple_metric ~metric_type:Counter "process_uptime_ms_total"
       (fun () ->
-        Core.Time.Span.to_ms (Core.Time.diff (Core.Time.now ()) start_time))
+        Core.Time.Span.to_ms (Core.Time.diff (Core.Time.now ()) start_time) )
       ~help:"Total time the process has been running for in milliseconds."
 
   let metrics =
@@ -267,10 +242,6 @@ module Runtime = struct
     ; ocaml_gc_largest_free
     ; ocaml_gc_fragments
     ; ocaml_gc_stack_size
-    ; jemalloc_active_bytes
-    ; jemalloc_resident_bytes
-    ; jemalloc_allocated_bytes
-    ; jemalloc_mapped_bytes
     ; process_cpu_seconds_total
     ; process_uptime_ms_total
     ]
@@ -278,7 +249,7 @@ module Runtime = struct
   let () =
     let open CollectorRegistry in
     List.iter metrics ~f:(fun (info, collector) ->
-        register default info collector)
+        register default info collector )
 end
 
 module Cryptography = struct
@@ -303,10 +274,37 @@ module Cryptography = struct
     Snark_work_histogram.v "snark_work_merge_time_sec" ~help ~namespace
       ~subsystem
 
+  let snark_work_zkapp_base_time_sec =
+    let help = "time elapsed while doing base proof for a zkapp transaction" in
+    Counter.v "snark_work_zkapp_base_time_sec" ~help ~namespace ~subsystem
+
   let snark_work_base_time_sec =
-    let help = "time elapsed while doing base proof" in
-    Snark_work_histogram.v "snark_work_base_time_sec" ~help ~namespace
-      ~subsystem
+    let help =
+      "time elapsed while doing base proof for a non-zkapp transaction"
+    in
+    Counter.v "snark_work_base_time_sec" ~help ~namespace ~subsystem
+
+  let snark_work_zkapp_base_submissions =
+    let help =
+      "Number of base transactions snarks for zkapp transactions submitted"
+    in
+    Counter.v "snark_work_zkapp_base_submissions" ~help ~namespace ~subsystem
+
+  let snark_work_base_submissions =
+    let help =
+      "Number of base transactions snarks for non-zkapp transactions submitted"
+    in
+    Counter.v "snark_work_base_submissions" ~help ~namespace ~subsystem
+
+  let zkapp_transaction_length =
+    let help = "Number of updates in a zkapp transaction" in
+    Counter.v "zkapp_transaction_length" ~help ~namespace ~subsystem
+
+  let zkapp_proof_updates =
+    let help =
+      "Number of updates with proof authorization in a zkapp transaction"
+    in
+    Counter.v "zkapp_proof_updates" ~help ~namespace ~subsystem
 
   (* TODO:
      let transaction_proving_time_ms =
@@ -321,6 +319,24 @@ module Bootstrap = struct
   let bootstrap_time_ms =
     let help = "time elapsed while bootstrapping" in
     Gauge.v "bootstrap_time_ms" ~help ~namespace ~subsystem
+
+  let staking_epoch_ledger_sync_ms =
+    let help = "time elapsed when sync staking epoch ledger in ms" in
+    Counter.v "staking_epoch_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let next_epoch_ledger_sync_ms =
+    let help = "time elapsed when sync next epoch ledger in ms" in
+    Counter.v "next_epoch_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let root_snarked_ledger_sync_ms =
+    let help = "time elapsed when sync root snarked ledger in ms" in
+    Counter.v "root_snarked_ledger_sync_ms" ~help ~namespace ~subsystem
+
+  let num_of_root_snarked_ledger_retargeted =
+    let help =
+      "number of times root_snarked_ledger retargeted during bootstrap"
+    in
+    Gauge.v "num_of_root_snarked_ledger_retargeted" ~help ~namespace ~subsystem
 end
 
 module Transaction_pool = struct
@@ -341,6 +357,33 @@ module Transaction_pool = struct
       "Number of transactions added to the pool since the node start"
     in
     Counter.v "transactions_added_to_pool" ~help ~namespace ~subsystem
+
+  let vk_refcount_table_size : Gauge.t =
+    let help = "Size of verification key refcount table" in
+    Gauge.v "vk_refcount_table_size" ~help ~namespace ~subsystem
+
+  let zkapp_transactions_added_to_pool : Counter.t =
+    let help =
+      "Number of zkapp transactions added to the pool since the node start"
+    in
+    Counter.v "zkapp_transactions_added_to_pool" ~help ~namespace ~subsystem
+
+  let zkapp_transaction_size : Counter.t =
+    let help = "Size of valid zkapp transaction received (bin_size_t)" in
+    Counter.v "zkapp_transaction_size" ~help ~namespace ~subsystem
+
+  let zkapp_updates : Counter.t =
+    let help =
+      "Number of account updates in a valid zkapp transaction received"
+    in
+    Counter.v "zkapp_updates" ~help ~namespace ~subsystem
+
+  let zkapp_proof_updates : Counter.t =
+    let help =
+      "Number of account updates with proof authorization in a zkapp \
+       transaction"
+    in
+    Counter.v "zkapp_proof_updates" ~help ~namespace ~subsystem
 end
 
 module Metric_map (Metric : sig
@@ -431,6 +474,36 @@ module Network = struct
             "average time, in ms, for blocks to be validated and rebroadcasted"
         end)
         ()
+
+    module Processing_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "processing_time"
+
+          let help =
+            "average time, in ms, for blocks to be accepted after the OCaml \
+             process receives it"
+        end)
+        ()
+
+    module Rejection_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "rejection_time"
+
+          let help =
+            "average time, in ms, for blocks to be rejected after the OCaml \
+             process receives it"
+        end)
+        ()
   end
 
   module Snark_work = struct
@@ -466,6 +539,36 @@ module Network = struct
              rebroadcasted"
         end)
         ()
+
+    module Processing_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "processing_time"
+
+          let help =
+            "average delay, in ms, for snark work to be accepted after the \
+             OCaml process receives it"
+        end)
+        ()
+
+    module Rejection_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "rejection_time"
+
+          let help =
+            "average time, in ms, for snark work to be rejected after the \
+             OCaml process receives it"
+        end)
+        ()
   end
 
   module Transaction = struct
@@ -499,6 +602,36 @@ module Network = struct
           let help =
             "average delay, in ms, for transactions to be validated and \
              rebroadcasted"
+        end)
+        ()
+
+    module Processing_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "processing_time"
+
+          let help =
+            "average delay, in ms, for transactions to be accepted after the \
+             OCaml process receives it"
+        end)
+        ()
+
+    module Rejection_time =
+      Moving_time_average
+        (struct
+          include Delay_time_spec
+
+          let subsystem = subsystem
+
+          let name = "rejection_time"
+
+          let help =
+            "average time, in ms, for transactions to be rejected after the \
+             OCaml process receives it"
         end)
         ()
   end
@@ -940,6 +1073,10 @@ module Snark_work = struct
     in
     Counter.v "snark_work_timed_out_rpc" ~help ~namespace ~subsystem
 
+  let snark_work_failed_rpc : Counter.t =
+    let help = "# of snark work failures reported by snark workers" in
+    Counter.v "snark_work_failed_rpc" ~help ~namespace ~subsystem
+
   let snark_pool_size : Gauge.t =
     let help = "# of completed snark work bundles in the snark pool" in
     Gauge.v "snark_pool_size" ~help ~namespace ~subsystem
@@ -1174,6 +1311,10 @@ module Transition_frontier = struct
     let help = "# of transactions in the current best tip" in
     Gauge.v "best_tip_user_txns" ~help ~namespace ~subsystem
 
+  let best_tip_zkapp_txns : Gauge.t =
+    let help = "# of transactions in the current best tip" in
+    Gauge.v "best_tip_zkapp_txns" ~help ~namespace ~subsystem
+
   let best_tip_coinbase : Gauge.t =
     let help =
       "0 if there is no coinbase in the current best tip, 1 otherwise"
@@ -1330,7 +1471,7 @@ module Block_latency = struct
           let total_sum, count_sum =
             List.fold buckets ~init:(0.0, 0)
               ~f:(fun (total_sum, count_sum) (total, count) ->
-                (total_sum +. total, count_sum + count))
+                (total_sum +. total, count_sum + count) )
           in
           total_sum /. Float.of_int count_sum
       end)
@@ -1505,7 +1646,7 @@ module Execution_times = struct
     O1trace.Thread.iter_threads ~f:(fun thread ->
         let name = O1trace.Thread.name thread in
         if not (Hashtbl.mem tracked_metrics name) then
-          Hashtbl.add_exn tracked_metrics ~key:name ~data:(create_metric thread))
+          Hashtbl.add_exn tracked_metrics ~key:name ~data:(create_metric thread) )
 
   let () = CollectorRegistry.(register_pre_collect default sync_metrics)
 end
@@ -1567,7 +1708,7 @@ let server ?forward_uri ~port ~logger () =
   O1trace.background_thread "collect_gc_metrics" Runtime.gc_stat ;
   O1trace.thread "serve_metrics"
     (generic_server ?forward_uri ~port ~logger
-       ~registry:CollectorRegistry.default)
+       ~registry:CollectorRegistry.default )
 
 module Archive = struct
   type t =

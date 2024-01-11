@@ -15,8 +15,10 @@
    integers
    bin_prot.shape
    ;; local libraries
+   mina_wire_types
    mina_base.util
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    genesis_constants
    crypto_params
    random_oracle
@@ -45,12 +47,14 @@
    kimchi_bindings
    kimchi_types
    pasta_bindings
+   ppx_deriving_yojson.runtime
+   ppx_version.runtime
  )
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  (preprocess
   (pps
-    ppx_coda
+    ppx_mina
     h_list.ppx
     ppx_assert
     ppx_compare

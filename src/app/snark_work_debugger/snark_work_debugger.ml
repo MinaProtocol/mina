@@ -13,6 +13,8 @@ let rec sexp_to_sexp : Sexp.t -> Sexplib0.Sexp.t = function
   | List xs ->
       List (List.map ~f:sexp_to_sexp xs)
 
+let () = ignore sexp_to_sexp
+
 let main (spec_path : string) =
   let module Inputs = Snark_worker.Prod.Inputs in
   let%bind spec = Reader.load_sexp_exn spec_path Inputs.single_spec_of_sexp in

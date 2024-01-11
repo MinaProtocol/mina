@@ -1,5 +1,5 @@
-use mina_curves::pasta::{fp::Fp, fq::Fq};
-use oracle::{constants::PlonkSpongeConstantsKimchi, permutation::poseidon_block_cipher};
+use mina_curves::pasta::{Fp, Fq};
+use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, permutation::poseidon_block_cipher};
 use wasm_bindgen::prelude::*;
 
 use crate::{
@@ -15,7 +15,7 @@ pub fn caml_pasta_fp_poseidon_block_cipher(
 ) -> WasmFlatVector<WasmPastaFp> {
     let mut state_vec: Vec<Fp> = state.into_iter().map(Into::into).collect();
     poseidon_block_cipher::<Fp, PlonkSpongeConstantsKimchi>(
-        &oracle::pasta::fp_kimchi::params(),
+        &mina_poseidon::pasta::fp_kimchi::params(),
         &mut state_vec,
     );
     state_vec
@@ -33,7 +33,7 @@ pub fn caml_pasta_fq_poseidon_block_cipher(
 ) -> WasmFlatVector<WasmPastaFq> {
     let mut state_vec: Vec<Fq> = state.into_iter().map(Into::into).collect();
     poseidon_block_cipher::<Fq, PlonkSpongeConstantsKimchi>(
-        &oracle::pasta::fq_kimchi::params(),
+        &mina_poseidon::pasta::fq_kimchi::params(),
         &mut state_vec,
     );
     state_vec

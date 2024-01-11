@@ -3,13 +3,15 @@
  (public_name crypto_params)
  (flags :standard -short-paths -warn-error -58)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    core_kernel
    bin_prot.shape
+   sexplib0
    ;; local libraries
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    pickles.backend
    snarky.backendless
    cache_dir

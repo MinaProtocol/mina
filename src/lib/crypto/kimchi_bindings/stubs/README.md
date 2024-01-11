@@ -4,19 +4,19 @@ To call the [Kimchi](https://github.com/o1-labs/proof-systems) library from OCam
 These bindings are written in Rust with the help of two libraries: 
 
 * [OCaml-rs](https://github.com/zshipko/ocaml-rs) to facilitate exporting a Rust library to a static library that can be used from within OCaml. Insead of exporting code directly to a C interface, it makes use of the OCaml runtime directly and can also store values and custom types on the OCaml heap.
-* [ocaml-gen](https://github.com/o1-labs/proof-systems) to generate the necessary OCaml code. This library is used in [`binding_generation/`](./binding_generation/).
+* [ocaml-gen](https://github.com/o1-labs/proof-systems) to generate the necessary OCaml code. This library is used in [`src/main.rs`](./src/main.rs).
 
 The bindings are generated automatically via the [`dune`](./dune) file's rule and 'promoted' to this directory.
 If you want to generate the OCaml binding manually, you can run the following command:
 
 ```shell
-$ cargo run --manifest-path binding_generation/Cargo.toml
+$ cargo run
 ```
 
 If you follow the command with up to 3 `output_file` arguments it will write the result to the corresponding `output_file`s:
 
 ```shell
-$ cargo run --manifest-path binding_generation/Cargo.toml ./kimchi_types.ml ./pasta_bindings.ml ./kimchi_bindings.ml
+$ cargo run ./kimchi_types.ml ./pasta_bindings.ml ./kimchi_bindings.ml
 ```
 
 ## Some OCaml-rs guidelines

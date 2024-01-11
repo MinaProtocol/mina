@@ -1,11 +1,14 @@
 open Core_kernel
 open Hash_prefixes
 
-let salt (s : Hash_prefixes.t) = Random_oracle.salt (s :> string)
+let salt (s : Hash_prefixes.t) = Hash_prefix_create.salt (s :> string)
 
-let salt_legacy (s : Hash_prefixes.t) = Random_oracle.Legacy.salt (s :> string)
+let salt_legacy (s : Hash_prefixes.t) =
+  Hash_prefix_create.salt_legacy (s :> string)
 
-let receipt_chain_user_command = salt_legacy receipt_chain_user_command
+let receipt_chain_signed_command = salt_legacy receipt_chain_user_command
+
+let receipt_chain_zkapp_command = salt receipt_chain_user_command
 
 let receipt_chain_zkapp = salt receipt_chain_zkapp
 
@@ -58,23 +61,32 @@ let signature_for_mainnet = salt signature_mainnet
 
 let signature_for_testnet = salt signature_testnet
 
-let signature =
-  match Mina_signature_kind.t with
+let signature_for_other chain_name = salt @@ signature_other chain_name
+
+let signature ?(signature_kind = Mina_signature_kind.t) =
+  match signature_kind with
   | Mainnet ->
       signature_for_mainnet
   | Testnet ->
       signature_for_testnet
+  | Other_network chain_name ->
+      signature_for_other chain_name
 
 let signature_for_mainnet_legacy = salt_legacy signature_mainnet
 
 let signature_for_testnet_legacy = salt_legacy signature_testnet
 
-let signature_legacy =
-  match Mina_signature_kind.t with
+let signature_for_other_legacy chain_name =
+  salt_legacy @@ signature_other chain_name
+
+let signature_legacy ?(signature_kind = Mina_signature_kind.t) =
+  match signature_kind with
   | Mainnet ->
       signature_for_mainnet_legacy
   | Testnet ->
       signature_for_testnet_legacy
+  | Other_network chain_name ->
+      signature_for_other_legacy chain_name
 
 let vrf_output = salt vrf_output
 
@@ -92,7 +104,7 @@ let zkapp_account = salt zkapp_account
 
 let zkapp_payload = salt zkapp_payload
 
-let zkapp_body = salt zkapp_body
+let zkapp_body ?(chain = Mina_signature_kind.t) = salt @@ zkapp_body ~chain
 
 let zkapp_precondition = salt zkapp_precondition
 
@@ -100,16 +112,16 @@ let zkapp_precondition_account = salt zkapp_precondition_account
 
 let zkapp_precondition_protocol_state = salt zkapp_precondition_protocol_state
 
-let party = salt party
+let account_update_account_precondition =
+  salt account_update_account_precondition
 
-let party_account_precondition = salt party_account_precondition
+let account_update_cons = salt account_update_cons
 
-let party_cons = salt party_cons
+let account_update_node = salt account_update_node
 
-let party_node = salt party_node
+let account_update_stack_frame = salt account_update_stack_frame
 
-let party_with_protocol_state_predicate =
-  salt party_with_protocol_state_predicate
+let account_update_stack_frame_cons = salt account_update_stack_frame_cons
 
 let zkapp_uri = salt zkapp_uri
 
@@ -117,7 +129,7 @@ let zkapp_event = salt zkapp_event
 
 let zkapp_events = salt zkapp_events
 
-let zkapp_sequence_events = salt zkapp_sequence_events
+let zkapp_actions = salt zkapp_actions
 
 let zkapp_memo = salt zkapp_memo
 

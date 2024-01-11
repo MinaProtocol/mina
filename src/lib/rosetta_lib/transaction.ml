@@ -24,6 +24,10 @@ module Unsigned = struct
         ; valid_until : Unsigned_extended.UInt32.t option
         }
       [@@deriving yojson]
+
+      let is_fee_sufficient (payment : t) : bool =
+        let open Currency.Fee in
+        of_uint64 payment.fee >= Currency.Fee.minimum_user_command_fee
     end
 
     module Delegation = struct
@@ -73,7 +77,7 @@ module Unsigned = struct
             ~error:
               (Errors.create
                  (`Operations_not_valid
-                   [ Errors.Partial_reason.Amount_not_some ]))
+                   [ Errors.Partial_reason.Amount_not_some ] ) )
         in
         let payment =
           { Rendered.Payment.to_ = un_pk command.receiver
@@ -159,7 +163,7 @@ module Unsigned = struct
       Random_oracle_input.Legacy.Coding.deserialize ~field_of_string
         ~of_bool:Fn.id
         (String.to_list
-           (Option.value_exn (Hex.Safe.of_hex r.random_oracle_input)))
+           (Option.value_exn (Hex.Safe.of_hex r.random_oracle_input)) )
       |> Result.map_error ~f:(fun e ->
              let parse_context =
                match e with
@@ -171,8 +175,8 @@ module Unsigned = struct
              Errors.create
                ~context:
                  (sprintf "Random oracle input deserialization: %s"
-                    parse_context)
-               (`Json_parse None))
+                    parse_context )
+               (`Json_parse None) )
     in
     match (r.payment, r.stake_delegation) with
     | Some payment, None ->
@@ -190,7 +194,7 @@ module Unsigned = struct
     | _ ->
         Result.fail
           (Errors.create ~context:"Unsigned transaction un-rendering"
-             `Unsupported_operation_for_construction)
+             `Unsupported_operation_for_construction )
 end
 
 module Signature = struct
@@ -199,7 +203,7 @@ module Signature = struct
     |> Result.of_option
          ~error:
            (Errors.create ~context:"Signed transaction un-rendering"
-              `Unsupported_operation_for_construction)
+              `Unsupported_operation_for_construction )
 
   let encode = Mina_base.Signature.Raw.encode
 end
@@ -252,7 +256,7 @@ module Signed = struct
     | _ ->
         Result.fail
           (Errors.create ~context:"Signed transaction un-rendering"
-             `Unsupported_operation_for_construction)
+             `Unsupported_operation_for_construction )
 
   let to_mina_signed t =
     Or_error.try_with_join (fun () ->
@@ -272,7 +276,7 @@ module Signed = struct
           ; payload
           }
         in
-        command)
+        command )
 end
 
 let to_mina_signed transaction_json =
@@ -286,4 +290,4 @@ let to_mina_signed transaction_json =
         Signed.of_rendered rendered
         |> Result.map_error ~f:(fun err -> Error.of_string (Errors.show err))
       in
-      Signed.to_mina_signed t)
+      Signed.to_mina_signed t )

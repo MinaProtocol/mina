@@ -1,19 +1,21 @@
-use commitment_dlog::commitment::{shift_scalar, PolyComm};
 use kimchi::circuits::scalars::RandomOracles;
 use kimchi::proof::ProverProof;
 use kimchi::verifier_index::VerifierIndex as DlogVerifierIndex;
-use oracle::{
+use mina_poseidon::{
     self,
     constants::PlonkSpongeConstantsKimchi,
     sponge::{DefaultFqSponge, DefaultFrSponge},
     FqSponge,
 };
 use paste::paste;
+use poly_commitment::commitment::{shift_scalar, PolyComm};
+use poly_commitment::evaluation_proof::OpeningProof;
+use poly_commitment::SRS;
 use wasm_bindgen::prelude::*;
 // use wasm_bindgen::convert::{IntoWasmAbi, FromWasmAbi};
 use crate::wasm_vector::WasmVector;
 // use crate::wasm_flat_vector::WasmFlatVector;
-use ark_ff::Zero;
+use ark_ff::{One, Zero};
 
 //
 // CamlOracles
@@ -36,13 +38,13 @@ macro_rules! impl_oracles {
 
         paste! {
             use crate::wasm_flat_vector::WasmFlatVector;
-            use oracle::sponge::ScalarChallenge;
+            use mina_poseidon::sponge::ScalarChallenge;
 
             #[wasm_bindgen]
             #[derive(Clone, Copy)]
             pub struct [<Wasm $field_name:camel RandomOracles>] {
-                pub joint_combiner_chal: $WasmF,
-                pub joint_combiner: $WasmF,
+                pub joint_combiner_chal: Option<$WasmF>,
+                pub joint_combiner: Option<$WasmF>,
                 pub beta: $WasmF,
                 pub gamma: $WasmF,
                 pub alpha_chal: $WasmF,
@@ -58,10 +60,11 @@ macro_rules! impl_oracles {
 
             #[wasm_bindgen]
             impl [<Wasm $field_name:camel RandomOracles>] {
+                #[allow(clippy::too_many_arguments)]
                 #[wasm_bindgen(constructor)]
                 pub fn new(
-                    joint_combiner_chal: $WasmF,
-                    joint_combiner: $WasmF,
+                    joint_combiner_chal: Option<$WasmF>,
+                    joint_combiner: Option<$WasmF>,
                     beta: $WasmF,
                     gamma: $WasmF,
                     alpha_chal: $WasmF,
@@ -93,8 +96,8 @@ macro_rules! impl_oracles {
             {
                 fn from(ro: RandomOracles<$F>) -> Self {
                     Self {
-                        joint_combiner_chal: ro.joint_combiner.0.0.into(),
-                        joint_combiner: ro.joint_combiner.1.into(),
+                        joint_combiner_chal: ro.joint_combiner.as_ref().map(|x| x.0.0.into()),
+                        joint_combiner: ro.joint_combiner.as_ref().map(|x| x.1.into()),
                         beta: ro.beta.into(),
                         gamma: ro.gamma.into(),
                         alpha_chal: ro.alpha_chal.0.into(),
@@ -112,8 +115,15 @@ macro_rules! impl_oracles {
             impl Into<RandomOracles<$F>> for WasmRandomOracles
             {
                 fn into(self) -> RandomOracles<$F> {
+                    let joint_combiner =
+                        match (self.joint_combiner_chal, self.joint_combiner) {
+                            (Some(joint_combiner_chal), Some(joint_combiner)) => {
+                                Some((ScalarChallenge(joint_combiner_chal.into()), joint_combiner.into()))
+                            },
+                            _ => None
+                        };
                     RandomOracles {
-                        joint_combiner: (ScalarChallenge(self.joint_combiner_chal.into()), self.joint_combiner.into()),
+                        joint_combiner,
                         beta: self.beta.into(),
                         gamma: self.gamma.into(),
                         alpha_chal: ScalarChallenge(self.alpha_chal.into()),
@@ -167,57 +177,82 @@ macro_rules! impl_oracles {
                 lgr_comm: WasmVector<$WasmPolyComm>, // the bases to commit polynomials
                 index: $index,    // parameters
                 proof: $WasmProverProof, // the final proof (contains public elements at the beginning)
-            ) -> Result<[<Wasm $field_name:camel Oracles>], JsValue> {
+            ) -> Result<[<Wasm $field_name:camel Oracles>], JsError> {
                 // conversions
+                let result = crate::rayon::run_in_pool(|| {
+                    let index: DlogVerifierIndex<$G, OpeningProof<$G>> = index.into();
 
-                let index: DlogVerifierIndex<$G> = index.into();
+                    let lgr_comm: Vec<PolyComm<$G>> = lgr_comm
+                        .into_iter()
+                        .take(proof.public.len())
+                        .map(Into::into)
+                        .collect();
+                    let lgr_comm_refs: Vec<_> = lgr_comm.iter().collect();
 
-                let lgr_comm: Vec<PolyComm<$G>> = lgr_comm
-                    .into_iter()
-                    .take(proof.public.len())
-                    .map(Into::into)
-                    .collect();
-                let lgr_comm_refs: Vec<_> = lgr_comm.iter().collect();
+                    let p_comm = PolyComm::<$G>::multi_scalar_mul(
+                        &lgr_comm_refs,
+                        &proof
+                            .public
+                            .iter()
+                            .map(|a| a.clone().into())
+                            .map(|s: $F| -s)
+                            .collect::<Vec<_>>(),
+                    );
+                    let p_comm = {
+                        index
+                            .srs()
+                            .mask_custom(
+                                p_comm.clone(),
+                                &p_comm.map(|_| $F::one()),
+                            )
+                            .unwrap()
+                            .commitment
+                    };
 
-                let p_comm = PolyComm::<$G>::multi_scalar_mul(
-                    &lgr_comm_refs,
-                    &proof
-                        .public
-                        .iter()
-                        .map(|a| a.clone().into())
-                        .map(|s: $F| -s)
-                        .collect::<Vec<_>>(),
-                );
+                    let (proof, public_input): (ProverProof<$G, OpeningProof<$G>>, Vec<$F>) = proof.into();
 
-                let proof: ProverProof<$G> = proof.into();
+                    let oracles_result =
+                        proof.oracles::<
+                            DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>,
+                            DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>
+                        >(&index, &p_comm, Some(&public_input));
+                    let oracles_result = match oracles_result {
+                        Err(e) => {
+                            return Err(format!("oracles_create: {}", e));
+                        }
+                        Ok(cs) => cs,
+                    };
 
-                let oracles_result =
-                    proof.oracles::<DefaultFqSponge<$curve_params, PlonkSpongeConstantsKimchi>, DefaultFrSponge<$F, PlonkSpongeConstantsKimchi>>(&index, &p_comm).map_err(|e| JsValue::from_str(&format!("oracles_create: {}", e)))?;
+                    let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
+                        oracles_result.fq_sponge,
+                        oracles_result.combined_inner_product,
+                        oracles_result.public_evals,
+                        oracles_result.digest,
+                        oracles_result.oracles,
+                    );
 
-                let (mut sponge, combined_inner_product, p_eval, digest, oracles) = (
-                    oracles_result.fq_sponge,
-                    oracles_result.combined_inner_product,
-                    oracles_result.p_eval,
-                    oracles_result.digest,
-                    oracles_result.oracles,
-                );
+                    sponge.absorb_fr(&[shift_scalar::<$G>(combined_inner_product)]);
 
-                sponge.absorb_fr(&[shift_scalar::<$G>(combined_inner_product)]);
+                    let opening_prechallenges = proof
+                        .proof
+                        .prechallenges(&mut sponge)
+                        .into_iter()
+                        .map(|x| x.0.into())
+                        .collect();
 
-                let opening_prechallenges = proof
-                    .proof
-                    .prechallenges(&mut sponge)
-                    .into_iter()
-                    .map(|x| x.0.into())
-                    .collect();
+                    Ok((oracles, p_eval, opening_prechallenges, digest))
+                });
 
-                Ok([<Wasm $field_name:camel Oracles>] {
-                    o: oracles.into(),
-                    p_eval0: p_eval[0][0].into(),
-                    p_eval1: p_eval[1][0].into(),
-                    opening_prechallenges,
-                    digest_before_evaluations: digest.into(),
-                })
+                match result {
+                    Ok((oracles, p_eval, opening_prechallenges, digest)) => Ok([<Wasm $field_name:camel Oracles>] {
+                        o: oracles.into(),
+                        p_eval0: p_eval[0][0].into(),
+                        p_eval1: p_eval[1][0].into(),
+                        opening_prechallenges,
+                        digest_before_evaluations: digest.into()
+                    }),
+                    Err(err) => Err(JsError::new(&err))
+                }
             }
 
             #[wasm_bindgen]
@@ -252,10 +287,7 @@ pub mod fp {
         plonk_verifier_index::fp::WasmFpPlonkVerifierIndex as WasmPlonkVerifierIndex,
         poly_comm::vesta::WasmFpPolyComm as WasmPolyComm,
     };
-    use mina_curves::pasta::{
-        fp::Fp,
-        vesta::{Affine as GAffine, VestaParameters},
-    };
+    use mina_curves::pasta::{Fp, Vesta as GAffine, VestaParameters};
 
     impl_oracles!(
         WasmPastaFp,
@@ -277,10 +309,7 @@ pub mod fq {
         plonk_verifier_index::fq::WasmFqPlonkVerifierIndex as WasmPlonkVerifierIndex,
         poly_comm::pallas::WasmFqPolyComm as WasmPolyComm,
     };
-    use mina_curves::pasta::{
-        fq::Fq,
-        pallas::{Affine as GAffine, PallasParameters},
-    };
+    use mina_curves::pasta::{Fq, Pallas as GAffine, PallasParameters};
 
     impl_oracles!(
         WasmPastaFq,

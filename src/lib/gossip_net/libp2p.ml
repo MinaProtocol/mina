@@ -41,7 +41,7 @@ module Config = struct
     ; flooding : bool
     ; direct_peers : Mina_net2.Multiaddr.t list
     ; peer_exchange : bool
-    ; mina_peer_exchange : bool
+    ; peer_protection_ratio : float
     ; seed_peer_list_url : Uri.t option
     ; min_connections : int
     ; time_controller : Block_time.Controller.t
@@ -49,7 +49,7 @@ module Config = struct
     ; pubsub_v1 : pubsub_topic_mode_t
     ; pubsub_v0 : pubsub_topic_mode_t
     ; validation_queue_size : int
-    ; mutable keypair : Mina_net2.Keypair.t option
+    ; mutable keypair : Mina_net2.Keypair.t
     ; all_peers_seen_metric : bool
     ; known_private_ip_nets : Core.Unix.Cidr.t list
     }
@@ -60,7 +60,8 @@ module type S = sig
   include Intf.Gossip_net_intf
 
   val create :
-       Config.t
+       ?allow_multiple_instances:bool
+    -> Config.t
     -> pids:Child_processes.Termination.t
     -> Rpc_intf.rpc_handler list
     -> Message.sinks
@@ -146,7 +147,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
             [%log' debug logger]
               ~metadata:
                 [ ("rate_limiter", Network_pool.Rate_limiter.summary rl) ]
-              !"%s $rate_limiter" Impl.name)
+              !"%s $rate_limiter" Impl.name )
       in
       let rl = Network_pool.Rate_limiter.create ~capacity:budget in
       log_rate_limiter_occasionally rl ;
@@ -165,7 +166,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
               ()
         | `Within_capacity ->
             O1trace.thread (Printf.sprintf "handle_rpc_%s" Impl.name) (fun () ->
-                handler peer ~version q)
+                handler peer ~version q )
       in
       Impl.implement_multi handler
 
@@ -184,7 +185,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       don't_wait_for
         (Pipe.iter underlying_r ~f:(fun msg ->
              Pipe.write_without_pushback_if_open read_w msg ;
-             Deferred.unit)) ;
+             Deferred.unit ) ) ;
       let transport =
         Async_rpc_kernel.Pipe_transport.(create Kind.string read_r underlying_w)
       in
@@ -198,8 +199,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
     (* Creates just the helper, making sure to register everything
        BEFORE we start listening/advertise ourselves for discovery. *)
-    let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
-        high_connectivity_ivar ~added_seeds ~pids ~on_unexpected_termination
+    let create_libp2p ?(allow_multiple_instances = false) (config : Config.t)
+        rpc_handlers first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
+        ~on_unexpected_termination
         ~sinks:
           (Message.Any_sinks (sinksM, (sink_block, sink_tx, sink_snark_work))) =
       let module Sinks = (val sinksM) in
@@ -215,7 +217,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
         | Mina_net2.Libp2p_helper_died_unexpectedly ->
             on_unexpected_termination ()
         | _ ->
-            raise exn
+            Exn.reraise exn "Mina_net2 raised an exception"
       in
       let%bind seeds_from_url =
         match config.seed_peer_list_url with
@@ -234,22 +236,15 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
         Monitor.try_with ~here:[%here] ~rest:(`Call handle_mina_net2_exception)
           (fun () ->
             O1trace.thread "mina_net2" (fun () ->
-                Mina_net2.create
+                Mina_net2.create ~allow_multiple_instances
                   ~all_peers_seen_metric:config.all_peers_seen_metric
                   ~on_peer_connected:(fun _ -> record_peer_connection ())
                   ~on_peer_disconnected:ignore ~logger:config.logger ~conf_dir
-                  ~pids))
+                  ~pids () ) )
       with
       | Ok (Ok net2) -> (
           let open Mina_net2 in
-          (* Make an ephemeral keypair for this session TODO: persist in the config dir *)
-          let%bind me =
-            match config.keypair with
-            | Some kp ->
-                return kp
-            | None ->
-                Mina_net2.generate_random_keypair net2
-          in
+          let me = config.keypair in
           let my_peer_id = Keypair.to_peer_id me |> Peer.Id.to_string in
           Logger.append_to_global_metadata
             [ ("peer_id", `String my_peer_id)
@@ -267,7 +262,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                 Some
                   (Peer.create config.addrs_and_ports.bind_ip
                      ~libp2p_port:config.addrs_and_ports.libp2p_port
-                     ~peer_id:my_peer_id) ) ;
+                     ~peer_id:my_peer_id ) ) ;
           [%log' info config.logger] "libp2p peer ID this session is $peer_id"
             ~metadata:[ ("peer_id", `String my_peer_id) ] ;
           let initializing_libp2p_result : _ Deferred.Or_error.t =
@@ -281,9 +276,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                    ; List.map
                        ~f:
                          (Fn.compose Mina_net2.Multiaddr.of_string
-                            Peer.to_multiaddr_string)
+                            Peer.to_multiaddr_string )
                        (Hash_set.to_list added_seeds)
-                   ])
+                   ] )
             in
             let%bind () =
               configure net2 ~me ~metrics_port:config.metrics_port
@@ -291,20 +286,20 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                   [ Multiaddr.of_string
                       (sprintf "/ip4/0.0.0.0/tcp/%d"
                          (Option.value_exn config.addrs_and_ports.peer)
-                           .libp2p_port)
+                           .libp2p_port )
                   ]
                 ~external_maddr:
                   (Multiaddr.of_string
                      (sprintf "/ip4/%s/tcp/%d"
                         (Unix.Inet_addr.to_string
-                           config.addrs_and_ports.external_ip)
+                           config.addrs_and_ports.external_ip )
                         (Option.value_exn config.addrs_and_ports.peer)
-                          .libp2p_port))
+                          .libp2p_port ) )
                 ~network_id:config.chain_id
                 ~unsafe_no_trust_ip:config.unsafe_no_trust_ip ~seed_peers
                 ~direct_peers:config.direct_peers
                 ~peer_exchange:config.peer_exchange
-                ~mina_peer_exchange:config.mina_peer_exchange
+                ~peer_protection_ratio:config.peer_protection_ratio
                 ~flooding:config.flooding
                 ~min_connections:config.min_connections
                 ~max_connections:config.max_connections
@@ -319,7 +314,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                                | Banned_until _ ->
                                    Some peer
                                | _ ->
-                                   None)
+                                   None )
                     ; trusted_peers =
                         List.filter_map ~f:Mina_net2.Multiaddr.to_peer
                           config.initial_peers
@@ -361,7 +356,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                           ~connection_state:(Fn.const peer)
                           ~description:
                             (Info.of_thunk (fun () ->
-                                 sprintf "stream from %s" peer.peer_id))
+                                 sprintf "stream from %s" peer.peer_id ) )
                           transport
                       with
                       | Error handshake_error ->
@@ -398,7 +393,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                                 ~metadata:
                                   [ ("error", Error_json.error_to_yojson e) ]
                           | Ok () ->
-                              () )))
+                              () ) ) )
             in
             let subscribe ~fn topic bin_prot =
               Mina_net2.Pubsub.subscribe_encode net2
@@ -418,9 +413,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
             let snark_bin_prot =
               Network_pool.Snark_pool.Diff_versioned.Stable.Latest.bin_t
             in
-            let block_bin_prot =
-              Mina_transition.External_transition.Raw.Stable.Latest.bin_t
-            in
+            let block_bin_prot = Mina_block.Stable.Latest.bin_t in
             let unit_f _ = Deferred.unit in
             let publish_v1_impl push_impl bin_prot topic =
               match config.pubsub_v1 with
@@ -445,19 +438,15 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
               publish_v1_impl
                 (fun (env, vc) ->
                   Sinks.Block_sink.push sink_block
-                    ( `Transition
-                        (Envelope.Incoming.map
-                           ~f:Mina_transition.External_transition.decompose env)
+                    ( `Transition env
                     , `Time_received (Block_time.now config.time_controller)
-                    , `Valid_cb vc ))
+                    , `Valid_cb vc ) )
                 block_bin_prot v1_topic_block
-              >>| Fn.flip Fn.compose Mina_transition.External_transition.compose
             in
             let map_v0_msg msg =
               match msg with
               | Message.New_state state ->
-                  Message.Latest.T.New_state
-                    (Mina_transition.External_transition.compose state)
+                  Message.Latest.T.New_state state
               | Message.Transaction_pool_diff diff ->
                   Message.Latest.T.Transaction_pool_diff diff
               | Message.Snark_pool_diff diff ->
@@ -470,19 +459,17 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                   | Message.Latest.T.New_state state ->
                       Sinks.Block_sink.push sink_block
                         ( `Transition
-                            (Envelope.Incoming.map
-                               ~f:(fun _ ->
-                                 Mina_transition.External_transition.decompose
-                                   state)
-                               env)
+                            (Envelope.Incoming.map ~f:(const state) env)
                         , `Time_received (Block_time.now config.time_controller)
                         , `Valid_cb vc )
-                  | Message.Latest.T.Transaction_pool_diff diff ->
+                  | Message.Latest.T.Transaction_pool_diff
+                      Network_pool.With_nonce.{ message = diff; _ } ->
                       Sinks.Tx_sink.push sink_tx
                         (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc)
-                  | Message.Latest.T.Snark_pool_diff diff ->
+                  | Message.Latest.T.Snark_pool_diff
+                      Network_pool.With_nonce.{ message = diff; _ } ->
                       Sinks.Snark_sink.push sink_snark_work
-                        (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc))
+                        (Envelope.Incoming.map ~f:(fun _ -> diff) env, vc) )
                 v0_topic Message.Latest.T.bin_msg
             in
             let%bind publish_v0 =
@@ -503,13 +490,13 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                    (sprintf "/ip4/%s/tcp/%d"
                       ( config.addrs_and_ports.bind_ip
                       |> Unix.Inet_addr.to_string )
-                      (Option.value_exn config.addrs_and_ports.peer).libp2p_port))
+                      (Option.value_exn config.addrs_and_ports.peer).libp2p_port ) )
             in
             let add_many xs ~is_seed =
               Deferred.map
                 (Deferred.List.iter ~how:`Parallel xs ~f:(fun x ->
                      let open Deferred.Let_syntax in
-                     Mina_net2.add_peer ~is_seed net2 x >>| ignore))
+                     Mina_net2.add_peer ~is_seed net2 x >>| ignore ) )
                 ~f:(fun () -> Ok ())
             in
             don't_wait_for
@@ -522,17 +509,18 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                     in
                     add_many ~is_seed:false
                       (List.filter !peers_snapshot ~f:(fun p ->
-                           not (Hash_set.mem seeds (Multiaddr.to_string p))))
+                           not (Hash_set.mem seeds (Multiaddr.to_string p)) ) )
                   in
                   let%bind () = Mina_net2.begin_advertising net2 in
-                  return ())
+                  return () )
                  ~f:(function
                    | Ok () ->
                        ()
                    | Error e ->
                        [%log' warn config.logger]
                          "starting libp2p up failed: $error"
-                         ~metadata:[ ("error", Error_json.error_to_yojson e) ])) ;
+                         ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                   ) ) ;
             { publish_v0
             ; publish_v1_block
             ; publish_v1_tx
@@ -541,7 +529,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
           in
           match%map initializing_libp2p_result with
           | Ok pfs ->
-              (net2, pfs, me)
+              (net2, pfs)
           | Error e ->
               fail e )
       | Ok (Error e) ->
@@ -553,7 +541,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
     let bandwidth_info t = !(t.net2) >>= Mina_net2.bandwidth_info
 
-    let create (config : Config.t) ~pids rpc_handlers (sinks : Message.sinks) =
+    let create ?(allow_multiple_instances = false) (config : Config.t) ~pids
+        rpc_handlers (sinks : Message.sinks) =
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in
       let net2_ref = ref (Deferred.never ()) in
@@ -561,13 +550,13 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       let restarts_r, restarts_w =
         Strict_pipe.create ~name:"libp2p-restarts"
           (Strict_pipe.Buffered
-             (`Capacity 0, `Overflow (Strict_pipe.Drop_head ignore)))
+             (`Capacity 0, `Overflow (Strict_pipe.Drop_head ignore)) )
       in
       let added_seeds = Peer.Hash_set.create () in
       let%bind () =
         let rec on_libp2p_create res =
           net2_ref :=
-            Deferred.map res ~f:(fun (n, _, _) ->
+            Deferred.map res ~f:(fun (n, _) ->
                 ( match
                     Sys.getenv "MINA_LIBP2P_HELPER_RESTART_INTERVAL_BASE"
                   with
@@ -580,7 +569,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                       let delta =
                         Option.value_map ~f:Float.of_string
                           (Sys.getenv
-                             "MINA_LIBP2P_HELPER_RESTART_INTERVAL_DELTA")
+                             "MINA_LIBP2P_HELPER_RESTART_INTERVAL_DELTA" )
                           ~default:2.5
                         |> Float.min (base_time /. 2.)
                       in
@@ -591,9 +580,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                       >>= fun () -> Mina_net2.shutdown n >>| restart_libp2p )
                 | None ->
                     () ) ;
-                n) ;
+                n ) ;
           let pf_impl f msg =
-            let%bind _, pf, _ = res in
+            let%bind _, pf = res in
             f pf msg
           in
           pfs_ref :=
@@ -603,15 +592,13 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
             ; publish_v1_snark_work =
                 pf_impl (fun pf -> pf.publish_v1_snark_work)
             } ;
-          upon res (fun (_, _, me) ->
-              (* This is a hack so that we keep the same keypair across restarts. *)
-              config.keypair <- Some me ;
-              let logger = config.logger in
-              [%log trace] ~metadata:[] "Successfully restarted libp2p")
+          upon res (fun _ ->
+              [%log' trace config.logger] ~metadata:[]
+                "Successfully restarted libp2p" )
         and start_libp2p () =
           let libp2p =
-            create_libp2p config rpc_handlers first_peer_ivar
-              high_connectivity_ivar ~added_seeds ~pids
+            create_libp2p ~allow_multiple_instances config rpc_handlers
+              first_peer_ivar high_connectivity_ivar ~added_seeds ~pids
               ~on_unexpected_termination:restart_libp2p ~sinks
           in
           on_libp2p_create libp2p ; Deferred.ignore_m libp2p
@@ -620,11 +607,19 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
           (Strict_pipe.Reader.iter restarts_r ~f:(fun () ->
                let%bind n = !net2_ref in
                let%bind () = Mina_net2.shutdown n in
-               restart_libp2p () ; !net2_ref >>| ignore)) ;
+               restart_libp2p () ; !net2_ref >>| ignore ) ) ;
         start_libp2p ()
       in
       let ban_configuration =
         ref { Mina_net2.banned_peers = []; trusted_peers = []; isolate = false }
+      in
+      let send_heartbeat peer =
+        O1trace.thread "execute_heartbeat" (fun () ->
+            let n_def = !net2_ref in
+            if Deferred.is_determined n_def then
+              let%map net2 = n_def in
+              Mina_net2.send_heartbeat net2 peer.Network_peer.Peer.peer_id
+            else Deferred.unit )
       in
       let do_ban (banned_peer, expiration) =
         O1trace.thread "execute_gossip_net_bans" (fun () ->
@@ -636,7 +631,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                 { !ban_configuration with
                   banned_peers =
                     List.filter !ban_configuration.banned_peers ~f:(fun p ->
-                        not (Peer.equal p banned_peer))
+                        not (Peer.equal p banned_peer) )
                 } ;
               Mina_net2.set_connection_gating_config net2 !ban_configuration
               |> Deferred.ignore_m ) ;
@@ -645,8 +640,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                { !ban_configuration with
                  banned_peers = banned_peer :: !ban_configuration.banned_peers
                } ;
-             Mina_net2.set_connection_gating_config net2 !ban_configuration)
-            |> Deferred.ignore_m)
+             Mina_net2.set_connection_gating_config net2 !ban_configuration )
+            |> Deferred.ignore_m )
       in
       let%map () =
         Deferred.List.iter (Trust_system.peer_statuses config.trust_system)
@@ -656,16 +651,23 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
             ) ->
               do_ban (addr, expiration)
           | _ ->
-              Deferred.unit)
+              Deferred.unit )
+      in
+      let handle_trust_system_upcall upcall =
+        match upcall with
+        | `Ban u ->
+            do_ban u
+        | `Heartbeat peer ->
+            send_heartbeat peer
       in
       let ban_reader, ban_writer = Linear_pipe.create () in
       don't_wait_for
         (let%map () =
            Strict_pipe.Reader.iter
-             (Trust_system.ban_pipe config.trust_system)
-             ~f:do_ban
+             (Trust_system.upcall_pipe config.trust_system)
+             ~f:handle_trust_system_upcall
          in
-         Linear_pipe.close ban_writer) ;
+         Linear_pipe.close ban_writer ) ;
       let t =
         { config
         ; added_seeds
@@ -686,7 +688,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                 List.map peers
                   ~f:
                     (Fn.compose Mina_net2.Multiaddr.of_string
-                       Peer.to_multiaddr_string))) ;
+                       Peer.to_multiaddr_string ) ) ) ;
       t
 
     let set_node_status t data =
@@ -743,8 +745,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                    ~send_every:(Time_ns.Span.of_sec 10.)
                    ~timeout:
                      (Option.value ~default:(Time_ns.Span.of_sec 120.)
-                        heartbeat_timeout)
-                   ())
+                        heartbeat_timeout )
+                   () )
               ~connection_state:(Fn.const ())
               ~dispatch_queries:(fun conn ->
                 Versioned_rpc.Connection_with_menu.create conn
@@ -760,8 +762,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                     Deferred.choose
                       [ Deferred.choice d Fn.id
                       ; choice (after timeout) (fun () ->
-                            Or_error.error_string "rpc timed out")
-                      ])
+                            Or_error.error_string "rpc timed out" )
+                      ] )
               transport
               ~on_handshake_error:
                 (`Call
@@ -775,7 +777,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
                                 ( "Handshake error: $exn"
                                 , [ ("exn", `String (Exn.to_string exn)) ] ) ))
                     in
-                    Or_error.error_string "handshake error")))
+                    Or_error.error_string "handshake error" ) ) )
         >>= function
         | Ok (Ok result) ->
             (* call succeeded, result is valid *)
@@ -895,7 +897,7 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
             t peer transport
             (fun conn qs ->
               Deferred.Or_error.List.map ?how qs ~f:(fun q ->
-                  Impl.dispatch_multi conn q))
+                  Impl.dispatch_multi conn q ) )
             qs
           >>| fun data ->
           Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
@@ -921,25 +923,26 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       let%bind () =
         guard_topic ?origin_topic v1_topic_block pfs.publish_v1_block state
       in
-      guard_topic ?origin_topic v0_topic pfs.publish_v0
-        (Message.New_state state)
+      guard_topic ?origin_topic v0_topic pfs.publish_v0 (Message.New_state state)
 
-    let broadcast_transaction_pool_diff ?origin_topic t diff =
+    let broadcast_transaction_pool_diff ?origin_topic ?(nonce = 0) t diff =
       let pfs = !(t.publish_functions) in
       let%bind () =
         guard_topic ?origin_topic v1_topic_tx pfs.publish_v1_tx diff
       in
       guard_topic ?origin_topic v0_topic pfs.publish_v0
-        (Message.Transaction_pool_diff diff)
+        (Message.Transaction_pool_diff
+           { Network_pool.With_nonce.nonce; message = diff } )
 
-    let broadcast_snark_pool_diff ?origin_topic t diff =
+    let broadcast_snark_pool_diff ?origin_topic ?(nonce = 0) t diff =
       let pfs = !(t.publish_functions) in
       let%bind () =
         guard_topic ?origin_topic v1_topic_snark_work pfs.publish_v1_snark_work
           diff
       in
       guard_topic ?origin_topic v0_topic pfs.publish_v0
-        (Message.Snark_pool_diff diff)
+        (Message.Snark_pool_diff
+           { Network_pool.With_nonce.nonce; message = diff } )
 
     let on_first_connect t ~f = Deferred.map (Ivar.read t.first_peer_ivar) ~f
 
@@ -952,9 +955,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       let%map net2 = !(t.net2) in
       Mina_net2.connection_gating_config net2
 
-    let set_connection_gating t config =
+    let set_connection_gating ?clean_added_peers t config =
       let%bind net2 = !(t.net2) in
-      Mina_net2.set_connection_gating_config net2 config
+      Mina_net2.set_connection_gating_config ?clean_added_peers net2 config
 
     let restart_helper t = t.restart_helper ()
   end

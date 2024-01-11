@@ -202,7 +202,7 @@ let changed_prefixes =
 *)
 let true_prefixes =
   List.map changed_prefixes ~f:(fun c ->
-      fixed_prefix ^ String.of_char (Char.of_int_exn c) ^ desired_prefix)
+      fixed_prefix ^ String.of_char (Char.of_int_exn c) ^ desired_prefix )
 
 (** Compute the list of powers of 2 that fit inside the Pallas base field.
 
@@ -246,7 +246,7 @@ let field_elements =
       in
       -String.compare
          (Public_key.Compressed.to_base58_check pk1)
-         (Public_key.Compressed.to_base58_check pk2))
+         (Public_key.Compressed.to_base58_check pk2) )
 
 (** Find a 'base' public key to start searching from.
 
@@ -304,7 +304,7 @@ let find_base_pk prefix =
            Stop searching, and return the previous best, along with the count
            of field elements that we have already considered.
         *)
-        Stop (Some (pk, i)))
+        Stop (Some (pk, i)) )
 
 (** Compute the next bitstring, reverse-lexicographically. Equivalent to adding
     1 bitwise.
@@ -368,7 +368,7 @@ let print_values prefix =
           List.fold2_exn ~init:base_pk.x field_elements field_selectors
             ~f:(fun field selected_field selected ->
               if selected then Snark_params.Tick.Field.add field selected_field
-              else field)
+              else field )
         in
         (* Test both odd and even versions of the public key. *)
         let pk_odd = { base_pk with x = field } in
@@ -386,6 +386,6 @@ let print_values prefix =
             ()
       in
       if debug then Format.eprintf "Keys for %s:@." prefix ;
-      go field_selectors)
+      go field_selectors )
 
 let () = List.iter ~f:print_values true_prefixes

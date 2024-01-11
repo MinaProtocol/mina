@@ -27,14 +27,14 @@ struct
       | Changed (_, value) ->
           Strict_pipe.Writer.write writer value
       | Invalidated ->
-          ()) ;
+          () ) ;
     (Strict_pipe.Reader.to_linear_pipe reader).Linear_pipe.Reader.pipe
 
   let of_broadcast_pipe pipe =
     let init = Broadcast_pipe.Reader.peek pipe in
     let var = Var.create init in
     Broadcast_pipe.Reader.iter pipe ~f:(fun value ->
-        Var.set var value ; stabilize () ; Deferred.unit)
+        Var.set var value ; stabilize () ; Deferred.unit )
     |> don't_wait_for ;
     var
 
@@ -43,7 +43,7 @@ struct
     don't_wait_for
       (Deferred.map deferred ~f:(fun () ->
            Var.set var `Filled ;
-           stabilize ())) ;
+           stabilize () ) ) ;
     var
 
   let of_ivar (ivar : unit Ivar.t) = of_deferred (Ivar.read ivar)

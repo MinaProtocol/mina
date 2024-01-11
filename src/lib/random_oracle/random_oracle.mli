@@ -18,6 +18,10 @@ module State : sig
   val map : 'a t -> f:('a -> 'b) -> 'b t
 
   val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
+
+  val to_array : 'a t -> 'a array
+
+  val of_array : 'a array -> 'a t
 end
 
 include
@@ -55,12 +59,26 @@ val read_typ' :
 module Legacy : sig
   module Input = Random_oracle_input.Legacy
 
+  module Inputs : sig
+    val rounds_full : int
+
+    val initial_ark : bool
+
+    val rounds_partial : int
+
+    val alpha : int
+  end
+
   module State : sig
     type 'a t [@@deriving equal, sexp, compare]
 
     val map : 'a t -> f:('a -> 'b) -> 'b t
 
     val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
+
+    val to_array : 'a t -> 'a array
+
+    val of_array : 'a array -> 'a t
   end
 
   include

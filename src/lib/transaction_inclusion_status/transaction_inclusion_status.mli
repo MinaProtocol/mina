@@ -23,4 +23,4 @@ val get_status :
        Transition_frontier.t Option.t Broadcast_pipe.Reader.t
   -> transaction_pool:Network_pool.Transaction_pool.t
   -> User_command.t
-  -> State.t Or_error.t
+  -> State.t

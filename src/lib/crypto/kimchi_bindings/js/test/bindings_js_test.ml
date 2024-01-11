@@ -1,8 +1,10 @@
-open Kimchi
+open Kimchi_types
+open Pasta_bindings
+open Kimchi_bindings
 open Js_of_ocaml
-module Bigint_256 = Foundations.BigInt256
-module Pasta_fp = Foundations.Fp
-module Pasta_fq = Foundations.Fq
+module Bigint_256 = BigInt256
+module Pasta_fp = Fp
+module Pasta_fq = Fq
 module Pasta_fp_vector = FieldVectors.Fp
 module Pasta_fq_vector = FieldVectors.Fq
 module Pasta_pallas = Pallas
@@ -15,7 +17,7 @@ module Pasta_fp_verifier_index = Protocol.VerifierIndex.Fp
 module Pasta_fq_verifier_index = Protocol.VerifierIndex.Fq
 
 (* NOTE: For nodejs, we need to manually add the following line to the javascript bindings, after imports['env'] has been declared.
-imports['env']['memory'] = new WebAssembly.Memory({initial: 18, maximum: 16384, shared: true});
+   imports['env']['memory'] = new WebAssembly.Memory({initial: 18, maximum: 16384, shared: true});
 *)
 
 type a = { a : int; b : bool; c : int option option }
@@ -71,7 +73,7 @@ let _ =
        method bytesOfJsString x = Js.to_string x |> Bytes.of_string
 
        method bytesToJsString x = Bytes.to_string x |> Js.string
-    end)
+    end )
 
 let _ =
   let open Bigint_256 in
@@ -100,7 +102,7 @@ let _ =
        method ofBytes x = of_bytes x
 
        method deepCopy x = deep_copy x
-    end)
+    end )
 
 let _ =
   let open Pasta_fp in
@@ -165,7 +167,7 @@ let _ =
        method ofBytes x = of_bytes x
 
        method deepCopy x = deep_copy x
-    end)
+    end )
 
 let _ =
   let open Pasta_fq in
@@ -230,7 +232,7 @@ let _ =
        method ofBytes x = of_bytes x
 
        method deepCopy x = deep_copy x
-    end)
+    end )
 
 let _ =
   let open Bigint_256 in
@@ -258,7 +260,7 @@ let _ =
          let ten_bytes = to_bytes ten in
          assert (compare (of_bytes ten_bytes) ten = 0) ;
          assert (compare (deep_copy six) six = 0)
-    end)
+    end )
 
 let _ =
   let open Pasta_fp in
@@ -271,8 +273,7 @@ let _ =
          assert (
            String.equal
              (Bigint_256.to_string size)
-             "28948022309329048855892746252171976963363056481941560715954676764349967630337"
-         ) ;
+             "28948022309329048855892746252171976963363056481941560715954676764349967630337" ) ;
          let one = of_int 1 in
          let two = of_string "2" in
          let rand1 = random () in
@@ -317,7 +318,7 @@ let _ =
          let gen = domain_generator 2 in
          assert (equal (of_bytes (to_bytes gen)) gen) ;
          assert (equal (deep_copy rand2) rand2)
-    end)
+    end )
 
 let _ =
   let open Pasta_fq in
@@ -330,8 +331,7 @@ let _ =
          assert (
            String.equal
              (Bigint_256.to_string size)
-             "28948022309329048855892746252171976963363056481941647379679742748393362948097"
-         ) ;
+             "28948022309329048855892746252171976963363056481941647379679742748393362948097" ) ;
          let one = of_int 1 in
          let two = of_string "2" in
          let rand1 = random () in
@@ -376,7 +376,7 @@ let _ =
          let gen = domain_generator 2 in
          assert (equal (of_bytes (to_bytes gen)) gen) ;
          assert (equal (deep_copy rand2) rand2)
-    end)
+    end )
 
 let _ =
   let open Pasta_fp_vector in
@@ -404,7 +404,7 @@ let _ =
          assert (Pasta_fp.equal (Pasta_fp.of_int 10) (get first 1)) ;
          assert (Pasta_fp.equal (Pasta_fp.of_int 30) (get first 2)) ;
          assert (Pasta_fp.equal (Pasta_fp.of_int 1) (get second 0))
-    end)
+    end )
 
 let _ =
   let open Pasta_fq_vector in
@@ -432,13 +432,13 @@ let _ =
          assert (Pasta_fq.equal (Pasta_fq.of_int 10) (get first 1)) ;
          assert (Pasta_fq.equal (Pasta_fq.of_int 30) (get first 2)) ;
          assert (Pasta_fq.equal (Pasta_fq.of_int 1) (get second 0))
-    end)
+    end )
 
 let eq_affine ~field_equal x y =
   match (x, y) with
-  | Foundations.Infinity, Foundations.Infinity ->
+  | Infinity, Infinity ->
       true
-  | Foundations.Finite (x1, y1), Foundations.Finite (x2, y2) ->
+  | Finite (x1, y1), Finite (x2, y2) ->
       field_equal x1 x2 && field_equal y1 y2
   | _ ->
       false
@@ -479,9 +479,9 @@ let _ =
          let affine_rand2 = to_affine rand2 in
          let copy_using_of_affine_coordinates pt =
            match pt with
-           | Foundations.Infinity ->
-               of_affine Foundations.Infinity
-           | Foundations.Finite (x, y) ->
+           | Infinity ->
+               of_affine Infinity
+           | Finite (x, y) ->
                of_affine_coordinates x y
          in
          let rand1_again = copy_using_of_affine_coordinates affine_rand1 in
@@ -506,14 +506,12 @@ let _ =
          assert (
            String.equal
              (Pasta_fp.to_string endo_base)
-             "20444556541222657078399132219657928148671392403212669005631716460534733845831"
-         ) ;
+             "20444556541222657078399132219657928148671392403212669005631716460534733845831" ) ;
          let endo_scalar = endo_scalar () in
          assert (
            String.equal
              (Pasta_fq.to_string endo_scalar)
-             "26005156700822196841419187675678338661165322343552424574062261873906994770353"
-         ) ;
+             "26005156700822196841419187675678338661165322343552424574062261873906994770353" ) ;
          let one_copied = deep_copy affine_one in
          assert (eq affine_one one_copied) ;
          let infinity_copied = deep_copy affine_infinity in
@@ -521,7 +519,7 @@ let _ =
          assert (eq affine_infinity Infinity) ;
          let infinity_copied_ = deep_copy Infinity in
          assert (eq infinity_copied_ Infinity)
-    end)
+    end )
 
 let _ =
   let open Pasta_vesta in
@@ -559,9 +557,9 @@ let _ =
          let affine_rand2 = to_affine rand2 in
          let copy_using_of_affine_coordinates pt =
            match pt with
-           | Foundations.Infinity ->
-               of_affine Foundations.Infinity
-           | Foundations.Finite (x, y) ->
+           | Infinity ->
+               of_affine Infinity
+           | Finite (x, y) ->
                of_affine_coordinates x y
          in
          let rand1_again = copy_using_of_affine_coordinates affine_rand1 in
@@ -586,25 +584,22 @@ let _ =
          assert (
            String.equal
              (Pasta_fq.to_string endo_base)
-             "2942865608506852014473558576493638302197734138389222805617480874486368177743"
-         ) ;
+             "2942865608506852014473558576493638302197734138389222805617480874486368177743" ) ;
          let endo_scalar = endo_scalar () in
          assert (
            String.equal
              (Pasta_fp.to_string endo_scalar)
-             "8503465768106391777493614032514048814691664078728891710322960303815233784505"
-         ) ;
+             "8503465768106391777493614032514048814691664078728891710322960303815233784505" ) ;
          let one_copied = deep_copy affine_one in
          assert (eq affine_one one_copied) ;
          let infinity_copied = deep_copy affine_infinity in
          assert (eq affine_infinity infinity_copied) ;
          assert (eq affine_infinity Infinity) ;
-         let infinity_copied_ = deep_copy Foundations.Infinity in
+         let infinity_copied_ = deep_copy Infinity in
          assert (eq infinity_copied_ Infinity)
-    end)
+    end )
 
-let eq_poly_comm ~field_equal (x : _ Protocol.poly_comm)
-    (y : _ Protocol.poly_comm) =
+let eq_poly_comm ~field_equal (x : _ poly_comm) (y : _ poly_comm) =
   Array.for_all2 (eq_affine ~field_equal) x.unshifted y.unshifted
   && Option.equal (eq_affine ~field_equal) x.shifted y.shifted
 
@@ -613,9 +608,7 @@ module Backend = Kimchi_backend.Pasta.Pallas_based_plonk
 let () = Backend.Keypair.set_urs_info []
 
 module Impl =
-  Snarky_backendless.Snark.Run.Make
-    (Kimchi_backend.Pasta.Pallas_based_plonk)
-    (Unit)
+  Snarky_backendless.Snark.Run.Make (Kimchi_backend.Pasta.Pallas_based_plonk)
 
 let _ =
   Js.export "snarky_test"
@@ -628,7 +621,7 @@ let _ =
            let stop = new%js Js_of_ocaml.Js.date_now in
            log
              (Core_kernel.ksprintf Js.string "%s: %f seconds" label
-                ((stop##getTime -. start##getTime) /. 1000.)) ;
+                ((stop##getTime -. start##getTime) /. 1000.) ) ;
            x
          in
          let open Impl in
@@ -639,30 +632,32 @@ let _ =
            let _ = go 1000 x in
            ()
          in
-         let input = Data_spec.[ Typ.field ] in
-         let _pk =
+         let (pk : Backend.Keypair.t) =
            time "generate_keypair" (fun () ->
-               constraint_system ~exposing:input main |> Backend.Keypair.create)
+               constraint_system ~input_typ:Typ.field ~return_typ:Typ.unit main
+               |> Backend.Keypair.create ~prev_challenges:0 )
          in
-         let pk =
+         let (_ : Backend.Keypair.t) =
            time "generate_keypair2" (fun () ->
-               constraint_system ~exposing:input main |> Backend.Keypair.create)
+               constraint_system ~input_typ:Typ.field ~return_typ:Typ.unit main
+               |> Backend.Keypair.create ~prev_challenges:0 )
          in
          let x = Backend.Field.of_int 2 in
-         let pi =
+         let (pi : Backend.Proof.with_public_evals) =
            time "generate witness conv" (fun () ->
-               Impl.generate_witness_conv input main
-                 ~f:(fun { Proof_inputs.auxiliary_inputs; public_inputs } ->
+               Impl.generate_witness_conv ~input_typ:Typ.field
+                 ~return_typ:Typ.unit main
+                 ~f:(fun { Proof_inputs.auxiliary_inputs; public_inputs } () ->
                    time "create proof" (fun () ->
                        Backend.Proof.create pk ~auxiliary:auxiliary_inputs
-                         ~primary:public_inputs))
-                 () x)
+                         ~primary:public_inputs ) )
+                 x )
          in
          let vk = Backend.Keypair.vk pk in
          let vec = Backend.Field.Vector.create () in
          Backend.Field.Vector.emplace_back vec x ;
          assert (time "verify proof" (fun () -> Backend.Proof.verify pi vk vec))
-    end)
+    end )
 
 let _ =
   let open Pasta_fp_urs in
@@ -676,7 +671,7 @@ let _ =
             let log x = (Js.Unsafe.js_expr "console.log" : _ -> unit) x in
             log
               (Core_kernel.ksprintf Js.string "%s: %f seconds" label
-                 ((stop##getTime -. start##getTime) /. 1000.)) ;
+                 ((stop##getTime -. start##getTime) /. 1000.) ) ;
             x
           in
           let n = 131072 in
@@ -690,7 +685,7 @@ let _ =
             let xs = Array.init log_n (fun _ -> Pasta_fp.random ()) in
             time "b_poly" (fun () -> b_poly_commitment urs xs)
           in
-          ()) ;
+          () ) ;
          let eq_affine x y = eq_affine ~field_equal:Pasta_fq.equal x y in
          let eq = eq_poly_comm ~field_equal:Pasta_fq.equal in
          let first = create 10 in
@@ -706,7 +701,7 @@ let _ =
          let affines =
            Array.init 16 (fun i ->
                try lcomm1.unshifted.(i)
-               with _ -> Pasta_vesta.random () |> Pasta_vesta.to_affine)
+               with _ -> Pasta_vesta.random () |> Pasta_vesta.to_affine )
          in
          let res = batch_accumulator_check second affines inputs2 in
          assert (res || not res) ;
@@ -716,7 +711,7 @@ let _ =
          let h_second_again = Pasta_vesta.deep_copy h_second in
          assert (eq_affine h_first h_first_again) ;
          assert (eq_affine h_second h_second_again)
-    end)
+    end )
 
 let _ =
   let open Pasta_fq_urs in
@@ -738,7 +733,7 @@ let _ =
          let affines =
            Array.init 16 (fun i ->
                try lcomm1.unshifted.(i)
-               with _ -> Pasta_pallas.random () |> Pasta_pallas.to_affine)
+               with _ -> Pasta_pallas.random () |> Pasta_pallas.to_affine )
          in
          let res = batch_accumulator_check second affines inputs2 in
          assert (res || not res) ;
@@ -748,9 +743,9 @@ let _ =
          let h_second_again = Pasta_pallas.deep_copy h_second in
          assert (eq_affine h_first h_first_again) ;
          assert (eq_affine h_second h_second_again)
-    end)
+    end )
 
-let mk_wires typ i (r1, c1) (r2, c2) (r3, c3) coeffs : _ Protocol.circuit_gate =
+let mk_wires typ i (r1, c1) (r2, c2) (r3, c3) coeffs : _ circuit_gate =
   { typ
   ; wires =
       ( { row = r1; col = c1 }
@@ -770,8 +765,8 @@ let _ =
        method run =
          let vec1 = create () in
          let vec2 = create () in
-         let eq { Protocol.typ = kind1; wires = wires1; coeffs = c1 }
-             { Protocol.typ = kind2; wires = wires2; coeffs = c2 } =
+         let eq { typ = kind1; wires = wires1; coeffs = c1 }
+             { typ = kind2; wires = wires2; coeffs = c2 } =
            kind1 = kind2 && wires1 = wires2
            && try Array.for_all2 Pasta_fp.equal c1 c2 with _ -> false
          in
@@ -848,7 +843,7 @@ let _ =
              (mk_wires Zero 0 (0, 1) (0, 1) (0, 0) zero.coeffs)
          in
          test_vec vec1 ; test_vec vec2
-    end)
+    end )
 
 let _ =
   let open Protocol.Gates.Vector.Fq in
@@ -857,8 +852,8 @@ let _ =
        method run =
          let vec1 = create () in
          let vec2 = create () in
-         let eq { Protocol.typ = kind1; wires = wires1; coeffs = c1 }
-             { Protocol.typ = kind2; wires = wires2; coeffs = c2 } =
+         let eq { typ = kind1; wires = wires1; coeffs = c1 }
+             { typ = kind2; wires = wires2; coeffs = c2 } =
            kind1 = kind2 && wires1 = wires2
            && try Array.for_all2 Pasta_fq.equal c1 c2 with _ -> false
          in
@@ -880,47 +875,20 @@ let _ =
          let vbmul3 =
            mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (rand_fields 20)
          in
-         let endomul1 =
-           mk_wires ChaCha0 6 (6, 0) (6, 1) (6, 2) (rand_fields 30)
-         in
-         let endomul2 =
-           mk_wires ChaCha1 7 (7, 0) (7, 1) (7, 2) (rand_fields 31)
-         in
-         let endomul3 =
-           mk_wires ChaCha2 8 (8, 0) (8, 1) (8, 2) (rand_fields 32)
-         in
-         let endomul4 =
-           mk_wires ChaChaFinal 9 (9, 0) (9, 1) (9, 2) (rand_fields 33)
-         in
-         let all =
-           [ zero
-           ; generic
-           ; add1
-           ; add2
-           ; vbmul1
-           ; vbmul2
-           ; vbmul3
-           ; endomul1
-           ; endomul2
-           ; endomul3
-           ; endomul4
-           ]
-         in
+         let all = [ zero; generic; add1; add2; vbmul1; vbmul2; vbmul3 ] in
          let test_vec vec =
            List.iter (add vec) all ;
            List.iteri (fun i x -> assert (eq x (get vec i))) all ;
            let l, r, o, _, _, _, _ = zero.wires in
            wrap vec l r ;
            assert (
-             eq (get vec 0) (mk_wires Zero 0 (0, 1) (0, 1) (0, 2) zero.coeffs)
-           ) ;
+             eq (get vec 0) (mk_wires Zero 0 (0, 1) (0, 1) (0, 2) zero.coeffs) ) ;
            wrap vec o l ;
            assert (
-             eq (get vec 0) (mk_wires Zero 0 (0, 1) (0, 1) (0, 0) zero.coeffs)
-           )
+             eq (get vec 0) (mk_wires Zero 0 (0, 1) (0, 1) (0, 0) zero.coeffs) )
          in
          test_vec vec1 ; test_vec vec2
-    end)
+    end )
 
 let _ =
   let open Pasta_fp_index in
@@ -952,8 +920,16 @@ let _ =
            vec
          in
          let urs = Pasta_fp_urs.create 16 in
-         let index0 = create gate_vector 0 urs in
-         let index2 = create gate_vector 2 urs in
+         (* TODO(dw) write tests with lookup tables *)
+         let lookup_tables = [||] in
+         (* TODO(dw) write tests with runtime tables *)
+         let runtime_table_cfg = [||] in
+         let index0 =
+           create gate_vector 0 lookup_tables runtime_table_cfg 0 urs
+         in
+         let index2 =
+           create gate_vector 2 lookup_tables runtime_table_cfg 0 urs
+         in
          assert (max_degree index0 = 16) ;
          assert (max_degree index2 = 16) ;
          assert (public_inputs index0 = 0) ;
@@ -964,7 +940,7 @@ let _ =
          assert (domain_d4_size index2 = 64) ;
          assert (domain_d8_size index0 = 128) ;
          assert (domain_d8_size index2 = 128)
-    end)
+    end )
 
 let _ =
   let open Pasta_fq_index in
@@ -994,38 +970,21 @@ let _ =
            let vbmul3 =
              mk_wires EndoMulScalar 5 (5, 0) (5, 1) (5, 2) (rand_fields 20)
            in
-           let endomul1 =
-             mk_wires ChaCha0 6 (6, 0) (6, 1) (6, 2) (rand_fields 30)
-           in
-           let endomul2 =
-             mk_wires ChaCha1 7 (7, 0) (7, 1) (7, 2) (rand_fields 31)
-           in
-           let endomul3 =
-             mk_wires ChaCha2 8 (8, 0) (8, 1) (8, 2) (rand_fields 32)
-           in
-           let endomul4 =
-             mk_wires ChaChaFinal 9 (9, 0) (9, 1) (9, 2) (rand_fields 33)
-           in
-           let all =
-             [ zero
-             ; generic
-             ; add1
-             ; add2
-             ; vbmul1
-             ; vbmul2
-             ; vbmul3
-             ; endomul1
-             ; endomul2
-             ; endomul3
-             ; endomul4
-             ]
-           in
+           let all = [ zero; generic; add1; add2; vbmul1; vbmul2; vbmul3 ] in
            List.iter (add vec) all ;
            vec
          in
          let urs = Pasta_fq_urs.create 16 in
-         let index0 = create gate_vector 0 urs in
-         let index2 = create gate_vector 2 urs in
+         (* TODO(dw) write tests with lookup tables *)
+         let lookup_tables = [||] in
+         (* TODO(dw) write tests with runtime tables *)
+         let runtime_table_cfg = [||] in
+         let index0 =
+           create gate_vector 0 lookup_tables runtime_table_cfg 0 urs
+         in
+         let index2 =
+           create gate_vector 2 lookup_tables runtime_table_cfg 0 urs
+         in
          assert (max_degree index0 = 16) ;
          assert (max_degree index2 = 16) ;
          assert (public_inputs index0 = 0) ;
@@ -1036,12 +995,12 @@ let _ =
          assert (domain_d4_size index2 = 64) ;
          assert (domain_d8_size index0 = 128) ;
          assert (domain_d8_size index2 = 128)
-    end)
+    end )
 
 let eq_verification_shifts ~field_equal l r = Array.for_all2 field_equal l r
 
 let verification_evals_to_list
-    { Protocol.VerifierIndex.sigma_comm : 'PolyComm array
+    { VerifierIndex.sigma_comm : 'PolyComm array
     ; coefficients_comm : 'PolyComm array
     ; generic_comm : 'PolyComm
     ; psm_comm : 'PolyComm
@@ -1049,39 +1008,66 @@ let verification_evals_to_list
     ; mul_comm : 'PolyComm
     ; emul_comm : 'PolyComm
     ; endomul_scalar_comm : 'PolyComm
-    ; chacha_comm : 'PolyComm array option
+    ; xor_comm : 'PolyComm option
+    ; range_check0_comm : 'PolyComm option
+    ; range_check1_comm : 'PolyComm option
+    ; foreign_field_add_comm : 'PolyComm option
+    ; foreign_field_mul_comm : 'PolyComm option
+    ; rot_comm : 'PolyComm option
     } =
-  generic_comm :: psm_comm :: complete_add_comm :: mul_comm :: emul_comm
-  :: endomul_scalar_comm
-  :: ( Array.append sigma_comm coefficients_comm
-     |> Array.append (Option.value ~default:[||] chacha_comm)
-     |> Array.to_list )
+  let non_opt_comms =
+    generic_comm :: psm_comm :: complete_add_comm :: mul_comm :: emul_comm
+    :: endomul_scalar_comm
+    :: (Array.append sigma_comm coefficients_comm |> Array.to_list)
+  in
+  let opt_comms =
+    [ xor_comm
+    ; range_check0_comm
+    ; range_check1_comm
+    ; foreign_field_add_comm
+    ; foreign_field_mul_comm
+    ; rot_comm
+    ]
+  in
+  List.map Option.some non_opt_comms @ opt_comms
 
 let eq_verifier_index ~field_equal ~other_field_equal
-    { Protocol.VerifierIndex.domain =
-        { log_size_of_group = i1_1; group_gen = f1 }
+    { VerifierIndex.domain = { log_size_of_group = i1_1; group_gen = f1 }
     ; max_poly_size = i1_2
-    ; max_quot_size = i1_3
     ; srs = _
     ; evals = evals1
     ; shifts = shifts1
     ; lookup_index = _
+    ; public = public1
+    ; prev_challenges = prev_challenges1
+    ; zk_rows = zk_rows1
     }
-    { Protocol.VerifierIndex.domain =
-        { log_size_of_group = i2_1; group_gen = f2 }
+    { VerifierIndex.domain = { log_size_of_group = i2_1; group_gen = f2 }
     ; max_poly_size = i2_2
-    ; max_quot_size = i2_3
     ; srs = _
     ; evals = evals2
     ; shifts = shifts2
     ; lookup_index = _
+    ; public = public2
+    ; prev_challenges = prev_challenges2
+    ; zk_rows = zk_rows2
     } =
-  i1_1 = i2_1 && field_equal f1 f2 && i1_2 = i2_2 && i1_3 = i2_3
+  i1_1 = i2_1 && field_equal f1 f2 && i1_2 = i2_2
   && List.for_all2
-       (eq_poly_comm ~field_equal:other_field_equal)
+       (fun x y ->
+         match (x, y) with
+         | Some x, Some y ->
+             eq_poly_comm ~field_equal:other_field_equal x y
+         | None, None ->
+             true
+         | _, _ ->
+             false )
        (verification_evals_to_list evals1)
        (verification_evals_to_list evals2)
   && eq_verification_shifts ~field_equal shifts1 shifts2
+  && public1 = public2
+  && prev_challenges1 = prev_challenges2
+  && zk_rows1 = zk_rows2
 
 let _ =
   let open Pasta_fp_verifier_index in
@@ -1117,8 +1103,18 @@ let _ =
              ~other_field_equal:Pasta_fq.equal
          in
          let urs = Pasta_fp_urs.create 16 in
-         let index0 = Pasta_fp_index.create gate_vector 0 urs in
-         let index2 = Pasta_fp_index.create gate_vector 2 urs in
+         (* TODO(dw) write tests with lookup tables *)
+         let lookup_tables = [||] in
+         (* TODO(dw) write tests with runtime tables *)
+         let runtime_table_cfg = [||] in
+         let index0 =
+           Pasta_fp_index.create gate_vector 0 lookup_tables runtime_table_cfg 0
+             urs
+         in
+         let index2 =
+           Pasta_fp_index.create gate_vector 2 lookup_tables runtime_table_cfg 0
+             urs
+         in
          let vindex0_0 = create index0 in
          let vindex0_1 = create index0 in
          assert (eq vindex0_0 vindex0_1) ;
@@ -1131,7 +1127,7 @@ let _ =
          List.iter
            (fun x -> assert (eq (deep_copy x) x))
            [ vindex0_0; vindex2_0; dummy0 ]
-    end)
+    end )
 
 let _ =
   let open Pasta_fq_verifier_index in
@@ -1167,8 +1163,18 @@ let _ =
              ~other_field_equal:Pasta_fp.equal
          in
          let urs = Pasta_fq_urs.create 16 in
-         let index0 = Pasta_fq_index.create gate_vector 0 urs in
-         let index2 = Pasta_fq_index.create gate_vector 2 urs in
+         (* TODO(dw) write tests with lookup tables *)
+         let lookup_tables = [||] in
+         (* TODO(dw) write tests with runtime tables *)
+         let runtime_table_cfg = [||] in
+         let index0 =
+           Pasta_fq_index.create gate_vector 0 lookup_tables runtime_table_cfg 0
+             urs
+         in
+         let index2 =
+           Pasta_fq_index.create gate_vector 2 lookup_tables runtime_table_cfg 0
+             urs
+         in
          let vindex0_0 = create index0 in
          let vindex0_1 = create index0 in
          assert (eq vindex0_0 vindex0_1) ;
@@ -1181,6 +1187,6 @@ let _ =
          List.iter
            (fun x -> assert (eq (deep_copy x) x))
            [ vindex0_0; vindex2_0; dummy0 ]
-    end)
+    end )
 
 let linkme = ()

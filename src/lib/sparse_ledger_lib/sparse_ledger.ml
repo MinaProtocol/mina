@@ -74,6 +74,17 @@ module type S = sig
   val add_path :
     t -> [ `Left of hash | `Right of hash ] list -> account_id -> account -> t
 
+  (** Same as [add_path], but using the hashes provided in the wide merkle path
+      instead of recomputing them.
+      This is unsafe: the hashes are not checked or recomputed.
+  *)
+  val add_wide_path_unsafe :
+       t
+    -> [ `Left of hash * hash | `Right of hash * hash ] list
+    -> account_id
+    -> account
+    -> t
+
   val iteri : t -> f:(int -> account -> unit) -> unit
 
   val merkle_root : t -> hash
@@ -122,54 +133,85 @@ end = struct
 
   let merkle_root { T.tree; _ } = hash tree
 
-  let add_path depth0 tree0 path0 account =
-    let rec build_tree height p =
-      match p with
-      | `Left h_r :: path ->
-          let l = build_tree (height - 1) path in
-          Tree.Node (Hash.merge ~height (hash l) h_r, l, Hash h_r)
-      | `Right h_l :: path ->
-          let r = build_tree (height - 1) path in
-          Node (Hash.merge ~height h_l (hash r), Hash h_l, r)
-      | [] ->
-          assert (height = -1) ;
-          Account account
+  let add_path_impl ~replace_self tree0 path0 account =
+    (* Takes height, left and right children and builds a pair of sibling nodes
+       one level up *)
+    let build_tail_f height (prev_l, prev_r) =
+      replace_self ~f:(fun mself ->
+          let self =
+            match mself with
+            | Some self ->
+                self
+            | None ->
+                Hash.merge ~height (hash prev_l) (hash prev_r)
+          in
+          Tree.Node (self, prev_l, prev_r) )
     in
-    let rec union height tree path =
-      match (tree, path) with
-      | Tree.Hash h, path ->
-          let t = build_tree height path in
-          [%test_result: Hash.t]
-            ~message:
-              "Hashes in union are not equal, something is wrong with your \
-               ledger"
-            ~expect:h (hash t) ;
-          t
-      | Node (h, l, r), `Left h_r :: path ->
-          assert (Hash.equal h_r (hash r)) ;
-          let l = union (height - 1) l path in
-          Node (h, l, r)
-      | Node (h, l, r), `Right h_l :: path ->
-          assert (Hash.equal h_l (hash l)) ;
-          let r = union (height - 1) r path in
-          Node (h, l, r)
+    (* Builds the tail of path, i.e. part of the path that is not present in
+       the current ledger and we just add it all the way down to account
+       using the path *)
+    let build_tail hash_node_to_bottom_path =
+      let bottom_el, bottom_to_hash_node_path =
+        Mina_stdlib.Nonempty_list.(rev hash_node_to_bottom_path |> uncons)
+      in
+      (* Left and right branches of a node that is parent of the bottom node *)
+      let init = replace_self ~f:(Fn.const (Tree.Account account)) bottom_el in
+      List.foldi ~init bottom_to_hash_node_path ~f:build_tail_f
+    in
+    (* Traverses the tree along path, collecting nodes and untraversed sibling hashes
+        Stops when encounters `Hash` or `Account` node.
+
+       Returns the last visited node (`Hash` or `Account`), remainder of path and
+       collected node/sibling hashes in bottom-to-top order.
+    *)
+    let rec traverse_through_nodes = function
+      | Tree.Account _, _ :: _ ->
+          failwith "path is longer than a tree's branch"
+      | Account _, [] | Tree.Hash _, [] ->
+          Tree.Account account
+      | Tree.Hash h, fst_el :: rest ->
+          let tail_l, tail_r =
+            build_tail (Mina_stdlib.Nonempty_list.init fst_el rest)
+          in
+          Tree.Node (h, tail_l, tail_r)
+      | Node (h, l, r), `Left _ :: rest ->
+          Tree.Node (h, traverse_through_nodes (l, rest), r)
+      | Node (h, l, r), `Right _ :: rest ->
+          Tree.Node (h, l, traverse_through_nodes (r, rest))
       | Node _, [] ->
-          failwith "Path too short"
-      | Account _, _ :: _ ->
-          failwith "Path too long"
-      | Account a, [] ->
-          assert (Account.equal a account) ;
-          tree
+          failwith "path is shorter than a tree's branch"
     in
-    union (depth0 - 1) tree0 (List.rev path0)
+    traverse_through_nodes (tree0, List.rev path0)
 
   let add_path (t : t) path account_id account =
     let index =
       List.foldi path ~init:0 ~f:(fun i acc x ->
-          match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc)
+          match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
+    in
+    let replace_self ~f = function
+      | `Left h_r ->
+          (f None, Tree.Hash h_r)
+      | `Right h_l ->
+          (Tree.Hash h_l, f None)
     in
     { t with
-      tree = add_path t.depth t.tree path account
+      tree = add_path_impl ~replace_self t.tree path account
+    ; indexes = (account_id, index) :: t.indexes
+    }
+
+  let add_wide_path_unsafe (t : t) path account_id account =
+    let index =
+      List.foldi path ~init:0 ~f:(fun i acc x ->
+          match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
+    in
+    let replace_self ~f = function
+      | `Left (h_l, h_r) ->
+          (f (Some h_l), Tree.Hash h_r)
+      | `Right (h_l, h_r) ->
+          (Tree.Hash h_l, f (Some h_r))
+    in
+    { t with
+      tree = add_path_impl ~replace_self t.tree path account
     ; indexes = (account_id, index) :: t.indexes
     }
 
@@ -221,8 +263,8 @@ end = struct
           in
           failwithf
             !"Sparse_ledger.get: Bad index %i. Expected a%s, but got a%s at \
-              depth %i. Tree = %{sexp:t}"
-            idx expected_kind kind (depth - i) t ()
+              depth %i. Tree = %{sexp:t}, tree_depth = %d"
+            idx expected_kind kind (depth - i) t depth ()
     in
     go (depth - 1) tree
 
@@ -374,7 +416,7 @@ let%test_module "sparse-ledger-test" =
                 ~message:
                   "Iteri index should be contained in the indexes auxillary \
                    structure"
-                ~expect:true (Int.Set.mem indexes i)))
+                ~expect:true (Int.Set.mem indexes i) ) )
 
     let%test_unit "path_test" =
       Quickcheck.test gen ~f:(fun t ->
@@ -382,7 +424,7 @@ let%test_module "sparse-ledger-test" =
           let t' =
             List.fold t.indexes ~init:root ~f:(fun acc (_, index) ->
                 let account = get_exn t index in
-                add_path acc (path_exn t index) (Account.key account) account)
+                add_path acc (path_exn t index) (Account.key account) account )
           in
-          assert (Tree.equal Hash.equal Account.equal t'.tree t.tree))
+          assert (Tree.equal Hash.equal Account.equal t'.tree t.tree) )
   end )

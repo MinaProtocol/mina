@@ -32,7 +32,7 @@ struct
     let params = Elem.Params.create ?min ?max ?buckets () in
     let intervals =
       List.init (Elem.Params.buckets params) ~f:(fun i ->
-          Elem.interval_of_bucket ~params i)
+          Elem.interval_of_bucket ~params i )
     in
     { buckets = Array.init (Elem.Params.buckets params) ~f:(fun _ -> 0)
     ; intervals

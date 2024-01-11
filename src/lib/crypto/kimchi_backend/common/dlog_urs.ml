@@ -48,7 +48,7 @@ module Make (Inputs : Inputs_intf) = struct
               (fun () -> name)
               (fun () ~path -> Or_error.try_with (fun () -> Urs.read path))
               (fun _ urs path ->
-                Or_error.try_with (fun () -> Urs.write urs path))
+                Or_error.try_with (fun () -> Urs.write urs path) )
           in
           let u =
             match Key_cache.Sync.read specs store () with
@@ -62,7 +62,7 @@ module Make (Inputs : Inputs_intf) = struct
                       | On_disk _ ->
                           true
                       | S3 _ ->
-                          false))
+                          false ) )
                     store () urs
                 in
                 urs

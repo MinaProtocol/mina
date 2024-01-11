@@ -45,12 +45,12 @@ module Ledger_hash = Ledger_hash0
 
      "Making sense" can be captured by the idea that these are the *increasing*
      boolean functions on the type { has_valid_signature: bool; has_valid_proof: bool }.
-  *)
+*)
 module Auth_required = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t =
+      type t = Mina_wire_types.Mina_base.Permissions.Auth_required.V2.t =
         | None
         | Either
         | Proof
@@ -65,6 +65,15 @@ module Auth_required = struct
     end
   end]
 
+  let from ~auth_tag : t =
+    match auth_tag with
+    | Control.Tag.Proof ->
+        Proof
+    | Signature ->
+        Signature
+    | None_given ->
+        None
+
   (* permissions such that [check permission (Proof _)] is true *)
   let gen_for_proof_authorization : t Quickcheck.Generator.t =
     Quickcheck.Generator.of_list [ None; Either; Proof ]
@@ -76,6 +85,32 @@ module Auth_required = struct
   (* permissions such that [check permission None_given] is true *)
   let gen_for_none_given_authorization : t Quickcheck.Generator.t =
     Quickcheck.Generator.return None
+
+  let to_string = function
+    | None ->
+        "None"
+    | Either ->
+        "Either"
+    | Proof ->
+        "Proof"
+    | Signature ->
+        "Signature"
+    | Impossible ->
+        "Impossible"
+
+  let of_string = function
+    | "None" ->
+        Stable.Latest.None
+    | "Either" ->
+        Either
+    | "Proof" ->
+        Proof
+    | "Signature" ->
+        Signature
+    | "Impossible" ->
+        Impossible
+    | _ ->
+        failwith "auth_required_of_string: unknown variant"
 
   (* The encoding is chosen so that it is easy to write this function
 
@@ -209,7 +244,7 @@ module Auth_required = struct
 
   let%test_unit "decode encode" =
     List.iter [ Impossible; Proof; Signature; Either ] ~f:(fun t ->
-        [%test_eq: t] t (decode (encode t)))
+        [%test_eq: t] t (decode (encode t)) )
 
   [%%ifdef consensus_mechanism]
 
@@ -220,7 +255,7 @@ module Auth_required = struct
 
     let to_input : t -> _ =
       Encoding.to_input ~field_of_bool:(fun (b : Boolean.var) ->
-          (b :> Field.Var.t))
+          (b :> Field.Var.t) )
 
     let constant t = Encoding.map (encode t) ~f:Boolean.var_of_value
 
@@ -308,17 +343,20 @@ module Poly = struct
   module Stable = struct
     module V2 = struct
       type 'controller t =
+            'controller Mina_wire_types.Mina_base.Permissions.Poly.V2.t =
         { edit_state : 'controller
+        ; access : 'controller
         ; send : 'controller
         ; receive : 'controller
         ; set_delegate : 'controller
         ; set_permissions : 'controller
         ; set_verification_key : 'controller
         ; set_zkapp_uri : 'controller
-        ; edit_sequence_state : 'controller
+        ; edit_action_state : 'controller
         ; set_token_symbol : 'controller
         ; increment_nonce : 'controller
         ; set_voting_for : 'controller
+        ; set_timing : 'controller
         }
       [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
     end
@@ -330,8 +368,10 @@ module Poly = struct
       ~send:(f controller) ~set_delegate:(f controller)
       ~set_permissions:(f controller) ~set_verification_key:(f controller)
       ~receive:(f controller) ~set_zkapp_uri:(f controller)
-      ~edit_sequence_state:(f controller) ~set_token_symbol:(f controller)
+      ~edit_action_state:(f controller) ~set_token_symbol:(f controller)
       ~increment_nonce:(f controller) ~set_voting_for:(f controller)
+      ~set_timing:(f controller) ~access:(f controller)
+    |> List.rev
     |> List.reduce_exn ~f:Random_oracle.Input.Chunked.append
 end
 
@@ -364,10 +404,17 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
   let%bind set_permissions = auth_required_gen in
   let%bind set_verification_key = auth_required_gen in
   let%bind set_zkapp_uri = auth_required_gen in
-  let%bind edit_sequence_state = auth_required_gen in
+  let%bind edit_action_state = auth_required_gen in
   let%bind set_token_symbol = auth_required_gen in
   let%bind increment_nonce = auth_required_gen in
   let%bind set_voting_for = auth_required_gen in
+  let%bind set_timing = auth_required_gen in
+  let%bind access =
+    (* Access permission is significantly more restrictive, do not arbitrarily
+       set it when tests may not be intending to exercise it.
+    *)
+    Auth_required.gen_for_none_given_authorization
+  in
   return
     { Poly.edit_state
     ; send
@@ -376,10 +423,12 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
     ; set_permissions
     ; set_verification_key
     ; set_zkapp_uri
-    ; edit_sequence_state
+    ; edit_action_state
     ; set_token_symbol
     ; increment_nonce
     ; set_voting_for
+    ; set_timing
+    ; access
     }
 
 [%%ifdef consensus_mechanism]
@@ -398,22 +447,24 @@ module Checked = struct
     let c = g Auth_required.Checked.if_ in
     Poly.Fields.map ~edit_state:c ~send:c ~receive:c ~set_delegate:c
       ~set_permissions:c ~set_verification_key:c ~set_zkapp_uri:c
-      ~edit_sequence_state:c ~set_token_symbol:c ~increment_nonce:c
-      ~set_voting_for:c
+      ~edit_action_state:c ~set_token_symbol:c ~increment_nonce:c
+      ~set_voting_for:c ~set_timing:c ~access:c
 
   let constant (t : Stable.Latest.t) : t =
     let open Core_kernel.Field in
     let a f = Auth_required.Checked.constant (get f t) in
     Poly.Fields.map ~edit_state:a ~send:a ~receive:a ~set_delegate:a
       ~set_permissions:a ~set_verification_key:a ~set_zkapp_uri:a
-      ~edit_sequence_state:a ~set_token_symbol:a ~increment_nonce:a
-      ~set_voting_for:a
+      ~edit_action_state:a ~set_token_symbol:a ~increment_nonce:a
+      ~set_voting_for:a ~set_timing:a ~access:a
 end
 
 let typ =
   let open Poly.Stable.Latest in
   Typ.of_hlistable
     [ Auth_required.typ
+    ; Auth_required.typ
+    ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
@@ -440,57 +491,36 @@ let user_default : t =
   ; set_permissions = Signature
   ; set_verification_key = Signature
   ; set_zkapp_uri = Signature
-  ; edit_sequence_state = Signature
+  ; edit_action_state = Signature
   ; set_token_symbol = Signature
   ; increment_nonce = Signature
   ; set_voting_for = Signature
+  ; set_timing = Signature
+  ; access = None
   }
 
 let empty : t =
   { edit_state = None
   ; send = None
   ; receive = None
+  ; access = None
   ; set_delegate = None
   ; set_permissions = None
   ; set_verification_key = None
   ; set_zkapp_uri = None
-  ; edit_sequence_state = None
+  ; edit_action_state = None
   ; set_token_symbol = None
   ; increment_nonce = None
   ; set_voting_for = None
+  ; set_timing = None
   }
 
 (* deriving-fields-related stuff *)
-let auth_required_to_string = function
-  | Auth_required.Stable.Latest.None ->
-      "None"
-  | Either ->
-      "Either"
-  | Proof ->
-      "Proof"
-  | Signature ->
-      "Signature"
-  | Impossible ->
-      "Impossible"
-
-let auth_required_of_string = function
-  | "None" ->
-      Auth_required.Stable.Latest.None
-  | "Either" ->
-      Either
-  | "Proof" ->
-      Proof
-  | "Signature" ->
-      Signature
-  | "Impossible" ->
-      Impossible
-  | _ ->
-      failwith "auth_required_of_string: unknown variant"
 
 let auth_required =
   Fields_derivers_zkapps.Derivers.iso_string ~name:"AuthRequired"
-    ~doc:"Kind of authorization required" ~to_string:auth_required_to_string
-    ~of_string:auth_required_of_string
+    ~js_type:(Custom "AuthRequired") ~doc:"Kind of authorization required"
+    ~to_string:Auth_required.to_string ~of_string:Auth_required.of_string
 
 let deriver obj =
   let open Fields_derivers_zkapps.Derivers in
@@ -498,9 +528,10 @@ let deriver obj =
   Poly.Fields.make_creator obj ~edit_state:!.auth_required ~send:!.auth_required
     ~receive:!.auth_required ~set_delegate:!.auth_required
     ~set_permissions:!.auth_required ~set_verification_key:!.auth_required
-    ~set_zkapp_uri:!.auth_required ~edit_sequence_state:!.auth_required
+    ~set_zkapp_uri:!.auth_required ~edit_action_state:!.auth_required
     ~set_token_symbol:!.auth_required ~increment_nonce:!.auth_required
-    ~set_voting_for:!.auth_required
+    ~set_voting_for:!.auth_required ~set_timing:!.auth_required
+    ~access:!.auth_required
   |> finish "Permissions" ~t_toplevel_annots:Poly.t_toplevel_annots
 
 let%test_unit "json roundtrip" =
@@ -517,15 +548,17 @@ let%test_unit "json value" =
     (user_default |> to_json full |> Yojson.Safe.to_string)
     ( {json|{
         editState: "Signature",
+        access: "None",
         send: "Signature",
         receive: "None",
         setDelegate: "Signature",
         setPermissions: "Signature",
         setVerificationKey: "Signature",
         setZkappUri: "Signature",
-        editSequenceState: "Signature",
+        editActionState: "Signature",
         setTokenSymbol: "Signature",
         incrementNonce: "Signature",
-        setVotingFor: "Signature"
+        setVotingFor: "Signature",
+        setTiming: "Signature"
       }|json}
     |> Yojson.Safe.from_string |> Yojson.Safe.to_string )

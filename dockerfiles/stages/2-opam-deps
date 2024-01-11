@@ -11,14 +11,19 @@ FROM build-deps AS opam-deps
 ARG MINA_DIR=mina
 # branch to checkout for opam dependencies
 ARG MINA_BRANCH=compatible
+# mina repository to pull from
+ARG MINA_REPO=https://github.com/MinaProtocol/mina
 
 # location of external packages
 ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
 
-# don't keep sources, to force reinstall of pinned packages from Mina sources
+# don't keep build directories
+# to force reinstall of pinned packages from Mina sources
 # and to keep Docker image reasonable size
 ENV OPAMKEEPBUILDDIR false
 ENV OPAMREUSEBUILDDIR false
+# Limit logs for opam install errors to 20 lines per error
+ENV OPAMERRLOGLEN 20
 
 # --- Shallow clone the Mina repo, only focused on the given MINA_BRANCH
 # git will clone into an empty dir, but this also helps us set the workdir in advance
@@ -27,18 +32,19 @@ RUN git clone \
   --depth 1 \
   --shallow-submodules \
   --recurse-submodules \
-  https://github.com/MinaProtocol/mina ${HOME}/${MINA_DIR}
+  ${MINA_REPO} ${HOME}/${MINA_DIR}
 
 WORKDIR $HOME/$MINA_DIR
 
 ENV OPAMYES 1
 
 # --- Import Opam Switch
-# TODO: handle this opam work without cloning the full repository (directly pull src/opam.export)
-RUN opam switch import src/opam.export
+# TODO: handle this opam work without cloning the full repository (directly pull opam.export)
+RUN opam switch import opam.export --quiet
 
 # --- Pin external packages / submodules
-# TODO: Would be really nice to pull this script, the git submodules, and src/opam.export exclusively in this stage
+# TODO: Would be really nice to pull this script, the git submodules, and opam.export exclusively in this stage
+# Remove .ppx and the .ppx-cache so they can be built on each run
 RUN eval $(opam config env) \
   && scripts/pin-external-packages.sh \
-  && opam clean --logs -cs
+  && opam clean --logs -cs --quiet

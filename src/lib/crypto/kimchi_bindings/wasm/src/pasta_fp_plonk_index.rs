@@ -1,11 +1,18 @@
 use ark_poly::EvaluationDomain;
+use kimchi::circuits::lookup::runtime_tables::RuntimeTableCfg;
 
+use crate::arkworks::WasmPastaFp;
 use crate::gate_vector::fp::WasmGateVector;
 use crate::srs::fp::WasmFpSrs as WasmSrs;
+use crate::wasm_flat_vector::WasmFlatVector;
+use crate::wasm_vector::{fp::*, WasmVector};
+use kimchi::circuits::lookup::tables::LookupTable;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::linearization::expr_linearization;
-use kimchi::prover_index::ProverIndex as DlogIndex;
-use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
+use kimchi::poly_commitment::evaluation_proof::OpeningProof;
+use kimchi::prover_index::ProverIndex;
+use mina_curves::pasta::{Fp, Pallas as GAffineOther, Vesta as GAffine, VestaParameters};
+use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -19,68 +26,143 @@ use wasm_bindgen::prelude::*;
 
 /// Boxed so that we don't store large proving indexes in the OCaml heap.
 #[wasm_bindgen]
-pub struct WasmPastaFpPlonkIndex(#[wasm_bindgen(skip)] pub Box<DlogIndex<GAffine>>);
+pub struct WasmPastaFpPlonkIndex(
+    #[wasm_bindgen(skip)] pub Box<ProverIndex<GAffine, OpeningProof<GAffine>>>,
+);
 
-//
+// This should mimic LookupTable structure
+#[wasm_bindgen]
+pub struct WasmPastaFpLookupTable {
+    #[wasm_bindgen(skip)]
+    pub id: i32,
+    #[wasm_bindgen(skip)]
+    pub data: WasmVecVecFp,
+}
+
+// Converter from WasmPastaFpLookupTable to LookupTable, used by the binding
+// below.
+impl From<WasmPastaFpLookupTable> for LookupTable<Fp> {
+    fn from(wasm_lt: WasmPastaFpLookupTable) -> LookupTable<Fp> {
+        LookupTable {
+            id: wasm_lt.id.into(),
+            data: wasm_lt.data.0,
+        }
+    }
+}
+
+// JS constructor for js/bindings.js
+#[wasm_bindgen]
+impl WasmPastaFpLookupTable {
+    #[wasm_bindgen(constructor)]
+    pub fn new(id: i32, data: WasmVecVecFp) -> WasmPastaFpLookupTable {
+        WasmPastaFpLookupTable { id, data }
+    }
+}
+
+// Runtime table config
+
+#[wasm_bindgen]
+pub struct WasmPastaFpRuntimeTableCfg {
+    #[wasm_bindgen(skip)]
+    pub id: i32,
+    #[wasm_bindgen(skip)]
+    pub first_column: WasmFlatVector<WasmPastaFp>,
+}
+
+// JS constructor for js/bindings.js
+#[wasm_bindgen]
+impl WasmPastaFpRuntimeTableCfg {
+    #[wasm_bindgen(constructor)]
+    pub fn new(id: i32, first_column: WasmFlatVector<WasmPastaFp>) -> Self {
+        Self { id, first_column }
+    }
+}
+
+impl From<WasmPastaFpRuntimeTableCfg> for RuntimeTableCfg<Fp> {
+    fn from(wasm_rt_table_cfg: WasmPastaFpRuntimeTableCfg) -> Self {
+        Self {
+            id: wasm_rt_table_cfg.id,
+            first_column: wasm_rt_table_cfg
+                .first_column
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        }
+    }
+}
+
 // CamlPastaFpPlonkIndex methods
 //
 
+// Change js/web/worker-spec.js accordingly
 #[wasm_bindgen]
 pub fn caml_pasta_fp_plonk_index_create(
     gates: &WasmGateVector,
     public_: i32,
+    lookup_tables: WasmVector<WasmPastaFpLookupTable>,
+    runtime_table_cfgs: WasmVector<WasmPastaFpRuntimeTableCfg>,
+    prev_challenges: i32,
     srs: &WasmSrs,
-) -> Result<WasmPastaFpPlonkIndex, JsValue> {
-    // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
-    let gates: Vec<_> = gates
-        .0
-        .iter()
-        .map(|gate| CircuitGate::<Fp> {
-            typ: gate.typ,
-            wires: gate.wires,
-            coeffs: gate.coeffs.clone(),
-        })
-        .collect();
+) -> Result<WasmPastaFpPlonkIndex, JsError> {
+    console_error_panic_hook::set_once();
+    let index = crate::rayon::run_in_pool(|| {
+        // flatten the permutation information (because OCaml has a different way of keeping track of permutations)
+        let gates: Vec<_> = gates
+            .0
+            .iter()
+            .map(|gate| CircuitGate::<Fp> {
+                typ: gate.typ,
+                wires: gate.wires,
+                coeffs: gate.coeffs.clone(),
+            })
+            .collect();
 
-    // console_log("Index.create Fp");
-    // for (i, g) in gates.iter().enumerate() {
-    //     console_log(&format_circuit_gate(i, g));
-    // }
+        let rust_runtime_table_cfgs: Vec<RuntimeTableCfg<Fp>> =
+            runtime_table_cfgs.into_iter().map(Into::into).collect();
 
-    // create constraint system
-    let cs = match ConstraintSystem::<Fp>::create(
-        gates,
-        vec![],
-        oracle::pasta::fp_kimchi::params(),
-        public_ as usize,
-    ) {
-        None => {
-            return Err(JsValue::from_str(
-                "caml_pasta_fp_plonk_index_create: could not create constraint system",
-            ));
+        let rust_lookup_tables: Vec<LookupTable<Fp>> =
+            lookup_tables.into_iter().map(Into::into).collect();
+
+        // create constraint system
+        let cs = match ConstraintSystem::<Fp>::create(gates)
+            .public(public_ as usize)
+            .prev_challenges(prev_challenges as usize)
+            .lookup(rust_lookup_tables)
+            .runtime(if rust_runtime_table_cfgs.is_empty() {
+                None
+            } else {
+                Some(rust_runtime_table_cfgs)
+            })
+            .build()
+        {
+            Err(_) => {
+                return Err("caml_pasta_fp_plonk_index_create: could not create constraint system");
+            }
+            Ok(cs) => cs,
+        };
+
+        // endo
+        let (endo_q, _endo_r) = poly_commitment::srs::endos::<GAffineOther>();
+
+        // Unsafe if we are in a multi-core ocaml
+        {
+            let ptr: &mut poly_commitment::srs::SRS<GAffine> =
+                unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
+            ptr.add_lagrange_basis(cs.domain.d1);
         }
-        Some(cs) => cs,
-    };
 
-    // endo
-    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
-
-    // Unsafe if we are in a multi-core ocaml
-    {
-        let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
-            unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-        ptr.add_lagrange_basis(cs.domain.d1);
-    }
+        let mut index =
+            ProverIndex::<GAffine, OpeningProof<GAffine>>::create(cs, endo_q, srs.0.clone());
+        // Compute and cache the verifier index digest
+        index.compute_verifier_index_digest::<DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>>();
+        Ok(index)
+    });
 
     // create index
-    Ok(WasmPastaFpPlonkIndex(Box::new(
-        DlogIndex::<GAffine>::create(
-            cs,
-            oracle::pasta::fq_kimchi::params(),
-            endo_q,
-            srs.0.clone(),
-        ),
-    )))
+    match index {
+        Ok(index) => Ok(WasmPastaFpPlonkIndex(Box::new(index))),
+        Err(str) => Err(JsError::new(str)),
+    }
 }
 
 #[wasm_bindgen]
@@ -123,18 +205,17 @@ pub fn caml_pasta_fp_plonk_index_read(
 
     // optional offset in file
     if let Some(offset) = offset {
-        r.seek(Start(offset as u64)).map_err(|err| {
-            JsValue::from_str(&format!("caml_pasta_fp_plonk_index_read: {}", err))
-        })?;
+        r.seek(Start(offset as u64))
+            .map_err(|err| JsValue::from_str(&format!("caml_pasta_fp_plonk_index_read: {err}")))?;
     }
 
     // deserialize the index
-    let mut t = DlogIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))
-        .map_err(|err| JsValue::from_str(&format!("caml_pasta_fp_plonk_index_read: {}", err)))?;
-    t.cs.fr_sponge_params = oracle::pasta::fp_kimchi::params();
+    let mut t = ProverIndex::<GAffine, OpeningProof<GAffine>>::deserialize(
+        &mut rmp_serde::Deserializer::new(r),
+    )
+    .map_err(|err| JsValue::from_str(&format!("caml_pasta_fp_plonk_index_read: {err}")))?;
     t.srs = srs.0.clone();
-    t.fq_sponge_params = oracle::pasta::fq_kimchi::params();
-    let (linearization, powers_of_alpha) = expr_linearization(t.cs.domain.d1, false, None);
+    let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 
@@ -156,21 +237,27 @@ pub fn caml_pasta_fp_plonk_index_write(
     index
         .0
         .serialize(&mut rmp_serde::Serializer::new(w))
-        .map_err(|e| JsValue::from_str(&format!("caml_pasta_fp_plonk_index_read: {}", e)))
+        .map_err(|e| JsValue::from_str(&format!("caml_pasta_fp_plonk_index_read: {e}")))
+}
+
+#[wasm_bindgen]
+pub fn caml_pasta_fp_plonk_index_serialize(index: &WasmPastaFpPlonkIndex) -> String {
+    let serialized = rmp_serde::to_vec(&index.0).unwrap();
+    base64::encode(serialized)
 }
 
 // helpers
 
 fn format_field(f: &Fp) -> String {
     // TODO this could be much nicer, should end up as "1", "-1", "0" etc
-    format!("{}", f)
+    format!("{f}")
 }
 
 pub fn format_circuit_gate(i: usize, gate: &CircuitGate<Fp>) -> String {
     let coeffs = gate
         .coeffs
         .iter()
-        .map(|coeff: &Fp| format_field(coeff))
+        .map(format_field)
         .collect::<Vec<_>>()
         .join("\n");
     let wires = gate

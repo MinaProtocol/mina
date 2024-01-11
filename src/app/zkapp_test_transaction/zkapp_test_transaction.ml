@@ -7,9 +7,9 @@ open Zkapp_test_transaction_lib.Commands
 module Flags = struct
   open Command
 
-  let default_fee = Currency.Fee.of_formatted_string "1"
+  let default_fee = Currency.Fee.of_mina_string_exn "1"
 
-  let min_fee = Currency.Fee.of_formatted_string "0.003"
+  let min_fee = Currency.Fee.of_mina_string_exn "0.003"
 
   let memo =
     Param.flag "--memo" ~doc:"STRING Memo accompanying the transaction"
@@ -21,14 +21,9 @@ module Flags = struct
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
-           (Currency.Fee.to_formatted_string default_fee)
-           (Currency.Fee.to_formatted_string min_fee))
+           (Currency.Fee.to_mina_string default_fee)
+           (Currency.Fee.to_mina_string min_fee) )
       (Param.optional txn_fee)
-
-  let zkapp_account_key =
-    Param.flag "--zkapp-account-key"
-      ~doc:"PUBLIC KEY Base58 encoded public key of the new zkApp account"
-      Param.(required public_key_compressed)
 
   let amount =
     Param.flag "--receiver-amount" ~doc:"NN Receiver amount in Mina"
@@ -58,42 +53,52 @@ module Flags = struct
 end
 
 let create_zkapp_account =
-  let create_command ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce ~memo ()
-      =
+  let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+      ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo () =
     let open Deferred.Let_syntax in
-    let%map parties =
-      create_zkapp_account ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce
-        ~memo
+    let%map zkapp_command =
+      create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
+        ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo
     in
-    Util.print_snapp_transaction parties ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   Command.(
     let open Let_syntax in
     Command.async
       ~summary:"Generate a zkApp transaction that creates a zkApp account"
-      (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
-       and snapp_keyfile =
+      (let%map fee_payer, fee, fee_payer_nonce, memo, debug = Flags.common_flags
+       and sender =
+         Param.flag "--sender-key"
+           ~doc:
+             "KEYFILE Private key file for the sender of the transaction \
+              (should already be in the ledger)"
+           Param.(required string)
+       and sender_nonce =
+         Param.flag "--sender-nonce" ~doc:"NN Nonce of the sender account"
+           Param.(required txn_nonce)
+       and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new zkApp account"
+           ~doc:"KEYFILE Private key file for the zkApp account to be created"
            Param.(required string)
        and amount = Flags.amount in
        let fee = Option.value ~default:Flags.default_fee fee in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
-       create_command ~debug ~keyfile ~fee ~snapp_keyfile ~amount ~nonce ~memo))
+              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
+       create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+         ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ))
 
-let upgrade_snapp =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+let upgrade_zkapp =
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
       ~verification_key ~zkapp_uri ~auth () =
     let open Deferred.Let_syntax in
-    let%map parties =
-      upgrade_snapp ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
+    let%map zkapp_command =
+      upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
         ~verification_key ~zkapp_uri ~auth
     in
-    Util.print_snapp_transaction parties ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   Command.(
@@ -101,9 +106,9 @@ let upgrade_snapp =
     Command.async
       ~summary:"Generate a zkApp transaction that updates the verification key"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
-       and snapp_keyfile =
+       and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new zkApp account"
+           ~doc:"KEYFILE Private key file for the zkApp account to be upgraded"
            Param.(required string)
        and verification_key =
          Param.flag "--verification-key"
@@ -124,18 +129,61 @@ let upgrade_snapp =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
+              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        let zkapp_uri = Zkapp_basic.Set_or_keep.of_option zkapp_uri_str in
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~verification_key ~zkapp_uri ~auth))
+       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+         ~verification_key ~zkapp_uri ~auth ))
+
+let transfer_funds_one_receiver =
+  let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+      ~fee_payer_nonce ~memo ~receiver ~amount () =
+    let open Deferred.Let_syntax in
+    let%map zkapp_command =
+      transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer
+        ~fee_payer_nonce ~memo
+        ~receivers:(Deferred.return [ (receiver, amount) ])
+    in
+    Util.print_snapp_transaction ~debug zkapp_command ;
+    ()
+  in
+  Command.(
+    let open Let_syntax in
+    Command.async
+      ~summary:
+        "Generate a zkApp Transaction that makes one transfer to the receiver \
+         account"
+      (let%map fee_payer, fee, fee_payer_nonce, memo, debug = Flags.common_flags
+       and sender =
+         Param.flag "--sender-key"
+           ~doc:
+             "KEYFILE Private key file for the sender of the transaction \
+              (should already be in the ledger)"
+           Param.(required string)
+       and sender_nonce =
+         Param.flag "--sender-nonce" ~doc:"NN Nonce of the sender account"
+           Param.(required txn_nonce)
+       and receiver =
+         Param.flag "--receiver"
+           ~doc:"PUBLIC_KEY the public key of the receiver"
+           Param.(required public_key_compressed)
+       and amount = Flags.amount in
+       let fee = Option.value ~default:Flags.default_fee fee in
+       if Currency.Fee.(fee < Flags.min_fee) then
+         failwithf "Fee must at least be %s"
+           (Currency.Fee.to_mina_string Flags.min_fee)
+           () ;
+       create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+         ~fee_payer_nonce ~memo ~receiver ~amount ))
 
 let transfer_funds =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~receivers () =
+  let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+      ~fee_payer_nonce ~memo ~receivers () =
     let open Deferred.Let_syntax in
-    let%map parties =
-      transfer_funds ~debug ~keyfile ~fee ~nonce ~memo ~receivers
+    let%map zkapp_command =
+      transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer
+        ~fee_payer_nonce ~memo ~receivers
     in
-    Util.print_snapp_transaction parties ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   let read_key_and_amount count =
@@ -150,7 +198,7 @@ let transfer_funds =
           printf !"Amount:%!" ;
           match%map Reader.read_line (Lazy.force Reader.stdin) with
           | `Ok amt ->
-              let amount = Currency.Amount.of_formatted_string amt in
+              let amount = Currency.Amount.of_mina_string_exn amt in
               (pk, amount)
           | `Eof ->
               failwith "Invalid amount" )
@@ -184,24 +232,35 @@ let transfer_funds =
       ~summary:
         "Generate a zkApp transaction that makes multiple transfers from one \
          account"
-      (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags in
+      (let%map fee_payer, fee, fee_payer_nonce, memo, debug = Flags.common_flags
+       and sender =
+         Param.flag "--sender-key"
+           ~doc:
+             "KEYFILE Private key file for the sender of the transaction \
+              (should already be in the ledger)"
+           Param.(required string)
+       and sender_nonce =
+         Param.flag "--sender-nonce" ~doc:"NN Nonce of the sender account"
+           Param.(required txn_nonce)
+       in
        let fee = Option.value ~default:Flags.default_fee fee in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwithf "Fee must at least be %s"
-           (Currency.Fee.to_formatted_string Flags.min_fee)
+           (Currency.Fee.to_mina_string Flags.min_fee)
            () ;
        let max_keys = 10 in
        let receivers = read_key_and_amount max_keys in
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~receivers))
+       create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
+         ~fee_payer_nonce ~memo ~receivers ))
 
 let update_state =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
       () =
     let open Deferred.Let_syntax in
-    let%map parties =
-      update_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~app_state
+    let%map zkapp_command =
+      update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
     in
-    Util.print_snapp_transaction parties ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   Command.(
@@ -209,9 +268,9 @@ let update_state =
     Command.async
       ~summary:"Generate a zkApp transaction that updates zkApp state"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
-       and snapp_keyfile =
+       and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new zkApp account"
+           ~doc:"KEYFILE Private key file of the zkApp account to be updated"
            Param.(required string)
        and app_state =
          Param.flag "--zkapp-state"
@@ -224,39 +283,39 @@ let update_state =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~app_state))
+              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
+       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+         ~app_state ))
 
 let update_zkapp_uri =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
       ~auth () =
     let open Deferred.Let_syntax in
-    let%map parties =
+    let%map zkapp_command =
       update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
         ~zkapp_uri ~auth
     in
-    Util.print_snapp_transaction parties ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   Command.(
     let open Let_syntax in
     Command.async
-      ~summary:"Generate a zkApp transaction that updates the zkApp uri"
+      ~summary:"Generate a zkApp transaction that updates the zkApp URI"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new zkApp account"
+           ~doc:"KEYFILE Private key file of the zkApp account to be updated"
            Param.(required string)
        and zkapp_uri =
          Param.flag "--zkapp-uri"
-           ~doc:"SNAPP_URI The string to be used as the updated zkApp uri"
+           ~doc:"SNAPP_URI The string to be used as the updated zkApp URI"
            Param.(required string)
        and auth =
          Param.flag "--auth"
            ~doc:
              "Proof|Signature|Either|None Current authorization in the account \
-              to change the zkApp uri"
+              to change the zkApp URI"
            Param.(required string)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
@@ -264,19 +323,19 @@ let update_zkapp_uri =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
+              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~zkapp_uri ~auth))
+         ~zkapp_uri ~auth ))
 
-let update_sequence_state =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-      ~sequence_state () =
+let update_action_state =
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+      ~action_state () =
     let open Deferred.Let_syntax in
-    let%map parties =
-      update_sequence_state ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-        ~sequence_state
+    let%map zkapp_command =
+      update_action_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+        ~action_state
     in
-    Util.print_snapp_transaction parties ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   Command.(
@@ -284,66 +343,61 @@ let update_sequence_state =
     Command.async
       ~summary:"Generate a zkApp transaction that updates zkApp state"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
-       and snapp_keyfile =
+       and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new zkApp account"
+           ~doc:"KEYFILE Private key file of the zkApp account to be updated"
            Param.(required string)
-       and sequence_state0 =
+       and action_state0 =
          Param.flag "--sequence-state0"
            ~doc:"String(hash)|Integer(field element) a list of elements"
            Param.(
              required
                (Arg_type.comma_separated ~allow_empty:false
-                  ~strip_whitespace:true string))
-       and sequence_state1 =
+                  ~strip_whitespace:true string ))
+       and action_state1 =
          Param.flag "--sequence-state1"
            ~doc:"String(hash)|Integer(field element) a list of elements"
            Param.(
              optional_with_default []
                (Arg_type.comma_separated ~allow_empty:false
-                  ~strip_whitespace:true string))
-       and sequence_state2 =
+                  ~strip_whitespace:true string ))
+       and action_state2 =
          Param.flag "--sequence-state2"
            ~doc:"String(hash)|Integer(field element) a list of elements"
            Param.(
              optional_with_default []
                (Arg_type.comma_separated ~allow_empty:false
-                  ~strip_whitespace:true string))
-       and sequence_state3 =
+                  ~strip_whitespace:true string ))
+       and action_state3 =
          Param.flag "--sequence-state3"
            ~doc:"String(hash)|Integer(field element) a list of elements"
            Param.(
              optional_with_default []
                (Arg_type.comma_separated ~allow_empty:false
-                  ~strip_whitespace:true string))
+                  ~strip_whitespace:true string ))
        in
        let fee = Option.value ~default:Flags.default_fee fee in
-       let sequence_state =
+       let action_state =
          List.filter_map
-           ~f:(fun s ->
-             if List.is_empty s then None else Some (Array.of_list s))
-           [ sequence_state0
-           ; sequence_state1
-           ; sequence_state2
-           ; sequence_state3
-           ]
+           ~f:(fun s -> if List.is_empty s then None else Some (Array.of_list s))
+           [ action_state0; action_state1; action_state2; action_state3 ]
        in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~sequence_state))
+              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
+       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+         ~action_state ))
 
 let update_token_symbol =
   let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
       ~token_symbol ~auth () =
     let open Deferred.Let_syntax in
-    let%map parties =
+    let%map zkapp_command =
       update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
         ~token_symbol ~auth
     in
-    Util.print_snapp_transaction parties ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   Command.(
@@ -353,7 +407,7 @@ let update_token_symbol =
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
        and snapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new zkApp account"
+           ~doc:"KEYFILE Private key file of the zkApp account to be updated"
            Param.(required string)
        and token_symbol =
          Param.flag "--token-symbol"
@@ -371,19 +425,19 @@ let update_token_symbol =
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
+              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~token_symbol ~auth))
+         ~token_symbol ~auth ))
 
 let update_permissions =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-      ~permissions ~current_auth () =
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+      ~snapp_update ~current_auth () =
     let open Deferred.Let_syntax in
-    let%map parties =
-      update_permissions ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-        ~permissions ~current_auth
+    let%map zkapp_command =
+      update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+        ~snapp_update ~current_auth
     in
-    Util.print_snapp_transaction parties ;
+    Util.print_snapp_transaction ~debug zkapp_command ;
     ()
   in
   Command.(
@@ -393,9 +447,9 @@ let update_permissions =
         "Generate a zkApp transaction that updates the permissions of a zkApp \
          account"
       (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
-       and snapp_keyfile =
+       and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
-           ~doc:"KEYFILE Private key file to create a new zkApp account"
+           ~doc:"KEYFILE Private key file of the zkApp account to be updated"
            Param.(required string)
        and edit_state =
          Param.flag "--edit-state" ~doc:"Proof|Signature|Either|None"
@@ -406,6 +460,9 @@ let update_permissions =
        and receive =
          Param.flag "--receive" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
+       and access =
+         Param.flag "--access" ~doc:"Proof|Signature|Either|None"
+           Param.(optional_with_default "None" string)
        and set_permissions =
          Param.flag "--set-permissions" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
@@ -418,7 +475,7 @@ let update_permissions =
        and set_zkapp_uri =
          Param.flag "--set-zkapp-uri" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
-       and edit_sequence_state =
+       and edit_action_state =
          Param.flag "--set-sequence-state" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and set_token_symbol =
@@ -429,6 +486,9 @@ let update_permissions =
            Param.(required string)
        and set_voting_for =
          Param.flag "--set-voting-for" ~doc:"Proof|Signature|Either|None"
+           Param.(required string)
+       and set_timing =
+         Param.flag "--set-timing" ~doc:"Proof|Signature|Either|None"
            Param.(required string)
        and current_auth =
          Param.flag "--current-auth"
@@ -443,25 +503,96 @@ let update_permissions =
            { Permissions.Poly.edit_state = Util.auth_of_string edit_state
            ; send = Util.auth_of_string send
            ; receive = Util.auth_of_string receive
+           ; access = Util.auth_of_string access
            ; set_permissions = Util.auth_of_string set_permissions
            ; set_delegate = Util.auth_of_string set_delegate
            ; set_verification_key = Util.auth_of_string set_verification_key
            ; set_zkapp_uri = Util.auth_of_string set_zkapp_uri
-           ; edit_sequence_state = Util.auth_of_string edit_sequence_state
+           ; edit_action_state = Util.auth_of_string edit_action_state
            ; set_token_symbol = Util.auth_of_string set_token_symbol
            ; increment_nonce = Util.auth_of_string increment_nonce
            ; set_voting_for = Util.auth_of_string set_voting_for
+           ; set_timing = Util.auth_of_string set_timing
            }
        in
+       let snapp_update = { Account_update.Update.dummy with permissions } in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
-              (Currency.Fee.to_formatted_string Flags.min_fee)) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~permissions
-         ~current_auth:(Util.auth_of_string current_auth)))
+              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
+       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+         ~snapp_update
+         ~current_auth:(Util.auth_of_string current_auth) ))
 
-let test_snapp_with_genesis_ledger =
+let update_timings =
+  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+      ~snapp_update ~current_auth () =
+    let open Deferred.Let_syntax in
+    let%map zkapp_command =
+      update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+        ~snapp_update ~current_auth
+    in
+    Util.print_snapp_transaction ~debug zkapp_command ;
+    ()
+  in
+  Command.(
+    let open Let_syntax in
+    Command.async
+      ~summary:
+        "Generate a zkApp transaction that updates the timings of a zkApp \
+         account"
+      (let%map keyfile, fee, nonce, memo, debug = Flags.common_flags
+       and zkapp_keyfile =
+         Param.flag "--zkapp-account-key"
+           ~doc:"KEYFILE Private key file of the zkApp account to be updated"
+           Param.(required string)
+       and initial_minimum_balance =
+         Param.flag "--initial-minimum-balance"
+           ~doc:"initial minimum balance as int"
+           Param.(required int)
+       and cliff_time =
+         Param.flag "--cliff-time" ~doc:"cliff time in int" Param.(required int)
+       and cliff_amount =
+         Param.flag "--cliff-amount" ~doc:"cliff amount in int"
+           Param.(required int)
+       and vesting_period =
+         Param.flag "--vesting-period" ~doc:"vesting period in int"
+           Param.(required int)
+       and vesting_increment =
+         Param.flag "--vesting-increment" ~doc:"vesting increment in int"
+           Param.(required int)
+       and current_auth =
+         Param.flag "--current-auth"
+           ~doc:
+             "Proof|Signature|Either|None Current authorization in the account \
+              to change permissions"
+           Param.(required string)
+       in
+       let fee = Option.value ~default:Flags.default_fee fee in
+       let timing =
+         Zkapp_basic.Set_or_keep.Set
+           ( { initial_minimum_balance =
+                 Currency.Balance.of_mina_int_exn initial_minimum_balance
+             ; cliff_time =
+                 Mina_numbers.Global_slot_since_genesis.of_int cliff_time
+             ; cliff_amount = Currency.Amount.of_mina_int_exn cliff_amount
+             ; vesting_period =
+                 Mina_numbers.Global_slot_span.of_int vesting_period
+             ; vesting_increment =
+                 Currency.Amount.of_mina_int_exn vesting_increment
+             }
+             : Account_update.Update.Timing_info.value )
+       in
+       let snapp_update = { Account_update.Update.dummy with timing } in
+       if Currency.Fee.(fee < Flags.min_fee) then
+         failwith
+           (sprintf "Fee must at least be %s"
+              (Currency.Fee.to_mina_string Flags.min_fee) ) ;
+       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
+         ~snapp_update
+         ~current_auth:(Util.auth_of_string current_auth) ))
+
+let test_zkapp_with_genesis_ledger =
   Command.(
     let open Let_syntax in
     Command.async
@@ -474,7 +605,7 @@ let test_snapp_with_genesis_ledger =
              "KEYFILE Private key file for the fee payer of the transaction \
               (should be in the genesis ledger)"
            Param.(required string)
-       and snapp_keyfile =
+       and zkapp_keyfile =
          Param.flag "--zkapp-account-key"
            ~doc:"KEYFILE Private key file to create a new zkApp account"
            Param.(required string)
@@ -484,21 +615,23 @@ let test_snapp_with_genesis_ledger =
              "PATH path to a configuration file consisting the genesis ledger"
            Param.(required string)
        in
-       test_snapp_with_genesis_ledger_main keyfile snapp_keyfile config_file))
+       test_zkapp_with_genesis_ledger_main keyfile zkapp_keyfile config_file ))
 
 let txn_commands =
   [ ("create-zkapp-account", create_zkapp_account)
-  ; ("upgrade-zkapp", upgrade_snapp)
+  ; ("upgrade-zkapp", upgrade_zkapp)
   ; ("transfer-funds", transfer_funds)
+  ; ("transfer-funds-one-receiver", transfer_funds_one_receiver)
   ; ("update-state", update_state)
   ; ("update-zkapp-uri", update_zkapp_uri)
-  ; ("update-sequence-state", update_sequence_state)
+  ; ("update-sequence-state", update_action_state)
   ; ("update-token-symbol", update_token_symbol)
   ; ("update-permissions", update_permissions)
-  ; ("test-zkapp-with-genesis-ledger", test_snapp_with_genesis_ledger)
+  ; ("update-timings", update_timings)
+  ; ("test-zkapp-with-genesis-ledger", test_zkapp_with_genesis_ledger)
   ]
 
 let () =
   Command.run
     (Command.group ~summary:"ZkApp test transaction"
-       ~preserve_subcommand_order:() txn_commands)
+       ~preserve_subcommand_order:() txn_commands )

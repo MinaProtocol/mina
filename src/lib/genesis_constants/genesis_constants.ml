@@ -28,7 +28,7 @@ module Fork_constants = struct
   type t =
     { previous_state_hash : Pickles.Backend.Tick.Field.Stable.Latest.t
     ; previous_length : Mina_numbers.Length.Stable.Latest.t
-    ; previous_global_slot : Mina_numbers.Global_slot.Stable.Latest.t
+    ; genesis_slot : Mina_numbers.Global_slot_since_genesis.Stable.Latest.t
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 end
@@ -67,13 +67,15 @@ module Constraint_constants = struct
     ; account_creation_fee = Currency.Fee.to_uint64 t.account_creation_fee
     ; fork =
         ( match t.fork with
-        | Some { previous_length; previous_state_hash; previous_global_slot } ->
+        | Some { previous_length; previous_state_hash; genesis_slot } ->
             Some
               { previous_length = Unsigned.UInt32.to_int previous_length
               ; previous_state_hash =
                   Pickles.Backend.Tick.Field.to_string previous_state_hash
-              ; previous_global_slot =
-                  Unsigned.UInt32.to_int previous_global_slot
+              ; genesis_slot =
+                  Unsigned.UInt32.to_int
+                    (Mina_numbers.Global_slot_since_genesis.to_uint32
+                       genesis_slot )
               }
         | None ->
             None )
@@ -162,17 +164,16 @@ module Constraint_constants = struct
 
       [%%inject "fork_previous_state_hash", fork_previous_state_hash]
 
-      [%%inject "fork_previous_global_slot", fork_previous_global_slot]
+      [%%inject "fork_genesis_slot", fork_genesis_slot]
 
       let fork =
         Some
-          { Fork_constants.previous_length =
-              Mina_numbers.Length.of_int fork_previous_length
-          ; previous_state_hash =
+          { Fork_constants.previous_state_hash =
               Data_hash_lib.State_hash.of_base58_check_exn
                 fork_previous_state_hash
-          ; previous_global_slot =
-              Mina_numbers.Global_slot.of_int fork_previous_global_slot
+          ; previous_length = Mina_numbers.Length.of_int fork_previous_length
+          ; genesis_slot =
+              Mina_numbers.Global_slot_since_genesis.of_int fork_genesis_slot
           }
 
       [%%endif]
@@ -185,10 +186,10 @@ module Constraint_constants = struct
         ; transaction_capacity_log_2
         ; pending_coinbase_depth
         ; coinbase_amount =
-            Currency.Amount.of_formatted_string coinbase_amount_string
+            Currency.Amount.of_mina_string_exn coinbase_amount_string
         ; supercharged_coinbase_factor
         ; account_creation_fee =
-            Currency.Fee.of_formatted_string account_creation_fee_string
+            Currency.Fee.of_mina_string_exn account_creation_fee_string
         ; fork
         }
     end :
@@ -200,8 +201,8 @@ module Constraint_constants = struct
 end
 
 (*Constants that can be specified for generating the base proof (that are not required for key-generation) in runtime_genesis_ledger.exe and that can be configured at runtime.
-The types are defined such that this module doesn't depend on any of the coda libraries (except blake2 and module_version) to avoid dependency cycles.
-TODO: #4659 move key generation to runtime_genesis_ledger.exe to include scan_state constants, consensus constants (c and  block_window_duration) and ledger depth here*)
+  The types are defined such that this module doesn't depend on any of the coda libraries (except blake2 and module_version) to avoid dependency cycles.
+  TODO: #4659 move key generation to runtime_genesis_ledger.exe to include scan_state constants, consensus constants (c and  block_window_duration) and ledger depth here*)
 
 let genesis_timestamp_of_string str =
   let default_zone = Time.Zone.of_utc_offset ~hours:(-8) in
@@ -216,7 +217,7 @@ let validate_time time_str =
   match
     Result.try_with (fun () ->
         Option.value_map ~default:(Time.now ()) ~f:genesis_timestamp_of_string
-          time_str)
+          time_str )
   with
   | Ok time ->
       Ok (of_time time)
@@ -237,6 +238,10 @@ module Protocol = struct
     module Stable = struct
       module V1 = struct
         type ('length, 'delta, 'genesis_state_timestamp) t =
+              ( 'length
+              , 'delta
+              , 'genesis_state_timestamp )
+              Mina_wire_types.Genesis_constants.Protocol.Poly.V1.t =
           { k : 'length
           ; slots_per_epoch : 'length
           ; slots_per_sub_window : 'length
@@ -248,10 +253,10 @@ module Protocol = struct
     end]
   end
 
-  [%%versioned_asserted
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = (int, int, Int64.t) Poly.Stable.V1.t
+      type t = (int, int, (Int64.t[@version_asserted])) Poly.Stable.V1.t
       [@@deriving equal, ord, hash]
 
       let to_latest = Fn.id
@@ -267,8 +272,8 @@ module Protocol = struct
                 (Time.to_string_abs
                    (Time.of_span_since_epoch
                       (Time.Span.of_ms
-                         (Int64.to_float t.genesis_state_timestamp)))
-                   ~zone:Time.Zone.utc) )
+                         (Int64.to_float t.genesis_state_timestamp) ) )
+                   ~zone:Time.Zone.utc ) )
           ]
 
       let of_yojson = function
@@ -307,29 +312,11 @@ module Protocol = struct
           ; genesis_state_timestamp =
               Time.to_string_abs
                 (Time.of_span_since_epoch
-                   (Time.Span.of_ms (Int64.to_float t.genesis_state_timestamp)))
+                   (Time.Span.of_ms (Int64.to_float t.genesis_state_timestamp)) )
                 ~zone:Time.Zone.utc
           }
         in
         T.sexp_of_t t'
-    end
-
-    module Tests = struct
-      let%test "protocol constants serialization v1" =
-        let t : V1.t =
-          { k = 1
-          ; delta = 100
-          ; slots_per_sub_window = 10
-          ; slots_per_epoch = 1000
-          ; genesis_state_timestamp =
-              Time.of_string "2019-10-08 17:51:23.050849Z" |> of_time
-          }
-        in
-        (*from the print statement in Serialization.check_serialization*)
-        let known_good_digest = "28b7c3bb5f94351f0afa6ebd83078730" in
-        Ppx_version_runtime.Serialization.check_serialization
-          (module V1)
-          t known_good_digest
     end
   end]
 
@@ -342,13 +329,15 @@ module T = struct
     { protocol : Protocol.Stable.Latest.t
     ; txpool_max_size : int
     ; num_accounts : int option
-    ; transaction_expiry_hr : int
+    ; zkapp_proof_update_cost : float
+    ; zkapp_signed_single_update_cost : float
+    ; zkapp_signed_pair_update_cost : float
+    ; zkapp_transaction_cost_limit : float
+    ; max_event_elements : int
+    ; max_action_elements : int
     }
-  [@@deriving to_yojson, bin_io_unversioned]
+  [@@deriving to_yojson, sexp_of, bin_io_unversioned]
 
-  (*Note: not including transaction_expiry_hr in the chain id to give nodes the
-    flexibility to update it when required but having different expiry times
-    will cause inconsistent pools*)
   let hash (t : t) =
     let str =
       ( List.map
@@ -364,7 +353,7 @@ module T = struct
       ^ Time.to_string_abs ~zone:Time.Zone.utc
           (Time.of_span_since_epoch
              (Time.Span.of_ms
-                (Int64.to_float t.protocol.genesis_state_timestamp)))
+                (Int64.to_float t.protocol.genesis_state_timestamp) ) )
     in
     Blake2.digest_string str |> Blake2.to_hex
 end
@@ -394,7 +383,15 @@ let compiled : t =
       }
   ; txpool_max_size = pool_max_size
   ; num_accounts = None
-  ; transaction_expiry_hr = Mina_compile_config.transaction_expiry_hr
+  ; zkapp_proof_update_cost = Mina_compile_config.zkapp_proof_update_cost
+  ; zkapp_signed_single_update_cost =
+      Mina_compile_config.zkapp_signed_single_update_cost
+  ; zkapp_signed_pair_update_cost =
+      Mina_compile_config.zkapp_signed_pair_update_cost
+  ; zkapp_transaction_cost_limit =
+      Mina_compile_config.zkapp_transaction_cost_limit
+  ; max_event_elements = Mina_compile_config.max_event_elements
+  ; max_action_elements = Mina_compile_config.max_action_elements
   }
 
 let for_unit_tests = compiled

@@ -1,7 +1,7 @@
 open Core
 open Async
 
-(** Methods for the client to interact with Coda protocol *)
+(** Methods for the client to interact with Mina protocol *)
 
 let print_rpc_error error =
   eprintf "RPC connection error: %s\n" (Error.to_string_hum error)
@@ -19,11 +19,11 @@ let dispatch rpc query (host_and_port : Host_and_port.t) =
                 (Rpc.Connection.Heartbeat_config.create
                    ~timeout:
                      (Time_ns.Span.of_sec
-                        Mina_compile_config.rpc_heartbeat_timeout_sec)
+                        Mina_compile_config.rpc_heartbeat_timeout_sec )
                    ~send_every:
                      (Time_ns.Span.of_sec
-                        Mina_compile_config.rpc_heartbeat_send_every_sec)
-                   ())
+                        Mina_compile_config.rpc_heartbeat_send_every_sec )
+                   () )
               r w
               ~connection_state:(fun _ -> ())
           with
@@ -32,9 +32,9 @@ let dispatch rpc query (host_and_port : Host_and_port.t) =
                 (Or_error.errorf
                    !"Error connecting to the daemon on %{sexp:Host_and_port.t} \
                      using the RPC call, %s,: %s"
-                   host_and_port (Rpc.Rpc.name rpc) (Exn.to_string exn))
+                   host_and_port (Rpc.Rpc.name rpc) (Exn.to_string exn) )
           | Ok conn ->
-              Rpc.Rpc.dispatch rpc conn query))
+              Rpc.Rpc.dispatch rpc conn query ) )
 
 let dispatch_join_errors rpc query port =
   let open Deferred.Let_syntax in

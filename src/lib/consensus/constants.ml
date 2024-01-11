@@ -181,7 +181,7 @@ let create' (type a b c)
     (module M : M_intf
       with type length = a
        and type time = b
-       and type timespan = c)
+       and type timespan = c )
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~(protocol_constants : (a, a, b) Genesis_constants.Protocol.Poly.t) :
     (a, b, c) Poly.t =
@@ -238,7 +238,8 @@ let create' (type a b c)
         slots
     | Some f ->
         M.( + )
-          (M.constant (Unsigned.UInt32.to_int f.previous_global_slot))
+          (M.constant
+             (Mina_numbers.Global_slot_since_genesis.to_int f.genesis_slot) )
           slots
   in
   let res : (a, b, c) Poly.t =
@@ -291,7 +292,7 @@ let for_unit_tests =
     (create
        ~constraint_constants:
          Genesis_constants.Constraint_constants.for_unit_tests
-       ~protocol_constants:Genesis_constants.for_unit_tests.protocol)
+       ~protocol_constants:Genesis_constants.for_unit_tests.protocol )
 
 let to_protocol_constants
     ({ k
@@ -301,7 +302,7 @@ let to_protocol_constants
      ; slots_per_epoch
      ; _
      } :
-      _ Poly.t) =
+      _ Poly.t ) =
   { Mina_base.Protocol_constants_checked.Poly.k
   ; delta
   ; genesis_state_timestamp
@@ -309,8 +310,8 @@ let to_protocol_constants
   ; slots_per_epoch
   }
 
-let data_spec =
-  Data_spec.
+let typ =
+  Typ.of_hlistable
     [ Length.Checked.typ
     ; Length.Checked.typ
     ; Length.Checked.typ
@@ -326,11 +327,8 @@ let data_spec =
     ; Block_time.Span.Checked.typ
     ; Block_time.Checked.typ
     ]
-
-let typ =
-  Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
-    ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
-    ~value_of_hlist:Poly.of_hlist
+    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let to_input (t : t) =
   Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
@@ -353,7 +351,7 @@ let to_input (t : t) =
             ; t.delta_duration
            |]
        ; [| Block_time.to_input t.genesis_state_timestamp |]
-       ])
+       ] )
 
 let gc_parameters (constants : t) =
   let open Unsigned.UInt32 in
@@ -392,7 +390,7 @@ module Checked = struct
               ; t.delta_duration
              |]
          ; [| Block_time.Checked.to_input t.genesis_state_timestamp |]
-         ])
+         ] )
 
   let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(protocol_constants : Mina_base.Protocol_constants_checked.var) :
@@ -401,7 +399,7 @@ module Checked = struct
       make_checked (fun () ->
           create'
             (module Constants_checked)
-            ~constraint_constants ~protocol_constants)
+            ~constraint_constants ~protocol_constants )
     in
     let%map checkpoint_window_slots_per_year, checkpoint_window_size_in_slots =
       let constant c =
@@ -441,11 +439,11 @@ let%test_unit "checked = unchecked" =
   let test =
     Test_util.test_equal Protocol_constants_checked.typ typ
       (fun protocol_constants ->
-        Checked.create ~constraint_constants ~protocol_constants)
+        Checked.create ~constraint_constants ~protocol_constants )
       (fun protocol_constants ->
         create ~constraint_constants
           ~protocol_constants:
-            (Protocol_constants_checked.t_of_value protocol_constants))
+            (Protocol_constants_checked.t_of_value protocol_constants) )
   in
   Quickcheck.test ~trials:100 Protocol_constants_checked.Value.gen
     ~examples:[ Protocol_constants_checked.value_of_t for_unit_tests ]

@@ -27,8 +27,8 @@ module Token_id = struct
                     "When metadata is provided for account identifiers, \
                      acceptable format is exactly { \"token_id\": \
                      <base58-encoded-field-element> }. You provided %s"
-                    (Yojson.Safe.pretty_to_string bad))
-               (`Json_parse None))
+                    (Yojson.Safe.pretty_to_string bad) )
+               (`Json_parse None) )
       | None ->
           M.return None
   end
@@ -36,6 +36,9 @@ end
 
 let negated (t : Amount.t) =
   { t with value = (Int64.to_string @@ Int64.(neg @@ of_string t.value)) }
+
+let compare_to_int64 (t : Amount.t) (i : int64) =
+  Int64.(compare (of_string t.value) i)
 
 let mina total =
   { Amount.value = Unsigned.UInt64.to_string total

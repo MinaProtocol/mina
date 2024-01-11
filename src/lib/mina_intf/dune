@@ -13,7 +13,7 @@
    consensus
    precomputed_values
    genesis_constants
-   mina_transition
+   mina_block
    proof_carrying_data
    cache_lib
    mina_base
@@ -26,6 +26,7 @@
    verifier
    rose_tree
    mina_ledger
+   transaction_snark_work
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version ppx_deriving.std ppx_deriving_yojson)))

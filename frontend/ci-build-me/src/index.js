@@ -5,30 +5,6 @@ const { httpsRequest } = require("./util/httpsRequest");
 const axios = require("axios");
 
 const apiKey = process.env.BUILDKITE_API_ACCESS_TOKEN;
-const circleApiKey = process.env.CIRCLECI_API_ACCESS_TOKEN;
-
-const runCircleBuild = async (github) => {
-  const postData = JSON.stringify({
-    branch: `pull/${github.pull_request.number}/head`,
-    parameters: {
-      "run-ci": true,
-    },
-  });
-
-  const options = {
-    hostname: "circleci.com",
-    port: 443,
-    path: `/api/v2/project/github/MinaProtocol/mina/pipeline`,
-    method: "POST",
-    headers: {
-      "Circle-token": circleApiKey,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-  };
-  const request = await httpsRequest(options, postData);
-  return request;
-};
 
 const runBuild = async (github, pipeline_name, env) => {
   const postData = JSON.stringify({
@@ -88,44 +64,8 @@ const getRequest = async (url) => {
 
 const handler = async (event, req) => {
   const buildkiteTrigger = {};
-  if (event == "pull_request") {
-    if (
-      // if PR has ci-build-me label
-      req.body.pull_request.labels.filter(
-        (label) => label.name == "ci-build-me"
-      ).length > 0 &&
-      // and we are pushing new commits or actively adding this label
-      (req.body.action == "synchronize" || req.body.action == "labeled") &&
-      // and this is PR _not_ from a fork
-      req.body.pull_request.head.user.login ==
-        req.body.pull_request.base.user.login
-    ) {
-      let buildAlreadyExists;
-      try {
-        const res = await hasExistingBuilds(req.body);
-        buildAlreadyExists = res;
-      } catch (e) {
-        // if this fails for some reason, assume we don't have an existing build
-        console.error(`Failed to find existing builds:`);
-        console.error(e);
-        buildAlreadyExists = false;
-      }
-
-      if (!buildAlreadyExists) {
-        const buildkite = await runBuild(req.body, "mina", {});
-        const circle = await runCircleBuild(req.body);
-        return [buildkite, circle];
-      } else {
-        console.info("Build for this commit on this branch was already found");
-        return [
-          "build already found for this commit",
-          "build already found for this commit",
-        ];
-      }
-    }
-  } else if (event == "issue_comment") {
-    // PR Gating Lifting section
-    if (
+  // PR Gating Lifting section
+  if (
       // we are creating the comment
       req.body.action == "created" &&
       // and this is actually a pull request
@@ -136,10 +76,11 @@ const handler = async (event, req) => {
     ) {
       // TODO #7711: Actually look at @MinaProtocol/stakeholder-reviewers team instead of hardcoding the users here
       if (
-        req.body.sender.login == "es92" ||
         req.body.sender.login == "aneesharaines" ||
         req.body.sender.login == "bkase" ||
-        req.body.sender.login == "imeckler"
+        req.body.sender.login == "deepthiskumar" ||
+        req.body.sender.login == "mrmr1993" ||
+        req.body.sender.login == "nholland94"
       ) {
         const prData = await getRequest(req.body.issue.pull_request.url);
         const buildkite = await runBuild(
@@ -150,11 +91,11 @@ const handler = async (event, req) => {
           "mina-pr-gating",
           { PR_GATE: "lifted" }
         );
-        return [buildkite, null];
+        return buildkite;
       } else {
         return [
-          "comment author is not (publically) a member of the core team",
-          "comment author is not (publically) a member of the core team",
+          "comment author is not authorized to approve for mainnet",
+          "comment author is not authorized to approve for mainnet",
         ];
       }
     }
@@ -172,7 +113,10 @@ const handler = async (event, req) => {
       const orgData = await getRequest(req.body.sender.organizations_url);
       // and the comment author is part of the core team
       if (
-        orgData.data.filter((org) => org.login == "MinaProtocol").length > 0
+          orgData.data.filter((org) => org.login == "MinaProtocol").length > 0 ||
+          req.body.sender.login == "ylecornec" ||
+          req.body.sender.login == "balsoft" ||
+          req.body.sender.login == "bryanhonof"
       ) {
         const prData = await getRequest(req.body.issue.pull_request.url);
         const buildkite = await runBuild(
@@ -183,10 +127,7 @@ const handler = async (event, req) => {
           "mina",
           {}
         );
-        const circle = await runCircleBuild({
-          pull_request: prData.data,
-        });
-        return [buildkite, circle];
+        return [buildkite];
       } else {
         // NB: Users that are 'privately' a member of the org will not be able to trigger CI jobs
         return [
@@ -195,9 +136,76 @@ const handler = async (event, req) => {
         ];
       }
     }
-  }
-  return [null, null];
-};
+
+    // Mina CI Nightly Build section
+    else if (
+      // we are creating the comment
+      req.body.action == "created" &&
+      // and this is actually a pull request
+      req.body.issue.pull_request &&
+      req.body.issue.pull_request.url &&
+      // and the comment contents is exactly the slug we are looking for
+      req.body.comment.body == "!ci-nightly-me"
+    ) {
+      const orgData = await getRequest(req.body.sender.organizations_url);
+      // and the comment author is part of the core team
+      if (
+          orgData.data.filter((org) => org.login == "MinaProtocol").length > 0
+      ) {
+        const prData = await getRequest(req.body.issue.pull_request.url);
+        const buildkite = await runBuild(
+          {
+            sender: req.body.sender,
+            pull_request: prData.data,
+          },
+          "mina-end-to-end-nightlies",
+          {}
+        );
+        return [buildkite];
+      } else {
+        // NB: Users that are 'privately' a member of the org will not be able to trigger CI jobs
+        return [
+          "comment author is not (publically) a member of the core team",
+          "comment author is not (publically) a member of the core team",
+        ];
+      }
+    }
+
+ 	else if (
+      // we are creating the comment
+      req.body.action == "created" &&
+      // and this is actually a pull request
+      req.body.issue.pull_request &&
+      req.body.issue.pull_request.url &&
+      // and the comment contents is exactly the slug we are looking for
+      req.body.comment.body == "!ci-toolchain-me"
+    ) {
+      const orgData = await getRequest(req.body.sender.organizations_url);
+      // and the comment author is part of the core team
+      if (
+          orgData.data.filter((org) => org.login == "MinaProtocol").length > 0
+      ) {
+        const prData = await getRequest(req.body.issue.pull_request.url);
+        const buildkite = await runBuild(
+          {
+            sender: req.body.sender,
+            pull_request: prData.data,
+          },
+          "mina-toolchains-build",
+          {}
+        );
+        return [buildkite];
+      } else {
+        // NB: Users that are 'privately' a member of the org will not be able to trigger CI jobs
+        return [
+          "comment author is not (publically) a member of the core team",
+          "comment author is not (publically) a member of the core team",
+        ];
+      }
+    }
+    
+    return null;
+  };
 
 /**
  * HTTP Cloud Function for GitHub Webhook events.
@@ -225,24 +233,16 @@ exports.githubWebhookHandler = async (req, res) => {
     github.validateWebhook(req);
 
     const githubEvent = req.headers["x-github-event"];
-    const [buildkite, circle] = await handler(githubEvent, req);
+    const buildkite = await handler(githubEvent, req);
     if (buildkite && buildkite.web_url) {
       console.info(`Triggered buildkite build at ${buildkite.web_url}`);
     } else {
       console.error(`Failed to trigger buildkite build for some reason:`);
       console.error(buildkite);
     }
-
-    if (circle && circle.number) {
-      console.info(`Triggered circle build #${circle.number}`);
-    } else {
-      console.error(`Failed to trigger circle build for some reason:`);
-      console.error(circle);
-    }
-
     res.status(200);
     console.info(`HTTP 200: ${githubEvent} event`);
-    res.send({ buildkite, circle } || {});
+    res.send({ buildkite } || {});
   } catch (e) {
     if (e instanceof HTTPError) {
       res.status(e.statusCode).send(e.message);

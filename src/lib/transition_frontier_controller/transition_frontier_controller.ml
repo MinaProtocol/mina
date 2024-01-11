@@ -1,17 +1,30 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
+open Mina_block
 
-let run ~logger ~trust_system ~verifier ~network ~time_controller
-    ~collected_transitions ~frontier ~network_transition_reader
-    ~producer_transition_reader ~clear_reader ~precomputed_values =
+module type CONTEXT = sig
+  val logger : Logger.t
+
+  val precomputed_values : Precomputed_values.t
+
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val consensus_constants : Consensus.Constants.t
+end
+
+let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
+    ~time_controller ~collected_transitions ~frontier ~get_completed_work
+    ~network_transition_reader ~producer_transition_reader ~clear_reader =
+  let open Context in
   let valid_transition_pipe_capacity = 50 in
   let start_time = Time.now () in
   let f_drop_head name head valid_cb =
-    let block = Cache_lib.Cached.peek head in
-    Mina_transition.External_transition.Initial_validated
-    .handle_dropped_transition
-      (Network_peer.Envelope.Incoming.data block)
+    let block : Mina_block.initial_valid_block =
+      Network_peer.Envelope.Incoming.data @@ Cache_lib.Cached.peek head
+    in
+    Mina_block.handle_dropped_transition
+      (Validation.block_with_hash block |> With_hash.hash)
       ?valid_cb ~pipe_name:name ~logger
   in
   let valid_transition_reader, valid_transition_writer =
@@ -26,7 +39,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
                     Counter.inc_one
                       Pipe.Drop_on_overflow
                       .transition_frontier_valid_transitions) ;
-                  f_drop_head name head vc)) ))
+                  f_drop_head name head vc ) ) ) )
   in
   let primary_transition_pipe_capacity =
     valid_transition_pipe_capacity + List.length collected_transitions
@@ -44,7 +57,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
                     Counter.inc_one
                       Pipe.Drop_on_overflow
                       .transition_frontier_primary_transitions) ;
-                  f_drop_head name head vc)) ))
+                  f_drop_head name head vc ) ) ) )
   in
   let processed_transition_reader, processed_transition_writer =
     Strict_pipe.create ~name:"processed transitions"
@@ -70,12 +83,12 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
           unprocessed_transition_cache t
       in
       Strict_pipe.Writer.write primary_transition_writer
-        (`Block block_cached, `Valid_cb None)) ;
+        (`Block block_cached, `Valid_cb None) ) ;
   let initial_state_hashes =
     List.map collected_transitions ~f:(fun envelope ->
-        ( Network_peer.Envelope.Incoming.data envelope
-        |> Mina_transition.External_transition.Initial_validated.state_hashes )
-          .state_hash)
+        Network_peer.Envelope.Incoming.data envelope
+        |> Validation.block_with_hash
+        |> Mina_base.State_hash.With_state_hashes.state_hash )
     |> Mina_base.State_hash.Set.of_list
   in
   let extensions = Transition_frontier.extensions frontier in
@@ -94,26 +107,27 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
            Mina_metrics.(
              Gauge.set Catchup.initial_catchup_time
                Time.(Span.to_min @@ diff (now ()) start_time)) ;
-           Deferred.return true )) ;
+           Deferred.return true ) ) ;
   Transition_handler.Validator.run
-    ~consensus_constants:
-      (Precomputed_values.consensus_constants precomputed_values)
-    ~logger ~trust_system ~time_controller ~frontier
+    ~context:(module Context)
+    ~trust_system ~time_controller ~frontier
     ~transition_reader:network_transition_reader ~valid_transition_writer
     ~unprocessed_transition_cache ;
   Strict_pipe.Reader.iter_without_pushback valid_transition_reader
     ~f:(fun (`Block b, `Valid_cb vc) ->
-      Strict_pipe.Writer.write primary_transition_writer (`Block b, `Valid_cb vc))
+      Strict_pipe.Writer.write primary_transition_writer (`Block b, `Valid_cb vc) )
   |> don't_wait_for ;
   let clean_up_catchup_scheduler = Ivar.create () in
-  Transition_handler.Processor.run ~logger ~precomputed_values ~time_controller
-    ~trust_system ~verifier ~frontier ~primary_transition_reader
-    ~producer_transition_reader ~clean_up_catchup_scheduler ~catchup_job_writer
-    ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-    ~processed_transition_writer ;
-  Ledger_catchup.run ~logger ~precomputed_values ~trust_system ~verifier
-    ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
-    ~unprocessed_transition_cache ;
+  Transition_handler.Processor.run
+    ~context:(module Context)
+    ~time_controller ~trust_system ~verifier ~frontier ~get_completed_work
+    ~primary_transition_reader ~producer_transition_reader
+    ~clean_up_catchup_scheduler ~catchup_job_writer ~catchup_breadcrumbs_reader
+    ~catchup_breadcrumbs_writer ~processed_transition_writer ;
+  Ledger_catchup.run
+    ~context:(module Context)
+    ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
+    ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ;
   Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
       let open Strict_pipe.Writer in
       kill valid_transition_writer ;
@@ -123,6 +137,6 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       kill catchup_breadcrumbs_writer ;
       if Ivar.is_full clean_up_catchup_scheduler then
         [%log error] "Ivar.fill bug is here!" ;
-      Ivar.fill clean_up_catchup_scheduler ())
+      Ivar.fill clean_up_catchup_scheduler () )
   |> don't_wait_for ;
   processed_transition_reader

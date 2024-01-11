@@ -1,10 +1,11 @@
 use ark_poly::UVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
-use commitment_dlog::{
-    commitment::{b_poly_coefficients, caml::CamlPolyComm},
-    srs::{endos, SRS},
-};
 use paste::paste;
+use poly_commitment::SRS as _;
+use poly_commitment::{
+    commitment::{b_poly_coefficients, caml::CamlPolyComm},
+    srs::SRS,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -62,14 +63,10 @@ macro_rules! impl_srs {
                 }
 
                 // TODO: shouldn't we just error instead of returning None?
-                let mut srs = match SRS::<$G>::deserialize(&mut rmp_serde::Deserializer::new(reader)) {
+                let srs = match SRS::<$G>::deserialize(&mut rmp_serde::Deserializer::new(reader)) {
                     Ok(srs) => srs,
                     Err(_) => return Ok(None),
                 };
-
-                let (endo_q, endo_r) = endos::<$G>();
-                srs.endo_q = endo_q;
-                srs.endo_r = endo_r;
 
                 Ok(Some($name::new(srs)))
             }
@@ -87,11 +84,26 @@ macro_rules! impl_srs {
                         .unwrap()
                 })?;
 
-                let evals = (0..domain_size)
-                    .map(|j| if i == j { <$F as ark_ff::One>::one() } else { <$F as ark_ff::Zero>::zero() })
-                    .collect();
-                let p = Evaluations::<$F>::from_vec_and_domain(evals, x_domain).interpolate();
-                Ok(srs.commit_non_hiding(&p, None).into())
+                {
+                    // We're single-threaded, so it's safe to grab this pointer as mutable.
+                    // Do not try this at home.
+                    let srs = unsafe { &mut *((&**srs as *const SRS<$G>) as *mut SRS<$G>) as &mut SRS<$G> };
+                    srs.add_lagrange_basis(x_domain);
+                }
+
+                Ok(srs.lagrange_bases[&x_domain.size()][i as usize].clone().into())
+            }
+
+            #[ocaml_gen::func]
+            #[ocaml::func]
+            pub fn [<$name:snake _add_lagrange_basis>](
+                srs: $name,
+                log2_size: ocaml::Int,
+            ) {
+                let ptr: &mut poly_commitment::srs::SRS<$G> =
+                    unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
+                let domain = EvaluationDomain::<$F>::new(1 << (log2_size as usize)).expect("invalid domain size");
+                ptr.add_lagrange_basis(domain);
             }
 
             #[ocaml_gen::func]
@@ -110,7 +122,7 @@ macro_rules! impl_srs {
                 let evals = evals.into_iter().map(Into::into).collect();
                 let p = Evaluations::<$F>::from_vec_and_domain(evals, x_domain).interpolate();
 
-                Ok(srs.commit_non_hiding(&p, None).into())
+                Ok(srs.commit_non_hiding(&p, 1, None).into())
             }
 
             #[ocaml_gen::func]
@@ -123,7 +135,7 @@ macro_rules! impl_srs {
                 let coeffs = b_poly_coefficients(&chals);
                 let p = DensePolynomial::<$F>::from_coefficients_vec(coeffs);
 
-                Ok(srs.commit_non_hiding(&p, None).into())
+                Ok(srs.commit_non_hiding(&p, 1, None).into())
             }
 
             #[ocaml_gen::func]
@@ -136,6 +148,20 @@ macro_rules! impl_srs {
                 let comms: Vec<_> = comms.into_iter().map(Into::into).collect();
                 let chals: Vec<_> = chals.into_iter().map(Into::into).collect();
                 crate::urs_utils::batch_dlog_accumulator_check(&srs, &comms, &chals)
+            }
+
+            #[ocaml_gen::func]
+            #[ocaml::func]
+            pub fn [<$name:snake _batch_accumulator_generate>](
+                srs: $name,
+                comms: ocaml::Int,
+                chals: Vec<$CamlF>,
+            ) -> Vec<$CamlG> {
+                crate::urs_utils::batch_dlog_accumulator_generate::<$G>(
+                    &srs,
+                    comms as usize,
+                    &chals.into_iter().map(From::from).collect(),
+                ).into_iter().map(Into::into).collect()
             }
 
             #[ocaml_gen::func]
@@ -154,15 +180,15 @@ macro_rules! impl_srs {
 pub mod fp {
     use super::*;
     use crate::arkworks::{CamlFp, CamlGVesta};
-    use mina_curves::pasta::{fp::Fp, vesta::Affine as GAffine};
+    use mina_curves::pasta::{Fp, Vesta};
 
-    impl_srs!(CamlFpSrs, CamlFp, CamlGVesta, Fp, GAffine);
+    impl_srs!(CamlFpSrs, CamlFp, CamlGVesta, Fp, Vesta);
 }
 
 pub mod fq {
     use super::*;
     use crate::arkworks::{CamlFq, CamlGPallas};
-    use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine};
+    use mina_curves::pasta::{Fq, Pallas};
 
-    impl_srs!(CamlFqSrs, CamlFq, CamlGPallas, Fq, GAffine);
+    impl_srs!(CamlFqSrs, CamlFq, CamlGPallas, Fq, Pallas);
 }

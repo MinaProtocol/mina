@@ -9,32 +9,22 @@ ARG deb_codename=focal
 ARG DOCKER_VERSION=19.03.4
 ARG TERRAFORM_VERSION=0.14.11
 ARG DEBS3_VERSION=0.11.6
+ARG DHALL_VERSION=1.41.1
+ARG DHALL_JSON_VERSION=1.7.10
+ARG DHALL_BASH_VERSION=1.0.40
 
-# location of repo used for pins and external package commits
-ARG MINA_DIR=mina
-
-# location of external packages
-ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
-
-# Rust nightly toolchain for WebAssembly builds
-ARG RUST_NIGHTLY=2021-11-16
-
-ENV PATH "$PATH:$HOME/.cargo/bin"
-
-# don't keep sources, to force reinstall of pinned packages from Mina sources
-# and to keep Docker image reasonable size
-ENV OPAMKEEPBUILDDIR=false
-ENV OPAMREUSEBUILDDIR=false
-
-ENV DEBIAN_FRONTEND=noninteractive
+USER root
 
 # OS package dependencies
-RUN sudo apt-get update -y \
-  && sudo apt-get install -y \
+# afaict this is the last python dependency of any kind in CI
+RUN apt-get update --yes \
+  && apt-get install --yes \
     apt-transport-https \
     apt-utils \
     awscli \
     cmake \
+    fakeroot \
+    gnupg2 \
     jq \
     libboost-dev \
     libboost-program-options-dev \
@@ -57,60 +47,63 @@ RUN sudo apt-get update -y \
     postgresql-contrib \
     perl \
     pkg-config \
+    python3-sexpdata \
     rubygems \
-    zlib1g-dev
-
-# -- Debian Buster python dependencies (largely installed above from apt)
-# Buster images are used in our migrated integration tests which reqiure python2 jinja2
-# Ocaml lints scripts/require-ppxs.py is already python3 and requires sexpdata
-RUN test "$deb_codename" = "buster" \
-      && sudo apt-get install -y \
-          python \
-          python-pip \
-          python-jinja2 \
-          python-flake8 \
-          python-sexpdata \
-          python3-sexpdata \
-      && sudo pip install readchar \
-      || exit 0
+    wget \
+    zlib1g-dev \
+  && rm -rf /var/lib/apt/lists/*
 
 # --- deb-s3 tool
-# tweag version, with lock only on manifest upload
-RUN curl -sLO https://github.com/tweag/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
-    && sudo gem install deb-s3-${DEBS3_VERSION}.gem \
+# Custom version, with lock only on manifest upload
+RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
+    && gem install deb-s3-${DEBS3_VERSION}.gem \
     && rm -f deb-s3-${DEBS3_VERSION}.gem
 
 # --- Docker Daemon
-RUN curl -L -o /tmp/docker-${DOCKER_VERSION}.tgz https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz \
-    && tar -xz -C /tmp -f /tmp/docker-${DOCKER_VERSION}.tgz \
-    && sudo mv /tmp/docker/* /usr/bin
+RUN curl -sL https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz \
+    | tar --extract --gzip --strip-components 1 --directory=/usr/bin --file=-
 
 # --- Terraform tools
-RUN curl -sL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip -o terraform.zip \
-    && unzip terraform.zip \
-    && sudo mv terraform /usr/bin \
-    && sudo ln -s /usr/bin/terraform /usr/local/bin/terraform
+RUN wget -O- https://apt.releases.hashicorp.com/gpg | \
+    gpg --dearmor | \
+    sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg \
+    gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint \
+    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
+    https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
+    sudo tee /etc/apt/sources.list.d/hashicorp.list \
+    sudo apt-get update \
+    sudo apt-get install terraform
 
 # --- Google Cloud tools
-RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
-    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - \
-    && sudo apt-get update -y \
-    && sudo apt-get install -y google-cloud-sdk kubectl
+RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
+    && apt-get update --yes \
+    && apt-get install --yes google-cloud-sdk kubectl \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
 # --- Helm tools
-RUN curl https://baltocdn.com/helm/signing.asc | sudo apt-key add - \
-    && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list \
-    && sudo apt-get update -y \
-    && sudo apt-get install -y helm
+RUN curl https://baltocdn.com/helm/signing.asc | apt-key add - \
+    && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list \
+    && apt-get update --yes \
+    && apt-get install --yes --no-install-recommends helm \
+    && rm -rf /var/lib/apt/lists/*
 
-# --- yarn + nodejs
-RUN curl -sL https://deb.nodesource.com/setup_lts.x | sudo -E bash - \
+# --- yarn + nodejs, pinned version
+RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - \
     && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - \
     && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
-    && sudo apt update \
-    && sudo apt install -y nodejs yarn
+    && apt update --yes \
+    && apt install --yes --no-install-recommends nodejs yarn \
+    && rm -rf /var/lib/apt/lists/*
 
-# --- extra Rust toolchain and wasm-pack for Wasm builds
-RUN rustup toolchain install "nightly-${RUST_NIGHTLY}" \
-    && rustup component add rust-src --toolchain "nightly-${RUST_NIGHTLY}"
-RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+# Dhall
+RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-$DHALL_VERSION-x86_64-linux.tar.bz2 \
+    | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall
+RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-bash-$DHALL_BASH_VERSION-x86_64-linux.tar.bz2 \
+    | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-bash
+RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-json-$DHALL_JSON_VERSION-x86_64-linux.tar.bz2 \
+    | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-yaml
+
+USER opam

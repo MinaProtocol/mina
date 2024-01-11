@@ -1,9 +1,9 @@
 (library
  (name sync_handler)
  (public_name sync_handler)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane))
+ (preprocess (pps ppx_mina ppx_version ppx_jane))
  (libraries
    ;; opam libraries
    sexplib0
@@ -14,6 +14,8 @@
    ;; local libraries
    with_hash
    data_hash_lib
+   precomputed_values
+   genesis_constants
    trust_system
    transition_frontier_extensions
    transition_frontier_base
@@ -23,7 +25,7 @@
    mina_intf
    transition_frontier
    best_tip_prover
-   mina_transition
+   mina_block
    network_peer
    logger
    merkle_ledger
@@ -31,4 +33,5 @@
    truth
    proof_carrying_data
    mina_ledger
+   mina_wire_types
 ))

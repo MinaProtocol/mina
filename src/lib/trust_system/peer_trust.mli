@@ -30,6 +30,8 @@ module type Action_intf = sig
   (** Convert an action into a format string and a set of metadata for
       logging *)
   val to_log : t -> string * (string, Yojson.Safe.t) List.Assoc.t
+
+  val is_reason_for_heartbeat : t -> bool
 end
 
 (** Trust increment that sets a maximum rate of doing a bad thing (presuming the
@@ -59,7 +61,11 @@ module Make (Action : Action_intf) : sig
       proactively disconnect from peers when they're banned. You *must* consume
       this, otherwise the program will block indefinitely when a peer is
       banned. *)
-  val ban_pipe : t -> (Network_peer.Peer.t * Time.t) Strict_pipe.Reader.t
+  val upcall_pipe :
+       t
+    -> [ `Ban of Network_peer.Peer.t * Time.t
+       | `Heartbeat of Network_peer.Peer.t ]
+       Strict_pipe.Reader.t
 
   (** Record an action a peer took. This may result in a ban event being
       emitted *)

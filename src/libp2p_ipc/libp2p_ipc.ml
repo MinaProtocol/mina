@@ -89,10 +89,9 @@ let () =
     | Received_undefined_union (ctx, n) ->
         Some
           (Printf.sprintf
-             "Received an undefined union for %s over the libp2p IPC: %n " ctx
-             n)
+             "Received an undefined union for %s over the libp2p IPC: %n " ctx n )
     | _ ->
-        None)
+        None )
 
 let compression = `None
 
@@ -137,9 +136,9 @@ let create_peer_id peer_id =
 
 let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
     ~external_multiaddr ~network_id ~unsafe_no_trust_ip ~flood ~direct_peers
-    ~seed_peers ~known_private_ip_nets ~peer_exchange ~mina_peer_exchange
+    ~seed_peers ~known_private_ip_nets ~peer_exchange ~peer_protection_ratio
     ~min_connections ~max_connections ~validation_queue_size ~gating_config
-    ~topic_config =
+    ~topic_config () =
   build
     (module Builder.Libp2pConfig)
     Builder.Libp2pConfig.(
@@ -155,7 +154,7 @@ let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
       *> list_op seed_peers_set_list seed_peers
       *> list_op known_private_ip_nets_set_list known_private_ip_nets
       *> op peer_exchange_set peer_exchange
-      *> op mina_peer_exchange_set mina_peer_exchange
+      *> op peer_protection_ratio_set peer_protection_ratio
       *> op min_connections_set_int_exn min_connections
       *> op max_connections_set_int_exn max_connections
       *> op validation_queue_size_set_int_exn validation_queue_size
@@ -164,7 +163,7 @@ let create_libp2p_config ~private_key ~statedir ~listen_on ?metrics_port
            (List.map ~f:create_topic_level topic_config))
 
 let create_gating_config ~banned_ips ~banned_peers ~trusted_ips ~trusted_peers
-    ~isolate =
+    ~isolate ~clean_added_peers =
   build
     (module Builder.GatingConfig)
     Builder.GatingConfig.(
@@ -172,7 +171,8 @@ let create_gating_config ~banned_ips ~banned_peers ~trusted_ips ~trusted_peers
       *> list_op banned_peer_ids_set_list banned_peers
       *> list_op trusted_ips_set_list trusted_ips
       *> list_op trusted_peer_ids_set_list trusted_peers
-      *> op isolate_set isolate)
+      *> op isolate_set isolate
+      *> op clean_added_peers_set clean_added_peers)
 
 let create_rpc_header ~sequence_number =
   build'
@@ -224,6 +224,10 @@ let rpc_request_body_set req body =
       ignore @@ set_node_status_set_builder req b
   | GetPeerNodeStatus b ->
       ignore @@ get_peer_node_status_set_builder req b
+  | TestDecodeBitswapBlocks b ->
+      ignore @@ test_decode_bitswap_blocks_set_builder req b
+  | TestEncodeBitswapBlocks b ->
+      ignore @@ test_encode_bitswap_blocks_set_builder req b
   | Undefined _ ->
       failwith "cannot set undefined rpc request body"
 
@@ -261,7 +265,34 @@ let push_message_to_outgoing_message request =
     Builder.Libp2pHelperInterface.Message.(
       builder_op push_message_set_builder request)
 
-let create_push_message ~validation_id ~validation_result =
+let create_add_resource_push_message ~tag ~data =
+  build'
+    (module Builder.Libp2pHelperInterface.PushMessage)
+    Builder.Libp2pHelperInterface.PushMessage.(
+      builder_op header_set_builder (create_push_message_header ())
+      *> reader_op add_resource_set_reader
+           (build
+              (module Builder.Libp2pHelperInterface.AddResource)
+              Builder.Libp2pHelperInterface.AddResource.(
+                op tag_set_exn tag *> op data_set data) ))
+
+let create_heartbeat_peer_push_message ~peer_id =
+  let id =
+    build'
+      (module Builder.PeerId)
+      Builder.PeerId.(op id_set (Peer.Id.to_string peer_id))
+  in
+  build'
+    (module Builder.Libp2pHelperInterface.PushMessage)
+    Builder.Libp2pHelperInterface.PushMessage.(
+      builder_op header_set_builder (create_push_message_header ())
+      *> reader_op heartbeat_peer_set_reader
+           (build
+              (module Builder.Libp2pHelperInterface.HeartbeatPeer)
+              Builder.Libp2pHelperInterface.HeartbeatPeer.(
+                builder_op id_set_builder id) ))
+
+let create_validation_push_message ~validation_id ~validation_result =
   build'
     (module Builder.Libp2pHelperInterface.PushMessage)
     Builder.Libp2pHelperInterface.PushMessage.(
@@ -271,7 +302,7 @@ let create_push_message ~validation_id ~validation_result =
               (module Builder.Libp2pHelperInterface.Validation)
               Builder.Libp2pHelperInterface.Validation.(
                 reader_op validation_id_set_reader validation_id
-                *> op result_set validation_result)))
+                *> op result_set validation_result) ))
 
 let read_and_decode_message =
   let open Incremental_parsing in
@@ -284,7 +315,7 @@ let read_and_decode_message =
   let%map segments =
     parse
       (polymorphic_list
-         (List.map segment_sizes ~f:(fun n -> bytes (Uint32.to_int n * 8))))
+         (List.map segment_sizes ~f:(fun n -> bytes (Uint32.to_int n * 8))) )
   in
   Capnp.BytesMessage.Message.of_storage segments
 
@@ -300,13 +331,16 @@ let read_incoming_messages reader =
   let r, w = Strict_pipe.create Strict_pipe.Synchronous in
   let fragment_stream = Incremental_parsing.Fragment_stream.create () in
   O1trace.background_thread "stream_libp2p_ipc_messages" (fun () ->
-      stream_messages fragment_stream w) ;
+      stream_messages fragment_stream w ) ;
   O1trace.background_thread "accumulate_libp2p_ipc_message_fragments" (fun () ->
       Strict_pipe.Reader.iter_without_pushback reader ~f:(fun fragment ->
           Incremental_parsing.Fragment_stream.add_fragment fragment_stream
-            (Stdlib.Bytes.unsafe_of_string fragment))) ;
+            (Stdlib.Bytes.unsafe_of_string fragment) ) ) ;
   r
 
 let write_outgoing_message writer msg =
   msg |> Builder.Libp2pHelperInterface.Message.to_message
-  |> Capnp.Codecs.serialize_iter ~compression ~f:(Writer.write writer)
+  |> Capnp.Codecs.serialize_fold_copyless ~compression ~init:0
+       ~f:(fun total str len ->
+         Writer.write ~len writer str ;
+         total + len )

@@ -66,16 +66,19 @@ module type Work_S = sig
   module Single : sig
     module Spec : sig
       type t = (Transaction_witness.t, ledger_proof) Work.Single.Spec.t
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, yojson]
     end
   end
 
   module Spec : sig
-    type t = Single.Spec.t Work.Spec.t [@@deriving sexp, to_yojson]
+    type t = Single.Spec.t Work.Spec.t [@@deriving sexp, yojson]
   end
 
   module Result : sig
     type t = (Spec.t, ledger_proof) Work.Result.t
+
+    val transactions :
+      t -> Mina_transaction.Transaction.t option One_or_two.Stable.V1.t
   end
 end
 
@@ -107,6 +110,19 @@ module type Rpcs_versioned_S = sig
 
     module Latest = V2
   end
+
+  module Failed_to_generate_snark : sig
+    module V2 : sig
+      type query = Error.t * Work.Spec.t * Signature_lib.Public_key.Compressed.t
+      [@@deriving bin_io]
+
+      type response = unit [@@deriving bin_io]
+
+      val rpc : (query, response) Rpc.Rpc.t
+    end
+
+    module Latest = V2
+  end
 end
 
 (* result of Functor.Make *)
@@ -120,11 +136,17 @@ module type S0 = sig
       Rpc_master
         with type Master.T.query = unit
          and type Master.T.response =
-              (Work.Spec.t * Signature_lib.Public_key.Compressed.t) option
+          (Work.Spec.t * Signature_lib.Public_key.Compressed.t) option
 
     module Submit_work :
       Rpc_master
         with type Master.T.query = Work.Result.t
+         and type Master.T.response = unit
+
+    module Failed_to_generate_snark :
+      Rpc_master
+        with type Master.T.query =
+          Error.t * Work.Spec.t * Signature_lib.Public_key.Compressed.t
          and type Master.T.response = unit
   end
 

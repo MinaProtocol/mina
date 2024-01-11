@@ -2,6 +2,7 @@ let Prelude = ../../External/Prelude.dhall
 let Cmd = ../../Lib/Cmds.dhall
 let S = ../../Lib/SelectFiles.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Command = ../../Command/Base.dhall
 let RunInToolchain = ../../Command/RunInToolchain.dhall
@@ -13,6 +14,7 @@ in
 let user = "admin"
 let password = "codarules"
 let db = "archiver"
+let command_key = "archive-unit-tests"
 in
 
 Pipeline.build
@@ -26,31 +28,30 @@ Pipeline.build
           ]
         , path = "Test"
         , name = "ArchiveNodeUnitTest"
+        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Test ]
         }
     , steps =
     let outerDir : Text =
-            "/var/buildkite/builds/\\\$BUILDKITE_AGENT_NAME/\\\$BUILDKITE_ORGANIZATION_SLUG/\\\$BUILDKITE_PIPELINE_SLUG"
+            "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
     in
       [ Command.build
           Command.Config::
             { commands =
-              RunInToolchain.runInToolchainBuster
+              RunInToolchain.runInToolchain
                 [ "POSTGRES_PASSWORD=${password}"
                 , "POSTGRES_USER=${user}"
                 , "POSTGRES_DB=${db}"
                 , "GO=/usr/lib/go/bin/go"
+                , "DUNE_INSTRUMENT_WITH=bisect_ppx"
+                , "COVERALLS_TOKEN"
                 ]
                 (Prelude.Text.concatSep " && "
                   [ "bash buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db}"
                   , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
-                  , WithCargo.withCargo "eval \\\$(opam config env) && dune runtest src/app/archive"
-                  , "PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/drop_tables.sql"
-                  , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
-                  , "make libp2p_helper"
-                  , "./scripts/test.py run --non-interactive --collect-artifacts --yes --out-dir 'test_output' 'test_archive_processor:coda-archive-processor-test'"
+                  , WithCargo.withCargo "eval \\\$(opam config env) && dune runtest src/app/archive && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
                   ])
             , label = "Archive node unit tests"
-            , key = "archive-unit-tests"
+            , key = command_key
             , target = Size.Large
             , docker = None Docker.Type
             , artifact_paths = [ S.contains "test_output/artifacts/*" ]

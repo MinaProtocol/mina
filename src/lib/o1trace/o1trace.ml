@@ -9,18 +9,18 @@ let () = Plugins.enable_plugin (module Execution_timer)
 
 let on_job_enter' (fiber : Thread.Fiber.t) =
   Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
-      Plugin.on_job_enter fiber)
+      Plugin.on_job_enter fiber )
 
 let on_job_exit' fiber elapsed_time =
   Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
-      Plugin.on_job_exit fiber elapsed_time)
+      Plugin.on_job_exit fiber elapsed_time )
 
 let on_job_enter ctx =
   Option.iter (Thread.Fiber.of_context ctx) ~f:on_job_enter'
 
 let on_job_exit ctx elapsed_time =
   Option.iter (Thread.Fiber.of_context ctx) ~f:(fun thread ->
-      on_job_exit' thread elapsed_time)
+      on_job_exit' thread elapsed_time )
 
 let current_sync_fiber = ref None
 
@@ -48,6 +48,15 @@ let rec find_recursive_fiber thread_name parent_thread_name
     Option.bind fiber.parent
       ~f:(find_recursive_fiber thread_name parent_thread_name)
 
+let local_storage_id =
+  Type_equal.Id.create ~name:"o1trace" (sexp_of_list sexp_of_string)
+
+let with_o1trace ~name context =
+  Execution_context.find_local context local_storage_id
+  |> Option.value_map ~default:[ name ] ~f:(List.cons name)
+  |> Option.some
+  |> Execution_context.with_local context local_storage_id
+
 let exec_thread ~exec_same_thread ~exec_new_thread name =
   let sync_fiber = !current_sync_fiber in
   let parent = grab_parent_fiber () in
@@ -55,7 +64,7 @@ let exec_thread ~exec_same_thread ~exec_new_thread name =
   let result =
     if
       Option.value_map parent ~default:false ~f:(fun p ->
-          String.equal p.thread.name name)
+          String.equal p.thread.name name )
     then exec_same_thread ()
     else
       let fiber =
@@ -74,13 +83,14 @@ let thread name f =
   exec_thread name ~exec_same_thread:f ~exec_new_thread:(fun fiber ->
       let ctx = Scheduler.current_execution_context () in
       let ctx = Thread.Fiber.apply_to_context fiber ctx in
+      let ctx = with_o1trace ~name ctx in
       match Scheduler.within_context ctx f with
       | Error () ->
-          failwithf
-            "timing task `%s` failed, exception reported to parent monitor" name
-            ()
+          (* Scheduler.within_context will send the actual error to the parent monitor asynchronously.
+           * At this point, the thread has crashed, so we just return a Deferred that will never resolve *)
+          Deferred.create (Fn.const ())
       | Ok x ->
-          x)
+          x )
 
 let background_thread name f = don't_wait_for (thread name f)
 
@@ -90,10 +100,18 @@ let sync_thread name f =
       current_sync_fiber := Some fiber ;
       on_job_enter' fiber ;
       let start_time = Time_ns.now () in
-      let result = f () in
-      let elapsed_time = Time_ns.abs_diff (Time_ns.now ()) start_time in
-      on_job_exit' fiber elapsed_time ;
-      result)
+      let ctx = Scheduler.current_execution_context () in
+      let ctx = with_o1trace ~name ctx in
+      match
+        Scheduler.Private.with_execution_context (Scheduler.Private.t ()) ctx
+          ~f:(fun () -> Result.try_with f)
+      with
+      | Error exn ->
+          Exn.reraise exn "exception caught by O1trace.sync_thread"
+      | Ok result ->
+          let elapsed_time = Time_ns.abs_diff (Time_ns.now ()) start_time in
+          on_job_exit' fiber elapsed_time ;
+          result )
 
 let () = Stdlib.(Async_kernel.Tracing.fns := { on_job_enter; on_job_exit })
 
@@ -108,6 +126,12 @@ let () =
 
 let%test_module "thread tests" =
   ( module struct
+    exception Test_exn
+
+    let is_test_exn exn =
+      (* there isn't a great way to compare the exn to the one that was thrown due to how async mangles the exn, so we do this instead *)
+      String.is_substring (Exn.to_string exn) ~substring:"(Test_exn)"
+
     let child_of n =
       match
         let prev_sync_fiber = !current_sync_fiber in
@@ -126,7 +150,7 @@ let%test_module "thread tests" =
           let s = Ivar.create () in
           f (Ivar.fill s) ;
           let%bind () = Ivar.read s in
-          Writer.(flushed (Lazy.force stdout)))
+          Writer.(flushed (Lazy.force stdout)) )
 
     let test f = test' (fun s -> don't_wait_for (f s))
 
@@ -138,7 +162,7 @@ let%test_module "thread tests" =
                   thread "c" (fun () ->
                       assert (child_of "b") ;
                       stop () ;
-                      Deferred.unit))))
+                      Deferred.unit ) ) ) )
 
     let%test_unit "thread > background_thread > thread" =
       test (fun stop ->
@@ -148,23 +172,23 @@ let%test_module "thread tests" =
                   thread "c" (fun () ->
                       assert (child_of "b") ;
                       stop () ;
-                      Deferred.unit)) ;
-              Deferred.unit))
+                      Deferred.unit ) ) ;
+              Deferred.unit ) )
 
     let%test_unit "thread > sync_thread" =
       test (fun stop ->
           thread "a" (fun () ->
               sync_thread "b" (fun () ->
                   assert (child_of "a") ;
-                  stop ()) ;
-              Deferred.unit))
+                  stop () ) ;
+              Deferred.unit ) )
 
     let%test_unit "sync_thread > sync_thread" =
       test' (fun stop ->
           sync_thread "a" (fun () ->
               sync_thread "b" (fun () ->
                   assert (child_of "a") ;
-                  stop ())))
+                  stop () ) ) )
 
     let%test_unit "sync_thread > background_thread" =
       test (fun stop ->
@@ -172,8 +196,8 @@ let%test_module "thread tests" =
               background_thread "b" (fun () ->
                   assert (child_of "a") ;
                   stop () ;
-                  Deferred.unit)) ;
-          Deferred.unit)
+                  Deferred.unit ) ) ;
+          Deferred.unit )
 
     let%test_unit "sync_thread > background_thread" =
       test' (fun stop ->
@@ -181,7 +205,7 @@ let%test_module "thread tests" =
               background_thread "b" (fun () ->
                   assert (child_of "a") ;
                   stop () ;
-                  Deferred.unit)))
+                  Deferred.unit ) ) )
 
     let%test_unit "sync_thread > background_thread > sync_thread > thread" =
       test' (fun stop ->
@@ -194,8 +218,34 @@ let%test_module "thread tests" =
                         (thread "d" (fun () ->
                              assert (child_of "c") ;
                              stop () ;
-                             Deferred.unit))) ;
-                  Deferred.unit)))
+                             Deferred.unit ) ) ) ;
+                  Deferred.unit ) ) )
+
+    let%test_unit "exceptions are handled properly when raised in first cycle \
+                   of a thread" =
+      test (fun stop ->
+          match%map
+            Monitor.try_with (fun () ->
+                thread "test" (fun () -> raise Test_exn) )
+          with
+          | Ok _ ->
+              failwith "expected a failure"
+          | Error exn ->
+              assert (is_test_exn exn) ;
+              stop () )
+
+    let%test_unit "exceptions are handled properly when raised in first cycle \
+                   of a sync_thread" =
+      test (fun stop ->
+          match%map
+            Monitor.try_with (fun () ->
+                sync_thread "test" (fun () -> raise Test_exn) )
+          with
+          | Ok _ ->
+              failwith "expected a failure"
+          | Error exn ->
+              assert (is_test_exn exn) ;
+              stop () )
 
     (* TODO: recursion tests *)
   end )

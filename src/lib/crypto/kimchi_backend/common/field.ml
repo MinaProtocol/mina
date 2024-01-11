@@ -37,6 +37,8 @@ module type Input_intf = sig
 
   val is_square : t -> bool
 
+  val compare : t -> t -> int
+
   val equal : t -> t -> bool
 
   val print : t -> unit
@@ -121,13 +123,16 @@ module type S = sig
 end
 
 module type S_with_version = sig
+  [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
+      [@@@with_all_version_tags]
+
       type t [@@deriving version, sexp, bin_io, compare, yojson, hash, equal]
     end
-
-    module Latest = V1
-  end
+  end]
 
   include S with type t = Stable.Latest.t
 end
@@ -143,48 +148,53 @@ module Make (F : Input_intf) :
 
   let size_in_bits = size_in_bits ()
 
+  [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = F.t [@@deriving version { asserted }]
+      [@@@with_all_version_tags]
 
-      include Binable.Of_binable
-                (Bigint)
-                (struct
-                  type nonrec t = t
+      type t = (F.t[@version_asserted]) [@@deriving version]
 
-                  let to_binable = to_bigint
+      let to_latest = Fn.id
 
-                  let of_binable = of_bigint
-                end)
+      include
+        Binable.Of_binable
+          (Bigint)
+          (struct
+            type nonrec t = t
 
-      include Sexpable.Of_sexpable
-                (Bigint)
-                (struct
-                  type nonrec t = t
+            let to_binable = to_bigint
 
-                  let to_sexpable = to_bigint
+            let of_binable = of_bigint
+          end)
 
-                  let of_sexpable = of_bigint
-                end)
+      include
+        Sexpable.Of_sexpable
+          (Bigint)
+          (struct
+            type nonrec t = t
 
-      let to_bignum_bigint n =
-        let rec go i two_to_the_i acc =
-          if Int.equal i size_in_bits then acc
+            let to_sexpable = to_bigint
+
+            let of_sexpable = of_bigint
+          end)
+
+      let to_bignum_bigint =
+        let zero = of_int 0 in
+        let one = of_int 1 in
+        fun n ->
+          if equal n zero then Bignum_bigint.zero
+          else if equal n one then Bignum_bigint.one
           else
-            let acc' =
-              if Bigint.test_bit n i then Bignum_bigint.(acc + two_to_the_i)
-              else acc
-            in
-            go (i + 1) Bignum_bigint.(two_to_the_i + two_to_the_i) acc'
-        in
-        go 0 Bignum_bigint.one Bignum_bigint.zero
+            Bytes.unsafe_to_string
+              ~no_mutation_while_string_reachable:(to_bytes n)
+            |> Z.of_bits |> Bignum_bigint.of_zarith_bigint
 
-      let hash_fold_t s x =
-        Bignum_bigint.hash_fold_t s (to_bignum_bigint (to_bigint x))
+      let hash_fold_t s x = Bignum_bigint.hash_fold_t s (to_bignum_bigint x)
 
       let hash = Hash.of_fold hash_fold_t
 
-      let compare t1 t2 = Bigint.compare (to_bigint t1) (to_bigint t2)
+      let compare = compare
 
       let equal = equal
 
@@ -198,9 +208,7 @@ module Make (F : Input_intf) :
         | _ ->
             Error "expected hex string"
     end
-
-    module Latest = V1
-  end
+  end]
 
   include (
     Stable.Latest : module type of Stable.Latest with type t := Stable.Latest.t )
@@ -224,7 +232,7 @@ module Make (F : Input_intf) :
   let of_bits bs =
     List.fold (List.rev bs) ~init:zero ~f:(fun acc b ->
         let acc = add acc acc in
-        if b then add acc one else acc)
+        if b then add acc one else acc )
 
   let%test_unit "sexp round trip" =
     let t = random () in
@@ -235,7 +243,7 @@ module Make (F : Input_intf) :
     [%test_eq: Stable.Latest.t] t
       (Binable.of_string
          (module Stable.Latest)
-         (Binable.to_string (module Stable.Latest) t))
+         (Binable.to_string (module Stable.Latest) t) )
 
   let ( + ) = add
 
@@ -273,7 +281,7 @@ module Make (F : Input_intf) :
     Quickcheck.test
       (Quickcheck.Generator.list_with_length
          Int.(size_in_bits - 1)
-         Bool.quickcheck_generator)
+         Bool.quickcheck_generator )
       ~f:(fun bs ->
-        [%test_eq: bool list] (bs @ [ false ]) (to_bits (of_bits bs)))
+        [%test_eq: bool list] (bs @ [ false ]) (to_bits (of_bits bs)) )
 end

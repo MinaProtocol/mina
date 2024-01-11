@@ -27,7 +27,7 @@ let map { accs; bits; ss; base; n_prev; n_next } ~f =
 let map2 t1 t2 ~f =
   { accs =
       Array.map (Array.zip_exn t1.accs t2.accs) ~f:(fun ((x1, y1), (x2, y2)) ->
-          (f x1 x2, f y1 y2))
+          (f x1 x2, f y1 y2) )
   ; bits =
       Array.map (Array.zip_exn t1.bits t2.bits) ~f:(fun (x1, x2) -> f x1 x2)
   ; ss = Array.map (Array.zip_exn t1.ss t2.ss) ~f:(fun (x1, x2) -> f x1 x2)

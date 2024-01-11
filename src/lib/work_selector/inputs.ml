@@ -52,7 +52,7 @@ module Test_inputs = struct
         | None ->
             fee
         | Some fee' ->
-            Currency.Fee.min fee fee')
+            Currency.Fee.min fee fee' )
   end
 
   module Staged_ledger = struct

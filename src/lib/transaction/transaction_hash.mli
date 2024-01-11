@@ -12,19 +12,37 @@ end]
 
 type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson, equal]
 
+val digest_string : ?off:int -> ?len:int -> string -> t
+
 val of_base58_check : string -> t Or_error.t
 
 val of_base58_check_exn : string -> t
 
 val to_base58_check : t -> string
 
+(* original mainnet transaction hashes *)
+val to_base58_check_v1 : t -> string
+
+val of_base58_check_v1 : string -> t Or_error.t
+
+val of_base58_check_exn_v1 : string -> t
+
 val hash_signed_command : Signed_command.t -> t
+
+val hash_signed_command_v1 : Signed_command.Stable.V1.t -> t
 
 val hash_command : User_command.t -> t
 
 val hash_fee_transfer : Fee_transfer.Single.t -> t
 
 val hash_coinbase : Coinbase.t -> t
+
+(** the input string can be either a Base58Check encoding of a
+    Signed command.Stable.V1.t instance, or, the Base64 encoding
+    of a later version of a signed command or
+    any version of a zkApp command
+*)
+val hash_of_transaction_id : string -> t Or_error.t
 
 include Comparable.S with type t := t
 

@@ -1,7 +1,7 @@
 (library
  (name mina_ledger)
  (public_name mina_ledger)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let ppx_custom_printf ppx_base ppx_deriving_yojson ppx_inline_test ppx_assert))
  (libraries
@@ -20,15 +20,23 @@
    core_kernel.uuid
    ppx_inline_test.config
    ;; local libraries
+   mina_wire_types
+   sgn
    syncable_ledger
    snark_params
+   zkapp_command_builder
    pickles
+   pickles.backend
+   pickles_types
    mina_base.import
    o1trace
    rocksdb
    random_oracle
    currency
    genesis_constants
+   kimchi_backend
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    merkle_mask
    merkle_ledger
    mina_base
@@ -43,4 +51,7 @@
    quickcheck_lib
    snarky.backendless
    unsigned_extended
+   with_hash
+   ppx_version.runtime
+   direction
 ))

@@ -1,10 +1,12 @@
 open Core_kernel
 open Mina_base
-open Mina_transition
+open Mina_block
 
 type full = Full
 
 type lite = Lite
+
+[@@@alert "-deprecated"]
 
 module Dummy_binable1 (T : sig
   type 'a t
@@ -36,13 +38,15 @@ end) =
       let of_binable _ = assert false
     end)
 
+[@@@alert "+deprecated"]
+
 module Node = struct
   [%%versioned_binable
   module Stable = struct
     module V3 = struct
       type 'a t =
         | Full : Breadcrumb.t -> full t
-        | Lite : External_transition.Validated.Stable.V3.t -> lite t
+        | Lite : Mina_block.Validated.Stable.V2.t -> lite t
 
       include Dummy_binable1 (struct
         type nonrec 'a t = 'a t
@@ -53,7 +57,7 @@ end
 
 module Node_list = struct
   type full_node =
-    { transition : External_transition.Validated.t
+    { transition : Mina_block.Validated.t
     ; scan_state : Staged_ledger.Scan_state.t
     }
 
@@ -66,10 +70,8 @@ module Node_list = struct
   type 'repr node_list = 'repr t
 
   let to_lite =
-    let f { transition; _ } =
-      (External_transition.Validated.state_hashes transition).state_hash
-    in
-    List.map ~f
+    List.map ~f:(fun { transition; _ } ->
+        Mina_block.Validated.state_hash transition )
 
   module Lite = struct
     module Binable_arg = struct
@@ -107,9 +109,14 @@ module Node_list = struct
 end
 
 module Root_transition = struct
+  type 'repr root_transition_scan_state =
+    | Lite : lite root_transition_scan_state
+    | Full : Staged_ledger.Scan_state.t -> full root_transition_scan_state
+
   type 'repr t =
     { new_root : Root_data.Limited.t
     ; garbage : 'repr Node_list.t
+    ; old_root_scan_state : 'repr root_transition_scan_state
     ; just_emitted_a_proof : bool
     }
 
@@ -160,8 +167,12 @@ module Root_transition = struct
 
           let of_binable
               ({ new_root; garbage; just_emitted_a_proof } :
-                Binable_arg.Stable.V4.t) : t =
-            { new_root; garbage; just_emitted_a_proof }
+                Binable_arg.Stable.V4.t ) : t =
+            { new_root
+            ; garbage
+            ; old_root_scan_state = Lite
+            ; just_emitted_a_proof
+            }
         end
 
         include Binable.Of_binable (Binable_arg.Stable.V4) (T_nonbinable)
@@ -209,8 +220,7 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
     | New_node (Full breadcrumb) ->
         State_hash.to_yojson (Breadcrumb.state_hash breadcrumb)
     | New_node (Lite transition) ->
-        let x, _ = transition in
-        State_hash.to_yojson (State_hash.With_state_hashes.state_hash x)
+        State_hash.to_yojson (Mina_block.Validated.state_hash transition)
     | Root_transitioned { new_root; garbage; just_emitted_a_proof } ->
         let garbage_hashes =
           match garbage with
@@ -234,12 +244,18 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
 let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
   match diff with
   | New_node (Full breadcrumb) ->
-      New_node (Lite (Breadcrumb.validated_transition breadcrumb))
+      let external_transition = Breadcrumb.validated_transition breadcrumb in
+      New_node (Lite external_transition)
   | Root_transitioned
-      { new_root; garbage = Full garbage_nodes; just_emitted_a_proof } ->
+      { new_root
+      ; garbage = Full garbage_nodes
+      ; old_root_scan_state = Full _
+      ; just_emitted_a_proof
+      } ->
       Root_transitioned
         { new_root
         ; garbage = Lite (Node_list.to_lite garbage_nodes)
+        ; old_root_scan_state = Lite
         ; just_emitted_a_proof
         }
   | Best_tip_changed b ->
@@ -250,9 +266,9 @@ module Lite_binable = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t =
-        | New_node of External_transition.Validated.Stable.V3.t
+        | New_node of Mina_block.Validated.Stable.V2.t
         | Root_transitioned of Root_transition.Lite.Stable.V4.t
         | Best_tip_changed of State_hash.Stable.V1.t
 
@@ -270,8 +286,8 @@ module Lite = struct
       module Stable = struct
         [@@@no_toplevel_latest_type]
 
-        module V2 = struct
-          type t = Lite_binable.Stable.V2.t
+        module V3 = struct
+          type t = Lite_binable.Stable.V3.t
 
           let to_latest = Fn.id
         end
@@ -282,22 +298,22 @@ module Lite = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V2 = struct
-        type t = E : (lite, 'mutant) diff -> t
+      module V3 = struct
+        type t = E : (lite, 'mutant) diff -> t [@@unboxed]
 
         module T_nonbinable = struct
           type nonrec t = t
 
           let to_binable = function
             | E (New_node (Lite x)) ->
-                (New_node x : Binable_arg.Stable.V2.t)
+                (New_node x : Binable_arg.Stable.V3.t)
             | E (Root_transitioned x) ->
                 Root_transitioned x
             | E (Best_tip_changed x) ->
                 Best_tip_changed x
 
           let of_binable = function
-            | (New_node x : Binable_arg.Stable.V2.t) ->
+            | (New_node x : Binable_arg.Stable.V3.t) ->
                 E (New_node (Lite x))
             | Root_transitioned x ->
                 E (Root_transitioned x)
@@ -305,7 +321,7 @@ module Lite = struct
                 E (Best_tip_changed x)
         end
 
-        include Binable.Of_binable (Binable_arg.Stable.V2) (T_nonbinable)
+        include Binable.Of_binable (Binable_arg.Stable.V3) (T_nonbinable)
 
         let to_latest = Fn.id
       end

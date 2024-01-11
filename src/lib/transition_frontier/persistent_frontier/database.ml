@@ -1,7 +1,7 @@
 open Async_kernel
 open Core
 open Mina_base
-open Mina_transition
+open Mina_block
 open Frontier_base
 
 (* TODO: cache state body hashes in db to avoid re-hashing on load (#10293) *)
@@ -46,9 +46,7 @@ module Schema = struct
 
   type _ t =
     | Db_version : int t
-    | Transition :
-        State_hash.Stable.V1.t
-        -> External_transition.Raw.Stable.V2.t t
+    | Transition : State_hash.Stable.V1.t -> Mina_block.Stable.V2.t t
     | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
     | Root : Root_data.Minimal.Stable.V2.t t
     | Best_tip : State_hash.Stable.V1.t t
@@ -73,7 +71,7 @@ module Schema = struct
     | Db_version ->
         [%bin_type_class: int]
     | Transition _ ->
-        [%bin_type_class: External_transition.Raw.Stable.Latest.t]
+        [%bin_type_class: Mina_block.Stable.Latest.t]
     | Arcs _ ->
         [%bin_type_class: State_hash.Stable.Latest.t list]
     | Root ->
@@ -91,7 +89,7 @@ module Schema = struct
       -> a t Bin_prot.Type_class.t =
    fun (module M) ~to_gadt ~of_gadt ->
     let ({ shape; writer = { size; write }; reader = { read; vtag_read } }
-          : data Bin_prot.Type_class.t) =
+          : data Bin_prot.Type_class.t ) =
       [%bin_type_class: M.t]
     in
     { shape
@@ -103,7 +101,7 @@ module Schema = struct
         { read = (fun buffer ~pos_ref -> to_gadt (read buffer ~pos_ref))
         ; vtag_read =
             (fun buffer ~pos_ref number ->
-              to_gadt (vtag_read buffer ~pos_ref number))
+              to_gadt (vtag_read buffer ~pos_ref number) )
         }
     }
 
@@ -142,7 +140,7 @@ module Schema = struct
           (module Keys.String)
           ~to_gadt:(fun _ -> Protocol_states_for_root_scan_state)
           ~of_gadt:(fun Protocol_states_for_root_scan_state ->
-            "protocol_states_in_root_scan_state")
+            "protocol_states_in_root_scan_state" )
 end
 
 module Error = struct
@@ -193,7 +191,7 @@ module Error = struct
     in
     let additional_context =
       Option.map member_id ~f:(fun id ->
-          Printf.sprintf " (hash = %s)" (State_hash.raw_hash_bytes id))
+          Printf.sprintf " (hash = %s)" (State_hash.raw_hash_bytes id) )
       |> Option.value ~default:""
     in
     Printf.sprintf "%s not found%s" member_name additional_context
@@ -220,6 +218,8 @@ let close t = Rocks.close t.db
 
 open Schema
 open Rocks
+
+type batch_t = Batch.t
 
 let mem db ~key = Option.is_some (get db ~key)
 
@@ -276,30 +276,32 @@ let check t ~genesis_state_hash =
               get t.db ~key:(Transition succ_hash)
                 ~error:(`Corrupt (`Not_found (`Transition succ_hash)))
             in
-            check_arcs succ_hash)
+            check_arcs succ_hash )
       in
       let%bind () = check_version () in
-      let%bind root_hash, root_transition = check_base () in
-      let root_block = External_transition.decompose root_transition in
+      let%bind root_hash, root_block = check_base () in
+      let root_protocol_state =
+        root_block |> Mina_block.header |> Mina_block.Header.protocol_state
+      in
       let%bind () =
         let persisted_genesis_state_hash =
-          External_transition.protocol_state root_block
-          |> Mina_state.Protocol_state.genesis_state_hash
+          Mina_state.Protocol_state.genesis_state_hash root_protocol_state
         in
         if State_hash.equal persisted_genesis_state_hash genesis_state_hash then
           Ok ()
         else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
       in
       let%map () = check_arcs root_hash in
-      External_transition.blockchain_state root_block
-      |> Mina_state.Blockchain_state.snarked_ledger_hash)
+      root_block |> Mina_block.header |> Header.protocol_state
+      |> Mina_state.Protocol_state.blockchain_state
+      |> Mina_state.Blockchain_state.snarked_ledger_hash )
   |> Result.map_error ~f:(fun err -> `Corrupt (`Raised err))
   |> Result.join
 
 let initialize t ~root_data =
   let open Root_data.Limited in
   let root_state_hash, root_transition =
-    let t, _ = External_transition.Validated.erase (transition root_data) in
+    let t = Mina_block.Validated.forget (transition root_data) in
     ( State_hash.With_state_hashes.state_hash t
     , State_hash.With_state_hashes.data t )
   in
@@ -313,64 +315,83 @@ let initialize t ~root_data =
       Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited root_data) ;
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
-        ~data:(protocol_states root_data |> List.map ~f:With_hash.data))
+        ~data:(protocol_states root_data |> List.map ~f:With_hash.data) )
 
-let add t ~transition:(transition, _validation) =
+let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
+    ~parent_hashes =
+  let f h = Some_key.Some_key (Arcs h) in
+  let values =
+    get_batch t.db ~keys:(Some_key Root :: List.map parent_hashes ~f)
+  in
+  let populate res parent_hash arc_opt =
+    let%bind.Result () = res in
+    match arc_opt with
+    | Some (Some_key.Some_key_value (Arcs _, (data : State_hash.t list))) ->
+        State_hash.Table.set arcs_cache ~key:parent_hash ~data ;
+        Result.return ()
+    | _ ->
+        Error (`Not_found (`Arcs parent_hash))
+  in
+  match values with
+  | Some (Some_key_value (Root, (old_root : Root_data.Minimal.Stable.V2.t)))
+    :: arcs ->
+      let%map.Result () =
+        List.fold2_exn ~init:(Result.return ()) ~f:populate parent_hashes arcs
+      in
+      old_root
+  | _ ->
+      Error (`Not_found `Old_root_transition)
+
+let add ~arcs_cache ~transition =
+  let transition = Mina_block.Validated.forget transition in
   let hash = State_hash.With_state_hashes.state_hash transition in
-  let raw_transition =
-    External_transition.compose (With_hash.data transition)
-  in
   let parent_hash =
-    External_transition.parent_hash (With_hash.data transition)
+    With_hash.data transition |> Mina_block.header |> Header.protocol_state
+    |> Mina_state.Protocol_state.previous_state_hash
   in
-  let%bind () =
-    Result.ok_if_true
-      (mem t.db ~key:(Transition parent_hash))
-      ~error:(`Not_found (`Parent_transition parent_hash))
-  in
-  let%map parent_arcs =
-    get t.db ~key:(Arcs parent_hash) ~error:(`Not_found (`Arcs parent_hash))
-  in
-  Batch.with_batch t.db ~f:(fun batch ->
-      Batch.set batch ~key:(Transition hash) ~data:raw_transition ;
-      Batch.set batch ~key:(Arcs hash) ~data:[] ;
-      Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs))
+  let parent_arcs = State_hash.Table.find_exn arcs_cache parent_hash in
+  State_hash.Table.set arcs_cache ~key:parent_hash ~data:(hash :: parent_arcs) ;
+  State_hash.Table.set arcs_cache ~key:hash ~data:[] ;
+  fun batch ->
+    Batch.set batch ~key:(Transition hash) ~data:(With_hash.data transition) ;
+    Batch.set batch ~key:(Arcs hash) ~data:[] ;
+    Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
 
-let move_root t ~new_root ~garbage =
+let move_root ~old_root ~new_root ~garbage =
   let open Root_data.Limited in
-  let%bind () =
-    Result.ok_if_true
-      (mem t.db ~key:(Transition (hashes new_root).state_hash))
-      ~error:(`Not_found `New_root_transition)
-  in
-  let%map old_root =
-    get t.db ~key:Root ~error:(`Not_found `Old_root_transition)
-  in
   let old_root_hash = Root_data.Minimal.hash old_root in
-  (* TODO: Result compatible rocksdb batch transaction *)
-  Batch.with_batch t.db ~f:(fun batch ->
-      Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited new_root) ;
-      Batch.set batch ~key:Protocol_states_for_root_scan_state
-        ~data:(List.map ~f:With_hash.data (protocol_states new_root)) ;
-      List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
-          (* because we are removing entire forks of the tree, there is
-           * no need to have extra logic to any remove arcs to the node
-           * we are deleting since there we are deleting all of a node's
-           * parents as well
-           *)
-          Batch.remove batch ~key:(Transition node_hash) ;
-          Batch.remove batch ~key:(Arcs node_hash))) ;
-  old_root_hash
+  fun batch ->
+    Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited new_root) ;
+    Batch.set batch ~key:Protocol_states_for_root_scan_state
+      ~data:(List.map ~f:With_hash.data (protocol_states new_root)) ;
+    List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
+        (* because we are removing entire forks of the tree, there is
+         * no need to have extra logic to any remove arcs to the node
+         * we are deleting since there we are deleting all of a node's
+         * parents as well
+         *)
+        Batch.remove batch ~key:(Transition node_hash) ;
+        Batch.remove batch ~key:(Arcs node_hash) )
 
 let get_transition t hash =
   let%map transition =
     get t.db ~key:(Transition hash) ~error:(`Not_found (`Transition hash))
   in
-  (* this transition was read from the database, so it must have been validated already *)
-  let (`I_swear_this_is_safe_see_my_comment validated_transition) =
-    External_transition.(Validated.create_unsafe @@ decompose transition)
+  let block =
+    { With_hash.data = transition
+    ; hash =
+        { State_hash.State_hashes.state_hash = hash; state_body_hash = None }
+    }
   in
-  validated_transition
+  let parent_hash =
+    block |> With_hash.data |> Mina_block.header
+    |> Mina_block.Header.protocol_state
+    |> Mina_state.Protocol_state.previous_state_hash
+  in
+  (* TODO: the delta transition chain proof is incorrect (same behavior the daemon used to have, but we should probably fix this?) *)
+  Mina_block.Validated.unsafe_of_trusted_block
+    ~delta_block_chain_proof:(Mina_stdlib.Nonempty_list.singleton parent_hash)
+    (`This_block_is_trusted_to_be_safe block)
 
 let get_arcs t hash = get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
 
@@ -386,11 +407,7 @@ let get_root_hash t =
 
 let get_best_tip t = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
 
-let set_best_tip t hash =
-  let%map old_best_tip_hash = get_best_tip t in
-  (* no need to batch because we only do one operation *)
-  set t.db ~key:Best_tip ~data:hash ;
-  old_best_tip_hash
+let set_best_tip data = Batch.set ~key:Best_tip ~data
 
 let rec crawl_successors t hash ~init ~f =
   let open Deferred.Result.Let_syntax in
@@ -401,4 +418,6 @@ let rec crawl_successors t hash ~init ~f =
         Deferred.map (f init transition)
           ~f:(Result.map_error ~f:(fun err -> `Crawl_error err))
       in
-      crawl_successors t succ_hash ~init:init' ~f)
+      crawl_successors t succ_hash ~init:init' ~f )
+
+let with_batch t = Batch.with_batch t.db
