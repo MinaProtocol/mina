@@ -189,6 +189,7 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
                       | Insufficient_work _
                       | Mismatched_statuses _
                       | Invalid_public_key _
+                      | ZkApps_exceed_limit _
                       | Unexpected _ ->
                           make_actions Gossiped_invalid_transition
                     in
@@ -401,6 +402,8 @@ module For_tests = struct
             ~coinbase_receiver ~logger staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
             ~current_state_view ~state_and_body_hash ~supercharge_coinbase
+            ~zkapps_per_block:
+              precomputed_values.genesis_constants.protocol.zkapps_per_block
         with
         | Ok r ->
             return r

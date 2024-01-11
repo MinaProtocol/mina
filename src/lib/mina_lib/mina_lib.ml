@@ -1380,7 +1380,9 @@ let start t =
       ~log_block_creation:t.config.log_block_creation
       ~block_reward_threshold:t.config.block_reward_threshold
       ~block_produced_bvar:t.components.block_produced_bvar
-      ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net ;
+      ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
+      ~zkapps_per_block:
+        t.config.precomputed_values.genesis_constants.protocol.zkapps_per_block ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with

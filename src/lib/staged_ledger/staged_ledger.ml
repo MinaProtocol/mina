@@ -958,7 +958,7 @@ module T = struct
 
   let apply_diff ?(skip_verification = false) ~logger ~constraint_constants
       ~global_slot t pre_diff_info ~current_state_view ~state_and_body_hash
-      ~log_prefix =
+      ~log_prefix ~zkapps_per_block =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2 t.constraint_constants.transaction_capacity_log_2
@@ -988,10 +988,10 @@ module T = struct
             |> List.filter ~f:(fun txn -> zkAppCountGetter txn)
             |> List.length
           in
-          if zkAppCount > Genesis_constants.zkapps_per_block then
+          if zkAppCount > zkapps_per_block then
             Deferred.Result.fail
               (Staged_ledger_error.ZkApps_exceed_limit
-                 (zkAppCount, Genesis_constants.zkapps_per_block) )
+                 (zkAppCount, zkapps_per_block) )
           else Deferred.Result.return () )
     in
     [%log internal] "Update_coinbase_stack"
@@ -1193,7 +1193,8 @@ module T = struct
 
   let apply ?skip_verification ~constraint_constants ~global_slot t
       (witness : Staged_ledger_diff.t) ~logger ~verifier ~current_state_view
-      ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase =
+      ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
+      ~zkapps_per_block =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () =
@@ -1225,7 +1226,7 @@ module T = struct
         ~constraint_constants ~global_slot t
         (forget_prediff_info prediff)
         ~logger ~current_state_view ~state_and_body_hash
-        ~log_prefix:"apply_diff"
+        ~log_prefix:"apply_diff" ~zkapps_per_block
     in
     [%log internal] "Diff_applied" ;
     [%log debug]
@@ -1247,7 +1248,7 @@ module T = struct
   let apply_diff_unchecked ~constraint_constants ~global_slot t
       (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) ~logger
       ~current_state_view ~state_and_body_hash ~coinbase_receiver
-      ~supercharge_coinbase =
+      ~supercharge_coinbase ~zkapps_per_block =
     let open Deferred.Result.Let_syntax in
     let%bind prediff =
       Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
@@ -1258,7 +1259,7 @@ module T = struct
     apply_diff t
       (forget_prediff_info prediff)
       ~constraint_constants ~global_slot ~logger ~current_state_view
-      ~state_and_body_hash ~log_prefix:"apply_diff_unchecked"
+      ~state_and_body_hash ~log_prefix:"apply_diff_unchecked" ~zkapps_per_block
 
   module Resources = struct
     module Discarded = struct
@@ -2187,6 +2188,8 @@ let%test_module "staged ledger tests" =
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
 
+    let zkapps_per_block = 1
+
     let logger = Logger.null ()
 
     let `VK vk, `Prover zkapp_prover =
@@ -2238,7 +2241,7 @@ let%test_module "staged ledger tests" =
         match%map
           Sl.apply ~constraint_constants ~global_slot !sl diff' ~logger
             ~verifier ~current_state_view ~state_and_body_hash
-            ~coinbase_receiver ~supercharge_coinbase
+            ~coinbase_receiver ~supercharge_coinbase ~zkapps_per_block
         with
         | Ok x ->
             x
@@ -3223,6 +3226,7 @@ let%test_module "staged ledger tests" =
                           ( state_hashes.state_hash
                           , state_hashes.state_body_hash |> Option.value_exn )
                         ~coinbase_receiver ~supercharge_coinbase:true
+                        ~zkapps_per_block
                     in
                     let checked', diff' =
                       match apply_res with
@@ -4247,6 +4251,7 @@ let%test_module "staged ledger tests" =
                       (Staged_ledger_diff.forget diff)
                       ~logger ~verifier ~current_state_view ~state_and_body_hash
                       ~coinbase_receiver ~supercharge_coinbase:false
+                      ~zkapps_per_block
                   with
                   | Ok _x ->
                       assert false
@@ -4539,7 +4544,7 @@ let%test_module "staged ledger tests" =
                           (Staged_ledger_diff.forget diff)
                           ~logger ~verifier:verifier_full ~current_state_view
                           ~state_and_body_hash ~coinbase_receiver
-                          ~supercharge_coinbase:false
+                          ~supercharge_coinbase:false ~zkapps_per_block
                       with
                       | Ok _ ->
                           failwith "invalid block should be rejected"
