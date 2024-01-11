@@ -60,6 +60,7 @@ type t =
   ; delta : int
   ; slots_per_epoch : int
   ; slots_per_sub_window : int
+  ; grace_period_slots : int
   ; txpool_max_size : int
   }
 
@@ -91,6 +92,7 @@ let default =
   ; k = 20
   ; slots_per_epoch = 3 * 8 * 20
   ; slots_per_sub_window = 2
+  ; grace_period_slots = 140
   ; delta = 0
   ; txpool_max_size = 3000
   }
