@@ -1,6 +1,7 @@
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
-
+let PipelineMode = ../../Pipeline/Mode.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 let Prelude = ../../External/Prelude.dhall
 
 let Cmd = ../../Lib/Cmds.dhall
@@ -25,6 +26,7 @@ in Pipeline.build Pipeline.Config::{
       S.exactly "buildkite/src/Jobs/Test/BerkeleyCompatibility" "dhall"
     ],
     path = "Test",
+    tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ],
     name = "BerkeleyCompatibility"
   },
   steps = [
@@ -36,7 +38,8 @@ in Pipeline.build Pipeline.Config::{
       key = "berkeley-compatibilty-test",
       target = Size.XLarge,
       docker = None Docker.Type,
-      depends_on = dependsOn
+      depends_on = dependsOn,
+      timeout_in_minutes = Some +60
     }
   ]
 }

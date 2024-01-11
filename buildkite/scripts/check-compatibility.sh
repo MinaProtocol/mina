@@ -86,17 +86,20 @@ function boot_and_sync {
     REST_SERVER="http://127.0.0.1:$REST_PORT/graphql"
 
     while [ $SYNCED -eq 0 ]; do
-	SYNC_STATUS=$(docker container exec -it $DAEMON_CONTAINER \
-			     curl -g -X POST -H "Content-Type: application/json" -d '{"query":"query { syncStatus }"}' ${REST_SERVER})
+        SYNC_STATUS=$(docker container exec -it $DAEMON_CONTAINER \
+                    curl -g -X POST -H "Content-Type: application/json" -d '{"query":"query { syncStatus }"}' ${REST_SERVER})
 
-	# "connection refused" until GraphQL server up
-	GOT_SYNC_STATUS=$(echo ${SYNC_STATUS} | grep "syncStatus")
-	if [ ! -z $GOT_SYNC_STATUS ]; then
-	    echo "Sync status:" $GOT_SYNC_STATUS
-	fi
+        # print logs
+        docker container logs $DAEMON_CONTAINER --tail 10
 
-	SYNCED=$(echo ${SYNC_STATUS} | grep -c "SYNCED")
-	sleep 5
+        # "connection refused" until GraphQL server up
+        GOT_SYNC_STATUS=$(echo ${SYNC_STATUS} | grep "syncStatus")
+        if [ ! -z $GOT_SYNC_STATUS ]; then
+            echo $(date +'%Y-%m-%d %H:%M:%S') ". Sync status:" $GOT_SYNC_STATUS
+        fi
+
+        SYNCED=$(echo ${SYNC_STATUS} | grep -c "SYNCED")
+    	sleep 5
     done
 }
 

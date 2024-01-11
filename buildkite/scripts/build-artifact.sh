@@ -13,7 +13,7 @@ echo "--- Build libp2p_helper TODO: use the previously uploaded build artifact"
 make -C src/app/libp2p_helper
 
 MAINNET_TARGETS=""
-[[ ${MINA_BUILD_MAINNET} ]] && MAINNET_TARGETS="src/app/cli/src/mina_mainnet_signatures.exe src/app/rosetta/rosetta_mainnet_signatures.exe "
+[[ ${MINA_BUILD_MAINNET} ]] && MAINNET_TARGETS="src/app/cli/src/mina_mainnet_signatures.exe src/app/rosetta/rosetta_mainnet_signatures.exe src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe"
 
 echo "--- Build all major tagets required for packaging"
 echo "Building from Commit SHA: ${MINA_COMMIT_SHA1}"
@@ -28,12 +28,17 @@ dune build "--profile=${DUNE_PROFILE}" \
   src/app/replayer/replayer.exe \
   src/app/extract_blocks/extract_blocks.exe \
   src/app/archive_blocks/archive_blocks.exe \
+  src/app/berkeley_migration/berkeley_migration.exe \
+  src/app/last_vrf_output_to_b64/last_vrf_output_to_b64.exe \
+  src/app/receipt_chain_hash_to_b58/receipt_chain_hash_to_b58.exe \
   src/app/batch_txn_tool/batch_txn_tool.exe \
   src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
   src/app/swap_bad_balances/swap_bad_balances.exe \
   src/app/zkapp_test_transaction/zkapp_test_transaction.exe \
   src/app/rosetta/rosetta_testnet_signatures.exe \
-  src/app/test_executive/test_executive.exe # 2>&1 | tee /tmp/buildocaml.log
+  src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe \
+  src/app/test_executive/test_executive.exe  \
+  src/test/command_line_tests/command_line_tests.exe # 2>&1 | tee /tmp/buildocaml.log
 
 echo "--- Bundle all packages for Debian ${MINA_DEB_CODENAME}"
 echo " Includes mina daemon, archive-node, rosetta, generate keypair for berkeley"

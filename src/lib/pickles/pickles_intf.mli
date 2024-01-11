@@ -16,8 +16,7 @@ module type S = sig
   module Step_verifier = Step_verifier
   module Common = Common
   module Proof_cache = Proof_cache
-
-  exception Return_digest of Md5.t
+  module Ro = Ro
 
   module type Statement_intf = sig
     type field
@@ -238,8 +237,12 @@ module type S = sig
       }
   end
 
+  type chunking_data = Verify.Instance.chunking_data =
+    { num_chunks : int; domain_size : int; zk_rows : int }
+
   val verify_promise :
-       (module Nat.Intf with type n = 'n)
+       ?chunking_data:chunking_data
+    -> (module Nat.Intf with type n = 'n)
     -> (module Statement_value_intf with type t = 'a)
     -> Verification_key.t
     -> ('a * ('n, 'n) Proof.t) list
@@ -370,8 +373,8 @@ module type S = sig
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
-    -> ?return_early_digest_exception:bool
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+    -> ?num_chunks:int
     -> public_input:
          ( 'var
          , 'value
@@ -426,6 +429,7 @@ module type S = sig
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+    -> ?num_chunks:int
     -> public_input:
          ( 'var
          , 'value

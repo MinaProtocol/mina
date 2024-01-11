@@ -65,15 +65,16 @@ let combine_evaluations (type f) t ~crs_max_degree ~(mul : f -> f -> f) ~add
     ~shifted_pow:(fun deg x -> pow x (crs_max_degree - deg))
     ~mul ~add ~one ~evaluation_point ~xi
 
-open Plonk_types.Poly_comm
-
-let combine_split_commitments _t ~scale_and_add ~init:i ~xi (type n)
+let combine_split_commitments _t ~scale_and_add ~init:i ~xi
+    ~reduce_without_degree_bound ~reduce_with_degree_bound (type n)
     (without_degree_bound : (_, n) Vector.t) with_degree_bound =
   let flat =
-    List.concat_map (Vector.to_list without_degree_bound) ~f:Array.to_list
-    @ List.concat_map (Vector.to_list with_degree_bound)
-        ~f:(fun { With_degree_bound.unshifted; shifted } ->
-          Array.to_list unshifted @ [ shifted ] )
+    List.concat_map
+      (Vector.to_list without_degree_bound)
+      ~f:reduce_without_degree_bound
+    @ List.concat_map
+        (Vector.to_list with_degree_bound)
+        ~f:reduce_with_degree_bound
   in
   let rec go = function
     | [] ->

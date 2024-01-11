@@ -1,0 +1,20 @@
+(executable
+ (package receipt_chain_hash_to_b58)
+ (name receipt_chain_hash_to_b58)
+ (public_name receipt_chain_hash_to_b58)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   ;; local libraries
+   mina_base
+   kimchi_backend
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   pickles
+   pickles.backend
+   pickles_types
+   snark_params
+ )
+ (preprocessor_deps ../../config.mlh)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_mina ppx_version)))

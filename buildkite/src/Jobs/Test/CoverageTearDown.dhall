@@ -8,7 +8,7 @@ let Size = ../../Command/Size.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
 let PipelineMode = ../../Pipeline/Mode.dhall
-let PipelineStage = ../../Pipeline/Stage.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 
 in Pipeline.build 
   Pipeline.Config::{
@@ -16,7 +16,7 @@ in Pipeline.build
       JobSpec::{
         dirtyWhen = [ S.everything ],
         path = "Test",
-        stage = PipelineStage.Type.TearDown,
+        tags = [ PipelineTag.Type.TearDown ],
         name = "CoverageTearDown"
     }
   , steps = [
