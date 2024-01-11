@@ -1,6 +1,6 @@
 (library
- (public_name integration_test_cloud_engine)
- (name integration_test_cloud_engine)
+ (public_name integration_test_local_engine)
+ (name integration_test_local_engine)
  (inline_tests
   (flags -verbose -show-counts))
  (instrumentation
