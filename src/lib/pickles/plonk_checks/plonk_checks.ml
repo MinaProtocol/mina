@@ -152,7 +152,7 @@ let get_feature_flag (feature_flags : _ all_feature_flags)
 
 let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     (module F : Field_with_if_intf with type t = t and type bool = boolean)
-    ~endo ~mds ~field_of_hex ~domain ~srs_length_log2
+    ~endo ~mds ~field_of_hex ~domain ~zk_rows ~srs_length_log2
     ({ alpha; beta; gamma; zeta; joint_combiner; feature_flags } :
       (t, _, boolean) Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
     =
@@ -234,21 +234,44 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
     done ;
     arr
   in
-  let w4, w3, w2, w1 =
+  let ( omega_to_zk_minus_1
+      , omega_to_zk
+      , omega_to_intermediate_powers
+      , omega_to_zk_plus_1
+      , omega_to_minus_1 ) =
     (* generator^{n - 3} *)
     let gen = domain#generator in
     (* gen_inv = gen^{n - 1} = gen^{-1} *)
-    let w1 = one / gen in
-    let w2 = square w1 in
-    let w3 = w2 * w1 in
-    let w4 = lazy (w3 * w1) in
-    (w4, w3, w2, w1)
+    let omega_to_minus_1 = one / gen in
+    let omega_to_minus_2 = square omega_to_minus_1 in
+    let omega_to_intermediate_powers, omega_to_zk_plus_1 =
+      let next_term = ref omega_to_minus_2 in
+      let omega_to_intermediate_powers =
+        Array.init
+          Stdlib.(zk_rows - 3)
+          ~f:(fun _ ->
+            let term = !next_term in
+            next_term := term * omega_to_minus_1 ;
+            term )
+      in
+      (omega_to_intermediate_powers, !next_term)
+    in
+    let omega_to_zk = omega_to_zk_plus_1 * omega_to_minus_1 in
+    let omega_to_zk_minus_1 = lazy (omega_to_zk * omega_to_minus_1) in
+    ( omega_to_zk_minus_1
+    , omega_to_zk
+    , omega_to_intermediate_powers
+    , omega_to_zk_plus_1
+    , omega_to_minus_1 )
   in
   let zk_polynomial =
-    (* Vanishing polynomial of [w1, w2, w3]
-        evaluated at x = zeta
+    (* Vanishing polynomial of
+       [omega_to_minus_1, omega_to_zk_plus_1, omega_to_zk]
+       evaluated at x = zeta
     *)
-    (zeta - w1) * (zeta - w2) * (zeta - w3)
+    (zeta - omega_to_minus_1)
+    * (zeta - omega_to_zk_plus_1)
+    * (zeta - omega_to_zk)
   in
   let zeta_to_n_minus_1 = lazy (domain#vanishing_polynomial zeta) in
   { Scalars.Env.add = ( + )
@@ -262,8 +285,9 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
   ; cell = Fn.id
   ; double = (fun x -> of_int 2 * x)
   ; zk_polynomial
-  ; omega_to_minus_3 = w3
+  ; omega_to_minus_zk_rows = omega_to_zk
   ; zeta_to_n_minus_1 = domain#vanishing_polynomial zeta
+  ; zeta_to_srs_length = lazy (pow2pow (module F) zeta srs_length_log2)
   ; endo_coefficient = endo
   ; mds = (fun (row, col) -> mds.(row).(col))
   ; srs_length_log2
@@ -273,7 +297,9 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
           (* No need to compute anything when not using lookups *)
           F.one
       | Some _ ->
-          zk_polynomial * (zeta - Lazy.force w4) )
+          Array.fold omega_to_intermediate_powers
+            ~init:(zk_polynomial * (zeta - Lazy.force omega_to_zk_minus_1))
+            ~f:(fun acc omega_pow -> acc * (zeta - omega_pow)) )
   ; joint_combiner = Option.value joint_combiner ~default:F.one
   ; beta
   ; gamma
@@ -281,20 +307,20 @@ let scalars_env (type boolean t) (module B : Bool_intf with type t = boolean)
       (fun i ->
         let w_to_i =
           match i with
-          | 0 ->
+          | false, 0 ->
               one
-          | 1 ->
+          | false, 1 ->
               domain#generator
-          | -1 ->
-              w1
-          | -2 ->
-              w2
-          | -3 ->
-              w3
-          | -4 ->
-              Lazy.force w4
-          | _ ->
-              failwith "TODO"
+          | false, -1 ->
+              omega_to_minus_1
+          | false, -2 ->
+              omega_to_zk_plus_1
+          | false, -3 | true, 0 ->
+              omega_to_zk
+          | true, -1 ->
+              Lazy.force omega_to_zk_minus_1
+          | b, i ->
+              failwithf "TODO: unnormalized_lagrange_basis(%b, %i)" b i ()
         in
         Lazy.force zeta_to_n_minus_1 / (zeta - w_to_i) )
   ; if_feature =
@@ -327,6 +353,16 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     let zkp = env.zk_polynomial in
     let alpha_pow = env.alpha_pow in
     let zeta1m1 = env.zeta_to_n_minus_1 in
+    let p_eval0 =
+      Option.value_exn
+        (Array.fold_right ~init:None p_eval0 ~f:(fun p_eval0 acc ->
+             match acc with
+             | None ->
+                 Some p_eval0
+             | Some acc ->
+                 let zeta1 = Lazy.force env.zeta_to_srs_length in
+                 Some F.(p_eval0 + (zeta1 * acc)) ) )
+    in
     let open F in
     let w0 = Vector.to_array e.w |> Array.map ~f:fst in
     let ft_eval0 =
@@ -349,11 +385,11 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
     let nominator =
       ( zeta1m1
         * alpha_pow Int.(perm_alpha0 + 1)
-        * (zeta - env.omega_to_minus_3)
+        * (zeta - env.omega_to_minus_zk_rows)
       + (zeta1m1 * alpha_pow Int.(perm_alpha0 + 2) * (zeta - one)) )
       * (one - e0 z)
     in
-    let denominator = (zeta - env.omega_to_minus_3) * (zeta - one) in
+    let denominator = (zeta - env.omega_to_minus_zk_rows) * (zeta - one) in
     let ft_eval0 = ft_eval0 + (nominator / denominator) in
     let constant_term = Sc.constant_term env in
     ft_eval0 - constant_term
@@ -393,7 +429,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         ; gamma
         ; zeta
         ; zeta_to_domain_size = env.zeta_to_n_minus_1 + F.one
-        ; zeta_to_srs_length = pow2pow (module F) zeta env.srs_length_log2
+        ; zeta_to_srs_length = Lazy.force env.zeta_to_srs_length
         ; perm
         ; joint_combiner = Opt.of_option joint_combiner
         ; feature_flags = actual_feature_flags

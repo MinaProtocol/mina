@@ -51,6 +51,6 @@ Pipeline.build
         mode = PipelineMode.Type.Stable
       },
     steps = [
-      buildTestCmd "dev" "src/lib/transaction_snark/test/zkapp_fuzzy/zkapp_fuzzy.exe" 3600 150 Size.Small
+      buildTestCmd "dev" "src/lib/transaction_snark/test/zkapp_fuzzy/zkapp_fuzzy.exe" 4200 150 Size.Small
     ]
   }
