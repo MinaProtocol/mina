@@ -2,7 +2,7 @@
  (name cli_lib)
  (public_name cli_lib)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    result
@@ -41,10 +41,10 @@
    pickles.backend
    consensus.vrf
    error_json
-   logproc_lib
-   pasta
-   gossip_net
-)
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   ppx_version.runtime
+   gossip_net)
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make))
  (instrumentation (backend bisect_ppx))

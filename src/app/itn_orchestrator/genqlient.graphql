@@ -1,0 +1,33 @@
+query auth() {
+    auth {
+        serverUuid
+        signerSequenceNumber
+        libp2pPort
+        peerId
+        isBlockProducer
+    }
+}
+
+mutation schedulePayments($input: PaymentsDetails!) {
+    schedulePayments(input: $input) 
+}
+
+mutation stopScheduledTransactions($handle: String!) {
+    stopScheduledTransactions(handle: $handle) 
+}
+
+mutation scheduleZkappCommands($input: ZkappCommandsDetails!) {
+    scheduleZkappCommands(input: $input) 
+}
+
+query slotsWon() {
+    slotsWon
+}
+
+mutation updateGating($input: GatingUpdate!) {
+    updateGating(input: $input)
+}
+
+mutation stopDaemon($clean: Boolean, $delay: Int) {
+    stopDaemon(cleanConfig: $clean, delaySeconds: $delay)
+}

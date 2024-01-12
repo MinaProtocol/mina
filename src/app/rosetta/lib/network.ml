@@ -5,13 +5,18 @@ module Get_status =
 {|
   query {
     genesisBlock {
-      stateHash
-   }
+      stateHash @ppxCustom(module: "Scalars.String_json")
+      protocolState {
+        consensusState {
+          blockHeight
+        }
+      }
+    }
     bestChain(maxLength: 1) {
-      stateHash
+      stateHash @ppxCustom(module: "Scalars.String_json")
       protocolState {
         blockchainState {
-          utcDate
+          utcDate @ppxCustom(module: "Serializing.Int64")
         }
         consensusState {
           blockHeight @ppxCustom(module: "Serializing.Int64")
@@ -19,11 +24,11 @@ module Get_status =
       }
     }
     daemonStatus {
-      chainId
       peers { peerId }
     }
     syncStatus
     initialPeers
+    networkID
   }
 |}]
 
@@ -32,9 +37,6 @@ open Core_kernel
 open Async
 open Rosetta_lib
 open Rosetta_models
-
-(* TODO: Also change this to zero when .5361 finishes *)
-let genesis_block_height = Int64.one
 
 
 module Sql = struct
@@ -78,9 +80,6 @@ module Get_version =
 {|
   query {
     version
-    daemonStatus {
-      chainId
-    }
   }
 |}]
 
@@ -88,9 +87,7 @@ module Get_network =
 [%graphql
 {|
   query {
-    daemonStatus {
-      chainId
-    }
+    networkID
   }
 |}]
 
@@ -98,51 +95,20 @@ module Get_network_memoized = struct
   let query =
      Memoize.build @@
      fun ~graphql_uri () -> Graphql.query Get_network.(make @@ makeVariables ()) graphql_uri
-
-   module Mock = struct
-     let query ~graphql_uri:_ =
-        Result.return
-        @@ object
-          method daemonStatus =
-            object
-              method chainId = "xxxxx"
-            end
-       end
-   end
 end
 
-(* TODO: Update this when we have a new chainId *)
-let mainnet_chain_id =
-  "5f704cc0c82e0ed70e873f0893d7e06f148524e3f0bdae2afb02e7819a0c24d1"
-
-(* TODO: Update this when we have a new chainId *)
-let devnet_chain_id =
-  "b6ee40d336f4cc3f33c1cc04dee7618eb8e556664c2b2d82ad4676b512a82418"
-
-let network_tag_of_graphql res =
-  let equal_chain_id id =
-    String.equal res.Get_network.daemonStatus.chainId id
-  in
-  if equal_chain_id mainnet_chain_id then "mainnet"
-  else if equal_chain_id devnet_chain_id then "devnet"
-  else "debug"
-
 module Validate_choice = struct
-  let build ~chainId =
-    object
-      method daemonStatus =
-        object
-          method chainId = chainId
-        end
-    end
-
   module Real = struct
     let validate ~network_identifier ~graphql_uri =
       let open Deferred.Result.Let_syntax in
       let%bind gql_response = Get_network_memoized.query ~graphql_uri () in
-      let network_tag = network_tag_of_graphql gql_response in
-      let requested_tag = network_identifier.Network_identifier.network in
-      if not (String.equal requested_tag network_tag) then
+      let network_tag = gql_response.networkID in
+      let requested_tag =
+        Format.sprintf "%s:%s"
+          network_identifier.Network_identifier.blockchain
+          network_identifier.Network_identifier.network
+      in
+      if not (String.equal network_tag requested_tag) then
         Deferred.Result.fail
           (Errors.create (`Network_doesn't_exist (requested_tag, network_tag)))
       else Deferred.Result.return ()
@@ -156,27 +122,33 @@ end
 
 module List_ = struct
   module Env = struct
-    type t = string (* just the network name *)
-
-    module Real = struct
-      let read_network =
-        Memoize.ignores_args @@
-          fun logger ->
-            match Sys.getenv "MINA_ROSETTA_NETWORK" with
-            | Some s -> s
-            | None ->
-                [%log warn] "MINA_ROSETTA_NETWORK is not set, assuming debug network";
-                "debug"
+    module Make (M : Monad_fail.S) = struct
+      type t = unit -> (string, Errors.t) M.t
     end
+
+    module Real = Make (Deferred.Result)
+
+    let real ~graphql_uri : Real.t =
+      fun () ->
+      let open Deferred.Result.Let_syntax in
+      let%map resp = Get_network_memoized.query ~graphql_uri () in
+      resp.networkID
+
   end
 
   module Impl (M : Monad_fail.S) = struct
-    let handle ~(env:Env.t) =
-      M.return @@
-      { Network_list_response.network_identifiers=
-          [ { Network_identifier.blockchain= "mina"
-            ; network= env
-            ; sub_network_identifier= None } ] }
+    let handle ~(env:Env.Make(M).t) =
+      let open M.Let_syntax in
+      let%bind network_tag = env () in
+      match String.split ~on:':' network_tag with
+      | [ blockchain; network ] ->
+         return
+           { Network_list_response.network_identifiers =
+               [ { Network_identifier.blockchain
+                 ; network
+                 ; sub_network_identifier= None } ] }
+      | _ ->
+         M.fail (Errors.create (`Graphql_mina_query "Invalid network tag"))
   end
 
   module Real = Impl (Deferred.Result)
@@ -239,7 +211,11 @@ module Status = struct
         | Some chain ->
             M.return (Array.last chain)
       in
-      let genesis_block_state_hash = (res.genesisBlock).stateHash in
+      let genesis_block_height =
+        res.genesisBlock.protocolState.consensusState.blockHeight
+        |> Unsigned.UInt32.to_int64
+      in
+      let genesis_block_state_hash = res.genesisBlock.stateHash in
       let%bind (latest_db_block_height,latest_db_block_hash, latest_db_block_timestamp) = env.db_latest_block () in
       let%map (oldest_db_block_height,oldest_db_block_hash) = env.db_oldest_block () in
       { Network_status_response.current_block_identifier=
@@ -274,21 +250,28 @@ module Status = struct
       module Mock = Impl (Result)
 
       let build ~best_chain_missing = {
-        Get_status.genesisBlock = {stateHash = "GENESIS_HASH"};
+        Get_status.genesisBlock = {
+          stateHash = "GENESIS_HASH";
+          protocolState = {
+            consensusState = {
+              blockHeight = Unsigned.UInt32.one
+            };
+          };
+        };
         bestChain = if best_chain_missing then None
           else Some [|{
               stateHash = "STATE_HASH_TIP";
               protocolState = {
-                blockchainState = {utcDate = Int64.to_string @@ Int64.of_int_exn 1_594_854_566};
+                blockchainState = {utcDate = Int64.of_int_exn 1_594_854_566};
                 consensusState = {blockHeight = Int64.of_int_exn 4 }
               }
             }|];
         daemonStatus = {
-          chainId = devnet_chain_id;
           peers = [|{peerId = "dev.o1test.net"}|]
         };
         syncStatus = `SYNCED;
-        initialPeers = [||]
+        initialPeers = [||];
+        networkID = "mina:testnet"
       }
 
       let no_chain_info_env : 'gql Env.Mock.t =
@@ -311,19 +294,22 @@ module Status = struct
         ; db_oldest_block=
             (fun () -> Result.return (Int64.of_int_exn 1, "GENESIS_HASH"))
         ; db_latest_block=
-            (fun () -> Result.return (Int64.max_value, "LATEST_BLOCK_HASH", Int64.max_value))
+            (fun () -> Result.return (Int64.of_int_exn 4, "LATEST_BLOCK_HASH", Int64.max_value))
         }
 
       let%test_unit "oldest block is genesis" =
         Test.assert_ ~f:Network_status_response.to_yojson
           ~actual:
-            (Mock.handle ~graphql_uri:(Uri.of_string "https://minaprotocol.com") ~env:oldest_block_is_genesis_env dummy_network_request)
+            (Mock.handle
+               ~graphql_uri:(Uri.of_string "https://minaprotocol.com")
+               ~env:oldest_block_is_genesis_env
+               dummy_network_request)
           ~expected:
             ( Result.return
             @@ { Network_status_response.current_block_identifier=
                    { Block_identifier.index= Int64.of_int_exn 4
-                   ; hash= "STATE_HASH_TIP" }
-               ; current_block_timestamp= Int64.of_int_exn 1_594_854_566
+                   ; hash= "LATEST_BLOCK_HASH" }
+               ; current_block_timestamp= Int64.max_value
                ; genesis_block_identifier=
                    { Block_identifier.index= Int64.of_int_exn 1
                    ; hash= "GENESIS_HASH" }
@@ -354,9 +340,9 @@ module Status = struct
           ~expected:
             ( Result.return
             @@ { Network_status_response.current_block_identifier=
-                   { Block_identifier.index= Int64.of_int_exn 4
-                   ; hash= "STATE_HASH_TIP" }
-               ; current_block_timestamp= Int64.of_int_exn 1_594_854_566
+                   { Block_identifier.index= Int64.of_int_exn 10_000
+                   ; hash= "ANOTHER_HASH" }
+               ; current_block_timestamp= Int64.of_int_exn 20_000
                ; genesis_block_identifier=
                    { Block_identifier.index= Int64.of_int_exn 1
                    ; hash= "GENESIS_HASH" }
@@ -381,7 +367,7 @@ module Options = struct
     let handle (_network : Network_request.t) =
       M.return @@
       { Network_options_response.version=
-          Version.create "1.4.9" "v1.0"
+          Version.create "1.4.9" "1.0.0"
       ; allow=
           { Allow.operation_statuses= Lazy.force Operation_statuses.all
           ; operation_types= Lazy.force Operation_types.all
@@ -394,7 +380,9 @@ module Options = struct
               (* If we implement the /call endpoint we'll need to list its supported methods here *)
           ; call_methods= []
           ; balance_exemptions= []
-          ; mempool_coins= false } }
+          ; mempool_coins= false
+          ; block_hash_case = Some `Case_sensitive
+          ; transaction_hash_case = Some `Case_sensitive } }
   end
 
   module Real = Impl (Deferred.Result)
@@ -408,7 +396,7 @@ module Options = struct
           ~actual:(Mock.handle dummy_network_request)
           ~expected:
             ( Result.return
-            @@ { Network_options_response.version= Version.create "1.4.9" "v1.0"
+            @@ { Network_options_response.version= Version.create "1.4.9" "1.0.0"
                ; allow=
                    { Allow.operation_statuses= Lazy.force Operation_statuses.all
                    ; operation_types= Lazy.force Operation_types.all
@@ -417,7 +405,9 @@ module Options = struct
                    ; timestamp_start_index= None
                    ; call_methods= []
                    ; balance_exemptions= []
-                   ; mempool_coins= false } } )
+                   ; mempool_coins= false
+                   ; block_hash_case= Some `Case_sensitive
+                   ; transaction_hash_case= Some `Case_sensitive } } )
     end )
 end
 
@@ -428,12 +418,14 @@ let router ~get_graphql_uri_or_error ~logger ~with_db (route : string list) body
   [%log info] "Network query" ~metadata:[("query",body)];
   match route with
   | ["list"] ->
+      let%bind graphql_uri = get_graphql_uri_or_error () in
       let%bind _meta =
         Errors.Lift.parse ~context:"Request" @@ Metadata_request.of_yojson body
         |> Errors.Lift.wrap
       in
       let%map res =
-        List_.Real.handle ~env:(List_.Env.Real.read_network logger) |> Errors.Lift.wrap
+        List_.Real.handle ~env:(List_.Env.real ~graphql_uri)
+        |> Errors.Lift.wrap
       in
       Network_list_response.to_yojson res
   | ["status"] ->
