@@ -29,6 +29,8 @@ let add (t : t) ~parent new_child =
 let data t =
   let collected_transitions = State_hash.Table.data t |> List.concat in
   assert (
-    List.length collected_transitions
-    = List.length (List.stable_dedup collected_transitions) ) ;
+    Stdlib.List.compare_lengths collected_transitions
+      (List.stable_dedup collected_transitions)
+    = 0 )
+  (* TODO: make this assertion more efficient *) ;
   collected_transitions

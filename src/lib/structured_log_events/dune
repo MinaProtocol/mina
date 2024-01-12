@@ -1,7 +1,7 @@
 (library
  (name structured_log_events)
  (public_name structured_log_events)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (library_flags -linkall)
  (libraries
    ;; opam libraries

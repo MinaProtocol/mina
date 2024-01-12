@@ -28,16 +28,15 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         Libp2p.step debVersion,
         Command.build
           Command.Config::{
-            commands = DebianVersions.toolchainRunner debVersion [
-              "DUNE_PROFILE=devnet",
-              "AWS_ACCESS_KEY_ID",
-              "AWS_SECRET_ACCESS_KEY",
-              "MINA_BRANCH=$BUILDKITE_BRANCH",
-              "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
-              "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}",
-              -- add zexe standardization preprocessing step (see: https://github.com/MinaProtocol/mina/pull/5777)
-              "PREPROCESSOR=./scripts/zexe-standardize.sh"
-            ] "./buildkite/scripts/build-artifact.sh",
+            commands = 
+              DebianVersions.toolchainRunner debVersion [
+                "DUNE_PROFILE=devnet",
+                "AWS_ACCESS_KEY_ID",
+                "AWS_SECRET_ACCESS_KEY",
+                "MINA_BRANCH=$BUILDKITE_BRANCH",
+                "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
+                "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
+              ] "./buildkite/scripts/build-artifact.sh",
             label = "Build Mina for ${DebianVersions.capitalName debVersion}",
             key = "build-deb-pkg",
             target = Size.XLarge,
@@ -48,27 +47,18 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
               } ] -- libp2p error
           },
 
-        -- daemon devnet image
-        let daemonDevnetSpec = DockerImage.ReleaseSpec::{
+        -- daemon berkeley image
+        let daemonBerkeleySpec = DockerImage.ReleaseSpec::{
           deps=DebianVersions.dependsOn debVersion,
           service="mina-daemon",
-          network="devnet",
+          network="berkeley",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="daemon-devnet-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}-docker-image"
         }
-        in
-        DockerImage.generateStep daemonDevnetSpec,
 
-        -- daemon mainnet image
-        let daemonMainnetSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
-          service="mina-daemon",
-          network="mainnet",
-          deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="daemon-mainnet-${DebianVersions.lowerName debVersion}-docker-image"
-        }
         in
-        DockerImage.generateStep daemonMainnetSpec,
+
+        DockerImage.generateStep daemonBerkeleySpec,
 
         -- test_executive image
         let testExecutiveSpec = DockerImage.ReleaseSpec::{
@@ -79,6 +69,17 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         }
         in
         DockerImage.generateStep testExecutiveSpec,
+
+        -- batch_txn_tool image
+        let batchTxnSpec = DockerImage.ReleaseSpec::{
+          deps=DebianVersions.dependsOn debVersion,
+          service="mina-batch-txn",
+          network="berkeley",
+          deb_codename="${DebianVersions.lowerName debVersion}",
+          step_key="batch-txn-${DebianVersions.lowerName debVersion}-docker-image"
+        }
+        in
+        DockerImage.generateStep batchTxnSpec,
 
         -- archive image
         let archiveSpec = DockerImage.ReleaseSpec::{
@@ -93,12 +94,25 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         -- rosetta image
         let rosettaSpec = DockerImage.ReleaseSpec::{
           service="mina-rosetta",
-          extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --no-cache",
+          extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --cache-from ${DebianVersions.toolchainImage debVersion}",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
         }
         in
-        DockerImage.generateStep rosettaSpec
+
+        DockerImage.generateStep rosettaSpec,
+
+        -- ZkApp test transaction image
+        let zkappTestTxnSpec = DockerImage.ReleaseSpec::{
+          deps=DebianVersions.dependsOn debVersion,
+          service="mina-zkapp-test-transaction",
+          deb_codename="${DebianVersions.lowerName debVersion}",
+          step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}-docker-image"
+        }
+
+        in
+
+        DockerImage.generateStep zkappTestTxnSpec
 
       ]
     }
@@ -107,7 +121,5 @@ in
 {
   bullseye  = pipeline DebianVersions.DebVersion.Bullseye
   , buster  = pipeline DebianVersions.DebVersion.Buster
-  , stretch = pipeline DebianVersions.DebVersion.Stretch
   , focal   = pipeline DebianVersions.DebVersion.Focal
-  , bionic  = pipeline DebianVersions.DebVersion.Bionic
 }

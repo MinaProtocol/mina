@@ -10,6 +10,8 @@
    sexplib0
    base64
    ;; local libraries
+   mina_wire_types
+   mina_base.import
    random_oracle
    data_hash_lib
    pickles
@@ -17,17 +19,23 @@
    unsigned_extended
    key_cache.native
    mina_base
-   coda_runtime_config
+   mina_runtime_config
    genesis_constants
    coda_genesis_proof
    signature_lib
    mina_numbers
+   mina_stdlib
    with_hash
    currency
    pickles.backend
    logger
    snark_params
-   pasta
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   ppx_inline_test.config
+   inline_test_quiet_logs
  )
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_jane ppx_version ppx_inline_test ppx_let ppx_deriving.std ppx_deriving_yojson ppx_custom_printf)))
+ (preprocess (pps ppx_mina ppx_jane ppx_version ppx_inline_test
+                  ppx_let ppx_deriving.std ppx_deriving_yojson ppx_custom_printf)))

@@ -14,6 +14,7 @@ in
 let user = "admin"
 let password = "codarules"
 let db = "archiver"
+let command_key = "archive-unit-tests"
 in
 
 Pipeline.build
@@ -31,7 +32,7 @@ Pipeline.build
         }
     , steps =
     let outerDir : Text =
-            "/var/buildkite/builds/\\\$BUILDKITE_AGENT_NAME/\\\$BUILDKITE_ORGANIZATION_SLUG/\\\$BUILDKITE_PIPELINE_SLUG"
+            "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
     in
       [ Command.build
           Command.Config::
@@ -41,14 +42,16 @@ Pipeline.build
                 , "POSTGRES_USER=${user}"
                 , "POSTGRES_DB=${db}"
                 , "GO=/usr/lib/go/bin/go"
+                , "DUNE_INSTRUMENT_WITH=bisect_ppx"
+                , "COVERALLS_TOKEN"
                 ]
                 (Prelude.Text.concatSep " && "
                   [ "bash buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db}"
                   , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
-                  , WithCargo.withCargo "eval \\\$(opam config env) && dune runtest src/app/archive"
+                  , WithCargo.withCargo "eval \\\$(opam config env) && dune runtest src/app/archive && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
                   ])
             , label = "Archive node unit tests"
-            , key = "archive-unit-tests"
+            , key = command_key
             , target = Size.Large
             , docker = None Docker.Type
             , artifact_paths = [ S.contains "test_output/artifacts/*" ]
