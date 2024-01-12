@@ -72,5 +72,6 @@ RUN pip3 install cqlsh-expansion
 RUN ln -s /usr/bin/aws /bin/aws
 RUN ln -s /usr/local/bin/cqlsh /bin/cqlsh
 RUN ln -s /usr/local/bin/cqlsh-expansion /bin/cqlsh-expansion
+RUN /usr/local/bin/cqlsh-expansion.init
 
 ENTRYPOINT ["/bin/delegation-verify"]
