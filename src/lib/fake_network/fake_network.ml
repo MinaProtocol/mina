@@ -60,8 +60,12 @@ type peer_state =
   ; get_transition_knowledge :
       unit Envelope.Incoming.t -> Pasta_bindings.Fp.t list Deferred.t
   ; get_transition_chain_proof :
-         Pasta_bindings.Fp.t Envelope.Incoming.t
-      -> (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t list) option Deferred.t
+         (State_hash.t * State_hash.t list) Envelope.Incoming.t
+      -> ( State_hash.t
+         * State_body_hash.t list
+         * Mina_block.Header.with_hash list )
+         option
+         Deferred.t
   ; get_transition_chain :
          Pasta_bindings.Fp.t list Envelope.Incoming.t
       -> Mina_block.t list option Deferred.t
@@ -143,8 +147,9 @@ let setup (type n) ~context:(module Context : CONTEXT)
               (* TODO: merge implementations with mina_lib *)
               Mina_networking.create
                 (config peer state.consensus_local_state)
+                ~on_bitswap_update:(fun ~tag:_ _ _ -> ())
                 ~sinks:
-                  ( Transition_handler.Block_sink.void
+                  ( Network_pool.Block_sink.void
                   , Network_pool.Transaction_pool.Remote_sink.void
                   , Network_pool.Snark_pool.Remote_sink.void )
                 ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
@@ -246,7 +251,26 @@ module Generator = struct
             fun query_env ->
               Deferred.return
                 (Sync_handler.Root.prove
-                   ~context:(module Context)
+                   ~context:
+                     ( module struct
+                       include Context
+
+                       let catchup_config =
+                         { Mina_intf.max_download_time_per_block_sec = 1.
+                         ; max_download_jobs = 20
+                         ; max_verifier_jobs = 1
+                         ; max_proofs_per_batch = 100
+                         ; max_retrieve_hash_chain_jobs = 5
+                         ; building_breadcrumb_timeout = Time.Span.of_min 2.
+                         ; bitwap_download_timeout = Time.Span.of_sec 2.
+                         ; peer_download_timeout = Time.Span.of_sec 2.
+                         ; ancestry_verification_timeout = Time.Span.of_sec 30.
+                         ; ancestry_download_timeout = Time.Span.of_sec 3.
+                         ; transaction_snark_verification_timeout =
+                             Time.Span.of_min 4.
+                         ; bitswap_enabled = true
+                         }
+                     end )
                    ~frontier
                    ( Envelope.Incoming.data query_env
                    |> With_hash.map_hash ~f:(fun state_hash ->
@@ -278,9 +302,11 @@ module Generator = struct
             f
         | None ->
             fun query_env ->
+              let state_hash, canopy = Envelope.Incoming.data query_env in
               Deferred.return
-                (Transition_chain_prover.prove ~frontier
-                   (Envelope.Incoming.data query_env) ) )
+                (Transition_chain_prover.prove_with_headers ~frontier
+                   ~canopy:(State_hash.Set.of_list canopy)
+                   state_hash ) )
     ; get_transition_chain =
         ( match get_transition_chain with
         | Some f ->

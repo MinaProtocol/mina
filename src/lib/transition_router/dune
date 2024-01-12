@@ -49,4 +49,5 @@
    data_hash_lib
    mina_wire_types
    internal_tracing
+   transition_frontier_bit_catchup
 ))

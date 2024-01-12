@@ -11,6 +11,8 @@ end]
 
 type t = Stable.Latest.t [@@deriving sexp, compare, yojson, equal]
 
+include Core_kernel.Hashable with type t := t
+
 type var
 
 val var_of_t : t -> var
@@ -26,3 +28,7 @@ val to_hex : t -> string
 val of_hex_exn : string -> t
 
 val to_raw_string : t -> string
+
+val to_blake2 : t -> Blake2.t
+
+val of_blake2 : Blake2.t -> t

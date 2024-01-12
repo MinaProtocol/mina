@@ -12,9 +12,10 @@ module Full_frontier = Full_frontier
 module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
-module Catchup_tree = Catchup_tree
+module Catchup_state = Catchup_state
 module Full_catchup_tree = Full_catchup_tree
 module Catchup_hash_tree = Catchup_hash_tree
+module Gossip = Gossip
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -24,6 +25,9 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val is_header_relevant :
+    root:Frontier_base.Breadcrumb.t -> Mina_block.Header.with_hash -> bool
 end
 
 let max_catchup_chunk_length = 20
@@ -39,7 +43,7 @@ type t =
   { logger : Logger.t
   ; verifier : Verifier.t
   ; consensus_local_state : Consensus.Data.Local_state.t
-  ; catchup_tree : Catchup_tree.t
+  ; catchup_state : Catchup_state.t
   ; full_frontier : Full_frontier.t
   ; persistent_root : Persistent_root.t
   ; persistent_root_instance : Persistent_root.Instance.t
@@ -50,7 +54,7 @@ type t =
   ; closed : unit Ivar.t
   }
 
-let catchup_tree t = t.catchup_tree
+let catchup_state t = t.catchup_state
 
 type Structured_log_events.t += Added_breadcrumb_user_commands
   [@@deriving register_event]
@@ -95,7 +99,7 @@ let genesis_root_data ~precomputed_values =
 let load_from_persistence_and_start ~context:(module Context : CONTEXT)
     ~verifier ~consensus_local_state ~max_length ~persistent_root
     ~persistent_root_instance ~persistent_frontier ~persistent_frontier_instance
-    ~catchup_mode ignore_consensus_local_state =
+    ~catchup_mode ~block_storage_actions ignore_consensus_local_state =
   let open Context in
   let open Deferred.Result.Let_syntax in
   let root_identifier =
@@ -162,8 +166,13 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
                  (Persistent_frontier.Database.Error.not_found_message err) ) )
   in
   { logger
-  ; catchup_tree =
-      Catchup_tree.create catchup_mode ~root:(Full_frontier.root full_frontier)
+  ; catchup_state =
+      Catchup_state.create ~logger catchup_mode
+        ~root:(Full_frontier.root full_frontier)
+        ~is_in_frontier:
+          (Fn.compose Option.is_some @@ Full_frontier.find full_frontier)
+        ~iter_frontier:(Full_frontier.iter full_frontier)
+        ~block_storage_actions ~is_header_relevant
   ; verifier
   ; consensus_local_state
   ; full_frontier
@@ -185,7 +194,9 @@ let rec load_with_max_length :
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> catchup_mode:[ `Normal | `Super ]
+    -> catchup_mode:
+         [ `Bit of Bit_catchup_state.create_args_t | `Normal | `Super ]
+    -> block_storage_actions:Bit_catchup_state.block_storage_actions
     -> unit
     -> ( t
        , [> `Bootstrap_required
@@ -195,7 +206,8 @@ let rec load_with_max_length :
        Deferred.Result.t =
  fun ~context:(module Context : CONTEXT) ~max_length
      ?(retry_with_fresh_db = true) ~verifier ~consensus_local_state
-     ~persistent_root ~persistent_frontier ~catchup_mode () ->
+     ~persistent_root ~persistent_frontier ~catchup_mode ~block_storage_actions
+     () ->
   let open Context in
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
@@ -208,8 +220,7 @@ let rec load_with_max_length :
       Persistent_root.load_from_disk_exn persistent_root ~snarked_ledger_hash
         ~logger
     with
-    | Error _err as err_result ->
-        (* _err has type [> `Snarked_ledger_mismatch ] *)
+    | Error (_err : [> `Snarked_ledger_mismatch ]) as err_result ->
         [%log warn] "Persisted frontier failed to load"
           ~metadata:
             [ ("error", `String "SNARKed ledger mismatch on load from disk")
@@ -224,9 +235,10 @@ let rec load_with_max_length :
         match%bind
           load_from_persistence_and_start
             ~context:(module Context)
-            ~verifier ~consensus_local_state ~max_length ~persistent_root
-            ~persistent_root_instance ~catchup_mode ~persistent_frontier
-            ~persistent_frontier_instance ignore_consensus_local_state
+            ~block_storage_actions ~verifier ~consensus_local_state ~max_length
+            ~persistent_root ~persistent_root_instance ~catchup_mode
+            ~persistent_frontier ~persistent_frontier_instance
+            ignore_consensus_local_state
         with
         | Ok _ as result ->
             [%str_log trace] Persisted_frontier_loaded ;
@@ -326,8 +338,9 @@ let rec load_with_max_length :
         in
         load_with_max_length
           ~context:(module Context)
-          ~max_length ~verifier ~consensus_local_state ~persistent_root
-          ~persistent_frontier ~retry_with_fresh_db:false ~catchup_mode ()
+          ~block_storage_actions ~max_length ~verifier ~consensus_local_state
+          ~persistent_root ~persistent_frontier ~retry_with_fresh_db:false
+          ~catchup_mode ()
         >>| Result.map_error ~f:(function
               | `Persistent_frontier_malformed ->
                   `Failure
@@ -354,19 +367,18 @@ let rec load_with_max_length :
           [%str_log trace] Transition_frontier_loaded_from_persistence ;
           return res )
 
-let load ?(retry_with_fresh_db = true) ~context:(module Context : CONTEXT)
-    ~verifier ~consensus_local_state ~persistent_root ~persistent_frontier
-    ~catchup_mode () =
-  let open Context in
+let load ?(retry_with_fresh_db = true) ~context ~verifier ~consensus_local_state
+    ~persistent_root ~persistent_frontier ~catchup_mode ~block_storage_actions
+    () =
+  let (module Context : CONTEXT) = context in
   O1trace.thread "transition_frontier_load" (fun () ->
       let max_length =
         global_max_length
-          (Precomputed_values.genesis_constants precomputed_values)
+          (Precomputed_values.genesis_constants Context.precomputed_values)
       in
-      load_with_max_length
-        ~context:(module Context)
-        ~max_length ~retry_with_fresh_db ~verifier ~consensus_local_state
-        ~persistent_root ~persistent_frontier ~catchup_mode () )
+      load_with_max_length ~context ~max_length ~retry_with_fresh_db ~verifier
+        ~consensus_local_state ~persistent_root ~persistent_frontier
+        ~catchup_mode ~block_storage_actions () )
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
@@ -374,7 +386,7 @@ let close ~loc
     { logger
     ; verifier = _
     ; consensus_local_state = _
-    ; catchup_tree = _
+    ; catchup_state = _
     ; full_frontier
     ; persistent_root = _safe_to_ignore_1
     ; persistent_root_instance
@@ -406,16 +418,14 @@ let genesis_state_hash { genesis_state_hash; _ } = genesis_state_hash
 let root_snarked_ledger { persistent_root_instance; _ } =
   Persistent_root.Instance.snarked_ledger persistent_root_instance
 
-let add_breadcrumb_exn t breadcrumb =
-  let open Deferred.Let_syntax in
+let add_breadcrumb_impl t breadcrumb =
   let state_hash = Breadcrumb.state_hash breadcrumb in
   Internal_tracing.with_state_hash state_hash
   @@ fun () ->
-  let logger = t.logger in
-  [%log internal] "Add_breadcrumb_to_frontier" ;
-  [%log internal] "Calculate_diffs" ;
+  [%log' internal t.logger] "Add_breadcrumb_to_frontier" ;
+  [%log' internal t.logger] "Calculate_diffs" ;
   let diffs = Full_frontier.calculate_diffs t.full_frontier breadcrumb in
-  [%log internal] "Calculate_diffs_done" ;
+  [%log' internal t.logger] "Calculate_diffs_done" ;
   [%log' trace t.logger]
     ~metadata:
       [ ( "state_hash"
@@ -427,19 +437,19 @@ let add_breadcrumb_exn t breadcrumb =
     "PRE: ($state_hash, $n)" ;
   [%str_log' trace t.logger]
     (Applying_diffs { diffs = List.map ~f:Diff.Full.E.to_yojson diffs }) ;
-  [%log internal] "Apply_catchup_tree_diffs" ;
-  Catchup_tree.apply_diffs t.catchup_tree diffs ;
-  [%log internal] "Apply_full_frontier_diffs"
+  [%log' internal t.logger] "Apply_catchup_tree_diffs" ;
+  Catchup_state.apply_diffs ~logger:t.logger t.catchup_state diffs ;
+  [%log' internal t.logger] "Apply_full_frontier_diffs"
     ~metadata:[ ("count", `Int (List.length diffs)) ] ;
   let (`New_root_and_diffs_with_mutants
         (new_root_identifier, diffs_with_mutants) ) =
     (* Root DB moves here *)
     Full_frontier.apply_diffs t.full_frontier diffs
       ~has_long_catchup_job:
-        (Catchup_tree.max_catchup_chain_length t.catchup_tree > 5)
+        (lazy (Catchup_state.max_catchup_chain_length t.catchup_state > 5))
       ~enable_epoch_ledger_sync:(`Enabled (root_snarked_ledger t))
   in
-  [%log internal] "Apply_full_frontier_diffs_done" ;
+  [%log' internal t.logger] "Apply_full_frontier_diffs_done" ;
   Option.iter new_root_identifier
     ~f:(Persistent_root.Instance.set_root_identifier t.persistent_root_instance) ;
   [%log' trace t.logger]
@@ -469,11 +479,17 @@ let add_breadcrumb_exn t breadcrumb =
   let lite_diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in
-  [%log internal] "Synchronize_persistent_frontier" ;
-  let%bind sync_result =
+  (lite_diffs, diffs_with_mutants)
+
+let add_breadcrumbs_exn t breadcrumbs =
+  let res = List.map breadcrumbs ~f:(add_breadcrumb_impl t) in
+  let diffs = List.concat_map ~f:fst res in
+  let diffs_with_mutants = List.concat_map ~f:snd res in
+  [%log' internal t.logger] "Synchronize_persistent_frontier" ;
+  let%bind.Deferred sync_result =
     (* Diffs get put into a buffer here. They're processed asynchronously, except for root transitions *)
     Persistent_frontier.Instance.notify_sync t.persistent_frontier_instance
-      ~diffs:lite_diffs
+      ~diffs
   in
   sync_result
   |> Result.map_error ~f:(fun `Sync_must_be_running ->
@@ -482,14 +498,16 @@ let add_breadcrumb_exn t breadcrumb =
             running, which indicates that transition frontier initialization \
             has not been performed correctly" )
   |> Result.ok_exn ;
-  [%log internal] "Synchronize_persistent_frontier_done" ;
-  [%log internal] "Notify_frontier_extensions" ;
+  [%log' internal t.logger] "Synchronize_persistent_frontier_done" ;
+  [%log' internal t.logger] "Notify_frontier_extensions" ;
   let%map () =
-    Extensions.notify t.extensions ~logger ~frontier:t.full_frontier
+    Extensions.notify t.extensions ~logger:t.logger ~frontier:t.full_frontier
       ~diffs_with_mutants
   in
-  [%log internal] "Notify_frontier_extensions_done" ;
-  [%log internal] "Add_breadcrumb_to_frontier_done"
+  [%log' internal t.logger] "Notify_frontier_extensions_done" ;
+  [%log' internal t.logger] "Add_breadcrumb_to_frontier_done"
+
+let add_breadcrumb_exn t breadcrumb = add_breadcrumbs_exn t [ breadcrumb ]
 
 (* proxy full frontier functions *)
 include struct
@@ -709,6 +727,8 @@ module For_tests = struct
       let constraint_constants = precomputed_values.constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let is_header_relevant ~root:_ _ = true
     end in
     let open Context in
     let open Quickcheck.Generator.Let_syntax in
@@ -770,6 +790,9 @@ module For_tests = struct
         ignore
         @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
              ~dest:(Persistent_root.Instance.snarked_ledger instance) ) ;
+    let block_storage_actions =
+      Bit_catchup_state.{ add_body = (fun ~id:_ _ -> ()); remove_body = ignore }
+    in
     let frontier_result =
       Async.Thread_safe.block_on_async_exn (fun () ->
           load_with_max_length ~max_length ~retry_with_fresh_db:false
@@ -783,7 +806,7 @@ module For_tests = struct
                   `Normal
               | None ->
                   `Normal )
-            ~persistent_frontier () )
+            ~block_storage_actions ~persistent_frontier () )
     in
     let frontier =
       let fail msg = failwith ("failed to load transition frontier: " ^ msg) in

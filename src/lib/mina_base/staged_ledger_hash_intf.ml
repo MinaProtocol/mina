@@ -23,6 +23,8 @@ module type Full = sig
     -> genesis_ledger_hash:Ledger_hash.t
     -> t
 
+  include Comparable.S with type t := t
+
   module Stable : sig
     module V1 : sig
       type nonrec t = t

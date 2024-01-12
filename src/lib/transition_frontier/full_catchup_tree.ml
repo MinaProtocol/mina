@@ -51,21 +51,15 @@ module Node = struct
       | To_download of Downloader_job.t
       | To_initial_validate of Mina_block.t Envelope.Incoming.t
       | To_verify of
-          ( ( Mina_block.initial_valid_block Envelope.Incoming.t
-            , State_hash.t )
-            Cached.t
-          * Mina_net2.Validation_callback.t option )
+          ( (Mina_block.initial_valid_block, State_hash.t) Cached.t
+          * Gossip.gossip_map )
       | Wait_for_parent of
-          ( ( Mina_block.almost_valid_block Envelope.Incoming.t
-            , State_hash.t )
-            Cached.t
-          * Mina_net2.Validation_callback.t option )
+          ( (Mina_block.almost_valid_block, State_hash.t) Cached.t
+          * Gossip.gossip_map )
       | To_build_breadcrumb of
           ( [ `Parent of State_hash.t ]
-          * ( Mina_block.almost_valid_block Envelope.Incoming.t
-            , State_hash.t )
-            Cached.t
-          * Mina_net2.Validation_callback.t option )
+          * (Mina_block.almost_valid_block, State_hash.t) Cached.t
+          * Gossip.gossip_map )
       (* TODO: Name this to Initial_root *)
       | Root of Breadcrumb.t Ivar.t
 
@@ -324,18 +318,12 @@ let remove_node' t (node : Node.t) =
       ()
   | To_initial_validate _ ->
       ()
-  | To_verify (c, vc) ->
-      Option.value_map ~default:ignore
-        ~f:Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore ;
-      ignore
-        ( Cached.invalidate_with_failure c
-          : Mina_block.initial_valid_block Envelope.Incoming.t )
-  | To_build_breadcrumb (_parent, c, vc) ->
-      Option.value_map ~default:ignore
-        ~f:Mina_net2.Validation_callback.fire_if_not_already_fired vc `Ignore ;
-      ignore
-        ( Cached.invalidate_with_failure c
-          : Mina_block.almost_valid_block Envelope.Incoming.t )
+  | To_verify (c, gm) ->
+      Gossip.fire_ignore_to_validation_callbacks gm ;
+      ignore (Cached.invalidate_with_failure c : Mina_block.initial_valid_block)
+  | To_build_breadcrumb (_parent, c, gm) ->
+      Gossip.fire_ignore_to_validation_callbacks gm ;
+      ignore (Cached.invalidate_with_failure c : Mina_block.almost_valid_block)
 
 let remove_node t h =
   match Hashtbl.find t.nodes h with

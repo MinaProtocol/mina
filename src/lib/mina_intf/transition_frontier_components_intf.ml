@@ -5,6 +5,21 @@ open Cache_lib
 open Mina_base
 open Network_peer
 
+type catchup_config =
+  { max_download_time_per_block_sec : float
+  ; max_download_jobs : int
+  ; max_verifier_jobs : int
+  ; max_proofs_per_batch : int
+  ; max_retrieve_hash_chain_jobs : int
+  ; building_breadcrumb_timeout : Time.Span.t
+  ; bitwap_download_timeout : Time.Span.t
+  ; peer_download_timeout : Time.Span.t
+  ; ancestry_verification_timeout : Time.Span.t
+  ; ancestry_download_timeout : Time.Span.t
+  ; transaction_snark_verification_timeout : Time.Span.t
+  ; bitswap_enabled : bool
+  }
+
 module type CONTEXT = sig
   val logger : Logger.t
 
@@ -13,6 +28,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val catchup_config : catchup_config
 end
 
 module type Transition_handler_validator_intf = sig
@@ -257,6 +274,15 @@ module type Transition_chain_prover_intf = sig
     -> frontier:transition_frontier
     -> State_hash.t
     -> (State_hash.t * State_body_hash.t list) option
+
+  val prove_with_headers :
+       ?length:int
+    -> ?max_headers:int
+    -> frontier:transition_frontier
+    -> canopy:State_hash.Set.t
+    -> State_hash.t
+    -> (State_hash.t * State_body_hash.t list * Mina_block.Header.with_hash list)
+       option
 end
 
 module type Bootstrap_controller_intf = sig
@@ -339,23 +365,23 @@ module type Transition_router_intf = sig
          transition_frontier option Pipe_lib.Broadcast_pipe.Reader.t
          * transition_frontier option Pipe_lib.Broadcast_pipe.Writer.t
     -> network_transition_reader:
-         ( [ `Transition of Mina_block.t Envelope.Incoming.t ]
+         ( [ `Block of Mina_block.t Envelope.Incoming.t
+           | `Header of Mina_block.Header.t Envelope.Incoming.t ]
          * [ `Time_received of Block_time.t ]
-         * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
+         * [ `Topic_and_vc of string * Mina_net2.Validation_callback.t ] )
          Strict_pipe.Reader.t
     -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> most_recent_valid_block:
-         Mina_block.initial_valid_block Broadcast_pipe.Reader.t
-         * Mina_block.initial_valid_block Broadcast_pipe.Writer.t
+         Mina_block.initial_valid_header Broadcast_pipe.Reader.t
+         * Mina_block.initial_valid_header Broadcast_pipe.Writer.t
     -> get_completed_work:
          (   Transaction_snark_work.Statement.t
           -> Transaction_snark_work.Checked.t option )
-    -> catchup_mode:[ `Normal | `Super ]
+    -> catchup_mode:
+         [ `Bit of Bit_catchup_state.create_args_t | `Normal | `Super ]
     -> notify_online:(unit -> unit Deferred.t)
+    -> on_block_body_update_ref:
+         ([< `Added | `Broken ] -> Consensus.Body_reference.t list -> unit) ref
     -> unit
-    -> ( [ `Transition of Mina_block.Validated.t ]
-       * [ `Source of [ `Gossip | `Catchup | `Internal ] ]
-       * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
-       Strict_pipe.Reader.t
-       * unit Ivar.t
+    -> Mina_block.Validated.t Strict_pipe.Reader.t * unit Ivar.t
 end

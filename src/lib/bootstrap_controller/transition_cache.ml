@@ -1,36 +1,34 @@
 open Mina_base
 open Core
-open Network_peer
 
-(* Cache represents a graph. The key is a State_hash, which is the node in
-   the graph, and the value is the children transitions of the node *)
-
-type t =
-  Mina_block.initial_valid_block Envelope.Incoming.t list State_hash.Table.t
+type t = Transition_frontier.Gossip.element State_hash.Table.t
 
 let create () = State_hash.Table.create ()
 
-let add (t : t) ~parent new_child =
-  State_hash.Table.update t parent ~f:(function
-    | None ->
-        [ new_child ]
-    | Some children ->
-        if
-          List.mem children new_child ~equal:(fun e1 e2 ->
-              let state_hash e =
-                Envelope.Incoming.data e
-                |> Mina_block.Validation.block_with_hash
-                |> State_hash.With_state_hashes.state_hash
-              in
-              State_hash.equal (state_hash e1) (state_hash e2) )
-        then children
-        else new_child :: children )
+let state_hash e =
+  State_hash.With_state_hashes.state_hash
+  @@ Transition_frontier.Gossip.header_with_hash e
 
-let data t =
-  let collected_transitions = State_hash.Table.data t |> List.concat in
-  assert (
-    Stdlib.List.compare_lengths collected_transitions
-      (List.stable_dedup collected_transitions)
-    = 0 )
-  (* TODO: make this assertion more efficient *) ;
-  collected_transitions
+let logger = Logger.create ()
+
+let add (t : t) el gossip_map =
+  State_hash.Table.update t (state_hash el) ~f:(function
+    | None ->
+        (el, `Gossip_map gossip_map)
+    | Some (prev_el, `Gossip_map gm) ->
+        let gm' =
+          String.Map.merge gm gossip_map ~f:(fun ~key:topic -> function
+            | `Left v ->
+                Some v
+            | `Right v ->
+                Some v
+            | `Both (old_gd, _new_gd) ->
+                [%log warn] "Received gossip on topic %s and $state_hash twice"
+                  topic
+                  ~metadata:
+                    [ ("state_hash", State_hash.to_yojson @@ state_hash el) ] ;
+                Some old_gd )
+        in
+        ((match el with `Block _ -> el | _ -> prev_el), `Gossip_map gm') )
+
+let data = State_hash.Table.data

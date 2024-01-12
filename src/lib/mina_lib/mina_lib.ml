@@ -32,10 +32,6 @@ type Structured_log_events.t += Ledger_catchup
 type Structured_log_events.t += Synced
   [@@deriving register_event { msg = "Mina daemon is synced" }]
 
-type Structured_log_events.t +=
-  | Rebroadcast_transition of { state_hash : State_hash.t }
-  [@@deriving register_event { msg = "Rebroadcasting $state_hash" }]
-
 exception Snark_worker_error of int
 
 exception Snark_worker_signal_interrupt of Signal.t
@@ -65,7 +61,7 @@ type components =
   ; snark_pool : Network_pool.Snark_pool.t
   ; transition_frontier : Transition_frontier.t option Broadcast_pipe.Reader.t
   ; most_recent_valid_block :
-      Mina_block.initial_valid_block Broadcast_pipe.Reader.t
+      Mina_block.initial_valid_header Broadcast_pipe.Reader.t
   ; block_produced_bvar : (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
   }
 
@@ -405,11 +401,11 @@ let get_node_state t =
     | None ->
         None
     | Some tf -> (
-        match Transition_frontier.catchup_tree tf with
-        | Full catchup_tree ->
+        match Transition_frontier.catchup_state tf with
+        | Full catchup_state ->
             Some
               (Transition_frontier.Full_catchup_tree.to_node_status_report
-                 catchup_tree )
+                 catchup_state )
         | _ ->
             None )
   in
@@ -1298,9 +1294,11 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val catchup_config : Mina_intf.catchup_config
 end
 
-let context (config : Config.t) : (module CONTEXT) =
+let context (config : Config.t) =
   ( module struct
     let logger = config.logger
 
@@ -1309,7 +1307,9 @@ let context (config : Config.t) : (module CONTEXT) =
     let consensus_constants = precomputed_values.consensus_constants
 
     let constraint_constants = precomputed_values.constraint_constants
-  end )
+
+    let catchup_config = config.catchup_config
+  end : CONTEXT )
 
 let start t =
   let set_next_producer_timing timing consensus_state =
@@ -1370,11 +1370,13 @@ let start t =
     t.block_production_status := block_production_status ;
     t.next_producer_timing <- Some next_producer_timing
   in
+  let (module Context : CONTEXT) = context t.config in
   if
     not
       (Keypair.And_compressed_pk.Set.is_empty t.config.block_production_keypairs)
   then
-    Block_producer.run ~context:(context t.config)
+    Block_producer.run
+      ~context:(module Context)
       ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
       ~set_next_producer_timing ~prover:t.processes.prover
       ~trust_system:t.config.trust_system
@@ -1426,8 +1428,10 @@ let start t =
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
+  let (module Context : CONTEXT) = context t.config in
   let%bind () =
-    Block_producer.run_precomputed ~context:(context t.config)
+    Block_producer.run_precomputed
+      ~context:(module Context)
       ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
       ~time_controller:t.config.time_controller
       ~frontier_reader:t.components.transition_frontier
@@ -1481,7 +1485,6 @@ end
 
 let create ?wallets (config : Config.t) =
   let module Context = (val context config) in
-  let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
@@ -1846,7 +1849,7 @@ let create ?wallets (config : Config.t) =
                 config.net_config.log_gossip_heard.snark_pool_diff
           in
           let block_reader, block_sink =
-            Transition_handler.Block_sink.create
+            Network_pool.Block_sink.create
               { logger = config.logger
               ; slot_duration_ms =
                   config.precomputed_values.consensus_constants.slot_duration_ms
@@ -1859,9 +1862,43 @@ let create ?wallets (config : Config.t) =
               }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
+          let log_ignoring_bitswap_update ~tag type_ ids =
+            let type_str =
+              match type_ with
+              | `Added ->
+                  "added"
+              | `Removed ->
+                  "removed"
+              | `Broken ->
+                  "broken"
+            in
+            [%log' warn Context.logger]
+              "Ignoring bitswap update (tag: %d, type: %s) for $ids"
+              (Mina_net2.Bitswap_tag.to_enum tag)
+              type_str
+              ~metadata:[ ("ids", `List (List.map ~f:Blake2.to_yojson ids)) ]
+          in
+          let on_block_body_update_ref =
+            ref (log_ignoring_bitswap_update ~tag:Mina_net2.Bitswap_tag.Body)
+          in
+          let block_db_path =
+            Core.(config.conf_dir ^/ "mina_net2" ^/ "block-db")
+          in
+          let block_storage = Lmdb_storage.Block.create block_db_path in
+          let header_db_path = Core.(config.conf_dir ^/ "header-db") in
+          let header_storage = Lmdb_storage.Header.create header_db_path in
+          let known_body_refs = Bit_catchup_state.Known_body_refs.create () in
           let%bind net =
             O1trace.thread "mina_networking" (fun () ->
                 Mina_networking.create config.net_config ~get_some_initial_peers
+                  ~on_bitswap_update:(fun ~tag type_ ids ->
+                    match (tag, type_) with
+                    | Mina_net2.Bitswap_tag.Body, (`Added as type')
+                    | Mina_net2.Bitswap_tag.Body, (`Broken as type') ->
+                        !on_block_body_update_ref type' ids
+                    | Mina_net2.Bitswap_tag.Body, `Removed ->
+                        Bit_catchup_state.Known_body_refs.on_block_body_removed
+                          known_body_refs ~header_storage ids )
                   ~sinks
                   ~get_staged_ledger_aux_and_pending_coinbases_at_hash:(fun query_env
                                                                             ->
@@ -1948,8 +1985,10 @@ let create ?wallets (config : Config.t) =
                   ~get_node_status
                   ~get_transition_chain_proof:
                     (handle_request "get_transition_chain_proof"
-                       ~f:(fun ~frontier hash ->
-                         Transition_chain_prover.prove ~frontier hash ) )
+                       ~f:(fun ~frontier (state_hash, canopy) ->
+                         Transition_chain_prover.prove_with_headers ~frontier
+                           ~canopy:(State_hash.Set.of_list canopy)
+                           state_hash ) )
                   ~get_transition_chain:
                     (handle_request "get_transition_chain"
                        ~f:Sync_handler.get_transition_chain )
@@ -2013,9 +2052,28 @@ let create ?wallets (config : Config.t) =
           |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block) =
             Broadcast_pipe.create
-              ( Mina_block.genesis ~precomputed_values:config.precomputed_values
+              ( Mina_block.genesis_header
+                  ~precomputed_values:config.precomputed_values
               |> Validation.reset_frontier_dependencies_validation
               |> Validation.reset_staged_ledger_diff_validation )
+          in
+          let catchup_mode =
+            match config.catchup_mode with
+            | `Super ->
+                `Super
+            | `Normal ->
+                `Normal
+            | `Bit ->
+                `Bit
+                  ( Transition_frontier_controller.create_transition_states
+                      ~trust_system:config.trust_system ~logger:config.logger
+                      ~block_storage ~header_storage
+                      ~block_storage_actions:
+                        (Bootstrap_controller.block_storage_actions net)
+                      ~known_body_refs
+                  , known_body_refs
+                  , block_storage
+                  , header_storage )
           in
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
@@ -2032,20 +2090,10 @@ let create ?wallets (config : Config.t) =
               ~producer_transition_reader ~most_recent_valid_block
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ()
+              ~notify_online ~on_block_body_update_ref ()
           in
-          let ( valid_transitions_for_network
-              , valid_transitions_for_api
-              , new_blocks ) =
-            let network_pipe, downstream_pipe =
-              Strict_pipe.Reader.Fork.two valid_transitions
-            in
-            let api_pipe, new_blocks_pipe =
-              Strict_pipe.Reader.(
-                Fork.two
-                  (map downstream_pipe ~f:(fun (`Transition t, _, _) -> t)))
-            in
-            (network_pipe, api_pipe, new_blocks_pipe)
+          let valid_transitions_for_api, new_blocks =
+            Strict_pipe.Reader.Fork.two valid_transitions
           in
           O1trace.background_thread "broadcast_transaction_pool_diffs"
             (fun () ->
@@ -2067,95 +2115,6 @@ let create ?wallets (config : Config.t) =
                   in
                   Mina_networking.broadcast_transaction_pool_diff ~nonce net
                     message ) ) ;
-          O1trace.background_thread "broadcast_blocks" (fun () ->
-              Strict_pipe.Reader.iter_without_pushback
-                valid_transitions_for_network
-                ~f:(fun
-                     (`Transition transition, `Source source, `Valid_cb valid_cb)
-                   ->
-                  let hash =
-                    Mina_block.Validated.forget transition
-                    |> State_hash.With_state_hashes.state_hash
-                  in
-                  let consensus_state =
-                    transition |> Mina_block.Validated.header
-                    |> Header.protocol_state
-                    |> Mina_state.Protocol_state.consensus_state
-                  in
-                  let now =
-                    let open Block_time in
-                    now config.time_controller |> to_span_since_epoch
-                    |> Span.to_ms
-                  in
-                  match
-                    Consensus.Hooks.received_at_valid_time
-                      ~constants:consensus_constants ~time_received:now
-                      consensus_state
-                  with
-                  | Ok () -> (
-                      match source with
-                      | `Gossip ->
-                          [%str_log' info config.logger]
-                            ~metadata:
-                              [ ( "external_transition"
-                                , Mina_block.Validated.to_yojson transition )
-                              ]
-                            (Rebroadcast_transition { state_hash = hash }) ;
-                          (*send callback to libp2p to forward the gossiped transition*)
-                          Option.iter
-                            ~f:
-                              (Fn.flip
-                                 Mina_net2.Validation_callback
-                                 .fire_if_not_already_fired `Accept )
-                            valid_cb
-                      | `Internal ->
-                          (*Send callback to publish the new block. Don't log rebroadcast message if it is internally generated; There is a broadcast log*)
-                          Option.iter
-                            ~f:
-                              (Fn.flip
-                                 Mina_net2.Validation_callback
-                                 .fire_if_not_already_fired `Accept )
-                            valid_cb
-                      | `Catchup ->
-                          (*Noop for directly downloaded transitions*)
-                          Option.iter
-                            ~f:
-                              (Fn.flip
-                                 Mina_net2.Validation_callback
-                                 .fire_if_not_already_fired `Accept )
-                            valid_cb )
-                  | Error reason -> (
-                      let timing_error_json =
-                        match reason with
-                        | `Too_early ->
-                            `String "too early"
-                        | `Too_late slots ->
-                            `String (sprintf "%Lu slots too late" slots)
-                      in
-                      let metadata =
-                        [ ("state_hash", State_hash.to_yojson hash)
-                        ; ("block", Mina_block.Validated.to_yojson transition)
-                        ; ("timing", timing_error_json)
-                        ]
-                      in
-                      Option.iter
-                        ~f:
-                          (Fn.flip
-                             Mina_net2.Validation_callback
-                             .fire_if_not_already_fired `Reject )
-                        valid_cb ;
-                      match source with
-                      | `Catchup ->
-                          ()
-                      | `Internal ->
-                          [%log' error config.logger] ~metadata
-                            "Internally generated block $state_hash cannot be \
-                             rebroadcast because it's not a valid time to do \
-                             so ($timing)"
-                      | `Gossip ->
-                          [%log' warn config.logger] ~metadata
-                            "Not rebroadcasting block $state_hash because it \
-                             was received $timing" ) ) ) ;
           (* FIXME #4093: augment ban_notifications with a Peer.ID so we can implement ban_notify
              trace_task "ban notification loop" (fun () ->
               Linear_pipe.iter (Mina_networking.ban_notification_reader net)

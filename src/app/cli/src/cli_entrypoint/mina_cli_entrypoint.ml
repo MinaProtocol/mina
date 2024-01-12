@@ -289,9 +289,14 @@ let setup_daemon logger =
   and is_seed =
     flag "--seed" ~aliases:[ "seed" ] ~doc:"Start the node as a seed node"
       no_arg
+  and catchup_mode =
+    flag "--catchup" ~aliases:[ "catchup" ]
+      ~doc:"Catchup mode: bit (default), super, normal or bit-no-bitswap."
+      (optional catchup_mode)
   and no_super_catchup =
     flag "--no-super-catchup" ~aliases:[ "no-super-catchup" ]
-      ~doc:"Don't use super-catchup" no_arg
+      ~doc:"Deprecated. Use --catchup normal instead. Don't use super-catchup"
+      no_arg
   and enable_flooding =
     flag "--enable-flooding" ~aliases:[ "enable-flooding" ]
       ~doc:
@@ -326,6 +331,20 @@ let setup_daemon logger =
             %d)"
            Cli_lib.Default.max_connections )
       (optional int)
+  and pubsub_v0 =
+    flag "--pubsub-v0" ~aliases:[ "pubsub-v0" ]
+      ~doc:
+        ( Printf.sprintf
+            "Mode of using pubsub topic v0 ('r', 'rw' or 'none') (default: %s)"
+        @@ pubsub_topic_mode_to_string Cli_lib.Default.pubsub_v0 )
+      (optional pubsub_topic_mode)
+  and pubsub_v1 =
+    flag "--pubsub-v1" ~aliases:[ "pubsub-v1" ]
+      ~doc:
+        ( Printf.sprintf
+            "Mode of using pubsub topic v1 ('r', 'rw' or 'none') (default: %s)"
+        @@ pubsub_topic_mode_to_string Cli_lib.Default.pubsub_v1 )
+      (optional pubsub_topic_mode)
   and validation_queue_size =
     flag "--validation-queue-size"
       ~aliases:[ "validation-queue-size" ]
@@ -1169,15 +1188,13 @@ let setup_daemon logger =
             or_from_config YJ.Util.to_int_option "max-connections"
               ~default:Cli_lib.Default.max_connections max_connections
           in
-          let pubsub_v1 = Gossip_net.Libp2p.N in
-          (* TODO uncomment after introducing Bitswap-based block retrieval *)
-          (* let pubsub_v1 =
-               or_from_config to_pubsub_topic_mode_option "pubsub-v1"
-                 ~default:Cli_lib.Default.pubsub_v1 pubsub_v1
-             in *)
+          let pubsub_v1 =
+            or_from_config to_pubsub_topic_mode_option "pubsub-v1"
+              ~default:Cli_lib.Default.pubsub_v1 pubsub_v1
+          in
           let pubsub_v0 =
             or_from_config to_pubsub_topic_mode_option "pubsub-v0"
-              ~default:Cli_lib.Default.pubsub_v0 None
+              ~default:Cli_lib.Default.pubsub_v0 pubsub_v0
           in
           let validation_queue_size =
             or_from_config YJ.Util.to_int_option "validation-queue-size"
@@ -1343,12 +1360,73 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
             *)
             Option.iter itn_max_logs ~f:Itn_logger.set_queue_bound ;
           let start_time = Time.now () in
+          (* TODO replace default with parameters from config *)
+          let catchup_mode, bitswap_enabled =
+            match (catchup_mode, no_super_catchup) with
+            | Some `Super, _ ->
+                (`Super, false)
+            | Some `Normal, _ ->
+                (`Normal, false)
+            | Some (`Bit b), _ ->
+                (`Bit, b)
+            | None, true ->
+                (`Normal, false)
+            | None, false ->
+                (`Bit, true)
+          in
+          let catchup_config =
+            let def = Cli_lib.Default.catchup_config in
+            let int_opt key = or_from_config YJ.Util.to_int_option key None in
+            let float_opt key =
+              or_from_config YJ.Util.to_float_option key None
+            in
+            let span_opt key =
+              or_from_config
+                (Fn.compose
+                   (Option.map ~f:Time.Span.of_sec)
+                   YJ.Util.to_float_option )
+                key None
+            in
+            Mina_intf.
+              { bitswap_enabled
+              ; max_download_time_per_block_sec =
+                  float_opt "max-download-time-per-block"
+                    ~default:def.max_download_time_per_block_sec
+              ; max_download_jobs =
+                  int_opt "max-download-jobs" ~default:def.max_download_jobs
+              ; max_proofs_per_batch =
+                  int_opt "max-verifier-jobs" ~default:def.max_proofs_per_batch
+              ; max_verifier_jobs =
+                  int_opt "max-verifier-jobs" ~default:def.max_verifier_jobs
+              ; max_retrieve_hash_chain_jobs =
+                  int_opt "max-retrieve-hash-chain-jobs"
+                    ~default:def.max_retrieve_hash_chain_jobs
+              ; building_breadcrumb_timeout =
+                  span_opt "building-breadcrumb-timeout"
+                    ~default:def.building_breadcrumb_timeout
+              ; bitwap_download_timeout =
+                  span_opt "bitwap-download-timeout"
+                    ~default:def.bitwap_download_timeout
+              ; peer_download_timeout =
+                  span_opt "peer-download-timeout"
+                    ~default:def.peer_download_timeout
+              ; ancestry_verification_timeout =
+                  span_opt "ancestry-verification-timeout"
+                    ~default:def.ancestry_verification_timeout
+              ; ancestry_download_timeout =
+                  span_opt "ancestry-download-timeout"
+                    ~default:def.ancestry_download_timeout
+              ; transaction_snark_verification_timeout =
+                  span_opt "transaction-snark-verification-timeout"
+                    ~default:def.transaction_snark_verification_timeout
+              }
+          in
           let%map mina =
             Mina_lib.create ~wallets
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~chain_id ~is_seed ~super_catchup:(not no_super_catchup)
-                 ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
-                 ~gossip_net_params ~proposed_protocol_version_opt
+                 ~chain_id ~is_seed ~catchup_mode ~disable_node_status
+                 ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
+                 ~proposed_protocol_version_opt
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method )
@@ -1371,7 +1449,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ?precomputed_blocks_path ~log_precomputed_blocks
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
                  ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
-                 ~node_status_url ~graphql_control_port:itn_graphql_port () )
+                 ~node_status_url ~graphql_control_port:itn_graphql_port
+                 ~catchup_config () )
           in
           { mina
           ; client_trustlist
@@ -1666,6 +1745,9 @@ let internal_commands logger =
         and format =
           flag "--format" ~aliases:[ "-format" ] (optional string)
             ~doc:"sexp/json the format to parse input in"
+        and limit =
+          flag "--limit" ~aliases:[ "-limit" ] (optional int)
+            ~doc:"limit the number of proofs taken from the file"
         in
         fun () ->
           let open Async in
@@ -1695,7 +1777,7 @@ let internal_commands logger =
                   "Expected format flag to be one of sexp, json, got '%s'"
                   format ()
           in
-          let%bind input =
+          let%bind input_full =
             match format with
             | `Sexp -> (
                 let%map input_sexp =
@@ -1743,6 +1825,16 @@ let internal_commands logger =
                         `Blockchain input
                     | Error err ->
                         failwithf "Could not parse JSON: %s" err () ) )
+          in
+          let input =
+            let cap lst =
+              Option.value_map ~default:Fn.id ~f:(Fn.flip List.take) limit lst
+            in
+            match input_full with
+            | `Blockchain lst ->
+                `Blockchain (cap lst)
+            | `Transaction lst ->
+                `Transaction (cap lst)
           in
           let%bind verifier =
             Verifier.create ~logger

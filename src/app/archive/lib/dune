@@ -74,6 +74,7 @@
    error_json
    ppx_deriving_yojson.runtime
    ppx_version.runtime
+   mina_intf
  )
  (inline_tests (flags -verbose -show-counts))
  (modes native)

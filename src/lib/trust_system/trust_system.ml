@@ -15,6 +15,8 @@ module Actions = struct
         (** Peer gossiped a transition before its slot. *)
     | Gossiped_invalid_transition
         (** Peer gossiped an invalid transition to us. *)
+    | Sent_invalid_transition
+        (** Peer sent an invalid transition in response to our request. *)
     | Disconnected_chain
         (** Peer has been determined to be on a chain that is not connected to our chain. *)
     | Sent_bad_hash
@@ -95,6 +97,8 @@ module Actions = struct
     | Gossiped_future_transition ->
         Insta_ban
     | Gossiped_invalid_transition ->
+        Insta_ban
+    | Sent_invalid_transition ->
         Insta_ban
     | Disconnected_chain ->
         Insta_ban

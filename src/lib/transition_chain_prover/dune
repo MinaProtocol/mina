@@ -24,4 +24,5 @@
    pickles
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
+   transition_frontier_bit_catchup
 ))

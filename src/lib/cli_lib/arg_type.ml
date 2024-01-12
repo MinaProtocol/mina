@@ -10,6 +10,21 @@ let int16 =
   Command.Arg_type.map Command.Param.int
     ~f:(Fn.compose Or_error.ok_exn validate_int16)
 
+let catchup_mode : [ `Bit of bool | `Normal | `Super ] Command.Arg_type.t =
+  Command.Arg_type.create (fun s ->
+      match s with
+      | "normal" ->
+          `Normal
+      | "super" ->
+          `Super
+      | "bit" ->
+          `Bit true
+      | "bit-no-bitswap" ->
+          `Bit false
+      | _ ->
+          eprintf "Invalid catchup mode: %s" s ;
+          exit 1 )
+
 let pubsub_topic_mode =
   let open Gossip_net.Libp2p in
   Command.Arg_type.create (fun s ->

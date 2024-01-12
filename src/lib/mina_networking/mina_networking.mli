@@ -12,6 +12,7 @@ type Structured_log_events.t +=
   | Gossip_transaction_pool_diff of
       { fee_payer_summaries : User_command.fee_payer_summary_t list }
   | Gossip_snark_pool_diff of { work : Snark_pool.Resource_pool.Diff.compact }
+  | Rebroadcast_transition of { state_hash : State_hash.t }
   [@@deriving register_event]
 
 val refused_answer_query_string : string
@@ -47,9 +48,11 @@ module Rpcs : sig
   end
 
   module Get_transition_chain_proof : sig
-    type query = State_hash.t
+    type query = State_hash.t * State_hash.t list
 
-    type response = (State_hash.t * State_body_hash.t list) option
+    type response =
+      (State_hash.t * State_body_hash.t list * Mina_block.Header.with_hash list)
+      option
   end
 
   module Get_ancestry : sig
@@ -215,8 +218,9 @@ val get_transition_chain_proof :
   -> ?timeout:Time.Span.t
   -> t
   -> Network_peer.Peer.t
-  -> State_hash.t
-  -> (State_hash.t * State_body_hash.t List.t) Deferred.Or_error.t
+  -> State_hash.t * State_hash.t list
+  -> (State_hash.t * State_body_hash.t list * Mina_block.Header.with_hash list)
+     Deferred.Or_error.t
 
 val get_transition_chain :
      ?heartbeat_timeout:Time_ns.Span.t
@@ -225,6 +229,18 @@ val get_transition_chain :
   -> Network_peer.Peer.t
   -> State_hash.t list
   -> Mina_block.t list Deferred.Or_error.t
+
+val add_bitswap_resource :
+     t
+  -> id:Blake2.t
+  -> tag:Mina_net2.Bitswap_tag.t
+  -> data:string
+  -> unit Deferred.t
+
+val download_bitswap_resource :
+  t -> tag:Mina_net2.Bitswap_tag.t -> ids:Blake2.t list -> unit Deferred.t
+
+val remove_bitswap_resource : t -> ids:Blake2.t list -> unit Deferred.t
 
 val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t
@@ -238,8 +254,13 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
 
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
 
-val broadcast_state :
-  t -> Mina_block.t State_hash.With_state_hashes.t -> unit Deferred.t
+val broadcast_transition : t -> Mina_block.with_hash -> unit Deferred.t
+
+val rebroadcast_transition :
+     origin_topics:string list
+  -> t
+  -> [ `Block of Mina_block.with_hash | `Header of Mina_block.Header.with_hash ]
+  -> unit Deferred.t
 
 val broadcast_snark_pool_diff :
   ?nonce:int -> t -> Snark_pool.Resource_pool.Diff.t -> unit Deferred.t
@@ -283,6 +304,7 @@ val ban_notification_reader :
 
 val create :
      Config.t
+  -> on_bitswap_update:Mina_net2.on_bitswap_update_t
   -> sinks:Sinks.t
   -> get_some_initial_peers:
        (   Rpcs.Get_some_initial_peers.query Envelope.Incoming.t
