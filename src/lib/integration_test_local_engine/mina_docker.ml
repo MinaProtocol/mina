@@ -154,6 +154,7 @@ module Network_config = struct
             ; slots_per_sub_window = Some slots_per_sub_window
             ; genesis_state_timestamp =
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
+            ; grace_period_slots = None
             }
       ; proof = Some proof_config
       ; ledger =
