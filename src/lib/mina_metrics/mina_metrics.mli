@@ -9,6 +9,8 @@ module Counter : sig
   val inc_one : t -> unit
 
   val inc : t -> float -> unit
+
+  val value : t -> float
 end
 
 module Gauge : sig
@@ -23,12 +25,16 @@ module Gauge : sig
   val dec : t -> float -> unit
 
   val set : t -> float -> unit
+
+  val value : t -> float
 end
 
 module type Histogram = sig
   type t
 
   val observe : t -> float -> unit
+
+  val buckets : t -> int list
 end
 
 module Runtime : sig
@@ -52,17 +58,47 @@ module Cryptography : sig
 
   val snark_work_merge_time_sec : Snark_work_histogram.t
 
-  val snark_work_base_time_sec : Snark_work_histogram.t
+  val snark_work_zkapp_base_time_sec : Counter.t
+
+  val snark_work_base_time_sec : Counter.t
+
+  val snark_work_zkapp_base_submissions : Counter.t
+
+  val snark_work_base_submissions : Counter.t
+
+  val zkapp_transaction_length : Counter.t
+
+  val zkapp_proof_updates : Counter.t
 end
 
 module Bootstrap : sig
   val bootstrap_time_ms : Gauge.t
+
+  val staking_epoch_ledger_sync_ms : Counter.t
+
+  val next_epoch_ledger_sync_ms : Counter.t
+
+  val root_snarked_ledger_sync_ms : Counter.t
+
+  val num_of_root_snarked_ledger_retargeted : Gauge.t
 end
 
 module Transaction_pool : sig
   val useful_transactions_received_time_sec : Gauge.t
 
   val pool_size : Gauge.t
+
+  val transactions_added_to_pool : Counter.t
+
+  val vk_refcount_table_size : Gauge.t
+
+  val zkapp_transactions_added_to_pool : Counter.t
+
+  val zkapp_transaction_size : Counter.t
+
+  val zkapp_updates : Counter.t
+
+  val zkapp_proof_updates : Counter.t
 end
 
 module Network : sig
@@ -88,6 +124,14 @@ module Network : sig
     module Validation_time : sig
       val update : Time.Span.t -> unit
     end
+
+    module Processing_time : sig
+      val update : Time.Span.t -> unit
+    end
+
+    module Rejection_time : sig
+      val update : Time.Span.t -> unit
+    end
   end
 
   module Snark_work : sig
@@ -100,6 +144,14 @@ module Network : sig
     val received : Counter.t
 
     module Validation_time : sig
+      val update : Time.Span.t -> unit
+    end
+
+    module Processing_time : sig
+      val update : Time.Span.t -> unit
+    end
+
+    module Rejection_time : sig
       val update : Time.Span.t -> unit
     end
   end
@@ -116,24 +168,33 @@ module Network : sig
     module Validation_time : sig
       val update : Time.Span.t -> unit
     end
+
+    module Processing_time : sig
+      val update : Time.Span.t -> unit
+    end
+
+    module Rejection_time : sig
+      val update : Time.Span.t -> unit
+    end
   end
 
   val rpc_requests_received : Counter.t
 
   val rpc_requests_sent : Counter.t
 
-  val get_some_initial_peers_rpcs_sent : Counter.t
+  val get_some_initial_peers_rpcs_sent : Counter.t * Gauge.t
 
-  val get_some_initial_peers_rpcs_received : Counter.t
+  val get_some_initial_peers_rpcs_received : Counter.t * Gauge.t
 
   val get_some_initial_peers_rpc_requests_failed : Counter.t
 
   val get_some_initial_peers_rpc_responses_failed : Counter.t
 
-  val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent : Counter.t
+  val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_sent :
+    Counter.t * Gauge.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpcs_received :
-    Counter.t
+    Counter.t * Gauge.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_requests_failed :
     Counter.t
@@ -141,77 +202,89 @@ module Network : sig
   val get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc_responses_failed :
     Counter.t
 
-  val answer_sync_ledger_query_rpcs_sent : Counter.t
+  val answer_sync_ledger_query_rpcs_sent : Counter.t * Gauge.t
 
-  val answer_sync_ledger_query_rpcs_received : Counter.t
+  val answer_sync_ledger_query_rpcs_received : Counter.t * Gauge.t
 
   val answer_sync_ledger_query_rpc_requests_failed : Counter.t
 
   val answer_sync_ledger_query_rpc_responses_failed : Counter.t
 
-  val get_transition_chain_rpcs_sent : Counter.t
+  val get_transition_chain_rpcs_sent : Counter.t * Gauge.t
 
-  val get_transition_chain_rpcs_received : Counter.t
+  val get_transition_chain_rpcs_received : Counter.t * Gauge.t
 
   val get_transition_chain_rpc_requests_failed : Counter.t
 
   val get_transition_chain_rpc_responses_failed : Counter.t
 
-  val get_transition_knowledge_rpcs_sent : Counter.t
+  val get_transition_knowledge_rpcs_sent : Counter.t * Gauge.t
 
-  val get_transition_knowledge_rpcs_received : Counter.t
+  val get_transition_knowledge_rpcs_received : Counter.t * Gauge.t
 
   val get_transition_knowledge_rpc_requests_failed : Counter.t
 
   val get_transition_knowledge_rpc_responses_failed : Counter.t
 
-  val get_transition_chain_proof_rpcs_sent : Counter.t
+  val get_transition_chain_proof_rpcs_sent : Counter.t * Gauge.t
 
-  val get_transition_chain_proof_rpcs_received : Counter.t
+  val get_transition_chain_proof_rpcs_received : Counter.t * Gauge.t
 
   val get_transition_chain_proof_rpc_requests_failed : Counter.t
 
   val get_transition_chain_proof_rpc_responses_failed : Counter.t
 
-  val get_node_status_rpcs_sent : Counter.t
+  val get_node_status_rpcs_sent : Counter.t * Gauge.t
 
-  val get_node_status_rpcs_received : Counter.t
+  val get_node_status_rpcs_received : Counter.t * Gauge.t
 
   val get_node_status_rpc_requests_failed : Counter.t
 
   val get_node_status_rpc_responses_failed : Counter.t
 
-  val get_ancestry_rpcs_sent : Counter.t
+  val get_ancestry_rpcs_sent : Counter.t * Gauge.t
 
-  val get_ancestry_rpcs_received : Counter.t
+  val get_ancestry_rpcs_received : Counter.t * Gauge.t
 
   val get_ancestry_rpc_requests_failed : Counter.t
 
   val get_ancestry_rpc_responses_failed : Counter.t
 
-  val ban_notify_rpcs_sent : Counter.t
+  val ban_notify_rpcs_sent : Counter.t * Gauge.t
 
-  val ban_notify_rpcs_received : Counter.t
+  val ban_notify_rpcs_received : Counter.t * Gauge.t
 
   val ban_notify_rpc_requests_failed : Counter.t
 
   val ban_notify_rpc_responses_failed : Counter.t
 
-  val get_best_tip_rpcs_sent : Counter.t
+  val get_best_tip_rpcs_sent : Counter.t * Gauge.t
 
-  val get_best_tip_rpcs_received : Counter.t
+  val get_best_tip_rpcs_received : Counter.t * Gauge.t
 
   val get_best_tip_rpc_requests_failed : Counter.t
 
   val get_best_tip_rpc_responses_failed : Counter.t
 
-  val get_epoch_ledger_rpcs_sent : Counter.t
+  val get_epoch_ledger_rpcs_sent : Counter.t * Gauge.t
 
-  val get_epoch_ledger_rpcs_received : Counter.t
+  val get_epoch_ledger_rpcs_received : Counter.t * Gauge.t
 
   val get_epoch_ledger_rpc_requests_failed : Counter.t
 
   val get_epoch_ledger_rpc_responses_failed : Counter.t
+
+  val new_state_received : Gauge.t
+
+  val new_state_broadcasted : Gauge.t
+
+  val snark_pool_diff_received : Gauge.t
+
+  val snark_pool_diff_broadcasted : Gauge.t
+
+  val transaction_pool_diff_received : Gauge.t
+
+  val transaction_pool_diff_broadcasted : Gauge.t
 
   val rpc_connections_failed : Counter.t
 
@@ -232,6 +305,8 @@ module Network : sig
   val rpc_latency_ms_summary : Rpc_latency_histogram.t
 
   val ipc_latency_ns_summary : Ipc_latency_histogram.t
+
+  val ipc_logs_received_total : Counter.t
 end
 
 module Pipe : sig
@@ -264,6 +339,8 @@ module Snark_work : sig
   val snark_work_assigned_rpc : Counter.t
 
   val snark_work_timed_out_rpc : Counter.t
+
+  val snark_work_failed_rpc : Counter.t
 
   val snark_pool_size : Gauge.t
 
@@ -310,6 +387,10 @@ module Block_producer : sig
   val slots_won : Counter.t
 
   val blocks_produced : Counter.t
+
+  module Block_production_delay_histogram : Histogram
+
+  val block_production_delay : Block_production_delay_histogram.t
 end
 
 module Transition_frontier : sig
@@ -348,6 +429,8 @@ module Transition_frontier : sig
   val recently_finalized_staged_txns : Gauge.t
 
   val best_tip_user_txns : Gauge.t
+
+  val best_tip_zkapp_txns : Gauge.t
 
   val best_tip_coinbase : Gauge.t
 
@@ -414,6 +497,14 @@ module Block_latency : sig
   end
 
   module Inclusion_time : sig
+    val v : Gauge.t
+
+    val update : Time.Span.t -> unit
+
+    val clear : unit -> unit
+  end
+
+  module Validation_acceptance_time : sig
     val v : Gauge.t
 
     val update : Time.Span.t -> unit

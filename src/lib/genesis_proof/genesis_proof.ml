@@ -10,9 +10,10 @@ module Inputs = struct
     ; genesis_constants : Genesis_constants.t
     ; genesis_ledger : Genesis_ledger.Packed.t
     ; genesis_epoch_data : Consensus.Genesis_epoch_data.t
+    ; genesis_body_reference : Consensus.Body_reference.t
     ; consensus_constants : Consensus.Constants.t
-    ; protocol_state_with_hash :
-        (Protocol_state.value, State_hash.t) With_hash.t
+    ; protocol_state_with_hashes :
+        Protocol_state.value State_hash.With_state_hashes.t
     ; constraint_system_digests : (string * Md5_lib.t) list option
     ; blockchain_proof_system_id :
         (* This is only used for calculating the hash to lookup the genesis
@@ -63,12 +64,12 @@ module Inputs = struct
 
   let consensus_constants { consensus_constants; _ } = consensus_constants
 
-  let genesis_state_with_hash { protocol_state_with_hash; _ } =
-    protocol_state_with_hash
+  let genesis_state_with_hashes { protocol_state_with_hashes; _ } =
+    protocol_state_with_hashes
 
-  let genesis_state t = (genesis_state_with_hash t).data
+  let genesis_state t = (genesis_state_with_hashes t).data
 
-  let genesis_state_hash t = (genesis_state_with_hash t).hash
+  let genesis_state_hashes t = (genesis_state_with_hashes t).hash
 end
 
 module Proof_data = struct
@@ -86,9 +87,10 @@ module T = struct
     ; proof_level : Genesis_constants.Proof_level.t
     ; genesis_ledger : Genesis_ledger.Packed.t
     ; genesis_epoch_data : Consensus.Genesis_epoch_data.t
+    ; genesis_body_reference : Consensus.Body_reference.t
     ; consensus_constants : Consensus.Constants.t
-    ; protocol_state_with_hash :
-        (Protocol_state.value, State_hash.t) With_hash.t
+    ; protocol_state_with_hashes :
+        Protocol_state.value State_hash.With_state_hashes.t
     ; constraint_system_digests : (string * Md5_lib.t) list Lazy.t
     ; proof_data : Proof_data.t option
     }
@@ -133,12 +135,12 @@ module T = struct
 
   let consensus_constants { consensus_constants; _ } = consensus_constants
 
-  let genesis_state_with_hash { protocol_state_with_hash; _ } =
-    protocol_state_with_hash
+  let genesis_state_with_hashes { protocol_state_with_hashes; _ } =
+    protocol_state_with_hashes
 
-  let genesis_state t = (genesis_state_with_hash t).data
+  let genesis_state t = (genesis_state_with_hashes t).data
 
-  let genesis_state_hash t = (genesis_state_with_hash t).hash
+  let genesis_state_hashes t = (genesis_state_with_hashes t).hash
 
   let genesis_proof { proof_data; _ } =
     Option.map proof_data ~f:(fun { Proof_data.genesis_proof = p; _ } -> p)
@@ -154,26 +156,15 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
   let prev_state =
     Protocol_state.negative_one ~genesis_ledger
       ~genesis_epoch_data:t.genesis_epoch_data ~constraint_constants
-      ~consensus_constants
+      ~consensus_constants ~genesis_body_reference:t.genesis_body_reference
   in
-  let curr = t.protocol_state_with_hash.data in
+  let curr = t.protocol_state_with_hashes.data in
   let dummy_txn_stmt : Transaction_snark.Statement.With_sok.t =
-    { sok_digest = Mina_base.Sok_message.Digest.default
-    ; source =
-        Blockchain_state.snarked_ledger_hash
-          (Protocol_state.blockchain_state prev_state)
-    ; target =
-        Blockchain_state.snarked_ledger_hash
-          (Protocol_state.blockchain_state curr)
-    ; supply_increase = Currency.Amount.zero
-    ; fee_excess = Fee_excess.zero
-    ; next_available_token_before = Token_id.(next default)
-    ; next_available_token_after = Token_id.(next default)
-    ; pending_coinbase_stack_state =
-        { source = Mina_base.Pending_coinbase.Stack.empty
-        ; target = Mina_base.Pending_coinbase.Stack.empty
-        }
-    }
+    let t =
+      Blockchain_state.ledger_proof_statement
+        (Protocol_state.blockchain_state curr)
+    in
+    { t with sok_digest = Sok_message.Digest.default }
   in
   let genesis_epoch_ledger =
     match t.genesis_epoch_data with
@@ -183,19 +174,25 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
         data.staking.ledger
   in
   let open Pickles_types in
-  let blockchain_dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n in
-  let txn_dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N0.n in
+  let blockchain_dummy =
+    Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16
+  in
+  let txn_dummy =
+    Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N0.n ~domain_log2:14
+  in
   B.step
     ~handler:
       (Consensus.Data.Prover_state.precomputed_handler ~constraint_constants
-         ~genesis_epoch_ledger)
+         ~genesis_epoch_ledger )
     { transition =
         Snark_transition.genesis ~constraint_constants ~consensus_constants
-          ~genesis_ledger
+          ~genesis_ledger ~genesis_body_reference:t.genesis_body_reference
     ; prev_state
+    ; prev_state_proof = blockchain_dummy
+    ; txn_snark = dummy_txn_stmt
+    ; txn_snark_proof = txn_dummy
     }
-    [ (prev_state, blockchain_dummy); (dummy_txn_stmt, txn_dummy) ]
-    t.protocol_state_with_hash.data
+    t.protocol_state_with_hashes.data
 
 let digests (module T : Transaction_snark.S)
     (module B : Blockchain_snark.Blockchain_snark_state.S) =
@@ -222,21 +219,22 @@ let blockchain_snark_state (inputs : Inputs.t) :
   ((module T), (module B))
 
 let create_values txn b (t : Inputs.t) =
-  let%map.Async.Deferred genesis_proof = base_proof b t in
+  let%map.Async.Deferred (), (), genesis_proof = base_proof b t in
   { runtime_config = t.runtime_config
   ; constraint_constants = t.constraint_constants
   ; proof_level = t.proof_level
   ; genesis_constants = t.genesis_constants
   ; genesis_ledger = t.genesis_ledger
   ; genesis_epoch_data = t.genesis_epoch_data
+  ; genesis_body_reference = t.genesis_body_reference
   ; consensus_constants = t.consensus_constants
-  ; protocol_state_with_hash = t.protocol_state_with_hash
+  ; protocol_state_with_hashes = t.protocol_state_with_hashes
   ; constraint_system_digests = digests txn b
   ; proof_data =
       Some
         { blockchain_proof_system_id =
             (let (module B) = b in
-             Lazy.force B.Proof.id)
+             Lazy.force B.Proof.id )
         ; genesis_proof
         }
   }
@@ -248,12 +246,13 @@ let create_values_no_proof (t : Inputs.t) =
   ; genesis_constants = t.genesis_constants
   ; genesis_ledger = t.genesis_ledger
   ; genesis_epoch_data = t.genesis_epoch_data
+  ; genesis_body_reference = t.genesis_body_reference
   ; consensus_constants = t.consensus_constants
-  ; protocol_state_with_hash = t.protocol_state_with_hash
+  ; protocol_state_with_hashes = t.protocol_state_with_hashes
   ; constraint_system_digests =
       lazy
         (let txn, b = blockchain_snark_state t in
-         Lazy.force (digests txn b))
+         Lazy.force (digests txn b) )
   ; proof_data = None
   }
 
@@ -264,8 +263,9 @@ let to_inputs (t : t) : Inputs.t =
   ; genesis_constants = t.genesis_constants
   ; genesis_ledger = t.genesis_ledger
   ; genesis_epoch_data = t.genesis_epoch_data
+  ; genesis_body_reference = t.genesis_body_reference
   ; consensus_constants = t.consensus_constants
-  ; protocol_state_with_hash = t.protocol_state_with_hash
+  ; protocol_state_with_hashes = t.protocol_state_with_hashes
   ; constraint_system_digests =
       ( if Lazy.is_val t.constraint_system_digests then
         Some (Lazy.force t.constraint_system_digests)

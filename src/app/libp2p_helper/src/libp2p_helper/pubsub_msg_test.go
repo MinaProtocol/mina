@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,24 +20,21 @@ func testPublishDo(t *testing.T, app *app, topic string, data []byte, rpcSeqno u
 	require.NoError(t, m.SetTopic(topic))
 	require.NoError(t, m.SetData(data))
 
-	resMsg := PublishReq(m).handle(app, rpcSeqno)
+	resMsg, _ := PublishReq(m).handle(app, rpcSeqno)
 	require.NoError(t, err)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "publish")
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasPublish())
 	_, err = respSuccess.Publish()
 	require.NoError(t, err)
 
-	_, has := app.Topics[topic]
+	_, has := app._topics[topic]
 	require.True(t, has)
 }
 
 func TestPublish(t *testing.T) {
-	var err error
 	testApp, _ := newTestApp(t, nil, true)
-	testApp.P2p.Pubsub, err = pubsub.NewGossipSub(testApp.Ctx, testApp.P2p.Host)
-	require.NoError(t, err)
-
+	require.NoError(t, configurePubsub(testApp, 32, nil, nil))
 	testPublishDo(t, testApp, "testtopic", []byte("testdata"), 48)
 }
 
@@ -50,25 +48,23 @@ func testSubscribeDo(t *testing.T, app *app, topic string, subId uint64, rpcSeqn
 	require.NoError(t, err)
 	sid.SetId(subId)
 
-	resMsg := SubscribeReq(m).handle(app, rpcSeqno)
+	resMsg, _ := SubscribeReq(m).handle(app, rpcSeqno)
 	require.NoError(t, err)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "subscribe")
 	require.Equal(t, seqno, rpcSeqno)
 	require.True(t, respSuccess.HasSubscribe())
 	_, err = respSuccess.Subscribe()
 	require.NoError(t, err)
 
-	_, has := app.Topics[topic]
+	_, has := app._topics[topic]
 	require.True(t, has)
-	_, has = app.Subs[subId]
+	_, has = app._subs[subId]
 	require.True(t, has)
 }
 
 func testSubscribeImpl(t *testing.T) (*app, string, uint64) {
-	var err error
 	testApp, _ := newTestApp(t, nil, true)
-	testApp.P2p.Pubsub, err = pubsub.NewGossipSub(testApp.Ctx, testApp.P2p.Host)
-	require.NoError(t, err)
+	require.NoError(t, configurePubsub(testApp, 32, nil, nil))
 
 	topic := "testtopic"
 	idx := uint64(21)
@@ -94,54 +90,45 @@ func TestUnsubscribe(t *testing.T) {
 	require.NoError(t, err)
 	sid.SetId(idx)
 
-	resMsg := UnsubscribeReq(m).handle(testApp, 7739)
+	resMsg, _ := UnsubscribeReq(m).handle(testApp, 7739)
 	require.NoError(t, err)
-	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg)
+	seqno, respSuccess := checkRpcResponseSuccess(t, resMsg, "unsubscribe")
 	require.Equal(t, seqno, uint64(7739))
 	require.True(t, respSuccess.HasUnsubscribe())
 	_, err = respSuccess.Unsubscribe()
 	require.NoError(t, err)
 
-	_, has := testApp.Subs[idx]
+	_, has := testApp._subs[idx]
 	require.False(t, has)
 }
 
 func TestValidationPush(t *testing.T) {
 	testApp, _ := newTestApp(t, nil, true)
 
-	ipcValResults := []ipc.ValidationResult{
-		ipc.ValidationResult_accept,
-		ipc.ValidationResult_reject,
-		ipc.ValidationResult_ignore,
+	ipc2Pubsub := map[ipc.ValidationResult]pubsub.ValidationResult{
+		ipc.ValidationResult_accept: pubsub.ValidationAccept,
+		ipc.ValidationResult_reject: pubsub.ValidationReject,
+		ipc.ValidationResult_ignore: pubsub.ValidationIgnore,
 	}
 
-	pubsubValResults := []pubsub.ValidationResult{
-		pubsub.ValidationAccept,
-		pubsub.ValidationReject,
-		pubsub.ValidationIgnore,
-	}
-
-	for i := 0; i < len(ipcValResults); i++ {
-		result := ValidationUnknown
-		seqno := uint64(i)
+	for resIpc, resPS := range ipc2Pubsub {
+		seqno := rand.Uint64()
 		status := &validationStatus{
-			Completion: make(chan pubsub.ValidationResult),
+			Completion: make(chan pubsub.ValidationResult, 1),
 		}
-		testApp.Validators[seqno] = status
-		go func() {
-			result = <-status.Completion
-		}()
+		testApp._validators[seqno] = status
 		_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 		require.NoError(t, err)
 		m, err := ipc.NewRootLibp2pHelperInterface_Validation(seg)
 		require.NoError(t, err)
 		validationId, err := m.NewValidationId()
 		validationId.SetId(seqno)
-		m.SetResult(ipcValResults[i])
-		testApp.handleValidation(m)
+		m.SetResult(resIpc)
+		ValidationPush(m).handle(testApp)
 		require.NoError(t, err)
-		require.Equal(t, pubsubValResults[i], result)
-		_, has := testApp.Validators[seqno]
+		result := <-status.Completion
+		require.Equal(t, resPS, result)
+		_, has := testApp._validators[seqno]
 		require.False(t, has)
 	}
 }

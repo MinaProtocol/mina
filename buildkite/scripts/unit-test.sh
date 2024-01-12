@@ -12,9 +12,18 @@ path=$2
 
 source ~/.profile
 
+export MINA_LIBP2P_PASS="naughty blue worm"
+export NO_JS_BUILD=1 # skip some JS targets which have extra implicit dependencies
+
 echo "--- Make build"
-export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go 
+export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go
 time make build
 
+echo "--- Build all targets"
+dune build "${path}" --profile="${profile}" -j16
+
+echo "--- Check for changes to verification keys"
+time dune runtest "src/app/print_blockchain_snark_vk" --profile="${profile}" -j16
+
 echo "--- Run unit tests"
-time dune runtest "${path}" --profile="${profile}" -j16 || (./scripts/link-coredumps.sh && false)
+time dune runtest "${path}" --profile="${profile}" -j16 || (./scripts/link-coredumps.sh)

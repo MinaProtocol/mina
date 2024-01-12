@@ -7,9 +7,6 @@ open Signature_lib
 module Make (Env : sig
   val env : string
 
-  (* TODO: remove eventually *)
-  val env_deprecated : string option
-
   val which : string
 end) =
 struct
@@ -21,8 +18,6 @@ struct
   type t = Keypair.t
 
   let env = env
-
-  let env_deprecated = env_deprecated
 
   (** Writes a keypair to [privkey_path] and [privkey_path ^ ".pub"] using [Secret_file] *)
   let write_exn { Keypair.private_key; public_key } ~(privkey_path : string)
@@ -62,7 +57,7 @@ struct
          with exn ->
            Privkey_error.corrupted_privkey
              (Error.createf "Error parsing decrypted private key file: %s"
-                (Exn.to_string exn))
+                (Exn.to_string exn) )
        in
        try return (Keypair.of_private_key_exn sk)
        with exn ->
@@ -70,7 +65,7 @@ struct
            (Error.createf
               "Error computing public key from private, is your keyfile \
                corrupt? %s"
-              (Exn.to_string exn))
+              (Exn.to_string exn) )
 
   (** Reads a private key from [privkey_path] using [Secret_file], throws on failure *)
   let read_exn ~(privkey_path : string) ~(password : Secret_file.password) :
@@ -84,17 +79,16 @@ struct
   let read_exn' path =
     let password =
       let env_value = Sys.getenv env in
-      let env_deprecated_value = Option.bind env_deprecated ~f:Sys.getenv in
-      match (env_value, env_deprecated_value) with
-      | Some v, _ | None, Some v ->
+      match env_value with
+      | Some v ->
           lazy (return @@ Bytes.of_string v)
-      | None, None ->
+      | None ->
           let error_help_message =
             sprintf "Set the %s environment variable to the password" env
           in
           lazy
             (Password.read_hidden_line ~error_help_message
-               "Secret key password: ")
+               "Secret key password: " )
     in
     read_exn ~privkey_path:path ~password
 end

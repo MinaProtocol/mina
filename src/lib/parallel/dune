@@ -2,7 +2,15 @@
  (name parallel)
  (public_name parallel)
  (library_flags -linkall)
- (libraries core async rpc_parallel)
+ (libraries
+   ;; opam libraries
+   async_rpc_kernel
+   async
+   core
+   rpc_parallel
+   async.async_rpc
+   core_kernel
+ )
  (preprocess
   (pps ppx_version ppx_jane ppx_compare))
  (instrumentation (backend bisect_ppx))

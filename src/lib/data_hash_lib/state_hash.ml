@@ -3,18 +3,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifndef consensus_mechanism]
-
-module Outside_hash_image = Outside_hash_image_nonconsensus.Outside_hash_image
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-open Snark_params_nonconsensus
-
-[%%else]
-
 open Snark_params.Tick
-
-[%%endif]
 
 include Data_hash.Make_full_size (struct
   let version_byte = Base58_check.Version_bytes.state_hash
@@ -33,7 +22,7 @@ let zero = dummy
 (* in the nonconsensus world, we don't have the Pedersen machinery available,
    so just inline the value for zero
 *)
-let zero = Snark_params_nonconsensus.Field.of_string "0"
+let zero = Field.of_string "0"
 
 [%%endif]
 
@@ -43,6 +32,8 @@ let to_bytes = `Use_to_base58_check_or_raw_hash_bytes
 
 let to_decimal_string = to_decimal_string
 
+let of_decimal_string = of_decimal_string
+
 (* Data hash versioned boilerplate below *)
 
 [%%versioned
@@ -51,7 +42,7 @@ module Stable = struct
 
   module V1 = struct
     module T = struct
-      type t = Field.t [@@deriving sexp, compare, hash, version { asserted }]
+      type t = (Field.t[@version_asserted]) [@@deriving sexp, compare, hash]
     end
 
     include T
@@ -65,4 +56,11 @@ module Stable = struct
   end
 end]
 
-type _unused = unit constraint t = Stable.Latest.t
+let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
+
+let deriver obj =
+  Fields_derivers_zkapps.(
+    iso_string ~name:"StateHash" ~js_type:Field ~to_string:to_base58_check
+      ~of_string:of_base58_check_exn
+    |> needs_custom_js ~name:"StateHash" ~js_type:field)
+    obj

@@ -1,4 +1,4 @@
-(* archive_blocks.ml -- archive precomputed or extensional blocks to Postgresql *)
+(* archive_blocks.ml *)
 
 open Core_kernel
 open Async
@@ -49,17 +49,34 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
             return (add_to_failure_file file)
       in
       let add_precomputed_block =
-        make_add_block
-          Mina_transition.External_transition.Precomputed_block.of_yojson
+        (* allow use of older-versioned blocks *)
+        let of_yojson json =
+          match Mina_block.Precomputed.Stable.of_yojson_to_latest json with
+          | Ok block ->
+              Ok block
+          | Error err ->
+              Error (Error.to_string_hum err)
+        in
+        make_add_block of_yojson
           (Processor.add_block_aux_precomputed
              ~constraint_constants:
-               Genesis_constants.Constraint_constants.compiled pool
-             ~delete_older_than:None ~logger)
+               Genesis_constants.Constraint_constants.compiled ~pool
+             ~delete_older_than:None ~logger )
       in
       let add_extensional_block =
-        make_add_block Archive_lib.Extensional.Block.of_yojson
-          (Processor.add_block_aux_extensional ~logger pool
-             ~delete_older_than:None)
+        (* allow use of older-versioned blocks *)
+        let of_yojson json =
+          match
+            Archive_lib.Extensional.Block.Stable.of_yojson_to_latest json
+          with
+          | Ok block ->
+              Ok block
+          | Error err ->
+              Error (Error.to_string_hum err)
+        in
+        make_add_block of_yojson
+          (Processor.add_block_aux_extensional ~logger ~pool
+             ~delete_older_than:None )
       in
       Deferred.List.iter files ~f:(fun file ->
           In_channel.with_file file ~f:(fun in_channel ->
@@ -80,7 +97,7 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
                       [ ("file", `String file)
                       ; ("error", `String (Exn.to_string exn))
                       ] ;
-                  return (add_to_failure_file file)))
+                  return (add_to_failure_file file) ) )
 
 let () =
   Command.(
@@ -116,4 +133,4 @@ let () =
              (Flag.optional_with_default true Param.bool)
          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
          main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
-           ~log_successes ~files)))
+           ~log_successes ~files )))

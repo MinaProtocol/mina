@@ -1,16 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-
-[%%endif]
 
 [%%versioned
 module Stable = struct
@@ -24,7 +15,7 @@ end]
 
 let gen =
   Quickcheck.Generator.map Bool.quickcheck_generator ~f:(fun b ->
-      if b then Pos else Neg)
+      if b then Pos else Neg )
 
 let negate = function Pos -> Neg | Neg -> Pos
 
@@ -43,11 +34,15 @@ type var = Field.Var.t
 
 let typ : (var, t) Typ.t =
   let open Typ in
-  { check = (fun x -> assert_r1cs x x (Field.Var.constant Field.one))
-  ; store = (fun t -> Store.store (to_field t))
-  ; read = (fun x -> Read.(read x >>| of_field_exn))
-  ; alloc = Alloc.alloc
-  }
+  Typ
+    { check = (fun x -> assert_r1cs x x (Field.Var.constant Field.one))
+    ; var_to_fields = (fun t -> ([| t |], ()))
+    ; var_of_fields = (fun (ts, ()) -> ts.(0))
+    ; value_to_fields = (fun t -> ([| to_field t |], ()))
+    ; value_of_fields = (fun (ts, ()) -> of_field_exn ts.(0))
+    ; size_in_field_elements = 1
+    ; constraint_system_auxiliary = (fun () -> ())
+    }
 
 module Checked = struct
   let two = Field.of_int 2

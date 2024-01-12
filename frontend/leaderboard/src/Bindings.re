@@ -47,11 +47,11 @@ module GoogleSheets = {
     resource: sheetsUploadData,
   };
 
-  [@bs.scope ("google", "auth")] [@bs.new] [@bs.module "googleapis"]
+  [@bs.scope ("auth")] [@bs.new] [@bs.module "@googleapis/sheets"]
   external googleAuth: authConfig => client = "GoogleAuth";
 
-  [@bs.scope "google"] [@bs.module "googleapis"]
-  external sheets: sheetsConfig => sheets = "sheets";
+  [@bs.module "@googleapis/sheets"]
+  external sheets: sheetsConfig => sheets = "";
 
   [@bs.send]
   external getClient:

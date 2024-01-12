@@ -2,8 +2,7 @@
 
 (* columns in spreadsheet:
 
- Wallet Address (Public Key)|Amount (MINA)|Initial Minimum Balance|(MINA) Cliff Time (Months)|Cliff Unlock Amount (MINA)|Unlock Frequency (0: per slot, 1: per month)|Unlock Amount (MINA)|Delegate (Public Key) [Optional]
-
+   Wallet Address (Public Key)|Amount (MINA)|Initial Minimum Balance|(MINA) Cliff Time (Months)|Cliff Unlock Amount (MINA)|Unlock Frequency (0: per slot, 1: per month)|Unlock Amount (MINA)|Delegate (Public Key) [Optional]
 *)
 
 open Core_kernel
@@ -56,9 +55,9 @@ let valid_mina_amount amount =
       false
 
 let amount_geq_min_balance ~amount ~initial_min_balance =
-  let amount = Currency.Amount.of_formatted_string amount in
+  let amount = Currency.Amount.of_mina_string_exn amount in
   let initial_min_balance =
-    Currency.Amount.of_formatted_string initial_min_balance
+    Currency.Amount.of_mina_string_exn initial_min_balance
   in
   Currency.Amount.( >= ) amount initial_min_balance
 
@@ -86,7 +85,7 @@ let generate_missing_delegate_accounts ~logger =
   let delegates = String.Table.keys delegates_tbl in
   let missing_delegates =
     List.filter delegates ~f:(fun delegate ->
-        not (String.Table.mem accounts_tbl delegate))
+        not (String.Table.mem accounts_tbl delegate) )
   in
   let delegate_accounts =
     List.map missing_delegates ~f:(generate_delegate_account ~logger)
@@ -99,31 +98,31 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
   [%log info] "Processing record for $wallet_pk"
     ~metadata:[ ("wallet_pk", `String wallet_pk) ] ;
   let pk = Some wallet_pk in
-  let balance = Currency.Balance.of_formatted_string amount in
+  let balance = Currency.Balance.of_mina_string_exn amount in
   let initial_minimum_balance =
     (* if omitted in the TSV, use balance *)
     if String.is_empty initial_min_balance then balance
-    else Currency.Balance.of_formatted_string initial_min_balance
+    else Currency.Balance.of_mina_string_exn initial_min_balance
   in
   let cliff_time =
     let num_slots_float =
       Float.of_string cliff_time_months *. slots_per_month_float
     in
     (* if there's a fractional slot, wait until next slot by rounding up *)
-    Global_slot.of_int (Float.iround_up_exn num_slots_float)
+    Global_slot_since_genesis.of_int (Float.iround_up_exn num_slots_float)
   in
-  let cliff_amount = Currency.Amount.of_formatted_string cliff_amount in
+  let cliff_amount = Currency.Amount.of_mina_string_exn cliff_amount in
   let vesting_period =
     match Int.of_string unlock_frequency with
     | 0 ->
-        Global_slot.of_int 1
+        Global_slot_since_genesis.of_int 1
     | 1 ->
-        Global_slot.of_int slots_per_month
+        Global_slot_since_genesis.of_int slots_per_month
     | _ ->
         failwithf "Expected unlock frequency to be 0 or 1, got %s"
           unlock_frequency ()
   in
-  let vesting_increment = Currency.Amount.of_formatted_string unlock_amount in
+  let vesting_increment = Currency.Amount.of_mina_string_exn unlock_amount in
   let no_vesting =
     Currency.Amount.equal cliff_amount Currency.Amount.zero
     && Currency.Amount.equal vesting_increment Currency.Amount.zero
@@ -167,7 +166,7 @@ let account_of_tsv ~logger tsv =
       Some
         (runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
            ~cliff_time_months ~cliff_amount ~unlock_frequency ~unlock_amount
-           ~delegatee_pk)
+           ~delegatee_pk )
   | _ ->
       (* should not occur, we've already validated the record *)
       failwithf "TSV line does not contain expected number of fields: %s" tsv ()
@@ -185,7 +184,7 @@ let validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
   let valid_cliff_time_months =
     try
       let n = Float.of_string cliff_time_months in
-      n >= 0.0
+      Float.(n >= 0.0)
     with _ -> false
   in
   let valid_cliff_amount = valid_mina_amount cliff_amount in
@@ -204,11 +203,11 @@ let validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
     *)
     let initial_minimum_balance =
       if String.is_empty initial_min_balance then
-        Currency.Balance.of_formatted_string amount
-      else Currency.Balance.of_formatted_string initial_min_balance
+        Currency.Balance.of_mina_string_exn amount
+      else Currency.Balance.of_mina_string_exn initial_min_balance
     in
-    let cliff_amount = Currency.Amount.of_formatted_string cliff_amount in
-    let unlock_amount = Currency.Amount.of_formatted_string unlock_amount in
+    let cliff_amount = Currency.Amount.of_mina_string_exn cliff_amount in
+    let unlock_amount = Currency.Amount.of_mina_string_exn unlock_amount in
     if
       Currency.Amount.equal cliff_amount Currency.Amount.zero
       && Currency.Amount.equal unlock_amount Currency.Amount.zero
@@ -231,7 +230,7 @@ let validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
   let valid_str = "VALID" in
   let invalid_fields =
     List.map valid_field_descs ~f:(fun (field, valid) ->
-        if valid then valid_str else field)
+        if valid then valid_str else field )
     |> List.filter ~f:(fun field -> not (String.equal field valid_str))
     |> String.concat ~sep:","
   in
@@ -288,7 +287,7 @@ let main ~tsv_file ~output_file () =
         in
         (* skip first line *)
         let _headers = In_channel.input_line in_channel in
-        go 0 false)
+        go 0 false )
   in
   if validation_errors then (
     [%log fatal] "Input has validation errors, exiting" ;
@@ -313,7 +312,7 @@ let main ~tsv_file ~output_file () =
         in
         (* skip first line *)
         let _headers = In_channel.input_line in_channel in
-        go [] 0)
+        go [] 0 )
   in
   [%log info] "Processed %d records" num_accounts ;
   let generated_accounts, num_generated =
@@ -329,7 +328,7 @@ let main ~tsv_file ~output_file () =
       List.iter jsons ~f:(fun json ->
           Out_channel.output_string out_channel
             (Yojson.Safe.pretty_to_string json) ;
-          Out_channel.newline out_channel)) ;
+          Out_channel.newline out_channel ) ) ;
   return ()
 
 let () =
@@ -350,4 +349,4 @@ let () =
                 format"
              Param.(required string)
          in
-         main ~tsv_file ~output_file)))
+         main ~tsv_file ~output_file )))

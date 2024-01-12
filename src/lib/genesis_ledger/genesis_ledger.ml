@@ -2,6 +2,7 @@ open Core_kernel
 open Currency
 open Signature_lib
 open Mina_base
+module Ledger = Mina_ledger.Ledger
 module Intf = Intf
 
 let account_with_timing account_id balance (timing : Intf.Timing.t) =
@@ -10,12 +11,18 @@ let account_with_timing account_id balance (timing : Intf.Timing.t) =
       Account.create account_id balance
   | Timed t ->
       let initial_minimum_balance =
-        Currency.Balance.of_int t.initial_minimum_balance
+        Currency.Balance.of_nanomina_int_exn t.initial_minimum_balance
       in
-      let cliff_time = Mina_numbers.Global_slot.of_int t.cliff_time in
-      let cliff_amount = Currency.Amount.of_int t.cliff_amount in
-      let vesting_increment = Currency.Amount.of_int t.vesting_increment in
-      let vesting_period = Mina_numbers.Global_slot.of_int t.vesting_period in
+      let cliff_time =
+        Mina_numbers.Global_slot_since_genesis.of_int t.cliff_time
+      in
+      let cliff_amount = Currency.Amount.of_nanomina_int_exn t.cliff_amount in
+      let vesting_increment =
+        Currency.Amount.of_nanomina_int_exn t.vesting_increment
+      in
+      let vesting_period =
+        Mina_numbers.Global_slot_span.of_int t.vesting_period
+      in
       Account.create_timed account_id balance ~initial_minimum_balance
         ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       |> Or_error.ok_exn
@@ -28,8 +35,8 @@ module Private_accounts (Accounts : Intf.Private_accounts.S) = struct
     let%map accounts = accounts in
     List.map accounts ~f:(fun { pk; sk; balance; timing } ->
         let account_id = Account_id.create pk Token_id.default in
-        let balance = Balance.of_formatted_string (Int.to_string balance) in
-        (Some sk, account_with_timing account_id balance timing))
+        let balance = Balance.of_mina_string_exn (Int.to_string balance) in
+        (Some sk, account_with_timing account_id balance timing) )
 end
 
 module Public_accounts (Accounts : Intf.Public_accounts.S) = struct
@@ -40,9 +47,9 @@ module Public_accounts (Accounts : Intf.Public_accounts.S) = struct
     let%map accounts = Accounts.accounts in
     List.map accounts ~f:(fun { pk; balance; delegate; timing } ->
         let account_id = Account_id.create pk Token_id.default in
-        let balance = Balance.of_int balance in
+        let balance = Balance.of_nanomina_int_exn balance in
         let base_acct = account_with_timing account_id balance timing in
-        (None, { base_acct with delegate = Option.value ~default:pk delegate }))
+        (None, { base_acct with delegate = Option.value ~default:pk delegate }) )
 end
 
 (** Generate a ledger using the sample keypairs from [Mina_base] with the given
@@ -57,13 +64,13 @@ module Balances (Balances : Intf.Named_balances_intf) = struct
     let accounts =
       let open Lazy.Let_syntax in
       let%map balances = Balances.balances
-      and keypairs = Mina_base.Sample_keypairs.keypairs in
+      and keypairs = Key_gen.Sample_keypairs.keypairs in
       List.mapi balances ~f:(fun i b ->
           { balance = b
           ; pk = fst keypairs.(i)
           ; sk = snd keypairs.(i)
           ; timing = Untimed
-          })
+          } )
   end)
 end
 
@@ -94,7 +101,7 @@ module Utils = struct
     find_account_record_exn accounts ~f:(fun new_account ->
         not
           (List.mem ~equal:Public_key.Compressed.equal old_account_pks
-             (Account.public_key new_account)))
+             (Account.public_key new_account) ) )
 
   let find_new_account_record_exn accounts old_account_pks =
     find_new_account_record_exn_ accounts
@@ -118,11 +125,14 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
       | `Path directory_name ->
           lazy (Ledger.create ~directory_name ~depth (), false)
     in
-    if insert_accounts then
-      List.iter (Lazy.force accounts) ~f:(fun (_, account) ->
-          Ledger.create_new_account_exn ledger
-            (Account.identifier account)
-            account) ;
+    ( if insert_accounts then
+      let addrs_and_accounts =
+        let ledger_depth = Ledger.depth ledger in
+        Lazy.force accounts
+        |> List.mapi ~f:(fun i (_, acct) ->
+               (Ledger.Addr.of_int_exn ~ledger_depth i, acct) )
+      in
+      Ledger.set_batch_accounts ledger addrs_and_accounts ) ;
     ledger
 
   include Utils
@@ -143,8 +153,8 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
     in
     Memo.unit (fun () ->
         List.max_elt (Lazy.force accounts) ~compare:(fun (_, a) (_, b) ->
-            Balance.compare a.balance b.balance)
-        |> Option.value_exn ?here:None ?error:None ~message:error_msg)
+            Balance.compare a.balance b.balance )
+        |> Option.value_exn ?here:None ?error:None ~message:error_msg )
 
   let largest_account_id_exn =
     Memo.unit (fun () -> largest_account_exn () |> id_of_account_record)
@@ -212,8 +222,8 @@ end) : Intf.S = struct
     in
     Memo.unit (fun () ->
         List.max_elt (Lazy.force accounts) ~compare:(fun (_, a) (_, b) ->
-            Balance.compare a.Account.Poly.balance b.Account.Poly.balance)
-        |> Option.value_exn ?here:None ?error:None ~message:error_msg)
+            Balance.compare a.Account.Poly.balance b.Account.Poly.balance )
+        |> Option.value_exn ?here:None ?error:None ~message:error_msg )
 
   let largest_account_id_exn =
     Memo.unit (fun () -> largest_account_exn () |> id_of_account_record)
@@ -251,7 +261,7 @@ module Testnet_postake_many_producers = Register (Balances (struct
     lazy
       (let high_balances = List.init 50 ~f:(Fn.const 5_000_000) in
        let low_balances = List.init 10 ~f:(Fn.const 1_000) in
-       high_balances @ low_balances)
+       high_balances @ low_balances )
 end))
 
 module Test = Register (Balances (Test_ledger))
@@ -290,7 +300,7 @@ module Integration_tests = struct
       lazy
         (let high_balances = List.init 2 ~f:(Fn.const 5_000_000) in
          let low_balances = List.init 16 ~f:(Fn.const 1_000) in
-         high_balances @ low_balances)
+         high_balances @ low_balances )
   end))
 
   module Three_even_stakes = Register (Balances (struct

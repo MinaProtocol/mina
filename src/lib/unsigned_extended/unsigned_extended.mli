@@ -9,18 +9,19 @@ module type S = S
 module Extend : F
 
 module UInt64 : sig
+  [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
+      [@@@with_all_version_tags]
+
       type t = Unsigned.UInt64.t
       [@@deriving bin_io, sexp, hash, compare, equal, yojson, version]
     end
-
-    module Latest = V1
-  end
+  end]
 
   include S with type t = Stable.Latest.t
-
-  val dhall_type : Ppx_dhall_type.Dhall_type.t
 
   val to_uint64 : t -> uint64
 
@@ -28,14 +29,17 @@ module UInt64 : sig
 end
 
 module UInt32 : sig
+  [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V1 : sig
+      [@@@with_all_version_tags]
+
       type t = Unsigned.UInt32.t
       [@@deriving bin_io, sexp, hash, compare, equal, yojson, version]
     end
-
-    module Latest = V1
-  end
+  end]
 
   include S with type t = Stable.Latest.t
 

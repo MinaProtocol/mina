@@ -24,15 +24,15 @@ let op (type a b) (op : a builder_t -> b -> unit) (value : b) : a op =
 let list_op (type a b cap)
     (op : a builder_t -> b list -> (cap, b, Builder.array_t) Capnp.Array.t)
     (value : b list) : a op =
- fun builder -> ignore (op builder value)
+ fun builder -> ignore (op builder value : _ Capnp.Array.t)
 
 let reader_op (type a b) (op : a builder_t -> b reader_t -> b builder_t)
     (value : b reader_t) : a op =
- fun builder -> ignore (op builder value)
+ fun builder -> ignore (op builder value : b builder_t)
 
 let builder_op (type a b) (op : a builder_t -> b builder_t -> b builder_t)
     (value : b builder_t) : a op =
- fun builder -> ignore (op builder value)
+ fun builder -> ignore (op builder value : b builder_t)
 
 let optional (type a b c) (dsl_op : (a builder_t -> b -> c) -> b -> a op)
     (op : a builder_t -> b -> c) (value : b option) : a op =

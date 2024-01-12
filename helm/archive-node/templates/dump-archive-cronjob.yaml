@@ -1,0 +1,72 @@
+{{- if and .Values.archive.enablePostgresDB .Values.archive.enableDumpCronjob }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: "{{ template "archive-node.fullname" . }}-dump-cronjob"
+spec:
+  concurrencyPolicy: Replace
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - command:
+            - /bin/bash
+            - -c
+            - '
+            apk add curl;
+            apk add python3;
+            curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-410.0.0-linux-x86_64.tar.gz;
+            tar -xzf google-cloud-cli-410.0.0-linux-x86_64.tar.gz;
+            ./google-cloud-sdk/install.sh --quiet;
+            echo "installed gsutil";
+
+            DATE="$(date +%F_%H%M)";
+            FILENAME="{{ .Values.testnetName }}-archive-dump-${DATE}".sql;
+
+            pg_dump --no-owner --create --username {{ .Values.postgresql.auth.username }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.postgresql.auth.database }} > $FILENAME;
+
+            tar -czvf $FILENAME.tar.gz $FILENAME;
+
+            echo "archive database dumped";
+
+            ./google-cloud-sdk/bin/gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $FILENAME.tar.gz gs://mina-archive-dumps;
+
+            echo "archive database uploaded to bucket";
+
+            '
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: "{{ template "archive-node.fullname" . }}-postgresql"
+            - name: GCLOUD_KEYFILE
+              value: /gcloud/keyfile.json
+            image: postgres:15-alpine
+            imagePullPolicy: IfNotPresent
+            name: "{{ template "archive-node.fullname" . }}-dump-cronjob"
+            resources: {}
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /gcloud/
+              name: gcloud-keyfile
+          dnsPolicy: ClusterFirst
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - name: gcloud-keyfile
+            secret:
+              defaultMode: 256
+              items:
+              - key: keyfile
+                path: keyfile.json
+              secretName: gcloud-keyfile
+  schedule: 0 0 * * *
+  successfulJobsHistoryLimit: 3
+  suspend: false
+{{- end -}}

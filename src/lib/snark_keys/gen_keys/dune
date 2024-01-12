@@ -1,9 +1,0 @@
-(executable
- (name gen_keys)
- (flags -g)
- (libraries ppxlib cache_dir mina_base
-            transaction_snark blockchain_snark async core genesis_ledger_helper_lib)
- (preprocess
-  (pps ppx_version ppx_let ppxlib.metaquot))
- (instrumentation (backend bisect_ppx))
- (modes native))

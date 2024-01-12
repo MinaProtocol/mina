@@ -10,11 +10,7 @@ let Cmd = ../Lib/Cmds.dhall in
     Command.build
       Command.Config::{
         commands = [
-          Cmd.runInDocker
-            Cmd.Docker::{
-              image = (../Constants/ContainerImages.dhall).ubuntu1804
-            }
-            "./buildkite/scripts/replayer-test.sh"
+          Cmd.run "./buildkite/scripts/replayer-test.sh"
         ],
         label = "Replayer test",
         key = "replayer-test",

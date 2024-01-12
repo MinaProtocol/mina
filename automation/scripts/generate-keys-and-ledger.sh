@@ -12,7 +12,7 @@ FISH_COUNT_TOTAL=1
 SEED_COUNT=1
 EXTRA_COUNT=1 # Extra community keys to be handed out manually
 
-MINA_DAEMON_IMAGE="codaprotocol/mina-daemon:1.1.6alpha4-feature-mina-passwd-envvars-devnet-4a86bc8"
+MINA_DAEMON_IMAGE="minaprotocol/mina-daemon:1.3.0beta1-develop-7af1312-buster-devnet"
 
 WHALE_AMOUNT=2250000
 FISH_AMOUNT=20000
@@ -69,6 +69,11 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd "${SCRIPTPATH}/../"
 PATH=$PATH:$(pwd)/bin
 
+if [[ -s $ARTIFACT_PATH/genesis_ledger.json ]]; then
+  echo "exiting because a genesis ledger already exists in the testnet dir"
+  exit 0
+fi
+
 if $RESET; then
   echo "resetting keys and genesis_ledger"
   ls keys/keysets/* | grep -v "bots_keyfiles" | xargs -I % rm "%"
@@ -84,7 +89,7 @@ rm -rf ./keys/genesis && mkdir ./keys/genesis
 set -eo pipefail
 set -e
 
-privkey_pass="naughty blue worm"
+privkey_pass="naughty red vampire"
 
 function generate_key_files {
 
@@ -105,7 +110,7 @@ function generate_key_files {
     docker run \
       --mount type=bind,source=${output_dir},target=/keys \
       --entrypoint /bin/bash $MINA_DAEMON_IMAGE \
-      -c "MINA_LIBP2P_PASS='${privkey_pass}' mina advanced generate-libp2p-keypair -privkey-path /keys/${name_prefix}_libp2p_${k}"
+      -c "MINA_LIBP2P_PASS='${privkey_pass}' mina libp2p generate-keypair -privkey-path /keys/${name_prefix}_libp2p_${k}"
   done
 
   # ensure proper r+w permissions for access to keys external to container
@@ -374,7 +379,7 @@ ${TESTNET}_extra-fish
 add_another_to_prompt ${TESTNET}_offline-whales ${WHALE_AMOUNT} ${TESTNET}_online-whales
 add_another_to_prompt ${TESTNET}_offline-fish ${FISH_AMOUNT} ${TESTNET}_online-fish
 add_another_to_prompt ${TESTNET}_online-fish ${FISH_AMOUNT} ${TESTNET}_online-fish
-add_another_to_prompt ${TESTNET}_online-o1 ${FISH_AMOUNT} ${TESTNET}_online-o1
+# add_another_to_prompt ${TESTNET}_online-o1 ${FISH_AMOUNT} ${TESTNET}_online-o1
 
 if [ -s keys/keysets/${TESTNET}_bots_keyfiles ];
 then
