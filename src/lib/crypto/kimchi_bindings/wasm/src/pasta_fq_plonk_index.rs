@@ -190,6 +190,35 @@ pub fn caml_pasta_fq_plonk_index_domain_d8_size(index: &WasmPastaFqPlonkIndex) -
 }
 
 #[wasm_bindgen]
+pub fn caml_pasta_fq_plonk_index_decode(
+    bytes: &[u8],
+    srs: &WasmSrs,
+) -> Result<WasmPastaFqPlonkIndex, JsError> {
+    let mut deserializer = rmp_serde::Deserializer::new(bytes);
+    let mut index =
+        ProverIndex::<GAffine, OpeningProof<GAffine>>::deserialize(&mut deserializer)
+            .map_err(|e| JsError::new(&format!("caml_pasta_fq_plonk_index_decode: {}", e)))?;
+
+    index.srs = srs.0.clone();
+    let (linearization, powers_of_alpha) = expr_linearization(Some(&index.cs.feature_flags), true);
+    index.linearization = linearization;
+    index.powers_of_alpha = powers_of_alpha;
+
+    Ok(WasmPastaFqPlonkIndex(Box::new(index)))
+}
+
+#[wasm_bindgen]
+pub fn caml_pasta_fq_plonk_index_encode(index: &WasmPastaFqPlonkIndex) -> Result<Vec<u8>, JsError> {
+    let mut buffer = Vec::new();
+    let mut serializer = rmp_serde::Serializer::new(&mut buffer);
+    index
+        .0
+        .serialize(&mut serializer)
+        .map_err(|e| JsError::new(&format!("caml_pasta_fq_plonk_index_encode: {}", e)))?;
+    Ok(buffer)
+}
+
+#[wasm_bindgen]
 pub fn caml_pasta_fq_plonk_index_read(
     offset: Option<i32>,
     srs: &WasmSrs,

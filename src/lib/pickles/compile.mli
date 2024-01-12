@@ -266,12 +266,24 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
           *)
   }
 
+module Storables : sig
+  type t =
+    { step_storable : Cache.Step.storable
+    ; step_vk_storable : Cache.Step.vk_storable
+    ; wrap_storable : Cache.Wrap.storable
+    ; wrap_vk_storable : Cache.Wrap.vk_storable
+    }
+
+  val default : t
+end
+
 (** This compiles a series of inductive rules defining a set into a proof
       system for proving membership in that set, with a prover corresponding
       to each inductive rule. *)
 val compile_with_wrap_main_override_promise :
      ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
   -> ?cache:Key_cache.Spec.t list
+  -> ?storables:Storables.t
   -> ?proof_cache:Proof_cache.t
   -> ?disk_keys:
        (Cache.Step.Key.Verification.t, 'branches) Vector.t
@@ -292,7 +304,8 @@ val compile_with_wrap_main_override_promise :
   -> branches:(module Nat.Intf with type n = 'branches)
   -> max_proofs_verified:(module Nat.Add.Intf with type n = 'max_proofs_verified)
   -> name:string
-  -> constraint_constants:Snark_keys_header.Constraint_constants.t
+  -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
+  -> ?commits:Snark_keys_header.Commits.With_date.t
   -> choices:
        (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
         -> ( 'prev_varss

@@ -186,7 +186,8 @@ struct
 
   module One_hot_vector = One_hot_vector.Make (Impl)
 
-  type ('a, 'a_opt) index' = ('a, 'a_opt) Plonk_verification_key_evals.Step.t
+  type ('comm, 'comm_opt) index' =
+    ('comm, 'comm_opt) Plonk_verification_key_evals.Step.t
 
   (* Mask out the given vector of indices with the given one-hot vector *)
   let choose_key :
@@ -1250,11 +1251,10 @@ struct
               Common.ft_comm
                 ~add:(Ops.add_fast ?check_finite:None)
                 ~scale:scale_fast ~negate:Inner_curve.negate
-                ~endoscale:(Scalar_challenge.endo ?num_bits:None)
                 ~verification_key:
                   (Plonk_verification_key_evals.Step.forget_optional_commitments
                      m )
-                ~plonk ~alpha ~t_comm )
+                ~plonk ~t_comm )
         in
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)

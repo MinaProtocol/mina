@@ -25,6 +25,7 @@
   base.caml
   ppx_inline_test.config
   bignum.bigint
+  zarith
   base.base_internalhash_types
   ;; local libraries
   tuple_lib
