@@ -40,7 +40,7 @@
   zkapps_examples
   yojson
   mina_wire_types)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_jane))
  (instrumentation

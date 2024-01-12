@@ -202,7 +202,9 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                 ; preconditions =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
-                    ; account = Nonce (Account.Nonce.succ sender_nonce)
+                    ; account =
+                        Zkapp_precondition.Account.nonce
+                          (Account.Nonce.succ sender_nonce)
                     ; valid_while = Ignore
                     }
                 ; may_use_token = No
@@ -227,14 +229,15 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                 ; preconditions =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
-                    ; account = Full Zkapp_precondition.Account.accept
+                    ; account = Zkapp_precondition.Account.accept
                     ; valid_while = Ignore
                     }
                 ; may_use_token = No
                 ; use_full_commitment = false
                 ; authorization_kind = Proof (With_hash.hash vk)
                 }
-            ; authorization = Proof Mina_base.Proof.transaction_dummy
+            ; authorization =
+                Proof (Lazy.force Mina_base.Proof.transaction_dummy)
             }
           in
           let protocol_state = Zkapp_precondition.Protocol_state.accept in

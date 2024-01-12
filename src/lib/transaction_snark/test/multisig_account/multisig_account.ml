@@ -340,7 +340,9 @@ let%test_module "multisig_account" =
                     ; preconditions =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
-                        ; account = Nonce (Account.Nonce.succ sender_nonce)
+                        ; account =
+                            Zkapp_precondition.Account.nonce
+                              (Account.Nonce.succ sender_nonce)
                         ; valid_while = Ignore
                         }
                     ; use_full_commitment = false
@@ -366,14 +368,15 @@ let%test_module "multisig_account" =
                     ; preconditions =
                         { Account_update.Preconditions.network =
                             Zkapp_precondition.Protocol_state.accept
-                        ; account = Full Zkapp_precondition.Account.accept
+                        ; account = Zkapp_precondition.Account.accept
                         ; valid_while = Ignore
                         }
                     ; use_full_commitment = false
                     ; may_use_token = No
                     ; authorization_kind = Proof (With_hash.hash vk)
                     }
-                ; authorization = Proof Mina_base.Proof.transaction_dummy
+                ; authorization =
+                    Proof (Lazy.force Mina_base.Proof.transaction_dummy)
                 }
               in
               let memo = Signed_command_memo.empty in

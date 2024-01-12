@@ -1,7 +1,7 @@
 (library
  (name mina_transaction_unix)
  (public_name mina_transaction.unix)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    graphql-async

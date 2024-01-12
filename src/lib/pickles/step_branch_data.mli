@@ -1,16 +1,20 @@
 open Pickles_types
 
+(** The data obtained from "compiling" an inductive rule into a circuit. *)
 type ( 'a_var
      , 'a_value
      , 'ret_var
      , 'ret_value
      , 'auxiliary_var
      , 'auxiliary_value
+     (* type level nat *)
      , 'max_proofs_verified
      , 'branches
      , 'prev_vars
      , 'prev_values
+     (* type level nat *)
      , 'local_widths
+     (* type level nat *)
      , 'local_heights )
      t =
   | T :
@@ -32,6 +36,7 @@ type ( 'a_var
           , 'auxiliary_var
           , 'auxiliary_value )
           Inductive_rule.t
+            (* Main functions to compute *)
       ; main :
              step_domains:(Import.Domains.t, 'branches) Pickles_types.Vector.t
           -> unit
@@ -58,19 +63,28 @@ type ( 'a_var
          , 'ret_value
          , 'auxiliary_var
          , 'auxiliary_value
+         (* type level nat *)
          , 'max_proofs_verified
          , 'branches
          , 'prev_vars
          , 'prev_values
+         (* type level nat *)
          , 'local_widths
+         (* type level nat *)
          , 'local_heights )
          t
 
+(** Compile one rule into a value of type [t]
+    [create idx self wrap_domains feature_flags actual_feature_flags
+    max_proofs_verified branches public_input aux_typ var_to_field_elem
+    val_to_field_elem rule]
+*)
 val create :
      index:int
   -> self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
   -> wrap_domains:Import.Domains.t
-  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+  -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
+  -> num_chunks:int
   -> actual_feature_flags:bool Plonk_types.Features.t
   -> max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
   -> proofs_verifieds:(int, 'branches) Pickles_types.Vector.t

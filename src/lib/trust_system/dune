@@ -26,7 +26,7 @@
    test_util
    ppx_version.runtime
  )
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (preprocess
   (pps
     ppx_assert

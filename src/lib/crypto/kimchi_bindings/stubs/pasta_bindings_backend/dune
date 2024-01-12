@@ -4,7 +4,7 @@
  (modules pasta_bindings_backend)
  (instrumentation
   (backend bisect_ppx))
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_inline_test))
  (virtual_modules pasta_bindings_backend)

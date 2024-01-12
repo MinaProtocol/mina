@@ -543,6 +543,24 @@ module type S = sig
     -> bool Or_error.t
 
   module For_tests : sig
+    module Stack (Elt : sig
+      type t
+    end) : sig
+      type t = Elt.t list
+
+      val if_ : bool -> then_:t -> else_:t -> t
+
+      val empty : unit -> t
+
+      val is_empty : t -> bool
+
+      val pop_exn : t -> Elt.t * t
+
+      val pop : t -> (Elt.t * t) option
+
+      val push : Elt.t -> onto:t -> t
+    end
+
     val validate_timing_with_min_balance :
          account:Account.t
       -> txn_amount:Amount.t
@@ -1865,23 +1883,14 @@ module Make (L : Ledger_intf.S) :
             global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
       | Check_account_precondition
-          (account_update, account, new_account, local_state) -> (
-          match account_update.body.preconditions.account with
-          | Accept ->
-              local_state
-          | Nonce n ->
-              let nonce_matches = Account.Nonce.equal account.nonce n in
-              Inputs.Local_state.add_check local_state
-                Account_nonce_precondition_unsatisfied nonce_matches
-          | Full precondition_account ->
-              let local_state = ref local_state in
-              let check failure b =
-                local_state :=
-                  Inputs.Local_state.add_check !local_state failure b
-              in
-              Zkapp_precondition.Account.check ~new_account ~check
-                precondition_account account ;
-              !local_state )
+          (account_update, account, new_account, local_state) ->
+          let local_state = ref local_state in
+          let check failure b =
+            local_state := Inputs.Local_state.add_check !local_state failure b
+          in
+          Zkapp_precondition.Account.check ~new_account ~check
+            account_update.body.preconditions.account account ;
+          !local_state
       | Init_account { account_update = _; account = a } ->
           a
   end
@@ -2512,6 +2521,8 @@ module Make (L : Ledger_intf.S) :
     >>= Mina_stdlib.Result.List.map ~f:(apply_transaction_second_pass ledger)
 
   module For_tests = struct
+    module Stack = Inputs.Stack
+
     let validate_timing_with_min_balance = validate_timing_with_min_balance
 
     let validate_timing = validate_timing
@@ -2757,7 +2768,7 @@ module For_tests = struct
                 ; preconditions =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
-                    ; account = Accept
+                    ; account = Zkapp_precondition.Account.accept
                     ; valid_while = Ignore
                     }
                 ; may_use_token = No
@@ -2769,7 +2780,7 @@ module For_tests = struct
                 }
             ; authorization =
                 ( if use_full_commitment then Signature Signature.dummy
-                else Proof Mina_base.Proof.transaction_dummy )
+                else Proof (Lazy.force Mina_base.Proof.transaction_dummy) )
             }
           ; { body =
                 { public_key = receiver
@@ -2784,7 +2795,7 @@ module For_tests = struct
                 ; preconditions =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
-                    ; account = Accept
+                    ; account = Zkapp_precondition.Account.accept
                     ; valid_while = Ignore
                     }
                 ; may_use_token = No

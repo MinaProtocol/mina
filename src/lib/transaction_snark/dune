@@ -2,7 +2,7 @@
  (name transaction_snark)
  (public_name transaction_snark)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    ppx_inline_test.config
@@ -66,6 +66,8 @@
    ppx_version.runtime
    logger
    zkapp_command_builder
+   snark_keys_header
+   mina_version
  )
  (preprocess
   (pps ppx_snarky ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))

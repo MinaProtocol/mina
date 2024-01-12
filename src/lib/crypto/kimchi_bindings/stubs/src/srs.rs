@@ -1,6 +1,7 @@
 use ark_poly::UVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
 use paste::paste;
+use poly_commitment::SRS as _;
 use poly_commitment::{
     commitment::{b_poly_coefficients, caml::CamlPolyComm},
     srs::SRS,
@@ -121,7 +122,7 @@ macro_rules! impl_srs {
                 let evals = evals.into_iter().map(Into::into).collect();
                 let p = Evaluations::<$F>::from_vec_and_domain(evals, x_domain).interpolate();
 
-                Ok(srs.commit_non_hiding(&p, None).into())
+                Ok(srs.commit_non_hiding(&p, 1, None).into())
             }
 
             #[ocaml_gen::func]
@@ -134,7 +135,7 @@ macro_rules! impl_srs {
                 let coeffs = b_poly_coefficients(&chals);
                 let p = DensePolynomial::<$F>::from_coefficients_vec(coeffs);
 
-                Ok(srs.commit_non_hiding(&p, None).into())
+                Ok(srs.commit_non_hiding(&p, 1, None).into())
             }
 
             #[ocaml_gen::func]

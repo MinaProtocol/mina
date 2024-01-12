@@ -2,7 +2,7 @@
  (name currency)
  (public_name currency_nonconsensus)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;;opam libraries
    result
@@ -19,7 +19,6 @@
    mina_wire_types
    codable
    bignum_bigint
-   ppx_dhall_type
    random_oracle_input
    snark_params_nonconsensus
    random_oracle_nonconsensus

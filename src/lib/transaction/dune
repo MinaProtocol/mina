@@ -1,7 +1,7 @@
 (library
  (name mina_transaction)
  (public_name mina_transaction)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    base.caml

@@ -11,6 +11,8 @@
    core_kernel
    yojson
    sexplib0
+   ppx_deriving_yojson.runtime
+   result
    ;; local libraries
    logger
    mina_base.import
@@ -36,7 +38,7 @@
    mina_transaction
    )
   (library_flags -linkall)
-  (inline_tests)
+  (inline_tests (flags -verbose -show-counts) (deps proof_cache.json))
   (preprocess
     (pps ppx_snarky ppx_version ppx_jane ppx_mina))
   (instrumentation (backend bisect_ppx)))

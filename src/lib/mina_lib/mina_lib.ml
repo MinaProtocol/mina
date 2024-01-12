@@ -462,6 +462,13 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
   let open Mina_incremental.Status in
   let restart_delay = Time.Span.of_min 5. in
   let offline_shutdown_delay = Time.Span.of_min 25. in
+  let after_genesis =
+    let genesis_timestamp =
+      Genesis_constants.(
+        genesis_timestamp_of_string genesis_state_timestamp_string)
+    in
+    fun () -> Time.(( >= ) (now ())) genesis_timestamp
+  in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
@@ -471,29 +478,31 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
         else
           match online_status with
           | `Offline ->
-              ( match !next_helper_restart with
-              | None ->
-                  next_helper_restart :=
-                    Some
-                      (Async.Clock.Event.run_after restart_delay
-                         (fun () ->
-                           [%log info]
-                             "Offline for too long; restarting libp2p_helper" ;
-                           Mina_networking.restart_helper net ;
-                           next_helper_restart := None ;
-                           match !offline_shutdown with
-                           | None ->
-                               offline_shutdown :=
-                                 Some
-                                   (Async.Clock.Event.run_after
-                                      offline_shutdown_delay
-                                      (fun () -> raise Offline_shutdown)
-                                      () )
-                           | Some _ ->
-                               () )
-                         () )
-              | Some _ ->
-                  () ) ;
+              (* nothing to do if offline before genesis *)
+              ( if after_genesis () then
+                match !next_helper_restart with
+                | None ->
+                    next_helper_restart :=
+                      Some
+                        (Async.Clock.Event.run_after restart_delay
+                           (fun () ->
+                             [%log info]
+                               "Offline for too long; restarting libp2p_helper" ;
+                             Mina_networking.restart_helper net ;
+                             next_helper_restart := None ;
+                             match !offline_shutdown with
+                             | None ->
+                                 offline_shutdown :=
+                                   Some
+                                     (Async.Clock.Event.run_after
+                                        offline_shutdown_delay
+                                        (fun () -> raise Offline_shutdown)
+                                        () )
+                             | Some _ ->
+                                 () )
+                           () )
+                | Some _ ->
+                    () ) ;
               let is_empty = function `Empty -> true | _ -> false in
               if is_empty first_connection then (
                 [%str_log info] Connecting ;
@@ -572,10 +581,12 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
       | Some _ ->
           ()
       | None ->
-          bootstrap_timeout :=
-            Some
-              (Timeout.create () bootstrap_timeout_duration
-                 ~f:log_bootstrap_error_and_restart )
+          (* don't check bootstrap timeout before genesis *)
+          if after_genesis () then
+            bootstrap_timeout :=
+              Some
+                (Timeout.create () bootstrap_timeout_duration
+                   ~f:log_bootstrap_error_and_restart )
     in
     let stop_bootstrap_timeout () =
       match !bootstrap_timeout with
@@ -585,7 +596,7 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
       | None ->
           ()
     in
-    let handle_status_change sync_status =
+    let handle_status_change (sync_status : Sync_status.t) =
       ( match sync_status with
       | `Offline ->
           start_offline_timeout ()
@@ -1311,7 +1322,7 @@ let start t =
         Node_status_service.start ~logger:t.config.logger ~node_status_url
           ~network:t.components.net
           ~transition_frontier:t.components.transition_frontier
-          ~sync_status:t.sync_status
+          ~sync_status:t.sync_status ~chain_id:t.config.chain_id
           ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
           ~start_time:t.config.start_time
           ~slot_duration:
@@ -1320,13 +1331,17 @@ let start t =
     | None ->
         ()
   in
+  let built_with_commit_sha =
+    if t.config.uptime_send_node_commit then Some Mina_version.commit_id_short
+    else None
+  in
   Uptime_service.start ~logger:t.config.logger ~uptime_url:t.config.uptime_url
     ~snark_worker_opt:t.processes.uptime_snark_worker_opt
     ~transition_frontier:t.components.transition_frontier
     ~time_controller:t.config.time_controller
     ~block_produced_bvar:t.components.block_produced_bvar
     ~uptime_submitter_keypair:t.config.uptime_submitter_keypair
-    ~graphql_control_port:t.config.graphql_control_port
+    ~graphql_control_port:t.config.graphql_control_port ~built_with_commit_sha
     ~get_next_producer_timing:(fun () -> t.next_producer_timing)
     ~get_snark_work_fee:(fun () -> snark_work_fee t)
     ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer) ;
@@ -1527,7 +1542,6 @@ let create ?wallets (config : Config.t) =
                 >>| Result.ok )
           in
           log_snark_coordinator_warning config snark_worker ;
-          Protocol_version.set_current config.initial_protocol_version ;
           Protocol_version.set_proposed_opt config.proposed_protocol_version_opt ;
           let log_rate_limiter_occasionally rl ~label =
             let t = Time.Span.of_min 1. in
@@ -1762,8 +1776,9 @@ let create ?wallets (config : Config.t) =
               ; on_push = notify_online
               ; log_gossip_heard = config.net_config.log_gossip_heard.new_state
               ; time_controller = config.net_config.time_controller
-              ; consensus_constants = config.net_config.consensus_constants
+              ; consensus_constants
               ; genesis_constants = config.precomputed_values.genesis_constants
+              ; constraint_constants
               }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
@@ -1938,6 +1953,8 @@ let create ?wallets (config : Config.t) =
                 (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
               ~catchup_mode ~network_transition_reader:block_reader
               ~producer_transition_reader ~most_recent_valid_block
+              ~get_completed_work:
+                (Network_pool.Snark_pool.get_completed_work snark_pool)
               ~notify_online ()
           in
           let ( valid_transitions_for_network

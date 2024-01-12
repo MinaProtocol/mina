@@ -1,6 +1,10 @@
 use kimchi::circuits::{
     expr::FeatureFlag,
-    lookup::lookups::{LookupFeatures, LookupPattern, LookupPatterns},
+    lookup::{
+        lookups::{LookupFeatures, LookupPattern, LookupPatterns},
+        runtime_tables::caml::{CamlRuntimeTable, CamlRuntimeTableCfg},
+        tables::caml::CamlLookupTable,
+    },
 };
 use kimchi::proof::{caml::CamlRecursionChallenge, PointEvaluations};
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
@@ -29,6 +33,7 @@ use wires_15_stubs::{
     CamlOpeningProof,
     CamlPolyComm,
     CamlProofEvaluations,
+    CamlProofWithPublic,
     CamlProverCommitments,
     CamlProverProof,
     CamlRandomOracles,
@@ -100,8 +105,13 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_type!(w, env, CamlRecursionChallenge::<T1, T2> => "recursion_challenge");
     decl_type!(w, env, CamlOpeningProof::<T1, T2> => "opening_proof");
     decl_type!(w, env, CamlLookupCommitments::<T1> => "lookup_commitments");
+
+    decl_type!(w, env, CamlRuntimeTableCfg::<T1> => "runtime_table_cfg");
+    decl_type!(w, env, CamlLookupTable::<T1> => "lookup_table");
+    decl_type!(w, env, CamlRuntimeTable::<T1> => "runtime_table");
     decl_type!(w, env, CamlProverCommitments::<T1> => "prover_commitments");
     decl_type!(w, env, CamlProverProof<T1, T2> => "prover_proof");
+    decl_type!(w, env, CamlProofWithPublic<T1, T2> => "proof_with_public");
 
     decl_type!(w, env, CamlWire => "wire");
     decl_type!(w, env, GateType => "gate_type");
@@ -167,6 +177,7 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_func!(w, env, caml_pasta_fp_to_string => "to_string");
         decl_func!(w, env, caml_pasta_fp_of_string => "of_string");
         decl_func!(w, env, caml_pasta_fp_print => "print");
+        decl_func!(w, env, caml_pasta_fp_print_rust => "print_rust");
         decl_func!(w, env, caml_pasta_fp_copy => "copy");
         decl_func!(w, env, caml_pasta_fp_mut_add => "mut_add");
         decl_func!(w, env, caml_pasta_fp_mut_sub => "mut_sub");
@@ -203,6 +214,7 @@ fn generate_pasta_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_func!(w, env, caml_pasta_fq_to_string => "to_string");
         decl_func!(w, env, caml_pasta_fq_of_string => "of_string");
         decl_func!(w, env, caml_pasta_fq_print => "print");
+        decl_func!(w, env, caml_pasta_fq_print_rust => "print_rust");
         decl_func!(w, env, caml_pasta_fq_copy => "copy");
         decl_func!(w, env, caml_pasta_fq_mut_add => "mut_add");
         decl_func!(w, env, caml_pasta_fq_mut_sub => "mut_sub");
@@ -431,7 +443,8 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_module!(w, env, "Fp", {
                 decl_type_alias!(w, env, "t" => CamlOracles<CamlFp>);
 
-                decl_func!(w, env, fp_oracles_create => "create");
+                decl_func!(w, env, fp_oracles_create_no_public => "create");
+                decl_func!(w, env, fp_oracles_create => "create_with_public_evals");
                 decl_func!(w, env, fp_oracles_dummy => "dummy");
                 decl_func!(w, env, fp_oracles_deep_copy => "deep_copy");
             });
@@ -439,7 +452,8 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
             decl_module!(w, env, "Fq", {
                 decl_type_alias!(w, env, "t" => CamlOracles<CamlFq>);
 
-                decl_func!(w, env, fq_oracles_create => "create");
+                decl_func!(w, env, fq_oracles_create_no_public => "create");
+                decl_func!(w, env, fq_oracles_create => "create_with_public_evals");
                 decl_func!(w, env, fq_oracles_dummy => "dummy");
                 decl_func!(w, env, fq_oracles_deep_copy => "deep_copy");
             });
@@ -448,6 +462,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
         decl_module!(w, env, "Proof", {
             decl_module!(w, env, "Fp", {
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_create => "create");
+                decl_func!(w, env, caml_pasta_fp_plonk_proof_create_and_verify => "create_and_verify");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_lookup => "example_with_lookup");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_ffadd => "example_with_ffadd");
                 decl_func!(w, env, caml_pasta_fp_plonk_proof_example_with_xor => "example_with_xor");

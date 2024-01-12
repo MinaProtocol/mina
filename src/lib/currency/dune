@@ -3,7 +3,7 @@
  (public_name currency)
  (library_flags -linkall)
  (flags -w -22) ; Silence ppx_version's warnings
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    base.base_internalhash_types
@@ -20,7 +20,6 @@
    ;; local libraries
    bignum_bigint
    bitstring_lib
-   ppx_dhall_type
    codable
    test_util
    unsigned_extended

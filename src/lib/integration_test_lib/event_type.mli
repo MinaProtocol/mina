@@ -73,7 +73,8 @@ end
 module Breadcrumb_added : sig
   type t =
     { state_hash : State_hash.t
-    ; user_commands : User_command.Valid.t With_status.t list
+    ; transaction_hashes :
+        Mina_transaction.Transaction_hash.t With_status.t list
     }
 
   include Event_type_intf with type t := t
@@ -136,7 +137,7 @@ module Gossip : sig
   end
 
   module Transactions : sig
-    type r = { txns : Network_pool.Transaction_pool.Resource_pool.Diff.t }
+    type r = { fee_payer_summaries : User_command.fee_payer_summary_t list }
     [@@deriving hash, yojson]
 
     type t = r With_direction.t

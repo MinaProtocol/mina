@@ -26,7 +26,7 @@
    unsigned_extended
    with_hash
  )
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)
  (preprocess

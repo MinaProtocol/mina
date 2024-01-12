@@ -2,7 +2,7 @@
 final: prev: {
   vend = final.callPackage ./vend { };
 
-  go-capnproto2 = final.buildGo118Module rec {
+  go-capnproto2 = final.buildGo119Module rec {
     pname = "capnpc-go";
     version = "v3.0.0-alpha.5";
     vendorSha256 = "sha256-oZ6fUUpAsBS5hvl2+eqWsE3i0lwJzXeVaH2OiqWJQyY=";
@@ -31,28 +31,28 @@ final: prev: {
   };
 
   # Jobs/Test/Libp2pUnitTest
-  libp2p_helper = final.buildGo118Module {
+  libp2p_helper = final.buildGo119Module {
     pname = "libp2p_helper";
     version = "0.1";
     src = ../src/app/libp2p_helper/src;
     doCheck = false; # TODO: tests hang
     vendorSha256 = let hashes = final.lib.importJSON ./libp2p_helper.json; in
-      # sanity check, to make sure the fixed output drv doesn't keep working
+    # sanity check, to make sure the fixed output drv doesn't keep working
       # when the inputs change
       if builtins.hashFile "sha256" ../src/app/libp2p_helper/src/go.mod
-      == hashes."go.mod"
-      && builtins.hashFile "sha256" ../src/app/libp2p_helper/src/go.sum
-      == hashes."go.sum" then
+        == hashes."go.mod"
+        && builtins.hashFile "sha256" ../src/app/libp2p_helper/src/go.sum
+        == hashes."go.sum" then
         hashes.vendorSha256
       else
         final.lib.warn
-        ''
-          Below, you will find an error about a hash mismatch.
-          This is likely because you have updated go.mod and/or go.sum in libp2p_helper.
-          Please, locate the "got: " hash in the aforementioned error. If it's in SRI format ([35;1msha256-<...>[31;1m), copy the entire hash, including the `[35;1msha256-[31;1m'. Otherwise (if it's in the base32 format, like `[35;1msha256:<...>[31;1m'), copy only the base32 part, without `[35;1msha256:[31;1m'.
-          Then, run [37;1m./nix/update-libp2p-hashes.sh [35;1m"<got hash here>"[31;0m
-        ''
-        final.lib.fakeHash;
+          ''
+            Below, you will find an error about a hash mismatch.
+            This is likely because you have updated go.mod and/or go.sum in libp2p_helper.
+            Please, locate the "got: " hash in the aforementioned error. If it's in SRI format ([35;1msha256-<...>[31;1m), copy the entire hash, including the `[35;1msha256-[31;1m'. Otherwise (if it's in the base32 format, like `[35;1msha256:<...>[31;1m'), copy only the base32 part, without `[35;1msha256:[31;1m'.
+            Then, run [37;1m./nix/update-libp2p-hashes.sh [35;1m"<got hash here>"[31;0m
+          ''
+          final.lib.fakeHash;
     NO_MDNS_TEST = 1; # no multicast support inside the nix sandbox
     overrideModAttrs = n: {
       # Yo dawg

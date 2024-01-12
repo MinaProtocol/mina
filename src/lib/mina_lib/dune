@@ -2,7 +2,7 @@
  (name mina_lib)
  (public_name mina_lib)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    integers

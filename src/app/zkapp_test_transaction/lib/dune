@@ -52,7 +52,7 @@
    staged_ledger_diff
    mina_wire_types
  )
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_mina ppx_version ppx_let ppx_sexp_conv
                   ppx_hash ppx_compare ppx_deriving_yojson h_list.ppx ppx_inline_test)))

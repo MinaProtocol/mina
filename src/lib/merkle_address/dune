@@ -2,7 +2,7 @@
  (name merkle_address)
  (public_name merkle_address)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
 (libraries
   ;; opam libraries
   base.base_internalhash_types

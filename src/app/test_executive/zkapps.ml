@@ -136,7 +136,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Wait for nodes to initialize"
         (wait_for t
            ( Wait_condition.nodes_to_initialize
-           @@ (Network.all_nodes network |> Core.String.Map.data) ) )
+           @@ (Network.all_mina_nodes network |> Core.String.Map.data) ) )
     in
     let node =
       Core.String.Map.find_exn (Network.block_producers network) "node-a"
@@ -383,7 +383,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 | Proof _ ->
                     { other_p with
                       authorization =
-                        Control.Proof Mina_base.Proof.blockchain_dummy
+                        Control.Proof
+                          (Lazy.force Mina_base.Proof.blockchain_dummy)
                     }
                 | _ ->
                     other_p )
@@ -756,7 +757,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Send a zkapp with a different chain id"
         (send_invalid_zkapp ~logger
            (Network.Node.get_ingress_uri node)
-           zkapp_command_cross_network_replay "Verification_failed" )
+           zkapp_command_cross_network_replay "Invalid_proof" )
     in
     let%bind () =
       section_hard "Send a zkapp with an insufficient fee"
@@ -764,6 +765,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Network.Node.get_ingress_uri node)
            zkapp_command_insufficient_fee "Insufficient fee" )
     in
+    let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 1) in
+    let%bind () = Malleable_error.lift (after (Time.Span.of_sec 30.0)) in
     (* Won't be accepted until the previous transactions are applied *)
     let%bind () =
       section_hard "Send a zkApp transaction to update all fields"
@@ -775,7 +778,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Send a zkapp with an invalid proof"
         (send_invalid_zkapp ~logger
            (Network.Node.get_ingress_uri node)
-           zkapp_command_invalid_proof "Verification_failed" )
+           zkapp_command_invalid_proof "Invalid_proof" )
     in
     let%bind () =
       section_hard "Send a zkapp with an insufficient replace fee"
@@ -800,7 +803,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Send a zkApp transaction with an invalid signature"
         (send_invalid_zkapp ~logger
            (Network.Node.get_ingress_uri node)
-           zkapp_command_invalid_signature "Verification_failed" )
+           zkapp_command_invalid_signature "Invalid_signature" )
     in
     let%bind () =
       section_hard "Send a zkApp transaction with a nonexistent fee payer"

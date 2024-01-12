@@ -61,6 +61,7 @@ type node_status_data =
   ; libp2p_cpu_usage : float
   ; commit_hash : string
   ; git_branch : string
+  ; chain_id : string
   ; peer_id : string
   ; ip_address : string
   ; timestamp : string
@@ -150,8 +151,8 @@ let reset_gauges () =
   Queue.clear Transition_frontier.validated_blocks ;
   Queue.clear Transition_frontier.rejected_blocks
 
-let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
-    ~addrs_and_ports ~start_time ~slot_duration =
+let start ~logger ~node_status_url ~transition_frontier ~sync_status ~chain_id
+    ~network ~addrs_and_ports ~start_time ~slot_duration =
   [%log info] "Starting node status service using URL $url"
     ~metadata:[ ("url", `String node_status_url) ] ;
   let five_slots = Time.Span.scale slot_duration 5. in
@@ -204,6 +205,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
             ; libp2p_cpu_usage
             ; commit_hash = Mina_version.commit_id
             ; git_branch = Mina_version.branch
+            ; chain_id
             ; peer_id =
                 (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
             ; ip_address =
