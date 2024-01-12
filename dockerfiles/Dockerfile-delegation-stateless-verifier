@@ -70,5 +70,7 @@ RUN pip3 install awscli
 RUN pip3 install cqlsh-expansion
 
 RUN ln -s /usr/bin/aws /bin/aws
+RUN ln -s /usr/local/bin/cqlsh /bin/cqlsh
+RUN ln -s /usr/local/bin/cqlsh-expansion /bin/cqlsh-expansion
 
-ENTRYPOINT ["./delegation-verify"]
+ENTRYPOINT ["/bin/delegation-verify"]
