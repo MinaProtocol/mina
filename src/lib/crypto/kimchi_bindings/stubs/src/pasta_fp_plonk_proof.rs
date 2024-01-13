@@ -441,10 +441,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     }
 
     // Create constraint system
-    let cs = ConstraintSystem::<Fp>::create(gates)
-        .lookup(vec![foreign_field_mul::gadget::lookup_table()])
-        .build()
-        .unwrap();
+    let cs = ConstraintSystem::<Fp>::create(gates).build().unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
     ptr.add_lagrange_basis(cs.domain.d1);
@@ -510,10 +507,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
     }
 
     // Create constraint system
-    let cs = ConstraintSystem::<Fp>::create(gates)
-        .lookup(vec![range_check::gadget::lookup_table()])
-        .build()
-        .unwrap();
+    let cs = ConstraintSystem::<Fp>::create(gates).build().unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
     ptr.add_lagrange_basis(cs.domain.d1);
@@ -585,10 +579,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
     };
 
     // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
-    let cs = ConstraintSystem::<Fp>::create(gates)
-        .lookup(vec![range_check::gadget::lookup_table()])
-        .build()
-        .unwrap();
+    let cs = ConstraintSystem::<Fp>::create(gates).build().unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
     ptr.add_lagrange_basis(cs.domain.d1);
@@ -711,7 +702,6 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
     // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
         .public(num_public_inputs)
-        .lookup(vec![range_check::gadget::lookup_table()])
         .build()
         .unwrap();
 
@@ -800,7 +790,6 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
     // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
         .public(num_public_inputs)
-        .lookup(vec![xor::lookup_table()])
         .build()
         .unwrap();
 
@@ -894,7 +883,6 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
     // not sure if theres a smarter way instead of the double unwrap, but should be fine in the test
     let cs = ConstraintSystem::<Fp>::create(gates)
         .public(num_public_inputs)
-        .lookup(vec![rot::lookup_table()])
         .build()
         .unwrap();
 
