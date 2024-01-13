@@ -392,6 +392,7 @@ module Json_layout = struct
       ; delta : int option [@default None]
       ; slots_per_epoch : int option [@default None]
       ; slots_per_sub_window : int option [@default None]
+      ; grace_period_slots : int option [@default None]
       ; genesis_state_timestamp : string option [@default None]
       }
     [@@deriving yojson, fields, dhall_type]
@@ -847,6 +848,7 @@ module Genesis = struct
     ; delta : int option
     ; slots_per_epoch : int option
     ; slots_per_sub_window : int option
+    ; grace_period_slots : int option
     ; genesis_state_timestamp : string option
     }
   [@@deriving bin_io_unversioned]
@@ -868,6 +870,8 @@ module Genesis = struct
         opt_fallthrough ~default:t1.slots_per_epoch t2.slots_per_epoch
     ; slots_per_sub_window =
         opt_fallthrough ~default:t1.slots_per_sub_window t2.slots_per_sub_window
+    ; grace_period_slots =
+        opt_fallthrough ~default:t1.grace_period_slots t2.grace_period_slots
     ; genesis_state_timestamp =
         opt_fallthrough ~default:t1.genesis_state_timestamp
           t2.genesis_state_timestamp

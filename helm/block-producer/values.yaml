@@ -116,5 +116,5 @@ nodeSelector:
 
 storage:
   accessMode: "ReadWriteOnce"
-  size: "4Gi"
+  size: "30Gi"
   storageClass: "standard"

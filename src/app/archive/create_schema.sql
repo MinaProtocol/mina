@@ -135,7 +135,7 @@ CREATE TABLE protocol_versions
 , transaction      int    NOT NULL
 , network          int    NOT NULL
 , patch            int    NOT NULL
-, UNIQUE (transaction,network)
+, UNIQUE (transaction,network,patch)
 );
 
 CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned', 'pending');
