@@ -487,6 +487,13 @@ end) : S = struct
       ~constraint_constants:
         (Genesis_constants.Constraint_constants.to_snark_keys_header
            constraint_constants )
+      ~commits:
+        { commits =
+            { mina = Mina_version.commit_id
+            ; marlin = Mina_version.marlin_commit_id
+            }
+        ; commit_date = Mina_version.commit_date
+        }
       ~choices:(fun ~self ->
         [ rule ~proof_level ~constraint_constants T.tag self ] )
 

@@ -12,6 +12,7 @@
    random_oracle
    mina_signature_kind
    hash_prefixes
+   hash_prefix_create
    pickles
    )
  (preprocessor_deps ../../config.mlh)
