@@ -1,5 +1,5 @@
 (lang dune 3.3)
-(implicit_transitive_deps false)
+(implicit_transitive_deps true)
 
 (package (name allocation_functor))
 (package (name archive_blocks))
