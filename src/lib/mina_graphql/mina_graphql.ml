@@ -1569,6 +1569,16 @@ module Mutations = struct
                  exit 0 ) ;
               return @@ Ok s )
 
+    let zkapp_cmd_limit =
+      field "zkAppCommandLimit"
+        ~args:
+          Arg.[ arg "limit" ~doc:"ZkApp commands per block limit." ~typ:int ]
+        ~typ:int
+        ~doc:"Set zkApp commands per block limit for the block producer."
+        ~resolve:(fun { ctx = _; _ } () limit ->
+          Block_producer.zkapp_cmd_limit := limit ;
+          limit )
+
     let commands =
       [ schedule_payments
       ; schedule_zkapp_commands
@@ -1576,6 +1586,7 @@ module Mutations = struct
       ; update_gating
       ; flush_internal_logs
       ; stop_daemon
+      ; zkapp_cmd_limit
       ]
   end
 end
