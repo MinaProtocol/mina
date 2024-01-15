@@ -4356,9 +4356,6 @@ module Queries = struct
               | Some (`Finalized (Ledger_db l)) ->
                   return (Some (Ledger.Any_ledger.cast (module Ledger.Db) l))
             in
-            let protocol_state_hash =
-              Transition_frontier.Breadcrumb.state_hash best_tip
-            in
             Option.iter next_epoch_ledger ~f:(fun ledger ->
                 assert (
                   Mina_base.Ledger_hash.equal
@@ -4367,7 +4364,7 @@ module Queries = struct
             let%map new_config =
               Runtime_config.make_fork_config ~staged_ledger ~global_slot
                 ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
-                ~next_epoch_seed ~blockchain_length ~protocol_state_hash
+                ~next_epoch_seed ~blockchain_length ~protocol_state
                 runtime_config
             in
             Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic )

@@ -1267,7 +1267,7 @@ let ledger_of_accounts accounts =
     }
 
 let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
-    ~protocol_state_hash ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
+    ~protocol_state ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
     ~next_epoch_seed (runtime_config : t) =
   let open Async.Deferred.Result.Let_syntax in
   let global_slot = Mina_numbers.Global_slot.to_int global_slot in
@@ -1283,10 +1283,26 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
     let%map fork = proof.fork in
     fork.previous_length + blockchain_length
   in
+  let protocol_constants = Mina_state.Protocol_state.constants protocol_state in
+  let genesis =
+    { Genesis.k =
+        Some
+          (Unsigned.UInt32.to_int
+             protocol_constants.Genesis_constants.Protocol.Poly.k )
+    ; delta = Some (Unsigned.UInt32.to_int protocol_constants.delta)
+    ; slots_per_epoch =
+        Some (Unsigned.UInt32.to_int protocol_constants.slots_per_epoch)
+    ; slots_per_sub_window =
+        Some (Unsigned.UInt32.to_int protocol_constants.slots_per_sub_window)
+    ; genesis_state_timestamp =
+        Some (Block_time.to_string protocol_constants.genesis_state_timestamp)
+    }
+  in
   let fork =
     Fork_config.
       { previous_state_hash =
-          Mina_base.State_hash.to_base58_check protocol_state_hash
+          Mina_base.State_hash.to_base58_check
+            protocol_state.Mina_state.Protocol_state.Poly.previous_state_hash
       ; previous_length =
           Option.value ~default:blockchain_length previous_length
       ; previous_global_slot = global_slot
@@ -1321,7 +1337,7 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
        artificially add it. In fact, it wouldn't work at all,
        because the new node would try to create this account at
        startup, even though it already exists, leading to an error.*)
-      ~epoch_data
+      ~epoch_data ~genesis
       ~ledger:
         { ledger with
           base = Accounts accounts
