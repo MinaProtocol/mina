@@ -11,14 +11,12 @@ The development branches in progress in `mina` are as follows:
   - It contains all the changes which are literally backwards compatible with the current mainnet deployment. Any nodes running a version of mina based off of compatible should connect to the current mainnet.
   - It serves as the preparation ground for the next mainnet soft fork release.
 - `rampup`: what is deployed on the testnet
-  - Compatible with `compatible`.
   - The public incentivized network where an early version of the 2.0 hardfork is deployed for community testing.
   - `rampup` is a temporary branch maintained until public testnets requiring compatibility are running.
   - Never make PRs to `rampup` unless you're explicitly fixing a testnet bug.
 - `berkeley`/`izmir`: next hardfork branch / release candidate.
   - Contains all the new features that are scheduled for the release (berkeley or izmir).
   - `berkeley` is a 2.0 temporary branch maintained until the hard fork after which compatible will include all berkeley changes.
-  -
   - The "devnet" testnet is running from `master`, sometimes `compatible`, and features only the current release (not cutting edge/berkeley).
 - `develop`: 2.0 compatible changes not scoped for the 2.0 hard fork upgrade.
   - In other words, `develop` is next non-harmful release (after `berkeley`).
@@ -53,7 +51,10 @@ Whenever a hard fork happens, the code in  `develop` is released.  When this hap
 
 ## Day to day: which branch should I use?
 
-When developing a feature, if it’s not something that breaks compatibility, then you should be developing a feature branch, called `foo_COMP` for example, based off of `compatible`.  If you’re not sure whether or not your changes are breaking, they probably are not and should build upon compatible.
+When developing a feature, use the general description of the branches above to decide. Here's a quick rule:
+- If a feature/enhancement/bug fix is not feature breaking, and scoped for a mainnet then base it off of `compatible`. If you’re not sure whether or not your changes are breaking, they probably are not and should build upon `compatible`.
+- If the feature is scoped for hardfork and is not compatible against a running public testnet, then base it off of the hardfork branch (for example, `berkeley`).
+- If it is a bug fix required for a public testnet testing upcoming hardfork then base it off of `rampup`.
 
 ### Handling back-merging conflicts
 
