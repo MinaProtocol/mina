@@ -28,8 +28,8 @@ let verify_one ~srs
      } :
       _ Per_proof_witness.t ) (d : _ Types_map.For_step.t)
     (messages_for_next_wrap_proof : Digest.t) (unfinalized : Unfinalized.t)
-    (should_verify : B.t) : _ Vector.t * B.t =
-  Boolean.Assert.( = ) unfinalized.should_finalize should_verify ;
+    (must_verify : B.t) : _ Vector.t * B.t =
+  Boolean.Assert.( = ) unfinalized.should_finalize must_verify ;
   let deferred_values = proof_state.deferred_values in
   let finalized, chals =
     with_label __LOC__ (fun () ->
@@ -105,10 +105,9 @@ let verify_one ~srs
                 }
             }
           ~proofs_verified:d.max_proofs_verified ~wrap_domain:d.wrap_domain
-          ~is_base_case:(Boolean.not should_verify)
-          ~sponge_after_index ~sg_old:prev_challenge_polynomial_commitments
-          ~proof:wrap_proof ~wrap_verification_key:d.wrap_key statement
-          unfinalized )
+          ~is_base_case:(Boolean.not must_verify) ~sponge_after_index
+          ~sg_old:prev_challenge_polynomial_commitments ~proof:wrap_proof
+          ~wrap_verification_key:d.wrap_key statement unfinalized )
   in
   if debug then
     as_prover
@@ -116,11 +115,11 @@ let verify_one ~srs
         fun () ->
           let finalized = read Boolean.typ finalized in
           let verified = read Boolean.typ verified in
-          let should_verify = read Boolean.typ should_verify in
+          let must_verify = read Boolean.typ must_verify in
           printf "finalized: %b\n%!" finalized ;
           printf "verified: %b\n%!" verified ;
-          printf "should_verify: %b\n\n%!" should_verify) ;
-  (chals, Boolean.(verified &&& finalized ||| not should_verify))
+          printf "must_verify: %b\n\n%!" must_verify) ;
+  (chals, Boolean.(verified &&& finalized ||| not must_verify))
 
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main :
@@ -421,7 +420,7 @@ let step_main :
                   , messages_for_next_wrap_proof
                     :: messages_for_next_wrap_proofs
                   , unfinalized :: unfinalizeds
-                  , { proof_must_verify = should_verify; _ } :: stmts
+                  , { proof_must_verify = must_verify; _ } :: stmts
                   , S pi
                   , actual_wrap_domain :: actual_wrap_domains ) ->
                     let () =
@@ -458,7 +457,7 @@ let step_main :
                     in
                     let chals, v =
                       verify_one ~srs p d messages_for_next_wrap_proof
-                        unfinalized should_verify
+                        unfinalized must_verify
                     in
                     let chalss, vs =
                       go proofs datas messages_for_next_wrap_proofs unfinalizeds

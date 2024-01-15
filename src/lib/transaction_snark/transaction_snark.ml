@@ -2073,14 +2073,14 @@ module Make_str (A : Wire_types.Concrete) = struct
         let open Basic in
         let module M = H4.T (Pickles.Tag) in
         let s = Basic.spec t in
-        let prev_should_verify =
+        let prev_must_verify =
           match proof_level with
           | Genesis_constants.Proof_level.Full ->
               true
           | _ ->
               false
         in
-        let b = Boolean.var_of_value prev_should_verify in
+        let b = Boolean.var_of_value prev_must_verify in
         match t with
         | Proved ->
             { identifier = "proved"
@@ -3245,14 +3245,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       (s1, s2)
 
     let rule ~proof_level self : _ Pickles.Inductive_rule.t =
-      let prev_should_verify =
+      let prev_must_verify =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
             true
         | _ ->
             false
       in
-      let b = Boolean.var_of_value prev_should_verify in
+      let b = Boolean.var_of_value prev_must_verify in
       { identifier = "merge"
       ; prevs = [ self; self ]
       ; main =
