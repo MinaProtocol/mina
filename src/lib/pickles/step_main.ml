@@ -2,7 +2,6 @@ open Pickles_types
 open Hlist
 open Import
 open Impls.Step
-open Step_verifier
 module B = Inductive_rule.B
 
 (* Converts from the one hot vector representation of a number
@@ -16,6 +15,7 @@ module B = Inductive_rule.B
 let _one_hot_vector_to_num (type n) (v : n Per_proof_witness.One_hot_vector.t) :
     Field.t =
   let n = Vector.length (v :> (Boolean.var, n) Vector.t) in
+  let open Step_verifier in
   Pseudo.choose (v, Vector.init n ~f:Field.of_int) ~f:Fn.id
 
 let verify_one ~srs
@@ -41,9 +41,9 @@ let verify_one ~srs
           sponge
         in
         (* TODO: Refactor args into an "unfinalized proof" struct *)
-        finalize_other_proof d.max_proofs_verified ~step_domains:d.step_domains
-          ~zk_rows:d.zk_rows ~sponge ~prev_challenges deferred_values
-          prev_proof_evals )
+        Step_verifier.finalize_other_proof d.max_proofs_verified
+          ~step_domains:d.step_domains ~zk_rows:d.zk_rows ~sponge
+          ~prev_challenges deferred_values prev_proof_evals )
   in
   let branch_data = deferred_values.branch_data in
   let sponge_after_index, hash_messages_for_next_step_proof =
@@ -53,7 +53,8 @@ let verify_one ~srs
     in
     let sponge_after_index, hash_messages_for_next_step_proof =
       (* TODO: Don't rehash when it's not necessary *)
-      hash_messages_for_next_step_proof_opt ~index:d.wrap_key to_field_elements
+      Step_verifier.hash_messages_for_next_step_proof_opt ~index:d.wrap_key
+        to_field_elements
     in
     (sponge_after_index, unstage hash_messages_for_next_step_proof)
   in
@@ -87,7 +88,7 @@ let verify_one ~srs
      statement *)
   let verified =
     with_label __LOC__ (fun () ->
-        verify ~srs
+        Step_verifier.verify ~srs
           ~feature_flags:(Plonk_types.Features.of_full d.feature_flags)
           ~lookup_parameters:
             { use = d.feature_flags.uses_lookups
@@ -349,7 +350,7 @@ let step_main :
           exists
             ~request:(fun () -> Req.Wrap_index)
             (Plonk_verification_key_evals.typ
-               (Typ.array ~length:num_chunks Inner_curve.typ) )
+               (Typ.array ~length:num_chunks Step_verifier.Inner_curve.typ) )
         and prevs =
           exists (Prev_typ.f prev_proof_typs) ~request:(fun () ->
               Req.Proof_with_datas )
@@ -527,16 +528,17 @@ let step_main :
         let messages_for_next_step_proof =
           let challenge_polynomial_commitments =
             let module M =
-              H3.Map (Per_proof_witness) (E03 (Inner_curve))
+              H3.Map (Per_proof_witness) (E03 (Step_verifier.Inner_curve))
                 (struct
                   let f :
-                      type a b c. (a, b, c) Per_proof_witness.t -> Inner_curve.t
-                      =
+                      type a b c.
+                         (a, b, c) Per_proof_witness.t
+                      -> Step_verifier.Inner_curve.t =
                    fun acc ->
                     acc.wrap_proof.opening.challenge_polynomial_commitment
                 end)
             in
-            let module V = H3.To_vector (Inner_curve) in
+            let module V = H3.To_vector (Step_verifier.Inner_curve) in
             V.f proofs_verified (M.f prevs)
           in
           with_label "hash_messages_for_next_step_proof" (fun () ->
@@ -546,8 +548,8 @@ let step_main :
                   fun x -> fst (typ.var_to_fields x)
                 in
                 unstage
-                  (hash_messages_for_next_step_proof ~index:dlog_plonk_index
-                     to_field_elements )
+                  (Step_verifier.hash_messages_for_next_step_proof
+                     ~index:dlog_plonk_index to_field_elements )
               in
               let (app_state : var) =
                 match public_input with
