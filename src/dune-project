@@ -1,5 +1,5 @@
 (lang dune 3.3)
-(implicit_transitive_deps false)
+(implicit_transitive_deps true)
 
 (package (name allocation_functor))
 (package (name archive_blocks))
@@ -69,6 +69,7 @@
 (package (name inline_test_quiet_logs))
 (package (name integers_stubs_js))
 (package (name integration_test_cloud_engine))
+(package (name integration_test_local_engine))
 (package (name integration_test_lib))
 (package (name internal_tracing))
 (package (name interpolator_lib))

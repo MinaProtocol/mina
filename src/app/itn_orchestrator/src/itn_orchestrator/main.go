@@ -44,7 +44,8 @@ func init() {
 	addAction(actions, lib.ExceptAction{})
 	addAction(actions, lib.StopDaemonAction{})
 	addAction(actions, lib.RotateAction{})
-
+	addAction(actions, lib.SetZkappSoftLimitAction{})
+	addAction(actions, lib.SlotsCoveredCheckAction{})
 }
 
 type AwsConfig struct {

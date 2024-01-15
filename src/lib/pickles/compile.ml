@@ -228,6 +228,22 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
           *)
   }
 
+module Storables = struct
+  type t =
+    { step_storable : Cache.Step.storable
+    ; step_vk_storable : Cache.Step.vk_storable
+    ; wrap_storable : Cache.Wrap.storable
+    ; wrap_vk_storable : Cache.Wrap.vk_storable
+    }
+
+  let default =
+    { step_storable = Cache.Step.storable
+    ; step_vk_storable = Cache.Step.vk_storable
+    ; wrap_storable = Cache.Wrap.storable
+    ; wrap_vk_storable = Cache.Wrap.vk_storable
+    }
+end
+
 module Make
     (Arg_var : Statement_var_intf)
     (Arg_value : Statement_value_intf)
@@ -278,7 +294,7 @@ struct
 
   module Lazy_keys = struct
     type t =
-      (Impls.Step.Keypair.t * Dirty.t) Lazy.t
+      (Impls.Step.Proving_key.t * Dirty.t) Lazy.t
       * (Kimchi_bindings.Protocol.VerifierIndex.Fp.t * Dirty.t) Lazy.t
 
     (* TODO Think this is right.. *)
@@ -341,6 +357,7 @@ struct
       type var value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
          self:(var, value, max_proofs_verified, branches) Tag.t
       -> cache:Key_cache.Spec.t list
+      -> storables:Storables.t
       -> proof_cache:Proof_cache.t option
       -> ?disk_keys:
            (Cache.Step.Key.Verification.t, branches) Vector.t
@@ -353,7 +370,8 @@ struct
       -> max_proofs_verified:
            (module Nat.Add.Intf with type n = max_proofs_verified)
       -> name:string
-      -> constraint_constants:Snark_keys_header.Constraint_constants.t
+      -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
+      -> ?commits:Snark_keys_header.Commits.With_date.t
       -> public_input:
            ( var
            , value
@@ -379,20 +397,44 @@ struct
          * _
          * _
          * _ =
-   fun ~self ~cache ~proof_cache ?disk_keys ?override_wrap_domain
-       ?override_wrap_main ?(num_chunks = 1) ~branches:(module Branches)
-       ~max_proofs_verified ~name ~constraint_constants ~public_input
-       ~auxiliary_typ ~choices () ->
+   fun ~self ~cache
+       ~storables:
+         { step_storable; step_vk_storable; wrap_storable; wrap_vk_storable }
+       ~proof_cache ?disk_keys ?override_wrap_domain ?override_wrap_main
+       ?(num_chunks = 1) ~branches:(module Branches) ~max_proofs_verified ~name
+       ?constraint_constants ?commits ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
+      let constraint_constants : Snark_keys_header.Constraint_constants.t =
+        match constraint_constants with
+        | Some constraint_constants ->
+            constraint_constants
+        | None ->
+            { sub_windows_per_window = 0
+            ; ledger_depth = 0
+            ; work_delay = 0
+            ; block_window_duration_ms = 0
+            ; transaction_capacity = Log_2 0
+            ; pending_coinbase_depth = 0
+            ; coinbase_amount = Unsigned.UInt64.of_int 0
+            ; supercharged_coinbase_factor = 0
+            ; account_creation_fee = Unsigned.UInt64.of_int 0
+            ; fork = None
+            }
+      in
+      let (commits, commit_date) : Snark_keys_header.Commits.t * string =
+        match commits with
+        | Some { commits; commit_date } ->
+            (commits, commit_date)
+        | None ->
+            ( { mina = "[NOT SPECIFIED]"; marlin = "[NOT SPECIFIED]" }
+            , "[UNKNOWN]" )
+      in
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
       ; constraint_constants
-      ; commits =
-          { mina = Mina_version.commit_id
-          ; marlin = Mina_version.marlin_commit_id
-          }
+      ; commits
       ; length = (* This is a dummy, it gets filled in on read/write. *) 0
-      ; commit_date = Mina_version.commit_date
+      ; commit_date
       ; constraint_system_hash
       ; identifying_hash =
           (* TODO: Proper identifying hash. *)
@@ -589,7 +631,7 @@ struct
                 Common.time "step read or generate" (fun () ->
                     Cache.Step.read_or_generate
                       ~prev_challenges:(Nat.to_int (fst b.proofs_verified))
-                      cache k_p k_v
+                      cache ~s_p:step_storable k_p ~s_v:step_vk_storable k_v
                       (Snarky_backendless.Typ.unit ())
                       typ main )
               in
@@ -665,7 +707,8 @@ struct
       let r =
         Common.time "wrap read or generate " (fun () ->
             Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
-              ~prev_challenges:2 cache disk_key_prover disk_key_verifier typ
+              ~prev_challenges:2 cache ~s_p:wrap_storable disk_key_prover
+              ~s_v:wrap_vk_storable disk_key_verifier typ
               (Snarky_backendless.Typ.unit ())
               main )
       in
@@ -727,7 +770,7 @@ struct
                  ~f:(fun x -> [| x |])
                  wrap_vk.commitments )
             ~public_input ~auxiliary_typ ~feature_flags
-            (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
+            (fst (Lazy.force step_pk))
             wrap_vk.index
         in
         let step_vk = fst (Lazy.force step_vk) in
@@ -775,7 +818,7 @@ struct
                    wrap_vk.commitments )
               wrap_main ~typ ~step_vk ~step_plonk_indices:(Lazy.force step_vks)
               ~actual_wrap_domains
-              (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
+              (fst (Lazy.force wrap_pk))
               proof
           in
           ( return_value
@@ -943,6 +986,7 @@ let compile_with_wrap_main_override_promise :
     type var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
        ?self:(var, value, max_proofs_verified, branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
+    -> ?storables:Storables.t
     -> ?proof_cache:Proof_cache.t
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, branches) Vector.t
@@ -964,7 +1008,8 @@ let compile_with_wrap_main_override_promise :
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = max_proofs_verified)
     -> name:string
-    -> constraint_constants:Snark_keys_header.Constraint_constants.t
+    -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
+    -> ?commits:Snark_keys_header.Commits.With_date.t
     -> choices:
          (   self:(var, value, max_proofs_verified, branches) Tag.t
           -> ( prev_varss
@@ -996,9 +1041,10 @@ let compile_with_wrap_main_override_promise :
  (* This function is an adapter between the user-facing Pickles.compile API
     and the underlying Make(_).compile function which builds the circuits.
  *)
- fun ?self ?(cache = []) ?proof_cache ?disk_keys ?override_wrap_domain
-     ?override_wrap_main ?num_chunks ~public_input ~auxiliary_typ ~branches
-     ~max_proofs_verified ~name ~constraint_constants ~choices () ->
+ fun ?self ?(cache = []) ?(storables = Storables.default) ?proof_cache
+     ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks
+     ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
+     ?constraint_constants ?commits ~choices () ->
   let self =
     match self with
     | None ->
@@ -1064,9 +1110,10 @@ let compile_with_wrap_main_override_promise :
         r :: conv_irs rs
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
-    M.compile ~self ~proof_cache ~cache ?disk_keys ?override_wrap_domain
-      ?override_wrap_main ?num_chunks ~branches ~max_proofs_verified ~name
-      ~public_input ~auxiliary_typ ~constraint_constants
+    M.compile ~self ~proof_cache ~cache ~storables ?disk_keys
+      ?override_wrap_domain ?override_wrap_main ?num_chunks ~branches
+      ~max_proofs_verified ~name ~public_input ~auxiliary_typ
+      ?constraint_constants ?commits
       ~choices:(fun ~self -> conv_irs (choices ~self))
       ()
   in
@@ -1257,19 +1304,6 @@ end) =
 struct
   open Impls.Step
 
-  let constraint_constants : Snark_keys_header.Constraint_constants.t =
-    { sub_windows_per_window = 0
-    ; ledger_depth = 0
-    ; work_delay = 0
-    ; block_window_duration_ms = 0
-    ; transaction_capacity = Log_2 0
-    ; pending_coinbase_depth = 0
-    ; coinbase_amount = Unsigned.UInt64.of_int 0
-    ; supercharged_coinbase_factor = 0
-    ; account_creation_fee = Unsigned.UInt64.of_int 0
-    ; fork = None
-    }
-
   let rule self : _ Inductive_rule.t =
     { identifier = "main"
     ; prevs = [ self; self ]
@@ -1306,19 +1340,6 @@ struct
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"
-      ~constraint_constants:
-        (* Dummy values *)
-        { sub_windows_per_window = 0
-        ; ledger_depth = 0
-        ; work_delay = 0
-        ; block_window_duration_ms = 0
-        ; transaction_capacity = Log_2 0
-        ; pending_coinbase_depth = 0
-        ; coinbase_amount = Unsigned.UInt64.of_int 0
-        ; supercharged_coinbase_factor = 0
-        ; account_creation_fee = Unsigned.UInt64.of_int 0
-        ; fork = None
-        }
       ~choices:(fun ~self -> [ rule self ])
 
   module Proof = (val p)
@@ -1357,7 +1378,7 @@ struct
             ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
             ~branches:(module Nat.N1)
             ~max_proofs_verified:(module Nat.N2)
-            ~name:"recurse-on-bad" ~constraint_constants
+            ~name:"recurse-on-bad"
             ~choices:(fun ~self:_ ->
               [ { identifier = "main"
                 ; feature_flags = Plonk_types.Features.none_bool
