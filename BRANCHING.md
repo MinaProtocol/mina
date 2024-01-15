@@ -45,7 +45,7 @@ The relationship between the branches is as presented: `master ⊆ compatible �
 ### Hard forks / releases:
 
 Whenever a hard fork happens, the code in the corresponding release branch, e.g. `berkeley`, is released.  When this happens, the current `compatible` is entirely discarded and a new `compatible` gets created based off of `develop`:
-- `release/1.X.X` branches are made off of `compatible` and tagged with alpha and beta tags until the code is deemed stable, then the `release/1.X.X` branch is merged into `master` and given a stable tag. Whenever code is tagged, if anything is missing in in the upstream branches (compatible, develop) then the tagged branch is also merged back for consistency.
+- `release/1.X.X` branches are made off of `compatible` and tagged with alpha and beta tags until the code is deemed stable, then the `release/1.X.X` branch is merged into `master` and given a stable tag. Whenever code is tagged, if anything is missing in in the downstream branches (compatible, develop) then the tagged branch is also merged back for consistency.
 - So after Berkeley release: `berkeley` branch will become the new `master`. `berkeley` will be removed from `proof-systems`. `develop` will be renamed into `compatible`.
 
 
@@ -71,7 +71,7 @@ PRs resolving merge conflicts (merge-PRs) should only be merged after the origin
 - Rerun failing `check-merges-cleanly-into-*` jobs against the original PR-rampup and merge PR-rampup after CI is green.
 
 
-The protocol team at o1labs will conduct weekly synchronization of all branches for all non-conflicting changes to ensure a smooth experience for everyone involved in the Mina repository. The protocol team will reach out to respective teams if there are any conflicting changes (due to force-merges performed mistakenly) and/or failing tests caused by code changes in the upstream branches
+The protocol team at o1labs will conduct weekly synchronization of all branches for all non-conflicting changes to ensure a smooth experience for everyone involved in the Mina repository. The protocol team will reach out to respective teams if there are any conflicting changes (due to force-merges performed mistakenly) and/or failing tests caused by code changes in the upstream branches.
 
 
 # proof-systems Branching policy
