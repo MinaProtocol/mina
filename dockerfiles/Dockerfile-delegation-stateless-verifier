@@ -20,12 +20,6 @@ ARG MINA_DIR=mina
 
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
-RUN echo "Current user is: $(whoami)"
-
-RUN echo "Current dir is: $(pwd)"
-
-RUN echo "Path is: $PATH"
-
 # git will clone into an empty dir, but this also helps us set the workdir in advance
 RUN cd $HOME && rm -rf $HOME/${MINA_DIR} \
   && git clone \
@@ -38,7 +32,6 @@ RUN cd $HOME && rm -rf $HOME/${MINA_DIR} \
 WORKDIR $HOME/${MINA_DIR}
 
 RUN git submodule sync && git submodule update --init --recursive
-
 
 RUN mkdir ${HOME}/app
 
@@ -59,19 +52,25 @@ RUN cp ./delegation-verify /bin/delegation-verify
 # add authenticate.sh to image
 RUN cp src/app/delegation_verify/scripts/authenticate.sh /bin/authenticate.sh
 
-# make binary and script executable
-RUN chmod +x /bin/authenticate.sh /bin/delegation-verify
-
-RUN rm -rf $HOME/${MINA_DIR}
+# Runtime image
+FROM ubuntu:latest
 
 # awscli and cqlsh-expansion are used by the delegation verification tool
-RUN apt-get update && apt-get install -y python3 python3-pip
+RUN apt-get update && apt-get install -y python3 python3-pip jq libjemalloc2 libssl-dev
 RUN pip3 install awscli
 RUN pip3 install cqlsh-expansion
 
+# Copy resources from builder to runtime image
+COPY --from=builder /bin/delegation-verify /bin/delegation-verify
+COPY --from=builder /bin/authenticate.sh /bin/authenticate.sh
+
+# Make symlinks
 RUN ln -s /usr/bin/aws /bin/aws
 RUN ln -s /usr/local/bin/cqlsh /bin/cqlsh
 RUN ln -s /usr/local/bin/cqlsh-expansion /bin/cqlsh-expansion
 RUN /usr/local/bin/cqlsh-expansion.init
+
+# make binary and script executable
+RUN chmod +x /bin/authenticate.sh /bin/delegation-verify
 
 ENTRYPOINT ["/bin/delegation-verify"]
