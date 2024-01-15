@@ -93,4 +93,9 @@ RUN /usr/local/bin/cqlsh-expansion.init
 # make binary and script executable
 RUN chmod +x /bin/authenticate.sh /bin/delegation-verify
 
+# set up timezone
+ENV DEBIAN_FRONTEND="noninteractive"
+ENV TZ="Etc/UTC"
+RUN apt install tzdata
+
 ENTRYPOINT ["/bin/delegation-verify"]
