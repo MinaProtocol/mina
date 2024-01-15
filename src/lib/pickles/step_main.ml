@@ -369,7 +369,7 @@ let step_main :
             (Vector.typ (Typ.Internal.ref ()) (Length.to_nat proofs_verified))
             ~request:(fun () -> Req.Wrap_domain_indices)
         in
-        let prevs =
+        let proof_witnesses =
           (* Inject the app-state values into the per-proof witnesses. *)
           let rec go :
               type vars ns1 ns2.
@@ -402,10 +402,10 @@ let step_main :
                        , n )
                        Vector.t
                   -> (_, n) Vector.t * B.t list =
-               fun proofs datas messages_for_next_wrap_proofs unfinalizeds stmts
-                   pi ~actual_wrap_domains ->
+               fun proof_witnesses datas messages_for_next_wrap_proofs
+                   unfinalizeds stmts pi ~actual_wrap_domains ->
                 match
-                  ( proofs
+                  ( proof_witnesses
                   , datas
                   , messages_for_next_wrap_proofs
                   , unfinalizeds
@@ -415,7 +415,7 @@ let step_main :
                 with
                 | [], [], [], [], [], Z, [] ->
                     ([], [])
-                | ( p :: proofs
+                | ( pw :: proof_witnesses
                   , d :: datas
                   , messages_for_next_wrap_proof
                     :: messages_for_next_wrap_proofs
@@ -456,12 +456,12 @@ let step_main :
                           ()
                     in
                     let chals, v =
-                      verify_one ~srs p d messages_for_next_wrap_proof
+                      verify_one ~srs pw d messages_for_next_wrap_proof
                         unfinalized must_verify
                     in
                     let chalss, vs =
-                      go proofs datas messages_for_next_wrap_proofs unfinalizeds
-                        stmts pi ~actual_wrap_domains
+                      go proof_witnesses datas messages_for_next_wrap_proofs
+                        unfinalizeds stmts pi ~actual_wrap_domains
                     in
                     (chals :: chalss, v :: vs)
               in
@@ -518,8 +518,9 @@ let step_main :
                   in
                   M.f rule.prevs
                 in
-                go prevs datas messages_for_next_wrap_proofs unfinalized_proofs
-                  previous_proof_statements proofs_verified ~actual_wrap_domains
+                go proof_witnesses datas messages_for_next_wrap_proofs
+                  unfinalized_proofs previous_proof_statements proofs_verified
+                  ~actual_wrap_domains
               in
               Boolean.Assert.all vs ; chalss )
         in
@@ -538,7 +539,7 @@ let step_main :
                 end)
             in
             let module V = H3.To_vector (Step_verifier.Inner_curve) in
-            V.f proofs_verified (M.f prevs)
+            V.f proofs_verified (M.f proof_witnesses)
           in
           with_label "hash_messages_for_next_step_proof" (fun () ->
               let hash_messages_for_next_step_proof =
