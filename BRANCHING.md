@@ -24,6 +24,11 @@ The development branches in progress in `mina` are as follows:
   - Contains changes which break backwards compatibility, or changes that depend on past compatibility-breaking changes.  “Not backwards compatible” means that a daemon running this version of mina will not connect to mainnet.
   - Major changes to the daemon, protocol, or crypto will sometimes cause backwards-compatibility breaking changes, and of course such changes need to be done with deliberation and are not to be taken lightly.  Changes to infrastructure, auxiliary develop scripts, tests, CI, are usually not be backwards compatibility breaking, and thereby should go into compatible (unless you are doing something very special and you know what you’re doing).
   - The difference between `develop` and `berkeley` is that `berkeley` will be the actual hardfork release, while `develop` is subsequent softfork release candidate, softfork after `berkeley`. `develop` is just not tested as rigorously, but it's softfork compatible with `berkeley`. So if `berkeley` can be thought of as 2.0, then `develop` is 2.01.
+- `o1js-main`: compatible with testnet, but has latest `proof-systems` features so that they can be used in `o1js`
+  - Contains mina changes from `rampup`
+  - But `proof-systems/develop` which by default is used by `mina/develop`.
+  - Uses `o1js/main` and `o1js-bindings/main` as explained [here](https://github.com/o1-labs/o1js/blob/main/README-dev.md#branch-compatibility?).
+  - When `proof-systems/develop` is too cutting-edge and the adaptations of its changes haven't been landed in mina, `o1js` will use the `proof-systems/o1js-main` branch which is lagging behind `proof-systems/develop` a bit.
 
 
 The relationship between the branches is as presented: `master ⊆ compatible ⊆ rampup ⊆ berkeley ⊆ develop`.
@@ -39,14 +44,9 @@ The relationship between the branches is as presented: `master ⊆ compatible �
 
 ### Hard forks / releases:
 
-Whenever a hard fork happens, the code in  `develop` is released.  When this happens, the current `compatible` is entirely discarded and a new `compatible` gets created based off of `develop`
-- `release/1.X.X` branches are made off of `compatible` and tagged with alpha and beta tags until the code is deemed stable, then the `release/1.X.X` branch is merged into `master` and given a stable tag. Whenever code is tagged, if anything is missing in in the upstream branches (compatible, develop) then the tagged branch is also merged back for consistency.
+Whenever a hard fork happens, the code in the corresponding release branch, e.g. `berkeley`, is released.  When this happens, the current `compatible` is entirely discarded and a new `compatible` gets created based off of `develop`:
+- `release/1.X.X` branches are made off of `compatible` and tagged with alpha and beta tags until the code is deemed stable, then the `release/1.X.X` branch is merged into `master` and given a stable tag. Whenever code is tagged, if anything is missing in in the upstream branches (compatible, develop) then the tagged branch is also merged back for consistency.
 - So after Berkeley release: `berkeley` branch will become the new `master`. `berkeley` will be removed from `proof-systems`. `develop` will be renamed into `compatible`.
-`o1js-main`: compatible with testnet, but has latest `proof-systems` features so that they can be used in `o1js`
-- Contains mina changes from `rampup`
-- But `proof-systems/develop` which by default is used by `mina/develop`.
-- Uses `o1js/main` and `o1js-bindings/main` as explained [here](https://github.com/o1-labs/o1js/blob/main/README-dev.md#branch-compatibility?).
-- When `proof-systems/develop` is too cutting-edge and the adaptations of its changes haven't been landed in mina, `o1js` will use the `proof-systems/o1js-main` branch which is lagging behind `proof-systems/develop` a bit.
 
 
 ## Day to day: which branch should I use?
