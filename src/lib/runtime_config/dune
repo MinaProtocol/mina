@@ -3,6 +3,8 @@
  (public_name mina_runtime_config)
  (libraries
    ;; opam libraries
+   async
+   async_kernel
    core_kernel
    bin_prot.shape
    base.caml
@@ -14,19 +16,25 @@
    ;; local libraries
    currency
    data_hash_lib
+   kimchi_backend
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
+   mina_ledger
+   merkle_ledger
    mina_base
    mina_base.import
    mina_numbers
-   signature_lib
+   mina_wire_types
    ppx_dhall_type
    snark_params
    unsigned_extended
    pickles
    pickles.backend
    pickles_types
+   random_oracle
    with_hash
+   signature_lib
+   staged_ledger
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_sexp_conv ppx_let ppx_deriving_yojson
