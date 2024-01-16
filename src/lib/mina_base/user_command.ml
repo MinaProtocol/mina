@@ -238,7 +238,7 @@ let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 let zkAppsDisabled t =
   match t with
   | Zkapp_command _ ->
-      not Mina_compile_config.zkapps_disabled
+      Mina_compile_config.zkapps_disabled
   | _ ->
       false
 
