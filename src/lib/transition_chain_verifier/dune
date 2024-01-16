@@ -11,6 +11,6 @@
    merkle_list_verifier
    mina_state
    mina_base
-   non_empty_list
+   mina_stdlib
    data_hash_lib
 ))

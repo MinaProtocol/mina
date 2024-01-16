@@ -20,7 +20,7 @@ let level_color =
   let open Bash_colors in
   let open Logger.Level in
   function
-  | Spam | Trace ->
+  | Spam | Trace | Internal ->
       cyan
   | Debug ->
       green

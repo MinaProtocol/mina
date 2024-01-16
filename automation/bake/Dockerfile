@@ -6,7 +6,7 @@ ARG COMMIT_HASH=master
 ARG TESTNET_NAME=testworld
 ARG CONFIG_FILE="/root/daemon.json"
 
-RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/automation/terraform/testnets/${TESTNET_NAME}/genesis_ledger.json -o "${CONFIG_FILE}"
+COPY ../../genesis_ledgers/${TESTNET_NAME}.json "${CONFIG_FILE}"
 
 RUN head ${CONFIG_FILE}
 
