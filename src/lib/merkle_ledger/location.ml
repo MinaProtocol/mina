@@ -147,6 +147,26 @@ module T = struct
     | Right ->
         (sibling, base)
 
+  (* Returns a reverse of traversal path from top of the tree to the location
+     (direction to take and sibling's hash).contents
+
+     By reverse it means that head of returned list contains direction from
+     location's parent to the location along with the location's sibling.
+  *)
+  let merkle_path_dependencies_exn (location : t) : (t * Direction.t) list =
+    let rec loop k =
+      if Addr.depth k = 0 then []
+      else
+        let sibling = Hash (Addr.sibling k) in
+        let dir = last_direction k in
+        (sibling, dir) :: loop (Addr.parent_exn k)
+    in
+    match location with
+    | Hash addr ->
+        loop addr
+    | _ ->
+        failwith "can only get merkle path dependencies of a hash location"
+
   type location = t [@@deriving sexp, compare]
 
   include Comparable.Make (struct

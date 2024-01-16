@@ -1,0 +1,12 @@
+(library
+ (public_name mina_base_nonconsensus.import)
+ (name mina_base_import)
+ (libraries signature_lib_nonconsensus)
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
+ (preprocess (pps
+    ppx_version
+    ppx_optcomp))
+ (instrumentation (backend bisect_ppx)))

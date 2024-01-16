@@ -26,7 +26,8 @@ let%test_module "network pool test" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ()) )
+            ~pids:(Child_processes.Termination.create_pid_table ())
+            () )
 
     module Mock_snark_pool =
       Snark_pool.Make (Mocks.Base_ledger) (Mocks.Staged_ledger)
@@ -49,7 +50,7 @@ let%test_module "network pool test" =
         { Priced_proof.proof =
             One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
         ; fee =
-            { fee = Currency.Fee.of_int 0
+            { fee = Currency.Fee.zero
             ; prover = Signature_lib.Public_key.Compressed.empty
             }
         }
@@ -68,10 +69,9 @@ let%test_module "network pool test" =
             Mock_snark_pool.Resource_pool.Diff.Add_solved_work
               (work, priced_proof)
           in
-          don't_wait_for
-            (Mock_snark_pool.apply_and_broadcast network_pool
-               (Envelope.Incoming.local command)
-               (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) ) ;
+          Mock_snark_pool.apply_and_broadcast network_pool
+            (Envelope.Incoming.local command)
+            (Mock_snark_pool.Broadcast_callback.Local (Fn.const ())) ;
           let%map _ =
             Linear_pipe.read (Mock_snark_pool.broadcasts network_pool)
           in
@@ -101,7 +101,7 @@ let%test_module "network pool test" =
               { proof =
                   One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
               ; fee =
-                  { fee = Currency.Fee.of_int 0
+                  { fee = Currency.Fee.zero
                   ; prover = Signature_lib.Public_key.Compressed.empty
                   }
               } )
@@ -130,7 +130,7 @@ let%test_module "network pool test" =
         let%bind () = Mocks.Transition_frontier.refer_statements tf works in
         don't_wait_for
         @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
-             ~f:(fun work_command ->
+             ~f:(fun With_nonce.{ message = work_command; _ } ->
                let work =
                  match work_command with
                  | Mock_snark_pool.Resource_pool.Diff.Add_solved_work (work, _)

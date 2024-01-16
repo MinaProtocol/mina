@@ -12,7 +12,8 @@
    bin_prot.shape
    ;; local libraries
    network_peer
-   )
- (inline_tests)
+   ppx_version.runtime
+ )
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_let ppx_deriving_yojson)))
