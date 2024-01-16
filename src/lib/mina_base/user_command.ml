@@ -418,7 +418,7 @@ let check_well_formedness ~genesis_constants t :
     let open Well_formedness_error in
     [ (has_insufficient_fee, Insufficient_fee)
     ; (has_zero_vesting_period, Zero_vesting_period)
-    ; (zkAppsDisabled, Zkapp_too_big (Error.of_string "zkapps disabled"))
+    ; (zkAppsDisabled, Zkapps_are_disabled)
     ]
   in
   let errs0 =
