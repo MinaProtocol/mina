@@ -186,4 +186,8 @@ Some command-line options work with both modes of operation:
 Build
 -----
 
-The executable and docker image can be built with Nix. For further instructions, consult the Mina [Nix documentation](https://github.com/MinaProtocol/mina/tree/berkeley/nix) 
+To build the docker image go to the root of the repositoryand run
+
+`docker build -t <image-name> -f dockerfiles/Dockerfile-delegation-stateless-verifier .`
+
+where `<image-name>` is your desired image name.
