@@ -4,7 +4,15 @@ module Ledger = Mina_ledger.Ledger
 
 type t = Ledger.t
 
-let main ~config_file ~genesis_dir ~proof_level () =
+module Hash_json = struct
+  type epoch_data = { staking_hash : string; next_hash : string option }
+  [@@deriving to_yojson]
+
+  type t = { genesis_hash : string; epoch_data : epoch_data option }
+  [@@deriving to_yojson]
+end
+
+let main ~config_file ~genesis_dir ~proof_level ~hash_output_file () =
   let%bind config =
     match config_file with
     | Some config_file -> (
@@ -20,17 +28,38 @@ let main ~config_file ~genesis_dir ~proof_level () =
     | None ->
         return Runtime_config.default
   in
-  Deferred.Or_error.ok_exn @@ Deferred.Or_error.ignore_m
-  @@ Genesis_ledger_helper.init_from_config_file ?genesis_dir
-       ~logger:(Logger.create ()) ~proof_level config
+  let%bind precomputed_values, _ =
+    Deferred.Or_error.ok_exn
+    @@ Genesis_ledger_helper.init_from_config_file ?genesis_dir
+         ~logger:(Logger.create ()) ~proof_level config
+  in
+  Option.value_map hash_output_file ~default:Deferred.unit ~f:(fun path ->
+      let ledger_hash ledger =
+        Mina_base.State_hash.to_base58_check @@ Mina_ledger.Ledger.merkle_root
+        @@ Lazy.force ledger
+      in
+      let genesis_hash =
+        ledger_hash @@ Genesis_ledger.Packed.t precomputed_values.genesis_ledger
+      in
+      let epoch_data =
+        Option.map precomputed_values.genesis_epoch_data ~f:(fun data ->
+            { Hash_json.staking_hash = ledger_hash data.staking.ledger
+            ; next_hash =
+                Option.map data.next ~f:(fun data -> ledger_hash data.ledger)
+            } )
+      in
+      Async.Writer.save path
+        ~contents:
+          (Yojson.Safe.to_string
+             (Hash_json.to_yojson { genesis_hash; epoch_data }) ) )
 
 let () =
   Command.run
     (Command.async
        ~summary:
          "Generate the genesis ledger and genesis proof for a given \
-          configuration file, or for the compile-time configuration if none \
-          is provided"
+          configuration file, or for the compile-time configuration if none is \
+          provided"
        Command.(
          let open Let_syntax in
          let open Command.Param in
@@ -43,12 +72,17 @@ let () =
                (sprintf
                   "Dir where the genesis ledger and genesis proof is to be \
                    saved (default: %s)"
-                  Cache_dir.autogen_path)
+                  Cache_dir.autogen_path )
              (optional string)
          and proof_level =
            flag "--proof-level"
              (optional
-                (Arg_type.create Genesis_constants.Proof_level.of_string))
+                (Arg_type.create Genesis_constants.Proof_level.of_string) )
              ~doc:"full|check|none"
+         and hash_output_file =
+           flag "--hash-output-file" (optional string)
+             ~doc:
+               "PATH path to the file where the hashes of the ledgers are to \
+                be saved"
          in
-         main ~config_file ~genesis_dir ~proof_level))
+         main ~config_file ~genesis_dir ~proof_level ~hash_output_file) )

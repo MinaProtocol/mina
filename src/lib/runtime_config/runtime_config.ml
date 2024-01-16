@@ -373,7 +373,11 @@ module Json_layout = struct
 
   module Epoch_data = struct
     module Data = struct
-      type t = { accounts : Accounts.t; seed : string }
+      type t =
+        { accounts : Accounts.t option [@default None]
+        ; seed : string
+        ; hash : string option [@default None]
+        }
       [@@deriving yojson, fields, dhall_type]
 
       let fields = Fields.names |> Array.of_list
@@ -1194,38 +1198,63 @@ module Epoch_data = struct
   let to_json_layout : t -> Json_layout.Epoch_data.t =
    fun { staking; next } ->
     let accounts (ledger : Ledger.t) =
-      match ledger.base with Accounts acc -> acc | _ -> assert false
+      match ledger.base with Accounts acc -> Some acc | _ -> None
     in
     let staking =
       { Json_layout.Epoch_data.Data.accounts = accounts staking.ledger
       ; seed = staking.seed
+      ; hash = staking.ledger.hash
       }
     in
     let next =
       Option.map next ~f:(fun n ->
           { Json_layout.Epoch_data.Data.accounts = accounts n.ledger
           ; seed = n.seed
+          ; hash = n.ledger.hash
           } )
     in
     { Json_layout.Epoch_data.staking; next }
 
   let of_json_layout : Json_layout.Epoch_data.t -> (t, string) Result.t =
    fun { staking; next } ->
-    let data accounts seed =
+    let open Result.Let_syntax in
+    let data (t : [ `Staking | `Next ])
+        { Json_layout.Epoch_data.Data.accounts; seed; hash } =
+      let%map base =
+        match accounts with
+        | Some accounts ->
+            return @@ Ledger.Accounts accounts
+        | None -> (
+            match hash with
+            | Some hash ->
+                return @@ Ledger.Hash hash
+            | None ->
+                let ledger_name =
+                  match t with `Staking -> "staking" | `Next -> "next"
+                in
+                Error
+                  (sprintf
+                     "Runtime_config.Epoch_data.of_json_layout: Expected a \
+                      field 'accounts', or 'hash' in '%s' ledger"
+                     ledger_name ) )
+      in
       let ledger =
-        { Ledger.base = Accounts accounts
+        { Ledger.base
         ; num_accounts = None
         ; balances = []
-        ; hash = None
+        ; hash
         ; name = None
         ; add_genesis_winner = Some false
         }
       in
       { Data.ledger; seed }
     in
-    let staking = data staking.accounts staking.seed in
-    let next = Option.map next ~f:(fun n -> data n.accounts n.seed) in
-    Ok { staking; next }
+    let%bind staking = data `Staking staking in
+    let%map next =
+      Option.value_map next ~default:(Ok None) ~f:(fun next ->
+          Result.map ~f:Option.some @@ data `Next next )
+    in
+    { staking; next }
 
   let to_yojson x = Json_layout.Epoch_data.to_yojson (to_json_layout x)
 
@@ -1272,16 +1301,34 @@ let to_yojson x = Json_layout.to_yojson (to_json_layout x)
 
 let to_yojson_without_accounts x =
   let layout = to_json_layout x in
-  let num_accounts =
-    let%bind.Option ledger = layout.ledger in
-    let%map.Option accounts = ledger.accounts in
-    List.length accounts
+  let genesis_accounts =
+    let%bind.Option { accounts; _ } = layout.ledger in
+    Option.map ~f:List.length accounts
+  in
+  let staking_accounts =
+    let%bind.Option { staking; _ } = layout.epoch_data in
+    Option.map ~f:List.length staking.accounts
+  in
+  let next_accounts =
+    let%bind.Option { next; _ } = layout.epoch_data in
+    let%bind.Option { accounts; _ } = next in
+    Option.map ~f:List.length accounts
   in
   let layout =
     let f ledger = { ledger with Json_layout.Ledger.accounts = None } in
-    { layout with ledger = Option.map ~f layout.ledger }
+    { layout with
+      ledger = Option.map ~f layout.ledger
+    ; epoch_data =
+        Option.map layout.epoch_data ~f:(fun { staking; next } ->
+            { Json_layout.Epoch_data.staking = { staking with accounts = None }
+            ; next = Option.map next ~f:(fun n -> { n with accounts = None })
+            } )
+    }
   in
-  (Json_layout.to_yojson layout, num_accounts)
+  ( Json_layout.to_yojson layout
+  , `Accounts_omitted
+      (`Genesis genesis_accounts, `Staking staking_accounts, `Next next_accounts)
+  )
 
 let of_yojson json = Result.bind ~f:of_json_layout (Json_layout.of_yojson json)
 
