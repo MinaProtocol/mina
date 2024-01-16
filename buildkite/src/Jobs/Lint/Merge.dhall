@@ -100,5 +100,15 @@ Pipeline.build
               image = (../../Constants/ContainerImages.dhall).toolchainBase
             }
         }
+    , Command.build
+        Command.Config::{
+          commands = [ Cmd.run "true" ] : List Cmd.Type
+          , label = "pr"
+          , key = "pr"
+          , target = Size.Small
+          , docker = Some Docker::{
+              image = (../../Constants/ContainerImages.dhall).toolchainBase
+            }
+        }
     ]
   }
