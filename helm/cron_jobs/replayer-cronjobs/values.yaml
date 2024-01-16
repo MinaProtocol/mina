@@ -41,11 +41,18 @@ tolerations: []
 affinity: {}
 
 replayers:
-- name: berkeley
+- name: mainnet-migrated
   schedule: "0 2 * * *"
   image: *image
   resources: *resources
   script:
-    secretName: berkeley
-    scriptName: berkeley.sh
+    secretName: mainnet-migrated
+    scriptName: mainnet-migrated.sh
+# - name: test-run
+#   schedule: "0 2 * * *"
+#   image: *image
+#   resources: *resources
+#   script:
+#     secretName: test-run
+#     scriptName: test-run.sh
 
