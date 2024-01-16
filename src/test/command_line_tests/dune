@@ -10,6 +10,7 @@
    async_unix
    stdio
    alcotest
+   cmdliner
    ;; mina libraries
    init
  )

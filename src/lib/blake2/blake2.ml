@@ -52,6 +52,12 @@ module Make () = struct
 
   [%%versioned_binable
   module Stable = struct
+    (* it would be better to use `with_all_version_tags` on just
+       the module where we need a version tag, but that doesn't
+       (yet) work with %%versioned_binable
+    *)
+    [@@@with_top_version_tag]
+
     module V1 = struct
       type t = T1.t [@@deriving hash, sexp, compare, equal]
 

@@ -255,6 +255,24 @@ groups:
       description: "{{ $value }} blocks have been validated on network {{ $labels.testnet }} in the last hour (according to some node)."
       runbook: "https://www.notion.so/minaprotocol/FewBlocksPerHour-47a6356f093242d988b0d9527ce23478"
 
+  - alert: StuckInBootstrap
+    expr: count by (testnet) (increase(Coda_Runtime_process_uptime_ms_total{syncStatus = "BOOTSTRAP"}[2h]) >= 7200000) > 0
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical 
+    annotations:
+      summary: "One or more {{ $labels.testnet }} nodes are stuck at bootstrap for more than 2 hours"
+
+  - alert: StuckInCatchup 
+    expr: count by (testnet) (increase(Coda_Runtime_process_uptime_ms_total{syncStatus = "CATCHUP"}[2h]) >= 7200000) > 0
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical 
+    annotations:
+      summary: "One or more {{ $labels.testnet }} nodes are stuck at catchup for more than 2 hours"
+
 
 - name: Warnings
   rules:
