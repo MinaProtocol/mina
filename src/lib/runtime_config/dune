@@ -3,16 +3,20 @@
  (public_name coda_runtime_config)
  (libraries
    ;; opam libraries
+   async
+   async_kernel
    core_kernel
    bin_prot.shape
    base.caml
    base
    base64
-   sexplib0
+   integers
    result
+   sexplib0
    ;; local libraries
    currency
    data_hash_lib
+   merkle_ledger
    mina_base
    mina_numbers
    ppx_dhall_type
@@ -22,8 +26,9 @@
    pickles
    pickles.backend
    pickles_types
-   signature_lib
    with_hash
+   signature_lib
+   staged_ledger
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_sexp_conv ppx_let ppx_deriving_yojson ppx_dhall_type ppx_version ppx_compare)))
