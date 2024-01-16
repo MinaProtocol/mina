@@ -32,6 +32,8 @@ module Time = struct
 
   let of_yojson _ = not_implemented ()
 
+  let pp _ _ = not_implemented ()
+
   let set_pretty_to_string _ = not_implemented ()
 
   let pretty_to_string _ = not_implemented ()
