@@ -404,24 +404,31 @@ end
 
 let check_well_formedness ~genesis_constants t :
     (unit, Well_formedness_error.t list) result =
-  let preds =
-    let open Well_formedness_error in
-    [ (has_insufficient_fee, Insufficient_fee)
-    ; (has_zero_vesting_period, Zero_vesting_period)
-    ]
-  in
-  let errs0 =
-    List.fold preds ~init:[] ~f:(fun acc (f, err) ->
-        if f t then err :: acc else acc )
-  in
-  let errs =
-    match valid_size ~genesis_constants t with
-    | Ok () ->
-        errs0
-    | Error err ->
-        Zkapp_too_big err :: errs0
-  in
-  if List.is_empty errs then Ok () else Error errs
+  if Mina_compile_config.zkapps_disabled then
+    match t with
+    | Zkapp_command _ ->
+        Error [ Zkapp_too_big (Error.of_string "zkapps disabled") ]
+    | Signed_command _ ->
+        Ok ()
+  else
+    let preds =
+      let open Well_formedness_error in
+      [ (has_insufficient_fee, Insufficient_fee)
+      ; (has_zero_vesting_period, Zero_vesting_period)
+      ]
+    in
+    let errs0 =
+      List.fold preds ~init:[] ~f:(fun acc (f, err) ->
+          if f t then err :: acc else acc )
+    in
+    let errs =
+      match valid_size ~genesis_constants t with
+      | Ok () ->
+          errs0
+      | Error err ->
+          Zkapp_too_big err :: errs0
+    in
+    if List.is_empty errs then Ok () else Error errs
 
 type fee_payer_summary_t = Signature.t * Account.key * int
 [@@deriving yojson, hash]
