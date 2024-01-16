@@ -836,14 +836,26 @@ let print_config ~logger config =
        let%map.Option name = ledger.name in
        `String name
   in
-  let json_config, accounts_omitted =
+  let ( json_config
+      , `Accounts_omitted
+          ( `Genesis genesis_accounts_omitted
+          , `Staking staking_accounts_omitted
+          , `Next next_accounts_omitted ) ) =
     Runtime_config.to_yojson_without_accounts config
   in
-  let f i = List.cons ("accounts_omitted", `Int i) in
+  let append_accounts_omitted s =
+    Option.value_map
+      ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
+      ~default:Fn.id
+  in
+  let metadata =
+    append_accounts_omitted "genesis" genesis_accounts_omitted
+    @@ append_accounts_omitted "staking" staking_accounts_omitted
+    @@ append_accounts_omitted "next" next_accounts_omitted
+         [ ("name", ledger_name_json); ("config", json_config) ]
+  in
   [%log info] "Initializing with runtime configuration. Ledger name: $name"
-    ~metadata:
-      (Option.value_map ~f ~default:Fn.id accounts_omitted
-         [ ("name", ledger_name_json); ("config", json_config) ] )
+    ~metadata
 
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~proof_level (config : Runtime_config.t) =
