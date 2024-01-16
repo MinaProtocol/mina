@@ -82,4 +82,3 @@ let zkapp_cmd_limit = Some zkapp_cmd_limit
 [%%endif]
 
 let zkapps_disabled = false
-(* [%%inject "zkapps_disabled", zkapps_disabled] *)
