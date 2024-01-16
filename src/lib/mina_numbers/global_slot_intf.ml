@@ -18,8 +18,6 @@ module type S_base = sig
 
   val gen_incl : t -> t -> t Core_kernel.Quickcheck.Generator.t
 
-  val dhall_type : Ppx_dhall_type.Dhall_type.t
-
   val zero : t
 
   val one : t

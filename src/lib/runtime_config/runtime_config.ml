@@ -8,7 +8,7 @@ module Fork_config = struct
     ; previous_length : int (* number of blocks produced since genesis *)
     ; previous_global_slot : int (* global slot since genesis *)
     }
-  [@@deriving yojson, dhall_type, bin_io_unversioned]
+  [@@deriving yojson, bin_io_unversioned]
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -78,7 +78,7 @@ module Json_layout = struct
           ; vesting_period : Mina_numbers.Global_slot_span.t
           ; vesting_increment : Currency.Amount.t
           }
-        [@@deriving yojson, fields, dhall_type, sexp]
+        [@@deriving yojson, fields, sexp]
 
         let fields = Fields.names |> Array.of_list
 
@@ -88,7 +88,7 @@ module Json_layout = struct
       module Permissions = struct
         module Auth_required = struct
           type t = None | Either | Proof | Signature | Impossible
-          [@@deriving dhall_type, sexp, bin_io_unversioned]
+          [@@deriving sexp, bin_io_unversioned]
 
           let to_yojson = function
             | None ->
@@ -161,7 +161,7 @@ module Json_layout = struct
           ; set_voting_for : Auth_required.t [@default None]
           ; set_timing : Auth_required.t [@default None]
           }
-        [@@deriving yojson, fields, dhall_type, sexp, bin_io_unversioned]
+        [@@deriving yojson, fields, sexp, bin_io_unversioned]
 
         let fields = Fields.names |> Array.of_list
 
@@ -172,9 +172,6 @@ module Json_layout = struct
         module Field = struct
           type t = Snark_params.Tick.Field.t
           [@@deriving sexp, bin_io_unversioned]
-
-          (* can't be automatically derived *)
-          let dhall_type = Ppx_dhall_type.Dhall_type.Text
 
           let to_yojson t = `String (Snark_params.Tick.Field.to_string t)
 
@@ -190,9 +187,6 @@ module Json_layout = struct
         module Verification_key = struct
           type t = Pickles.Side_loaded.Verification_key.Stable.Latest.t
           [@@deriving sexp, bin_io_unversioned]
-
-          (* can't be automatically derived *)
-          let dhall_type = Ppx_dhall_type.Dhall_type.Text
 
           let to_yojson t =
             `String (Pickles.Side_loaded.Verification_key.to_base64 t)
@@ -227,7 +221,7 @@ module Json_layout = struct
           ; proved_state : bool
           ; zkapp_uri : string
           }
-        [@@deriving sexp, fields, dhall_type, yojson, bin_io_unversioned]
+        [@@deriving sexp, fields, yojson, bin_io_unversioned]
 
         let fields = Fields.names |> Array.of_list
 
@@ -249,7 +243,7 @@ module Json_layout = struct
         ; permissions : Permissions.t option [@default None]
         ; token_symbol : string option [@default None]
         }
-      [@@deriving sexp, fields, yojson, dhall_type]
+      [@@deriving sexp, fields, yojson]
 
       let fields = Fields.names |> Array.of_list
 
@@ -271,13 +265,13 @@ module Json_layout = struct
         }
     end
 
-    type t = Single.t list [@@deriving yojson, dhall_type]
+    type t = Single.t list [@@deriving yojson]
   end
 
   module Ledger = struct
     module Balance_spec = struct
       type t = { number : int; balance : Currency.Balance.t }
-      [@@deriving yojson, dhall_type]
+      [@@deriving yojson]
     end
 
     type t =
@@ -288,7 +282,7 @@ module Json_layout = struct
       ; name : string option [@default None]
       ; add_genesis_winner : bool option [@default None]
       }
-    [@@deriving yojson, fields, dhall_type]
+    [@@deriving yojson, fields]
 
     let fields = Fields.names |> Array.of_list
 
@@ -298,11 +292,10 @@ module Json_layout = struct
   module Proof_keys = struct
     module Transaction_capacity = struct
       type t =
-        { log_2 : int option
-              [@default None] [@key "2_to_the"] [@dhall_type.key "two_to_the"]
+        { log_2 : int option [@default None] [@key "2_to_the"]
         ; txns_per_second_x10 : int option [@default None]
         }
-      [@@deriving yojson, dhall_type]
+      [@@deriving yojson]
 
       (* we don't deriving the field names here, because the first one differs from the
          field in the record type
@@ -330,7 +323,7 @@ module Json_layout = struct
       ; account_creation_fee : Currency.Fee.t option [@default None]
       ; fork : Fork_config.t option [@default None]
       }
-    [@@deriving yojson, fields, dhall_type]
+    [@@deriving yojson, fields]
 
     let fields = Fields.names |> Array.of_list
 
@@ -346,7 +339,7 @@ module Json_layout = struct
       ; grace_period_slots : int option [@default None]
       ; genesis_state_timestamp : string option [@default None]
       }
-    [@@deriving yojson, fields, dhall_type]
+    [@@deriving yojson, fields]
 
     let fields = Fields.names |> Array.of_list
 
@@ -364,7 +357,7 @@ module Json_layout = struct
       ; max_event_elements : int option [@default None]
       ; max_action_elements : int option [@default None]
       }
-    [@@deriving yojson, fields, dhall_type]
+    [@@deriving yojson, fields]
 
     let fields = Fields.names |> Array.of_list
 
@@ -373,8 +366,12 @@ module Json_layout = struct
 
   module Epoch_data = struct
     module Data = struct
-      type t = { accounts : Accounts.t; seed : string }
-      [@@deriving yojson, fields, dhall_type]
+      type t =
+        { accounts : Accounts.t option [@default None]
+        ; seed : string
+        ; hash : string option [@default None]
+        }
+      [@@deriving yojson, fields]
 
       let fields = Fields.names |> Array.of_list
 
@@ -385,7 +382,7 @@ module Json_layout = struct
       { staking : Data.t
       ; next : (Data.t option[@default None]) (*If None then next = staking*)
       }
-    [@@deriving yojson, fields, dhall_type]
+    [@@deriving yojson, fields]
 
     let fields = Fields.names |> Array.of_list
 
@@ -399,7 +396,7 @@ module Json_layout = struct
     ; ledger : Ledger.t option [@default None]
     ; epoch_data : Epoch_data.t option [@default None]
     }
-  [@@deriving yojson, fields, dhall_type]
+  [@@deriving yojson, fields]
 
   let fields = Fields.names |> Array.of_list
 
@@ -1194,38 +1191,63 @@ module Epoch_data = struct
   let to_json_layout : t -> Json_layout.Epoch_data.t =
    fun { staking; next } ->
     let accounts (ledger : Ledger.t) =
-      match ledger.base with Accounts acc -> acc | _ -> assert false
+      match ledger.base with Accounts acc -> Some acc | _ -> None
     in
     let staking =
       { Json_layout.Epoch_data.Data.accounts = accounts staking.ledger
       ; seed = staking.seed
+      ; hash = staking.ledger.hash
       }
     in
     let next =
       Option.map next ~f:(fun n ->
           { Json_layout.Epoch_data.Data.accounts = accounts n.ledger
           ; seed = n.seed
+          ; hash = n.ledger.hash
           } )
     in
     { Json_layout.Epoch_data.staking; next }
 
   let of_json_layout : Json_layout.Epoch_data.t -> (t, string) Result.t =
    fun { staking; next } ->
-    let data accounts seed =
+    let open Result.Let_syntax in
+    let data (t : [ `Staking | `Next ])
+        { Json_layout.Epoch_data.Data.accounts; seed; hash } =
+      let%map base =
+        match accounts with
+        | Some accounts ->
+            return @@ Ledger.Accounts accounts
+        | None -> (
+            match hash with
+            | Some hash ->
+                return @@ Ledger.Hash hash
+            | None ->
+                let ledger_name =
+                  match t with `Staking -> "staking" | `Next -> "next"
+                in
+                Error
+                  (sprintf
+                     "Runtime_config.Epoch_data.of_json_layout: Expected a \
+                      field 'accounts', or 'hash' in '%s' ledger"
+                     ledger_name ) )
+      in
       let ledger =
-        { Ledger.base = Accounts accounts
+        { Ledger.base
         ; num_accounts = None
         ; balances = []
-        ; hash = None
+        ; hash
         ; name = None
         ; add_genesis_winner = Some false
         }
       in
       { Data.ledger; seed }
     in
-    let staking = data staking.accounts staking.seed in
-    let next = Option.map next ~f:(fun n -> data n.accounts n.seed) in
-    Ok { staking; next }
+    let%bind staking = data `Staking staking in
+    let%map next =
+      Option.value_map next ~default:(Ok None) ~f:(fun next ->
+          Result.map ~f:Option.some @@ data `Next next )
+    in
+    { staking; next }
 
   let to_yojson x = Json_layout.Epoch_data.to_yojson (to_json_layout x)
 
@@ -1272,16 +1294,34 @@ let to_yojson x = Json_layout.to_yojson (to_json_layout x)
 
 let to_yojson_without_accounts x =
   let layout = to_json_layout x in
-  let num_accounts =
-    let%bind.Option ledger = layout.ledger in
-    let%map.Option accounts = ledger.accounts in
-    List.length accounts
+  let genesis_accounts =
+    let%bind.Option { accounts; _ } = layout.ledger in
+    Option.map ~f:List.length accounts
+  in
+  let staking_accounts =
+    let%bind.Option { staking; _ } = layout.epoch_data in
+    Option.map ~f:List.length staking.accounts
+  in
+  let next_accounts =
+    let%bind.Option { next; _ } = layout.epoch_data in
+    let%bind.Option { accounts; _ } = next in
+    Option.map ~f:List.length accounts
   in
   let layout =
     let f ledger = { ledger with Json_layout.Ledger.accounts = None } in
-    { layout with ledger = Option.map ~f layout.ledger }
+    { layout with
+      ledger = Option.map ~f layout.ledger
+    ; epoch_data =
+        Option.map layout.epoch_data ~f:(fun { staking; next } ->
+            { Json_layout.Epoch_data.staking = { staking with accounts = None }
+            ; next = Option.map next ~f:(fun n -> { n with accounts = None })
+            } )
+    }
   in
-  (Json_layout.to_yojson layout, num_accounts)
+  ( Json_layout.to_yojson layout
+  , `Accounts_omitted
+      (`Genesis genesis_accounts, `Staking staking_accounts, `Next next_accounts)
+  )
 
 let of_yojson json = Result.bind ~f:of_json_layout (Json_layout.of_yojson json)
 
