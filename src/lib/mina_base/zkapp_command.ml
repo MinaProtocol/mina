@@ -1960,7 +1960,7 @@ let is_incompatible_version t =
       match p.body.update.permissions with
       | Keep ->
           false
-      | Set { set_verification_key = auth, txn_version; _ } ->
+      | Set { set_verification_key = _auth, txn_version; _ } ->
           not Mina_numbers.Txn_version.(equal_to_current txn_version) )
 
 let get_transaction_commitments (zkapp_command : t) =
