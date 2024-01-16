@@ -235,6 +235,13 @@ let minimum_fee = Currency.Fee.minimum_user_command_fee
 
 let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
+let zkAppsDisabled t =
+  match t with
+  | Zkapp_command _ ->
+      not Mina_compile_config.zkapps_disabled
+  | _ ->
+      false
+
 (* always `Accessed` for fee payer *)
 let accounts_accessed (t : t) (status : Transaction_status.t) :
     (Account_id.t * [ `Accessed | `Not_accessed ]) list =
@@ -391,6 +398,7 @@ module Well_formedness_error = struct
     | Insufficient_fee
     | Zero_vesting_period
     | Zkapp_too_big of (Error.t[@to_yojson Error_json.error_to_yojson])
+    | Zkapps_are_disabled
   [@@deriving compare, to_yojson]
 
   let to_string = function
@@ -400,35 +408,31 @@ module Well_formedness_error = struct
         "Zero vesting period"
     | Zkapp_too_big err ->
         sprintf "Zkapp too big (%s)" (Error.to_string_hum err)
+    | Zkapps_are_disabled ->
+        "Zkapps are disabled"
 end
 
 let check_well_formedness ~genesis_constants t :
     (unit, Well_formedness_error.t list) result =
-  if Mina_compile_config.zkapps_disabled then
-    match t with
-    | Zkapp_command _ ->
-        Error [ Zkapp_too_big (Error.of_string "zkapps disabled") ]
-    | Signed_command _ ->
-        Ok ()
-  else
-    let preds =
-      let open Well_formedness_error in
-      [ (has_insufficient_fee, Insufficient_fee)
-      ; (has_zero_vesting_period, Zero_vesting_period)
-      ]
-    in
-    let errs0 =
-      List.fold preds ~init:[] ~f:(fun acc (f, err) ->
-          if f t then err :: acc else acc )
-    in
-    let errs =
-      match valid_size ~genesis_constants t with
-      | Ok () ->
-          errs0
-      | Error err ->
-          Zkapp_too_big err :: errs0
-    in
-    if List.is_empty errs then Ok () else Error errs
+  let preds =
+    let open Well_formedness_error in
+    [ (has_insufficient_fee, Insufficient_fee)
+    ; (has_zero_vesting_period, Zero_vesting_period)
+    ; (zkAppsDisabled, Zkapp_too_big (Error.of_string "zkapps disabled"))
+    ]
+  in
+  let errs0 =
+    List.fold preds ~init:[] ~f:(fun acc (f, err) ->
+        if f t then err :: acc else acc )
+  in
+  let errs =
+    match valid_size ~genesis_constants t with
+    | Ok () ->
+        errs0
+    | Error err ->
+        Zkapp_too_big err :: errs0
+  in
+  if List.is_empty errs then Ok () else Error errs
 
 type fee_payer_summary_t = Signature.t * Account.key * int
 [@@deriving yojson, hash]
