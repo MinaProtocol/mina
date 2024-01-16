@@ -4361,11 +4361,14 @@ module Queries = struct
                   Mina_base.Ledger_hash.equal
                     (Ledger.Any_ledger.M.merkle_root ledger)
                     next_epoch.ledger.hash ) ) ;
-            let%map new_config =
+            let%bind new_config =
               Runtime_config.make_fork_config ~staged_ledger ~global_slot
                 ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
                 ~next_epoch_seed ~blockchain_length ~protocol_state
                 runtime_config
+            in
+            let%map () =
+              Async_unix.Scheduler.yield () |> Deferred.map ~f:Result.return
             in
             Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic )
 
