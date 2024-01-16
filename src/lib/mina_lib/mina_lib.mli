@@ -200,3 +200,9 @@ val runtime_config : t -> Runtime_config.t
 val start_filtered_log : t -> string list -> unit Or_error.t
 
 val get_filtered_log_entries : t -> int -> string list * bool
+
+val best_chain_block_by_height :
+  t -> Unsigned.UInt32.t -> (Transition_frontier.Breadcrumb.t, string) Result.t
+
+val best_chain_block_by_state_hash :
+  t -> State_hash.t -> (Transition_frontier.Breadcrumb.t, string) Result.t

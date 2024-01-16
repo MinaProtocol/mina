@@ -4076,25 +4076,13 @@ module Queries = struct
       ~resolve:(fun { ctx = coda; _ } () (state_hash_base58_opt : string option)
                     (height_opt : int option) ->
         let open Result.Let_syntax in
-        let get_transition_frontier () =
-          let transition_frontier_pipe = Mina_lib.transition_frontier coda in
-          Pipe_lib.Broadcast_pipe.Reader.peek transition_frontier_pipe
-          |> Result.of_option ~error:"Could not obtain transition frontier"
-        in
         let block_from_state_hash state_hash_base58 =
           let%bind state_hash =
             State_hash.of_base58_check state_hash_base58
             |> Result.map_error ~f:Error.to_string_hum
           in
-          let%bind transition_frontier = get_transition_frontier () in
           let%map breadcrumb =
-            Transition_frontier.find transition_frontier state_hash
-            |> Result.of_option
-                 ~error:
-                   (sprintf
-                      "Block with state hash %s not found in transition \
-                       frontier"
-                      state_hash_base58 )
+            Mina_lib.best_chain_block_by_state_hash coda state_hash
           in
           block_of_breadcrumb coda breadcrumb
         in
@@ -4107,29 +4095,10 @@ module Queries = struct
             *)
             Unsigned.UInt32.of_int height
           in
-          let%bind transition_frontier = get_transition_frontier () in
-          let best_chain_breadcrumbs =
-            Transition_frontier.best_tip_path transition_frontier
+          let%map breadcrumb =
+            Mina_lib.best_chain_block_by_height coda height_uint32
           in
-          let%map desired_breadcrumb =
-            List.find best_chain_breadcrumbs ~f:(fun bc ->
-                let validated_transition =
-                  Transition_frontier.Breadcrumb.validated_transition bc
-                in
-                let block_height =
-                  Mina_block.(
-                    blockchain_length @@ With_hash.data
-                    @@ Validated.forget validated_transition)
-                in
-                Unsigned.UInt32.equal block_height height_uint32 )
-            |> Result.of_option
-                 ~error:
-                   (sprintf
-                      "Could not find block in transition frontier with height \
-                       %d"
-                      height )
-          in
-          block_of_breadcrumb coda desired_breadcrumb
+          block_of_breadcrumb coda breadcrumb
         in
         match (state_hash_base58_opt, height_opt) with
         | Some state_hash_base58, None ->
