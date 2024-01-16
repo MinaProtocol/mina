@@ -69,7 +69,6 @@
         rust = import ./nix/rust.nix;
         go = import ./nix/go.nix;
         javascript = import ./nix/javascript.nix;
-        python = import ./nix/python.nix;
         ocaml = final: prev: {
           ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
             inherit inputs;
@@ -288,12 +287,12 @@
         # Main user-facing binaries.
         packages = rec {
           inherit (ocamlPackages)
-            mina mina_tests mina-ocaml-format test_executive mina-delegation-verify;
+            mina mina_tests mina-ocaml-format test_executive;
           inherit (pkgs)
             libp2p_helper kimchi_bindings_stubs snarky_js leaderboard
             validation trace-tool zkapp-cli;
           inherit (dockerImages)
-            mina-image-slim mina-image-full mina-archive-image-full mina-delegation-verify-image;
+            mina-image-slim mina-image-full mina-archive-image-full;
           mina-deb = debianPackages.mina;
           default = mina;
         };

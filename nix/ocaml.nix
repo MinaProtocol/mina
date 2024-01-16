@@ -322,25 +322,6 @@ let
         '';
       });
 
-      # Stateless verification tool
-      mina-delegation-verify-dev = self.mina-dev.overrideAttrs (_: {
-        pname = "mina-delegation-verify";
-        version = "dev";
-        outputs = [ "out" ];
-
-        buildPhase = ''
-          dune build --display=short --profile=devnet \
-            src/app/delegation_verify/delegation_verify.exe
-        '';
-
-        installPhase = ''
-          mkdir -p $out/bin
-          mv _build/default/src/app/delegation_verify/delegation_verify.exe $out/bin/delegation-verify
-        '';
-      });
-
-      mina-delegation-verify = wrapMina self.mina-delegation-verify-dev { };
-
       # Integration test executive
       test_executive-dev = self.mina-dev.overrideAttrs (oa: {
         pname = "mina-test_executive";
