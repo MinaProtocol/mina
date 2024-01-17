@@ -539,7 +539,7 @@ let setup_daemon logger =
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-oversized-logs.log"
-               ~max_size:logrotate_max_size ~num_rotate:file_log_rotations ) ;
+               ~max_size:logrotate_max_size ~num_rotate:20 ) ;
         (* Consumer for `[%log internal]` logging used for internal tracing *)
         Itn_logger.set_message_postprocessor
           Internal_tracing.For_itn_logger.post_process_message ;
@@ -753,17 +753,29 @@ let setup_daemon logger =
             | Ok (precomputed_values, _) ->
                 precomputed_values
             | Error err ->
-                let json_config, accounts_omitted =
+                let ( json_config
+                    , `Accounts_omitted
+                        ( `Genesis genesis_accounts_omitted
+                        , `Staking staking_accounts_omitted
+                        , `Next next_accounts_omitted ) ) =
                   Runtime_config.to_yojson_without_accounts config
                 in
-                let f i = List.cons ("accounts_omitted", `Int i) in
-                [%log fatal]
-                  "Failed initializing with configuration $config: $error"
-                  ~metadata:
-                    (Option.value_map ~f ~default:Fn.id accounts_omitted
+                let append_accounts_omitted s =
+                  Option.value_map
+                    ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
+                    ~default:Fn.id
+                in
+                let metadata =
+                  append_accounts_omitted "genesis" genesis_accounts_omitted
+                  @@ append_accounts_omitted "staking" staking_accounts_omitted
+                  @@ append_accounts_omitted "next" next_accounts_omitted
                        [ ("config", json_config)
                        ; ("error", Error_json.error_to_yojson err)
-                       ] ) ;
+                       ]
+                in
+                [%log info]
+                  "Initializing with runtime configuration. Ledger name: $name"
+                  ~metadata ;
                 Error.raise err
           in
           let rev_daemon_configs =

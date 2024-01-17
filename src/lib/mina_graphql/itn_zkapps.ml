@@ -125,9 +125,10 @@ let rec wait_until_zkapps_deployed ?(deployed = false) ~scheduler_tbl ~mina
       "Some deployed zkApp accounts weren't found in the best tip ledger, \
        trying again" ;
     let%bind () =
+      (* Checking three times per block window to avoid unnecessary waiting after the block is created *)
       Async.after
         (Time.Span.of_ms
-           (Float.of_int constraint_constants.block_window_duration_ms) )
+           (Float.of_int constraint_constants.block_window_duration_ms /. 3.0) )
     in
     let ledger =
       Utils.get_ledger_and_breadcrumb mina
@@ -223,13 +224,19 @@ let send_zkapps ~fee_payer_array ~constraint_constants ~tm_end ~scheduler_tbl
           @@ Quickcheck.Generator.generate
                ( if zkapp_command_details.max_cost then
                  Mina_generators.Zkapp_command_generators
-                 .gen_max_cost_zkapp_command_from ~fee_payer_keypair:fee_payer
-                   ~account_state_tbl ~vk
+                 .gen_max_cost_zkapp_command_from ~memo
+                   ~fee_range:
+                     ( zkapp_command_details.min_fee
+                     , zkapp_command_details.max_fee )
+                   ~fee_payer_keypair:fee_payer ~account_state_tbl ~vk
                    ~genesis_constants:
                      (Mina_lib.config mina).precomputed_values.genesis_constants
+                   ()
                else
                  Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
                    ~memo
+                   ?max_account_updates:
+                     zkapp_command_details.max_account_updates
                    ~no_account_precondition:
                      zkapp_command_details.no_precondition
                    ~fee_range:

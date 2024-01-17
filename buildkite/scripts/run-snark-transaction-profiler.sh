@@ -8,13 +8,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y git apt-transport-https ca-certificates tzdata curl python3
 
-case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
-  rampup|berkeley|release/2.0.0|develop)
-    TESTNET_NAME="berkeley"
-  ;;
-  *)
-    TESTNET_NAME="mainnet"
-esac
+TESTNET_NAME="berkeley"
 
 git config --global --add safe.directory /workdir
 
@@ -29,5 +23,5 @@ K=1
 MAX_NUM_UPDATES=4
 MIN_NUM_UPDATES=2   
 
-echo "--- Run Snark Transaction Profiler with parameters: --zkapps --k ${K} --max-num-updates ${MAX_NUM_UPDATES} --min-num-updates ${MIN_NUM_UPDATES}"
+echo "-- Run Snark Transaction Profiler with parameters: --zkapps --k ${K} --max-num-updates ${MAX_NUM_UPDATES} --min-num-updates ${MIN_NUM_UPDATES}"
 python3 ./scripts/snark_transaction_profiler.py ${K} ${MAX_NUM_UPDATES} ${MIN_NUM_UPDATES}

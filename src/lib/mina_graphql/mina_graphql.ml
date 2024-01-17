@@ -1290,36 +1290,35 @@ module Mutations = struct
                   Public_key.compress public_key )
               |> Public_key.Compressed.Hash_set.of_list
             in
-            upon
-              (Itn_zkapps.wait_until_zkapps_deployed ~scheduler_tbl ~mina
-                 ~ledger ~deployment_fee:zkapp_command_details.deployment_fee
-                 ~max_cost:zkapp_command_details.max_cost
-                 ~init_balance:zkapp_command_details.init_balance
-                 ~fee_payer_array ~constraint_constants zkapp_account_keypairs
-                 ~logger ~uuid ~stop_signal ~stop_time:tm_end
-                 ~memo_prefix:zkapp_command_details.memo_prefix ~wait_span )
-              (fun result ->
-                match result with
-                | None ->
-                    ()
-                | Some ledger ->
-                    let account_state_tbl =
-                      let get_account ids role =
-                        List.map ids ~f:(fun id ->
-                            (id, (Utils.account_of_id id ledger, role)) )
-                      in
-                      Account_id.Table.of_alist_exn
-                        ( get_account fee_payer_ids `Fee_payer
-                        @ get_account zkapp_account_ids `Ordinary_participant )
+            let deploy_zkapps_do () =
+              Itn_zkapps.wait_until_zkapps_deployed ~scheduler_tbl ~mina ~ledger
+                ~deployment_fee:zkapp_command_details.deployment_fee
+                ~max_cost:zkapp_command_details.max_cost
+                ~init_balance:zkapp_command_details.init_balance
+                ~fee_payer_array ~constraint_constants zkapp_account_keypairs
+                ~logger ~uuid ~stop_signal ~stop_time:tm_end
+                ~memo_prefix:zkapp_command_details.memo_prefix ~wait_span
+            in
+            upon (deploy_zkapps_do ()) (function
+              | None ->
+                  ()
+              | Some ledger ->
+                  let account_state_tbl =
+                    let get_account ids role =
+                      List.map ids ~f:(fun id ->
+                          (id, (Utils.account_of_id id ledger, role)) )
                     in
-                    let tm_next = Time.add (Time.now ()) wait_span in
-                    don't_wait_for
-                    @@ Itn_zkapps.send_zkapps ~fee_payer_array
-                         ~constraint_constants ~scheduler_tbl ~uuid ~keymap
-                         ~unused_pks ~stop_signal ~mina ~zkapp_command_details
-                         ~wait_span ~logger ~tm_end ~account_state_tbl tm_next
-                         (List.length zkapp_account_keypairs) ) ;
-
+                    Account_id.Table.of_alist_exn
+                      ( get_account fee_payer_ids `Fee_payer
+                      @ get_account zkapp_account_ids `Ordinary_participant )
+                  in
+                  let tm_next = Time.add (Time.now ()) wait_span in
+                  don't_wait_for
+                  @@ Itn_zkapps.send_zkapps ~fee_payer_array
+                       ~constraint_constants ~scheduler_tbl ~uuid ~keymap
+                       ~unused_pks ~stop_signal ~mina ~zkapp_command_details
+                       ~wait_span ~logger ~tm_end ~account_state_tbl tm_next
+                       (List.length zkapp_account_keypairs) ) ;
             Ok (Uuid.to_string uuid) )
 
     let stop_scheduled_transactions =
@@ -1570,6 +1569,16 @@ module Mutations = struct
                  exit 0 ) ;
               return @@ Ok s )
 
+    let zkapp_cmd_limit =
+      field "zkAppCommandLimit"
+        ~args:
+          Arg.[ arg "limit" ~doc:"ZkApp commands per block limit." ~typ:int ]
+        ~typ:int
+        ~doc:"Set zkApp commands per block limit for the block producer."
+        ~resolve:(fun { ctx = _; _ } () limit ->
+          Block_producer.zkapp_cmd_limit := limit ;
+          limit )
+
     let commands =
       [ schedule_payments
       ; schedule_zkapp_commands
@@ -1577,6 +1586,7 @@ module Mutations = struct
       ; update_gating
       ; flush_internal_logs
       ; stop_daemon
+      ; zkapp_cmd_limit
       ]
   end
 end
@@ -2294,16 +2304,7 @@ module Queries = struct
         |> Runtime_config.to_yojson |> Yojson.Safe.to_basic )
 
   let fork_config =
-    let rec map_results ~f = function
-      | [] ->
-          Result.return []
-      | r :: rs ->
-          let open Result.Let_syntax in
-          let%bind r' = f r in
-          let%map rs = map_results ~f rs in
-          r' :: rs
-    in
-    field "fork_config"
+    io_field "fork_config"
       ~doc:
         "The runtime configuration for a blockchain fork intended to be a \
          continuation of the current one."
@@ -2312,63 +2313,81 @@ module Queries = struct
       ~resolve:(fun { ctx = mina; _ } () ->
         match Mina_lib.best_tip mina with
         | `Bootstrapping ->
-            `Assoc [ ("error", `String "Daemon is bootstrapping") ]
-        | `Active best_tip -> (
+            Deferred.Result.fail "Daemon is bootstrapping"
+        | `Active best_tip ->
+            let open Deferred.Result.Let_syntax in
             let block = Transition_frontier.Breadcrumb.(block best_tip) in
+            let blockchain_length = Mina_block.blockchain_length block in
             let global_slot =
-              Mina_block.blockchain_length block |> Unsigned.UInt32.to_int
+              Mina_block.consensus_state block
+              |> Consensus.Data.Consensus_state.curr_global_slot
             in
-            let accounts_or_error =
+            let staged_ledger =
               Transition_frontier.Breadcrumb.staged_ledger best_tip
               |> Staged_ledger.ledger
-              |> Ledger.foldi ~init:[] ~f:(fun _ accum act -> act :: accum)
-              |> map_results
-                   ~f:Runtime_config.Json_layout.Accounts.Single.of_account
             in
             let protocol_state =
               Transition_frontier.Breadcrumb.protocol_state best_tip
             in
-            match accounts_or_error with
-            | Error e ->
-                `Assoc [ ("error", `String e) ]
-            | Ok accounts ->
-                let runtime_config = Mina_lib.runtime_config mina in
-                let ledger = Option.value_exn runtime_config.ledger in
-                let previous_length =
-                  let open Option.Let_syntax in
-                  let%bind proof = runtime_config.proof in
-                  let%map fork = proof.fork in
-                  fork.previous_length + global_slot
-                in
-                let fork =
-                  Runtime_config.Fork_config.
-                    { previous_state_hash =
-                        State_hash.to_base58_check
-                          protocol_state.previous_state_hash
-                    ; previous_length =
-                        Option.value ~default:global_slot previous_length
-                    ; genesis_slot = global_slot
-                    }
-                in
-                let update =
-                  Runtime_config.make
-                  (* add_genesis_winner must be set to false, because this
-                     config effectively creates a continuation of the current
-                     blockchain state and therefore the genesis ledger already
-                     contains the winner of the previous block. No need to
-                     artificially add it. In fact, it wouldn't work at all,
-                     because the new node would try to create this account at
-                     startup, even though it already exists, leading to an error.*)
-                    ~ledger:
-                      { ledger with
-                        base = Accounts accounts
-                      ; add_genesis_winner = Some false
-                      }
-                    ~proof:(Runtime_config.Proof_keys.make ~fork ())
-                    ()
-                in
-                let new_config = Runtime_config.combine runtime_config update in
-                Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic ) )
+            let consensus =
+              Mina_state.Protocol_state.consensus_state protocol_state
+            in
+            let staking_epoch =
+              Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
+                consensus
+            in
+            let next_epoch =
+              Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
+                consensus
+            in
+            let staking_epoch_seed =
+              Mina_base.Epoch_seed.to_base58_check
+                staking_epoch.Mina_base.Epoch_data.Poly.seed
+            in
+            let next_epoch_seed =
+              Mina_base.Epoch_seed.to_base58_check
+                next_epoch.Mina_base.Epoch_data.Poly.seed
+            in
+            let runtime_config = Mina_lib.runtime_config mina in
+            let%bind staking_ledger =
+              match Mina_lib.staking_ledger mina with
+              | None ->
+                  Deferred.Result.fail "Staking ledger is not initialized."
+              | Some (Genesis_epoch_ledger l) ->
+                  return (Ledger.Any_ledger.cast (module Ledger) l)
+              | Some (Ledger_db l) ->
+                  return (Ledger.Any_ledger.cast (module Ledger.Db) l)
+            in
+            assert (
+              Mina_base.Ledger_hash.equal
+                (Ledger.Any_ledger.M.merkle_root staking_ledger)
+                staking_epoch.ledger.hash ) ;
+            let%bind next_epoch_ledger =
+              match Mina_lib.next_epoch_ledger mina with
+              | None ->
+                  Deferred.Result.fail "Next epoch ledger is not initialized."
+              | Some `Notfinalized ->
+                  return None
+              | Some (`Finalized (Genesis_epoch_ledger l)) ->
+                  return (Some (Ledger.Any_ledger.cast (module Ledger) l))
+              | Some (`Finalized (Ledger_db l)) ->
+                  return (Some (Ledger.Any_ledger.cast (module Ledger.Db) l))
+            in
+            let protocol_state_hash =
+              Transition_frontier.Breadcrumb.state_hash best_tip
+            in
+            Option.iter next_epoch_ledger ~f:(fun ledger ->
+                assert (
+                  Mina_base.Ledger_hash.equal
+                    (Ledger.Any_ledger.M.merkle_root ledger)
+                    next_epoch.ledger.hash ) ) ;
+            let%map new_config =
+              Runtime_config.make_fork_config ~staged_ledger ~global_slot
+                ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
+                ~next_epoch_seed ~blockchain_length ~protocol_state_hash
+                runtime_config
+            in
+            Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic )
 
   let thread_graph =
     field "threadGraph"
