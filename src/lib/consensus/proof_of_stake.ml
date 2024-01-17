@@ -2654,7 +2654,8 @@ module Make_str (A : Wire_types.Concrete) = struct
      * as the ledger hash specified by the epoch data).
      *)
     let select_epoch_snapshot ~(constants : Constants.t)
-        ~(consensus_state : Consensus_state.Value.t) ~local_state ~epoch =
+        ~(consensus_state : Consensus_state.Value.t) ~local_state ~epoch
+        ~genesis_ledger_hash =
       let open Local_state in
       let open Epoch_data.Poly in
       (* are we in the next epoch after the consensus state? *)
@@ -2665,21 +2666,26 @@ module Make_str (A : Wire_types.Concrete) = struct
       (* has the first transition in the epoch (other than the genesis epoch) reached finalization? *)
       let epoch_is_not_finalized =
         let is_genesis_epoch = Length.equal epoch Length.zero in
+        let staking_ledger_same_as_genesis =
+          Mina_base.Frozen_ledger_hash.equal
+            consensus_state.staking_epoch_data.ledger.hash genesis_ledger_hash
+        in
         let epoch_is_finalized =
           Length.(consensus_state.next_epoch_data.epoch_length > constants.k)
         in
-        (not epoch_is_finalized) && not is_genesis_epoch
+        (not epoch_is_finalized)
+        && not (is_genesis_epoch && staking_ledger_same_as_genesis)
       in
       if in_next_epoch || epoch_is_not_finalized then
         (`Curr, !local_state.Data.next_epoch_snapshot)
       else (`Last, !local_state.staking_epoch_snapshot)
 
     let get_epoch_ledger ~constants ~(consensus_state : Consensus_state.Value.t)
-        ~local_state =
+        ~local_state ~genesis_ledger_hash =
       let _, snapshot =
         select_epoch_snapshot ~constants ~consensus_state
           ~epoch:(Data.Consensus_state.curr_epoch consensus_state)
-          ~local_state
+          ~local_state ~genesis_ledger_hash
       in
       Data.Local_state.Snapshot.ledger snapshot
 
@@ -2701,11 +2707,13 @@ module Make_str (A : Wire_types.Concrete) = struct
       match s with One _ -> 1 | Both _ -> 2
 
     let required_local_state_sync ~constants
-        ~(consensus_state : Consensus_state.Value.t) ~local_state =
+        ~(consensus_state : Consensus_state.Value.t) ~local_state
+        ~genesis_ledger_hash =
       let open Mina_base in
       let epoch = Consensus_state.curr_epoch consensus_state in
       let source, _snapshot =
         select_epoch_snapshot ~constants ~consensus_state ~local_state ~epoch
+          ~genesis_ledger_hash
       in
       let required_snapshot_sync snapshot_id expected_root =
         Option.some_if
@@ -3051,7 +3059,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     let epoch_end_time = Epoch.end_time
 
     let get_epoch_data_for_vrf ~(constants : Constants.t) now
-        (state : Consensus_state.Value.t) ~local_state ~logger :
+        (state : Consensus_state.Value.t) ~local_state ~logger
+        ~genesis_ledger_hash :
         Epoch_data_for_vrf.t * Local_state.Snapshot.Ledger_snapshot.t =
       let curr_epoch, curr_slot =
         Epoch.epoch_and_slot_of_time_exn ~constants
@@ -3096,7 +3105,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let epoch_snapshot =
         let source, snapshot =
           select_epoch_snapshot ~constants ~consensus_state:state ~local_state
-            ~epoch
+            ~epoch ~genesis_ledger_hash
         in
         let snapshot_ledger_hash =
           Local_state.Snapshot.Ledger_snapshot.merkle_root snapshot.ledger

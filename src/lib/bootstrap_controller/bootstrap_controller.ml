@@ -499,10 +499,16 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                     , Some ("Received valid scan state from peer", []) ))
             in
             let best_seen_block_with_hash, _ = t.best_seen_transition in
-            let consensus_state =
+            let protocol_state =
               With_hash.data best_seen_block_with_hash
               |> Mina_block.header |> Mina_block.Header.protocol_state
-              |> Protocol_state.consensus_state
+            in
+            let consensus_state =
+              protocol_state |> Protocol_state.consensus_state
+            in
+            let genesis_ledger_hash =
+              protocol_state |> Protocol_state.blockchain_state
+              |> Blockchain_state.genesis_ledger_hash
             in
             (* Synchronize consensus local state if necessary *)
             let%bind ( local_state_sync_time
@@ -512,6 +518,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                     Consensus.Hooks.required_local_state_sync
                       ~constants:precomputed_values.consensus_constants
                       ~consensus_state ~local_state:consensus_local_state
+                      ~genesis_ledger_hash
                   with
                 | None ->
                     [%log debug]

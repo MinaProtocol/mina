@@ -1031,16 +1031,20 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                in
                check_next_block_timing slot i () )
         | Some transition_frontier ->
-            let consensus_state =
-              Transition_frontier.best_tip transition_frontier
-              |> Breadcrumb.consensus_state
+            let best_tip = Transition_frontier.best_tip transition_frontier in
+            let consensus_state = best_tip |> Breadcrumb.consensus_state in
+            let genesis_ledger_hash =
+              best_tip |> Breadcrumb.protocol_state
+              |> Protocol_state.blockchain_state
+              |> Blockchain_state.genesis_ledger_hash
             in
             let now = Block_time.now time_controller in
             let epoch_data_for_vrf, ledger_snapshot =
               O1trace.sync_thread "get_epoch_data_for_vrf" (fun () ->
                   Consensus.Hooks.get_epoch_data_for_vrf
                     ~constants:consensus_constants (time_to_ms now)
-                    consensus_state ~local_state:consensus_local_state ~logger )
+                    consensus_state ~local_state:consensus_local_state ~logger
+                    ~genesis_ledger_hash )
             in
             let i' = Mina_numbers.Length.succ epoch_data_for_vrf.epoch in
             let new_global_slot = epoch_data_for_vrf.global_slot in

@@ -696,6 +696,7 @@ module type S = sig
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
       -> logger:Logger.t
+      -> genesis_ledger_hash:Ledger_hash.t
       -> Data.Epoch_data_for_vrf.t * Local_state.Snapshot.Ledger_snapshot.t
 
     val get_block_data :
@@ -745,6 +746,7 @@ module type S = sig
          constants:Constants.t
       -> consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
+      -> genesis_ledger_hash:Ledger_hash.t
       -> local_state_sync option
 
     (**
