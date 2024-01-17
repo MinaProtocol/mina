@@ -1,13 +1,13 @@
-#################################################################################################
-# The "production" Stage
-# - sets up the final container with built binaries and a running postgresql archive node setup
-#################################################################################################
-# Supports debian:buster-slim, debian:bullseye-slim, and ubuntu:focal
 ARG image=ubuntu:focal
 FROM ${image} AS production
 ARG deb_codename=focal
+ARG deb_version
+ARG deb_release=unstable
+ARG network=mainnet
 
 ARG psql_version=13
+# Golang version number used to detemine tarball name
+ARG GO_VERSION=1.19.11
 
 ARG MINA_DAEMON_PORT=10101
 ARG MINA_CONFIG_DIR=/data/.mina-config
@@ -18,6 +18,23 @@ ARG ROSETTA_CLI_VERSION=v0.10.1
 
 ENV DEBIAN_FRONTEND noninteractive
 
+# We do not install the below platform-specific dependencies,
+# and instead assume that apt will install the proper deps based on the package definition.
+# The packages are noted here just for clarity/documentation.
+# Stretch-only Deps:
+#    libffi6
+#    libprocps6
+#    libjemalloc1
+# Buster-only Deps:
+#    libffi7
+#    libprocps7
+#    libjemalloc2
+# Bullseye/Focal-only Deps:
+#    libffi7
+#    libprocps8
+#    libjemalloc2
+
+
 # --- Dependencies across many platforms
 RUN apt-get update --quiet --yes \
   && apt-get upgrade --quiet --yes \
@@ -26,6 +43,7 @@ RUN apt-get update --quiet --yes \
     apt-transport-https \
     curl \
     ca-certificates \
+    build-essential \
     dnsutils \
     dumb-init \
     gettext \
@@ -46,41 +64,14 @@ RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
        postgresql-"$psql_version" \
        postgresql-client-"$psql_version"
 
-# --- Debian 11 "Bullseye" Dependencies
-RUN test "$deb_codename" = "bullseye" \
-     && apt-get update -y \
-     && apt-get install -y \
-         libjemalloc2 \
-         libprocps8 \
-         libffi7 \
-     || exit 0
-
-# --- Debian 10 "Buster" Dependencies
-RUN test "$deb_codename" = "buster" \
-     && apt-get update --quiet --yes \
-     && apt-get install --quiet --yes --no-install-recommends \
-         libjemalloc2 \
-         libprocps7 \
-         libffi6 \
-     || exit 0
-
-# --- Ubuntu 20.04 "Focal Fossa" Dependencies
-RUN test "$deb_codename" = "focal" \
-     && apt-get update --quiet --yes \
-     && apt-get install --quiet --yes --no-install-recommends \
-         libjemalloc2 \
-         libprocps8 \
-         libffi7 \
-     || exit 0
+# --- Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
+RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
 
 # --- Install rosetta-cli
-
 # The following commands install rosetta-cli with an updated rosetta-sdk-go dependency, which supports delegation transactions.
 # Upstream PR to rosetta-sdk-go: https://github.com/coinbase/rosetta-sdk-go/pull/457
 # They can be replaced once there is a new release of rosetta-cli containing the above change by:
-# RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/${ROSETTA_CLI_VERSION}/scripts/install.sh | sh -s
-COPY --from=builder /usr/lib/go /usr/lib/go
-RUN apt-get install -y gcc
+#RUN curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/${ROSETTA_CLI_VERSION}/scripts/install.sh | sh -s
 RUN export GOBIN="$(pwd)/bin" \
   && curl -L "https://github.com/coinbase/rosetta-cli/archive/refs/tags/v0.10.1.tar.gz" -o "/tmp/v0.10.1.tar.gz" \
   && tar xzf "/tmp/v0.10.1.tar.gz" -C "/tmp" \
@@ -99,15 +90,14 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
   > ${MINA_CONFIG_DIR}/wallets/store/${PK} \
   && chmod go-rwx ${MINA_CONFIG_DIR}/wallets/store/${PK}
 
-# --- Copy artifacts from the 3-builder stage
-COPY --from=builder /home/opam/app/* /usr/local/bin/
-COPY --from=builder /home/opam/mina/src/app/rosetta/*.sh /rosetta/
-COPY --from=builder /home/opam/mina/src/app/rosetta/*.conf /rosetta/
-COPY --from=builder /home/opam/mina/src/app/rosetta/README.md /rosetta/
-COPY --from=builder /home/opam/mina/src/app/rosetta/rosetta-cli-config/*.json /rosetta/rosetta-cli-config/
-COPY --from=builder /home/opam/mina/src/app/rosetta/rosetta-cli-config/*.ros /rosetta/rosetta-cli-config/
-COPY --from=builder /home/opam/mina/src/app/archive/*.sql /archive/
-COPY --from=builder /home/opam/mina/genesis_ledgers /genesis_ledgers/
+
+# Mina daemon package
+# jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
+RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
+  && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+  && apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --allow-downgrades "mina-$network=$deb_version" "mina-archive=$deb_version" "mina-zkapp-test-transaction=$deb_version" \
+  && rm -rf /var/lib/apt/lists/*
 
 # --- Set up postgres
 USER postgres
@@ -118,10 +108,10 @@ RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
 # Run as root so it can create /data/postgresql
 USER root
 RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
-  && pg_createcluster --start -d /data/postgresql --createclusterconf /rosetta/postgresql.conf ${POSTGRES_VERSION} main
+  && pg_createcluster --start -d /data/postgresql --createclusterconf /etc/mina/rosetta/postgresql.conf ${POSTGRES_VERSION} main
 
 # --- Container workdir, ports, entrypoint, etc.
-WORKDIR /rosetta
+WORKDIR /etc/mina/rosetta
 
 EXPOSE 3087
 EXPOSE $MINA_DAEMON_PORT

@@ -458,13 +458,14 @@ let make_constraint_constants
       ( match config.fork with
       | None ->
           default.fork
-      | Some { previous_state_hash; previous_length; genesis_slot } ->
+      | Some { previous_state_hash; previous_length; previous_global_slot } ->
           Some
             { previous_state_hash =
                 State_hash.of_base58_check_exn previous_state_hash
             ; previous_length = Mina_numbers.Length.of_int previous_length
             ; genesis_slot =
-                Mina_numbers.Global_slot_since_genesis.of_int genesis_slot
+                Mina_numbers.Global_slot_since_genesis.of_int
+                  previous_global_slot
             } )
   }
 
@@ -497,7 +498,7 @@ let runtime_config_of_constraint_constants
           { Runtime_config.Fork_config.previous_state_hash =
               State_hash.to_base58_check previous_state_hash
           ; previous_length = Mina_numbers.Length.to_int previous_length
-          ; genesis_slot =
+          ; previous_global_slot =
               Mina_numbers.Global_slot_since_genesis.to_int genesis_slot
           } )
   }
@@ -539,6 +540,9 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
       ; slots_per_sub_window =
           Option.value ~default:default.protocol.slots_per_sub_window
             (config.genesis >>= fun cfg -> cfg.slots_per_sub_window)
+      ; grace_period_slots =
+          Option.value ~default:default.protocol.grace_period_slots
+            (config.genesis >>= fun cfg -> cfg.grace_period_slots)
       ; genesis_state_timestamp =
           Option.value ~default:default.protocol.genesis_state_timestamp
             genesis_state_timestamp
@@ -576,6 +580,7 @@ let runtime_config_of_genesis_constants (genesis_constants : Genesis_constants.t
   ; delta = Some genesis_constants.protocol.delta
   ; slots_per_epoch = Some genesis_constants.protocol.slots_per_epoch
   ; slots_per_sub_window = Some genesis_constants.protocol.slots_per_sub_window
+  ; grace_period_slots = Some genesis_constants.protocol.grace_period_slots
   ; genesis_state_timestamp =
       Some
         (Genesis_constants.genesis_timestamp_to_string

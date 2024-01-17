@@ -1,3 +1,4 @@
+open Core_kernel
 open Mina_base
 open Snark_params
 
@@ -54,7 +55,8 @@ type pass_number = Pass_1 | Pass_2
     Raises if either the snark generation or application fails
 *)
 val check_zkapp_command_with_merges_exn :
-     ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
+     ?logger:Logger.t
+  -> ?expected_failure:Mina_base.Transaction_status.Failure.t * pass_number
   -> ?ignore_outside_snark:bool
   -> ?global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> ?state_body:Transaction_protocol_state.Block_data.t
@@ -116,7 +118,7 @@ val pending_coinbase_stack_target :
 module Wallet : sig
   type t = { private_key : Signature_lib.Private_key.t; account : Account.t }
 
-  val random_wallets : ?n:int -> unit -> t array
+  val random_wallets : ?n:int -> unit -> t array Quickcheck.Generator.t
 
   val user_command_with_wallet :
        t array
