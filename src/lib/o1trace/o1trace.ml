@@ -22,6 +22,10 @@ let on_job_exit ctx elapsed_time =
   Option.iter (Thread.Fiber.of_context ctx) ~f:(fun thread ->
       on_job_exit' thread elapsed_time )
 
+let on_new_fiber (fiber : Thread.Fiber.t) =
+  Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
+      Plugin.on_new_fiber fiber )
+
 let current_sync_fiber = ref None
 
 (* grabs the parent fiber, returning the fiber (if available) and a reset function to call after exiting the child fiber *)
@@ -72,7 +76,8 @@ let exec_thread ~exec_same_thread ~exec_new_thread name =
         | Some fiber ->
             fiber
         | None ->
-            Thread.Fiber.register name parent
+            let fib = Thread.Fiber.register name parent in
+            on_new_fiber fib ; fib
       in
       exec_new_thread fiber
   in
@@ -113,7 +118,11 @@ let sync_thread name f =
           on_job_exit' fiber elapsed_time ;
           result )
 
-let () = Stdlib.(Async_kernel.Tracing.fns := { on_job_enter; on_job_exit })
+let () =
+  Stdlib.(Async_kernel.Tracing.fns := { on_job_enter; on_job_exit }) ;
+  Scheduler.Expert.run_every_cycle_end (fun () ->
+      Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
+          Plugin.on_cycle_end () ) )
 
 (*
 let () =
