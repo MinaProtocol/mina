@@ -321,22 +321,28 @@ module HardForkSteps = struct
            and %d pending"
           orphaned_blocks pending_blocks ()
 
-  let assert_migrated_db_contains_orphaned_and_pending_blocks query_migrated_db
-      =
-    let%bind pending_blocks =
-      query_migrated_db ~f:(fun db -> Sql.Berkeley.count_orphaned_blocks db)
-    in
+  let assert_migrated_db_contains_no_orphaned_blocks query_migrated_db =
     let%bind orphaned_blocks =
       query_migrated_db ~f:(fun db -> Sql.Berkeley.count_pending_blocks db)
     in
-    match orphaned_blocks + pending_blocks with
+    match orphaned_blocks with
     | 0 ->
-        failwith "Expected to have at least one pending or orphaned block"
-    | _ ->
         Deferred.unit
+    | _ ->
+        failwith "Expected to have none orphaned blocks"
+
+  let assert_migrated_db_contains_pending_blocks query_migrated_db =
+    let%bind pending_blocks =
+      query_migrated_db ~f:(fun db -> Sql.Berkeley.count_orphaned_blocks db)
+    in
+    match pending_blocks with
+    | 0 ->
+        Deferred.unit
+    | _ ->
+        failwith "Expected to have at least one pending  block"
 
   let compare_hashes mainnet_archive_conn_str migrated_archive_conn_str
-      end_global_slot ~full_migration =
+      end_global_slot ~should_contain_pending_blocks =
     let mainnet_archive_uri = Uri.of_string mainnet_archive_conn_str in
     let migrated_archive_uri = Uri.of_string migrated_archive_conn_str in
     let mainnet_pool =
@@ -379,18 +385,20 @@ module HardForkSteps = struct
             "internal_commands"
         in
         let%bind _ =
-          match full_migration with
+          assert_migrated_db_contains_no_orphaned_blocks query_migrated_db
+        in
+        let%bind _ =
+          match should_contain_pending_blocks with
           | true ->
-              assert_migrated_db_contains_only_canonical_blocks
-                query_migrated_db
+              assert_migrated_db_contains_pending_blocks query_migrated_db
           | false ->
-              assert_migrated_db_contains_orphaned_and_pending_blocks
+              assert_migrated_db_contains_only_canonical_blocks
                 query_migrated_db
         in
         let%bind _ =
           compare_hashes
             ~fetch_data_sql:(fun db ->
-              match full_migration with
+              match should_contain_pending_blocks with
               | true ->
                   Sql.Mainnet.block_hashes db end_global_slot
               | false ->
@@ -403,7 +411,7 @@ module HardForkSteps = struct
         let%bind _ =
           compare_hashes
             ~fetch_data_sql:(fun db ->
-              match full_migration with
+              match should_contain_pending_blocks with
               | true ->
                   Sql.Mainnet.block_parent_hashes db end_global_slot
               | false ->
@@ -417,7 +425,7 @@ module HardForkSteps = struct
         let%bind _ =
           compare_hashes
             ~fetch_data_sql:(fun db ->
-              match full_migration with
+              match should_contain_pending_blocks with
               | true ->
                   Sql.Mainnet.ledger_hashes db end_global_slot
               | false ->
@@ -428,6 +436,24 @@ module HardForkSteps = struct
             "ledger_hashes"
         in
 
+        let%bind expected_hashes =
+          query_mainnet_db ~f:(fun db ->
+              Sql.Common.block_state_hashes db end_global_slot )
+        in
+        let%bind actual_hashes =
+          query_migrated_db ~f:(fun db ->
+              Sql.Common.block_state_hashes db end_global_slot )
+        in
+        List.iter expected_hashes ~f:(fun (expected_child, expected_parent) ->
+            if
+              List.exists actual_hashes ~f:(fun (actual_child, actual_parent) ->
+                  String.equal expected_child actual_child
+                  && String.equal expected_parent actual_parent )
+            then ()
+            else
+              failwithf
+                "Relationed skew cannot find '%s' -> '%s' in migrated database"
+                expected_child expected_parent () ) ;
         Deferred.unit
 
   let import_mainnet_dump t date =
@@ -488,7 +514,7 @@ module HardForkSteps = struct
     Util.run_cmd_exn "." "rm"
       [ "-f"; Printf.sprintf "%s/%s-checkpoint*.json" t.working_dir prefix ]
 
-  let compare_replayer_outputs expected actual ~compare_auxiliary_data =
+  let compare_replayer_outputs expected actual ~compare_receipt_chain_hashes =
     let expected_output = BerkeleyTablesAppOutput.of_json_file_exn expected in
     let actual_output = BerkeleyTablesAppOutput.of_json_file_exn actual in
 
@@ -559,7 +585,7 @@ module HardForkSteps = struct
         with
         | Some actual_account ->
             compare_balances actual_account expected_account ;
-            if compare_auxiliary_data then
+            if compare_receipt_chain_hashes then
               compare_receipt actual_account expected_account ;
             compare_delegation actual_account expected_account
         | None ->

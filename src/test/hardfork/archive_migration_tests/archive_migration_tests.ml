@@ -68,10 +68,10 @@ module HardForkTests = struct
 
         let%bind _ =
           HardForkSteps.compare_hashes conn_str_source_db conn_str_target_db
-            migration_end_slot ~full_migration:false
+            migration_end_slot ~should_contain_pending_blocks:false
         in
         HardForkSteps.compare_replayer_outputs reference_replayer_output
-          actual_replayer_output ~compare_auxiliary_data:false ;
+          actual_replayer_output ~compare_receipt_chain_hashes:false ;
         Deferred.unit )
 
   let random_migration env_file =
@@ -143,10 +143,10 @@ module HardForkTests = struct
 
         let%bind _ =
           HardForkSteps.compare_hashes conn_str_source_db conn_str_target_db
-            migration_end_slot ~full_migration:false
+            migration_end_slot ~should_contain_pending_blocks:false
         in
         HardForkSteps.compare_replayer_outputs reference_replayer_output
-          actual_replayer_output ~compare_auxiliary_data:false ;
+          actual_replayer_output ~compare_receipt_chain_hashes:false ;
         Deferred.unit )
 
   let checkpoint env_file =
@@ -253,10 +253,10 @@ module HardForkTests = struct
 
         let%bind _ =
           HardForkSteps.compare_hashes conn_str_source_db conn_str_target_db
-            migration_end_slot ~full_migration:false
+            migration_end_slot ~should_contain_pending_blocks:false
         in
         HardForkSteps.compare_replayer_outputs reference_replayer_output
-          actual_replayer_output ~compare_auxiliary_data:false ;
+          actual_replayer_output ~compare_receipt_chain_hashes:false ;
         Deferred.unit )
 
   let incremental env_file =
@@ -334,10 +334,11 @@ module HardForkTests = struct
           temp_dir ;
         let%bind _ =
           HardForkSteps.compare_hashes conn_str_mainnet_source_db
-            conn_str_target_db migration_end_slot ~full_migration:false
+            conn_str_target_db migration_end_slot
+            ~should_contain_pending_blocks:true
         in
         HardForkSteps.compare_replayer_outputs reference_replayer_output
-          actual_replayer_output ~compare_auxiliary_data:false ;
+          actual_replayer_output ~compare_receipt_chain_hashes:false ;
 
         let%bind blocks =
           HardForkSteps.download_mainnet_precomputed_blocks steps ~from:11
@@ -383,10 +384,11 @@ module HardForkTests = struct
 
         let%bind _ =
           HardForkSteps.compare_hashes conn_str_mainnet_source_db
-            conn_str_target_db migration_end_slot ~full_migration:false
+            conn_str_target_db migration_end_slot
+            ~should_contain_pending_blocks:true
         in
         HardForkSteps.compare_replayer_outputs reference_replayer_output
-          actual_replayer_output ~compare_auxiliary_data:false ;
+          actual_replayer_output ~compare_receipt_chain_hashes:false ;
         Deferred.unit )
 end
 

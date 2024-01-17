@@ -1,5 +1,19 @@
 open Caqti_async
 
+module Common = struct
+  let block_state_hashes_query =
+    Caqti_request.collect Caqti_type.int
+      Caqti_type.(tup2 string string)
+      {sql| 
+          SELECT state_hash,parent_hash FROM blocks WHERE
+                chain_status <> 'orphaned'
+           ORDER BY global_slot_since_genesis desc LIMIT 1
+          |sql}
+
+  let block_state_hashes (module Conn : CONNECTION) end_global_slot =
+    Conn.collect_list block_state_hashes_query end_global_slot
+end
+
 module Mainnet = struct
   let latest_state_hash_before_slot_query =
     Caqti_request.find_opt Caqti_type.int Caqti_type.string
