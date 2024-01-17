@@ -51,6 +51,8 @@ locals {
 
   ]])
 
+  nodeselector_preemptible = var.nodeselector_preemptible
+
   block_producer_configs = concat(local.whale_configs, local.fish_configs)
 
   whale_count_unique = length(var.whales)
@@ -88,7 +90,10 @@ locals {
     persistenceStorageClass = "ssd-delete"
     persistenceAccessModes  = ["ReadWriteOnce"]
     spotAllowed             = "false"
-    persist_working_dir     = true
+    nodeSelector = {
+      preemptible = local.nodeselector_preemptible
+    }
+    persist_working_dir = true
   }
 
   static_peers = local.seed_static_peers

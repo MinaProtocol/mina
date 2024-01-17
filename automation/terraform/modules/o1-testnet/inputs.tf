@@ -25,6 +25,12 @@ variable "k8s_context" {
 
 # Global Vars
 
+variable "nodeselector_preemptible" {
+  description = "Helm value that determines if affinities to spots are required during scheduling"
+  type        = bool
+  default     = true
+}
+
 variable "artifact_path" {
   type    = string
   default = "/tmp"
@@ -199,6 +205,9 @@ variable "snark_coordinators" {
       snark_worker_public_key      = string
       snark_coordinators_host_port = number
       persist_working_dir          = bool
+      nodeSelector = object({
+        preemptible = bool
+      })
   }))
   default = []
 }

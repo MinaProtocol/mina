@@ -73,6 +73,8 @@ locals {
   #   ${file("../../../${local.testnet_name}-accounts.csv")}
   # EOT
   make_report_accounts = ""
+
+  nodeselector_preemptible = false
 }
 
 module "berkeley" {
@@ -81,10 +83,11 @@ module "berkeley" {
 
   artifact_path = abspath(path.module)
 
-  cluster_name   = "coda-infra-central1"
-  cluster_region = "us-central1"
-  k8s_context    = "gke_o1labs-192920_us-east1_coda-infra-east"
-  testnet_name   = local.testnet_name
+  cluster_name             = "coda-infra-central1"
+  cluster_region           = "us-central1"
+  k8s_context              = "gke_o1labs-192920_us-east1_coda-infra-east"
+  testnet_name             = local.testnet_name
+  nodeselector_preemptible = local.nodeselector_preemptible
 
   mina_image                  = local.mina_image
   mina_archive_image          = local.mina_archive_image
@@ -104,9 +107,11 @@ module "berkeley" {
       enableLocalDaemon = true
       enablePostgresDB  = true
       postgresHost      = "archive-1-postgresql"
+      nodeSelector = {
+        preemptible = local.nodeselector_preemptible
+      }
     }
   ]
-
 
   mina_faucet_amount = "10000000000"
   mina_faucet_fee    = "100000000"
@@ -139,6 +144,9 @@ module "berkeley" {
       snark_worker_public_key      = "B62qmQsEHcsPUs5xdtHKjEmWqqhUPRSF2GNmdguqnNvpEZpKftPC69e"
       snark_coordinators_host_port = 10401
       persist_working_dir          = true
+      nodeSelector = {
+        preemptible = local.nodeselector_preemptible
+      }
     }
   ]
 

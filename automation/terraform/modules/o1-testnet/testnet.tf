@@ -64,6 +64,10 @@ module "kubernetes_testnet" {
   snark_coordinators = var.snark_coordinators
 
   # block_producer_key_pass = var.block_producer_key_pass
+  block_producer_node_selector = {
+    preemptible = local.nodeselector_preemptible
+  }
+  
   block_producer_configs = [for i, bp in local.block_producer_configs :
     {
       name                   = bp.name
@@ -83,6 +87,7 @@ module "kubernetes_testnet" {
     }
   ]
 
+
   seed_external_port = 10001
 
   seed_configs = [
@@ -95,12 +100,18 @@ module "kubernetes_testnet" {
       enableArchive       = length(local.archive_node_configs) > 0
       archiveAddress      = length(local.archive_node_configs) > 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
       persist_working_dir = true
+      nodeSelector = {
+        preemptible = local.nodeselector_preemptible
+      }
     }
   ]
 
   plain_node_configs = [
     for i in range(var.plain_node_count) : {
       name = "plain-node-${i + 1}"
+      nodeSelector = {
+        preemptible = local.nodeselector_preemptible
+      }
     }
   ]
 
