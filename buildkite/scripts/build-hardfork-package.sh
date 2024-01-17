@@ -2,35 +2,14 @@
 
 set -eo pipefail
 
+([ -z "$DUNE_PROFILE" ] || [ -z "$RUNTIME_CONFIG_JSON" ] || [ -z "$MINA_DEB_CODENAME" ]) && echo "required env vars were not provided" && exit 1
+
 eval $(opam config env)
 export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
 export GO=/usr/lib/go/bin/go
+export TESTNET_NAME=mainnet-hardfork
 
 MINA_COMMIT_SHA1=$(git rev-parse HEAD)
-
-echo "--- Install latest mainnet package"
-
-echo "deb [trusted=yes] http://packages.o1test.net ${MINA_DEB_CODENAME} unstable" | sudo tee /etc/apt/sources.list.d/mina.list
-sudo apt-get update
-# FIXME: This installs a specific version at a specific commit.
-# This is strictly better than excluding the version string though, because
-# including it could select an artifact from *any* previous PR, whether
-# mainnet-compatible or not.
-sudo apt-get install -y "mina-mainnet=1.4.0beta2-compatible-aeca8b8"
-
-# Use the `mina` binary in the path to dump the fork config
-export MINA_V1_DAEMON=mina
-export RUNTIME_CONFIG_JSON=$PWD/runtime-config.json
-
-echo "--- Fetch fork config from mainnet"
-
-./scripts/hardfork/export_fork_config.sh
-
-rm -rf ~/.mina-config
-
-echo "--- Clean fork config to generate runtime config for hard-fork"
-
-./scripts/hardfork/convert_fork_config.sh
 
 echo "--- Build libp2p_helper"
 make -C src/app/libp2p_helper
