@@ -484,8 +484,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section_hard "Check vesting of timed3/timed4 account"
-        ((* [offset] represents *)
-         let check_balance name key cliff_offset =
+        (let check_balance name key cliff_offset =
            let%bind global_slot_since_hard_fork =
              Integration_test_lib.Graphql_requests
              .must_get_global_slot_since_hard_fork ~logger
