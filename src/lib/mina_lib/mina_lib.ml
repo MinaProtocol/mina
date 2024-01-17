@@ -1074,13 +1074,19 @@ let staking_ledger t =
   let%map transition_frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
+  let best_tip = Transition_frontier.best_tip transition_frontier in
   let consensus_state =
-    Transition_frontier.Breadcrumb.consensus_state
-      (Transition_frontier.best_tip transition_frontier)
+    Transition_frontier.Breadcrumb.consensus_state best_tip
   in
+  let genesis_ledger_hash =
+    Transition_frontier.Breadcrumb.protocol_state best_tip
+    |> Mina_state.Protocol_state.blockchain_state
+    |> Mina_state.Blockchain_state.genesis_ledger_hash
+  in
+
   let local_state = t.config.consensus_local_state in
   Consensus.Hooks.get_epoch_ledger ~constants:consensus_constants
-    ~consensus_state ~local_state
+    ~consensus_state ~local_state ~genesis_ledger_hash
 
 let next_epoch_ledger t =
   let open Option.Let_syntax in

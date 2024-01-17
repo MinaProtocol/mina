@@ -421,6 +421,11 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
               "Successfully loaded frontier, but failed downloaded best tip \
                from network" ;
           let curr_best_tip = Transition_frontier.best_tip frontier in
+          let genesis_ledger_hash =
+            Transition_frontier.Breadcrumb.protocol_state curr_best_tip
+            |> Mina_state.Protocol_state.blockchain_state
+            |> Mina_state.Blockchain_state.genesis_ledger_hash
+          in
           let%map () =
             if not sync_local_state then (
               [%log info] "Not syncing local state, should only occur in tests" ;
@@ -433,7 +438,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
                   ~consensus_state:
                     (Transition_frontier.Breadcrumb.consensus_state
                        curr_best_tip )
-                  ~local_state:consensus_local_state
+                  ~local_state:consensus_local_state ~genesis_ledger_hash
               with
               | None ->
                   [%log info] "Local state already in sync" ;

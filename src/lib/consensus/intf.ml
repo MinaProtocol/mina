@@ -731,6 +731,7 @@ module type S = sig
          constants:Constants.t
       -> consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
+      -> genesis_ledger_hash:Ledger_hash.t
       -> Data.Local_state.Snapshot.Ledger_snapshot.t
 
     val epoch_end_time :

@@ -842,12 +842,17 @@ let apply_diffs ({ context = (module Context); _ } as t) diffs
     ~enable_epoch_ledger_sync ~has_long_catchup_job =
   let open Context in
   let open Root_identifier.Stable.Latest in
+  let best_tip = best_tip t in
+  let genesis_ledger_hash =
+    Breadcrumb.protocol_state best_tip
+    |> Protocol_state.blockchain_state |> Blockchain_state.genesis_ledger_hash
+  in
   [%log' trace t.logger] "Applying %d diffs to full frontier "
     (List.length diffs) ;
   let local_state_was_synced_at_start =
     Consensus.Hooks.required_local_state_sync ~constants:consensus_constants
-      ~consensus_state:(Breadcrumb.consensus_state (best_tip t))
-      ~local_state:t.consensus_local_state
+      ~consensus_state:(Breadcrumb.consensus_state best_tip)
+      ~local_state:t.consensus_local_state ~genesis_ledger_hash
     |> Option.is_none
   in
   let new_root, diffs_with_mutants =
@@ -878,7 +883,7 @@ let apply_diffs ({ context = (module Context); _ } as t) diffs
             ~consensus_state:
               (Breadcrumb.consensus_state
                  (Hashtbl.find_exn t.table t.best_tip).breadcrumb )
-            ~local_state:t.consensus_local_state
+            ~local_state:t.consensus_local_state ~genesis_ledger_hash
         with
         | Some jobs ->
             (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
