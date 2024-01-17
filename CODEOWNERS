@@ -15,7 +15,7 @@
 
 /src/external/ @bkase @psteckler @aneesharaines @mrmr1993
 
-/src/app/archive @MinaProtocol/product-eng-reviewers
+/src/app/archive @MinaProtocol/protocol-eng-reviewers
 /src/app/cli/src/mina.ml @MinaProtocol/protocol-eng-reviewers
 /src/app/cli/src/init @MinaProtocol/protocol-eng-reviewers
 /src/app/libp2p_helper @MinaProtocol/protocol-eng-reviewers

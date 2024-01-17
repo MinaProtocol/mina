@@ -540,6 +540,9 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
       ; slots_per_sub_window =
           Option.value ~default:default.protocol.slots_per_sub_window
             (config.genesis >>= fun cfg -> cfg.slots_per_sub_window)
+      ; grace_period_slots =
+          Option.value ~default:default.protocol.grace_period_slots
+            (config.genesis >>= fun cfg -> cfg.grace_period_slots)
       ; genesis_state_timestamp =
           Option.value ~default:default.protocol.genesis_state_timestamp
             genesis_state_timestamp
@@ -577,6 +580,7 @@ let runtime_config_of_genesis_constants (genesis_constants : Genesis_constants.t
   ; delta = Some genesis_constants.protocol.delta
   ; slots_per_epoch = Some genesis_constants.protocol.slots_per_epoch
   ; slots_per_sub_window = Some genesis_constants.protocol.slots_per_sub_window
+  ; grace_period_slots = Some genesis_constants.protocol.grace_period_slots
   ; genesis_state_timestamp =
       Some
         (Genesis_constants.genesis_timestamp_to_string

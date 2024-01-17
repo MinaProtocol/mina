@@ -72,8 +72,11 @@ type pass_number = Pass_1 | Pass_2
 
 let pass_number_to_int = function Pass_1 -> 1 | Pass_2 -> 2
 
-let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
-    ?global_slot ?(state_body = genesis_state_body) ledger zkapp_commands =
+let logger_null = Logger.null ()
+
+let check_zkapp_command_with_merges_exn ?(logger = logger_null)
+    ?expected_failure ?ignore_outside_snark ?global_slot
+    ?(state_body = genesis_state_body) ledger zkapp_commands =
   let module T = (val Lazy.force snark_module) in
   let ignore_outside_snark = Option.value ~default:false ignore_outside_snark in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
@@ -226,29 +229,42 @@ let check_zkapp_command_with_merges_exn ?expected_failure ?ignore_outside_snark
                           failwith "no witnesses generated"
                       | (witness, spec, stmt) :: rest ->
                           let open Async.Deferred.Or_error.Let_syntax in
+                          let start = Time.now () in
                           let%bind p1 =
                             Async.Deferred.Or_error.try_with ~here:[%here]
                               (fun () ->
                                 T.of_zkapp_command_segment_exn ~statement:stmt
                                   ~witness ~spec )
                           in
-                          Async.Deferred.List.fold ~init:(Ok p1) rest
-                            ~f:(fun acc (witness, spec, stmt) ->
-                              let%bind prev = Async.Deferred.return acc in
-                              let%bind curr =
-                                Async.Deferred.Or_error.try_with ~here:[%here]
-                                  (fun () ->
-                                    T.of_zkapp_command_segment_exn
-                                      ~statement:stmt ~witness ~spec )
-                              in
-                              let sok_digest =
-                                Sok_message.create ~fee:Fee.zero
-                                  ~prover:
-                                    (Quickcheck.random_value
-                                       Public_key.Compressed.gen )
-                                |> Sok_message.digest
-                              in
-                              T.merge ~sok_digest prev curr )
+                          let%map result =
+                            Async.Deferred.List.fold ~init:(Ok p1) rest
+                              ~f:(fun acc (witness, spec, stmt) ->
+                                let%bind prev = Async.Deferred.return acc in
+                                let%bind curr =
+                                  Async.Deferred.Or_error.try_with ~here:[%here]
+                                    (fun () ->
+                                      T.of_zkapp_command_segment_exn
+                                        ~statement:stmt ~witness ~spec )
+                                in
+                                let sok_digest =
+                                  Sok_message.create ~fee:Fee.zero
+                                    ~prover:
+                                      (Quickcheck.random_value
+                                         Public_key.Compressed.gen )
+                                  |> Sok_message.digest
+                                in
+                                T.merge ~sok_digest prev curr )
+                          in
+                          [%log info]
+                            ~metadata:
+                              [ ( "duration"
+                                , `String
+                                    Time.(
+                                      Span.to_short_string
+                                      @@ diff (Time.now ()) start) )
+                              ]
+                            "transaction snark computation takes $duration" ;
+                          result
                     in
                     let p = Or_error.ok_exn p in
                     ( match statement_opt with
@@ -422,19 +438,27 @@ module Wallet = struct
   type t = { private_key : Private_key.t; account : Account.t }
 
   let random_wallets ?(n = min (Int.pow 2 ledger_depth) (1 lsl 10)) () =
-    let random_wallet () : t =
-      let private_key = Private_key.create () in
+    let open Quickcheck.Generator.Let_syntax in
+    let random_wallet : t Quickcheck.Generator.t =
+      let%bind private_key = Private_key.gen in
       let public_key =
         Public_key.compress (Public_key.of_private_key_exn private_key)
       in
       let account_id = Account_id.create public_key Token_id.default in
+      let%map amount = Int.gen_incl 0 99 in
       { private_key
       ; account =
-          Account.create account_id
-            (Balance.of_mina_int_exn (50 + Random.int 100))
+          Account.create account_id (Balance.of_mina_int_exn (50 + amount))
       }
     in
-    Array.init n ~f:(fun _ -> random_wallet ())
+    Quickcheck.Generator.create (fun ~size ~random ->
+        (* It appears that we should accumulate some state here, but [random]
+           does this internally for us as we call the generator. See e.g. the
+           definition of [Quickcheck.Generator.bind] for the general pattern that
+           we apply here.
+        *)
+        Array.init n ~f:(fun _ ->
+            Quickcheck.Generator.generate random_wallet ~size ~random ) )
 
   let user_command ~fee_payer ~receiver_pk amt fee nonce memo =
     let payload : Signed_command.Payload.t =
