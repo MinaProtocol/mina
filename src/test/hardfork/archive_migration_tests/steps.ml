@@ -323,7 +323,7 @@ module HardForkSteps = struct
 
   let assert_migrated_db_contains_no_orphaned_blocks query_migrated_db =
     let%bind orphaned_blocks =
-      query_migrated_db ~f:(fun db -> Sql.Berkeley.count_pending_blocks db)
+      query_migrated_db ~f:(fun db -> Sql.Berkeley.count_orphaned_blocks db)
     in
     match orphaned_blocks with
     | 0 ->
@@ -333,13 +333,13 @@ module HardForkSteps = struct
 
   let assert_migrated_db_contains_pending_blocks query_migrated_db =
     let%bind pending_blocks =
-      query_migrated_db ~f:(fun db -> Sql.Berkeley.count_orphaned_blocks db)
+      query_migrated_db ~f:(fun db -> Sql.Berkeley.count_pending_blocks db)
     in
     match pending_blocks with
     | 0 ->
-        Deferred.unit
+        failwith "Expected to have at least one pending block"
     | _ ->
-        failwith "Expected to have at least one pending  block"
+        Deferred.unit
 
   let compare_hashes mainnet_archive_conn_str migrated_archive_conn_str
       end_global_slot ~should_contain_pending_blocks =
@@ -400,7 +400,7 @@ module HardForkSteps = struct
             ~fetch_data_sql:(fun db ->
               match should_contain_pending_blocks with
               | true ->
-                  Sql.Mainnet.block_hashes db end_global_slot
+                  Sql.Mainnet.block_hashes_only_canonical db end_global_slot
               | false ->
                   Sql.Mainnet.block_hashes_no_orphaned db end_global_slot )
             ~find_element_sql:(fun hash ->
@@ -413,7 +413,8 @@ module HardForkSteps = struct
             ~fetch_data_sql:(fun db ->
               match should_contain_pending_blocks with
               | true ->
-                  Sql.Mainnet.block_parent_hashes db end_global_slot
+                  Sql.Mainnet.block_parent_hashes_only_canonical db
+                    end_global_slot
               | false ->
                   Sql.Mainnet.block_parent_hashes_no_orphaned db end_global_slot
               )
@@ -427,7 +428,7 @@ module HardForkSteps = struct
             ~fetch_data_sql:(fun db ->
               match should_contain_pending_blocks with
               | true ->
-                  Sql.Mainnet.ledger_hashes db end_global_slot
+                  Sql.Mainnet.ledger_hashes_only_canonical db end_global_slot
               | false ->
                   Sql.Mainnet.ledger_hashes_no_orphaned db end_global_slot )
             ~find_element_sql:(fun hash ->
@@ -452,7 +453,8 @@ module HardForkSteps = struct
             then ()
             else
               failwithf
-                "Relationed skew cannot find '%s' -> '%s' in migrated database"
+                "Relation between blocks skew. Cannot find original subchain \
+                 '%s' -> '%s' in migrated database"
                 expected_child expected_parent () ) ;
         Deferred.unit
 

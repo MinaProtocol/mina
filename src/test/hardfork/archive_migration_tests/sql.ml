@@ -5,9 +5,9 @@ module Common = struct
     Caqti_request.collect Caqti_type.int
       Caqti_type.(tup2 string string)
       {sql| 
-          SELECT state_hash,parent_hash FROM blocks WHERE
-                chain_status <> 'orphaned'
-           ORDER BY global_slot_since_genesis desc LIMIT 1
+            SELECT state_hash,parent_hash FROM blocks 
+            WHERE chain_status <> 'orphaned'
+            AND global_slot_since_genesis < ?
           |sql}
 
   let block_state_hashes (module Conn : CONNECTION) end_global_slot =
@@ -100,15 +100,15 @@ module Mainnet = struct
 
   let block_hashes_query =
     Caqti_request.collect Caqti_type.int Caqti_type.string
-      {sql| select state_hash from blocks where global_slot_since_genesis < ? |sql}
+      {sql| select state_hash from blocks where global_slot_since_genesis < ? and chain_status = 'canonical' |sql}
 
   let block_parent_hashes_query =
     Caqti_request.collect Caqti_type.int Caqti_type.string
-      {sql| select state_hash from blocks where global_slot_since_genesis < ? and state_hash is not null|sql}
+      {sql| select state_hash from blocks where global_slot_since_genesis < ? and state_hash is not null and chain_status = 'canonical'|sql}
 
   let ledger_hashes_query =
     Caqti_request.collect Caqti_type.int Caqti_type.string
-      {sql| select ledger_hash from blocks where global_slot_since_genesis < ? |sql}
+      {sql| select ledger_hash from blocks where global_slot_since_genesis < ? and chain_status = 'canonical' |sql}
 
   let block_hashes_query_no_orphaned =
     Caqti_request.collect Caqti_type.int Caqti_type.string
@@ -132,13 +132,14 @@ module Mainnet = struct
             and chain_status <> 'orphaned' 
       |sql}
 
-  let block_hashes (module Conn : CONNECTION) end_global_slot =
+  let block_hashes_only_canonical (module Conn : CONNECTION) end_global_slot =
     Conn.collect_list block_hashes_query end_global_slot
 
-  let block_parent_hashes (module Conn : CONNECTION) end_global_slot =
+  let block_parent_hashes_only_canonical (module Conn : CONNECTION)
+      end_global_slot =
     Conn.collect_list block_parent_hashes_query end_global_slot
 
-  let ledger_hashes (module Conn : CONNECTION) end_global_slot =
+  let ledger_hashes_only_canonical (module Conn : CONNECTION) end_global_slot =
     Conn.collect_list ledger_hashes_query end_global_slot
 
   let block_hashes_no_orphaned (module Conn : CONNECTION) end_global_slot =
@@ -207,13 +208,13 @@ module Berkeley = struct
   let count_pending_blocks_query =
     Caqti_request.find Caqti_type.string Caqti_type.int
       {sql| select count(*) from blocks 
-            where chain_status <> 'pending'
+            where chain_status = 'pending'
       |sql}
 
   let count_orphaned_blocks_query =
     Caqti_request.find Caqti_type.string Caqti_type.int
       {sql| select count(*) from blocks 
-            where chain_status <> 'orphaned'
+            where chain_status = 'orphaned'
       |sql}
 
   let count_pending_blocks (module Conn : CONNECTION) =

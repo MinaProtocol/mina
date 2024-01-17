@@ -143,7 +143,7 @@ module HardForkTests = struct
 
         let%bind _ =
           HardForkSteps.compare_hashes conn_str_source_db conn_str_target_db
-            migration_end_slot ~should_contain_pending_blocks:false
+            migration_end_slot ~should_contain_pending_blocks:true
         in
         HardForkSteps.compare_replayer_outputs reference_replayer_output
           actual_replayer_output ~compare_receipt_chain_hashes:false ;
