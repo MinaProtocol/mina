@@ -15,7 +15,6 @@
    result
    ;;local libraries
    mina_wire_types
-   ppx_dhall_type
    bignum_bigint
    fold_lib
    tuple_lib
