@@ -147,7 +147,7 @@ let
         MINA_COMMIT_DATE = "<unknown>";
         MINA_BRANCH = "<unknown>";
 
-        DUNE_PROFILE = "devnet";
+        DUNE_PROFILE = "dev";
 
         NIX_LDFLAGS =
           optionalString (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64)
@@ -269,9 +269,9 @@ let
           mv _build/default/src/app/cli/src/mina.exe $out/bin/mina
         '';
       });
-        
+
       with-instrumentation = wrapMina self.with-instrumentation-dev { };
-      
+
       # Unit tests
       mina_tests = runMinaCheck {
         name = "tests";
