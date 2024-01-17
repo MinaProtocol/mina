@@ -992,7 +992,7 @@ module Sql = struct
         tup2 Archive_lib.Processor.Zkapp_account_update_body.typ Extras.typ)
 
     let query =
-      Caqti_request.collect Caqti_type.(tup2 int string) typ
+      Caqti_request.collect Caqti_type.(tup3 int string int) typ
         {|
          SELECT zaub.account_identifier_id,
                 zaub.id,
@@ -1027,10 +1027,11 @@ module Sql = struct
            ON t.id = ai.token_id
          WHERE zc.id = ?
            AND t.value = ?
+           AND bzc.block_id = ?
     |}
 
-    let run (module Conn : Caqti_async.CONNECTION) id =
-      Conn.collect_list query (id, Mina_base.Token_id.(to_string default) )
+    let run (module Conn : Caqti_async.CONNECTION) command_id block_id =
+      Conn.collect_list query (command_id, Mina_base.Token_id.(to_string default), block_id)
     end
     
     let run (module Conn : Caqti_async.CONNECTION) input =
@@ -1190,7 +1191,7 @@ module Sql = struct
           (* TODO: check if this holds *)
           let token = Mina_base.Token_id.(to_string default) in
           let%bind raw_zkapp_account_update =
-            Zkapp_account_update.run (module Conn) cmd_id
+            Zkapp_account_update.run (module Conn) cmd_id block_id
             |> Errors.Lift.sql
                  ~context:"Finding zkapp account updates within command"
           in
