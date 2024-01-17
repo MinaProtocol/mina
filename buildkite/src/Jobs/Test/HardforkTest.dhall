@@ -1,14 +1,13 @@
 let Prelude = ../../External/Prelude.dhall
+let B = ../../External/Buildkite.dhall
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let Cmd = ../../Lib/Cmds.dhall
 let S = ../../Lib/SelectFiles.dhall
 let D = S.PathPattern
-
+let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
 let PipelineTag = ../../Pipeline/Tag.dhall
-
-let JobSpec = ../../Pipeline/JobSpec.dhall
-
 let Command = ../../Command/Base.dhall
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Docker = ../../Command/Docker/Type.dhall
@@ -23,17 +22,19 @@ let dependsOn = Dockers.dependsOnKey "TestSuiteArtifact" Dockers.Type.Bullseye P
 in
 
 let buildTestCmd : Size -> Command.Type = \(cmd_target : Size) ->
-  let key = "single-node-tests" in
+  let key = "hardfork-tests" in
   Command.build
     Command.Config::{
       commands = [
-        Cmd.run "buildkite/scripts/single-node-tests.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
+        Cmd.run "buildkite/scripts/hardfork-archive-migration-tests.sh",
+        Cmd.run "buildkite/scripts/upload-partial-coverage-data.sh ${key}"
       ],
-      label = "Test: Single Node",
+      label = "hardfork-tests",
       key = key,
       target = cmd_target,
       docker = None Docker.Type,
-      depends_on = dependsOn 
+      depends_on = dependsOn,
+      soft_fail = Some (B/SoftFail.Boolean True)
     }
 
 in
@@ -45,8 +46,8 @@ Pipeline.build
         S.strictlyStart (S.contains "src/lib"),
         S.strictlyStart (S.contains "src/test"),
         S.strictly (S.contains "Makefile"),
-        S.exactly "buildkite/src/Jobs/Test/SingleNodeTest" "dhall",
-        S.exactly "buildkite/scripts/single-node-tests" "sh"
+        S.exactly "buildkite/src/Jobs/Test/HardforkTest" "dhall",
+        S.exactly "buildkite/scripts/hardfork-tests" "sh"
       ]
 
       in
@@ -54,10 +55,10 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = unitDirtyWhen,
         path = "Test",
-        name = "SingleNodeTest",
+        name = "HardforkTest",
         tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
       },
     steps = [
-      buildTestCmd Size.XLarge
+      buildTestCmd Size.QA
     ]
   }

@@ -37,8 +37,9 @@ dune build "--profile=${DUNE_PROFILE}" \
   src/app/zkapp_test_transaction/zkapp_test_transaction.exe \
   src/app/rosetta/rosetta_testnet_signatures.exe \
   src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe \
-  src/app/test_executive/test_executive.exe  \
-  src/test/command_line_tests/command_line_tests.exe # 2>&1 | tee /tmp/buildocaml.log
+  src/app/test_executive/test_executive.exe \
+  src/test/command_line_tests/command_line_tests.exe \
+  src/test/hardfork/archive_migration_tests/archive_migration_tests.exe # 2>&1 | tee /tmp/buildocaml.log
 
 echo "--- Bundle all packages for Debian ${MINA_DEB_CODENAME}"
 echo " Includes mina daemon, archive-node, rosetta, generate keypair for berkeley"

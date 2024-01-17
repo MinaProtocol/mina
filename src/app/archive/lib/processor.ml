@@ -1901,11 +1901,11 @@ module User_command = struct
     let table_name = "user_commands"
 
     let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
-        =
+        ~v1_transaction_hash =
       Conn.find_opt
         (Caqti_request.find_opt Caqti_type.string Caqti_type.int
            (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:[ "hash" ] ()) )
-        (Transaction_hash.to_base58_check transaction_hash)
+        (to_base58_check transaction_hash ~v1_transaction_hash)
 
     let load (module Conn : CONNECTION) ~(id : int) =
       Conn.find
@@ -1929,10 +1929,10 @@ module User_command = struct
       { fee_payer_id; receiver_id }
 
     let add_if_doesn't_exist ?(via = `Ident) (module Conn : CONNECTION)
-        (t : Signed_command.t) =
+        (t : Signed_command.t) ~v1_transaction_hash =
       let open Deferred.Result.Let_syntax in
       let transaction_hash = Transaction_hash.hash_command (Signed_command t) in
-      match%bind find (module Conn) ~transaction_hash with
+      match%bind find ~v1_transaction_hash (module Conn) ~transaction_hash with
       | Some user_command_id ->
           return user_command_id
       | None ->
@@ -1975,13 +1975,15 @@ module User_command = struct
             ; valid_until
             ; memo =
                 Signed_command.memo t |> Signed_command_memo.to_base58_check
-            ; hash = transaction_hash |> Transaction_hash.to_base58_check
+            ; hash = transaction_hash |> to_base58_check ~v1_transaction_hash
             }
 
     let add_extensional_if_doesn't_exist (module Conn : CONNECTION)
         ?(v1_transaction_hash = false) (user_cmd : Extensional.User_command.t) =
       let open Deferred.Result.Let_syntax in
-      match%bind find (module Conn) ~transaction_hash:user_cmd.hash with
+      match%bind
+        find (module Conn) ~transaction_hash:user_cmd.hash ~v1_transaction_hash
+      with
       | Some id ->
           return id
       | None ->
@@ -2085,17 +2087,18 @@ module User_command = struct
     | Zkapp_command _ ->
         `Zkapp_command
 
-  let add_if_doesn't_exist conn ~logger (t : User_command.t) =
+  let add_if_doesn't_exist conn (t : User_command.t) ~v1_transaction_hash =
     match t with
     | Signed_command sc ->
         Signed_command.add_if_doesn't_exist conn ~via:(via t) sc
+          ~v1_transaction_hash
     | Zkapp_command ps ->
         Zkapp_command.add_if_doesn't_exist conn ~logger ps
 
-  let find conn ~(transaction_hash : Transaction_hash.t) =
+  let find conn ~(transaction_hash : Transaction_hash.t) ~v1_transaction_hash =
     let open Deferred.Result.Let_syntax in
     let%bind signed_command_id =
-      Signed_command.find conn ~transaction_hash
+      Signed_command.find conn ~transaction_hash ~v1_transaction_hash
       >>| Option.map ~f:(fun id -> `Signed_command_id id)
     in
     let%map zkapp_command_id =
@@ -2228,7 +2231,7 @@ module Fee_transfer = struct
           ; fee =
               Fee_transfer.Single.fee t |> Currency.Fee.to_uint64
               |> Unsigned.UInt64.to_int64
-          ; hash = transaction_hash |> Transaction_hash.to_base58_check
+          ; hash = transaction_hash |> to_base58_check ~v1_transaction_hash
           }
 end
 
@@ -2275,7 +2278,7 @@ module Coinbase = struct
           ; amount =
               Coinbase.amount t |> Currency.Amount.to_uint64
               |> Unsigned.UInt64.to_int64
-          ; hash = transaction_hash |> Transaction_hash.to_base58_check
+          ; hash = transaction_hash |> to_base58_check ~v1_transaction_hash
           }
 end
 
@@ -2876,7 +2879,7 @@ module Block = struct
 
   let add_parts_if_doesn't_exist (module Conn : CONNECTION) ~logger
       ~constraint_constants ~protocol_state ~staged_ledger_diff
-      ~protocol_version ~proposed_protocol_version ~hash =
+      ~protocol_version ~proposed_protocol_version ~hash ~v1_transaction_hash =
     let open Deferred.Result.Let_syntax in
     match%bind find_opt (module Conn) ~state_hash:hash with
     | Some block_id ->
@@ -3053,7 +3056,7 @@ module Block = struct
                 let%bind id =
                   User_command.add_if_doesn't_exist
                     (module Conn)
-                    ~logger user_command.data
+                    user_command.data ~v1_transaction_hash
                 in
                 let%map () =
                   match command with
@@ -3283,7 +3286,7 @@ module Block = struct
       ~protocol_version:(Header.current_protocol_version @@ Mina_block.header t)
       ~proposed_protocol_version:
         (Header.proposed_protocol_version_opt @@ Mina_block.header t)
-      ~hash
+      ~hash ~v1_transaction_hash:false
 
   let add_from_precomputed conn ~constraint_constants (t : Precomputed.t) =
     add_parts_if_doesn't_exist conn ~constraint_constants
@@ -3291,6 +3294,7 @@ module Block = struct
       ~protocol_version:t.protocol_version
       ~proposed_protocol_version:t.proposed_protocol_version
       ~hash:(Protocol_state.hashes t.protocol_state).state_hash
+      ~v1_transaction_hash:false
 
   let add_from_extensional (module Conn : CONNECTION) ~logger
       ?(v1_transaction_hash = false) (block : Extensional.Block.t) =

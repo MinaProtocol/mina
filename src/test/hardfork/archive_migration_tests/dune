@@ -1,0 +1,32 @@
+(tests
+ (names archive_migration_tests)
+ (libraries
+   ;; opam libraries
+   async_kernel
+   core_kernel
+   ppx_inline_test.config
+   async
+   core
+   async_unix
+   stdio
+   alcotest
+   yojson
+   result
+   uri
+   caqti
+   caqti-async
+   caqti-driver-postgresql
+   ;; mina libraries
+   init
+   currency
+   integration_test_lib
+   mina_runtime_config
+   mina_caqti
+   mina_ledger
+   mina_base
+   mina_block
+   cmdliner
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_compare))
+)

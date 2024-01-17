@@ -134,6 +134,8 @@ copy_common_daemon_configs() {
   cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
   cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
   cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
+  cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
+
 
   # Copy signature-based Binaries (based on signature type $2 passed into the function)
   cp ./default/src/app/cli/src/mina_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
@@ -258,11 +260,25 @@ build_deb mina-batch-txn
 
 ##################################### GENERATE TEST SUITE PACKAGE #######################################
 
+create_control_file mina-test-suite "${SHARED_DEPS}${DAEMON_DEPS}" 'Test suite apps for mina.'
 
-create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.'
+mkdir -p "${BUILDDIR}/etc/mina/test/genesis_ledgers"
+mkdir -p "${BUILDDIR}/usr/local/bin"
+mkdir -p "${BUILDDIR}/etc/mina/test/hardfork/archive_migration_tests"
+mkdir -p "${BUILDDIR}/etc/mina/test/hardfork/test_data"
+
+cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/etc/mina/test/genesis_ledgers/mainnet.json"
+cp -r ../src/test/hardfork/test_data/* "${BUILDDIR}/etc/mina/test/hardfork/test_data"
+cp ../src/test/hardfork/archive_migration_tests/ci.json "${BUILDDIR}/etc/mina/test/hardfork/archive_migration_tests/ci.json"
 
 # Binaries
+
+cp ./default/src/test/hardfork/archive_migration_tests/archive_migration_tests.exe "${BUILDDIR}/usr/local/bin/mina-archive-migration-tests"
 cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
+cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
+cp ./default/src/app/berkeley_account_tables/berkeley_account_tables.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-account-tables"
+   
+
 
 build_deb mina-test-suite
 

@@ -1,0 +1,23 @@
+{
+  "executor": "dune",
+  "paths": {
+    "berkeley_migration":"src/app/berkeley_migration/berkeley_migration.exe",
+    "replayer":"src/app/replayer/replayer.exe",
+    "mainnet_genesis_ledger": "genesis_ledgers/mainnet.json",
+    "mainnet_genesis_block": "src/test/hardfork/test_data/mainnet_migration/genesis_data_only.sql",
+    "random_data_dump": "src/test/hardfork/test_data/random_migration/dump.sql",
+    "create_schema_script": "src/app/archive/create_schema.sql",
+    "zkapp_tables_script": "src/app/archive/zkapp_tables.sql",
+    "random_data_ledger": "src/test/hardfork/test_data/random_migration/genesis_ledger.json",
+    "working_dir": "hardfork_tests"
+  },
+  "reference": {
+    "docker": "gcr.io/o1labs-192920/mina-archive:1.4.0beta2-dkijania-dump-blocks-comp-a6082ee-buster"
+  },
+  "db" : {
+    "password" : "postgres",
+    "user" : "postgres",
+    "port" : 5555,
+    "host" : "172.21.0.1"
+  }
+}
