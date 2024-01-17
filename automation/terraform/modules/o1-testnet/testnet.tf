@@ -67,7 +67,7 @@ module "kubernetes_testnet" {
   block_producer_node_selector = {
     preemptible = local.nodeselector_preemptible
   }
-  
+
   block_producer_configs = [for i, bp in local.block_producer_configs :
     {
       name                   = bp.name
@@ -86,7 +86,6 @@ module "kubernetes_testnet" {
       persist_working_dir    = true
     }
   ]
-
 
   seed_external_port = 10001
 
