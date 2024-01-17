@@ -125,12 +125,6 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   let get_uuid { uuid; _ } = uuid
 
-  let depth t = t.depth
-
-  let with_ledger ~f =
-    let mask = create () in
-    f mask
-
   module Attached = struct
     type parent = Base.t [@@deriving sexp]
 
@@ -146,21 +140,9 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     type root_hash = Hash.t
 
-    exception Location_is_not_account of Location.t
-
     exception
       Dangling_parent_reference of
         Uuid.t * (* Location where null was set*) string
-
-    let create () =
-      failwith
-        "Mask.Attached.create: cannot create an attached mask; use Mask.create \
-         and Mask.set_parent"
-
-    let with_ledger ~f:_ =
-      failwith
-        "Mask.Attached.with_ledger: cannot create an attached mask; use \
-         Mask.create and Mask.set_parent"
 
     let unset_parent ?(trigger_signal = true) ~loc t =
       assert (Result.is_ok t.parent) ;
@@ -617,13 +599,6 @@ module Make (Inputs : Inputs_intf.S) = struct
             Some hash
           with _ -> None )
 
-    (* batch operations TODO: rely on availability of batch operations in Base
-       for speed *)
-    (* NB: rocksdb does not support batch reads; should we offer this? *)
-    let get_batch_exn t locations =
-      assert_is_attached t ;
-      List.map locations ~f:(fun location -> get t location)
-
     let get_hash_batch_exn t locations =
       assert_is_attached t ;
       let maps, ancestor = maps_and_ancestor t in
@@ -1004,11 +979,6 @@ module Make (Inputs : Inputs_intf.S) = struct
         ( Addr.of_directions
         @@ List.init ledger_depth ~f:(fun _ -> Direction.Left) )
 
-    let loc_max a b =
-      let a' = Location.to_path_exn a in
-      let b' = Location.to_path_exn b in
-      if Location.Addr.compare a' b' > 0 then a else b
-
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t account_id account =
       assert_is_attached t ;
@@ -1039,10 +1009,6 @@ module Make (Inputs : Inputs_intf.S) = struct
                   Ok (`Added, location) ) )
       | Some location ->
           Ok (`Existed, location)
-
-    let sexp_of_location = Location.sexp_of_t
-
-    let location_of_sexp = Location.t_of_sexp
   end
 
   let set_parent ?accumulated:accumulated_opt t parent =
@@ -1068,6 +1034,4 @@ module Make (Inputs : Inputs_intf.S) = struct
     | _ ->
         () ) ;
     t
-
-  let addr_to_location addr = Location.Account addr
 end

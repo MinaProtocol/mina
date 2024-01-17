@@ -116,31 +116,6 @@ module Make (Inputs : Inputs_intf) = struct
 
     type t = Leaf of Summary.t | Node of Summary.t * t list
     [@@deriving sexp_of]
-
-    module type Crawler_intf = sig
-      type t
-
-      val get_uuid : t -> Uuid.t
-
-      val merkle_root : t -> Hash.t
-    end
-
-    let rec _crawl : type a. (module Crawler_intf with type t = a) -> a -> t =
-     fun (module C) c ->
-      let summary =
-        let uuid = C.get_uuid c in
-        ( `Uuid uuid
-        , `Hash
-            ( try C.merkle_root c
-              with _ ->
-                Core.printf !"CAUGHT %{sexp: Uuid.t}\n%!" uuid ;
-                Hash.empty_account ) )
-      in
-      match Uuid.Table.find registered_masks (C.get_uuid c) with
-      | None ->
-          Leaf summary
-      | Some masks ->
-          Node (summary, List.map masks ~f:(_crawl (module Mask.Attached)))
   end
 
   let unsafe_preload_accounts_from_parent =
