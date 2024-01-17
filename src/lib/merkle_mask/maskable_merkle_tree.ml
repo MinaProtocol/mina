@@ -47,7 +47,7 @@ module Make (Inputs : Inputs_intf) = struct
       Visualization.display_prefix_of_string @@ Uuid.to_string
       @@ Mask.Attached.get_uuid mask
 
-    let name mask = sprintf !"\"%s \"" (format_uuid mask)
+    let name mask = sprintf !"%S" (format_uuid mask)
 
     let display_attached_mask mask =
       let root_hash = Mask.Attached.merkle_root mask in
@@ -107,15 +107,6 @@ module Make (Inputs : Inputs_intf) = struct
       Out_channel.with_file filename ~f:(fun output_channel ->
           let graph = to_graph () in
           Graphviz.output_graph output_channel graph )
-  end
-
-  module Visualize = struct
-    module Summary = struct
-      type t = [ `Uuid of Uuid.t ] * [ `Hash of Hash.t ] [@@deriving sexp_of]
-    end
-
-    type t = Leaf of Summary.t | Node of Summary.t * t list
-    [@@deriving sexp_of]
   end
 
   let unsafe_preload_accounts_from_parent =
