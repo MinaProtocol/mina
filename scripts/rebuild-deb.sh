@@ -276,9 +276,6 @@ cp ../src/test/hardfork/archive_migration_tests/ci.json "${BUILDDIR}/etc/mina/te
 cp ./default/src/test/hardfork/archive_migration_tests/archive_migration_tests.exe "${BUILDDIR}/usr/local/bin/mina-archive-migration-tests"
 cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
 cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
-cp ./default/src/app/berkeley_account_tables/berkeley_account_tables.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-account-tables"
-   
-
 
 build_deb mina-test-suite
 

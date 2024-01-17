@@ -76,7 +76,6 @@ ls
 cp ./default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/mina-archive"
 cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-archive-blocks"
 cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-extract-blocks"
-cp ./default/src/app/berkeley_account_tables/berkeley_account_tables.exe "${BUILD_DIR}/usr/local/bin/mina-berkeley-account-tables"
 
 cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILD_DIR}/usr/local/bin/mina-missing-blocks-auditor"
 cp ./default/src/app/replayer/replayer.exe "${BUILD_DIR}/usr/local/bin/mina-replayer"
