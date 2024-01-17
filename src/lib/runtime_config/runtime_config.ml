@@ -1285,7 +1285,8 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
   let global_slot = Mina_numbers.Global_slot.to_int global_slot in
   let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
   let yield () =
-    Async_unix.Scheduler.yield () |> Async.Deferred.map ~f:Result.return
+    let open Async.Deferred.Infix in
+    Async_unix.Scheduler.yield () >>| Result.return
   in
   let%bind () = yield () in
   let%bind accounts =

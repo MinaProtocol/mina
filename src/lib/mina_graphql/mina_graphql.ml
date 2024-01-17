@@ -4361,7 +4361,8 @@ module Queries = struct
             ~next_epoch_seed ~blockchain_length ~protocol_state runtime_config
         in
         let%map () =
-          Async_unix.Scheduler.yield () |> Deferred.map ~f:Result.return
+          let open Async.Deferred.Infix in
+          Async_unix.Scheduler.yield () >>| Result.return
         in
         Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic )
 
