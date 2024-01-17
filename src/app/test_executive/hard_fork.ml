@@ -496,7 +496,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            let num_slots_since_cliff =
              Mina_numbers.Global_slot_since_hard_fork.to_int
                global_slot_since_hard_fork
-             + cliff_offset
+             - cliff_offset
            in
            let total = 20_000_000_000_000 in
            let locked =
