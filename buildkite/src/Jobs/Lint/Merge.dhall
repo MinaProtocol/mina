@@ -52,6 +52,16 @@ Pipeline.build
               image = (../../Constants/ContainerImages.dhall).toolchainBase
             }
         }
+      Command.build
+        Command.Config::{
+          commands = [ Cmd.run "buildkite/scripts/merges-cleanly.sh rampup"]
+          , label = "Check merges cleanly into berkeley"
+          , key = "clean-merge-berkeley"
+          , target = Size.Small
+          , docker = Some Docker::{
+              image = (../../Constants/ContainerImages.dhall).toolchainBase
+            }
+        },
     , Command.build
         Command.Config::{
           commands = [ Cmd.run "true" ] : List Cmd.Type
