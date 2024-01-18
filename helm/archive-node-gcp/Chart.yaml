@@ -1,0 +1,26 @@
+apiVersion: v2
+name: archive-node
+description: A Helm chart for Mina Protocol's archive node
+type: application
+version: 1.1.7
+appVersion: 1.16.0
+annotations:
+  artifacthub.io/changes: |
+    - init container use mina libp2p generate-keypair command
+dependencies:
+  - name: postgresql
+    version: "*"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: archive.enablePostgresDB
+  - name: common-utilities
+    version: "*"
+    repository: "https://coda-charts.storage.googleapis.com"
+icon: https://storage.googleapis.com/coda-charts/Mina_Icon_Secondary_RGB_Black.png
+keywords:
+- archive
+- postgres
+- mina
+- testnet
+home: https://minaprotocol.com/
+sources:
+- https://github.com/MinaProtocol/mina/tree/compatible/helm/archive-node

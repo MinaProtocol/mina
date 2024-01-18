@@ -1,6 +1,8 @@
 testnetName: "testnet"
 mina:
   runtimeConfig:
+    enabled: false
+    genesisLedgerURL: ""
   generateGenesisProof: true
   logPrecomputedBlocks: true
   logTxnPoolGossip: false

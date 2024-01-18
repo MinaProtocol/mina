@@ -57,6 +57,18 @@ spec:
           - name: MINA_LIBP2P_PASS
             value: {{ $config.libp2pSecretPassword | quote }}
       {{- end }}
+      {{- if $.Values.mina.runtimeConfig.enabled }}
+      - name: daemon-config
+        image: busybox:latest
+        command:
+          - wget
+          - -O
+          - /root/config/genesis_ledger.json
+          - {{ $.Values.mina.runtimeConfig.genesisLedgerURL }}
+        volumeMounts:
+          - name: {{ $.Release.Name }}-daemon-config-dir
+            mountPath: /root/config
+      {{- end }}
       containers:
       - name: mina
         resources:
@@ -97,8 +109,8 @@ spec:
           {{- if $.Values.mina.seedPeersURL }}
           "-peer-list-url", {{ $.Values.mina.seedPeersURL | quote }},
           {{- end -}}
-          {{- if $.Values.mina.runtimeConfig }}
-          "-config-file", "/root/config/daemon.json",
+          {{- if $.Values.mina.runtimeConfig.enabled }}
+          "-config-file", "/root/config/genesis_ledger.json",
           {{- end }}
           "-libp2p-keypair", "/root/libp2p-keys/key",
           {{- range $.Values.mina.seedPeers }}
@@ -170,24 +182,23 @@ spec:
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
         {{- end }}
-        {{- if $.Values.mina.runtimeConfig }}
-        - name: daemon-config
-          mountPath: "/root/config/"
-        {{- end }}
         - name: config-dir
           mountPath: /root/.mina-config/
+        {{- if $.Values.mina.runtimeConfig.enabled }}
+        - name: {{ $.Release.Name }}-daemon-config-dir
+          mountPath: /root/config
+        {{- end }}
       volumes:
       - name: config-dir
       {{- if $.Values.persist_working_dir }}
         persistentVolumeClaim:
           claimName: pvc-{{ $config.name }}
-      {{- else}}
+      {{- else }}
         emptyDir: {}
       {{- end }}
-      {{- if $.Values.mina.runtimeConfig }}
-      - name: daemon-config
-        configMap:
-          name: seed-daemon-config
+      {{- if $.Values.mina.runtimeConfig.enabled }}
+      - name: {{ $.Release.Name }}-daemon-config-dir
+        emptyDir: {}
       {{- end }}
       {{- if $config.privateKeySecret }}
       - name: private-keys
