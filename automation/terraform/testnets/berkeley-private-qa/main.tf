@@ -62,8 +62,8 @@ locals {
   testnet_name       = "berkeley-private-qa"
   mina_image         = "gcr.io/o1labs-192920/mina-daemon:1.0.0MinaProtocol-mina-stealth-fixes-berkeley-b880414-focal-berkeley"
   mina_archive_image = "gcr.io/o1labs-192920/mina-archive:1.0.0MinaProtocol-mina-stealth-fixes-berkeley-b880414-focal"
-  seed_region        = "us-central1"
-  seed_zone          = "us-central1-b"
+  seed_region        = "us-east1"
+  seed_zone          = "us-east1-b"
 
   # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
   make_report_discord_webhook_url = ""
@@ -172,7 +172,7 @@ module "berkeley" {
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/berkeley_seeds.txt"
+  # seed_peers_url                  = "https://storage.googleapis.com/seed-lists/berkeley_seeds.txt"
 
   # a pass must be set to connect the zkapps dash to grafana
   # leave empty to lock down the zkapps dashboard
