@@ -8,17 +8,6 @@ open Core
 *)
 module Make (Inputs : Inputs_intf.S) = struct
   open Inputs
-
-  type account = Account.t
-
-  type hash = Hash.t
-
-  type account_id = Account_id.t
-
-  type account_id_set = Account_id.Set.t
-
-  type location = Location.t
-
   module Location = Location
   module Addr = Location.Addr
 
@@ -137,8 +126,6 @@ module Make (Inputs : Inputs_intf.S) = struct
     type index = int
 
     type path = Path.t
-
-    type root_hash = Hash.t
 
     exception
       Dangling_parent_reference of
