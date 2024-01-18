@@ -58,15 +58,6 @@ let of_yojson_generic ~fields of_yojson json =
   dump_on_error json @@ of_yojson
   @@ yojson_strip_fields ~keep_fields:fields json
 
-let map_results ls ~f =
-  let open Result.Let_syntax in
-  let%map r =
-    List.fold_result ls ~init:[] ~f:(fun t el ->
-        let%map h = f el in
-        h :: t )
-  in
-  List.rev r
-
 module Json_layout = struct
   module Accounts = struct
     module Single = struct
@@ -563,9 +554,9 @@ module Accounts = struct
 
     let to_account (a : t) : Mina_base.Account.t =
       let open Signature_lib in
-      let open Mina_base.Account.Poly.Stable.V2 in
+      let open Mina_base.Account.Poly in
       let timing =
-        let open Mina_base.Account_timing.Poly.Stable.V2 in
+        let open Mina_base.Account_timing.Poly in
         match a.timing with
         | None ->
             Untimed
@@ -586,7 +577,7 @@ module Accounts = struct
       in
       let permissions =
         let perms = Option.value_exn a.permissions in
-        Mina_base.Permissions.Poly.Stable.V2.
+        Mina_base.Permissions.Poly.
           { edit_state =
               Json_layout.Accounts.Single.Permissions.Auth_required
               .to_account_perm perms.edit_state
@@ -629,14 +620,14 @@ module Accounts = struct
           }
       in
       let mk_zkapp (app : Zkapp_account.t) :
-          ( Mina_base__.Zkapp_state.Value.Stable.V1.t
-          , Mina_base__.Verification_key_wire.Stable.V1.t option
+          ( Mina_base.Zkapp_state.Value.t
+          , Mina_base.Verification_key_wire.t option
           , Zkapp_account.Zkapp_version.t
           , Zkapp_account.Field.t
-          , Mina_wire_types.Mina_numbers.Global_slot_since_genesis.V1.t
+          , Mina_numbers.Global_slot_since_genesis.t
           , bool
           , string )
-          Mina_base.Zkapp_account.Poly.Stable.V2.t =
+          Mina_base.Zkapp_account.Poly.t =
         let hash_data = Mina_base.Verification_key_wire.digest_vk in
         Zkapp_account.
           { app_state = Mina_base.Zkapp_state.V.of_list_exn app.app_state
@@ -1366,7 +1357,8 @@ let gen =
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
   Mina_ledger.Ledger.Any_ledger.M.to_list ledger
-  |> Async.Deferred.map ~f:(map_results ~f:Accounts.Single.of_account)
+  |> Async.Deferred.map
+       ~f:(Mina_stdlib.Result.List.map ~f:Accounts.Single.of_account)
 
 let ledger_of_accounts accounts =
   Ledger.
