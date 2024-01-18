@@ -73,25 +73,3 @@ PRs resolving merge conflicts (merge-PRs) should only be merged after the origin
 
 
 The protocol team at o1labs will conduct weekly synchronization of all branches for all non-conflicting changes to ensure a smooth experience for everyone involved in the Mina repository. The protocol team will reach out to respective teams if there are any conflicting changes (due to force-merges performed mistakenly) and/or failing tests caused by code changes in the upstream branches.
-
-
-# proof-systems Branching policy
-
-Generally, proof-systems intends to be synchronized with the mina repository, and so its branching policy is quite similar. However several important (some, temporary) distinctions exist:
-
-- `compatible`:
-    - Compatible with `rampup` in `mina`.
-    - Mina's `compatible`, similarly to mina's `master`, does not have `proof-systems`.
-- `berkley`: future hardfork release, will be going out to berkeley.
-  - This is where hotfixes go.
-- `develop`: matches mina's `develop`, soft fork-compatibility.
-  - Also used by `mina/o1js-main` and `o1js/main`.
-- `master`: future feature work development, containing breaking changes. Anything that does not need to be released alongside mina.
-    - Note that `mina`'s `master` does not depend on `proof-systems` at all.
-- `izmir`: next hardfork release after berkeley.
-- In the future:
-  - `master`/`develop` will reverse roles and become something like gitflow.
-  - After Berkeley release `compatible` will become properly synced with `mina/compatible`.
-- Direction of merge:
-  - Back-merging: `compatible` into `berkeley` into `develop` into `master`.
-  - Front-merging (introducing new features): other direction, but where you start depends on where the feature belongs.
