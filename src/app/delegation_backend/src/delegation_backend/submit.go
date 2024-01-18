@@ -34,22 +34,28 @@ func writeErrorResponse(app *App, w *http.ResponseWriter, msg string) {
 
 func (ctx *AwsContext) S3Save(objs ObjectsToSave) {
 	for path, bs := range objs {
-		_, err := ctx.Client.HeadObject(ctx.Context, &s3.HeadObjectInput{
-			Bucket: ctx.BucketName,
-			Key:    aws.String(ctx.Prefix + "/" + path),
-		})
-		if err == nil {
-			ctx.Log.Warnf("object already exists: %s", path)
+		fullKey := aws.String(ctx.Prefix + "/" + path)
+		if strings.Contains(path, "blocks") {
+			_, err := ctx.Client.HeadObject(ctx.Context, &s3.HeadObjectInput{
+				Bucket: ctx.BucketName,
+				Key:    fullKey,
+			})
+			if err == nil {
+				ctx.Log.Warnf("S3Save: object already exists, skipping: %s", path)
+				continue
+			}
+			ctx.Log.Warnf("S3Save: Error encountered but proceeding with save: %s, error: %v", path, err)
 		}
 
-		_, err = ctx.Client.PutObject(ctx.Context, &s3.PutObjectInput{
+		ctx.Log.Debugf("S3Save: saving %s", path)
+		_, err := ctx.Client.PutObject(ctx.Context, &s3.PutObjectInput{
 			Bucket:     ctx.BucketName,
-			Key:        aws.String(ctx.Prefix + "/" + path),
+			Key:        fullKey,
 			Body:       bytes.NewReader(bs),
 			ContentMD5: nil,
 		})
 		if err != nil {
-			ctx.Log.Warnf("Error while saving metadata: %v", err)
+			ctx.Log.Warnf("S3Save: Error while saving metadata: %v", err)
 		}
 	}
 }
