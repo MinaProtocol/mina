@@ -44,10 +44,11 @@ The relationship between the branches is as presented: `master ⊆ compatible �
 
 ### Hard forks / releases:
 
-Whenever a hard fork happens, the code in the corresponding release branch, e.g. `berkeley`, is released.  When this happens, the current `compatible` is entirely discarded and a new `compatible` gets created based off of `develop`:
+Whenever a hard fork happens, the code in the corresponding release branch, e.g. `berkeley`, is released to become the new `master`.
+- The intention is then to again have `compatible` as a next soft-fork branch.
+  - The transition will be gradual: right after HF, `berkeley` will be copied into both `master` *and* `compatible`, and `develop` will remain as is for a while. PRs from `develop` will be gradually picked based on release scope and included in `compatible` for subsequent soft-fork releases.
+  - The pre-Berkeley `compatible` is entirely discarded. The pre-Berkeley branch `berkeley` is completely removed from both `mina` and `proof-systems`.
 - `release/1.X.X` branches are made off of `compatible` and tagged with alpha and beta tags until the code is deemed stable, then the `release/1.X.X` branch is merged into `master` and given a stable tag. Whenever code is tagged, if anything is missing in in the downstream branches (compatible, develop) then the tagged branch is also merged back for consistency.
-- So after Berkeley release: `berkeley` branch will become the new `master`. `berkeley` will be removed from `proof-systems`. `develop` will be renamed into `compatible`.
-
 
 ## Day to day: which branch should I use?
 
@@ -62,7 +63,7 @@ We have CI jobs named `check-merges-cleanly-into-BRANCH` that fail if a PR intro
 
 If that CI job passes, then you can proceed and no further action is needed.
 
-PRs resolving merge conflicts (merge-PRs) should only be merged after the original PR is approved, and all changes from the original PR are incorporated into the merge-PRs. Consider a PR with is made from `mybranch` branch against `rampup`, and causes conflicts in `berkeley` and `develop`. In this case the workflow is as follows:
+PRs resolving merge conflicts (merge-PRs) should only be merged after the original PR is approved, and all changes from the original PR are incorporated into the merge-PRs. Consider a PR which is made from `mybranch` branch against `rampup`, and causes conflicts in `berkeley` and `develop`. In this case the workflow is as follows:
 - Review and approve the original PR against `rampup` (PR-rampup). CI passes except for `check-merges-cleanly-into-*` jobs.
 - Incorporate all changes from PR-rampup into a new PR against `berkeley` (PR-berkeley) and resolve conflicts. Concretely, make a new branch+PR based off of `mybranch` called `mybranch-berkeley` (for example), and then merge `berkeley` into `mybranch-berkeley`. Fix any merge errors that result.
   - Keeping branches in sync: If after making e.g. `mybranch-berkeley`, you need to make changes to `mybranch`, then do so, but make sure to merge the newly updated `mybranch` into `mybranch-berkeley`. In order for the git magic to work, `mybranch-berkeley` needs to be a superset of the commits from `mybranch`, and it also needs to be merged first.
