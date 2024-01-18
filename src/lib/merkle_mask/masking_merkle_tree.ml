@@ -713,7 +713,9 @@ module Make (Inputs : Inputs_intf.S) = struct
                     else our_loc
                   in
                   Some loc
-              | _ ->
+              | (Generic _ | Hash _), Account _
+              | Account _, (Generic _ | Hash _)
+              | (Generic _ | Hash _), (Generic _ | Hash _) ->
                   failwith
                     "last_filled: expected account locations for the parent \
                      and mask" ) )
@@ -816,7 +818,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           match location with
           | Account addr ->
               Addr.to_int addr + 1
-          | _ ->
+          | Generic _ | Hash _ ->
               failwith "Expected mask current location to represent an account"
           )
 
