@@ -48,5 +48,5 @@ if [ $MODE == "run" ]; then
     jq  '.db.host |= "'"$NETWORK_GATEWAY"'"' src/test/hardfork/archive_migration_tests/ci.json | \
     jq  '.reference.volume_bind |= "'"$BUILDKITE_BUILD_CHECKOUT_PATH"'/hardfork_tests"' > ci.json
    
-    docker run --volume "/var/run/docker.sock:/var/run/docker.sock" --volume $BUILDKITE_BUILD_CHECKOUT_PATH:/workdir --entrypoint mina-archive-migration-tests $TEST_SUITE_DOCKER test mainnet_migration --env /workdir/ci.json -v
+    docker run --volume "/var/run/docker.sock:/var/run/docker.sock" --volume $BUILDKITE_BUILD_CHECKOUT_PATH:/workdir --entrypoint mina-archive-migration-tests $TEST_SUITE_DOCKER test mainnet_migration --env /workdir/ci.json 
 fi
