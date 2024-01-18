@@ -4279,12 +4279,10 @@ module Queries = struct
               | `Active breadcrumb ->
                   return breadcrumb )
           | Some state_hash_base58, None ->
-              let%bind state_hash =
-                State_hash.of_base58_check state_hash_base58
-                |> Result.map_error ~f:Error.to_string_hum
-                |> Deferred.return
-              in
-              Mina_lib.best_chain_block_by_state_hash mina state_hash
+              let open Result.Monad_infix in
+              State_hash.of_base58_check state_hash_base58
+              |> Result.map_error ~f:Error.to_string_hum
+              >>= Mina_lib.best_chain_block_by_state_hash mina
               |> Deferred.return
           | None, Some block_height ->
               Mina_lib.best_chain_block_by_height mina
@@ -4293,7 +4291,7 @@ module Queries = struct
           | Some _, Some _ ->
               Deferred.Result.fail "Cannot specify both state hash and height"
         in
-        let block = Transition_frontier.Breadcrumb.(block breadcrumb) in
+        let block = Transition_frontier.Breadcrumb.block breadcrumb in
         let blockchain_length = Mina_block.blockchain_length block in
         let global_slot =
           Mina_block.consensus_state block

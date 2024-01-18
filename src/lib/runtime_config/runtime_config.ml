@@ -1261,7 +1261,8 @@ let ledger_accounts (ledger : Mina_base.Ledger.Any_ledger.witness) =
   let%map accounts =
     deferred_list_fold ~init:[]
       ~f:(fun acc el ->
-        let%bind () = yield () |> Async.Deferred.map ~f:Result.return in
+        let open Async.Deferred.Infix in
+        let%bind () = yield () >>| Result.return in
         let%map elt = Accounts.Single.of_account el |> Async.Deferred.return in
         elt :: acc )
       accounts
