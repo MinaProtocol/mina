@@ -105,7 +105,7 @@ module Network_config = struct
     let add_accounts accounts_and_keypairs =
       List.map accounts_and_keypairs
         ~f:(fun
-             ( { Test_config.Test_account.balance; account_name; timing }
+             ( { Test_config.Test_account.balance; account_name; timing; _ }
              , (pk, sk) )
            ->
           let timing = runtime_timing_of_timing timing in
@@ -180,7 +180,7 @@ module Network_config = struct
                   (epoch_accounts : Test_config.Test_account.t list) =
                 let epoch_ledger_accounts =
                   List.map epoch_accounts
-                    ~f:(fun { account_name; balance; timing } ->
+                    ~f:(fun { account_name; balance; timing; _ } ->
                       let balance = Balance.of_mina_string_exn balance in
                       let timing = runtime_timing_of_timing timing in
                       let genesis_account =
