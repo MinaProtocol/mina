@@ -3,6 +3,8 @@
   "paths": {
     "berkeley_migration":"/usr/local/bin/mina-berkeley-migration",
     "replayer":"/usr/local/bin/mina-replayer",
+    "mina":"/usr/local/bin/mina",
+    "mina_archive":"/usr/local/bin/mina-archive",
     "mainnet_genesis_ledger": "/etc/mina/test/genesis_ledgers/mainnet.json",
     "mainnet_genesis_block": "/etc/mina/test/hardfork/test_data/mainnet_migration/genesis_data_only.sql",
     "create_schema_script": "/workdir/src/app/archive/create_schema.sql",

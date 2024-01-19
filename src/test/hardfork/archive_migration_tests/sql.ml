@@ -30,6 +30,21 @@ module Mainnet = struct
                 chain_status <> 'orphaned'
            ORDER BY global_slot_since_genesis desc LIMIT 1
           |sql}
+  
+  let blockchain_length_for_state_hash_query =
+    Caqti_request.find_opt Caqti_type.string Caqti_type.int
+    {sql| 
+        SELECT height FROM blocks WHERE
+              state_hash = ?
+        |sql}
+
+  let latest_canonical_state_hash_query =
+    Caqti_request.find_opt Caqti_type.unit Caqti_type.string
+      {sql| 
+          SELECT state_hash FROM blocks WHERE
+                chain_status = 'canonical'
+           ORDER BY global_slot_since_genesis desc LIMIT 1
+          |sql}
 
   let global_slot_since_genesis_at_state_hash_query =
     Caqti_request.find_opt Caqti_type.string Caqti_type.int
@@ -39,12 +54,20 @@ module Mainnet = struct
           LIMIT 1
           |sql}
 
+          
+
+  let blockchain_length_for_state_hash (module Conn : CONNECTION) state_hash =
+    Conn.find_opt blockchain_length_for_state_hash_query state_hash
+
   let global_slot_since_genesis_at_state_hash (module Conn : CONNECTION)
       state_hash =
     Conn.find_opt global_slot_since_genesis_at_state_hash_query state_hash
 
   let latest_state_hash_before_slot (module Conn : CONNECTION) slot =
     Conn.find_opt latest_state_hash_before_slot_query slot
+
+  let latest_canonical_state_hash (module Conn : CONNECTION) =
+    Conn.find_opt latest_canonical_state_hash_query ()
 
   let latest_state_hash (module Conn : CONNECTION) =
     Conn.find_opt latest_state_hash ()

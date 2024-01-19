@@ -4,6 +4,8 @@ module Settings = struct
   type paths =
     { berkeley_migration : string
     ; replayer : string
+    ; mina : string
+    ; mina_archive : string
     ; mainnet_genesis_ledger : string
     ; mainnet_genesis_block : string
     ; mainnet_data_bucket : string [@default "mina_network_block_data"]

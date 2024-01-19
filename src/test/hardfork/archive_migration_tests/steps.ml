@@ -264,6 +264,36 @@ module HardForkSteps = struct
           query_mainnet_db ~f:(fun db -> Sql.Mainnet.latest_state_hash db)
         in
         Deferred.return maybe_slot
+  
+  let get_latest_canonical_state_hash uri = 
+    let open Deferred.Let_syntax in
+    let mainnet_pool = Caqti_async.connect_pool ~max_size:128 uri in
+
+    match mainnet_pool with
+    | Error _ ->
+        failwithf "Failed to create Caqti pools for Postgresql to %s"
+          (Uri.to_string uri) ()
+    | Ok mainnet_pool ->
+        let query_mainnet_db = Mina_caqti.query mainnet_pool in
+        let%bind maybe_slot =
+          query_mainnet_db ~f:(fun db -> Sql.Mainnet.latest_canonical_state_hash db)
+        in
+        Deferred.return maybe_slot
+
+  let get_blockchain_length_for_state_hash uri state_hash = 
+    let open Deferred.Let_syntax in
+    let mainnet_pool = Caqti_async.connect_pool ~max_size:128 uri in
+
+    match mainnet_pool with
+    | Error _ ->
+        failwithf "Failed to create Caqti pools for Postgresql to %s"
+          (Uri.to_string uri) ()
+    | Ok mainnet_pool ->
+        let query_mainnet_db = Mina_caqti.query mainnet_pool in
+        let%bind maybe_blockchain_length =
+          query_mainnet_db ~f:(fun db -> Sql.Mainnet.blockchain_length_for_state_hash db state_hash)
+        in
+        Deferred.return maybe_blockchain_length
 
   let get_latest_state_hash_at_slot uri migration_end_slot =
     let open Deferred.Let_syntax in
@@ -285,9 +315,8 @@ module HardForkSteps = struct
                (Printf.sprintf "Cannot find latest state has for slot: %d"
                   migration_end_slot ) )
 
-  let get_migration_end_slot_for_state_hash conn_str state_hash =
+  let get_migration_end_slot_for_state_hash uri state_hash =
     let open Deferred.Let_syntax in
-    let uri = Uri.of_string conn_str in
     let mainnet_pool = Caqti_async.connect_pool ~max_size:128 uri in
     match mainnet_pool with
     | Error _ ->
@@ -457,6 +486,26 @@ module HardForkSteps = struct
                  '%s' -> '%s' in migrated database"
                 expected_child expected_parent () ) ;
         Deferred.unit
+
+
+  let generate_libp2p_keypair t privkey_local_folder_path =
+    let privkey_path = Filename.concat t.working_dir privkey_local_folder_path in
+    Util.run_cmd_exn "." "mina"
+      [ "libp2p"
+      ; "generate-keypair"
+      ; "-privkey-path"
+      ; privkey_path
+      ]
+
+
+  let generate_keypair t privkey_local_path =
+        let privkey_path = Filename.concat t.working_dir privkey_local_path in
+        Util.run_cmd_exn "." "mina"
+          [ "advanced"
+          ; "generate-keypair"
+          ; "-privkey-path"
+          ; privkey_path
+          ]
 
   let import_mainnet_dump t date =
     let dump_name =
@@ -677,4 +726,35 @@ module HardForkSteps = struct
              let left = get_length left in
              let right = get_length right in
              left - right ) )
+  
+
+  let run_in_background t ~args prog =
+    match t.env.executor with
+    | Dune ->
+      Process.create ~args ~prog ()
+    | Bash ->
+      Process.create 
+      ~args:(["exec"; prog; "--"; "run"] @ args) 
+      ~prog:"dune" ()
+
+  let run_in_background_exn t ~args prog = 
+    let open Deferred.Let_syntax in
+    let%bind process = run_in_background t ~args prog in
+    return process
+
+    
+  let start_archive_node t config conn_str =
+    run_in_background_exn 
+      t
+      ~args:["run"; "--config-file"; config;"--postgres-uri"; conn_str] 
+      t.env.paths.mina_archive
+
+  let start_seed_deamon_node t ~block_producer_key ~config_file ~libp2p_keypair archive_node = 
+    run_in_background_exn 
+      t
+      ~args:["daemon"; "--block-producer-key"; block_producer_key;"--config-file"; config_file
+        ; "--libp2p-keypair"; libp2p_keypair; "--seed"; "--archive-address"; archive_node ] 
+      t.env.paths.mina
+   
+   
 end
