@@ -3,7 +3,18 @@ open Mina_base
 
 let () =
   run "Test mina_base."
-    [ Zkapp_account_test.
+    [ Verification_key_permission_test.
+        ( "verification-key-permission"
+        , [ test_case
+              "Update verification key permission with a different version \
+               should be rejected."
+              `Quick update_vk_perm_with_different_version
+          ; test_case
+              "Update verification key permission with current version should \
+               be accepted."
+              `Quick update_vk_perm_with_current_version
+          ] )
+    ; Zkapp_account_test.
         ( "zkapp-accounts"
         , [ test_case "Events pop after push is idempotent." `Quick
               (checked_pop_reverses_push (module Zkapp_account.Events))

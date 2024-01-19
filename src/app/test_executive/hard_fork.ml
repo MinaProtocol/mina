@@ -87,6 +87,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (Balance.to_mina_string balance.locked)
   end
 
+  let older_version = Mina_numbers.Txn_version.of_int 1
+
   let fork_config : Runtime_config.Fork_config.t =
     { previous_state_hash =
         "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
@@ -96,11 +98,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    let staking_accounts : Test_Account.t list =
-      [ { account_name = "node-a-key"; balance = "400000"; timing = Untimed }
-      ; { account_name = "node-b-key"; balance = "300000"; timing = Untimed }
-      ; { account_name = "snark-node-key1"; balance = "0"; timing = Untimed }
-      ; { account_name = "snark-node-key2"; balance = "0"; timing = Untimed }
+    let staking_accounts : Test_account.t list =
+      let open Test_account in
+      [ create ~account_name:"node-a-key" ~balance:"400000" ()
+      ; create ~account_name:"node-b-key" ~balance:"300000" ()
+      ; create ~account_name:"snark-node-key1" ~balance:"0" ()
+      ; create ~account_name:"snark-node-key2" ~balance:"0" ()
       ]
     in
     let staking : Test_config.Epoch_data.Data.t =
@@ -111,12 +114,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       { epoch_ledger; epoch_seed }
     in
     (* next accounts contains staking accounts, with balances changed, one new account *)
-    let next_accounts : Test_Account.t list =
-      [ { account_name = "node-a-key"; balance = "200000"; timing = Untimed }
-      ; { account_name = "node-b-key"; balance = "350000"; timing = Untimed }
-      ; { account_name = "snark-node-key1"; balance = "0"; timing = Untimed }
-      ; { account_name = "snark-node-key2"; balance = "0"; timing = Untimed }
-      ; { account_name = "fish1"; balance = "100"; timing = Untimed }
+    let next_accounts : Test_account.t list =
+      let open Test_account in
+      [ create ~account_name:"node-a-key" ~balance:"200000" ()
+      ; create ~account_name:"node-b-key" ~balance:"350000" ()
+      ; create ~account_name:"snark-node-key1" ~balance:"0" ()
+      ; create ~account_name:"snark-node-key2" ~balance:"0" ()
+      ; create ~account_name:"fish1" ~balance:"100" ()
       ]
     in
     let next : Test_config.Epoch_data.Data.t =
@@ -130,38 +134,48 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; epoch_data = Some { staking; next = Some next }
     ; genesis_ledger =
+        (let open Test_account in
         (* the genesis ledger contains the staking ledger plus some other accounts *)
         staking_accounts
-        @ [ { account_name = "fish1"; balance = "100"; timing = Untimed }
-          ; { account_name = "fish2"; balance = "100"; timing = Untimed }
-          ; { account_name = "fish3"; balance = "1000"; timing = Untimed }
+        @ [ create ~account_name:"fish1" ~balance:"100" ()
+          ; create ~account_name:"fish2" ~balance:"100" ()
+          ; create ~account_name:"fish3" ~balance:"1000" ()
             (* account fully vested before hard fork *)
-          ; { account_name = "timed1"
-            ; balance = "10000" (* balance in Mina *)
-            ; timing =
-                make_timing ~min_balance:10_000_000_000_000 ~cliff_time:100_000
-                  ~cliff_amount:1_000_000_000_000 ~vesting_period:1000
-                  ~vesting_increment:1_000_000_000_000
-            }
+          ; create ~account_name:"timed1" ~balance:"10000" (* balance in Mina *)
+              ~timing:
+                (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:100_000
+                   ~cliff_amount:1_000_000_000_000 ~vesting_period:1000
+                   ~vesting_increment:1_000_000_000_000 )
+              ()
             (* account starts vesting before hard fork, not fully vested after
                cliff is before hard fork
             *)
-          ; { account_name = "timed2"
-            ; balance = "10000" (* balance in Mina *)
-            ; timing =
-                make_timing ~min_balance:10_000_000_000_000 ~cliff_time:499_995
-                  ~cliff_amount:2_000_000_000_000 ~vesting_period:5
-                  ~vesting_increment:3_000_000_000_000
-            }
+          ; create ~account_name:"timed2" ~balance:"10000" (* balance in Mina *)
+              ~timing:
+                (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:499_995
+                   ~cliff_amount:2_000_000_000_000 ~vesting_period:5
+                   ~vesting_increment:3_000_000_000_000 )
+              ()
             (* cliff at hard fork, vesting with each slot *)
-          ; { account_name = "timed3"
-            ; balance = "20000" (* balance in Mina *)
-            ; timing =
-                make_timing ~min_balance:20_000_000_000_000 ~cliff_time:500_000
-                  ~cliff_amount:2_000_000_000_000 ~vesting_period:1
-                  ~vesting_increment:1_000_000_000_000
-            }
-          ]
+          ; create ~account_name:"timed3" ~balance:"20000" (* balance in Mina *)
+              ~timing:
+                (make_timing ~min_balance:20_000_000_000_000 ~cliff_time:500_000
+                   ~cliff_amount:2_000_000_000_000 ~vesting_period:1
+                   ~vesting_increment:1_000_000_000_000 )
+              ()
+          ; create ~account_name:"vk-proof" ~balance:"10000"
+              ~permissions:
+                { Permissions.user_default with
+                  set_verification_key = (Proof, older_version)
+                }
+              ~zkapp:Zkapp_account.default ()
+          ; create ~account_name:"vk-impossible" ~balance:"1000"
+              ~permissions:
+                { Permissions.user_default with
+                  set_verification_key = (Proof, older_version)
+                }
+              ~zkapp:Zkapp_account.default ()
+          ])
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -185,6 +199,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let run network t =
     let open Malleable_error.Let_syntax in
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.compiled
+    in
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
@@ -212,6 +229,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let timed3 =
       Core.String.Map.find_exn (Network.genesis_keypairs network) "timed3"
+    in
+    let vk_proof =
+      Core.String.Map.find_exn (Network.genesis_keypairs network) "vk-proof"
+    in
+    let vk_impossible =
+      Core.String.Map.find_exn
+        (Network.genesis_keypairs network)
+        "vk-impossible"
     in
     let sender = fish2.keypair in
     let receiver = fish1.keypair in
@@ -255,7 +280,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Signed_command.sign_payload sender.private_key payload
       |> Signature.Raw.encode
     in
-    let%bind zkapp_command_create_accounts =
+    let zkapp_command_create_accounts =
       (* construct a Zkapp_command.t *)
       let zkapp_keypairs =
         List.init 3 ~f:(fun _ -> Signature_lib.Keypair.create ())
@@ -281,9 +306,56 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; authorization_kind = Signature
         }
       in
-      return
-      @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-           zkapp_command_spec
+      Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+        zkapp_command_spec
+    in
+
+    let%bind zkapp_command_update_vk_proof, zkapp_command_update_vk_impossible =
+      let snapp_update =
+        { Account_update.Update.dummy with
+          verification_key =
+            Zkapp_basic.Set_or_keep.Set
+              { data = Pickles.Side_loaded.Verification_key.dummy
+              ; hash = Zkapp_account.dummy_vk_hash ()
+              }
+        }
+      in
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let amount = Currency.Amount.of_mina_int_exn 10 in
+      let memo = Signed_command_memo.create_from_string_exn "update vk proof" in
+      let (spec_proof : Transaction_snark.For_tests.Update_states_spec.t) =
+        { sender = (fish1.keypair, Account.Nonce.one)
+        ; fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount
+        ; zkapp_account_keypairs = [ vk_proof.keypair ]
+        ; memo
+        ; new_zkapp_account = false
+        ; snapp_update
+        ; current_auth = Signature
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; actions = []
+        ; preconditions = None
+        }
+      in
+      let spec_impossible =
+        { spec_proof with
+          zkapp_account_keypairs = [ vk_impossible.keypair ]
+        ; sender = (fish1.keypair, Account.Nonce.(succ one))
+        }
+      in
+      let%map vk_proof =
+        Malleable_error.lift
+        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+             spec_proof
+      and vk_impossible =
+        Malleable_error.lift
+        @@ Transaction_snark.For_tests.update_states ~constraint_constants
+             spec_impossible
+      in
+      (vk_proof, vk_impossible)
     in
     let wait_for_zkapp zkapp_command =
       let with_timeout =
@@ -469,6 +541,34 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             genesis derived from hard fork config"
            (List.length blocks) ;
          return () )
+    in
+    let%bind () =
+      section_hard
+        "send a zkapp to update verification key using Signature while account \
+         permission is set to Proof with old version"
+      @@ send_zkapp ~logger
+           (Network.Node.get_ingress_uri node_a)
+           zkapp_command_update_vk_proof
+    in
+    let%bind () =
+      section_hard
+        "Wait for zkapp to update verification key to be included in \
+         transition frontier"
+      @@ wait_for_zkapp zkapp_command_update_vk_proof
+    in
+    let%bind () =
+      section_hard
+        "send a zkapp to update verification key using Signature while account \
+         permission is set to Impossible with old version"
+      @@ send_zkapp ~logger
+           (Network.Node.get_ingress_uri node_a)
+           zkapp_command_update_vk_impossible
+    in
+    let%bind () =
+      section_hard
+        "Wait for zkapp to update verification key to be included in \
+         transition frontier"
+      @@ wait_for_zkapp zkapp_command_update_vk_impossible
     in
     section_hard "running replayer"
       (let%bind logs =
