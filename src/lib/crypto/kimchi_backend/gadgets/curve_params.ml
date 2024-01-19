@@ -219,6 +219,4 @@ let from_strings (type field)
   let gen_x = Bignum_bigint.of_string gen_x in
   let gen_y = Bignum_bigint.of_string gen_y in
   let order = Bignum_bigint.of_string order in
-  to_circuit_constants
-    (module Circuit)
     { default with a; b; modulus; gen = (gen_x, gen_y); order }

@@ -23,6 +23,16 @@ let is_on_curve_bignum_point (curve : Curve_params.t)
     = (pow y (of_int 2) - (pow x (of_int 3) + (curve.a * x) + curve.b))
       % curve.modulus)
 
+let log (type f) (module Circuit : Snark_intf.Run with type field = f) point name =
+  let x, y = point in
+  let ff_to_string f = Foreign_field.Element.Standard.to_string_as_prover (module Circuit) f in
+  let is_g_inf g = Affine.equal_as_prover (module Circuit) g (Affine.const_zero (module Circuit)) in
+  let () = Js_of_ocaml.Firebug.console##log (Js_of_ocaml.Js.string name) in
+  let () = Js_of_ocaml.Firebug.console##log (Js_of_ocaml.Js.string (ff_to_string x)) in
+  let () = Js_of_ocaml.Firebug.console##log (Js_of_ocaml.Js.string (ff_to_string y)) in
+  let () = Js_of_ocaml.Firebug.console##log (Js_of_ocaml.Js.string ("is " ^ name ^ " infinity?")) in
+  Js_of_ocaml.Firebug.console##log (Js_of_ocaml.Js.bool (is_g_inf point))
+
 (* Gadget for (partial) elliptic curve group addition over foreign field
  *
  *   Given input points L and R, constrains that
@@ -990,6 +1000,11 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     List.foldi scalar ~init:(curve.ia.acc, point) (* (acc, base) *)
       ~f:(fun i (acc, base) bit ->
         (* Add: sum = acc + base *)
+        let () = Circuit.as_prover (fun () ->
+          let () = log (module Circuit) acc "acc" in
+          let () = log (module Circuit) base "base" in
+          ()
+        ) in
         let sum = add (module Circuit) external_checks curve acc base in
         (* Bounds 1:
          *   Left input is previous result, so already checked.
@@ -1027,9 +1042,15 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
 
         (* Group add conditionally *)
         let acc = Affine.if_ (module Circuit) bit ~then_:sum ~else_:acc in
-
+        
         (acc, double_base) )
   in
+
+  let () = Circuit.as_prover (fun () ->
+    let () = log (module Circuit) acc "acc" in
+    let () = log (module Circuit) curve.ia.neg_acc "curve.ia.neg_acc" in
+    ()
+  ) in
 
   (* Subtract init_point from accumulator for final result *)
   add (module Circuit) external_checks curve acc curve.ia.neg_acc
