@@ -35,16 +35,18 @@ func writeErrorResponse(app *App, w *http.ResponseWriter, msg string) {
 func (ctx *AwsContext) S3Save(objs ObjectsToSave) {
 	for path, bs := range objs {
 		fullKey := aws.String(ctx.Prefix + "/" + path)
-		if strings.Contains(path, "blocks") {
+		if strings.HasPrefix(path, "blocks/") {
 			_, err := ctx.Client.HeadObject(ctx.Context, &s3.HeadObjectInput{
 				Bucket: ctx.BucketName,
 				Key:    fullKey,
 			})
 			if err == nil {
-				ctx.Log.Warnf("S3Save: object already exists, skipping: %s", path)
+				//block already exists, skipping
 				continue
 			}
-			ctx.Log.Warnf("S3Save: Error encountered but proceeding with save: %s, error: %v", path, err)
+			if !strings.Contains(err.Error(), "NotFound") {
+				ctx.Log.Warnf("S3Save: Error when checking if block exists, but will continue with block save: %s, error: %v", path, err)
+			}
 		}
 
 		ctx.Log.Debugf("S3Save: saving %s", path)
