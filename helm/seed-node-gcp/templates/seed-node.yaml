@@ -67,7 +67,7 @@ spec:
             wget -O /root/config/genesis_ledger.json {{ $.Values.mina.runtimeConfig.genesisLedgerURL }};
 
             echo "Replacing baked ledger with {{ $.Values.mina.runtimeConfig.genesisLedgerURL }}";
-            cp /root/config/genesis_ledger.json /root/.mina-config/daemon.json || echo "Failed to copy file. Check permissions or file existence.";
+            cp /root/config/genesis_ledger.json /root/.mina-config/daemon.json && chmod a+r /root/.mina-config/daemon.json || echo "Failed to copy file or set permissions. Check permissions or file existence.";
         volumeMounts:
           - name: {{ $.Release.Name }}-daemon-config-dir
             mountPath: /root/config
