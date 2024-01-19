@@ -39,7 +39,7 @@ variable "whale_count" {
   type = number
 
   description = "Number of online whales for the network to run"
-  default     = 2
+  default     = 5
 }
 
 variable "fish_count" {
@@ -50,7 +50,7 @@ variable "fish_count" {
 }
 
 variable "seed_count" {
-  default = 1
+  default = 3
 }
 
 variable "plain_node_count" {
@@ -97,7 +97,7 @@ module "berkeley" {
   watchdog_image              = "gcr.io/o1labs-192920/watchdog:0.4.13"
   use_embedded_runtime_config = true
 
-  archive_node_count            = 1
+  archive_node_count            = 2
   mina_archive_schema           = "create_schema.sql"
   mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/b1facecde934ce3969771c34962b878d75321ca7/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/b1facecde934ce3969771c34962b878d75321ca7/src/app/archive/zkapp_tables.sql"]
 
@@ -107,6 +107,15 @@ module "berkeley" {
       enableLocalDaemon = true
       enablePostgresDB  = true
       postgresHost      = "archive-1-postgresql"
+      nodeSelector = {
+        preemptible = local.nodeselector_preemptible
+      }
+    },
+    {
+      name              = "archive-2"
+      enableLocalDaemon = true
+      enablePostgresDB  = true
+      postgresHost      = "archive-2-postgresql"
       nodeSelector = {
         preemptible = local.nodeselector_preemptible
       }
@@ -139,7 +148,7 @@ module "berkeley" {
   snark_coordinators = [
     {
       snark_coordinator_name       = local.testnet_name
-      snark_worker_replicas        = 2
+      snark_worker_replicas        = 5
       snark_worker_fee             = "0.01"
       snark_worker_public_key      = "B62qmQsEHcsPUs5xdtHKjEmWqqhUPRSF2GNmdguqnNvpEZpKftPC69e"
       snark_coordinators_host_port = 10401
