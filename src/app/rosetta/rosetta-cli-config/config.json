@@ -5,7 +5,7 @@
  },
  "online_url": "http://localhost:PLACEHOLDER_ROSETTA_ONLINE_PORT",
  "data_directory": "",
- "http_timeout": 10,
+ "http_timeout": 300,
  "max_retries": 5,
  "retry_elapsed_time": 0,
  "max_online_connections": 120,
@@ -47,8 +47,8 @@
    "initial_balance_fetch_disabled": false,
    "end_conditions": {
      "create_account":      10,
-     "transfer_payment":    20,
-     "transfer_delegation": 5
+     "payment":    20,
+     "delegation": 5
    }
  },
  "data": {
