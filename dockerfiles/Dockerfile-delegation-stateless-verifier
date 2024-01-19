@@ -60,7 +60,7 @@ COPY --from=builder /bin/delegation-verify /bin/delegation-verify
 COPY --from=builder /bin/authenticate.sh /bin/authenticate.sh
 
 # awscli and cqlsh-expansion are used by the delegation verification tool
-RUN apt-get update && apt-get install -y python3 python3-pip jq libjemalloc2 wget
+RUN apt-get update && apt-get install -y python3 python3-pip jq libjemalloc2 wget dnsutils gawk
 RUN pip3 install awscli
 RUN pip3 install cqlsh-expansion
 
