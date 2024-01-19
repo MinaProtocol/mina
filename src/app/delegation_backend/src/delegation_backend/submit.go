@@ -183,7 +183,7 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	metaBytes, err1 := req.MakeMetaToBeSaved(remoteAddr)
 	if err1 != nil {
-		h.app.Log.Errorf("Error while marshaling JSON for metaToBeSaved: %v", err)
+		h.app.Log.Errorf("Error while marshaling JSON for metaToBeSaved: %v", err1)
 		w.WriteHeader(500)
 		writeErrorResponse(h.app, &w, "Unexpected server error")
 		return
