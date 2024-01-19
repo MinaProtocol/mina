@@ -1354,19 +1354,20 @@ ALTER SEQUENCE public.zkapp_nonce_bounds_id_seq OWNED BY public.zkapp_nonce_boun
 
 CREATE TABLE public.zkapp_permissions (
     id integer NOT NULL,
-    edit_state public.zkapp_auth_required_type NOT NULL,
-    send public.zkapp_auth_required_type NOT NULL,
-    receive public.zkapp_auth_required_type NOT NULL,
-    access public.zkapp_auth_required_type NOT NULL,
-    set_delegate public.zkapp_auth_required_type NOT NULL,
-    set_permissions public.zkapp_auth_required_type NOT NULL,
-    set_verification_key public.zkapp_auth_required_type NOT NULL,
-    set_zkapp_uri public.zkapp_auth_required_type NOT NULL,
-    edit_action_state public.zkapp_auth_required_type NOT NULL,
-    set_token_symbol public.zkapp_auth_required_type NOT NULL,
-    increment_nonce public.zkapp_auth_required_type NOT NULL,
-    set_voting_for public.zkapp_auth_required_type NOT NULL,
-    set_timing public.zkapp_auth_required_type NOT NULL
+    edit_state                       public.zkapp_auth_required_type NOT NULL,
+    send                             public.zkapp_auth_required_type NOT NULL,
+    receive                          public.zkapp_auth_required_type NOT NULL,
+    access                           public.zkapp_auth_required_type NOT NULL,
+    set_delegate                     public.zkapp_auth_required_type NOT NULL,
+    set_permissions                  public.zkapp_auth_required_type NOT NULL,
+    set_verification_key_auth        public.zkapp_auth_required_type NOT NULL,
+    set_verification_key_txn_version int                             NOT NULL,
+    set_zkapp_uri                    public.zkapp_auth_required_type NOT NULL,
+    edit_action_state                public.zkapp_auth_required_type NOT NULL,
+    set_token_symbol                 public.zkapp_auth_required_type NOT NULL,
+    increment_nonce                  public.zkapp_auth_required_type NOT NULL,
+    set_voting_for                   public.zkapp_auth_required_type NOT NULL,
+    set_timing                       public.zkapp_auth_required_type NOT NULL
 );
 
 
@@ -2473,34 +2474,34 @@ COPY public.accounts_accessed (ledger_index, block_id, account_identifier_id, to
 11	1	242	1	269	0	2n1hGCgg3jCKQJzVBgfujGqyV6D9riKgq27zhXqYgTRVZM5kqfkm	242	1	242	1	\N
 3	2	74	1	499750000000	1	2n1w5Q8vCgyxzKzp3mEEL371He1UmN2vmPreEnVSetrDqCo5aFP1	75	1	74	1	\N
 7	2	150	1	725250000000	0	2n1hGCgg3jCKQJzVBgfujGqyV6D9riKgq27zhXqYgTRVZM5kqfkm	97	1	150	1	\N
-4	2	160	1	11549995000000000	1	2n1AwgLqpEggvAPTKtdzEiKKbj1MkPDiqfKMELNobugxQTBAGsAJ	7	1	160	1	\N
+4	2	160	1	11549995000000000	1	2n2S9ea5eHGGisPbJH9RbXkUKfRu9A4Xb1KLokdqH2Qw2KHZ4iXj	7	1	160	1	\N
 3	3	74	1	496750000000	13	2n1bv5yhoZMQ811ATHE9TuQuK8MPYBusWztBD9e2PpRH99AgDSaF	75	1	74	1	\N
 7	3	150	1	1558250000000	0	2n1hGCgg3jCKQJzVBgfujGqyV6D9riKgq27zhXqYgTRVZM5kqfkm	97	1	150	1	\N
-4	3	160	1	11549885000000000	23	2mzhSXRbt7RBByzoboE1H5u4Ugea6YBq6RWz3X7HNm3byYNTpiWC	7	1	160	1	\N
+4	3	160	1	11549885000000000	23	2mznKTHfHv7MMmcgqsmoeuLGm5Ueoo2RKNQwSxaSEqCpsDPw8mvG	7	1	160	1	\N
 5	4	6	1	833000000000	0	2n1hGCgg3jCKQJzVBgfujGqyV6D9riKgq27zhXqYgTRVZM5kqfkm	7	1	6	1	\N
 3	4	74	1	496750000000	13	2n1bv5yhoZMQ811ATHE9TuQuK8MPYBusWztBD9e2PpRH99AgDSaF	75	1	74	1	\N
-4	4	160	1	11549885000000000	23	2mzhSXRbt7RBByzoboE1H5u4Ugea6YBq6RWz3X7HNm3byYNTpiWC	7	1	160	1	\N
+4	4	160	1	11549885000000000	23	2mznKTHfHv7MMmcgqsmoeuLGm5Ueoo2RKNQwSxaSEqCpsDPw8mvG	7	1	160	1	\N
 5	5	6	1	807000000000	0	2n1hGCgg3jCKQJzVBgfujGqyV6D9riKgq27zhXqYgTRVZM5kqfkm	7	1	6	1	\N
 3	5	74	1	494750000000	21	2n2FyeU3yzAVZYYDQkyPnCouctK85idey24n4mHMtvdRfVjttPrT	75	1	74	1	\N
-4	5	160	1	11549800000000000	40	2mzatzhRN9RCQYvJgsGBSF2LQdNxqP4XwWyjREaimE2T3LMk64ws	7	1	160	1	\N
+4	5	160	1	11549800000000000	40	2n1KzrDbbCYok1Sb9BCeDPkQS7NPmNxrpxX6H2dmY5oVHJV5Vn7Z	7	1	160	1	\N
 3	6	74	1	492750000000	29	2mzYD6pTYYPtACSn4syfyNtbyDV6D5Y7cDA4fRXC39ak7cPrUE3J	75	1	74	1	\N
 7	6	150	1	2365250000000	0	2n1hGCgg3jCKQJzVBgfujGqyV6D9riKgq27zhXqYgTRVZM5kqfkm	97	1	150	1	\N
-4	6	160	1	11549715000000000	57	2n1SosT8PPnXsNimKGckCx1JXMHRkbvEnMkYXQZbTqEHGqsdH2pj	7	1	160	1	\N
+4	6	160	1	11549715000000000	57	2n1Q7LyeFaFwggZUTa8SVbCb8SWv8Xj1cJSP3xLjV3ACcrZmpeDS	7	1	160	1	\N
 5	7	6	1	1614250000000	0	2n1hGCgg3jCKQJzVBgfujGqyV6D9riKgq27zhXqYgTRVZM5kqfkm	7	1	6	1	\N
 3	7	74	1	490500000000	38	2n19Pmphgs7JxTA6yhQp5ur8YqxotPKqoRFVYwwZF2CPgCRMXNTH	75	1	74	1	\N
-4	7	160	1	11549630000000000	74	2n1HGuwvXhKmTucpYaJccqFTZhJZKy5jcLrje9wUfjG1mtgPpQzW	7	1	160	1	\N
+4	7	160	1	11549630000000000	74	2mzbeAuudugyVVi66cUquGoX4U4CfPdZkMMsabfTae2GoU5y5M9z	7	1	160	1	\N
 3	8	74	1	490500000000	38	2n19Pmphgs7JxTA6yhQp5ur8YqxotPKqoRFVYwwZF2CPgCRMXNTH	75	1	74	1	\N
 7	8	150	1	3172500000000	0	2n1hGCgg3jCKQJzVBgfujGqyV6D9riKgq27zhXqYgTRVZM5kqfkm	97	1	150	1	\N
-4	8	160	1	11549630000000000	74	2n1HGuwvXhKmTucpYaJccqFTZhJZKy5jcLrje9wUfjG1mtgPpQzW	7	1	160	1	\N
+4	8	160	1	11549630000000000	74	2mzbeAuudugyVVi66cUquGoX4U4CfPdZkMMsabfTae2GoU5y5M9z	7	1	160	1	\N
 5	9	6	1	2421250000000	0	2n1hGCgg3jCKQJzVBgfujGqyV6D9riKgq27zhXqYgTRVZM5kqfkm	7	1	6	1	\N
 3	9	74	1	488500000000	46	2mzzMeB15JTeem44mZ4x6p6dFWM16p4UXFjP4fNJz7wXBFcMW5ps	75	1	74	1	\N
-4	9	160	1	11549545000000000	91	2mzjiYE1H7C7yLejpd8tTFe7EbA2zs5PiN1ESTqRKwymEcd1sdnK	7	1	160	1	\N
+4	9	160	1	11549545000000000	91	2n27TprAR8SnzNcfbsgagPY85Vc67JEkJRJYNNv3r9z13GccRDKH	7	1	160	1	\N
 5	10	6	1	3228500000000	0	2n1hGCgg3jCKQJzVBgfujGqyV6D9riKgq27zhXqYgTRVZM5kqfkm	7	1	6	1	\N
 3	10	74	1	486250000000	55	2n2FKShqJCt1TnBmnFy5NXRFBzcXKVnvCoDKtdUGAvpmKYwmpz9J	75	1	74	1	\N
-4	10	160	1	11549460000000000	108	2n1eJngaiKa7ZtTA5dDPNNekXRHiZrkeHWvAMLgeFLSnGnXNkj5j	7	1	160	1	\N
+4	10	160	1	11549460000000000	108	2n19963FSZ9GmMk2DS8wyEHbFmB129ah3EG7XG5CScjJk7jrK4Gj	7	1	160	1	\N
 3	11	74	1	484250000000	63	2n1Sox1V2xJogEYVavNTYW8s8P5SXNCtyLHtCfxnCEhES1c7VDAm	75	1	74	1	\N
 7	11	150	1	3172250000000	0	2n1hGCgg3jCKQJzVBgfujGqyV6D9riKgq27zhXqYgTRVZM5kqfkm	97	1	150	1	\N
-4	11	160	1	11549375000000000	125	2n243vFgrwHQ7U7bhZdkfuDBUsRKaf3CRWcyQrD2fjVoxg5tAfGj	7	1	160	1	\N
+4	11	160	1	11549375000000000	125	2mzkLYN5qPgnJ8ddA4cARiyR6gyyFuB8SH5MAoJsVv6PrKuuq2T5	7	1	160	1	\N
 5	12	6	1	4035750000000	0	2n1hGCgg3jCKQJzVBgfujGqyV6D9riKgq27zhXqYgTRVZM5kqfkm	7	1	6	1	\N
 3	12	74	1	482000000000	72	2n1trpzwMbSEVQXbGrZ7e5Ug6xQVPB9GXScqKTApk33j6NnVb924	75	1	74	1	\N
 4	12	160	1	11549290000000000	142	2n1rjkm5oSUpepSmi2uivxnsfChWPXWimdHNJThMU6B546k154JQ	7	1	160	1	\N
@@ -2524,16 +2525,16 @@ COPY public.accounts_created (block_id, account_identifier_id, creation_fee) FRO
 
 COPY public.blocks (id, state_hash, parent_id, parent_hash, creator_id, block_winner_id, last_vrf_output, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, min_window_density, sub_window_densities, total_currency, ledger_hash, height, global_slot_since_hard_fork, global_slot_since_genesis, protocol_version_id, proposed_protocol_version_id, "timestamp", chain_status) FROM stdin;
 1	3NLUQWTbi4vtHYzGM2MZic9v51R4QJJit3pbxx4dPMA1w1zhyeSP	\N	3NKiuQZnXcHcz1N99e7PnVdSNt8dc3Ku7KT1cNHUQhNJv9svMvhh	1	1	39cyg4ZmMtnb_aFUIerNAoAJV8qtkfOpq0zFzPspjgM=	1	1	2	77	{1,7,7,7,7,7,7,7,7,7,7}	23166005000061388	jxMSC7rer8PqzEig8LujhfSsqWu4AETJ5D7f23HCHrcWVYMZcXC	1	0	0	1	\N	1702331186000	canonical
-2	3NKu2nh1N1i3AXgJVKenUAgRMsF4w1NxWVtwcHwhhCAqRz3UDtCx	1	3NLUQWTbi4vtHYzGM2MZic9v51R4QJJit3pbxx4dPMA1w1zhyeSP	97	96	9BYTAMp7Ga9Xmv4RaZKVDCCYzijXXytGVg1H_BdQhAM=	1	1	3	77	{2,7,7,7,7,7,7,7,7,7,7}	23166005000061388	jxu2GeeyU57CWkPnAcAV7e2qpfAKMYjnWUdL6vUwPJ9ULjwZUiz	2	4	4	1	\N	1702332024849	pending
-3	3NLZvjMBG4R4AziCrmsyK9RJWLC1br9iMAxUMLCV9GvmcjR67sbj	2	3NKu2nh1N1i3AXgJVKenUAgRMsF4w1NxWVtwcHwhhCAqRz3UDtCx	97	96	h8O_l74faIHPkCwRwwS9_XXVigLPrrseq-M8l2-C5gA=	1	1	4	77	{3,7,7,7,7,7,7,7,7,7,7}	23166005000061388	jxobVoH4L3pBtnVgeghn4vJnZfTqayUxaXKnNHYYzKKH2a8hzMB	3	6	6	1	\N	1702332266000	pending
+2	3NKu2nh1N1i3AXgJVKenUAgRMsF4w1NxWVtwcHwhhCAqRz3UDtCx	1	3NLUQWTbi4vtHYzGM2MZic9v51R4QJJit3pbxx4dPMA1w1zhyeSP	97	96	9BYTAMp7Ga9Xmv4RaZKVDCCYzijXXytGVg1H_BdQhAM=	1	1	3	77	{2,7,7,7,7,7,7,7,7,7,7}	23166005000061388	jxb1LBrXXTmFyjXzgZPrFGX7bRqKxpFcCiapQSahaWEG71PYJWS	2	4	4	1	\N	1702332024849	pending
+3	3NLZvjMBG4R4AziCrmsyK9RJWLC1br9iMAxUMLCV9GvmcjR67sbj	2	3NKu2nh1N1i3AXgJVKenUAgRMsF4w1NxWVtwcHwhhCAqRz3UDtCx	97	96	h8O_l74faIHPkCwRwwS9_XXVigLPrrseq-M8l2-C5gA=	1	1	4	77	{3,7,7,7,7,7,7,7,7,7,7}	23166005000061388	jxGmpdz7ntwJRJMhgAvnSmfMUrzsgXSmPrncJb6yCt5gVGDYGLE	3	6	6	1	\N	1702332266000	pending
 4	3NL4gERLJWc7yzHmEFgvrPEmgAfWYX41d92xD1yqD9kuWsEEig8q	2	3NKu2nh1N1i3AXgJVKenUAgRMsF4w1NxWVtwcHwhhCAqRz3UDtCx	7	161	jUWKsm4sn9tFlJo4YOcSDAkKVJjdvWaFalXYSGcU_Qc=	1	1	5	77	{3,7,7,7,7,7,7,7,7,7,7}	23166005000061388	jxJwQo5zgcXaXHSzB5Dcw51WLrnPndYvzzS25kzUWGEBYCWHPag	3	6	6	1	\N	1702332266000	pending
-5	3NKngXmbkh1QboN7HcezcH2ziHFbVBuyt15tFMPStexZkkbcNwxu	3	3NLZvjMBG4R4AziCrmsyK9RJWLC1br9iMAxUMLCV9GvmcjR67sbj	7	161	8HV19ck0r8egQAHEh5B3FrbBeXb-JIyZ8uSEMZdPcwA=	1	1	6	77	{3,1,7,7,7,7,7,7,7,7,7}	23166005000061388	jwMytdxy2Qerb3ANLQF5Y8qt2A3BZNSTZANaWF1G5PAnATXC1Ng	4	7	7	1	\N	1702332446000	pending
-6	3NL4SeyFfDxSooESJiLFfwogpkDVgKuNUPTLZMkF1tead7fapgdo	5	3NKngXmbkh1QboN7HcezcH2ziHFbVBuyt15tFMPStexZkkbcNwxu	97	96	MktfsU3LbeImP_dDMPetRn1hlXqJkqWb33t-Oi5DogY=	1	1	7	77	{3,2,7,7,7,7,7,7,7,7,7}	23166005000061388	jwBBsXxf5qM5hwUNyySf5TEWFaDSEhksJ4idbiRczEpvwjNNVPV	5	8	8	1	\N	1702332626000	pending
-7	3NLdy7iVttfzGiNvscFGGCJyQQSDaQXkDi8MojhBV7CwaVfd9cTG	6	3NL4SeyFfDxSooESJiLFfwogpkDVgKuNUPTLZMkF1tead7fapgdo	7	161	kseLpLXYuoMANYaMbSnwhnJ_uKrDYZX5MUhgbZ0OUwk=	1	1	8	77	{3,3,7,7,7,7,7,7,7,7,7}	23166005000061388	jxnVAUTZPT2GLiyh5E3pWGmirn5RNCSRnK7oeukHTzppWDunP5q	6	9	9	1	\N	1702332806000	pending
+5	3NKngXmbkh1QboN7HcezcH2ziHFbVBuyt15tFMPStexZkkbcNwxu	3	3NLZvjMBG4R4AziCrmsyK9RJWLC1br9iMAxUMLCV9GvmcjR67sbj	7	161	8HV19ck0r8egQAHEh5B3FrbBeXb-JIyZ8uSEMZdPcwA=	1	1	6	77	{3,1,7,7,7,7,7,7,7,7,7}	23166005000061388	jwaJVHvKPQd6cbXQXmCpY29JGYG6hFqBboneWtPVQkHgJRm5ZGy	4	7	7	1	\N	1702332446000	pending
+6	3NL4SeyFfDxSooESJiLFfwogpkDVgKuNUPTLZMkF1tead7fapgdo	5	3NKngXmbkh1QboN7HcezcH2ziHFbVBuyt15tFMPStexZkkbcNwxu	97	96	MktfsU3LbeImP_dDMPetRn1hlXqJkqWb33t-Oi5DogY=	1	1	7	77	{3,2,7,7,7,7,7,7,7,7,7}	23166005000061388	jwcMfSzucWVroj6pRvrLUXPkmBJVa7cqU3gdVsQEeCzf8N5SiyE	5	8	8	1	\N	1702332626000	pending
+7	3NLdy7iVttfzGiNvscFGGCJyQQSDaQXkDi8MojhBV7CwaVfd9cTG	6	3NL4SeyFfDxSooESJiLFfwogpkDVgKuNUPTLZMkF1tead7fapgdo	7	161	kseLpLXYuoMANYaMbSnwhnJ_uKrDYZX5MUhgbZ0OUwk=	1	1	8	77	{3,3,7,7,7,7,7,7,7,7,7}	23166005000061388	jxg9PEUJkse7iyq1Esm2NmgKqAWP8DvxHzj22pt8XvL367rdKp9	6	9	9	1	\N	1702332806000	pending
 8	3NKguNbqF2PfVt5CVrnxUKeAnmr7vkNA7DEiVHR2S1KzKo7s6Z8f	6	3NL4SeyFfDxSooESJiLFfwogpkDVgKuNUPTLZMkF1tead7fapgdo	97	96	WHiGP0j9g_aLyGFs8YLzptAksD7UShELzkeLV5CFSg0=	1	1	9	77	{3,3,7,7,7,7,7,7,7,7,7}	23166005000061388	jxA13f8pn9zNxM4uadzKiKJXBkM831SUf3SQzQdfHBtfgxaSEra	6	9	9	1	\N	1702332806000	pending
-9	3NLV8muTbbUhjibRYWovz4z98e9RK64J713G95G15poCYvxvNWg4	7	3NLdy7iVttfzGiNvscFGGCJyQQSDaQXkDi8MojhBV7CwaVfd9cTG	7	161	K15Q0QjO62_mUnBHiwA0TLPSUlnBL6mNNmhAPeTNIQk=	1	1	10	77	{3,4,7,7,7,7,7,7,7,7,7}	23166005000061388	jxmhqTSmkVb8dxB9VnobwZwtDpZFC7m8vT8YUHpbinpwi1eySVd	7	10	10	1	\N	1702332986000	pending
-10	3NL8eePFe6GCx1gVoWnU2zAZAsWjnJTLNCweptxahDXEsnDm1iMm	9	3NLV8muTbbUhjibRYWovz4z98e9RK64J713G95G15poCYvxvNWg4	7	161	lkM_prqO2YnhtIbpTnnreSmrHzg__DcmelI_iXrVjQ0=	1	1	11	77	{3,5,7,7,7,7,7,7,7,7,7}	23166005000061388	jxaUKY9NG6UXMEkPNpiy7AsJskppn39feVSFx7PivktEK42V5T6	8	11	11	1	\N	1702333166000	pending
-11	3NKs8ugWuKYypPMDTPZz6PjZyFe3usVK5shzftFP4xPn9enWe1YF	10	3NL8eePFe6GCx1gVoWnU2zAZAsWjnJTLNCweptxahDXEsnDm1iMm	97	96	vij6SWXMhAp4VKJMWP_F5TNmJvNcIV3iVyNSq0WJ_wY=	1	1	12	77	{3,6,7,7,7,7,7,7,7,7,7}	23166005000061388	jxFe4HKTKU7yNdrrGs5n3D4GDizvtUoKfU7TPrAmFYu2BtDJnKX	9	12	12	1	\N	1702333346000	pending
+9	3NLV8muTbbUhjibRYWovz4z98e9RK64J713G95G15poCYvxvNWg4	7	3NLdy7iVttfzGiNvscFGGCJyQQSDaQXkDi8MojhBV7CwaVfd9cTG	7	161	K15Q0QjO62_mUnBHiwA0TLPSUlnBL6mNNmhAPeTNIQk=	1	1	10	77	{3,4,7,7,7,7,7,7,7,7,7}	23166005000061388	jxKBeAdmKHj4YAVnaLHTCihPQNsvEQk7T8fnUNsrMZ4p9uogWcs	7	10	10	1	\N	1702332986000	pending
+10	3NL8eePFe6GCx1gVoWnU2zAZAsWjnJTLNCweptxahDXEsnDm1iMm	9	3NLV8muTbbUhjibRYWovz4z98e9RK64J713G95G15poCYvxvNWg4	7	161	lkM_prqO2YnhtIbpTnnreSmrHzg__DcmelI_iXrVjQ0=	1	1	11	77	{3,5,7,7,7,7,7,7,7,7,7}	23166005000061388	jwEdmKkEKTF2cJwayp7ytYrgAebAGPBJGMYbNRzaTD8QCXoct1o	8	11	11	1	\N	1702333166000	pending
+11	3NKs8ugWuKYypPMDTPZz6PjZyFe3usVK5shzftFP4xPn9enWe1YF	10	3NL8eePFe6GCx1gVoWnU2zAZAsWjnJTLNCweptxahDXEsnDm1iMm	97	96	vij6SWXMhAp4VKJMWP_F5TNmJvNcIV3iVyNSq0WJ_wY=	1	1	12	77	{3,6,7,7,7,7,7,7,7,7,7}	23166005000061388	jwYeSUa4pEjGBdmgeSCut2d58KPxZraH2DxZW96rmxfjNnGna6w	9	12	12	1	\N	1702333346000	pending
 12	3NK4VTsPEG1xLnL78qcAZNzDP8XC2n56U8xFQWMTfzCCc4QSYvKT	11	3NKs8ugWuKYypPMDTPZz6PjZyFe3usVK5shzftFP4xPn9enWe1YF	7	161	1KaD7jgdU0IA4U8wnJDFMd3tzsyswckMXsr5St4VVg4=	1	1	13	77	{3,7,7,7,7,7,7,7,7,7,7}	23166005000061388	jxz8dMnhGEyMuAUZxZwBdsWMF6PHymSBNqMJNWHtB4Wr6NKCaVq	10	13	13	1	\N	1702333526000	pending
 13	3NKsyvrS5sw6LSq4BaNBnn5cXxFR4adRADyL21J1S8ZxrJPmAxcD	11	3NKs8ugWuKYypPMDTPZz6PjZyFe3usVK5shzftFP4xPn9enWe1YF	97	96	gJcea1QZdjSNdmG2NdW_so0DfHQwFHoNxIYKGHYEdgs=	1	1	14	77	{3,7,7,7,7,7,7,7,7,7,7}	23166005000061388	jxm4ovWL7ZhhRKPH3LTLj5kZyTR5U9pvicFhSGM1hvqWBgP1sxs	10	13	13	1	\N	1702333526000	pending
 \.
@@ -4506,8 +4507,8 @@ COPY public.zkapp_nonce_bounds (id, nonce_lower_bound, nonce_upper_bound) FROM s
 -- Data for Name: zkapp_permissions; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.zkapp_permissions (id, edit_state, send, receive, access, set_delegate, set_permissions, set_verification_key, set_zkapp_uri, edit_action_state, set_token_symbol, increment_nonce, set_voting_for, set_timing) FROM stdin;
-1	signature	signature	none	none	signature	signature	signature	signature	signature	signature	signature	signature	signature
+COPY public.zkapp_permissions (id, edit_state, send, receive, access, set_delegate, set_permissions, set_verification_key_auth, set_verification_key_txn_version, set_zkapp_uri, edit_action_state, set_token_symbol, increment_nonce, set_voting_for, set_timing) FROM stdin;
+1	signature	signature	none	none	signature	signature	signature	2	signature	signature	signature	signature	signature	signature
 \.
 
 
