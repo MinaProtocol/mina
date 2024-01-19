@@ -17,6 +17,7 @@ use wires_15_stubs::{
         pasta_fq::*,
     },
     bn254_fp_plonk_index::*,
+    bn254_fp_plonk_proof::*,
     bn254_fp_plonk_verifier_index::*,
     field_vector::{bn254_fp::*, bn254_fq::*, fp::*, fq::*},
     gate_vector::{bn254_fp::*, fp::*, fq::*},
@@ -684,6 +685,10 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_batch_verify => "batch_verify");
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_dummy => "dummy");
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_deep_copy => "deep_copy");
+            });
+
+            decl_module!(w, env, "Bn254Fp", {
+                decl_func!(w, env, caml_bn254_fp_plonk_proof_create => "create");
             });
         });
     });

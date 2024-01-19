@@ -221,5 +221,6 @@ module Bn254 : sig
     module Proving_key = Kimchi_bn254.Bn254_based_plonk.Proving_key
     module R1CS_constraint_system = Kimchi_bn254.Bn254_based_plonk.R1CS_constraint_system
     module Keypair = Kimchi_bn254.Bn254_based_plonk.Keypair
+    module Proof = Kimchi_bn254.Bn254_based_plonk.Proof
   end
 end

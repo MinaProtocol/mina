@@ -11,6 +11,7 @@ module Bn254_based_plonk = struct
   module R1CS_constraint_system = Bn254_based_plonk.R1CS_constraint_system
   module Keypair = Bn254_based_plonk.Keypair
   module Proving_key = Bn254_based_plonk.Proving_key
+  module Proof = Bn254_based_plonk.Proof
 end
 
 module Bn254 = struct
