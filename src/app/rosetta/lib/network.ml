@@ -75,6 +75,14 @@ let sync_status_to_string = function
   | `SYNCED ->
       "Synced"
 
+let is_synced = function
+  | `SYNCED -> true
+  | `BOOTSTRAP
+  | `CATCHUP 
+  | `CONNECTING 
+  | `LISTENING 
+  | `OFFLINE -> false
+
 module Get_version =
 [%graphql
 {|
@@ -239,7 +247,7 @@ module Status = struct
                 Some ((latest_node_block.protocolState).consensusState).blockHeight
             ; target_index= None
             ; stage= Some (sync_status_to_string res.syncStatus)
-            ; synced = None
+            ; synced = (Some (is_synced res.syncStatus))
             } }
   end
 
