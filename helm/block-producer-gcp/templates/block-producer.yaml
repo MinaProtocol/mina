@@ -1,0 +1,430 @@
+{{ range $config := $.Values.blockProducerConfigs}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $config.name }}
+  labels:
+    app: {{ $config.name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $config.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $config.name }}
+        testnet: {{ $.Values.testnetName }}
+        role: block-producer
+        class: {{ default "undefined" $config.class }}
+        version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
+        syncStatus: INIT
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
+        prometheus.io/path: '/metrics'
+    spec:
+      {{- if $.Values.priorityClass }}
+      priorityClassName: {{ $.Values.priorityClass }}
+      {{- end }}
+      initContainers:
+      - name: fix-perms
+        image: busybox
+        command:
+        - sh
+        - -c
+        - for dir in keys echo-keys faucet-keys; do [ -d /$dir ] && /bin/cp /$dir/* /wallet-keys; done; /bin/chmod 0700 /wallet-keys
+        volumeMounts:
+        - name: private-keys
+          mountPath: "/keys/"
+          readOnly: true
+        {{- if $config.runWithBots }}
+        - name: echo-service-key
+          mountPath: "/echo-keys/"
+          readOnly: true
+        - name: faucet-service-key
+          mountPath: "/faucet-keys/"
+          readOnly: true
+        {{- end }}
+        - name: wallet-keys
+          mountPath: /wallet-keys
+        securityContext:
+          runAsUser: 0
+      - name: install-key
+        image: {{ $.Values.mina.image | quote }}
+        command:
+        - bash
+        - -c
+        - for key in key echo-key faucet-key; do [ ! -f /root/wallet-keys/$key ] || mina accounts import -config-directory /root/.mina-config -privkey-path /root/wallet-keys/$key; done
+        volumeMounts:
+        - name: wallet-keys
+          mountPath: /root/wallet-keys
+        - name: config-dir
+          mountPath: /root/.mina-config
+        env:
+          - name: MINA_PRIVKEY_PASS
+            value: {{ $config.privateKeyPW | quote }}
+      {{ if $config.libp2pSecret -}}
+      - name: libp2p-perms
+        image: {{ $.Values.mina.image | quote }}
+        command:
+        - bash
+        - -c
+        - /bin/cp /libp2p-keys/* /root/libp2p-keys && /bin/chmod -R 0700 /root/libp2p-keys/
+        volumeMounts:
+        - name: libp2p-keys
+          mountPath: /libp2p-keys
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        env:
+          - name: MINA_LIBP2P_PASS
+            value: {{ $config.privateKeyPW | quote }}
+      {{- else -}}
+      - name: libp2p-perms
+        image: {{ $.Values.mina.image | quote }}
+        command:
+        - bash
+        - -c
+        - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
+        volumeMounts:
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        env:
+          - name: MINA_LIBP2P_PASS
+            value: {{ $config.privateKeyPW | quote }}
+      {{- end }}
+      containers:
+      {{ if $config.runWithUserAgent -}}
+      - name: user-agent
+        resources:
+          requests:
+            memory: 512m
+            cpu: 0.1
+        image: {{ $.Values.userAgent.image }}
+        command: ["bash"]
+        args: ["-c", "python3 agent.py"]
+        env:
+          {{ if ne $.Values.userAgent.minFee "" -}}
+          - name: AGENT_MIN_FEE
+            value: {{ $.Values.userAgent.minFee | quote }}
+          {{ end -}}
+          {{- if ne $.Values.userAgent.maxFee "" -}}
+          - name: AGENT_MAX_FEE
+            value: {{ $.Values.userAgent.maxFee | quote }}
+          {{ end -}}
+          {{- if ne $.Values.userAgent.minTx "" -}}
+          - name: AGENT_MIN_TX
+            value: {{ $.Values.userAgent.minTx | quote }}
+          {{ end -}}
+          {{- if ne $.Values.userAgent.maxTx "" -}}
+          - name: AGENT_MAX_TX
+            value: {{ $.Values.userAgent.maxTx | quote }}
+          {{ end -}}
+          {{- if ne $.Values.userAgent.txBatchSize "" -}}
+          - name: AGENT_TX_BATCH_SIZE
+            value: {{ $.Values.userAgent.txBatchSize | quote }}
+          {{ end -}}
+          {{- if ne $.Values.userAgent.sendEveryMins "" -}}
+          - name: AGENT_SEND_EVERY_MINS
+            value: "1"
+          {{ end -}}
+          - name: CODA_PUBLIC_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ $config.keypairName }}
+                key: pub
+          - name: MINA_PRIVKEY_PASS
+            value: {{ $config.privateKeyPW | quote }}
+          - name: PYTHONUNBUFFERED
+            value: "1"
+        ports:
+        - name: metrics-port
+          containerPort: {{ $.Values.userAgent.ports.metrics }}
+{{- include "healthcheck.userAgent.allChecks" $.Values | indent 8 }}
+        imagePullPolicy: Always
+      {{- end }}
+      {{ if $config.runWithBots -}}
+      - name: bots
+        resources:
+          requests:
+            memory: 512m
+            cpu: 0.1
+        image: {{ $.Values.bots.image }}
+        env:
+          - name: MINA_GRAPHQL_HOST
+            value: "0.0.0.0"
+          - name: MINA_GRAPHQL_PORT
+            value: {{ $.Values.bots.ports.graphql | quote }}
+          - name: ECHO_PUBLICKEY
+            valueFrom:
+              secretKeyRef:
+                name: echo-service-key
+                key: pub
+          - name: ECHO_PASSWORD
+            value: {{ $config.privateKeyPW | quote }}
+          - name: FAUCET_PUBLICKEY
+            valueFrom:
+              secretKeyRef:
+                name: faucet-service-key
+                key: pub
+          - name: FAUCET_PASSWORD
+            value: {{ $config.privateKeyPW | quote }}
+          - name: DISCORD_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: o1-discord-api-key
+                key: o1discord
+          - name: FAUCET_AMOUNT
+            value: {{ $.Values.bots.faucet.amount | quote }}
+          - name: FEE_AMOUNT
+            value: {{ $.Values.bots.faucet.fee | quote }}
+        ports:
+        - name: graphql-port
+          containerPort: {{ $.Values.bots.ports.graphql }}
+{{- include "healthcheck.bots.allChecks" $.Values | indent 8 }}
+        imagePullPolicy: Always
+      {{- end }}
+      - name: mina
+        resources:
+          limits:
+          requests:
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
+        image: {{ $.Values.mina.image }}
+        {{ if $.Values.mina.useCustomEntrypoint -}}
+        command: [{{ $.Values.mina.customEntrypoint }}]
+        {{- end }}
+        args: [ "daemon",
+          "-log-level", {{ $.Values.mina.logLevel }},
+          "-log-json",
+          {{- if $.Values.mina.logSnarkWorkGossip }}
+          "-log-snark-work-gossip", "true",
+          {{- end -}}
+          {{- if $.Values.mina.logPrecomputedBlocks }}
+          "-log-precomputed-blocks", "true",
+          {{- end -}}
+          {{- if $.Values.mina.logTxnPoolGossip }}
+          "-log-txn-pool-gossip", "true",
+          {{- end -}}
+          {{- if $config.isolated }}
+          "-isolate-network", "true",
+          {{- end -}}
+          {{- if $config.enablePeerExchange }}
+          "-enable-peer-exchange", "true",
+          {{- end -}}
+          {{- if $config.enableGossipFlooding }}
+          "-enable-flooding", "true",
+          {{- end -}}
+          "-libp2p-keypair", "/root/libp2p-keys/key",
+          {{- range $.Values.mina.seedPeers }}
+          "-peer", {{ . | quote }},
+          {{- end -}}
+          {{- if $.Values.mina.seedPeersURL }}
+          "-peer-list-url", {{ $.Values.mina.seedPeersURL | quote }},
+          {{- end -}}
+          "-config-directory", "/root/.mina-config",
+          "-client-port", "$(DAEMON_CLIENT_PORT)",
+          "-rest-port", "$(DAEMON_REST_PORT)",
+          {{- if $.Values.mina.exposeGraphql }}
+          "-insecure-rest-server",
+          {{- end -}}
+          "-external-port", "$(DAEMON_EXTERNAL_PORT)",
+          "-metrics-port", "$(DAEMON_METRICS_PORT)",
+          "-block-producer-key", "/root/wallet-keys/key",
+          {{- if $.Values.mina.uploadBlocksToGCloud }}
+          "-upload-blocks-to-gcloud", "true",
+          {{- end }}
+          {{- if $.Values.mina.runtimeConfig }}
+          "-config-file", "/root/config/daemon.json",
+          {{- end -}}
+          "-generate-genesis-proof", {{ $.Values.mina.generateGenesisProof | quote }},
+          {{- if $config.enableArchive }}
+          "-archive-address", {{ $config.archiveAddress }}
+          {{- end -}}
+        ]
+        env:
+        - name: "RAYON_NUM_THREADS"
+          value: "6"
+        - name: DAEMON_REST_PORT
+          value: {{ $.Values.mina.ports.graphql | quote }}
+        - name: DAEMON_CLIENT_PORT
+          value: {{ $.Values.mina.ports.client | quote }}
+        - name: DAEMON_METRICS_PORT
+          value: {{ $.Values.mina.ports.metrics | quote }}
+        - name: DAEMON_EXTERNAL_PORT
+          value: {{ default $.Values.mina.ports.p2p $config.externalPort | quote }}
+        - name: GCLOUD_KEYFILE
+          value: "/gcloud/keyfile.json"
+        - name: NETWORK_NAME
+          value: {{ $.Values.testnetName }}
+        - name: GCLOUD_BLOCK_UPLOAD_BUCKET
+          value: "mina_network_block_data"
+        - name: MINA_PRIVKEY_PASS
+          value: {{ $config.privateKeyPW | quote }}
+        - name: MINA_LIBP2P_PASS
+          value: {{ $config.privateKeyPW | quote }}
+        - name: MINA_CLIENT_TRUSTLIST
+          value: "10.0.0.0/8"
+        ports:
+        - name: client-port
+          protocol: TCP
+          containerPort: {{ $.Values.mina.ports.client }}
+        - name: graphql-port
+          protocol: TCP
+          containerPort: {{ $.Values.mina.ports.graphql }}
+        - name: metrics-port
+          protocol: TCP
+          containerPort: {{ $.Values.mina.ports.metrics }}
+        - name: external-port
+          protocol: TCP
+          containerPort: {{ default $.Values.mina.ports.p2p $config.externalPort }}
+          hostPort: {{ default $.Values.mina.ports.external $config.externalPort }}
+        {{- if $.Values.mina.exposeItnGraphql }}
+        - name: http-itn-graphql
+          protocol: TCP
+          port: {{ $.Values.mina.itn.port }}
+          targetPort: {{ $.Values.mina.itn.port }}
+        {{- end }}  
+{{$data := dict "name" $config.name "healthcheck" $.Values.healthcheck }}
+{{- include "healthcheck.daemon.allChecks" $data | indent 8 }}
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: wallet-keys
+          mountPath: /root/wallet-keys
+        - name: config-dir
+          mountPath: /root/.mina-config
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        {{- if $.Values.mina.uploadBlocksToGCloud }}
+        - name: gcloud-keyfile
+          mountPath: "/gcloud/"
+        {{- end }}
+        {{- if $.Values.mina.runtimeConfig }}
+        - name: daemon-config
+          mountPath: "/root/config/"
+        {{- end }}
+{{- include "nodeSelector.preemptible" $.Values | indent 6 }}
+      volumes:
+      - name: config-dir
+      {{- if $.Values.persist_working_dir }}
+        persistentVolumeClaim:
+          claimName: pvc-{{ $config.name }}
+      {{- else}}
+        emptyDir: {}
+      {{- end }}
+      - name: private-keys
+        secret:
+          secretName: {{ $config.keypairName }}
+          defaultMode: 256
+          items:
+          - key: key
+            path: key
+          - key: pub
+            path: key.pub
+      {{- if $config.libp2pSecret }}
+      - name: libp2p-keys
+        secret:
+          secretName: {{ $config.libp2pSecret }}
+          defaultMode: 0700
+          items:
+          - key: key
+            path: key
+          - key: pub
+            path: key.pub
+      {{- end }}
+      {{ if $config.runWithBots }}
+      - name: echo-service-key
+        secret:
+          secretName: echo-service-key
+          defaultMode: 256
+          items:
+          - key: key
+            path: echo-key
+          - key: pub
+            path: echo-key.pub
+      - name: faucet-service-key
+        secret:
+          secretName: faucet-service-key
+          defaultMode: 256
+          items:
+          - key: key
+            path: faucet-key
+          - key: pub
+            path: faucet-key.pub
+      {{ end -}}
+      - name: wallet-keys
+        emptyDir: {}
+      - name: actual-libp2p
+        emptyDir: {}
+      {{- if $.Values.mina.runtimeConfig }}
+      - name: daemon-config
+        configMap:
+          name: block-producer-daemon-config
+      {{- end }}
+      {{- if $.Values.mina.uploadBlocksToGCloud }}
+      - name: gcloud-keyfile
+        secret:
+          secretName: gcloud-keyfile
+          defaultMode: 256
+          items:
+          - key: keyfile
+            path: keyfile.json
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $config.name }}
+spec:
+  type: ClusterIP
+  # We want all pods to have their addresses published for the sake of the
+  # other testnet pods even before they're ready, since they
+  # have to be able to talk to each other in order to become ready.
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $config.name }}
+  ports:
+  - name: tcp-p2p
+    port: {{ default $.Values.mina.ports.p2p $config.externalPort }}
+    targetPort: external-port
+---
+{{- if $.Values.mina.exposeGraphql }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $config.name }}-graphql
+spec:
+  type: ClusterIP
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $config.name }}
+  ports:
+  - name: http-graphql
+    protocol: TCP
+    port: 80
+    targetPort: {{ $.Values.mina.ports.graphql }}
+  {{- if $.Values.mina.exposeItnGraphql }}
+  - name: http-itn-graphql
+    protocol: TCP
+    port: {{ $.Values.mina.itn.port }}
+    targetPort: {{ $.Values.mina.itn.port }}
+  {{- end }}  
+{{- end }}
+---
+{{- if $.Values.persist_working_dir }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-{{ $config.name }}
+spec:
+  accessModes:
+      - {{ $.Values.storage.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ $.Values.storage.size | quote }}
+  storageClassName: "{{ $.Values.storage.storageClass }}"
+---
+{{ end }}
+---
+{{ end }}
+---

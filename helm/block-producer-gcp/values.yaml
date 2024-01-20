@@ -1,0 +1,120 @@
+testnetName: "testnet"
+
+mina:
+  runtimeConfig:
+  generateGenesisProof: true
+  logLevel: "Debug"
+  logSnarkWorkGossip: false
+  logPrecomputedBlocks: false
+  logTxnPoolGossip: false
+  image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet
+  useCustomEntrypoint: false
+  customEntrypoint: ""
+  # privkeyPass: "naughty blue worm"
+  seedPeers:
+    - /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH
+    - /dns4/seed-two.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA
+  ports:
+    client: "8301"
+    graphql: "3085"
+    metrics: "10001"
+    p2p: "10909"
+  exposeGraphql: false
+  exposeItnGraphql: false
+  itn:
+    port: "3086"
+    keys: ""
+
+  
+  cpuRequest: 6
+  memRequest: "12.0Gi"
+
+userAgent:
+  image: ""
+  minFee: ""
+  maxFee: ""
+  minTx: ""
+  maxTx: ""
+  txBatchSize: ""
+  sendEveryMins: ""
+  ports:
+    metrics: 8000
+
+bots:
+  image: ""
+  faucet:
+    amount: "10000000000"
+    fee: "100000000"
+  ports:
+    graphql: 3085
+
+# for purposes of testing this chart, we provide defaults that exercise all sidecar permutations
+blockProducerConfigs:
+  - name: "test-1"
+    runWithUserAgent: false
+    runWithBots: false
+    # privateKeySecret: "yolo"
+    keypairName: ""
+    # privateKey : ""
+    # publicKey : ""
+    privateKeyPW : ""
+    isolated: false
+    enableGossipFlooding: false
+    enablePeerExchange: false
+    enableArchive: true
+    archiveAddress: archive-1:3086
+  - name: "test-2"
+    runWithUserAgent: true
+    runWithBots: false
+    # privateKeySecret: "yolo"
+    keypairName: ""
+    # privateKey : ""
+    # publicKey : ""
+    privateKeyPW : ""
+    isolated: false
+    enableGossipFlooding: false
+    enablePeerExchange: false
+    enableArchive: false
+    archiveAddress: archive-1:3086
+  - name: "test-3"
+    runWithUserAgent: false
+    runWithBots: true
+    # privateKeySecret: "yolo"
+    keypairName: ""
+    # privateKey : ""
+    # publicKey : ""
+    privateKeyPW : ""
+    isolated: false
+    enableGossipFlooding: false
+    enablePeerExchange: false
+    libp2pSecret: "libp2pYolo"
+    enableArchive: false
+    archiveAddress: archive-1:3086
+  - name: "test-4"
+    runWithUserAgent: true
+    runWithBots: true
+    # privateKeySecret: "yolo"
+    keypairName: ""
+    # privateKey : ""
+    # publicKey : ""
+    privateKeyPW : ""
+    isolated: false
+    enableGossipFlooding: false
+    enablePeerExchange: false
+    libp2pSecret: "libp2pYolo"
+    enableArchive: false
+    archiveAddress: archive-1:3086
+
+healthcheck:
+  enabled: true
+  failureThreshold: 60
+  periodSeconds: 5
+  initialDelaySeconds: 30
+
+nodeSelector:
+  preemptible: true
+
+storage:
+  accessMode: "ReadWriteOnce"
+  size: "30Gi"
+  storageClass: "standard"
