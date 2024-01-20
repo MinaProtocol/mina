@@ -246,17 +246,13 @@ metadata:
   name: {{ $config.name }}
   {{- if $config.externalService }}
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: {{ $config.name }}-{{ $.Values.testnetName }}.gcp.o1test.net
+    external-dns.alpha.kubernetes.io/hostname: {{ $config.name }}.gcp.o1test.net
   {{- end }}
 spec:
   {{- if $config.externalService }}
   type: LoadBalancer
   {{- else }}
   type: ClusterIP
-  {{- end }}
-  {{- if $config.externalIp }}
-  type: LoadBalancer
-  loadBalancerIP: {{ $config.externalIp }}
   {{- end }}
   # We want all pods to have their addresses published for the sake of the
   # other testnet pods even before they're ready, since they
