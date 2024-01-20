@@ -60,8 +60,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name       = "berkeley-private-qa"
-  mina_image         = "gcr.io/o1labs-192920/mina-daemon:1.0.0MinaProtocol-mina-stealth-fixes-fix-shape-audit-f1715b8-buster-berkeley"
-  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:1.0.0MinaProtocol-mina-stealth-fixes-fix-shape-audit-f1715b8-buster"
+  mina_image         = "gcr.io/o1labs-192920/mina-daemon:1.0.0MinaProtocol-mina-stealth-fixes-berkeley-915a444-bullseye-berkeley"
+  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:1.0.0MinaProtocol-mina-stealth-fixes-berkeley-915a444-bullseye"
   seed_region        = "us-east1"
   seed_zone          = "us-east1-b"
 
