@@ -8,9 +8,10 @@
     "mainnet_genesis_ledger": "genesis_ledgers/mainnet.json",
     "mainnet_genesis_block": "src/test/hardfork/test_data/mainnet_migration/genesis_data_only.sql",
     "random_data_dump": "src/test/hardfork/test_data/random_migration/dump.sql",
+    "random_data_ledger": "src/test/hardfork/test_data/random_migration/genesis_ledger.json",
+    "random_hardfork_folder": "src/test/hardfork/test_data/full_migration",
     "create_schema_script": "src/app/archive/create_schema.sql",
     "zkapp_tables_script": "src/app/archive/zkapp_tables.sql",
-    "random_data_ledger": "src/test/hardfork/test_data/random_migration/genesis_ledger.json",
     "working_dir": "hardfork_tests"
   },
   "reference": {

@@ -200,6 +200,27 @@ module HardForkSteps = struct
 
     run t ~args replayer_app
 
+  let run_berkeley_replayer t ~archive_uri ~input_config ~interval_checkpoint
+    ~replayer_app ~output_ledger = 
+    let args =
+      [ "--archive-uri"
+      ; archive_uri
+      ; "--input-file"
+      ; input_config
+      ; "--checkpoint-interval"
+      ; string_of_int interval_checkpoint
+      ; "--output-file"
+      ; output_ledger
+      ; "--checkpoint-output-folder"
+      ; t.working_dir
+      ; "--checkpoint-file-prefix"
+      ; "berkeley"
+      ]
+    in
+
+    run t ~args replayer_app
+
+
   let gather_files_with_prefix root ~substring =
     Sys.readdir root |> Array.to_list
     |> List.filter ~f:(fun x -> String.is_substring x ~substring)
@@ -208,7 +229,15 @@ module HardForkSteps = struct
   let gather_replayer_migration_checkpoint_files root =
     let substring = "migration-checkpoint" in
     gather_files_with_prefix root ~substring
-    |> List.sort ~compare:String.compare
+    |> List.sort ~compare:(fun left right ->
+      let get_checkpoint_slot file = 
+        Scanf.sscanf (Filename.basename file) "migration-checkpoint-%d.json"
+            (fun d -> d)
+      in
+      let left = get_checkpoint_slot left in
+      let right = get_checkpoint_slot right in
+      left - right )
+
 
   let gather_extensional_block_files root =
     let get_blockchain_length extensional_block_file =
@@ -231,6 +260,15 @@ module HardForkSteps = struct
            let left = get_blockchain_length (full_path left) in
            let right = get_blockchain_length (full_path right) in
            left - right )
+
+  let get_forked_blockchain uri fork_point =
+    match Caqti_async.connect_pool ~max_size:128 uri with
+    | Error _ ->
+        failwithf "Failed to create Caqti pools for Postgresql to %s"
+          (Uri.to_string uri) ()
+    | Ok pool ->
+        let query_db = Mina_caqti.query pool in
+        query_db ~f:(fun db -> Sql.Berkeley.Block_info.forked_blockchain db fork_point )
 
   let get_max_length uri =
     match Caqti_async.connect_pool ~max_size:128 uri with
@@ -548,6 +586,14 @@ module HardForkSteps = struct
     let%bind _ = create_schema t db_name t.env.paths.mainnet_genesis_block in
     Deferred.return (Settings.connection_str_to t.env db_name)
 
+  let import_hardfork_data_dump t =
+      let db_name =
+        Printf.sprintf "%s_input_%d" t.test_name (Random.int 10000 + 1000)
+      in
+      let%bind _ = create_db t db_name in
+      let%bind _ = create_schema t db_name (Filename.concat t.env.paths.random_hardfork_folder "dump.sql" )in
+      Deferred.return (Settings.connection_str_to t.env db_name)
+  
   let import_random_data_dump t =
     let db_name =
       Printf.sprintf "%s_input_%d" t.test_name (Random.int 10000 + 1000)
@@ -559,7 +605,8 @@ module HardForkSteps = struct
   let recreate_working_dir t =
     let open Deferred.Let_syntax in
     let%bind _ = Util.run_cmd_exn "." "rm" [ "-rf"; t.working_dir ] in
-    Unix.mkdir_p t.working_dir ; Deferred.return ()
+    Unix.mkdir_p t.working_dir; 
+    Deferred.return ()
 
   let clear_checkpoint_files prefix t =
     Util.run_cmd_exn "." "rm"
@@ -729,14 +776,17 @@ module HardForkSteps = struct
   
 
   let run_in_background t ~args prog =
-    match t.env.executor with
+    let (args, prog) = match t.env.executor with
     | Dune ->
-      Process.create ~args ~prog ()
+      ((["exec"; prog; "--"] @ args), "dune")
     | Bash ->
-      Process.create 
-      ~args:(["exec"; prog; "--"; "run"] @ args) 
-      ~prog:"dune" ()
-
+      (args, prog)
+    in
+    [%log' spam (Logger.create ())]
+    "Running command in background: $command"
+    ~metadata:[ ("command", `String (String.concat (prog :: args) ~sep:" ")) ] ;
+    Process.create ~args ~prog ()
+ 
   let run_in_background_exn t ~args prog = 
     let open Deferred.Let_syntax in
     let%bind process = run_in_background t ~args prog in
@@ -753,8 +803,25 @@ module HardForkSteps = struct
     run_in_background_exn 
       t
       ~args:["daemon"; "--block-producer-key"; block_producer_key;"--config-file"; config_file
-        ; "--libp2p-keypair"; libp2p_keypair; "--seed"; "--archive-address"; archive_node ] 
+        ; "--libp2p-keypair"; libp2p_keypair; "--seed"; "--archive-address"; archive_node
+        ] 
       t.env.paths.mina
    
-   
+  let copy_folder ~source ~target = 
+      Util.run_cmd_exn "." "cp" ["-r"; source; target ]
+
+  let import_account t ~privkey =
+      run t ~args:["accounts"; "import"; "--privkey"; privkey] t.env.paths.mina
+  let unlock_account t ~pk =
+    run t ~args:["accounts"; "unlock"; "--public-key";pk] t.env.paths.mina
+
+  let send_transactions_in_loop t ~count ~amount ~sleep ~sender ~receiver =
+    Deferred.List.init count ~f:(fun _ -> 
+        let%bind _ = run t ~args:["client"; "send-payment"; "--amount"; string_of_int amount
+        ; "--sender"; sender; "--receiver"; receiver
+        ] t.env.paths.mina in
+        Unix.sleep sleep;
+        Deferred.unit
+      )
+
 end

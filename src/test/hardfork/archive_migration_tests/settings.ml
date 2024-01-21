@@ -10,6 +10,9 @@ module Settings = struct
     ; mainnet_genesis_block : string
     ; mainnet_data_bucket : string [@default "mina_network_block_data"]
     ; create_schema_script : string
+    ; random_hardfork_folder : string
+    ; random_hardfork_bucket : string
+    [@default "mina_random_network_block_data_placeholder/hardfork"]
     ; zkapp_tables_script : string
     ; random_data_ledger : string
     ; random_data_dump : string

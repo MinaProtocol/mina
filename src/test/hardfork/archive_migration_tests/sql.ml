@@ -245,4 +245,53 @@ module Berkeley = struct
 
   let count_orphaned_blocks (module Conn : CONNECTION) =
     Conn.find count_orphaned_blocks_query "orphaned"
+
+ 
+  module Block_info = struct
+          type t =
+            { id : int
+            ; parent_id : int
+            ; global_slot_since_genesis : int64
+            ; global_slot_since_hardfork : int64
+            ; global_slot : int64
+            ; state_hash : string
+            ; height: int
+            ; chain_status: string
+            ; parent_hash : string
+            ; ledger_hash : string
+            ; protocol_version_id: int
+            }
+          [@@deriving hlist]
+        
+          let typ =
+            Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+              Caqti_type.[ int; int; int64; int64; int64; string; int; string; string; string; int ]
+        
+          (* find all blocks, working back from block with given state hash *)
+          let forked_blockchain_query =
+            Caqti_request.collect
+              Caqti_type.string
+              typ
+              {sql| 
+                      SELECT id, 
+                             parent_id, 
+                             global_slot_since_genesis, 
+                             global_slot_since_hardfork,
+                             global_slot,
+                             state_hash,
+                             height,
+                             chain_status,
+                             parent_hash,
+                             ledger_hash
+                      
+                      FROM blocks
+                      WHERE state_hash = ? or protocol_version_id = 2 
+                      ORDER BY global_slot_since_genesis ASC
+                  |sql}
+
+          let forked_blockchain (module Conn : CONNECTION) forked_state =
+            Conn.collect_list forked_blockchain_query forked_state
+        end
+
+
 end

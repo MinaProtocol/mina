@@ -162,20 +162,24 @@ module HardForkTests = struct
     let actual_replayer_output =
       Filename.concat temp_dir "actual_replayer_output.json"
     in
+    let berkeley_replayer_output =
+      Filename.concat temp_dir "berkeley_replayer_output.json"
+    in
     Async.Thread_safe.block_on_async_exn (fun () ->
         let steps = HardForkSteps.create env temp_dir test_name in
         let open Deferred.Let_syntax in
         let%bind _ = HardForkSteps.recreate_working_dir steps in
 
         let%bind conn_str_source_db =
-          HardForkSteps.import_random_data_dump steps
+          HardForkSteps.import_hardfork_data_dump steps
         in
 
         let%bind last_canonical_hash = HardForkSteps.get_latest_canonical_state_hash (Uri.of_string conn_str_source_db) in
-
+        let random_data_ledger =  (Filename.concat env.paths.random_hardfork_folder "genesis_ledger.json" )
+        in
         let input =
           BerkeleyTablesAppInput.of_runtime_config_file_exn
-            env.paths.random_data_ledger last_canonical_hash
+          random_data_ledger last_canonical_hash
         in
         BerkeleyTablesAppInput.to_yojson_file input reference_replayer_input ;
 
@@ -191,9 +195,9 @@ module HardForkTests = struct
         
         let%bind _ =
           HardForkSteps.perform_berkeley_migration steps ~batch_size:2
-            ~genesis_ledger:env.paths.random_data_ledger
+            ~genesis_ledger:random_data_ledger
             ~source_archive_uri:conn_str_source_db
-            ~source_blocks_bucket:env.paths.random_data_bucket
+            ~source_blocks_bucket:env.paths.random_hardfork_bucket
             ~target_archive_uri:conn_str_target_db
             ~end_global_slot:None
             ~berkeley_migration_app:env.paths.berkeley_migration
@@ -202,18 +206,20 @@ module HardForkTests = struct
         let%bind _ =
           HardForkSteps.run_migration_replayer steps
             ~archive_uri:conn_str_target_db
-            ~input_config:reference_replayer_input ~interval_checkpoint:100
+            ~input_config:reference_replayer_input ~interval_checkpoint:1
             ~replayer_app:env.paths.replayer
             ~output_ledger:actual_replayer_output
         in
 
+        let now = Time.now ()
+        in
         let genesis: Runtime_config.Json_layout.Genesis.t = { 
           k = None 
         ; delta = None
         ; slots_per_epoch = None
         ; slots_per_sub_window = None
         ; grace_period_slots = None
-        ; genesis_state_timestamp = Some "2024-01-18T21:59:37+0100"
+        ; genesis_state_timestamp = Some (Time.to_string now)
         }
       in
 
@@ -233,50 +239,25 @@ module HardForkTests = struct
       in
       let proof = Runtime_config.Proof_keys.make ~fork () in
 
-      Unix.putenv ~key:"MINA_LIBP2P_PASS" ~data:"" ;
-      Unix.putenv ~key:"MINA_PRIVKEY_PASS" ~data:"" ;
+      Unix.putenv ~key:"MINA_LIBP2P_PASS" ~data:"naughty blue worm";
+      Unix.putenv ~key:"MINA_PRIVKEY_PASS" ~data:"naughty blue worm";
    
-      let%bind _ = HardForkSteps.generate_keypair steps "keys/block_producer.key" in
-      let%bind _ = HardForkSteps.generate_keypair steps "keys/snark_producer.key" in
+
+      let%bind _ = HardForkSteps.copy_folder ~source:
+        (Filename.concat env.paths.random_hardfork_folder "online_whale_keys") ~target:(Filename.concat temp_dir "keys")
+      in
+      
+      let%bind _ = HardForkSteps.copy_folder ~source:
+        (Filename.concat env.paths.random_hardfork_folder "snark_worker_keys") ~target:(Filename.concat temp_dir "keys")
+      in
+      
       let%bind _ = HardForkSteps.generate_libp2p_keypair steps "keys/libp2p-keypair" in 
 
-      let block_producer_pk = In_channel.read_all (Filename.concat temp_dir "keys/block_producer.key.pub") |> String.strip in
-      let _snark_producer_pk = In_channel.read_all (Filename.concat temp_dir "keys/snark_producer.key.pub") |> String.strip in
+      let block_producer_key = In_channel.read_all (Filename.concat temp_dir "keys/online_whale_account_0.pub") |> String.strip in
+      let second_block_producer_key = In_channel.read_all (Filename.concat temp_dir "keys/online_whale_account_1.pub") |> String.strip in
+      let _snark_producer_pk = In_channel.read_all (Filename.concat temp_dir "keys/snark_worker_keys/snark_worker_account") |> String.strip in
 
-      let new_base = match migration_replayer_output.target_genesis_ledger.base with
-        | Named _  -> failwith "wrong genesis" 
-        | Accounts accounts -> 
-          let additional_account: Runtime_config.Accounts.Single.t = {
-             pk = block_producer_pk
-            ; sk = None
-            ; balance = Currency.Balance.of_mina_int_exn 1000000000
-            ; delegate = None
-            ; timing = None
-            ; token = None
-            ; nonce = Mina_numbers.Account_nonce.of_int 0
-            ; receipt_chain_hash = None
-            ; voting_for = None
-            ; zkapp = None
-            ; permissions = None
-            ; token_symbol = None
-          }
-          in          
-          accounts @ [additional_account]
-          
-        | Hash _ ->  failwith "wrong genesis" 
-      in
-
-      let ledger: Runtime_config.Ledger.t = {
-        base = Runtime_config.Ledger.Accounts new_base
-      ; num_accounts = migration_replayer_output.target_genesis_ledger.num_accounts
-      ; balances = migration_replayer_output.target_genesis_ledger.balances
-      ; hash = migration_replayer_output.target_genesis_ledger.hash
-      ; name = migration_replayer_output.target_genesis_ledger.name
-      ; add_genesis_winner = migration_replayer_output.target_genesis_ledger.add_genesis_winner
-      } 
-      in
-
-      let runtime_config = Runtime_config.make ~genesis ~ledger ~proof () in
+      let runtime_config = Runtime_config.make ~genesis ~ledger:migration_replayer_output.target_genesis_ledger ~proof () in
       let config_filename = (Printf.sprintf "%s/daemon.json" steps.working_dir) in
 
         Runtime_config.to_yojson runtime_config |> 
@@ -287,14 +268,64 @@ module HardForkTests = struct
       let _archive_process = archive_process |> Or_error.ok_exn in
       Unix.sleep 10;
 
-      let%bind daemon_process =  HardForkSteps.start_seed_deamon_node steps ~block_producer_key ~config_file ~libp2p_keypair "127.0.0.1:3086" in
-      let _archive_process = daemon_process |> Or_error.ok_exn in
-      Unix.sleep 100;
+      let%bind daemon_process =  HardForkSteps.start_seed_deamon_node steps ~block_producer_key:(Filename.concat temp_dir "keys/online_whale_account_0") ~config_file:config_filename 
+        ~libp2p_keypair:(Filename.concat temp_dir "keys/libp2p-keypair") "127.0.0.1:3086" in
+      let _daemon_process = daemon_process |> Or_error.ok_exn in
+      Unix.sleep 380;
 
+
+      let%bind _ = HardForkSteps.import_account steps ~privkey:(Filename.concat temp_dir "keys/online_whale_account_0") in
+      let%bind _ = HardForkSteps.unlock_account steps ~pk:block_producer_key in
+      let%bind _ = HardForkSteps.send_transactions_in_loop steps ~count:10 ~amount:1 ~sleep:10 ~sender:block_producer_key ~receiver:second_block_producer_key in
+
+      let migration_replayer_output_struct = BerkeleyTablesAppOutput.of_json_file_exn actual_replayer_output in
+      
+      let%bind forked_blockchain = HardForkSteps.get_forked_blockchain (Uri.of_string conn_str_target_db) (
+        Mina_base.State_hash.to_base58_check migration_replayer_output_struct.target_fork_state_hash) in
+
+      let (fork_point, fork_chain) = match forked_blockchain with
+        | [] -> failwith "forked blockchain is empty"
+        | fork_point::fork_chain -> (fork_point,fork_chain)
+      in
+
+      List.iteri fork_chain ~f:(fun idx block -> 
+        let idx_64 = Int64.of_int idx in
+        (if Int.(<>) block.protocol_version_id 2 then
+          failwithf "block with id (%d) has unexpected protocol version" block.id ()
+        else 
+          ()
+        );
+        (if Int64.(=) block.global_slot_since_hardfork idx_64 then
+          failwithf "block with id (%d) has unexpected global_slot_since_hardfork" block.id ()
+        else 
+          ()
+        );
+        (if Int64.(>) block.global_slot_since_genesis ( Int64.(+) fork_point.global_slot_since_genesis (Int64.(+) idx_64 Int64.one)) then
+          failwithf "block with id (%d) has unexpected global_slot_since_genesis" block.id ()
+        else 
+          ()
+        );
+        (if Int.(>) block.height (fork_point.height + idx+ 1) then
+          failwithf "block with id (%d) has unexpected global_slot_since_genesis" block.id ()
+        else 
+          ()
+        ); 
+      );
+
+      let last_checkpoint =
+        HardForkSteps.gather_replayer_migration_checkpoint_files temp_dir |> List.last_exn
+      in      
+      let%bind _ =
+      HardForkSteps.run_berkeley_replayer steps
+        ~archive_uri:conn_str_target_db
+        ~input_config:last_checkpoint
+        ~interval_checkpoint:1
+        ~replayer_app:env.paths.replayer
+        ~output_ledger:berkeley_replayer_output
+    in
 
 
       Deferred.unit 
-        
         )
 
   let checkpoint env_file =

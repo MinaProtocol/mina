@@ -18,6 +18,7 @@
    caqti-driver-postgresql
    ;; mina libraries
    init
+   logger
    currency
    integration_test_lib
    mina_runtime_config
@@ -28,5 +29,5 @@
    cmdliner
  )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_compare))
+ (preprocess (pps ppx_version ppx_mina ppx_jane ppx_deriving_yojson ppx_compare h_list.ppx))
 )
