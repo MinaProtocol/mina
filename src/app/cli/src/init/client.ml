@@ -1001,6 +1001,42 @@ let hash_ledger =
                err ;
              ignore (exit 1 : 'a Deferred.t) )
 
+let verify_ledger_integrity =
+  let open Command.Let_syntax in
+  Command.async
+    ~summary:"Verify the merkle root of a stored ledger is the expected value"
+    (let%map expected_root =
+       Command.Param.(
+         flag "--expected-hash" ~doc:"HASH expected Merkle root"
+           (required string))
+     and directory_name =
+       Command.Param.(
+         flag "--ledger-dir"
+           ~doc:
+             "LEDGER-DIR directory containing ledger file (eg \
+              ~/.mina-config/root/snarked_ledger)"
+           (required string))
+     and ledger_depth =
+       Command.Param.(
+         flag "--depth" ~doc:"DEPTH ledger depth (default 30)"
+           (optional_with_default 20 int))
+     in
+     fun () ->
+       let open Mina_base.Ledger.Db in
+       (* FIXME: should we take a mandatory --config-file and load it in for the depth? *)
+       let ledger = create ~directory_name ~depth:ledger_depth () in
+       let root_start = merkle_root ledger in
+       Format.printf "Unverified root at start: %s@."
+         (Ledger_hash.to_base58_check root_start) ;
+       match
+         verify_integrity ledger
+           (Ledger_hash.of_base58_check expected_root |> Or_error.ok_exn)
+       with
+       | `Corrupt ->
+           exit 1
+       | `All_clear ->
+           exit 0 )
+
 let currency_in_ledger =
   let open Command.Let_syntax in
   Command.async
@@ -2419,4 +2455,5 @@ let ledger =
     [ ("export", export_ledger)
     ; ("hash", hash_ledger)
     ; ("currency", currency_in_ledger)
+    ; ("verify-integrity", verify_ledger_integrity)
     ]

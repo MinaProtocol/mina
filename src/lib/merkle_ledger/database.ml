@@ -728,4 +728,19 @@ module Make (Inputs : Inputs_intf) :
   let merkle_path_at_index_exn t index =
     let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
     merkle_path_at_addr_exn t addr
+
+  let verify_integrity mdb expected_root : [ `All_clear | `Corrupt ] =
+    (* first, ensures the stored root matches the expected.
+        then, rehash all stored accounts and verify the leaf hashes match,
+        and that this property holds also for the internal hashes.
+        we do this by doing a get/set of all accounts. This is awfully
+        slow but it should do the trick... *)
+    let all_accts = to_list_sequential mdb in
+    set_all_accounts_rooted_at_exn mdb (Addr.root ()) all_accts ;
+    let end_hash = merkle_root mdb in
+    (* idea: if we want more precise information about why corrupt, maybe we can
+       use syncable_ledger and sync to itself with the expected_root? *)
+    if Hash.equal expected_root end_hash then
+      `All_clear
+    else `Corrupt
 end
