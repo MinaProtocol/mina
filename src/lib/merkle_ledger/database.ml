@@ -597,7 +597,7 @@ module Make (Inputs : Inputs_intf) :
 
   let get_at_index_exn mdb index =
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
-    get mdb (Location.Account addr) |> Option.value_exn
+    get mdb (Location.Account addr) |> Option.value_exn ~here:[%here]
 
   let set_at_index_exn mdb index account =
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
@@ -740,7 +740,5 @@ module Make (Inputs : Inputs_intf) :
     let end_hash = merkle_root mdb in
     (* idea: if we want more precise information about why corrupt, maybe we can
        use syncable_ledger and sync to itself with the expected_root? *)
-    if Hash.equal expected_root end_hash then
-      `All_clear
-    else `Corrupt
+    if Hash.equal expected_root end_hash then `All_clear else `Corrupt
 end

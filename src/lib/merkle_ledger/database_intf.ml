@@ -11,8 +11,8 @@ module type S = sig
 
   val with_ledger : depth:int -> f:(t -> 'a) -> 'a
 
-  val verify_integrity : t -> root_hash -> [`All_clear | `Corrupt ]
-  
+  val verify_integrity : t -> root_hash -> [ `All_clear | `Corrupt ]
+
   module For_tests : sig
     val gen_account_location :
       ledger_depth:int -> Location.t Core.Quickcheck.Generator.t
