@@ -235,7 +235,7 @@ let minimum_fee = Currency.Fee.minimum_user_command_fee
 
 let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
-let zkAppsDisabled t =
+let is_disabled t =
   match t with
   | Zkapp_command _ ->
       Mina_compile_config.zkapps_disabled
@@ -398,7 +398,7 @@ module Well_formedness_error = struct
     | Insufficient_fee
     | Zero_vesting_period
     | Zkapp_too_big of (Error.t[@to_yojson Error_json.error_to_yojson])
-    | Zkapps_are_disabled
+    | Transaction_type_disabled
   [@@deriving compare, to_yojson]
 
   let to_string = function
@@ -408,7 +408,7 @@ module Well_formedness_error = struct
         "Zero vesting period"
     | Zkapp_too_big err ->
         sprintf "Zkapp too big (%s)" (Error.to_string_hum err)
-    | Zkapps_are_disabled ->
+    | Transaction_type_disabled ->
         "Zkapps are disabled"
 end
 
@@ -418,7 +418,7 @@ let check_well_formedness ~genesis_constants t :
     let open Well_formedness_error in
     [ (has_insufficient_fee, Insufficient_fee)
     ; (has_zero_vesting_period, Zero_vesting_period)
-    ; (zkAppsDisabled, Zkapps_are_disabled)
+    ; (is_disabled, Transaction_type_disabled)
     ]
   in
   let errs0 =
