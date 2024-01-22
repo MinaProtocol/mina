@@ -2471,11 +2471,10 @@ let%test_module _ =
           assert_pool_txs independent_cmds' ;
           Deferred.unit )
 
-    let%test_unit "transactions added after slot_tx_end are rejected" =
+    let test_txns_rejects slot_tx_end =
       Thread_safe.block_on_async_exn (fun () ->
-          let curr_slot = current_global_slot () in
           let%bind assert_pool_txs, pool, _best_tip_diff_w, (_, _best_tip_ref) =
-            setup_test ~slot_tx_end:(Some curr_slot) ()
+            setup_test ~slot_tx_end:(Some slot_tx_end) ()
           in
           assert_pool_txs [] ;
           let%bind apply_res =
@@ -2486,4 +2485,14 @@ let%test_module _ =
           [%test_eq: pool_apply] (Ok []) (accepted_commands apply_res) ;
           assert_pool_txs [] ;
           Deferred.unit )
+
+    let%test_unit "transactions added at slot_tx_end are rejected" =
+      let curr_slot = current_global_slot () in
+      test_txns_rejects curr_slot
+
+    let%test_unit "transactions added after slot_tx_end are rejected" =
+      let curr_slot = current_global_slot () in
+      test_txns_rejects
+        Mina_numbers.Global_slot.(
+          Option.value_exn @@ sub curr_slot @@ succ zero)
   end )
