@@ -4,6 +4,8 @@ let List/map = Prelude.List.map
 
 let S = ../../Lib/SelectFiles.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
+
 let Cmd = ../../Lib/Cmds.dhall
 let Command = ../../Command/Base.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
@@ -52,7 +54,8 @@ in Pipeline.build Pipeline.Config::{
         S.strictlyStart (S.contains ValidationService.rootPath)
       ],
       path = "Lint",
-      name = "ValidationService"
+      name = "ValidationService",
+      tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint ]
     },
   steps = [
     Command.build Command.Config::{

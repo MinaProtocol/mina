@@ -805,7 +805,7 @@ module Sql = struct
           Extras.typ)
 
     let query =
-      Caqti_request.collect Caqti_type.int typ
+      Caqti_request.collect Caqti_type.(tup2 int string) typ
         {|
          SELECT u.id,
                 u.command_type,
@@ -848,11 +848,14 @@ module Sql = struct
                 ON buc2.user_command_id = uc2.id
                 AND uc2.receiver_id = u.receiver_iD
                 AND buc2.block_id = buc.block_id)
+         INNER JOIN tokens t
+           ON t.id = ai_receiver.token_id
          WHERE buc.block_id = ?
+           AND t.value = ?
         |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
-      Conn.collect_list query id
+      Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
   end
 
   module Internal_commands = struct
@@ -873,7 +876,7 @@ module Sql = struct
         tup3 int Archive_lib.Processor.Internal_command.typ Extras.typ)
 
     let query =
-      Caqti_request.collect Caqti_type.int typ
+      Caqti_request.collect Caqti_type.(tup2 int string) typ
         {|
          SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no)
            i.id,
@@ -894,11 +897,14 @@ module Sql = struct
            ON ai.public_key_id = receiver_id
          LEFT JOIN accounts_created ac
            ON ac.account_identifier_id = ai.id
+         INNER JOIN tokens t
+           ON t.id = ai.token_id
          WHERE bic.block_id = ?
+          AND t.value = ?
       |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
-      Conn.collect_list query id
+      Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
   end
 
   module Zkapp_commands = struct
@@ -986,7 +992,7 @@ module Sql = struct
         tup2 Archive_lib.Processor.Zkapp_account_update_body.typ Extras.typ)
 
     let query =
-      Caqti_request.collect Caqti_type.int typ
+      Caqti_request.collect Caqti_type.(tup3 int string int) typ
         {|
          SELECT zaub.account_identifier_id,
                 zaub.id,
@@ -998,9 +1004,12 @@ module Sql = struct
                 zaub.call_depth,
                 zaub.zkapp_network_precondition_id,
                 zaub.zkapp_account_precondition_id,
+                zaub.zkapp_valid_while_precondition_id,
                 zaub.use_full_commitment,
+                zaub.implicit_account_creation_fee,
                 zaub.may_use_token,
                 zaub.authorization_kind,
+                zaub.verification_key_hash_id,
                 pk.value as account,
                 bzc.status
          FROM zkapp_commands zc
@@ -1014,14 +1023,18 @@ module Sql = struct
            ON ai.id = zaub.account_identifier_id
          INNER JOIN public_keys pk
            ON ai.public_key_id = pk.id
+         INNER JOIN tokens t
+           ON t.id = ai.token_id
          WHERE zc.id = ?
+           AND t.value = ?
+           AND bzc.block_id = ?
     |}
 
-    let run (module Conn : Caqti_async.CONNECTION) id =
-      Conn.collect_list query id
-  end
-
-  let run (module Conn : Caqti_async.CONNECTION) input =
+    let run (module Conn : Caqti_async.CONNECTION) command_id block_id =
+      Conn.collect_list query (command_id, Mina_base.Token_id.(to_string default), block_id)
+    end
+    
+    let run (module Conn : Caqti_async.CONNECTION) input =
     let module M = struct
       include Deferred.Result
 
@@ -1178,7 +1191,7 @@ module Sql = struct
           (* TODO: check if this holds *)
           let token = Mina_base.Token_id.(to_string default) in
           let%bind raw_zkapp_account_update =
-            Zkapp_account_update.run (module Conn) cmd_id
+            Zkapp_account_update.run (module Conn) cmd_id block_id
             |> Errors.Lift.sql
                  ~context:"Finding zkapp account updates within command"
           in
