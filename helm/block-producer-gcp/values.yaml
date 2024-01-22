@@ -2,6 +2,8 @@ testnetName: "testnet"
 annotations: {}
 mina:
   runtimeConfig:
+    enabled: false
+    genesisLedgerURL: "" # url to wget genesis_ledger.json
   generateGenesisProof: true
   logLevel: "Debug"
   logSnarkWorkGossip: false

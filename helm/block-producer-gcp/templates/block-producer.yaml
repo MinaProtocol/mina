@@ -97,6 +97,23 @@ spec:
           - name: MINA_LIBP2P_PASS
             value: {{ $config.privateKeyPW | quote }}
       {{- end }}
+      {{- if $.Values.mina.runtimeConfig.enabled }}
+      - name: daemon-config
+        image: alpine:latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "Downloading genesis ledger:";
+            wget -O /root/config/genesis_ledger.json {{ $.Values.mina.runtimeConfig.genesisLedgerURL }};
+
+            echo "Replacing baked ledger with {{ $.Values.mina.runtimeConfig.genesisLedgerURL }}";
+            cp /root/config/genesis_ledger.json /root/.mina-config/daemon.json && chmod a+r /root/.mina-config/daemon.json || echo "Failed to copy file or set permissions. Check permissions or file existence.";
+        volumeMounts:
+          - name: {{ $.Release.Name }}-daemon-config-dir
+            mountPath: /root/config
+          - name: config-dir
+            mountPath: /root/.mina-config/
+      {{- end }}
       containers:
       {{ if $config.runWithUserAgent -}}
       - name: user-agent
@@ -238,8 +255,8 @@ spec:
           {{- if $.Values.mina.uploadBlocksToGCloud }}
           "-upload-blocks-to-gcloud", "true",
           {{- end }}
-          {{- if $.Values.mina.runtimeConfig }}
-          "-config-file", "/root/config/daemon.json",
+          {{- if $.Values.mina.runtimeConfig.enabled }}
+          "-config-file", "/root/config/genesis_ledger.json",
           {{- end -}}
           "-generate-genesis-proof", {{ $.Values.mina.generateGenesisProof | quote }},
           {{- if $config.enableArchive }}
@@ -303,9 +320,9 @@ spec:
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
         {{- end }}
-        {{- if $.Values.mina.runtimeConfig }}
-        - name: daemon-config
-          mountPath: "/root/config/"
+        {{- if $.Values.mina.runtimeConfig.enabled }}
+        - name: {{ $.Release.Name }}-daemon-config-dir
+          mountPath: /root/config
         {{- end }}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
       volumes:
@@ -360,10 +377,9 @@ spec:
         emptyDir: {}
       - name: actual-libp2p
         emptyDir: {}
-      {{- if $.Values.mina.runtimeConfig }}
-      - name: daemon-config
-        configMap:
-          name: block-producer-daemon-config
+      {{- if $.Values.mina.runtimeConfig.enabled }}
+      - name: {{ $.Release.Name }}-daemon-config-dir
+        emptyDir: {}
       {{- end }}
       {{- if $.Values.mina.uploadBlocksToGCloud }}
       - name: gcloud-keyfile
