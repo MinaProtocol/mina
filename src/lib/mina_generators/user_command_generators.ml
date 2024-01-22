@@ -113,7 +113,7 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
       ; send = Either
       ; set_delegate = Either
       ; set_permissions = Either
-      ; set_verification_key = Either
+      ; set_verification_key = (Either, Mina_numbers.Txn_version.current)
       ; set_zkapp_uri = Either
       ; edit_action_state = Either
       ; set_token_symbol = Either
