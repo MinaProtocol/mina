@@ -1148,6 +1148,7 @@ module Daemon = struct
     let%bind zkapp_signed_pair_update_cost = Float.gen_incl 0.0 100.0 in
     let%bind zkapp_transaction_cost_limit = Float.gen_incl 0.0 100.0 in
     let%bind max_event_elements = Int.gen_incl 0 100 in
+    let%bind zkapp_cmd_limit_hardcap = Int.gen_incl 0 1000 in
     let%map max_action_elements = Int.gen_incl 0 1000 in
     { txpool_max_size = Some txpool_max_size
     ; peer_list_url = None
@@ -1157,6 +1158,7 @@ module Daemon = struct
     ; zkapp_transaction_cost_limit = Some zkapp_transaction_cost_limit
     ; max_event_elements = Some max_event_elements
     ; max_action_elements = Some max_action_elements
+    ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
     }
 end
 
