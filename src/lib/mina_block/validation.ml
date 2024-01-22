@@ -503,9 +503,9 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
       ~coinbase_receiver:(Consensus_state.coinbase_receiver consensus_state)
       ~supercharge_coinbase:
         (Consensus_state.supercharge_coinbase consensus_state)
-      ~zkapps_per_block_hard_cap:
+      ~zkapp_cmd_limit_hardcap:
         precomputed_values.Precomputed_values.genesis_constants
-          .zkapps_per_block_hard_cap
+          .zkapp_cmd_limit_hardcap
     |> Deferred.Result.map_error ~f:(fun e ->
            `Staged_ledger_application_failed e )
   in

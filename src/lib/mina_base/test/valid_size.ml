@@ -44,7 +44,7 @@ let genesis_constant_error limit events actions : Genesis_constants.t =
   ; zkapp_transaction_cost_limit = limit
   ; max_event_elements = events
   ; max_action_elements = actions
-  ; zkapps_per_block_hard_cap = 128
+  ; zkapp_cmd_limit_hardcap = 128
   }
 
 (* Note that in the following tests the generated zkapp_type will have an account_updates (i.e. a call_forest)

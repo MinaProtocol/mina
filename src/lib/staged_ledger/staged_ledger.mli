@@ -193,7 +193,7 @@ val apply :
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
-  -> zkapps_per_block_hard_cap:int
+  -> zkapp_cmd_limit_hardcap:int
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
        * [ `Ledger_proof of
            ( Ledger_proof.t
@@ -218,7 +218,7 @@ val apply_diff_unchecked :
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
-  -> zkapps_per_block_hard_cap:int
+  -> zkapp_cmd_limit_hardcap:int
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
        * [ `Ledger_proof of
            ( Ledger_proof.t
