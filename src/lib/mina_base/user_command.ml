@@ -235,8 +235,7 @@ let minimum_fee = Currency.Fee.minimum_user_command_fee
 
 let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
-let is_disabled t =
-  match t with
+let is_disabled = function
   | Zkapp_command _ ->
       Mina_compile_config.zkapps_disabled
   | _ ->
@@ -409,7 +408,7 @@ module Well_formedness_error = struct
     | Zkapp_too_big err ->
         sprintf "Zkapp too big (%s)" (Error.to_string_hum err)
     | Transaction_type_disabled ->
-        "Zkapps are disabled"
+        "Transaction type disabled"
 end
 
 let check_well_formedness ~genesis_constants t :
