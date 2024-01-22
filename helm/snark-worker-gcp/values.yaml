@@ -1,6 +1,9 @@
 testnetName: "testnet"
+annotations: {}
 mina:
   runtimeConfig:
+    enabled: false
+    genesisLedgerURL: "" # url to wget genesis_ledger.json
   generateGenesisProof: true
   enableArchive: false
   archiveAddress: archive-1:3086

@@ -2,17 +2,21 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{$.Values.coordinatorName }}
+  annotations:
+  {{- with $.Values.annotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
   labels:
-    app: {{$.Values.coordinatorName}}
+    app: {{ $.Values.coordinatorName }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{$.Values.coordinatorName }}
+      app: {{ $.Values.coordinatorName }}
   template:
     metadata:
       labels:
-        app: {{$.Values.coordinatorName}}
+        app: {{ $.Values.coordinatorName }}
         testnet: {{ $.Values.testnetName }}
         role: snark-coordinator
         version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
@@ -38,6 +42,23 @@ spec:
         env:
           - name: MINA_LIBP2P_PASS
             value: {{ $.Values.mina.privkeyPass | quote }}
+       {{- if $.Values.mina.runtimeConfig.enabled }}
+      - name: daemon-config
+        image: alpine:latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "Downloading genesis ledger:";
+            wget -O /root/config/genesis_ledger.json {{ $.Values.mina.runtimeConfig.genesisLedgerURL }};
+
+            echo "Replacing baked ledger with {{ $.Values.mina.runtimeConfig.genesisLedgerURL }}";
+            cp /root/config/genesis_ledger.json /root/.mina-config/daemon.json && chmod a+r /root/.mina-config/daemon.json || echo "Failed to copy file or set permissions. Check permissions or file existence.";
+        volumeMounts:
+          - name: {{ $.Release.Name }}-daemon-config-dir
+            mountPath: /root/config
+          - name: config-dir
+            mountPath: /root/.mina-config/
+      {{- end }}     
       containers:
       - name: mina
         resources:
@@ -66,8 +87,8 @@ spec:
           {{- if $.Values.mina.logTxnPoolGossip }}
           "-log-txn-pool-gossip", "true",
           {{- end -}}
-          {{- if $.Values.mina.runtimeConfig }}
-          "-config-file", "/root/config/daemon.json",
+          {{- if $.Values.mina.runtimeConfig.enabled }}
+          "-config-file", "/root/config/genesis_ledger.json",
           {{- end }}
           {{- range $.Values.mina.seedPeers }}
           "-peer", {{ . | quote }},
@@ -123,8 +144,8 @@ spec:
 {{- include "healthcheck.snarkCoordinator.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:
-        {{- if $.Values.mina.runtimeConfig }}
-        - name: daemon-config
+        {{- if $.Values.mina.runtimeConfig.enabled }}
+        - name: {{ $.Release.Name }}-daemon-config-dir
           mountPath: "/root/config/"
         {{- end }}
         - name: actual-libp2p
@@ -132,10 +153,9 @@ spec:
         - name: config-dir
           mountPath: /root/.mina-config/
       volumes:
-      {{- if $.Values.mina.runtimeConfig }}
-      - name: daemon-config
-        configMap:
-          name: {{$.Values.coordinatorName }}-daemon-config
+      {{- if $.Values.mina.runtimeConfig.enabled }}
+      - name: {{ $.Release.Name }}-daemon-config-dir
+        emptyDir: {}
       {{- end }}
       - name: actual-libp2p
         emptyDir: {}

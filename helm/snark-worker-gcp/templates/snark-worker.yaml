@@ -2,17 +2,21 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $.Values.workerName }}
+  annotations:
+  {{- with $.Values.annotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
   labels:
-    app: {{$.Values.workerName}}
+    app: {{ $.Values.workerName }}
 spec:
   replicas: {{ $.Values.workerReplicas }}
   selector:
     matchLabels:
-      app: {{$.Values.workerName}}
+      app: {{ $.Values.workerName }}
   template:
     metadata:
       labels:
-        app: {{$.Values.workerName}}
+        app: {{ $.Values.workerName }}
         testnet: {{ $.Values.testnetName }}
         role: snark-worker
         version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
@@ -30,8 +34,8 @@ spec:
           limits:
             memory: 16.0Gi
           requests:
-            memory: {{$.Values.workerMemRequest}}
-            cpu: {{$.Values.workerCpuRequest}}
+            memory: {{ $.Values.workerMemRequest }}
+            cpu: {{ $.Values.workerCpuRequest }}
         image: {{ $.Values.mina.image }}
         {{ if $.Values.mina.useCustomEntrypoint -}}
         command: [{{ $.Values.mina.customEntrypoint }}]
