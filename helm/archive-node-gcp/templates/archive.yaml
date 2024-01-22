@@ -2,6 +2,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ template "archive-node.fullname" . }}
+  annotations:
+  {{- with $.Values.annotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
   labels:
     app: {{ template "archive-node.fullname" . }}
 spec:

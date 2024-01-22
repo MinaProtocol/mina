@@ -3,6 +3,10 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: "{{ template "archive-node.fullname" . }}-dump-cronjob"
+  annotations:
+  {{- with $.Values.annotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   concurrencyPolicy: Replace
   failedJobsHistoryLimit: 1

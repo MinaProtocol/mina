@@ -3,6 +3,10 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: "{{ template "archive-node.fullname" . }}-db-bootstrap"
+  annotations:
+  {{- with $.Values.annotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   template:
     spec:

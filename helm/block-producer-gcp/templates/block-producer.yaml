@@ -3,6 +3,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $config.name }}
+  annotations:
+  {{- with $.Values.annotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
   labels:
     app: {{ $config.name }}
 spec:

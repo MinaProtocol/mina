@@ -1,4 +1,5 @@
 testnetName: "testnet"
+annotations: {}
 mina:
   runtimeConfig:
     enabled: false
@@ -12,8 +13,8 @@ mina:
   customEntrypoint: ""
   privkeyPass: "naughty blue worm"
   seedPeers:
-    - /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH
-    - /dns4/seed-two.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA
+  - /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH
+  - /dns4/seed-two.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA
   ports:
     client: "8301"
     graphql: "3085"
@@ -34,8 +35,8 @@ archive:
   # remoteSchemaFile needs to be just the script name, not a url.  remoteSchemaAuxFiles needs to be a list of urls of scripts, one of these urls needs to be the url of the main sql script that invokes the other ones.  sorry it's confusing
   remoteSchemaFile: "create_schema.sql"
   remoteSchemaAuxFiles:
-    - "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/zkapp_tables.sql"
-    - "https://raw.githubusercontent.com/MinaProtocol/mina/compatible/src/app/archive/create_schema.sql"
+  - "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/zkapp_tables.sql"
+  - "https://raw.githubusercontent.com/MinaProtocol/mina/compatible/src/app/archive/create_schema.sql"
   postgresHost: '{{ .Release.Name }}-postgresql'
   postgresUri: postgres://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.ports.postgres }}/{{ .Values.postgresql.auth.database }}
   ports:
