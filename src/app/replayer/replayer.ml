@@ -599,7 +599,7 @@ let try_slot ~logger pool slot =
   go ~slot ~tries_left:num_tries
 
 let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
-    ~max_canonical_slot =
+    ~max_canonical_slot ~checkpoint_output_folder_opt ~checkpoint_file_prefix =
   if Int64.( <= ) last_global_slot_since_genesis max_canonical_slot then (
     (* start replaying at the slot after the one we've just finished with *)
     let start_slot_since_genesis = Int64.succ last_global_slot_since_genesis in
@@ -610,7 +610,15 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
       input_to_yojson input |> Yojson.Safe.pretty_to_string
     in
     let checkpoint_file =
-      sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
+      let checkpoint_filename =
+        sprintf "%s-checkpoint-%Ld.json" checkpoint_file_prefix
+          start_slot_since_genesis
+      in
+      match checkpoint_output_folder_opt with
+      | Some parent ->
+          Filename.concat parent checkpoint_filename
+      | None ->
+          checkpoint_filename
     in
     [%log info] "Writing checkpoint file"
       ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
@@ -624,7 +632,8 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
     Deferred.unit )
 
 let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
-    ~continue_on_error ~checkpoint_interval () =
+    ~continue_on_error ~checkpoint_interval ~checkpoint_output_folder_opt
+    ~checkpoint_file_prefix () =
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -1127,10 +1136,12 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                    is not the start slot" ;
                 Core.exit 1 )
           | Some (state_hash, ledger_hash, snarked_hash) ->
-              let write_checkpoint_file () =
+              let write_checkpoint_file ~checkpoint_output_folder_opt
+                  ~checkpoint_file_prefix () =
                 let write_checkpoint () =
                   write_replayer_checkpoint ~logger ~ledger
                     ~last_global_slot_since_genesis ~max_canonical_slot
+                    ~checkpoint_output_folder_opt ~checkpoint_file_prefix
                 in
                 if last_block then write_checkpoint ()
                 else
@@ -1374,7 +1385,8 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                 (* don't check ledger hash, because depth changed from mainnet *)
                 let%bind () = check_account_accessed state_hash in
                 log_state_hash_on_next_slot last_global_slot_since_genesis ;
-                write_checkpoint_file ()
+                write_checkpoint_file ~checkpoint_output_folder_opt
+                  ~checkpoint_file_prefix ()
         in
         (* a sequence is a command type, slot, sequence number triple *)
         let get_internal_cmd_sequence (ic : Sql.Internal_command.t) =
@@ -1681,6 +1693,15 @@ let () =
            Param.flag "--checkpoint-interval"
              ~doc:"NN Write checkpoint file every NN slots"
              Param.(optional int)
+         and checkpoint_output_folder_opt =
+           Param.flag "--checkpoint-output-folder"
+             ~doc:"file Folder containing the resulting checkpoints"
+             Param.(optional string)
+         and checkpoint_file_prefix =
+           Param.flag "--checkpoint-file-prefix"
+             ~doc:"string Checkpoint file prefix (default: 'replayer')"
+             Param.(optional_with_default "replayer" string)
          in
          main ~input_file ~output_file_opt ~migration_mode ~archive_uri
-           ~checkpoint_interval ~continue_on_error )))
+           ~checkpoint_interval ~continue_on_error ~checkpoint_output_folder_opt
+           ~checkpoint_file_prefix )))
