@@ -40,7 +40,6 @@ ENV OPAMYES 1
 
 # --- Import Opam Switch
 # TODO: handle this opam work without cloning the full repository (directly pull opam.export)
-RUN opam update
 RUN opam switch import opam.export --quiet
 
 # --- Pin external packages / submodules
