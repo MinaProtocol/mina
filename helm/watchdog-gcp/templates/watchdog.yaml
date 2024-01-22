@@ -4,6 +4,10 @@ metadata:
   name: {{ .Values.name }}
   labels:
     app: {{ .Values.name }}
+  annotations:
+  {{- with $.Values.annotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   replicas: 1
   selector:
@@ -79,6 +83,10 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: watchdog-make-reports
+  annotations:
+  {{- with $.Values.annotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   schedule: "*/30 * * * *"
   concurrencyPolicy: Forbid
@@ -105,8 +113,6 @@ spec:
             {{- if .Values.makeReportDiscordWebhookUrl }}
             - name: "MAKE_REPORT_DISCORD_WEBHOOK_URL"
               value: {{ .Values.makeReportDiscordWebhookUrl | quote }}
-            {{- if .Values.makeReportAccount }}
-            {{- end }}
             - name: "MAKE_REPORT_ACCOUNTS"
               value: {{ .Values.makeReportAccounts | quote }}
             {{- end }}
