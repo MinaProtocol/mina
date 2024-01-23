@@ -36,7 +36,7 @@ end) : S with type hash := Hash.t = struct
           | `Right h ->
               Hash.merge ~height h acc
         in
-        (acc, height + 1))
+        (acc, height + 1) )
     |> fst
 
   let check_path t leaf_hash root_hash =

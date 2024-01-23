@@ -4,29 +4,32 @@ open Pipe_lib.Strict_pipe
 open Mina_base
 open Mina_state
 open Signature_lib
-open Mina_transition
+open Mina_block
 open Network_peer
 
 type validation_error =
   [ `Invalid_time_received of [ `Too_early | `Too_late of int64 ]
   | `Invalid_genesis_protocol_state
-  | `Invalid_proof
-  | `Invalid_delta_transition_chain_proof
+  | `Invalid_proof of Error.t
+  | `Invalid_delta_block_chain_proof
   | `Verifier_error of Error.t
   | `Mismatched_protocol_version
   | `Invalid_protocol_version ]
+[@@deriving sexp_of]
 
 let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
-    ~trust_system ~sender ~transition_with_hash ~delta
-    (error : validation_error) =
+    ~trust_system ~sender ~transition_with_hash ~delta (error : validation_error)
+    =
   let open Trust_system.Actions in
-  let state_hash = With_hash.hash transition_with_hash in
+  let state_hash =
+    State_hash.With_state_hashes.state_hash transition_with_hash
+  in
   let transition = With_hash.data transition_with_hash in
   let punish action message =
     let message' =
       "external transition with state hash $state_hash"
       ^ Option.value_map message ~default:"" ~f:(fun (txt, _) ->
-            sprintf ", %s" txt)
+            sprintf ", %s" txt )
     in
     let metadata =
       ("state_hash", State_hash.to_yojson state_hash)
@@ -48,16 +51,17 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         ]
     | `Invalid_genesis_protocol_state ->
         [ ("reason", `String "invalid genesis state") ]
-    | `Invalid_proof ->
+    | `Invalid_proof err ->
         [ ("reason", `String "invalid proof")
         ; ( "protocol_state"
-          , External_transition.protocol_state transition
+          , Header.protocol_state (Mina_block.header transition)
             |> Protocol_state.value_to_yojson )
         ; ( "proof"
-          , External_transition.protocol_state_proof transition
+          , Header.protocol_state_proof @@ Mina_block.header transition
             |> Proof.to_yojson )
+        ; ("error", Error_json.error_to_yojson err)
         ]
-    | `Invalid_delta_transition_chain_proof ->
+    | `Invalid_delta_block_chain_proof ->
         [ ("reason", `String "invalid delta transition chain proof") ]
     | `Verifier_error err ->
         [ ("reason", `String "verifier error")
@@ -73,8 +77,8 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     ; ( "time_received"
       , `String
           (Time.to_string_abs
-             (Block_time.to_time time_received)
-             ~zone:Time.Zone.utc) )
+             (Block_time.to_time_exn time_received)
+             ~zone:Time.Zone.utc ) )
     ]
     @ metadata
   in
@@ -85,7 +89,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     ~metadata:
       ( ( "protocol_state"
         , Protocol_state.Value.to_yojson
-            (External_transition.protocol_state transition) )
+            (Header.protocol_state (Mina_block.header transition)) )
       :: metadata )
     "Validation error: external transition with state hash $state_hash was \
      rejected for reason $reason" ;
@@ -97,12 +101,12 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
           (error_metadata @ [ ("state_hash", State_hash.to_yojson state_hash) ])
         "Error in verifier verifying blockchain proof for $state_hash: $error" ;
       Deferred.unit
-  | `Invalid_proof ->
+  | `Invalid_proof _ ->
       Mina_metrics.(Counter.inc_one Rejected_blocks.invalid_proof) ;
       Queue.enqueue Transition_frontier.rejected_blocks
         (state_hash, sender, time_received, `Invalid_proof) ;
       punish Sent_invalid_proof None
-  | `Invalid_delta_transition_chain_proof ->
+  | `Invalid_delta_block_chain_proof ->
       Queue.enqueue Transition_frontier.rejected_blocks
         ( state_hash
         , sender
@@ -126,7 +130,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         (Gossiped_old_transition (slot_diff, delta))
         (Some
            ( "off by $slot_diff slots"
-           , [ ("slot_diff", `String (Int64.to_string slot_diff)) ] ))
+           , [ ("slot_diff", `String (Int64.to_string slot_diff)) ] ) )
   | `Invalid_protocol_version ->
       Queue.enqueue Transition_frontier.rejected_blocks
         (state_hash, sender, time_received, `Invalid_protocol_version) ;
@@ -189,14 +193,14 @@ module Duplicate_block_detector = struct
   let check ~precomputed_values ~rejected_blocks_logger ~time_received t logger
       external_transition_with_hash =
     let external_transition = external_transition_with_hash.With_hash.data in
-    let protocol_state_hash = external_transition_with_hash.hash in
-    let open Consensus.Data.Consensus_state in
-    let consensus_state =
-      External_transition.consensus_state external_transition
+    let protocol_state_hash =
+      State_hash.With_state_hashes.state_hash external_transition_with_hash
     in
+    let open Consensus.Data.Consensus_state in
+    let consensus_state = Mina_block.consensus_state external_transition in
     let consensus_time = consensus_time consensus_state in
     let block_producer =
-      External_transition.block_producer external_transition
+      Consensus.Data.Consensus_state.block_creator consensus_state
     in
     let block = Blocks.{ consensus_time; block_producer } in
     (* try table GC *)
@@ -216,8 +220,8 @@ module Duplicate_block_detector = struct
             ; ( "time_received"
               , `String
                   (Time.to_string_abs
-                     (Block_time.to_time time_received)
-                     ~zone:Time.Zone.utc) )
+                     (Block_time.to_time_exn time_received)
+                     ~zone:Time.Zone.utc ) )
             ]
           in
           let msg : (_, unit, string, unit) format4 =
@@ -232,7 +236,7 @@ end
 let run ~logger ~trust_system ~verifier ~transition_reader
     ~valid_transition_writer ~initialization_finish_signal ~precomputed_values =
   let genesis_state_hash =
-    Precomputed_values.genesis_state_hash precomputed_values
+    (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
   in
   let genesis_constants =
     Precomputed_values.genesis_constants precomputed_values
@@ -242,98 +246,129 @@ let run ~logger ~trust_system ~verifier ~transition_reader
   in
   let open Deferred.Let_syntax in
   let duplicate_checker = Duplicate_block_detector.create () in
-  don't_wait_for
-    (Reader.iter transition_reader ~f:(fun network_transition ->
-         if Ivar.is_full initialization_finish_signal then (
-           let ( `Transition transition_env
-               , `Time_received time_received
-               , `Valid_cb valid_cb ) =
-             network_transition
-           in
-           let blockchain_length =
-             Envelope.Incoming.data transition_env
-             |> External_transition.consensus_state
-             |> Consensus.Data.Consensus_state.blockchain_length
-             |> Mina_numbers.Length.to_int
-           in
-           Mina_metrics.Transition_frontier
-           .update_max_unvalidated_blocklength_observed blockchain_length ;
-           ( if not (Mina_net2.Validation_callback.is_expired valid_cb) then (
-             let transition_with_hash =
-               Envelope.Incoming.data transition_env
-               |> With_hash.of_data
-                    ~hash_data:
-                      (Fn.compose Protocol_state.hash
-                         External_transition.protocol_state)
-             in
-             Duplicate_block_detector.check ~precomputed_values
-               ~rejected_blocks_logger ~time_received duplicate_checker logger
-               transition_with_hash ;
-             let sender = Envelope.Incoming.sender transition_env in
-             let computation =
-               let open Interruptible.Let_syntax in
-               let defer f x =
-                 Interruptible.uninterruptible @@ Deferred.return (f x)
-               in
-               let%bind () =
-                 Interruptible.lift Deferred.unit
-                   (Mina_net2.Validation_callback.await_timeout valid_cb)
-               in
-               match%bind
-                 let open Interruptible.Result.Let_syntax in
-                 External_transition.(
-                   Validation.wrap transition_with_hash
-                   |> defer
-                        (validate_time_received ~precomputed_values
-                           ~time_received)
-                   >>= defer
-                         (validate_genesis_protocol_state ~genesis_state_hash)
-                   >>= (fun x ->
-                         Interruptible.uninterruptible
-                           (validate_proofs ~verifier ~genesis_state_hash [ x ])
-                         >>| List.hd_exn)
-                   >>= defer validate_delta_transition_chain
-                   >>= defer validate_protocol_versions)
-               with
-               | Ok verified_transition ->
-                   External_transition.poke_validation_callback
-                     (Envelope.Incoming.data transition_env)
-                     valid_cb ;
-                   Envelope.Incoming.wrap ~data:verified_transition ~sender
-                   |> Writer.write valid_transition_writer ;
-                   Mina_metrics.Transition_frontier
-                   .update_max_blocklength_observed blockchain_length ;
-                   Queue.enqueue Transition_frontier.validated_blocks
-                     (With_hash.hash transition_with_hash, sender, time_received) ;
-                   return ()
-               | Error error ->
-                   Mina_net2.Validation_callback.fire_if_not_already_fired
-                     valid_cb `Reject ;
-                   Interruptible.uninterruptible
-                   @@ handle_validation_error ~logger ~rejected_blocks_logger
-                        ~time_received ~trust_system ~sender
-                        ~transition_with_hash
-                        ~delta:genesis_constants.protocol.delta error
-             in
-             Interruptible.force computation )
-           else Deferred.Result.fail () )
-           >>| function
-           | Ok () ->
-               ()
-           | Error () ->
-               let state_hash =
-                 Envelope.Incoming.data transition_env
-                 |> External_transition.state_hash
-               in
-               let metadata =
-                 [ ("state_hash", State_hash.to_yojson state_hash)
-                 ; ( "time_received"
-                   , `String
-                       (Time.to_string_abs
-                          (Block_time.to_time time_received)
-                          ~zone:Time.Zone.utc) )
-                 ]
-               in
-               [%log error] ~metadata
-                 "Dropping blocks because libp2p validation expired" )
-         else Deferred.unit))
+  O1trace.background_thread "initially_validate_blocks" (fun () ->
+      Reader.iter transition_reader
+        ~f:(fun
+             ( `Transition transition_env
+             , `Time_received time_received
+             , `Valid_cb valid_cb )
+           ->
+          let state_hash =
+            ( Envelope.Incoming.data transition_env
+            |> Mina_block.header |> Header.protocol_state
+            |> Protocol_state.hashes )
+              .state_hash
+          in
+          Internal_tracing.Context_call.with_call_id ~tag:"initial_validation"
+          @@ fun () ->
+          Internal_tracing.with_state_hash state_hash
+          @@ fun () ->
+          [%log internal] "Initial_validation" ;
+          if Ivar.is_full initialization_finish_signal then (
+            let blockchain_length =
+              Envelope.Incoming.data transition_env
+              |> Mina_block.blockchain_length |> Mina_numbers.Length.to_int
+            in
+            Mina_metrics.Transition_frontier
+            .update_max_unvalidated_blocklength_observed blockchain_length ;
+            ( if not (Mina_net2.Validation_callback.is_expired valid_cb) then (
+              let transition_with_hash =
+                Envelope.Incoming.data transition_env
+                |> With_hash.of_data
+                     ~hash_data:
+                       (Fn.compose Protocol_state.hashes
+                          (Fn.compose Header.protocol_state Mina_block.header) )
+              in
+              Duplicate_block_detector.check ~precomputed_values
+                ~rejected_blocks_logger ~time_received duplicate_checker logger
+                transition_with_hash ;
+              let sender = Envelope.Incoming.sender transition_env in
+              let computation =
+                let open Interruptible.Let_syntax in
+                let defer f x =
+                  Interruptible.uninterruptible @@ Deferred.return (f x)
+                in
+                let%bind () =
+                  Interruptible.lift Deferred.unit
+                    (Mina_net2.Validation_callback.await_timeout valid_cb)
+                in
+                match%bind
+                  let open Interruptible.Result.Let_syntax in
+                  Validation.(
+                    wrap transition_with_hash
+                    |> defer
+                         (validate_time_received ~precomputed_values
+                            ~time_received )
+                    >>= defer
+                          (validate_genesis_protocol_state ~genesis_state_hash)
+                    >>= Fn.compose Interruptible.uninterruptible
+                          (validate_single_proof ~verifier ~genesis_state_hash)
+                    >>= defer validate_delta_block_chain
+                    >>= defer validate_protocol_versions)
+                with
+                | Ok verified_transition ->
+                    [%log internal] "Initial_validation_done" ;
+                    Writer.write valid_transition_writer
+                      ( `Block
+                          (Envelope.Incoming.wrap ~data:verified_transition
+                             ~sender )
+                      , `Valid_cb valid_cb ) ;
+                    Mina_metrics.Transition_frontier
+                    .update_max_blocklength_observed blockchain_length ;
+                    Queue.enqueue Transition_frontier.validated_blocks
+                      ( State_hash.With_state_hashes.state_hash
+                          transition_with_hash
+                      , sender
+                      , time_received ) ;
+                    return ()
+                | Error error ->
+                    Internal_tracing.with_state_hash state_hash
+                    @@ fun () ->
+                    [%log internal] "Failure"
+                      ~metadata:
+                        [ ( "reason"
+                          , `String
+                              ( "Failed initial validation: "
+                              ^ Sexp.to_string
+                                  ([%sexp_of: validation_error] error) ) )
+                        ] ;
+                    Mina_net2.Validation_callback.fire_if_not_already_fired
+                      valid_cb `Reject ;
+                    Interruptible.uninterruptible
+                    @@ handle_validation_error ~logger ~rejected_blocks_logger
+                         ~time_received ~trust_system ~sender
+                         ~transition_with_hash
+                         ~delta:genesis_constants.protocol.delta error
+              in
+              Interruptible.force computation )
+            else Deferred.Result.fail () )
+            >>| function
+            | Ok () ->
+                ()
+            | Error () ->
+                let state_hash =
+                  ( Envelope.Incoming.data transition_env
+                  |> Mina_block.header |> Header.protocol_state
+                  |> Protocol_state.hashes )
+                    .state_hash
+                in
+                Internal_tracing.with_state_hash state_hash
+                @@ fun () ->
+                [%log internal] "Failure"
+                  ~metadata:
+                    [ ("reason", `String "Validation callback expired") ] ;
+                let metadata =
+                  [ ("state_hash", State_hash.to_yojson state_hash)
+                  ; ( "time_received"
+                    , `String
+                        (Time.to_string_abs
+                           (Block_time.to_time_exn time_received)
+                           ~zone:Time.Zone.utc ) )
+                  ]
+                in
+                [%log error] ~metadata
+                  "Dropping blocks because libp2p validation expired" )
+          else (
+            [%log internal] "Failure"
+              ~metadata:[ ("reason", `String "Node still initializing") ] ;
+            Deferred.unit ) ) )

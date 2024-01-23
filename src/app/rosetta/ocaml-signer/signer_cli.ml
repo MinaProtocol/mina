@@ -116,13 +116,43 @@ let generate_command =
   printf "%s\n" Signer.Keys.(of_keypair keypair |> to_private_key_bytes) ;
   return ()
 
+(** Extracts an hexadecimal private key suitable for rosetta from a private-key file.
+    Similarly to the main [mina] binary, the password from the [Secrets.Keypair.env] environment variable will be used if it it set, otherwise it will be read from stdin.*)
+let hex_of_private_key_file =
+  let open Command.Let_syntax in
+  let%map_open privkey_path =
+    flag "--private-key-path" ~doc:"Path to the private key file"
+      (required string)
+  in
+  fun () ->
+    let password =
+      Lazy.return
+        ( match Sys.getenv Secrets.Keypair.env with
+        | Some password ->
+            Deferred.return (Bytes.of_string password)
+        | None ->
+            Secrets.Password.read_hidden_line ~error_help_message:""
+              "Secret key password: " )
+    in
+    let print_key =
+      let open Deferred.Result.Let_syntax in
+      let%bind keypair =
+        Secrets.Keypair.read ~privkey_path ~password
+        |> Deferred.Result.map_error ~f:Secrets.Privkey_error.to_string
+      in
+      return
+        (Format.printf "%s@."
+           (Rosetta_coding.Coding.of_scalar keypair.private_key) )
+    in
+    Deferred.map ~f:Result.ok_or_failwith print_key
+
 let convert_signature_command =
   let open Command.Let_syntax in
   let%map_open field_str =
-      flag "--field" ~doc:"Field string in decimal (from client-sdk)"
+      flag "--field" ~doc:"Field string in decimal (from mina-signer)"
         (required string)
   and scalar_str =
-      flag "--scalar" ~doc:"Scalar string in decimal (from client-sdk)"
+      flag "--scalar" ~doc:"Scalar string in decimal (from mina-signer)"
         (required string)
   in
   fun () ->
@@ -151,4 +181,8 @@ let commands =
     , Command.async ~summary:"Convert signature from field,scalar decimal strings into Rosetta Signature" convert_signature_command )
   ; ( "verify-message"
     , Command.async ~summary:"Verify a string message was signed properly" verify_message_command )
-    ]
+  ; ( "hex-of-private-key-file"
+    , Command.async
+        ~summary:"Read a private key file and display it as hexadecimal"
+        hex_of_private_key_file )
+  ]

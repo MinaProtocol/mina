@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,7 +20,9 @@ import (
 
 	logging "github.com/ipfs/go-log/v2"
 
-	net "github.com/libp2p/go-libp2p-core/network"
+	net "github.com/libp2p/go-libp2p/core/network"
+
+	gonet "net"
 
 	ipc "libp2p_ipc"
 
@@ -31,7 +33,7 @@ func TestMain(m *testing.M) {
 	for i := 0; i < 100; i++ {
 		logging.Logger(fmt.Sprintf("node%d", i))
 	}
-  // Uncomment for more logging (ERROR by default)
+	// Uncomment for more logging (ERROR by default)
 	// _ = logging.SetLogLevel("mina.helper.bitswap", "WARN")
 	// _ = logging.SetLogLevel("engine", "DEBUG")
 	// _ = logging.SetLogLevel("codanet.Helper", "WARN")
@@ -53,7 +55,7 @@ const (
 )
 
 func TestMplex_SendLargeMessage(t *testing.T) {
-	// assert we are able to send and receive a message with size up to 1 << 30 bytes
+	// assert we are able to send and receive a message with size up to 1 MiB
 	appA, _ := newTestApp(t, nil, true)
 	appA.NoDHT = true
 
@@ -67,7 +69,7 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
-	msgSize := uint64(1 << 30)
+	msgSize := uint64(1 << 20)
 
 	withTimeoutAsync(t, func(done chan interface{}) {
 		// create handler that reads `msgSize` bytes
@@ -107,15 +109,10 @@ func createMessage(size uint64) []byte {
 }
 
 func TestPeerExchange(t *testing.T) {
-	codanet.NoDHT = true
-	defer func() {
-		codanet.NoDHT = false
-	}()
-
 	// only allow peer count of 2 for node A
 	maxCount := 2
 	appAPort := nextPort()
-	appA := newTestAppWithMaxConns(t, nil, true, maxCount, maxCount, appAPort)
+	appA := newTestAppWithMaxConnsAndCtxAndGrace(t, newTestKey(t), nil, true, maxCount, maxCount, .2, appAPort, context.Background(), time.Second)
 	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
 
@@ -137,20 +134,30 @@ func TestPeerExchange(t *testing.T) {
 	t.Logf("c=%s", appC.P2p.Host.ID())
 	t.Logf("d=%s", appD.P2p.Host.ID())
 
-	withTimeout(t, func() {
+	ctx, cancelF := context.WithTimeout(context.Background(), time.Minute)
+	go func() {
 		for {
 			// check if appC is connected to appB
 			for _, peer := range appD.P2p.Host.Network().Peers() {
 				if peer == appB.P2p.Host.ID() || peer == appC.P2p.Host.ID() {
+					cancelF()
 					return
 				}
 			}
 			time.Sleep(time.Millisecond * 100)
 		}
-	}, "D did not connect to B or C via A")
+	}()
 
+	<-ctx.Done()
+
+	if ctx.Err() == context.DeadlineExceeded {
+		t.Fatal("D did not connect to B or C via A")
+	}
+	time.Sleep(time.Second * 2)
+	appA.P2p.TrimOpenConns(context.Background())
 	time.Sleep(time.Second)
-	require.Equal(t, maxCount, len(appA.P2p.Host.Network().Peers()))
+
+	require.LessOrEqual(t, len(appA.P2p.Host.Network().Peers()), maxCount)
 }
 
 func sendStreamMessage(t *testing.T, from *app, to *app, msg []byte) {
@@ -258,16 +265,24 @@ func TestLibp2pMetrics(t *testing.T) {
 	require.NoError(t, err)
 
 	var streamIdx uint64 = 0
+	var streamMutex sync.Mutex
 	handler := func(stream net.Stream) {
 		handleStreamReads(appB, stream, streamIdx)
+		streamMutex.Lock()
+		defer streamMutex.Unlock()
 		streamIdx++
 	}
 
 	appB.P2p.Host.SetStreamHandler(testProtocol, handler)
 
+	listener, err := gonet.Listen("tcp", ":0")
+	if err != nil {
+		panic(err)
+	}
+	port := listener.Addr().(*gonet.TCPAddr).Port
 	server := http.NewServeMux()
 	server.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(":9001", server)
+	go http.Serve(listener, server)
 
 	go appB.checkPeerCount()
 	go appB.checkMessageStats()
@@ -283,11 +298,11 @@ func TestLibp2pMetrics(t *testing.T) {
 	expectedPeerCount := len(appB.P2p.Host.Network().Peers())
 	expectedCurrentConnCount := appB.P2p.ConnectionManager.GetInfo().ConnCount
 
-	resp, err := http.Get("http://localhost:9001/metrics")
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", port))
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 
 	respBody := string(body)

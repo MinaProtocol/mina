@@ -17,8 +17,7 @@ module Worker_state = struct
 
   type t = (module S)
 
-  let create ~logger : t Deferred.t =
-    Memory_stats.log_memory_stats logger ~process:"uptime service SNARK worker" ;
+  let create () : t Deferred.t =
     Deferred.return
       (let module M = struct
          let perform_single (message, single_spec) =
@@ -30,7 +29,7 @@ module Worker_state = struct
            in
            Prod.perform_single worker_state ~message single_spec
        end in
-      (module M : S))
+      (module M : S) )
 
   let get = Fn.id
 end
@@ -81,7 +80,7 @@ module Worker = struct
 
       let init_worker_state logger =
         [%log info] "Uptime SNARK worker started" ;
-        Worker_state.create ~logger
+        Worker_state.create ()
 
       let init_connection_state ~connection:_ ~worker_state:_ () = Deferred.unit
     end
@@ -105,7 +104,8 @@ let create ~logger ~pids : t Deferred.t =
   [%log info] "Starting a new uptime service SNARK worker process" ;
   let%map connection, process =
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-      ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:() logger
+      ~on_failure ~shutdown_on:Connection_closed ~connection_state_init_arg:()
+      logger
   in
   [%log info]
     "Daemon started process of kind $process_kind with pid \
@@ -131,14 +131,14 @@ let create ~logger ~pids : t Deferred.t =
        ~f:(fun stdout ->
          return
          @@ [%log debug] "Uptime SNARK worker stdout: $stdout"
-              ~metadata:[ ("stdout", `String stdout) ]) ;
+              ~metadata:[ ("stdout", `String stdout) ] ) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stderr process |> Reader.pipe)
        ~f:(fun stderr ->
          return
          @@ [%log error] "Uptime SNARK worker stderr: $stderr"
-              ~metadata:[ ("stderr", `String stderr) ]) ;
+              ~metadata:[ ("stderr", `String stderr) ] ) ;
   { connection; process; logger }
 
 let perform_single { connection; _ } ((_message, _single_spec) as arg) =

@@ -3,20 +3,9 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 module Field = Snark_params.Tick.Field
 module Scalar = Snark_params.Tick.Inner_curve.Scalar
 open Signature_lib
-
-[%%else]
-
-module Field = Snark_params_nonconsensus.Field
-module Scalar = Snark_params_nonconsensus.Inner_curve.Scalar
-open Signature_lib_nonconsensus
-
-[%%endif]
 
 (* see RFC 0038, section "marshal-keys" for a specification *)
 
@@ -86,7 +75,7 @@ let bits_by_8s = bits_by_n 8
 let of_unpackable (type t) (module M : Packed with type t = t)
     ?(padding_bit = false) (packed : t) =
   let bits0 = M.unpack packed |> List.rev in
-  assert (List.length bits0 = 255) ;
+  assert (Mina_stdlib.List.Length.Compare.(bits0 = 255)) ;
   (* field elements, scalars are 255 bits, left-pad to get 32 bytes *)
   let bits = padding_bit :: bits0 in
   (* break of the bits byte by byte *)
@@ -180,8 +169,6 @@ let%test "public key compressed roundtrip odd" =
 let%test "public key compressed roundtrip even" =
   pk_compressed_roundtrip_test hex_key_even ()
 
-[%%ifndef consensus_mechanism]
-
 (* for running tests from JS *)
 
 let unit_tests =
@@ -196,6 +183,4 @@ let unit_tests =
 let run_unit_tests () =
   List.iter unit_tests ~f:(fun (name, test) ->
       printf "Running %s test\n%!" name ;
-      assert (test ()))
-
-[%%endif]
+      assert (test ()) )

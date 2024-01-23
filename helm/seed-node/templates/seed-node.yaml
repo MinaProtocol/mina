@@ -24,6 +24,9 @@ spec:
         prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      {{- if $.Values.priorityClass }}
+      priorityClassName: {{ $.Values.priorityClass }}
+      {{- end }}
       initContainers:
       {{ if $config.libp2pSecret -}}
       - name: libp2p-perms
@@ -37,14 +40,30 @@ spec:
           mountPath: /libp2p-keys
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
+        env:
+        - name: MINA_LIBP2P_PASS
+          value: {{ $config.libp2pSecretPassword | quote }}
+      {{- else -}}
+      - name: libp2p-perms
+        image: {{ $.Values.mina.image | quote }}
+        command:
+        - bash
+        - -c
+        - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
+        volumeMounts:
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        env:
+          - name: MINA_LIBP2P_PASS
+            value: {{ $config.libp2pSecretPassword | quote }}
       {{- end }}
       containers:
       - name: mina
         resources:
           limits:
           requests:
-            memory: 32.0Gi
-            cpu: 12.0
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
         image: {{ $.Values.mina.image }}
         {{ if $.Values.mina.useCustomEntrypoint -}}
         command: [{{ $.Values.mina.customEntrypoint }}]
@@ -58,6 +77,10 @@ spec:
           "-rest-port", "$(DAEMON_REST_PORT)",
           {{- if $.Values.mina.exposeGraphql }}
           "-insecure-rest-server",
+          {{- end -}}
+          {{- if $.Values.mina.exposeItnGraphql }}
+          "--itn-graphql-port", "$(DAEMON_ITN_REST_PORT)",
+          "--itn-keys", "$(DAEMON_ITN_KEYS)",
           {{- end -}}
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
@@ -75,11 +98,9 @@ spec:
           "-peer-list-url", {{ $.Values.mina.seedPeersURL | quote }},
           {{- end -}}
           {{- if $.Values.mina.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
+          "-config-file", "/root/config/daemon.json",
           {{- end }}
-          {{- if $config.libp2pSecret }}
-          "-discovery-keypair", "/root/libp2p-keys/key",
-          {{- end -}}
+          "-libp2p-keypair", "/root/libp2p-keys/key",
           {{- range $.Values.mina.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}
@@ -97,14 +118,16 @@ spec:
           value: "6"
         - name: DAEMON_REST_PORT
           value: {{ $.Values.mina.ports.graphql | quote }}
+        - name: DAEMON_ITN_REST_PORT
+          value: {{ $.Values.mina.itn.port | quote }}
+        - name: DAEMON_ITN_KEYS
+          value: {{ $.Values.mina.itn.keys | quote }}
         - name: DAEMON_CLIENT_PORT
           value: {{ $.Values.mina.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
           value: {{ $.Values.mina.ports.metrics | quote }}
-        - name: CODA_CLIENT_TRUSTLIST
+        - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
-        - name: CONNECT_PRIVATE_IPS
-          value: "true"
         - name: GCLOUD_KEYFILE
           value: "/gcloud/keyfile.json"
         - name: NETWORK_NAME
@@ -112,11 +135,11 @@ spec:
         - name: GCLOUD_BLOCK_UPLOAD_BUCKET
           value: "mina_network_block_data"
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ default $.Values.mina.ports.p2p $config.externalPort | quote }}
-        {{- if $config.libp2pSecret }}
+          value: {{ $.Values.mina.ports.p2p | quote }}
+        # {{- if $config.libp2pSecret }}
         - name: MINA_LIBP2P_PASS
-          value: {{ $.Values.mina.privkeyPass | quote }}
-        {{- end }}
+          value: {{ $config.libp2pSecretPassword | quote }}
+        # {{- end }}
         ports:
         - name: client-port
           protocol: TCP
@@ -129,25 +152,38 @@ spec:
           containerPort: {{ $.Values.mina.ports.metrics }}
         - name: external-port
           protocol: TCP
-          containerPort: {{ default $.Values.mina.ports.p2p $config.externalPort }}
-          hostPort: {{ default $.Values.mina.ports.external $config.externalPort }}
+          containerPort: {{ $.Values.mina.ports.p2p }}
+          hostPort: {{ $.Values.mina.ports.p2p }}
+        {{- if $.Values.mina.exposeItnGraphql }}
+        - name: itn-port
+          protocol: TCP
+          containerPort: {{ $.Values.mina.itn.port }}
+        {{- end }} 
+        
 {{$data := dict "name" $config.name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.seed.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:
-        {{- if $config.libp2pSecret }}
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
-        {{- end }}
         {{- if $.Values.mina.uploadBlocksToGCloud }}
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
         {{- end }}
         {{- if $.Values.mina.runtimeConfig }}
         - name: daemon-config
-          mountPath: "/config/"
+          mountPath: "/root/config/"
         {{- end }}
+        - name: config-dir
+          mountPath: /root/.mina-config/
       volumes:
+      - name: config-dir
+      {{- if $.Values.persist_working_dir }}
+        persistentVolumeClaim:
+          claimName: pvc-{{ $config.name }}
+      {{- else}}
+        emptyDir: {}
+      {{- end }}
       {{- if $.Values.mina.runtimeConfig }}
       - name: daemon-config
         configMap:
@@ -207,7 +243,7 @@ spec:
     app: {{ $config.name }}
   ports:
   - name: tcp-p2p
-    port: {{ default $.Values.mina.ports.p2p $config.externalPort }}
+    port: {{ $.Values.mina.ports.p2p }}
     targetPort: external-port
 ---
 {{- if $.Values.mina.exposeGraphql }}
@@ -225,6 +261,28 @@ spec:
     protocol: TCP
     port: 80
     targetPort: {{ $.Values.mina.ports.graphql }}
+  {{- if $.Values.mina.exposeItnGraphql }}
+  - name: http-itn-graphql
+    protocol: TCP
+    port: {{ $.Values.mina.itn.port }}
+    targetPort: {{ $.Values.mina.itn.port }}
+  {{- end }}  
 {{- end }}
 ---
+{{- if $.Values.persist_working_dir }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-{{ $config.name }}
+spec:
+  accessModes:
+      - {{ $.Values.storage.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ $.Values.storage.size | quote }}
+  storageClassName: "{{ $.Values.storage.storageClass }}"
+---
 {{ end }}
+---
+{{ end }}
+---

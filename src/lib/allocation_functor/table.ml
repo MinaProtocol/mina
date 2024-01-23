@@ -69,7 +69,7 @@ module Allocation_data = struct
       in
       let sum =
         List.fold_left indices ~init:0.0 ~f:(fun acc i ->
-            acc +. get_lifetime_ms (count - 1 - (i + offset)))
+            acc +. get_lifetime_ms (count - 1 - (i + offset)) )
       in
       sum /. Int.to_float (List.length indices)
     in
@@ -115,7 +115,7 @@ module Allocation_data = struct
           { allocation_times =
               Queue.of_list
               @@ List.map (List.rev time_offsets) ~f:(fun offset ->
-                     (0, Time.sub now (Time.Span.of_ms offset)))
+                     (0, Time.sub now (Time.Span.of_ms offset)) )
           ; next_allocation_id = 0
           }
         in
@@ -202,6 +202,6 @@ let dump () =
   let entries =
     String.Table.to_alist table
     |> List.Assoc.map ~f:(fun { statistics; _ } ->
-           Allocation_statistics.to_yojson statistics)
+           Allocation_statistics.to_yojson statistics )
   in
   `Assoc entries

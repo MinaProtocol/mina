@@ -2,7 +2,7 @@ open Async
 open Core
 open Pipe_lib
 
-type catchup_job_states =
+type catchup_job_states = Transition_frontier.Full_catchup_tree.job_states =
   { finished : int
   ; failed : int
   ; to_download : int
@@ -50,7 +50,8 @@ type block =
 [@@deriving to_yojson]
 
 type node_status_data =
-  { block_height_at_best_tip : int
+  { version : int
+  ; block_height_at_best_tip : int
   ; max_observed_block_height : int
   ; max_observed_unvalidated_block_height : int
   ; catchup_job_states : catchup_job_states option
@@ -60,6 +61,7 @@ type node_status_data =
   ; libp2p_cpu_usage : float
   ; commit_hash : string
   ; git_branch : string
+  ; chain_id : string
   ; peer_id : string
   ; ip_address : string
   ; timestamp : string
@@ -80,10 +82,10 @@ let send_node_status_data ~logger ~url node_status_data =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
   in
   match%map
-    Async.try_with (fun () ->
+    Async.try_with ~here:[%here] (fun () ->
         Cohttp_async.Client.post ~headers
           ~body:(Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
-          url)
+          url )
   with
   | Ok ({ status; _ }, body) ->
       let metadata =
@@ -149,8 +151,8 @@ let reset_gauges () =
   Queue.clear Transition_frontier.validated_blocks ;
   Queue.clear Transition_frontier.rejected_blocks
 
-let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
-    ~addrs_and_ports ~start_time ~slot_duration =
+let start ~logger ~node_status_url ~transition_frontier ~sync_status ~chain_id
+    ~network ~addrs_and_ports ~start_time ~slot_duration =
   [%log info] "Starting node status service using URL $url"
     ~metadata:[ ("url", `String node_status_url) ] ;
   let five_slots = Time.Span.scale slot_duration 5. in
@@ -158,7 +160,8 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
   every ~start:(after five_slots) ~continue_on_error:true five_slots
   @@ fun () ->
   don't_wait_for
-  @@
+  @@ O1trace.thread "node_status_service"
+  @@ fun () ->
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       [%log info] "Transition frontier not available for node status service" ;
@@ -167,40 +170,9 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
       let catchup_job_states =
         match Transition_frontier.catchup_tree tf with
         | Full catchup_tree ->
-            let catchup_states =
-              Transition_frontier.Full_catchup_tree.to_node_status_report
-                catchup_tree
-            in
-            let init =
-              { finished = 0
-              ; failed = 0
-              ; to_download = 0
-              ; to_initial_validate = 0
-              ; to_verify = 0
-              ; wait_for_parent = 0
-              ; to_build_breadcrumb = 0
-              }
-            in
             Some
-              (List.fold catchup_states ~init ~f:(fun acc (state, n) ->
-                   match state with
-                   | Transition_frontier.Full_catchup_tree.Node.State.Enum
-                     .Finished ->
-                       { acc with finished = n }
-                   | Failed ->
-                       { acc with failed = n }
-                   | To_download ->
-                       { acc with to_download = n }
-                   | To_initial_validate ->
-                       { acc with to_initial_validate = n }
-                   | To_verify ->
-                       { acc with to_verify = n }
-                   | Wait_for_parent ->
-                       { acc with wait_for_parent = n }
-                   | To_build_breadcrumb ->
-                       { acc with to_build_breadcrumb = n }
-                   | Root ->
-                       acc))
+              (Transition_frontier.Full_catchup_tree.to_node_status_report
+                 catchup_tree )
         | _ ->
             None
       in
@@ -215,10 +187,12 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
           , `Cpu_usage libp2p_cpu_usage ) ->
           let%bind peers = Mina_networking.peers network in
           let node_status_data =
-            { block_height_at_best_tip =
+            { version = 1
+            ; block_height_at_best_tip =
                 Transition_frontier.best_tip tf
-                |> Transition_frontier.Breadcrumb.blockchain_length
-                |> Unsigned.UInt32.to_int
+                |> Transition_frontier.Breadcrumb.consensus_state
+                |> Consensus.Data.Consensus_state.blockchain_length
+                |> Mina_numbers.Length.to_uint32 |> Unsigned.UInt32.to_int
             ; max_observed_block_height =
                 !Mina_metrics.Transition_frontier.max_blocklength_observed
             ; max_observed_unvalidated_block_height =
@@ -231,6 +205,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
             ; libp2p_cpu_usage
             ; commit_hash = Mina_version.commit_id
             ; git_branch = Mina_version.branch
+            ; chain_id
             ; peer_id =
                 (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
             ; ip_address =
@@ -364,19 +339,19 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
                     { hash
                     ; sender
                     ; received_at =
-                        Time.to_string (Block_time.to_time received_at)
+                        Time.to_string (Block_time.to_time_exn received_at)
                     ; is_valid = false
                     ; reason_for_rejection = Some reason_for_rejection
-                    })
+                    } )
                 @ List.map (Queue.to_list Transition_frontier.validated_blocks)
                     ~f:(fun (hash, sender, received_at) ->
                       { hash
                       ; sender
                       ; received_at =
-                          Time.to_string (Block_time.to_time received_at)
+                          Time.to_string (Block_time.to_time_exn received_at)
                       ; is_valid = true
                       ; reason_for_rejection = None
-                      })
+                      } )
             }
           in
           reset_gauges () ;

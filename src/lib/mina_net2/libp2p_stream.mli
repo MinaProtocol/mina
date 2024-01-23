@@ -41,3 +41,5 @@ val stream_closed :
   -> who_closed:participant
   -> t
   -> [ `Stream_should_be_released of bool ]
+
+val max_chunk_size : int

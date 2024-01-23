@@ -54,7 +54,7 @@ If a community member engages in unacceptable behavior, the community organizers
 
 ## 6. Reporting Guidelines
 
-If you are subject to or witness unacceptable behavior, or have any other concerns, please notify the Mina community as soon as possible by emailing contact@minaprotocol.org. Please see the [Reporting Guidelines](/docs/reporting-guidelines.md). You can also contact an admin in the [Discord server](https://bit.ly/MinaDiscord).
+If you are subject to or witness unacceptable behavior, or have any other concerns, please notify the Mina community as soon as possible by emailing contact@minaprotocol.org. You can also contact an admin in the [Discord server](https://bit.ly/MinaDiscord).
 
 Additionally, community organizers are available to help community members engage with local law enforcement or to otherwise help those experiencing unacceptable behavior feel safe. In the context of in-person events, organizers will also provide escorts as desired by the person experiencing distress.
 
@@ -68,6 +68,6 @@ This Code of Conduct and its related procedures also applies to unacceptable beh
 
 ## 8. License and attribution
 
-This Code of Conduct is adapted from the [Stumptown Syndicate](http://stumptownsyndicate.org) Code of Conduct under a [Creative Commons Attribution-ShareAlike license](http://creativecommons.org/licenses/by-sa/3.0/).
+This Code of Conduct is adapted from the [Stumptown Syndicate](https://github.com/stumpsyn) Code of Conduct under a [Creative Commons Attribution-ShareAlike license](http://creativecommons.org/licenses/by-sa/3.0/).
 
 Portions of text derived from the [Django Code of Conduct](https://www.djangoproject.com/conduct/) and the [Geek Feminism Anti-Harassment Policy](http://geekfeminism.wikia.com/wiki/Conference_anti-harassment/Policy).

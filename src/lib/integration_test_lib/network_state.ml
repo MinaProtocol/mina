@@ -2,6 +2,7 @@ open Async_kernel
 open Core_kernel
 open Pipe_lib
 open Mina_base
+open Mina_transaction
 
 module Make
     (Engine : Intf.Engine.S)
@@ -11,7 +12,14 @@ module Make
      and module Event_router := Event_router = struct
   module Node = Engine.Network.Node
 
-  let map_to_yojson m ~f = `Assoc String.Map.(m |> map ~f |> to_alist)
+  let set_to_yojson ~(element : 'a -> Yojson.Safe.t) s : Yojson.Safe.t =
+    `List (List.map ~f:element (State_hash.Set.to_list s))
+
+  let map_to_yojson ~(f_key_to_string : 'a -> string) ~f_value_to_yojson m :
+      Yojson.Safe.t =
+    `Assoc
+      ( Map.to_alist m
+      |> List.map ~f:(fun (k, v) -> (f_key_to_string k, f_value_to_yojson v)) )
 
   (* TODO: Just replace the first 3 fields here with Protocol_state *)
   type t =
@@ -20,12 +28,36 @@ module Make
     ; global_slot : int
     ; snarked_ledgers_generated : int
     ; blocks_generated : int
+    ; num_transition_frontier_loaded_from_persistence : int
+    ; num_persisted_frontier_loaded : int
+    ; num_persisted_frontier_fresh_boot : int
+    ; num_bootstrap_required : int
+    ; num_persisted_frontier_dropped : int
     ; node_initialization : bool String.Map.t
-          [@to_yojson map_to_yojson ~f:(fun b -> `Bool b)]
+          [@to_yojson
+            map_to_yojson ~f_key_to_string:ident ~f_value_to_yojson:(fun b ->
+                `Bool b )]
     ; gossip_received : Gossip_state.t String.Map.t
-          [@to_yojson map_to_yojson ~f:Gossip_state.to_yojson]
+          [@to_yojson
+            map_to_yojson ~f_key_to_string:ident
+              ~f_value_to_yojson:Gossip_state.to_yojson]
     ; best_tips_by_node : State_hash.t String.Map.t
-          [@to_yojson map_to_yojson ~f:State_hash.to_yojson]
+          [@to_yojson
+            map_to_yojson ~f_key_to_string:ident
+              ~f_value_to_yojson:State_hash.to_yojson]
+    ; blocks_produced_by_node : State_hash.t list String.Map.t
+          [@to_yojson
+            map_to_yojson ~f_key_to_string:ident ~f_value_to_yojson:(fun ls ->
+                `List (List.map State_hash.to_yojson ls) )]
+    ; blocks_seen_by_node : State_hash.Set.t String.Map.t
+          [@to_yojson
+            map_to_yojson ~f_key_to_string:ident ~f_value_to_yojson:(fun set ->
+                `List
+                  (State_hash.Set.to_list set |> List.map State_hash.to_yojson) )]
+    ; blocks_including_txn : State_hash.Set.t Transaction_hash.Map.t
+          [@to_yojson
+            map_to_yojson ~f_key_to_string:Transaction_hash.to_base58_check
+              ~f_value_to_yojson:(set_to_yojson ~element:State_hash.to_yojson)]
     }
   [@@deriving to_yojson]
 
@@ -38,6 +70,14 @@ module Make
     ; node_initialization = String.Map.empty
     ; gossip_received = String.Map.empty
     ; best_tips_by_node = String.Map.empty
+    ; blocks_produced_by_node = String.Map.empty
+    ; blocks_seen_by_node = String.Map.empty
+    ; blocks_including_txn = Transaction_hash.Map.empty
+    ; num_transition_frontier_loaded_from_persistence = 0
+    ; num_persisted_frontier_loaded = 0
+    ; num_persisted_frontier_fresh_boot = 0
+    ; num_bootstrap_required = 0
+    ; num_persisted_frontier_dropped = 0
     }
 
   let listen ~logger event_router =
@@ -54,13 +94,26 @@ module Make
     ignore
       ( Event_router.on event_router Event_type.Block_produced
           ~f:(fun node block_produced ->
-            [%log debug] "Updating network state with block produced event" ;
+            [%log debug] "Updating network state with block produced event"
+              ~metadata:
+                [ ( "snark_ledger_generated"
+                  , `Bool block_produced.snarked_ledger_generated )
+                ] ;
             update ~f:(fun state ->
                 [%log debug] "handling block production from $node"
-                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 if block_produced.block_height > state.block_height then
                   let snarked_ledgers_generated =
                     if block_produced.snarked_ledger_generated then 1 else 0
+                  in
+                  let blocks_produced_by_node_map =
+                    Core.String.Map.update state.blocks_produced_by_node
+                      (Node.id node) ~f:(fun ls_opt ->
+                        match ls_opt with
+                        | None ->
+                            [ block_produced.state_hash ]
+                        | Some ls ->
+                            List.cons block_produced.state_hash ls )
                   in
                   { state with
                     epoch = block_produced.global_slot
@@ -70,8 +123,9 @@ module Make
                   ; snarked_ledgers_generated =
                       state.snarked_ledgers_generated
                       + snarked_ledgers_generated
+                  ; blocks_produced_by_node = blocks_produced_by_node_map
                   }
-                else state))
+                else state ) )
         : _ Event_router.event_subscription ) ;
     (* handle_update_best_tips *)
     ignore
@@ -83,14 +137,14 @@ module Make
                application event" ;
             update ~f:(fun state ->
                 [%log debug] "handling frontier diff application of $node"
-                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 Option.value_map diff_application.best_tip_changed
                   ~default:state ~f:(fun new_best_tip ->
                     let best_tips_by_node' =
                       String.Map.set state.best_tips_by_node ~key:(Node.id node)
                         ~data:new_best_tip
                     in
-                    { state with best_tips_by_node = best_tips_by_node' })))
+                    { state with best_tips_by_node = best_tips_by_node' } ) ) )
         : _ Event_router.event_subscription ) ;
     let handle_gossip_received event_type =
       ignore
@@ -109,18 +163,18 @@ module Make
                                 state
                           in
                           [%log debug] "GOSSIP RECEIVED by $node"
-                            ~metadata:[ ("node", `String (Node.id node)) ] ;
-                          [%log debug] "GOSSIP RECEIVED recevied event: $event"
+                            ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
+                          [%log debug] "GOSSIP RECEIVED received event: $event"
                             ~metadata:
                               [ ( "event"
                                 , Event_type.event_to_yojson
                                     (Event_type.Event
-                                       (event_type, gossip_with_direction)) )
+                                       (event_type, gossip_with_direction) ) )
                               ] ;
                           Gossip_state.add gossip_state event_type
                             gossip_with_direction ;
-                          gossip_state)
-                  }))
+                          gossip_state )
+                  } ) )
           : _ Event_router.event_subscription )
     in
     handle_gossip_received Block_gossip ;
@@ -133,12 +187,82 @@ module Make
             update ~f:(fun state ->
                 [%log debug]
                   "Updating network state with initialization event of $node"
-                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 let node_initialization' =
                   String.Map.set state.node_initialization ~key:(Node.id node)
                     ~data:true
                 in
-                { state with node_initialization = node_initialization' }))
+                { state with node_initialization = node_initialization' } ) )
+        : _ Event_router.event_subscription ) ;
+    (* handle_persisted_frontier_loaded *)
+    ignore
+      ( Event_router.on event_router Event_type.Persisted_frontier_loaded
+          ~f:(fun node () ->
+            update ~f:(fun state ->
+                [%log debug]
+                  "Updating network state with persisted frontier loaded event \
+                   of $node"
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
+                { state with
+                  num_persisted_frontier_loaded =
+                    state.num_persisted_frontier_loaded + 1
+                } ) )
+        : _ Event_router.event_subscription ) ;
+    (* handle_persisted_frontier_fresh_boot *)
+    ignore
+      ( Event_router.on event_router Event_type.Persisted_frontier_fresh_boot
+          ~f:(fun node () ->
+            update ~f:(fun state ->
+                [%log debug]
+                  "Updating network state with persisted frontier fresh boot \
+                   event of $node"
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
+                { state with
+                  num_persisted_frontier_fresh_boot =
+                    state.num_persisted_frontier_fresh_boot + 1
+                } ) )
+        : _ Event_router.event_subscription ) ;
+    (* handle_bootstrap_required *)
+    ignore
+      ( Event_router.on event_router Event_type.Bootstrap_required
+          ~f:(fun node () ->
+            update ~f:(fun state ->
+                [%log debug]
+                  "Updating network state with bootstrap required event of \
+                   $node"
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
+                { state with
+                  num_bootstrap_required = state.num_bootstrap_required + 1
+                } ) )
+        : _ Event_router.event_subscription ) ;
+    (* handle_persisted_frontier_dropped *)
+    ignore
+      ( Event_router.on event_router Event_type.Persisted_frontier_dropped
+          ~f:(fun node () ->
+            update ~f:(fun state ->
+                [%log debug]
+                  "Updating network state with persisted frontier dropped \
+                   event of $node"
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
+                { state with
+                  num_persisted_frontier_dropped =
+                    state.num_persisted_frontier_dropped + 1
+                } ) )
+        : _ Event_router.event_subscription ) ;
+    (* handle_transition frontier loaded *)
+    ignore
+      ( Event_router.on event_router
+          Event_type.Transition_frontier_loaded_from_persistence
+          ~f:(fun node () ->
+            update ~f:(fun state ->
+                [%log debug]
+                  "Updating network state with transition frontier loaded \
+                   event of $node"
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
+                { state with
+                  num_transition_frontier_loaded_from_persistence =
+                    state.num_transition_frontier_loaded_from_persistence + 1
+                } ) )
         : _ Event_router.event_subscription ) ;
     (* handle_node_offline *)
     ignore
@@ -146,7 +270,7 @@ module Make
             update ~f:(fun state ->
                 [%log debug]
                   "Updating network state with event of $node going offline"
-                  ~metadata:[ ("node", `String (Node.id node)) ] ;
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
                 let node_initialization' =
                   String.Map.set state.node_initialization ~key:(Node.id node)
                     ~data:false
@@ -157,7 +281,45 @@ module Make
                 { state with
                   node_initialization = node_initialization'
                 ; best_tips_by_node = best_tips_by_node'
-                }))
+                } ) )
+        : _ Event_router.event_subscription ) ;
+    (* handle_breadcrumb_added *)
+    ignore
+      ( Event_router.on event_router Event_type.Breadcrumb_added
+          ~f:(fun node breadcrumb ->
+            update ~f:(fun state ->
+                [%log debug]
+                  "Updating network state with Breadcrumb added to $node"
+                  ~metadata:[ ("node", `String (Node.infra_id node)) ] ;
+                let blocks_seen_by_node' =
+                  String.Map.update state.blocks_seen_by_node (Node.id node)
+                    ~f:(fun block_set ->
+                      State_hash.Set.add
+                        (Option.value block_set ~default:State_hash.Set.empty)
+                        breadcrumb.state_hash )
+                in
+                let transaction_hashes =
+                  List.map breadcrumb.transaction_hashes ~f:With_status.data
+                in
+                let blocks_including_txn' =
+                  List.fold transaction_hashes ~init:state.blocks_including_txn
+                    ~f:(fun accum hash ->
+                      let block_set' =
+                        State_hash.Set.add
+                          ( Transaction_hash.Map.find accum hash
+                          |> Option.value ~default:State_hash.Set.empty )
+                          breadcrumb.state_hash
+                      in
+                      [%log debug]
+                        "adding or updating txn_hash %s to \
+                         state.blocks_including_txn"
+                        (Transaction_hash.to_base58_check hash) ;
+                      Transaction_hash.Map.set accum ~key:hash ~data:block_set' )
+                in
+                { state with
+                  blocks_seen_by_node = blocks_seen_by_node'
+                ; blocks_including_txn = blocks_including_txn'
+                } ) )
         : _ Event_router.event_subscription ) ;
     (r, w)
 end

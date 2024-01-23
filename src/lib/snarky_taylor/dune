@@ -3,8 +3,14 @@
  (public_name snarky_taylor)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_compare))
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
+   ;; opam libraries
+   bignum.bigint
+   core_kernel
+   bignum
+   sexplib0
+   ;; local libraries
    snarky.backendless
    snarky_integer
-   core_kernel))
+   ))

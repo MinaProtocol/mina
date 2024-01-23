@@ -158,7 +158,7 @@ and we still only have to do one VRF evaluation outside the SNARK.
 
 Prior art is pretty scarce, but here are Tezos and Cardano's docs.
 
-- Tezos: [Docs](https://tezos.gitlab.io/master/whitedoc/proof_of_stake.html#delegates).
+- Tezos: [Docs](https://tezos.gitlab.io/active/proof_of_stake.html#delegation).
   As far as I can tell uses non-transitive stake delegation.
 - Cardano: [Docs](https://cardanodocs.com/technical/delegation).
   Uses transitive stake delegation.

@@ -3,129 +3,121 @@ open Async
 open Webkit_trace_event
 module Scheduler = Async_kernel_scheduler
 
-module T = struct
-  let buf = Bigstring.create 512
+let current_wr = ref None
 
-  let emit_event w event =
-    try Webkit_trace_event_binary_output.emit_event ~buf w event
+let emitted_since_cycle_ended = ref false
+
+let emit_event' =
+  let buf = Bigstring.create 512 in
+  fun wr event ->
+    emitted_since_cycle_ended := true ;
+    try Webkit_trace_event_binary_output.emit_event ~buf wr event
     with exn ->
-      Writer.writef w "failed to write o1trace event: %s\n" (Exn.to_string exn)
+      Writer.writef wr "failed to write o1trace event: %s\n" (Exn.to_string exn)
 
-  let timestamp () =
-    Time_stamp_counter.now () |> Time_stamp_counter.to_int63 |> Int63.to_int_exn
+let emit_event event =
+  Option.iter !current_wr ~f:(fun wr -> emit_event' wr event)
 
-  let current_wr = ref None
+let timestamp () =
+  Time_stamp_counter.now () |> Time_stamp_counter.to_int63 |> Int63.to_int_exn
 
-  let our_pid = Unix.getpid () |> Pid.to_int
+let our_pid = Unix.getpid () |> Pid.to_int
 
-  let next_tid = ref 1
+let new_event (k : event_kind) : event =
+  { name = ""
+  ; categories = []
+  ; phase = k
+  ; timestamp = timestamp ()
+  ; pid = our_pid
+  ; tid = 0
+  }
 
-  let tid_names = ref []
+let new_thread_event ?(include_name = "") tid event_kind =
+  { (new_event event_kind) with tid; name = include_name }
 
-  let remember_tid name tid = tid_names := (name, tid) :: !tid_names
+(*
 
-  let new_event (k : event_kind) : event =
-    { name = ""
-    ; categories = []
-    ; phase = k
-    ; timestamp = timestamp ()
-    ; pid = our_pid
-    ; tid = 0
-    }
+let trace name f =
+  let new_ctx =
+    O1trace.Thread_registry.assign_tid name
+      (Scheduler.current_execution_context ())
+  in
+  log_thread_existence name new_ctx.tid ;
+  match Scheduler.within_context new_ctx f with
+  | Error () ->
+      failwithf
+        "traced task `%s` failed, exception reported to parent monitor" name
+        ()
+  | Ok x ->
+      x
 
-  let log_thread_existence name tid =
-    Option.iter !current_wr ~f:(fun wr ->
-        emit_event wr { (new_event New_thread) with name; tid })
+let trace_event (name : string) =
+  Option.iter !current_wr ~f:(fun wr ->
+      emit_event wr { (new_event Event) with name })
 
-  let trace_new_thread (name : string) (tid : int) =
-    remember_tid name tid ;
-    log_thread_existence name tid
+let recurring_prefix x = "R&" ^ x
 
-  let trace_thread_switch (new_ctx : Execution_context.t) =
-    Option.iter !current_wr ~f:(fun wr ->
-        emit_event wr { (new_event Thread_switch) with tid = new_ctx.tid })
+let _trace_recurring name f = trace (recurring_prefix name) f
 
-  let () =
-    Async_kernel.Tracing.fns :=
-      { trace_thread_switch
-      ; trace_new_thread = (fun name ctx -> trace_new_thread name ctx.tid)
-      }
+let _trace_recurring_task (name : string) (f : unit -> unit Deferred.t) =
+  trace_task (recurring_prefix name) (fun () ->
+      trace_event "started another" ;
+      f ())
 
-  let trace_event (name : string) =
-    Option.iter !current_wr ~f:(fun wr ->
-        emit_event wr { (new_event Event) with name })
+let measure (name : string) (f : unit -> 'a) : 'a =
+  match !current_wr with
+  | Some wr ->
+      emit_event wr { (new_event Measure_start) with name } ;
+      let res = f () in
+      emit_event wr (new_event Measure_end) ;
+      res
+  | None ->
+      f ()
+*)
 
-  let trace (name : string) (f : unit -> 'a) =
-    let new_ctx =
-      Execution_context.with_tid
-        Scheduler.(current_execution_context ())
-        !next_tid
-    in
-    next_tid := !next_tid + 1 ;
-    trace_new_thread name new_ctx.tid ;
-    match Scheduler.within_context new_ctx f with
-    | Error () ->
-        failwithf
-          "traced task `%s` failed, exception reported to parent monitor" name
-          ()
-    | Ok x ->
-        x
+module T = struct
+  include
+    O1trace.Plugins.Register_plugin
+      (struct
+        type state = unit [@@deriving sexp_of]
 
-  let trace_task (name : string) (f : unit -> unit Deferred.t) =
-    don't_wait_for (trace name f)
+        let name = "Webkit_event"
 
-  let recurring_prefix x = "R&" ^ x
+        let init_state _ = ()
+      end)
+      ()
 
-  let trace_recurring name f = trace (recurring_prefix name) f
+  let most_recent_id = ref 0
 
-  let trace_recurring_task (name : string) (f : unit -> unit Deferred.t) =
-    trace_task (recurring_prefix name) (fun () ->
-        trace_event "started another" ;
-        f ())
+  let on_job_enter (fiber : O1trace.Thread.Fiber.t) =
+    if fiber.id <> !most_recent_id then (
+      most_recent_id := fiber.id ;
+      emit_event (new_thread_event fiber.id Thread_switch) )
 
-  let measure (name : string) (f : unit -> 'a) : 'a =
-    match !current_wr with
-    | Some wr ->
-        emit_event wr { (new_event Measure_start) with name } ;
-        let res = f () in
-        emit_event wr (new_event Measure_end) ;
-        res
-    | None ->
-        f ()
+  let on_job_exit _fiber _time_elapsed = ()
 
-  let forget_tid (f : unit -> 'a) =
-    let new_ctx =
-      Execution_context.with_tid Scheduler.(current_execution_context ()) 0
-    in
-    let res = Scheduler.within_context new_ctx f |> Result.ok in
-    Option.value_exn res
+  let on_new_fiber (fiber : O1trace.Thread.Fiber.t) =
+    let fullname = String.concat ~sep:"/" (O1trace.Thread.Fiber.key fiber) in
+    emit_event (new_thread_event ~include_name:fullname fiber.id New_thread)
 
-  let start_tracing wr =
-    current_wr := Some wr ;
-    let sch = Scheduler.t () in
-    Scheduler.Expert.set_on_end_of_cycle (fun () ->
-        if not sch.cycle_started then
-          emit_event wr
-            { (new_event Cycle_end) with
-              tid = sch.current_execution_context.tid
-            } ;
-        sch.cycle_started <- true) ;
-    emit_event wr (new_event Pid_is) ;
-    List.iter !tid_names ~f:(fun (name, tid) -> log_thread_existence name tid) ;
-    emit_event wr
-      { (new_event Thread_switch) with tid = sch.current_execution_context.tid }
-
-  let stop_tracing () =
-    let sch = Scheduler.t () in
-    Scheduler.Expert.set_on_end_of_cycle Fn.id ;
-    Option.iter !current_wr ~f:(fun wr ->
-        emit_event wr
-          { (new_event Trace_end) with tid = sch.current_execution_context.tid }) ;
-    current_wr := None
+  let on_cycle_end () =
+    if !emitted_since_cycle_ended then emit_event (new_event Cycle_end) ;
+    emitted_since_cycle_ended := false
 end
 
-include T
-
 let start_tracing wr =
-  start_tracing wr ;
-  O1trace.set_implementation (module T)
+  if Option.is_some !current_wr then (* log an error, do nothing *)
+    ()
+  else (
+    current_wr := Some wr ;
+    emit_event (new_event Pid_is) ;
+    O1trace.Thread.iter_fibers ~f:T.on_new_fiber ;
+    O1trace.Plugins.enable_plugin (module T) )
+
+let stop_tracing () =
+  if Option.is_none !current_wr then (* log an error, do nothing *)
+    ()
+  else (
+    emit_event (new_event Trace_end) ;
+    current_wr := None ;
+    O1trace.Plugins.disable_plugin (module T) )

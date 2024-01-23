@@ -1,20 +1,8 @@
 (* test_encodings.ml -- print out Rosetta encodings *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Signature_lib
 open Rosetta_coding
-
-[%%else]
-
-open Signature_lib_nonconsensus
-open Rosetta_coding_nonconsensus
-
-[%%endif]
 
 let pk1 =
   Public_key.Compressed.of_base58_check_exn

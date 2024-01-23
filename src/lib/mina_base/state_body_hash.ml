@@ -1,17 +1,5 @@
-[%%import "/src/config.mlh"]
-
-open Core
-
-[%%ifdef consensus_mechanism]
-
+open Core_kernel
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
 
 include Data_hash.Make_full_size (struct
   let description = "State body hash"
@@ -29,7 +17,7 @@ module Stable = struct
 
   module V1 = struct
     module T = struct
-      type t = Field.t [@@deriving sexp, compare, hash, version { asserted }]
+      type t = (Field.t[@version_asserted]) [@@deriving sexp, compare, hash]
     end
 
     include T
@@ -43,4 +31,4 @@ module Stable = struct
   end
 end]
 
-type _unused = unit constraint t = Stable.Latest.t
+let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T

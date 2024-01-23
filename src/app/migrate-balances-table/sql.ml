@@ -15,7 +15,7 @@ let create_temp_balances_table (module Conn : Caqti_async.CONNECTION) =
            , block_secondary_sequence_no  int    NOT NULL
            , UNIQUE (public_key_id,balance,block_id,block_height,block_sequence_no,block_secondary_sequence_no)
            )
-      |sql})
+      |sql} )
 
 let copy_table_to_temp_table (module Conn : Caqti_async.CONNECTION) table =
   Conn.exec
@@ -23,7 +23,7 @@ let copy_table_to_temp_table (module Conn : Caqti_async.CONNECTION) table =
        (sprintf
           {sql| CREATE TABLE IF NOT EXISTS %s_temp AS (SELECT * FROM %s)
                 |sql}
-          table table))
+          table table ) )
 
 let create_table_index (module Conn : Caqti_async.CONNECTION) table col =
   Conn.exec
@@ -31,7 +31,7 @@ let create_table_index (module Conn : Caqti_async.CONNECTION) table col =
        (sprintf
           {sql| CREATE INDEX IF NOT EXISTS idx_%s_%s ON %s(%s)
                 |sql}
-          table col table col))
+          table col table col ) )
 
 let create_temp_table_index (module Conn : Caqti_async.CONNECTION) table col =
   create_table_index (module Conn) (sprintf "%s_temp" table) col
@@ -43,7 +43,7 @@ let create_table_named_index (module Conn : Caqti_async.CONNECTION) table col
        (sprintf
           {sql| CREATE INDEX IF NOT EXISTS idx_%s_%s ON %s(%s)
                 |sql}
-          table name table col))
+          table name table col ) )
 
 let create_temp_table_named_index (module Conn : Caqti_async.CONNECTION) table
     col name =
@@ -53,7 +53,7 @@ let drop_table_index (module Conn : Caqti_async.CONNECTION) table col =
   Conn.exec
     (Caqti_request.exec Caqti_type.unit
        (sprintf {sql| DROP INDEX IF EXISTS idx_%s_%s
-          |sql} table col))
+          |sql} table col ) )
 
 let drop_temp_table_index (module Conn : Caqti_async.CONNECTION) table col =
   drop_table_index (module Conn) (sprintf "%s_temp" table) col
@@ -65,7 +65,7 @@ let create_cursor (module Conn : Caqti_async.CONNECTION) name =
           {sql| CREATE TABLE IF NOT EXISTS %s_cursor
                       ( value int NOT NULL)
                  |sql}
-          name))
+          name ) )
 
 let initialize_cursor (module Conn : Caqti_async.CONNECTION) name =
   Conn.exec
@@ -73,13 +73,13 @@ let initialize_cursor (module Conn : Caqti_async.CONNECTION) name =
        (sprintf
           {sql| INSERT INTO %s_cursor (value) VALUES (0)
                 |sql}
-          name))
+          name ) )
 
 let current_cursor (module Conn : Caqti_async.CONNECTION) name =
   Conn.find_opt
     (Caqti_request.find_opt Caqti_type.unit Caqti_type.int
        (sprintf {sql| SELECT value FROM %s_cursor
-                |sql} name))
+                |sql} name ) )
 
 let update_cursor (module Conn : Caqti_async.CONNECTION) name ndx =
   Conn.exec
@@ -87,7 +87,7 @@ let update_cursor (module Conn : Caqti_async.CONNECTION) name ndx =
        (sprintf
           {sql| UPDATE %s_cursor SET value = $1
                 |sql}
-          name))
+          name ) )
     ndx
 
 let drop_foreign_key_constraint (module Conn : Caqti_async.CONNECTION) table
@@ -142,7 +142,7 @@ let find_balance_entry (module Conn : Caqti_async.CONNECTION) ~public_key_id
             AND block_height = $4
             AND block_sequence_no = $5
             AND block_secondary_sequence_no = $6
-      |sql})
+      |sql} )
     ( public_key_id
     , balance
     , (block_id, block_height, block_sequence_no, block_secondary_sequence_no)
@@ -170,7 +170,7 @@ let insert_balance_entry (module Conn : Caqti_async.CONNECTION) ~public_key_id
             , $5
             , $6)
             RETURNING id
-      |sql})
+      |sql} )
     ( public_key_id
     , balance
     , (block_id, block_height, block_sequence_no, block_secondary_sequence_no)
@@ -187,7 +187,7 @@ let get_internal_commands (module Conn : Caqti_async.CONNECTION) =
             INNER JOIN balances bal ON bal.id = receiver_balance
             ORDER BY (bal.public_key_id,bal.balance,bic.block_id,blocks.height,bic.sequence_no,bic.secondary_sequence_no,
                       internal_command_id)
-      |sql})
+      |sql} )
 
 let update_internal_command_receiver_balance
     (module Conn : Caqti_async.CONNECTION) ~new_balance_id ~block_id
@@ -200,7 +200,7 @@ let update_internal_command_receiver_balance
           AND internal_command_id = $3
           AND sequence_no = $4
           AND secondary_sequence_no = $5
-      |sql})
+      |sql} )
     ( new_balance_id
     , ( block_id
       , internal_command_id
@@ -218,7 +218,7 @@ let get_user_command_fee_payers (module Conn : Caqti_async.CONNECTION) =
              INNER JOIN balances bal_fee_payer ON bal_fee_payer.id = fee_payer_balance
              ORDER BY (buc.block_id,blocks.height,buc.sequence_no,user_command_id,
                        bal_fee_payer.public_key_id,bal_fee_payer.balance)
-      |sql})
+      |sql} )
 
 let get_user_command_sources (module Conn : Caqti_async.CONNECTION) =
   Conn.collect_list
@@ -232,7 +232,7 @@ let get_user_command_sources (module Conn : Caqti_async.CONNECTION) =
              WHERE source_balance IS NOT NULL
              ORDER BY (buc.block_id,blocks.height,buc.sequence_no,user_command_id,
                        bal_source.public_key_id,bal_source.balance)
-      |sql})
+      |sql} )
 
 let get_user_command_receivers (module Conn : Caqti_async.CONNECTION) =
   Conn.collect_list
@@ -246,7 +246,7 @@ let get_user_command_receivers (module Conn : Caqti_async.CONNECTION) =
              WHERE receiver_balance IS NOT NULL
              ORDER BY (buc.block_id,blocks.height,buc.sequence_no,user_command_id,
                        bal_receiver.public_key_id,bal_receiver.balance)
-      |sql})
+      |sql} )
 
 let update_user_command_fee_payer_balance (module Conn : Caqti_async.CONNECTION)
     ~new_balance_id ~block_id ~user_command_id ~block_sequence_no =
@@ -257,7 +257,7 @@ let update_user_command_fee_payer_balance (module Conn : Caqti_async.CONNECTION)
           WHERE block_id = $2
           AND user_command_id = $3
           AND sequence_no = $4
-      |sql})
+      |sql} )
     (new_balance_id, (block_id, user_command_id, block_sequence_no))
 
 let update_user_command_source_balance (module Conn : Caqti_async.CONNECTION)
@@ -270,7 +270,7 @@ let update_user_command_source_balance (module Conn : Caqti_async.CONNECTION)
           AND user_command_id = $3
           AND sequence_no = $4
           AND source_balance IS NOT NULL
-      |sql})
+      |sql} )
     (new_balance_id, (block_id, user_command_id, block_sequence_no))
 
 let update_user_command_receiver_balance (module Conn : Caqti_async.CONNECTION)
@@ -283,14 +283,14 @@ let update_user_command_receiver_balance (module Conn : Caqti_async.CONNECTION)
           AND user_command_id = $3
           AND sequence_no = $4
           AND receiver_balance IS NOT NULL
-      |sql})
+      |sql} )
     (new_balance_id, (block_id, user_command_id, block_sequence_no))
 
 let drop_table (module Conn : Caqti_async.CONNECTION) table =
   Conn.exec
     (Caqti_request.exec Caqti_type.unit
        (sprintf {sql| DROP TABLE %s
-                |sql} table))
+                |sql} table ) )
 
 let rename_temp_table (module Conn : Caqti_async.CONNECTION) table =
   Conn.exec
@@ -299,12 +299,12 @@ let rename_temp_table (module Conn : Caqti_async.CONNECTION) table =
           {sql| ALTER TABLE %s_temp
                 RENAME TO %s
           |sql}
-          table table))
+          table table ) )
 
 let get_column_count (module Conn : Caqti_async.CONNECTION) table =
   Conn.find
     (Caqti_request.find Caqti_type.string Caqti_type.int
        {sql| SELECT COUNT(*) FROM information_schema.columns
              WHERE table_name=$1
-       |sql})
+       |sql} )
     table

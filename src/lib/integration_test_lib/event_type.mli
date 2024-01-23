@@ -52,6 +52,7 @@ module Block_produced : sig
     ; epoch : int
     ; global_slot : int
     ; snarked_ledger_generated : bool
+    ; state_hash : State_hash.t
     }
 
   include Event_type_intf with type t := t
@@ -70,7 +71,41 @@ module Block_produced : sig
 end
 
 module Breadcrumb_added : sig
-  type t = { user_commands : User_command.Valid.t With_status.t list }
+  type t =
+    { state_hash : State_hash.t
+    ; transaction_hashes :
+        Mina_transaction.Transaction_hash.t With_status.t list
+    }
+
+  include Event_type_intf with type t := t
+end
+
+module Transition_frontier_loaded_from_persistence : sig
+  type t = unit
+
+  include Event_type_intf with type t := t
+end
+
+module Persisted_frontier_loaded : sig
+  type t = unit
+
+  include Event_type_intf with type t := t
+end
+
+module Persisted_frontier_fresh_boot : sig
+  type t = unit
+
+  include Event_type_intf with type t := t
+end
+
+module Bootstrap_required : sig
+  type t = unit
+
+  include Event_type_intf with type t := t
+end
+
+module Persisted_frontier_dropped : sig
+  type t = unit
 
   include Event_type_intf with type t := t
 end
@@ -102,13 +137,19 @@ module Gossip : sig
   end
 
   module Transactions : sig
-    type r = { txns : Network_pool.Transaction_pool.Resource_pool.Diff.t }
+    type r = { fee_payer_summaries : User_command.fee_payer_summary_t list }
     [@@deriving hash, yojson]
 
     type t = r With_direction.t
 
     include Event_type_intf with type t := t
   end
+end
+
+module Snark_work_failed : sig
+  type t = { error : Yojson.Safe.t }
+
+  include Event_type_intf with type t := t
 end
 
 type 'a t =
@@ -122,6 +163,13 @@ type 'a t =
   | Block_gossip : Gossip.Block.t t
   | Snark_work_gossip : Gossip.Snark_work.t t
   | Transactions_gossip : Gossip.Transactions.t t
+  | Snark_work_failed : Snark_work_failed.t t
+  | Transition_frontier_loaded_from_persistence
+      : Transition_frontier_loaded_from_persistence.t t
+  | Persisted_frontier_loaded : Persisted_frontier_loaded.t t
+  | Persisted_frontier_fresh_boot : Persisted_frontier_fresh_boot.t t
+  | Persisted_frontier_dropped : Persisted_frontier_dropped.t t
+  | Bootstrap_required : Bootstrap_required.t t
 
 val to_string : 'a t -> string
 

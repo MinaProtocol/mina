@@ -2,8 +2,15 @@
  (name interruptible)
  (public_name interruptible)
  (library_flags -linkall)
- (inline_tests)
- (libraries core_kernel async_kernel run_in_thread)
+ (inline_tests (flags -verbose -show-counts))
+ (libraries
+   ;; opam libraries
+   core_kernel
+   async_kernel
+   ppx_inline_test.config
+   ;; local libraries
+   run_in_thread
+   )
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving.std))
  (instrumentation (backend bisect_ppx))

@@ -1,20 +1,11 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Async_kernel
-
-[%%ifndef consensus_mechanism]
-
-module Currency = Currency_nonconsensus.Currency
-module Mina_compile_config =
-  Mina_compile_config_nonconsensus.Mina_compile_config
-
-[%%endif]
 
 module Partial_reason = struct
   type t =
     | Length_mismatch
     | Fee_payer_and_source_mismatch
+    | Fee_not_negative
     | Amount_not_some
     | Account_not_some
     | Invalid_metadata
@@ -48,7 +39,7 @@ module Variant = struct
     | `Signature_invalid
     | `Memo_invalid
     | `Graphql_uri_not_set
-    | (* We want each of these to be an explicitly different error *)
+    | (* We want each of these Transaction_submit... to be distinct errors *)
       `Transaction_submit_no_sender
     | `Transaction_submit_duplicate
     | `Transaction_submit_bad_nonce
@@ -90,7 +81,7 @@ end = struct
 
   let kind { extra_context = _; kind } = kind
 
-  let message = function
+  let message : Variant.t -> string = function
     | `Sql _ ->
         "SQL failure"
     | `Json_parse _ ->
@@ -144,7 +135,7 @@ end = struct
     | `Transaction_submit_expired ->
         "Can't send transaction: Expired"
 
-  let context = function
+  let context : Variant.t -> string option = function
     | `Sql msg ->
         Some msg
     | `Json_parse optional_msg ->
@@ -156,7 +147,7 @@ end = struct
           (sprintf
              !"You are requesting the status for the network %s, but you are \
                connected to the network %s\n"
-             req conn)
+             req conn )
     | `Chain_info_missing ->
         Some
           "Could not get chain information. This probably means you are \
@@ -168,7 +159,7 @@ end = struct
           (sprintf
              !"You attempted to lookup %s, but we couldn't find it in the \
                ledger."
-             addr)
+             addr )
     | `Invariant_violation ->
         None
     | `Transaction_not_found hash ->
@@ -178,13 +169,13 @@ end = struct
               This may be due to its inclusion in a block -- try looking for \
               this transaction in a recent block. It also could be due to the \
               transaction being evicted from the mempool."
-             hash)
+             hash )
     | `Block_missing s ->
         Some
           (sprintf
              "We couldn't find the block in the archive node, specified by %s. \
               Ask a friend for the missing data."
-             s)
+             s )
     | `Malformed_public_key ->
         None
     | `Operations_not_valid reasons ->
@@ -192,7 +183,7 @@ end = struct
           (sprintf
              !"Cannot recover transaction for the following reasons: %{sexp: \
                Partial_reason.t list}"
-             reasons)
+             reasons )
     | `Public_key_format_not_valid ->
         None
     | `Unsupported_operation_for_construction ->
@@ -224,7 +215,7 @@ end = struct
     | `Transaction_submit_expired ->
         None
 
-  let retriable = function
+  let retriable : Variant.t -> bool = function
     | `Sql _ ->
         false
     | `Json_parse _ ->
@@ -279,7 +270,7 @@ end = struct
         false
 
   (* Unlike message above, description can be updated whenever we see fit *)
-  let description = function
+  let description : Variant.t -> string = function
     | `Sql _ ->
         "We encountered a SQL failure."
     | `Json_parse _ ->
@@ -339,8 +330,7 @@ end = struct
         sprintf
           "The minimum fee on transactions is %s . Please increase your fee to \
            at least this amount."
-          (Currency.Fee.to_formatted_string
-             Mina_compile_config.minimum_user_command_fee)
+          (Currency.Fee.to_mina_string Currency.Fee.minimum_user_command_fee)
     | `Transaction_submit_invalid_signature ->
         "An invalid signature is attached to this transaction"
     | `Transaction_submit_insufficient_balance ->
@@ -365,14 +355,14 @@ end = struct
               (`Assoc
                 [ ("body", Variant.to_yojson t.kind)
                 ; ("error", `String context)
-                ])
+                ] )
         | Some context1, Some context2 ->
             Some
               (`Assoc
                 [ ("body", Variant.to_yojson t.kind)
                 ; ("error", `String context1)
                 ; ("extra", `String context2)
-                ]) )
+                ] ) )
     ; description = Some (description t.kind)
     }
 
@@ -393,17 +383,17 @@ end = struct
     |> Lazy.map ~f:(fun vs -> List.map vs ~f:(Fn.compose erase create))
     |> Lazy.map ~f:(fun es ->
            List.map es ~f:(fun e ->
-               { e with Rosetta_models.Error.details = None })
+               { e with Rosetta_models.Error.details = None } )
            |> uniq
                 ~eq:(fun { Rosetta_models.Error.code; _ } { code = code2; _ } ->
-                  Int32.equal code code2))
+                  Int32.equal code code2 ) )
 
   module Lift = struct
     let parse ?context res =
       Deferred.return
         (Result.map_error
            ~f:(fun s -> create ?context (`Json_parse (Some s)))
-           res)
+           res )
 
     let sql ?context res =
       Deferred.Result.map_error

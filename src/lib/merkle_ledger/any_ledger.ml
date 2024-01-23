@@ -113,8 +113,6 @@ module Make_base (Inputs : Inputs_intf) :
 
     module Addr = Location.Addr
 
-    let remove_accounts_exn (T ((module Base), t)) = Base.remove_accounts_exn t
-
     let merkle_path_at_index_exn (T ((module Base), t)) =
       Base.merkle_path_at_index_exn t
 
@@ -122,7 +120,12 @@ module Make_base (Inputs : Inputs_intf) :
 
     let merkle_path_batch (T ((module Base), t)) = Base.merkle_path_batch t
 
+    let wide_merkle_path_batch (T ((module Base), t)) =
+      Base.wide_merkle_path_batch t
+
     let merkle_root (T ((module Base), t)) = Base.merkle_root t
+
+    let get_hash_batch_exn (T ((module Base), t)) = Base.get_hash_batch_exn t
 
     let index_of_account_exn (T ((module Base), t)) =
       Base.index_of_account_exn t
@@ -165,12 +168,6 @@ module Make_base (Inputs : Inputs_intf) :
 
     let token_owners (T ((module Base), t)) = Base.token_owners t
 
-    let next_available_token (T ((module Base), t)) =
-      Base.next_available_token t
-
-    let set_next_available_token (T ((module Base), t)) =
-      Base.set_next_available_token t
-
     let iteri (T ((module Base), t)) = Base.iteri t
 
     (* ignored_keys must be Base.Keys.Set.t, but that isn't necessarily the same as Keys.Set.t for the
@@ -183,7 +180,7 @@ module Make_base (Inputs : Inputs_intf) :
 
     let to_list (T ((module Base), t)) = Base.to_list t
 
-    let make_space_for (T ((module Base), t)) = Base.make_space_for t
+    let to_list_sequential (T ((module Base), t)) = Base.to_list_sequential t
 
     let get_all_accounts_rooted_at_exn (T ((module Base), t)) =
       Base.get_all_accounts_rooted_at_exn t

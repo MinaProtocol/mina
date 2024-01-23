@@ -19,11 +19,7 @@ module Constant = struct
   end]
 
   (* Force the typechecker to verify that these types are equal. *)
-  let () =
-    let _f : unit -> (t, Stable.Latest.t) Type_equal.t =
-     fun () -> Type_equal.T
-    in
-    ()
+  let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
   open Backend
 
@@ -51,7 +47,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
               ~compute:As_prover.(fun () -> Field.Constant.unpack (read_var x))
           in
           Field.Assert.equal x (Field.project res) ;
-          res)
+          res )
   end
 
   let () = assert (Field.size_in_bits < 64 * Nat.to_int Limbs.n)

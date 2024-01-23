@@ -1,6 +1,4 @@
 (* masking_merkle_tree_intf.ml *)
-open Core_kernel
-
 (* the type of a Merkle tree mask associated with a parent Merkle tree *)
 module type S = sig
   type t
@@ -34,6 +32,8 @@ module type S = sig
 
   val get_uuid : t -> Uuid.t
 
+  type accumulated_t
+
   module Attached : sig
     include
       Base_merkle_tree_intf.S
@@ -55,10 +55,6 @@ module type S = sig
     (** get hash from mask, if present, else from its parent *)
     val get_hash : t -> Addr.t -> hash option
 
-    (** registers a new account in the ledger; unsafe to call if account id already exists *)
-    val unsafe_create_account :
-      t -> account_id -> account -> Location.t Or_error.t
-
     (** commit all state to the parent, flush state locally *)
     val commit : t -> unit
 
@@ -79,9 +75,25 @@ module type S = sig
     (** called when parent sets an account; update local state *)
     val parent_set_notify : t -> account -> unit
 
+    (* makes new mask instance with copied tables, re-use parent *)
     val copy : t -> t
 
-    (* makes new mask instance with copied tables, re-use parent *)
+    (* Adds specified accounts to the mask by laoding them from parent ledger.
+
+       Could be useful for transaction processing when to pre-populate mask with the
+       accounts used in processing a transaction (or a block) to ensure there are not loaded
+       from parent on each lookup. I.e. these accounts will be cached in mask and accessing
+       them during processing of a transaction won't use disk I/O.
+    *)
+    val unsafe_preload_accounts_from_parent : t -> account_id list -> unit
+
+    val to_accumulated : t -> accumulated_t
+
+    (** Drop accumulated structure, a method used in safeguard against
+        unwanted modification of ancestor's mask *)
+    val drop_accumulated : t -> unit
+
+    val is_committing : t -> bool
 
     (** already have module For_testing from include above *)
     module For_testing : sig
@@ -94,5 +106,6 @@ module type S = sig
   end
 
   (** tell mask about parent *)
-  val set_parent : unattached -> parent -> Attached.t
+  val set_parent :
+    ?accumulated:accumulated_t -> unattached -> parent -> Attached.t
 end

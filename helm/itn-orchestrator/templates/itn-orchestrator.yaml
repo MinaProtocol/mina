@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}
+  labels:
+    app: {{ .Values.name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.name }}
+        testnet: {{ $.Values.testnetName }}
+        role: orchestrator
+        version: {{ trunc 6 (split ":" $.Values.image)._1 | trimSuffix "-" }}
+    spec:
+      containers:
+      - name: itn-orchestrator
+        resources:
+          requests:
+            memory: 512m
+            cpu: 1.0
+        image: {{ .Values.image }}
+        imagePullPolicy: Always

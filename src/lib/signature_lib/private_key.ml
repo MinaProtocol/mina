@@ -1,21 +1,15 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
 
-[%%else]
-
-open Snark_params_nonconsensus
-
-[%%endif]
-
-[%%versioned_asserted
+[%%versioned
 module Stable = struct
   module V1 = struct
-    type t = Inner_curve.Scalar.t [@@deriving compare, sexp]
+    [@@@with_all_version_tags]
+
+    type t = (Inner_curve.Scalar.t[@version_asserted])
+    [@@deriving compare, sexp]
 
     (* deriver not working, apparently *)
     let sexp_of_t = [%sexp_of: Inner_curve.Scalar.t]
@@ -34,31 +28,6 @@ module Stable = struct
     [%%else]
 
     let gen = Inner_curve.Scalar.(gen_uniform_incl one (zero - one))
-
-    [%%endif]
-  end
-
-  module Tests = struct
-    (* these tests check not only whether the serialization of the version-asserted type has changed,
-       but also whether the serializations for the consensus and nonconsensus code are identical
-    *)
-
-    [%%if curve_size = 255]
-
-    let%test "private key serialization v1" =
-      let pk =
-        Quickcheck.random_value ~seed:(`Deterministic "private key seed v1")
-          V1.gen
-      in
-      let known_good_digest = "86b85ec8a4a965c25cab59c5cb1f44ed" in
-      Ppx_version_runtime.Serialization.check_serialization
-        (module V1)
-        pk known_good_digest
-
-    [%%else]
-
-    let%test "private key serialization v1" =
-      failwith "No test for this curve size"
 
     [%%endif]
   end
@@ -111,15 +80,19 @@ let create () : t =
   Snarkette.Pasta.Fq.of_bigint
     (Snarkette.Nat.of_bytes
        (String.init 32 ~f:(fun i ->
-            Char.of_int_exn (Js.Optdef.get (Js.array_get x i) byte_undefined))))
+            Char.of_int_exn (Js.Optdef.get (Js.array_get x i) byte_undefined) )
+       ) )
 
 [%%endif]
 
 include Comparable.Make_binable (Stable.Latest)
 
-let of_bigstring_exn = Binable.of_bigstring (module Stable.Latest)
+(* for compatibility with existing private key serializations *)
+let of_bigstring_exn =
+  Binable.of_bigstring (module Stable.Latest.With_all_version_tags)
 
-let to_bigstring = Binable.to_bigstring (module Stable.Latest)
+let to_bigstring =
+  Binable.to_bigstring (module Stable.Latest.With_all_version_tags)
 
 module Base58_check = Base58_check.Make (struct
   let description = "Private key"

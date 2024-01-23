@@ -1,5 +1,3 @@
-include O1trace.S
-
 (** Enable tracing, using the supplied writer.
 
     Tracing is global, so don't call this more than once in the same process
