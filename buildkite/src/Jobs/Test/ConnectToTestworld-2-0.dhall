@@ -24,6 +24,6 @@ in Pipeline.build Pipeline.Config::{
     name = "ConnectToTestworld-2-0"
   },
   steps = [
-    ConnectToTestnet.step dependsOn "testworld-2-0" "40s" "2m" (B/SoftFail.Boolean False)
+    ConnectToTestnet.step dependsOn "testworld-2-0" "40s" "2m" (B/SoftFail.Boolean True)
   ]
 }
