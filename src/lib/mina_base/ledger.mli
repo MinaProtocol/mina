@@ -5,73 +5,73 @@ module Location : Merkle_ledger.Location_intf.S
 
 module Db :
   Merkle_ledger.Database_intf.S
-  with module Location = Location
-  with module Addr = Location.Addr
-  with type root_hash := Ledger_hash.t
-   and type hash := Ledger_hash.t
-   and type account := Account.t
-   and type key := Public_key.Compressed.t
-   and type token_id := Token_id.t
-   and type token_id_set := Token_id.Set.t
-   and type account_id := Account_id.t
-   and type account_id_set := Account_id.Set.t
+    with module Location = Location
+    with module Addr = Location.Addr
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.t
+     and type key := Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
 
 module Any_ledger :
   Merkle_ledger.Any_ledger.S
-  with module Location = Location
-  with type account := Account.t
-   and type key := Public_key.Compressed.t
-   and type token_id := Token_id.t
-   and type token_id_set := Token_id.Set.t
-   and type account_id := Account_id.t
-   and type account_id_set := Account_id.Set.t
-   and type hash := Ledger_hash.t
+    with module Location = Location
+    with type account := Account.t
+     and type key := Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+     and type hash := Ledger_hash.t
 
 module Mask :
   Merkle_mask.Masking_merkle_tree_intf.S
-  with module Location = Location
-   and module Attached.Addr = Location.Addr
-  with type account := Account.t
-   and type key := Public_key.Compressed.t
-   and type token_id := Token_id.t
-   and type token_id_set := Token_id.Set.t
-   and type account_id := Account_id.t
-   and type account_id_set := Account_id.Set.t
-   and type hash := Ledger_hash.t
-   and type location := Location.t
-   and type parent := Any_ledger.M.t
+    with module Location = Location
+     and module Attached.Addr = Location.Addr
+    with type account := Account.t
+     and type key := Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+     and type hash := Ledger_hash.t
+     and type location := Location.t
+     and type parent := Any_ledger.M.t
 
 module Maskable :
   Merkle_mask.Maskable_merkle_tree_intf.S
-  with module Location = Location
-  with module Addr = Location.Addr
-  with type account := Account.t
-   and type key := Public_key.Compressed.t
-   and type token_id := Token_id.t
-   and type token_id_set := Token_id.Set.t
-   and type account_id := Account_id.t
-   and type account_id_set := Account_id.Set.t
-   and type hash := Ledger_hash.t
-   and type root_hash := Ledger_hash.t
-   and type unattached_mask := Mask.t
-   and type attached_mask := Mask.Attached.t
-   and type t := Any_ledger.M.t
+    with module Location = Location
+    with module Addr = Location.Addr
+    with type account := Account.t
+     and type key := Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+     and type hash := Ledger_hash.t
+     and type root_hash := Ledger_hash.t
+     and type unattached_mask := Mask.t
+     and type attached_mask := Mask.Attached.t
+     and type t := Any_ledger.M.t
 
 include
   Merkle_mask.Maskable_merkle_tree_intf.S
-  with module Location := Location
-  with module Addr = Location.Addr
-  with type root_hash := Ledger_hash.t
-   and type hash := Ledger_hash.t
-   and type account := Account.t
-   and type key := Public_key.Compressed.t
-   and type token_id := Token_id.t
-   and type token_id_set := Token_id.Set.t
-   and type account_id := Account_id.t
-   and type account_id_set := Account_id.Set.t
-   and type t = Mask.Attached.t
-   and type attached_mask = Mask.Attached.t
-   and type unattached_mask = Mask.t
+    with module Location := Location
+    with module Addr = Location.Addr
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.t
+     and type key := Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+     and type t = Mask.Attached.t
+     and type attached_mask = Mask.Attached.t
+     and type unattached_mask = Mask.t
 
 (* We override the type of unregister_mask_exn that comes from
    Merkle_mask.Maskable_merkle_tree_intf.S because at this level callers aren't
@@ -106,19 +106,20 @@ module Transaction_applied : sig
   module Signed_command_applied : sig
     module Common : sig
       type t = Transaction_applied.Signed_command_applied.Common.t =
-        { user_command: Signed_command.t With_status.t
-        ; previous_receipt_chain_hash: Receipt.Chain_hash.t
-        ; fee_payer_timing: Account.Timing.t
-        ; source_timing: Account.Timing.t option }
+        { user_command : Signed_command.t With_status.t
+        ; previous_receipt_chain_hash : Receipt.Chain_hash.t
+        ; fee_payer_timing : Account.Timing.t
+        ; source_timing : Account.Timing.t option
+        }
       [@@deriving sexp]
     end
 
     module Body : sig
       type t = Transaction_applied.Signed_command_applied.Body.t =
-        | Payment of {previous_empty_accounts: Account_id.t list}
+        | Payment of { previous_empty_accounts : Account_id.t list }
         | Stake_delegation of
-            { previous_delegate: Public_key.Compressed.t option }
-        | Create_new_token of {created_token: Token_id.t}
+            { previous_delegate : Public_key.Compressed.t option }
+        | Create_new_token of { created_token : Token_id.t }
         | Create_token_account
         | Mint_tokens
         | Failed
@@ -126,14 +127,15 @@ module Transaction_applied : sig
     end
 
     type t = Transaction_applied.Signed_command_applied.t =
-      {common: Common.t; body: Body.t}
+      { common : Common.t; body : Body.t }
     [@@deriving sexp]
   end
 
   module Snapp_command_applied : sig
     type t = Transaction_applied.Snapp_command_applied.t =
-      { accounts: (Account_id.t * Account.t option) list
-      ; command: Snapp_command.t With_status.t }
+      { accounts : (Account_id.t * Account.t option) list
+      ; command : Snapp_command.t With_status.t
+      }
     [@@deriving sexp]
   end
 
@@ -146,19 +148,21 @@ module Transaction_applied : sig
 
   module Fee_transfer_applied : sig
     type t = Transaction_applied.Fee_transfer_applied.t =
-      { fee_transfer: Fee_transfer.t
-      ; previous_empty_accounts: Account_id.t list
-      ; receiver_timing: Account.Timing.t
-      ; balances: Transaction_status.Fee_transfer_balance_data.t }
+      { fee_transfer : Fee_transfer.t
+      ; previous_empty_accounts : Account_id.t list
+      ; receiver_timing : Account.Timing.t
+      ; balances : Transaction_status.Fee_transfer_balance_data.t
+      }
     [@@deriving sexp]
   end
 
   module Coinbase_applied : sig
     type t = Transaction_applied.Coinbase_applied.t =
-      { coinbase: Coinbase.t
-      ; previous_empty_accounts: Account_id.t list
-      ; receiver_timing: Account.Timing.t
-      ; balances: Transaction_status.Coinbase_balance_data.t }
+      { coinbase : Coinbase.t
+      ; previous_empty_accounts : Account_id.t list
+      ; receiver_timing : Account.Timing.t
+      ; balances : Transaction_status.Coinbase_balance_data.t
+      }
     [@@deriving sexp]
   end
 
@@ -171,7 +175,7 @@ module Transaction_applied : sig
   end
 
   type t = Transaction_applied.t =
-    {previous_hash: Ledger_hash.t; varying: Varying.t}
+    { previous_hash : Ledger_hash.t; varying : Varying.t }
   [@@deriving sexp]
 
   val transaction : t -> Transaction.t With_status.t
@@ -229,14 +233,14 @@ val merkle_root_after_snapp_command_exn :
   -> txn_state_view:Snapp_predicate.Protocol_state.View.t
   -> t
   -> Snapp_command.Valid.t
-  -> Ledger_hash.t * [`Next_available_token of Token_id.t]
+  -> Ledger_hash.t * [ `Next_available_token of Token_id.t ]
 
 val merkle_root_after_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_global_slot:Mina_numbers.Global_slot.t
   -> t
   -> Signed_command.With_valid_signature.t
-  -> Ledger_hash.t * [`Next_available_token of Token_id.t]
+  -> Ledger_hash.t * [ `Next_available_token of Token_id.t ]
 
 (** Raises if the ledger is full. *)
 val create_empty_exn : t -> Account_id.t -> Path.t * Account.t
@@ -264,3 +268,20 @@ type init_state =
 
 (** Apply a generated state to a blank, concrete ledger. *)
 val apply_initial_ledger_state : t -> init_state -> unit
+
+module For_tests : sig
+  open Currency
+  open Mina_numbers
+
+  val validate_timing_with_min_balance :
+       account:Account.t
+    -> txn_amount:Amount.t
+    -> txn_global_slot:Global_slot.t
+    -> (Account.Timing.t * [> `Min_balance of Balance.t ]) Or_error.t
+
+  val validate_timing :
+       account:Account.t
+    -> txn_amount:Amount.t
+    -> txn_global_slot:Global_slot.t
+    -> Account.Timing.t Or_error.t
+end

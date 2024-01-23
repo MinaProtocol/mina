@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Import
 open Types
 open Pickles_types
@@ -31,8 +31,7 @@ module Wrap = struct
           ( ( ( Challenge.Constant.t
               , Challenge.Constant.t Scalar_challenge.t
               , Field.Constant.t Shifted_value.t
-              , ( Challenge.Constant.t Scalar_challenge.t
-                  Bulletproof_challenge.t
+              , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
                 , Tock.Rounds.n )
                 Vector.t
               , Digest.Constant.t
@@ -58,7 +57,7 @@ module Wrap = struct
   type ('mb, 'ml) t =
     (module S
        with type max_branching = 'mb
-        and type max_local_max_branchings = 'ml)
+        and type max_local_max_branchings = 'ml )
 
   let create : type mb ml. unit -> (mb, ml) t =
    fun () ->
@@ -136,15 +135,15 @@ module Step = struct
       | App_state : statement t
   end
 
-  let create
-      : type local_signature local_branches statement prev_values max_branching.
+  let create :
+      type local_signature local_branches statement prev_values max_branching.
          unit
       -> (module S
             with type local_signature = local_signature
              and type local_branches = local_branches
              and type statement = statement
              and type prev_values = prev_values
-             and type max_branching = max_branching) =
+             and type max_branching = max_branching ) =
    fun () ->
     let module R = struct
       type nonrec max_branching = max_branching

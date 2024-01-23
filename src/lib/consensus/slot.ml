@@ -58,6 +58,7 @@ let%test_unit "in_seed_update_range unchecked vs. checked equality" =
     UInt32.div constants.slots_per_epoch (UInt32.of_int 3) |> UInt32.to_int
   in
   let examples =
-    List.map ~f:UInt32.of_int [x; x - 1; x + 1; x * 2; (x * 2) - 1; (x * 2) + 1]
+    List.map ~f:UInt32.of_int
+      [ x; x - 1; x + 1; x * 2; (x * 2) - 1; (x * 2) + 1 ]
   in
   Quickcheck.test ~trials:100 ~examples (gen constants) ~f:test

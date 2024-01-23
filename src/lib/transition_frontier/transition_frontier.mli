@@ -48,7 +48,8 @@ val load :
   -> ( t
      , [> `Failure of string
        | `Bootstrap_required
-       | `Persistent_frontier_malformed ] )
+       | `Persistent_frontier_malformed
+       | `Snarked_ledger_mismatch ] )
      Deferred.Result.t
 
 val close : loc:string -> t -> unit Deferred.t
@@ -67,7 +68,12 @@ val extensions : t -> Extensions.t
 
 val genesis_state_hash : t -> State_hash.t
 
+val rejected_blocks : (State_hash.t * Network_peer.Envelope.Sender.t * Block_time.t * [`Invalid_proof | `Invalid_delta_transition_chain_proof | `Too_early | `Too_late | `Invalid_genesis_protocol_state | `Invalid_protocol_version  | `Mismatched_protocol_version]) Core.Queue.t
+
+val validated_blocks : (State_hash.t * Network_peer.Envelope.Sender.t * Block_time.t) Core.Queue.t
+
 module For_tests : sig
+  open Core_kernel
   open Signature_lib
 
   val equal : t -> t -> bool
@@ -86,7 +92,8 @@ module For_tests : sig
     -> ( t
        , [> `Failure of string
          | `Bootstrap_required
-         | `Persistent_frontier_malformed ] )
+         | `Persistent_frontier_malformed
+         | `Snarked_ledger_mismatch ] )
        Deferred.Result.t
 
   val gen_genesis_breadcrumb :
@@ -112,12 +119,13 @@ module For_tests : sig
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:( Breadcrumb.t
-                            * ( Mina_base.State_hash.t
-                              * Mina_state.Protocol_state.value )
+                            * Mina_state.Protocol_state.value
+                              Mina_base.State_hash.With_state_hashes.t
                               list )
                             Quickcheck.Generator.t
     -> max_length:int
     -> size:int
+    -> ?use_super_catchup:bool
     -> unit
     -> t Quickcheck.Generator.t
 
@@ -130,14 +138,15 @@ module For_tests : sig
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:( Breadcrumb.t
-                            * ( Mina_base.State_hash.t
-                              * Mina_state.Protocol_state.value )
+                            * Mina_state.Protocol_state.value
+                              Mina_base.State_hash.With_state_hashes.t
                               list )
                             Quickcheck.Generator.t
     -> ?get_branch_root:(t -> Breadcrumb.t)
     -> max_length:int
     -> frontier_size:int
     -> branch_size:int
+    -> ?use_super_catchup:bool
     -> unit
     -> (t * Breadcrumb.t list) Quickcheck.Generator.t
 end

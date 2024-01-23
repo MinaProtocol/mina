@@ -5,7 +5,7 @@ open Unsigned.Size_t
 module type Stable_v1 = sig
   module Stable : sig
     module V1 : sig
-      type t [@@deriving version, bin_io, sexp, compare, yojson, hash, eq]
+      type t [@@deriving version, bin_io, sexp, compare, yojson, hash, equal]
     end
 
     module Latest = V1
@@ -74,8 +74,7 @@ module type Inputs_intf = sig
   end
 
   module Verifier_index : sig
-    type t =
-      (Scalar_field.t, Urs.t, Poly_comm.Backend.t) Plonk_verifier_index.t
+    type t = (Scalar_field.t, Urs.t, Poly_comm.Backend.t) Plonk_verifier_index.t
 
     val create : Index.t -> t
   end
@@ -86,8 +85,9 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
 
   type t =
-    { index: Index.t
-    ; cs: (Gate_vector.t, Scalar_field.t) Plonk_constraint_system.t }
+    { index : Index.t
+    ; cs : (Gate_vector.t, Scalar_field.t) Plonk_constraint_system.t
+    }
 
   let name = sprintf "%s_%d_v3" name (Pickles_types.Nat.to_int Rounds.n)
 
@@ -95,9 +95,7 @@ module Make (Inputs : Inputs_intf) = struct
     let urs_info = Set_once.create () in
     let urs = ref None in
     let degree = 1 lsl Pickles_types.Nat.to_int Rounds.n in
-    let set_urs_info specs =
-      Set_once.set_exn urs_info Lexing.dummy_pos specs
-    in
+    let set_urs_info specs = Set_once.set_exn urs_info Lexing.dummy_pos specs in
     let load () =
       match !urs with
       | Some urs ->
@@ -131,13 +129,13 @@ module Make (Inputs : Inputs_intf) = struct
                 u
             | Error _e ->
                 let urs = Urs.create degree in
-                let _ =
+                let (_ : (unit, Error.t) Result.t) =
                   Key_cache.Sync.write
                     (List.filter specs ~f:(function
                       | On_disk _ ->
                           true
                       | S3 _ ->
-                          false ))
+                          false ) )
                     store () urs
                 in
                 urs
@@ -158,14 +156,14 @@ module Make (Inputs : Inputs_intf) = struct
           let h = List.hd_exn x in
           let t = List.last_exn x in
           Gate_vector.wrap gates
-            {row= conv t.row; col= t.col}
-            {row= conv h.row; col= h.col} ) ;
+            { row = conv t.row; col = t.col }
+            { row = conv h.row; col = h.col } ) ;
     let index =
       Index.create gates
         (Set_once.get_exn cs.public_input_size [%here])
         (load_urs ())
     in
-    {index; cs}
+    { index; cs }
 
   let vk t = Verifier_index.create t.index
 

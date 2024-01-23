@@ -79,7 +79,8 @@ module Test_inputs = struct
 
     let get_protocol_state _t _hash =
       Ok
-        (Lazy.force Precomputed_values.for_unit_tests).protocol_state_with_hash
+        (Lazy.force Precomputed_values.for_unit_tests)
+          .protocol_state_with_hashes
           .data
   end
 end

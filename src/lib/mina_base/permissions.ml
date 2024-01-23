@@ -1,19 +1,10 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
-module Mina_numbers = Mina_numbers
-
-[%%else]
-
-module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
-module Currency = Currency_nonconsensus.Currency
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
@@ -53,7 +44,7 @@ module Ledger_hash = Ledger_hash0
 
      "Making sense" can be captured by the idea that these are the *increasing*
      boolean functions on the type { has_valid_signature: bool; has_valid_proof: bool }.
-  *)
+*)
 module Auth_required = struct
   [%%versioned
   module Stable = struct
@@ -65,10 +56,10 @@ module Auth_required = struct
         | Signature
         | Both
         | Impossible (* Both and either can both be subsumed in verification key.
-            It is good to have "Either" as a separate thing to spare the owner from
-            having to make a proof instead of a signature. Both, I'm not sure if there's
-            a good justification for. *)
-      [@@deriving sexp, eq, compare, hash, yojson, enum]
+                        It is good to have "Either" as a separate thing to spare the owner from
+                        having to make a proof instead of a signature. Both, I'm not sure if there's
+                        a good justification for. *)
+      [@@deriving sexp, equal, compare, hash, yojson, enum]
 
       let to_latest = Fn.id
     end
@@ -108,83 +99,108 @@ module Auth_required = struct
           Impossible
         Signature sufficient
           None
-    *)
+  *)
   module Encoding = struct
     type 'bool t =
-      {constant: 'bool; signature_necessary: 'bool; signature_sufficient: 'bool}
+      { constant : 'bool
+      ; signature_necessary : 'bool
+      ; signature_sufficient : 'bool
+      }
     [@@deriving hlist, fields]
 
     let to_input t =
-      let [x; y; z] = to_hlist t in
-      Random_oracle.Input.bitstring [x; y; z]
+      let [ x; y; z ] = to_hlist t in
+      Random_oracle.Input.bitstring [ x; y; z ]
 
     let map t ~f =
-      { constant= f t.constant
-      ; signature_necessary= f t.signature_necessary
-      ; signature_sufficient= f t.signature_sufficient }
+      { constant = f t.constant
+      ; signature_necessary = f t.signature_necessary
+      ; signature_sufficient = f t.signature_sufficient
+      }
 
     let _ = map
 
-    [%%ifdef
-    consensus_mechanism]
+    [%%ifdef consensus_mechanism]
 
     let if_ b ~then_:t ~else_:e =
       let open Pickles.Impls.Step in
-      { constant= Boolean.if_ b ~then_:t.constant ~else_:e.constant
-      ; signature_necessary=
+      { constant = Boolean.if_ b ~then_:t.constant ~else_:e.constant
+      ; signature_necessary =
           Boolean.if_ b ~then_:t.signature_necessary
             ~else_:e.signature_necessary
-      ; signature_sufficient=
+      ; signature_sufficient =
           Boolean.if_ b ~then_:t.signature_sufficient
-            ~else_:e.signature_sufficient }
+            ~else_:e.signature_sufficient
+      }
 
     [%%endif]
   end
 
   let encode : t -> bool Encoding.t = function
     | Impossible ->
-        {constant= true; signature_necessary= true; signature_sufficient= false}
+        { constant = true
+        ; signature_necessary = true
+        ; signature_sufficient = false
+        }
     | None ->
-        {constant= true; signature_necessary= false; signature_sufficient= true}
+        { constant = true
+        ; signature_necessary = false
+        ; signature_sufficient = true
+        }
     | Proof ->
-        { constant= false
-        ; signature_necessary= false
-        ; signature_sufficient= false }
+        { constant = false
+        ; signature_necessary = false
+        ; signature_sufficient = false
+        }
     | Signature ->
-        {constant= false; signature_necessary= true; signature_sufficient= true}
+        { constant = false
+        ; signature_necessary = true
+        ; signature_sufficient = true
+        }
     | Either ->
-        { constant= false
-        ; signature_necessary= false
-        ; signature_sufficient= true }
+        { constant = false
+        ; signature_necessary = false
+        ; signature_sufficient = true
+        }
     | Both ->
-        { constant= false
-        ; signature_necessary= true
-        ; signature_sufficient= false }
+        { constant = false
+        ; signature_necessary = true
+        ; signature_sufficient = false
+        }
 
   let decode : bool Encoding.t -> t = function
-    | {constant= true; signature_necessary= _; signature_sufficient= false} ->
+    | { constant = true; signature_necessary = _; signature_sufficient = false }
+      ->
         Impossible
-    | {constant= true; signature_necessary= _; signature_sufficient= true} ->
+    | { constant = true; signature_necessary = _; signature_sufficient = true }
+      ->
         None
-    | {constant= false; signature_necessary= false; signature_sufficient= false}
-      ->
+    | { constant = false
+      ; signature_necessary = false
+      ; signature_sufficient = false
+      } ->
         Proof
-    | {constant= false; signature_necessary= true; signature_sufficient= true}
-      ->
+    | { constant = false
+      ; signature_necessary = true
+      ; signature_sufficient = true
+      } ->
         Signature
-    | {constant= false; signature_necessary= false; signature_sufficient= true}
-      ->
+    | { constant = false
+      ; signature_necessary = false
+      ; signature_sufficient = true
+      } ->
         Either
-    | {constant= false; signature_necessary= true; signature_sufficient= false}
-      ->
+    | { constant = false
+      ; signature_necessary = true
+      ; signature_sufficient = false
+      } ->
         Both
 
   let%test_unit "decode encode" =
-    List.iter [Impossible; Proof; Signature; Either; Both] ~f:(fun t ->
+    List.iter [ Impossible; Proof; Signature; Either; Both ] ~f:(fun t ->
         [%test_eq: t] t (decode (encode t)) )
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   module Checked = struct
     type t = Boolean.var Encoding.t
@@ -196,7 +212,7 @@ module Auth_required = struct
     let constant t = Encoding.map (encode t) ~f:Boolean.var_of_value
 
     let eval_no_proof
-        ({constant; signature_necessary= _; signature_sufficient} : t)
+        ({ constant; signature_necessary = _; signature_sufficient } : t)
         ~signature_verifies =
       (* ways authorization can succeed when no proof is present:
          - None
@@ -210,7 +226,7 @@ module Auth_required = struct
       signature_sufficient
       &&& (constant ||| ((not constant) &&& signature_verifies))
 
-    let spec_eval ({constant; signature_necessary; signature_sufficient} : t)
+    let spec_eval ({ constant; signature_necessary; signature_sufficient } : t)
         ~signature_verifies =
       let open Pickles.Impls.Step.Boolean in
       let impossible = constant &&& not signature_sufficient in
@@ -222,15 +238,14 @@ module Auth_required = struct
       let didn't_fail_yet = result in
       (* If the transaction already failed to verify, we don't need to assert
          that the proof should verify. *)
-      ( result
-      , `proof_must_verify (didn't_fail_yet &&& not signature_sufficient) )
+      (result, `proof_must_verify (didn't_fail_yet &&& not signature_sufficient))
   end
 
   let typ =
     let t =
       let open Encoding in
       Typ.of_hlistable
-        [Boolean.typ; Boolean.typ; Boolean.typ]
+        [ Boolean.typ; Boolean.typ; Boolean.typ ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
     in
@@ -270,21 +285,22 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type ('bool, 'controller) t =
-        { stake: 'bool
-        ; edit_state: 'controller
-        ; send: 'controller
-        ; receive: 'controller
-        ; set_delegate: 'controller
-        ; set_permissions: 'controller
-        ; set_verification_key: 'controller }
-      [@@deriving sexp, eq, compare, hash, yojson, hlist, fields]
+        { stake : 'bool
+        ; edit_state : 'controller
+        ; send : 'controller
+        ; receive : 'controller
+        ; set_delegate : 'controller
+        ; set_permissions : 'controller
+        ; set_verification_key : 'controller
+        }
+      [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
 
   let to_input controller t =
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
     Stable.Latest.Fields.fold ~init:[]
-      ~stake:(f (fun x -> Random_oracle.Input.bitstring [x]))
+      ~stake:(f (fun x -> Random_oracle.Input.bitstring [ x ]))
       ~edit_state:(f controller) ~send:(f controller)
       ~set_delegate:(f controller) ~set_permissions:(f controller)
       ~set_verification_key:(f controller) ~receive:(f controller)
@@ -295,14 +311,13 @@ end
 module Stable = struct
   module V1 = struct
     type t = (bool, Auth_required.Stable.V1.t) Poly.Stable.V1.t
-    [@@deriving sexp, eq, compare, hash, yojson]
+    [@@deriving sexp, equal, compare, hash, yojson]
 
     let to_latest = Fn.id
   end
 end]
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 module Checked = struct
   type t = (Boolean.var, Auth_required.Checked.t) Poly.Stable.Latest.t
@@ -339,7 +354,8 @@ let typ =
     ; Auth_required.typ
     ; Auth_required.typ
     ; Auth_required.typ
-    ; Auth_required.typ ]
+    ; Auth_required.typ
+    ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
 
@@ -348,19 +364,21 @@ let typ =
 let to_input x = Poly.to_input Auth_required.to_input x
 
 let user_default : t =
-  { stake= true
-  ; edit_state= Signature
-  ; send= Signature
-  ; receive= None
-  ; set_delegate= Signature
-  ; set_permissions= Signature
-  ; set_verification_key= Signature }
+  { stake = true
+  ; edit_state = Signature
+  ; send = Signature
+  ; receive = None
+  ; set_delegate = Signature
+  ; set_permissions = Signature
+  ; set_verification_key = Signature
+  }
 
 let empty : t =
-  { stake= false
-  ; edit_state= None
-  ; send= None
-  ; receive= None
-  ; set_delegate= None
-  ; set_permissions= None
-  ; set_verification_key= None }
+  { stake = false
+  ; edit_state = None
+  ; send = None
+  ; receive = None
+  ; set_delegate = None
+  ; set_permissions = None
+  ; set_verification_key = None
+  }

@@ -17,11 +17,11 @@ module type Constants = sig
 
   val gc_parameters :
        t
-    -> [`Acceptable_network_delay of Length.t]
-       * [`Gc_width of Length.t]
-       * [`Gc_width_epoch of Length.t]
-       * [`Gc_width_slot of Length.t]
-       * [`Gc_interval of Length.t]
+    -> [ `Acceptable_network_delay of Length.t ]
+       * [ `Gc_width of Length.t ]
+       * [ `Gc_width_epoch of Length.t ]
+       * [ `Gc_width_slot of Length.t ]
+       * [ `Gc_interval of Length.t ]
 end
 
 module type Blockchain_state = sig
@@ -92,7 +92,7 @@ module type Protocol_state = sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type ('state_hash, 'body) t [@@deriving eq, hash, sexp, to_yojson]
+        type ('state_hash, 'body) t [@@deriving equal, hash, sexp, to_yojson]
       end
     end]
   end
@@ -136,7 +136,7 @@ module type Protocol_state = sig
     module Stable : sig
       module V1 : sig
         type t = (State_hash.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
-        [@@deriving sexp, eq, compare]
+        [@@deriving sexp, equal, compare]
       end
     end]
   end
@@ -241,7 +241,7 @@ module type State_hooks = sig
     -> prev_state_hash:Mina_base.State_hash.var
     -> snark_transition_var
     -> Currency.Amount.var
-    -> ( [`Success of Snark_params.Tick.Boolean.var] * consensus_state_var
+    -> ( [ `Success of Snark_params.Tick.Boolean.var ] * consensus_state_var
        , _ )
        Snark_params.Tick.Checked.t
 
@@ -252,13 +252,12 @@ module type State_hooks = sig
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> constants:Constants.t
       -> gen_slot_advancement:int Quickcheck.Generator.t
-      -> (   previous_protocol_state:( protocol_state
-                                     , Mina_base.State_hash.t )
-                                     With_hash.t
+      -> (   previous_protocol_state:
+               protocol_state Mina_base.State_hash.With_state_hashes.t
           -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
           -> coinbase_receiver:Public_key.Compressed.t
           -> supercharge_coinbase:bool
-          -> consensus_state)
+          -> consensus_state )
          Quickcheck.Generator.t
   end
 end
@@ -280,13 +279,14 @@ module type S = sig
     module Stable : sig
       module V1 : sig
         type t =
-          { delta: int
-          ; k: int
-          ; slots_per_epoch: int
-          ; slot_duration: int
-          ; epoch_duration: int
-          ; genesis_state_timestamp: Block_time.Stable.V1.t
-          ; acceptable_network_delay: int }
+          { delta : int
+          ; k : int
+          ; slots_per_epoch : int
+          ; slot_duration : int
+          ; epoch_duration : int
+          ; genesis_state_timestamp : Block_time.Stable.V1.t
+          ; acceptable_network_delay : int
+          }
         [@@deriving yojson, fields]
       end
     end]
@@ -299,10 +299,11 @@ module type S = sig
 
   module Genesis_epoch_data : sig
     module Data : sig
-      type t = {ledger: Mina_base.Ledger.t Lazy.t; seed: Mina_base.Epoch_seed.t}
+      type t =
+        { ledger : Mina_base.Ledger.t Lazy.t; seed : Mina_base.Epoch_seed.t }
     end
 
-    type tt = {staking: Data.t; next: Data.t option}
+    type tt = { staking : Data.t; next : Data.t option }
 
     type t = tt option
 
@@ -362,6 +363,28 @@ module type S = sig
         -> Signature_lib.Public_key.Compressed.Set.t
         -> Block_time.t
         -> unit
+    end
+
+    module Vrf : sig
+      val check :
+           constraint_constants:Genesis_constants.Constraint_constants.t
+        -> global_slot:Mina_numbers.Global_slot.t
+        -> seed:Mina_base.Epoch_seed.t
+        -> producer_private_key:Signature_lib.Private_key.t
+        -> producer_public_key:Signature_lib.Public_key.Compressed.t
+        -> total_stake:Amount.t
+        -> logger:Logger.t
+        -> get_delegators:
+             (   Public_key.Compressed.t
+              -> Mina_base.Account.t Mina_base.Account.Index.Table.t option )
+        -> ( ( [ `Vrf_eval of string ]
+             * [> `Vrf_output of Consensus_vrf.Output_hash.t ]
+             * [> `Delegator of
+                  Signature_lib.Public_key.Compressed.t
+                  * Mina_base.Account.Index.t ] )
+             option
+           , unit )
+           Interruptible.t
     end
 
     module Prover_state : sig
@@ -430,6 +453,8 @@ module type S = sig
 
       val slot : t -> Unsigned.UInt32.t
 
+      val succ : t -> t
+
       val start_time : constants:Constants.t -> t -> Block_time.t
 
       val end_time : constants:Constants.t -> t -> Block_time.t
@@ -447,7 +472,7 @@ module type S = sig
         [%%versioned:
         module Stable : sig
           module V1 : sig
-            type t [@@deriving hash, eq, compare, sexp, yojson]
+            type t [@@deriving hash, equal, compare, sexp, yojson]
           end
         end]
 
@@ -528,8 +553,7 @@ module type S = sig
 
       val next_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
 
-      val graphql_type :
-        unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
+      val graphql_type : unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
 
       val curr_slot : Value.t -> Slot.t
 
@@ -564,6 +588,48 @@ module type S = sig
 
       val coinbase_receiver : t -> Public_key.Compressed.t
     end
+
+    module Epoch_data_for_vrf : sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t =
+            { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
+            ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
+            ; epoch : Mina_numbers.Length.Stable.V1.t
+            ; global_slot : Mina_numbers.Global_slot.Stable.V1.t
+            ; global_slot_since_genesis : Mina_numbers.Global_slot.Stable.V1.t
+            ; delegatee_table :
+                Mina_base.Account.Stable.V1.t
+                Mina_base.Account.Index.Stable.V1.Table.t
+                Public_key.Compressed.Stable.V1.Table.t
+            }
+          [@@deriving sexp]
+
+          val to_latest : t -> t
+        end
+      end]
+    end
+
+    module Slot_won : sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t =
+            { delegator :
+                Signature_lib.Public_key.Compressed.Stable.V1.t
+                * Mina_base.Account.Index.Stable.V1.t
+            ; producer : Signature_lib.Keypair.Stable.V1.t
+            ; global_slot : Mina_numbers.Global_slot.Stable.V1.t
+            ; global_slot_since_genesis : Mina_numbers.Global_slot.Stable.V1.t
+            ; vrf_result : Consensus_vrf.Output_hash.Stable.V1.t
+            }
+          [@@deriving sexp]
+
+          val to_latest : t -> t
+        end
+      end]
+    end
   end
 
   module Coinbase_receiver : sig
@@ -571,7 +637,7 @@ module type S = sig
        Other: specified account (with default token) receives coinbases
     *)
 
-    type t = [`Producer | `Other of Public_key.Compressed.t]
+    type t = [ `Producer | `Other of Public_key.Compressed.t ]
     [@@deriving yojson]
   end
 
@@ -588,9 +654,13 @@ module type S = sig
         -> rpc_handler list
 
       type query =
-        { query:
-            'q 'r.    Network_peer.Peer.t -> ('q, 'r) rpc -> 'q
-            -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t }
+        { query :
+            'q 'r.
+               Network_peer.Peer.t
+            -> ('q, 'r) rpc
+            -> 'q
+            -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t
+        }
     end
 
     (* Check whether we are in the genesis epoch *)
@@ -603,7 +673,9 @@ module type S = sig
          constants:Constants.t
       -> Consensus_state.Value.t
       -> time_received:Unix_timestamp.t
-      -> (unit, [`Too_early | `Too_late of int64]) result
+      -> (unit, [ `Too_early | `Too_late of int64 ]) result
+
+    type select_status = [ `Keep | `Take ] [@@deriving equal]
 
     (**
      * Select between two ledger builder controller tips given the consensus
@@ -612,34 +684,27 @@ module type S = sig
     *)
     val select :
          constants:Constants.t
-      -> existing:(Consensus_state.Value.t, State_hash.t) With_hash.t
-      -> candidate:(Consensus_state.Value.t, State_hash.t) With_hash.t
+      -> existing:
+           Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
+      -> candidate:
+           Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
       -> logger:Logger.t
-      -> [`Keep | `Take]
+      -> select_status
 
-    type block_producer_timing =
-      [ `Check_again of Unix_timestamp.t
-      | `Produce_now of Block_data.t * Public_key.Compressed.t
-      | `Produce of Unix_timestamp.t * Block_data.t * Public_key.Compressed.t
-      ]
-
-    (**
-     * Determine if and when to next produce a block. Either informs the callee
-     * to check again at some time in the future, or to schedule block
-     * production with some particular keypair at some time in the future, or to
-     * produce a block now with some keypair and check again some time in the
-     * future.
-     *)
-    val next_producer_timing :
-         constraint_constants:Genesis_constants.Constraint_constants.t
-      -> constants:Constants.t
+    (*Data required to evaluate VRFs for an epoch*)
+    val get_epoch_data_for_vrf :
+         constants:Constants.t
       -> Unix_timestamp.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
-      -> coinbase_receiver:Coinbase_receiver.t
       -> logger:Logger.t
-      -> block_producer_timing Async.Deferred.t
+      -> Data.Epoch_data_for_vrf.t * Local_state.Snapshot.Ledger_snapshot.t
+
+    val get_block_data :
+         slot_won:Slot_won.t
+      -> ledger_snapshot:Local_state.Snapshot.Ledger_snapshot.t
+      -> coinbase_receiver:Coinbase_receiver.t
+      -> Block_data.t
 
     (**
      * A hook for managing local state when the locked tip is updated.
@@ -657,8 +722,10 @@ module type S = sig
      *)
     val should_bootstrap :
          constants:Constants.t
-      -> existing:(Consensus_state.Value.t, State_hash.t) With_hash.t
-      -> candidate:(Consensus_state.Value.t, State_hash.t) With_hash.t
+      -> existing:
+           Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
+      -> candidate:
+           Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
       -> logger:Logger.t
       -> bool
 
@@ -667,6 +734,9 @@ module type S = sig
       -> consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
       -> Data.Local_state.Snapshot.Ledger_snapshot.t
+
+    val epoch_end_time :
+      constants:Constants.t -> Mina_numbers.Length.t -> Block_time.t
 
     (** Data needed to synchronize the local state. *)
     type local_state_sync [@@deriving to_yojson]
@@ -696,25 +766,25 @@ module type S = sig
     module Make_state_hooks
         (Blockchain_state : Blockchain_state)
         (Protocol_state : Protocol_state
-                          with type blockchain_state :=
-                                      Blockchain_state.Value.t
-                           and type blockchain_state_var :=
-                                      Blockchain_state.var
-                           and type consensus_state := Consensus_state.Value.t
-                           and type consensus_state_var := Consensus_state.var)
+                            with type blockchain_state :=
+                              Blockchain_state.Value.t
+                             and type blockchain_state_var :=
+                              Blockchain_state.var
+                             and type consensus_state := Consensus_state.Value.t
+                             and type consensus_state_var := Consensus_state.var)
         (Snark_transition : Snark_transition
-                            with type blockchain_state_var :=
-                                        Blockchain_state.var
-                             and type consensus_transition_var :=
-                                        Consensus_transition.var) :
+                              with type blockchain_state_var :=
+                                Blockchain_state.var
+                               and type consensus_transition_var :=
+                                Consensus_transition.var) :
       State_hooks
-      with type blockchain_state := Blockchain_state.Value.t
-       and type protocol_state := Protocol_state.Value.t
-       and type protocol_state_var := Protocol_state.var
-       and type snark_transition_var := Snark_transition.var
-       and type consensus_state := Consensus_state.Value.t
-       and type consensus_state_var := Consensus_state.var
-       and type consensus_transition := Consensus_transition.Value.t
-       and type block_data := Block_data.t
+        with type blockchain_state := Blockchain_state.Value.t
+         and type protocol_state := Protocol_state.Value.t
+         and type protocol_state_var := Protocol_state.var
+         and type snark_transition_var := Snark_transition.var
+         and type consensus_state := Consensus_state.Value.t
+         and type consensus_state_var := Consensus_state.var
+         and type consensus_transition := Consensus_transition.Value.t
+         and type block_data := Block_data.t
   end
 end

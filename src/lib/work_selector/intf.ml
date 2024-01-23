@@ -50,8 +50,8 @@ module type Inputs_intf = sig
 
     val all_work_pairs :
          t
-      -> get_state:(   Mina_base.State_hash.t
-                    -> Mina_state.Protocol_state.value Or_error.t)
+      -> get_state:
+           (Mina_base.State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
       -> ( Transaction.t
          , Transaction_witness.t
          , Ledger_proof.t )
@@ -82,8 +82,8 @@ module type State_intf = sig
 
   val init :
        reassignment_wait:int
-    -> frontier_broadcast_pipe:transition_frontier option
-                               Pipe_lib.Broadcast_pipe.Reader.t
+    -> frontier_broadcast_pipe:
+         transition_frontier option Pipe_lib.Broadcast_pipe.Reader.t
     -> logger:Logger.t
     -> t
 end
@@ -169,8 +169,7 @@ module type Selection_method_intf = sig
 
   type transition_frontier
 
-  module State :
-    State_intf with type transition_frontier := transition_frontier
+  module State : State_intf with type transition_frontier := transition_frontier
 
   val remove : State.t -> work One_or_two.t -> unit
 
@@ -191,13 +190,14 @@ end
 module type Make_selection_method_intf = functor
   (Inputs : Inputs_intf)
   (Lib : Lib_intf with module Inputs := Inputs)
-  -> Selection_method_intf
-     with type staged_ledger := Inputs.Staged_ledger.t
-      and type work :=
-                 ( Inputs.Transaction.t
-                 , Inputs.Transaction_witness.t
-                 , Inputs.Ledger_proof.t )
-                 Snark_work_lib.Work.Single.Spec.t
-      and type snark_pool := Inputs.Snark_pool.t
-      and type transition_frontier := Inputs.Transition_frontier.t
-      and module State := Lib.State
+  ->
+  Selection_method_intf
+    with type staged_ledger := Inputs.Staged_ledger.t
+     and type work :=
+      ( Inputs.Transaction.t
+      , Inputs.Transaction_witness.t
+      , Inputs.Ledger_proof.t )
+      Snark_work_lib.Work.Single.Spec.t
+     and type snark_pool := Inputs.Snark_pool.t
+     and type transition_frontier := Inputs.Transition_frontier.t
+     and module State := Lib.State

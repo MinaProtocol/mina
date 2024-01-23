@@ -5,6 +5,7 @@ let B = ../../External/Buildkite.dhall
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
@@ -14,7 +15,7 @@ let Command = ../../Command/Base.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
 
-let OpamInit = ../../Command/OpamInit.dhall
+let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let Size = ../../Command/Size.dhall
 
@@ -31,6 +32,7 @@ in  Pipeline.build
         , dirtyWhen = [ S.strictlyStart (S.contains "src/") ]
         , path = "Lint"
         , name = "Fast"
+        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint ]
         }
       , steps =
         [ Command.build
@@ -47,26 +49,26 @@ in  Pipeline.build
         , Command.build
             Command.Config::{
             , commands =
-                OpamInit.andThenRunInDocker
+                RunInToolchain.runInToolchain
                   [ "CI=true"
                   , "BASE_BRANCH_NAME=\$BUILDKITE_PULL_REQUEST_BASE_BRANCH"
                   ]
                   "./scripts/compare_ci_diff_types.sh"
-            , label = "Optional fast lint steps; versions compatibility changes"
-            , key = "lint-optional-types"
+            , label = "Versions compatibility linter"
+            , key = "lint-types"
             , target = Size.Medium
             , docker = None Docker.Type
             }
         , Command.build
             Command.Config::{
             , commands =
-                OpamInit.andThenRunInDocker
+                RunInToolchain.runInToolchain
                   [ "CI=true"
                   , "BASE_BRANCH_NAME=\$BUILDKITE_PULL_REQUEST_BASE_BRANCH"
                   ]
                   "./scripts/compare_ci_diff_binables.sh"
-            , label = "Optional fast lint steps; binable compatibility changes"
-            , key = "lint-optional-binable"
+            , label = "Binable compatibility linter"
+            , key = "lint-binable"
             , target = Size.Medium
             , docker = None Docker.Type
             }

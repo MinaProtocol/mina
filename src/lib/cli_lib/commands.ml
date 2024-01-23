@@ -5,12 +5,12 @@ open Async
 let generate_keypair =
   Command.async ~summary:"Generate a new public, private keypair"
     (let open Command.Let_syntax in
-    let env = Secrets.Keypair.env in
-    if Option.is_some (Sys.getenv env) then
-      printf "Using password from environment variable %s\n" env ;
     let%map_open privkey_path = Flag.privkey_write_path in
     Exceptions.handle_nicely
     @@ fun () ->
+    let env = Secrets.Keypair.env in
+    if Option.is_some (Sys.getenv env) then
+      eprintf "Using password from environment variable %s\n" env ;
     let open Deferred.Let_syntax in
     let kp = Keypair.create () in
     let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
@@ -33,12 +33,12 @@ let validate_keypair =
         In_channel.with_file pubkey_path ~f:(fun in_channel ->
             match In_channel.input_line in_channel with
             | Some line -> (
-              try Public_key.Compressed.of_base58_check_exn line
-              with _exn ->
-                eprintf
-                  "Could not create public key in file %s from text: %s\n"
-                  pubkey_path line ;
-                exit 1 )
+                try Public_key.Compressed.of_base58_check_exn line
+                with _exn ->
+                  eprintf
+                    "Could not create public key in file %s from text: %s\n"
+                    pubkey_path line ;
+                  exit 1 )
             | None ->
                 eprintf "No public key found in file %s\n" pubkey_path ;
                 exit 1 )
@@ -70,8 +70,7 @@ let validate_keypair =
           (Snark_params.Tick.Inner_curve.of_affine keypair.public_key)
           message
       in
-      if verified then
-        printf "Verified a transaction using specified keypair\n"
+      if verified then printf "Verified a transaction using specified keypair\n"
       else (
         eprintf "Failed to verify a transaction using the specific keypair\n" ;
         exit 1 )
@@ -79,8 +78,7 @@ let validate_keypair =
     let open Deferred.Let_syntax in
     let%bind () =
       let password =
-        lazy
-          (Secrets.Keypair.Terminal_stdin.prompt_password "Enter password: ")
+        lazy (Secrets.Keypair.Terminal_stdin.prompt_password "Enter password: ")
       in
       match%map Secrets.Keypair.read ~privkey_path ~password with
       | Ok keypair ->
@@ -103,8 +101,10 @@ let validate_transaction =
     ( Command.Param.return
     @@ fun () ->
     let num_fails = ref 0 in
+    (* TODO upgrade to yojson 2.0.0 when possible to use seq_from_channel
+     * instead of the deprecated stream interface *)
     let jsons = Yojson.Safe.stream_from_channel In_channel.stdin in
-    ( match
+    ( match[@alert "--deprecated"]
         Or_error.try_with (fun () ->
             Caml.Stream.iter
               (fun transaction_json ->
@@ -124,7 +124,7 @@ let validate_transaction =
                        error:%s@."
                       (Yojson.Safe.pretty_to_string transaction_json)
                       (Yojson.Safe.pretty_to_string
-                         (Error_json.error_to_yojson err)) )
+                         (Error_json.error_to_yojson err) ) )
               jsons )
       with
     | Ok () ->
@@ -137,9 +137,15 @@ let validate_transaction =
     if !num_fails > 0 then (
       Format.printf "Some transactions failed to verify@." ;
       exit 1 )
-    else (
-      Format.printf "All transactions were valid@." ;
-      exit 0 ) )
+    else
+      let[@alert "--deprecated"] first = Caml.Stream.peek jsons in
+      match first with
+      | None ->
+          Format.printf "Could not parse any transactions@." ;
+          exit 1
+      | _ ->
+          Format.printf "All transactions were valid@." ;
+          exit 0 )
 
 module Vrf = struct
   let generate_witness =
@@ -150,9 +156,6 @@ module Vrf = struct
          threshold_met = true in the JSON output), or to generate a witness \
          that a 3rd party can use to verify a vrf evaluation."
       (let open Command.Let_syntax in
-      let env = Secrets.Keypair.env in
-      if Option.is_some (Sys.getenv env) then
-        printf "Using password from environment variable %s\n" env ;
       let%map_open privkey_path = Flag.privkey_write_path
       and global_slot =
         flag "--global-slot" ~doc:"NUM Global slot to evaluate the VRF for"
@@ -167,8 +170,8 @@ module Vrf = struct
       and generate_outputs =
         flag "--generate-outputs"
           ~doc:
-            "true|false Whether to generate the vrf in addition to the \
-             witness (default: false)"
+            "true|false Whether to generate the vrf in addition to the witness \
+             (default: false)"
           (optional_with_default false bool)
       and delegated_stake =
         flag "--delegated-stake"
@@ -182,6 +185,9 @@ module Vrf = struct
       in
       Exceptions.handle_nicely
       @@ fun () ->
+      let env = Secrets.Keypair.env in
+      if Option.is_some (Sys.getenv env) then
+        eprintf "Using password from environment variable %s\n" env ;
       let open Deferred.Let_syntax in
       (* TODO-someday: constraint constants from config file. *)
       let constraint_constants =
@@ -197,21 +203,24 @@ module Vrf = struct
             let open Consensus_vrf.Layout in
             let evaluation =
               Evaluation.of_message_and_sk ~constraint_constants
-                { global_slot= Mina_numbers.Global_slot.of_int global_slot
-                ; epoch_seed=
+                { global_slot = Mina_numbers.Global_slot.of_int global_slot
+                ; epoch_seed =
                     Mina_base.Epoch_seed.of_base58_check_exn epoch_seed
-                ; delegator_index }
+                ; delegator_index
+                }
                 keypair.private_key
             in
             let evaluation =
               match (delegated_stake, total_stake) with
               | Some delegated_stake, Some total_stake ->
                   { evaluation with
-                    vrf_threshold=
+                    vrf_threshold =
                       Some
-                        { delegated_stake=
+                        { delegated_stake =
                             Currency.Balance.of_int delegated_stake
-                        ; total_stake= Currency.Amount.of_int total_stake } }
+                        ; total_stake = Currency.Amount.of_int total_stake
+                        }
+                  }
               | _ ->
                   evaluation
             in
@@ -234,16 +243,16 @@ module Vrf = struct
   let batch_generate_witness =
     Command.async
       ~summary:
-        "Generate a batch of vrf evaluation witnesses from {\"globalSlot\": \
-         _, \"epochSeed\": _, \"delegatorIndex\": _} JSON message objects \
-         read on stdin"
+        "Generate a batch of vrf evaluation witnesses from {\"globalSlot\": _, \
+         \"epochSeed\": _, \"delegatorIndex\": _} JSON message objects read on \
+         stdin"
       (let open Command.Let_syntax in
-      let env = Secrets.Keypair.env in
-      if Option.is_some (Sys.getenv env) then
-        printf "Using password from environment variable %s\n" env ;
       let%map_open privkey_path = Flag.privkey_write_path in
       Exceptions.handle_nicely
       @@ fun () ->
+      let env = Secrets.Keypair.env in
+      if Option.is_some (Sys.getenv env) then
+        eprintf "Using password from environment variable %s\n" env ;
       let open Deferred.Let_syntax in
       (* TODO-someday: constraint constants from config file. *)
       let constraint_constants =
@@ -283,7 +292,7 @@ module Vrf = struct
                 | Error err ->
                     Format.eprintf "Error:@.%s@.@."
                       (Yojson.Safe.pretty_to_string
-                         (Error_json.error_to_yojson err)) ;
+                         (Error_json.error_to_yojson err) ) ;
                     `Repeat () )
         | Error err ->
             eprintf "Could not read the specified keypair: %s\n"
@@ -301,8 +310,8 @@ module Vrf = struct
          if given. The threshold should be included in the JSON for each vrf \
          as the 'vrfThreshold' field, of format {delegatedStake: 1000, \
          totalStake: 1000000000}. The threshold is not checked against a \
-         ledger; this should be done manually to confirm whether \
-         threshold_met in the output corresponds to an actual won block."
+         ledger; this should be done manually to confirm whether threshold_met \
+         in the output corresponds to an actual won block."
       ( Command.Param.return @@ Exceptions.handle_nicely
       @@ fun () ->
       let open Deferred.Let_syntax in
@@ -321,8 +330,7 @@ module Vrf = struct
                   in
                   let open Consensus_vrf.Layout in
                   let evaluation =
-                    Result.ok_or_failwith
-                      (Evaluation.of_yojson evaluation_json)
+                    Result.ok_or_failwith (Evaluation.of_yojson evaluation_json)
                   in
                   let evaluation =
                     Evaluation.compute_vrf ~constraint_constants evaluation
@@ -338,7 +346,7 @@ module Vrf = struct
             | Error err ->
                 Format.eprintf "Error:@.%s@.@."
                   (Yojson.Safe.pretty_to_string
-                     (Error_json.error_to_yojson err)) ;
+                     (Error_json.error_to_yojson err) ) ;
                 `Repeat () )
       in
       exit 0 )
@@ -347,5 +355,6 @@ module Vrf = struct
     Command.group ~summary:"Commands for vrf evaluations"
       [ ("generate-witness", generate_witness)
       ; ("batch-generate-witness", batch_generate_witness)
-      ; ("batch-check-witness", batch_check_witness) ]
+      ; ("batch-check-witness", batch_check_witness)
+      ]
 end

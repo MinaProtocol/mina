@@ -7,7 +7,7 @@ end
 
 module T (Impl : Snarky_backendless.Snark_intf.Run) = struct
   (* TODO: Optimization. Have this have length n - 1 since the last one is
-   determined by the remaining ones. *)
+     determined by the remaining ones. *)
   type 'n t = (Impl.Boolean.var, 'n) Vector.t
 end
 
@@ -27,11 +27,12 @@ struct
     let typ = Vector.typ Boolean.typ n in
     let typ =
       { typ with
-        check=
+        check =
           (fun x ->
             Snarky_backendless.Checked.bind (typ.check x) ~f:(fun () ->
                 make_checked (fun () ->
-                    Boolean.Assert.exactly_one (Vector.to_list x) ) ) ) }
+                    Boolean.Assert.exactly_one (Vector.to_list x) ) ) )
+      }
     in
     Typ.transport typ
       ~there:(fun i -> Vector.init n ~f:(( = ) i))

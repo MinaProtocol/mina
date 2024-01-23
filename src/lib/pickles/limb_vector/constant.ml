@@ -23,8 +23,8 @@ module Hex64 = struct
     let of_yojson yojson =
       match yojson with
       | `String x -> (
-        try Result.Ok (Int64.of_string x)
-        with _ -> Result.Error "Constant.Make.Hex64.t" )
+          try Result.Ok (Int64.of_string x)
+          with _ -> Result.Error "Constant.Make.Hex64.t" )
       | _ ->
           of_yojson yojson
 
@@ -67,7 +67,6 @@ module Hex64 = struct
       (* TODO: Add serialization tests here to make sure that Core doesn't
          change it out from under us between versions.
       *)
-    
     end
   end]
 end

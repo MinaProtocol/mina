@@ -1,5 +1,4 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 open Snark_params
@@ -12,7 +11,8 @@ module Time = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = UInt64.Stable.V1.t [@@deriving sexp, compare, eq, hash, yojson]
+      type t = UInt64.Stable.V1.t
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
 
@@ -31,10 +31,15 @@ module Time = struct
   let zero = UInt64.zero
 
   module Controller = struct
-    [%%if
-    time_offsets]
+    [%%if time_offsets]
 
     type t = unit -> Time.Span.t [@@deriving sexp]
+
+    (* NB: All instances are identical by construction (see basic below). *)
+    let equal _ _ = true
+
+    (* NB: All instances are identical by construction (see basic below). *)
+    let compare _ _ = 0
 
     let time_offset = ref None
 
@@ -68,14 +73,22 @@ module Time = struct
           offset
       | None ->
           let offset =
+            let env = "MINA_TIME_OFFSET" in
+            (* TODO: remove eventually *)
+            let env_deprecated = "CODA_TIME_OFFSET" in
             let env_offset =
-              match Core.Sys.getenv "CODA_TIME_OFFSET" with
-              | Some tm ->
+              match (Core.Sys.getenv env, Core.Sys.getenv env_deprecated) with
+              | Some tm, _ ->
                   Int.of_string tm
-              | None ->
+              | _, Some tm ->
+                  [%log warn]
+                    "Using deprecated environment variable %s, please use %s \
+                     instead"
+                    env_deprecated env ;
+                  Int.of_string tm
+              | None, None ->
                   [%log debug]
-                    "Environment variable CODA_TIME_OFFSET not found, using \
-                     default of 0" ;
+                    "Environment variable %s not found, using default of 0" env ;
                   0
             in
             Core_kernel.Time.Span.of_int_sec env_offset
@@ -87,7 +100,7 @@ module Time = struct
 
     [%%else]
 
-    type t = unit [@@deriving sexp]
+    type t = unit [@@deriving sexp, equal, compare]
 
     let create () = ()
 
@@ -133,7 +146,7 @@ module Time = struct
     module Stable = struct
       module V1 = struct
         type t = UInt64.Stable.V1.t
-        [@@deriving sexp, compare, eq, hash, yojson]
+        [@@deriving sexp, compare, equal, hash, yojson]
 
         let to_latest = Fn.id
       end
@@ -187,8 +200,7 @@ module Time = struct
     Time.of_span_since_epoch
       (Time.Span.of_ms (Int64.to_float (UInt64.to_int64 t)))
 
-  [%%if
-  time_offsets]
+  [%%if time_offsets]
 
   let now offset = of_time (Time.sub (Time.now ()) (offset ()))
 
@@ -229,21 +241,19 @@ module Time = struct
 
   let to_string = Fn.compose Int64.to_string to_int64
 
-  [%%if
-  time_offsets]
+  [%%if time_offsets]
 
-  let to_string_system_time (offset : Controller.t) (t : t) : string =
-    let t2 : t =
-      of_span_since_epoch
-        Span.(to_span_since_epoch t + of_time_span (offset ()))
-    in
-    Int64.to_string (to_int64 t2)
+  let to_system_time (offset : Controller.t) (t : t) =
+    of_span_since_epoch Span.(to_span_since_epoch t + of_time_span (offset ()))
 
   [%%else]
 
-  let to_string_system_time _ = Fn.compose Int64.to_string to_int64
+  let to_system_time (_offset : Controller.t) (t : t) = t
 
   [%%endif]
+
+  let to_string_system_time (offset : Controller.t) (t : t) : string =
+    to_system_time offset t |> to_string
 
   let of_string_exn string =
     Int64.of_string string |> Span.of_ms |> of_span_since_epoch

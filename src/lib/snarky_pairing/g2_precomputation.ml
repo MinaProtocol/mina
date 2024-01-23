@@ -6,10 +6,10 @@ module type S = sig
   module Fqe : Snarky_field_extensions.Intf.S with module Impl = Impl
 
   module Coeff : sig
-    type t = {rx: Fqe.t; ry: Fqe.t; gamma: Fqe.t; gamma_x: Fqe.t}
+    type t = { rx : Fqe.t; ry : Fqe.t; gamma : Fqe.t; gamma_x : Fqe.t }
   end
 
-  type t = {q: Fqe.t * Fqe.t; coeffs: Coeff.t list}
+  type t = { q : Fqe.t * Fqe.t; coeffs : Coeff.t list }
 
   val create : Fqe.t * Fqe.t -> (t, _) Impl.Checked.t
 end
@@ -17,22 +17,22 @@ end
 module Make
     (Fqe : Snarky_field_extensions.Intf.S)
     (N : Snarkette.Nat_intf.S) (Params : sig
-        val coeff_a : Fqe.Unchecked.t
+      val coeff_a : Fqe.Unchecked.t
 
-        val loop_count : N.t
+      val loop_count : N.t
     end) =
 struct
   module Fqe = Fqe
   module Impl = Fqe.Impl
 
   module Coeff = struct
-    type t = {rx: Fqe.t; ry: Fqe.t; gamma: Fqe.t; gamma_x: Fqe.t}
+    type t = { rx : Fqe.t; ry : Fqe.t; gamma : Fqe.t; gamma_x : Fqe.t }
     [@@deriving fields]
   end
 
   type g2 = Fqe.t * Fqe.t
 
-  type t = {q: g2; coeffs: Coeff.t list}
+  type t = { q : g2; coeffs : Coeff.t list }
 
   open Impl
   open Let_syntax
@@ -49,7 +49,7 @@ struct
     and ry = c ry
     and gamma = c gamma
     and gamma_x = c gamma_x in
-    {rx; ry; gamma; gamma_x}
+    { rx; ry; gamma; gamma_x }
 
   let if_ b ~then_ ~else_ =
     let%map q = if_g2 b ~then_:then_.q ~else_:else_.q
@@ -57,9 +57,9 @@ struct
       Checked.List.map (List.zip_exn then_.coeffs else_.coeffs)
         ~f:(fun (t, e) -> if_coeff b ~then_:t ~else_:e)
     in
-    {q; coeffs}
+    { q; coeffs }
 
-  type 'fqe loop_state = {rx: 'fqe; ry: 'fqe}
+  type 'fqe loop_state = { rx : 'fqe; ry : 'fqe }
 
   let length (a, b, c) =
     let l = Field.Var.length in
@@ -74,44 +74,47 @@ struct
     in
     let c =
       let gamma_x = gamma * s.rx in
-      { Coeff.rx= constant s.rx
-      ; ry= constant s.ry
-      ; gamma= constant gamma
-      ; gamma_x= constant gamma_x }
+      { Coeff.rx = constant s.rx
+      ; ry = constant s.ry
+      ; gamma = constant gamma
+      ; gamma_x = constant gamma_x
+      }
     in
     let s =
       let rx = square gamma - (s.rx + s.rx) in
       let ry = (gamma * (s.rx - rx)) - s.ry in
-      {rx; ry}
+      { rx; ry }
     in
     (s, c)
 
-  let addition_step_unchecked naf_i ~q:(qx, qy)
-      (s : Fqe.Unchecked.t loop_state) =
+  let addition_step_unchecked naf_i ~q:(qx, qy) (s : Fqe.Unchecked.t loop_state)
+      =
     let open Fqe in
     let open Unchecked in
     let gamma =
       let top = if naf_i > 0 then s.ry - qy else s.ry + qy in
-      (*  This [div_unsafe] is definitely safe in the context of pre-processing
-            a verification key. The reason is the following. The top hash of the SNARK commits
-            the prover to using the correct verification key inside the SNARK, and we know for
-            that verification key that we will not hit a 0/0 case.
 
-            In the general pairing context (e.g., for precomputing on G2 elements in the proof),
-            I am not certain about this use of [div_unsafe]. *)
+      (* This [div_unsafe] is definitely safe in the context of pre-processing
+           a verification key. The reason is the following. The top hash of the SNARK commits
+           the prover to using the correct verification key inside the SNARK, and we know for
+           that verification key that we will not hit a 0/0 case.
+
+           In the general pairing context (e.g., for precomputing on G2 elements in the proof),
+           I am not certain about this use of [div_unsafe]. *)
       top / (s.rx - qx)
     in
     let c =
       let gamma_x = gamma * qx in
-      { Coeff.rx= constant s.rx
-      ; ry= constant s.ry
-      ; gamma= constant gamma
-      ; gamma_x= constant gamma_x }
+      { Coeff.rx = constant s.rx
+      ; ry = constant s.ry
+      ; gamma = constant gamma
+      ; gamma_x = constant gamma_x
+      }
     in
     let s =
       let rx = square gamma - (s.rx + qx) in
       let ry = (gamma * (s.rx - rx)) - s.ry in
-      {rx; ry}
+      { rx; ry }
     in
     (s, c)
 
@@ -130,11 +133,11 @@ struct
           go (i - 1) found_nonzero s acc
         else go (i - 1) found_nonzero s acc
     in
-    let coeffs = go (Array.length naf - 1) false {rx= qx; ry= qy} [] in
-    {q= Fqe.(constant qx, constant qy); coeffs}
+    let coeffs = go (Array.length naf - 1) false { rx = qx; ry = qy } [] in
+    { q = Fqe.(constant qx, constant qy); coeffs }
 
   (* I verified using sage that if the input [s] satisfies ry^2 = rx^3 + a rx + b, then
-   so does the output. *)
+     so does the output. *)
   let doubling_step (s : Fqe.t loop_state) =
     with_label __LOC__
       (let open Fqe in
@@ -150,7 +153,7 @@ struct
              since our curve has prime order. *)
         in
         let%map gamma_x = gamma * s.rx in
-        {Coeff.rx= s.rx; ry= s.ry; gamma; gamma_x}
+        { Coeff.rx = s.rx; ry = s.ry; gamma; gamma_x }
       in
       let%map s =
         with_label __LOC__
@@ -165,8 +168,8 @@ struct
                        Fqe.Unchecked.(square gamma - (srx + srx))))
              in
              (* rx = c.gamma^2 - 2 * s.rx
-           rx + 2 * s.rx = c.gamma^2
-        *)
+                rx + 2 * s.rx = c.gamma^2
+             *)
              let%map () =
                assert_square c.gamma (res + scale s.rx (Field.of_int 2))
              in
@@ -191,7 +194,7 @@ struct
              let%map () = assert_r1cs c.gamma (s.rx - rx) (res + s.ry) in
              res
            in
-           {rx; ry})
+           { rx; ry } )
       in
       (s, c))
 
@@ -202,23 +205,24 @@ struct
       let%bind c =
         let%bind gamma =
           let top = if naf_i > 0 then s.ry - qy else s.ry + qy in
-          (*  This [div_unsafe] is definitely safe in the context of pre-processing
-            a verification key. The reason is the following. The top hash of the SNARK commits
-            the prover to using the correct verification key inside the SNARK, and we know for
-            that verification key that we will not hit a 0/0 case.
 
-            In the general pairing context (e.g., for precomputing on G2 elements in the proof),
-            I am not certain about this use of [div_unsafe]. *)
+          (* This [div_unsafe] is definitely safe in the context of pre-processing
+             a verification key. The reason is the following. The top hash of the SNARK commits
+             the prover to using the correct verification key inside the SNARK, and we know for
+             that verification key that we will not hit a 0/0 case.
+
+             In the general pairing context (e.g., for precomputing on G2 elements in the proof),
+             I am not certain about this use of [div_unsafe]. *)
           div_unsafe top (s.rx - qx)
         in
         let%map gamma_x = gamma * qx in
-        {Coeff.rx= s.rx; ry= s.ry; gamma; gamma_x}
+        { Coeff.rx = s.rx; ry = s.ry; gamma; gamma_x }
       in
       let%map s =
         let%bind rx =
           (* rx = c.gamma^2 - (s.rx + qx)
-           c.gamma^2 = rx + s.rx + qx
-        *)
+             c.gamma^2 = rx + s.rx + qx
+          *)
           let%bind res =
             exists Fqe.typ
               ~compute:
@@ -234,8 +238,8 @@ struct
         in
         let%map ry =
           (* ry = c.gamma * (s.rx - rx) - s.ry
-           c.gamma * (s.rx - rx) = ry + s.ry
-        *)
+             c.gamma * (s.rx - rx) = ry + s.ry
+          *)
           let%bind res =
             exists Fqe.typ
               ~compute:
@@ -250,7 +254,7 @@ struct
           let%map () = assert_r1cs c.gamma (s.rx - rx) (res + s.ry) in
           res
         in
-        {rx; ry}
+        { rx; ry }
       in
       (s, c))
 
@@ -272,6 +276,8 @@ struct
         else go (i - 1) found_nonzero s acc
     in
     with_label __LOC__
-      (let%map coeffs = go (Array.length naf - 1) false {rx= qx; ry= qy} [] in
-       {q; coeffs})
+      (let%map coeffs =
+         go (Array.length naf - 1) false { rx = qx; ry = qy } []
+       in
+       { q; coeffs } )
 end

@@ -1,17 +1,12 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Ppxlib
-open Asttypes
-open Parsetree
-open Longident
 open Core
 open Async
 open Mina_state
 
 (* TODO: refactor to do compile time selection *)
-[%%if
-proof_level = "full"]
+[%%if proof_level = "full"]
 
 let use_dummy_values = false
 
@@ -21,8 +16,7 @@ let use_dummy_values = true
 
 [%%endif]
 
-[%%inject
-"generate_genesis_proof", generate_genesis_proof]
+[%%inject "generate_genesis_proof", generate_genesis_proof]
 
 module type S = sig
   val compiled_values : Genesis_proof.t Async.Deferred.t option
@@ -41,7 +35,7 @@ let hashes =
        Blockchain_snark.Blockchain_snark_state.constraint_system_digests
          ~proof_level ~constraint_constants ()
      in
-     ts @ bs)
+     ts @ bs )
 
 let hashes_to_expr ~loc hashes =
   let open Ppxlib.Ast_builder.Default in
@@ -60,8 +54,8 @@ let vk_id_to_expr ~loc vk_id =
            [%e
              estring ~loc
                (Core.Sexp.to_string
-                  (Pickles.Verification_key.Id.sexp_of_t vk_id))]
-           Pickles.Verification_key.Id.t_of_sexp)
+                  (Pickles.Verification_key.Id.sexp_of_t vk_id) )]
+           Pickles.Verification_key.Id.t_of_sexp )
     in
     fun () -> Lazy.force t]
 
@@ -78,7 +72,7 @@ module Inputs = struct
     Consensus.Constants.create ~constraint_constants
       ~protocol_constants:genesis_constants.protocol
 
-  let protocol_state_with_hash =
+  let protocol_state_with_hashes =
     Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
       ~genesis_epoch_data ~constraint_constants ~consensus_constants
 end
@@ -96,16 +90,17 @@ module Dummy = struct
     if generate_genesis_proof then
       Some
         (Async.return
-           { Genesis_proof.runtime_config= Runtime_config.default
+           { Genesis_proof.runtime_config = Runtime_config.default
            ; constraint_constants
            ; proof_level
            ; genesis_constants
-           ; genesis_ledger= (module Test_genesis_ledger)
+           ; genesis_ledger = (module Test_genesis_ledger)
            ; genesis_epoch_data
            ; consensus_constants
-           ; protocol_state_with_hash
-           ; constraint_system_digests= hashes
-           ; proof_data= None })
+           ; protocol_state_with_hashes
+           ; constraint_system_digests = hashes
+           ; proof_data = None
+           } )
     else None
 end
 
@@ -127,24 +122,25 @@ module Make_real () = struct
            Genesis_proof.create_values
              (module T)
              (module B)
-             { runtime_config= Runtime_config.default
+             { runtime_config = Runtime_config.default
              ; constraint_constants
-             ; proof_level= Full
+             ; proof_level = Full
              ; genesis_constants
-             ; genesis_ledger= (module Test_genesis_ledger)
+             ; genesis_ledger = (module Test_genesis_ledger)
              ; genesis_epoch_data
              ; consensus_constants
-             ; protocol_state_with_hash
-             ; constraint_system_digests= None
-             ; blockchain_proof_system_id= None }
+             ; protocol_state_with_hashes
+             ; constraint_system_digests = None
+             ; blockchain_proof_system_id = None
+             }
          in
-         values)
+         values )
     else None
 end
 
 let main () =
   let open Ppxlib.Ast_builder.Default in
-  let target = Sys.argv.(1) in
+  let target = (Sys.get_argv ()).(1) in
   let fmt = Format.formatter_of_out_channel (Out_channel.create target) in
   let loc = Ppxlib.Location.none in
   let (module M) =
@@ -165,7 +161,7 @@ let main () =
 
       let for_unit_tests =
         lazy
-          (let protocol_state_with_hash =
+          (let protocol_state_with_hashes =
              Mina_state.Genesis_protocol_state.t
                ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
                ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
@@ -174,18 +170,19 @@ let main () =
                ~consensus_constants:
                  (Lazy.force Consensus.Constants.for_unit_tests)
            in
-           { runtime_config= Runtime_config.default
-           ; constraint_constants=
+           { runtime_config = Runtime_config.default
+           ; constraint_constants =
                Genesis_constants.Constraint_constants.for_unit_tests
-           ; proof_level= Genesis_constants.Proof_level.for_unit_tests
-           ; genesis_constants= Genesis_constants.for_unit_tests
-           ; genesis_ledger= Genesis_ledger.for_unit_tests
-           ; genesis_epoch_data= Consensus.Genesis_epoch_data.for_unit_tests
-           ; consensus_constants= Lazy.force Consensus.Constants.for_unit_tests
-           ; protocol_state_with_hash
-           ; constraint_system_digests=
+           ; proof_level = Genesis_constants.Proof_level.for_unit_tests
+           ; genesis_constants = Genesis_constants.for_unit_tests
+           ; genesis_ledger = Genesis_ledger.for_unit_tests
+           ; genesis_epoch_data = Consensus.Genesis_epoch_data.for_unit_tests
+           ; consensus_constants = Lazy.force Consensus.Constants.for_unit_tests
+           ; protocol_state_with_hashes
+           ; constraint_system_digests =
                lazy [%e hashes_to_expr ~loc (Lazy.force hashes)]
-           ; proof_data= None })
+           ; proof_data = None
+           } )
 
       let compiled_inputs =
         lazy
@@ -198,35 +195,37 @@ let main () =
              Consensus.Constants.create ~constraint_constants
                ~protocol_constants:genesis_constants.protocol
            in
-           let protocol_state_with_hash =
+           let protocol_state_with_hashes =
              Mina_state.Genesis_protocol_state.t
                ~genesis_ledger:Test_genesis_ledger.t ~genesis_epoch_data
                ~constraint_constants ~consensus_constants
            in
-           { Genesis_proof.Inputs.runtime_config= Runtime_config.default
+           { Genesis_proof.Inputs.runtime_config = Runtime_config.default
            ; constraint_constants
-           ; proof_level= Genesis_constants.Proof_level.compiled
+           ; proof_level = Genesis_constants.Proof_level.compiled
            ; genesis_constants
-           ; genesis_ledger= (module Test_genesis_ledger)
+           ; genesis_ledger = (module Test_genesis_ledger)
            ; genesis_epoch_data
            ; consensus_constants
-           ; protocol_state_with_hash
-           ; constraint_system_digests=
+           ; protocol_state_with_hashes
+           ; constraint_system_digests =
                [%e
                  match compiled_values with
-                 | Some {constraint_system_digests= hashes; _} ->
+                 | Some { constraint_system_digests = hashes; _ } ->
                      [%expr Some [%e hashes_to_expr ~loc (Lazy.force hashes)]]
                  | None ->
                      [%expr None]]
-           ; blockchain_proof_system_id=
+           ; blockchain_proof_system_id =
                [%e
                  match compiled_values with
                  | Some
-                     {proof_data= Some {blockchain_proof_system_id= id; _}; _}
-                   ->
+                     { proof_data = Some { blockchain_proof_system_id = id; _ }
+                     ; _
+                     } ->
                      [%expr Some [%e vk_id_to_expr ~loc id]]
                  | _ ->
-                     [%expr None]] })
+                     [%expr None]]
+           } )
 
       let compiled =
         [%e
@@ -236,29 +235,28 @@ let main () =
                 Some
                   ( lazy
                     (let inputs = Lazy.force compiled_inputs in
-                     { runtime_config= inputs.runtime_config
-                     ; constraint_constants= inputs.constraint_constants
-                     ; proof_level= inputs.proof_level
-                     ; genesis_constants= inputs.genesis_constants
-                     ; genesis_ledger= inputs.genesis_ledger
-                     ; genesis_epoch_data= inputs.genesis_epoch_data
-                     ; consensus_constants= inputs.consensus_constants
-                     ; protocol_state_with_hash=
-                         inputs.protocol_state_with_hash
-                     ; constraint_system_digests=
+                     { runtime_config = inputs.runtime_config
+                     ; constraint_constants = inputs.constraint_constants
+                     ; proof_level = inputs.proof_level
+                     ; genesis_constants = inputs.genesis_constants
+                     ; genesis_ledger = inputs.genesis_ledger
+                     ; genesis_epoch_data = inputs.genesis_epoch_data
+                     ; consensus_constants = inputs.consensus_constants
+                     ; protocol_state_with_hashes =
+                         inputs.protocol_state_with_hashes
+                     ; constraint_system_digests =
                          lazy [%e hashes_to_expr ~loc (Lazy.force hashes)]
-                     ; proof_data=
+                     ; proof_data =
                          [%e
                            match compiled_values.proof_data with
                            | Some proof_data ->
                                [%expr
                                  Some
-                                   { blockchain_proof_system_id=
+                                   { blockchain_proof_system_id =
                                        [%expr
                                          vk_id_to_expr ~loc
-                                           proof_data
-                                             .blockchain_proof_system_id]
-                                   ; genesis_proof=
+                                           proof_data.blockchain_proof_system_id]
+                                   ; genesis_proof =
                                        Core.Binable.of_string
                                          (module Mina_base.Proof.Stable.Latest)
                                          [%e
@@ -266,9 +264,11 @@ let main () =
                                              (Binable.to_string
                                                 ( module Mina_base.Proof.Stable
                                                          .Latest )
-                                                proof_data.genesis_proof)] }]
+                                                proof_data.genesis_proof )]
+                                   }]
                            | None ->
-                               [%expr None]] }) )]
+                               [%expr None]]
+                     } ) )]
           | None ->
               [%expr None]]]
   in

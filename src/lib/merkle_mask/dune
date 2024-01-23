@@ -2,11 +2,31 @@
  (name merkle_mask)
  (public_name merkle_mask)
  (library_flags -linkall)
- (libraries core debug_assert bitstring integers immutable_array
-            merkle_ledger merkle_address yojson visualization)
+ (libraries
+   ;; opam libraries
+   base.caml
+   async_kernel
+   async
+   sexplib0
+   core_kernel.uuid
+   integers
+   bitstring
+   core_kernel
+   yojson
+   core
+   base.base_internalhash_types
+   core.uuid
+   stdio
+   ;; local libraries
+   debug_assert
+   merkle_ledger
+   visualization
+   non_empty_list
+   direction
+ )
  (preprocess
   (pps
-    ppx_deriving.eq
+    ppx_compare
     ppx_deriving.show
     ppx_deriving_yojson
     ppx_jane

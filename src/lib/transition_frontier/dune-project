@@ -1,2 +1,3 @@
 (lang dune 2.7)
 (name transition_frontier)
+(implicit_transitive_deps false)

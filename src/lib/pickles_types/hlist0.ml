@@ -11,8 +11,8 @@ module Length = struct
 
   type 'xs n = T : 'n Nat.t * ('xs, 'n) t -> 'xs n
 
-  let rec contr : type xs n m.
-      (xs, n) t -> (xs, m) t -> (n, m) Core_kernel.Type_equal.t =
+  let rec contr :
+      type xs n m. (xs, n) t -> (xs, m) t -> (n, m) Core_kernel.Type_equal.t =
    fun t1 t2 ->
     match (t1, t2) with
     | Z, Z ->

@@ -6,21 +6,21 @@ module type Inputs_intf = sig
 
   module Fq :
     Snarky_field_extensions.Intf.S
-    with module Impl = Impl
-     and type 'a A.t = 'a
-     and type 'a Base.t_ = 'a
+      with module Impl = Impl
+       and type 'a A.t = 'a
+       and type 'a Base.t_ = 'a
 
   module Fqe :
     Snarky_field_extensions.Intf.S_with_primitive_element
-    with module Impl = Impl
-     and module Base = Fq
+      with module Impl = Impl
+       and module Base = Fq
 
   module Fqk : sig
     include
       Snarky_field_extensions.Intf.S
-      with module Impl = Impl
-       and type 'a Base.t_ = 'a Fqe.t_
-       and type 'a A.t = 'a * 'a
+        with module Impl = Impl
+         and type 'a Base.t_ = 'a Fqe.t_
+         and type 'a A.t = 'a * 'a
 
     val special_mul : t -> t -> (t, _) Impl.Checked.t
 
@@ -31,15 +31,15 @@ module type Inputs_intf = sig
 
   module G1_precomputation :
     G1_precomputation.S
-    with module Impl = Impl
-     and type 'a Fqe.Base.t_ = 'a Fqe.Base.t_
-     and type 'a Fqe.A.t = 'a Fqe.A.t
+      with module Impl = Impl
+       and type 'a Fqe.Base.t_ = 'a Fqe.Base.t_
+       and type 'a Fqe.A.t = 'a Fqe.A.t
 
   module G2_precomputation :
     G2_precomputation.S
-    with module Impl = Impl
-     and type 'a Fqe.Base.t_ = 'a Fqe.Base.t_
-     and type 'a Fqe.A.t = 'a Fqe.A.t
+      with module Impl = Impl
+       and type 'a Fqe.Base.t_ = 'a Fqe.Base.t_
+       and type 'a Fqe.A.t = 'a Fqe.A.t
 
   module N : Snarkette.Nat_intf.S
 
@@ -55,8 +55,8 @@ module Make (Inputs : Inputs_intf) = struct
   open Impl
   open Let_syntax
 
-  let double_line_eval (p : G1_precomputation.t)
-      (c : G2_precomputation.Coeff.t) : (Fqk.t, _) Checked.t =
+  let double_line_eval (p : G1_precomputation.t) (c : G2_precomputation.Coeff.t)
+      : (Fqk.t, _) Checked.t =
     with_label __LOC__
       (let px, _ = p.p in
        let%map c1 =
@@ -64,7 +64,7 @@ module Make (Inputs : Inputs_intf) = struct
          let%map t = Fqe.mul_field gamma_twist px in
          Fqe.(c.gamma_x - c.ry - t)
        in
-       (p.py_twist_squared, c1))
+       (p.py_twist_squared, c1) )
 
   (* result = c.gamma_x + qy * (invert_q ? -1 : 1) - gamma_twist * px *)
   let add_line_eval ~invert_q (p : G1_precomputation.t)
@@ -78,12 +78,11 @@ module Make (Inputs : Inputs_intf) = struct
          let%map t = mul_field gamma_twist px in
          c.gamma_x + (if invert_q then qy else Fqe.negate qy) - t
        in
-       (p.py_twist_squared, c1))
+       (p.py_twist_squared, c1) )
 
   let uncons_exn = function [] -> failwith "uncons_exn" | x :: xs -> (x, xs)
 
-  let finalize =
-    if Params.loop_count_is_neg then Fqk.unitary_inverse else Fn.id
+  let finalize = if Params.loop_count_is_neg then Fqk.unitary_inverse else Fn.id
 
   let miller_loop (p : G1_precomputation.t) (q : G2_precomputation.t) =
     let naf = Snarkette.Fields.find_wnaf (module N) 1 Params.loop_count in
@@ -120,11 +119,11 @@ module Make (Inputs : Inputs_intf) = struct
             | Neg ->
                 Fqk.special_div acc a
             (* TODO: Use an unsafe div here if appropriate. I think it should be fine
-             since py_twisted is py (a curve y-coorindate, guaranteed to be non-zero)
-             times a constant.
-          *)
+               since py_twisted is py (a curve y-coorindate, guaranteed to be non-zero)
+               times a constant.
+            *)
           in
-          (acc, (sgn, p, {q with G2_precomputation.coeffs})) )
+          (acc, (sgn, p, { q with G2_precomputation.coeffs })) )
     in
     let rec go i found_nonzero pairs f =
       if i < 0 then return f

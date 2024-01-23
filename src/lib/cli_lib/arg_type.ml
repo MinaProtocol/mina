@@ -10,6 +10,24 @@ let int16 =
   Command.Arg_type.map Command.Param.int
     ~f:(Fn.compose Or_error.ok_exn validate_int16)
 
+let pubsub_topic_mode =
+  let open Gossip_net.Libp2p in
+  Command.Arg_type.create (fun s ->
+      match s with
+      | "ro" ->
+          RO
+      | "rw" ->
+          RW
+      | "none" ->
+          N
+      | _ ->
+          eprintf "Invalid pubsub topic mode: %s" s ;
+          exit 1 )
+
+let pubsub_topic_mode_to_string mode =
+  let open Gossip_net.Libp2p in
+  match mode with RO -> "ro" | RW -> "rw" | N -> "none"
+
 let public_key_compressed =
   Command.Arg_type.create (fun s ->
       let error_string e =
@@ -31,14 +49,14 @@ let public_key_compressed =
  * public-facing interface if possible *)
 include (
   struct
-      let public_key =
-        Command.Arg_type.map public_key_compressed ~f:(fun pk ->
-            match Public_key.decompress pk with
-            | None ->
-                failwith "Invalid key"
-            | Some pk' ->
-                pk' )
-    end :
+    let public_key =
+      Command.Arg_type.map public_key_compressed ~f:(fun pk ->
+          match Public_key.decompress pk with
+          | None ->
+              failwith "Invalid key"
+          | Some pk' ->
+              pk' )
+  end :
     sig
       val public_key : Public_key.t Command.Arg_type.t
         [@@deprecated "Use public_key_compressed in commandline args"]
@@ -49,7 +67,7 @@ let token_id =
 
 let receipt_chain_hash =
   Command.Arg_type.map Command.Param.string
-    ~f:Mina_base.Receipt.Chain_hash.of_string
+    ~f:Mina_base.Receipt.Chain_hash.of_base58_check_exn
 
 let peer : Host_and_port.t Command.Arg_type.t =
   Command.Arg_type.create (fun s -> Host_and_port.of_string s)
@@ -74,8 +92,7 @@ let hd_index =
 let ip_address =
   Command.Arg_type.map Command.Param.string ~f:Unix.Inet_addr.of_string
 
-let cidr_mask =
-  Command.Arg_type.map Command.Param.string ~f:Unix.Cidr.of_string
+let cidr_mask = Command.Arg_type.map Command.Param.string ~f:Unix.Cidr.of_string
 
 let log_level =
   Command.Arg_type.map Command.Param.string ~f:(fun log_level_str_with_case ->

@@ -20,41 +20,24 @@ open Asttypes
      module T = struct
        [%%define_from_scope x,y]
      end
- *)
+*)
 
 let name = "define_from_scope"
 
-let pat_of_id loc id =
-  {ppat_desc= Ppat_var {txt= id; loc}; ppat_loc= loc; ppat_attributes= []}
-
-let ident_of_id loc id =
-  { pexp_desc= Pexp_ident {txt= Lident id; loc}
-  ; pexp_loc= loc
-  ; pexp_attributes= [] }
-
 let expr_to_id loc expr =
   match expr.pexp_desc with
-  | Pexp_ident {txt= Lident s; _} ->
+  | Pexp_ident { txt = Lident s; _ } ->
       s
   | _ ->
       Location.raise_errorf ~loc "Expected identifier"
 
 let expand ~loc ~path:_ (items : expression list) =
+  let (module Ast_builder) = Ast_builder.make loc in
+  let open Ast_builder in
   let ids = List.map items ~f:(expr_to_id loc) in
-  let pats = List.map ids ~f:(pat_of_id loc) in
-  let idents = List.map ids ~f:(ident_of_id loc) in
-  { pstr_desc=
-      Pstr_value
-        ( Nonrecursive
-        , [ { pvb_pat=
-                {ppat_desc= Ppat_tuple pats; ppat_loc= loc; ppat_attributes= []}
-            ; pvb_expr=
-                { pexp_desc= Pexp_tuple idents
-                ; pexp_loc= loc
-                ; pexp_attributes= [] }
-            ; pvb_attributes= []
-            ; pvb_loc= loc } ] )
-  ; pstr_loc= loc }
+  let vars = List.map ids ~f:evar in
+  let pats = List.map ids ~f:pvar in
+  [%stri let [%p ppat_tuple pats] = [%e pexp_tuple vars]]
 
 let ext =
   Extension.declare name Extension.Context.structure_item
@@ -62,4 +45,4 @@ let ext =
     expand
 
 let () =
-  Driver.register_transformation name ~rules:[Context_free.Rule.extension ext]
+  Driver.register_transformation name ~rules:[ Context_free.Rule.extension ext ]

@@ -36,36 +36,38 @@ let constr_of_decl ~loc decl =
 let str_decl ~loc (decl : type_declaration) : structure =
   let open Ast_builder.Default in
   match decl with
-  | {ptype_kind= Ptype_variant constrs; ptype_name= name; _} ->
+  | { ptype_kind = Ptype_variant constrs; ptype_name = name; _ } ->
       (* [type t = A of int | B of bool | ...] *)
       [%str
         let ([%p pvar ~loc (mangle ~suffix:deriver_name name.txt)] :
-              [%t constr_of_decl ~loc decl] -> int) =
+              [%t constr_of_decl ~loc decl] -> int ) =
           [%e
             pexp_function ~loc
               (List.mapi constrs ~f:(fun i constr ->
-                   { pc_lhs=
+                   { pc_lhs =
                        ppat_construct ~loc (mk_lid constr.pcd_name)
                          ( match constr.pcd_args with
                          | Pcstr_tuple [] ->
                              None
                          | _ ->
                              Some (ppat_any ~loc) )
-                   ; pc_guard= None
-                   ; pc_rhs= eint ~loc i } ))]
+                   ; pc_guard = None
+                   ; pc_rhs = eint ~loc i
+                   } ) )]
 
         let [%p pvar ~loc (mangle_prefix ~prefix:"min" name.txt)] = 0
 
         let [%p pvar ~loc (mangle_prefix ~prefix:"max" name.txt)] =
           [%e eint ~loc (List.length constrs - 1)]]
-  | { ptype_kind= Ptype_abstract
-    ; ptype_name= name
-    ; ptype_manifest= Some {ptyp_desc= Ptyp_constr (lid, _); _}
-    ; _ } ->
+  | { ptype_kind = Ptype_abstract
+    ; ptype_name = name
+    ; ptype_manifest = Some { ptyp_desc = Ptyp_constr (lid, _); _ }
+    ; _
+    } ->
       (* [type t = Foo.t] *)
       [%str
         let ([%p pvar ~loc (mangle ~suffix:deriver_name name.txt)] :
-              [%t constr_of_decl ~loc decl] -> int) =
+              [%t constr_of_decl ~loc decl] -> int ) =
           [%e
             pexp_ident ~loc (Located.map (mangle_lid ~suffix:deriver_name) lid)]
 
@@ -76,41 +78,42 @@ let str_decl ~loc (decl : type_declaration) : structure =
         let [%p pvar ~loc (mangle_prefix ~prefix:"max" name.txt)] =
           [%e
             pexp_ident ~loc (Located.map (mangle_prefix_lid ~prefix:"max") lid)]]
-  | { ptype_kind= Ptype_abstract
-    ; ptype_name= name
-    ; ptype_manifest= Some {ptyp_desc= Ptyp_variant (constrs, Closed, _); _}
-    ; _ } ->
+  | { ptype_kind = Ptype_abstract
+    ; ptype_name = name
+    ; ptype_manifest = Some { ptyp_desc = Ptyp_variant (constrs, Closed, _); _ }
+    ; _
+    } ->
       (* [type t = [ `A of int | `B of bool | ...]] *)
       [%str
         let ([%p pvar ~loc (mangle ~suffix:deriver_name name.txt)] :
-              [%t constr_of_decl ~loc decl] -> int) =
+              [%t constr_of_decl ~loc decl] -> int ) =
           [%e
             pexp_function ~loc
               (List.mapi constrs ~f:(fun i constr ->
-                   match constr with
-                   | Rtag (label, _, has_empty, args) ->
-                       { pc_lhs=
+                   match constr.prf_desc with
+                   | Rtag (label, has_empty, args) ->
+                       { pc_lhs =
                            ( match (has_empty, args) with
                            | _, [] ->
                                (* [`A] *)
                                ppat_variant ~loc label.txt None
                            | false, _ :: _ ->
                                (* [`A of int] *)
-                               ppat_variant ~loc label.txt
-                                 (Some (ppat_any ~loc))
+                               ppat_variant ~loc label.txt (Some (ppat_any ~loc))
                            | true, _ :: _ ->
                                (* [`A | `A of int] *)
                                ppat_or ~loc
                                  (ppat_variant ~loc label.txt None)
                                  (ppat_variant ~loc label.txt
-                                    (Some (ppat_any ~loc))) )
-                       ; pc_guard= None
-                       ; pc_rhs= eint ~loc i }
+                                    (Some (ppat_any ~loc)) ) )
+                       ; pc_guard = None
+                       ; pc_rhs = eint ~loc i
+                       }
                    | Rinherit typ ->
                        Location.raise_errorf ~loc:typ.ptyp_loc
-                         "Cannot derive %s for this type: inherited fields \
-                          are not supported"
-                         deriver_name ))]
+                         "Cannot derive %s for this type: inherited fields are \
+                          not supported"
+                         deriver_name ) )]
 
         let [%p pvar ~loc (mangle_prefix ~prefix:"min" name.txt)] = 0
 
@@ -136,7 +139,8 @@ let sig_decl ~loc (decl : type_declaration) : signature =
     ; value_description ~loc ~prim:[]
         ~name:
           (Located.mk ~loc (mangle_prefix ~prefix:"max" decl.ptype_name.txt))
-        ~type_:[%type: int] ]
+        ~type_:[%type: int]
+    ]
 
 let str_type_decl ~loc ~path:_ (_rec_flag, decls) : structure =
   List.concat_map ~f:(str_decl ~loc) decls

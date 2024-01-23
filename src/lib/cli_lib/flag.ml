@@ -2,48 +2,49 @@ open Core
 
 let json =
   Command.Param.(
-    flag "--json" ~aliases:["json"] no_arg
+    flag "--json" ~aliases:[ "json" ] no_arg
       ~doc:"Use JSON output (default: plaintext)")
 
 let plaintext =
   Command.Param.(
-    flag "--plaintext" ~aliases:["plaintext"] no_arg
+    flag "--plaintext" ~aliases:[ "plaintext" ] no_arg
       ~doc:"Use plaintext input or output (default: JSON)")
 
 let performance =
   Command.Param.(
-    flag "--performance" ~aliases:["performance"] no_arg
+    flag "--performance" ~aliases:[ "performance" ] no_arg
       ~doc:
         "Include performance histograms in status output (default: don't \
          include)")
 
 let privkey_write_path =
   let open Command.Param in
-  flag "--privkey-path" ~aliases:["privkey-path"]
+  flag "--privkey-path" ~aliases:[ "privkey-path" ]
     ~doc:"FILE File to write private key into (public key will be FILE.pub)"
     (required string)
 
 let privkey_read_path =
   let open Command.Param in
-  flag "--privkey-path" ~aliases:["privkey-path"]
+  flag "--privkey-path" ~aliases:[ "privkey-path" ]
     ~doc:"FILE File to read private key from" (required string)
 
 let conf_dir =
   let open Command.Param in
-  flag "--config-directory" ~aliases:["config-directory"]
+  flag "--config-directory" ~aliases:[ "config-directory" ]
     ~doc:"DIR Configuration directory" (optional string)
 
 module Doc_builder = struct
   type 'value t =
-    { type_name: string
-    ; description: string
-    ; examples: 'value list
-    ; display: 'value -> string }
+    { type_name : string
+    ; description : string
+    ; examples : 'value list
+    ; display : 'value -> string
+    }
 
   let create ~display ?(examples = []) type_name description =
-    {type_name; description; examples; display}
+    { type_name; description; examples; display }
 
-  let display ~default {type_name; description; examples; display} =
+  let display ~default { type_name; description; examples; display } =
     let open Printf in
     let example_text =
       if List.is_empty examples then ""
@@ -59,10 +60,10 @@ module Doc_builder = struct
 end
 
 module Types = struct
-  type 'a with_name = {name: string; value: 'a}
+  type 'a with_name = { name : string; value : 'a }
 
   type 'a with_name_and_displayed_default =
-    {name: string; value: 'a option; default: 'a}
+    { name : string; value : 'a option; default : 'a }
 
   (*Difference between Optional and Optional_value is that the name is still accessible if the value is None*)
   type ('value, 'output) t =
@@ -77,7 +78,7 @@ end
 let setup_flag ~arg_type ~name ?aliases doc =
   let open Command.Let_syntax in
   Command.Param.flag name ?aliases ~doc (Command.Param.optional arg_type)
-  >>| Option.map ~f:(fun value -> {Types.name; value})
+  >>| Option.map ~f:(fun value -> { Types.name; value })
 
 let create (type value output) :
        name:string
@@ -95,22 +96,22 @@ let create (type value output) :
         setup_flag ~arg_type ~name ?aliases
           (Doc_builder.display ~default:None doc_builder)
         >>| function
-        | Some {name; value} ->
-            {Types.name; value= Some value}
+        | Some { name; value } ->
+            { Types.name; value = Some value }
         | None ->
-            {name; value= None} )
+            { name; value = None } )
     | Optional_with_displayed_default default -> (
         setup_flag ~arg_type ~name ?aliases
           (Doc_builder.display ~default:(Some default) doc_builder)
         >>| function
-        | Some {name; value} ->
-            {Types.name; value= Some value; default}
+        | Some { name; value } ->
+            { Types.name; value = Some value; default }
         | None ->
-            {name; value= None; default} )
+            { name; value = None; default } )
     | Resolve_with_default default ->
         setup_flag ~arg_type ~name ?aliases
           (Doc_builder.display ~default:(Some default) doc_builder)
-        >>| Option.value ~default:{Types.name; value= default}
+        >>| Option.value ~default:{ Types.name; value = default }
 
 module Port = struct
   let to_string = Int.to_string
@@ -150,28 +151,28 @@ module Port = struct
 
   module Daemon = struct
     let external_ =
-      create ~name:"--external-port" ~aliases:["external-port"]
+      create ~name:"--external-port" ~aliases:[ "external-port" ]
         ~default:default_libp2p
         "Port to use for all libp2p communications (gossip and RPC)"
 
     let client =
-      create ~name:"--client-port" ~aliases:["client-port"]
+      create ~name:"--client-port" ~aliases:[ "client-port" ]
         ~default:default_client
         "local RPC-server for clients to interact with the daemon"
 
     let rest_server =
-      create ~name:"--rest-port" ~aliases:["rest-port"] ~default:default_rest
+      create ~name:"--rest-port" ~aliases:[ "rest-port" ] ~default:default_rest
         "local REST-server for daemon interaction"
 
     let limited_graphql_server =
       create_optional ~name:"--limited-graphql-port"
-        ~aliases:["limited-graphql-port"]
+        ~aliases:[ "limited-graphql-port" ]
         "GraphQL-server for limited daemon interaction"
   end
 
   module Archive = struct
     let server =
-      create ~name:"--server-port" ~aliases:["server-port"]
+      create ~name:"--server-port" ~aliases:[ "server-port" ]
         ~default:default_archive "port to launch the archive server"
   end
 end
@@ -206,28 +207,30 @@ module Host_and_port = struct
     else Host_and_port.to_string host_and_port
 
   let create_examples port =
-    [Port.to_host_and_port port; Host_and_port.create ~host:example_host ~port]
+    [ Port.to_host_and_port port
+    ; Host_and_port.create ~host:example_host ~port
+    ]
 
   let make_doc_builder description example_port =
     Doc_builder.create ~display:to_string
       ~examples:(create_examples example_port)
       "HOST:PORT/LOCALHOST-PORT"
       (sprintf "%s. If HOST is omitted, then localhost is assumed to be HOST."
-         description)
+         description )
 
   module Client = struct
     let daemon =
-      create ~name:"--daemon-port" ~aliases:["daemon-port"] ~arg_type
+      create ~name:"--daemon-port" ~aliases:[ "daemon-port" ] ~arg_type
         (make_doc_builder "Client to local daemon communication"
-           Port.default_client)
+           Port.default_client )
         (Resolve_with_default (Port.to_host_and_port Port.default_client))
   end
 
   module Daemon = struct
     let archive =
-      create ~name:"--archive-address" ~aliases:["archive-address"] ~arg_type
+      create ~name:"--archive-address" ~aliases:[ "archive-address" ] ~arg_type
         (make_doc_builder "Daemon to archive process communication"
-           Port.default_archive)
+           Port.default_archive )
         Optional
   end
 end
@@ -260,7 +263,8 @@ module Uri = struct
           ; Uri.of_string
               ( "/dns4/peer1-rising-phoenix.o1test.net" ^ ":"
               ^ Int.to_string Port.default_rest
-              ^/ "graphql" ) ]
+              ^/ "graphql" )
+          ]
         "URI/LOCALHOST-PORT" "graphql rest server for daemon interaction"
 
     let name = "rest-server"
@@ -268,12 +272,12 @@ module Uri = struct
     let default = Port.to_uri ~path:"graphql" Port.default_rest
 
     let rest_graphql =
-      create ~name:"--rest-server" ~aliases:["rest-server"]
+      create ~name:"--rest-server" ~aliases:[ "rest-server" ]
         ~arg_type:(arg_type ~path:"graphql") doc_builder
         (Resolve_with_default default)
 
     let rest_graphql_opt =
-      create ~name:"--rest-server" ~aliases:["rest-server"]
+      create ~name:"--rest-server" ~aliases:[ "rest-server" ]
         ~arg_type:(arg_type ~path:"graphql") doc_builder Optional
   end
 
@@ -282,21 +286,23 @@ module Uri = struct
       let doc_builder =
         Doc_builder.create ~display:to_string
           ~examples:
-            [Uri.of_string "postgres://admin:codarules@postgres:5432/archiver"]
+            [ Uri.of_string "postgres://admin:codarules@postgres:5432/archiver"
+            ]
           "URI" "URI for postgresql database"
       in
-      create ~name:"--postgres-uri" ~aliases:["postgres-uri"]
+      create ~name:"--postgres-uri" ~aliases:[ "postgres-uri" ]
         ~arg_type:(Command.Arg_type.map Command.Param.string ~f:Uri.of_string)
         doc_builder
         (Resolve_with_default
-           (Uri.of_string "postgres://admin:codarules@postgres:5432/archiver"))
+           (Uri.of_string "postgres://admin:codarules@postgres:5432/archiver")
+        )
   end
 end
 
 module Log = struct
   let json =
     let open Command.Param in
-    flag "--log-json" ~aliases:["log-json"] no_arg
+    flag "--log-json" ~aliases:[ "log-json" ] no_arg
       ~doc:"Print log output as JSON (default: plain text)"
 
   let all_levels =
@@ -306,7 +312,7 @@ module Log = struct
     let log_level = Arg_type.log_level in
     let open Command.Param in
     let doc = sprintf "LEVEL Set log level (%s, default: Info)" all_levels in
-    flag "--log-level" ~aliases:["log-level"] ~doc
+    flag "--log-level" ~aliases:[ "log-level" ] ~doc
       (optional_with_default Logger.Level.Info log_level)
 
   let file_log_level =
@@ -316,86 +322,87 @@ module Log = struct
       sprintf "LEVEL Set log level for the log file (%s, default: Trace)"
         all_levels
     in
-    flag "--file-log-level" ~aliases:["file-log-level"] ~doc
+    flag "--file-log-level" ~aliases:[ "file-log-level" ] ~doc
       (optional_with_default Logger.Level.Trace log_level)
 end
 
 type signed_command_common =
-  { sender: Signature_lib.Public_key.Compressed.t
-  ; fee: Currency.Fee.t
-  ; nonce: Mina_base.Account.Nonce.t option
-  ; memo: string option }
+  { sender : Signature_lib.Public_key.Compressed.t
+  ; fee : Currency.Fee.t
+  ; nonce : Mina_base.Account.Nonce.t option
+  ; memo : string option
+  }
 
 let signed_command_common : signed_command_common Command.Param.t =
   let open Command.Let_syntax in
   let open Arg_type in
   let%map_open sender =
-    flag "--sender" ~aliases:["sender"]
+    flag "--sender" ~aliases:[ "sender" ]
       (required public_key_compressed)
       ~doc:"PUBLICKEY Public key from which you want to send the transaction"
   and fee =
-    flag "--fee" ~aliases:["fee"]
+    flag "--fee" ~aliases:[ "fee" ]
       ~doc:
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
            (Currency.Fee.to_formatted_string
-              Mina_compile_config.default_transaction_fee)
+              Mina_compile_config.default_transaction_fee )
            (Currency.Fee.to_formatted_string
-              Mina_base.Signed_command.minimum_fee))
+              Mina_base.Signed_command.minimum_fee ) )
       (optional txn_fee)
   and nonce =
-    flag "--nonce" ~aliases:["nonce"]
+    flag "--nonce" ~aliases:[ "nonce" ]
       ~doc:
-        "NONCE Nonce that you would like to set for your transaction \
-         (default: nonce of your account on the best ledger or the successor \
-         of highest value nonce of your sent transactions from the \
-         transaction pool )"
+        "NONCE Nonce that you would like to set for your transaction (default: \
+         nonce of your account on the best ledger or the successor of highest \
+         value nonce of your sent transactions from the transaction pool )"
       (optional txn_nonce)
   and memo =
-    flag "--memo" ~aliases:["memo"]
+    flag "--memo" ~aliases:[ "memo" ]
       ~doc:"STRING Memo accompanying the transaction" (optional string)
   in
   { sender
-  ; fee= Option.value fee ~default:Mina_compile_config.default_transaction_fee
+  ; fee = Option.value fee ~default:Mina_compile_config.default_transaction_fee
   ; nonce
-  ; memo }
+  ; memo
+  }
 
 module Signed_command = struct
   open Arg_type
 
   let hd_index =
     let open Command.Param in
-    flag "--hd-index" ~aliases:["HD-index"]
+    flag "--hd-index" ~aliases:[ "HD-index" ]
       ~doc:"HD-INDEX Index used by hardware wallet" (required hd_index)
 
   let receiver_pk =
     let open Command.Param in
-    flag "--receiver" ~aliases:["receiver"]
+    flag "--receiver" ~aliases:[ "receiver" ]
       ~doc:"PUBLICKEY Public key to which you want to send money"
       (required public_key_compressed)
 
   let amount =
     let open Command.Param in
-    flag "--amount" ~aliases:["amount"]
+    flag "--amount" ~aliases:[ "amount" ]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
 
   let fee =
     let open Command.Param in
-    flag "--fee" ~aliases:["fee"]
+    flag "--fee" ~aliases:[ "fee" ]
       ~doc:
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
            (Currency.Fee.to_formatted_string
-              Mina_compile_config.default_transaction_fee)
+              Mina_compile_config.default_transaction_fee )
            (Currency.Fee.to_formatted_string
-              Mina_base.Signed_command.minimum_fee))
+              Mina_base.Signed_command.minimum_fee ) )
       (optional txn_fee)
 
   let valid_until =
     let open Command.Param in
-    flag "--valid-until" ~aliases:["valid-until"]
+    flag "--valid-until" ~aliases:[ "valid-until" ]
       ~doc:
         "GLOBAL-SLOT The last global-slot at which this transaction will be \
          considered valid. This makes it possible to have transactions which \
@@ -405,20 +412,19 @@ module Signed_command = struct
 
   let nonce =
     let open Command.Param in
-    flag "--nonce" ~aliases:["nonce"]
+    flag "--nonce" ~aliases:[ "nonce" ]
       ~doc:
-        "NONCE Nonce that you would like to set for your transaction \
-         (default: nonce of your account on the best ledger or the successor \
-         of highest value nonce of your sent transactions from the \
-         transaction pool )"
+        "NONCE Nonce that you would like to set for your transaction (default: \
+         nonce of your account on the best ledger or the successor of highest \
+         value nonce of your sent transactions from the transaction pool )"
       (optional txn_nonce)
 
   let memo =
     let open Command.Param in
-    flag "--memo" ~aliases:["memo"]
+    flag "--memo" ~aliases:[ "memo" ]
       ~doc:
         (sprintf
            "STRING Memo accompanying the transaction (up to %d characters)"
-           Mina_base.Signed_command_memo.max_input_length)
+           Mina_base.Signed_command_memo.max_input_length )
       (optional string)
 end

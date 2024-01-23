@@ -20,7 +20,7 @@ let unrelated_g =
     unstage
       (group_map
          (module Me.Field)
-         ~a:Me.Inner_curve.Params.a ~b:Me.Inner_curve.Params.b)
+         ~a:Me.Inner_curve.Params.a ~b:Me.Inner_curve.Params.b )
   and str = Fn.compose bits_to_bytes Me.Field.to_bits in
   fun (x, y) -> group_map (field_random_oracle (str x ^ str y))
 
@@ -70,8 +70,7 @@ module Sponge = struct
 end
 
 let%test_unit "sponge" =
-  let module T = Make_sponge.Test (Impl) (Tock_field_sponge.Field) (Sponge.S)
-  in
+  let module T = Make_sponge.Test (Impl) (Tock_field_sponge.Field) (Sponge.S) in
   T.test Tock_field_sponge.params
 
 module Input_domain = struct
@@ -80,7 +79,7 @@ module Input_domain = struct
     time "lagrange" (fun () ->
         Array.init domain_size ~f:(fun i ->
             (Marlin_plonk_bindings.Pasta_fp_urs.lagrange_commitment
-               (Tick.Keypair.load_urs ()) domain_size i)
+               (Tick.Keypair.load_urs ()) domain_size i )
               .unshifted.(0)
             |> Or_infinity.finite_exn ) )
 
@@ -161,7 +160,7 @@ module Inner_curve = struct
   include (
     T :
       module type of T
-      with module Scaling_precomputation := T.Scaling_precomputation )
+        with module Scaling_precomputation := T.Scaling_precomputation )
 
   module Scaling_precomputation = T.Scaling_precomputation
 
@@ -171,7 +170,7 @@ module Inner_curve = struct
     with_label __LOC__ (fun () ->
         T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs) )
 
-  let to_field_elements (x, y) = [x; y]
+  let to_field_elements (x, y) = [ x; y ]
 
   let assert_equal (x1, y1) (x2, y2) =
     Field.Assert.equal x1 x2 ; Field.Assert.equal y1 y2
@@ -185,7 +184,7 @@ module Inner_curve = struct
               C.scale
                 (C.of_affine (read typ t))
                 (Other.Field.inv
-                   (Other.Field.of_bits (List.map ~f:(read Boolean.typ) bs)))
+                   (Other.Field.of_bits (List.map ~f:(read Boolean.typ) bs)) )
               |> C.to_affine_exn)
     in
     assert_equal t (scale res bs) ;
@@ -197,6 +196,8 @@ module Inner_curve = struct
 
   let if_ = T.if_
 end
+
+module Ops = Plonk_curve_ops.Make (Impl) (Inner_curve)
 
 module Generators = struct
   let h =

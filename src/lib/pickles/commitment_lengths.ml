@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Pickles_types
 open Import
 
@@ -12,7 +12,7 @@ let generic' ~h ~sub ~add:( + ) ~mul:( * ) ~of_int ~ceil_div_max_degree :
     ceil_div_max_degree (Common.max_quot_size ~of_int ~mul:( * ) ~sub n)
   in
   let h = ceil_div_max_degree n in
-  {l= n; r= n; o= n; z= n; t= t_bound; f= n; sigma1= h; sigma2= h}
+  { l = n; r = n; o = n; z = n; t = t_bound; f = n; sigma1 = h; sigma2 = h }
 
 let generic map ~h ~max_degree : _ Dlog_plonk_types.Evals.t =
   let t_bound = map h ~f:(fun h -> Common.max_quot_size_int h) in
@@ -20,9 +20,9 @@ let generic map ~h ~max_degree : _ Dlog_plonk_types.Evals.t =
     ~f:(fun v ->
       map v ~f:(fun x -> Int.round_up x ~to_multiple_of:max_degree / max_degree)
       )
-    {l= h; r= h; o= h; z= h; t= t_bound; f= h; sigma1= h; sigma2= h}
+    { l = h; r = h; o = h; z = h; t = t_bound; f = h; sigma1 = h; sigma2 = h }
 
-let of_domains {Domains.h; _} ~max_degree : int Dlog_plonk_types.Evals.t =
+let of_domains { Domains.h; _ } ~max_degree : int Dlog_plonk_types.Evals.t =
   let h = Domain.size h in
   generic ~max_degree (fun x ~f -> f x) ~h
 

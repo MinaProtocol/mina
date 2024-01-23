@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Pickles_types
 open Hlist
 open Common
@@ -15,11 +15,11 @@ type ( 'a_var
      , 'local_heights )
      t =
   | T :
-      { branching: 'branching Nat.t * ('prev_vars, 'branching) Hlist.Length.t
-      ; index: Types.Index.t
-      ; lte: ('branching, 'max_branching) Nat.Lte.t
-      ; domains: Domains.t
-      ; rule:
+      { branching : 'branching Nat.t * ('prev_vars, 'branching) Hlist.Length.t
+      ; index : Types.Index.t
+      ; lte : ('branching, 'max_branching) Nat.Lte.t
+      ; domains : Domains.t
+      ; rule :
           ( 'prev_vars
           , 'prev_values
           , 'local_widths
@@ -27,20 +27,21 @@ type ( 'a_var
           , 'a_avar
           , 'a_value )
           Inductive_rule.t
-      ; main:
+      ; main :
              step_domains:(Domains.t, 'branches) Vector.t
           -> ( (Unfinalized.t, 'max_branching) Vector.t
              , Impls.Step.Field.t
              , (Impls.Step.Field.t, 'max_branching) Vector.t )
              Types.Pairing_based.Statement.t
           -> unit
-      ; requests:
+      ; requests :
           (module Requests.Step.S
              with type statement = 'a_value
               and type max_branching = 'max_branching
               and type prev_values = 'prev_values
               and type local_signature = 'local_widths
-              and type local_branches = 'local_heights) }
+              and type local_branches = 'local_heights )
+      }
       -> ( 'a_var
          , 'a_value
          , 'max_branching
@@ -54,7 +55,7 @@ type ( 'a_var
 (* Compile an inductive rule. *)
 let create
     (type branches max_branching local_signature local_branches a_var a_value
-    prev_vars prev_values) ~index
+    prev_vars prev_values ) ~index
     ~(self : (a_var, a_value, max_branching, branches) Tag.t) ~wrap_domains
     ~(max_branching : max_branching Nat.t)
     ~(branchings : (int, branches) Vector.t) ~(branches : branches Nat.t) ~typ
@@ -62,7 +63,8 @@ let create
   Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
   let (T (self_width, branching)) = HT.length rule.prevs in
-  let rec extract_lengths : type a b n m k.
+  let rec extract_lengths :
+      type a b n m k.
          (a, b, n, m) HT.t
       -> (a, k) Length.t
       -> n H1.T(Nat).t * m H1.T(Nat).t * (n, k) Length.t * (m, k) Length.t =
@@ -105,7 +107,8 @@ let create
         ; var_to_field_elements
         ; value_to_field_elements
         ; wrap_domains
-        ; step_domains }
+        ; step_domains
+        }
       ~self_branches:branches ~branching ~local_signature:widths
       ~local_signature_length ~local_branches:heights ~local_branches_length
       ~lte ~self
@@ -126,10 +129,11 @@ let create
   in
   Timer.clock __LOC__ ;
   T
-    { branching= (self_width, branching)
+    { branching = (self_width, branching)
     ; index
     ; lte
     ; rule
-    ; domains= own_domains
-    ; main= step
-    ; requests }
+    ; domains = own_domains
+    ; main = step
+    ; requests
+    }

@@ -3,31 +3,28 @@ open Mina_base
 
 module Poly : sig
   type ('blockchain_state, 'consensus_transition, 'pending_coinbase_update) t =
-    { blockchain_state: 'blockchain_state
-    ; consensus_transition: 'consensus_transition
-    ; pending_coinbase_update: 'pending_coinbase_update }
+    { blockchain_state : 'blockchain_state
+    ; consensus_transition : 'consensus_transition
+    ; pending_coinbase_update : 'pending_coinbase_update
+    }
   [@@deriving sexp, fields]
 
-  module Stable :
-    sig
-      module V1 : sig
-        type ( 'blockchain_state
-             , 'consensus_transition
-             , 'pending_coinbase_update )
-             t
-        [@@deriving bin_io, sexp, version]
-      end
-
-      module Latest : module type of V1
+  module Stable : sig
+    module V1 : sig
+      type ( 'blockchain_state
+           , 'consensus_transition
+           , 'pending_coinbase_update )
+           t
+      [@@deriving bin_io, sexp, version]
     end
-    with type ( 'blockchain_state
-              , 'consensus_transition
-              , 'pending_coinbase_update )
-              V1.t =
-                ( 'blockchain_state
-                , 'consensus_transition
-                , 'pending_coinbase_update )
-                t
+
+    module Latest : module type of V1
+  end
+  with type ( 'blockchain_state
+            , 'consensus_transition
+            , 'pending_coinbase_update )
+            V1.t =
+    ('blockchain_state, 'consensus_transition, 'pending_coinbase_update) t
 end
 
 module Value : sig

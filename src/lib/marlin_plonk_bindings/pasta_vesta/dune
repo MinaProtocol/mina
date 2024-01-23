@@ -5,7 +5,9 @@
    marlin_plonk_bindings_stubs
    marlin_plonk_bindings_types
    marlin_plonk_bindings_pasta_fp
-   marlin_plonk_bindings_pasta_fq)
+   marlin_plonk_bindings_pasta_fq
+   ppx_inline_test.config
+ )
  (instrumentation (backend bisect_ppx))
  (inline_tests)
  (preprocess (pps ppx_version ppx_inline_test)))

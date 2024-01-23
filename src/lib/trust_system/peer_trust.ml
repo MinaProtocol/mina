@@ -39,14 +39,15 @@ module type Input_intf = sig
 
   module Db :
     Key_value_database.Intf.Ident
-    with type key := Peer_id.t
-     and type value := Record.t
-     and type config := Config.t
+      with type key := Peer_id.t
+       and type value := Record.t
+       and type config := Config.t
 
   module Action : Action_intf
 
   type Structured_log_events.t +=
-    | Peer_banned of {sender_id: Peer_id.t; expiration: Time.t; action: string}
+    | Peer_banned of
+        { sender_id : Peer_id.t; expiration : Time.t; action : string }
     [@@deriving register_event]
 end
 
@@ -59,8 +60,7 @@ module Time_with_json = struct
   let of_yojson = function
     | `String time ->
         Ok
-          (Time.of_string_gen ~if_no_timezone:(`Use_this_one Time.Zone.utc)
-             time)
+          (Time.of_string_gen ~if_no_timezone:(`Use_this_one Time.Zone.utc) time)
     | _ ->
         Error "Trust_system.Peer_trust: Could not parse time"
 end
@@ -75,10 +75,11 @@ module Log_events = struct
   (* TODO: Split per action. *)
   type Structured_log_events.t +=
     | Peer_banned of
-        { sender_id: Network_peer.Peer.t
-        ; expiration: Time_with_json.t
-        ; action: string }
-    [@@deriving register_event {msg= ban_message}]
+        { sender_id : Network_peer.Peer.t
+        ; expiration : Time_with_json.t
+        ; action : string
+        }
+    [@@deriving register_event { msg = ban_message }]
 end
 
 include Log_events
@@ -87,39 +88,40 @@ module Make0 (Inputs : Input_intf) = struct
   open Inputs
 
   type t =
-    { db: Db.t option
+    { db : Db.t option
           (* This is an option to allow using a fake trust system in tests. This is
-       ugly, but the alternative is functoring half of Coda over the trust
-       system. *)
-    ; bans_reader: (Peer_id.t * Time.t) Strict_pipe.Reader.t
-    ; bans_writer:
+             ugly, but the alternative is functoring half of Coda over the trust
+             system. *)
+    ; bans_reader : (Peer_id.t * Time.t) Strict_pipe.Reader.t
+    ; bans_writer :
         ( Peer_id.t * Time.t
         , Strict_pipe.synchronous
         , unit Deferred.t )
         Strict_pipe.Writer.t
-    ; mutable actions_writers: (Action.t * Peer_id.t) Pipe.Writer.t list }
+    ; mutable actions_writers : (Action.t * Peer_id.t) Pipe.Writer.t list
+    }
 
   module Record_inst = Record.Make (Now)
 
   let create db_dir =
     let reader, writer = Strict_pipe.create Strict_pipe.Synchronous in
-    { db= Some (Db.create db_dir)
-    ; bans_reader= reader
-    ; bans_writer= writer
-    ; actions_writers= [] }
+    { db = Some (Db.create db_dir)
+    ; bans_reader = reader
+    ; bans_writer = writer
+    ; actions_writers = []
+    }
 
   let null : unit -> t =
    fun () ->
-    let bans_reader, bans_writer =
-      Strict_pipe.create Strict_pipe.Synchronous
-    in
-    {db= None; bans_reader; bans_writer; actions_writers= []}
+    let bans_reader, bans_writer = Strict_pipe.create Strict_pipe.Synchronous in
+    { db = None; bans_reader; bans_writer; actions_writers = [] }
 
-  let ban_pipe {bans_reader; _} = bans_reader
+  let ban_pipe { bans_reader; _ } = bans_reader
 
-  let get_db {db; _} peer = Option.bind db ~f:(fun db' -> Db.get db' ~key:peer)
+  let get_db { db; _ } peer =
+    Option.bind db ~f:(fun db' -> Db.get db' ~key:peer)
 
-  let peer_statuses {db; _} =
+  let peer_statuses { db; _ } =
     Option.value_map db ~default:[] ~f:(fun db' ->
         Db.to_alist db'
         |> List.map ~f:(fun (peer, record) ->
@@ -129,7 +131,7 @@ module Make0 (Inputs : Input_intf) = struct
     List.filter (peer_statuses t) ~f:(fun (p, _status) ->
         Unix.Inet_addr.equal (Peer_id.ip p) ip )
 
-  let reset_ip ({db; _} as t) ip =
+  let reset_ip ({ db; _ } as t) ip =
     Option.value_map db ~default:() ~f:(fun db' ->
         List.map
           ~f:(fun (id, _status) -> Db.remove db' ~key:id)
@@ -137,13 +139,13 @@ module Make0 (Inputs : Input_intf) = struct
         |> ignore ) ;
     lookup_ip t ip
 
-  let close {db; bans_writer; _} =
+  let close { db; bans_writer; _ } =
     Option.iter db ~f:Db.close ;
     Strict_pipe.Writer.close bans_writer
 
-  let record ({db; bans_writer; _} as t) logger peer action =
-    t.actions_writers
-    <- List.filter t.actions_writers ~f:(Fn.compose not Pipe.is_closed) ;
+  let record ({ db; bans_writer; _ } as t) logger peer action =
+    t.actions_writers <-
+      List.filter t.actions_writers ~f:(Fn.compose not Pipe.is_closed) ;
     List.iter t.actions_writers
       ~f:(Fn.flip Pipe.write_without_pushback (action, peer)) ;
     let old_record =
@@ -171,11 +173,11 @@ module Make0 (Inputs : Input_intf) = struct
     let action_fmt, action_metadata = Action.to_log action in
     let log_trust_change () =
       let verb =
-        if simple_new.trust >. simple_old.trust then "Increasing"
+        if Float.(simple_new.trust > simple_old.trust) then "Increasing"
         else "Decreasing"
       in
       [%log debug]
-        ~metadata:([("sender_id", Peer_id.to_yojson peer)] @ action_metadata)
+        ~metadata:([ ("sender_id", Peer_id.to_yojson peer) ] @ action_metadata)
         "%s trust for peer $sender_id due to %s. New trust is %f." verb
         action_fmt simple_new.trust
     in
@@ -183,7 +185,7 @@ module Make0 (Inputs : Input_intf) = struct
       match (simple_old.banned, simple_new.banned) with
       | Unbanned, Banned_until expiration ->
           [%str_log faulty_peer_without_punishment] ~metadata:action_metadata
-            (Peer_banned {sender_id= peer; expiration; action= action_fmt}) ;
+            (Peer_banned { sender_id = peer; expiration; action = action_fmt }) ;
           if Option.is_some db then (
             Mina_metrics.Gauge.inc_one Mina_metrics.Trust_system.banned_peers ;
             if tmp_bans_are_disabled then Deferred.unit
@@ -254,10 +256,11 @@ let%test_module "peer_trust" =
 
       type Structured_log_events.t +=
         | Peer_banned of
-            { sender_id: Peer_id.t
-            ; expiration: Time_with_json.t
-            ; action: string }
-        [@@deriving register_event {msg= "Peer banned"}]
+            { sender_id : Peer_id.t
+            ; expiration : Time_with_json.t
+            ; action : string
+            }
+        [@@deriving register_event { msg = "Peer banned" }]
     end)
 
     (* We want to check the output of the pipe in these tests, but it's
@@ -299,10 +302,10 @@ let%test_module "peer_trust" =
             let db = setup_mock_db () in
             let%map () = Peer_trust_test.record db nolog 0 Insta_ban in
             match Peer_trust_test.lookup_ip db peer0 with
-            | [(_, {trust= -1.0; banned= Banned_until time})] ->
+            | [ (_, { trust = -1.0; banned = Banned_until time }) ] ->
                 [%test_eq: Time.t] time
                 @@ Time.add !Mock_now.current_time Time.Span.day ;
-                assert_ban_pipe [0] ;
+                assert_ban_pipe [ 0 ] ;
                 true
             | _ ->
                 false )
@@ -312,14 +315,15 @@ let%test_module "peer_trust" =
           let db = setup_mock_db () in
           let%map () = Peer_trust_test.record db nolog 0 Action.Big_credit in
           match Peer_trust_test.lookup_ip db peer0 with
-          | [(_, {trust= start_trust; banned= Unbanned})] -> (
+          | [ (_, { trust = start_trust; banned = Unbanned }) ] -> (
               Mock_now.advance Time.Span.day ;
               assert_ban_pipe [] ;
               match Peer_trust_test.lookup_ip db peer0 with
-              | [(_, {trust= decayed_trust; banned= Unbanned})] ->
+              | [ (_, { trust = decayed_trust; banned = Unbanned }) ] ->
                   (* N.b. the floating point equality operator has a built in
-                 tolerance i.e. it's approximate equality. *)
-                  decayed_trust =. start_trust /. 2.0
+                     tolerance i.e. it's approximate equality.
+                  *)
+                  Float.(decayed_trust =. start_trust /. 2.0)
               | _ ->
                   false )
           | _ ->
@@ -347,9 +351,9 @@ let%test_module "peer_trust" =
           let db = setup_mock_db () in
           let%map () = act_constant_rate db 1. Action.Slow_punish in
           match Peer_trust_test.lookup_ip db peer0 with
-          | [(_, {banned= Banned_until _; _})] ->
+          | [ (_, { banned = Banned_until _; _ }) ] ->
               false
-          | [(_, {banned= Unbanned; _})] ->
+          | [ (_, { banned = Unbanned; _ }) ] ->
               assert_ban_pipe [] ; true
           | _ ->
               false )
@@ -361,10 +365,10 @@ let%test_module "peer_trust" =
             let db = setup_mock_db () in
             let%map () = act_constant_rate db 1.1 Action.Slow_punish in
             match Peer_trust_test.lookup_ip db peer0 with
-            | [(_, {banned= Banned_until _; _})] ->
-                assert_ban_pipe [0] ;
+            | [ (_, { banned = Banned_until _; _ }) ] ->
+                assert_ban_pipe [ 0 ] ;
                 true
-            | [(_, {banned= Unbanned; _})] ->
+            | [ (_, { banned = Unbanned; _ }) ] ->
                 false
             | _ ->
                 false )
@@ -380,9 +384,9 @@ let%test_module "peer_trust" =
                 Peer_trust_test.record db nolog 0 Action.Slow_credit )
           in
           match Peer_trust_test.lookup_ip db peer0 with
-          | [(_, {banned= Banned_until _; _})] ->
+          | [ (_, { banned = Banned_until _; _ }) ] ->
               false
-          | [(_, {banned= Unbanned; _})] ->
+          | [ (_, { banned = Unbanned; _ }) ] ->
               assert_ban_pipe [] ; true
           | _ ->
               false )
@@ -394,21 +398,21 @@ let%test_module "peer_trust" =
             let db = setup_mock_db () in
             let%bind () = act_constant_rate db 1. Action.Big_credit in
             ( match Peer_trust_test.lookup_ip db peer0 with
-            | [(_, {trust; banned= Unbanned})] ->
-                assert (trust >. 0.99) ;
+            | [ (_, { trust; banned = Unbanned }) ] ->
+                assert (Float.(trust > 0.99)) ;
                 assert_ban_pipe []
-            | [(_, {banned= Banned_until _; _})] ->
+            | [ (_, { banned = Banned_until _; _ }) ] ->
                 failwith "Peer is banned after credits"
             | _ ->
                 failwith "unexpected amount of peers" ) ;
             let%map () = Peer_trust_test.record db nolog 0 Action.Insta_ban in
             match Peer_trust_test.lookup_ip db peer0 with
-            | [(_, {trust= -1.0; banned= Banned_until _})] ->
-                assert_ban_pipe [0] ;
+            | [ (_, { trust = -1.0; banned = Banned_until _ }) ] ->
+                assert_ban_pipe [ 0 ] ;
                 true
-            | [(_, {banned= Banned_until _; _})] ->
+            | [ (_, { banned = Banned_until _; _ }) ] ->
                 failwith "Trust not set to -1"
-            | [(_, {banned= Unbanned; _})] ->
+            | [ (_, { banned = Unbanned; _ }) ] ->
                 failwith "Peer not banned"
             | _ ->
                 false )
@@ -420,7 +424,7 @@ let%test_module "peer_trust" =
             let db = setup_mock_db () in
             let%bind () = Peer_trust_test.record db nolog 0 Action.Insta_ban in
             let%map () = Peer_trust_test.record db nolog 1 Action.Insta_ban in
-            assert_ban_pipe [1; 0] (* Reverse order since it's a snoc list. *) ;
+            assert_ban_pipe [ 1; 0 ] (* Reverse order since it's a snoc list. *) ;
             true )
 
     let%test_unit "actions are written to the pipe" =
@@ -433,7 +437,7 @@ let%test_module "peer_trust" =
           match%bind Pipe.read_exactly pipe ~num_values:3 with
           | `Exactly queue ->
               [%test_eq: (Action.t * int) list]
-                Action.[(Insta_ban, 0); (Big_credit, 1); (Slow_credit, 1)]
+                Action.[ (Insta_ban, 0); (Big_credit, 1); (Slow_credit, 1) ]
                 (Queue.to_list queue) ;
               Pipe.close_read pipe ;
               let%bind () =

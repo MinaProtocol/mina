@@ -24,6 +24,8 @@ def peer_to_multiaddr(peer):
 def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, nodes_queried, nodes_responded, seed_nodes_queried, seed_nodes_responded, nodes_errored, context_deadline_exceeded, failed_security_protocol_negotiation, connection_refused_errors, size_limit_exceeded_errors, timed_out_errors, stream_reset_errors, other_connection_errors, prover_errors):
   print('collecting node status metrics')
 
+  start = time.time()
+
   pods = v1.list_namespaced_pod(namespace, watch=False)
 
   pod_names = [ p['metadata']['name'] for p in pods.to_dict()['items'] if p['status']['phase'] == 'Running' ]
@@ -81,6 +83,9 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
   timed_out_errors.set(err_time_out)
   other_connection_errors.set(err_others)
   nodes_synced.set(synced_fraction)
+
+  end = time.time()
+  print("Updating Coda_watchdog_nodes_synced took {} seconds".format(end-start))
 
   # -------------------------------------------------
 
@@ -145,6 +150,9 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
 
   print("Number of  peers with 'Synced' status: {}\nPeers not synced near the best tip: {}".format(sum(all_synced_peers), peers_out_of_sync))
 
+  end2 = time.time()
+  print("Updating Coda_watchdog_nodes_synced_near_best_tip took {} seconds".format(end2-end))
+
   nodes_synced_near_best_tip.set(synced_near_best_tip_fraction)
 
 # ========================================================================
@@ -154,6 +162,8 @@ def collect_node_status(v1, namespace, seeds, pods, seed_nodes_responded, seed_n
   error_resps = []
   all_resps = []
   peer_set = set()
+
+  start = time.time()
 
   def contains_error(resp):
     try:
@@ -203,6 +213,8 @@ def collect_node_status(v1, namespace, seeds, pods, seed_nodes_responded, seed_n
       
 
   valid_resps = peer_table.values()
+  end = time.time()
+  print("Node status collection took {} seconds".format(end-start))
 
   return (len(peer_set), valid_resps, error_resps)
 

@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Pickles_types
 open Import
 open Types
@@ -16,14 +16,15 @@ module Base = struct
          , 'dlog_me_onlys
          , 'prev_evals )
          t =
-      { statement:
+      { statement :
           ( 'unfinalized_proofs
           , ('s, 'sgs, 'bp_chals) Me_only.Pairing_based.t
           , 'dlog_me_onlys )
           Types.Pairing_based.Statement.t
-      ; index: Index.t
-      ; prev_evals: 'prev_evals
-      ; proof: Tick.Proof.t }
+      ; index : Index.t
+      ; prev_evals : 'prev_evals
+      ; proof : Tick.Proof.t
+      }
   end
 
   module Double = struct
@@ -42,7 +43,7 @@ module Base = struct
 
       module V1 = struct
         type ('dlog_me_only, 'pairing_me_only) t =
-          { statement:
+          { statement :
               ( Limb_vector.Constant.Hex64.Stable.V1.t
                 Vector.Vector_2.Stable.V1.t
               , Limb_vector.Constant.Hex64.Stable.V1.t
@@ -60,19 +61,20 @@ module Base = struct
                 Step_bp_vec.Stable.V1.t
               , Index.Stable.V1.t )
               Types.Dlog_based.Statement.Minimal.Stable.V1.t
-          ; prev_evals:
+          ; prev_evals :
               Tick.Field.Stable.V1.t Dlog_plonk_types.Pc_array.Stable.V1.t
               Dlog_plonk_types.Evals.Stable.V1.t
               Double.Stable.V1.t
-          ; prev_x_hat: Tick.Field.Stable.V1.t Double.Stable.V1.t
-          ; proof: Tock.Proof.Stable.V1.t }
+          ; prev_x_hat : Tick.Field.Stable.V1.t Double.Stable.V1.t
+          ; proof : Tock.Proof.Stable.V1.t
+          }
         [@@deriving compare, sexp, yojson, hash, equal]
       end
     end]
 
     type ('dlog_me_only, 'pairing_me_only) t =
           ('dlog_me_only, 'pairing_me_only) Stable.Latest.t =
-      { statement:
+      { statement :
           ( Challenge.Constant.t
           , Challenge.Constant.t Scalar_challenge.t
           , Tick.Field.t Shifted_value.t
@@ -84,11 +86,12 @@ module Base = struct
             Step_bp_vec.t
           , Index.t )
           Types.Dlog_based.Statement.Minimal.t
-      ; prev_evals:
+      ; prev_evals :
           Tick.Field.t Dlog_plonk_types.Pc_array.t Dlog_plonk_types.Evals.t
           Double.t
-      ; prev_x_hat: Tick.Field.t Double.t
-      ; proof: Tock.Proof.t }
+      ; prev_x_hat : Tick.Field.t Double.t
+      ; proof : Tock.Proof.t
+      }
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 end
@@ -113,8 +116,8 @@ end
 
 type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) With_data.t
 
-let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
-    (most_recent_width : r Nat.t) : (w, h) t =
+let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t) (most_recent_width : r Nat.t)
+    : (w, h) t =
   let open Ro in
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
@@ -124,60 +127,72 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
     Commitment_lengths.of_domains wrap_domains ~max_degree:Max_degree.wrap
   in
   T
-    { statement=
-        { proof_state=
-            { deferred_values=
-                { xi= scalar_chal ()
-                ; combined_inner_product= Shifted_value (tick ())
-                ; b= Shifted_value (tick ())
-                ; which_branch= Option.value_exn (Index.of_int 0)
-                ; bulletproof_challenges= Dummy.Ipa.Step.challenges
-                ; plonk=
-                    { alpha= scalar_chal ()
-                    ; beta= chal ()
-                    ; gamma= chal ()
-                    ; zeta= scalar_chal () } }
-            ; sponge_digest_before_evaluations=
+    { statement =
+        { proof_state =
+            { deferred_values =
+                { xi = scalar_chal ()
+                ; combined_inner_product = Shifted_value (tick ())
+                ; b = Shifted_value (tick ())
+                ; which_branch = Option.value_exn (Index.of_int 0)
+                ; bulletproof_challenges = Dummy.Ipa.Step.challenges
+                ; plonk =
+                    { alpha = scalar_chal ()
+                    ; beta = chal ()
+                    ; gamma = chal ()
+                    ; zeta = scalar_chal ()
+                    }
+                }
+            ; sponge_digest_before_evaluations =
                 Digest.Constant.of_tock_field Tock.Field.zero
-            ; me_only=
-                { sg= Lazy.force Dummy.Ipa.Step.sg
-                ; old_bulletproof_challenges=
-                    Vector.init h ~f:(fun _ -> Dummy.Ipa.Wrap.challenges) } }
-        ; pass_through=
-            { app_state= ()
-            ; old_bulletproof_challenges=
+            ; me_only =
+                { sg = Lazy.force Dummy.Ipa.Step.sg
+                ; old_bulletproof_challenges =
+                    Vector.init h ~f:(fun _ -> Dummy.Ipa.Wrap.challenges)
+                }
+            }
+        ; pass_through =
+            { app_state = ()
+            ; old_bulletproof_challenges =
                 (* Not sure if this should be w or h honestly ...*)
                 Vector.init most_recent_width ~f:(fun _ ->
                     Dummy.Ipa.Step.challenges )
                 (* TODO: Should this be wrap? *)
-            ; sg=
+            ; sg =
                 Vector.init most_recent_width ~f:(fun _ ->
-                    Lazy.force Dummy.Ipa.Wrap.sg ) } }
-    ; proof=
-        { messages=
-            { l_comm= g lengths.l
-            ; r_comm= g lengths.r
-            ; o_comm= g lengths.o
-            ; z_comm= g lengths.z
-            ; t_comm=
-                { unshifted=
+                    Lazy.force Dummy.Ipa.Wrap.sg )
+            }
+        }
+    ; proof =
+        { messages =
+            { l_comm = g lengths.l
+            ; r_comm = g lengths.r
+            ; o_comm = g lengths.o
+            ; z_comm = g lengths.z
+            ; t_comm =
+                { unshifted =
                     Array.map (g lengths.t) ~f:(fun x -> Or_infinity.Finite x)
-                ; shifted= Finite g0 } }
-        ; openings=
-            { proof=
-                { lr=
+                ; shifted = Finite g0
+                }
+            }
+        ; openings =
+            { proof =
+                { lr =
                     Array.init (Nat.to_int Tock.Rounds.n) ~f:(fun _ -> (g0, g0))
-                ; z_1= Ro.tock ()
-                ; z_2= Ro.tock ()
-                ; delta= g0
-                ; sg= g0 }
-            ; evals=
+                ; z_1 = Ro.tock ()
+                ; z_2 = Ro.tock ()
+                ; delta = g0
+                ; sg = g0
+                }
+            ; evals =
                 (let e () = Dlog_plonk_types.Evals.map lengths ~f:tock in
-                 (e (), e ())) } }
-    ; prev_evals=
+                 (e (), e ()) )
+            }
+        }
+    ; prev_evals =
         (let e () = Dlog_plonk_types.Evals.map lengths ~f:tick_arr in
-         (e (), e ()))
-    ; prev_x_hat= (tick (), tick ()) }
+         (e (), e ()) )
+    ; prev_x_hat = (tick (), tick ())
+    }
 
 module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
   module Max_branching_at_most = At_most.With_length (W)
@@ -203,14 +218,16 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
   let to_repr (T t) : Repr.t =
     let lte = Nat.lte_exn (Vector.length t.statement.pass_through.sg) W.n in
     { t with
-      statement=
+      statement =
         { t.statement with
-          pass_through=
+          pass_through =
             { t.statement.pass_through with
-              sg= At_most.of_vector t.statement.pass_through.sg lte
-            ; old_bulletproof_challenges=
+              sg = At_most.of_vector t.statement.pass_through.sg lte
+            ; old_bulletproof_challenges =
                 At_most.of_vector
-                  t.statement.pass_through.old_bulletproof_challenges lte } }
+                  t.statement.pass_through.old_bulletproof_challenges lte
+            }
+        }
     }
 
   let of_repr (r : Repr.t) : t =
@@ -223,10 +240,11 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
     in
     T
       { r with
-        statement=
+        statement =
           { r.statement with
-            pass_through=
-              {r.statement.pass_through with sg; old_bulletproof_challenges} }
+            pass_through =
+              { r.statement.pass_through with sg; old_bulletproof_challenges }
+          }
       }
 
   let compare t1 t2 = Repr.compare (to_repr t1) (to_repr t2)
@@ -237,15 +255,16 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
 
   let hash t = Repr.hash (to_repr t)
 
-  include Sexpable.Of_sexpable
-            (Repr)
-            (struct
-              type nonrec t = t
+  include
+    Sexpable.Of_sexpable
+      (Repr)
+      (struct
+        type nonrec t = t
 
-              let to_sexpable = to_repr
+        let to_sexpable = to_repr
 
-              let of_sexpable = of_repr
-            end)
+        let of_sexpable = of_repr
+      end)
 
   let to_yojson x = Repr.to_yojson (to_repr x)
 
@@ -268,8 +287,7 @@ module Branching_2 = struct
             Dlog_based.Proof_state.Me_only.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t At_most.At_most_2.Stable.V1.t
-            , Limb_vector.Constant.Hex64.Stable.V1.t
-              Vector.Vector_2.Stable.V1.t
+            , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
               Scalar_challenge.Stable.V1.t
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
@@ -285,7 +303,7 @@ module Branching_2 = struct
     include T.Repr
 
     (* Force the typechecker to verify that these types are equal. *)
-    let _ =
+    let () =
       let _f : unit -> (t, Stable.Latest.t) Type_equal.t =
        fun () -> Type_equal.T
       in
@@ -303,15 +321,16 @@ module Branching_2 = struct
 
       include (T : module type of T with type t := t with module Repr := T.Repr)
 
-      include Binable.Of_binable
-                (Repr.Stable.V1)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable
+          (Repr.Stable.V1)
+          (struct
+            type nonrec t = t
 
-                  let to_binable = to_repr
+            let to_binable = to_repr
 
-                  let of_binable = of_repr
-                end)
+            let of_binable = of_repr
+          end)
     end
   end]
 
@@ -338,8 +357,7 @@ module Branching_max = struct
           , ( unit
             , Tock.Curve.Affine.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t
-            , Limb_vector.Constant.Hex64.Stable.V1.t
-              Vector.Vector_2.Stable.V1.t
+            , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
               Scalar_challenge.Stable.V1.t
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
@@ -355,7 +373,7 @@ module Branching_max = struct
     include T.Repr
 
     (* Force the typechecker to verify that these types are equal. *)
-    let _ =
+    let () =
       let _f : unit -> (t, Stable.Latest.t) Type_equal.t =
        fun () -> Type_equal.T
       in
@@ -373,15 +391,16 @@ module Branching_max = struct
 
       include (T : module type of T with type t := t with module Repr := T.Repr)
 
-      include Binable.Of_binable
-                (Repr.Stable.V1)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable
+          (Repr.Stable.V1)
+          (struct
+            type nonrec t = t
 
-                  let to_binable = to_repr
+            let to_binable = to_repr
 
-                  let of_binable = of_repr
-                end)
+            let of_binable = of_repr
+          end)
     end
   end]
 

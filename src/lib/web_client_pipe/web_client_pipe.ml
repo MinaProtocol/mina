@@ -26,17 +26,18 @@ end)
 (Store : Storage_intf with type location := string and type data := Data.t)
 (Request : Web_request.Intf.S) : S with type data := Data.t = struct
   type t =
-    { filename: string
-    ; reader: Data.t Linear_pipe.Reader.t
-    ; writer: Data.t Linear_pipe.Writer.t }
+    { filename : string
+    ; reader : Data.t Linear_pipe.Reader.t
+    ; writer : Data.t Linear_pipe.Writer.t
+    }
 
-  let write_to_storage {filename; _} request data =
+  let write_to_storage { filename; _ } request data =
     let%bind () = Store.store filename data in
     Request.put request filename
 
   let create ~filename ~logger =
     let reader, writer = Linear_pipe.create () in
-    let t = {filename; reader; writer} in
+    let t = { filename; reader; writer } in
     let%map () =
       match%map Request.create () with
       | Ok request ->
@@ -47,14 +48,15 @@ end)
                      ()
                  | Error e ->
                      [%log error] "Error writing Web client pipe data: $error"
-                       ~metadata:[("error", Error_json.error_to_yojson e)] ))
+                       ~metadata:[ ("error", Error_json.error_to_yojson e) ] )
+            )
       | Error e ->
           [%log error] "Unable to create request: $error"
-            ~metadata:[("error", Error_json.error_to_yojson e)]
+            ~metadata:[ ("error", Error_json.error_to_yojson e) ]
     in
     t
 
-  let store {reader; writer; _} data =
+  let store { reader; writer; _ } data =
     Linear_pipe.force_write_maybe_drop_head ~capacity:1 writer reader data ;
     Deferred.unit
 end

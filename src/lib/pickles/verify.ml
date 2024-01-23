@@ -1,5 +1,6 @@
 module SC = Scalar_challenge
-open Core
+open Core_kernel
+open Async_kernel
 open Pickles_types
 open Common
 open Import
@@ -31,25 +32,29 @@ let verify_heterogenous (ts : Instance.t list) =
       | _ ->
           Error
             (String.concat ~sep:"\n"
-               (List.map !r ~f:(fun lab -> Lazy.force lab)))
+               (List.map !r ~f:(fun lab -> Lazy.force lab)) )
     in
     ((fun (lab, b) -> if not b then r := lab :: !r), result)
   in
-  let in_circuit_plonks =
+  let in_circuit_plonks, computed_bp_chals =
     List.map ts
-      ~f:(fun (T
-                ( _max_branching
-                , _statement
-                , key
-                , app_state
-                , T
-                    { statement
-                    ; prev_x_hat= (x_hat1, _) as prev_x_hat
-                    ; prev_evals= evals } ))
+      ~f:(fun
+           (T
+             ( _max_branching
+             , _statement
+             , key
+             , app_state
+             , T
+                 { statement
+                 ; prev_x_hat = (x_hat1, _) as prev_x_hat
+                 ; prev_evals = evals
+                 } ) )
          ->
         Timer.start __LOC__ ;
         let statement =
-          {statement with pass_through= {statement.pass_through with app_state}}
+          { statement with
+            pass_through = { statement.pass_through with app_state }
+          }
         in
         let open Pairing_marlin_types in
         let open Types.Dlog_based.Proof_state in
@@ -58,10 +63,12 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         Timer.clock __LOC__ ;
         let { Deferred_values.xi
-            ; plonk= plonk0
+            ; plonk = plonk0
             ; combined_inner_product
             ; which_branch
-            ; bulletproof_challenges } =
+            ; bulletproof_challenges
+            ; b
+            } =
           Deferred_values.map_challenges ~f:Challenge.Constant.to_tick_field
             ~scalar:sc statement.proof_state.deferred_values
         in
@@ -85,19 +92,24 @@ let verify_heterogenous (ts : Instance.t list) =
                 (Plonk_checks.domain
                    (module Tick.Field)
                    step_domains.h ~shifts:Common.tick_shifts
-                   ~domain_generator:Backend.Tick.Field.domain_generator)
-              {zeta; beta= chal plonk0.beta; gamma= chal plonk0.gamma; alpha}
+                   ~domain_generator:Backend.Tick.Field.domain_generator )
+              { zeta
+              ; beta = chal plonk0.beta
+              ; gamma = chal plonk0.gamma
+              ; alpha
+              }
               (Plonk_checks.evals_of_split_evals
                  (module Tick.Field)
-                 evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw)
+                 evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw )
               x_hat1
           in
           check (lazy "linearization_check", Tick.Field.equal lin1 lin2) ;
           { p with
-            zeta= plonk0.zeta
-          ; alpha= plonk0.alpha
-          ; beta= plonk0.beta
-          ; gamma= plonk0.gamma }
+            zeta = plonk0.zeta
+          ; alpha = plonk0.alpha
+          ; beta = plonk0.beta
+          ; gamma = plonk0.gamma
+          }
         in
         Timer.clock __LOC__ ;
         let absorb, squeeze =
@@ -106,7 +118,7 @@ let verify_heterogenous (ts : Instance.t list) =
             let s = create Tick_field_sponge.params in
             absorb s
               (Digest.Constant.to_tick_field
-                 statement.proof_state.sponge_digest_before_evaluations) ;
+                 statement.proof_state.sponge_digest_before_evaluations ) ;
             s
           in
           let squeeze () =
@@ -121,7 +133,7 @@ let verify_heterogenous (ts : Instance.t list) =
         let absorb_evals (x_hat, e) =
           let xs, ys = Dlog_plonk_types.Evals.to_vectors e in
           List.iter
-            Vector.([|x_hat|] :: (to_list xs @ to_list ys))
+            Vector.([| x_hat |] :: (to_list xs @ to_list ys))
             ~f:(Array.iter ~f:absorb)
         in
         Double.(iter ~f:absorb_evals (map2 prev_x_hat evals ~f:Tuple2.create)) ;
@@ -140,7 +152,7 @@ let verify_heterogenous (ts : Instance.t list) =
             evals ~x_hat:prev_x_hat
             ~old_bulletproof_challenges:
               (Vector.map ~f:Ipa.Step.compute_challenges
-                 statement.pass_through.old_bulletproof_challenges)
+                 statement.pass_through.old_bulletproof_challenges )
             ~r:r_actual ~xi ~zeta ~zetaw ~step_branch_domains:step_domains
         in
         let check_eq lab x y =
@@ -148,84 +160,94 @@ let verify_heterogenous (ts : Instance.t list) =
             ( lazy
                 (sprintf
                    !"%s: %{sexp:Tick_field.t} != %{sexp:Tick_field.t}"
-                   lab x y)
+                   lab x y )
             , Tick_field.equal x y )
         in
         Timer.clock __LOC__ ;
+        let bulletproof_challenges =
+          Ipa.Step.compute_challenges bulletproof_challenges
+        in
         Timer.clock __LOC__ ;
+        let shifted_value =
+          Shifted_value.to_field (module Tick.Field) ~shift:Shifts.tick
+        in
+        let b_actual =
+          let challenge_poly =
+            unstage (Wrap.b_poly (Vector.to_array bulletproof_challenges))
+          in
+          Tick.Field.(challenge_poly zeta + (r_actual * challenge_poly zetaw))
+        in
         List.iter
           ~f:(fun (s, x, y) -> check_eq s x y)
           (* Both these values can actually be omitted from the proof on the wire since we recompute them
-   anyway. *)
+             anyway. *)
           [ ("xi", xi, xi_actual)
           ; ( "combined_inner_product"
-            , Shifted_value.to_field
-                (module Tick.Field)
-                combined_inner_product ~shift:Shifts.tick
-            , combined_inner_product_actual ) ] ;
-        plonk )
+            , shifted_value combined_inner_product
+            , combined_inner_product_actual )
+          ; ("b", shifted_value b, b_actual)
+          ] ;
+        (plonk, bulletproof_challenges) )
+    |> List.unzip
   in
   let open Backend.Tock.Proof in
+  let open Deferred.Let_syntax in
+  let%bind accumulator_check =
+    Ipa.Step.accumulator_check
+      (List.map ts ~f:(fun (T (_, _, _, _, T t)) ->
+           ( t.statement.proof_state.me_only.sg
+           , Ipa.Step.compute_challenges
+               t.statement.proof_state.deferred_values.bulletproof_challenges ) )
+      )
+  in
   Common.time "batch_step_dlog_check" (fun () ->
-      check
-        ( lazy "batch_step_dlog_check"
-        , Ipa.Step.accumulator_check
-            (List.map ts ~f:(fun (T (_, _, _, _, T t)) ->
-                 ( t.statement.proof_state.me_only.sg
-                 , Ipa.Step.compute_challenges
-                     t.statement.proof_state.deferred_values
-                       .bulletproof_challenges ) )) ) ) ;
-  Common.time "dlog_check" (fun () ->
-      check
-        ( lazy "dlog_check"
-        , batch_verify
-            (List.map2_exn ts in_circuit_plonks
-               ~f:(fun (T
-                         ( ( module
-                         Max_branching )
-                         , ( module
-                         A_value )
-                         , key
-                         , app_state
-                         , T t ))
-                  plonk
-                  ->
-                 let prepared_statement :
-                     _ Types.Dlog_based.Statement.In_circuit.t =
-                   { pass_through=
-                       Common.hash_pairing_me_only
-                         ~app_state:A_value.to_field_elements
-                         (Reduced_me_only.Pairing_based.prepare
-                            ~dlog_plonk_index:key.commitments
-                            {t.statement.pass_through with app_state})
-                   ; proof_state=
-                       { t.statement.proof_state with
-                         deferred_values=
-                           {t.statement.proof_state.deferred_values with plonk}
-                       ; me_only=
-                           Common.hash_dlog_me_only Max_branching.n
-                             (Reduced_me_only.Dlog_based.prepare
-                                t.statement.proof_state.me_only) } }
-                 in
-                 let input =
-                   tock_unpadded_public_input_of_statement prepared_statement
-                 in
-                 ( key.index
-                 , t.proof
-                 , input
-                 , Some
-                     (Vector.to_list
-                        (Vector.map2
-                           ~f:(fun g cs ->
-                             { Challenge_polynomial.challenges=
-                                 Vector.to_array
-                                   (Ipa.Wrap.compute_challenges cs)
-                             ; commitment= g } )
-                           (Vector.extend_exn t.statement.pass_through.sg
-                              Max_branching.n
-                              (Lazy.force Dummy.Ipa.Wrap.sg))
-                           t.statement.proof_state.me_only
-                             .old_bulletproof_challenges)) ) )) ) ) ;
+      check (lazy "batch_step_dlog_check", accumulator_check) ) ;
+  let%map dlog_check =
+    batch_verify
+      (List.map2_exn ts in_circuit_plonks
+         ~f:(fun
+              (T ((module Max_branching), (module A_value), key, app_state, T t))
+              plonk
+            ->
+           let prepared_statement : _ Types.Dlog_based.Statement.In_circuit.t =
+             { pass_through =
+                 Common.hash_pairing_me_only
+                   ~app_state:A_value.to_field_elements
+                   (Reduced_me_only.Pairing_based.prepare
+                      ~dlog_plonk_index:key.commitments
+                      { t.statement.pass_through with app_state } )
+             ; proof_state =
+                 { t.statement.proof_state with
+                   deferred_values =
+                     { t.statement.proof_state.deferred_values with plonk }
+                 ; me_only =
+                     Common.hash_dlog_me_only Max_branching.n
+                       (Reduced_me_only.Dlog_based.prepare
+                          t.statement.proof_state.me_only )
+                 }
+             }
+           in
+           let input =
+             tock_unpadded_public_input_of_statement prepared_statement
+           in
+           ( key.index
+           , t.proof
+           , input
+           , Some
+               (Vector.to_list
+                  (Vector.map2
+                     ~f:(fun g cs ->
+                       { Challenge_polynomial.challenges =
+                           Vector.to_array (Ipa.Wrap.compute_challenges cs)
+                       ; commitment = g
+                       } )
+                     (Vector.extend_exn t.statement.pass_through.sg
+                        Max_branching.n
+                        (Lazy.force Dummy.Ipa.Wrap.sg) )
+                     t.statement.proof_state.me_only.old_bulletproof_challenges ) )
+           ) ) )
+  in
+  Common.time "dlog_check" (fun () -> check (lazy "dlog_check", dlog_check)) ;
   match result () with
   | Ok () ->
       true
@@ -238,4 +260,4 @@ let verify (type a n) (max_branching : (module Nat.Intf with type n = n))
     (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
   verify_heterogenous
     (List.map ts ~f:(fun (x, p) ->
-         Instance.T (max_branching, a_value, key, x, p) ))
+         Instance.T (max_branching, a_value, key, x, p) ) )

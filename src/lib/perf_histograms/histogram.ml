@@ -15,17 +15,18 @@ module Make (Elem : sig
     val create : ?min:t0 -> ?max:t0 -> ?buckets:int -> unit -> t
   end
 
-  val bucket : params:Params.t -> t -> [`Index of int | `Overflow | `Underflow]
+  val bucket : params:Params.t -> t -> [ `Index of int | `Overflow | `Underflow ]
 
   val interval_of_bucket : params:Params.t -> int -> t * t
 end) =
 struct
   type t =
-    { buckets: int Array.t
-    ; intervals: (Elem.t * Elem.t) List.t
-    ; mutable underflow: int
-    ; mutable overflow: int
-    ; params: Elem.Params.t }
+    { buckets : int Array.t
+    ; intervals : (Elem.t * Elem.t) List.t
+    ; mutable underflow : int
+    ; mutable overflow : int
+    ; params : Elem.Params.t
+    }
 
   let create ?buckets ?min ?max () =
     let params = Elem.Params.create ?min ?max ?buckets () in
@@ -33,11 +34,12 @@ struct
       List.init (Elem.Params.buckets params) ~f:(fun i ->
           Elem.interval_of_bucket ~params i )
     in
-    { buckets= Array.init (Elem.Params.buckets params) ~f:(fun _ -> 0)
+    { buckets = Array.init (Elem.Params.buckets params) ~f:(fun _ -> 0)
     ; intervals
-    ; underflow= 0
-    ; overflow= 0
-    ; params }
+    ; underflow = 0
+    ; overflow = 0
+    ; params
+    }
 
   let clear t =
     Array.fill t.buckets ~pos:0 ~len:(Array.length t.buckets) 0 ;
@@ -46,17 +48,18 @@ struct
 
   module Pretty = struct
     type t =
-      { values: int list
-      ; intervals: (Elem.t * Elem.t) list
-      ; underflow: int
-      ; overflow: int }
+      { values : int list
+      ; intervals : (Elem.t * Elem.t) list
+      ; underflow : int
+      ; overflow : int
+      }
     [@@deriving yojson, bin_io_unversioned, fields]
   end
 
-  let report {intervals; buckets; underflow; overflow; params= _} =
-    {Pretty.values= Array.to_list buckets; intervals; underflow; overflow}
+  let report { intervals; buckets; underflow; overflow; params = _ } =
+    { Pretty.values = Array.to_list buckets; intervals; underflow; overflow }
 
-  let add ({params; _} as t) e =
+  let add ({ params; _ } as t) e =
     match Elem.bucket ~params e with
     | `Index i ->
         t.buckets.(i) <- Int.succ t.buckets.(i)
@@ -83,9 +86,9 @@ module Exp_time_spans = Make (struct
   module Params = struct
     type t0 = t
 
-    type t = {a: float; b: float; buckets: int}
+    type t = { a : float; b : float; buckets : int }
 
-    let buckets {buckets; _} = buckets
+    let buckets { buckets; _ } = buckets
 
     (* See http://mathworld.wolfram.com/LeastSquaresFittingLogarithmic.html *)
     let fit min max buckets =
@@ -126,10 +129,10 @@ module Exp_time_spans = Make (struct
     let create ?(min = Time.Span.of_sec 1.) ?(max = Time.Span.of_min 10.)
         ?(buckets = 50) () =
       let a, b = fit min max buckets in
-      {a; b; buckets}
+      { a; b; buckets }
   end
 
-  let interval_of_bucket ~params:{Params.a; b; _} i =
+  let interval_of_bucket ~params:{ Params.a; b; _ } i =
     (* f-1(y) = e^{y/b - a/b} *)
     let f_1 y =
       let y = Float.of_int y in
@@ -137,7 +140,7 @@ module Exp_time_spans = Make (struct
     in
     (Time.Span.of_ms (f_1 i), Time.Span.of_ms (f_1 (i + 1)))
 
-  let bucket ~params:{Params.a; b; buckets} span =
+  let bucket ~params:{ Params.a; b; buckets } span =
     let x = Time.Span.to_ms span in
     if Float.( <= ) x 0.0 then `Underflow
     else

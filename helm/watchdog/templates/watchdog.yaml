@@ -15,10 +15,10 @@ spec:
         app: {{ .Values.name }}
         testnet: {{ $.Values.testnetName }}
         role: watchdog
-        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
+        version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
       annotations:
         prometheus.io/scrape: 'true'
-        prometheus.io/port: {{ $.Values.coda.ports.metrics | quote }}
+        prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
       containers:
@@ -44,12 +44,12 @@ spec:
           - name: "MAKE_REPORT_ACCOUNTS"
             value: {{ .Values.makeReportAccounts | quote }}
           - name: "METRICS_PORT"
-            value: {{ $.Values.coda.ports.metrics | quote }}
+            value: {{ $.Values.mina.ports.metrics | quote }}
           - name: "SEED_PEERS_URL"
             value: {{ $.Values.seedPeersURL | quote }}
           - name: "GOOGLE_APPLICATION_CREDENTIALS"
             value: "/gcloud/keyfile.json"
-          {{- if $.Values.coda.uploadBlocksToGCloud }}
+          {{- if $.Values.mina.uploadBlocksToGCloud }}
           - name: "CHECK_GCLOUD_STORAGE_BUCKET"
             value: "true"
           {{- end }}
@@ -57,15 +57,15 @@ spec:
         ports: 
         - name: metrics-port
           protocol: TCP 
-          containerPort: {{ $.Values.coda.ports.metrics }}
+          containerPort: {{ $.Values.mina.ports.metrics }}
         imagePullPolicy: Always
         volumeMounts:
-        {{- if $.Values.coda.uploadBlocksToGCloud }}
+        {{- if $.Values.mina.uploadBlocksToGCloud }}
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
         {{- end }}
       volumes:
-      {{- if $.Values.coda.uploadBlocksToGCloud }}
+      {{- if $.Values.mina.uploadBlocksToGCloud }}
       - name: gcloud-keyfile
         secret:
           secretName: gcloud-keyfile
@@ -75,7 +75,7 @@ spec:
             path: keyfile.json
       {{- end }}
 ---
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: watchdog-make-reports

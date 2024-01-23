@@ -26,8 +26,8 @@ let rec to_vector : type a n. (a, n) t -> a Vector.e = function
 let rec map : type a b n. (a, n) t -> f:(a -> b) -> (b, n) t =
  fun xs ~f -> match xs with [] -> [] | x :: xs -> f x :: map xs ~f
 
-let rec extend_to_vector : type a n.
-    (a, n) t -> a -> n Nat.t -> (a, n) Vector.t =
+let rec extend_to_vector : type a n. (a, n) t -> a -> n Nat.t -> (a, n) Vector.t
+    =
  fun v a n ->
   match (v, n) with
   | [], Z ->
@@ -105,26 +105,26 @@ module At_most_2 = struct
     module V1 = struct
       type 'a t = ('a, Nat.N2.n) at_most
 
-      include Binable.Of_binable1
-                (Core_kernel.List.Stable.V1)
-                (struct
-                  type nonrec 'a t = 'a t
+      include
+        Binable.Of_binable1_without_uuid
+          (Core_kernel.List.Stable.V1)
+          (struct
+            type nonrec 'a t = 'a t
 
-                  let to_binable = to_list
+            let to_binable = to_list
 
-                  let of_binable xs = of_list_and_length_exn xs Nat.N2.n
-                end)
+            let of_binable xs = of_list_and_length_exn xs Nat.N2.n
+          end)
 
       include (
         With_length
           (Nat.N2) :
-          module type of With_length (Nat.N2) with type 'a t := 'a t )
-    end
-  end]
+            module type of With_length (Nat.N2) with type 'a t := 'a t )
+      end
+    end]
 
-  type 'a t = 'a Stable.Latest.t
-  [@@deriving sexp, equal, compare, hash, yojson]
-end
+  type 'a t = 'a Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
+  end
 
 module At_most_8 = struct
   [%%versioned_binable
@@ -134,23 +134,23 @@ module At_most_8 = struct
     module V1 = struct
       type 'a t = ('a, Nat.N8.n) at_most
 
-      include Binable.Of_binable1
-                (Core_kernel.List.Stable.V1)
-                (struct
-                  type nonrec 'a t = 'a t
+      include
+        Binable.Of_binable1_without_uuid
+          (Core_kernel.List.Stable.V1)
+          (struct
+            type nonrec 'a t = 'a t
 
-                  let to_binable = to_list
+            let to_binable = to_list
 
-                  let of_binable xs = of_list_and_length_exn xs Nat.N8.n
-                end)
+            let of_binable xs = of_list_and_length_exn xs Nat.N8.n
+          end)
 
       include (
         With_length
           (Nat.N8) :
-          module type of With_length (Nat.N8) with type 'a t := 'a t )
-    end
-  end]
+            module type of With_length (Nat.N8) with type 'a t := 'a t )
+      end
+    end]
 
-  type 'a t = 'a Stable.Latest.t
-  [@@deriving sexp, equal, compare, hash, yojson]
-end
+  type 'a t = 'a Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
+  end

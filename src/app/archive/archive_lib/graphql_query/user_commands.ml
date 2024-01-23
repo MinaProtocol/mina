@@ -1,13 +1,12 @@
-open Mina_base
-open Signature_lib
+module Serializing = Graphql_lib.Serializing
 
 module Query_first_seen =
 [%graphql
 {|
     query query ($hashes: [String!]!) {
         user_commands(where: {hash: {_in: $hashes}} ) {
-            hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
-            first_seen @bsDecoder(fn: "Base_types.deserialize_optional_block_time")
+            hash @ppxCustom(module: "Serializing.Transaction_hash")
+            first_seen @ppxCustom(module: "Base_types.Optional_block_time")
         }
     }
   |}]
@@ -19,11 +18,11 @@ module Query_participants =
         user_commands(where: {hash: {_in: $hashes}} ) {
           receiver {
             id
-            value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
+            value @ppxCustom(module: "Serializing.Public_key_s")
           }
           sender {
             id
-            value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
+            value @ppxCustom(module: "Serializing.Public_key_s")
           }
         }
     }
@@ -35,19 +34,19 @@ module Query =
 {|
     query query ($hash: String!) {
         user_commands(where: {hash: {_eq: $hash}} ) {
-            fee @bsDecoder (fn: "Base_types.Fee.deserialize")
-            hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
-            memo @bsDecoder(fn: "Signed_command_memo.of_string")
-            nonce @bsDecoder (fn: "Base_types.Nonce.deserialize")
+            fee @ppxCustom(module: "Base_types.Fee")
+            hash @ppxCustom(module: "Serializing.Transaction_hash")
+            memo @ppxCustom(module: "Serializing.Memo")
+            nonce @ppxCustom(module: "Base_types.Nonce")
             sender {
-                value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
+                value @ppxCustom(module: "Serializing.Public_key_s")
             }
             receiver {
-              value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
-            } 
-            typ @bsDecoder (fn: "Base_types.User_command_type.decode")
-            amount @bsDecoder (fn: "Base_types.Amount.deserialize")
-            first_seen @bsDecoder(fn: "Base_types.deserialize_optional_block_time")
+              value @ppxCustom(module: "Serializing.Public_key_s")
+            }
+            typ @ppxCustom(module: "Base_types.User_command_type")
+            amount @ppxCustom(module: "Base_types.Amount")
+            first_seen @ppxCustom(module: "Base_types.Optional_block_time")
         }
     }
   |}]
@@ -57,11 +56,11 @@ module Insert =
 {|
     mutation insert ($user_commands: [user_commands_insert_input!]!) {
     insert_user_commands(objects: $user_commands,
-    on_conflict: {constraint: user_commands_hash_key, update_columns: first_seen}
+    on_conflict: {constraint_: user_commands_hash_key, update_columns: [first_seen]}
     ) {
       returning {
-        hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
-        first_seen @bsDecoder(fn: "Base_types.deserialize_optional_block_time")
+        hash @ppxCustom(module: "Serializing.Transaction_hash")
+        first_seen @ppxCustom(module: "Base_types.Optional_block_time")
       }
     }
   }

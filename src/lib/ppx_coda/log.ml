@@ -19,7 +19,6 @@ open Asttypes
 
    The variants `%str_log` and `%str_log'` generate the module `Logger.Structured`
    instead of `Logger`.
-
 *)
 
 module type Ppxinfo = sig
@@ -42,8 +41,7 @@ module Make (Info : Ppxinfo) = struct
     in
     let log_level_expr = pexp_ident (Located.mk log_level_id) in
     (* spam and best_tip_diff logs don't contain module, location *)
-    if
-      String.equal level_name "spam" || String.equal level_name "best_tip_diff"
+    if String.equal level_name "spam" || String.equal level_name "best_tip_diff"
     then [%expr [%e log_level_expr] [%e logger]]
     else
       [%expr
@@ -69,11 +67,11 @@ module Make (Info : Ppxinfo) = struct
 
   let () =
     Driver.register_transformation Info.name
-      ~rules:[Context_free.Rule.extension ext_capture_logger]
+      ~rules:[ Context_free.Rule.extension ext_capture_logger ]
 
   let () =
     Driver.register_transformation (prime Info.name)
-      ~rules:[Context_free.Rule.extension ext_explicit_logger]
+      ~rules:[ Context_free.Rule.extension ext_explicit_logger ]
 end
 
 include Make (struct

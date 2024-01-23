@@ -9,14 +9,11 @@ module Make (Engine : Intf.Engine.S) () :
   module Event_handler_id = Unique_id.Int ()
 
   type ('a, 'b) handler_func =
-    Node.t -> 'a -> [`Stop of 'b | `Continue] Deferred.t
+    Node.t -> 'a -> [ `Stop of 'b | `Continue ] Deferred.t
 
   type event_handler =
     | Event_handler :
-        Event_handler_id.t
-        * 'b Ivar.t
-        * 'a Event_type.t
-        * ('a, 'b) handler_func
+        Event_handler_id.t * 'b Ivar.t * 'a Event_type.t * ('a, 'b) handler_func
         -> event_handler
 
   (* event subscriptions surface information from the handler (as type witnesses), but do not existentially hide the result parameter *)
@@ -28,15 +25,14 @@ module Make (Engine : Intf.Engine.S) () :
   type handler_map = event_handler list Event_type.Map.t
 
   (* TODO: asynchronously unregistered event handlers *)
-  type t = {logger: Logger.t; handlers: handler_map ref}
+  type t = { logger : Logger.t; handlers : handler_map ref }
 
   let unregister_event_handlers_by_id handlers event_type ids =
     handlers :=
       Event_type.Map.update !handlers event_type ~f:(fun registered_handlers ->
           registered_handlers |> Option.value ~default:[]
           |> List.filter ~f:(fun (Event_handler (registered_id, _, _, _)) ->
-                 not (List.mem ids registered_id ~equal:Event_handler_id.equal)
-             ) )
+                 not (List.mem ids registered_id ~equal:Event_handler_id.equal) ) )
 
   let dispatch_event handlers node event =
     let open Event_type in
@@ -53,7 +49,7 @@ module Make (Engine : Intf.Engine.S) () :
                 ( handler_id
                 , handler_finished_ivar
                 , handler_type
-                , handler_callback )) =
+                , handler_callback ) ) =
             handler
           in
           match%map
@@ -77,9 +73,10 @@ module Make (Engine : Intf.Engine.S) () :
            [%log debug] "Dispatching event $event for $node"
              ~metadata:
                [ ("event", Event_type.event_to_yojson event)
-               ; ("node", `String (Node.id node)) ] ;
-           dispatch_event handlers node event )) ;
-    {logger; handlers}
+               ; ("node", `String (Node.infra_id node))
+               ] ;
+           dispatch_event handlers node event ) ) ;
+    { logger; handlers }
 
   let on t event_type ~f =
     let event_type_ex = Event_type.Event_type event_type in
@@ -94,7 +91,7 @@ module Make (Engine : Intf.Engine.S) () :
   let cancel t event_subscription cancellation =
     let (Event_subscription (id, ivar, event_type)) = event_subscription in
     unregister_event_handlers_by_id t.handlers
-      (Event_type.Event_type event_type) [id] ;
+      (Event_type.Event_type event_type) [ id ] ;
     Ivar.fill ivar cancellation
 
   let await event_subscription =
@@ -104,9 +101,7 @@ module Make (Engine : Intf.Engine.S) () :
   let await_with_timeout t event_subscription ~timeout_duration
       ~timeout_cancellation =
     let open Deferred.Let_syntax in
-    match%map
-      Timeout.await () ~timeout_duration (await event_subscription)
-    with
+    match%map Timeout.await () ~timeout_duration (await event_subscription) with
     | `Ok x ->
         x
     | `Timeout ->

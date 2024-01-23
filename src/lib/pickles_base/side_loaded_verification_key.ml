@@ -122,9 +122,8 @@ module Max_branches_vec = struct
     end
   end]
 
-  let _ =
-    let _f : type a. unit -> (a t, (a, Max_branches.n) At_most.t) Type_equal.t
-        =
+  let () =
+    let _f : type a. unit -> (a t, (a, Max_branches.n) At_most.t) Type_equal.t =
      fun () -> Type_equal.T
     in
     ()
@@ -134,14 +133,14 @@ module Domains = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = {h: 'a}
+      type 'a t = { h : 'a }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
 
-  let iter {h} ~f = f h
+  let iter { h } ~f = f h
 
-  let map {h} ~f = {h= f h}
+  let map { h } ~f = { h = f h }
 end
 
 module Repr = struct
@@ -149,11 +148,12 @@ module Repr = struct
   module Stable = struct
     module V1 = struct
       type 'g t =
-        { step_data:
+        { step_data :
             (Domain.Stable.V1.t Domains.Stable.V1.t * Width.Stable.V1.t)
             Max_branches_vec.Stable.V1.t
-        ; max_width: Width.Stable.V1.t
-        ; wrap_index: 'g list Plonk_verification_key_evals.Stable.V1.t }
+        ; max_width : Width.Stable.V1.t
+        ; wrap_index : 'g list Plonk_verification_key_evals.Stable.V1.t
+        }
 
       let to_latest = Fn.id
     end
@@ -165,18 +165,19 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type ('g, 'vk) t =
-        { step_data:
+        { step_data :
             (Domain.Stable.V1.t Domains.Stable.V1.t * Width.Stable.V1.t)
             Max_branches_vec.Stable.V1.t
-        ; max_width: Width.Stable.V1.t
-        ; wrap_index: 'g list Plonk_verification_key_evals.Stable.V1.t
-        ; wrap_vk: 'vk option }
+        ; max_width : Width.Stable.V1.t
+        ; wrap_index : 'g list Plonk_verification_key_evals.Stable.V1.t
+        ; wrap_vk : 'vk option
+        }
       [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 end
 
-let dummy_domains = {Domains.h= Domain.Pow_2_roots_of_unity 0}
+let dummy_domains = { Domains.h = Domain.Pow_2_roots_of_unity 0 }
 
 let dummy_width = Width.zero
 
@@ -200,7 +201,8 @@ let wrap_index_to_input (type gs f) (g : gs -> f array) =
         ; g15
         ; g16
         ; g17
-        ; g18 ] =
+        ; g18
+        ] =
       Plonk_verification_key_evals.to_hlist t
     in
     List.map
@@ -221,34 +223,34 @@ let wrap_index_to_input (type gs f) (g : gs -> f array) =
       ; g15
       ; g16
       ; g17
-      ; g18 ]
+      ; g18
+      ]
       ~f:(Fn.compose field_elements g)
     |> List.reduce_exn ~f:append
 
 let to_input : _ Poly.t -> _ =
   let open Random_oracle_input in
   let map_reduce t ~f = Array.map t ~f |> Array.reduce_exn ~f:append in
-  fun {step_data; max_width; wrap_index} ->
-    ( let bits ~len n = bitstring (bits ~len n) in
-      let num_branches =
-        bits ~len:(Nat.to_int Max_branches.Log2.n) (At_most.length step_data)
-      in
-      let step_domains, step_widths =
-        At_most.extend_to_vector step_data
-          (dummy_domains, dummy_width)
-          Max_branches.n
-        |> Vector.unzip
-      in
-      List.reduce_exn ~f:append
-        [ map_reduce (Vector.to_array step_domains) ~f:(fun {Domains.h} ->
-              map_reduce [|h|] ~f:(fun (Pow_2_roots_of_unity x) ->
-                  bits ~len:max_log2_degree x ) )
-        ; Array.map (Vector.to_array step_widths) ~f:Width.to_bits
-          |> bitstrings
-        ; bitstring (Width.to_bits max_width)
-        ; wrap_index_to_input
-            (Fn.compose Array.of_list
-               (List.concat_map ~f:(fun (x, y) -> [x; y])))
-            wrap_index
-        ; num_branches ]
-      : _ Random_oracle_input.t )
+  fun { step_data; max_width; wrap_index } : _ Random_oracle_input.t ->
+    let bits ~len n = bitstring (bits ~len n) in
+    let num_branches =
+      bits ~len:(Nat.to_int Max_branches.Log2.n) (At_most.length step_data)
+    in
+    let step_domains, step_widths =
+      At_most.extend_to_vector step_data
+        (dummy_domains, dummy_width)
+        Max_branches.n
+      |> Vector.unzip
+    in
+    List.reduce_exn ~f:append
+      [ map_reduce (Vector.to_array step_domains) ~f:(fun { Domains.h } ->
+            map_reduce [| h |] ~f:(fun (Pow_2_roots_of_unity x) ->
+                bits ~len:max_log2_degree x ) )
+      ; Array.map (Vector.to_array step_widths) ~f:Width.to_bits |> bitstrings
+      ; bitstring (Width.to_bits max_width)
+      ; wrap_index_to_input
+          (Fn.compose Array.of_list
+             (List.concat_map ~f:(fun (x, y) -> [ x; y ])) )
+          wrap_index
+      ; num_branches
+      ]

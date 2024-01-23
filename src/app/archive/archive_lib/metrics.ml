@@ -38,7 +38,7 @@ module Missing_blocks = struct
         LEFT JOIN blocks b 
         ON h = b.height WHERE b.height IS NULL) as v
       |sql}
-         missing_blocks_width)
+         missing_blocks_width )
 
   let update ~missing_blocks_width (module Conn : Caqti_async.CONNECTION)
       metric_server =
@@ -75,7 +75,7 @@ let log_error ~logger pool metric_server
     (f :
          (module Caqti_async.CONNECTION)
       -> Mina_metrics.Archive.t
-      -> (unit, [> Caqti_error.call_or_retrieve]) Deferred.Result.t) =
+      -> (unit, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t ) =
   let open Deferred.Let_syntax in
   match%map
     Caqti_async.Pool.use
@@ -87,7 +87,7 @@ let log_error ~logger pool metric_server
       ()
   | Error e ->
       [%log warn] "Error updating archive metrics: $error"
-        ~metadata:[("error", `String (Caqti_error.show e))]
+        ~metadata:[ ("error", `String (Caqti_error.show e)) ]
 
 let update ~logger ~missing_blocks_width pool metric_server =
   Deferred.all_unit
@@ -95,4 +95,5 @@ let update ~logger ~missing_blocks_width pool metric_server =
        ~f:(log_error ~logger pool metric_server)
        [ Max_block_height.update
        ; Unparented_blocks.update
-       ; Missing_blocks.update ~missing_blocks_width ])
+       ; Missing_blocks.update ~missing_blocks_width
+       ] )

@@ -9,22 +9,23 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type ('length, 'time, 'timespan) t =
-        { k: 'length
-        ; delta: 'length
-        ; slots_per_sub_window: 'length
-        ; slots_per_window: 'length
-        ; sub_windows_per_window: 'length
-        ; slots_per_epoch: 'length (* The first slot after the grace period. *)
-        ; grace_period_end: 'length
-        ; epoch_size: 'length
-        ; checkpoint_window_slots_per_year: 'length
-        ; checkpoint_window_size_in_slots: 'length
-        ; block_window_duration_ms: 'timespan
-        ; slot_duration_ms: 'timespan
-        ; epoch_duration: 'timespan
-        ; delta_duration: 'timespan
-        ; genesis_state_timestamp: 'time }
-      [@@deriving eq, ord, hash, sexp, to_yojson, hlist]
+        { k : 'length
+        ; delta : 'length
+        ; slots_per_sub_window : 'length
+        ; slots_per_window : 'length
+        ; sub_windows_per_window : 'length
+        ; slots_per_epoch : 'length (* The first slot after the grace period. *)
+        ; grace_period_end : 'length
+        ; epoch_size : 'length
+        ; checkpoint_window_slots_per_year : 'length
+        ; checkpoint_window_size_in_slots : 'length
+        ; block_window_duration_ms : 'timespan
+        ; slot_duration_ms : 'timespan
+        ; epoch_duration : 'timespan
+        ; delta_duration : 'timespan
+        ; genesis_state_timestamp : 'time
+        }
+      [@@deriving equal, compare, hash, sexp, to_yojson, hlist]
     end
   end]
 end
@@ -37,7 +38,7 @@ module Stable = struct
       , Block_time.Stable.V1.t
       , Block_time.Span.Stable.V1.t )
       Poly.Stable.V1.t
-    [@@deriving eq, ord, hash, sexp, to_yojson]
+    [@@deriving equal, ord, hash, sexp, to_yojson]
 
     let to_latest = Fn.id
   end
@@ -89,9 +90,9 @@ end
 
 module Constants_UInt32 :
   M_intf
-  with type length = Length.t
-   and type time = Block_time.t
-   and type timespan = Block_time.Span.t = struct
+    with type length = Length.t
+     and type time = Block_time.t
+     and type timespan = Block_time.Span.t = struct
   type t = UInt32.t
 
   type length = Length.t
@@ -131,9 +132,9 @@ end
 
 module Constants_checked :
   M_intf
-  with type length = Length.Checked.t
-   and type time = Block_time.Unpacked.var
-   and type timespan = Block_time.Span.Unpacked.var = struct
+    with type length = Length.Checked.t
+     and type time = Block_time.Unpacked.var
+     and type timespan = Block_time.Span.Unpacked.var = struct
   open Snarky_integer
 
   type t = field Integer.t
@@ -182,7 +183,7 @@ let create' (type a b c)
     (module M : M_intf
       with type length = a
        and type time = b
-       and type timespan = c)
+       and type timespan = c )
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~(protocol_constants : (a, a, b) Genesis_constants.Protocol.Poly.t) :
     (a, b, c) Poly.t =
@@ -193,7 +194,7 @@ let create' (type a b c)
   let k = of_length protocol_constants.k in
   let delta = of_length protocol_constants.delta in
   (*TODO: sub_windows_per_window, slots_per_sub_window are currently dummy
-  values and need to be updated before mainnet*)
+    values and need to be updated before mainnet*)
   let slots_per_sub_window =
     of_length protocol_constants.slots_per_sub_window
   in
@@ -213,7 +214,7 @@ let create' (type a b c)
   end in
   let delta_duration = Slot.duration_ms * (delta + M.one) in
   let num_days = 3. in
-  assert (num_days < 14.) ;
+  assert (Float.(num_days < 14.)) ;
   (* We forgo updating the min density for the first [num_days] days (or epoch, whichever comes first)
       of the network's operation. The reasoning is as follows:
 
@@ -243,21 +244,22 @@ let create' (type a b c)
           slots
   in
   let res : (a, b, c) Poly.t =
-    { Poly.k= to_length k
-    ; delta= to_length delta
-    ; block_window_duration_ms= to_timespan block_window_duration_ms
-    ; slots_per_sub_window= to_length slots_per_sub_window
-    ; slots_per_window= to_length slots_per_window
-    ; sub_windows_per_window= to_length sub_windows_per_window
-    ; slots_per_epoch= to_length slots_per_epoch
-    ; grace_period_end= to_length grace_period_end
-    ; slot_duration_ms= to_timespan Slot.duration_ms
-    ; epoch_size= to_length Epoch.size
-    ; epoch_duration= to_timespan Epoch.duration
-    ; checkpoint_window_slots_per_year= to_length zero
-    ; checkpoint_window_size_in_slots= to_length zero
-    ; delta_duration= to_timespan delta_duration
-    ; genesis_state_timestamp= protocol_constants.genesis_state_timestamp }
+    { Poly.k = to_length k
+    ; delta = to_length delta
+    ; block_window_duration_ms = to_timespan block_window_duration_ms
+    ; slots_per_sub_window = to_length slots_per_sub_window
+    ; slots_per_window = to_length slots_per_window
+    ; sub_windows_per_window = to_length sub_windows_per_window
+    ; slots_per_epoch = to_length slots_per_epoch
+    ; grace_period_end = to_length grace_period_end
+    ; slot_duration_ms = to_timespan Slot.duration_ms
+    ; epoch_size = to_length Epoch.size
+    ; epoch_duration = to_timespan Epoch.duration
+    ; checkpoint_window_slots_per_year = to_length zero
+    ; checkpoint_window_size_in_slots = to_length zero
+    ; delta_duration = to_timespan delta_duration
+    ; genesis_state_timestamp = protocol_constants.genesis_state_timestamp
+    }
   in
   res
 
@@ -284,14 +286,15 @@ let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
   in
   { constants with
     checkpoint_window_size_in_slots
-  ; checkpoint_window_slots_per_year }
+  ; checkpoint_window_slots_per_year
+  }
 
 let for_unit_tests =
   lazy
     (create
        ~constraint_constants:
          Genesis_constants.Constraint_constants.for_unit_tests
-       ~protocol_constants:Genesis_constants.for_unit_tests.protocol)
+       ~protocol_constants:Genesis_constants.for_unit_tests.protocol )
 
 let to_protocol_constants
     ({ k
@@ -299,13 +302,15 @@ let to_protocol_constants
      ; genesis_state_timestamp
      ; slots_per_sub_window
      ; slots_per_epoch
-     ; _ } :
-      _ Poly.t) =
+     ; _
+     } :
+      _ Poly.t ) =
   { Mina_base.Protocol_constants_checked.Poly.k
   ; delta
   ; genesis_state_timestamp
   ; slots_per_sub_window
-  ; slots_per_epoch }
+  ; slots_per_epoch
+  }
 
 let data_spec =
   Data_spec.
@@ -323,7 +328,8 @@ let data_spec =
     ; Block_time.Span.Unpacked.typ
     ; Block_time.Span.Unpacked.typ
     ; Block_time.Span.Unpacked.typ
-    ; Block_time.Unpacked.typ ]
+    ; Block_time.Unpacked.typ
+    ]
 
 let typ =
   Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
@@ -345,13 +351,16 @@ let to_input (t : t) =
             ; t.grace_period_end
             ; t.epoch_size
             ; t.checkpoint_window_slots_per_year
-            ; t.checkpoint_window_size_in_slots |]
+            ; t.checkpoint_window_size_in_slots
+           |]
        ; Array.map ~f:s
            [| t.block_window_duration_ms
             ; t.slot_duration_ms
             ; t.epoch_duration
-            ; t.delta_duration |]
-       ; [|Block_time.Bits.to_bits t.genesis_state_timestamp|] ])
+            ; t.delta_duration
+           |]
+       ; [| Block_time.Bits.to_bits t.genesis_state_timestamp |]
+       ] )
 
 let gc_parameters (constants : t) =
   let open Unsigned.UInt32 in
@@ -409,7 +418,8 @@ module Checked = struct
           ; slot_duration_ms
           ; epoch_duration
           ; delta_duration
-          ; genesis_state_timestamp |])
+          ; genesis_state_timestamp
+         |] )
 
   let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(protocol_constants : Mina_base.Protocol_constants_checked.var) :
@@ -446,7 +456,8 @@ module Checked = struct
     in
     { constants with
       checkpoint_window_slots_per_year
-    ; checkpoint_window_size_in_slots }
+    ; checkpoint_window_size_in_slots
+    }
 end
 
 let%test_unit "checked = unchecked" =
@@ -465,5 +476,5 @@ let%test_unit "checked = unchecked" =
             (Protocol_constants_checked.t_of_value protocol_constants) )
   in
   Quickcheck.test ~trials:100 Protocol_constants_checked.Value.gen
-    ~examples:[Protocol_constants_checked.value_of_t for_unit_tests]
+    ~examples:[ Protocol_constants_checked.value_of_t for_unit_tests ]
     ~f:test

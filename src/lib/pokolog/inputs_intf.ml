@@ -17,9 +17,9 @@ module type Checked = sig
 
   module Hash :
     Hash_intf.Checked
-    with module Impl := Impl
-     and type group := Group.t
-     and type scalar := Scalar.t
+      with module Impl := Impl
+       and type group := Group.t
+       and type scalar := Scalar.t
 end
 
 module type S = sig
@@ -32,7 +32,7 @@ module type S = sig
 
   module Hash :
     Hash_intf.S
-    with module Impl := Impl
-     and module Scalar := Scalar
-     and module Group := Group
+      with module Impl := Impl
+       and module Scalar := Scalar
+       and module Group := Group
 end

@@ -7,5 +7,5 @@ It is a *Coda Service*, meaning it is necessary to run this alongside a synced a
 `ECHO_PUBLICKEY`: Coda Public Key that corresponds to a installed wallet
 `FAUCET_PUBLICKEY`: Coda Public Key that corresponds to a installed wallet
 `DISCORD_API_KEY`: A Discord Bot API Key
-`CODA_GRAPHQL_HOST`: Defaults to `localhost`, the hostname of the *Coda Daemon* 
-`CODA_GRAPHQL_PORT`: Defaults to `0xc0d` (3085), the port the *Coda Daemon* is listening on 
+`MINA_GRAPHQL_HOST`: Defaults to `localhost`, the hostname of the *Coda Daemon* 
+`MINA_GRAPHQL_PORT`: Defaults to `0xc0d` (3085), the port the *Coda Daemon* is listening on 

@@ -4,7 +4,7 @@ The faucet service is a simple Discord bot that listens for requests for `CODA` 
 
 ## Usage
 
-First you'll need to have a `coda` daemon running on your machine. See the docs [here](https://codaprotocol.com/docs/getting-started/) for instructions on getting a node, then run the following command:
+First you'll need to have a `coda` daemon running on your machine. See the docs [here](https://docs.minaprotocol.com/en/getting-started) for instructions on getting a node, then run the following command:
 
 ```
 $ mina daemon -rest-port 49370 -peer beta.o1test.net:8303
@@ -12,7 +12,7 @@ $ mina daemon -rest-port 49370 -peer beta.o1test.net:8303
 
 This process must be running for this service to work. Open a new terminal session before you continue.
 
-The service requires [Python 3.7]() to be installed on your system, and uses [pip]() as the package manager. To make things easy, a docker-compose environment has been provided that allows you to start the service simply. First, copy the example and update your environment variables:
+The service requires Python 3.7 to be installed on your system, and uses pip as the package manager. To make things easy, a docker-compose environment has been provided that allows you to start the service simply. First, copy the example and update your environment variables:
 
 ```
 cp docker-compose.yml.example docker-compose.yml

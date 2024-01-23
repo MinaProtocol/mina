@@ -31,17 +31,17 @@ while [ $# -gt 0 ]; do
 done
 
 echo Testnet is ${TESTNET}
-echo Initial Docker Image is codaprotocol/mina-daemon:${DOCKER_TAG}
+echo Initial Docker Image is minaprotocol/mina-daemon:${DOCKER_TAG}
 echo Mina Git Repo Pathspec is ${GIT_PATHSPEC}
 echo Config File Path is ${CONFIG_FILE}
 
 first7=$(echo ${GIT_PATHSPEC} | cut -c1-7)
 
-hub_baked_tag="codaprotocol/mina-daemon-baked:${DOCKER_TAG}-${TESTNET}-${first7}"
-gcr_baked_tag="gcr.io/o1labs-192920/mina-daemon-baked:${DOCKER_TAG}-${TESTNET}-${first7}"
+hub_baked_tag="minaprotocol/mina-daemon-baked:${DOCKER_TAG}-${TESTNET}"
+gcr_baked_tag="gcr.io/o1labs-192920/mina-daemon-baked:${DOCKER_TAG}-${TESTNET}"
 
 docker_tag_exists() {
-  curl --silent -f -lSL "https://index.docker.io/v1/repositories/codaprotocol/mina-daemon/tags/${DOCKER_TAG}" > /dev/null
+  curl --silent -f -lSL "https://index.docker.io/v1/repositories/minaprotocol/mina-daemon/tags/${DOCKER_TAG}" > /dev/null
 }
 
 # Consistent method for finding a directory to work from
@@ -72,8 +72,14 @@ cat Dockerfile | docker build --no-cache \
   --build-arg "TESTNET_NAME=${TESTNET}" \
   --build-arg "CONFIG_FILE=${CONFIG_FILE}" -
 
-docker push "$hub_baked_tag"
 docker tag "$hub_baked_tag" "$gcr_baked_tag"
+
+echo "Pushing to dockerhub"
+docker push "$hub_baked_tag"
+echo "Pushing to GCR"
 docker push "$gcr_baked_tag"
-echo "Built + Pushed Image: ${hub_baked_tag}"
+
+echo "Built + Pushed Image"
+echo "Dockerhub url: ${hub_baked_tag}"
+echo "GCR url: ${gcr_baked_tag}"
 

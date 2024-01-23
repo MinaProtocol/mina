@@ -1,11 +1,11 @@
 <a href="https://minaprotocol.com">
-	<img width="200" src="https://minaprotocol.com/static/Mina_Wordmark_Github.png" alt="Mina Logo" />
+	<img width="200" src="https://github.com/MinaProtocol/docs/blob/main/public/static/img/svg/mina-wordmark-redviolet.svg?raw=true&sanitize=true" alt="Mina Logo" />
 </a>
 <hr/>
 
 # Repository Purpose
 
-This repository is designed to show an opinionated example on how to operate a network of Coda Daemons. It implements the entire node lifecycle using a modern Infrastructure as Code toolset. Community contributions are warmly encouraged, please see the [contribution guidelines](#to-do) for more details. The code is designed to be as modular as possible, allowing the end-user to "pick and choose" the parts they would like to incorporate into their own infrastructure stack.
+This repository is designed to show an opinionated example on how to operate a network of Mina Daemons. It implements the entire node lifecycle using a modern Infrastructure as Code toolset. Community contributions are warmly encouraged, please see the [contribution guidelines](../CONTRIBUTING.md) for more details. The code is designed to be as modular as possible, allowing the end-user to "pick and choose" the parts they would like to incorporate into their own infrastructure stack.
 
 If you have any issues setting up your testnet or have any other questions about this repository, join the public [Discord Server](https://discord.gg/ShKhA7J) and get help from the Coda community.
 
@@ -24,17 +24,16 @@ automation
     └── testnets
 ```
 
-**Helm:** Contains Helm Charts for various components of a Coda Testnet
+**Helm:** Contains Helm Charts for various components of a Mina Testnet
 
 - _block-producer:_ One or more block producers consisting of unique `deployments`
 - _snark-worker:_ Deploys a "SNARK Coordinator" consisting of one or more worker process containers
 
-**Terraform:** Contains resource modules and live code to deploy a Coda Testnet.
+**Terraform:** Contains resource modules and live code to deploy a Mina Testnet.
 
 - Note: Currently most modules are written against Google Kubernetes Engine, multi-cloud support is on the roadmap.
 - _infrastructure:_ The root module for infrastructure like K8s Clusters and Prometheus.
-- _kubernetes/testnet:_ A Terraform module that encapsulates a Coda Testnet, including Seed Nodes, Block Producers and SNARK Workers.
-- _google-cloud/coda-seed-node:_ A Terraform module that deploys a set of public Seed Nodes on Google Compute Engine in the configured region.
+- _kubernetes/testnet:_ A Terraform module that encapsulates a Mina Testnet, including Seed Nodes, Block Producers and SNARK Workers.
   _Scripts:_ Testnet utilities for key generation & storage, redelegation, etc.
 
 # Prerequisites
@@ -53,9 +52,15 @@ For the purposes of this README we are assuming the following:
 - You have Kubectl configured for the GKE cluster of your choice: https://cloud.google.com/kubernetes-engine/docs/how-to/cluster-access-for-kubectl
   TL;DR: `gcloud container clusters get-credentials -region us-east1 coda-infra-east`
 
+- You have `jq` installed on your local machine. jq is a json processor that is used to create the testnet ledger
+
+- You have `node` version `14.x` installed to your machine. (Note that later releases of `node` and `npm` may cause compatibility issues with the `node-fetch` module used for certain scripts and ledger generation. The newer version of `node-fetch` has not been tested: https://github.com/node-fetch/node-fetch/blob/HEAD/docs/v3-UPGRADE-GUIDE.md)
+
+- You have installed and initialized the `yarn` build tool by running `yarn install` and `yarn build` from within the ./automation directory, before building your testnet
+
 # What is a Testnet
 
-A Testnet (a.k.a. Test Network) is a tool that is used to "test" Coda's distributed software. Our testnets are designed to simulate a "Mainnet" environment in order to identify bugs and test new functionality. Along with the network itself, there are several bots and services that are additionally deployed to facilitate a baseline of activity and access to the network.
+A Testnet (a.k.a. Test Network) is a tool that is used to "test" Mina's distributed software. Our testnets are designed to simulate a "Mainnet" environment in order to identify bugs and test new functionality. Along with the network itself, there are several bots and services that are additionally deployed to facilitate a baseline of activity and access to the network.
 
 # Components of a Testnet
 
@@ -65,7 +70,7 @@ In order to simulate a differentiation between O(1) Stake (Whales) and end-user 
 
 ### Bots
 
-Bots are often used to automate transactions being sent around the network. Often, these require special consideration in the genesis ledger, so it's worth keeping them in mind when setting up a new network. For example, the O(1) Discord Faucet is a simple sidecar bot that runs against a Coda Daemon's GraphQL Port and responds to requests for funds in the Coda Protocol Discord server.
+Bots are often used to automate transactions being sent around the network. Often, these require special consideration in the genesis ledger, so it's worth keeping them in mind when setting up a new network. For example, the O(1) Discord Faucet is a simple sidecar bot that runs against a Mina Daemon's GraphQL Port and responds to requests for funds in the Mina Protocol Discord server.
 
 ### Services
 
@@ -91,7 +96,7 @@ Public Testnets are functionally similar to QA Testnets but have the addition of
 
 Deploying a testnet is a relatively straightforward process once you have ironed out the configuration. At a high level, there are several pieces of configuration it's important to keep in mind or else your deployment might fail:
 
-- Coda Keypairs
+- Mina Keypairs
 - Genesis Ledger
 - Runtime Constants
 
@@ -110,17 +115,17 @@ If you don't know if you _should_ do this, you probably shouldn't!
 ### Quick steps to launch a small network
 
 1) make a new `terraform/testnets/<testnet>`
-2) `./scripts/generate-keys-and-ledger.sh --testnet=<testnet> --wc=10 --fc=10`
-3) run `./scripts/bake.sh --testnet=<testnet> --docker-tag=<tag, ex. 0.0.17-beta6-develop> --automation-commit=$(git log -1 --pretty=format:%H) --cloud=true`
-4) copy the image tag from the output of bake.sh to `coda_image` in `terraform/testnets/<testnet>/main.tf`
-5) set the archive image tag to the corresponding tag name - for example, if the image is `0.0.17-beta10-880882e`, use  `gcr.io/o1labs-192920/coda-archive:0.0.17-beta10-880882e`
-6) run `terraform apply`
-7) after its done applying, run `./scripts/upload-keys-k8s.sh <testnet>`
+2) if necessary, modify the `main.tf` file in order to change the number of fish or whales
+3) run the generate keys and ledger script to generate the genesis ledger with all the necessary libp2p and account keys.  make sure the argument you pass to --wc and --fc matches the number of whales and fish you specified in the main.tf  `./scripts/generate-keys-and-ledger.sh --testnet=<testnet> --wc=10 --fc=10`
+4) optionally, run `./scripts/bake.sh --testnet=<testnet> --docker-tag=<tag, ex. 0.0.17-beta6-develop> --automation-commit=$(git log -1 --pretty=format:%H) --cloud=true`.  in our current system, baking a new image (which would put the newly generated genesis ledger and onto the image itself) is not necessary because when running terraform apply in a later step, terraform will run `./scripts/upload-keys-k8s.sh <testnet>` which uploads the ledger and mounts it on a volume which will override anything baked into the image.
+4.1) copy the image tag from the output of bake.sh to `mina_image` in `terraform/testnets/<testnet>/main.tf`
+4.2) set the archive image tag to the corresponding tag name - for example, if the image is `0.0.17-beta10-880882e`, use  `gcr.io/o1labs-192920/coda-archive:0.0.17-beta10-880882e`
+5) run `terraform apply`
 
-For a public network, add on
+For a public network, the bake script is required, and also add the following steps
 
-8) run `python3 scripts/get_peers.py <testnet>`
-9) run `scripts/upload_cloud_bake_to_docker.sh --testnet=<TESTNET> --docker-tag=<tag> --automation-commit=<automation commit>`
+6) run `python3 scripts/get_peers.py <testnet>`
+7) run `scripts/upload_cloud_bake_to_docker.sh --testnet=<TESTNET> --docker-tag=<tag> --automation-commit=<automation commit>`
 
 ### Creating the Testnet directory
 
@@ -130,7 +135,7 @@ Next, you must create a new testnet in `terraform/testnets/`. For ease of use, y
 - Name of testnet
 - number of nodes to deploy
 - Location of the Genesis Ledger
-- Kubernetes [context](https://github.com/MinaProtocol/coda-automation/commit/141db8821a133501d3d4ed9b739fcad1f9b88bef) for indicating which managed *k8s* cluster to deploy to
+- Kubernetes context for indicating which managed *k8s* cluster to deploy to
 
 ### Manage *k8s* Cluster for Deployment
 
@@ -157,14 +162,16 @@ Once decided on a cluster/context to deploy, use the following command to retrie
 
 #### Configure testnet module `k8s_context`
 
-There is a testnet module variable which determines the *Kubernetes* context to deploy to. Reference the module's [variable definitions](https://github.com/MinaProtocol/coda-automation/blob/master/terraform/modules/kubernetes/testnet/variables.tf) for more details on how to properly configure.
+There is a testnet module variable which determines the *Kubernetes* context to deploy to. Reference the module's [variable definitions](./terraform/modules/kubernetes/testnet/variables.tf) for more details on how to properly configure.
 
-```variable "k8s_context" {
+```
+variable "k8s_context" {
   type = string
 
   description = "K8s resource provider context"
   default     = "gke_o1labs-192920_us-east1_coda-infra-east"
-}```
+}
+```
 
 #### Set Terraform Kubernetes provider configuration path
 
@@ -172,13 +179,12 @@ In order for Terraform to locate and identify the configured Kubernetes contexts
 
 ```
 export KUBE_CONFIG_PATH=~/.kube/config
-}```
+```
 
 ### Generate Keys and Genesis Ledger
 
 The script `scripts/generate-keys-and-ledger.sh` handles key and genesis ledger generation. This script will build keysets and public/private key files to the output path in `./keys/keysets` and `keys/testnet-keys`.
 It is necessary to set the number of whales, fish, and extra-fish. The testnet name will specify the genesis ledger output folder for daemon consumption. `terraform/tests/TESTNET/`
-You will need to have compiled coda-network to the `bin/`
 
 ```
 ./scripts/generate-keys-and-ledger.sh --testnet=beans --wc=5 --fc=1 --efc=2
@@ -201,24 +207,8 @@ The bake script allows you to bundle keys and genesis ledger pre baked into the 
 Options:
   --testnet=STRING            Name of the testnet.
   --docker-tag=STRING         Docker tag for the mina daemon repository.
-  --automation-commit=STRING  Specifying commit for coda-automation.
+  --automation-commit=STRING  Specifying commit for mina/automation.
   --cloud=true|false          Should docker be built in cloud or locally.
-```
-
-### Autodeploy.sh
-
-Assuming the hard task of configuration has been completed without error, this script will make your deployment experience a _breeze_.
-
-This script will do the following:
-
-- Attempt to tear down (aka "destroy") the existing testnet, should it exist
-- Deploy anew the testnet as defined in the previous section
-- Upload the keys you generated to Kubernetes as Secrets for use at runtime
-
-Note: The deployment of keys relies on kubectl being properly configured for the cluster you are deploying to!
-
-```
-./scripts/auto-deploy.sh <testnet>
 ```
 
 ### Upload Secrets script
@@ -261,27 +251,14 @@ labels.k8s-pod/app:"block-producer"
 #### Dashboards
 
 There are several public Grafana dashboards available here:
-
+<!-- xrefcheck:ignore link -->
 - [Network Overview](https://o1testnet.grafana.net/d/qx4y6dfWz/network-overview?orgId=1)
+<!-- xrefcheck:ignore link -->
 - [Block Producer](https://o1testnet.grafana.net/d/Rgo87HhWz/block-producer-dashboard?orgId=1&refresh=1m)
+<!-- xrefcheck:ignore link -->
 - [SNARK Worker](https://o1testnet.grafana.net/d/scQUGOhWk/snark-worker-dashboard?orgId=1&refresh=1m)
 
 # Deploy a Public Testnet
-
-### Bkase's memory of deploys as of 9/16
-
-0. Commit to master
-1. git tag 0.0.16-beta4 (with -m or it won't work) (increment the 4 every time)
-2. push the tag
-3. Push the master
-4. curl -X POST --header "Content-Type: application/json" -H "Circle-Token: 62bcf7b6c8ef60bdee3ecb3618d530e5f77eb78e" -d '{ "branch": "master", "parameters": { "run-ci": true } }' 'https://circleci.com/api/v2/project/github/CodaProtocol/coda/pipeline'
-   (this starts the build)
-5. In coda automation, unzip the 3.3-keys.tar.gz into coda-automation
-6. Download secrets for gogoel cloud storage -- scripts/o1-google-cloud-storage-api-key.json
-7. Download secrets for faucet API token -- scripts/o1-discord-api-key
-8. In coda automation, checkout test-public-testnet-deploy branch
-9. This deployment is located in pickles/ testnet
-10. Run `./scripts/auto-deploy.sh pickles keys/`
 
 ### Collect User Key Submissions
 
@@ -289,82 +266,15 @@ The purpose of a public testnet is to allow end-users to try out the software an
 
 For context, these keys correspond to the "Fish Keys" in the QA Net deployments, and Online Fish Keys are ommitted in a Public Testnet deployment and "Offline Fish Keys" are instead delegated to the submitted User Keys.
 
-### Generate Keys
-
-As in a QA Network, keys are managed by `scripts/testnet-keys.py`, you need to generate keys for each role and/or service you intend to deploy.
-
-In the case of a public testnet, the following commands could be run:
-
-```
-python3 scripts/testnet-keys.py keys  generate-offline-fish-keys --count <nUserSubmissions>
-python3 scripts/testnet-keys.py keys  generate-offline-whale-keys --count 5
-python3 scripts/testnet-keys.py keys  generate-online-whale-keys --count 5
-python3 scripts/testnet-keys.py keys  generate-service-keys //(faucet, echo, etc...)
-```
-
-These commands will generate folders in the `scripts` directory by default, this output directory is a configurable location.
-
-```
-$ python3 scripts/testnet-keys.py keys generate-offline-fish-keys --help
-Usage: testnet-keys.py keys generate-offline-fish-keys [OPTIONS]
-
-  Generate Public Keys for Offline Fish Accounts
-
-Options:
-  --count INTEGER      Number of Fish Account keys to generate.
-  --output-dir TEXT    Directory to output Fish Account Keys to.
-  --privkey-pass TEXT  The password to use when generating keys.
-  --help               Show this message and exit.
-```
-
 ### Generate Genesis Ledger
 
 Once you have the keys for your deploymenet created, and the Staker Keys saved to a CSV, you can use them to generate a genesis ledger with the following command.
 
 ```
-python3 scripts/testnet-keys.py ledger generate-ledger
+scripts/generate-keys-and-ledger.sh
 ```
 
-The script will try to load keys from the default directories here, so if you wrote them to a different spot (or moved them), you can pass the location via the CLI.
-
-```
-$ python3 scripts/testnet-keys.py ledger generate-ledger --help
-Usage: testnet-keys.py ledger generate-ledger [OPTIONS]
-
-  Generates a Genesis Ledger based on previously generated Whale, Fish, and
-  Block Producer keys.  If keys are not present on the filesystem at the
-  specified location, they are not generated.
-
-Options:
-  --generate-remainder TEXT       Indicates that keys should be generated if
-                                  there are not a sufficient number of keys
-                                  present.
-  --service-accounts-directory TEXT
-                                  Directory where Service Account Keys will be
-                                  stored.
-  --num-whale-accounts INTEGER    Number of Whale accounts to be generated.
-  --online-whale-accounts-directory TEXT
-                                  Directory where Offline Whale Account Keys
-                                  will be stored.
-  --offline-whale-accounts-directory TEXT
-                                  Directory where Offline Whale Account Keys
-                                  will be stored.
-  --num-fish-accounts INTEGER     Number of Fish accounts to be generated.
-  --online-fish-accounts-directory TEXT
-                                  Directory where Online Fish Account Keys
-                                  will be stored.
-  --offline-fish-accounts-directory TEXT
-                                  Directory where Offline Fish Account Keys
-                                  will be stored.
-  --staker-csv-file TEXT          Location of a CSV file detailing Discord
-                                  Username and Public Key for Stakers.
-  --help                          Show this message and exit.
-```
-
-There's several gotchas here that the script will check for:
-
-- For a particular block producer "class", number of offline and online keys must be equal
-- Remember the path to the ledger file here, you will need it as an input to your deployment
+Read the source for more about what it is doing and how.
 
 ### Create a Testnet
 
@@ -383,36 +293,6 @@ module "network" {
   network_name   = "${local.netname}-testnet-network"
   network_region = "us-west1"
   subnet_name    = "${local.netname}-testnet-subnet"
-}
-
-module "seed_one" {
-  source             = "../../modules/google-cloud/coda-seed-node"
-  coda_image         = local.coda_image
-  project_id         = data.google_project.project.project_id
-  subnetwork_project = data.google_project.project.project_id
-  subnetwork         = module.network.subnet_link
-  network            = module.network.network_link
-  instance_name      = "${local.netname}-seed-one"
-  zone               = "us-west1-a"
-  region             = "us-west1"
-  client_email       = "1020762690228-compute@developer.gserviceaccount.com"
-  discovery_keypair  = "23jhTeLbLKJSM9f3xgbG1M6QRHJksFtjP9VUNUmQ9fq3urSovGVS25k8LLn8mgdyKcYDSteRcdZiNvXXXAvCUnST6oufs,4XTTMESM7AkSo5yfxJFBpLr65wdVt8dfuQTuhgQgtnADryQwP,12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH"
-  seed_peers         = ""
-}
-
-module "seed_two" {
-  source             = "../../modules/google-cloud/coda-seed-node"
-  coda_image         = local.coda_image
-  project_id         = data.google_project.project.project_id
-  subnetwork_project = data.google_project.project.project_id
-  subnetwork         = module.network.subnet_link
-  network            = module.network.network_link
-  instance_name      = "${local.netname}-seed-two"
-  zone               = "us-west1-a"
-  region             = "us-west1"
-  client_email       = "1020762690228-compute@developer.gserviceaccount.com"
-  discovery_keypair  = "23jhTbijdCA9zioRbv7HboRs7F8qZL59N5GQvGzhfB3MrS5qNrQK5fEdWyB5wno9srsDFNRc4FaNUDCEnzJGHG9XX6iSe,4XTTMBUfbSrzTGiKVp8mhZCuE9nDwj3USx3WL2YmFpP4zM2DG,12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA"
-  seed_peers         = "-peer /ip4/${module.seed_one.instance_external_ip}/tcp/10002/p2p/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH"
 }
 
 # Seed DNS
@@ -435,51 +315,4 @@ resource "aws_route53_record" "seed_two" {
   ttl     = "300"
   records = [module.seed_two.instance_external_ip]
 }
-```
-
-### Autodeploy.sh
-
-Assuming the hard task of configuration has been completed without error, this script will make your deployment experience a _breeze_.
-
-This script will do the following:
-
-- Attempt to tear down (aka "destroy") the existing testnet, should it exist
-- Deploy anew the testnet as defined in the previous section
-- Upload the online keys you generated to Kubernetes as Secrets for use at runtime
-
-Note: The deployment of keys relies on kubectl being properly configured for the cluster you are deploying to!
-
-```
-./scripts/auto-deploy.sh <testnet>
-```
-
-# Testnet SDK
-
-We've included a utility tool to help with the process of spinning up a network. To use the tool clone the repo and run the following commands:
-
-```
-yarn
-yarn build
-yarn link
-```
-
-Now you can use the `coda-network` command. To use some of the functionality, you'll need a [Google Cloud Service Account](https://cloud.google.com/iam/docs/service-accounts). Once you download the key for the service account, use the following command to configure it:
-
-```
-export GOOGLE_APPLICATION_CREDENTIALS=<PATH_TO_KEYFILE>
-```
-
-Try the following command to get started:
-
-```
-coda-network --help
-```
-
-Some of the common commands are:
-
-```
-coda-network keypair create
-coda-netowrk keyset create -n <KEYSET_NAME>
-coda-network keyset add -n <KEYSET_NAME> -k <PUBLIC_KEY>
-coda-network genesis create
 ```

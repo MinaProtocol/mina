@@ -2,8 +2,7 @@ type t
 
 external size_in_bits : unit -> int = "caml_pasta_fp_size_in_bits"
 
-external size :
-  unit -> Marlin_plonk_bindings_bigint_256.t
+external size : unit -> Marlin_plonk_bindings_bigint_256.t
   = "caml_pasta_fp_size"
 
 external add : t -> t -> t = "caml_pasta_fp_add"
@@ -50,16 +49,13 @@ external random : unit -> t = "caml_pasta_fp_random"
 
 external rng : int -> t = "caml_pasta_fp_rng"
 
-external to_bigint :
-  t -> Marlin_plonk_bindings_bigint_256.t
+external to_bigint : t -> Marlin_plonk_bindings_bigint_256.t
   = "caml_pasta_fp_to_bigint"
 
-external of_bigint :
-  Marlin_plonk_bindings_bigint_256.t -> t
+external of_bigint : Marlin_plonk_bindings_bigint_256.t -> t
   = "caml_pasta_fp_of_bigint"
 
-external two_adic_root_of_unity :
-  unit -> t
+external two_adic_root_of_unity : unit -> t
   = "caml_pasta_fp_two_adic_root_of_unity"
 
 external domain_generator : int -> t = "caml_pasta_fp_domain_generator"
@@ -73,3 +69,10 @@ external deep_copy : t -> t = "caml_pasta_fp_deep_copy"
 let%test "deep_copy" =
   let x = random () in
   deep_copy x = x
+
+let%test "operations" =
+  let six = of_int 6 in
+  let two = of_int 2 in
+  let three = div six two in
+  let six' = add three three in
+  compare six six' = 0

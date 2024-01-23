@@ -1,7 +1,7 @@
 open Core_kernel
 open Async
 open Mina_base
-open Mina_transition
+open Mina_block
 open Frontier_base
 open Network_peer
 
@@ -10,12 +10,12 @@ module type Inputs_intf = sig
 
   module Best_tip_prover :
     Mina_intf.Best_tip_prover_intf
-    with type transition_frontier := Transition_frontier.t
+      with type transition_frontier := Transition_frontier.t
 end
 
 module Make (Inputs : Inputs_intf) :
   Mina_intf.Sync_handler_intf
-  with type transition_frontier := Inputs.Transition_frontier.t = struct
+    with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
   let find_in_root_history frontier state_hash =
@@ -52,22 +52,22 @@ module Make (Inputs : Inputs_intf) :
     else if
       Ledger_hash.equal ledger_hash
         (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
-           staking_epoch_ledger)
+           staking_epoch_ledger )
     then
       match staking_epoch_ledger with
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot
-        .Genesis_epoch_ledger _ ->
+      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
+          _ ->
           None
       | Ledger_db ledger ->
           Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
     else if
       Ledger_hash.equal ledger_hash
         (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
-           next_epoch_ledger)
+           next_epoch_ledger )
     then
       match next_epoch_ledger with
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot
-        .Genesis_epoch_ledger _ ->
+      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
+          _ ->
           None
       | Ledger_db ledger ->
           Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
@@ -91,8 +91,7 @@ module Make (Inputs : Inputs_intf) :
         in
         Sync_ledger.Any_ledger.Responder.answer_query responder query
 
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier state_hash
-      =
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier state_hash =
     let open Option.Let_syntax in
     let protocol_states scan_state =
       Staged_ledger.Scan_state.required_state_hashes scan_state
@@ -145,7 +144,7 @@ module Make (Inputs : Inputs_intf) :
       if requested <= Transition_frontier.max_catchup_chunk_length then Some ()
       else (
         [%log' trace (Logger.create ())]
-          ~metadata:[("n", `Int requested)]
+          ~metadata:[ ("n", `Int requested) ]
           "get_transition_chain requested $n > %d hashes"
           Transition_frontier.max_catchup_chunk_length ;
         None )
@@ -156,10 +155,11 @@ module Make (Inputs : Inputs_intf) :
           Transition_frontier.(
             find frontier hash >>| Breadcrumb.validated_transition)
           ( find_in_root_history frontier hash
-          >>| fun x -> Root_data.Historical.transition x )
+          >>| Fn.compose External_transition.Validated.lower
+                Root_data.Historical.transition )
           ~f:Fn.const
       in
-      External_transition.Validation.forget_validation validated_transition
+      With_hash.data @@ Mina_block.Validated.forget validated_transition
     in
     match Transition_frontier.catchup_tree frontier with
     | Full _ ->
@@ -183,22 +183,23 @@ module Make (Inputs : Inputs_intf) :
   module Root = struct
     let prove ~logger ~consensus_constants ~frontier seen_consensus_state =
       let open Option.Let_syntax in
-      let%bind best_tip_with_witness =
-        Best_tip_prover.prove ~logger frontier
-      in
+      let%bind best_tip_with_witness = Best_tip_prover.prove ~logger frontier in
       let is_tip_better =
-        Consensus.Hooks.select ~constants:consensus_constants
-          ~logger:
-            (Logger.extend logger [("selection_context", `String "Root.prove")])
-          ~existing:
-            (With_hash.map ~f:External_transition.consensus_state
-               best_tip_with_witness.data)
-          ~candidate:seen_consensus_state
-        = `Keep
+        Consensus.Hooks.equal_select_status
+          (Consensus.Hooks.select ~constants:consensus_constants
+             ~logger:
+               (Logger.extend logger
+                  [ ("selection_context", `String "Root.prove") ] )
+             ~existing:
+               (With_hash.map ~f:Mina_block.consensus_state
+                  best_tip_with_witness.data )
+             ~candidate:seen_consensus_state )
+          `Keep
       in
       let%map () = Option.some_if is_tip_better () in
       { best_tip_with_witness with
-        data= With_hash.data best_tip_with_witness.data }
+        data = With_hash.data best_tip_with_witness.data
+      }
 
     let verify ~logger ~verifier ~consensus_constants ~genesis_constants
         ~precomputed_values observed_state peer_root =
@@ -209,14 +210,15 @@ module Make (Inputs : Inputs_intf) :
           peer_root
       in
       let is_before_best_tip candidate =
-        Consensus.Hooks.select ~constants:consensus_constants
-          ~logger:
-            (Logger.extend logger [("selection_context", `String "Root.verify")])
-          ~existing:
-            (With_hash.map ~f:External_transition.consensus_state
-               best_tip_transition)
-          ~candidate
-        = `Keep
+        Consensus.Hooks.equal_select_status
+          (Consensus.Hooks.select ~constants:consensus_constants
+             ~logger:
+               (Logger.extend logger
+                  [ ("selection_context", `String "Root.verify") ] )
+             ~existing:
+               (With_hash.map ~f:Mina_block.consensus_state best_tip_transition)
+             ~candidate )
+          `Keep
       in
       let%map () =
         Deferred.return
@@ -225,7 +227,7 @@ module Make (Inputs : Inputs_intf) :
              ~error:
                (Error.createf
                   !"Peer lied about it's best tip %{sexp:State_hash.t}"
-                  best_tip_transition.hash))
+                  (State_hash.With_state_hashes.state_hash best_tip_transition) ) )
       in
       verified_witness
   end

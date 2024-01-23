@@ -8,8 +8,9 @@
 
 type t =
   { (* Identifier should be populated with a globally unique identifier of a Coin. In Bitcoin, this identifier would be transaction_hash:index. *)
-    identifier: string }
-[@@deriving yojson {strict= false}, show, eq]
+    identifier : string
+  }
+[@@deriving yojson { strict = false }, show, eq]
 
 (** CoinIdentifier uniquely identifies a Coin. *)
-let create (identifier : string) : t = {identifier}
+let create (identifier : string) : t = { identifier }

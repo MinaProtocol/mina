@@ -4,7 +4,7 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type 'a t = 'a * 'a list [@@deriving sexp, compare, eq, hash]
+    type 'a t = 'a * 'a list [@@deriving sexp, compare, equal, hash, to_yojson]
   end
 end]
 
@@ -42,8 +42,7 @@ module C = Container.Make (struct
   let length = `Define_using_fold
 end)
 
-[%%define_locally
-C.(find, find_map, iter, length)]
+[%%define_locally C.(find, find_map, iter, length)]
 
 let fold (x, xs) ~init ~f = List.fold xs ~init:(init x) ~f
 

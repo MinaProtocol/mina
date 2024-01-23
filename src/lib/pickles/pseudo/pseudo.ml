@@ -40,7 +40,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
       let shifts = Vector.map log2s ~f:(fun d -> shifts ~log2_size:d) in
       let open Marlin_plonk_bindings.Types.Plonk_verification_shifts in
       let mk f = mask which (Vector.map shifts ~f) in
-      {r= mk (fun {r; _} -> r); o= mk (fun {o; _} -> o)}
+      { r = mk (fun { r; _ } -> r); o = mk (fun { o; _ } -> o) }
 
     let generator (type n) ((which, log2s) : (int, n) t) ~domain_generator =
       mask which (Vector.map log2s ~f:(fun d -> domain_generator ~log2_size:d))

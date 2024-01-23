@@ -32,9 +32,9 @@ module Checked = struct
         let q, _ =
           Integer.div_mod ~m
             (Mina_numbers.Global_slot.Checked.to_integer
-               (Global_slot.slot_number s))
+               (Global_slot.slot_number s) )
             (Mina_numbers.Length.Checked.to_integer
-               constants.slots_per_sub_window)
+               constants.slots_per_sub_window )
         in
         q )
 
@@ -44,7 +44,7 @@ module Checked = struct
         let _, shift =
           Integer.div_mod ~m t
             (Mina_numbers.Length.Checked.to_integer
-               constants.sub_windows_per_window)
+               constants.sub_windows_per_window )
         in
         Sub_window.Checked.Unsafe.of_integer shift )
 

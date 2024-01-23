@@ -1,10 +1,8 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
 open Signature_lib
@@ -20,63 +18,60 @@ module Transition = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = {prev: 'a; next: 'a}
-      [@@deriving hlist, sexp, eq, yojson, hash, compare]
+      type 'a t = { prev : 'a; next : 'a }
+      [@@deriving hlist, sexp, equal, yojson, hash, compare]
     end
   end]
 
-  let to_input {prev; next} ~f = Random_oracle_input.append (f prev) (f next)
+  let to_input { prev; next } ~f = Random_oracle_input.append (f prev) (f next)
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   let typ t =
-    Typ.of_hlistable [t; t] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+    Typ.of_hlistable [ t; t ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   [%%endif]
 end
 
 module Flagged_data = struct
-  type ('flag, 'a) t = {flag: 'flag; data: 'a} [@@deriving hlist, fields]
+  type ('flag, 'a) t = { flag : 'flag; data : 'a } [@@deriving hlist, fields]
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   let typ flag t =
-    Typ.of_hlistable [flag; t] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+    Typ.of_hlistable [ flag; t ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   [%%endif]
 
-  let to_input' {flag; data} ~flag:f ~data:d =
+  let to_input' { flag; data } ~flag:f ~data:d =
     Random_oracle_input.(append (f flag) (d data))
 end
 
 module Flagged_option = struct
-  type ('bool, 'a) t = {is_some: 'bool; data: 'a} [@@deriving hlist, fields]
+  type ('bool, 'a) t = { is_some : 'bool; data : 'a } [@@deriving hlist, fields]
 
-  let to_input' {is_some; data} ~f =
-    Random_oracle_input.(append (bitstring [is_some]) (f data))
+  let to_input' { is_some; data } ~f =
+    Random_oracle_input.(append (bitstring [ is_some ]) (f data))
 
-  let to_input {is_some; data} ~default ~f =
+  let to_input { is_some; data } ~default ~f =
     let data = if is_some then data else default in
-    to_input' {is_some; data} ~f
+    to_input' { is_some; data } ~f
 
   let of_option t ~default =
     match t with
     | None ->
-        {is_some= false; data= default}
+        { is_some = false; data = default }
     | Some data ->
-        {is_some= true; data}
+        { is_some = true; data }
 
-  let to_option {is_some; data} = Option.some_if is_some data
+  let to_option { is_some; data } = Option.some_if is_some data
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   let typ t =
-    Typ.of_hlistable [Boolean.typ; t] ~var_to_hlist:to_hlist
+    Typ.of_hlistable [ Boolean.typ; t ] ~var_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let option_typ ~default t =
@@ -90,7 +85,7 @@ module Set_or_keep = struct
   module Stable = struct
     module V1 = struct
       type 'a t = Set of 'a | Keep
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 
@@ -102,8 +97,11 @@ module Set_or_keep = struct
 
   let set_or_keep t x = match t with Keep -> x | Set y -> y
 
-  [%%ifdef
-  consensus_mechanism]
+  let is_set = function Set _ -> true | _ -> false
+
+  let is_keep = function Keep -> true | _ -> false
+
+  [%%ifdef consensus_mechanism]
 
   module Checked : sig
     type 'a t
@@ -127,7 +125,7 @@ module Set_or_keep = struct
   end = struct
     type 'a t = (Boolean.var, 'a) Flagged_option.t
 
-    let set_or_keep ~if_ ({is_some; data} : _ t) x =
+    let set_or_keep ~if_ ({ is_some; data } : _ t) x =
       if_ is_some ~then_:data ~else_:x
 
     let data = Flagged_option.data
@@ -158,7 +156,7 @@ module Or_ignore = struct
   module Stable = struct
     module V1 = struct
       type 'a t = Check of 'a | Ignore
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 
@@ -166,8 +164,7 @@ module Or_ignore = struct
 
   let of_option = function None -> Ignore | Some x -> Check x
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   module Checked : sig
     type 'a t
@@ -203,8 +200,8 @@ module Or_ignore = struct
       match t with
       | Implicit x ->
           f x
-      | Explicit {is_some; data} ->
-          Pickles.Impls.Step.Boolean.(any [not is_some; f data])
+      | Explicit { is_some; data } ->
+          Pickles.Impls.Step.Boolean.(any [ not is_some; f data ])
 
     let typ_implicit (type a a_var) ~equal ~(ignore : a) (t : (a_var, a) Typ.t)
         : (a_var t, a Stable.Latest.t) Typ.t =
@@ -235,45 +232,44 @@ module Account_state = struct
   module Stable = struct
     module V1 = struct
       type t = Empty | Non_empty | Any
-      [@@deriving sexp, eq, yojson, hash, compare, enum]
+      [@@deriving sexp, equal, yojson, hash, compare, enum]
 
       let to_latest = Fn.id
     end
   end]
 
   module Encoding = struct
-    type 'b t = {any: 'b; empty: 'b} [@@deriving hlist]
+    type 'b t = { any : 'b; empty : 'b } [@@deriving hlist]
 
-    let to_input {any; empty} = Random_oracle_input.bitstring [any; empty]
+    let to_input { any; empty } = Random_oracle_input.bitstring [ any; empty ]
   end
 
   let encode : t -> bool Encoding.t = function
     | Empty ->
-        {any= false; empty= true}
+        { any = false; empty = true }
     | Non_empty ->
-        {any= false; empty= false}
+        { any = false; empty = false }
     | Any ->
-        {any= true; empty= false}
+        { any = true; empty = false }
 
   let decode : bool Encoding.t -> t = function
-    | {any= false; empty= true} ->
+    | { any = false; empty = true } ->
         Empty
-    | {any= false; empty= false} ->
+    | { any = false; empty = false } ->
         Non_empty
-    | {any= true; empty= false} | {any= true; empty= true} ->
+    | { any = true; empty = false } | { any = true; empty = true } ->
         Any
 
   let to_input (x : t) = Encoding.to_input (encode x)
 
-  let check (t : t) (x : [`Empty | `Non_empty]) =
+  let check (t : t) (x : [ `Empty | `Non_empty ]) =
     match (t, x) with
     | Any, _ | Non_empty, `Non_empty | Empty, `Empty ->
         Ok ()
     | _ ->
         Or_error.error_string "Bad account_type"
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   module Checked = struct
     open Pickles.Impls.Step
@@ -283,20 +279,22 @@ module Account_state = struct
     let to_input (t : t) = Encoding.to_input t
 
     let check (t : t) ~is_empty =
-      Boolean.(any [t.any; t.empty && is_empty; (not t.empty) && not is_empty])
+      Boolean.(
+        any [ t.any; t.empty && is_empty; (not t.empty) && not is_empty ])
   end
 
   let typ : (Checked.t, t) Typ.t =
     let open Encoding in
-    Typ.of_hlistable [Boolean.typ; Boolean.typ] ~var_to_hlist:to_hlist
-      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    Typ.of_hlistable
+      [ Boolean.typ; Boolean.typ ]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
     |> Typ.transport ~there:encode ~back:decode
 
   [%%endif]
 end
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 module F = Pickles.Backend.Tick.Field
 
@@ -307,12 +305,12 @@ let invalid_public_key : Public_key.Compressed.t Lazy.t =
     b + (x * (a + square x))
   in
   let rec go i : Public_key.Compressed.t =
-    if not (is_square (f i)) then {x= i; is_odd= false} else go (i + one)
+    if not (is_square (f i)) then { x = i; is_odd = false } else go (i + one)
   in
   lazy (go zero)
 
 [%%else]
 
-module F = Snark_params_nonconsensus.Field
+module F = Snark_params.Tick.Field
 
 [%%endif]

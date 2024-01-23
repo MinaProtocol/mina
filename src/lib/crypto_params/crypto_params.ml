@@ -21,7 +21,7 @@ module Tick = struct
   let group_map_params =
     Group_map.Params.create
       (module Pickles.Backend.Tock.Field)
-      Pickles.Backend.Tock.Inner_curve.Params.{a; b}
+      Pickles.Backend.Tock.Inner_curve.Params.{ a; b }
 
   include Full.Internal_Basic
   module Number = Snarky_backendless.Number.Make (Full.Internal_Basic)

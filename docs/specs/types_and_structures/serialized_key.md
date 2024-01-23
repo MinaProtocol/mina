@@ -10,10 +10,10 @@ Table of Contents
       * [`transaction_capacity`](#transaction_capacity)
       * [`fork`](#fork)
     * [`commits`](#commits)
-  * [Example](#Example)
+  * [Example](#example)
 * [`body`](#body)
-  * [Verifier key](#verifier-key)
-  * [Prover key](#prover-key)
+  * Verifier key
+  * Prover key
 
 # File format
 
@@ -140,6 +140,7 @@ To help ensure no download errors have occurred, the `length` field should match
 | `marlin` | `String` | Githash uniquely identifying `marlin` library build (e.g. `"[DIRTY]29b90544308c4db199640062508af3789867ce03"`) |
 
 ## Example
+[example]: #example
 
 This is an example of what the entire header looks like on disk.
 

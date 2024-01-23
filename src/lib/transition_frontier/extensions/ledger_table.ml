@@ -18,8 +18,9 @@ module T = struct
 
   let add_entry t ~ledger_hash ~ledger =
     (* add ledger, increment ref count *)
-    ignore (Hashtbl.add t.ledgers ~key:ledger_hash ~data:ledger) ;
-    ignore (Hashtbl.incr t.counts ledger_hash)
+    ignore
+      (Hashtbl.add t.ledgers ~key:ledger_hash ~data:ledger : [`Duplicate | `Ok]) ;
+    ignore (Hashtbl.incr t.counts ledger_hash : view)
 
   let remove_entry t ~ledger_hash =
     (* decrement ref count, remove ledger if count is 0 *)
@@ -61,8 +62,8 @@ module T = struct
                 in
                 let blockchain_state =
                   Protocol_state.blockchain_state
-                  @@ Mina_transition.External_transition.protocol_state
-                       external_transition
+                  @@ Mina_block.(Header.protocol_state @@ header
+                       external_transition)
                 in
                 let staged_ledger =
                   Blockchain_state.staged_ledger_hash blockchain_state

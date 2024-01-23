@@ -1,2 +1,2 @@
-(lang dune 2.7)
-(allow_approximate_merlin)
+(lang dune 3.3)
+(implicit_transitive_deps false)

@@ -1,20 +1,13 @@
 (* data_hash.ml *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef
-consensus_mechanism]
-
 open Snark_params.Tick
+
+[%%ifdef consensus_mechanism]
+
 open Bitstring_lib
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
@@ -28,6 +21,8 @@ struct
 
   let to_decimal_string (t : Field.t) = Field.to_string t
 
+  let of_decimal_string (s : string) = Field.of_string s
+
   let to_bytes t =
     Fold_lib.(Fold.bool_t_to_string (Fold.of_list (Field.unpack t)))
 
@@ -37,8 +32,7 @@ struct
 
   let to_input t = Random_oracle.Input.field t
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   (* this is in consensus code, because Bigint comes
      from snarky functors
@@ -54,21 +48,23 @@ struct
       ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
 
   type var =
-    { digest: Random_oracle.Checked.Digest.t
-    ; mutable bits: Boolean.var Bitstring.Lsb_first.t option }
+    { digest : Random_oracle.Checked.Digest.t
+    ; mutable bits : Boolean.var Bitstring.Lsb_first.t option
+    }
 
   let var_of_t t =
     let n = Bigint.of_field t in
-    { digest= Field.Var.constant t
-    ; bits=
+    { digest = Field.Var.constant t
+    ; bits =
         Some
           (Bitstring.Lsb_first.of_list
              (List.init M.length_in_bits ~f:(fun i ->
-                  Boolean.var_of_value (Bigint.test_bit n i) ))) }
+                  Boolean.var_of_value (Bigint.test_bit n i) ) ) )
+    }
 
   open Let_syntax
 
-  let var_to_hash_packed {digest; _} = digest
+  let var_to_hash_packed { digest; _ } = digest
 
   (* TODO: Audit this usage of choose_preimage *)
   let unpack =
@@ -104,8 +100,8 @@ struct
 
   let typ : (var, t) Typ.t =
     Typ.transport_var Typ.field
-      ~there:(fun {digest; bits= _} -> digest)
-      ~back:(fun digest -> {digest; bits= None})
+      ~there:(fun { digest; bits = _ } -> digest)
+      ~back:(fun digest -> { digest; bits = None })
 
   [%%endif]
 end
@@ -115,7 +111,7 @@ module T0 = struct
   module Stable = struct
     module V1 = struct
       type t = Field.t
-      [@@deriving sexp, compare, hash, version {asserted}, bin_io]
+      [@@deriving sexp, compare, hash, version { asserted }, bin_io]
 
       let to_latest = Fn.id
     end
@@ -133,8 +129,7 @@ module T0 = struct
       Quickcheck.random_value ~seed:(`Deterministic "Data_hash.T0 tests")
         Field.gen
 
-    [%%if
-    curve_size = 255]
+    [%%if curve_size = 255]
 
     let%test "Binable from stringable V1" =
       let known_good_digest = "fa43c8180f9f3cef1cf5767592e964c1" in
@@ -168,13 +163,8 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
   end)
 
   [%%define_locally
-  Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
-
-  [%%define_locally
-  Base58_check.String_ops.(to_string, of_string)]
-
-  [%%define_locally
-  Base58_check.(to_yojson, of_yojson)]
+  Base58_check.
+    (to_base58_check, of_base58_check, of_base58_check_exn, to_yojson, of_yojson)]
 
   module T = struct
     type t = Field.t [@@deriving sexp, compare, hash]
@@ -185,16 +175,15 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
 
   let of_hash = Fn.id
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
-  let var_of_hash_packed digest = {digest; bits= None}
+  let var_of_hash_packed digest = { digest; bits = None }
 
   let if_ cond ~then_ ~else_ =
     let%map digest =
       Field.Checked.if_ cond ~then_:then_.digest ~else_:else_.digest
     in
-    {digest; bits= None}
+    { digest; bits = None }
 
   [%%endif]
 end

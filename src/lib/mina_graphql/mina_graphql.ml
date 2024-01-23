@@ -4,6 +4,7 @@ open Graphql_async
 open Mina_base
 open Signature_lib
 open Currency
+module Schema = Graphql_wrapper.Make (Schema)
 
 (** Convert a GraphQL constant to the equivalent json representation.
     We can't coerce this directly because of the presence of the [`Enum]
@@ -89,6 +90,8 @@ module Reflection = struct
 
     let nn_int a x = id ~typ:(non_null int) a x
 
+    let nn_int_list a x = id ~typ:(non_null (list (non_null int))) a x
+
     let int a x = id ~typ:int a x
 
     let nn_bool a x = id ~typ:(non_null bool) a x
@@ -125,7 +128,7 @@ module Reflection = struct
                 | To_build_breadcrumb, _ ->
                     "to_build_breadcrumb"
                 | Root, _ ->
-                    "root" )) )
+                    "root" ) ) )
         ~typ:(list (non_null string))
         a x
 
@@ -145,17 +148,22 @@ end
 
 module Types = struct
   open Schema
-  open Graphql_lib.Base_types
 
-  let public_key = public_key ()
+  include struct
+    open Graphql_lib.Scalars
 
-  let uint64 = uint64 ()
+    let public_key = PublicKey.typ ()
 
-  let uint32 = uint32 ()
+    let uint64 = UInt64.typ ()
 
-  let token_id = token_id ()
+    let uint32 = UInt32.typ ()
 
-  let epoch_seed = epoch_seed ()
+    let token_id = TokenId.typ ()
+
+    let json = JSON.typ ()
+
+    let epoch_seed = EpochSeed.typ ()
+  end
 
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
@@ -163,7 +171,7 @@ module Types = struct
         (List.map Sync_status.all ~f:(fun status ->
              enum_value
                (String.map ~f:Char.uppercase @@ Sync_status.to_string status)
-               ~value:status ))
+               ~value:status ) )
 
   let transaction_status :
       ('context, Transaction_inclusion_status.State.t option) typ =
@@ -179,7 +187,8 @@ module Types = struct
           ; enum_value "UNKNOWN" ~value:Unknown
               ~doc:
                 "The transaction has either been snarked, reached finality \
-                 through consensus or has been dropped" ]
+                 through consensus or has been dropped"
+          ]
 
   let consensus_time =
     let module C = Consensus.Data.Consensus_time in
@@ -196,18 +205,19 @@ module Types = struct
               C.to_uint32 global_slot )
         ; field "startTime" ~typ:(non_null string)
             ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} global_slot ->
+            ~resolve:(fun { ctx = coda; _ } global_slot ->
               let constants =
                 (Mina_lib.config coda).precomputed_values.consensus_constants
               in
               Block_time.to_string @@ C.start_time ~constants global_slot )
         ; field "endTime" ~typ:(non_null string)
             ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} global_slot ->
+            ~resolve:(fun { ctx = coda; _ } global_slot ->
               let constants =
                 (Mina_lib.config coda).precomputed_values.consensus_constants
               in
-              Block_time.to_string @@ C.end_time ~constants global_slot ) ] )
+              Block_time.to_string @@ C.end_time ~constants global_slot )
+        ] )
 
   let consensus_time_with_global_slot_since_genesis =
     obj "ConsensusTimeGlobalSlot"
@@ -215,14 +225,15 @@ module Types = struct
       ~fields:(fun _ ->
         [ field "consensusTime" ~typ:(non_null consensus_time)
             ~doc:
-              "Time in terms of slot number in an epoch, start and end time \
-               of the slot since UTC epoch"
+              "Time in terms of slot number in an epoch, start and end time of \
+               the slot since UTC epoch"
             ~args:Arg.[]
             ~resolve:(fun _ (time, _) -> time)
         ; field "globalSlotSinceGenesis"
             ~args:Arg.[]
             ~typ:(non_null uint32)
-            ~resolve:(fun _ (_, slot) -> slot) ] )
+            ~resolve:(fun _ (_, slot) -> slot)
+        ] )
 
   let block_producer_timing :
       (_, Daemon_rpcs.Types.Status.Next_producer_timing.t option) typ =
@@ -235,50 +246,58 @@ module Types = struct
             ~typ:(non_null @@ list @@ non_null consensus_time)
             ~doc:"Next block production time"
             ~args:Arg.[]
-            ~resolve:
-              (fun {ctx= coda; _}
-                   {Daemon_rpcs.Types.Status.Next_producer_timing.timing; _} ->
+            ~resolve:(fun { ctx = coda; _ }
+                          { Daemon_rpcs.Types.Status.Next_producer_timing.timing
+                          ; _
+                          } ->
               let consensus_constants =
                 (Mina_lib.config coda).precomputed_values.consensus_constants
               in
               match timing with
               | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
                   []
+              | Evaluating_vrf _last_checked_slot ->
+                  []
               | Produce info ->
-                  [of_time info.time ~consensus_constants]
+                  [ of_time info.time ~consensus_constants ]
               | Produce_now info ->
-                  [of_time ~consensus_constants info.time] )
+                  [ of_time ~consensus_constants info.time ] )
         ; field "globalSlotSinceGenesis"
             ~typ:(non_null @@ list @@ non_null uint32)
             ~doc:"Next block production global-slot-since-genesis "
             ~args:Arg.[]
-            ~resolve:
-              (fun _ {Daemon_rpcs.Types.Status.Next_producer_timing.timing; _} ->
+            ~resolve:(fun _
+                          { Daemon_rpcs.Types.Status.Next_producer_timing.timing
+                          ; _
+                          } ->
               match timing with
               | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
                   []
+              | Evaluating_vrf _last_checked_slot ->
+                  []
               | Produce info ->
-                  [info.for_slot.global_slot_since_genesis]
+                  [ info.for_slot.global_slot_since_genesis ]
               | Produce_now info ->
-                  [info.for_slot.global_slot_since_genesis] )
+                  [ info.for_slot.global_slot_since_genesis ] )
         ; field "generatedFromConsensusAt"
             ~typ:(non_null consensus_time_with_global_slot_since_genesis)
             ~doc:
-              "Consensus time of the block that was used to determine the \
-               next block production time"
+              "Consensus time of the block that was used to determine the next \
+               block production time"
             ~args:Arg.[]
-            ~resolve:
-              (fun {ctx= coda; _}
-                   { Daemon_rpcs.Types.Status.Next_producer_timing
-                     .generated_from_consensus_at=
-                       {slot; global_slot_since_genesis}
-                   ; _ } ->
+            ~resolve:(fun { ctx = coda; _ }
+                          { Daemon_rpcs.Types.Status.Next_producer_timing
+                            .generated_from_consensus_at =
+                              { slot; global_slot_since_genesis }
+                          ; _
+                          } ->
               let consensus_constants =
                 (Mina_lib.config coda).precomputed_values.consensus_constants
               in
               ( Consensus.Data.Consensus_time.of_global_slot
                   ~constants:consensus_constants slot
-              , global_slot_since_genesis ) ) ] )
+              , global_slot_since_genesis ) )
+        ] )
 
   module DaemonStatus = struct
     type t = Daemon_rpcs.Types.Status.t
@@ -292,8 +311,8 @@ module Types = struct
           ; field "stop" ~typ:(non_null string)
               ~args:Arg.[]
               ~resolve:(fun _ (_, end_) ->
-                Time.Span.to_ms end_ |> Int64.of_float |> Int64.to_string ) ]
-      )
+                Time.Span.to_ms end_ |> Int64.of_float |> Int64.to_string )
+          ] )
 
     let histogram : (_, Perf_histograms.Report.t option) typ =
       obj "Histogram" ~fields:(fun _ ->
@@ -358,6 +377,16 @@ module Types = struct
                ~external_ip:nn_string ~bind_ip:nn_string ~client_port:nn_int
                ~libp2p_port:nn_int ~peer:(id ~typ:peer) )
 
+    let metrics : (_, Daemon_rpcs.Types.Status.Metrics.t option) typ =
+      obj "Metrics" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Daemon_rpcs.Types.Status.Metrics.Fields.fold ~init:[]
+               ~block_production_delay:nn_int_list
+               ~transaction_pool_diff_received:nn_int
+               ~transaction_pool_diff_broadcasted:nn_int
+               ~transactions_added_to_pool:nn_int ~transaction_pool_size:nn_int )
+
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
           let open Reflection.Shorthand in
@@ -384,7 +413,8 @@ module Types = struct
                ~consensus_configuration:
                  (id ~typ:(non_null consensus_configuration))
                ~highest_block_length_received:nn_int
-               ~highest_unvalidated_block_length_received:nn_int )
+               ~highest_unvalidated_block_length_received:nn_int
+               ~metrics:(id ~typ:(non_null metrics)) )
   end
 
   let fee_transfer =
@@ -393,26 +423,27 @@ module Types = struct
             ~args:Arg.[]
             ~doc:"Public key of fee transfer recipient"
             ~typ:(non_null public_key)
-            ~resolve:(fun _ ({Fee_transfer.receiver_pk= pk; _}, _) -> pk)
+            ~resolve:(fun _ ({ Fee_transfer.receiver_pk = pk; _ }, _) -> pk)
         ; field "fee" ~typ:(non_null uint64)
             ~args:Arg.[]
             ~doc:"Amount that the recipient is paid in this fee transfer"
-            ~resolve:(fun _ ({Fee_transfer.fee; _}, _) ->
+            ~resolve:(fun _ ({ Fee_transfer.fee; _ }, _) ->
               Currency.Fee.to_uint64 fee )
         ; field "type" ~typ:(non_null string)
             ~args:Arg.[]
             ~doc:
               "Fee_transfer|Fee_transfer_via_coinbase Snark worker fees \
                deducted from the coinbase amount are of type \
-               'Fee_transfer_via_coinbase', rest are deducted from \
-               transaction fees"
+               'Fee_transfer_via_coinbase', rest are deducted from transaction \
+               fees"
             ~resolve:(fun _ (_, transfer_type) ->
               match transfer_type with
               | Filtered_external_transition.Fee_transfer_type
                 .Fee_transfer_via_coinbase ->
                   "Fee_transfer_via_coinbase"
               | Fee_transfer ->
-                  "Fee_transfer" ) ] )
+                  "Fee_transfer" )
+        ] )
 
   let account_timing : (Mina_lib.t, Account_timing.t option) typ =
     obj "AccountTiming" ~fields:(fun _ ->
@@ -461,31 +492,32 @@ module Types = struct
               | Account_timing.Untimed ->
                   None
               | Timed timing_info ->
-                  Some
-                    (Currency.Amount.to_uint64 timing_info.vesting_increment)
-              ) ] )
+                  Some (Currency.Amount.to_uint64 timing_info.vesting_increment)
+              )
+        ] )
 
   let completed_work =
     obj "CompletedWork" ~doc:"Completed snark works" ~fields:(fun _ ->
         [ field "prover"
             ~args:Arg.[]
             ~doc:"Public key of the prover" ~typ:(non_null public_key)
-            ~resolve:(fun _ {Transaction_snark_work.Info.prover; _} -> prover)
+            ~resolve:(fun _ { Transaction_snark_work.Info.prover; _ } -> prover)
         ; field "fee" ~typ:(non_null uint64)
             ~args:Arg.[]
             ~doc:"Amount the prover is paid for the snark work"
-            ~resolve:(fun _ {Transaction_snark_work.Info.fee; _} ->
+            ~resolve:(fun _ { Transaction_snark_work.Info.fee; _ } ->
               Currency.Fee.to_uint64 fee )
         ; field "workIds" ~doc:"Unique identifier for the snark work purchased"
             ~typ:(non_null @@ list @@ non_null int)
             ~args:Arg.[]
-            ~resolve:(fun _ {Transaction_snark_work.Info.work_ids; _} ->
-              One_or_two.to_list work_ids ) ] )
+            ~resolve:(fun _ { Transaction_snark_work.Info.work_ids; _ } ->
+              One_or_two.to_list work_ids )
+        ] )
 
   let sign =
     enum "sign"
       ~values:
-        [enum_value "PLUS" ~value:Sgn.Pos; enum_value "MINUS" ~value:Sgn.Neg]
+        [ enum_value "PLUS" ~value:Sgn.Pos; enum_value "MINUS" ~value:Sgn.Neg ]
 
   let signed_fee =
     obj "SignedFee" ~doc:"Signed fee" ~fields:(fun _ ->
@@ -495,7 +527,8 @@ module Types = struct
         ; field "feeMagnitude" ~typ:(non_null uint64) ~doc:"Fee"
             ~args:Arg.[]
             ~resolve:(fun _ fee ->
-              Currency.Amount.(to_uint64 (Signed.magnitude fee)) ) ] )
+              Currency.Amount.(to_uint64 (Signed.magnitude fee)) )
+        ] )
 
   let work_statement =
     obj "WorkDescription"
@@ -505,35 +538,37 @@ module Types = struct
         [ field "sourceLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the source ledger"
             ~args:Arg.[]
-            ~resolve:(fun _ {Transaction_snark.Statement.source; _} ->
-              Frozen_ledger_hash.to_string source )
+            ~resolve:(fun _ { Transaction_snark.Statement.source; _ } ->
+              Frozen_ledger_hash.to_base58_check source )
         ; field "targetLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the target ledger"
             ~args:Arg.[]
-            ~resolve:(fun _ {Transaction_snark.Statement.target; _} ->
-              Frozen_ledger_hash.to_string target )
+            ~resolve:(fun _ { Transaction_snark.Statement.target; _ } ->
+              Frozen_ledger_hash.to_base58_check target )
         ; field "feeExcess" ~typ:(non_null signed_fee)
             ~doc:
               "Total transaction fee that is not accounted for in the \
                transition from source ledger to target ledger"
             ~args:Arg.[]
-            ~resolve:
-              (fun _
-                   ({fee_excess= {fee_excess_l; _}; _} :
-                     Transaction_snark.Statement.t) ->
+            ~resolve:(fun _
+                          ({ fee_excess = { fee_excess_l; _ }; _ } :
+                            Transaction_snark.Statement.t ) ->
               (* TODO: Expose full fee excess data. *)
               { fee_excess_l with
-                magnitude= Currency.Amount.of_fee fee_excess_l.magnitude } )
+                magnitude = Currency.Amount.of_fee fee_excess_l.magnitude
+              } )
         ; field "supplyIncrease" ~typ:(non_null uint64)
             ~doc:"Increase in total coinbase reward "
             ~args:Arg.[]
-            ~resolve:
-              (fun _ ({supply_increase; _} : Transaction_snark.Statement.t) ->
+            ~resolve:(fun _
+                          ({ supply_increase; _ } :
+                            Transaction_snark.Statement.t ) ->
               Currency.Amount.to_uint64 supply_increase )
         ; field "workId" ~doc:"Unique identifier for a snark work"
             ~typ:(non_null int)
             ~args:Arg.[]
-            ~resolve:(fun _ w -> Transaction_snark.Statement.hash w) ] )
+            ~resolve:(fun _ w -> Transaction_snark.Statement.hash w)
+        ] )
 
   let pending_work =
     obj "PendingSnarkWork"
@@ -543,7 +578,8 @@ module Types = struct
             ~args:Arg.[]
             ~doc:"Work bundle with one or two snark work"
             ~typ:(non_null @@ list @@ non_null work_statement)
-            ~resolve:(fun _ w -> One_or_two.to_list w) ] )
+            ~resolve:(fun _ w -> One_or_two.to_list w)
+        ] )
 
   let blockchain_state :
       ( 'context
@@ -564,9 +600,9 @@ module Types = struct
                  ~extra:
                    ". Time offsets are adjusted to reflect true wall-clock \
                     time instead of genesis time."
-                 "utcDate")
+                 "utcDate" )
             ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} t ->
+            ~resolve:(fun { ctx = coda; _ } t ->
               let blockchain_state, _ = t in
               let timestamp =
                 Mina_state.Blockchain_state.timestamp blockchain_state
@@ -580,10 +616,9 @@ module Types = struct
             ~resolve:(fun _ t ->
               let blockchain_state, _ = t in
               let snarked_ledger_hash =
-                Mina_state.Blockchain_state.snarked_ledger_hash
-                  blockchain_state
+                Mina_state.Blockchain_state.snarked_ledger_hash blockchain_state
               in
-              Frozen_ledger_hash.to_string snarked_ledger_hash )
+              Frozen_ledger_hash.to_base58_check snarked_ledger_hash )
         ; field "stagedLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the staged ledger"
             ~args:Arg.[]
@@ -592,16 +627,15 @@ module Types = struct
               let staged_ledger_hash =
                 Mina_state.Blockchain_state.staged_ledger_hash blockchain_state
               in
-              Mina_base.Ledger_hash.to_string
+              Mina_base.Ledger_hash.to_base58_check
               @@ Staged_ledger_hash.ledger_hash staged_ledger_hash )
         ; field "stagedLedgerProofEmitted" ~typ:bool
             ~doc:
-              "Block finished a staged ledger, and a proof was emitted from \
-               it and included into this block's proof. If there is no \
-               transition frontier available or no block found, this will \
-               return null."
+              "Block finished a staged ledger, and a proof was emitted from it \
+               and included into this block's proof. If there is no transition \
+               frontier available or no block found, this will return null."
             ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} t ->
+            ~resolve:(fun { ctx = coda; _ } t ->
               let open Option.Let_syntax in
               let _, hash = t in
               let%bind frontier =
@@ -613,7 +647,8 @@ module Types = struct
                   None
               | Some b ->
                   Some (Transition_frontier.Breadcrumb.just_emitted_a_proof b)
-              ) ] )
+              )
+        ] )
 
   let protocol_state :
       ( 'context
@@ -643,36 +678,39 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ t ->
               let protocol_state, _ = t in
-              protocol_state.consensus_state ) ] )
+              protocol_state.consensus_state )
+        ] )
 
-  let chain_reorganization_status : ('contxt, [`Changed] option) typ =
+  let chain_reorganization_status : ('contxt, [ `Changed ] option) typ =
     enum "ChainReorganizationStatus"
       ~doc:"Status for whenever the blockchain is reorganized"
-      ~values:[enum_value "CHANGED" ~value:`Changed]
+      ~values:[ enum_value "CHANGED" ~value:`Changed ]
 
   let genesis_constants =
     obj "GenesisConstants" ~fields:(fun _ ->
         [ field "accountCreationFee" ~typ:(non_null uint64)
             ~doc:"The fee charged to create a new account"
             ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} () ->
+            ~resolve:(fun { ctx = coda; _ } () ->
               (Mina_lib.config coda).precomputed_values.constraint_constants
                 .account_creation_fee |> Currency.Fee.to_uint64 )
         ; field "coinbase" ~typ:(non_null uint64)
             ~doc:
               "The amount received as a coinbase reward for producing a block"
             ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} () ->
+            ~resolve:(fun { ctx = coda; _ } () ->
               (Mina_lib.config coda).precomputed_values.constraint_constants
-                .coinbase_amount |> Currency.Amount.to_uint64 ) ] )
+                .coinbase_amount |> Currency.Amount.to_uint64 )
+        ] )
 
   module AccountObj = struct
     module AnnotatedBalance = struct
       type t =
-        { total: Balance.t
-        ; unknown: Balance.t
-        ; timing: Mina_base.Account_timing.t
-        ; breadcrumb: Transition_frontier.Breadcrumb.t option }
+        { total : Balance.t
+        ; unknown : Balance.t
+        ; timing : Mina_base.Account_timing.t
+        ; breadcrumb : Transition_frontier.Breadcrumb.t option
+        }
 
       let min_balance (b : t) =
         match (b.timing, b.breadcrumb) with
@@ -694,7 +732,7 @@ module Types = struct
                  ~cliff_amount:timing_info.cliff_amount
                  ~vesting_period:timing_info.vesting_period
                  ~vesting_increment:timing_info.vesting_increment
-                 ~initial_minimum_balance:timing_info.initial_minimum_balance)
+                 ~initial_minimum_balance:timing_info.initial_minimum_balance )
 
       let obj =
         obj "AnnotatedBalance"
@@ -724,8 +762,7 @@ module Types = struct
                       let total_balance : uint64 = Balance.to_uint64 b.total in
                       let min_balance_uint64 = Balance.to_uint64 min_balance in
                       if
-                        Unsigned.UInt64.compare total_balance
-                          min_balance_uint64
+                        Unsigned.UInt64.compare total_balance min_balance_uint64
                         > 0
                       then Unsigned.UInt64.sub total_balance min_balance_uint64
                       else Unsigned.UInt64.zero ) )
@@ -745,21 +782,21 @@ module Types = struct
                   | None ->
                       Unsigned.UInt32.zero
                   | Some crumb ->
-                      Transition_frontier.Breadcrumb.blockchain_length crumb )
+                      Transition_frontier.Breadcrumb.consensus_state crumb
+                      |> Consensus.Data.Consensus_state.blockchain_length )
               (* TODO: Mutually recurse with "block" instead -- #5396 *)
             ; field "stateHash" ~typ:string
                 ~doc:
-                  "Hash of block at which balance was measured. Can be null \
-                   if bootstrapping. Guaranteed to be non-null for direct \
-                   account lookup queries when not bootstrapping. Can also be \
-                   null when accessed as nested properties (eg. via \
-                   delegators). "
+                  "Hash of block at which balance was measured. Can be null if \
+                   bootstrapping. Guaranteed to be non-null for direct account \
+                   lookup queries when not bootstrapping. Can also be null \
+                   when accessed as nested properties (eg. via delegators). "
                 ~args:Arg.[]
                 ~resolve:(fun _ (b : t) ->
                   Option.map b.breadcrumb ~f:(fun crumb ->
                       State_hash.to_base58_check
-                      @@ Transition_frontier.Breadcrumb.state_hash crumb ) ) ]
-        )
+                      @@ Transition_frontier.Breadcrumb.state_hash crumb ) )
+            ] )
     end
 
     module Partial_account = struct
@@ -774,7 +811,8 @@ module Types = struct
           ; voting_for
           ; timing
           ; permissions
-          ; snapp } =
+          ; snapp
+          } =
         let open Option.Let_syntax in
         let%bind public_key = public_key in
         let%bind token_permissions = token_permissions in
@@ -795,7 +833,8 @@ module Types = struct
         ; voting_for
         ; timing
         ; permissions
-        ; snapp }
+        ; snapp
+        }
 
       let of_full_account ?breadcrumb
           { Account.Poly.public_key
@@ -808,22 +847,25 @@ module Types = struct
           ; voting_for
           ; timing
           ; permissions
-          ; snapp } =
+          ; snapp
+          } =
         { Account.Poly.public_key
         ; token_id
-        ; token_permissions= Some token_permissions
-        ; nonce= Some nonce
-        ; balance=
-            { AnnotatedBalance.total= balance
-            ; unknown= balance
+        ; token_permissions = Some token_permissions
+        ; nonce = Some nonce
+        ; balance =
+            { AnnotatedBalance.total = balance
+            ; unknown = balance
             ; timing
-            ; breadcrumb }
-        ; receipt_chain_hash= Some receipt_chain_hash
+            ; breadcrumb
+            }
+        ; receipt_chain_hash = Some receipt_chain_hash
         ; delegate
-        ; voting_for= Some voting_for
+        ; voting_for = Some voting_for
         ; timing
-        ; permissions= Some permissions
-        ; snapp }
+        ; permissions = Some permissions
+        ; snapp
+        }
 
       let of_account_id coda account_id =
         let account =
@@ -842,28 +884,30 @@ module Types = struct
             of_full_account ~breadcrumb account
         | None ->
             Account.
-              { Poly.public_key= Account_id.public_key account_id
-              ; token_id= Account_id.token_id account_id
-              ; token_permissions= None
-              ; nonce= None
-              ; delegate= None
-              ; balance=
-                  { AnnotatedBalance.total= Balance.zero
-                  ; unknown= Balance.zero
-                  ; timing= Timing.Untimed
-                  ; breadcrumb= None }
-              ; receipt_chain_hash= None
-              ; voting_for= None
-              ; timing= Timing.Untimed
-              ; permissions= None
-              ; snapp= None }
+              { Poly.public_key = Account_id.public_key account_id
+              ; token_id = Account_id.token_id account_id
+              ; token_permissions = None
+              ; nonce = None
+              ; delegate = None
+              ; balance =
+                  { AnnotatedBalance.total = Balance.zero
+                  ; unknown = Balance.zero
+                  ; timing = Timing.Untimed
+                  ; breadcrumb = None
+                  }
+              ; receipt_chain_hash = None
+              ; voting_for = None
+              ; timing = Timing.Untimed
+              ; permissions = None
+              ; snapp = None
+              }
 
       let of_pk coda pk =
         of_account_id coda (Account_id.create pk Token_id.default)
     end
 
     type t =
-      { account:
+      { account :
           ( Public_key.Compressed.t
           , Token_id.t
           , Token_permissions.t option
@@ -876,31 +920,33 @@ module Types = struct
           , Permissions.t option
           , Snapp_account.t option )
           Account.Poly.t
-      ; locked: bool option
-      ; is_actively_staking: bool
-      ; path: string
-      ; index: Account.Index.t option }
+      ; locked : bool option
+      ; is_actively_staking : bool
+      ; path : string
+      ; index : Account.Index.t option
+      }
 
     let lift coda pk account =
       let block_production_pubkeys = Mina_lib.block_production_pubkeys coda in
       let accounts = Mina_lib.wallets coda in
       let best_tip_ledger = Mina_lib.best_ledger coda in
       { account
-      ; locked= Secrets.Wallets.check_locked accounts ~needle:pk
-      ; is_actively_staking=
+      ; locked = Secrets.Wallets.check_locked accounts ~needle:pk
+      ; is_actively_staking =
           ( if Token_id.(equal default) account.token_id then
             Public_key.Compressed.Set.mem block_production_pubkeys pk
           else (* Non-default token accounts cannot stake. *)
             false )
-      ; path= Secrets.Wallets.get_path accounts pk
-      ; index=
+      ; path = Secrets.Wallets.get_path accounts pk
+      ; index =
           ( match best_tip_ledger with
           | `Active ledger ->
               Option.try_with (fun () ->
                   Ledger.index_of_account_exn ledger
                     (Account_id.create account.public_key account.token_id) )
           | _ ->
-              None ) }
+              None )
+      }
 
     let get_best_ledger_account coda aid =
       lift coda
@@ -910,7 +956,7 @@ module Types = struct
     let get_best_ledger_account_pk coda pk =
       lift coda pk (Partial_account.of_pk coda pk)
 
-    let account_id {Account.Poly.public_key; token_id; _} =
+    let account_id { Account.Poly.public_key; token_id; _ } =
       Account_id.create public_key token_id
 
     let rec account =
@@ -920,27 +966,27 @@ module Types = struct
              [ field "publicKey" ~typ:(non_null public_key)
                  ~doc:"The public identity of the account"
                  ~args:Arg.[]
-                 ~resolve:(fun _ {account; _} ->
+                 ~resolve:(fun _ { account; _ } ->
                    account.Account.Poly.public_key )
              ; field "token" ~typ:(non_null token_id)
                  ~doc:"The token associated with this account"
                  ~args:Arg.[]
-                 ~resolve:(fun _ {account; _} -> account.Account.Poly.token_id)
+                 ~resolve:(fun _ { account; _ } -> account.Account.Poly.token_id)
              ; field "timing" ~typ:(non_null account_timing)
                  ~doc:"The timing associated with this account"
                  ~args:Arg.[]
-                 ~resolve:(fun _ {account; _} -> account.Account.Poly.timing)
+                 ~resolve:(fun _ { account; _ } -> account.Account.Poly.timing)
              ; field "balance"
                  ~typ:(non_null AnnotatedBalance.obj)
                  ~doc:"The amount of mina owned by the account"
                  ~args:Arg.[]
-                 ~resolve:(fun _ {account; _} -> account.Account.Poly.balance)
+                 ~resolve:(fun _ { account; _ } -> account.Account.Poly.balance)
              ; field "nonce" ~typ:string
                  ~doc:
                    "A natural number that increases with each transaction \
                     (stringified uint32)"
                  ~args:Arg.[]
-                 ~resolve:(fun _ {account; _} ->
+                 ~resolve:(fun _ { account; _ } ->
                    Option.map ~f:Account.Nonce.to_string
                      account.Account.Poly.nonce )
              ; field "inferredNonce" ~typ:string
@@ -949,7 +995,7 @@ module Types = struct
                     transactions (transactions not yet included in a block) \
                     (stringified uint32)"
                  ~args:Arg.[]
-                 ~resolve:(fun {ctx= coda; _} {account; _} ->
+                 ~resolve:(fun { ctx = coda; _ } { account; _ } ->
                    let account_id = account_id account in
                    match
                      Mina_lib
@@ -965,49 +1011,50 @@ module Types = struct
                    "The account that you delegated on the staking ledger of \
                     the current block's epoch"
                  ~args:Arg.[]
-                 ~resolve:(fun {ctx= coda; _} {account; _} ->
+                 ~resolve:(fun { ctx = coda; _ } { account; _ } ->
                    let open Option.Let_syntax in
                    let account_id = account_id account in
                    match%bind Mina_lib.staking_ledger coda with
                    | Genesis_epoch_ledger staking_ledger -> (
-                     match
-                       let open Option.Let_syntax in
-                       account_id
-                       |> Ledger.location_of_account staking_ledger
-                       >>= Ledger.get staking_ledger
-                     with
-                     | Some delegate_account ->
+                       match
+                         let open Option.Let_syntax in
+                         account_id
+                         |> Ledger.location_of_account staking_ledger
+                         >>= Ledger.get staking_ledger
+                       with
+                       | Some delegate_account ->
+                           let delegate_key = delegate_account.public_key in
+                           Some (get_best_ledger_account_pk coda delegate_key)
+                       | None ->
+                           [%log' warn (Mina_lib.top_level_logger coda)]
+                             "Could not retrieve delegate account from the \
+                              genesis ledger. The account was not present in \
+                              the ledger." ;
+                           None )
+                   | Ledger_db staking_ledger -> (
+                       try
+                         let index =
+                           Mina_base.Ledger.Db.index_of_account_exn
+                             staking_ledger account_id
+                         in
+                         let delegate_account =
+                           Mina_base.Ledger.Db.get_at_index_exn staking_ledger
+                             index
+                         in
                          let delegate_key = delegate_account.public_key in
                          Some (get_best_ledger_account_pk coda delegate_key)
-                     | None ->
+                       with e ->
                          [%log' warn (Mina_lib.top_level_logger coda)]
-                           "Could not retrieve delegate account from the \
-                            genesis ledger. The account was not present in \
-                            the ledger." ;
-                         None )
-                   | Ledger_db staking_ledger -> (
-                     try
-                       let index =
-                         Mina_base.Ledger.Db.index_of_account_exn
-                           staking_ledger account_id
-                       in
-                       let delegate_account =
-                         Mina_base.Ledger.Db.get_at_index_exn staking_ledger
-                           index
-                       in
-                       let delegate_key = delegate_account.public_key in
-                       Some (get_best_ledger_account_pk coda delegate_key)
-                     with e ->
-                       [%log' warn (Mina_lib.top_level_logger coda)]
-                         ~metadata:[("error", `String (Exn.to_string e))]
-                         "Could not retrieve delegate account from sparse \
-                          ledger. The account may not be in the ledger: $error" ;
-                       None ) )
+                           ~metadata:[ ("error", `String (Exn.to_string e)) ]
+                           "Could not retrieve delegate account from sparse \
+                            ledger. The account may not be in the ledger: \
+                            $error" ;
+                         None ) )
              ; field "receiptChainHash" ~typ:string
                  ~doc:"Top hash of the receipt chain merkle-list"
                  ~args:Arg.[]
-                 ~resolve:(fun _ {account; _} ->
-                   Option.map ~f:Receipt.Chain_hash.to_string
+                 ~resolve:(fun _ { account; _ } ->
+                   Option.map ~f:Receipt.Chain_hash.to_base58_check
                      account.Account.Poly.receipt_chain_hash )
              ; field "delegate" ~typ:public_key
                  ~doc:
@@ -1016,13 +1063,13 @@ module Types = struct
                     key"
                  ~args:Arg.[]
                  ~deprecated:(Deprecated (Some "use delegateAccount instead"))
-                 ~resolve:(fun _ {account; _} -> account.Account.Poly.delegate)
+                 ~resolve:(fun _ { account; _ } -> account.Account.Poly.delegate)
              ; field "delegateAccount" ~typ:(Lazy.force account)
                  ~doc:
                    "The account to which you are delegating - if you are not \
                     delegating to anybody, this would return your public key"
                  ~args:Arg.[]
-                 ~resolve:(fun {ctx= coda; _} {account; _} ->
+                 ~resolve:(fun { ctx = coda; _ } { account; _ } ->
                    Option.map
                      ~f:(get_best_ledger_account_pk coda)
                      account.Account.Poly.delegate )
@@ -1033,7 +1080,7 @@ module Types = struct
                     that the info is recorded in the last epoch so it might \
                     not be up to date with the current account status)"
                  ~args:Arg.[]
-                 ~resolve:(fun {ctx= coda; _} {account; _} ->
+                 ~resolve:(fun { ctx = coda; _ } { account; _ } ->
                    let open Option.Let_syntax in
                    let pk = account.Account.Poly.public_key in
                    let%map delegators =
@@ -1042,28 +1089,29 @@ module Types = struct
                    let best_tip_ledger = Mina_lib.best_ledger coda in
                    List.map
                      ~f:(fun a ->
-                       { account= Partial_account.of_full_account a
-                       ; locked= None
-                       ; is_actively_staking= true
-                       ; path= ""
-                       ; index=
+                       { account = Partial_account.of_full_account a
+                       ; locked = None
+                       ; is_actively_staking = true
+                       ; path = ""
+                       ; index =
                            ( match best_tip_ledger with
                            | `Active ledger ->
                                Option.try_with (fun () ->
                                    Ledger.index_of_account_exn ledger
                                      (Account.identifier a) )
                            | _ ->
-                               None ) } )
+                               None )
+                       } )
                      delegators )
              ; field "lastEpochDelegators"
                  ~typ:(list @@ non_null @@ Lazy.force account)
                  ~doc:
                    "The list of accounts which are delegating to you in the \
                     last epoch (note that the info is recorded in the one \
-                    before last epoch epoch so it might not be up to date \
-                    with the current account status)"
+                    before last epoch epoch so it might not be up to date with \
+                    the current account status)"
                  ~args:Arg.[]
-                 ~resolve:(fun {ctx= coda; _} {account; _} ->
+                 ~resolve:(fun { ctx = coda; _ } { account; _ } ->
                    let open Option.Let_syntax in
                    let pk = account.Account.Poly.public_key in
                    let%map delegators =
@@ -1072,72 +1120,74 @@ module Types = struct
                    let best_tip_ledger = Mina_lib.best_ledger coda in
                    List.map
                      ~f:(fun a ->
-                       { account= Partial_account.of_full_account a
-                       ; locked= None
-                       ; is_actively_staking= true
-                       ; path= ""
-                       ; index=
+                       { account = Partial_account.of_full_account a
+                       ; locked = None
+                       ; is_actively_staking = true
+                       ; path = ""
+                       ; index =
                            ( match best_tip_ledger with
                            | `Active ledger ->
                                Option.try_with (fun () ->
                                    Ledger.index_of_account_exn ledger
                                      (Account.identifier a) )
                            | _ ->
-                               None ) } )
+                               None )
+                       } )
                      delegators )
              ; field "votingFor" ~typ:string
                  ~doc:
                    "The previous epoch lock hash of the chain which you are \
                     voting for"
                  ~args:Arg.[]
-                 ~resolve:(fun _ {account; _} ->
+                 ~resolve:(fun _ { account; _ } ->
                    Option.map ~f:Mina_base.State_hash.to_base58_check
                      account.Account.Poly.voting_for )
              ; field "stakingActive" ~typ:(non_null bool)
                  ~doc:
                    "True if you are actively staking with this account on the \
-                    current daemon - this may not yet have been updated if \
-                    the staking key was changed recently"
+                    current daemon - this may not yet have been updated if the \
+                    staking key was changed recently"
                  ~args:Arg.[]
-                 ~resolve:(fun _ {is_actively_staking; _} ->
+                 ~resolve:(fun _ { is_actively_staking; _ } ->
                    is_actively_staking )
              ; field "privateKeyPath" ~typ:(non_null string)
                  ~doc:"Path of the private key file for this account"
                  ~args:Arg.[]
-                 ~resolve:(fun _ {path; _} -> path)
+                 ~resolve:(fun _ { path; _ } -> path)
              ; field "locked" ~typ:bool
                  ~doc:
                    "True if locked, false if unlocked, null if the account \
                     isn't tracked by the queried daemon"
                  ~args:Arg.[]
-                 ~resolve:(fun _ {locked; _} -> locked)
+                 ~resolve:(fun _ { locked; _ } -> locked)
              ; field "isTokenOwner" ~typ:bool
                  ~doc:"True if this account owns its associated token"
                  ~args:Arg.[]
-                 ~resolve:(fun _ {account; _} ->
-                   match%map.Option.Let_syntax account.token_permissions with
+                 ~resolve:(fun _ { account; _ } ->
+                   match%map.Option account.token_permissions with
                    | Token_owned _ ->
                        true
                    | Not_owned _ ->
                        false )
              ; field "isDisabled" ~typ:bool
                  ~doc:
-                   "True if this account has been disabled by the owner of \
-                    the associated token"
+                   "True if this account has been disabled by the owner of the \
+                    associated token"
                  ~args:Arg.[]
-                 ~resolve:(fun _ {account; _} ->
-                   match%map.Option.Let_syntax account.token_permissions with
+                 ~resolve:(fun _ { account; _ } ->
+                   match%map.Option account.token_permissions with
                    | Token_owned _ ->
                        false
-                   | Not_owned {account_disabled} ->
+                   | Not_owned { account_disabled } ->
                        account_disabled )
              ; field "index" ~typ:int
                  ~doc:
                    "The index of this account in the ledger, or null if this \
-                    account does not yet have a known position in the best \
-                    tip ledger"
+                    account does not yet have a known position in the best tip \
+                    ledger"
                  ~args:Arg.[]
-                 ~resolve:(fun _ {index; _} -> index) ] ))
+                 ~resolve:(fun _ { index; _ } -> index)
+             ] ) )
 
     let account = Lazy.force account
   end
@@ -1152,8 +1202,7 @@ module Types = struct
           | `Mint_tokens ]
           option )
         typ =
-      scalar "UserCommandKind" ~doc:"The kind of user command"
-        ~coerce:(function
+      scalar "UserCommandKind" ~doc:"The kind of user command" ~coerce:(function
         | `Payment ->
             `String "PAYMENT"
         | `Stake_delegation ->
@@ -1202,6 +1251,10 @@ module Types = struct
           ; abstract_field "feePayer"
               ~typ:(non_null AccountObj.account)
               ~args:[] ~doc:"Account that pays the fees for the command"
+          ; abstract_field "validUntil" ~typ:(non_null uint32) ~args:[]
+              ~doc:
+                "The global slot number after which this transaction cannot be \
+                 applied"
           ; abstract_field "token" ~typ:(non_null token_id) ~args:[]
               ~doc:"Token used by the command"
           ; abstract_field "amount" ~typ:(non_null uint64) ~args:[]
@@ -1236,7 +1289,8 @@ module Types = struct
               ~args:[] ~doc:"Account of the receiver"
               ~deprecated:(Deprecated (Some "use receiver field instead"))
           ; abstract_field "failureReason" ~typ:string ~args:[]
-              ~doc:"null is no failure, reason for failure otherwise." ] )
+              ~doc:"null is no failure, reason for failure otherwise."
+          ] )
 
     module Status = struct
       type t =
@@ -1246,9 +1300,9 @@ module Types = struct
     end
 
     module With_status = struct
-      type 'a t = {data: 'a; status: Status.t}
+      type 'a t = { data : 'a; status : Status.t }
 
-      let map t ~f = {t with data= f t.data}
+      let map t ~f = { t with data = f t.data }
     end
 
     let field_no_status ?doc ?deprecated lab ~typ ~args ~resolve =
@@ -1277,21 +1331,26 @@ module Types = struct
             |> Account.Nonce.to_int )
       ; field_no_status "source" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that the command is sent from"
-          ~resolve:(fun {ctx= coda; _} cmd ->
+          ~resolve:(fun { ctx = coda; _ } cmd ->
             AccountObj.get_best_ledger_account coda
               (Signed_command.source ~next_available_token:Token_id.invalid
-                 cmd.With_hash.data) )
+                 cmd.With_hash.data ) )
       ; field_no_status "receiver" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that the command applies to"
-          ~resolve:(fun {ctx= coda; _} cmd ->
+          ~resolve:(fun { ctx = coda; _ } cmd ->
             AccountObj.get_best_ledger_account coda
               (Signed_command.receiver ~next_available_token:Token_id.invalid
-                 cmd.With_hash.data) )
+                 cmd.With_hash.data ) )
       ; field_no_status "feePayer" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that pays the fees for the command"
-          ~resolve:(fun {ctx= coda; _} cmd ->
+          ~resolve:(fun { ctx = coda; _ } cmd ->
             AccountObj.get_best_ledger_account coda
               (Signed_command.fee_payer cmd.With_hash.data) )
+      ; field_no_status "validUntil" ~typ:(non_null uint32) ~args:[]
+          ~doc:
+            "The global slot number after which this transaction cannot be \
+             applied" ~resolve:(fun _ cmd ->
+            Signed_command.valid_until cmd.With_hash.data )
       ; field_no_status "token" ~typ:(non_null token_id) ~args:[]
           ~doc:"Token used for the transaction" ~resolve:(fun _ cmd ->
             Signed_command.token cmd.With_hash.data )
@@ -1318,11 +1377,11 @@ module Types = struct
                "A short message from the sender, encoded with Base58Check, \
                 version byte=0x%02X; byte 2 of the decoding is the message \
                 length"
-               (Char.to_int Base58_check.Version_bytes.user_command_memo))
+               (Char.to_int Base58_check.Version_bytes.user_command_memo) )
           ~resolve:(fun _ payment ->
             Signed_command_payload.memo
             @@ Signed_command.payload payment.With_hash.data
-            |> Signed_command_memo.to_string )
+            |> Signed_command_memo.to_base58_check )
       ; field_no_status "isDelegation" ~typ:(non_null bool) ~args:[]
           ~doc:"If true, this command represents a delegation of stake"
           ~deprecated:(Deprecated (Some "use kind field instead"))
@@ -1342,7 +1401,7 @@ module Types = struct
       ; field_no_status "fromAccount" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account of the sender"
           ~deprecated:(Deprecated (Some "use feePayer field instead"))
-          ~resolve:(fun {ctx= coda; _} payment ->
+          ~resolve:(fun { ctx = coda; _ } payment ->
             AccountObj.get_best_ledger_account coda
             @@ Signed_command.fee_payer payment.With_hash.data )
       ; field_no_status "to" ~typ:(non_null public_key) ~args:[]
@@ -1354,7 +1413,7 @@ module Types = struct
           ~doc:"Account of the receiver"
           ~deprecated:(Deprecated (Some "use receiver field instead"))
           ~args:Arg.[]
-          ~resolve:(fun {ctx= coda; _} cmd ->
+          ~resolve:(fun { ctx = coda; _ } cmd ->
             AccountObj.get_best_ledger_account coda
             @@ Signed_command.receiver ~next_available_token:Token_id.invalid
                  cmd.With_hash.data )
@@ -1366,7 +1425,8 @@ module Types = struct
             | Applied | Unknown ->
                 None
             | Included_but_failed failure ->
-                Some (Transaction_status.Failure.to_string failure) ) ]
+                Some (Transaction_status.Failure.to_string failure) )
+      ]
 
     let payment =
       obj "UserCommandPayment" ~fields:(fun _ -> user_command_shared_fields)
@@ -1376,16 +1436,15 @@ module Types = struct
     let stake_delegation =
       obj "UserCommandDelegation" ~fields:(fun _ ->
           field_no_status "delegator" ~typ:(non_null AccountObj.account)
-            ~args:[] ~resolve:(fun {ctx= coda; _} cmd ->
+            ~args:[] ~resolve:(fun { ctx = coda; _ } cmd ->
               AccountObj.get_best_ledger_account coda
                 (Signed_command.source ~next_available_token:Token_id.invalid
-                   cmd.With_hash.data) )
+                   cmd.With_hash.data ) )
           :: field_no_status "delegatee" ~typ:(non_null AccountObj.account)
-               ~args:[] ~resolve:(fun {ctx= coda; _} cmd ->
+               ~args:[] ~resolve:(fun { ctx = coda; _ } cmd ->
                  AccountObj.get_best_ledger_account coda
                    (Signed_command.receiver
-                      ~next_available_token:Token_id.invalid cmd.With_hash.data)
-             )
+                      ~next_available_token:Token_id.invalid cmd.With_hash.data ) )
           :: user_command_shared_fields )
 
     let mk_stake_delegation = add_type user_command_interface stake_delegation
@@ -1395,21 +1454,19 @@ module Types = struct
           field_no_status "tokenOwner" ~typ:(non_null public_key) ~args:[]
             ~doc:"Public key to set as the owner of the new token"
             ~resolve:(fun _ cmd -> Signed_command.source_pk cmd.With_hash.data)
-          :: field_no_status "newAccountsDisabled" ~typ:(non_null bool)
-               ~args:[]
+          :: field_no_status "newAccountsDisabled" ~typ:(non_null bool) ~args:[]
                ~doc:"Whether new accounts created in this token are disabled"
                ~resolve:(fun _ cmd ->
                  match
                    Signed_command_payload.body
                    @@ Signed_command.payload cmd.With_hash.data
                  with
-                 | Create_new_token {disable_new_accounts; _} ->
+                 | Create_new_token { disable_new_accounts; _ } ->
                      disable_new_accounts
                  | _ ->
                      (* We cannot exclude this at the type level. *)
                      failwith
-                       "Type error: Expected a Create_new_token user command"
-             )
+                       "Type error: Expected a Create_new_token user command" )
           :: user_command_shared_fields )
 
     let mk_create_new_token = add_type user_command_interface create_new_token
@@ -1418,10 +1475,10 @@ module Types = struct
       obj "UserCommandNewAccount" ~fields:(fun _ ->
           field_no_status "tokenOwner" ~typ:(non_null AccountObj.account)
             ~args:[] ~doc:"The account that owns the token for the new account"
-            ~resolve:(fun {ctx= coda; _} cmd ->
+            ~resolve:(fun { ctx = coda; _ } cmd ->
               AccountObj.get_best_ledger_account coda
                 (Signed_command.source ~next_available_token:Token_id.invalid
-                   cmd.With_hash.data) )
+                   cmd.With_hash.data ) )
           :: field_no_status "disabled" ~typ:(non_null bool) ~args:[]
                ~doc:
                  "Whether this account should be disabled upon creation. If \
@@ -1432,13 +1489,12 @@ module Types = struct
                    Signed_command_payload.body
                    @@ Signed_command.payload cmd.With_hash.data
                  with
-                 | Create_token_account {account_disabled; _} ->
+                 | Create_token_account { account_disabled; _ } ->
                      account_disabled
                  | _ ->
                      (* We cannot exclude this at the type level. *)
                      failwith
-                       "Type error: Expected a Create_new_token user command"
-             )
+                       "Type error: Expected a Create_new_token user command" )
           :: user_command_shared_fields )
 
     let mk_create_token_account =
@@ -1448,17 +1504,17 @@ module Types = struct
       obj "UserCommandMintTokens" ~fields:(fun _ ->
           field_no_status "tokenOwner" ~typ:(non_null AccountObj.account)
             ~args:[] ~doc:"The account that owns the token to mint"
-            ~resolve:(fun {ctx= coda; _} cmd ->
+            ~resolve:(fun { ctx = coda; _ } cmd ->
               AccountObj.get_best_ledger_account coda
                 (Signed_command.source ~next_available_token:Token_id.invalid
-                   cmd.With_hash.data) )
+                   cmd.With_hash.data ) )
           :: user_command_shared_fields )
 
     let mk_mint_tokens = add_type user_command_interface mint_tokens
 
     let mk_user_command
-        (cmd :
-          (Signed_command.t, Transaction_hash.t) With_hash.t With_status.t) =
+        (cmd : (Signed_command.t, Transaction_hash.t) With_hash.t With_status.t)
+        =
       match
         Signed_command_payload.body @@ Signed_command.payload cmd.data.data
       with
@@ -1482,11 +1538,11 @@ module Types = struct
       ~fields:(fun _ ->
         [ field "userCommands"
             ~doc:
-              "List of user commands (payments and stake delegations) \
-               included in this block"
+              "List of user commands (payments and stake delegations) included \
+               in this block"
             ~typ:(non_null @@ list @@ non_null user_command)
             ~args:Arg.[]
-            ~resolve:(fun _ {commands; _} ->
+            ~resolve:(fun _ { commands; _ } ->
               List.filter_map commands ~f:(fun t ->
                   match t.data.data with
                   | Signed_command c ->
@@ -1499,7 +1555,7 @@ module Types = struct
                       in
                       Some
                         (UserCommand.mk_user_command
-                           {status; data= {t.data with data= c}})
+                           { status; data = { t.data with data = c } } )
                   | Snapp_command _ ->
                       (* TODO: This should be supported in some graph QL query *)
                       None ) )
@@ -1507,18 +1563,20 @@ module Types = struct
             ~doc:"List of fee transfers included in this block"
             ~typ:(non_null @@ list @@ non_null fee_transfer)
             ~args:Arg.[]
-            ~resolve:(fun _ {fee_transfers; _} -> fee_transfers)
+            ~resolve:(fun _ { fee_transfers; _ } -> fee_transfers)
         ; field "coinbase" ~typ:(non_null uint64)
             ~doc:"Amount of mina granted to the producer of this block"
             ~args:Arg.[]
-            ~resolve:(fun _ {coinbase; _} -> Currency.Amount.to_uint64 coinbase)
+            ~resolve:(fun _ { coinbase; _ } ->
+              Currency.Amount.to_uint64 coinbase )
         ; field "coinbaseReceiverAccount" ~typ:AccountObj.account
             ~doc:"Account to which the coinbase for this block was granted"
             ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} {coinbase_receiver; _} ->
+            ~resolve:(fun { ctx = coda; _ } { coinbase_receiver; _ } ->
               Option.map
                 ~f:(AccountObj.get_best_ledger_account_pk coda)
-                coinbase_receiver ) ] )
+                coinbase_receiver )
+        ] )
 
   let protocol_state_proof : (Mina_lib.t, Proof.t option) typ =
     obj "protocolStateProof" ~fields:(fun _ ->
@@ -1526,9 +1584,8 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ proof ->
               (* Use the precomputed block proof encoding, for consistency. *)
-              Some
-                (Mina_transition.External_transition.Precomputed_block.Proof
-                 .to_bin_string proof) ) ] )
+              Some (Mina_block.Precomputed.Proof.to_bin_string proof) )
+        ] )
 
   let block :
       ( Mina_lib.t
@@ -1540,46 +1597,52 @@ module Types = struct
             ~doc:"Public key of account that produced this block"
             ~deprecated:(Deprecated (Some "use creatorAccount field instead"))
             ~args:Arg.[]
-            ~resolve:(fun _ {With_hash.data; _} -> data.creator)
+            ~resolve:(fun _ { With_hash.data; _ } -> data.creator)
         ; field "creatorAccount"
             ~typ:(non_null AccountObj.account)
             ~doc:"Account that produced this block"
             ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} {With_hash.data; _} ->
+            ~resolve:(fun { ctx = coda; _ } { With_hash.data; _ } ->
               AccountObj.get_best_ledger_account_pk coda data.creator )
         ; field "winnerAccount"
             ~typ:(non_null AccountObj.account)
             ~doc:"Account that won the slot (Delegator/Staker)"
             ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} {With_hash.data; _} ->
+            ~resolve:(fun { ctx = coda; _ } { With_hash.data; _ } ->
               AccountObj.get_best_ledger_account_pk coda data.winner )
         ; field "stateHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the state after this block"
             ~args:Arg.[]
-            ~resolve:(fun _ {With_hash.hash; _} ->
+            ~resolve:(fun _ { With_hash.hash; _ } ->
               State_hash.to_base58_check hash )
         ; field "stateHashField" ~typ:(non_null string)
             ~doc:
               "Experimental: Bigint field-element representation of stateHash"
             ~args:Arg.[]
-            ~resolve:(fun _ {With_hash.hash; _} ->
+            ~resolve:(fun _ { With_hash.hash; _ } ->
               State_hash.to_decimal_string hash )
         ; field "protocolState" ~typ:(non_null protocol_state)
             ~args:Arg.[]
-            ~resolve:(fun _ {With_hash.data; With_hash.hash; _} ->
+            ~resolve:(fun _ { With_hash.data; With_hash.hash; _ } ->
               (data.protocol_state, hash) )
         ; field "protocolStateProof"
             ~typ:(non_null protocol_state_proof)
             ~doc:"Snark proof of blockchain state"
             ~args:Arg.[]
-            ~resolve:(fun _ {With_hash.data; _} -> data.proof)
+            ~resolve:(fun _ { With_hash.data; _ } -> data.proof)
         ; field "transactions" ~typ:(non_null transactions)
             ~args:Arg.[]
-            ~resolve:(fun _ {With_hash.data; _} -> data.transactions)
+            ~resolve:(fun _ { With_hash.data; _ } -> data.transactions)
+        ; field "commandTransactionCount" ~typ:(non_null int)
+            ~doc:"Count of user command transactions in the block"
+            ~args:Arg.[]
+            ~resolve:(fun _ { With_hash.data; _ } ->
+              List.length data.transactions.commands )
         ; field "snarkJobs"
             ~typ:(non_null @@ list @@ non_null completed_work)
             ~args:Arg.[]
-            ~resolve:(fun _ {With_hash.data; _} -> data.snark_jobs) ] )
+            ~resolve:(fun _ { With_hash.data; _ } -> data.snark_jobs)
+        ] )
 
   let snark_worker =
     obj "SnarkWorker" ~fields:(fun _ ->
@@ -1592,13 +1655,14 @@ module Types = struct
             ~typ:(non_null AccountObj.account)
             ~doc:"Account of the current snark worker"
             ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} (key, _) ->
+            ~resolve:(fun { ctx = coda; _ } (key, _) ->
               AccountObj.get_best_ledger_account_pk coda key )
         ; field "fee" ~typ:(non_null uint64)
             ~doc:"Fee that snark worker is charging to generate a snark proof"
             ~args:Arg.[]
             ~resolve:(fun (_ : Mina_lib.t resolve_info) (_, fee) ->
-              Currency.Fee.to_uint64 fee ) ] )
+              Currency.Fee.to_uint64 fee )
+        ] )
 
   module Payload = struct
     let peer : ('context, Network_peer.Peer.t option) typ =
@@ -1613,7 +1677,8 @@ module Types = struct
                 Unix.Inet_addr.to_string peer.Network_peer.Peer.host )
           ; field "libp2p_port" ~typ:(non_null int)
               ~args:Arg.[]
-              ~resolve:(fun _ peer -> peer.Network_peer.Peer.libp2p_port) ] )
+              ~resolve:(fun _ peer -> peer.Network_peer.Peer.libp2p_port)
+          ] )
 
     let create_account : (Mina_lib.t, Account.key option) typ =
       obj "AddAccountPayload" ~fields:(fun _ ->
@@ -1626,8 +1691,9 @@ module Types = struct
               ~typ:(non_null AccountObj.account)
               ~doc:"Details of created account"
               ~args:Arg.[]
-              ~resolve:(fun {ctx= coda; _} key ->
-                AccountObj.get_best_ledger_account_pk coda key ) ] )
+              ~resolve:(fun { ctx = coda; _ } key ->
+                AccountObj.get_best_ledger_account_pk coda key )
+          ] )
 
     let unlock_account : (Mina_lib.t, Account.key option) typ =
       obj "UnlockPayload" ~fields:(fun _ ->
@@ -1640,8 +1706,9 @@ module Types = struct
               ~typ:(non_null AccountObj.account)
               ~doc:"Details of unlocked account"
               ~args:Arg.[]
-              ~resolve:(fun {ctx= coda; _} key ->
-                AccountObj.get_best_ledger_account_pk coda key ) ] )
+              ~resolve:(fun { ctx = coda; _ } key ->
+                AccountObj.get_best_ledger_account_pk coda key )
+          ] )
 
     let lock_account : (Mina_lib.t, Account.key option) typ =
       obj "LockPayload" ~fields:(fun _ ->
@@ -1653,22 +1720,25 @@ module Types = struct
               ~typ:(non_null AccountObj.account)
               ~doc:"Details of locked account"
               ~args:Arg.[]
-              ~resolve:(fun {ctx= coda; _} key ->
-                AccountObj.get_best_ledger_account_pk coda key ) ] )
+              ~resolve:(fun { ctx = coda; _ } key ->
+                AccountObj.get_best_ledger_account_pk coda key )
+          ] )
 
     let delete_account =
       obj "DeleteAccountPayload" ~fields:(fun _ ->
           [ field "publicKey" ~typ:(non_null public_key)
               ~doc:"Public key of the deleted account"
               ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id) ] )
+              ~resolve:(fun _ -> Fn.id)
+          ] )
 
     let reload_accounts =
       obj "ReloadAccountsPayload" ~fields:(fun _ ->
           [ field "success" ~typ:(non_null bool)
               ~doc:"True when the reload was successful"
               ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id) ] )
+              ~resolve:(fun _ -> Fn.id)
+          ] )
 
     let import_account =
       obj "ImportAccountPayload" ~fields:(fun _ ->
@@ -1683,7 +1753,8 @@ module Types = struct
               ~resolve:(fun _ -> snd)
           ; field "success" ~typ:(non_null bool)
               ~args:Arg.[]
-              ~resolve:(fun _ _ -> true) ] )
+              ~resolve:(fun _ _ -> true)
+          ] )
 
     let string_of_banned_status = function
       | Trust_system.Banned_status.Unbanned ->
@@ -1703,25 +1774,28 @@ module Types = struct
               ~resolve:(fun _ (peer, __) -> peer.Network_peer.Peer.peer_id)
           ; field "trust" ~typ:(non_null float) ~doc:"Trust score"
               ~args:Arg.[]
-              ~resolve:(fun _ (_, {trust; _}) -> trust)
+              ~resolve:(fun _ (_, { trust; _ }) -> trust)
           ; field "banned_status" ~typ:string ~doc:"Banned status"
               ~args:Arg.[]
-              ~resolve:(fun _ (_, {banned; _}) ->
-                string_of_banned_status banned ) ] )
+              ~resolve:(fun _ (_, { banned; _ }) ->
+                string_of_banned_status banned )
+          ] )
 
     let send_payment =
       obj "SendPaymentPayload" ~fields:(fun _ ->
           [ field "payment" ~typ:(non_null user_command)
               ~doc:"Payment that was sent"
               ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id) ] )
+              ~resolve:(fun _ -> Fn.id)
+          ] )
 
     let send_delegation =
       obj "SendDelegationPayload" ~fields:(fun _ ->
           [ field "delegation" ~typ:(non_null user_command)
               ~doc:"Delegation change that was sent"
               ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id) ] )
+              ~resolve:(fun _ -> Fn.id)
+          ] )
 
     let create_token =
       obj "SendCreateTokenPayload" ~fields:(fun _ ->
@@ -1729,7 +1803,8 @@ module Types = struct
               ~typ:(non_null UserCommand.create_new_token)
               ~doc:"Token creation command that was sent"
               ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id) ] )
+              ~resolve:(fun _ -> Fn.id)
+          ] )
 
     let create_token_account =
       obj "SendCreateTokenAccountPayload" ~fields:(fun _ ->
@@ -1737,7 +1812,8 @@ module Types = struct
               ~typ:(non_null UserCommand.create_token_account)
               ~doc:"Token account creation command that was sent"
               ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id) ] )
+              ~resolve:(fun _ -> Fn.id)
+          ] )
 
     let mint_tokens =
       obj "SendMintTokensPayload" ~fields:(fun _ ->
@@ -1745,7 +1821,8 @@ module Types = struct
               ~typ:(non_null UserCommand.mint_tokens)
               ~doc:"Token minting command that was sent"
               ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id) ] )
+              ~resolve:(fun _ -> Fn.id)
+          ] )
 
     let send_rosetta_transaction =
       obj "SendRosettaTransactionPayload" ~fields:(fun _ ->
@@ -1753,7 +1830,8 @@ module Types = struct
               ~typ:(non_null UserCommand.user_command_interface)
               ~doc:"Command that was sent"
               ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id) ] )
+              ~resolve:(fun _ -> Fn.id)
+          ] )
 
     let export_logs =
       obj "ExportLogsPayload" ~fields:(fun _ ->
@@ -1762,36 +1840,19 @@ module Types = struct
                 (non_null
                    (obj "TarFile" ~fields:(fun _ ->
                         [ field "tarfile" ~typ:(non_null string) ~args:[]
-                            ~resolve:(fun _ basename -> basename) ] )))
+                            ~resolve:(fun _ basename -> basename)
+                        ] ) ) )
               ~doc:"Tar archive containing logs"
               ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id) ] )
+              ~resolve:(fun _ -> Fn.id)
+          ] )
 
     let add_payment_receipt =
       obj "AddPaymentReceiptPayload" ~fields:(fun _ ->
           [ field "payment" ~typ:(non_null user_command)
               ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id) ] )
-
-    let set_staking =
-      obj "SetStakingPayload" ~fields:(fun _ ->
-          [ field "lastStaking"
-              ~doc:"Returns the public keys that were staking funds previously"
-              ~typ:(non_null (list (non_null public_key)))
-              ~args:Arg.[]
-              ~resolve:(fun _ (lastStaking, _, _) -> lastStaking)
-          ; field "lockedPublicKeys"
-              ~doc:
-                "List of public keys that could not be used to stake because \
-                 they were locked"
-              ~typ:(non_null (list (non_null public_key)))
-              ~args:Arg.[]
-              ~resolve:(fun _ (_, locked, _) -> locked)
-          ; field "currentStakingKeys"
-              ~doc:"Returns the public keys that are now staking their funds"
-              ~typ:(non_null (list (non_null public_key)))
-              ~args:Arg.[]
-              ~resolve:(fun _ (_, _, currentStaking) -> currentStaking) ] )
+              ~resolve:(fun _ -> Fn.id)
+          ] )
 
     let set_coinbase_receiver =
       obj "SetCoinbaseReceiverPayload" ~fields:(fun _ ->
@@ -1804,18 +1865,20 @@ module Types = struct
               ~resolve:(fun _ (last_receiver, _) -> last_receiver)
           ; field "currentCoinbaseReceiver"
               ~doc:
-                "Returns the public key that will receive coinbase, or none \
-                 if it will be the block producer"
+                "Returns the public key that will receive coinbase, or none if \
+                 it will be the block producer"
               ~typ:public_key
               ~args:Arg.[]
-              ~resolve:(fun _ (_, current_receiver) -> current_receiver) ] )
+              ~resolve:(fun _ (_, current_receiver) -> current_receiver)
+          ] )
 
     let set_snark_work_fee =
       obj "SetSnarkWorkFeePayload" ~fields:(fun _ ->
           [ field "lastFee" ~doc:"Returns the last fee set to do snark work"
               ~typ:(non_null uint64)
               ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id) ] )
+              ~resolve:(fun _ -> Fn.id)
+          ] )
 
     let set_snark_worker =
       obj "SetSnarkWorkerPayload" ~fields:(fun _ ->
@@ -1824,7 +1887,8 @@ module Types = struct
                 "Returns the last public key that was designated for snark work"
               ~typ:public_key
               ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id) ] )
+              ~resolve:(fun _ -> Fn.id)
+          ] )
 
     let set_connection_gating_config =
       obj "SetConnectionGatingConfigPayload" ~fields:(fun _ ->
@@ -1845,7 +1909,8 @@ module Types = struct
                 "If true, no connections will be allowed unless they are from \
                  a trusted peer"
               ~args:Arg.[]
-              ~resolve:(fun _ config -> config.Mina_net2.isolate) ] )
+              ~resolve:(fun _ config -> config.Mina_net2.isolate)
+          ] )
   end
 
   module Arguments = struct
@@ -1857,56 +1922,97 @@ module Types = struct
   module Input = struct
     open Schema.Arg
 
-    let peer : (Network_peer.Peer.t, string) result option arg_typ =
-      obj "NetworkPeer"
-        ~doc:"Network identifiers for another protocol participant"
-        ~coerce:(fun peer_id host libp2p_port ->
-          try
-            Ok
-              Network_peer.Peer.
-                {peer_id; host= Unix.Inet_addr.of_string host; libp2p_port}
-          with _ -> Error "Invalid format for NetworkPeer.host" )
-        ~fields:
-          [ arg "peer_id" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
-          ; arg "host" ~doc:"IP address of the remote host"
-              ~typ:(non_null string)
-          ; arg "libp2p_port" ~typ:(non_null int) ]
+    module NetworkPeer = struct
+      type input = Network_peer.Peer.t
 
-    let public_key_arg =
-      scalar "PublicKey" ~doc:"Base58Check-encoded public key string"
-        ~coerce:(fun key ->
-          match key with
-          | `String s ->
-              Result.try_with (fun () ->
-                  Public_key.of_base58_check_decompress_exn s )
-              |> Result.map_error ~f:(fun e -> Exn.to_string e)
-          | _ ->
-              Error "Invalid format for public key." )
+      let arg_typ : ((Network_peer.Peer.t, string) result option, _) arg_typ =
+        obj "NetworkPeer"
+          ~doc:"Network identifiers for another protocol participant"
+          ~coerce:(fun peer_id host libp2p_port ->
+            try
+              Ok
+                Network_peer.Peer.
+                  { peer_id; host = Unix.Inet_addr.of_string host; libp2p_port }
+            with _ -> Error "Invalid format for NetworkPeer.host" )
+          ~fields:
+            [ arg "peer_id" ~doc:"base58-encoded peer ID" ~typ:(non_null string)
+            ; arg "host" ~doc:"IP address of the remote host"
+                ~typ:(non_null string)
+            ; arg "libp2p_port" ~typ:(non_null int)
+            ]
+          ~split:(fun f (p : input) ->
+            f p.peer_id (Unix.Inet_addr.to_string p.host) p.libp2p_port )
+    end
 
-    let token_id_arg =
-      scalar "TokenId"
-        ~doc:"String representation of a token's UInt64 identifier"
-        ~coerce:(fun token ->
-          try
-            match token with
-            | `String token ->
-                Ok (Token_id.of_string token)
+    module PublicKey = struct
+      type input = Account.key
+
+      let arg_typ =
+        scalar "PublicKey" ~doc:"Base58Check-encoded public key string"
+          ~coerce:(fun key ->
+            match key with
+            | `String s ->
+                Result.try_with (fun () ->
+                    Public_key.of_base58_check_decompress_exn s )
+                |> Result.map_error ~f:(fun e -> Exn.to_string e)
             | _ ->
-                Error "Invalid format for token."
-          with _ -> Error "Invalid format for token." )
+                Error "Invalid format for public key." )
+          ~to_json:(function
+            | (k : input) -> `String (Public_key.Compressed.to_base58_check k)
+            )
+    end
 
-    let precomputed_block =
-      scalar "PrecomputedBlock"
-        ~doc:"Block encoded in precomputed block format" ~coerce:(fun json ->
-          let json = to_yojson json in
-          Mina_transition.External_transition.Precomputed_block.of_yojson json
-      )
+    module PrivateKey = struct
+      type input = Signature_lib.Private_key.t
 
-    let extensional_block =
-      scalar "ExtensionalBlock"
-        ~doc:"Block encoded in extensional block format" ~coerce:(fun json ->
-          let json = to_yojson json in
-          Archive_lib.Extensional.Block.of_yojson json )
+      let arg_typ =
+        scalar "PrivateKey" ~doc:"Base58Check-encoded private key"
+          ~coerce:Signature_lib.Private_key.of_yojson
+          ~to_json:Signature_lib.Private_key.to_yojson
+    end
+
+    module TokenId = struct
+      type input = Token_id.t
+
+      let arg_typ =
+        scalar "TokenId"
+          ~doc:"String representation of a token's UInt64 identifier"
+          ~coerce:(fun token ->
+            try
+              match token with
+              | `String token ->
+                  Ok (Token_id.of_string token)
+              | _ ->
+                  Error "Invalid format for token."
+            with _ -> Error "Invalid format for token." )
+          ~to_json:(function (i : input) -> `String (Token_id.to_string i))
+    end
+
+    module PrecomputedBlock = struct
+      type input = Mina_block.Precomputed.t
+
+      let arg_typ =
+        scalar "PrecomputedBlock"
+          ~doc:"Block encoded in precomputed block format"
+          ~coerce:(fun json ->
+            let json = to_yojson json in
+            Mina_block.Precomputed.of_yojson json )
+          ~to_json:(fun (x : input) ->
+            Yojson.Safe.to_basic (Mina_block.Precomputed.to_yojson x) )
+    end
+
+    module ExtensionalBlock = struct
+      type input = Archive_lib.Extensional.Block.t
+
+      let arg_typ =
+        scalar "ExtensionalBlock"
+          ~doc:"Block encoded in extensional block format"
+          ~coerce:(fun json ->
+            let json = to_yojson json in
+            Archive_lib.Extensional.Block.of_yojson json )
+          ~to_json:(fun (x : input) ->
+            Yojson.Safe.to_basic @@ Archive_lib.Extensional.Block.to_yojson x )
+    end
 
     module type Numeric_type = sig
       type t
@@ -1916,6 +2022,8 @@ module Types = struct
       val of_string : string -> t
 
       val of_int : int -> t
+
+      val to_int : t -> int
     end
 
     (** Converts a type into a graphql argument type. Expect name to start with uppercase    *)
@@ -1925,375 +2033,594 @@ module Types = struct
       scalar name
         ~doc:
           (sprintf
-             "String or Integer representation of a %s number. If the input \
-              is a string, it must represent the number in base 10"
-             lower_name) ~coerce:(fun key ->
+             "String or Integer representation of a %s number. If the input is \
+              a string, it must represent the number in base 10"
+             lower_name )
+        ~to_json:(function n -> `String (Numeric.to_string n))
+        ~coerce:(fun key ->
           match key with
           | `String s -> (
-            try
-              let n = Numeric.of_string s in
-              let s' = Numeric.to_string n in
-              (* Here, we check that the string that was passed converts to
-                   the numeric type, and that it is in range, by converting
-                   back to a string and checking that it is equal to the one
-                   passed. This prevents the following weirdnesses in the
-                   [Unsigned.UInt*] parsers:
-                   * if the absolute value is greater than [max_int], the value
-                     returned is [max_int]
-                     - ["99999999999999999999999999999999999"] is [max_int]
-                     - ["-99999999999999999999999999999999999"] is [max_int]
-                   * if otherwise the value is negative, the value returned is
-                     [max_int - (x - 1)]
-                     - ["-1"] is [max_int]
-                   * if there is a non-numeric character part-way through the
-                     string, the numeric prefix is treated as a number
-                     - ["1_000_000"] is [1]
-                     - ["-1_000_000"] is [max_int]
-                     - ["1.1"] is [1]
-                     - ["0x15"] is [0]
-                   * leading spaces are ignored
-                     - [" 1"] is [1]
-                   This is annoying to document, none of these behaviors are
-                   useful to users, and unexpectedly triggering one of them
-                   could have nasty consequences. Thus, we raise an error
-                   rather than silently misinterpreting their input.
+              try
+                let n = Numeric.of_string s in
+                let s' = Numeric.to_string n in
+                (* Here, we check that the string that was passed converts to
+                     the numeric type, and that it is in range, by converting
+                     back to a string and checking that it is equal to the one
+                     passed. This prevents the following weirdnesses in the
+                     [Unsigned.UInt*] parsers:
+                     * if the absolute value is greater than [max_int], the value
+                       returned is [max_int]
+                   - ["99999999999999999999999999999999999"] is [max_int]
+                   - ["-99999999999999999999999999999999999"] is [max_int]
+                     * if otherwise the value is negative, the value returned is
+                       [max_int - (x - 1)]
+                   - ["-1"] is [max_int]
+                     * if there is a non-numeric character part-way through the
+                       string, the numeric prefix is treated as a number
+                   - ["1_000_000"] is [1]
+                   - ["-1_000_000"] is [max_int]
+                   - ["1.1"] is [1]
+                   - ["0x15"] is [0]
+                     * leading spaces are ignored
+                   - [" 1"] is [1]
+                     This is annoying to document, none of these behaviors are
+                     useful to users, and unexpectedly triggering one of them
+                     could have nasty consequences. Thus, we raise an error
+                     rather than silently misinterpreting their input.
                 *)
-              assert (String.equal s s') ;
-              Ok n
-            with _ -> Error (sprintf "Could not decode %s." lower_name) )
+                assert (String.equal s s') ;
+                Ok n
+              with _ -> Error (sprintf "Could not decode %s." lower_name) )
           | `Int n ->
               if n < 0 then
                 Error
-                  (sprintf "Could not convert negative number to %s."
-                     lower_name)
+                  (sprintf "Could not convert negative number to %s." lower_name)
               else Ok (Numeric.of_int n)
           | _ ->
               Error (sprintf "Invalid format for %s type." lower_name) )
 
-    let uint64_arg = make_numeric_arg ~name:"UInt64" (module Unsigned.UInt64)
+    module UInt64 = struct
+      type input = Unsigned.UInt64.t
 
-    let uint32_arg = make_numeric_arg ~name:"UInt32" (module Unsigned.UInt32)
+      let arg_typ = make_numeric_arg ~name:"UInt64" (module Unsigned.UInt64)
+    end
 
-    let signature_arg =
-      obj "SignatureInput"
-        ~coerce:(fun field scalar rawSignature ->
-          let open Snark_params.Tick in
-          match rawSignature with
-          | Some signature ->
-              Result.of_option
-                (Signature.Raw.decode signature)
-                ~error:"rawSignature decoding error"
-          | None -> (
-            match (field, scalar) with
-            | Some field, Some scalar ->
-                Ok (Field.of_string field, Inner_curve.Scalar.of_string scalar)
-            | _ ->
-                Error "Either field+scalar or rawSignature must by non-null" )
-          )
-        ~doc:
-          "A cryptographic signature -- you must provide either field+scalar \
-           or rawSignature"
-        ~fields:
-          [ arg "field" ~typ:string ~doc:"Field component of signature"
-          ; arg "scalar" ~typ:string ~doc:"Scalar component of signature"
-          ; arg "rawSignature" ~typ:string ~doc:"Raw encoded signature" ]
+    module UInt32 = struct
+      type input = Unsigned.UInt32.t
 
-    let vrf_message =
-      obj "VrfMessageInput" ~doc:"The inputs to a vrf evaluation"
-        ~coerce:(fun global_slot epoch_seed delegator_index ->
-          { Consensus_vrf.Layout.Message.global_slot
-          ; epoch_seed= Mina_base.Epoch_seed.of_base58_check_exn epoch_seed
-          ; delegator_index } )
-        ~fields:
-          [ arg "globalSlot" ~typ:(non_null uint32_arg)
-          ; arg "epochSeed" ~doc:"Formatted with base58check"
-              ~typ:(non_null string)
-          ; arg "delegatorIndex"
-              ~doc:"Position in the ledger of the delegator's account"
-              ~typ:(non_null int) ]
+      let arg_typ = make_numeric_arg ~name:"UInt32" (module Unsigned.UInt32)
+    end
 
-    let vrf_threshold =
-      obj "VrfThresholdInput"
-        ~doc:
-          "The amount of stake delegated, used to determine the threshold for \
-           a vrf evaluation producing a block"
-        ~coerce:(fun delegated_stake total_stake ->
-          { Consensus_vrf.Layout.Threshold.delegated_stake=
-              Currency.Balance.of_uint64 delegated_stake
-          ; total_stake= Currency.Amount.of_uint64 total_stake } )
-        ~fields:
-          [ arg "delegatedStake"
-              ~doc:
-                "The amount of stake delegated to the vrf evaluator by the \
-                 delegating account. This should match the amount in the \
-                 epoch's staking ledger, which may be different to the amount \
-                 in the current ledger."
-              ~typ:(non_null uint64_arg)
-          ; arg "totalStake"
-              ~doc:
-                "The total amount of stake across all accounts in the epoch's \
-                 staking ledger."
-              ~typ:(non_null uint64_arg) ]
+    module SignatureInput = struct
+      open Snark_params.Tick
 
-    let vrf_evaluation =
-      obj "VrfEvaluationInput" ~doc:"The witness to a vrf evaluation"
-        ~coerce:
-          (fun message public_key c s scaled_message_hash vrf_threshold ->
-          { Consensus_vrf.Layout.Evaluation.message
-          ; public_key= Public_key.decompress_exn public_key
-          ; c= Snark_params.Tick.Inner_curve.Scalar.of_string c
-          ; s= Snark_params.Tick.Inner_curve.Scalar.of_string s
-          ; scaled_message_hash=
-              Consensus_vrf.Group.of_string_list_exn scaled_message_hash
-          ; vrf_threshold
-          ; vrf_output= None
-          ; vrf_output_fractional= None
-          ; threshold_met= None } )
-        ~fields:
-          [ arg "message" ~typ:(non_null vrf_message)
-          ; arg "publicKey" ~typ:(non_null public_key_arg)
-          ; arg "c" ~typ:(non_null string)
-          ; arg "s" ~typ:(non_null string)
-          ; arg "scaledMessageHash" ~typ:(non_null (list (non_null string)))
-          ; arg "vrfThreshold" ~typ:vrf_threshold ]
+      type input =
+        | Raw of Signature.t
+        | Field_and_scalar of Field.t * Inner_curve.Scalar.t
+
+      let arg_typ =
+        obj "SignatureInput"
+          ~coerce:(fun field scalar rawSignature ->
+            match rawSignature with
+            | Some signature ->
+                Result.of_option
+                  (Signature.Raw.decode signature)
+                  ~error:"rawSignature decoding error"
+            | None -> (
+                match (field, scalar) with
+                | Some field, Some scalar ->
+                    Ok
+                      ( Field.of_string field
+                      , Inner_curve.Scalar.of_string scalar )
+                | _ ->
+                    Error "Either field+scalar or rawSignature must by non-null"
+                ) )
+          ~doc:
+            "A cryptographic signature -- you must provide either field+scalar \
+             or rawSignature"
+          ~fields:
+            [ arg "field" ~typ:string ~doc:"Field component of signature"
+            ; arg "scalar" ~typ:string ~doc:"Scalar component of signature"
+            ; arg "rawSignature" ~typ:string ~doc:"Raw encoded signature"
+            ]
+          ~split:(fun f (input : input) ->
+            match input with
+            | Raw (s : Signature.t) ->
+                f None None (Some (Signature.Raw.encode s))
+            | Field_and_scalar (field, scalar) ->
+                f
+                  (Some (Field.to_string field))
+                  (Some (Inner_curve.Scalar.to_string scalar))
+                  None )
+    end
+
+    module VrfMessageInput = struct
+      type input = Consensus_vrf.Layout.Message.t
+
+      let arg_typ =
+        obj "VrfMessageInput" ~doc:"The inputs to a vrf evaluation"
+          ~coerce:(fun global_slot epoch_seed delegator_index ->
+            { Consensus_vrf.Layout.Message.global_slot
+            ; epoch_seed = Mina_base.Epoch_seed.of_base58_check_exn epoch_seed
+            ; delegator_index
+            } )
+          ~fields:
+            [ arg "globalSlot" ~typ:(non_null UInt32.arg_typ)
+            ; arg "epochSeed" ~doc:"Formatted with base58check"
+                ~typ:(non_null string)
+            ; arg "delegatorIndex"
+                ~doc:"Position in the ledger of the delegator's account"
+                ~typ:(non_null int)
+            ]
+          ~split:(fun f (t : input) ->
+            f t.global_slot
+              (Mina_base.Epoch_seed.to_base58_check t.epoch_seed)
+              t.delegator_index )
+    end
+
+    module VrfThresholdInput = struct
+      type input = Consensus_vrf.Layout.Threshold.t
+
+      let arg_typ =
+        obj "VrfThresholdInput"
+          ~doc:
+            "The amount of stake delegated, used to determine the threshold \
+             for a vrf evaluation producing a block"
+          ~coerce:(fun delegated_stake total_stake ->
+            { Consensus_vrf.Layout.Threshold.delegated_stake =
+                Currency.Balance.of_uint64 delegated_stake
+            ; total_stake = Currency.Amount.of_uint64 total_stake
+            } )
+          ~fields:
+            [ arg "delegatedStake"
+                ~doc:
+                  "The amount of stake delegated to the vrf evaluator by the \
+                   delegating account. This should match the amount in the \
+                   epoch's staking ledger, which may be different to the \
+                   amount in the current ledger."
+                ~typ:(non_null UInt64.arg_typ)
+            ; arg "totalStake"
+                ~doc:
+                  "The total amount of stake across all accounts in the \
+                   epoch's staking ledger."
+                ~typ:(non_null UInt64.arg_typ)
+            ]
+          ~split:(fun f (t : input) ->
+            f
+              (Currency.Balance.to_uint64 t.delegated_stake)
+              (Currency.Amount.to_uint64 t.total_stake) )
+    end
+
+    module VrfEvaluationInput = struct
+      type input = Consensus_vrf.Layout.Evaluation.t
+
+      let arg_typ =
+        obj "VrfEvaluationInput" ~doc:"The witness to a vrf evaluation"
+          ~coerce:(fun message public_key c s scaled_message_hash vrf_threshold ->
+            { Consensus_vrf.Layout.Evaluation.message
+            ; public_key = Public_key.decompress_exn public_key
+            ; c = Snark_params.Tick.Inner_curve.Scalar.of_string c
+            ; s = Snark_params.Tick.Inner_curve.Scalar.of_string s
+            ; scaled_message_hash =
+                Consensus_vrf.Group.of_string_list_exn scaled_message_hash
+            ; vrf_threshold
+            ; vrf_output = None
+            ; vrf_output_fractional = None
+            ; threshold_met = None
+            } )
+          ~split:(fun f (x : input) ->
+            f x.message
+              (Public_key.compress x.public_key)
+              (Snark_params.Tick.Inner_curve.Scalar.to_string x.c)
+              (Snark_params.Tick.Inner_curve.Scalar.to_string x.s)
+              (Consensus_vrf.Group.to_string_list_exn x.scaled_message_hash)
+              x.vrf_threshold )
+          ~fields:
+            [ arg "message" ~typ:(non_null VrfMessageInput.arg_typ)
+            ; arg "publicKey" ~typ:(non_null PublicKey.arg_typ)
+            ; arg "c" ~typ:(non_null string)
+            ; arg "s" ~typ:(non_null string)
+            ; arg "scaledMessageHash" ~typ:(non_null (list (non_null string)))
+            ; arg "vrfThreshold" ~typ:VrfThresholdInput.arg_typ
+            ]
+    end
 
     module Fields = struct
-      let from ~doc = arg "from" ~typ:(non_null public_key_arg) ~doc
+      let from ~doc = arg "from" ~typ:(non_null PublicKey.arg_typ) ~doc
 
-      let to_ ~doc = arg "to" ~typ:(non_null public_key_arg) ~doc
+      let to_ ~doc = arg "to" ~typ:(non_null PublicKey.arg_typ) ~doc
 
-      let token ~doc = arg "token" ~typ:(non_null token_id_arg) ~doc
+      let token ~doc = arg "token" ~typ:(non_null TokenId.arg_typ) ~doc
 
-      let token_opt ~doc = arg "token" ~typ:token_id_arg ~doc
+      let token_opt ~doc = arg "token" ~typ:TokenId.arg_typ ~doc
 
       let token_owner ~doc =
-        arg "tokenOwner" ~typ:(non_null public_key_arg) ~doc
+        arg "tokenOwner" ~typ:(non_null PublicKey.arg_typ) ~doc
 
-      let receiver ~doc = arg "receiver" ~typ:(non_null public_key_arg) ~doc
+      let receiver ~doc = arg "receiver" ~typ:(non_null PublicKey.arg_typ) ~doc
 
-      let receiver_opt ~doc = arg "receiver" ~typ:public_key_arg ~doc
+      let receiver_opt ~doc = arg "receiver" ~typ:PublicKey.arg_typ ~doc
 
-      let fee_payer_opt ~doc = arg "feePayer" ~typ:public_key_arg ~doc
+      let fee_payer_opt ~doc = arg "feePayer" ~typ:PublicKey.arg_typ ~doc
 
-      let fee ~doc = arg "fee" ~typ:(non_null uint64_arg) ~doc
+      let fee ~doc = arg "fee" ~typ:(non_null UInt64.arg_typ) ~doc
+
+      let amount ~doc = arg "amount" ~typ:(non_null UInt64.arg_typ) ~doc
 
       let memo =
         arg "memo" ~typ:string
           ~doc:"Short arbitrary message provided by the sender"
 
       let valid_until =
-        arg "validUntil" ~typ:uint32_arg
+        arg "validUntil" ~typ:UInt32.arg_typ
           ~doc:
             "The global slot number after which this transaction cannot be \
              applied"
 
       let nonce =
-        arg "nonce" ~typ:uint32_arg
+        arg "nonce" ~typ:UInt32.arg_typ
           ~doc:
             "Should only be set when cancelling transactions, otherwise a \
              nonce is determined automatically"
 
       let signature =
-        arg "signature" ~typ:signature_arg
+        arg "signature" ~typ:SignatureInput.arg_typ
           ~doc:
-            "If a signature is provided, this transaction is considered \
-             signed and will be broadcasted to the network without requiring \
-             a private key"
+            "If a signature is provided, this transaction is considered signed \
+             and will be broadcasted to the network without requiring a \
+             private key"
+
+      let senders =
+        arg "senders"
+          ~typ:(non_null (list (non_null PrivateKey.arg_typ)))
+          ~doc:"The private keys from which to sign the payments"
+
+      let repeat_count =
+        arg "repeat_count" ~typ:(non_null UInt32.arg_typ)
+          ~doc:"How many times shall transaction be repeated"
+
+      let repeat_delay_ms =
+        arg "repeat_delay_ms" ~typ:(non_null UInt32.arg_typ)
+          ~doc:"Delay with which a transaction shall be repeated"
     end
 
-    let send_payment =
-      let open Fields in
-      obj "SendPaymentInput"
-        ~coerce:(fun from to_ token amount fee valid_until memo nonce ->
-          (from, to_, token, amount, fee, valid_until, memo, nonce) )
-        ~fields:
-          [ from ~doc:"Public key of sender of payment"
-          ; to_ ~doc:"Public key of recipient of payment"
-          ; token_opt ~doc:"Token to send"
-          ; arg "amount" ~doc:"Amount of mina to send to receiver"
-              ~typ:(non_null uint64_arg)
-          ; fee ~doc:"Fee amount in order to send payment"
-          ; valid_until
-          ; memo
-          ; nonce ]
+    module SendPaymentInput = struct
+      type input =
+        { from : (Epoch_seed.t, bool) Public_key.Compressed.Poly.t
+        ; to_ : Account.key
+        ; amount : Currency.Amount.t
+        ; token : Token_id.t option
+        ; fee : Currency.Fee.t
+        ; valid_until : Unsigned.uint32 option
+        ; memo : string option
+        ; nonce : Unsigned.uint32 option
+        }
+      [@@deriving make]
 
-    let send_delegation =
-      let open Fields in
-      obj "SendDelegationInput"
-        ~coerce:(fun from to_ fee valid_until memo nonce ->
-          (from, to_, fee, valid_until, memo, nonce) )
-        ~fields:
-          [ from ~doc:"Public key of sender of a stake delegation"
-          ; to_ ~doc:"Public key of the account being delegated to"
-          ; fee ~doc:"Fee amount in order to send a stake delegation"
-          ; valid_until
-          ; memo
-          ; nonce ]
+      let arg_typ =
+        let open Fields in
+        obj "SendPaymentInput"
+          ~coerce:(fun from to_ token amount fee valid_until memo nonce ->
+            (from, to_, token, amount, fee, valid_until, memo, nonce) )
+          ~split:(fun f (x : input) ->
+            f x.from x.to_ x.token
+              (Currency.Amount.to_uint64 x.amount)
+              (Currency.Fee.to_uint64 x.fee)
+              x.valid_until x.memo x.nonce )
+          ~fields:
+            [ from ~doc:"Public key of sender of payment"
+            ; to_ ~doc:"Public key of recipient of payment"
+            ; token_opt ~doc:"Token to send"
+            ; amount ~doc:"Amount of mina to send to receiver"
+            ; fee ~doc:"Fee amount in order to send payment"
+            ; valid_until
+            ; memo
+            ; nonce
+            ]
+    end
 
-    let create_token =
-      let open Fields in
-      obj "SendCreateTokenInput"
-        ~coerce:(fun fee_payer token_owner fee valid_until memo nonce ->
-          (fee_payer, token_owner, fee, valid_until, memo, nonce) )
-        ~fields:
-          [ fee_payer_opt
-              ~doc:
-                "Public key to pay the fee from (defaults to the tokenOwner)"
-          ; token_owner ~doc:"Public key to create the token for"
-          ; fee ~doc:"Fee amount in order to create a token"
-          ; valid_until
-          ; memo
-          ; nonce ]
+    module SendDelegationInput = struct
+      type input =
+        { from : PublicKey.input
+        ; to_ : PublicKey.input
+        ; fee : Currency.Fee.t
+        ; valid_until : UInt32.input option
+        ; memo : string option
+        ; nonce : UInt32.input option
+        }
+      [@@deriving make]
 
-    let create_token_account =
-      let open Fields in
-      obj "SendCreateTokenAccountInput"
-        ~coerce:
-          (fun token_owner token receiver fee fee_payer valid_until memo nonce ->
-          ( token_owner
-          , token
-          , receiver
-          , fee
-          , fee_payer
-          , valid_until
-          , memo
-          , nonce ) )
-        ~fields:
-          [ token_owner ~doc:"Public key of the token's owner"
-          ; token ~doc:"Token to create an account for"
-          ; receiver ~doc:"Public key to create the account for"
-          ; fee ~doc:"Fee amount in order to create a token account"
-          ; fee_payer_opt
-              ~doc:
-                "Public key to pay the fees from and sign the transaction \
-                 with (defaults to the receiver)"
-          ; valid_until
-          ; memo
-          ; nonce ]
+      let arg_typ =
+        let open Fields in
+        obj "SendDelegationInput"
+          ~coerce:(fun from to_ fee valid_until memo nonce ->
+            (from, to_, fee, valid_until, memo, nonce) )
+          ~split:(fun f (x : input) ->
+            f x.from x.to_
+              (Currency.Fee.to_uint64 x.fee)
+              x.valid_until x.memo x.nonce )
+          ~fields:
+            [ from ~doc:"Public key of sender of a stake delegation"
+            ; to_ ~doc:"Public key of the account being delegated to"
+            ; fee ~doc:"Fee amount in order to send a stake delegation"
+            ; valid_until
+            ; memo
+            ; nonce
+            ]
+    end
 
-    let mint_tokens =
-      let open Fields in
-      obj "SendMintTokensInput"
-        ~coerce:
-          (fun token_owner token receiver amount fee valid_until memo nonce ->
-          (token_owner, token, receiver, amount, fee, valid_until, memo, nonce)
-          )
-        ~fields:
-          [ token_owner ~doc:"Public key of the token's owner"
-          ; token ~doc:"Token to mint more of"
-          ; receiver_opt
-              ~doc:
-                "Public key to mint the new tokens for (defaults to token \
-                 owner's account)"
-          ; arg "amount"
-              ~doc:"Amount of token to create in the receiver's account"
-              ~typ:(non_null uint64_arg)
-          ; fee ~doc:"Fee amount in order to mint tokens"
-          ; valid_until
-          ; memo
-          ; nonce ]
+    module SendCreateTokenInput = struct
+      type input =
+        { fee_payer : PublicKey.input option
+        ; token_owner : PublicKey.input
+        ; fee : UInt64.input
+        ; valid_until : UInt32.input option
+        ; memo : string option
+        ; nonce : UInt32.input option
+        }
+      [@@deriving make]
 
-    let rosetta_transaction =
-      Schema.Arg.scalar "RosettaTransaction"
-        ~doc:"A transaction encoded in the rosetta format"
-        ~coerce:(fun graphql_json ->
-          Rosetta_lib.Transaction.to_mina_signed (to_yojson graphql_json)
-          |> Result.map_error ~f:Error.to_string_hum )
+      let arg_typ =
+        let open Fields in
+        obj "SendCreateTokenInput"
+          ~coerce:(fun fee_payer token_owner fee valid_until memo nonce ->
+            (fee_payer, token_owner, fee, valid_until, memo, nonce) )
+          ~split:(fun f (x : input) ->
+            f x.fee_payer x.token_owner x.fee x.valid_until x.memo x.nonce )
+          ~fields:
+            [ fee_payer_opt
+                ~doc:
+                  "Public key to pay the fee from (defaults to the tokenOwner)"
+            ; token_owner ~doc:"Public key to create the token for"
+            ; fee ~doc:"Fee amount in order to create a token"
+            ; valid_until
+            ; memo
+            ; nonce
+            ]
+    end
 
-    let create_account =
-      obj "AddAccountInput" ~coerce:Fn.id
-        ~fields:
-          [ arg "password" ~doc:"Password used to encrypt the new account"
-              ~typ:(non_null string) ]
+    module SendCreateTokenAccountInput = struct
+      type input =
+        { token_owner : PublicKey.input
+        ; token : TokenId.input
+        ; receiver : PublicKey.input
+        ; fee : UInt64.input
+        ; fee_payer : PublicKey.input option
+        ; valid_until : UInt32.input option
+        ; memo : string option
+        ; nonce : UInt32.input option
+        }
+      [@@deriving make]
 
-    let unlock_account =
-      obj "UnlockInput"
-        ~coerce:(fun password pk -> (password, pk))
-        ~fields:
-          [ arg "password" ~doc:"Password for the account to be unlocked"
-              ~typ:(non_null string)
-          ; arg "publicKey"
-              ~doc:"Public key specifying which account to unlock"
-              ~typ:(non_null public_key_arg) ]
+      let arg_typ =
+        let open Fields in
+        obj "SendCreateTokenAccountInput"
+          ~coerce:(fun token_owner token receiver fee fee_payer valid_until memo
+                       nonce ->
+            ( token_owner
+            , token
+            , receiver
+            , fee
+            , fee_payer
+            , valid_until
+            , memo
+            , nonce ) )
+          ~split:(fun f (x : input) ->
+            f x.token_owner x.token x.receiver x.fee x.fee_payer x.valid_until
+              x.memo x.nonce )
+          ~fields:
+            [ token_owner ~doc:"Public key of the token's owner"
+            ; token ~doc:"Token to create an account for"
+            ; receiver ~doc:"Public key to create the account for"
+            ; fee ~doc:"Fee amount in order to create a token account"
+            ; fee_payer_opt
+                ~doc:
+                  "Public key to pay the fees from and sign the transaction \
+                   with (defaults to the receiver)"
+            ; valid_until
+            ; memo
+            ; nonce
+            ]
+    end
 
-    let create_hd_account =
-      obj "CreateHDAccountInput" ~coerce:Fn.id
-        ~fields:
-          [ arg "index" ~doc:"Index of the account in hardware wallet"
-              ~typ:(non_null uint32_arg) ]
+    module SendMintTokensInput = struct
+      type input =
+        { token_owner : PublicKey.input
+        ; token : TokenId.input
+        ; receiver : PublicKey.input option
+        ; amount : UInt64.input
+        ; fee : UInt64.input
+        ; valid_until : UInt32.input option
+        ; memo : string option
+        ; nonce : UInt32.input option
+        }
+      [@@deriving make]
 
-    let lock_account =
-      obj "LockInput" ~coerce:Fn.id
-        ~fields:
-          [ arg "publicKey" ~doc:"Public key specifying which account to lock"
-              ~typ:(non_null public_key_arg) ]
+      let arg_typ =
+        let open Fields in
+        obj "SendMintTokensInput"
+          ~coerce:(fun token_owner token receiver amount fee valid_until memo
+                       nonce ->
+            (token_owner, token, receiver, amount, fee, valid_until, memo, nonce)
+            )
+          ~split:(fun f (x : input) ->
+            f x.token_owner x.token x.receiver x.amount x.fee x.valid_until
+              x.memo x.nonce )
+          ~fields:
+            [ token_owner ~doc:"Public key of the token's owner"
+            ; token ~doc:"Token to mint more of"
+            ; receiver_opt
+                ~doc:
+                  "Public key to mint the new tokens for (defaults to token \
+                   owner's account)"
+            ; arg "amount"
+                ~doc:"Amount of token to create in the receiver's account"
+                ~typ:(non_null UInt64.arg_typ)
+            ; fee ~doc:"Fee amount in order to mint tokens"
+            ; valid_until
+            ; memo
+            ; nonce
+            ]
+    end
 
-    let delete_account =
-      obj "DeleteAccountInput" ~coerce:Fn.id
-        ~fields:
-          [ arg "publicKey" ~doc:"Public key of account to be deleted"
-              ~typ:(non_null public_key_arg) ]
+    module RosettaTransaction = struct
+      type input = Yojson.Basic.t
 
-    let reset_trust_status =
-      obj "ResetTrustStatusInput" ~coerce:Fn.id
-        ~fields:[arg "ipAddress" ~typ:(non_null string)]
+      let arg_typ =
+        Schema.Arg.scalar "RosettaTransaction"
+          ~doc:"A transaction encoded in the rosetta format"
+          ~coerce:(fun graphql_json ->
+            Rosetta_lib.Transaction.to_mina_signed (to_yojson graphql_json)
+            |> Result.map_error ~f:Error.to_string_hum )
+          ~to_json:Fn.id
+    end
 
-    (* TODO: Treat cases where filter_input has a null argument *)
-    let block_filter_input =
-      obj "BlockFilterInput" ~coerce:Fn.id
-        ~fields:
-          [ arg "relatedTo"
-              ~doc:
-                "A public key of a user who has their\n\
-                \        transaction in the block, or produced the block"
-              ~typ:(non_null public_key_arg) ]
+    module AddAccountInput = struct
+      type input = string
 
-    let user_command_filter_input =
-      obj "UserCommandFilterType" ~coerce:Fn.id
-        ~fields:
-          [ arg "toOrFrom"
-              ~doc:
-                "Public key of sender or receiver of transactions you are \
-                 looking for"
-              ~typ:(non_null public_key_arg) ]
+      let arg_typ =
+        obj "AddAccountInput" ~coerce:Fn.id
+          ~fields:
+            [ arg "password" ~doc:"Password used to encrypt the new account"
+                ~typ:(non_null string)
+            ]
+          ~split:Fn.id
+    end
 
-    let set_staking =
-      obj "SetStakingInput" ~coerce:Fn.id
-        ~fields:
-          [ arg "publicKeys"
-              ~typ:(non_null (list (non_null public_key_arg)))
-              ~doc:
-                "Public keys of accounts you wish to stake with - these must \
-                 be accounts that are in trackedAccounts" ]
+    module UnlockInput = struct
+      type input = Bytes.t * PublicKey.input
 
-    let set_coinbase_receiver =
-      obj "SetCoinbaseReceiverInput" ~coerce:Fn.id
-        ~fields:
-          [ arg "publicKey" ~typ:public_key_arg
-              ~doc:
-                "Public key of the account to receive coinbases. Block \
-                 production keys will receive the coinbases if none is given"
-          ]
+      let arg_typ =
+        obj "UnlockInput"
+          ~coerce:(fun password pk -> (password, pk))
+          ~fields:
+            [ arg "password" ~doc:"Password for the account to be unlocked"
+                ~typ:(non_null string)
+            ; arg "publicKey"
+                ~doc:"Public key specifying which account to unlock"
+                ~typ:(non_null PublicKey.arg_typ)
+            ]
+          ~split:(fun f ((password, pk) : input) ->
+            f (Bytes.to_string password) pk )
+    end
 
-    let set_snark_work_fee =
-      obj "SetSnarkWorkFee"
-        ~fields:[Fields.fee ~doc:"Fee to get rewarded for producing snark work"]
-        ~coerce:Fn.id
+    module CreateHDAccountInput = struct
+      type input = UInt32.input
 
-    let set_snark_worker =
-      obj "SetSnarkWorkerInput" ~coerce:Fn.id
-        ~fields:
-          [ arg "publicKey" ~typ:public_key_arg
-              ~doc:
-                "Public key you wish to start snark-working on; null to stop \
-                 doing any snark work" ]
+      let arg_typ =
+        obj "CreateHDAccountInput" ~coerce:Fn.id
+          ~fields:
+            [ arg "index" ~doc:"Index of the account in hardware wallet"
+                ~typ:(non_null UInt32.arg_typ)
+            ]
+          ~split:Fn.id
+    end
 
-    module AddPaymentReceipt = struct
-      type t = {payment: string; added_time: string}
+    module LockInput = struct
+      type input = PublicKey.input
 
-      let typ =
+      let arg_typ =
+        obj "LockInput" ~coerce:Fn.id
+          ~fields:
+            [ arg "publicKey" ~doc:"Public key specifying which account to lock"
+                ~typ:(non_null PublicKey.arg_typ)
+            ]
+          ~split:Fn.id
+    end
+
+    module DeleteAccountInput = struct
+      type input = PublicKey.input
+
+      let arg_typ =
+        obj "DeleteAccountInput" ~coerce:Fn.id
+          ~fields:
+            [ arg "publicKey" ~doc:"Public key of account to be deleted"
+                ~typ:(non_null PublicKey.arg_typ)
+            ]
+          ~split:Fn.id
+    end
+
+    module ResetTrustStatusInput = struct
+      type input = string
+
+      let arg_typ =
+        obj "ResetTrustStatusInput" ~coerce:Fn.id
+          ~fields:[ arg "ipAddress" ~typ:(non_null string) ]
+          ~split:Fn.id
+    end
+
+    module BlockFilterInput = struct
+      type input = PublicKey.input
+
+      (* TODO: Treat cases where filter_input has a null argument *)
+      let arg_typ =
+        obj "BlockFilterInput" ~coerce:Fn.id ~split:Fn.id
+          ~fields:
+            [ arg "relatedTo"
+                ~doc:
+                  "A public key of a user who has their\n\
+                  \        transaction in the block, or produced the block"
+                ~typ:(non_null PublicKey.arg_typ)
+            ]
+    end
+
+    module UserCommandFilterType = struct
+      type input = PublicKey.input
+
+      let arg_typ =
+        obj "UserCommandFilterType" ~coerce:Fn.id ~split:Fn.id
+          ~fields:
+            [ arg "toOrFrom"
+                ~doc:
+                  "Public key of sender or receiver of transactions you are \
+                   looking for"
+                ~typ:(non_null PublicKey.arg_typ)
+            ]
+    end
+
+    module SetCoinbaseReceiverInput = struct
+      type input = PublicKey.input option
+
+      let arg_typ =
+        obj "SetCoinbaseReceiverInput" ~coerce:Fn.id ~split:Fn.id
+          ~fields:
+            [ arg "publicKey" ~typ:PublicKey.arg_typ
+                ~doc:
+                  "Public key of the account to receive coinbases. Block \
+                   production keys will receive the coinbases if none is given"
+            ]
+    end
+
+    module SetSnarkWorkFee = struct
+      type input = UInt64.input
+
+      let arg_typ =
+        obj "SetSnarkWorkFee"
+          ~fields:
+            [ Fields.fee ~doc:"Fee to get rewarded for producing snark work" ]
+          ~coerce:Fn.id ~split:Fn.id
+    end
+
+    module SetSnarkWorkerInput = struct
+      type input = PublicKey.input option
+
+      let arg_typ =
+        obj "SetSnarkWorkerInput" ~coerce:Fn.id ~split:Fn.id
+          ~fields:
+            [ arg "publicKey" ~typ:PublicKey.arg_typ
+                ~doc:
+                  "Public key you wish to start snark-working on; null to stop \
+                   doing any snark work"
+            ]
+    end
+
+    module AddPaymentReceiptInput = struct
+      type input = { payment : string; added_time : string }
+
+      let arg_typ =
         obj "AddPaymentReceiptInput"
-          ~coerce:(fun payment added_time -> {payment; added_time})
+          ~coerce:(fun payment added_time -> { payment; added_time })
+          ~split:(fun f (t : input) -> f t.payment t.added_time)
           ~fields:
             [ arg "payment"
                 ~doc:(Doc.bin_prot "Serialized payment")
@@ -2303,30 +2630,38 @@ module Types = struct
                 ~doc:
                   (Doc.date
                      "Time that a payment gets added to another clients \
-                      transaction database") ]
+                      transaction database" )
+            ]
     end
 
-    let set_connection_gating_config =
-      obj "SetConnectionGatingConfigInput"
-        ~coerce:(fun trusted_peers banned_peers isolate ->
-          let open Result.Let_syntax in
-          let%bind trusted_peers = Result.all trusted_peers in
-          let%map banned_peers = Result.all banned_peers in
-          Mina_net2.{isolate; trusted_peers; banned_peers} )
-        ~fields:
-          Arg.
-            [ arg "trustedPeers"
-                ~typ:(non_null (list (non_null peer)))
-                ~doc:"Peers we will always allow connections from"
-            ; arg "bannedPeers"
-                ~typ:(non_null (list (non_null peer)))
-                ~doc:
-                  "Peers we will never allow connections from (unless they \
-                   are also trusted!)"
-            ; arg "isolate" ~typ:(non_null bool)
-                ~doc:
-                  "If true, no connections will be allowed unless they are \
-                   from a trusted peer" ]
+    module SetConnectionGatingConfigInput = struct
+      type input = Mina_net2.connection_gating
+
+      let arg_typ =
+        obj "SetConnectionGatingConfigInput"
+          ~coerce:(fun trusted_peers banned_peers isolate ->
+            let open Result.Let_syntax in
+            let%bind trusted_peers = Result.all trusted_peers in
+            let%map banned_peers = Result.all banned_peers in
+            Mina_net2.{ isolate; trusted_peers; banned_peers } )
+          ~split:(fun f (t : input) ->
+            f t.trusted_peers t.banned_peers t.isolate )
+          ~fields:
+            Arg.
+              [ arg "trustedPeers"
+                  ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
+                  ~doc:"Peers we will always allow connections from"
+              ; arg "bannedPeers"
+                  ~typ:(non_null (list (non_null NetworkPeer.arg_typ)))
+                  ~doc:
+                    "Peers we will never allow connections from (unless they \
+                     are also trusted!)"
+              ; arg "isolate" ~typ:(non_null bool)
+                  ~doc:
+                    "If true, no connections will be allowed unless they are \
+                     from a trusted peer"
+              ]
+    end
   end
 
   let vrf_message : ('context, Consensus_vrf.Layout.Message.t option) typ =
@@ -2334,15 +2669,16 @@ module Types = struct
     obj "VrfMessage" ~doc:"The inputs to a vrf evaluation" ~fields:(fun _ ->
         [ field "globalSlot" ~typ:(non_null uint32)
             ~args:Arg.[]
-            ~resolve:(fun _ {global_slot; _} -> global_slot)
+            ~resolve:(fun _ { global_slot; _ } -> global_slot)
         ; field "epochSeed" ~typ:(non_null epoch_seed)
             ~args:Arg.[]
-            ~resolve:(fun _ {epoch_seed; _} -> epoch_seed)
+            ~resolve:(fun _ { epoch_seed; _ } -> epoch_seed)
         ; field "delegatorIndex"
             ~doc:"Position in the ledger of the delegator's account"
             ~typ:(non_null int)
             ~args:Arg.[]
-            ~resolve:(fun _ {delegator_index; _} -> delegator_index) ] )
+            ~resolve:(fun _ { delegator_index; _ } -> delegator_index)
+        ] )
 
   let vrf_threshold =
     obj "VrfThreshold"
@@ -2352,20 +2688,20 @@ module Types = struct
         [ field "delegatedStake"
             ~doc:
               "The amount of stake delegated to the vrf evaluator by the \
-               delegating account. This should match the amount in the \
-               epoch's staking ledger, which may be different to the amount \
-               in the current ledger."
-            ~args:[] ~typ:(non_null uint64)
-            ~resolve:(fun _
-                     {Consensus_vrf.Layout.Threshold.delegated_stake; _}
+               delegating account. This should match the amount in the epoch's \
+               staking ledger, which may be different to the amount in the \
+               current ledger." ~args:[] ~typ:(non_null uint64)
+            ~resolve:(fun
+                       _
+                       { Consensus_vrf.Layout.Threshold.delegated_stake; _ }
                      -> Currency.Balance.to_uint64 delegated_stake )
         ; field "totalStake"
             ~doc:
               "The total amount of stake across all accounts in the epoch's \
-               staking ledger."
-            ~args:[] ~typ:(non_null uint64)
-            ~resolve:(fun _ {Consensus_vrf.Layout.Threshold.total_stake; _} ->
-              Currency.Amount.to_uint64 total_stake ) ] )
+               staking ledger." ~args:[] ~typ:(non_null uint64)
+            ~resolve:(fun _ { Consensus_vrf.Layout.Threshold.total_stake; _ } ->
+              Currency.Amount.to_uint64 total_stake )
+        ] )
 
   let vrf_evaluation : ('context, Consensus_vrf.Layout.Evaluation.t option) typ
       =
@@ -2375,31 +2711,31 @@ module Types = struct
       ~fields:(fun _ ->
         [ field "message" ~typ:(non_null vrf_message)
             ~args:Arg.[]
-            ~resolve:(fun _ {message; _} -> message)
+            ~resolve:(fun _ { message; _ } -> message)
         ; field "publicKey" ~typ:(non_null public_key)
             ~args:Arg.[]
-            ~resolve:(fun _ {public_key; _} -> Public_key.compress public_key)
+            ~resolve:(fun _ { public_key; _ } -> Public_key.compress public_key)
         ; field "c" ~typ:(non_null string)
             ~args:Arg.[]
-            ~resolve:(fun _ {c; _} -> Consensus_vrf.Scalar.to_string c)
+            ~resolve:(fun _ { c; _ } -> Consensus_vrf.Scalar.to_string c)
         ; field "s" ~typ:(non_null string)
             ~args:Arg.[]
-            ~resolve:(fun _ {s; _} -> Consensus_vrf.Scalar.to_string s)
+            ~resolve:(fun _ { s; _ } -> Consensus_vrf.Scalar.to_string s)
         ; field "scaledMessageHash"
             ~typ:(non_null (list (non_null string)))
             ~doc:"A group element represented as 2 field elements"
             ~args:Arg.[]
-            ~resolve:(fun _ {scaled_message_hash; _} ->
+            ~resolve:(fun _ { scaled_message_hash; _ } ->
               Consensus_vrf.Group.to_string_list_exn scaled_message_hash )
         ; field "vrfThreshold" ~typ:vrf_threshold
             ~args:Arg.[]
-            ~resolve:(fun _ {vrf_threshold; _} -> vrf_threshold)
+            ~resolve:(fun _ { vrf_threshold; _ } -> vrf_threshold)
         ; field "vrfOutput" ~typ:string
             ~doc:
               "The vrf output derived from the evaluation witness. If null, \
                the vrf witness was invalid."
             ~args:Arg.[]
-            ~resolve:(fun {ctx= mina; _} t ->
+            ~resolve:(fun { ctx = mina; _ } t ->
               let vrf_opt =
                 match t.vrf_output with
                 | Some vrf ->
@@ -2421,7 +2757,7 @@ module Types = struct
                (1 - (1 / 4)^(delegated_balance / total_stake)). If null, the \
                vrf witness was invalid."
             ~args:Arg.[]
-            ~resolve:(fun {ctx= mina; _} t ->
+            ~resolve:(fun { ctx = mina; _ } t ->
               match t.vrf_output_fractional with
               | Some f ->
                   Some f
@@ -2449,19 +2785,34 @@ module Types = struct
             ~args:
               Arg.
                 [ arg "input" ~doc:"Override for delegation threshold"
-                    ~typ:Input.vrf_threshold ]
-            ~resolve:(fun {ctx= mina; _} t input ->
+                    ~typ:Input.VrfThresholdInput.arg_typ
+                ]
+            ~resolve:(fun { ctx = mina; _ } t input ->
               match input with
-              | Some {delegated_stake; total_stake} ->
+              | Some { delegated_stake; total_stake } ->
                   let constraint_constants =
                     (Mina_lib.config mina).precomputed_values
                       .constraint_constants
                   in
                   (Consensus_vrf.Layout.Evaluation.compute_vrf
-                     ~constraint_constants t ~delegated_stake ~total_stake)
+                     ~constraint_constants t ~delegated_stake ~total_stake )
                     .threshold_met
               | None ->
-                  t.threshold_met ) ] )
+                  t.threshold_met )
+        ] )
+
+  let get_filtered_log_entries =
+    obj "GetFilteredLogEntries" ~fields:(fun _ ->
+        [ field "logMessages"
+            ~typ:(non_null (list (non_null string)))
+            ~doc:"Structured log messages since the given offset"
+            ~args:Arg.[]
+            ~resolve:(fun _ (logs, _) -> logs)
+        ; field "isCapturing" ~typ:(non_null bool)
+            ~doc:"Whether we are capturing structured log messages"
+            ~args:Arg.[]
+            ~resolve:(fun _ (_, is_started) -> is_started)
+        ] )
 end
 
 module Subscriptions = struct
@@ -2473,7 +2824,7 @@ module Subscriptions = struct
       ~deprecated:NotDeprecated
       ~typ:(non_null Types.sync_status)
       ~args:Arg.[]
-      ~resolve:(fun {ctx= coda; _} ->
+      ~resolve:(fun { ctx = coda; _ } ->
         Mina_lib.sync_status coda |> Mina_incremental.Status.to_pipe
         |> Deferred.Result.return )
 
@@ -2488,8 +2839,9 @@ module Subscriptions = struct
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key that is included in the block"
-              ~typ:Types.Input.public_key_arg ]
-      ~resolve:(fun {ctx= coda; _} public_key ->
+              ~typ:Types.Input.PublicKey.arg_typ
+          ]
+      ~resolve:(fun { ctx = coda; _ } public_key ->
         Deferred.Result.return
         @@ Mina_commands.Subscriptions.new_block coda public_key )
 
@@ -2500,21 +2852,19 @@ module Subscriptions = struct
          trivial extension of the existing one"
       ~typ:(non_null Types.chain_reorganization_status)
       ~args:Arg.[]
-      ~resolve:(fun {ctx= coda; _} ->
+      ~resolve:(fun { ctx = coda; _ } ->
         Deferred.Result.return
         @@ Mina_commands.Subscriptions.reorganization coda )
 
-  let commands = [new_sync_update; new_block; chain_reorganization]
+  let commands = [ new_sync_update; new_block; chain_reorganization ]
 end
 
 module Mutations = struct
   open Schema
 
-  let create_account_resolver {ctx= t; _} () password =
+  let create_account_resolver { ctx = t; _ } () password =
     let password = lazy (return (Bytes.of_string password)) in
-    let%map pk =
-      Mina_lib.wallets t |> Secrets.Wallets.generate_new ~password
-    in
+    let%map pk = Mina_lib.wallets t |> Secrets.Wallets.generate_new ~password in
     Mina_lib.subscriptions t |> Mina_lib.Subscriptions.add_new_subscription ~pk ;
     Result.return pk
 
@@ -2525,27 +2875,42 @@ module Mutations = struct
          daemon"
       ~deprecated:(Deprecated (Some "use createAccount instead"))
       ~typ:(non_null Types.Payload.create_account)
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_account)]
+      ~args:
+        Arg.[ arg "input" ~typ:(non_null Types.Input.AddAccountInput.arg_typ) ]
       ~resolve:create_account_resolver
+
+  let start_filtered_log =
+    field "startFilteredLog"
+      ~doc:
+        "TESTING ONLY: Start filtering and recording all structured events in \
+         memory"
+      ~typ:(non_null bool)
+      ~args:Arg.[ arg "filter" ~typ:(non_null (list (non_null string))) ]
+      ~resolve:(fun { ctx = t; _ } () filter ->
+        Result.is_ok @@ Mina_lib.start_filtered_log t filter )
 
   let create_account =
     io_field "createAccount"
       ~doc:
-        "Create a new account - this will create a new keypair and store it \
-         in the daemon"
+        "Create a new account - this will create a new keypair and store it in \
+         the daemon"
       ~typ:(non_null Types.Payload.create_account)
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_account)]
+      ~args:
+        Arg.[ arg "input" ~typ:(non_null Types.Input.AddAccountInput.arg_typ) ]
       ~resolve:create_account_resolver
 
-  let create_hd_account : (Mina_lib.t, unit) field =
+  let create_hd_account =
     io_field "createHDAccount"
       ~doc:Secrets.Hardware_wallets.create_hd_account_summary
       ~typ:(non_null Types.Payload.create_account)
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_hd_account)]
-      ~resolve:(fun {ctx= coda; _} () hd_index ->
+      ~args:
+        Arg.
+          [ arg "input" ~typ:(non_null Types.Input.CreateHDAccountInput.arg_typ)
+          ]
+      ~resolve:(fun { ctx = coda; _ } () hd_index ->
         Mina_lib.wallets coda |> Secrets.Wallets.create_hd_account ~hd_index )
 
-  let unlock_account_resolver {ctx= t; _} () (password, pk) =
+  let unlock_account_resolver { ctx = t; _ } () (password, pk) =
     let password = lazy (return (Bytes.of_string password)) in
     match%map
       Mina_lib.wallets t |> Secrets.Wallets.unlock ~needle:pk ~password
@@ -2554,6 +2919,10 @@ module Mutations = struct
         Error "Could not find owned account associated with provided key"
     | Error `Bad_password ->
         Error "Wrong password provided"
+    | Error (`Key_read_error e) ->
+        Error
+          (sprintf "Error reading the secret key file: %s"
+             (Secrets.Privkey_error.to_string e) )
     | Ok () ->
         Ok pk
 
@@ -2562,17 +2931,17 @@ module Mutations = struct
       ~doc:"Allow transactions to be sent from the unlocked account"
       ~deprecated:(Deprecated (Some "use unlockAccount instead"))
       ~typ:(non_null Types.Payload.unlock_account)
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.unlock_account)]
+      ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.UnlockInput.arg_typ) ]
       ~resolve:unlock_account_resolver
 
   let unlock_account =
     io_field "unlockAccount"
       ~doc:"Allow transactions to be sent from the unlocked account"
       ~typ:(non_null Types.Payload.unlock_account)
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.unlock_account)]
+      ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.UnlockInput.arg_typ) ]
       ~resolve:unlock_account_resolver
 
-  let lock_account_resolver {ctx= t; _} () pk =
+  let lock_account_resolver { ctx = t; _ } () pk =
     Mina_lib.wallets t |> Secrets.Wallets.lock ~needle:pk ;
     pk
 
@@ -2581,23 +2950,22 @@ module Mutations = struct
       ~doc:"Lock an unlocked account to prevent transaction being sent from it"
       ~deprecated:(Deprecated (Some "use lockAccount instead"))
       ~typ:(non_null Types.Payload.lock_account)
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.lock_account)]
+      ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.LockInput.arg_typ) ]
       ~resolve:lock_account_resolver
 
   let lock_account =
     field "lockAccount"
       ~doc:"Lock an unlocked account to prevent transaction being sent from it"
       ~typ:(non_null Types.Payload.lock_account)
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.lock_account)]
+      ~args:Arg.[ arg "input" ~typ:(non_null Types.Input.LockInput.arg_typ) ]
       ~resolve:lock_account_resolver
 
-  let delete_account_resolver {ctx= coda; _} () public_key =
+  let delete_account_resolver { ctx = coda; _ } () public_key =
     let open Deferred.Result.Let_syntax in
     let wallets = Mina_lib.wallets coda in
     let%map () =
       Deferred.Result.map_error
-        ~f:(fun `Not_found ->
-          "Could not find account with specified public key" )
+        ~f:(fun `Not_found -> "Could not find account with specified public key")
         (Secrets.Wallets.delete wallets public_key)
     in
     public_key
@@ -2607,25 +2975,28 @@ module Mutations = struct
       ~doc:"Delete the private key for an account that you track"
       ~deprecated:(Deprecated (Some "use deleteAccount instead"))
       ~typ:(non_null Types.Payload.delete_account)
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.delete_account)]
+      ~args:
+        Arg.
+          [ arg "input" ~typ:(non_null Types.Input.DeleteAccountInput.arg_typ) ]
       ~resolve:delete_account_resolver
 
   let delete_account =
     io_field "deleteAccount"
       ~doc:"Delete the private key for an account that you track"
       ~typ:(non_null Types.Payload.delete_account)
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.delete_account)]
+      ~args:
+        Arg.
+          [ arg "input" ~typ:(non_null Types.Input.DeleteAccountInput.arg_typ) ]
       ~resolve:delete_account_resolver
 
-  let reload_account_resolver {ctx= coda; _} () =
+  let reload_account_resolver { ctx = coda; _ } () =
     let%map _ =
       Secrets.Wallets.reload ~logger:(Logger.create ()) (Mina_lib.wallets coda)
     in
     Ok true
 
   let reload_wallets =
-    io_field "reloadWallets"
-      ~doc:"Reload tracked account information from disk"
+    io_field "reloadWallets" ~doc:"Reload tracked account information from disk"
       ~deprecated:(Deprecated (Some "use reloadAccounts instead"))
       ~typ:(non_null Types.Payload.reload_accounts)
       ~args:Arg.[]
@@ -2639,8 +3010,7 @@ module Mutations = struct
       ~resolve:reload_account_resolver
 
   let import_account =
-    io_field "importAccount"
-      ~doc:"Reload tracked account information from disk"
+    io_field "importAccount" ~doc:"Reload tracked account information from disk"
       ~typ:(non_null Types.Payload.import_account)
       ~args:
         Arg.
@@ -2650,13 +3020,18 @@ module Mutations = struct
                  working directory."
               ~typ:(non_null string)
           ; arg "password" ~doc:"Password for the account to import"
-              ~typ:(non_null string) ]
-      ~resolve:(fun {ctx= coda; _} () privkey_path password ->
+              ~typ:(non_null string)
+          ]
+      ~resolve:(fun { ctx = coda; _ } () privkey_path password ->
         let open Deferred.Result.Let_syntax in
+        (* the Keypair.read zeroes the password, so copy for use in import step below *)
+        let saved_password =
+          Lazy.return (Deferred.return (Bytes.of_string password))
+        in
         let password =
           Lazy.return (Deferred.return (Bytes.of_string password))
         in
-        let%bind ({Keypair.public_key; _} as keypair) =
+        let%bind ({ Keypair.public_key; _ } as keypair) =
           Secrets.Keypair.read ~privkey_path ~password
           |> Deferred.Result.map_error ~f:Secrets.Privkey_error.to_string
         in
@@ -2666,8 +3041,9 @@ module Mutations = struct
         | Some _ ->
             return (pk, true)
         | None ->
-            let%map.Async pk =
-              Secrets.Wallets.import_keypair wallets keypair ~password
+            let%map.Async.Deferred pk =
+              Secrets.Wallets.import_keypair wallets keypair
+                ~password:saved_password
             in
             Ok (pk, false) )
 
@@ -2675,8 +3051,12 @@ module Mutations = struct
     io_field "resetTrustStatus"
       ~doc:"Reset trust status for all peers at a given IP address"
       ~typ:(list (non_null Types.Payload.trust_status))
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.reset_trust_status)]
-      ~resolve:(fun {ctx= coda; _} () ip_address_input ->
+      ~args:
+        Arg.
+          [ arg "input"
+              ~typ:(non_null Types.Input.ResetTrustStatusInput.arg_typ)
+          ]
+      ~resolve:(fun { ctx = coda; _ } () ip_address_input ->
         let open Deferred.Result.Let_syntax in
         let%map ip_address =
           Deferred.return
@@ -2692,8 +3072,9 @@ module Mutations = struct
         match%map f with
         | Ok user_command ->
             Ok
-              { Types.UserCommand.With_status.data= user_command
-              ; status= Unknown }
+              { Types.UserCommand.With_status.data = user_command
+              ; status = Unknown
+              }
         | Error e ->
             Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
     | `Bootstrapping ->
@@ -2722,10 +3103,12 @@ module Mutations = struct
       Result.ok_if_true
         Currency.Fee.(fee >= Signed_command.minimum_fee)
         ~error:
+          (* IMPORTANT! Do not change the content of this error without
+           * updating Rosetta's construction API to handle the changes *)
           (sprintf
              !"Invalid user command. Fee %s is less than the minimum fee, %s."
              (Currency.Fee.to_formatted_string fee)
-             (Currency.Fee.to_formatted_string Signed_command.minimum_fee))
+             (Currency.Fee.to_formatted_string Signed_command.minimum_fee) )
     in
     let%map memo =
       Option.value_map memo ~default:(Ok Signed_command_memo.empty)
@@ -2757,8 +3140,9 @@ module Mutations = struct
     in
     let%map cmd = send_user_command coda user_command_input in
     Types.UserCommand.With_status.map cmd ~f:(fun cmd ->
-        { With_hash.data= cmd
-        ; hash= Transaction_hash.hash_command (Signed_command cmd) } )
+        { With_hash.data = cmd
+        ; hash = Transaction_hash.hash_command (Signed_command cmd)
+        } )
 
   let send_unsigned_user_command ~coda ~nonce_opt ~signer ~memo ~fee ~fee_token
       ~fee_payer_pk ~valid_until ~body =
@@ -2778,12 +3162,13 @@ module Mutations = struct
     in
     let%map cmd = send_user_command coda user_command_input in
     Types.UserCommand.With_status.map cmd ~f:(fun cmd ->
-        { With_hash.data= cmd
-        ; hash= Transaction_hash.hash_command (Signed_command cmd) } )
+        { With_hash.data = cmd
+        ; hash = Transaction_hash.hash_command (Signed_command cmd)
+        } )
 
   let export_logs ~coda basename_opt =
     let open Mina_lib in
-    let Config.{conf_dir; _} = Mina_lib.config coda in
+    let Config.{ conf_dir; _ } = Mina_lib.config coda in
     Conf_dir.export_logs_to_tar ?basename:basename_opt ~conf_dir
 
   let send_delegation =
@@ -2792,14 +3177,14 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.send_delegation)
       ~args:
         Arg.
-          [ arg "input" ~typ:(non_null Types.Input.send_delegation)
-          ; Types.Input.Fields.signature ]
-      ~resolve:
-        (fun {ctx= coda; _} () (from, to_, fee, valid_until, memo, nonce_opt)
-             signature ->
+          [ arg "input" ~typ:(non_null Types.Input.SendDelegationInput.arg_typ)
+          ; Types.Input.Fields.signature
+          ]
+      ~resolve:(fun { ctx = coda; _ } ()
+                    (from, to_, fee, valid_until, memo, nonce_opt) signature ->
         let body =
           Signed_command_payload.Body.Stake_delegation
-            (Set_delegate {delegator= from; new_delegate= to_})
+            (Set_delegate { delegator = from; new_delegate = to_ })
         in
         let fee_token = Token_id.default in
         match signature with
@@ -2818,18 +3203,25 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.send_payment)
       ~args:
         Arg.
-          [ arg "input" ~typ:(non_null Types.Input.send_payment)
-          ; Types.Input.Fields.signature ]
-      ~resolve:
-        (fun {ctx= coda; _} ()
-             (from, to_, token_id, amount, fee, valid_until, memo, nonce_opt)
-             signature ->
+          [ arg "input" ~typ:(non_null Types.Input.SendPaymentInput.arg_typ)
+          ; Types.Input.Fields.signature
+          ]
+      ~resolve:(fun { ctx = coda; _ } ()
+                    ( from
+                    , to_
+                    , token_id
+                    , amount
+                    , fee
+                    , valid_until
+                    , memo
+                    , nonce_opt ) signature ->
         let body =
           Signed_command_payload.Body.Payment
-            { source_pk= from
-            ; receiver_pk= to_
-            ; token_id= Option.value ~default:Token_id.default token_id
-            ; amount= Amount.of_uint64 amount }
+            { source_pk = from
+            ; receiver_pk = to_
+            ; token_id = Option.value ~default:Token_id.default token_id
+            ; amount = Amount.of_uint64 amount
+            }
         in
         let fee_token = Token_id.default in
         match signature with
@@ -2842,24 +3234,99 @@ module Mutations = struct
               ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
             |> Deferred.Result.map ~f:Types.UserCommand.mk_user_command )
 
+  let send_test_payments =
+    io_field "sendTestPayments" ~doc:"Send a series of test payments"
+      ~typ:(non_null int)
+      ~args:
+        Types.Input.Fields.
+          [ senders
+          ; receiver ~doc:"The receiver of the payments"
+          ; amount ~doc:"The amount of each payment"
+          ; fee ~doc:"The fee of each payment"
+          ; repeat_count
+          ; repeat_delay_ms
+          ]
+      ~resolve:(fun { ctx = coda; _ } () senders_list receiver_pk amount fee
+                    repeat_count repeat_delay_ms ->
+        let dumb_password = lazy (return (Bytes.of_string "dumb")) in
+        let senders = Array.of_list senders_list in
+        let repeat_delay =
+          Time.Span.of_ms @@ float_of_int
+          @@ Unsigned.UInt32.to_int repeat_delay_ms
+        in
+        let fee_token = Token_id.default in
+        let start = Time.now () in
+        let send_tx i =
+          let source_privkey = senders.(i % Array.length senders) in
+          let source_pk_decompressed =
+            Signature_lib.Public_key.of_private_key_exn source_privkey
+          in
+          let source_pk =
+            Signature_lib.Public_key.compress source_pk_decompressed
+          in
+          let body =
+            Signed_command_payload.Body.Payment
+              { source_pk
+              ; receiver_pk
+              ; token_id = Token_id.default
+              ; amount = Amount.of_uint64 amount
+              }
+          in
+          let memo = "" in
+          let kp =
+            Keypair.
+              { private_key = source_privkey
+              ; public_key = source_pk_decompressed
+              }
+          in
+          let%bind _ =
+            Secrets.Wallets.import_keypair (Mina_lib.wallets coda) kp
+              ~password:dumb_password
+          in
+          send_unsigned_user_command ~coda ~nonce_opt:None ~signer:source_pk
+            ~memo:(Some memo) ~fee ~fee_token ~fee_payer_pk:source_pk
+            ~valid_until:None ~body
+          |> Deferred.Result.map ~f:(const 0)
+        in
+
+        let do_ i =
+          let pause =
+            Time.diff
+              (Time.add start @@ Time.Span.scale repeat_delay @@ float_of_int i)
+            @@ Time.now ()
+          in
+          (if Time.Span.(pause > zero) then after pause else Deferred.unit)
+          >>= fun () -> send_tx i >>| const ()
+        in
+        for i = 2 to Unsigned.UInt32.to_int repeat_count do
+          don't_wait_for (do_ i)
+        done ;
+        (* don't_wait_for (Deferred.for_ 2 ~to_:repeat_count ~do_) ; *)
+        send_tx 1 )
+
   let create_token =
     io_field "createToken" ~doc:"Create a new token"
       ~typ:(non_null Types.Payload.create_token)
       ~args:
         Arg.
-          [ arg "input" ~typ:(non_null Types.Input.create_token)
-          ; Types.Input.Fields.signature ]
-      ~resolve:
-        (fun {ctx= coda; _} ()
-             (fee_payer_pk, token_owner, fee, valid_until, memo, nonce_opt)
-             signature ->
+          [ arg "input" ~typ:(non_null Types.Input.SendCreateTokenInput.arg_typ)
+          ; Types.Input.Fields.signature
+          ]
+      ~resolve:(fun { ctx = coda; _ } ()
+                    ( fee_payer_pk
+                    , token_owner
+                    , fee
+                    , valid_until
+                    , memo
+                    , nonce_opt ) signature ->
         let fee_payer_pk = Option.value ~default:token_owner fee_payer_pk in
         let body =
           Signed_command_payload.Body.Create_new_token
-            { token_owner_pk= token_owner
-            ; disable_new_accounts=
+            { token_owner_pk = token_owner
+            ; disable_new_accounts =
                 (* TODO(5274): Expose when permissions commands are merged. *)
-                false }
+                false
+            }
         in
         let fee_token = Token_id.default in
         match signature with
@@ -2875,26 +3342,28 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.create_token_account)
       ~args:
         Arg.
-          [ arg "input" ~typ:(non_null Types.Input.create_token_account)
-          ; Types.Input.Fields.signature ]
-      ~resolve:
-        (fun {ctx= coda; _} ()
-             ( token_owner
-             , token
-             , receiver
-             , fee
-             , fee_payer
-             , valid_until
-             , memo
-             , nonce_opt ) signature ->
+          [ arg "input"
+              ~typ:(non_null Types.Input.SendCreateTokenAccountInput.arg_typ)
+          ; Types.Input.Fields.signature
+          ]
+      ~resolve:(fun { ctx = coda; _ } ()
+                    ( token_owner
+                    , token
+                    , receiver
+                    , fee
+                    , fee_payer
+                    , valid_until
+                    , memo
+                    , nonce_opt ) signature ->
         let body =
           Signed_command_payload.Body.Create_token_account
-            { token_id= token
-            ; token_owner_pk= token_owner
-            ; receiver_pk= receiver
-            ; account_disabled=
+            { token_id = token
+            ; token_owner_pk = token_owner
+            ; receiver_pk = receiver
+            ; account_disabled =
                 (* TODO(5274): Expose when permissions commands are merged. *)
-                false }
+                false
+            }
         in
         let fee_token = Token_id.default in
         let fee_payer_pk = Option.value ~default:receiver fee_payer in
@@ -2903,40 +3372,39 @@ module Mutations = struct
             send_unsigned_user_command ~coda ~nonce_opt ~signer:fee_payer_pk
               ~memo ~fee ~fee_token ~fee_payer_pk ~valid_until ~body
         | Some signature ->
-            send_signed_user_command ~coda ~nonce_opt ~signer:fee_payer_pk
-              ~memo ~fee ~fee_token ~fee_payer_pk ~valid_until ~body ~signature
-        )
+            send_signed_user_command ~coda ~nonce_opt ~signer:fee_payer_pk ~memo
+              ~fee ~fee_token ~fee_payer_pk ~valid_until ~body ~signature )
 
   let mint_tokens =
     io_field "mintTokens" ~doc:"Mint more of a token"
       ~typ:(non_null Types.Payload.mint_tokens)
       ~args:
         Arg.
-          [ arg "input" ~typ:(non_null Types.Input.mint_tokens)
-          ; Types.Input.Fields.signature ]
-      ~resolve:
-        (fun {ctx= coda; _} ()
-             ( token_owner
-             , token
-             , receiver
-             , amount
-             , fee
-             , valid_until
-             , memo
-             , nonce_opt ) signature ->
+          [ arg "input" ~typ:(non_null Types.Input.SendMintTokensInput.arg_typ)
+          ; Types.Input.Fields.signature
+          ]
+      ~resolve:(fun { ctx = coda; _ } ()
+                    ( token_owner
+                    , token
+                    , receiver
+                    , amount
+                    , fee
+                    , valid_until
+                    , memo
+                    , nonce_opt ) signature ->
         let body =
           Signed_command_payload.Body.Mint_tokens
-            { token_id= token
-            ; token_owner_pk= token_owner
-            ; receiver_pk= Option.value ~default:token_owner receiver
-            ; amount= Amount.of_uint64 amount }
+            { token_id = token
+            ; token_owner_pk = token_owner
+            ; receiver_pk = Option.value ~default:token_owner receiver
+            ; amount = Amount.of_uint64 amount
+            }
         in
         let fee_token = Token_id.default in
         match signature with
         | None ->
             send_unsigned_user_command ~coda ~nonce_opt ~signer:token_owner
-              ~memo ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until
-              ~body
+              ~memo ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until ~body
         | Some signature ->
             send_signed_user_command ~coda ~nonce_opt ~signer:token_owner ~memo
               ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until ~body
@@ -2946,80 +3414,56 @@ module Mutations = struct
     io_field "sendRosettaTransaction"
       ~doc:"Send a transaction in rosetta format"
       ~typ:(non_null Types.Payload.send_rosetta_transaction)
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.rosetta_transaction)]
-      ~resolve:(fun {ctx= mina; _} () signed_command ->
+      ~args:
+        Arg.
+          [ arg "input" ~typ:(non_null Types.Input.RosettaTransaction.arg_typ) ]
+      ~resolve:(fun { ctx = mina; _ } () signed_command ->
         match%map
           Mina_lib.add_full_transactions mina
-            [User_command.Signed_command signed_command]
+            [ User_command.Signed_command signed_command ]
         with
-        | Ok ([(User_command.Signed_command signed_command as transaction)], _)
+        | Ok ([ (User_command.Signed_command signed_command as transaction) ], _)
           ->
             Ok
               (Types.UserCommand.mk_user_command
-                 { status= Unknown
-                 ; data=
-                     { With_hash.data= signed_command
-                     ; hash= Transaction_hash.hash_command transaction } })
+                 { status = Unknown
+                 ; data =
+                     { With_hash.data = signed_command
+                     ; hash = Transaction_hash.hash_command transaction
+                     }
+                 } )
         | Error err ->
             Error (Error.to_string_hum err)
-        | Ok ([], [(_, diff_error)]) ->
+        | Ok ([], [ (_, diff_error) ]) ->
             let diff_error =
               Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
               .to_string_hum diff_error
             in
             Error
               (sprintf "Transaction could not be entered into the pool: %s"
-                 diff_error)
+                 diff_error )
         | Ok _ ->
-            Error
-              "Internal error: response from transaction pool was malformed" )
+            Error "Internal error: response from transaction pool was malformed"
+        )
 
   let export_logs =
     io_field "exportLogs" ~doc:"Export daemon logs to tar archive"
-      ~args:Arg.[arg "basename" ~typ:string]
+      ~args:Arg.[ arg "basename" ~typ:string ]
       ~typ:(non_null Types.Payload.export_logs)
-      ~resolve:(fun {ctx= coda; _} () basename_opt ->
+      ~resolve:(fun { ctx = coda; _ } () basename_opt ->
         let%map result = export_logs ~coda basename_opt in
         Result.map_error result
           ~f:(Fn.compose Yojson.Safe.to_string Error_json.error_to_yojson) )
 
-  let set_staking =
-    field "setStaking" ~doc:"Set keys you wish to stake with"
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_staking)]
-      ~typ:(non_null Types.Payload.set_staking)
-      ~resolve:(fun {ctx= coda; _} () pks ->
-        let old_block_production_keys =
-          Mina_lib.block_production_pubkeys coda
-        in
-        let wallet = Mina_lib.wallets coda in
-        let unlocked, locked =
-          List.partition_map pks ~f:(fun pk ->
-              match Secrets.Wallets.find_unlocked ~needle:pk wallet with
-              | Some kp ->
-                  `Fst (kp, pk)
-              | None ->
-                  `Snd pk )
-        in
-        [%log' info (Mina_lib.top_level_logger coda)]
-          ~metadata:
-            [ ( "old"
-              , [%to_yojson: Public_key.Compressed.t list]
-                  (Public_key.Compressed.Set.to_list old_block_production_keys)
-              )
-            ; ("new", [%to_yojson: Public_key.Compressed.t list] pks) ]
-          !"Block production key replacement; old: $old, new: $new" ;
-        ignore
-        @@ Mina_lib.replace_block_production_keypairs coda
-             (Keypair.And_compressed_pk.Set.of_list unlocked) ;
-        ( Public_key.Compressed.Set.to_list old_block_production_keys
-        , locked
-        , List.map ~f:Tuple.T2.get2 unlocked ) )
-
   let set_coinbase_receiver =
     field "setCoinbaseReceiver" ~doc:"Set the key to receive coinbases"
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_coinbase_receiver)]
+      ~args:
+        Arg.
+          [ arg "input"
+              ~typ:(non_null Types.Input.SetCoinbaseReceiverInput.arg_typ)
+          ]
       ~typ:(non_null Types.Payload.set_coinbase_receiver)
-      ~resolve:(fun {ctx= mina; _} () coinbase_receiver ->
+      ~resolve:(fun { ctx = mina; _ } () coinbase_receiver ->
         let old_coinbase_receiver =
           match Mina_lib.coinbase_receiver mina with
           | `Producer ->
@@ -3040,9 +3484,12 @@ module Mutations = struct
   let set_snark_worker =
     io_field "setSnarkWorker"
       ~doc:"Set key you wish to snark work with or disable snark working"
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_snark_worker)]
+      ~args:
+        Arg.
+          [ arg "input" ~typ:(non_null Types.Input.SetSnarkWorkerInput.arg_typ)
+          ]
       ~typ:(non_null Types.Payload.set_snark_worker)
-      ~resolve:(fun {ctx= coda; _} () pk ->
+      ~resolve:(fun { ctx = coda; _ } () pk ->
         let old_snark_worker_key = Mina_lib.snark_worker_key coda in
         let%map () = Mina_lib.replace_snark_worker_key coda pk in
         Ok old_snark_worker_key )
@@ -3050,9 +3497,10 @@ module Mutations = struct
   let set_snark_work_fee =
     result_field "setSnarkWorkFee"
       ~doc:"Set fee that you will like to receive for doing snark work"
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_snark_work_fee)]
+      ~args:
+        Arg.[ arg "input" ~typ:(non_null Types.Input.SetSnarkWorkFee.arg_typ) ]
       ~typ:(non_null Types.Payload.set_snark_work_fee)
-      ~resolve:(fun {ctx= coda; _} () raw_fee ->
+      ~resolve:(fun { ctx = coda; _ } () raw_fee ->
         let open Result.Let_syntax in
         let%map fee =
           result_of_exn Currency.Fee.of_uint64 raw_fee
@@ -3066,12 +3514,14 @@ module Mutations = struct
     io_field "setConnectionGatingConfig"
       ~args:
         Arg.
-          [arg "input" ~typ:(non_null Types.Input.set_connection_gating_config)]
+          [ arg "input"
+              ~typ:(non_null Types.Input.SetConnectionGatingConfigInput.arg_typ)
+          ]
       ~doc:
         "Set the connection gating config, returning the current config after \
          the application (which may have failed)"
       ~typ:(non_null Types.Payload.set_connection_gating_config)
-      ~resolve:(fun {ctx= coda; _} () config ->
+      ~resolve:(fun { ctx = coda; _ } () config ->
         let open Deferred.Result.Let_syntax in
         let%bind config = Deferred.return config in
         let open Deferred.Let_syntax in
@@ -3082,11 +3532,14 @@ module Mutations = struct
     io_field "addPeers"
       ~args:
         Arg.
-          [ arg "peers" ~typ:(non_null @@ list @@ non_null @@ Types.Input.peer)
-          ; arg "seed" ~typ:bool ]
+          [ arg "peers"
+              ~typ:
+                (non_null @@ list @@ non_null @@ Types.Input.NetworkPeer.arg_typ)
+          ; arg "seed" ~typ:bool
+          ]
       ~doc:"Connect to the given peers"
       ~typ:(non_null @@ list @@ non_null Types.DaemonStatus.peer)
-      ~resolve:(fun {ctx= coda; _} () peers seed ->
+      ~resolve:(fun { ctx = coda; _ } () peers seed ->
         let open Deferred.Result.Let_syntax in
         let%bind peers =
           Result.combine_errors peers
@@ -3095,11 +3548,13 @@ module Mutations = struct
           |> Deferred.return
         in
         let net = Mina_lib.net coda in
-        let seed = Option.value ~default:true seed in
-        let%bind.Async maybe_failure =
+        let is_seed = Option.value ~default:true seed in
+        let%bind.Async.Deferred maybe_failure =
           (* Add peers until we find an error *)
           Deferred.List.find_map peers ~f:(fun peer ->
-              match%map.Async Mina_networking.add_peer net peer ~seed with
+              match%map.Async.Deferred
+                Mina_networking.add_peer net peer ~is_seed
+              with
               | Ok () ->
                   None
               | Error err ->
@@ -3119,14 +3574,16 @@ module Mutations = struct
       ~args:
         Arg.
           [ arg "block" ~doc:"Block encoded in precomputed block format"
-              ~typ:(non_null Types.Input.precomputed_block) ]
+              ~typ:(non_null Types.Input.PrecomputedBlock.arg_typ)
+          ]
       ~typ:
         (non_null
            (obj "Applied" ~fields:(fun _ ->
                 [ field "applied" ~typ:(non_null bool)
                     ~args:Arg.[]
-                    ~resolve:(fun _ _ -> true) ] )))
-      ~resolve:(fun {ctx= coda; _} () block ->
+                    ~resolve:(fun _ _ -> true)
+                ] ) ) )
+      ~resolve:(fun { ctx = coda; _ } () block ->
         let open Deferred.Result.Let_syntax in
         let%bind archive_location =
           match (Mina_lib.config coda).archive_process_location with
@@ -3148,14 +3605,16 @@ module Mutations = struct
       ~args:
         Arg.
           [ arg "block" ~doc:"Block encoded in extensional block format"
-              ~typ:(non_null Types.Input.extensional_block) ]
+              ~typ:(non_null Types.Input.ExtensionalBlock.arg_typ)
+          ]
       ~typ:
         (non_null
            (obj "Applied" ~fields:(fun _ ->
                 [ field "applied" ~typ:(non_null bool)
                     ~args:Arg.[]
-                    ~resolve:(fun _ _ -> true) ] )))
-      ~resolve:(fun {ctx= coda; _} () block ->
+                    ~resolve:(fun _ _ -> true)
+                ] ) ) )
+      ~resolve:(fun { ctx = coda; _ } () block ->
         let open Deferred.Result.Let_syntax in
         let%bind archive_location =
           match (Mina_lib.config coda).archive_process_location with
@@ -3174,6 +3633,7 @@ module Mutations = struct
 
   let commands =
     [ add_wallet
+    ; start_filtered_log
     ; create_account
     ; create_hd_account
     ; unlock_account
@@ -3186,12 +3646,12 @@ module Mutations = struct
     ; import_account
     ; reload_wallets
     ; send_payment
+    ; send_test_payments
     ; send_delegation
     ; create_token
     ; create_token_account
     ; mint_tokens
     ; export_logs
-    ; set_staking
     ; set_coinbase_receiver
     ; set_snark_worker
     ; set_snark_work_fee
@@ -3199,7 +3659,8 @@ module Mutations = struct
     ; add_peer
     ; archive_precomputed_block
     ; archive_extensional_block
-    ; send_rosetta_transaction ]
+    ; send_rosetta_transaction
+    ]
 end
 
 module Queries = struct
@@ -3215,11 +3676,12 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key of sender of pooled user commands"
-              ~typ:Types.Input.public_key_arg
+              ~typ:Types.Input.PublicKey.arg_typ
           ; arg "hashes" ~doc:"Hashes of the commands to find in the pool"
               ~typ:(list (non_null string))
-          ; arg "ids" ~typ:(list (non_null guid)) ~doc:"Ids of UserCommands" ]
-      ~resolve:(fun {ctx= coda; _} () opt_pk opt_hashes opt_txns ->
+          ; arg "ids" ~typ:(list (non_null guid)) ~doc:"Ids of UserCommands"
+          ]
+      ~resolve:(fun { ctx = coda; _ } () opt_pk opt_hashes opt_txns ->
         let transaction_pool = Mina_lib.transaction_pool coda in
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
@@ -3241,7 +3703,7 @@ module Queries = struct
                       |> Option.bind
                            ~f:
                              (Network_pool.Transaction_pool.Resource_pool
-                              .find_by_hash resource_pool) )
+                              .find_by_hash resource_pool ) )
               | None ->
                   []
             in
@@ -3261,7 +3723,7 @@ module Queries = struct
                                 branches above.
                              *)
                              let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                                   cmd) =
+                                   cmd ) =
                                User_command.to_valid_unsafe
                                  (Signed_command signed_command)
                              in
@@ -3285,40 +3747,40 @@ module Queries = struct
                     |> Public_key.Compressed.equal pk ) ) )
         |> List.filter_map ~f:(fun x ->
                let x =
-                 Transaction_hash.User_command_with_valid_signature
-                 .forget_check x
+                 Transaction_hash.User_command_with_valid_signature.forget_check
+                   x
                in
                match x.data with
                | Signed_command data ->
                    Some
                      (Types.UserCommand.mk_user_command
-                        {status= Unknown; data= {x with data}})
+                        { status = Unknown; data = { x with data } } )
                | Snapp_command _ ->
                    None ) )
 
   let sync_status =
     io_field "syncStatus" ~doc:"Network sync status" ~args:[]
-      ~typ:(non_null Types.sync_status) ~resolve:(fun {ctx= coda; _} () ->
+      ~typ:(non_null Types.sync_status) ~resolve:(fun { ctx = coda; _ } () ->
         let open Deferred.Let_syntax in
         (* pull out sync status from status, so that result here
              agrees with status; see issue #8251
-          *)
-        let%map {sync_status; _} =
+        *)
+        let%map { sync_status; _ } =
           Mina_commands.get_status ~flag:`Performance coda
         in
         Ok sync_status )
 
   let daemon_status =
     io_field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
-      ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun {ctx= coda; _} () ->
+      ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun { ctx = coda; _ } () ->
         Mina_commands.get_status ~flag:`Performance coda >>| Result.return )
 
   let trust_status =
     field "trustStatus"
       ~typ:(list (non_null Types.Payload.trust_status))
-      ~args:Arg.[arg "ipAddress" ~typ:(non_null string)]
+      ~args:Arg.[ arg "ipAddress" ~typ:(non_null string) ]
       ~doc:"Trust status for an IPv4 or IPv6 address"
-      ~resolve:(fun {ctx= coda; _} () (ip_addr_string : string) ->
+      ~resolve:(fun { ctx = coda; _ } () (ip_addr_string : string) ->
         match Types.Arguments.ip_address ~name:"ipAddress" ip_addr_string with
         | Ok ip_addr ->
             Some (Mina_commands.get_trust_status coda ip_addr)
@@ -3330,7 +3792,7 @@ module Queries = struct
       ~typ:(non_null @@ list @@ non_null Types.Payload.trust_status)
       ~args:Arg.[]
       ~doc:"IP address and trust status for all peers"
-      ~resolve:(fun {ctx= coda; _} () ->
+      ~resolve:(fun { ctx = coda; _ } () ->
         Mina_commands.get_trust_status_all coda )
 
   let version =
@@ -3339,26 +3801,34 @@ module Queries = struct
       ~doc:"The version of the node (git commit hash)"
       ~resolve:(fun _ _ -> Some Mina_version.commit_id)
 
-  let tracked_accounts_resolver {ctx= coda; _} () =
+  let get_filtered_log_entries =
+    field "getFilteredLogEntries"
+      ~typ:(non_null Types.get_filtered_log_entries)
+      ~args:Arg.[ arg "offset" ~typ:(non_null int) ]
+      ~doc:"TESTING ONLY: Retrieve all new structured events in memory"
+      ~resolve:(fun { ctx = t; _ } () i -> Mina_lib.get_filtered_log_entries t i)
+
+  let tracked_accounts_resolver { ctx = coda; _ } () =
     let wallets = Mina_lib.wallets coda in
     let block_production_pubkeys = Mina_lib.block_production_pubkeys coda in
     let best_tip_ledger = Mina_lib.best_ledger coda in
     wallets |> Secrets.Wallets.pks
     |> List.map ~f:(fun pk ->
-           { Types.AccountObj.account=
+           { Types.AccountObj.account =
                Types.AccountObj.Partial_account.of_pk coda pk
-           ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
-           ; is_actively_staking=
+           ; locked = Secrets.Wallets.check_locked wallets ~needle:pk
+           ; is_actively_staking =
                Public_key.Compressed.Set.mem block_production_pubkeys pk
-           ; path= Secrets.Wallets.get_path wallets pk
-           ; index=
+           ; path = Secrets.Wallets.get_path wallets pk
+           ; index =
                ( match best_tip_ledger with
                | `Active ledger ->
                    Option.try_with (fun () ->
                        Ledger.index_of_account_exn ledger
                          (Account_id.create pk Token_id.default) )
                | _ ->
-                   None ) } )
+                   None )
+           } )
 
   let owned_wallets =
     field "ownedWallets"
@@ -3375,10 +3845,10 @@ module Queries = struct
       ~args:Arg.[]
       ~resolve:tracked_accounts_resolver
 
-  let account_resolver {ctx= coda; _} () pk =
+  let account_resolver { ctx = coda; _ } () pk =
     Some
       (Types.AccountObj.lift coda pk
-         (Types.AccountObj.Partial_account.of_pk coda pk))
+         (Types.AccountObj.Partial_account.of_pk coda pk) )
 
   let wallet =
     field "wallet" ~doc:"Find any wallet via a public key"
@@ -3387,8 +3857,16 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key of account being retrieved"
-              ~typ:(non_null Types.Input.public_key_arg) ]
+              ~typ:(non_null Types.Input.PublicKey.arg_typ)
+          ]
       ~resolve:account_resolver
+
+  let get_ledger_and_breadcrumb coda =
+    coda |> Mina_lib.best_tip |> Participating_state.active
+    |> Option.map ~f:(fun tip ->
+           ( Transition_frontier.Breadcrumb.staged_ledger tip
+             |> Staged_ledger.ledger
+           , tip ) )
 
   let account =
     field "account" ~doc:"Find any account via a public key and token"
@@ -3396,15 +3874,21 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key of account being retrieved"
-              ~typ:(non_null Types.Input.public_key_arg)
+              ~typ:(non_null Types.Input.PublicKey.arg_typ)
           ; arg' "token"
               ~doc:"Token of account being retrieved (defaults to CODA)"
-              ~typ:Types.Input.token_id_arg ~default:Token_id.default ]
-      ~resolve:(fun {ctx= coda; _} () pk token ->
-        Some
-          ( Account_id.create pk token
-          |> Types.AccountObj.Partial_account.of_account_id coda
-          |> Types.AccountObj.lift coda pk ) )
+              ~typ:Types.Input.TokenId.arg_typ ~default:Token_id.default
+          ]
+      ~resolve:(fun { ctx = coda; _ } () pk token ->
+        Option.bind (get_ledger_and_breadcrumb coda)
+          ~f:(fun (ledger, breadcrumb) ->
+            let open Option.Let_syntax in
+            let%bind location =
+              Ledger.location_of_account ledger (Account_id.create pk token)
+            in
+            let%map account = Ledger.get ledger location in
+            Types.AccountObj.Partial_account.of_full_account ~breadcrumb account
+            |> Types.AccountObj.lift coda pk ) )
 
   let accounts_for_pk =
     field "accounts" ~doc:"Find all accounts for a public key"
@@ -3412,22 +3896,16 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key to find accounts for"
-              ~typ:(non_null Types.Input.public_key_arg) ]
-      ~resolve:(fun {ctx= coda; _} () pk ->
-        match
-          coda |> Mina_lib.best_tip |> Participating_state.active
-          |> Option.map ~f:(fun tip ->
-                 ( Transition_frontier.Breadcrumb.staged_ledger tip
-                   |> Staged_ledger.ledger
-                 , tip ) )
-        with
+              ~typ:(non_null Types.Input.PublicKey.arg_typ)
+          ]
+      ~resolve:(fun { ctx = coda; _ } () pk ->
+        match get_ledger_and_breadcrumb coda with
         | Some (ledger, breadcrumb) ->
             let tokens = Ledger.tokens ledger pk |> Set.to_list in
             List.filter_map tokens ~f:(fun token ->
                 let open Option.Let_syntax in
                 let%bind location =
-                  Ledger.location_of_account ledger
-                    (Account_id.create pk token)
+                  Ledger.location_of_account ledger (Account_id.create pk token)
                 in
                 let%map account = Ledger.get ledger location in
                 Types.AccountObj.Partial_account.of_full_account ~breadcrumb
@@ -3442,8 +3920,9 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "token" ~doc:"Token to find the owner for"
-              ~typ:(non_null Types.Input.token_id_arg) ]
-      ~resolve:(fun {ctx= coda; _} () token ->
+              ~typ:(non_null Types.Input.TokenId.arg_typ)
+          ]
+      ~resolve:(fun { ctx = coda; _ } () token ->
         coda |> Mina_lib.best_tip |> Participating_state.active
         |> Option.bind ~f:(fun tip ->
                let ledger =
@@ -3455,72 +3934,77 @@ module Queries = struct
   let transaction_status =
     result_field "transactionStatus" ~doc:"Get the status of a transaction"
       ~typ:(non_null Types.transaction_status)
-      ~args:Arg.[arg "payment" ~typ:(non_null guid) ~doc:"Id of a UserCommand"]
-      ~resolve:(fun {ctx= coda; _} () serialized_payment ->
+      ~args:
+        Arg.[ arg "payment" ~typ:(non_null guid) ~doc:"Id of a UserCommand" ]
+      ~resolve:(fun { ctx = coda; _ } () serialized_payment ->
         let open Result.Let_syntax in
         let deserialize_payment serialized_payment =
           result_of_or_error
             (Signed_command.of_base58_check serialized_payment)
             ~error:"Invalid payment provided"
           |> Result.map ~f:(fun cmd ->
-                 { With_hash.data= cmd
-                 ; hash= Transaction_hash.hash_command (Signed_command cmd) }
-             )
+                 { With_hash.data = cmd
+                 ; hash = Transaction_hash.hash_command (Signed_command cmd)
+                 } )
         in
         let%bind payment = deserialize_payment serialized_payment in
         let frontier_broadcast_pipe = Mina_lib.transition_frontier coda in
         let transaction_pool = Mina_lib.transaction_pool coda in
         Result.map_error
           (Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
-             ~transaction_pool payment.data)
+             ~transaction_pool payment.data )
           ~f:Error.to_string_hum )
 
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker
       ~args:Arg.[]
       ~doc:"Get information about the current snark worker"
-      ~resolve:(fun {ctx= coda; _} _ ->
+      ~resolve:(fun { ctx = coda; _ } _ ->
         Option.map (Mina_lib.snark_worker_key coda) ~f:(fun k ->
             (k, Mina_lib.snark_work_fee coda) ) )
 
   let genesis_block =
     field "genesisBlock" ~typ:(non_null Types.block) ~args:[]
-      ~doc:"Get the genesis block" ~resolve:(fun {ctx= coda; _} () ->
+      ~doc:"Get the genesis block" ~resolve:(fun { ctx = coda; _ } () ->
         let open Mina_state in
         let { Precomputed_values.genesis_ledger
             ; constraint_constants
             ; consensus_constants
             ; genesis_epoch_data
             ; proof_data
-            ; _ } =
+            ; _
+            } =
           (Mina_lib.config coda).precomputed_values
         in
-        let {With_hash.data= genesis_state; hash} =
+        let { With_hash.data = genesis_state
+            ; hash = { State_hash.State_hashes.state_hash = hash; _ }
+            } =
           Genesis_protocol_state.t
             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
             ~genesis_epoch_data ~constraint_constants ~consensus_constants
         in
         let winner = fst Consensus_state_hooks.genesis_winner in
-        { With_hash.data=
-            { Filtered_external_transition.creator= winner
+        { With_hash.data =
+            { Filtered_external_transition.creator = winner
             ; winner
-            ; protocol_state=
-                { previous_state_hash=
+            ; protocol_state =
+                { previous_state_hash =
                     Protocol_state.previous_state_hash genesis_state
-                ; blockchain_state=
+                ; blockchain_state =
                     Protocol_state.blockchain_state genesis_state
-                ; consensus_state= Protocol_state.consensus_state genesis_state
+                ; consensus_state = Protocol_state.consensus_state genesis_state
                 }
-            ; transactions=
-                { commands= []
-                ; fee_transfers= []
-                ; coinbase= constraint_constants.coinbase_amount
-                ; coinbase_receiver=
-                    Some (fst Consensus_state_hooks.genesis_winner) }
-            ; snark_jobs= []
-            ; proof=
+            ; transactions =
+                { commands = []
+                ; fee_transfers = []
+                ; coinbase = constraint_constants.coinbase_amount
+                ; coinbase_receiver =
+                    Some (fst Consensus_state_hooks.genesis_winner)
+                }
+            ; snark_jobs = []
+            ; proof =
                 ( match proof_data with
-                | Some {genesis_proof; _} ->
+                | Some { genesis_proof; _ } ->
                     genesis_proof
                 | None ->
                     (* It's nearly never useful to have a specific genesis
@@ -3529,26 +4013,25 @@ module Queries = struct
                        expensive proof generation step if we don't have one
                        available.
                     *)
-                    Proof.blockchain_dummy ) }
-        ; hash } )
+                    Proof.blockchain_dummy )
+            }
+        ; hash
+        } )
 
   (* used by best_chain, block below *)
   let block_of_breadcrumb coda breadcrumb =
     let hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
-    let transition =
-      Transition_frontier.Breadcrumb.validated_transition breadcrumb
-    in
+    let block = Transition_frontier.Breadcrumb.block breadcrumb in
     let transactions =
-      Mina_transition.External_transition.Validated.transactions
+      Mina_block.transactions
         ~constraint_constants:
-          (Mina_lib.config coda).precomputed_values.constraint_constants
-        transition
+          (Mina_lib.config coda).precomputed_values.constraint_constants block
     in
     With_hash.Stable.Latest.
-      { data=
-          Filtered_external_transition.of_transition transition `All
-            transactions
-      ; hash }
+      { data =
+          Filtered_external_transition.of_transition block `All transactions
+      ; hash
+      }
 
   let best_chain =
     io_field "bestChain"
@@ -3563,8 +4046,9 @@ module Queries = struct
                 "The maximum number of blocks to return. If there are more \
                  blocks in the transition frontier from root to tip, the n \
                  blocks closest to the best tip will be returned"
-              ~typ:int ]
-      ~resolve:(fun {ctx= coda; _} () max_length ->
+              ~typ:int
+          ]
+      ~resolve:(fun { ctx = coda; _ } () max_length ->
         match Mina_lib.best_chain ?max_length coda with
         | Some best_chain ->
             let%map blocks =
@@ -3579,8 +4063,8 @@ module Queries = struct
   let block =
     result_field2 "block"
       ~doc:
-        "Retrieve a block with the given state hash or height, if contained \
-         in the transition frontier."
+        "Retrieve a block with the given state hash or height, if contained in \
+         the transition frontier."
       ~typ:(non_null Types.block)
       ~args:
         Arg.
@@ -3589,29 +4073,16 @@ module Queries = struct
           ; arg "height"
               ~doc:"The height of the desired block in the best chain" ~typ:int
           ]
-      ~resolve:
-        (fun {ctx= coda; _} () (state_hash_base58_opt : string option)
-             (height_opt : int option) ->
+      ~resolve:(fun { ctx = coda; _ } () (state_hash_base58_opt : string option)
+                    (height_opt : int option) ->
         let open Result.Let_syntax in
-        let get_transition_frontier () =
-          let transition_frontier_pipe = Mina_lib.transition_frontier coda in
-          Pipe_lib.Broadcast_pipe.Reader.peek transition_frontier_pipe
-          |> Result.of_option ~error:"Could not obtain transition frontier"
-        in
         let block_from_state_hash state_hash_base58 =
           let%bind state_hash =
             State_hash.of_base58_check state_hash_base58
             |> Result.map_error ~f:Error.to_string_hum
           in
-          let%bind transition_frontier = get_transition_frontier () in
           let%map breadcrumb =
-            Transition_frontier.find transition_frontier state_hash
-            |> Result.of_option
-                 ~error:
-                   (sprintf
-                      "Block with state hash %s not found in transition \
-                       frontier"
-                      state_hash_base58)
+            Mina_lib.best_chain_block_by_state_hash coda state_hash
           in
           block_of_breadcrumb coda breadcrumb
         in
@@ -3619,33 +4090,15 @@ module Queries = struct
           let height_uint32 =
             (* GraphQL int is signed 32-bit
                  empirically, conversion does not raise even if
-                 - the number is negative
-                 - the number is not representable using 32 bits
-              *)
+               - the number is negative
+               - the number is not representable using 32 bits
+            *)
             Unsigned.UInt32.of_int height
           in
-          let%bind transition_frontier = get_transition_frontier () in
-          let best_chain_breadcrumbs =
-            Transition_frontier.best_tip_path transition_frontier
+          let%map breadcrumb =
+            Mina_lib.best_chain_block_by_height coda height_uint32
           in
-          let%map desired_breadcrumb =
-            List.find best_chain_breadcrumbs ~f:(fun bc ->
-                let validated_transition =
-                  Transition_frontier.Breadcrumb.validated_transition bc
-                in
-                let block_height =
-                  Mina_transition.External_transition.Validated
-                  .blockchain_length validated_transition
-                in
-                Unsigned.UInt32.equal block_height height_uint32 )
-            |> Result.of_option
-                 ~error:
-                   (sprintf
-                      "Could not find block in transition frontier with \
-                       height %d"
-                      height)
-          in
-          block_of_breadcrumb coda desired_breadcrumb
+          block_of_breadcrumb coda breadcrumb
         in
         match (state_hash_base58_opt, height_opt) with
         | Some state_hash_base58, None ->
@@ -3660,7 +4113,7 @@ module Queries = struct
       ~doc:"List of peers that the daemon first used to connect to the network"
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null string)
-      ~resolve:(fun {ctx= coda; _} () ->
+      ~resolve:(fun { ctx = coda; _ } () ->
         List.map (Mina_lib.initial_peers coda) ~f:Mina_net2.Multiaddr.to_string
         )
 
@@ -3669,7 +4122,7 @@ module Queries = struct
       ~doc:"List of peers that the daemon is currently connected to"
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null Types.DaemonStatus.peer)
-      ~resolve:(fun {ctx= coda; _} () ->
+      ~resolve:(fun { ctx = coda; _ } () ->
         let%map peers = Mina_networking.peers (Mina_lib.net coda) in
         Ok (List.map ~f:Network_peer.Peer.to_display peers) )
 
@@ -3678,7 +4131,7 @@ module Queries = struct
       ~doc:"List of completed snark works that have the lowest fee so far"
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null Types.completed_work)
-      ~resolve:(fun {ctx= coda; _} () ->
+      ~resolve:(fun { ctx = coda; _ } () ->
         Mina_lib.snark_pool coda |> Network_pool.Snark_pool.resource_pool
         |> Network_pool.Snark_pool.Resource_pool.all_completed_work )
 
@@ -3686,7 +4139,7 @@ module Queries = struct
     field "pendingSnarkWork" ~doc:"List of snark works that are yet to be done"
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null Types.pending_work)
-      ~resolve:(fun {ctx= coda; _} () ->
+      ~resolve:(fun { ctx = coda; _ } () ->
         let snark_job_state = Mina_lib.snark_job_state coda in
         let snark_pool = Mina_lib.snark_pool coda in
         let fee_opt =
@@ -3708,11 +4161,11 @@ module Queries = struct
   let time_offset =
     field "timeOffset"
       ~doc:
-        "The time offset in seconds used to convert real times into \
-         blockchain times"
+        "The time offset in seconds used to convert real times into blockchain \
+         times"
       ~args:Arg.[]
       ~typ:(non_null int)
-      ~resolve:(fun {ctx= coda; _} () ->
+      ~resolve:(fun { ctx = coda; _ } () ->
         Block_time.Controller.get_time_offset
           ~logger:(Mina_lib.config coda).logger
         |> Time.Span.to_sec |> Float.to_int )
@@ -3724,7 +4177,7 @@ module Queries = struct
          allocated sequentially, so all lower token IDs have been allocated"
       ~args:Arg.[]
       ~typ:(non_null Types.token_id)
-      ~resolve:(fun {ctx= coda; _} () ->
+      ~resolve:(fun { ctx = coda; _ } () ->
         coda |> Mina_lib.best_tip |> Participating_state.active
         |> Option.map ~f:(fun tip ->
                Transition_frontier.Breadcrumb.staged_ledger tip
@@ -3738,30 +4191,36 @@ module Queries = struct
          connections to permit"
       ~args:Arg.[]
       ~typ:(non_null Types.Payload.set_connection_gating_config)
-      ~resolve:(fun {ctx= coda; _} _ ->
+      ~resolve:(fun { ctx = coda; _ } _ ->
         let net = Mina_lib.net coda in
         let%map config = Mina_networking.connection_gating_config net in
         Ok config )
 
   let validate_payment =
     io_field "validatePayment"
-      ~doc:"Validate the format and signature of a payment"
-      ~typ:(non_null bool)
+      ~doc:"Validate the format and signature of a payment" ~typ:(non_null bool)
       ~args:
         Arg.
-          [ arg "input" ~typ:(non_null Types.Input.send_payment)
-          ; Types.Input.Fields.signature ]
-      ~resolve:
-        (fun {ctx= mina; _} ()
-             (from, to_, token_id, amount, fee, valid_until, memo, nonce_opt)
-             signature ->
+          [ arg "input" ~typ:(non_null Types.Input.SendPaymentInput.arg_typ)
+          ; Types.Input.Fields.signature
+          ]
+      ~resolve:(fun { ctx = mina; _ } ()
+                    ( from
+                    , to_
+                    , token_id
+                    , amount
+                    , fee
+                    , valid_until
+                    , memo
+                    , nonce_opt ) signature ->
         let open Deferred.Result.Let_syntax in
         let body =
           Signed_command_payload.Body.Payment
-            { source_pk= from
-            ; receiver_pk= to_
-            ; token_id= Option.value ~default:Token_id.default token_id
-            ; amount= Amount.of_uint64 amount }
+            { source_pk = from
+            ; receiver_pk = to_
+            ; token_id = Option.value ~default:Token_id.default token_id
+            ; amount = Amount.of_uint64 amount
+            }
         in
         let fee_token = Token_id.default in
         let%bind signature =
@@ -3787,6 +4246,136 @@ module Queries = struct
         in
         Signed_command.check_signature user_command )
 
+  let runtime_config =
+    field "runtimeConfig"
+      ~doc:"The runtime configuration passed to the daemon at start-up"
+      ~typ:(non_null Types.json)
+      ~args:Arg.[]
+      ~resolve:(fun { ctx = mina; _ } () ->
+        Mina_lib.runtime_config mina
+        |> Runtime_config.to_yojson |> Yojson.Safe.to_basic )
+
+  let fork_config =
+    io_field "fork_config"
+      ~doc:
+        "The runtime configuration for a blockchain fork intended to be a \
+         continuation of the current one."
+      ~typ:(non_null Types.json)
+      ~args:
+        Arg.
+          [ arg "stateHash" ~doc:"The state hash of the desired block"
+              ~typ:string
+          ; arg "height"
+              ~doc:"The height of the desired block in the best chain" ~typ:int
+          ]
+      ~resolve:(fun { ctx = mina; _ } () state_hash_opt block_height_opt ->
+        let open Deferred.Result.Let_syntax in
+        let%bind breadcrumb =
+          match (state_hash_opt, block_height_opt) with
+          | None, None -> (
+              match Mina_lib.best_tip mina with
+              | `Bootstrapping ->
+                  Deferred.Result.fail "Daemon is bootstrapping"
+              | `Active breadcrumb ->
+                  return breadcrumb )
+          | Some state_hash_base58, None ->
+              let open Result.Monad_infix in
+              State_hash.of_base58_check state_hash_base58
+              |> Result.map_error ~f:Error.to_string_hum
+              >>= Mina_lib.best_chain_block_by_state_hash mina
+              |> Deferred.return
+          | None, Some block_height ->
+              Mina_lib.best_chain_block_by_height mina
+                (Unsigned.UInt32.of_int block_height)
+              |> Deferred.return
+          | Some _, Some _ ->
+              Deferred.Result.fail "Cannot specify both state hash and height"
+        in
+        let block = Transition_frontier.Breadcrumb.block breadcrumb in
+        let blockchain_length = Mina_block.blockchain_length block in
+        let global_slot =
+          Mina_block.consensus_state block
+          |> Consensus.Data.Consensus_state.curr_global_slot
+        in
+        let staged_ledger =
+          Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+          |> Staged_ledger.ledger
+        in
+        let protocol_state =
+          Transition_frontier.Breadcrumb.protocol_state breadcrumb
+        in
+        let consensus =
+          Mina_state.Protocol_state.consensus_state protocol_state
+        in
+        let staking_epoch =
+          Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
+            consensus
+        in
+        let next_epoch =
+          Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
+            consensus
+        in
+        let staking_epoch_seed =
+          Mina_base.Epoch_seed.to_base58_check
+            staking_epoch.Mina_base.Epoch_data.Poly.seed
+        in
+        let next_epoch_seed =
+          Mina_base.Epoch_seed.to_base58_check
+            next_epoch.Mina_base.Epoch_data.Poly.seed
+        in
+        let runtime_config = Mina_lib.runtime_config mina in
+        let%bind staking_ledger =
+          match Mina_lib.staking_ledger mina with
+          | None ->
+              Deferred.Result.fail "Staking ledger is not initialized."
+          | Some (Genesis_epoch_ledger l) ->
+              return (Ledger.Any_ledger.cast (module Ledger) l)
+          | Some (Ledger_db l) ->
+              return (Ledger.Any_ledger.cast (module Ledger.Db) l)
+        in
+        assert (
+          Mina_base.Ledger_hash.equal
+            (Ledger.Any_ledger.M.merkle_root staking_ledger)
+            staking_epoch.ledger.hash ) ;
+        let%bind next_epoch_ledger =
+          match Mina_lib.next_epoch_ledger mina with
+          | None ->
+              Deferred.Result.fail "Next epoch ledger is not initialized."
+          | Some `Notfinalized ->
+              return None
+          | Some (`Finalized (Genesis_epoch_ledger l)) ->
+              return (Some (Ledger.Any_ledger.cast (module Ledger) l))
+          | Some (`Finalized (Ledger_db l)) ->
+              return (Some (Ledger.Any_ledger.cast (module Ledger.Db) l))
+        in
+        Option.iter next_epoch_ledger ~f:(fun ledger ->
+            assert (
+              Mina_base.Ledger_hash.equal
+                (Ledger.Any_ledger.M.merkle_root ledger)
+                next_epoch.ledger.hash ) ) ;
+        let%bind new_config =
+          Runtime_config.make_fork_config ~staged_ledger ~global_slot
+            ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
+            ~next_epoch_seed ~blockchain_length ~protocol_state runtime_config
+        in
+        let%map () =
+          let open Async.Deferred.Infix in
+          Async_unix.Scheduler.yield () >>| Result.return
+        in
+        Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic )
+
+  let thread_graph =
+    field "threadGraph"
+      ~doc:
+        "A graphviz dot format representation of the deamon's internal thread \
+         graph"
+      ~typ:(non_null string)
+      ~args:Arg.[]
+      ~resolve:(fun _ () ->
+        Bytes.unsafe_to_string
+          ~no_mutation_while_string_reachable:
+            (O1trace.Thread.dump_thread_graph ()) )
+
   let evaluate_vrf =
     io_field "evaluateVrf"
       ~doc:
@@ -3796,16 +4385,17 @@ module Queries = struct
       ~typ:(non_null Types.vrf_evaluation)
       ~args:
         Arg.
-          [ arg "message" ~typ:(non_null Types.Input.vrf_message)
-          ; arg "publicKey" ~typ:(non_null Types.Input.public_key_arg)
-          ; arg "vrfThreshold" ~typ:Types.Input.vrf_threshold ]
-      ~resolve:(fun {ctx= mina; _} () message public_key vrf_threshold ->
+          [ arg "message" ~typ:(non_null Types.Input.VrfMessageInput.arg_typ)
+          ; arg "publicKey" ~typ:(non_null Types.Input.PublicKey.arg_typ)
+          ; arg "vrfThreshold" ~typ:Types.Input.VrfThresholdInput.arg_typ
+          ]
+      ~resolve:(fun { ctx = mina; _ } () message public_key vrf_threshold ->
         Deferred.return
         @@
         let open Result.Let_syntax in
         let%map sk =
           match%bind Mutations.find_identity ~public_key mina with
-          | `Keypair {private_key; _} ->
+          | `Keypair { private_key; _ } ->
               Ok private_key
           | `Hd_index _ ->
               Error
@@ -3817,9 +4407,10 @@ module Queries = struct
         in
         let t =
           { (Consensus_vrf.Layout.Evaluation.of_message_and_sk
-               ~constraint_constants message sk)
+               ~constraint_constants message sk )
             with
-            vrf_threshold }
+            vrf_threshold
+          }
         in
         match vrf_threshold with
         | Some _ ->
@@ -3834,8 +4425,10 @@ module Queries = struct
          evaluations without needing to reveal the private key, in the format \
          returned by evaluateVrf"
       ~typ:(non_null Types.vrf_evaluation)
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.vrf_evaluation)]
-      ~resolve:(fun {ctx= mina; _} () evaluation ->
+      ~args:
+        Arg.
+          [ arg "input" ~typ:(non_null Types.Input.VrfEvaluationInput.arg_typ) ]
+      ~resolve:(fun { ctx = mina; _ } () evaluation ->
         let constraint_constants =
           (Mina_lib.config mina).precomputed_values.constraint_constants
         in
@@ -3846,6 +4439,7 @@ module Queries = struct
     [ sync_status
     ; daemon_status
     ; version
+    ; get_filtered_log_entries
     ; owned_wallets (* deprecated *)
     ; tracked_accounts
     ; wallet (* deprecated *)
@@ -3870,7 +4464,11 @@ module Queries = struct
     ; next_available_token
     ; validate_payment
     ; evaluate_vrf
-    ; check_vrf ]
+    ; check_vrf
+    ; runtime_config
+    ; fork_config
+    ; thread_graph
+    ]
 end
 
 let schema =
@@ -3882,5 +4480,5 @@ let schema_limited =
   (*including version because that's the default query*)
   Graphql_async.Schema.(
     schema
-      [Queries.daemon_status; Queries.block; Queries.version]
+      [ Queries.daemon_status; Queries.block; Queries.version ]
       ~mutations:[] ~subscriptions:[])

@@ -3,7 +3,14 @@
  (public_name bignum_bigint)
  (library_flags -linkall)
  (inline_tests)
- (libraries core_kernel fold_lib async_kernel bignum)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   async_kernel
+   bignum.bigint
+   ;; local libraries
+   fold_lib
+)
  (preprocess
   (pps ppx_version ppx_jane))
  (instrumentation (backend bisect_ppx))
