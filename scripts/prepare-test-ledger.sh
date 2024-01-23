@@ -35,8 +35,7 @@ keys_=""
 for key in "$@"; do
   keys_="\"$key\",$keys_"
 done
-keys_=${keys_:0:-1}
-echo $keys_
+keys_="${keys_:0:-1}"
 
 # jq filter to exclude block PKs from the ledger
 pre_filter="[.[] | select(.pk | IN($keys_) | not)]"
