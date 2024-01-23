@@ -11,7 +11,7 @@ import (
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
-	peer "github.com/libp2p/go-libp2p-core/peer"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -29,7 +29,12 @@ type extractPushMessage = func(ipcPushMessage) (pushMessage, error)
 
 type ipcRpcRequest = ipc.Libp2pHelperInterface_RpcRequest
 type rpcRequest interface {
-	handle(app *app, seqno uint64) *capnp.Message
+	// Handles rpc request and returns response and a function to be called
+	// immediately after writing response to the output stream
+	//
+	// Callback is needed in some cases to make sure response is written
+	// before some other messages might get written to the output stream
+	handle(app *app, seqno uint64) (*capnp.Message, func())
 }
 type extractRequest = func(ipcRpcRequest) (rpcRequest, error)
 
@@ -150,11 +155,11 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	if err != nil {
 		return nil, err
 	}
-	bannedPeers := peer.NewSet()
+	bannedPeers := make(map[peer.ID]struct{})
 	err = peerIdListForeach(bannedPeerIds, func(peerID string) error {
 		id, err := peer.Decode(peerID)
 		if err == nil {
-			bannedPeers.Add(id)
+			bannedPeers[id] = struct{}{}
 		}
 		return err
 	})
@@ -166,19 +171,21 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	if err != nil {
 		return nil, err
 	}
-	trustedPeers := peer.NewSet()
+	trustedPeers := make(map[peer.ID]struct{})
 	err = peerIdListForeach(trustedPeerIds, func(peerID string) error {
 		id, err := peer.Decode(peerID)
 		if err == nil {
-			trustedPeers.Add(id)
+			trustedPeers[id] = struct{}{}
 		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	for _, peer := range addedPeers {
-		trustedPeers.Add(peer.ID)
+	if !gc.CleanAddedPeers() {
+		for _, peer := range addedPeers {
+			trustedPeers[peer.ID] = struct{}{}
+		}
 	}
 
 	return &codanet.CodaGatingConfig{
@@ -205,7 +212,7 @@ func setNanoTime(ns *ipc.UnixNano, t time.Time) {
 	ns.SetNanoSec(t.UnixNano())
 }
 
-func mkRpcRespError(seqno uint64, rpcRespErr error) *capnp.Message {
+func mkRpcRespErrorNoFunc(seqno uint64, rpcRespErr error) *capnp.Message {
 	if rpcRespErr == nil {
 		panic("mkRpcRespError: nil error")
 	}
@@ -226,7 +233,11 @@ func mkRpcRespError(seqno uint64, rpcRespErr error) *capnp.Message {
 	})
 }
 
-func mkRpcRespSuccess(seqno uint64, f func(*ipc.Libp2pHelperInterface_RpcResponseSuccess)) *capnp.Message {
+func mkRpcRespError(seqno uint64, rpcRespErr error) (*capnp.Message, func()) {
+	return mkRpcRespErrorNoFunc(seqno, rpcRespErr), nil
+}
+
+func mkRpcRespSuccessNoFunc(seqno uint64, f func(*ipc.Libp2pHelperInterface_RpcResponseSuccess)) *capnp.Message {
 	return mkMsg(func(seg *capnp.Segment) {
 		m, err := ipc.NewRootDaemonInterface_Message(seg)
 		panicOnErr(err)
@@ -244,6 +255,10 @@ func mkRpcRespSuccess(seqno uint64, f func(*ipc.Libp2pHelperInterface_RpcRespons
 		panicOnErr(err)
 		f(&succ)
 	})
+}
+
+func mkRpcRespSuccess(seqno uint64, f func(*ipc.Libp2pHelperInterface_RpcResponseSuccess)) (*capnp.Message, func()) {
+	return mkRpcRespSuccessNoFunc(seqno, f), nil
 }
 
 func mkPushMsg(f func(ipc.DaemonInterface_PushMessage)) *capnp.Message {
