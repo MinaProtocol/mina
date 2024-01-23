@@ -47,7 +47,7 @@ replayers:
   resources: *resources
   script:
     secretName: mainnet-migrated
-    scriptName: mainnet-migrated.sh
+    scriptName: mainnet-migrated-phase-1.sh
 # - name: test-run
 #   schedule: "0 2 * * *"
 #   image: *image
