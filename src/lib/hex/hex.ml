@@ -141,7 +141,7 @@ module Sequence_be = struct
     assert (n = k + k) ;
     init k ~f:(fun i ->
         Char.of_int_exn
-          ((16 * Digit.to_int t.(2 * i)) + Digit.to_int t.((2 * i) + 1)))
+          ((16 * Digit.to_int t.(2 * i)) + Digit.to_int t.((2 * i) + 1)) )
 
   let to_string = to_bytes_like ~init:String.init
 
@@ -150,27 +150,34 @@ module Sequence_be = struct
   let to_bigstring = to_bytes_like ~init:Bigstring.init
 end
 
-let decode ?(pos = 0) ~init t =
+let decode ?(reverse = false) ?(pos = 0) ~init t =
   let n = String.length t - pos in
   let k = n / 2 in
   assert (n = k + k) ;
   let h j = Digit.(to_int (of_char_exn t.[pos + j])) in
-  init k ~f:(fun i -> Char.of_int_exn ((16 * h (2 * i)) + h ((2 * i) + 1)))
+  init k ~f:(fun i ->
+      let i = if reverse then k - 1 - i else i in
+      Char.of_int_exn ((16 * h (2 * i)) + h ((2 * i) + 1)) )
 
-let encode t =
-  String.init
-    (2 * String.length t)
-    ~f:(fun i ->
-      let c = Char.to_int t.[i / 2] in
+let encode ?(reverse = false) t =
+  let n = String.length t in
+  String.init (2 * n) ~f:(fun i ->
+      let c =
+        let byte = i / 2 in
+        Char.to_int t.[if reverse then n - 1 - byte else byte]
+      in
       let c = if i mod 2 = 0 then (* hi *)
                 c lsr 4 else (* lo *)
                           c in
-      hex_char_of_int_exn (c land 15))
+      hex_char_of_int_exn (c land 15) )
 
 let%test_unit "decode" =
   let t = String.init 100 ~f:(fun _ -> Char.of_int_exn (Random.int 256)) in
   let h = encode t in
   assert (String.equal t (decode ~init:String.init h)) ;
+  assert (
+    String.equal t
+      (decode ~reverse:true ~init:String.init (encode ~reverse:true t)) ) ;
   assert (String.equal t Sequence_be.(to_string (decode h)))
 
 (* TODO: Better deduplicate the hex coding between these two implementations #5711 *)
@@ -190,7 +197,7 @@ module Safe = struct
            in
            let high = charify @@ ((Char.to_int c land 0xF0) lsr 4) in
            let lo = charify (Char.to_int c land 0x0F) in
-           String.of_char_list [ high; lo ])
+           String.of_char_list [ high; lo ] )
     |> String.concat
 
   let%test_unit "to_hex sane" =
@@ -222,7 +229,7 @@ module Safe = struct
                Or_error.return
                @@ (Char.((to_u4 a lsl 4) lor to_u4 b |> of_int_exn) :: acc)
            | _ ->
-               Or_error.error_string "invalid hex")
+               Or_error.error_string "invalid hex" )
     |> Or_error.ok
     |> Option.map ~f:(Fn.compose String.of_char_list List.rev)
 
@@ -237,5 +244,5 @@ module Safe = struct
         else
           failwithf
             !"expected: %s ; hexified: %s ; actual: %s"
-            expected hexified actual ())
+            expected hexified actual () )
 end

@@ -2,7 +2,7 @@ open Async
 open Core_kernel
 open Network_peer
 open Pipe_lib
-open Mina_base.Rpc_intf
+open Network_peer.Rpc_intf
 
 type ban_creator = { banned_peer : Peer.t; banned_until : Time.t }
 [@@deriving fields]
@@ -18,6 +18,11 @@ module type Gossip_net_intf = sig
 
   val peers : t -> Peer.t list Deferred.t
 
+  val bandwidth_info :
+       t
+    -> ([ `Input of float ] * [ `Output of float ] * [ `Cpu_usage of float ])
+       Deferred.Or_error.t
+
   val set_node_status : t -> string -> unit Deferred.Or_error.t
 
   val get_peer_node_status : t -> Peer.t -> string Deferred.Or_error.t
@@ -29,7 +34,10 @@ module type Gossip_net_intf = sig
   val connection_gating : t -> Mina_net2.connection_gating Deferred.t
 
   val set_connection_gating :
-    t -> Mina_net2.connection_gating -> Mina_net2.connection_gating Deferred.t
+       ?clean_added_peers:bool
+    -> t
+    -> Mina_net2.connection_gating
+    -> Mina_net2.connection_gating Deferred.t
 
   val random_peers : t -> int -> Peer.t list Deferred.t
 
@@ -62,16 +70,26 @@ module type Gossip_net_intf = sig
     -> 'q
     -> 'r rpc_response Deferred.t List.t Deferred.t
 
-  val broadcast : t -> Message.msg -> unit
+  val broadcast_state :
+    ?origin_topic:string -> t -> Message.state_msg -> unit Deferred.t
+
+  val broadcast_transaction_pool_diff :
+       ?origin_topic:string
+    -> ?nonce:int
+    -> t
+    -> Message.transaction_pool_diff_msg
+    -> unit Deferred.t
+
+  val broadcast_snark_pool_diff :
+       ?origin_topic:string
+    -> ?nonce:int
+    -> t
+    -> Message.snark_pool_diff_msg
+    -> unit Deferred.t
 
   val on_first_connect : t -> f:(unit -> 'a) -> 'a Deferred.t
 
   val on_first_high_connectivity : t -> f:(unit -> 'a) -> 'a Deferred.t
-
-  val received_message_reader :
-       t
-    -> (Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t)
-       Strict_pipe.Reader.t
 
   val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
 end

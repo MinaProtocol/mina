@@ -20,11 +20,11 @@ let%test_unit "instantiate" =
           (Integer.of_bits ~m (Bitstring.Lsb_first.of_list Boolean.[ true_ ]))
         ~bottom:
           (Integer.of_bits ~m
-             (Bitstring.Lsb_first.of_list Boolean.[ false_; true_ ]))
+             (Bitstring.Lsb_first.of_list Boolean.[ false_; true_ ]) )
         ~top_is_less_than_bottom:() ~precision:2
     in
     Floating_point.to_bignum ~m (Exp.one_minus_exp ~m params arg)
   in
-  let (), res = M.run_and_check c () |> Or_error.ok_exn in
+  let res = M.run_and_check c |> Or_error.ok_exn in
   assert (
     Bignum.(equal res (Exp.Unchecked.one_minus_exp params (one / of_int 2))) )

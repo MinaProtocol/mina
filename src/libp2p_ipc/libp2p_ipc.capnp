@@ -11,6 +11,15 @@ struct PeerId {
   id @0 :Text;
 }
 
+struct BlockWithId {
+  blake2bHash @0 :Data;
+  block @1 :Data;
+}
+
+struct RootBlockId {
+  blake2bHash @0 :Data;
+}
+
 struct AddrInfo {
   peerId @0 :PeerId;
   addrs @1 :List(Multiaddr);
@@ -50,6 +59,11 @@ struct GatingConfig {
   trustedIps @2 :List(Text);
   trustedPeerIds @3 :List(PeerId);
   isolate @4 :Bool;
+  cleanAddedPeers @5 :Bool;
+}
+
+struct TopicLevel {
+  topics @0 :List(Text);
 }
 
 struct Libp2pConfig {
@@ -67,7 +81,17 @@ struct Libp2pConfig {
   gatingConfig @11 :GatingConfig;
   maxConnections @12 :UInt32;
   validationQueueSize @13 :UInt32;
-  minaPeerExchange @14 :Bool;
+  peerProtectionRatio @14 :Float32;
+  minConnections @15 :UInt32;
+  knownPrivateIpNets @16 :List(Text);
+  topicConfig @17 :List(TopicLevel);
+}
+
+# Resource status updated
+enum ResourceUpdateType {
+  added @0; # resource was added to storage
+  removed @1; # resource was removed from the storage
+  broken @2; # resource was found to be broken
 }
 
 enum ValidationResult {
@@ -81,6 +105,9 @@ struct StreamMessage {
   data @1 :Data;
 }
 
+struct Duration {
+  nanoSec @0 :UInt64;
+}
 # Unix timestamp in nanoseconds
 struct UnixNano {
   nanoSec @0 :Int64;
@@ -154,6 +181,16 @@ struct Libp2pHelperInterface {
 
     struct Response {
       result @0 :List(PeerInfo);
+    }
+  }
+
+  struct BandwidthInfo {
+    struct Request {}
+
+    struct Response {
+      inputBandwidth @0 :Float64;
+      outputBandwidth @1 :Float64;
+      cpuUsage @2 :Float64;
     }
   }
 
@@ -263,12 +300,54 @@ struct Libp2pHelperInterface {
     }
   }
 
+  # Rpcs only used for testing (TODO: move these somewhere else)
+  struct TestDecodeBitswapBlocks {
+    struct Request {
+      blocks @0 :List(BlockWithId);
+      rootBlockId @1 :RootBlockId;
+    }
+
+    struct Response {
+      decodedData @0 :Data;
+    }
+  }
+
+  struct TestEncodeBitswapBlocks {
+    struct Request {
+      data @0 :Data;
+      maxBlockSize @1 :Int64;
+    }
+
+    struct Response {
+      blocks @0 :List(BlockWithId);
+      rootBlockId @1 :RootBlockId;
+    }
+  }
+
   # validation is a special push message where the sequence number
   # corresponds to the the push message sent to the daemon in the
   # GossipReceived message
   struct Validation {
     validationId @0 :ValidationId;
     result @1 :ValidationResult;
+  }
+
+  struct DeleteResource {
+    ids @0 :List(RootBlockId);
+  }
+
+  struct HeartbeatPeer {
+    id @0 :PeerId;
+  }
+
+  struct DownloadResource {
+    tag @0 :UInt8;
+    ids @1 :List(RootBlockId);
+  }
+
+  struct AddResource {
+    tag @0 :UInt8;
+    data @1 :Data;
   }
 
   struct RpcRequest {
@@ -294,6 +373,9 @@ struct Libp2pHelperInterface {
       sendStream @17 :Libp2pHelperInterface.SendStream.Request;
       setNodeStatus @18 :Libp2pHelperInterface.SetNodeStatus.Request;
       getPeerNodeStatus @19 :Libp2pHelperInterface.GetPeerNodeStatus.Request;
+      bandwidthInfo @20 :Libp2pHelperInterface.BandwidthInfo.Request;
+      testDecodeBitswapBlocks @21 :Libp2pHelperInterface.TestDecodeBitswapBlocks.Request;
+      testEncodeBitswapBlocks @22 :Libp2pHelperInterface.TestEncodeBitswapBlocks.Request;
     }
   }
 
@@ -318,6 +400,9 @@ struct Libp2pHelperInterface {
       sendStream @16 :Libp2pHelperInterface.SendStream.Response;
       setNodeStatus @17 :Libp2pHelperInterface.SetNodeStatus.Response;
       getPeerNodeStatus @18 :Libp2pHelperInterface.GetPeerNodeStatus.Response;
+      bandwidthInfo @19 :Libp2pHelperInterface.BandwidthInfo.Response;
+      testDecodeBitswapBlocks @20 :Libp2pHelperInterface.TestDecodeBitswapBlocks.Response;
+      testEncodeBitswapBlocks @21 :Libp2pHelperInterface.TestEncodeBitswapBlocks.Response;
     }
   }
 
@@ -332,9 +417,13 @@ struct Libp2pHelperInterface {
   struct PushMessage {
     header @0 :PushMessageHeader;
 
-    # union {
-    validation @1 :Libp2pHelperInterface.Validation;
-    # }
+    union {
+      validation @1 :Libp2pHelperInterface.Validation;
+      addResource @2 :Libp2pHelperInterface.AddResource;
+      deleteResource @3 :Libp2pHelperInterface.DeleteResource;
+      downloadResource @4 :Libp2pHelperInterface.DownloadResource;
+      heartbeatPeer @5 :Libp2pHelperInterface.HeartbeatPeer;
+    }
   }
 
   struct Message {
@@ -383,6 +472,11 @@ struct DaemonInterface {
     msg @0 :StreamMessage;
   }
 
+  struct ResourceUpdate {
+    type @0 :ResourceUpdateType;
+    ids @1 :List(RootBlockId);
+  }
+
   struct PushMessage {
     header @0 :PushMessageHeader;
 
@@ -394,6 +488,7 @@ struct DaemonInterface {
       streamLost            @5 :DaemonInterface.StreamLost;
       streamComplete        @6 :DaemonInterface.StreamComplete;
       streamMessageReceived @7 :DaemonInterface.StreamMessageReceived;
+      resourceUpdated       @8 :DaemonInterface.ResourceUpdate;
     }
   }
 

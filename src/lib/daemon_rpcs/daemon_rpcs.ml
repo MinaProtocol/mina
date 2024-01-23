@@ -1,7 +1,6 @@
 open Core_kernel
 open Async
 open Mina_base
-open Signature_lib
 module Types = Types
 module Client = Client
 
@@ -21,13 +20,26 @@ module Send_user_commands = struct
   [@@deriving bin_io_unversioned]
 
   type response =
-    ( Network_pool.Transaction_pool.Diff_versioned.Stable.Latest.t
+    ( [ `Broadcasted | `Not_broadcasted ]
+    * Network_pool.Transaction_pool.Diff_versioned.Stable.Latest.t
     * Network_pool.Transaction_pool.Diff_versioned.Rejected.Stable.Latest.t )
     Or_error.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Send_user_commands" ~version:0 ~bin_query
+      ~bin_response
+end
+
+module Send_zkapp_commands = struct
+  type query = Zkapp_command.Stable.Latest.t list
+  [@@deriving bin_io_unversioned]
+
+  type response = Zkapp_command.Stable.Latest.t list Or_error.t
+  [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Send_zkapp_commands" ~version:0 ~bin_query
       ~bin_response
 end
 
@@ -117,7 +129,8 @@ end
 module Chain_id_inputs = struct
   type query = unit [@@deriving bin_io_unversioned]
 
-  type response = State_hash.Stable.Latest.t * Genesis_constants.t * string list
+  type response =
+    State_hash.Stable.Latest.t * Genesis_constants.t * string list * int * int
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -166,6 +179,9 @@ module Get_status = struct
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_status" ~version:0 ~bin_query ~bin_response
 end
+
+(* ITN internal logs from prover and verifier *)
+module Submit_internal_log = Itn_logger.Submit_internal_log
 
 module Clear_hist_status = struct
   type query = [ `Performance | `None ] [@@deriving bin_io_unversioned]
@@ -241,13 +257,24 @@ module Stop_tracing = struct
     Rpc.Rpc.create ~name:"Stop_tracing" ~version:0 ~bin_query ~bin_response
 end
 
-module Set_staking = struct
-  type query = Keypair.Stable.Latest.t list [@@deriving bin_io_unversioned]
+module Start_internal_tracing = struct
+  type query = unit [@@deriving bin_io_unversioned]
 
   type response = unit [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Set_staking" ~version:0 ~bin_query ~bin_response
+    Rpc.Rpc.create ~name:"Start_internal_tracing" ~version:0 ~bin_query
+      ~bin_response
+end
+
+module Stop_internal_tracing = struct
+  type query = unit [@@deriving bin_io_unversioned]
+
+  type response = unit [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Stop_internal_tracing" ~version:0 ~bin_query
+      ~bin_response
 end
 
 module Visualization = struct

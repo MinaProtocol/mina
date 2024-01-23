@@ -2,8 +2,6 @@ open Core
 open Async
 module Timeout = Timeout_lib.Core_time
 
-(* module util with  *)
-
 let run_cmd dir prog args =
   [%log' spam (Logger.create ())]
     "Running command (from %s): $command" dir
@@ -24,7 +22,7 @@ let check_cmd_output ~prog ~args output =
       (indent
          ( prog ^ " "
          ^ String.concat ~sep:" "
-             (List.map args ~f:(fun arg -> "\"" ^ arg ^ "\"")) )) ;
+             (List.map args ~f:(fun arg -> "\"" ^ arg ^ "\"")) ) ) ;
     print_endline "=== STDOUT ===" ;
     print_endline (indent output.stdout) ;
     print_endline "=== STDERR ===" ;
@@ -72,6 +70,12 @@ let run_cmd_exn dir prog args =
   | Error error ->
       Error.raise error
 
+let run_cmd_or_hard_error ?exit_code dir prog args =
+  let%bind output = run_cmd dir prog args in
+  Deferred.bind
+    ~f:(Malleable_error.or_hard_error ?exit_code)
+    (check_cmd_output ~prog ~args output)
+
 let run_cmd_exn_timeout ~timeout_seconds dir prog args =
   match%map run_cmd_or_error_timeout ~timeout_seconds dir prog args with
   | Ok output ->
@@ -86,17 +90,3 @@ let rec prompt_continue prompt_string =
   print_newline () ;
   if Char.equal c 'y' || Char.equal c 'Y' then Deferred.unit
   else prompt_continue prompt_string
-
-module Make (Engine : Intf.Engine.S) = struct
-  let pub_key_of_node node =
-    let open Signature_lib in
-    (* let n = Engine.Network.Node *)
-    match Engine.Network.Node.network_keypair node with
-    | Some nk ->
-        Malleable_error.return (nk.keypair.public_key |> Public_key.compress)
-    | None ->
-        Malleable_error.hard_error_format
-          "Node '%s' did not have a network keypair, if node is a block \
-           producer this should not happen"
-          (Engine.Network.Node.id node)
-end

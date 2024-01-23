@@ -1,139 +1,260 @@
-[%%import "/src/config.mlh"]
-
-[%%if tracing]
-
-open Core
+open Core_kernel
 open Async
-open Webkit_trace_event
-module Scheduler = Async_kernel_scheduler
+module Execution_timer = Execution_timer
+module Plugins = Plugins
+module Thread = Thread
 
-let buf = Bigstring.create 128
+(* TODO: this should probably go somewhere else (mina_cli_entrypoint or coda_run) *)
+let () = Plugins.enable_plugin (module Execution_timer)
 
-let emit_event = Output.Binary.emit_event ~buf
+let on_job_enter' (fiber : Thread.Fiber.t) =
+  Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
+      Plugin.on_job_enter fiber )
 
-let timestamp () =
-  Time_stamp_counter.now () |> Time_stamp_counter.to_int63 |> Int63.to_int_exn
+let on_job_exit' fiber elapsed_time =
+  Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
+      Plugin.on_job_exit fiber elapsed_time )
 
-let current_wr = ref None
+let on_job_enter ctx =
+  Option.iter (Thread.Fiber.of_context ctx) ~f:on_job_enter'
 
-let our_pid = Unix.getpid () |> Pid.to_int
+let on_job_exit ctx elapsed_time =
+  Option.iter (Thread.Fiber.of_context ctx) ~f:(fun thread ->
+      on_job_exit' thread elapsed_time )
 
-let next_tid = ref 1
+let on_new_fiber (fiber : Thread.Fiber.t) =
+  Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
+      Plugin.on_new_fiber fiber )
 
-let tid_names = ref []
+let current_sync_fiber = ref None
 
-let remember_tid name tid = tid_names := (name, tid) :: !tid_names
+(* grabs the parent fiber, returning the fiber (if available) and a reset function to call after exiting the child fiber *)
+let grab_parent_fiber () =
+  let ctx = Scheduler.current_execution_context () in
+  match !current_sync_fiber with
+  | None ->
+      Execution_context.find_local ctx Thread.Fiber.ctx_id
+  | Some fiber ->
+      current_sync_fiber := None ;
+      Some fiber
 
-let new_event (k : event_kind) : event =
-  { name = ""
-  ; categories = []
-  ; phase = k
-  ; timestamp = timestamp ()
-  ; pid = our_pid
-  ; tid = 0
-  }
+(* look through a fiber stack to find a recursive fiber call *)
+let rec find_recursive_fiber thread_name parent_thread_name
+    (fiber : Thread.Fiber.t) =
+  let thread_matches = String.equal fiber.thread.name thread_name in
+  let parent_thread_matches =
+    Option.equal String.equal
+      (Option.map fiber.parent ~f:(fun p -> p.thread.name))
+      parent_thread_name
+  in
+  if thread_matches && parent_thread_matches then Some fiber
+  else
+    Option.bind fiber.parent
+      ~f:(find_recursive_fiber thread_name parent_thread_name)
 
-let log_thread_existence name tid =
-  Option.iter !current_wr ~f:(fun wr ->
-      emit_event wr { (new_event New_thread) with name; tid })
+let local_storage_id =
+  Type_equal.Id.create ~name:"o1trace" (sexp_of_list sexp_of_string)
 
-let trace_new_thread (name : string) (tid : int) =
-  remember_tid name tid ;
-  log_thread_existence name tid
+let with_o1trace ~name context =
+  Execution_context.find_local context local_storage_id
+  |> Option.value_map ~default:[ name ] ~f:(List.cons name)
+  |> Option.some
+  |> Execution_context.with_local context local_storage_id
 
-let trace_thread_switch (new_ctx : Execution_context.t) =
-  Option.iter !current_wr ~f:(fun wr ->
-      emit_event wr { (new_event Thread_switch) with tid = new_ctx.tid })
+let exec_thread ~exec_same_thread ~exec_new_thread name =
+  let sync_fiber = !current_sync_fiber in
+  let parent = grab_parent_fiber () in
+  let parent_name = Option.map parent ~f:(fun p -> p.thread.name) in
+  let result =
+    if
+      Option.value_map parent ~default:false ~f:(fun p ->
+          String.equal p.thread.name name )
+    then exec_same_thread ()
+    else
+      let fiber =
+        match Option.bind parent ~f:(find_recursive_fiber name parent_name) with
+        | Some fiber ->
+            fiber
+        | None ->
+            let fib = Thread.Fiber.register name parent in
+            on_new_fiber fib ; fib
+      in
+      exec_new_thread fiber
+  in
+  current_sync_fiber := sync_fiber ;
+  result
+
+let thread name f =
+  exec_thread name ~exec_same_thread:f ~exec_new_thread:(fun fiber ->
+      let ctx = Scheduler.current_execution_context () in
+      let ctx = Thread.Fiber.apply_to_context fiber ctx in
+      let ctx = with_o1trace ~name ctx in
+      match Scheduler.within_context ctx f with
+      | Error () ->
+          (* Scheduler.within_context will send the actual error to the parent monitor asynchronously.
+           * At this point, the thread has crashed, so we just return a Deferred that will never resolve *)
+          Deferred.create (Fn.const ())
+      | Ok x ->
+          x )
+
+let background_thread name f = don't_wait_for (thread name f)
+
+(* it is unsafe to call into the scheduler directly within a `sync_thread` *)
+let sync_thread name f =
+  exec_thread name ~exec_same_thread:f ~exec_new_thread:(fun fiber ->
+      current_sync_fiber := Some fiber ;
+      on_job_enter' fiber ;
+      let start_time = Time_ns.now () in
+      let ctx = Scheduler.current_execution_context () in
+      let ctx = with_o1trace ~name ctx in
+      match
+        Scheduler.Private.with_execution_context (Scheduler.Private.t ()) ctx
+          ~f:(fun () -> Result.try_with f)
+      with
+      | Error exn ->
+          Exn.reraise exn "exception caught by O1trace.sync_thread"
+      | Ok result ->
+          let elapsed_time = Time_ns.abs_diff (Time_ns.now ()) start_time in
+          on_job_exit' fiber elapsed_time ;
+          result )
 
 let () =
-  Async_kernel.Tracing.fns :=
-    { trace_thread_switch
-    ; trace_new_thread = (fun name ctx -> trace_new_thread name ctx.tid)
-    }
+  Stdlib.(Async_kernel.Tracing.fns := { on_job_enter; on_job_exit }) ;
+  Scheduler.Expert.run_every_cycle_end (fun () ->
+      Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
+          Plugin.on_cycle_end () ) )
 
-let trace_event (name : string) =
-  Option.iter !current_wr ~f:(fun wr ->
-      emit_event wr { (new_event Event) with name })
-
-let trace (name : string) (f : unit -> 'a) =
-  let new_ctx =
-    Execution_context.with_tid
-      Scheduler.(current_execution_context ())
-      !next_tid
-  in
-  next_tid := !next_tid + 1 ;
-  trace_new_thread name new_ctx.tid ;
-  match Scheduler.within_context new_ctx f with
-  | Error () ->
-      failwithf "traced task `%s` failed, exception reported to parent monitor"
-        name ()
-  | Ok x ->
-      x
-
-let trace_task (name : string) (f : unit -> unit Deferred.t) =
-  don't_wait_for (trace name f)
-
-let recurring_prefix x = "R&" ^ x
-
-let trace_recurring name f = trace (recurring_prefix name) f
-
-let trace_recurring_task (name : string) (f : unit -> unit Deferred.t) =
-  trace_task (recurring_prefix name) (fun () ->
-      trace_event "started another" ;
-      f ())
-
-let measure (name : string) (f : unit -> 'a) : 'a =
-  match !current_wr with
-  | Some wr ->
-      emit_event wr { (new_event Measure_start) with name } ;
-      let res = f () in
-      emit_event wr (new_event Measure_end) ;
-      res
-  | None ->
-      f ()
-
-let forget_tid (f : unit -> 'a) =
-  let new_ctx =
-    Execution_context.with_tid Scheduler.(current_execution_context ()) 0
-  in
-  let res = Scheduler.within_context new_ctx f |> Result.ok in
-  Option.value_exn res
-
-let start_tracing wr =
-  current_wr := Some wr ;
-  let sch = Scheduler.t () in
+(*
+let () =
   Scheduler.Expert.set_on_end_of_cycle (fun () ->
-      if not sch.cycle_started then
-        emit_event wr
-          { (new_event Cycle_end) with tid = sch.current_execution_context.tid } ;
-      sch.cycle_started <- true) ;
-  emit_event wr (new_event Pid_is) ;
-  List.iter !tid_names ~f:(fun (name, tid) -> log_thread_existence name tid) ;
-  emit_event wr
-    { (new_event Thread_switch) with tid = sch.current_execution_context.tid }
+    Option.iter (Thread.current_thread ()) ~f:(fun thread ->
+      dispatch_plugins thread (fun (module Plugin) state -> Plugin.on_cycle_end thread.name state)) ;
+    (* this line should probably live inside Async_kernel *)
+    sch.cycle_started <- true)
+*)
 
-let stop_tracing () =
-  let sch = Scheduler.t () in
-  Scheduler.Expert.set_on_end_of_cycle Fn.id ;
-  Option.iter !current_wr ~f:(fun wr ->
-      emit_event wr
-        { (new_event Trace_end) with tid = sch.current_execution_context.tid }) ;
-  current_wr := None
+let%test_module "thread tests" =
+  ( module struct
+    exception Test_exn
 
-[%%else]
+    let is_test_exn exn =
+      (* there isn't a great way to compare the exn to the one that was thrown due to how async mangles the exn, so we do this instead *)
+      String.is_substring (Exn.to_string exn) ~substring:"(Test_exn)"
 
-let[@inline] measure _ f = f ()
+    let child_of n =
+      match
+        let prev_sync_fiber = !current_sync_fiber in
+        let%bind.Option fiber = grab_parent_fiber () in
+        current_sync_fiber := prev_sync_fiber ;
+        fiber.parent
+      with
+      | Some parent ->
+          String.equal parent.thread.name n
+      | None ->
+          false
 
-let[@inline] trace_event _ = ()
+    let test' f =
+      Hashtbl.clear Thread.threads ;
+      Thread_safe.block_on_async_exn (fun () ->
+          let s = Ivar.create () in
+          f (Ivar.fill s) ;
+          let%bind () = Ivar.read s in
+          Writer.(flushed (Lazy.force stdout)) )
 
-let[@inline] trace_recurring_task _ f = f ()
+    let test f = test' (fun s -> don't_wait_for (f s))
 
-let[@inline] trace_task _ f = f ()
+    let%test_unit "thread > thread > thread" =
+      test (fun stop ->
+          thread "a" (fun () ->
+              thread "b" (fun () ->
+                  assert (child_of "a") ;
+                  thread "c" (fun () ->
+                      assert (child_of "b") ;
+                      stop () ;
+                      Deferred.unit ) ) ) )
 
-let[@inline] start_tracing _ = ()
+    let%test_unit "thread > background_thread > thread" =
+      test (fun stop ->
+          thread "a" (fun () ->
+              background_thread "b" (fun () ->
+                  assert (child_of "a") ;
+                  thread "c" (fun () ->
+                      assert (child_of "b") ;
+                      stop () ;
+                      Deferred.unit ) ) ;
+              Deferred.unit ) )
 
-let[@inline] stop_tracing () = ()
+    let%test_unit "thread > sync_thread" =
+      test (fun stop ->
+          thread "a" (fun () ->
+              sync_thread "b" (fun () ->
+                  assert (child_of "a") ;
+                  stop () ) ;
+              Deferred.unit ) )
 
-let[@inline] forget_tid f = f ()
+    let%test_unit "sync_thread > sync_thread" =
+      test' (fun stop ->
+          sync_thread "a" (fun () ->
+              sync_thread "b" (fun () ->
+                  assert (child_of "a") ;
+                  stop () ) ) )
 
-[%%endif]
+    let%test_unit "sync_thread > background_thread" =
+      test (fun stop ->
+          sync_thread "a" (fun () ->
+              background_thread "b" (fun () ->
+                  assert (child_of "a") ;
+                  stop () ;
+                  Deferred.unit ) ) ;
+          Deferred.unit )
+
+    let%test_unit "sync_thread > background_thread" =
+      test' (fun stop ->
+          sync_thread "a" (fun () ->
+              background_thread "b" (fun () ->
+                  assert (child_of "a") ;
+                  stop () ;
+                  Deferred.unit ) ) )
+
+    let%test_unit "sync_thread > background_thread > sync_thread > thread" =
+      test' (fun stop ->
+          sync_thread "a" (fun () ->
+              background_thread "b" (fun () ->
+                  assert (child_of "a") ;
+                  sync_thread "c" (fun () ->
+                      assert (child_of "b") ;
+                      don't_wait_for
+                        (thread "d" (fun () ->
+                             assert (child_of "c") ;
+                             stop () ;
+                             Deferred.unit ) ) ) ;
+                  Deferred.unit ) ) )
+
+    let%test_unit "exceptions are handled properly when raised in first cycle \
+                   of a thread" =
+      test (fun stop ->
+          match%map
+            Monitor.try_with (fun () ->
+                thread "test" (fun () -> raise Test_exn) )
+          with
+          | Ok _ ->
+              failwith "expected a failure"
+          | Error exn ->
+              assert (is_test_exn exn) ;
+              stop () )
+
+    let%test_unit "exceptions are handled properly when raised in first cycle \
+                   of a sync_thread" =
+      test (fun stop ->
+          match%map
+            Monitor.try_with (fun () ->
+                sync_thread "test" (fun () -> raise Test_exn) )
+          with
+          | Ok _ ->
+              failwith "expected a failure"
+          | Error exn ->
+              assert (is_test_exn exn) ;
+              stop () )
+
+    (* TODO: recursion tests *)
+  end )

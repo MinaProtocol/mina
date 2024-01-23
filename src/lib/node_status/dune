@@ -3,9 +3,14 @@
  (public_name node_status)
  (library_flags -linkall)
  (libraries
+   ;; opam libraries
+   core
    core_kernel
-   mina_networking
- )
+   async
+   async_kernel
+   ;; local libraries
+   mina_net2
+   mina_networking)
  (preprocess
   (pps ppx_version ppx_compare ppx_deriving.enum ppx_deriving.ord
        ppx_base ppx_bench ppx_let ppx_sexp_conv ppx_bin_prot))

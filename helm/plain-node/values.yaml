@@ -1,11 +1,11 @@
 testnetName: "testnet"
-coda:
+mina:
   runtimeConfig:
   generateGenesisProof: true
   logPrecomputedBlocks: true
   logTxnPoolGossip: false
   maxConnections: 200
-  image: codaprotocol/coda-daemon:0.0.12-beta-develop-589b507
+  image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet
   useCustomEntrypoint: false
   customEntrypoint: ""
   seedPeers:
@@ -17,6 +17,12 @@ coda:
     metrics: "10001"
     p2p: "10909"
   exposeGraphql: false
+  exposeItnGraphql: false
+  itn:
+    port: "3086"
+    keys: ""
+  cpuRequest: 6
+  memRequest: "12.0Gi"
 
 name: "plain-node-x"
 
@@ -28,3 +34,8 @@ healthcheck:
 
 nodeSelector:
   preemptible: false
+
+storage:
+  accessMode: "ReadWriteOnce"
+  size: "4Gi"
+  storageClass: "standard"

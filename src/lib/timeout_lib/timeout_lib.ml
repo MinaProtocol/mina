@@ -7,7 +7,7 @@ module type Time_intf = sig
   module Span : sig
     type t
 
-    val to_time_ns_span : t -> Core.Time_ns.Span.t
+    val to_time_ns_span : t -> Time_ns.Span.t
 
     val ( - ) : t -> t -> t
   end
@@ -87,8 +87,8 @@ module Make (Time : Time_intf) : Timeout_intf(Time).S = struct
             ( create time_controller timeout_duration ~f:(fun x ->
                   if Ivar.is_full ivar then
                     [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-                  Ivar.fill_if_empty ivar x)
-              : unit t ))
+                  Ivar.fill_if_empty ivar x )
+              : unit t ) )
     in
     Deferred.(
       choose
@@ -104,9 +104,9 @@ end
 
 module Core_time = Make (struct
   include (
-    Core.Time :
-      module type of Core.Time
-        with module Span := Core.Time.Span
+    Core_kernel.Time :
+      module type of Core_kernel.Time
+        with module Span := Core_kernel.Time.Span
          and type underlying = float )
 
   module Controller = struct
@@ -114,9 +114,9 @@ module Core_time = Make (struct
   end
 
   module Span = struct
-    include Core.Time.Span
+    include Core_kernel.Time.Span
 
-    let to_time_ns_span = Fn.compose Core.Time_ns.Span.of_ns to_ns
+    let to_time_ns_span = Fn.compose Core_kernel.Time_ns.Span.of_ns to_ns
   end
 
   let diff x y =
@@ -127,15 +127,16 @@ end)
 
 module Core_time_ns = Make (struct
   include (
-    Core.Time_ns :
-      module type of Core.Time_ns with module Span := Core.Time_ns.Span )
+    Core_kernel.Time_ns :
+      module type of Core_kernel.Time_ns
+        with module Span := Core_kernel.Time_ns.Span )
 
   module Controller = struct
     type t = unit
   end
 
   module Span = struct
-    include Core.Time_ns.Span
+    include Core_kernel.Time_ns.Span
 
     let to_time_ns_span = Fn.id
   end

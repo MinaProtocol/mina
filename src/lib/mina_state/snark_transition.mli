@@ -24,15 +24,15 @@ module Poly : sig
             , 'consensus_transition
             , 'pending_coinbase_update )
             V1.t =
-        ('blockchain_state, 'consensus_transition, 'pending_coinbase_update) t
+    ('blockchain_state, 'consensus_transition, 'pending_coinbase_update) t
 end
 
 module Value : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t =
-        ( Blockchain_state.Value.Stable.V1.t
+        ( Blockchain_state.Value.Stable.V2.t
         , Consensus.Data.Consensus_transition.Value.Stable.V1.t
         , Pending_coinbase.Update.Stable.V1.t )
         Poly.Stable.V1.t
@@ -62,7 +62,8 @@ val create_value :
 val genesis :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> consensus_constants:Consensus.Constants.t
-  -> genesis_ledger:Ledger.t Lazy.t
+  -> genesis_ledger:Mina_ledger.Ledger.t Lazy.t
+  -> genesis_body_reference:Consensus.Body_reference.t
   -> Value.t
 
 val consensus_transition :

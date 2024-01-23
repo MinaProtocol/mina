@@ -15,7 +15,7 @@ let check_and_set_lockfile ~logger conf_dir =
         Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
             Writer.with_file ~exclusive:true lockfile ~f:(fun writer ->
                 let pid = Unix.getpid () in
-                return (Writer.writef writer "%d\n" (Pid.to_int pid))))
+                return (Writer.writef writer "%d\n" (Pid.to_int pid)) ) )
       with
       | Ok () ->
           [%log info] "Created daemon lockfile $lockfile"
@@ -26,7 +26,7 @@ let check_and_set_lockfile ~logger conf_dir =
               | `Yes ->
                   Unix.unlink lockfile
               | _ ->
-                  return ())
+                  return () )
       | Error exn ->
           Error.tag_arg (Error.of_exn exn)
             "Could not create the daemon lockfile" ("lockfile", lockfile)
@@ -72,7 +72,7 @@ let check_and_set_lockfile ~logger conf_dir =
                       [ ("lockfile", `String lockfile)
                       ; ("pid", `Int (Pid.to_int pid))
                       ] ;
-                  Unix.unlink lockfile )))
+                  Unix.unlink lockfile ) ) )
       with
       | Ok () ->
           ()
@@ -84,6 +84,45 @@ let check_and_set_lockfile ~logger conf_dir =
       Error.create "Could not determine whether the daemon lockfile exists"
         ("lockfile", lockfile) [%sexp_of: string * string]
       |> Error.raise
+
+let get_hw_info () =
+  let open Async in
+  let%bind linux_info =
+    if String.equal Sys.os_type "Unix" then
+      match%map Process.run ~prog:"uname" ~args:[ "-a" ] () with
+      | Ok s when String.is_prefix s ~prefix:"Linux" ->
+          Some s
+      | _ ->
+          None
+    else return None
+  in
+  if Option.is_some linux_info then
+    let linux_hw_progs =
+      [ ("cat", [ "/etc/os-release" ])
+      ; ("lscpu", [])
+      ; ("lsgpu", [])
+      ; ("lsmem", [])
+      ; ("lsblk", [])
+      ]
+    in
+    let%map outputs =
+      Deferred.List.map linux_hw_progs ~f:(fun (prog, args) ->
+          let header =
+            sprintf "*** Output from '%s' ***\n"
+              (String.concat ~sep:" " (prog :: args))
+          in
+          let%bind output =
+            match%map Process.run_lines ~prog ~args () with
+            | Ok lines ->
+                lines
+            | Error err ->
+                [ sprintf "Error: %s" (Error.to_string_hum err) ]
+          in
+          return ((header :: output) @ [ "" ]) )
+    in
+    Some (Option.value_exn linux_info :: List.concat outputs)
+  else (* TODO: Mac, other Unixes *)
+    return None
 
 let export_logs_to_tar ?basename ~conf_dir =
   let open Async in
@@ -108,45 +147,7 @@ let export_logs_to_tar ?basename ~conf_dir =
     Core.Sys.ls_dir conf_dir
     |> List.filter ~f:(String.is_substring ~substring:".log")
   in
-  let%bind.Deferred linux_info =
-    if String.equal Sys.os_type "Unix" then
-      match%map.Deferred Process.run ~prog:"uname" ~args:[ "-a" ] () with
-      | Ok s when String.is_prefix s ~prefix:"Linux" ->
-          Some s
-      | _ ->
-          None
-    else Deferred.return None
-  in
-  let%bind.Deferred hw_info_opt =
-    if Option.is_some linux_info then
-      let open Deferred.Let_syntax in
-      let linux_hw_progs =
-        [ ("cat", [ "/etc/os-release" ])
-        ; ("lscpu", [])
-        ; ("lsgpu", [])
-        ; ("lsmem", [])
-        ; ("lsblk", [])
-        ]
-      in
-      let%map outputs =
-        Deferred.List.map linux_hw_progs ~f:(fun (prog, args) ->
-            let header =
-              sprintf "*** Output from '%s' ***\n"
-                (String.concat ~sep:" " (prog :: args))
-            in
-            let%bind output =
-              match%map Process.run_lines ~prog ~args () with
-              | Ok lines ->
-                  lines
-              | Error err ->
-                  [ sprintf "Error: %s" (Error.to_string_hum err) ]
-            in
-            return ((header :: output) @ [ "" ]))
-      in
-      Some (Option.value_exn linux_info :: List.concat outputs)
-    else (* TODO: Mac, other Unixes *)
-      Deferred.return None
-  in
+  let%bind.Deferred hw_info_opt = get_hw_info () in
   let%bind.Deferred hw_file_opt =
     if Option.is_some hw_info_opt then
       let open Async in
@@ -156,7 +157,7 @@ let export_logs_to_tar ?basename ~conf_dir =
         Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
             Writer.with_file ~exclusive:true hw_info_file ~f:(fun writer ->
                 Deferred.List.map (Option.value_exn hw_info_opt) ~f:(fun line ->
-                    return (Writer.write_line writer line))))
+                    return (Writer.write_line writer line) ) ) )
       with
       | Ok _units ->
           Some hw_info
@@ -168,7 +169,7 @@ let export_logs_to_tar ?basename ~conf_dir =
   let base_files = "mina.version" :: log_files in
   let files =
     Option.value_map hw_file_opt ~default:base_files ~f:(fun hw_file ->
-        hw_file :: base_files)
+        hw_file :: base_files )
   in
   let tmp_dir = Filename.temp_dir ~in_dir:"/tmp" ("mina-logs_" ^ basename) "" in
   let files_in_dir dir = List.map files ~f:(fun file -> dir ^/ file) in

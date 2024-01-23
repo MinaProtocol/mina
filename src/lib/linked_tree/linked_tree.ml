@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Mina_numbers
 
 module type Key = Hashtbl.Key_plain
@@ -85,7 +85,7 @@ module Make (Key : Key) : S with module Key = Key = struct
         Hashtbl.remove t.table node.key ;
         List.iter node.children ~f:(fun child ->
             child.parent <- `Key node.key ;
-            go child) )
+            go child ) )
     in
     List.iter t.roots ~f:go
 

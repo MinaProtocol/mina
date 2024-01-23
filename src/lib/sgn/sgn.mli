@@ -1,16 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-
-[%%endif]
 
 [%%versioned:
 module Stable : sig
@@ -19,6 +10,8 @@ module Stable : sig
     [@@deriving sexp, hash, compare, equal, yojson]
   end
 end]
+
+type t = Stable.Latest.t = Pos | Neg
 
 val to_field : t -> Field.t
 
@@ -51,7 +44,7 @@ module Checked : sig
 
   val negate : var -> var
 
-  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+  val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
 end
 
 [%%endif]

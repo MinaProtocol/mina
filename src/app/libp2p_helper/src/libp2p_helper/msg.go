@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	gonet "net"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 
 	capnp "capnproto.org/go/capnp/v3"
 	"github.com/go-errors/errors"
-	peer "github.com/libp2p/go-libp2p-core/peer"
+	peer "github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -20,11 +21,22 @@ type codaPeerInfo struct {
 	PeerID     string
 }
 
-type ipcRpcRequest = ipc.Libp2pHelperInterface_RpcRequest
-type extractRequest = func(ipcRpcRequest) (rpcRequest, error)
-type rpcRequest interface {
-	handle(app *app, seqno uint64) *capnp.Message
+type ipcPushMessage = ipc.Libp2pHelperInterface_PushMessage
+type pushMessage interface {
+	handle(app *app)
 }
+type extractPushMessage = func(ipcPushMessage) (pushMessage, error)
+
+type ipcRpcRequest = ipc.Libp2pHelperInterface_RpcRequest
+type rpcRequest interface {
+	// Handles rpc request and returns response and a function to be called
+	// immediately after writing response to the output stream
+	//
+	// Callback is needed in some cases to make sure response is written
+	// before some other messages might get written to the output stream
+	handle(app *app, seqno uint64) (*capnp.Message, func())
+}
+type extractRequest = func(ipcRpcRequest) (rpcRequest, error)
 
 func filterIPString(filters *ma.Filters, ip string, action ma.Action) error {
 	realIP := gonet.ParseIP(ip).To4()
@@ -63,7 +75,7 @@ func multiaddrListForeach(l ipc.Multiaddr_List, f func(string) error) error {
 	return nil
 }
 
-func capnpPeerIdListForeach(l ipc.PeerId_List, f func(string) error) error {
+func peerIdListForeach(l ipc.PeerId_List, f func(string) error) error {
 	for i := 0; i < l.Len(); i++ {
 		el, err := l.At(i).Id()
 		if err != nil {
@@ -77,7 +89,7 @@ func capnpPeerIdListForeach(l ipc.PeerId_List, f func(string) error) error {
 	return nil
 }
 
-func capnpTextListForeach(l capnp.TextList, f func(string) error) error {
+func textListForeach(l capnp.TextList, f func(string) error) error {
 	for i := 0; i < l.Len(); i++ {
 		el, err := l.At(i)
 		if err != nil {
@@ -91,7 +103,18 @@ func capnpTextListForeach(l capnp.TextList, f func(string) error) error {
 	return nil
 }
 
-func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet.CodaGatingState, error) {
+func blockWithIdListForeach(l ipc.BlockWithId_List, f func(ipc.BlockWithId) error) error {
+	for i := 0; i < l.Len(); i++ {
+		el := l.At(i)
+		err := f(el)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet.CodaGatingConfig, error) {
 	_, totalIpNet, err := gonet.ParseCIDR("0.0.0.0/0")
 	if err != nil {
 		return nil, err
@@ -107,7 +130,7 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	if err != nil {
 		return nil, err
 	}
-	err = capnpTextListForeach(bannedIps, func(ip string) error {
+	err = textListForeach(bannedIps, func(ip string) error {
 		return filterIPString(bannedAddrFilters, ip, ma.ActionDeny)
 	})
 	if err != nil {
@@ -121,7 +144,7 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	if err != nil {
 		return nil, err
 	}
-	err = capnpTextListForeach(trustedIps, func(ip string) error {
+	err = textListForeach(trustedIps, func(ip string) error {
 		return filterIPString(trustedAddrFilters, ip, ma.ActionAccept)
 	})
 	if err != nil {
@@ -132,11 +155,11 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	if err != nil {
 		return nil, err
 	}
-	bannedPeers := peer.NewSet()
-	err = capnpPeerIdListForeach(bannedPeerIds, func(peerID string) error {
+	bannedPeers := make(map[peer.ID]struct{})
+	err = peerIdListForeach(bannedPeerIds, func(peerID string) error {
 		id, err := peer.Decode(peerID)
 		if err == nil {
-			bannedPeers.Add(id)
+			bannedPeers[id] = struct{}{}
 		}
 		return err
 	})
@@ -148,20 +171,28 @@ func readGatingConfig(gc ipc.GatingConfig, addedPeers []peer.AddrInfo) (*codanet
 	if err != nil {
 		return nil, err
 	}
-	trustedPeers := peer.NewSet()
-	err = capnpPeerIdListForeach(trustedPeerIds, func(peerID string) error {
-		id := peer.ID(peerID)
-		trustedPeers.Add(id)
+	trustedPeers := make(map[peer.ID]struct{})
+	err = peerIdListForeach(trustedPeerIds, func(peerID string) error {
+		id, err := peer.Decode(peerID)
+		if err == nil {
+			trustedPeers[id] = struct{}{}
+		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	for _, peer := range addedPeers {
-		trustedPeers.Add(peer.ID)
+	if !gc.CleanAddedPeers() {
+		for _, peer := range addedPeers {
+			trustedPeers[peer.ID] = struct{}{}
+		}
 	}
 
-	return codanet.NewCodaGatingState(bannedAddrFilters, trustedAddrFilters, bannedPeers, trustedPeers), nil
+	return &codanet.CodaGatingConfig{
+		BannedAddrFilters:  bannedAddrFilters,
+		TrustedAddrFilters: trustedAddrFilters,
+		BannedPeers:        bannedPeers,
+		TrustedPeers:       trustedPeers}, nil
 }
 
 func panicOnErr(err error) {
@@ -181,7 +212,7 @@ func setNanoTime(ns *ipc.UnixNano, t time.Time) {
 	ns.SetNanoSec(t.UnixNano())
 }
 
-func mkRpcRespError(seqno uint64, rpcRespErr error) *capnp.Message {
+func mkRpcRespErrorNoFunc(seqno uint64, rpcRespErr error) *capnp.Message {
 	if rpcRespErr == nil {
 		panic("mkRpcRespError: nil error")
 	}
@@ -202,7 +233,11 @@ func mkRpcRespError(seqno uint64, rpcRespErr error) *capnp.Message {
 	})
 }
 
-func mkRpcRespSuccess(seqno uint64, f func(*ipc.Libp2pHelperInterface_RpcResponseSuccess)) *capnp.Message {
+func mkRpcRespError(seqno uint64, rpcRespErr error) (*capnp.Message, func()) {
+	return mkRpcRespErrorNoFunc(seqno, rpcRespErr), nil
+}
+
+func mkRpcRespSuccessNoFunc(seqno uint64, f func(*ipc.Libp2pHelperInterface_RpcResponseSuccess)) *capnp.Message {
 	return mkMsg(func(seg *capnp.Segment) {
 		m, err := ipc.NewRootDaemonInterface_Message(seg)
 		panicOnErr(err)
@@ -220,6 +255,10 @@ func mkRpcRespSuccess(seqno uint64, f func(*ipc.Libp2pHelperInterface_RpcRespons
 		panicOnErr(err)
 		f(&succ)
 	})
+}
+
+func mkRpcRespSuccess(seqno uint64, f func(*ipc.Libp2pHelperInterface_RpcResponseSuccess)) (*capnp.Message, func()) {
+	return mkRpcRespSuccessNoFunc(seqno, f), nil
 }
 
 func mkPushMsg(f func(ipc.DaemonInterface_PushMessage)) *capnp.Message {
@@ -316,6 +355,7 @@ func mkGossipReceivedUpcall(sender *codaPeerInfo, expiration time.Time, seenAt t
 		subId.SetId(subIdx)
 
 		sn, err := gr.NewValidationId()
+		panicOnErr(err)
 		sn.SetId(seqno)
 		panicOnErr(gr.SetData(data))
 	})
@@ -352,5 +392,21 @@ func mkStreamMessageReceivedUpcall(streamIdx uint64, data []byte) *capnp.Message
 		panicOnErr(err)
 		sid.SetId(streamIdx)
 		panicOnErr(im.SetData(data))
+	})
+}
+
+func mkResourceUpdatedUpcall(type_ ipc.ResourceUpdateType, rootIds []root) *capnp.Message {
+	return mkPushMsg(func(m ipc.DaemonInterface_PushMessage) {
+		im, err := m.NewResourceUpdated()
+		panicOnErr(err)
+		if len(rootIds) > math.MaxInt32 {
+			panic("too many root ids in a single upcall")
+		}
+		im.SetType(type_)
+		mIds, err := im.NewIds(int32(len(rootIds)))
+		panicOnErr(err)
+		for i, rootId := range rootIds {
+			panicOnErr(mIds.At(i).SetBlake2bHash(rootId[:]))
+		}
 	})
 }

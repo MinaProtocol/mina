@@ -67,4 +67,4 @@ let rec sequence (list : 'a T.t List.t) : 'a List.t T.t =
   | participating_state :: participating_states ->
       bind participating_state ~f:(fun x ->
           map (sequence participating_states) ~f:(fun sub_result ->
-              x :: sub_result))
+              x :: sub_result ) )

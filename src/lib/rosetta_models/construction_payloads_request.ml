@@ -8,9 +8,9 @@
 
 type t =
   { network_identifier : Network_identifier.t
-  ; operations : Operation.t list
+  ; operations : Operation.t list [@default []]
   ; metadata : Yojson.Safe.t option [@default None]
-  ; public_keys : Public_key.t list
+  ; public_keys : Public_key.t list [@default []]
   }
 [@@deriving yojson { strict = false }, show, eq]
 
