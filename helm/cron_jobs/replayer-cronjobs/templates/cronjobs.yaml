@@ -34,16 +34,16 @@ spec:
             terminationMessagePolicy: File
             volumeMounts:
             - mountPath: /gcloud/
-              name: gcloud-keyfile
+              name: gcloud-keyfile-cronjobs
             - mountPath: /scripts/
               name: {{ .script.secretName }}
           restartPolicy: Never
           terminationGracePeriodSeconds: 30
           volumes:
-          - name: gcloud-keyfile
+          - name: gcloud-keyfile-cronjobs
             secret:
               defaultMode: 256
-              secretName: gcloud-keyfile
+              secretName: gcloud-keyfile-cronjobs
           - name: {{ .script.secretName }}
             secret:
               defaultMode: 0755
