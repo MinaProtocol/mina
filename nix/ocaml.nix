@@ -147,7 +147,7 @@ let
         MINA_COMMIT_DATE = "<unknown>";
         MINA_BRANCH = "<unknown>";
 
-        DUNE_PROFILE = "devnet";
+        DUNE_PROFILE = "dev";
 
         NIX_LDFLAGS =
           optionalString (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64)
@@ -256,6 +256,22 @@ let
       # Same as above, but wrapped with version info.
       mina = wrapMina self.mina-dev { };
 
+      # Mina with additional instrumentation info.
+      with-instrumentation-dev = self.mina-dev.overrideAttrs (oa: {
+        pname = "with-instrumentation";
+        outputs = [ "out" ];
+
+        buildPhase = ''
+          dune build  --display=short --profile=testnet_postake_medium_curves --instrument-with bisect_ppx src/app/cli/src/mina.exe
+        '';
+        installPhase = ''
+          mkdir -p $out/bin
+          mv _build/default/src/app/cli/src/mina.exe $out/bin/mina
+        '';
+      });
+
+      with-instrumentation = wrapMina self.with-instrumentation-dev { };
+
       # Unit tests
       mina_tests = runMinaCheck {
         name = "tests";
@@ -280,46 +296,6 @@ let
       mina-ocaml-format = runMinaCheck { name = "ocaml-format"; } ''
         dune exec --profile=dev src/app/reformat/reformat.exe -- -path . -check
       '';
-
-      # Javascript Client SDK
-      mina_client_sdk = self.mina-dev.overrideAttrs (_: {
-        pname = "mina_client_sdk";
-        version = "dev";
-        src = filtered-src;
-
-        outputs = [ "out" ];
-
-        checkInputs = [ pkgs.nodejs-16_x ];
-
-        MINA_VERSION_IMPLEMENTATION = "mina_version.dummy";
-
-        buildPhase = ''
-          dune build --display=short \
-            src/lib/crypto/kimchi_bindings/js/node_js \
-            src/app/client_sdk/client_sdk.bc.js \
-            src/lib/snarky_js_bindings/snarky_js_node.bc.js \
-            src/lib/snarky_js_bindings/snarky_js_web.bc.js
-        '';
-
-        doCheck = true;
-        checkPhase = ''
-          node src/app/client_sdk/tests/run_unit_tests.js
-
-          dune build src/app/client_sdk/tests/test_signatures.exe
-          ./_build/default/src/app/client_sdk/tests/test_signatures.exe > nat.consensus.json
-          node src/app/client_sdk/tests/test_signatures.js > js.nonconsensus.json
-          if ! diff -q nat.consensus.json js.nonconsensus.json; then
-            echo "Consensus and JS code generate different signatures";
-            exit 1
-          fi
-        '';
-
-        installPhase = ''
-          mkdir -p $out/share/client_sdk $out/share/snarkyjs_bindings
-          mv _build/default/src/app/client_sdk/client_sdk.bc.js $out/share/client_sdk
-          mv _build/default/src/lib/snarky_js_bindings/snarky_js_*.js $out/share/snarkyjs_bindings
-        '';
-      });
 
       # Integration test executive
       test_executive-dev = self.mina-dev.overrideAttrs (oa: {

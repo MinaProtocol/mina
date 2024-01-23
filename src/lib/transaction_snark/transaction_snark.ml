@@ -885,6 +885,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           module Permissions = struct
             type controller = Permissions.Auth_required.Checked.t
 
+            type txn_version = Mina_numbers.Txn_version.Checked.t
+
             let edit_state : t -> controller =
              fun a -> a.data.permissions.edit_state
 
@@ -900,8 +902,11 @@ module Make_str (A : Wire_types.Concrete) = struct
             let set_permissions : t -> controller =
              fun a -> a.data.permissions.set_permissions
 
-            let set_verification_key : t -> controller =
-             fun a -> a.data.permissions.set_verification_key
+            let set_verification_key_auth : t -> controller =
+             fun a -> fst a.data.permissions.set_verification_key
+
+            let set_verification_key_txn_version : t -> txn_version =
+             fun a -> snd a.data.permissions.set_verification_key
 
             let set_zkapp_uri : t -> controller =
              fun a -> a.data.permissions.set_zkapp_uri
@@ -923,7 +928,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             type t = Permissions.Checked.t
 
-            let if_ b ~then_ ~else_ = Permissions.Checked.if_ b ~then_ ~else_
+            let if_ b ~then_ ~else_ =
+              run_checked @@ Permissions.Checked.if_ b ~then_ ~else_
           end
 
           let account_with_hash (account : Account.Checked.Unhashed.t) : t =
@@ -1452,6 +1458,25 @@ module Make_str (A : Wire_types.Concrete) = struct
                   fun ~proof_verifies:_ ~signature_verifies perm ->
                     Permissions.Auth_required.Checked.eval_no_proof
                       ~signature_verifies perm
+
+            let verification_key_perm_fallback_to_signature_with_older_version =
+              Permissions.Auth_required.Checked
+              .verification_key_perm_fallback_to_signature_with_older_version
+          end
+
+          module Txn_version = struct
+            type t = Mina_numbers.Txn_version.Checked.t
+
+            let if_ cond ~then_ ~else_ =
+              run_checked
+              @@ Mina_numbers.Txn_version.Checked.if_ cond ~then_ ~else_
+
+            let equal_to_current t =
+              run_checked @@ Mina_numbers.Txn_version.equal_to_current_checked t
+
+            let older_than_current t =
+              run_checked
+              @@ Mina_numbers.Txn_version.older_than_current_checked t
           end
 
           module Ledger = struct
@@ -2073,14 +2098,14 @@ module Make_str (A : Wire_types.Concrete) = struct
         let open Basic in
         let module M = H4.T (Pickles.Tag) in
         let s = Basic.spec t in
-        let prev_should_verify =
+        let prev_must_verify =
           match proof_level with
           | Genesis_constants.Proof_level.Full ->
               true
           | _ ->
               false
         in
-        let b = Boolean.var_of_value prev_should_verify in
+        let b = Boolean.var_of_value prev_must_verify in
         match t with
         | Proved ->
             { identifier = "proved"
@@ -3245,14 +3270,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       (s1, s2)
 
     let rule ~proof_level self : _ Pickles.Inductive_rule.t =
-      let prev_should_verify =
+      let prev_must_verify =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
             true
         | _ ->
             false
       in
-      let b = Boolean.var_of_value prev_should_verify in
+      let b = Boolean.var_of_value prev_must_verify in
       { identifier = "merge"
       ; prevs = [ self; self ]
       ; main =
@@ -3293,6 +3318,13 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~constraint_constants:
         (Genesis_constants.Constraint_constants.to_snark_keys_header
            constraint_constants )
+      ~commits:
+        { commits =
+            { mina = Mina_version.commit_id
+            ; marlin = Mina_version.marlin_commit_id
+            }
+        ; commit_date = Mina_version.commit_date
+        }
       ~choices:(fun ~self ->
         let zkapp_command x =
           Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
@@ -4664,7 +4696,8 @@ module Make_str (A : Wire_types.Concrete) = struct
               ; may_use_token = No
               ; authorization_kind = Proof (With_hash.hash vk)
               }
-          ; authorization = Control.Proof Mina_base.Proof.blockchain_dummy
+          ; authorization =
+              Control.Proof (Lazy.force Mina_base.Proof.blockchain_dummy)
           }
       in
       let account_update_digest_with_selected_chain =
@@ -5059,7 +5092,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; may_use_token = No
             ; authorization_kind = Proof (With_hash.hash vk)
             }
-        ; authorization = Proof Mina_base.Proof.transaction_dummy
+        ; authorization = Proof (Lazy.force Mina_base.Proof.transaction_dummy)
         }
       in
       let memo = Signed_command_memo.empty in

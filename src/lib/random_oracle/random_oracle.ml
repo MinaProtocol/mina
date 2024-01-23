@@ -16,12 +16,15 @@ module State = struct
   include Array
 
   let map2 = map2_exn
+
+  let to_array t = t
+
+  let of_array t = t
 end
 
 module Input = Random_oracle_input
 
-let params : Field.t Sponge.Params.t =
-  Sponge.Params.(map pasta_p_kimchi ~f:Field.of_string)
+let params : Field.t Sponge.Params.t = Kimchi_pasta_basic.poseidon_params_fp
 
 module Operations = struct
   let add_assign ~state i x = Field.(state.(i) <- state.(i) + x)
@@ -143,7 +146,7 @@ module Legacy = struct
   module State = State
 
   let params : Field.t Sponge.Params.t =
-    Sponge.Params.(map pasta_p_legacy ~f:Field.of_string)
+    Sponge.Params.(map pasta_p_legacy ~f:Kimchi_pasta_basic.Fp.of_string)
 
   module Rounds = struct
     let rounds_full = 63

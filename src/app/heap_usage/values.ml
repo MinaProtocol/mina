@@ -242,7 +242,7 @@ let scan_state_merge_node :
       let sok_msg : Mina_base.Sok_message.t =
         { fee = Currency.Fee.zero; prover = sample_pk_compressed }
       in
-      let proof = Mina_base.Proof.transaction_dummy in
+      let proof = Lazy.force Mina_base.Proof.transaction_dummy in
       let statement =
         let without_sok =
           Quickcheck.random_value ~seed:(`Deterministic "no sok left")
@@ -258,7 +258,7 @@ let scan_state_merge_node :
         { fee = Currency.Fee.zero; prover = sample_pk_compressed }
       in
       (* so the left, right proofs differ, don't want sharing *)
-      let proof = Mina_base.Proof.blockchain_dummy in
+      let proof = Lazy.force Mina_base.Proof.blockchain_dummy in
       let statement =
         let without_sok =
           Quickcheck.random_value ~seed:(`Deterministic "no sok right")
@@ -413,7 +413,7 @@ let protocol_state =
       ],
       "last_vrf_output": "q4zrn2ZlIeTV8_8XPb3PZu4eQusG0n5ieUNy5gyZAAA=",
       "total_currency": "1014488754000001000",
-      "curr_global_slot": {
+      "curr_global_slot_since_hard_fork": {
         "slot_number": "2831",
         "slots_per_epoch": "7140"
       },
@@ -448,6 +448,7 @@ let protocol_state =
       "k": "290",
       "slots_per_epoch": "7140",
       "slots_per_sub_window": "7",
+      "grace_period_slots": "2160",
       "delta": "0",
       "genesis_state_timestamp": "1680823801000"
     }

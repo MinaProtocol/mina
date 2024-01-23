@@ -45,9 +45,16 @@ case "${MINA_DEB_CODENAME}" in
     ;;
 esac
 
+case "${DUNE_PROFILE}" in
+  devnet)
+    MINA_DEB_NAME="mina-berkeley"
+    ;;
+  *)
+    MINA_DEB_NAME="mina-berkeley-${DUNE_PROFILE}"
+    ;;
+esac
 
 BUILDDIR="deb_build"
-
 
 # Function to ease creation of Debian package control files
 create_control_file() {
@@ -130,7 +137,24 @@ copy_common_daemon_configs() {
 
   # Copy signature-based Binaries (based on signature type $2 passed into the function)
   cp ./default/src/app/cli/src/mina_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
+
+  # Copy rosetta-based Binaries
   cp ./default/src/app/rosetta/rosetta_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+  cp ./default/src/app/rosetta/ocaml-signer/signer_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
+
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/archive"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/genesis_ledgers"
+
+  # --- Copy artifacts
+  cp ../src/app/rosetta/*.conf "${BUILDDIR}/etc/mina/rosetta"
+  cp ../src/app/rosetta/*.sh "${BUILDDIR}/etc/mina/rosetta"
+
+  cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/rosetta/archive"
+  cp -r ../genesis_ledgers/* ${BUILDDIR}/etc/mina/rosetta/genesis_ledgers/
 
   # Copy over Build Configs (based on $2)
   mkdir -p "${BUILDDIR}/etc/coda/build_config"
@@ -197,6 +221,20 @@ build_deb mina-logproc
 
 ##################################### END LOGPROC PACKAGE #######################################
 
+##################################### GENERATE RECEIPT CHAIN HASH FIX PACKAGE #######################################
+
+create_control_file mina-receipt-chain-hash-fix "${SHARED_DEPS}${DAEMON_DEPS}" 'Tool to run automated fix against a archive database for receipt chain hash.'
+
+mkdir -p "${BUILDDIR}/etc/mina/receipt-chain-hash-fix-script"
+
+# Binaries
+cp ../scripts/migrate-itn-data.sh "${BUILDDIR}/etc/mina/receipt-chain-hash-fix-script/migrate-itn-data.sh"
+cp ./default/src/app/last_vrf_output_to_b64/last_vrf_output_to_b64.exe "${BUILDDIR}/usr/local/bin/mina-last-vrf-output-to-b64"
+cp ./default/src/app/receipt_chain_hash_to_b58/receipt_chain_hash_to_b58.exe "${BUILDDIR}/usr/local/bin/mina-receipt-chain-hash-to-b58"
+
+build_deb mina-receipt-chain-hash-fix
+
+##################################### END RECEIPT CHAIN HASH FIX PACKAGE #######################################
 
 ##################################### GENERATE TEST_EXECUTIVE PACKAGE #######################################
 
@@ -215,6 +253,20 @@ create_control_file mina-batch-txn "${SHARED_DEPS}" 'Load transaction tool again
 cp ./default/src/app/batch_txn_tool/batch_txn_tool.exe "${BUILDDIR}/usr/local/bin/mina-batch-txn"
 
 build_deb mina-batch-txn
+
+##################################### END BATCH TXN TOOL PACKAGE #######################################
+
+##################################### GENERATE TEST SUITE PACKAGE #######################################
+
+
+create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.'
+
+# Binaries
+cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
+
+build_deb mina-test-suite
+
+##################################### END TEST SUITE PACKAGE #######################################
 
 ##################################### MAINNET PACKAGE #######################################
 if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
@@ -259,18 +311,18 @@ cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe "${BUILDD
 
 build_deb mina-zkapp-test-transaction
 
-##################################### END SNAPP TEST TXN PACKAGE #######################################
+##################################### END ZKAPP TEST TXN PACKAGE #######################################
 
 ##################################### BERKELEY PACKAGE #######################################
 echo "------------------------------------------------------------"
 echo "--- Building Mina Berkeley testnet signatures deb without keys:"
 
 mkdir -p "${BUILDDIR}/DEBIAN"
-create_control_file mina-berkeley "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
+create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
 
 copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
 
-build_deb mina-berkeley
+build_deb "${MINA_DEB_NAME}"
 
 ##################################### END BERKELEY PACKAGE #######################################
 
@@ -328,7 +380,7 @@ if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
 then
   echo "---- Built all packages including mainnet, devnet, and the sidecar"
 else
-  echo "---- Not a mainnet-like branch, only built berkeley and beyond packages"  
+  echo "---- Not a mainnet-like branch, only built berkeley and beyond packages"
 fi
 
 ls -lh mina*.deb

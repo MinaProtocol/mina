@@ -34,7 +34,8 @@ end) =
 struct
   type t = Event.t list [@@deriving compare, sexp]
 
-  let empty_hash = Random_oracle.(salt Inputs.salt_phrase |> digest)
+  let empty_hash =
+    Hash_prefix_create.salt Inputs.salt_phrase |> Random_oracle.digest
 
   let push_hash acc hash =
     Random_oracle.hash ~init:Inputs.hash_prefix [| acc; hash |]
@@ -126,7 +127,7 @@ module Actions = struct
 
   let empty_state_element =
     let salt_phrase = "MinaZkappActionStateEmptyElt" in
-    Random_oracle.(salt salt_phrase |> digest)
+    Hash_prefix_create.salt salt_phrase |> Random_oracle.digest
 
   let push_events (acc : Field.t) (events : t) : Field.t =
     push_hash acc (hash events)
@@ -344,8 +345,8 @@ let typ : (Checked.t, t) Typ.t =
   let open Poly in
   Typ.of_hlistable
     [ Zkapp_state.typ Field.typ
-    ; Flagged_option.option_typ
-        ~default:{ With_hash.data = None; hash = dummy_vk_hash () }
+    ; Flagged_option.lazy_option_typ
+        ~default:(lazy { With_hash.data = None; hash = dummy_vk_hash () })
         (Data_as_hash.typ ~hash:With_hash.hash)
       |> Typ.transport
            ~there:(Option.map ~f:(With_hash.map ~f:Option.some))

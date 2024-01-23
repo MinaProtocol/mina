@@ -73,9 +73,12 @@ let setup_daemon logger =
     flag "--block-producer-key" ~aliases:[ "block-producer-key" ]
       ~doc:
         (sprintf
-           "KEYFILE Private key file for the block producer. You cannot \
+           "DEPRECATED: Use environment variable `MINA_BP_PRIVKEY` instead. \
+            Private key file for the block producer. Providing this flag or \
+            the environment variable will enable block production. You cannot \
             provide both `block-producer-key` and `block-producer-pubkey`. \
-            (default: don't produce blocks). %s"
+            (default: use environment variable `MINA_BP_PRIVKEY`, if provided, \
+            or else don't produce any blocks) %s"
            receiver_key_warning )
       (optional string)
   and block_production_pubkey =
@@ -85,8 +88,8 @@ let setup_daemon logger =
         (sprintf
            "PUBLICKEY Public key for the associated private key that is being \
             tracked by this daemon. You cannot provide both \
-            `block-producer-key` and `block-producer-pubkey`. (default: don't \
-            produce blocks). %s"
+            `block-producer-key` (or `MINA_BP_PRIVKEY`) and \
+            `block-producer-pubkey`. (default: don't produce blocks) %s"
            receiver_key_warning )
       (optional public_key_compressed)
   and block_production_password =
@@ -539,7 +542,7 @@ let setup_daemon logger =
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-oversized-logs.log"
-               ~max_size:logrotate_max_size ~num_rotate:file_log_rotations ) ;
+               ~max_size:logrotate_max_size ~num_rotate:20 ) ;
         (* Consumer for `[%log internal]` logging used for internal tracing *)
         Itn_logger.set_message_postprocessor
           Internal_tracing.For_itn_logger.post_process_message ;
@@ -753,17 +756,29 @@ let setup_daemon logger =
             | Ok (precomputed_values, _) ->
                 precomputed_values
             | Error err ->
-                let json_config, accounts_omitted =
+                let ( json_config
+                    , `Accounts_omitted
+                        ( `Genesis genesis_accounts_omitted
+                        , `Staking staking_accounts_omitted
+                        , `Next next_accounts_omitted ) ) =
                   Runtime_config.to_yojson_without_accounts config
                 in
-                let f i = List.cons ("accounts_omitted", `Int i) in
-                [%log fatal]
-                  "Failed initializing with configuration $config: $error"
-                  ~metadata:
-                    (Option.value_map ~f ~default:Fn.id accounts_omitted
+                let append_accounts_omitted s =
+                  Option.value_map
+                    ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
+                    ~default:Fn.id
+                in
+                let metadata =
+                  append_accounts_omitted "genesis" genesis_accounts_omitted
+                  @@ append_accounts_omitted "staking" staking_accounts_omitted
+                  @@ append_accounts_omitted "next" next_accounts_omitted
                        [ ("config", json_config)
                        ; ("error", Error_json.error_to_yojson err)
-                       ] ) ;
+                       ]
+                in
+                [%log info]
+                  "Initializing with runtime configuration. Ledger name: $name"
+                  ~metadata ;
                 Error.raise err
           in
           let rev_daemon_configs =
@@ -953,21 +968,39 @@ let setup_daemon logger =
                   Unix.putenv ~key:Secrets.Keypair.env ~data:password )
             block_production_password ;
           let%bind block_production_keypair =
-            match (block_production_key, block_production_pubkey) with
-            | Some _, Some _ ->
+            match
+              ( block_production_key
+              , block_production_pubkey
+              , Sys.getenv "MINA_BP_PRIVKEY" )
+            with
+            | Some _, Some _, _ ->
                 Mina_user_error.raise
                   "You cannot provide both `block-producer-key` and \
                    `block_production_pubkey`"
-            | None, None ->
+            | None, Some _, Some _ ->
+                Mina_user_error.raise
+                  "You cannot provide both `MINA_BP_PRIVKEY` and \
+                   `block_production_pubkey`"
+            | None, None, None ->
                 Deferred.return None
-            | Some sk_file, _ ->
+            | None, None, Some base58_privkey ->
+                let kp =
+                  Private_key.of_base58_check_exn base58_privkey
+                  |> Keypair.of_private_key_exn
+                in
+                Deferred.return (Some kp)
+            (* CLI argument takes precedence over env variable *)
+            | Some sk_file, None, (Some _ | None) ->
+                [%log warn]
+                  "`block-producer-key` is deprecated. Please set \
+                   `MINA_BP_PRIVKEY` environment variable instead." ;
                 let%map kp =
                   Secrets.Keypair.Terminal_stdin.read_exn
                     ~should_prompt_user:false ~which:"block producer keypair"
                     sk_file
                 in
                 Some kp
-            | _, Some tracked_pubkey ->
+            | None, Some tracked_pubkey, None ->
                 let%map kp =
                   Secrets.Wallets.get_tracked_keypair ~logger
                     ~which:"block producer keypair"
@@ -1656,6 +1689,52 @@ let internal_commands logger =
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
                  failwith "early EOF while reading sexp" ) ) )
+  ; ( "run-snark-worker-single"
+    , Command.async
+        ~summary:"Run snark-worker on a sexp provided on a single line of stdin"
+        (let open Command.Let_syntax in
+        let%map_open filename =
+          flag "--file" (required string)
+            ~doc:"File containing the s-expression of the snark work to execute"
+        in
+        fun () ->
+          let open Deferred.Let_syntax in
+          let logger = Logger.create () in
+          Parallel.init_master () ;
+          match%bind
+            Reader.with_file filename ~f:(fun reader ->
+                [%log info] "Created reader for %s" filename ;
+                Reader.read_sexp reader )
+          with
+          | `Ok sexp -> (
+              let%bind worker_state =
+                Snark_worker.Prod.Inputs.Worker_state.create
+                  ~proof_level:Genesis_constants.Proof_level.compiled
+                  ~constraint_constants:
+                    Genesis_constants.Constraint_constants.compiled ()
+              in
+              let sok_message =
+                { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
+                ; prover = Quickcheck.random_value Public_key.Compressed.gen
+                }
+              in
+              let spec =
+                [%of_sexp:
+                  ( Transaction_witness.t
+                  , Ledger_proof.t )
+                  Snark_work_lib.Work.Single.Spec.t] sexp
+              in
+              match%map
+                Snark_worker.Prod.Inputs.perform_single worker_state
+                  ~message:sok_message spec
+              with
+              | Ok _ ->
+                  [%log info] "Successfully worked"
+              | Error err ->
+                  [%log error] "Work didn't work: $err"
+                    ~metadata:[ ("err", Error_json.error_to_yojson err) ] )
+          | `Eof ->
+              failwith "early EOF while reading sexp") )
   ; ( "run-verifier"
     , Command.async
         ~summary:"Run verifier on a proof provided on a single line of stdin"

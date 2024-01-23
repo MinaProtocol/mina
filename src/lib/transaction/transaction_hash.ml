@@ -9,6 +9,23 @@ end
 
 include T
 
+(* Base58Check functions for original mainnet transaction hashes *)
+module V1_base58_check = Codable.Make_base58_check (struct
+  (* top tag needed for compatibility *)
+  type t = Stable.Latest.With_top_version_tag.t [@@deriving bin_io_unversioned]
+
+  let version_byte = Base58_check.Version_bytes.v1_transaction_hash
+
+  let description = "V1 Transaction hash"
+end)
+
+let to_base58_check_v1 = V1_base58_check.to_base58_check
+
+let of_base58_check_v1 = V1_base58_check.of_base58_check
+
+let of_base58_check_exn_v1 = V1_base58_check.of_base58_check_exn
+
+(* Base58Check functions for current hard fork *)
 module Base58_check = Codable.Make_base58_check (struct
   type t = Stable.Latest.t [@@deriving bin_io_unversioned]
 
@@ -69,7 +86,7 @@ let ( hash_signed_command_v1
               let dummy_auth =
                 match acct_update.authorization with
                 | Control.Proof _ ->
-                    Control.Proof Proof.transaction_dummy
+                    Control.Proof (Lazy.force Proof.transaction_dummy)
                 | Control.Signature _ ->
                     Control.Signature Signature.dummy
                 | Control.None_given ->
@@ -241,6 +258,17 @@ let%test_module "Transaction hashes" =
       in
       String.equal hash expected_hash
 
+    let%test "decode, recode v1 hashes" =
+      let v1_hashes =
+        [ "CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa"
+        ; "CkpZB4WE3wDRJ4CqCXqS4dqF8hoRQDVK8banePKUgTR6kvhTfyjRp"
+        ; "CkpYeG32dVJUjs6iq3oroXWitXar1eBtV3GVFyH5agw7HPp9bG4yQ"
+        ]
+      in
+      let decoded = List.map v1_hashes ~f:of_base58_check_exn_v1 in
+      let recoded = List.map decoded ~f:to_base58_check_v1 in
+      List.equal String.equal v1_hashes recoded
+
     let%test "signed command v1 hash from transaction id" =
       let transaction_id =
         "BD421DxjdoLimeUh4RA4FEvHdDn6bfxyMVWiWUwbYzQkqhNUv8B5M4gCSREpu9mVueBYoHYWkwB8BMf6iS2jjV8FffvPGkuNeczBfY7YRwLuUGBRCQJ3ktFBrNuu4abqgkYhXmcS2xyzoSGxHbXkJRAokTwjQ9HP6TLSeXz9qa92nJaTeccMnkoZBmEitsZWWnTCMqDc6rhN4Z9UMpg4wzdPMwNJvLRuJBD14Dd5pR84KBoY9rrnv66rHPc4m2hH9QSEt4aEJC76BQ446pHN9ZLmyhrk28f5xZdBmYxp3hV13fJEJ3Gv1XqJMBqFxRhzCVGoKDbLAaNRb5F1u1WxTzJu5n4cMMDEYydGEpNirY2PKQqHkR8gEqjXRTkpZzP8G19qT"
@@ -263,7 +291,7 @@ let%test_module "Transaction hashes" =
        * Run dune in this library's directory
        dune utop src/lib/transaction
        * Generate a zkapp transaction:
-            let txn = let txn = Mina_base.Zkapp_command.dummy in {txn with account_updates = Mina_base.Zkapp_command.Call_forest.map txn.account_updates ~f:(fun x -> {x with Mina_base.Account_update.authorization= Proof Mina_base.Proof.blockchain_dummy})};;
+            let txn = let txn = (Lazy.force Mina_base.Zkapp_command.dummy) in {txn with account_updates = Mina_base.Zkapp_command.Call_forest.map txn.account_updates ~f:(fun x -> {x with Mina_base.Account_update.authorization= Proof (Lazy.force Mina_base.Proof.blockchain_dummy)})};;
        * Print the transaction:
             Core_kernel.Out_channel.with_file "txn_id" ~f:(fun file -> Out_channel.output_string file (Core_kernel.Binable.to_string (module Mina_base.User_command.Stable.V2) (Zkapp_command txn) |> Base64.encode |> (function Ok x -> x | Error _ -> "")));;
         * Get the hash:

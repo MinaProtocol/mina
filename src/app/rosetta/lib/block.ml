@@ -998,9 +998,12 @@ module Sql = struct
                 zaub.call_depth,
                 zaub.zkapp_network_precondition_id,
                 zaub.zkapp_account_precondition_id,
+                zaub.zkapp_valid_while_precondition_id,
                 zaub.use_full_commitment,
+                zaub.implicit_account_creation_fee,
                 zaub.may_use_token,
                 zaub.authorization_kind,
+                zaub.verification_key_hash_id,
                 pk.value as account,
                 bzc.status
          FROM zkapp_commands zc

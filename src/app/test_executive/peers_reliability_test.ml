@@ -21,10 +21,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node-a-key"; balance = "700000"; timing = Untimed }
-        ; { account_name = "node-b-key"; balance = "700000"; timing = Untimed }
-        ; { account_name = "node-c-key"; balance = "800000"; timing = Untimed }
-        ]
+        (let open Test_account in
+        [ create ~account_name:"node-a-key" ~balance:"700000" ()
+        ; create ~account_name:"node-b-key" ~balance:"700000" ()
+        ; create ~account_name:"node-c-key" ~balance:"800000" ()
+        ])
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -173,7 +174,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "short bootstrap"
         (let%bind () = Node.stop node_c in
          [%log info] "%s stopped, will now wait for blocks to be produced"
-           (Node.id node_c) ;
+           (Node.infra_id node_c) ;
          let%bind () =
            wait_for t
              ( Wait_condition.blocks_to_be_produced 1
@@ -185,7 +186,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind () = Node.start ~fresh_state:true node_c in
          [%log info]
            "%s started again, will now wait for this node to initialize"
-           (Node.id node_c) ;
+           (Node.infra_id node_c) ;
          (* we've witnessed the loading of the node_c frontier on initialization
             so the event here must be the frontier loading on the node_c restart
          *)
