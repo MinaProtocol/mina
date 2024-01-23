@@ -100,6 +100,6 @@ else
   UPLOAD_SCRIPT_NAME=mainnet-migrated-archive-dump-${DATE}_0000.sql
   su postgres -c "cd ~ && pg_dump mainnet_archive_migrated > $UPLOAD_SCRIPT_NAME";
   UPLOAD_ARCHIVE_NAME=$UPLOAD_SCRIPT_NAME.tar.gz
-  tar -czvf $UPLOAD_ARCHIVE_NAME $UPLOAD_SCRIPT_NAME;
-  gsutil $KEY_FILE_ARG cp $UPLOAD_ARCHIVE_NAME gs://mina-archive-dumps
+  su postgres -c "cd ~ && tar -czvf $UPLOAD_ARCHIVE_NAME $UPLOAD_SCRIPT_NAME";
+  su postgres -c "cd ~ && gsutil $KEY_FILE_ARG cp $UPLOAD_ARCHIVE_NAME gs://mina-archive-dumps";
 fi
