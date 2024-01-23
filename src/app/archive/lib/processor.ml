@@ -1261,13 +1261,20 @@ module Timing_info = struct
     with
     | Some id ->
         Conn.find
-          (Caqti_request.find typ Caqti_type.int
-             {sql| UPDATE timing_info
-            (initial_minimum_balance, cliff_time, cliff_amount, vesting_period, vesting_increment)
-            VALUES (?, ?, ?, ?, ?)
-            WHERE id  )})
+          (Caqti_request.find
+             Caqti_type.(tup2 int typ)
+             Caqti_type.int
+             {sql| UPDATE timing_info SET
+                   initial_minimum_balance = $3,
+                   cliff_time = $4,
+                   cliff_amount = $5,
+                   vesting_period = $6,
+                   vesting_increment = $7
+                   WHERE id = $1
+                   RETURNING id
+             |sql} )
+          (id, values)
     | None ->
-
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO timing_info
@@ -2717,7 +2724,7 @@ module Accounts_accessed = struct
           Voting_for.add_if_doesn't_exist (module Conn) account.voting_for
         in
         let%bind timing_id =
-          Timing_info.add_if_doesn't_exist
+          Timing_info.add_or_update
             (module Conn)
             account_identifier_id account.timing
         in
