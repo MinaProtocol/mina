@@ -10,13 +10,7 @@ open Snark_params.Tick
 
 [%%endif]
 
-type t =
-  | Payment
-  | Stake_delegation
-  | Create_account
-  | Mint_tokens
-  | Fee_transfer
-  | Coinbase
+type t = Payment | Stake_delegation | Fee_transfer | Coinbase
 [@@deriving enum, equal, sexp]
 
 val to_string : t -> string
@@ -25,7 +19,7 @@ val gen : t Quickcheck.Generator.t
 
 val to_bits : t -> bool list
 
-val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+val to_input_legacy : t -> (Field.t, bool) Random_oracle.Input.Legacy.t
 
 [%%ifdef consensus_mechanism]
 
@@ -37,7 +31,8 @@ module Bits : sig
 
   val to_bits : var -> Boolean.var list
 
-  val to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
+  val to_input_legacy :
+    var -> (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
 end
 
 val bits_of_t : t -> Bits.var
@@ -54,10 +49,6 @@ module Unpacked : sig
 
   val is_stake_delegation : var -> Boolean.var
 
-  val is_create_account : var -> Boolean.var
-
-  val is_mint_tokens : var -> Boolean.var
-
   val is_fee_transfer : var -> Boolean.var
 
   val is_coinbase : var -> Boolean.var
@@ -66,7 +57,8 @@ module Unpacked : sig
 
   val to_bits : var -> Boolean.var list
 
-  val to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
+  val to_input_legacy :
+    var -> (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
 end
 
 val unpacked_of_t : t -> Unpacked.var
