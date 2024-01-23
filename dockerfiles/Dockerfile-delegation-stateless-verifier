@@ -85,7 +85,7 @@ RUN dpkg -i libffi7_3.3-4_amd64.deb
 RUN rm libffi7_3.3-4_amd64.deb
 
 # Make symlinks
-RUN ln -s /usr/bin/aws /bin/aws
+RUN ln -s /usr/local/bin/aws /bin/aws
 RUN ln -s /usr/local/bin/cqlsh /bin/cqlsh
 RUN ln -s /usr/local/bin/cqlsh-expansion /bin/cqlsh-expansion
 RUN /usr/local/bin/cqlsh-expansion.init
