@@ -11,9 +11,6 @@ module type Basic = sig
 
   type magnitude = t [@@deriving sexp, compare]
 
-  (* not automatically derived *)
-  val dhall_type : Ppx_dhall_type.Dhall_type.t
-
   val max_int : t
 
   val length_in_bits : int
@@ -124,6 +121,9 @@ module type Signed_intf = sig
   val gen : t Quickcheck.Generator.t
 
   val create : magnitude:magnitude -> sgn:Sgn.t -> t
+
+  (* allows creation of negative 0 *)
+  val create_preserve_zero_sign : magnitude:magnitude -> sgn:Sgn.t -> t
 
   val sgn : t -> Sgn.t
 
@@ -307,9 +307,6 @@ module type Full = sig
         [@@@with_all_version_tags]
 
         type t [@@deriving sexp, compare, hash, yojson, equal]
-
-        (* not automatically derived *)
-        val dhall_type : Ppx_dhall_type.Dhall_type.t
       end
     end]
 
@@ -367,9 +364,6 @@ module type Full = sig
         [@@@with_all_version_tags]
 
         type t [@@deriving sexp, compare, hash, equal, yojson]
-
-        (* not automatically derived *)
-        val dhall_type : Ppx_dhall_type.Dhall_type.t
       end
     end]
 
@@ -439,9 +433,6 @@ module type Full = sig
     module Stable : sig
       module V1 : sig
         type t [@@deriving sexp, compare, hash, yojson, equal]
-
-        (* not automatically derived *)
-        val dhall_type : Ppx_dhall_type.Dhall_type.t
       end
     end]
 

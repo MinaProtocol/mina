@@ -31,3 +31,8 @@ mutation updateGating($input: GatingUpdate!) {
 mutation stopDaemon($clean: Boolean, $delay: Int) {
     stopDaemon(cleanConfig: $clean, delaySeconds: $delay)
 }
+
+# @genqlient(pointer: true)
+mutation setZkappSoftLimit($limit: Int) {
+    zkAppCommandLimit(limit: $limit)
+}

@@ -51,6 +51,7 @@ Pipeline.build
           commands = [ Cmd.run "buildkite/scripts/merges-cleanly.sh berkeley"]
           , label = "Check merges cleanly into berkeley"
           , key = "clean-merge-berkeley"
+          , soft_fail = Some (B/SoftFail.Boolean True)
           , target = Size.Small
           , docker = Some Docker::{
               image = (../../Constants/ContainerImages.dhall).toolchainBase
@@ -95,6 +96,16 @@ Pipeline.build
           , label = "[proof-systems] Check merges cleanly into proof-systems master branch"
           , key = "merged-to-proof-systems-master"
           , soft_fail = Some (B/SoftFail.Boolean True)
+          , target = Size.Small
+          , docker = Some Docker::{
+              image = (../../Constants/ContainerImages.dhall).toolchainBase
+            }
+        }
+    , Command.build
+        Command.Config::{
+          commands = [ Cmd.run "true" ] : List Cmd.Type
+          , label = "pr"
+          , key = "pr"
           , target = Size.Small
           , docker = Some Docker::{
               image = (../../Constants/ContainerImages.dhall).toolchainBase

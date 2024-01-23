@@ -1,6 +1,7 @@
 open Core
 open Currency
 open Mina_base
+open Mina_base_test_helpers
 open Signature_lib
 open Zkapp_command
 

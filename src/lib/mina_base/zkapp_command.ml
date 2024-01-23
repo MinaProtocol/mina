@@ -1488,20 +1488,21 @@ let arg_query_string x =
   Fields_derivers_zkapps.Test.Loop.json_to_string_gql @@ to_json x
 
 let dummy =
-  let account_update : Account_update.t =
-    { body = Account_update.Body.dummy
-    ; authorization = Control.dummy_of_tag Signature
-    }
-  in
-  let fee_payer : Account_update.Fee_payer.t =
-    { body = Account_update.Body.Fee_payer.dummy
-    ; authorization = Signature.dummy
-    }
-  in
-  { fee_payer
-  ; account_updates = Call_forest.cons account_update []
-  ; memo = Signed_command_memo.empty
-  }
+  lazy
+    (let account_update : Account_update.t =
+       { body = Account_update.Body.dummy
+       ; authorization = Control.dummy_of_tag Signature
+       }
+     in
+     let fee_payer : Account_update.Fee_payer.t =
+       { body = Account_update.Body.Fee_payer.dummy
+       ; authorization = Signature.dummy
+       }
+     in
+     { fee_payer
+     ; account_updates = Call_forest.cons account_update []
+     ; memo = Signed_command_memo.empty
+     } )
 
 module Make_update_group (Input : sig
   type global_state
@@ -1954,6 +1955,14 @@ let has_zero_vesting_period t =
           false
       | Set { vesting_period; _ } ->
           Mina_numbers.Global_slot_span.(equal zero) vesting_period )
+
+let is_incompatible_version t =
+  Call_forest.exists t.account_updates ~f:(fun p ->
+      match p.body.update.permissions with
+      | Keep ->
+          false
+      | Set { set_verification_key = _auth, txn_version; _ } ->
+          not Mina_numbers.Txn_version.(equal_to_current txn_version) )
 
 let get_transaction_commitments (zkapp_command : t) =
   let memo_hash = Signed_command_memo.hash zkapp_command.memo in

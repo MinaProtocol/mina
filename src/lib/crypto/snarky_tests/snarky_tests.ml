@@ -611,7 +611,7 @@ module Protocol_circuits = struct
     ()
 
   let blockchain () : unit =
-    let expected = "3bfa747c59356e008201cc8e6af10f77" in
+    let expected = "0e1896d5c5840089da3304799c01efd8" in
     let digest =
       Blockchain_snark.Blockchain_snark_state.constraint_system_digests
     in
@@ -627,7 +627,7 @@ module Protocol_circuits = struct
 
   let transaction () : unit =
     let expected1 = "b8879f677f622a1d86648030701f43e1" in
-    let expected2 = "dc5ff6a480ceb21b1e0333d2b0262b67" in
+    let expected2 = "c9251dbcc565e8e18d15ca96d7908925" in
     let digest =
       Transaction_snark.constraint_system_digests ~constraint_constants ()
     in
@@ -663,8 +663,6 @@ let api_tests =
   ; ("compile imperative API", `Quick, get_hash_of_circuit)
   ; ("compile monadic API", `Quick, MonadicAPI.get_hash_of_circuit)
   ]
-
-(* run tests *)
 
 let () =
   let range_checks =

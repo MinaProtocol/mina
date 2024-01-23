@@ -30,8 +30,10 @@ CREATE TABLE zkapp_field
 */
 CREATE TABLE zkapp_field_array
 ( id                       serial  PRIMARY KEY
-, element_ids              int[]   NOT NULL
+, element_ids              int[]   NOT NULL UNIQUE
 );
+
+CREATE INDEX idx_zkapp_field_array_element_ids ON zkapp_field_array(element_ids);
 
 /* Fixed-width arrays of algebraic fields, given as id's from
    zkapp_field
@@ -78,8 +80,10 @@ CREATE TABLE zkapp_action_states
 */
 CREATE TABLE zkapp_events
 ( id                       serial           PRIMARY KEY
-, element_ids              int[]            NOT NULL
+, element_ids              int[]            NOT NULL UNIQUE
 );
+
+CREATE INDEX idx_zkapp_events_element_ids ON zkapp_events(element_ids);
 
 /* field elements derived from verification keys */
 CREATE TABLE zkapp_verification_key_hashes
@@ -97,19 +101,20 @@ CREATE TYPE zkapp_auth_required_type AS ENUM ('none', 'either', 'proof', 'signat
 
 CREATE TABLE zkapp_permissions
 ( id                       serial                PRIMARY KEY
-, edit_state               zkapp_auth_required_type    NOT NULL
-, send                     zkapp_auth_required_type    NOT NULL
-, receive                  zkapp_auth_required_type    NOT NULL
-, access                   zkapp_auth_required_type    NOT NULL
-, set_delegate             zkapp_auth_required_type    NOT NULL
-, set_permissions          zkapp_auth_required_type    NOT NULL
-, set_verification_key     zkapp_auth_required_type    NOT NULL
-, set_zkapp_uri            zkapp_auth_required_type    NOT NULL
-, edit_action_state      zkapp_auth_required_type    NOT NULL
-, set_token_symbol         zkapp_auth_required_type    NOT NULL
-, increment_nonce          zkapp_auth_required_type    NOT NULL
-, set_voting_for           zkapp_auth_required_type    NOT NULL
-, set_timing               zkapp_auth_required_type    NOT NULL
+, edit_state                       zkapp_auth_required_type    NOT NULL
+, send                             zkapp_auth_required_type    NOT NULL
+, receive                          zkapp_auth_required_type    NOT NULL
+, access                           zkapp_auth_required_type    NOT NULL
+, set_delegate                     zkapp_auth_required_type    NOT NULL
+, set_permissions                  zkapp_auth_required_type    NOT NULL
+, set_verification_key_auth        zkapp_auth_required_type    NOT NULL
+, set_verification_key_txn_version int                         NOT NULL
+, set_zkapp_uri                    zkapp_auth_required_type    NOT NULL
+, edit_action_state                zkapp_auth_required_type    NOT NULL
+, set_token_symbol                 zkapp_auth_required_type    NOT NULL
+, increment_nonce                  zkapp_auth_required_type    NOT NULL
+, set_voting_for                   zkapp_auth_required_type    NOT NULL
+, set_timing                       zkapp_auth_required_type    NOT NULL
 );
 
 CREATE TABLE zkapp_timing_info
@@ -162,6 +167,7 @@ CREATE TABLE zkapp_account_precondition
 , action_state_id          int                     REFERENCES zkapp_field(id)
 , proved_state             boolean
 , is_new                   boolean
+, UNIQUE(balance_id, receipt_chain_hash, delegate_id, state_id, action_state_id, proved_state, is_new, nonce_id)
 );
 
 CREATE TABLE zkapp_accounts

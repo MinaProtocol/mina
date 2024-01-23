@@ -75,7 +75,8 @@ let internal_commands_from_block_id ~mainnet_pool block_id =
         internal_cmd.fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
       in
       let hash =
-        Mina_transaction.Transaction_hash.of_base58_check_exn internal_cmd.hash
+        Mina_transaction.Transaction_hash.of_base58_check_exn_v1
+          internal_cmd.hash
       in
       let status = "applied" in
       let failure_reason = None in
@@ -142,7 +143,7 @@ let user_commands_from_block_id ~mainnet_pool block_id =
           ~f:mainnet_transaction_failure_of_string
       in
       let hash =
-        Mina_transaction.Transaction_hash.of_base58_check_exn user_cmd.hash
+        Mina_transaction.Transaction_hash.of_base58_check_exn_v1 user_cmd.hash
       in
       let cmd : Archive_lib.Extensional.User_command.t =
         { sequence_no
@@ -184,7 +185,8 @@ let mainnet_protocol_version =
   Protocol_version.create ~transaction:1 ~network:0 ~patch:0
 
 let mainnet_block_to_extensional ~logger ~mainnet_pool
-    ~(genesis_block : Mina_block.t) (block : Sql.Mainnet.Block.t) =
+    ~(genesis_block : Mina_block.t) (block : Sql.Mainnet.Block.t) ~bucket
+    ~batch_size =
   let query_mainnet_db ~f = Mina_caqti.query ~f mainnet_pool in
   let is_genesis_block = Int64.equal block.height Int64.one in
   let genesis_consensus_state =
@@ -199,7 +201,7 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool
     (* we may try to be fetching more blocks than exist
        gsutil seems to get the ones that do exist, in that exist
     *)
-    let batch_size = 1000L in
+    let batch_size = Int64.of_int batch_size in
     if is_genesis_block then Deferred.unit
     else if !first_batch then (
       let num_blocks = Int64.(batch_size - (block.height % batch_size)) in
@@ -209,7 +211,7 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool
           ; ("num_blocks", `Int (Int64.to_int_exn num_blocks))
           ] ;
       let%bind () =
-        Precomputed_block.fetch_batch ~height:block.height ~num_blocks
+        Precomputed_block.fetch_batch ~height:block.height ~num_blocks ~bucket
       in
       [%log info] "Done fetching first batch of precomputed blocks" ;
       first_batch := false ;
@@ -224,7 +226,7 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool
           ] ;
       let%bind () =
         Precomputed_block.fetch_batch ~height:block.height
-          ~num_blocks:batch_size
+          ~num_blocks:batch_size ~bucket
       in
       [%log info] "Done fetching batch of precomputed blocks" ;
       Deferred.unit )
@@ -403,7 +405,7 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool
       : Archive_lib.Extensional.Block.t )
 
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
-    ~end_global_slot () =
+    ~end_global_slot ~mina_network_blocks_bucket ~batch_size () =
   let logger = Logger.create () in
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
@@ -500,12 +502,12 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
               block.height block.state_hash ;
             let%bind extensional_block =
               mainnet_block_to_extensional ~logger ~mainnet_pool ~genesis_block
-                block
+                block ~bucket:mina_network_blocks_bucket ~batch_size
             in
             query_migrated_db ~f:(fun db ->
                 match%map
-                  Archive_lib.Processor.Block.add_from_extensional db
-                    extensional_block
+                  Archive_lib.Processor.Block.add_from_extensional ~logger db
+                    extensional_block ~v1_transaction_hash:true
                 with
                 | Ok _id ->
                     Ok ()
@@ -546,6 +548,15 @@ let () =
              ~doc:
                "NN Last global slot since genesis to include in the migration \
                 (if omitted, only canonical blocks will be migrated)"
+         and mina_network_blocks_bucket =
+           Param.flag "--mainnet-blocks-bucket"
+             ~aliases:[ "-mainnet-blocks-bucket" ]
+             Param.(required string)
+             ~doc:"Bucket with precomputed mainnet blocks"
+         and batch_size =
+           Param.flag "--batch-size" ~aliases:[ "-batch-size" ]
+             Param.(required int)
+             ~doc:"Batch size used when downloading precomputed blocks"
          in
          main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
-           ~end_global_slot )))
+           ~end_global_slot ~mina_network_blocks_bucket ~batch_size )))
