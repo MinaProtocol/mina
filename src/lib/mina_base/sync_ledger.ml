@@ -3,7 +3,7 @@ open Core_kernel
 module Hash = struct
   include Ledger_hash.Stable.V1
 
-  let to_string = Ledger_hash.to_string
+  let to_base58_check = Ledger_hash.to_base58_check
 
   let merge = Ledger_hash.merge
 

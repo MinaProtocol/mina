@@ -29,18 +29,19 @@ module "kubernetes_testnet" {
   testnet_name   = var.testnet_name
 
   use_local_charts   = true
-  coda_image         = var.coda_image
-  coda_archive_image = var.coda_archive_image
-  coda_agent_image   = var.coda_agent_image
-  coda_bots_image    = var.coda_bots_image
-  coda_points_image  = var.coda_points_image
+  mina_image         = var.mina_image
+  mina_archive_image = var.mina_archive_image
+  mina_agent_image   = var.mina_agent_image
+  mina_bots_image    = var.mina_bots_image
+  mina_points_image  = var.mina_points_image
   watchdog_image     = var.watchdog_image
 
-  coda_faucet_amount = var.coda_faucet_amount
-  coda_faucet_fee    = var.coda_faucet_amount
+  mina_faucet_amount = var.mina_faucet_amount
+  mina_faucet_fee    = var.mina_faucet_fee
 
   log_level           = var.log_level
   log_txn_pool_gossip = var.log_txn_pool_gossip
+  log_precomputed_blocks = var.log_precomputed_blocks
 
   agent_min_fee         = var.agent_min_fee
   agent_max_fee         = var.agent_max_fee
@@ -48,87 +49,59 @@ module "kubernetes_testnet" {
   agent_max_tx          = var.agent_max_tx
   agent_send_every_mins = var.agent_send_every_mins
 
-  additional_peers = [for peer in values(local.static_peers) : peer.full_peer]
-  runtime_config   = data.local_file.genesis_ledger.content
-
+  additional_peers = [for peer in local.static_peers : peer.full_peer]
+  runtime_config   = var.use_embedded_runtime_config ? "" : data.local_file.genesis_ledger.content
+  
   seed_zone   = var.seed_zone
   seed_region = var.seed_region
 
-  archive_configs = length(var.archive_configs) != 0 ? var.archive_configs : concat(
-    # by default, deploy a single local daemon and associated PostgresDB enabled archive server
-    [
-      {
-        name              = "archive-1"
-        enableLocalDaemon = true
-        enablePostgresDB  = true
-      }
-    ],
-    # in addition to stand-alone archive servers upto the input archive node count
-    [
-      for i in range(2, var.archive_node_count + 1) : {
-        name              = "archive-${i}"
-        enableLocalDaemon = false
-        enablePostgresDB  = false
-      }
-    ]
-  )
-  mina_archive_schema = var.mina_archive_schema
-  persistence_config  = var.postgres_persistence_config
+  archive_configs = local.archive_node_configs
 
-  snark_worker_replicas   = var.snark_worker_replicas
-  snark_worker_fee        = var.snark_worker_fee
-  snark_worker_public_key = var.snark_worker_public_key
-  snark_worker_host_port  = var.snark_worker_host_port
+  mina_archive_schema = var.mina_archive_schema
+
+  snark_coordinators = var.snark_coordinators
 
   block_producer_key_pass = var.block_producer_key_pass
-  block_producer_configs = concat(
-    [
-      for i in range(var.whale_count) : {
-        name                   = local.whale_block_producer_names[i]
-        class                  = "whale"
-        id                     = i + 1
-        external_port          = local.static_peers[local.whale_block_producer_names[i]].port
-        private_key_secret     = "online-whale-account-${i + 1}-key"
-        libp2p_secret          = "online-whale-libp2p-${i + 1}-key"
-        enable_gossip_flooding = false
-        run_with_user_agent    = false
-        run_with_bots          = false
-        enable_peer_exchange   = true
-        isolated               = false
-        enableArchive          = false
-        archiveAddress         = "archive-1:3086"
-      }
-    ],
-    [
-      for i in range(var.fish_count) : {
-        name                   = local.fish_block_producer_names[i]
-        class                  = "fish"
-        id                     = i + 1
-        external_port          = local.static_peers[local.fish_block_producer_names[i]].port
-        private_key_secret     = "online-fish-account-${i + 1}-key"
-        libp2p_secret          = "online-fish-libp2p-${i + 1}-key"
-        enable_gossip_flooding = false
-        run_with_user_agent    = true
-        run_with_bots          = false
-        enable_peer_exchange   = true
-        isolated               = false
-        enableArchive          = false
-        archiveAddress         = "archive-1:3086"
-      }
-    ]
-  )
+  block_producer_configs = [for i, bp in local.block_producer_configs:
+    {
+      name                   = bp.name
+      class                  = bp.class
+      # id                     = bp.total_node_index
+      keypair_name     = "${bp.class}-${bp.unique_node_index}-key"
+      privkey_password = "naughty blue worm"
+      external_port          = bp.port
+      libp2p_secret          = ""
+      enable_gossip_flooding = false
+      run_with_user_agent    = bp.class =="whale" ? false : ( var.nodes_with_user_agent == [] ? true : contains(var.nodes_with_user_agent, bp.name) )
+      # run_with_user_agent = bp.class =="whale" ? false : true
+      run_with_bots          = false
+      enable_peer_exchange   = true
+      isolated               = false
+      enableArchive          = false
+      archiveAddress         = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i%(length(local.archive_node_configs)) )["name"]}:${element(local.archive_node_configs, i%(length(local.archive_node_configs)) )["serverPort"]}" : ""  
+    }
+  ]
+
+  seed_external_port = 10001
 
   seed_configs = [
     for i in range(var.seed_count) : {
-      name               = local.seed_names[i]
+      name               = local.seed_static_peers[i].name
       class              = "seed"
-      id                 = i + 1
-      external_port      = local.static_peers[local.seed_names[i]].port
+      # id                 = i + 1
+      # external_port      = local.seed_static_peers[i].port
+      libp2p_secret      = "seed-${i + 1}-key"
+      libp2p_secret_pw      = "naughty blue worm"
       external_ip        = google_compute_address.seed_static_ip[i].address
-      private_key_secret = "online-seeds-account-${i + 1}-key"
-      libp2p_secret      = "online-seeds-libp2p-${i + 1}-key"
-      enableArchive      = false
-      archiveAddress     = "archive-1:3086"
+      # private_key_secret = "online-seeds-account-${i + 1}-key"
+      enableArchive      = length(local.archive_node_configs) > 0
+      archiveAddress     = length(local.archive_node_configs) > 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
+    }
+  ]
+
+  plain_node_configs = [
+    for i in range(var.plain_node_count) : {
+      name               = "plain-node-${i+1}"
     }
   ]
 

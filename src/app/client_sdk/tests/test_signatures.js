@@ -1,4 +1,4 @@
-var coda = require("../../../../_build/default/src/app/client_sdk/client_sdk.bc.js").codaSDK;
+var mina = require("../../../../_build/default/src/app/client_sdk/client_sdk.bc.js").minaSDK;
 
 var keypair = {
   privateKey:
@@ -43,17 +43,32 @@ var delegations = [
     },
   ];
 
+var strings = [
+    'this is a test',
+    'this is only a test',
+    'if this had been an actual emergency...'
+    ]
+
 var printSignature = s => console.log(`  { field: '${s.field}'\n  , scalar: '${s.scalar}'\n  },`);
 
-var payment_signatures = payments.map (t => coda.signPayment(keypair.privateKey, t))
+var networks = ["testnet","mainnet"]
 
-var delegation_signatures = delegations.map (t => coda.signStakeDelegation(keypair.privateKey, t))
+for (let i = 0; i < networks.length; i++) {
 
-// verify signatures before printing them
-payment_signatures.forEach (t => { if (!coda.verifyPaymentSignature (t)) { console.error ("Payment signature did not verify"); process.exit (1) } })
-delegation_signatures.forEach (t => { if (!coda.verifyStakeDelegationSignature (t)) { console.error ("Delegation signature did not verify"); process.exit (1) } })
+    var payment_signatures = payments.map (t => mina.signPayment(networks[i],keypair.privateKey, t))
 
-console.log("[");
-payment_signatures.forEach(t => printSignature (t.signature))
-delegation_signatures.forEach(t => printSignature (t.signature))
-console.log("]");
+    var delegation_signatures = delegations.map (t => mina.signStakeDelegation(networks[i],keypair.privateKey, t))
+
+    var string_signatures = strings.map (t => mina.signString(networks[i],keypair.privateKey, t))
+
+    // verify signatures before printing them
+    payment_signatures.forEach (t => { if (!mina.verifyPaymentSignature (networks[i],t)) { console.error ("Payment signature did not verify"); process.exit (1) } })
+    delegation_signatures.forEach (t => { if (!mina.verifyStakeDelegationSignature (networks[i],t)) { console.error ("Delegation signature did not verify"); process.exit (1) } })
+    string_signatures.forEach (t => {if (!mina.verifyStringSignature (networks[i],t)) { console.error ("String signature did not verify"); process.exit (1) } })
+
+    console.log("[");
+    payment_signatures.forEach(t => printSignature (t.signature))
+    delegation_signatures.forEach(t => printSignature (t.signature))
+    string_signatures.forEach(t => printSignature (t.signature))
+    console.log("]")
+}

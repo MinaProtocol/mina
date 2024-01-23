@@ -29,14 +29,15 @@ module type Resource_pool_base_intf = sig
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
-    -> frontier_broadcast_pipe:transition_frontier Option.t
-                               Broadcast_pipe.Reader.t
+    -> frontier_broadcast_pipe:
+         transition_frontier Option.t Broadcast_pipe.Reader.t
     -> config:Config.t
     -> logger:Logger.t
-    -> tf_diff_writer:( transition_frontier_diff
-                      , Strict_pipe.synchronous
-                      , unit Deferred.t )
-                      Strict_pipe.Writer.t
+    -> tf_diff_writer:
+         ( transition_frontier_diff
+         , Strict_pipe.synchronous
+         , unit Deferred.t )
+         Strict_pipe.Writer.t
     -> t
 end
 
@@ -46,6 +47,8 @@ end
  *  [Resource_pool_base_intf]. *)
 module type Resource_pool_diff_intf = sig
   type pool
+
+  val label : string
 
   type t [@@deriving sexp, to_yojson]
 
@@ -86,11 +89,17 @@ module type Resource_pool_diff_intf = sig
        pool
     -> verified Envelope.Incoming.t
     -> ( t * rejected
-       , [`Locally_generated of t * rejected | `Other of Error.t] )
+       , [ `Locally_generated of t * rejected | `Other of Error.t ] )
        Result.t
        Deferred.t
 
   val is_empty : t -> bool
+
+  val update_metrics :
+       t Envelope.Incoming.t
+    -> Mina_net2.Validation_callback.t
+    -> Logger.t option
+    -> unit
 end
 
 (** A [Resource_pool_intf] ties together an associated pair of
@@ -109,7 +118,19 @@ module type Resource_pool_intf = sig
       remove it from the set of potentially-rebroadcastable item.
   *)
   val get_rebroadcastable :
-    t -> has_timed_out:(Time.t -> [`Timed_out | `Ok]) -> Diff.t list
+    t -> has_timed_out:(Time.t -> [ `Timed_out | `Ok ]) -> Diff.t list
+end
+
+module type Broadcast_callback = sig
+  type resource_pool_diff
+
+  type rejected_diff
+
+  type t =
+    | Local of ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+    | External of Mina_net2.Validation_callback.t
+
+  val drop : resource_pool_diff -> rejected_diff -> t -> unit Deferred.t
 end
 
 (** A [Network_pool_base_intf] is the core implementation of a
@@ -137,46 +158,48 @@ module type Network_pool_base_intf = sig
 
   type transition_frontier
 
-  module Broadcast_callback : sig
-    type t =
-      | Local of ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
-      | External of Mina_net2.Validation_callback.t
-  end
+  module Local_sink :
+    Mina_net2.Sink.S_with_void
+      with type msg :=
+        resource_pool_diff
+        * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+
+  module Remote_sink :
+    Mina_net2.Sink.S_with_void
+      with type msg :=
+        resource_pool_diff Envelope.Incoming.t * Mina_net2.Validation_callback.t
+
+  module Broadcast_callback :
+    Broadcast_callback
+      with type resource_pool_diff := resource_pool_diff
+       and type rejected_diff := rejected_diff
 
   val create :
        config:config
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
-    -> incoming_diffs:( resource_pool_diff Envelope.Incoming.t
-                      * Mina_net2.Validation_callback.t )
-                      Strict_pipe.Reader.t
-    -> local_diffs:( resource_pool_diff
-                   * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
-                   )
-                   Strict_pipe.Reader.t
-    -> frontier_broadcast_pipe:transition_frontier Option.t
-                               Broadcast_pipe.Reader.t
+    -> frontier_broadcast_pipe:
+         transition_frontier Option.t Broadcast_pipe.Reader.t
     -> logger:Logger.t
-    -> t
+    -> log_gossip_heard:bool
+    -> on_remote_push:(unit -> unit Deferred.t)
+    -> t * Remote_sink.t * Local_sink.t
 
   val of_resource_pool_and_diffs :
        resource_pool
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> incoming_diffs:( resource_pool_diff Envelope.Incoming.t
-                      * Mina_net2.Validation_callback.t )
-                      Strict_pipe.Reader.t
-    -> local_diffs:( resource_pool_diff
-                   * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
-                   )
-                   Strict_pipe.Reader.t
     -> tf_diffs:transition_frontier_diff Strict_pipe.Reader.t
-    -> t
+    -> log_gossip_heard:bool
+    -> on_remote_push:(unit -> unit Deferred.t)
+    -> t * Remote_sink.t * Local_sink.t
 
   val resource_pool : t -> resource_pool
 
   val broadcasts : t -> resource_pool_diff Linear_pipe.Reader.t
+
+  val create_rate_limiter : unit -> Rate_limiter.t
 
   val apply_and_broadcast :
        t
@@ -202,7 +225,7 @@ module type Snark_resource_pool_intf = sig
     -> work:Transaction_snark_work.Statement.t
     -> proof:Ledger_proof.t One_or_two.t
     -> fee:Fee_with_prover.t
-    -> [`Added | `Statement_not_referenced]
+    -> [ `Added | `Statement_not_referenced ] Deferred.t
 
   val request_proof :
        t
@@ -211,8 +234,9 @@ module type Snark_resource_pool_intf = sig
 
   val verify_and_act :
        t
-    -> work:Transaction_snark_work.Statement.t
-            * Ledger_proof.t One_or_two.t Priced_proof.t
+    -> work:
+         Transaction_snark_work.Statement.t
+         * Ledger_proof.t One_or_two.t Priced_proof.t
     -> sender:Envelope.Sender.t
     -> bool Deferred.t
 
@@ -238,16 +262,21 @@ module type Snark_pool_diff_intf = sig
   type verified = t [@@deriving compare, sexp]
 
   type compact =
-    { work: Transaction_snark_work.Statement.t
-    ; fee: Currency.Fee.t
-    ; prover: Signature_lib.Public_key.Compressed.t }
-  [@@deriving yojson]
+    { work : Transaction_snark_work.Statement.t
+    ; fee : Currency.Fee.t
+    ; prover : Signature_lib.Public_key.Compressed.t
+    }
+  [@@deriving yojson, hash]
+
+  type Structured_log_events.t +=
+    | Snark_work_received of { work : compact; sender : Envelope.Sender.t }
+    [@@deriving register_event]
 
   include
     Resource_pool_diff_intf
-    with type t := t
-     and type verified := t
-     and type pool := resource_pool
+      with type t := t
+       and type verified := t
+       and type pool := resource_pool
 
   val to_compact : t -> compact option
 
@@ -281,17 +310,23 @@ module type Transaction_pool_diff_intf = sig
       | Expired
       | Overloaded
     [@@deriving sexp, yojson]
+
+    val to_string_hum : t -> string
   end
 
   module Rejected : sig
     type t = (User_command.t * Diff_error.t) list [@@deriving sexp, yojson]
   end
 
+  type Structured_log_events.t +=
+    | Transactions_received of { txns : t; sender : Envelope.Sender.t }
+    [@@deriving register_event]
+
   include
     Resource_pool_diff_intf
-    with type t := t
-     and type pool := resource_pool
-     and type rejected = Rejected.t
+      with type t := t
+       and type pool := resource_pool
+       and type rejected = Rejected.t
 end
 
 module type Transaction_resource_pool_intf = sig
@@ -305,8 +340,7 @@ module type Transaction_resource_pool_intf = sig
     -> verifier:Verifier.t
     -> Config.t
 
-  val member :
-    t -> Transaction_hash.User_command_with_valid_signature.t -> bool
+  val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool
 
   val transactions :
        logger:Logger.t
@@ -335,7 +369,12 @@ module type Base_ledger_intf = sig
 
   val location_of_account : t -> Account_id.t -> Location.t option
 
+  val location_of_account_batch :
+    t -> Account_id.t list -> (Account_id.t * Location.t option) list
+
   val get : t -> Location.t -> Account.t option
+
+  val get_batch : t -> Location.t list -> (Location.t * Account.t option) list
 
   val detached_signal : t -> unit Deferred.t
 end

@@ -1,4 +1,4 @@
-open Mina_base
+module Serializing = Graphql_lib.Serializing
 
 module Insert =
 [%graphql
@@ -6,10 +6,11 @@ module Insert =
     mutation insert(
         $blocks: [blocks_insert_input!]!
         ) {
-        insert_blocks(objects: $blocks, on_conflict: {constraint: blocks_state_hash_key, update_columns: state_hash_id}) {
+        insert_blocks(objects: $blocks, on_conflict:
+        {constraint_: blocks_state_hash_key, update_columns: [state_hash_id]}) {
           returning {
             state_hash {
-              value @bsDecoder(fn: "State_hash.of_base58_check_exn")
+              value @ppxCustom(module: "Serializing.State_hash")
             }
           }
         }
@@ -33,10 +34,10 @@ module Get_all_pending_blocks =
     blocks(where: {status: {_gte: 0}}) {
       status
       state_hash  {
-        value @bsDecoder(fn: "State_hash.of_base58_check_exn")
+        value @ppxCustom(module: "Serializing.State_hash")
       }
       parent_hash {
-        value @bsDecoder(fn: "State_hash.of_base58_check_exn")
+        value @ppxCustom(module: "Serializing.State_hash")
       }
     }
   }
@@ -48,7 +49,7 @@ module Get_stale_block_confirmations =
   query query($parent_hash: String!) {
     get_stale_block_confirmations(args: {new_block_parent_hash: $parent_hash}) {
       state_hash {
-        value @bsDecoder(fn: "State_hash.of_base58_check_exn")
+        value @ppxCustom(module: "Serializing.State_hash")
       }
       status
     }

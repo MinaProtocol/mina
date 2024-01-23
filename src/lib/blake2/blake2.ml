@@ -29,7 +29,7 @@ module Make () = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = T1.t [@@deriving hash, sexp, compare]
+      type t = T1.t [@@deriving hash, sexp, compare, equal]
 
       let to_latest = Fn.id
 
@@ -39,12 +39,12 @@ module Make () = struct
         [%%define_locally T1.(to_string, of_string)]
       end
 
-      include Binable.Of_stringable (Arg)
+      include Binable.Of_stringable_without_uuid (Arg)
     end
   end]
 
   [%%define_locally
-  T1.(to_raw_string, digest_string, to_hex)]
+  T1.(of_raw_string, to_raw_string, digest_string, digest_bigstring, to_hex)]
 
   (* do not create bin_io serialization *)
   include Hashable.Make (T1)
@@ -76,7 +76,7 @@ include Make ()
 
 (* values come from external library digestif, and serialization relies on raw string functions in that library,
    so check serialization is stable
- *)
+*)
 let%test "serialization test V1" =
   let blake2s = T0.digest_string "serialization test V1" in
   let known_good_digest = "562733d10582c5832e541fb60e38e7c8" in
@@ -86,8 +86,8 @@ let%test "serialization test V1" =
 
 let%test_unit "bits_to_string" =
   [%test_eq: string]
-    (bits_to_string [|true; false|])
-    (String.of_char_list [Char.of_int_exn 1])
+    (bits_to_string [| true; false |])
+    (String.of_char_list [ Char.of_int_exn 1 ])
 
 let%test_unit "string to bits" =
   Quickcheck.test ~trials:5 String.quickcheck_generator ~f:(fun s ->

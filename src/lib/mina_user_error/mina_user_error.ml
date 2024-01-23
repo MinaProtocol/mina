@@ -1,14 +1,14 @@
-exception Mina_user_error of {message: string; where: string option}
+exception Mina_user_error of { message : string; where : string option }
 
 let raisef ?where =
-  Format.ksprintf (fun message -> raise (Mina_user_error {message; where}))
+  Format.ksprintf (fun message -> raise (Mina_user_error { message; where }))
 
-let raise ?where message = raise (Mina_user_error {message; where})
+let raise ?where message = raise (Mina_user_error { message; where })
 
 let () =
   Stdlib.Printexc.register_printer (fun exn ->
       match exn with
-      | Mina_user_error {message; where} ->
+      | Mina_user_error { message; where } ->
           let error =
             match where with
             | None ->
@@ -20,10 +20,10 @@ let () =
             (Printf.sprintf {err|
 FATAL ERROR
 
-  ☠  Coda %s.
+  ☠  Mina %s.
 
   %s
-%!|err}
-               error message)
+%!|err} error
+               message )
       | _ ->
           None )

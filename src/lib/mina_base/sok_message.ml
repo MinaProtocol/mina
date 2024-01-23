@@ -5,14 +5,16 @@ open Import
 module Stable = struct
   module V1 = struct
     type t =
-      {fee: Currency.Fee.Stable.V1.t; prover: Public_key.Compressed.Stable.V1.t}
-    [@@deriving sexp, yojson, eq, compare]
+      { fee : Currency.Fee.Stable.V1.t
+      ; prover : Public_key.Compressed.Stable.V1.t
+      }
+    [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id
   end
 end]
 
-let create ~fee ~prover = Stable.Latest.{fee; prover}
+let create ~fee ~prover = Stable.Latest.{ fee; prover }
 
 module Digest = struct
   let length_in_bytes = Blake2.digest_size_in_bytes
@@ -20,21 +22,22 @@ module Digest = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = string [@@deriving sexp, hash, compare, eq, yojson]
+      type t = string [@@deriving sexp, hash, compare, equal, yojson]
 
       let to_latest = Fn.id
 
-      include Binable.Of_binable
-                (Core_kernel.String.Stable.V1)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable_without_uuid
+          (Core_kernel.String.Stable.V1)
+          (struct
+            type nonrec t = t
 
-                  let to_binable = Fn.id
+            let to_binable = Fn.id
 
-                  let of_binable s =
-                    assert (String.length s = length_in_bytes) ;
-                    s
-                end)
+            let of_binable s =
+              assert (String.length s = length_in_bytes) ;
+              s
+          end)
 
       let to_input t =
         Random_oracle.Input.bitstring Fold_lib.Fold.(to_list (string_bits t))
@@ -55,8 +58,7 @@ module Digest = struct
     let to_input t = Random_oracle.Input.bitstring (Array.to_list t)
   end
 
-  [%%define_locally
-  Stable.Latest.(to_input, typ)]
+  [%%define_locally Stable.Latest.(to_input, typ)]
 
   let default = String.init length_in_bytes ~f:(fun _ -> '\000')
 end

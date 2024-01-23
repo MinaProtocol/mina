@@ -1,0 +1,7 @@
+[Unit]
+Description=Mina Block Producer Stats Sidecar
+[Service]
+ExecStart=/usr/local/bin/mina-bp-stats-sidecar
+SuccessExitStatus=143
+[Install]
+WantedBy=multi-user.target

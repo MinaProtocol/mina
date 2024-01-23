@@ -22,3 +22,11 @@
 1.0.1:
 ------
 - enable daemon blockchain archival capability
+
+1.0.2:
+-----
+- add flag to allow logging precomputed blocks
+
+1.0.6:
+------
+- All references to the crypto currency now say Mina

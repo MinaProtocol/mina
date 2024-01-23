@@ -1,5 +1,5 @@
 open Intf
-open Core
+open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 
 module type Input_intf = sig
@@ -123,7 +123,7 @@ end
 module type S_with_version = sig
   module Stable : sig
     module V1 : sig
-      type t [@@deriving version, sexp, bin_io, compare, yojson, hash, eq]
+      type t [@@deriving version, sexp, bin_io, compare, yojson, hash, equal]
     end
 
     module Latest = V1
@@ -134,9 +134,9 @@ end
 
 module Make (F : Input_intf) :
   S_with_version
-  with type Stable.V1.t = F.t
-   and module Bigint = F.Bigint
-   and module Vector = F.Vector = struct
+    with type Stable.V1.t = F.t
+     and module Bigint = F.Bigint
+     and module Vector = F.Vector = struct
   include F
 
   let size = size ()
@@ -145,27 +145,29 @@ module Make (F : Input_intf) :
 
   module Stable = struct
     module V1 = struct
-      type t = F.t [@@deriving version {asserted}]
+      type t = F.t [@@deriving version { asserted }]
 
-      include Binable.Of_binable
-                (Bigint)
-                (struct
-                  type nonrec t = t
+      include
+        Binable.Of_binable
+          (Bigint)
+          (struct
+            type nonrec t = t
 
-                  let to_binable = to_bigint
+            let to_binable = to_bigint
 
-                  let of_binable = of_bigint
-                end)
+            let of_binable = of_bigint
+          end)
 
-      include Sexpable.Of_sexpable
-                (Bigint)
-                (struct
-                  type nonrec t = t
+      include
+        Sexpable.Of_sexpable
+          (Bigint)
+          (struct
+            type nonrec t = t
 
-                  let to_sexpable = to_bigint
+            let to_sexpable = to_bigint
 
-                  let of_sexpable = of_bigint
-                end)
+            let of_sexpable = of_bigint
+          end)
 
       let to_bignum_bigint n =
         let rec go i two_to_the_i acc =
@@ -235,7 +237,7 @@ module Make (F : Input_intf) :
     [%test_eq: Stable.Latest.t] t
       (Binable.of_string
          (module Stable.Latest)
-         (Binable.to_string (module Stable.Latest) t))
+         (Binable.to_string (module Stable.Latest) t) )
 
   let ( + ) = add
 
@@ -273,6 +275,7 @@ module Make (F : Input_intf) :
     Quickcheck.test
       (Quickcheck.Generator.list_with_length
          Int.(size_in_bits - 1)
-         Bool.quickcheck_generator)
-      ~f:(fun bs -> [%test_eq: bool list] (bs @ [false]) (to_bits (of_bits bs)))
+         Bool.quickcheck_generator )
+      ~f:(fun bs ->
+        [%test_eq: bool list] (bs @ [ false ]) (to_bits (of_bits bs)) )
 end

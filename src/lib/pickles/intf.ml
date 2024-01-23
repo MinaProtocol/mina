@@ -202,11 +202,11 @@ module Sponge (Impl : Snarky_backendless.Snark_intf.Run) = struct
 
   module type S =
     Sponge.Intf.Sponge
-    with module Field := Field
-     and module State := Sponge.State
-     and type input := Field.t
-     and type digest := length:int -> Boolean.var list * Field.t
-     and type t = Field.t Sponge.t
+      with module Field := Field
+       and module State := Sponge.State
+       and type input := Field.t
+       and type digest := length:int -> Boolean.var list * Field.t
+       and type t = Field.t Sponge.t
 end
 
 module type Inputs_base = sig
@@ -274,12 +274,12 @@ module Pairing_main_inputs = struct
     module Sponge : sig
       include
         Sponge_lib.Intf.Sponge
-        with module Field := Impl.Field
-         and module State := Sponge_lib.State
-         and type input :=
-                    [`Field of Impl.Field.t | `Bits of Impl.Boolean.var list]
-         and type digest := length:int -> Impl.Boolean.var list * Impl.Field.t
-         and type t = Impl.Field.t Sponge_lib.t
+          with module Field := Impl.Field
+           and module State := Sponge_lib.State
+           and type input :=
+            [ `Field of Impl.Field.t | `Bits of Impl.Boolean.var list ]
+           and type digest := length:int -> Impl.Boolean.var list * Impl.Field.t
+           and type t = Impl.Field.t Sponge_lib.t
 
       val squeeze_field : t -> Impl.Field.t
     end

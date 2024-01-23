@@ -8,9 +8,9 @@ include Checked_data
 
 module Controller = struct
   type nonrec 'a t =
-    {logger: Logger.t; tc: 'a Binable.m; mem: 'a t Location.Table.t}
+    { logger : Logger.t; tc : 'a Binable.m; mem : 'a t Location.Table.t }
 
-  let create ~logger tc = {logger; tc; mem= Location.Table.create ()}
+  let create ~logger tc = { logger; tc; mem = Location.Table.create () }
 end
 
 let load_with_checksum (type a) (c : a Controller.t) location =
@@ -27,7 +27,7 @@ let load c location =
 let store_with_checksum (type a) (c : a Controller.t) location (data : a) =
   let checksum = md5 c.tc data in
   Deferred.return
-    ( Location.Table.set c.mem ~key:location ~data:{checksum; data} ;
+    ( Location.Table.set c.mem ~key:location ~data:{ checksum; data } ;
       checksum )
 
 let store (c : 'a Controller.t) location data : unit Deferred.t =

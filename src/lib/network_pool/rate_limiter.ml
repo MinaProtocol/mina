@@ -41,7 +41,7 @@ module Record = struct
   (* For a given peer, all of the actions within [interval] that peer has performed,
      along with the remaining capacity for actions. *)
   type t =
-    {mutable remaining_capacity: Score.t; elts: (Score.t * Time.t) Queue.t}
+    { mutable remaining_capacity : Score.t; elts : (Score.t * Time.t) Queue.t }
   [@@deriving sexp]
 
   let clear_old_entries r ~now =
@@ -56,7 +56,7 @@ module Record = struct
           in
           if is_old then (
             r.remaining_capacity <- Score.(r.remaining_capacity + n) ;
-            ignore (Queue.dequeue_exn r.elts) ;
+            ignore (Queue.dequeue_exn r.elts : int * Time.t) ;
             go () )
     in
     go ()
@@ -74,16 +74,18 @@ end
 module Lru_table (Q : Hash_queue.S) = struct
   let max_size = 2048
 
-  type t = {table: Record.t Q.t; initial_capacity: Score.t}
+  type t = { table : Record.t Q.t; initial_capacity : Score.t }
   [@@deriving sexp_of]
 
-  let add ({table; initial_capacity} : t) (k : Q.Key.t) ~now ~score =
+  let add ({ table; initial_capacity } : t) (k : Q.key) ~now ~score =
     match Q.lookup_and_move_to_back table k with
     | None ->
         if Int.(Q.length table >= max_size) then
-          Q.dequeue_front table |> ignore ;
+          ignore (Q.dequeue_front table : Record.t option) ;
         Q.enqueue_back_exn table k
-          {Record.remaining_capacity= initial_capacity; elts= Queue.create ()} ;
+          { Record.remaining_capacity = initial_capacity
+          ; elts = Queue.create ()
+          } ;
         `Ok
     | Some r ->
         Record.add r ~now ~score
@@ -96,7 +98,18 @@ module Lru_table (Q : Hash_queue.S) = struct
         Record.clear_old_entries r ~now ;
         Score.(is_non_negative (r.remaining_capacity - score))
 
-  let create ~initial_capacity = {initial_capacity; table= Q.create ()}
+  let create ~initial_capacity = { initial_capacity; table = Q.create () }
+
+  let next_expires ({ table; _ } : t) (k : Q.key) =
+    match Q.lookup table k with
+    | None ->
+        Time.now ()
+    | Some { elts; _ } -> (
+        match Queue.peek elts with
+        | Some (_, time) ->
+            time
+        | None ->
+            Time.now () )
 end
 
 module Ip = struct
@@ -109,18 +122,18 @@ module Peer_id = struct
   module Lru = Lru_table (Hash_queue)
 end
 
-type t = {by_ip: Ip.Lru.t; by_peer_id: Peer_id.Lru.t} [@@deriving sexp_of]
+type t = { by_ip : Ip.Lru.t; by_peer_id : Peer_id.Lru.t } [@@deriving sexp_of]
 
 let create ~capacity:(capacity, `Per t) =
   let initial_capacity =
     let max_per_second = Float.of_int capacity /. Time.Span.to_sec t in
-    Float.round_up (max_per_second *. Time.Span.to_sec interval)
-    |> Float.to_int
+    Float.round_up (max_per_second *. Time.Span.to_sec interval) |> Float.to_int
   in
-  { by_ip= Ip.Lru.create ~initial_capacity
-  ; by_peer_id= Peer_id.Lru.create ~initial_capacity }
+  { by_ip = Ip.Lru.create ~initial_capacity
+  ; by_peer_id = Peer_id.Lru.create ~initial_capacity
+  }
 
-let add {by_ip; by_peer_id} (sender : Envelope.Sender.t) ~now ~score =
+let add { by_ip; by_peer_id } (sender : Envelope.Sender.t) ~now ~score =
   match sender with
   | Local ->
       `Within_capacity
@@ -131,31 +144,39 @@ let add {by_ip; by_peer_id} (sender : Envelope.Sender.t) ~now ~score =
         Ip.Lru.has_capacity by_ip ip ~now ~score
         && Peer_id.Lru.has_capacity by_peer_id id ~now ~score
       then (
-        Ip.Lru.add by_ip ip ~now ~score |> ignore ;
-        Peer_id.Lru.add by_peer_id id ~now ~score |> ignore ;
+        ignore (Ip.Lru.add by_ip ip ~now ~score : [ `No_space | `Ok ]) ;
+        ignore (Peer_id.Lru.add by_peer_id id ~now ~score : [ `No_space | `Ok ]) ;
         `Within_capacity )
       else `Capacity_exceeded
 
-module Summary = struct
-  type r = {capacity_used: Score.t} [@@deriving to_yojson]
+let next_expires { by_peer_id; _ } (sender : Envelope.Sender.t) =
+  match sender with
+  | Local ->
+      Time.now ()
+  | Remote { peer_id; _ } ->
+      Peer_id.Lru.next_expires by_peer_id peer_id
 
-  type t = {by_ip: (string * r) list; by_peer_id: (string * r) list}
+module Summary = struct
+  type r = { capacity_used : Score.t } [@@deriving to_yojson]
+
+  type t = { by_ip : (string * r) list; by_peer_id : (string * r) list }
   [@@deriving to_yojson]
 end
 
-let summary ({by_ip; by_peer_id} : t) =
+let summary ({ by_ip; by_peer_id } : t) =
   let open Summary in
   to_yojson
-    { by_ip=
+    { by_ip =
         Ip.Hash_queue.foldi by_ip.table ~init:[] ~f:(fun acc ~key ~data ->
             ( Unix.Inet_addr.to_string key
-            , {capacity_used= by_ip.initial_capacity - data.remaining_capacity}
-            )
+            , { capacity_used = by_ip.initial_capacity - data.remaining_capacity
+              } )
             :: acc )
-    ; by_peer_id=
+    ; by_peer_id =
         Peer_id.Hash_queue.foldi by_peer_id.table ~init:[]
           ~f:(fun acc ~key ~data ->
             ( Peer.Id.to_string key
-            , {capacity_used= by_ip.initial_capacity - data.remaining_capacity}
-            )
-            :: acc ) }
+            , { capacity_used = by_ip.initial_capacity - data.remaining_capacity
+              } )
+            :: acc )
+    }

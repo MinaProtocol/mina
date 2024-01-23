@@ -1,0 +1,38 @@
+#build with: 
+# docker build -t txn_burst_util -f Dockerfile_txn_burst .
+
+#or directly run with:
+# docker run -v <local keypath>:/keys --entrypoint ./_build/default/src/app/batch_txn_tool/batch_txn_tool.exe txn_burst_util --num-txn-per-acct 10 --origin-sender-sk-path "/keys/<origin key path>" --origin-sender-sk-pw "some password" --returner-sk-path "/keys/<origin key path>" --returner-sk-pw "some password"
+
+FROM minaprotocol/mina-toolchain:1.3.1beta1-compatible-9839d34-bullseye
+
+USER opam
+
+#install mina
+RUN sudo apt-get -y update && sudo apt-get -y install man
+RUN sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates
+RUN sudo echo "deb [trusted=yes] http://packages.o1test.net $(lsb_release -cs) unstable" | sudo tee /etc/apt/sources.list.d/mina.list \
+  && sudo apt-get update\
+  && sudo apt-get install -y --allow-downgrades mina-devnet=1.3.1beta1-metrics-gossip-data-collection-92db0c6
+
+# compile txn burst tool
+COPY ./batch_txn_tool.ml /home/opam
+COPY ./txn_tool_graphql.ml /home/opam
+COPY ./dune /home/opam
+ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
+RUN eval $(opam config env) \
+  && git config pull.rebase false \
+  && git pull \
+  && git checkout compatible \
+  && git submodule update --init --recursive \
+  && mv /home/opam/batch_txn_tool.ml src/app/batch_txn_tool \
+  && mv /home/opam/txn_tool_graphql.ml src/app/batch_txn_tool \
+  && mv /home/opam/dune src/app/batch_txn_tool \
+  && dune build src/app/batch_txn_tool/batch_txn_tool.exe
+
+USER root
+# prepare the key directories
+RUN mkdir /keys && chmod 700 /keys
+ENV MINA_PRIVKEY_PASS ""
+
+ENTRYPOINT ["./_build/default/src/app/batch_txn_tool/batch_txn_tool.exe"]

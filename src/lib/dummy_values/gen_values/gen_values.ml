@@ -1,7 +1,4 @@
 open Ppxlib
-open Asttypes
-open Parsetree
-open Longident
 open Core
 open Async
 open Pickles_types
@@ -34,8 +31,8 @@ let main () =
   in
   let loc = Ppxlib.Location.none in
   Pprintast.top_phrase fmt (Ptop_def (str ~loc)) ;
-  exit 0
+  ignore (exit 0 : 'a Deferred.t)
 
 let () =
-  ignore (main ()) ;
+  main () ;
   never_returns (Scheduler.go ())

@@ -1,5 +1,4 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 open Import
@@ -35,8 +34,7 @@ let gen =
 include Comparable.Make_binable (Stable.Latest)
 include Hashable.Make_binable (Stable.Latest)
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 type var = Public_key.Compressed.var * Token_id.var
 

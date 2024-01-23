@@ -1,6 +1,18 @@
 (library
  (name staged_ledger_diff)
  (public_name staged_ledger_diff)
- (libraries core_kernel mina_base transaction_snark_work)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   sexplib0
+   async
+   bin_prot.shape
+   base.caml
+   ;; local libraries
+   mina_base
+   transaction_snark_work
+   genesis_constants
+   currency
+   )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_version ppx_deriving_yojson)))

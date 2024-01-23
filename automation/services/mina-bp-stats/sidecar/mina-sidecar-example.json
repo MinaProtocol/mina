@@ -1,0 +1,4 @@
+{
+  "uploadURL": "https://some-host.somewhere/some-endpoing?token=some-token",
+  "nodeURL": "https://some.node.somewhere:3085"
+}

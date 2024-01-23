@@ -2,7 +2,15 @@
  (name sync_status)
  (public_name sync_status)
  (inline_tests)
- (libraries core_kernel currency signature_lib)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   bin_prot.shape
+   base.caml
+   sexplib0
+   base.base_internalhash_types
+   ppx_inline_test.config
+   )
  (preprocess
   (pps ppx_jane ppx_version ppx_deriving_yojson ppx_enumerate))
  (instrumentation (backend bisect_ppx))

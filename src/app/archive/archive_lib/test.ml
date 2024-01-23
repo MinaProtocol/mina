@@ -11,20 +11,39 @@ let%test_module "Archive node unit tests" =
     let proof_level = Genesis_constants.Proof_level.None
 
     let precomputed_values =
-      {(Lazy.force Precomputed_values.for_unit_tests) with proof_level}
+      { (Lazy.force Precomputed_values.for_unit_tests) with proof_level }
+
+    let constraint_constants = precomputed_values.constraint_constants
+
+    let verifier =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Verifier.create ~logger ~proof_level ~constraint_constants
+            ~conf_dir:None
+            ~pids:(Child_processes.Termination.create_pid_table ()) )
 
     module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
+
+    let archive_uri =
+      Uri.of_string
+        (Option.value
+           (Sys.getenv "MINA_TEST_POSTGRES")
+           ~default:"postgres://admin:codarules@localhost:5432/archiver" )
 
     let conn_lazy =
       lazy
         ( Thread_safe.block_on_async_exn
         @@ fun () ->
-        match%map
-          Caqti_async.connect
-            (Uri.of_string "postgres://admin:codarules@localhost:5432/archiver")
-        with
+        match%map Caqti_async.connect archive_uri with
         | Ok conn ->
             conn
+        | Error e ->
+            failwith @@ Caqti_error.show e )
+
+    let conn_pool_lazy =
+      lazy
+        ( match Caqti_async.connect_pool archive_uri with
+        | Ok pool ->
+            pool
         | Error e ->
             failwith @@ Caqti_error.show e )
 
@@ -35,14 +54,14 @@ let%test_module "Archive node unit tests" =
         ~fee_range:10 ()
 
     let fee_transfer_gen =
-      Fee_transfer.Single.Gen.with_random_receivers ~keys ~max_fee:10
+      Fee_transfer.Single.Gen.with_random_receivers ~keys ~min_fee:0 ~max_fee:10
         ~token:(Quickcheck.Generator.return Token_id.default)
 
     let coinbase_gen =
       Coinbase.Gen.with_random_receivers ~keys ~min_amount:20 ~max_amount:100
         ~fee_transfer:
           (Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
-             ~max_fee:(Currency.Fee.of_int 10))
+             ~min_fee:Currency.Fee.zero )
 
     let%test_unit "User_command: read and write" =
       let conn = Lazy.force conn_lazy in
@@ -78,7 +97,7 @@ let%test_module "Archive node unit tests" =
       Thread_safe.block_on_async_exn
       @@ fun () ->
       Async.Quickcheck.async_test
-        ~sexp_of:[%sexp_of: [`Normal | `Via_coinbase] * Fee_transfer.Single.t]
+        ~sexp_of:[%sexp_of: [ `Normal | `Via_coinbase ] * Fee_transfer.Single.t]
         (Quickcheck.Generator.tuple2 kind_gen fee_transfer_gen)
         ~f:(fun (kind, fee_transfer) ->
           let transaction_hash =
@@ -87,8 +106,7 @@ let%test_module "Archive node unit tests" =
           match%map
             let open Deferred.Result.Let_syntax in
             let%bind fee_transfer_id =
-              Processor.Fee_transfer.add_if_doesn't_exist conn fee_transfer
-                kind
+              Processor.Fee_transfer.add_if_doesn't_exist conn fee_transfer kind
             in
             let%map result =
               Processor.Internal_command.find conn ~transaction_hash
@@ -126,16 +144,15 @@ let%test_module "Archive node unit tests" =
               failwith @@ Caqti_error.show e )
 
     let%test_unit "Block: read and write" =
-      let conn = Lazy.force conn_lazy in
+      let pool = Lazy.force conn_pool_lazy in
       Quickcheck.test ~trials:20
         ( Quickcheck.Generator.with_size ~size:10
         @@ Quickcheck_lib.gen_imperative_list
              (Transition_frontier.For_tests.gen_genesis_breadcrumb
-                ~precomputed_values ())
+                ~precomputed_values ~verifier () )
              (Transition_frontier.Breadcrumb.For_tests.gen_non_deferred
-                ?logger:None ~precomputed_values ?verifier:None
-                ?trust_system:None
-                ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts))
+                ?logger:None ~precomputed_values ~verifier ?trust_system:None
+                ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts) )
         )
         ~f:(fun breadcrumbs ->
           Thread_safe.block_on_async_exn
@@ -146,8 +163,8 @@ let%test_module "Archive node unit tests" =
           in
           let processor_deferred_computation =
             Processor.run
-              ~constraint_constants:precomputed_values.constraint_constants
-              conn reader ~logger ~delete_older_than:None
+              ~constraint_constants:precomputed_values.constraint_constants pool
+              reader ~logger ~delete_older_than:None
           in
           let diffs =
             List.map
@@ -162,29 +179,35 @@ let%test_module "Archive node unit tests" =
           match%map
             Processor.deferred_result_list_fold breadcrumbs ~init:()
               ~f:(fun () breadcrumb ->
-                let open Deferred.Result.Let_syntax in
-                match%bind
-                  Processor.Block.find_opt conn
-                    ~state_hash:
-                      (Transition_frontier.Breadcrumb.state_hash breadcrumb)
-                with
-                | Some id ->
-                    let%bind Processor.Block.{parent_id; _} =
-                      Processor.Block.load conn ~id
-                    in
-                    if
-                      Transition_frontier.Breadcrumb.blockchain_length
-                        breadcrumb
-                      > Unsigned.UInt32.of_int 1
-                    then
-                      Processor.For_test.assert_parent_exist ~parent_id
-                        ~parent_hash:
-                          (Transition_frontier.Breadcrumb.parent_hash
-                             breadcrumb)
-                        conn
-                    else Deferred.Result.return ()
-                | None ->
-                    failwith "Failed to find saved block in database" )
+                Caqti_async.Pool.use
+                  (fun conn ->
+                    let open Deferred.Result.Let_syntax in
+                    match%bind
+                      Processor.Block.find_opt conn
+                        ~state_hash:
+                          (Transition_frontier.Breadcrumb.state_hash breadcrumb)
+                    with
+                    | Some id ->
+                        let%bind Processor.Block.{ parent_id; _ } =
+                          Processor.Block.load conn ~id
+                        in
+                        if
+                          Unsigned.UInt32.compare
+                            ( Consensus.Data.Consensus_state.blockchain_length
+                            @@ Transition_frontier.Breadcrumb.consensus_state
+                                 breadcrumb )
+                            (Unsigned.UInt32.of_int 1)
+                          > 0
+                        then
+                          Processor.For_test.assert_parent_exist ~parent_id
+                            ~parent_hash:
+                              (Transition_frontier.Breadcrumb.parent_hash
+                                 breadcrumb )
+                            conn
+                        else Deferred.Result.return ()
+                    | None ->
+                        failwith "Failed to find saved block in database" )
+                  pool )
           with
           | Ok () ->
               ()
@@ -200,7 +223,7 @@ let%test_module "Archive node unit tests" =
              (Transition_frontier.For_tests.gen_genesis_breadcrumb
                 ~precomputed_values ())
              (Transition_frontier.Breadcrumb.For_tests.gen_non_deferred
-                ?logger:None ~precomputed_values ?verifier:None
+                ?logger:None ~precomputed_values ~verifier
                 ?trust_system:None
                 ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts))
         )

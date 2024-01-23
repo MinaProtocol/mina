@@ -5,6 +5,7 @@ module Make
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t) =
 struct
   open Zexe_backend_common.Plonk_constraint_system.Plonk_constraint
+
   open Impl
 
   let seal = Tuple_lib.Double.map ~f:(Util.seal (module Impl))
@@ -15,14 +16,15 @@ struct
     let p3 =
       exists G.typ_unchecked
         ~compute:
-          As_prover.(
-            fun () -> G.Constant.( + ) (read G.typ p1) (read G.typ p2))
+          As_prover.(fun () -> G.Constant.( + ) (read G.typ p1) (read G.typ p2))
     in
     assert_
-      [ { annotation= Some __LOC__
-        ; basic=
+      [ { annotation = Some __LOC__
+        ; basic =
             Zexe_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (EC_add {p1; p2; p3}) } ] ;
+              (EC_add { p1; p2; p3 })
+        }
+      ] ;
     p3
 
   let scale_fast t (`Plus_two_to_len scalar) =
@@ -58,7 +60,7 @@ struct
                   G.Constant.(p + (p + tl')))
         in
         let open Field.Constant in
-        let row = {S.xt; yt; b= (b :> Field.t); xp; yp; l1; xs; ys} in
+        let row = { S.xt; yt; b = (b :> Field.t); xp; yp; l1; xs; ys } in
         go (row :: rows) s Int.(i - 1)
     in
     let n = Array.length scalar in
@@ -70,11 +72,12 @@ struct
         else
           let state = go [] p Int.(n - 2) in
           assert_
-            [ { annotation= Some __LOC__
-              ; basic=
-                  Zexe_backend_common.Plonk_constraint_system.Plonk_constraint
-                  .T
-                    (EC_scale {state}) } ] ;
+            [ { annotation = Some __LOC__
+              ; basic =
+                  Zexe_backend_common.Plonk_constraint_system.Plonk_constraint.T
+                    (EC_scale { state })
+              }
+            ] ;
           let fin = state.(Int.(n - 2)) in
           (fin.xs, fin.ys)
       in
@@ -109,11 +112,13 @@ struct
                   scale_fast g (`Plus_two_to_len (Array.of_list s)) ) )
             (fun (g, s) ->
               let open G.Constant.Scalar in
-              let shift = project (List.init n ~f:(fun _ -> false) @ [true]) in
+              let shift =
+                project (List.init n ~f:(fun _ -> false) @ [ true ])
+              in
               let x = project s + shift in
               G.Constant.scale g x )
             (random_point, xs)
         with e ->
-          Core.eprintf !"Input %{sexp: bool list}\n%!" xs ;
+          eprintf !"Input %{sexp: bool list}\n%!" xs ;
           raise e )
 end

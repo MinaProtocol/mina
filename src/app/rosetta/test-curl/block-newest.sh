@@ -2,5 +2,5 @@
 
 . lib.sh
 
-req /block '{ network_identifier: { blockchain: "coda", network: "debug" }, block_identifier: { }, metadata: {} }'
+req /block '{ network_identifier: { blockchain: "mina", network: "debug" }, block_identifier: { }, metadata: {} }'
 

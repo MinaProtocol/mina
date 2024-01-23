@@ -180,6 +180,15 @@ locals {
         fi
       EOF
 
+      "00-fix-letsencrypt-cert" = <<-EOF
+        #!/bin/bash
+        # workarounds from https://github.com/nodesource/distributions/issues/1266
+        apt-get -y update && apt-get -y install ca-certificates
+        rm /usr/share/ca-certificates/mozilla/DST_Root_CA_X3.crt
+        dpkg-reconfigure ca-certificates
+        update-ca-certificates
+      EOF
+
       "01-install-gcloudsdk" = <<-EOF
         #!/bin/bash
 
@@ -247,10 +256,14 @@ locals {
         apt-get update --yes && apt-get install --yes lsb-core apt-transport-https curl jq
 
         export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)"
-        echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-        curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-        apt-get update -y && apt-get install kubectl -y
-        cp --update --verbose $(which kubectl) "$${CI_SHARED_BIN}/kubectl"
+        echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+  && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
+  && apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends google-cloud-sdk kubectl google-cloud-sdk-gke-gcloud-auth-plugin \
+  && rm -rf /var/lib/apt/lists/*
+
+        export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+
 
         # Install helm
         curl https://baltocdn.com/helm/signing.asc | apt-key add -
@@ -290,6 +303,15 @@ locals {
         chmod +x bin/coda-network && ln --symbolic --force bin/coda-network /usr/local/bin/coda-network
       EOF
 
+      "02-install-cortextool" = <<-EOF
+        #!/bin/bash
+
+        set -euo pipefail
+
+        curl -fSL -o /usr/local/bin/cortextool "https://github.com/grafana/cortex-tools/releases/download/v0.7.2/cortextool_0.7.2_linux_x86_64"
+        chmod a+x /usr/local/bin/cortextool
+      EOF
+
       "03-setup-k8s-ctx" = <<-EOF
         #!/bin/bash
 
@@ -325,8 +347,8 @@ locals {
         ln --symbolic --force /docker-entrypoint.d/00-artifact-cache-helper /usr/local/bin/artifact-cache-helper.sh
 
         # Install mina debian package tools
-        echo "deb [trusted=yes] http://packages.o1test.net unstable main" > /etc/apt/sources.list.d/o1.list
-        apt-get update && apt-get install -y "mina-testnet-postake-medium-curves"
+        echo "deb [trusted=yes] http://packages.o1test.net stretch stable" > /etc/apt/sources.list.d/o1.list
+        apt-get update && apt-get install -y tzdata mina-devnet
       EOF
     }
   }

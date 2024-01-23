@@ -5,19 +5,21 @@ module Single : sig
   module Stable : sig
     module V1 : sig
       type t = private
-        { receiver_pk: Public_key.Compressed.Stable.V1.t
-        ; fee: Currency.Fee.Stable.V1.t
-        ; fee_token: Token_id.Stable.V1.t }
-      [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
+        { receiver_pk : Public_key.Compressed.Stable.V1.t
+        ; fee : Currency.Fee.Stable.V1.t
+        ; fee_token : Token_id.Stable.V1.t
+        }
+      [@@deriving bin_io, sexp, compare, equal, yojson, version, hash]
     end
 
     module Latest = V1
   end
 
   type t = Stable.Latest.t = private
-    { receiver_pk: Public_key.Compressed.t
-    ; fee: Currency.Fee.t
-    ; fee_token: Token_id.t }
+    { receiver_pk : Public_key.Compressed.t
+    ; fee : Currency.Fee.t
+    ; fee_token : Token_id.t
+    }
   [@@deriving sexp, compare, yojson, hash]
 
   include Comparable.S with type t := t
@@ -40,7 +42,8 @@ module Single : sig
 
   module Gen : sig
     val with_random_receivers :
-         keys:Signature_keypair.t array
+         ?min_fee:int
+      -> keys:Signature_keypair.t array
       -> max_fee:int
       -> token:Token_id.t Quickcheck.Generator.t
       -> t Quickcheck.Generator.t
@@ -50,7 +53,7 @@ end
 module Stable : sig
   module V1 : sig
     type t = private Single.Stable.V1.t One_or_two.Stable.V1.t
-    [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
+    [@@deriving bin_io, sexp, compare, equal, yojson, version, hash]
   end
 
   module Latest = V1
@@ -59,9 +62,10 @@ end
 type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash]
 
 type single = Single.t = private
-  { receiver_pk: Public_key.Compressed.t
-  ; fee: Currency.Fee.t
-  ; fee_token: Token_id.t }
+  { receiver_pk : Public_key.Compressed.t
+  ; fee : Currency.Fee.t
+  ; fee_token : Token_id.t
+  }
 [@@deriving sexp, compare, yojson, hash]
 
 include Comparable.S with type t := t

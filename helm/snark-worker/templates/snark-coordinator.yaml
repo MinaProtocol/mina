@@ -1,35 +1,41 @@
-{{- if .Values.coordinator.active }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{tpl .Values.coordinator.fullname .}}
+  name: {{$.Values.coordinatorName }}
   labels:
-    app: {{tpl .Values.coordinator.fullname .}}
+    app: {{$.Values.coordinatorName}}
 spec:
-  replicas: {{ .Values.numReplicas }}
+  replicas: 1
   selector:
     matchLabels:
-      app: {{tpl .Values.coordinator.fullname .}}
+      app: {{$.Values.coordinatorName }}
   template:
     metadata:
       labels:
-        app: {{tpl .Values.coordinator.fullname .}}
-        testnet: {{ .Values.testnetName }}
+        app: {{$.Values.coordinatorName}}
+        testnet: {{ $.Values.testnetName }}
         role: snark-coordinator
-        version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
+        version: {{ trunc 6 (split ":" $.Values.mina.image)._1 | trimSuffix "-" }}
+        syncStatus: INIT
       annotations:
         prometheus.io/scrape: 'true'
-        prometheus.io/port: {{ .Values.coda.ports.metrics | quote }}
+        prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      {{- if $.Values.priorityClass }}
+      priorityClassName: {{ $.Values.priorityClass }}
+      {{- end }}
       containers:
-      - name: coordinator
+      - name: mina
         resources:
           limits:
           requests:
-            memory: 24Gi
-            cpu: 8.0
-        image: {{ $.Values.coda.image }}
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
+        image: {{ $.Values.mina.image }}
+        {{ if $.Values.mina.useCustomEntrypoint -}}
+        command: [{{ $.Values.mina.customEntrypoint }}]
+        {{- end }}
         args: [ "daemon",
           "-log-level", "Debug",
           "-log-json",
@@ -43,65 +49,70 @@ spec:
           "-snark-worker-fee", "$(CODA_SNARK_FEE)",
           "-work-selection", "$(WORK_SELECTION)",
           "-enable-peer-exchange", "true",
-          {{- if $.Values.coda.runtimeConfig }}
+          {{- if $.Values.mina.logTxnPoolGossip }}
+          "-log-txn-pool-gossip", "true",
+          {{- end -}}
+          {{- if $.Values.mina.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           {{- end }}
-          {{- range $.Values.coda.seedPeers }}
+          {{- range $.Values.mina.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}
-          {{- if $.Values.coda.seedPeersURL }}
-          "-peer-list-url", {{ $.Values.coda.seedPeersURL | quote }},
+          {{- if $.Values.mina.seedPeersURL }}
+          "-peer-list-url", {{ $.Values.mina.seedPeersURL | quote }},
           {{- end }}
-          "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }},
-          {{- if $.Values.coda.enableArchive }}
-          "-archive-address", {{ $.Values.coda.archiveAddress }}
+          "-generate-genesis-proof", {{ $.Values.mina.generateGenesisProof | quote }},
+          {{- if $.Values.mina.enableArchive }}
+          "-archive-address", {{ $.Values.mina.archiveAddress }}
+          {{- end -}}
+          {{- if $.Values.mina.exposeGraphql }}
+          "-insecure-rest-server",
           {{- end -}}
         ]
         env:
         - name: "RAYON_NUM_THREADS"
           value: "7"
         - name: DAEMON_REST_PORT
-          value: {{ .Values.coda.ports.graphql | quote }}
+          value: {{ $.Values.mina.ports.graphql | quote }}
         - name: DAEMON_CLIENT_PORT
-          value: {{ .Values.coda.ports.client | quote }}
+          value: {{ $.Values.mina.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
-          value: {{ .Values.coda.ports.metrics | quote }}
-        - name: CODA_CLIENT_TRUSTLIST
+          value: {{ $.Values.mina.ports.metrics | quote }}
+        - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
-        - name: CONNECT_PRIVATE_IPS
-          value: "true"
         - name: CODA_SNARK_KEY
-          value: {{ .Values.coordinator.publicKey | quote }}
+          value: {{ $.Values.publicKey | quote }}
         - name: CODA_SNARK_FEE
-          value: {{ .Values.coordinator.snarkFee | quote }}
+          value: {{ $.Values.snarkFee | quote }}
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ .Values.coda.ports.p2p | quote }}
+          value: {{ $.Values.mina.ports.p2p | quote }}
         - name: WORK_SELECTION
-          value: {{$.Values.coordinator.workSelectionAlgorithm | quote }}
+          value: {{$.Values.workSelectionAlgorithm | quote }}
         ports:
         - name: client-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.client }}
+          containerPort: {{ $.Values.mina.ports.client }}
         - name: graphql-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.graphql }}
+          containerPort: {{ $.Values.mina.ports.graphql }}
         - name: metrics-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.metrics }}
+          containerPort: {{ $.Values.mina.ports.metrics }}
         - name: external-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.p2p }}
-          hostPort: {{ .Values.coda.ports.p2p }}
-{{- include "healthcheck.snarkCoordinator.allChecks" .Values | indent 8 }}
+          containerPort: {{ $.Values.mina.ports.p2p }}
+          hostPort: {{ $.Values.mina.ports.p2p }}
+{{$name := $.Values.coordinatorName }}
+{{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
+{{- include "healthcheck.snarkCoordinator.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
-      {{- if .Values.coda.runtimeConfig }}
+      {{- if $.Values.mina.runtimeConfig }}
         volumeMounts:
         - name: daemon-config
           mountPath: "/config/"
       volumes:
       - name: daemon-config
         configMap:
-          name: snark-coordinator-daemon-config
+          name: {{$.Values.coordinatorName }}-daemon-config
       {{- end }}
-{{- include "nodeSelector.preemptible" .Values | indent 6 }}
-{{- end }}
+{{- include "nodeSelector.preemptible" $.Values | indent 6 }}

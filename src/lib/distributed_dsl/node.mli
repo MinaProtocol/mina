@@ -3,7 +3,7 @@ open Async_kernel
 open Pipe_lib
 
 module type Peer_intf = sig
-  type t [@@deriving eq, hash, compare, sexp, yojson]
+  type t [@@deriving equal, hash, compare, sexp, yojson]
 
   include Hashable.S with type t := t
 end
@@ -23,9 +23,9 @@ end
 module type Timer_intf = sig
   type t
 
-  type tok [@@deriving eq]
+  type tok [@@deriving equal]
 
-  val wait : t -> Time.Span.t -> tok * [`Cancelled | `Finished] Deferred.t
+  val wait : t -> Time.Span.t -> tok * [ `Cancelled | `Finished ] Deferred.t
 
   val cancel : t -> tok -> unit
 end
@@ -111,44 +111,41 @@ module type S = sig
 end
 
 module type F = functor
-  (State :sig
-          
-          type t [@@deriving eq, sexp, yojson]
-        end)
-  (Message :sig
-            
-            type t
-          end)
+  (State : sig
+     type t [@@deriving equal, sexp, yojson]
+   end)
+  (Message : sig
+     type t
+   end)
   (Peer : Peer_intf)
   (Timer : Timer_intf)
-  (Message_label :sig
-                  
-                  type label [@@deriving enum, sexp]
+  (Message_label : sig
+     type label [@@deriving enum, sexp]
 
-                  include Hashable.S with type t = label
-                end)
-  (Timer_label :sig
-                
-                type label [@@deriving enum, sexp]
+     include Hashable.S with type t = label
+   end)
+  (Timer_label : sig
+     type label [@@deriving enum, sexp]
 
-                include Hashable.S with type t = label
-              end)
-  (Condition_label :sig
-                    
-                    type label [@@deriving enum, sexp, yojson]
+     include Hashable.S with type t = label
+   end)
+  (Condition_label : sig
+     type label [@@deriving enum, sexp, yojson]
 
-                    include Hashable.S with type t = label
-                  end)
-  (Transport :
-     Transport_intf with type message := Message.t and type peer := Peer.t)
-  -> S
-     with type message := Message.t
-      and type state := State.t
-      and type transport := Transport.t
-      and type peer := Peer.t
-      and module Message_label := Message_label
-      and module Timer_label := Timer_label
-      and module Condition_label := Condition_label
-      and module Timer := Timer
+     include Hashable.S with type t = label
+   end)
+  (Transport : Transport_intf
+                 with type message := Message.t
+                  and type peer := Peer.t)
+  ->
+  S
+    with type message := Message.t
+     and type state := State.t
+     and type transport := Transport.t
+     and type peer := Peer.t
+     and module Message_label := Message_label
+     and module Timer_label := Timer_label
+     and module Condition_label := Condition_label
+     and module Timer := Timer
 
 module Make : F

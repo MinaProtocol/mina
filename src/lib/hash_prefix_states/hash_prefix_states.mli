@@ -1,20 +1,12 @@
-[%%import "/src/config.mlh"]
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params
 open Tick
-
-[%%else]
-
-open Snark_params_nonconsensus
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
-
 open Random_oracle
 
 val signature : Field.t State.t
+
+val signature_for_mainnet : Field.t State.t
+
+val signature_for_testnet : Field.t State.t
 
 (** [merkle_tree depth] gives the hash prefix for the given node depth.
 
@@ -28,6 +20,8 @@ val coinbase_merkle_tree : int -> Field.t State.t
 val vrf_message : Field.t State.t
 
 val vrf_output : Field.t State.t
+
+val vrf_evaluation : Field.t State.t
 
 val epoch_seed : Field.t State.t
 

@@ -17,17 +17,17 @@ end
 type ('initial, 'partially_validated, 'result) t
 
 val create :
-     ?how_to_add:[`Insert | `Enqueue_back]
+     ?how_to_add:[ `Insert | `Enqueue_back ]
   -> ?logger:Logger.t
   -> ?compare_init:('init -> 'init -> int)
   -> ?weight:('init -> int)
   -> ?max_weight_per_call:int
-  -> (   [`Init of 'init | `Partially_validated of 'partially_validated] list
+  -> (   [ `Init of 'init | `Partially_validated of 'partially_validated ] list
       -> [ `Valid of 'result
          | `Invalid
          | `Potentially_invalid of 'partially_validated ]
          list
-         Deferred.Or_error.t)
+         Deferred.Or_error.t )
   -> ('init, 'partially_validated, 'result) t
 
 val verify :

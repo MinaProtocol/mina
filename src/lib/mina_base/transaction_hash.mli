@@ -5,17 +5,19 @@ module Stable : sig
   [@@@no_toplevel_latest_type]
 
   module V1 : sig
-    type t [@@deriving sexp, compare, hash]
+    type t [@@deriving sexp, compare, hash, equal]
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
+type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson, equal]
 
 val of_base58_check : string -> t Or_error.t
 
 val of_base58_check_exn : string -> t
 
 val to_base58_check : t -> string
+
+val hash_signed_command : Signed_command.t -> t
 
 val hash_command : User_command.t -> t
 

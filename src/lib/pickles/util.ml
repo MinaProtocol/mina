@@ -3,12 +3,13 @@ open Pickles_types
 
 type m = Abc.Label.t = A | B | C
 
-let rec absorb : type a g1 g1_opt f scalar.
+let rec absorb :
+    type a g1 g1_opt f scalar.
        absorb_field:(f -> unit)
     -> absorb_scalar:(scalar -> unit)
     -> g1_to_field_elements:(g1 -> f list)
     -> mask_g1_opt:(g1_opt -> g1)
-    -> (a, < scalar: scalar ; g1: g1 ; g1_opt: g1_opt >) Type.t
+    -> (a, < scalar : scalar ; g1 : g1 ; g1_opt : g1_opt >) Type.t
     -> a
     -> unit =
  fun ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt ty t ->
@@ -23,27 +24,27 @@ let rec absorb : type a g1 g1_opt f scalar.
         t
   | With_degree_bound ->
       Array.iter t.unshifted ~f:(fun t ->
-          absorb ~absorb_field ~absorb_scalar ~g1_to_field_elements
-            ~mask_g1_opt PC (mask_g1_opt t) ) ;
+          absorb ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt
+            PC (mask_g1_opt t) ) ;
       absorb ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt PC
         (mask_g1_opt t.shifted)
   | ty1 :: ty2 ->
       let absorb t =
-        absorb t ~absorb_field ~absorb_scalar ~g1_to_field_elements
-          ~mask_g1_opt
+        absorb t ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt
       in
       let t1, t2 = t in
       absorb ty1 t1 ; absorb ty2 t2
 
-let ones_vector : type f n.
+let ones_vector :
+    type f n.
        first_zero:f Snarky_backendless.Cvar.t
     -> (module Snarky_backendless.Snark_intf.Run with type field = f)
     -> n Nat.t
     -> (f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t, n) Vector.t =
  fun ~first_zero (module Impl) n ->
   let open Impl in
-  let rec go : type m.
-      Boolean.var -> int -> m Nat.t -> (Boolean.var, m) Vector.t =
+  let rec go :
+      type m. Boolean.var -> int -> m Nat.t -> (Boolean.var, m) Vector.t =
    fun value i m ->
     match m with
     | Z ->
@@ -58,7 +59,7 @@ let ones_vector : type f n.
 
 let split_last xs =
   let rec go acc = function
-    | [x] ->
+    | [ x ] ->
         (List.rev acc, x)
     | x :: xs ->
         go (x :: acc) xs
@@ -79,15 +80,14 @@ let seal (type f)
     (x : Impl.Field.t) : Impl.Field.t =
   let open Impl in
   match Field.to_constant_and_terms x with
-  | None, [(x, i)] when Field.Constant.(equal x one) ->
+  | None, [ (x, i) ] when Field.Constant.(equal x one) ->
       Snarky_backendless.Cvar.Var (Impl.Var.index i)
   | _ ->
       let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
       Field.Assert.equal x y ; y
 
 let unsafe_unpack_with_partial_sum (type f)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) x ~n
-    =
+    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) x ~n =
   let open Impl in
   let res =
     let length = Field.size_in_bits in

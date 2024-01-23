@@ -11,7 +11,7 @@ let of_time_exn ~(constants : Constants.t) t : t =
   if Time.(t < constants.genesis_state_timestamp) then
     raise
       (Invalid_argument
-         "Epoch.of_time: time is earlier than genesis block timestamp") ;
+         "Epoch.of_time: time is earlier than genesis block timestamp" ) ;
   let time_since_genesis = Time.diff t constants.genesis_state_timestamp in
   uint32_of_int64
     Int64.Infix.(
@@ -35,7 +35,7 @@ let slot_start_time ~(constants : Constants.t) (epoch : t) (slot : Slot.t) =
     (start_time epoch ~constants)
     (Block_time.Span.of_ms
        Int64.Infix.(
-         int64_of_uint32 slot * Time.Span.to_ms constants.slot_duration_ms))
+         int64_of_uint32 slot * Time.Span.to_ms constants.slot_duration_ms) )
 
 let slot_end_time ~(constants : Constants.t) (epoch : t) (slot : Slot.t) =
   Time.add (slot_start_time epoch slot ~constants) constants.slot_duration_ms
@@ -53,8 +53,14 @@ let epoch_and_slot_of_time_exn ~(constants : Constants.t) tm : t * Slot.t =
 
 let diff_in_slots ~(constants : Constants.t) ((epoch, slot) : t * Slot.t)
     ((epoch', slot') : t * Slot.t) : int64 =
-  let ( < ) x y = Pervasives.(Int64.compare x y < 0) in
-  let ( > ) x y = Pervasives.(Int64.compare x y > 0) in
+  let ( < ) x y =
+    let open Core_kernel in
+    Int64.compare x y < 0
+  in
+  let ( > ) x y =
+    let open Core_kernel in
+    Int64.compare x y > 0
+  in
   let open Int64.Infix in
   let of_uint32 = UInt32.to_int64 in
   let epoch, slot = (of_uint32 epoch, of_uint32 slot) in

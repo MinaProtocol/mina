@@ -1,0 +1,7 @@
+Current changes
+===============
+
+### Performance enhancements
+
+* #9530: Remove verifier process automatic restart, which was
+  intended to work around memory leaks, now fixed (Paul Steckler)

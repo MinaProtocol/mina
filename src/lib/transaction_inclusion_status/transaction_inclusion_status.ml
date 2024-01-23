@@ -1,3 +1,4 @@
+open Inline_test_quiet_logs
 open Core_kernel
 open Mina_base
 open Pipe_lib
@@ -37,19 +38,20 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
   | None ->
       State.Unknown
   | Some transition_frontier ->
-      with_return (fun {return} ->
+      with_return (fun { return } ->
           let best_tip_path =
             Transition_frontier.best_tip_path transition_frontier
           in
           let in_breadcrumb breadcrumb =
-            List.exists (Transition_frontier.Breadcrumb.commands breadcrumb)
-              ~f:(fun {data= cmd'; _} ->
-                match cmd' with
-                | Snapp_command _ ->
-                    false
-                | Signed_command cmd' ->
-                    Signed_command.equal cmd (Signed_command.forget_check cmd')
-            )
+            breadcrumb |> Transition_frontier.Breadcrumb.validated_transition
+            |> Mina_block.Validated.valid_commands
+            |> List.exists ~f:(fun { data = cmd'; _ } ->
+                   match cmd' with
+                   | Snapp_command _ ->
+                       false
+                   | Signed_command cmd' ->
+                       Signed_command.equal cmd
+                         (Signed_command.forget_check cmd') )
           in
           if List.exists ~f:in_breadcrumb best_tip_path then
             return State.Included ;
@@ -76,11 +78,21 @@ let%test_module "transaction_status" =
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
+    let proof_level = precomputed_values.proof_level
+
+    let constraint_constants = precomputed_values.constraint_constants
+
     module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
     let trust_system = Trust_system.null ()
 
     let pool_max_size = precomputed_values.genesis_constants.txpool_max_size
+
+    let verifier =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Verifier.create ~logger ~proof_level ~constraint_constants
+            ~conf_dir:None
+            ~pids:(Child_processes.Termination.create_pid_table ()) )
 
     let key_gen =
       let open Quickcheck.Generator in
@@ -92,38 +104,24 @@ let%test_module "transaction_status" =
           (Option.value_exn random_key_opt) )
 
     let gen_frontier =
-      Transition_frontier.For_tests.gen ~logger ~precomputed_values
+      Transition_frontier.For_tests.gen ~logger ~precomputed_values ~verifier
         ~trust_system ~max_length ~size:frontier_size ()
 
     let gen_user_command =
       Signed_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~fee_range:10
         ~key_gen ~nonce:(Account_nonce.of_int 1) ()
 
-    let proof_level = Genesis_constants.Proof_level.for_unit_tests
-
     let create_pool ~frontier_broadcast_pipe =
-      let pool_reader, _ =
-        Strict_pipe.(
-          create ~name:"transaction_status incomming diff" Synchronous)
-      in
-      let local_reader, local_writer =
-        Strict_pipe.(create ~name:"transaction_status local diff" Synchronous)
-      in
-      let%bind config =
-        let%map verifier =
-          Verifier.create ~logger ~proof_level
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~conf_dir:None
-        in
+      let config =
         Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
           ~verifier
       in
-      let transaction_pool =
+      let transaction_pool, _, local_sink =
         Transaction_pool.create ~config
           ~constraint_constants:precomputed_values.constraint_constants
           ~consensus_constants:precomputed_values.consensus_constants
-          ~time_controller ~incoming_diffs:pool_reader ~logger
-          ~local_diffs:local_reader ~frontier_broadcast_pipe
+          ~time_controller ~logger ~frontier_broadcast_pipe
+          ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
@@ -134,11 +132,12 @@ let%test_module "transaction_status" =
                ~metadata:
                  [ ( "transactions"
                    , Transaction_pool.Resource_pool.Diff.to_yojson transactions
-                   ) ] ;
+                   )
+                 ] ;
              Deferred.unit ) ;
       (* Need to wait for transaction_pool to see the transition_frontier *)
       let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
-      (transaction_pool, local_writer)
+      (transaction_pool, local_sink)
 
     let%test_unit "If the transition frontier currently doesn't exist, the \
                    status of a sent transaction will be unknown" =
@@ -150,8 +149,8 @@ let%test_module "transaction_status" =
                 create_pool ~frontier_broadcast_pipe
               in
               let%bind () =
-                Strict_pipe.Writer.write local_diffs_writer
-                  ([Signed_command user_command], Fn.const ())
+                Transaction_pool.Local_sink.push local_diffs_writer
+                  ([ Signed_command user_command ], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               [%log info] "Checking status" ;
@@ -174,8 +173,8 @@ let%test_module "transaction_status" =
                 create_pool ~frontier_broadcast_pipe
               in
               let%bind () =
-                Strict_pipe.Writer.write local_diffs_writer
-                  ([Signed_command user_command], Fn.const ())
+                Transaction_pool.Local_sink.push local_diffs_writer
+                  ([ Signed_command user_command ], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               let status =
@@ -211,7 +210,7 @@ let%test_module "transaction_status" =
                 Non_empty_list.uncons user_commands
               in
               let%bind () =
-                Strict_pipe.Writer.write local_diffs_writer
+                Transaction_pool.Local_sink.push local_diffs_writer
                   ( List.map pool_user_commands ~f:(fun x ->
                         User_command.Signed_command x )
                   , Fn.const () )

@@ -7,12 +7,15 @@
  *)
 
 type t =
-  { (* next_offset is the next offset to use when paginating through transaction results. If this field is not populated, there are no more transactions to query. *)
-    next_offset: int64 option [@default None]
-  ; (* transactions is an array of BlockTransactions sorted by most recent BlockIdentifier (meaning that transactions in recent blocks appear first). If there are many transactions for a particular search, transactions may not contain all matching transactions. It is up to the caller to paginate these transactions using the max_block field. *)
-    transactions: Block_transaction.t list }
-[@@deriving yojson {strict= false}, show]
+  { (* transactions is an array of BlockTransactions sorted by most recent BlockIdentifier (meaning that transactions in recent blocks appear first). If there are many transactions for a particular search, transactions may not contain all matching transactions. It is up to the caller to paginate these transactions using the max_block field. *)
+    transactions : Block_transaction.t list
+  ; (* total_count is the number of results for a given search. Callers typically use this value to concurrently fetch results by offset or to display a virtual page number associated with results. *)
+    total_count : int64
+  ; (* next_offset is the next offset to use when paginating through transaction results. If this field is not populated, there are no more transactions to query. *)
+    next_offset : int64 option [@default None]
+  }
+[@@deriving yojson { strict = false }, show, eq]
 
 (** SearchTransactionsResponse contains an ordered collection of BlockTransactions that match the query in SearchTransactionsRequest. These BlockTransactions are sorted from most recent block to oldest block. *)
-let create (transactions : Block_transaction.t list) : t =
-  {next_offset= None; transactions}
+let create (transactions : Block_transaction.t list) (total_count : int64) : t =
+  { transactions; total_count; next_offset = None }

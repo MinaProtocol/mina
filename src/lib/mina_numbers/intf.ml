@@ -1,23 +1,10 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 open Fold_lib
 open Tuple_lib
 open Unsigned
-
-[%%ifdef
-consensus_mechanism]
-
 open Snark_bits
-
-[%%else]
-
-open Snark_bits_nonconsensus
-module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
-module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-
-[%%endif]
 
 module type S_unchecked = sig
   type t [@@deriving sexp, compare, hash, yojson]
@@ -50,7 +37,7 @@ module type S_unchecked = sig
   val to_int : t -> int
 
   (* Someday: I think this only does ones greater than zero, but it doesn't really matter for
-    selecting the nonce *)
+     selecting the nonce *)
 
   val random : unit -> t
 
@@ -69,8 +56,7 @@ module type S_unchecked = sig
   val fold : t -> bool Triple.t Fold.t
 end
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 module type S_checked = sig
   type unchecked
@@ -97,7 +83,7 @@ module type S_checked = sig
     - If the argument to [`Underflow] is false, [x >= y] and the returned
       integer value is equal to [x - y]
   *)
-  val sub_or_zero : t -> t -> ([`Underflow of Boolean.var] * t, _) Checked.t
+  val sub_or_zero : t -> t -> ([ `Underflow of Boolean.var ] * t, _) Checked.t
 
   (** [sub ~m x y] computes [x - y] and ensures that [0 <= x - y] *)
   val sub : t -> t -> (t, _) Checked.t
@@ -163,7 +149,7 @@ module type UInt32 = sig
   module Stable : sig
     module V1 : sig
       type t = Unsigned_extended.UInt32.t
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 
@@ -173,13 +159,14 @@ module type UInt32 = sig
 
   val of_uint32 : uint32 -> t
 end
+[@@warning "-32"]
 
 module type UInt64 = sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
       type t = Unsigned_extended.UInt64.t
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 
@@ -189,25 +176,25 @@ module type UInt64 = sig
 
   val of_uint64 : uint64 -> t
 end
+[@@warning "-32"]
 
 module type F = functor
-  (N :sig
-      
-      type t [@@deriving bin_io, sexp, compare, hash]
+  (N : sig
+     type t [@@deriving bin_io, sexp, compare, hash]
 
-      include Unsigned_extended.S with type t := t
+     include Unsigned_extended.S with type t := t
 
-      val random : unit -> t
-    end)
+     val random : unit -> t
+   end)
   (Bits : Bits_intf.Convertible_bits with type t := N.t)
   -> S with type t := N.t and module Bits := Bits
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 module type F_checked = functor
   (N : Unsigned_extended.S)
   (Bits : Bits_intf.Convertible_bits with type t := N.t)
   -> S_checked with type unchecked := N.t
+[@@warning "-67"]
 
 [%%endif]

@@ -1,0 +1,15 @@
+(library
+ (name block_time_unix)
+ (public_name block_time.unix)
+ (libraries
+   ;; opam libraries
+   graphql-async
+   yojson
+   ;; local libraries
+   graphql_basic_scalars
+   block_time
+ )
+ (preprocess (pps ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis "Utils that depends on the unix library"))

@@ -1,5 +1,4 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
@@ -27,7 +26,7 @@ module Failure = struct
         | Snapp_account_not_present
         | Update_not_permitted
         | Incorrect_nonce
-      [@@deriving sexp, yojson, eq, compare, enum]
+      [@@deriving sexp, yojson, equal, compare, enum]
 
       let to_latest = Fn.id
     end
@@ -123,8 +122,8 @@ module Failure = struct
     | Receiver_not_present ->
         "The receiver account does not exist"
     | Amount_insufficient_to_create_account ->
-        "Cannot create account: transaction amount is smaller than the \
-         account creation fee"
+        "Cannot create account: transaction amount is smaller than the account \
+         creation fee"
     | Cannot_pay_creation_fee_in_token ->
         "Cannot create account: account creation fees cannot be paid in \
          non-default tokens"
@@ -149,8 +148,7 @@ module Failure = struct
     | Incorrect_nonce ->
         "Incorrect nonce"
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   open Snark_params.Tick
 
@@ -161,22 +159,23 @@ module Failure = struct
 
     module Poly = struct
       type 'bool t =
-        { predicate: 'bool
-        ; source_not_present: 'bool
-        ; receiver_not_present: 'bool
-        ; amount_insufficient_to_create_account: 'bool
-        ; cannot_pay_creation_fee_in_token: 'bool
-        ; source_insufficient_balance: 'bool
-        ; source_minimum_balance_violation: 'bool
-        ; receiver_already_exists: 'bool
-        ; not_token_owner: 'bool
-        ; mismatched_token_permissions: 'bool
-        ; overflow: 'bool
-        ; signed_command_on_snapp_account: 'bool
-        ; snapp_account_not_present: 'bool
-        ; update_not_permitted: 'bool
-        ; incorrect_nonce: 'bool }
-      [@@deriving hlist, eq, sexp, compare]
+        { predicate : 'bool
+        ; source_not_present : 'bool
+        ; receiver_not_present : 'bool
+        ; amount_insufficient_to_create_account : 'bool
+        ; cannot_pay_creation_fee_in_token : 'bool
+        ; source_insufficient_balance : 'bool
+        ; source_minimum_balance_violation : 'bool
+        ; receiver_already_exists : 'bool
+        ; not_token_owner : 'bool
+        ; mismatched_token_permissions : 'bool
+        ; overflow : 'bool
+        ; signed_command_on_snapp_account : 'bool
+        ; snapp_account_not_present : 'bool
+        ; update_not_permitted : 'bool
+        ; incorrect_nonce : 'bool
+        }
+      [@@deriving hlist, equal, sexp, compare]
 
       let map ~f
           { predicate
@@ -193,44 +192,47 @@ module Failure = struct
           ; signed_command_on_snapp_account
           ; snapp_account_not_present
           ; update_not_permitted
-          ; incorrect_nonce } =
-        { predicate= f predicate
-        ; source_not_present= f source_not_present
-        ; receiver_not_present= f receiver_not_present
-        ; amount_insufficient_to_create_account=
+          ; incorrect_nonce
+          } =
+        { predicate = f predicate
+        ; source_not_present = f source_not_present
+        ; receiver_not_present = f receiver_not_present
+        ; amount_insufficient_to_create_account =
             f amount_insufficient_to_create_account
-        ; cannot_pay_creation_fee_in_token= f cannot_pay_creation_fee_in_token
-        ; source_insufficient_balance= f source_insufficient_balance
-        ; source_minimum_balance_violation= f source_minimum_balance_violation
-        ; receiver_already_exists= f receiver_already_exists
-        ; not_token_owner= f not_token_owner
-        ; mismatched_token_permissions= f mismatched_token_permissions
-        ; overflow= f overflow
-        ; signed_command_on_snapp_account= f signed_command_on_snapp_account
-        ; snapp_account_not_present= f snapp_account_not_present
-        ; update_not_permitted= f update_not_permitted
-        ; incorrect_nonce= f incorrect_nonce }
+        ; cannot_pay_creation_fee_in_token = f cannot_pay_creation_fee_in_token
+        ; source_insufficient_balance = f source_insufficient_balance
+        ; source_minimum_balance_violation = f source_minimum_balance_violation
+        ; receiver_already_exists = f receiver_already_exists
+        ; not_token_owner = f not_token_owner
+        ; mismatched_token_permissions = f mismatched_token_permissions
+        ; overflow = f overflow
+        ; signed_command_on_snapp_account = f signed_command_on_snapp_account
+        ; snapp_account_not_present = f snapp_account_not_present
+        ; update_not_permitted = f update_not_permitted
+        ; incorrect_nonce = f incorrect_nonce
+        }
     end
 
     type 'bool poly = 'bool Poly.t =
-      { predicate: 'bool
-      ; source_not_present: 'bool
-      ; receiver_not_present: 'bool
-      ; amount_insufficient_to_create_account: 'bool
-      ; cannot_pay_creation_fee_in_token: 'bool
-      ; source_insufficient_balance: 'bool
-      ; source_minimum_balance_violation: 'bool
-      ; receiver_already_exists: 'bool
-      ; not_token_owner: 'bool
-      ; mismatched_token_permissions: 'bool
-      ; overflow: 'bool
-      ; signed_command_on_snapp_account: 'bool
-      ; snapp_account_not_present: 'bool
-      ; update_not_permitted: 'bool
-      ; incorrect_nonce: 'bool }
-    [@@deriving eq, sexp, compare]
+      { predicate : 'bool
+      ; source_not_present : 'bool
+      ; receiver_not_present : 'bool
+      ; amount_insufficient_to_create_account : 'bool
+      ; cannot_pay_creation_fee_in_token : 'bool
+      ; source_insufficient_balance : 'bool
+      ; source_minimum_balance_violation : 'bool
+      ; receiver_already_exists : 'bool
+      ; not_token_owner : 'bool
+      ; mismatched_token_permissions : 'bool
+      ; overflow : 'bool
+      ; signed_command_on_snapp_account : 'bool
+      ; snapp_account_not_present : 'bool
+      ; update_not_permitted : 'bool
+      ; incorrect_nonce : 'bool
+      }
+    [@@deriving equal, sexp, compare]
 
-    type t = bool poly [@@deriving eq, sexp, compare]
+    type t = bool poly [@@deriving equal, sexp, compare]
 
     let get t = function
       | Predicate ->
@@ -283,7 +285,8 @@ module Failure = struct
         ; signed_command_on_snapp_account
         ; snapp_account_not_present
         ; update_not_permitted
-        ; incorrect_nonce } =
+        ; incorrect_nonce
+        } =
       let bool_to_int b = if b then 1 else 0 in
       let failures =
         bool_to_int predicate
@@ -307,93 +310,95 @@ module Failure = struct
     let typ : (var, t) Typ.t =
       let bt = Boolean.typ in
       Typ.of_hlistable
-        [bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt]
+        [ bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt; bt ]
         ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
         ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
 
     let none =
-      { predicate= false
-      ; source_not_present= false
-      ; receiver_not_present= false
-      ; amount_insufficient_to_create_account= false
-      ; cannot_pay_creation_fee_in_token= false
-      ; source_insufficient_balance= false
-      ; source_minimum_balance_violation= false
-      ; receiver_already_exists= false
-      ; not_token_owner= false
-      ; mismatched_token_permissions= false
-      ; overflow= false
-      ; signed_command_on_snapp_account= false
-      ; snapp_account_not_present= false
-      ; update_not_permitted= false
-      ; incorrect_nonce= false }
+      { predicate = false
+      ; source_not_present = false
+      ; receiver_not_present = false
+      ; amount_insufficient_to_create_account = false
+      ; cannot_pay_creation_fee_in_token = false
+      ; source_insufficient_balance = false
+      ; source_minimum_balance_violation = false
+      ; receiver_already_exists = false
+      ; not_token_owner = false
+      ; mismatched_token_permissions = false
+      ; overflow = false
+      ; signed_command_on_snapp_account = false
+      ; snapp_account_not_present = false
+      ; update_not_permitted = false
+      ; incorrect_nonce = false
+      }
 
-    let predicate = {none with predicate= true}
+    let predicate = { none with predicate = true }
 
-    let source_not_present = {none with source_not_present= true}
+    let source_not_present = { none with source_not_present = true }
 
-    let receiver_not_present = {none with receiver_not_present= true}
+    let receiver_not_present = { none with receiver_not_present = true }
 
     let amount_insufficient_to_create_account =
-      {none with amount_insufficient_to_create_account= true}
+      { none with amount_insufficient_to_create_account = true }
 
     let cannot_pay_creation_fee_in_token =
-      {none with cannot_pay_creation_fee_in_token= true}
+      { none with cannot_pay_creation_fee_in_token = true }
 
     let source_insufficient_balance =
-      {none with source_insufficient_balance= true}
+      { none with source_insufficient_balance = true }
 
     let source_minimum_balance_violation =
-      {none with source_minimum_balance_violation= true}
+      { none with source_minimum_balance_violation = true }
 
-    let receiver_already_exists = {none with receiver_already_exists= true}
+    let receiver_already_exists = { none with receiver_already_exists = true }
 
-    let not_token_owner = {none with not_token_owner= true}
+    let not_token_owner = { none with not_token_owner = true }
 
     let mismatched_token_permissions =
-      {none with mismatched_token_permissions= true}
+      { none with mismatched_token_permissions = true }
 
-    let overflow = {none with overflow= true}
+    let overflow = { none with overflow = true }
 
     let signed_command_on_snapp_account =
-      {none with signed_command_on_snapp_account= true}
+      { none with signed_command_on_snapp_account = true }
 
-    let snapp_account_not_present = {none with snapp_account_not_present= true}
+    let snapp_account_not_present =
+      { none with snapp_account_not_present = true }
 
-    let update_not_permitted = {none with update_not_permitted= true}
+    let update_not_permitted = { none with update_not_permitted = true }
 
-    let incorrect_nonce = {none with incorrect_nonce= true}
+    let incorrect_nonce = { none with incorrect_nonce = true }
 
     let to_enum = function
-      | {predicate= true; _} ->
+      | { predicate = true; _ } ->
           to_enum Predicate
-      | {source_not_present= true; _} ->
+      | { source_not_present = true; _ } ->
           to_enum Source_not_present
-      | {receiver_not_present= true; _} ->
+      | { receiver_not_present = true; _ } ->
           to_enum Receiver_not_present
-      | {amount_insufficient_to_create_account= true; _} ->
+      | { amount_insufficient_to_create_account = true; _ } ->
           to_enum Amount_insufficient_to_create_account
-      | {cannot_pay_creation_fee_in_token= true; _} ->
+      | { cannot_pay_creation_fee_in_token = true; _ } ->
           to_enum Cannot_pay_creation_fee_in_token
-      | {source_insufficient_balance= true; _} ->
+      | { source_insufficient_balance = true; _ } ->
           to_enum Source_insufficient_balance
-      | {source_minimum_balance_violation= true; _} ->
+      | { source_minimum_balance_violation = true; _ } ->
           to_enum Source_minimum_balance_violation
-      | {receiver_already_exists= true; _} ->
+      | { receiver_already_exists = true; _ } ->
           to_enum Receiver_already_exists
-      | {not_token_owner= true; _} ->
+      | { not_token_owner = true; _ } ->
           to_enum Not_token_owner
-      | {mismatched_token_permissions= true; _} ->
+      | { mismatched_token_permissions = true; _ } ->
           to_enum Mismatched_token_permissions
-      | {overflow= true; _} ->
+      | { overflow = true; _ } ->
           to_enum Overflow
-      | {signed_command_on_snapp_account= true; _} ->
+      | { signed_command_on_snapp_account = true; _ } ->
           to_enum Signed_command_on_snapp_account
-      | {snapp_account_not_present= true; _} ->
+      | { snapp_account_not_present = true; _ } ->
           to_enum Snapp_account_not_present
-      | {update_not_permitted= true; _} ->
+      | { update_not_permitted = true; _ } ->
           to_enum Update_not_permitted
-      | {incorrect_nonce= true; _} ->
+      | { incorrect_nonce = true; _ } ->
           to_enum Incorrect_nonce
       | _ ->
           0
@@ -403,42 +408,42 @@ module Failure = struct
       | 0 ->
           Some none
       | _ -> (
-        match of_enum enum with
-        | Some failure ->
-            Some
-              ( match failure with
-              | Predicate ->
-                  predicate
-              | Source_not_present ->
-                  source_not_present
-              | Receiver_not_present ->
-                  receiver_not_present
-              | Amount_insufficient_to_create_account ->
-                  amount_insufficient_to_create_account
-              | Cannot_pay_creation_fee_in_token ->
-                  cannot_pay_creation_fee_in_token
-              | Source_insufficient_balance ->
-                  source_insufficient_balance
-              | Source_minimum_balance_violation ->
-                  source_minimum_balance_violation
-              | Receiver_already_exists ->
-                  receiver_already_exists
-              | Not_token_owner ->
-                  not_token_owner
-              | Mismatched_token_permissions ->
-                  mismatched_token_permissions
-              | Overflow ->
-                  overflow
-              | Signed_command_on_snapp_account ->
-                  signed_command_on_snapp_account
-              | Snapp_account_not_present ->
-                  snapp_account_not_present
-              | Update_not_permitted ->
-                  update_not_permitted
-              | Incorrect_nonce ->
-                  incorrect_nonce )
-        | None ->
-            None )
+          match of_enum enum with
+          | Some failure ->
+              Some
+                ( match failure with
+                | Predicate ->
+                    predicate
+                | Source_not_present ->
+                    source_not_present
+                | Receiver_not_present ->
+                    receiver_not_present
+                | Amount_insufficient_to_create_account ->
+                    amount_insufficient_to_create_account
+                | Cannot_pay_creation_fee_in_token ->
+                    cannot_pay_creation_fee_in_token
+                | Source_insufficient_balance ->
+                    source_insufficient_balance
+                | Source_minimum_balance_violation ->
+                    source_minimum_balance_violation
+                | Receiver_already_exists ->
+                    receiver_already_exists
+                | Not_token_owner ->
+                    not_token_owner
+                | Mismatched_token_permissions ->
+                    mismatched_token_permissions
+                | Overflow ->
+                    overflow
+                | Signed_command_on_snapp_account ->
+                    signed_command_on_snapp_account
+                | Snapp_account_not_present ->
+                    snapp_account_not_present
+                | Update_not_permitted ->
+                    update_not_permitted
+                | Incorrect_nonce ->
+                    incorrect_nonce )
+          | None ->
+              None )
 
     let min = 0
 
@@ -452,7 +457,7 @@ module Failure = struct
 
   module Var : sig
     module Accumulators : sig
-      type t = private {user_command_failure: Boolean.var}
+      type t = private { user_command_failure : Boolean.var }
     end
 
     (** Canonical representation for user command failures in snarky.
@@ -461,7 +466,7 @@ module Failure = struct
         enable us to do a cheap checking operation. The type is private to
         ensure that the invariants of this check are always satisfied.
     *)
-    type t = private {data: As_record.var; accumulators: Accumulators.t}
+    type t = private { data : As_record.var; accumulators : Accumulators.t }
 
     val min : int
 
@@ -507,7 +512,7 @@ module Failure = struct
   end = struct
     module Accumulators = struct
       (* TODO: receiver, source accumulators *)
-      type t = {user_command_failure: Boolean.var}
+      type t = { user_command_failure : Boolean.var }
 
       let make_unsafe
           ({ predicate
@@ -524,8 +529,9 @@ module Failure = struct
            ; signed_command_on_snapp_account
            ; snapp_account_not_present
            ; update_not_permitted
-           ; incorrect_nonce } :
-            As_record.var) : t =
+           ; incorrect_nonce
+           } :
+            As_record.var ) : t =
         let user_command_failure =
           Boolean.Unsafe.of_cvar
             (Field.Var.sum
@@ -543,29 +549,32 @@ module Failure = struct
                ; (signed_command_on_snapp_account :> Field.Var.t)
                ; (snapp_account_not_present :> Field.Var.t)
                ; (update_not_permitted :> Field.Var.t)
-               ; (incorrect_nonce :> Field.Var.t) ])
+               ; (incorrect_nonce :> Field.Var.t)
+               ] )
         in
-        {user_command_failure}
+        { user_command_failure }
 
-      let check {user_command_failure} =
+      let check { user_command_failure } =
         Checked.ignore_m
-        @@ Checked.all [Boolean.of_field (user_command_failure :> Field.Var.t)]
+        @@ Checked.all
+             [ Boolean.of_field (user_command_failure :> Field.Var.t) ]
     end
 
-    type t = {data: As_record.var; accumulators: Accumulators.t}
+    type t = { data : As_record.var; accumulators : Accumulators.t }
 
-    let of_record data = {data; accumulators= Accumulators.make_unsafe data}
+    let of_record data = { data; accumulators = Accumulators.make_unsafe data }
 
     let typ : (t, As_record.t) Typ.t =
       let typ = As_record.typ in
-      { store= (fun data -> Typ.Store.map ~f:of_record (typ.store data))
-      ; read= (fun {data; _} -> typ.read data)
-      ; alloc= Typ.Alloc.map ~f:of_record typ.alloc
-      ; check=
+      { store = (fun data -> Typ.Store.map ~f:of_record (typ.store data))
+      ; read = (fun { data; _ } -> typ.read data)
+      ; alloc = Typ.Alloc.map ~f:of_record typ.alloc
+      ; check =
           Checked.(
-            fun {data; accumulators} ->
+            fun { data; accumulators } ->
               let%bind () = typ.check data in
-              Accumulators.check accumulators) }
+              Accumulators.check accumulators)
+      }
 
     let mk_var = Fn.compose of_record As_record.var_of_t
 
@@ -607,7 +616,7 @@ module Failure = struct
 
     let incorrect_nonce = mk_var As_record.incorrect_nonce
 
-    let get {data; _} failure = As_record.get data failure
+    let get { data; _ } failure = As_record.get data failure
 
     let min = As_record.min
 
@@ -681,17 +690,18 @@ module Balance_data = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { fee_payer_balance: Currency.Balance.Stable.V1.t option
-        ; source_balance: Currency.Balance.Stable.V1.t option
-        ; receiver_balance: Currency.Balance.Stable.V1.t option }
-      [@@deriving sexp, yojson, eq, compare]
+        { fee_payer_balance : Currency.Balance.Stable.V1.t option
+        ; source_balance : Currency.Balance.Stable.V1.t option
+        ; receiver_balance : Currency.Balance.Stable.V1.t option
+        }
+      [@@deriving sexp, yojson, equal, compare]
 
       let to_latest = Fn.id
     end
   end]
 
   let empty =
-    {fee_payer_balance= None; source_balance= None; receiver_balance= None}
+    { fee_payer_balance = None; source_balance = None; receiver_balance = None }
 end
 
 module Coinbase_balance_data = struct
@@ -699,16 +709,17 @@ module Coinbase_balance_data = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { coinbase_receiver_balance: Currency.Balance.Stable.V1.t
-        ; fee_transfer_receiver_balance: Currency.Balance.Stable.V1.t option }
-      [@@deriving sexp, yojson, eq, compare]
+        { coinbase_receiver_balance : Currency.Balance.Stable.V1.t
+        ; fee_transfer_receiver_balance : Currency.Balance.Stable.V1.t option
+        }
+      [@@deriving sexp, yojson, equal, compare]
 
       let to_latest = Fn.id
     end
   end]
 
   let of_balance_data_exn
-      {Balance_data.fee_payer_balance; source_balance; receiver_balance} =
+      { Balance_data.fee_payer_balance; source_balance; receiver_balance } =
     ( match source_balance with
     | Some _ ->
         failwith
@@ -724,13 +735,16 @@ module Coinbase_balance_data = struct
             "Missing fee-payer balance for \
              Coinbase_balance_data.of_balance_data"
     in
-    {coinbase_receiver_balance; fee_transfer_receiver_balance= receiver_balance}
+    { coinbase_receiver_balance
+    ; fee_transfer_receiver_balance = receiver_balance
+    }
 
-  let to_balance_data {coinbase_receiver_balance; fee_transfer_receiver_balance}
-      =
-    { Balance_data.fee_payer_balance= Some coinbase_receiver_balance
-    ; source_balance= None
-    ; receiver_balance= fee_transfer_receiver_balance }
+  let to_balance_data
+      { coinbase_receiver_balance; fee_transfer_receiver_balance } =
+    { Balance_data.fee_payer_balance = Some coinbase_receiver_balance
+    ; source_balance = None
+    ; receiver_balance = fee_transfer_receiver_balance
+    }
 end
 
 module Fee_transfer_balance_data = struct
@@ -738,16 +752,17 @@ module Fee_transfer_balance_data = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { receiver1_balance: Currency.Balance.Stable.V1.t
-        ; receiver2_balance: Currency.Balance.Stable.V1.t option }
-      [@@deriving sexp, yojson, eq, compare]
+        { receiver1_balance : Currency.Balance.Stable.V1.t
+        ; receiver2_balance : Currency.Balance.Stable.V1.t option
+        }
+      [@@deriving sexp, yojson, equal, compare]
 
       let to_latest = Fn.id
     end
   end]
 
   let of_balance_data_exn
-      {Balance_data.fee_payer_balance; source_balance; receiver_balance} =
+      { Balance_data.fee_payer_balance; source_balance; receiver_balance } =
     ( match source_balance with
     | Some _ ->
         failwith
@@ -764,12 +779,13 @@ module Fee_transfer_balance_data = struct
             "Missing fee-payer balance for \
              Fee_transfer_balance_data.of_balance_data"
     in
-    {receiver1_balance; receiver2_balance= receiver_balance}
+    { receiver1_balance; receiver2_balance = receiver_balance }
 
-  let to_balance_data {receiver1_balance; receiver2_balance} =
-    { Balance_data.fee_payer_balance= Some receiver1_balance
-    ; source_balance= None
-    ; receiver_balance= receiver2_balance }
+  let to_balance_data { receiver1_balance; receiver2_balance } =
+    { Balance_data.fee_payer_balance = Some receiver1_balance
+    ; source_balance = None
+    ; receiver_balance = receiver2_balance
+    }
 end
 
 module Internal_command_balance_data = struct
@@ -779,7 +795,7 @@ module Internal_command_balance_data = struct
       type t =
         | Coinbase of Coinbase_balance_data.Stable.V1.t
         | Fee_transfer of Fee_transfer_balance_data.Stable.V1.t
-      [@@deriving sexp, yojson, eq, compare]
+      [@@deriving sexp, yojson, equal, compare]
 
       let to_latest = Fn.id
     end
@@ -791,21 +807,23 @@ module Auxiliary_data = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { fee_payer_account_creation_fee_paid:
+        { fee_payer_account_creation_fee_paid :
             Currency.Amount.Stable.V1.t option
-        ; receiver_account_creation_fee_paid:
+        ; receiver_account_creation_fee_paid :
             Currency.Amount.Stable.V1.t option
-        ; created_token: Token_id.Stable.V1.t option }
-      [@@deriving sexp, yojson, eq, compare]
+        ; created_token : Token_id.Stable.V1.t option
+        }
+      [@@deriving sexp, yojson, equal, compare]
 
       let to_latest = Fn.id
     end
   end]
 
   let empty =
-    { fee_payer_account_creation_fee_paid= None
-    ; receiver_account_creation_fee_paid= None
-    ; created_token= None }
+    { fee_payer_account_creation_fee_paid = None
+    ; receiver_account_creation_fee_paid = None
+    ; created_token = None
+    }
 end
 
 [%%versioned
@@ -814,7 +832,7 @@ module Stable = struct
     type t =
       | Applied of Auxiliary_data.Stable.V1.t * Balance_data.Stable.V1.t
       | Failed of Failure.Stable.V1.t * Balance_data.Stable.V1.t
-    [@@deriving sexp, yojson, eq, compare]
+    [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id
   end

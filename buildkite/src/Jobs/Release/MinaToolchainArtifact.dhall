@@ -8,33 +8,9 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
 let Size = ../../Command/Size.dhall
-let UploadGitEnv = ../../Command/UploadGitEnv.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 let DockerLogin = ../../Command/DockerLogin/Type.dhall
 
-
-let dependsOn = { name = "MinaToolchainArtifact", key = "upload-git-env" }
-let deployEnv = "export-git-env-vars.sh"
-
-let commands : List Cmd.Type =
-  [
-      -- Setup Git deploy environment
-      Cmd.run (
-        "if [ ! -f ${deployEnv} ]; then " ++
-            "buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID --include-retried-jobs --step _${dependsOn.name}-${dependsOn.key} ${deployEnv} .; " ++
-        "fi"
-      ),
-      -- Dockerhub: Build and release toolchain image
-      Cmd.run (
-        "source ${deployEnv} && docker build --rm --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/mina-toolchain:\\\$DOCKER_TAG . && " ++
-          "docker push codaprotocol/mina-toolchain:\\\$DOCKER_TAG"
-      ),
-      -- GCR: Build and release toolchain image
-      Cmd.run (
-        "source ${deployEnv} && docker tag codaprotocol/mina-toolchain:\\\$DOCKER_TAG gcr.io/o1labs-192920/mina-toolchain:\\\$DOCKER_TAG && " ++
-          "docker push gcr.io/o1labs-192920/mina-toolchain:\\\$DOCKER_TAG"
-      )
-  ]
 
 in
 
@@ -43,22 +19,40 @@ Pipeline.build
     spec =
       JobSpec::{
         dirtyWhen = [
-          S.strictlyStart (S.contains "dockerfiles/Dockerfile-toolchain"),
-          S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact")
+          S.strictlyStart (S.contains "dockerfiles/stages/1-"),
+          S.strictlyStart (S.contains "dockerfiles/stages/2-"),
+          S.strictlyStart (S.contains "dockerfiles/stages/3-"),
+          S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact"),
+          S.strictly (S.contains "opam.export")
         ],
         path = "Release",
         name = "MinaToolchainArtifact"
       },
     steps = [
-      UploadGitEnv.step,
-      Command.build
-        Command.Config::{
-            commands  = commands,
-            label = "Build and release Mina toolchain Docker image",
-            key = "mina-toolchain-image",
-            target = Size.XLarge,
-            docker_login = Some DockerLogin::{=},
-            depends_on = [ dependsOn ]
-        }
+
+      -- mina-toolchain Debian 11 "Bullseye" Toolchain
+      let toolchainBullseyeSpec = DockerImage.ReleaseSpec::{
+        service="mina-toolchain",
+        deb_codename="bullseye",
+        extra_args="--no-cache",
+        step_key="toolchain-bullseye-docker-image"
+      }
+
+      in
+
+      DockerImage.generateStep toolchainBullseyeSpec,
+
+      -- mina-toolchain Debian 10 "Buster" Toolchain
+      let toolchainBusterSpec = DockerImage.ReleaseSpec::{
+        service="mina-toolchain",
+        deb_codename="buster",
+        extra_args="--no-cache",
+        step_key="toolchain-buster-docker-image"
+      }
+
+      in
+
+      DockerImage.generateStep toolchainBusterSpec
+
     ]
   }

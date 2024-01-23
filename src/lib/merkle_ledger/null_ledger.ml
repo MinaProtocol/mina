@@ -9,22 +9,22 @@ end
 module Make (Inputs : Inputs_intf) : sig
   include
     Base_ledger_intf.S
-    with module Addr = Inputs.Location.Addr
-    with module Location = Inputs.Location
-    with type key := Inputs.Key.t
-     and type token_id := Inputs.Token_id.t
-     and type token_id_set := Inputs.Token_id.Set.t
-     and type account_id := Inputs.Account_id.t
-     and type account_id_set := Inputs.Account_id.Set.t
-     and type hash := Inputs.Hash.t
-     and type root_hash := Inputs.Hash.t
-     and type account := Inputs.Account.t
+      with module Addr = Inputs.Location.Addr
+      with module Location = Inputs.Location
+      with type key := Inputs.Key.t
+       and type token_id := Inputs.Token_id.t
+       and type token_id_set := Inputs.Token_id.Set.t
+       and type account_id := Inputs.Account_id.t
+       and type account_id_set := Inputs.Account_id.Set.t
+       and type hash := Inputs.Hash.t
+       and type root_hash := Inputs.Hash.t
+       and type account := Inputs.Account.t
 
   val create : depth:int -> unit -> t
 end = struct
   open Inputs
 
-  type t = {uuid: Uuid.t; depth: int} [@@deriving sexp_of]
+  type t = { uuid : Uuid.t; depth : int } [@@deriving sexp_of]
 
   let t_of_sexp _ = failwith "t_of_sexp unimplemented"
 
@@ -37,7 +37,7 @@ end = struct
 
   module Addr = Location.Addr
 
-  let create ~depth () = {uuid= Uuid_unix.create (); depth}
+  let create ~depth () = { uuid = Uuid_unix.create (); depth }
 
   let remove_accounts_exn _t keys =
     if List.is_empty keys then ()
@@ -85,6 +85,8 @@ end = struct
 
   let get _t _loc = None
 
+  let get_batch _t locs = List.map locs ~f:(fun loc -> (loc, None))
+
   let get_uuid t = t.uuid
 
   let get_directory _ = None
@@ -93,15 +95,15 @@ end = struct
 
   let close _t = ()
 
-  let get_or_create_account_exn _t =
-    failwith "get_or_create_account_exn: null ledgers cannot be mutated"
-
   let get_or_create_account _t =
     failwith "get_or_create_account: null ledgers cannot be mutated"
 
   let location_of_account _t _ = None
 
-  let accounts _t = Account_id.Set.empty
+  let location_of_account_batch _t accts =
+    List.map accts ~f:(fun acct -> (acct, None))
+
+  let accounts _t = Async.Deferred.return Account_id.Set.empty
 
   let token_owner _t _tid = None
 
@@ -116,13 +118,15 @@ end = struct
 
   let iteri _t ~f:_ = ()
 
-  let fold_until _t ~init ~f:_ ~finish = finish init
+  let fold_until _t ~init ~f:_ ~finish = Async.Deferred.return @@ finish init
 
   let foldi_with_ignored_accounts _t _ ~init ~f:_ = init
 
   let foldi _t ~init ~f:_ = init
 
-  let to_list _t = []
+  let to_list _t = Async.Deferred.return []
+
+  let to_list_sequential _t = []
 
   let make_space_for _t _tot = ()
 
@@ -136,10 +140,10 @@ end = struct
       zip_exn
         (map
            ~f:(Addr.of_int_exn ~ledger_depth:t.depth)
-           (range first_index last_index))
+           (range first_index last_index) )
         (init
            (1 lsl Addr.height ~ledger_depth:t.depth addr)
-           ~f:(Fn.const Account.empty)))
+           ~f:(Fn.const Account.empty) ))
 
   let set_all_accounts_rooted_at_exn _t =
     failwith "set_all_accounts_rooted_at_exn: null ledgers cannot be mutated"

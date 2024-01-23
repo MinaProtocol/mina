@@ -9,11 +9,9 @@ module M1 = struct
 end
 
 module M2 = struct
-  [%%define_locally
-  M1.(x, y, z)]
+  [%%define_locally M1.(x, y, z)]
 
-  [%%define_locally
-  M1.(q)]
+  [%%define_locally M1.(q)]
 
   let _ = x
 

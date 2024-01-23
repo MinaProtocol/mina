@@ -2,40 +2,42 @@ open Core_kernel
 
 type 'a t = T of 'a * 'a t list
 
-type 'a display = {value: 'a; children: 'a display list} [@@deriving yojson]
+type 'a display = { value : 'a; children : 'a display list } [@@deriving yojson]
 
 let rec to_display (T (value, children)) =
-  {value; children= List.map ~f:to_display children}
+  { value; children = List.map ~f:to_display children }
 
-let rec of_display {value; children} =
+let rec of_display { value; children } =
   T (value, List.map ~f:of_display children)
 
 let to_yojson conv t = display_to_yojson conv (to_display t)
 
-let of_yojson conv json =
-  Result.map ~f:of_display (display_of_yojson conv json)
+let of_yojson conv json = Result.map ~f:of_display (display_of_yojson conv json)
+
+let root (T (value, _)) = value
+
+let children (T (_, children)) = children
 
 let rec print ?(whitespace = 0) ~element_to_string (T (root, branches)) =
-  Printf.printf "%s- %s\n"
-    (String.make whitespace ' ')
-    (element_to_string root) ;
+  Printf.printf "%s- %s\n" (String.make whitespace ' ') (element_to_string root) ;
   List.iter branches ~f:(print ~whitespace:(whitespace + 2) ~element_to_string)
 
 let rec of_list_exn ?(subtrees = []) = function
   | [] ->
       raise
         (Invalid_argument
-           "Rose_tree.of_list_exn: cannot construct rose tree from empty list")
-  | [h] ->
+           "Rose_tree.of_list_exn: cannot construct rose tree from empty list"
+        )
+  | [ h ] ->
       T (h, subtrees)
   | h :: t ->
-      T (h, [of_list_exn t ~subtrees])
+      T (h, [ of_list_exn t ~subtrees ])
 
 let of_non_empty_list ?(subtrees = []) =
   Fn.compose
     (Non_empty_list.fold
        ~init:(fun x -> T (x, subtrees))
-       ~f:(fun acc x -> T (x, [acc])))
+       ~f:(fun acc x -> T (x, [ acc ])) )
     Non_empty_list.rev
 
 let rec equal ~f (T (value1, children1)) (T (value2, children2)) =

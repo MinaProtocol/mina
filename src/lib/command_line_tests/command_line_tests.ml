@@ -18,8 +18,7 @@ let%test_module "Command line tests" =
 
        the mina.exe executable must have been built before running the test
        here, else it will fail
-
-     *)
+    *)
     let coda_exe = "../../app/cli/src/mina.exe"
 
     let start_daemon config_dir genesis_ledger_dir port =
@@ -41,7 +40,10 @@ let%test_module "Command line tests" =
               ; "-genesis-ledger-dir"
               ; genesis_ledger_dir
               ; "-current-protocol-version"
-              ; "0.0.0" ]
+              ; "0.0.0"
+              ; "-external-ip"
+              ; "0.0.0.0"
+              ]
             ()
         with
         | Ok s ->
@@ -53,11 +55,11 @@ let%test_module "Command line tests" =
 
     let stop_daemon port =
       Process.run () ~prog:coda_exe
-        ~args:["client"; "stop-daemon"; "-daemon-port"; sprintf "%d" port]
+        ~args:[ "client"; "stop-daemon"; "-daemon-port"; sprintf "%d" port ]
 
     let start_client port =
       Process.run ~prog:coda_exe
-        ~args:["client"; "status"; "-daemon-port"; sprintf "%d" port]
+        ~args:[ "client"; "status"; "-daemon-port"; sprintf "%d" port ]
         ()
 
     let create_config_directories () =
@@ -67,14 +69,16 @@ let%test_module "Command line tests" =
       (conf, genesis)
 
     let remove_config_directory config_dir genesis_dir =
-      let%bind _ = Process.run_exn ~prog:"rm" ~args:["-rf"; config_dir] () in
-      Process.run_exn ~prog:"rm" ~args:["-rf"; genesis_dir] ()
+      let%bind _ = Process.run_exn ~prog:"rm" ~args:[ "-rf"; config_dir ] () in
+      Process.run_exn ~prog:"rm" ~args:[ "-rf"; genesis_dir ] ()
       |> Deferred.ignore_m
 
     let test_background_daemon () =
       let test_failed = ref false in
       let port = 1337 in
       let client_delay = 40. in
+      let retry_delay = 15. in
+      let retry_attempts = 15 in
       let config_dir, genesis_ledger_dir = create_config_directories () in
       Monitor.protect
         ~finally:(fun () ->
@@ -91,13 +95,28 @@ let%test_module "Command line tests" =
           match%map
             let open Deferred.Or_error.Let_syntax in
             let%bind _ = start_daemon config_dir genesis_ledger_dir port in
-            (* it takes awhile for the daemon to become available *)
+            (* It takes a while for the daemon to become available. *)
             let%bind () =
               Deferred.map
                 (after @@ Time.Span.of_sec client_delay)
                 ~f:Or_error.return
             in
-            let%bind _ = start_client port in
+            let%bind _ =
+              let rec go retries_remaining =
+                let open Deferred.Let_syntax in
+                match%bind start_client port with
+                | Error _ when retries_remaining > 0 ->
+                    Core.Printf.printf
+                      "Daemon not responding.. retrying (%i/%i)\n"
+                      (retry_attempts - retries_remaining)
+                      retry_attempts ;
+                    let%bind () = after @@ Time.Span.of_sec retry_delay in
+                    go (retries_remaining - 1)
+                | ret ->
+                    return ret
+              in
+              go retry_attempts
+            in
             let%map _ = stop_daemon port in
             ()
           with

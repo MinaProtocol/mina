@@ -19,3 +19,6 @@
 ------
 - enable daemon blockchain archival capability
  
+1.0.4:
+------
+- All references to the crypto currency now say Mina

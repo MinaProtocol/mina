@@ -1,381 +1,540 @@
-open Core
+open Core_kernel
 open Async
 open Integration_test_lib
 
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
 
+let mina_archive_container_id = "archive"
+
+let mina_archive_username = "mina"
+
+let mina_archive_pw = "zo3moong7moog4Iep7eNgo3iecaesahH"
+
+let postgres_url =
+  Printf.sprintf "postgres://%s:%s@archive-1-postgresql:5432/archive"
+    mina_archive_username mina_archive_pw
+
+type config =
+  { testnet_name : string
+  ; cluster : string
+  ; namespace : string
+  ; graphql_enabled : bool
+  }
+
+let base_kube_args { cluster; namespace; _ } =
+  [ "--cluster"; cluster; "--namespace"; namespace ]
+
 module Node = struct
+  type pod_info =
+    { network_keypair : Network_keypair.t option
+    ; primary_container_id : string
+          (* this is going to be probably either "mina" or "worker" *)
+    ; has_archive_container : bool
+          (* archive pods have a "mina" container and an "archive" container alongside *)
+    }
+
   type t =
-    {cluster: string; namespace: string; pod_id: string; node_graphql_port: int}
+    { app_id : string
+    ; pod_ids : string list
+    ; pod_info : pod_info
+    ; config : config
+    ; mutable should_be_running : bool
+    }
 
-  let id {pod_id; _} = pod_id
+  let id { app_id; _ } = app_id
 
-  let base_kube_args t = ["--cluster"; t.cluster; "--namespace"; t.namespace]
+  let infra_id { pod_ids; _ } = List.hd_exn pod_ids
 
-  let node_to_string (n : t) : String.t =
-    Format.sprintf
-      "{cluster: %s; namespace: %s; pod_id: %s; node_graphql_port: %d}"
-      n.cluster n.namespace n.pod_id n.node_graphql_port
+  let should_be_running { should_be_running; _ } = should_be_running
 
-  let node_list_to_string (nl : t list) : String.t =
-    Format.sprintf "[ %s ]"
-      (String.concat ~sep:",  " (List.map nl ~f:node_to_string))
+  let network_keypair { pod_info = { network_keypair; _ }; _ } = network_keypair
 
-  let run_in_container node cmd =
-    let base_args = base_kube_args node in
-    let base_kube_cmd = "kubectl " ^ String.concat ~sep:" " base_args in
-    let kubectl_cmd =
-      Printf.sprintf
-        "%s -c coda exec -i $( %s get pod -l \"app=%s\" -o name) -- %s"
-        base_kube_cmd base_kube_cmd node.pod_id cmd
+  let base_kube_args t = [ "--cluster"; t.cluster; "--namespace"; t.namespace ]
+
+  let get_ingress_uri node =
+    let host =
+      Printf.sprintf "%s.graphql.test.o1test.net" node.config.testnet_name
+    in
+    let path = Printf.sprintf "/%s/graphql" node.app_id in
+    Uri.make ~scheme:"http" ~host ~path ~port:80 ()
+
+  let get_logs_in_container ?container_id { pod_ids; config; pod_info; _ } =
+    let container_id =
+      Option.value container_id ~default:pod_info.primary_container_id
     in
     let%bind cwd = Unix.getcwd () in
-    let%map _ = Cmd_util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd] in
-    ()
+    Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:13 cwd "kubectl"
+      ( base_kube_args config
+      @ [ "logs"; "-c"; container_id; List.hd_exn pod_ids ] )
+
+  let run_in_container ?(exit_code = 10) ?container_id ?override_with_pod_id
+      ~cmd t =
+    let { config; pod_info; _ } = t in
+    let pod_id =
+      match override_with_pod_id with
+      | Some pid ->
+          pid
+      | None ->
+          List.hd_exn t.pod_ids
+    in
+    let container_id =
+      Option.value container_id ~default:pod_info.primary_container_id
+    in
+    let%bind cwd = Unix.getcwd () in
+    Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code cwd "kubectl"
+      ( base_kube_args config
+      @ [ "exec"; "-c"; container_id; "-i"; pod_id; "--" ]
+      @ cmd )
+
+  let cp_string_to_container_file ?container_id ~str ~dest t =
+    let { pod_ids; config; pod_info; _ } = t in
+    let container_id =
+      Option.value container_id ~default:pod_info.primary_container_id
+    in
+    let tmp_file, oc =
+      Caml.Filename.open_temp_file ~temp_dir:Filename.temp_dir_name
+        "integration_test_cp_string" ".tmp"
+    in
+    Out_channel.output_string oc str ;
+    Out_channel.close oc ;
+    let%bind cwd = Unix.getcwd () in
+    let dest_file =
+      sprintf "%s/%s:%s" config.namespace (List.hd_exn pod_ids) dest
+    in
+    Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
+      (base_kube_args config @ [ "cp"; "-c"; container_id; tmp_file; dest_file ])
 
   let start ~fresh_state node : unit Malleable_error.t =
     let open Malleable_error.Let_syntax in
+    node.should_be_running <- true ;
     let%bind () =
       if fresh_state then
-        Deferred.bind ~f:Malleable_error.return
-          (run_in_container node "rm -rf .mina-config")
+        run_in_container node ~cmd:[ "sh"; "-c"; "rm -rf .mina-config/*" ]
+        >>| ignore
       else Malleable_error.return ()
     in
-    Deferred.bind ~f:Malleable_error.return
-      (run_in_container node "./start.sh")
+    run_in_container ~exit_code:11 node ~cmd:[ "/start.sh" ] >>| ignore
 
   let stop node =
-    Deferred.bind ~f:Malleable_error.return (run_in_container node "./stop.sh")
-
-  module Decoders = Graphql_lib.Decoders
-
-  module Graphql = struct
-    (* queries on localhost because of port forwarding *)
-    let uri port =
-      Uri.make
-        ~host:Unix.Inet_addr.(localhost |> to_string)
-        ~port ~path:"graphql" ()
-
-    let get_pod_name t : string Malleable_error.t =
-      let args =
-        List.append (base_kube_args t)
-          [ "get"
-          ; "pod"
-          ; "-l"
-          ; sprintf "app=%s" t.pod_id
-          ; "-o=custom-columns=NAME:.metadata.name"
-          ; "--no-headers" ]
-      in
-      let%bind run_result =
-        Deferred.bind ~f:Malleable_error.of_or_error_hard
-          (Process.run_lines ~prog:"kubectl" ~args ())
-      in
-      match run_result with
-      | Ok
-          { Malleable_error.Accumulator.computation_result= [pod_name]
-          ; soft_errors= _ } ->
-          Malleable_error.return pod_name
-      | Ok {Malleable_error.Accumulator.computation_result= []; soft_errors= _}
-        ->
-          Malleable_error.of_string_hard_error "get_pod_name: no result"
-      | Ok _ ->
-          Malleable_error.of_string_hard_error "get_pod_name: too many results"
-      | Error
-          { Malleable_error.Hard_fail.hard_error= e
-          ; Malleable_error.Hard_fail.soft_errors= _ } ->
-          Malleable_error.of_error_hard e.error
-
-    (* default GraphQL port is 3085, may need to be explicit if multiple daemons are running *)
-    let set_port_forwarding ~logger t =
-      let open Malleable_error.Let_syntax in
-      let%bind name = get_pod_name t in
-      let port = t.node_graphql_port in
-      let portmap = string_of_int port ^ ":3085" in
-      let args =
-        List.append (base_kube_args t) ["port-forward"; name; portmap]
-      in
-      [%log debug] "Port forwarding using \"kubectl %s\"\n"
-        String.(concat args ~sep:" ") ;
-      let%bind proc =
-        Deferred.bind ~f:Malleable_error.of_or_error_hard
-          (Process.create ~prog:"kubectl" ~args ())
-      in
-      Exit_handlers.register_handler ~logger
-        ~description:
-          (sprintf "Kubectl port forwarder on pod %s, port %d" t.pod_id port)
-        (fun () ->
-          [%log debug]
-            "Port forwarding being killed, no longer occupying port %d " port ;
-          ignore Signal.(send kill (`Pid (Process.pid proc))) ) ;
-      Deferred.bind ~f:Malleable_error.of_or_error_hard
-        (Process.collect_stdout_and_wait proc)
-
-    module Client = Graphql_lib.Client.Make (struct
-      let preprocess_variables_string = Fn.id
-
-      let headers = String.Map.empty
-    end)
-
-    module Unlock_account =
-    [%graphql
-    {|
-      mutation ($password: String!, $public_key: PublicKey!) {
-        unlockAccount(input: {password: $password, publicKey: $public_key }) {
-          public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
-        }
-      }
-    |}]
-
-    module Send_payment =
-    [%graphql
-    {|
-      mutation ($sender: PublicKey!,
-      $receiver: PublicKey!,
-      $amount: UInt64!,
-      $token: UInt64,
-      $fee: UInt64!,
-      $nonce: UInt32,
-      $memo: String) {
-        sendPayment(input:
-          {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
-            payment {
-              id
-            }
-          }
-      }
-    |}]
-
-    module Get_balance =
-    [%graphql
-    {|
-      query ($public_key: PublicKey, $token: UInt64) {
-        account(publicKey: $public_key, token: $token) {
-          balance {
-            total @bsDecoder(fn: "Decoders.balance")
-          }
-        }
-      }
-    |}]
-
-    module Query_peer_id =
-    [%graphql
-    {|
-      query {
-        daemonStatus {
-          addrsAndPorts {
-            peer {
-              peerId
-            }
-          }
-          peers {  peerId }
-
-        }
-      }
-    |}]
-  end
-
-  let set_port_forwarding_exn ~logger t =
-    match%map.Deferred.Let_syntax Graphql.set_port_forwarding ~logger t with
-    | Ok _ ->
-        (* not reachable, port forwarder does not terminate *)
-        ()
-    | Error {Malleable_error.Hard_fail.hard_error= err; soft_errors= _} ->
-        [%log fatal] "Error running k8s port forwarding"
-          ~metadata:[("error", Error_json.error_to_yojson err.error)] ;
-        failwith "Could not run k8s port forwarding"
-
-  (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
-  let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
-      ?(initial_delay_sec = 30.0) ~logger ~graphql_port
-      ?(retry_on_graphql_error = false) ~query_name query_obj =
     let open Malleable_error.Let_syntax in
-    [%log info]
-      "exec_graphql_request, Will now attempt to make GraphQL request: %s"
-      query_name ;
-    let err_str str = sprintf "%s: %s" query_name str in
-    let rec retry n =
-      if n <= 0 then (
-        let err_str = err_str "too many tries" in
-        [%log fatal] "%s" err_str ;
-        Malleable_error.of_string_hard_error err_str )
-      else
-        match%bind
-          Deferred.bind ~f:Malleable_error.return
-            ((Graphql.Client.query query_obj) (Graphql.uri graphql_port))
-        with
-        | Ok result ->
-            let err_str = err_str "succeeded" in
-            [%log info] "exec_graphql_request %s" err_str ;
-            return result
-        | Error (`Failed_request err_string) ->
-            let err_str =
-              err_str
-                (sprintf
-                   "exec_graphql_request, Failed GraphQL request: %s, %d \
-                    tries left"
-                   err_string (n - 1))
-            in
-            [%log warn] "%s" err_str ;
-            let%bind () =
-              Deferred.bind ~f:Malleable_error.return
-                (after (Time.Span.of_sec retry_delay_sec))
-            in
-            retry (n - 1)
-        | Error (`Graphql_error err_string) ->
-            let err_str =
-              err_str
-                (sprintf "exec_graphql_request, GraphQL error: %s" err_string)
-            in
-            [%log error] "%s" err_str ;
-            if retry_on_graphql_error then (
-              let%bind () =
-                Deferred.bind ~f:Malleable_error.return
-                  (after (Time.Span.of_sec retry_delay_sec))
-              in
-              [%log debug]
-                "exec_graphql_request, After GraphQL error, %d tries left"
-                (n - 1) ;
-              retry (n - 1) )
-            else Malleable_error.of_string_hard_error err_string
+    node.should_be_running <- false ;
+    run_in_container ~exit_code:12 node ~cmd:[ "/stop.sh" ] >>| ignore
+
+  let logger_infra_metadata node =
+    [ ("namespace", `String node.config.namespace)
+    ; ("app_id", `String node.app_id)
+    ; ("pod_id", `String (List.hd_exn node.pod_ids))
+    ]
+
+  let dump_archive_data ~logger (t : t) ~data_file =
+    (* this function won't work if `t` doesn't happen to be an archive node *)
+    if not t.pod_info.has_archive_container then
+      failwith
+        "No archive container found.  One can only dump archive data of an \
+         archive node." ;
+    let open Malleable_error.Let_syntax in
+    let postgresql_pod_id = t.app_id ^ "-postgresql-0" in
+    let postgresql_container_id = "postgresql" in
+    (* Some quick clarification on the archive nodes:
+         An archive node archives all blocks as they come through, but does not produce blocks.
+         An archive node uses postgresql as storage, the postgresql db needs to be separately brought up and is sort of it's own thing infra wise
+         Archive nodes can be run side-by-side with an actual mina node
+
+       in the integration test framework, every archive node will have it's own single postgresql instance.
+       thus in the integration testing framework there will always be a one to one correspondence between archive node and postgresql db.
+       however more generally, it's entirely possible for a mina user/operator set up multiple archive nodes to be backed by a single postgresql database.
+       But for now we will assume that we don't need to test that
+
+       The integration test framework creates kubenetes deployments or "workloads" as they are called in GKE, but Nodes are mainly tracked by pod_id
+
+       A postgresql workload in the integration test framework will always have 1 managed pod,
+         whose pod_id is simply the app id/workload name of the archive node appended with "-postgresql-0".
+         so if the archive node is called "archive-1", then the corresponding postgresql managed pod will be called "archive-1-postgresql-0".
+       That managed pod will have exactly 1 container, and it will be called simply "postgresql"
+
+       It's rather hardcoded but this was just the simplest way to go, as our kubernetes_network tracks Nodes, ie MINA nodes.  a postgresql db is hard to account for
+       It's possible to run pg_dump from the archive node instead of directly reaching out to the postgresql pod, and that's what we used to do but there were occasionally version mismatches between the pg_dump on the archive node and the postgresql on the postgresql db
+    *)
+    [%log info] "Dumping archive data from (node: %s, container: %s)"
+      postgresql_pod_id postgresql_container_id ;
+    let%map data =
+      run_in_container t ~container_id:postgresql_container_id
+        ~override_with_pod_id:postgresql_pod_id
+        ~cmd:[ "pg_dump"; "--create"; "--no-owner"; postgres_url ]
     in
-    let%bind () =
+    [%log info] "Dumping archive data to file %s" data_file ;
+    Out_channel.with_file data_file ~f:(fun out_ch ->
+        Out_channel.output_string out_ch data )
+
+  let run_replayer ~logger (t : t) =
+    [%log info] "Running replayer on archived data (node: %s, container: %s)"
+      (List.hd_exn t.pod_ids) mina_archive_container_id ;
+    let open Malleable_error.Let_syntax in
+    let%bind accounts =
+      run_in_container t
+        ~cmd:[ "jq"; "-c"; ".ledger.accounts"; "/config/daemon.json" ]
+    in
+    let replayer_input =
+      sprintf
+        {| { "genesis_ledger": { "accounts": %s, "add_genesis_winner": true }} |}
+        accounts
+    in
+    let dest = "replayer-input.json" in
+    let%bind _res =
       Deferred.bind ~f:Malleable_error.return
-        (after (Time.Span.of_sec initial_delay_sec))
+        (cp_string_to_container_file t ~container_id:mina_archive_container_id
+           ~str:replayer_input ~dest )
     in
-    retry num_tries
+    run_in_container t ~container_id:mina_archive_container_id
+      ~cmd:
+        [ "mina-replayer"
+        ; "--archive-uri"
+        ; postgres_url
+        ; "--input-file"
+        ; dest
+        ; "--output-file"
+        ; "/dev/null"
+        ; "--continue-on-error"
+        ]
 
-  let get_peer_id ~logger t =
+  let dump_mina_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
-    [%log info] "Getting node's peer_id, and the peer_ids of node's peers"
-      ~metadata:
-        [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
-    (* let graphql_port = 3085 in *)
-    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t) ;
-    let query_obj = Graphql.Query_peer_id.make () in
-    let%bind query_result_obj =
-      exec_graphql_request ~logger ~graphql_port:t.node_graphql_port
-        ~retry_on_graphql_error:true ~query_name:"query_peer_id" query_obj
-    in
-    [%log info] "get_peer_id, finished exec_graphql_request" ;
-    let self_id_obj = ((query_result_obj#daemonStatus)#addrsAndPorts)#peer in
-    let%bind self_id =
-      match self_id_obj with
-      | None ->
-          Malleable_error.of_string_hard_error "Peer not found"
-      | Some peer ->
-          Malleable_error.return peer#peerId
-    in
-    let peers = (query_result_obj#daemonStatus)#peers |> Array.to_list in
-    let peer_ids = List.map peers ~f:(fun peer -> peer#peerId) in
+    [%log info] "Dumping container logs from (node: %s, container: %s)"
+      (List.hd_exn t.pod_ids) t.pod_info.primary_container_id ;
+    let%map logs = get_logs_in_container t in
+    [%log info] "Dumping container log to file %s" log_file ;
+    Out_channel.with_file log_file ~f:(fun out_ch ->
+        Out_channel.output_string out_ch logs )
+
+  let dump_precomputed_blocks ~logger (t : t) =
+    let open Malleable_error.Let_syntax in
     [%log info]
-      "get_peer_id, result of graphql querry (self_id,[peers]) (%s,%s)" self_id
-      (String.concat ~sep:" " peer_ids) ;
-    return (self_id, peer_ids)
+      "Dumping precomputed blocks from logs for (node: %s, container: %s)"
+      (List.hd_exn t.pod_ids) t.pod_info.primary_container_id ;
+    let%bind logs = get_logs_in_container t in
+    (* kubectl logs may include non-log output, like "Using password from environment variable" *)
+    let log_lines =
+      String.split logs ~on:'\n'
+      |> List.filter ~f:(String.is_prefix ~prefix:"{\"timestamp\":")
+    in
+    let jsons = List.map log_lines ~f:Yojson.Safe.from_string in
+    let metadata_jsons =
+      List.map jsons ~f:(fun json ->
+          match json with
+          | `Assoc items -> (
+              match List.Assoc.find items ~equal:String.equal "metadata" with
+              | Some md ->
+                  md
+              | None ->
+                  failwithf "Log line is missing metadata: %s"
+                    (Yojson.Safe.to_string json)
+                    () )
+          | other ->
+              failwithf "Expected log line to be a JSON record, got: %s"
+                (Yojson.Safe.to_string other)
+                () )
+    in
+    let state_hash_and_blocks =
+      List.fold metadata_jsons ~init:[] ~f:(fun acc json ->
+          match json with
+          | `Assoc items -> (
+              match
+                List.Assoc.find items ~equal:String.equal "precomputed_block"
+              with
+              | Some block -> (
+                  match
+                    List.Assoc.find items ~equal:String.equal "state_hash"
+                  with
+                  | Some state_hash ->
+                      (state_hash, block) :: acc
+                  | None ->
+                      failwith
+                        "Log metadata contains a precomputed block, but no \
+                         state hash" )
+              | None ->
+                  acc )
+          | other ->
+              failwithf "Expected log line to be a JSON record, got: %s"
+                (Yojson.Safe.to_string other)
+                () )
+    in
+    let%bind.Deferred () =
+      Deferred.List.iter state_hash_and_blocks
+        ~f:(fun (state_hash_json, block_json) ->
+          let double_quoted_state_hash =
+            Yojson.Safe.to_string state_hash_json
+          in
+          let state_hash =
+            String.sub double_quoted_state_hash ~pos:1
+              ~len:(String.length double_quoted_state_hash - 2)
+          in
+          let block = Yojson.Safe.pretty_to_string block_json in
+          let filename = state_hash ^ ".json" in
+          match%map.Deferred Sys.file_exists filename with
+          | `Yes ->
+              [%log info]
+                "File already exists for precomputed block with state hash %s"
+                state_hash
+          | _ ->
+              [%log info]
+                "Dumping precomputed block with state hash %s to file %s"
+                state_hash filename ;
+              Out_channel.with_file filename ~f:(fun out_ch ->
+                  Out_channel.output_string out_ch block ) )
+    in
+    Malleable_error.return ()
+end
 
-  let get_balance ~logger t ~account_id =
-    let open Malleable_error.Let_syntax in
-    [%log info] "Getting account balance"
-      ~metadata:
-        [ ("namespace", `String t.namespace)
-        ; ("pod_id", `String t.pod_id)
-        ; ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
-    (* let graphql_port = 3085 in *)
-    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t) ;
-    let pk = Mina_base.Account_id.public_key account_id in
-    let token = Mina_base.Account_id.token_id account_id in
-    let get_balance () =
-      let get_balance_obj =
-        Graphql.Get_balance.make
-          ~public_key:(Graphql_lib.Encoders.public_key pk)
-          ~token:(Graphql_lib.Encoders.token token)
-          ()
-      in
-      let%bind balance_obj =
-        exec_graphql_request ~logger ~graphql_port:t.node_graphql_port
-          ~retry_on_graphql_error:true ~query_name:"get_balance_graphql"
-          get_balance_obj
-      in
-      match balance_obj#account with
-      | None ->
-          Malleable_error.of_string_hard_error
-            (sprintf
-               !"Account with %{sexp:Mina_base.Account_id.t} not found"
-               account_id)
-      | Some acc ->
-          Malleable_error.return (acc#balance)#total
-    in
-    get_balance ()
+module Workload_to_deploy = struct
+  type t = { workload_id : string; pod_info : Node.pod_info }
 
-  (* if we expect failure, might want retry_on_graphql_error to be false *)
-  let send_payment ?(retry_on_graphql_error = true) ~logger t ~sender ~receiver
-      ~amount ~fee =
-    [%log info] "Sending a payment"
-      ~metadata:
-        [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
-    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t) ;
+  let construct_workload workload_id pod_info : t = { workload_id; pod_info }
+
+  let cons_pod_info ?network_keypair ?(has_archive_container = false)
+      primary_container_id : Node.pod_info =
+    { network_keypair; has_archive_container; primary_container_id }
+
+  let get_nodes_from_workload t ~config =
+    let%bind cwd = Unix.getcwd () in
     let open Malleable_error.Let_syntax in
-    let sender_pk_str = Signature_lib.Public_key.Compressed.to_string sender in
-    (* let graphql_port = 3085 in *)
-    [%log info] "send_payment: unlocking account"
-      ~metadata:[("sender_pk", `String sender_pk_str)] ;
-    let unlock_sender_account_graphql () =
-      let unlock_account_obj =
-        Graphql.Unlock_account.make ~password:"naughty blue worm"
-          ~public_key:(Graphql_lib.Encoders.public_key sender)
-          ()
-      in
-      exec_graphql_request ~logger ~graphql_port:t.node_graphql_port
-        ~query_name:"unlock_sender_account_graphql" unlock_account_obj
+    let%bind app_id =
+      Deferred.bind ~f:Malleable_error.or_hard_error
+        (Integration_test_lib.Util.run_cmd_or_error cwd "kubectl"
+           ( base_kube_args config
+           @ [ "get"
+             ; "deployment"
+             ; t.workload_id
+             ; "-o"
+             ; "jsonpath={.spec.selector.matchLabels.app}"
+             ] ) )
     in
-    let%bind _ = unlock_sender_account_graphql () in
-    let send_payment_graphql () =
-      let send_payment_obj =
-        Graphql.Send_payment.make
-          ~sender:(Graphql_lib.Encoders.public_key sender)
-          ~receiver:(Graphql_lib.Encoders.public_key receiver)
-          ~amount:(Graphql_lib.Encoders.amount amount)
-          ~fee:(Graphql_lib.Encoders.fee fee)
-          ()
-      in
-      (* retry_on_graphql_error=true because the node might be bootstrapping *)
-      exec_graphql_request ~logger ~graphql_port:t.node_graphql_port
-        ~retry_on_graphql_error ~query_name:"send_payment_graphql"
-        send_payment_obj
+    let%bind pod_ids_str =
+      Integration_test_lib.Util.run_cmd_or_hard_error cwd "kubectl"
+        ( base_kube_args config
+        @ [ "get"; "pod"; "-l"; "app=" ^ app_id; "-o"; "name" ] )
     in
-    let%map sent_payment_obj = send_payment_graphql () in
-    let (`UserCommand id_obj) = (sent_payment_obj#sendPayment)#payment in
-    let user_cmd_id = id_obj#id in
-    [%log info] "Sent payment"
-      ~metadata:[("user_command_id", `String user_cmd_id)] ;
-    ()
+    let pod_ids =
+      String.split pod_ids_str ~on:'\n'
+      |> List.filter ~f:(Fn.compose not String.is_empty)
+      |> List.map ~f:(String.substr_replace_first ~pattern:"pod/" ~with_:"")
+    in
+    if List.is_empty pod_ids then
+      Malleable_error.hard_error_format "no pods found for app %s" app_id
+    else
+      (* we have a strict 1 workload to 1 pod setup, except the snark workers. *)
+      (* elsewhere in the code I'm simply using List.hd_exn which is not ideal but enabled by the fact that in all relevant cases, there's only going to be 1 pod id in pod_ids *)
+      (* TODO fix this^ and have a more elegant solution *)
+      let pod_info = t.pod_info in
+      return
+        { Node.app_id; pod_ids; pod_info; config; should_be_running = false }
 end
 
 type t =
-  { namespace: string
-  ; constants: Test_config.constants
-  ; block_producers: Node.t list
-  ; snark_coordinators: Node.t list
-  ; archive_nodes: Node.t list
-  ; testnet_log_filter: string
-  ; keypairs: Signature_lib.Keypair.t list
-  ; nodes_by_app_id: Node.t String.Map.t }
+  { namespace : string
+  ; constants : Test_config.constants
+  ; seeds : Node.t Core.String.Map.t
+  ; block_producers : Node.t Core.String.Map.t
+  ; snark_coordinators : Node.t Core.String.Map.t
+  ; snark_workers : Node.t Core.String.Map.t
+  ; archive_nodes : Node.t Core.String.Map.t
+        (* ; nodes_by_pod_id : Node.t Core.String.Map.t *)
+  ; testnet_log_filter : string
+  ; genesis_keypairs : Network_keypair.t Core.String.Map.t
+  }
 
-let constants {constants; _} = constants
+let constants { constants; _ } = constants
 
-let constraint_constants {constants; _} = constants.constraints
+let constraint_constants { constants; _ } = constants.constraints
 
-let genesis_constants {constants; _} = constants.genesis
+let genesis_constants { constants; _ } = constants.genesis
 
-let block_producers {block_producers; _} = block_producers
+let seeds { seeds; _ } = seeds
 
-let snark_coordinators {snark_coordinators; _} = snark_coordinators
+let block_producers { block_producers; _ } = block_producers
 
-let archive_nodes {archive_nodes; _} = archive_nodes
+let snark_coordinators { snark_coordinators; _ } = snark_coordinators
 
-let keypairs {keypairs; _} = keypairs
+let snark_workers { snark_workers; _ } = snark_workers
 
-let all_nodes {block_producers; snark_coordinators; archive_nodes; _} =
-  block_producers @ snark_coordinators @ archive_nodes
+let archive_nodes { archive_nodes; _ } = archive_nodes
 
-let lookup_node_by_app_id t = Map.find t.nodes_by_app_id
+(* all_mina_nodes returns all *actual* mina nodes; that is, any node running an actual mina daemon. Note that a snark_worker is a node within the network but not technically a *mina* node because it runs no mina daemon, therefore not included here. snark_coordinators on the other hand are mina nodes running actual mina daemons. *)
+let all_mina_nodes
+    { seeds; block_producers; snark_coordinators; archive_nodes; _ } =
+  List.concat
+    [ Core.String.Map.to_alist seeds
+    ; Core.String.Map.to_alist block_producers
+    ; Core.String.Map.to_alist snark_coordinators
+    ; Core.String.Map.to_alist archive_nodes
+    ]
+  |> Core.String.Map.of_alist_exn
+
+(* all_nodes returns everything in the network.  Remember that snark_workers will never initialize and will never sync, and aren't supposed to. *)
+(* TODO snark workers and snark coordinators have the same key name, but different workload ids*)
+let all_nodes t =
+  List.concat
+    [ Core.String.Map.to_alist t.seeds
+    ; Core.String.Map.to_alist t.block_producers
+    ; Core.String.Map.to_alist t.snark_coordinators
+    ; Core.String.Map.to_alist t.snark_workers
+    ; Core.String.Map.to_alist t.archive_nodes
+    ]
+  |> Core.String.Map.of_alist_exn
+
+(* all_non_seed_nodes returns everything in the network except seed nodes. *)
+let all_non_seed_nodes t =
+  List.concat
+    [ Core.String.Map.to_alist t.block_producers
+    ; Core.String.Map.to_alist t.snark_coordinators
+    ; Core.String.Map.to_alist t.snark_workers
+    ; Core.String.Map.to_alist t.archive_nodes
+    ]
+  |> Core.String.Map.of_alist_exn
+
+let genesis_keypairs { genesis_keypairs; _ } = genesis_keypairs
+
+let lookup_node_by_pod_id t id =
+  let nodes = all_nodes t |> Core.Map.to_alist in
+  List.fold nodes ~init:None ~f:(fun acc (node_name, node) ->
+      match acc with
+      | Some acc ->
+          Some acc
+      | None ->
+          if String.equal id (List.hd_exn node.pod_ids) then
+            Some (node_name, node)
+          else None )
+
+let all_ids t =
+  let deployments = all_nodes t |> Core.Map.to_alist in
+  List.fold deployments ~init:[] ~f:(fun acc (_, node) ->
+      List.cons node.app_id acc )
+
+(* we have a strict 1 workload to 1 pod setup, except the snark workers. *)
+let all_pod_ids t =
+  let node_list = Core.String.Map.data (all_nodes t) in
+  let pod_ids = List.map node_list ~f:(fun n -> n.pod_ids) in
+  List.concat pod_ids
+
+let initialize_infra ~logger network =
+  let open Malleable_error.Let_syntax in
+  let poll_interval = Time.Span.of_sec 15.0 in
+  let max_polls = 1080 (* 6 hours *) in
+  let all_pods_set = all_pod_ids network |> String.Set.of_list in
+  let kube_get_pods () =
+    Integration_test_lib.Util.run_cmd_or_error_timeout ~timeout_seconds:60 "/"
+      "kubectl"
+      [ "-n"
+      ; network.namespace
+      ; "get"
+      ; "pods"
+      ; "-ojsonpath={range \
+         .items[*]}{.metadata.name}{':'}{.status.phase}{'\\n'}{end}"
+      ]
+  in
+  let parse_pod_statuses result_str =
+    result_str |> String.split_lines
+    |> List.map ~f:(fun line ->
+           let parts = String.split line ~on:':' in
+           assert (List.length parts = 2) ;
+           (List.nth_exn parts 0, List.nth_exn parts 1) )
+    |> List.filter ~f:(fun (pod_name, _) ->
+           String.Set.mem all_pods_set pod_name )
+    (* this filters out the archive bootstrap pods, since they aren't in all_pods_set.  in fact the bootstrap pods aren't tracked at all in the framework *)
+    |> String.Map.of_alist_exn
+  in
+  let rec poll n =
+    [%log debug] "Checking kubernetes pod statuses, n=%d" n ;
+    let is_successful_pod_status status = String.equal "Running" status in
+    let is_failed_pod_status status = String.equal "Failure" status in
+    match%bind Deferred.bind ~f:Malleable_error.return (kube_get_pods ()) with
+    | Ok str ->
+        let pod_statuses = parse_pod_statuses str in
+        [%log debug] "pod_statuses: \n %s"
+          ( String.Map.to_alist pod_statuses
+          |> List.map ~f:(fun (key, data) -> key ^ ": " ^ data ^ "\n")
+          |> String.concat ) ;
+        [%log debug] "all_pods: \n %s"
+          (String.Set.elements all_pods_set |> String.concat ~sep:", ") ;
+        let all_pods_are_present =
+          List.for_all (String.Set.elements all_pods_set) ~f:(fun pod_id ->
+              String.Map.mem pod_statuses pod_id )
+        in
+        let failed_pods =
+          List.filter_map (String.Map.to_alist pod_statuses)
+            ~f:(fun (pod_id, status) ->
+              Option.some_if (is_failed_pod_status status) pod_id )
+        in
+        let any_pods_are_not_running =
+          (* there could be duplicate keys... *)
+          List.exists
+            (String.Map.data pod_statuses)
+            ~f:(Fn.compose not is_successful_pod_status)
+        in
+        if not all_pods_are_present then (
+          let present_pods = String.Map.keys pod_statuses in
+          [%log fatal]
+            "Not all pods were found when querying namespace; this indicates a \
+             deployment error. Refusing to continue. \n\
+             Expected pods: [%s].  \n\
+             Present pods: [%s]"
+            (String.Set.elements all_pods_set |> String.concat ~sep:"; ")
+            (present_pods |> String.concat ~sep:"; ") ;
+          Malleable_error.hard_error_string ~exit_code:5
+            "Some pods were not found in namespace." )
+        else if not (List.is_empty failed_pods) then (
+          [%log fatal]
+            "At least one pod had an error while deploying. \n\
+             Expected pods: [%s].   \n\
+             Failed pos: [%s]."
+            (String.Set.elements all_pods_set |> String.concat ~sep:"; ")
+            (failed_pods |> String.concat ~sep:"; ") ;
+          Malleable_error.hard_error_string ~exit_code:14
+            "Some pods failed to deploy." )
+        else if any_pods_are_not_running then
+          let failed_pod_statuses =
+            List.filter (String.Map.to_alist pod_statuses)
+              ~f:(fun (_, status) -> not (is_successful_pod_status status))
+          in
+          if n > 0 then (
+            [%log debug] "Got bad pod statuses, polling again ($failed_statuses"
+              ~metadata:
+                [ ( "failed_statuses"
+                  , `Assoc
+                      (List.Assoc.map failed_pod_statuses ~f:(fun v ->
+                           `String v ) ) )
+                ] ;
+            let%bind () =
+              after poll_interval |> Deferred.bind ~f:Malleable_error.return
+            in
+            poll (n - 1) )
+          else (
+            [%log fatal]
+              "Got bad pod statuses, not all pods were assigned to nodes and \
+               ready in time.  pod statuses: ($failed_statuses"
+              ~metadata:
+                [ ( "failed_statuses"
+                  , `Assoc
+                      (List.Assoc.map failed_pod_statuses ~f:(fun v ->
+                           `String v ) ) )
+                ] ;
+            Malleable_error.hard_error_string ~exit_code:4
+              "Some pods either were not assigned to nodes or did not deploy \
+               properly." )
+        else return ()
+    | Error _ ->
+        [%log debug] "`kubectl get pods` timed out, polling again" ;
+        let%bind () =
+          after poll_interval |> Deferred.bind ~f:Malleable_error.return
+        in
+        poll n
+  in
+  [%log info] "Waiting for pods to be assigned nodes and become ready" ;
+  let res = poll max_polls in
+  match%bind.Deferred res with
+  | Error _ ->
+      [%log error] "Not all pods were assigned nodes, cannot proceed!" ;
+      res
+  | Ok _ ->
+      [%log info] "Pods assigned to nodes" ;
+      res

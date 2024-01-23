@@ -4,7 +4,7 @@ let rec find_all_files ~banlist_exts dirname basename =
   let ext =
     try String.split_on_char '.' basename |> List.rev |> List.hd with _ -> ""
   in
-  if List.exists (( =) ext) banlist_exts then []
+  if List.exists (String.equal ext) banlist_exts then []
   else
     let fullname = Filename.concat dirname basename in
     if Sys.is_directory fullname then
@@ -21,6 +21,5 @@ let () =
   @@ "(rule\n\
      \  (targets config.mlh)\n\
      \  (mode fallback)\n\
-     \  (deps %{profile}.mlh " ^ config_deps
-     ^ " (env_var CODA_DUNE_PROFILE))\n
+     \  (deps %{profile}.mlh " ^ config_deps ^ ")\n
      \  (action (copy %{profile}.mlh config.mlh)))"

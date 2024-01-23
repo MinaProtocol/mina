@@ -5,16 +5,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	"io"
+	"math"
 	"math/rand"
 	gonet "net"
 	"path"
+	"sync"
 	"time"
 
+	lmdbbs "github.com/georgeee/go-bs-lmdb"
+	"github.com/ipfs/go-bitswap"
+	bitnet "github.com/ipfs/go-bitswap/network"
 	dsb "github.com/ipfs/go-ds-badger"
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 	p2p "github.com/libp2p/go-libp2p"
+
 	p2pconnmgr "github.com/libp2p/go-libp2p-connmgr"
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/control"
@@ -23,6 +28,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
@@ -32,7 +38,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	record "github.com/libp2p/go-libp2p-record"
 	p2pconfig "github.com/libp2p/go-libp2p/config"
-	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
+	mdns "github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"golang.org/x/crypto/blake2b"
@@ -40,6 +46,8 @@ import (
 	libp2pmplex "github.com/libp2p/go-libp2p-mplex"
 	mplex "github.com/libp2p/go-mplex"
 )
+
+const NodeStatusTimeout = 10 * time.Second
 
 func parseCIDR(cidr string) gonet.IPNet {
 	_, ipnet, err := gonet.ParseCIDR(cidr)
@@ -50,6 +58,8 @@ func parseCIDR(cidr string) gonet.IPNet {
 }
 
 type getRandomPeersFunc func(num int, from peer.ID) []peer.AddrInfo
+
+const numPxConnectionWorkers int = 8
 
 var (
 	logger      = logging.Logger("codanet.Helper")
@@ -65,8 +75,9 @@ var (
 		"169.254.0.0/16",
 	}
 
-	pxProtocolID        = protocol.ID("/mina/peer-exchange")
-	TelemetryProtocolID = protocol.ID("/mina/telemetry")
+	pxProtocolID         = protocol.ID("/mina/peer-exchange")
+	NodeStatusProtocolID = protocol.ID("/mina/node-status")
+	BitSwapExchange      = protocol.ID("/mina/bitswap-exchange")
 
 	privateIpFilter *ma.Filters = nil
 )
@@ -87,23 +98,46 @@ func isPrivateAddr(addr ma.Multiaddr) bool {
 }
 
 type CodaConnectionManager struct {
-	ctx              context.Context
-	host             host.Host
-	p2pManager       *p2pconnmgr.BasicConnMgr
+	ctx        context.Context
+	host       host.Host
+	p2pManager *p2pconnmgr.BasicConnMgr
+	// minaPeerExchange controls whether to send random peers to the other ndoe before trimming its
+	// recently opened connection
 	minaPeerExchange bool
 	getRandomPeers   getRandomPeersFunc
 	OnConnect        func(network.Network, network.Conn)
 	OnDisconnect     func(network.Network, network.Conn)
+	// protectedMirror is a map of protected peer ids/tags, mirroring the structure in
+	// BasicConnMgr which is not accessible from CodaConnectionManager
+	protectedMirror     map[peer.ID]map[string]interface{}
+	protectedMirrorLock sync.Mutex
 }
 
-func newCodaConnectionManager(maxConnections int, minaPeerExchange bool) *CodaConnectionManager {
+func (cm *CodaConnectionManager) AddOnConnectHandler(f func(network.Network, network.Conn)) {
+	prevOnConnect := cm.OnConnect
+	cm.OnConnect = func(net network.Network, c network.Conn) {
+		prevOnConnect(net, c)
+		f(net, c)
+	}
+}
+
+func (cm *CodaConnectionManager) AddOnDisconnectHandler(f func(network.Network, network.Conn)) {
+	prevOnDisconnect := cm.OnDisconnect
+	cm.OnDisconnect = func(net network.Network, c network.Conn) {
+		prevOnDisconnect(net, c)
+		f(net, c)
+	}
+}
+
+func newCodaConnectionManager(minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration) *CodaConnectionManager {
 	noop := func(net network.Network, c network.Conn) {}
 
 	return &CodaConnectionManager{
-		p2pManager:       p2pconnmgr.NewConnManager(25, maxConnections, time.Duration(1*time.Millisecond)),
+		p2pManager:       p2pconnmgr.NewConnManager(minConnections, maxConnections, grace),
 		OnConnect:        noop,
 		OnDisconnect:     noop,
 		minaPeerExchange: minaPeerExchange,
+		protectedMirror:  make(map[peer.ID]map[string]interface{}),
 	}
 }
 
@@ -119,9 +153,33 @@ func (cm *CodaConnectionManager) GetTagInfo(p peer.ID) *connmgr.TagInfo {
 	return cm.p2pManager.GetTagInfo(p)
 }
 func (cm *CodaConnectionManager) TrimOpenConns(ctx context.Context) { cm.p2pManager.TrimOpenConns(ctx) }
-func (cm *CodaConnectionManager) Protect(p peer.ID, tag string)     { cm.p2pManager.Protect(p, tag) }
+func (cm *CodaConnectionManager) Protect(p peer.ID, tag string) {
+	cm.p2pManager.Protect(p, tag)
+	cm.protectedMirrorLock.Lock()
+	defer cm.protectedMirrorLock.Unlock()
+	pm := cm.protectedMirror
+	pm_, has := pm[p]
+	if !has {
+		pm_ = make(map[string]interface{})
+		pm[p] = pm_
+	}
+	pm_[tag] = nil
+}
 func (cm *CodaConnectionManager) Unprotect(p peer.ID, tag string) bool {
-	return cm.p2pManager.Unprotect(p, tag)
+	res := cm.p2pManager.Unprotect(p, tag)
+	cm.protectedMirrorLock.Lock()
+	defer cm.protectedMirrorLock.Unlock()
+	pm := cm.protectedMirror
+	pm_, has := pm[p]
+	if has {
+		delete(pm_, tag)
+	}
+	return res
+}
+func (cm *CodaConnectionManager) ViewProtected(f func(map[peer.ID]map[string]interface{})) {
+	cm.protectedMirrorLock.Lock()
+	defer cm.protectedMirrorLock.Unlock()
+	f(cm.protectedMirror)
 }
 func (cm *CodaConnectionManager) IsProtected(p peer.ID, tag string) bool {
 	return cm.p2pManager.IsProtected(p, tag)
@@ -157,16 +215,16 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 	cm.OnConnect(net, c)
 	cm.p2pManager.Notifee().Connected(net, c)
 
-	if !cm.minaPeerExchange {
-		return
-	}
-
 	info := cm.GetInfo()
 	if len(net.Peers()) <= info.HighWater {
 		return
 	}
 
 	cm.TrimOpenConns(context.Background())
+
+	if !cm.minaPeerExchange {
+		return
+	}
 
 	logger.Debugf("node=%s disconnecting from peer=%s; max peers=%d peercount=%d", c.LocalPeer(), c.RemotePeer(), info.HighWater, len(net.Peers()))
 
@@ -222,19 +280,71 @@ func (cm *CodaConnectionManager) GetInfo() p2pconnmgr.CMInfo {
 // Helper contains all the daemon state
 type Helper struct {
 	Host              host.Host
-	Mdns              *mdns.Service
+	Bitswap           *bitswap.Bitswap
+	BitswapStorage    BitswapStorage
+	Mdns              mdns.Service
 	Dht               *dual.DHT
 	Ctx               context.Context
 	Pubsub            *pubsub.PubSub
-	Logger            logging.EventLogger
+	Logger            logging.StandardLogger
 	Rendezvous        string
 	Discovery         *discovery.RoutingDiscovery
 	Me                peer.ID
-	GatingState       *CodaGatingState
+	gatingState       *CodaGatingState
 	ConnectionManager *CodaConnectionManager
 	BandwidthCounter  *metrics.BandwidthCounter
+	MsgStats          *MessageStats
 	Seeds             []peer.AddrInfo
-	TelemetryData     string
+	NodeStatus        []byte
+	pxDiscoveries     chan peer.AddrInfo
+}
+
+type MessageStats struct {
+	min   uint64
+	avg   uint64
+	max   uint64
+	total uint64
+	sync.RWMutex
+}
+
+func (ms *MessageStats) UpdateMetrics(val uint64) {
+	ms.Lock()
+	defer ms.Unlock()
+	if ms.max < val {
+		ms.max = val
+	}
+
+	if ms.min > val {
+		ms.min = val
+	}
+
+	ms.total++
+	if ms.avg == 0 {
+		ms.avg = val
+	} else {
+		ms.avg = (ms.avg*(ms.total-1) + val) / ms.total
+	}
+}
+
+type safeStats struct {
+	Min float64
+	Max float64
+	Avg float64
+}
+
+func (ms *MessageStats) GetStats() *safeStats {
+	ms.RLock()
+	defer ms.RUnlock()
+
+	return &safeStats{
+		Min: float64(ms.min),
+		Max: float64(ms.max),
+		Avg: float64(ms.avg),
+	}
+}
+
+func (h *Helper) ResetGatingConfigTrustedAddrFilters() {
+	h.gatingState.TrustedAddrFilters = ma.NewFilters()
 }
 
 // this type implements the ConnectionGating interface
@@ -249,29 +359,36 @@ type CodaGatingState struct {
 	TrustedPeers            *peer.Set
 }
 
+type CodaGatingConfig struct {
+	BannedAddrFilters  *ma.Filters
+	TrustedAddrFilters *ma.Filters
+	BannedPeers        *peer.Set
+	TrustedPeers       *peer.Set
+}
+
 // NewCodaGatingState returns a new CodaGatingState
-func NewCodaGatingState(bannedAddrFilters *ma.Filters, trustedAddrFilters *ma.Filters, bannedPeers *peer.Set, trustedPeers *peer.Set) *CodaGatingState {
+func NewCodaGatingState(config *CodaGatingConfig, knownPrivateAddrFilters *ma.Filters) *CodaGatingState {
 	logger := logging.Logger("codanet.CodaGatingState")
 
+	bannedAddrFilters := config.BannedAddrFilters
 	if bannedAddrFilters == nil {
 		bannedAddrFilters = ma.NewFilters()
 	}
 
+	trustedAddrFilters := config.TrustedAddrFilters
 	if trustedAddrFilters == nil {
 		trustedAddrFilters = ma.NewFilters()
 	}
 
+	bannedPeers := config.BannedPeers
 	if bannedPeers == nil {
 		bannedPeers = peer.NewSet()
 	}
 
+	trustedPeers := config.TrustedPeers
 	if trustedPeers == nil {
 		trustedPeers = peer.NewSet()
 	}
-
-	// we initialize the known private addr filters to reject all ip addresses initially
-	knownPrivateAddrFilters := ma.NewFilters()
-	knownPrivateAddrFilters.AddFilter(parseCIDR("0.0.0.0/0"), ma.ActionDeny)
 
 	return &CodaGatingState{
 		logger:                  logger,
@@ -280,6 +397,28 @@ func NewCodaGatingState(bannedAddrFilters *ma.Filters, trustedAddrFilters *ma.Fi
 		KnownPrivateAddrFilters: knownPrivateAddrFilters,
 		BannedPeers:             bannedPeers,
 		TrustedPeers:            trustedPeers,
+	}
+}
+
+func (h *Helper) GatingState() *CodaGatingState {
+	return h.gatingState
+}
+
+func (h *Helper) SetGatingState(gs *CodaGatingConfig) {
+	h.gatingState.TrustedPeers = gs.TrustedPeers
+	h.gatingState.BannedPeers = gs.BannedPeers
+	h.gatingState.TrustedAddrFilters = gs.TrustedAddrFilters
+	h.gatingState.BannedAddrFilters = gs.BannedAddrFilters
+	for _, c := range h.Host.Network().Conns() {
+		pid := c.RemotePeer()
+		maddr := c.RemoteMultiaddr()
+		if h.gatingState.checkAllowedPeerWithAddr(pid, maddr).isDeny() {
+			go func() {
+				if err := h.Host.Network().ClosePeer(pid); err != nil {
+					h.gatingState.logger.Infof("failed to close banned peer %v: %v", pid, err)
+				}
+			}()
+		}
 	}
 }
 
@@ -301,36 +440,101 @@ func (gs *CodaGatingState) MarkPrivateAddrAsKnown(addr ma.Multiaddr) {
 	}
 }
 
-func (gs *CodaGatingState) isPeerTrusted(p peer.ID) bool {
-	return gs.TrustedPeers.Contains(p)
+type connectionAllowance int
+
+const (
+	Undecided connectionAllowance = iota
+	DenyUnknownPrivateAddress
+	DenyBannedPeer
+	DenyBannedAddress
+	Accept
+)
+
+var connectionAllowanceStrings = map[connectionAllowance]string{
+	Undecided:                 "Undecided",
+	DenyUnknownPrivateAddress: "DenyUnknownPrivateAddress",
+	DenyBannedPeer:            "DenyBannedPeer",
+	DenyBannedAddress:         "DenyBannedAddress",
+	Accept:                    "Allow",
 }
 
-func (gs *CodaGatingState) isPeerBanned(p peer.ID) bool {
-	return gs.BannedPeers.Contains(p)
+func (ca connectionAllowance) String() string {
+	return connectionAllowanceStrings[ca]
+}
+
+func (c connectionAllowance) isDeny() bool {
+	return !(c == Accept || c == Undecided)
+}
+
+func (gs *CodaGatingState) checkPeerTrusted(p peer.ID) connectionAllowance {
+	if gs.TrustedPeers.Contains(p) {
+		return Accept
+	}
+	return Undecided
+}
+
+func (gs *CodaGatingState) checkPeerBanned(p peer.ID) connectionAllowance {
+	if gs.BannedPeers.Contains(p) {
+		return DenyBannedPeer
+	}
+	return Undecided
+}
+
+// bothAccept makes sure neither allowance denies the connection
+func bothAccept(a connectionAllowance, b connectionAllowance) connectionAllowance {
+	if a == Undecided {
+		return b
+	}
+	if a == Accept {
+		if b == Undecided {
+			return Accept
+		}
+		return b
+	}
+	return a
+}
+
+// unlessUndecided(a, b) returns `a` unless it is undecided, in which case it falls back to `b`
+func unlessUndecided(a connectionAllowance, b connectionAllowance) connectionAllowance {
+	if a == Undecided {
+		return b
+	}
+	return a
 }
 
 // checks if a peer id is allowed to dial/accept
-func (gs *CodaGatingState) isAllowedPeer(p peer.ID) bool {
-	return gs.isPeerTrusted(p) || !gs.isPeerBanned(p)
+func (gs *CodaGatingState) checkAllowedPeer(p peer.ID) connectionAllowance {
+	return unlessUndecided(gs.checkPeerTrusted(p), gs.checkPeerBanned(p))
 }
 
-func (gs *CodaGatingState) isAddrTrusted(addr ma.Multiaddr) bool {
-	return !gs.TrustedAddrFilters.AddrBlocked(addr)
+func (gs *CodaGatingState) checkAddrTrusted(addr ma.Multiaddr) connectionAllowance {
+	if !gs.TrustedAddrFilters.AddrBlocked(addr) {
+		return Accept
+	}
+	return Undecided
 }
 
-func (gs *CodaGatingState) isAddrBanned(addr ma.Multiaddr) bool {
-	return gs.BannedAddrFilters.AddrBlocked(addr)
+func (gs *CodaGatingState) checkAddrBanned(addr ma.Multiaddr) connectionAllowance {
+	if gs.BannedAddrFilters.AddrBlocked(addr) {
+		return DenyBannedAddress
+	}
+	return Undecided
 }
 
 // checks if an address is allowed to dial/accept
-func (gs *CodaGatingState) isAllowedAddr(addr ma.Multiaddr) bool {
-	publicOrKnownPrivate := !isPrivateAddr(addr) || !gs.KnownPrivateAddrFilters.AddrBlocked(addr)
-	return gs.isAddrTrusted(addr) || (!gs.isAddrBanned(addr) && publicOrKnownPrivate)
+func (gs *CodaGatingState) checkAllowedAddr(addr ma.Multiaddr) connectionAllowance {
+	if st := gs.checkAddrTrusted(addr); st != Undecided {
+		return st
+	}
+	if isPrivateAddr(addr) && gs.KnownPrivateAddrFilters.AddrBlocked(addr) {
+		return DenyUnknownPrivateAddress
+	}
+	return gs.checkAddrBanned(addr)
 }
 
 // checks if a peer is allowed to dial/accept; if the peer is in the trustlist, the address checks are overriden
-func (gs *CodaGatingState) isAllowedPeerWithAddr(p peer.ID, addr ma.Multiaddr) bool {
-	return gs.isPeerTrusted(p) || (gs.isAllowedPeer(p) && gs.isAllowedAddr(addr))
+func (gs *CodaGatingState) checkAllowedPeerWithAddr(p peer.ID, addr ma.Multiaddr) connectionAllowance {
+	return unlessUndecided(gs.checkPeerTrusted(p), bothAccept(gs.checkAllowedPeer(p), gs.checkAllowedAddr(addr)))
 }
 
 func (gs *CodaGatingState) logGate() {
@@ -340,15 +544,14 @@ func (gs *CodaGatingState) logGate() {
 // InterceptPeerDial tests whether we're permitted to Dial the specified peer.
 //
 // This is called by the network.Network implementation when dialling a peer.
-func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
-	allow = gs.isAllowedPeer(p)
-
-	if !allow {
-		gs.logger.Infof("disallowing peer dial to: %v (peer)", p)
+func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) bool {
+	allowance := gs.checkAllowedPeer(p)
+	if allowance.isDeny() {
+		gs.logger.Infof("disallowing peer dial to: %v (peer, %s)", p, allowance)
 		gs.logGate()
+		return false
 	}
-
-	return
+	return true
 }
 
 // InterceptAddrDial tests whether we're permitted to dial the specified
@@ -356,37 +559,32 @@ func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
 //
 // This is called by the network.Network implementation after it has
 // resolved the peer's addrs, and prior to dialling each.
-func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (allow bool) {
-	allow = gs.isAllowedPeerWithAddr(id, addr)
-
-	if !allow {
-		gs.logger.Infof("disallowing peer dial to: %v + %v (peer + address)", id, addr)
+func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) bool {
+	allowance := gs.checkAllowedPeerWithAddr(id, addr)
+	if allowance.isDeny() {
+		gs.logger.Infof("disallowing peer dial to: %v + %v (peer + address, %s)", id, addr, allowance)
 		gs.logGate()
+		return false
 	}
-
-	return
+	return true
 }
 
 // InterceptAccept tests whether an incipient inbound connection is allowed.
 //
 // This is called by the upgrader, or by the transport directly (e.g. QUIC,
 // Bluetooth), straight after it has accepted a connection from its socket.
-func (gs *CodaGatingState) InterceptAccept(addrs network.ConnMultiaddrs) (allow bool) {
+func (gs *CodaGatingState) InterceptAccept(addrs network.ConnMultiaddrs) bool {
 	remoteAddr := addrs.RemoteMultiaddr()
-	allow = gs.isAddrTrusted(remoteAddr) || !gs.isAddrBanned(remoteAddr)
-
-	if !allow {
-		gs.logger.Infof("refusing to accept inbound connection from addr: %v", remoteAddr)
+	allowance := unlessUndecided(gs.checkAddrTrusted(remoteAddr), gs.checkAddrBanned(remoteAddr))
+	if allowance.isDeny() {
+		gs.logger.Infof("refusing to accept inbound connection from addr: %v (%s)", remoteAddr, allowance)
 		gs.logGate()
+		return false
 	}
-
 	// If we are receiving a connection, and the remote address is private,
 	// then we infer that we should be able to connect to that private address.
-	if allow {
-		gs.MarkPrivateAddrAsKnown(remoteAddr)
-	}
-
-	return
+	gs.MarkPrivateAddrAsKnown(remoteAddr)
+	return true
 }
 
 // InterceptSecured tests whether a given connection, now authenticated,
@@ -395,19 +593,18 @@ func (gs *CodaGatingState) InterceptAccept(addrs network.ConnMultiaddrs) (allow 
 // This is called by the upgrader, after it has performed the security
 // handshake, and before it negotiates the muxer, or by the directly by the
 // transport, at the exact same checkpoint.
-func (gs *CodaGatingState) InterceptSecured(_ network.Direction, id peer.ID, addrs network.ConnMultiaddrs) (allow bool) {
+func (gs *CodaGatingState) InterceptSecured(_ network.Direction, id peer.ID, addrs network.ConnMultiaddrs) bool {
 	// note: we don't care about the direction (inbound/outbound). all
 	// connections in coda are symmetric: if i am allowed to connect to
 	// you, you are allowed to connect to me.
 	remoteAddr := addrs.RemoteMultiaddr()
-	allow = gs.isAllowedPeerWithAddr(id, remoteAddr)
-
-	if !allow {
-		gs.logger.Infof("refusing to accept inbound connection from authenticated addr: %v", remoteAddr)
+	allowance := gs.checkAllowedPeerWithAddr(id, remoteAddr)
+	if allowance.isDeny() {
+		gs.logger.Infof("refusing to accept inbound connection from authenticated addr: %v (%s)", remoteAddr, allowance)
 		gs.logGate()
+		return false
 	}
-
-	return
+	return true
 }
 
 // InterceptUpgraded tests whether a fully capable connection is allowed.
@@ -498,41 +695,62 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 	}
 
 	for _, p := range peers {
-		go func(p peer.AddrInfo) {
-			connInfo := h.ConnectionManager.GetInfo()
-			if connInfo.ConnCount < connInfo.LowWater {
-				err = h.Host.Connect(h.Ctx, p)
-				if err != nil {
-					logger.Debugf("failed to connect to peer %v err=%s", p, err)
-				} else {
-					logger.Debugf("connected to peer! %v", p)
-				}
-			} else {
-				h.Host.Peerstore().AddAddrs(p.ID, p.Addrs, peerstore.ConnectedAddrTTL)
-			}
-		}(p)
+		select {
+		case h.pxDiscoveries <- p:
+		default:
+			logger.Debugf("peer discoveries channel full; dropping peer %v", p)
+		}
 	}
 }
 
-func (h *Helper) handleTelemetryStreams(s network.Stream) {
+func (h *Helper) handleNodeStatusStreams(s network.Stream) {
 	defer func() {
-		_ = s.Close()
+		err := s.Close()
+		if err != nil {
+			logger.Error("failed to close write side of stream", err)
+			return
+		}
+
+		<-time.After(NodeStatusTimeout)
+
+		err = s.Reset()
+		if err != nil {
+			logger.Error("failed to reset stream", err)
+		}
 	}()
 
-	n, err := s.Write([]byte(h.TelemetryData))
+	n, err := s.Write(h.NodeStatus)
 	if err != nil {
 		logger.Error("failed to write to stream", err)
 		return
-	} else if n != len(h.TelemetryData) {
+	} else if n != len(h.NodeStatus) {
+		// TODO repeat writing, not log error
 		logger.Error("failed to write all data to stream")
 		return
 	}
 
-	logger.Debugf("wrote telemetry data to stream %s", s.Protocol())
+	logger.Debugf("wrote node status to stream %s", s.Protocol())
+}
+
+func (h Helper) pxConnectionWorker() {
+	for peer := range h.pxDiscoveries {
+		connInfo := h.ConnectionManager.GetInfo()
+		if connInfo.ConnCount < connInfo.LowWater {
+			err := h.Host.Connect(h.Ctx, peer)
+			if err != nil {
+				logger.Debugf("failed to connect to peer %v err=%s", peer, err)
+			} else {
+				logger.Debugf("connected to peer! %v", peer)
+			}
+		} else {
+			logger.Debugf("discovered peer (%v) via peer exchange, but already have too many connections; adding to peerstore, but refusing to connect", peer)
+			h.Host.Peerstore().AddAddrs(peer.ID, peer.Addrs, peerstore.ConnectedAddrTTL)
+		}
+	}
 }
 
 // MakeHelper does all the initialization to run one host
-func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, maxConnections int, minaPeerExchange bool) (*Helper, error) {
+func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingConfig *CodaGatingConfig, minConnections, maxConnections int, minaPeerExchange bool, grace time.Duration, knownPrivateIpNets []gonet.IPNet) (*Helper, error) {
 	me, err := peer.IDFromPrivateKey(pk)
 	if err != nil {
 		return nil, err
@@ -569,15 +787,23 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	mplex.MaxMessageSize = 1 << 30
 
-	connManager := newCodaConnectionManager(maxConnections, minaPeerExchange)
+	connManager := newCodaConnectionManager(minConnections, maxConnections, minaPeerExchange, grace)
 	bandwidthCounter := metrics.NewBandwidthCounter()
 
+	// we initialize the known private addr filters to reject all ip addresses initially
+	knownPrivateAddrFilters := ma.NewFilters()
+	knownPrivateAddrFilters.AddFilter(parseCIDR("0.0.0.0/0"), ma.ActionDeny)
+	for _, net := range knownPrivateIpNets {
+		knownPrivateAddrFilters.AddFilter(net, ma.ActionAccept)
+	}
+
+	gs := NewCodaGatingState(gatingConfig, knownPrivateAddrFilters)
 	host, err := p2p.New(ctx,
 		p2p.Muxer("/coda/mplex/1.0.0", libp2pmplex.DefaultTransport),
 		p2p.Identity(pk),
 		p2p.Peerstore(ps),
 		p2p.DisableRelay(),
-		p2p.ConnectionGater(gatingState),
+		p2p.ConnectionGater(gs),
 		p2p.ConnectionManager(connManager),
 		p2p.ListenAddrs(listenOn...),
 		p2p.AddrsFactory(func(as []ma.Multiaddr) []ma.Multiaddr {
@@ -611,9 +837,26 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		return nil, err
 	}
 
+	// 256MiB, a large enough mmap size to make mmap grow() a rare event
+	opt := lmdbbs.Options{
+		Path:            path.Join(statedir, "block-db"),
+		InitialMmapSize: 256 << 20,
+		CidToKeyMapper:  cidToKeyMapper,
+		KeyToCidMapper:  keyToCidMapper,
+	}
+	bstore, err := lmdbbs.Open(&opt)
+	if err != nil {
+		return nil, err
+	}
+
+	bitswapNetwork := bitnet.NewFromIpfsHost(host, kad, bitnet.Prefix(BitSwapExchange))
+	bs := bitswap.New(context.Background(), bitswapNetwork, bstore).(*bitswap.Bitswap)
+
 	// nil fields are initialized by beginAdvertising
 	h := &Helper{
 		Host:              host,
+		Bitswap:           bs,
+		BitswapStorage:    (*BitswapStorageLmdb)(bstore),
 		Ctx:               ctx,
 		Mdns:              nil,
 		Dht:               kad,
@@ -622,20 +865,27 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		Rendezvous:        rendezvousString,
 		Discovery:         nil,
 		Me:                me,
-		GatingState:       gatingState,
+		gatingState:       gs,
 		ConnectionManager: connManager,
 		BandwidthCounter:  bandwidthCounter,
+		MsgStats:          &MessageStats{min: math.MaxUint64},
 		Seeds:             seeds,
+		pxDiscoveries:     nil,
 	}
 
 	if !minaPeerExchange {
 		return h, nil
 	}
 
+	h.pxDiscoveries = make(chan peer.AddrInfo, maxConnections*3)
+	for w := 0; w < numPxConnectionWorkers; w++ {
+		go h.pxConnectionWorker()
+	}
+
 	connManager.getRandomPeers = h.getRandomPeers
 	connManager.ctx = ctx
 	connManager.host = host
 	h.Host.SetStreamHandler(pxProtocolID, h.handlePxStreams)
-	h.Host.SetStreamHandler(TelemetryProtocolID, h.handleTelemetryStreams)
+	h.Host.SetStreamHandler(NodeStatusProtocolID, h.handleNodeStatusStreams)
 	return h, nil
 }

@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Pickles_types
 open Backend
 open Composition_types
@@ -25,11 +25,11 @@ module Ipa = struct
     let challenges =
       Vector.init Tock.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
-          {Bulletproof_challenge.prechallenge} )
+          { Bulletproof_challenge.prechallenge } )
 
     let challenges_computed =
-      Vector.map challenges ~f:(fun {prechallenge} ->
-          (Ipa.Wrap.compute_challenge prechallenge : Tock.Field.t) )
+      Vector.map challenges ~f:(fun { prechallenge } : Tock.Field.t ->
+          Ipa.Wrap.compute_challenge prechallenge )
 
     let sg =
       lazy
@@ -40,11 +40,11 @@ module Ipa = struct
     let challenges =
       Vector.init Tick.Rounds.n ~f:(fun _ ->
           let prechallenge = Ro.scalar_chal () in
-          {Bulletproof_challenge.prechallenge} )
+          { Bulletproof_challenge.prechallenge } )
 
     let challenges_computed =
-      Vector.map challenges ~f:(fun {prechallenge} ->
-          (Ipa.Step.compute_challenge prechallenge : Tick.Field.t) )
+      Vector.map challenges ~f:(fun { prechallenge } : Tick.Field.t ->
+          Ipa.Step.compute_challenge prechallenge )
 
     let sg =
       lazy

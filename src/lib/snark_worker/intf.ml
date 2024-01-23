@@ -24,10 +24,7 @@ module type Inputs_intf = sig
   val perform_single :
        Worker_state.t
     -> message:Mina_base.Sok_message.t
-    -> ( Transaction.t
-       , Transaction_witness.t
-       , Ledger_proof.t )
-       Work.Single.Spec.t
+    -> (Transaction.t, Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
     -> (Ledger_proof.t * Time.Span.t) Deferred.Or_error.t
 end
 
@@ -123,14 +120,14 @@ module type S0 = sig
   module Rpcs : sig
     module Get_work :
       Rpc_master
-      with type Master.T.query = unit
-       and type Master.T.response =
-                  (Work.Spec.t * Signature_lib.Public_key.Compressed.t) option
+        with type Master.T.query = unit
+         and type Master.T.response =
+          (Work.Spec.t * Signature_lib.Public_key.Compressed.t) option
 
     module Submit_work :
       Rpc_master
-      with type Master.T.query = Work.Result.t
-       and type Master.T.response = unit
+        with type Master.T.query = Work.Result.t
+         and type Master.T.response = unit
   end
 
   val command_from_rpcs :

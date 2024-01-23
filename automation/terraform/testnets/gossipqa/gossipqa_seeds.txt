@@ -1,0 +1,8 @@
+/dns4/seed-1.gossip-data/tcp/10000/p2p/12D3KooWLsKcaX7TYaurdkYB8WmoUXNKqNUo94w6H4LhzqEYAGc5
+/dns4/seed-2.gossip-data/tcp/10001/p2p/12D3KooW9rebvJT88ZX8mUjCJpKNqyMVTvknri4xqv2d2FwU5DDj
+/dns4/seed-3.gossip-data/tcp/10002/p2p/12D3KooWNsBZvge1nGMxrdGRKgnXctdHAQ4SJDFhNEkHELhJzCSf
+
+
+/ip4/34.152.17.2/tcp/10000/p2p/12D3KooWLsKcaX7TYaurdkYB8WmoUXNKqNUo94w6H4LhzqEYAGc5
+/ip4/34.95.14.84/tcp/10001/p2p/12D3KooW9rebvJT88ZX8mUjCJpKNqyMVTvknri4xqv2d2FwU5DDj
+/ip4/34.95.27.69/tcp/10002/p2p/12D3KooWNsBZvge1nGMxrdGRKgnXctdHAQ4SJDFhNEkHELhJzCSf

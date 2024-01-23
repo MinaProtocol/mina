@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 module type Inputs_intf = sig
   module Location : Location_intf.S
@@ -16,9 +16,9 @@ module type Inputs_intf = sig
 
   module Account :
     Intf.Account
-    with type balance := Balance.t
-     and type account_id := Account_id.t
-     and type token_id := Token_id.t
+      with type balance := Balance.t
+       and type account_id := Account_id.t
+       and type token_id := Token_id.t
 
   module Hash : Intf.Hash with type account := Account.t
 
@@ -71,8 +71,8 @@ end = struct
     let open Inputs in
     let result =
       Location.Addr.Range.fold
-        (Location.Addr.Range.subtree_range
-           ~ledger_depth:(Inputs.ledger_depth t) address)
+        (Location.Addr.Range.subtree_range ~ledger_depth:(Inputs.ledger_depth t)
+           address )
         ~init:[]
         ~f:(fun bit_index acc ->
           let account = Base.get t (location_of_account_addr bit_index) in
@@ -148,7 +148,7 @@ end = struct
   let set_hash_batch t locations_and_hashes =
     Inputs.set_raw_hash_batch t
       (compute_affected_locations_and_hashes t locations_and_hashes
-         locations_and_hashes)
+         locations_and_hashes )
 
   let compute_last_index addresses =
     Non_empty_list.map addresses

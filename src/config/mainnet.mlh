@@ -1,0 +1,46 @@
+[%%define ledger_depth 20]
+[%%import "/src/config/curve/medium.mlh"]
+[%%import "/src/config/coinbase/realistic.mlh"]
+[%%import "/src/config/scan_state/point2tps.mlh"]
+[%%import "/src/config/debug_level/some.mlh"]
+[%%import "/src/config/proof_level/full.mlh"]
+[%%import "/src/config/txpool_size.mlh"]
+[%%import "/src/config/account_creation_fee/realistic.mlh"]
+[%%import "/src/config/amount_defaults/realistic.mlh"]
+[%%import "/src/config/protocol_version/current.mlh"]
+[%%import "/src/config/supercharged_coinbase_factor/two.mlh"]
+
+(* custom consensus parameters for the testnet release *)
+[%%define consensus_mechanism "proof_of_stake"]
+[%%define k 290]
+[%%define delta 0]
+[%%define slots_per_epoch 7140]
+[%%define slots_per_sub_window 7]
+[%%define sub_windows_per_window 11]
+
+[%%define record_async_backtraces false]
+[%%define time_offsets true]
+[%%define cache_exceptions false]
+
+[%%define plugins false]
+
+[%%define genesis_ledger "testnet_postake"]
+
+[%%define genesis_state_timestamp "2020-09-16 03:15:00-07:00"]
+[%%define block_window_duration 180000]
+
+[%%define integration_tests false]
+[%%define force_updates false]
+
+[%%define download_snark_keys false]
+[%%define generate_genesis_proof false]
+
+[%%define print_versioned_types false]
+
+[%%define daemon_expiry "2024-12-10 14:00:00-07:00"]
+[%%define test_full_epoch false]
+[%%import "/src/config/fork.mlh"]
+[%%import "/src/config/features/mainnet.mlh"]
+(* 2*block_window_duration *)
+[%%define compaction_interval 360000]
+[%%define vrf_poll_interval 5000]

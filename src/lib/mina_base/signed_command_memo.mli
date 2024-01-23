@@ -14,12 +14,12 @@ exception Too_long_user_memo_input
 
 exception Too_long_digestible_string
 
-type t [@@deriving sexp, eq, compare, hash, yojson]
+type t [@@deriving sexp, equal, compare, hash, yojson]
 
 module Stable : sig
   module V1 : sig
     type nonrec t = t
-    [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+    [@@deriving bin_io, sexp, equal, compare, hash, yojson, version]
   end
 
   module Latest = V1
@@ -44,9 +44,14 @@ val dummy : t
 
 val empty : t
 
-val to_string : t -> string
+val to_base58_check : t -> string
 
-val of_string : string -> t
+val of_base58_check_exn : string -> t
+
+(** for a memo of bytes, return a plaintext string
+    for a memo of a digest, return a hex-encoded string, prefixed by '0x'
+*)
+val to_string_hum : t -> string
 
 (** is the memo a digest *)
 val is_digest : t -> bool
@@ -93,3 +98,27 @@ val create_from_string : string -> t Or_error.t
 (** convert a memo to a list of bools
  *)
 val to_bits : t -> bool list
+
+type raw =
+  | Digest of string  (** The digest of the string, encoded by base58-check *)
+  | Bytes of string  (** A string containing the raw bytes in the memo. *)
+
+(** Convert into a raw representation.
+
+    Raises if the tag or length are invalid.
+*)
+val to_raw_exn : t -> raw
+
+(** Convert back into the raw input bytes.
+
+    Raises if the tag or length are invalid, or if the memo was a digest.
+    Equivalent to [to_raw_exn] and then a match on [Bytes].
+*)
+val to_raw_bytes_exn : t -> string
+
+(** Convert from a raw representation.
+
+    Raises if the digest is not a valid base58-check string, or if the bytes
+    string is too long.
+*)
+val of_raw_exn : raw -> t

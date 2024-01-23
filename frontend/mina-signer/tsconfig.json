@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es5",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "declaration": true,
+    "noImplicitAny": false,
+    "noEmitOnError": true,
+    "removeComments": false,
+    "sourceMap": false,
+    "outDir": "dist",
+    "rootDir": ".",
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "allowJs": true,
+    "checkJs": false,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitThis": true,
+    "noImplicitReturns": true,
+    "strictNullChecks": true,
+    "noUnusedLocals": true,
+    "strictPropertyInitialization": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "src/*.bc.js"]
+}

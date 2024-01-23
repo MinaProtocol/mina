@@ -14,17 +14,14 @@ module type S = sig
     | Find_index : Account_id.t -> Account.Index.t Request.t
 
   val get :
-       depth:int
-    -> var
-    -> Account.Index.Unpacked.var
-    -> (Account.var, _) Checked.t
+    depth:int -> var -> Account.Index.Unpacked.var -> (Account.var, _) Checked.t
 
   val merge : height:int -> t -> t -> t
 
   (** string representation of hash is Base58Check of bin_io representation *)
-  val to_string : t -> string
+  val to_base58_check : t -> string
 
-  val of_string : string -> t
+  val of_base58_check : string -> t Base.Or_error.t
 
   val empty_hash : t
 
@@ -43,17 +40,19 @@ module type S = sig
     -> var
     -> Account_id.var
     -> is_writeable:Boolean.var
-    -> f:(   is_empty_and_writeable:Boolean.var
+    -> f:
+         (   is_empty_and_writeable:Boolean.var
           -> Account.var
-          -> (Account.var, 's) Checked.t)
+          -> (Account.var, 's) Checked.t )
     -> (var, 's) Checked.t
 
   val modify_account_recv :
        depth:int
     -> var
     -> Account_id.var
-    -> f:(   is_empty_and_writeable:Boolean.var
+    -> f:
+         (   is_empty_and_writeable:Boolean.var
           -> Account.var
-          -> (Account.var, 's) Checked.t)
+          -> (Account.var, 's) Checked.t )
     -> (var, 's) Checked.t
 end

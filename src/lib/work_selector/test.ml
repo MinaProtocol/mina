@@ -57,9 +57,7 @@ struct
     let logger = Logger.null () in
     let send_work work_state =
       let rec go all_work =
-        let stuff =
-          Selection_method.work ~snark_pool ~fee ~logger work_state
-        in
+        let stuff = Selection_method.work ~snark_pool ~fee ~logger work_state in
         match stuff with
         | None ->
             all_work
@@ -91,7 +89,7 @@ struct
           return ()
       | work :: rest ->
           let%bind fee =
-            Quickcheck.Generator.of_list [cheap_work_fee; expensive_work_fee]
+            Quickcheck.Generator.of_list [ cheap_work_fee; expensive_work_fee ]
           in
           T.Snark_pool.add_snark snark_pool ~work ~fee ;
           add_works rest
@@ -113,8 +111,8 @@ struct
         gen_snark_pool
           ( T.Staged_ledger.all_work_pairs sl ~get_state:(fun _ ->
                 Ok
-                  (Lazy.force precomputed_values).protocol_state_with_hash.data
-            )
+                  (Lazy.force precomputed_values).protocol_state_with_hashes
+                    .data )
           |> Or_error.ok_exn )
           (Currency.Fee.of_int 2)
       in
@@ -134,8 +132,7 @@ struct
                 ~message:"Exceeded time expected to exhaust work" ~expect:true
                 (i <= p) ;
               let work =
-                Selection_method.work ~snark_pool ~fee:my_fee work_state
-                  ~logger
+                Selection_method.work ~snark_pool ~fee:my_fee work_state ~logger
               in
               match work with
               | None ->
@@ -145,7 +142,7 @@ struct
                     ~message:"Should not get any cheap jobs" ~expect:true
                     (Lib.For_tests.does_not_have_better_fee ~snark_pool
                        ~fee:my_fee
-                       (One_or_two.map job ~f:Lib.Work_spec.statement)) ;
+                       (One_or_two.map job ~f:Lib.Work_spec.statement) ) ;
                   go (i + 1)
             in
             go 0 ) )

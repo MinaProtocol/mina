@@ -19,9 +19,10 @@ module Partial = struct
 
     let bin_writer_t = M.bin_writer_t
 
-    let bin_reader_t = {read= bin_read_t; vtag_read= __bin_read_t__}
+    let bin_reader_t = { read = bin_read_t; vtag_read = __bin_read_t__ }
 
-    let bin_t = {shape= bin_shape_t; writer= bin_writer_t; reader= bin_reader_t}
+    let bin_t =
+      { shape = bin_shape_t; writer = bin_writer_t; reader = bin_reader_t }
   end
 
   module Sexp (M : Intf.Input.Sexp_intf) :
@@ -64,8 +65,8 @@ end
 
 module Bin_io_and_sexp (M : Intf.Input.Bin_io_and_sexp_intf) :
   Intf.Output.Bin_io_and_sexp_intf
-  with type t = M.t
-   and type 'a creator := 'a M.creator = struct
+    with type t = M.t
+     and type 'a creator := 'a M.creator = struct
   include Basic (M)
   include Partial.Bin_io (M)
   include Partial.Sexp (M)
@@ -80,8 +81,8 @@ end
 
 module Bin_io_and_yojson (M : Intf.Input.Bin_io_and_yojson_intf) :
   Intf.Output.Bin_io_and_yojson_intf
-  with type t = M.t
-   and type 'a creator := 'a M.creator = struct
+    with type t = M.t
+     and type 'a creator := 'a M.creator = struct
   include Basic (M)
   include Partial.Bin_io (M)
   include Partial.Yojson (M)
@@ -100,8 +101,8 @@ module Versioned_v1 = struct
   module Basic_intf (M : Intf.Input.Versioned_v1.Basic_intf) : sig
     include
       Intf.Output.Versioned_v1.Basic_intf
-      with type Stable.V1.t = M.Stable.V1.t
-       and type 'a Stable.V1.creator = 'a M.Stable.V1.creator
+        with type Stable.V1.t = M.Stable.V1.t
+         and type 'a Stable.V1.creator = 'a M.Stable.V1.creator
   end = struct
     module Stable = struct
       module V1 = struct
@@ -120,7 +121,7 @@ module Versioned_v1 = struct
 
       let versions = M.Stable.versions
 
-      let deserialize_binary_opt = M.Stable.deserialize_binary_opt
+      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
     type t = Stable.V1.t
@@ -129,8 +130,8 @@ module Versioned_v1 = struct
   module Sexp (M : Intf.Input.Versioned_v1.Sexp_intf) : sig
     include
       Intf.Output.Versioned_v1.Sexp_intf
-      with type Stable.V1.t = M.Stable.V1.t
-       and type 'a Stable.V1.creator = 'a M.Stable.V1.creator
+        with type Stable.V1.t = M.Stable.V1.t
+         and type 'a Stable.V1.creator = 'a M.Stable.V1.creator
   end = struct
     module Stable = struct
       module V1 = struct
@@ -149,7 +150,7 @@ module Versioned_v1 = struct
 
       let versions = M.Stable.versions
 
-      let deserialize_binary_opt = M.Stable.deserialize_binary_opt
+      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
     type t = Stable.V1.t
@@ -158,8 +159,8 @@ module Versioned_v1 = struct
   module Yojson (M : Intf.Input.Versioned_v1.Yojson_intf) : sig
     include
       Intf.Output.Versioned_v1.Yojson_intf
-      with type Stable.V1.t = M.Stable.V1.t
-       and type 'a Stable.V1.creator = 'a M.Stable.V1.creator
+        with type Stable.V1.t = M.Stable.V1.t
+         and type 'a Stable.V1.creator = 'a M.Stable.V1.creator
   end = struct
     module Stable = struct
       module V1 = struct
@@ -178,7 +179,7 @@ module Versioned_v1 = struct
 
       let versions = M.Stable.versions
 
-      let deserialize_binary_opt = M.Stable.deserialize_binary_opt
+      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
     type t = Stable.V1.t
@@ -188,8 +189,8 @@ module Versioned_v1 = struct
       (M : Intf.Input.Versioned_v1.Full_compare_eq_hash_intf) : sig
     include
       Intf.Output.Versioned_v1.Full_compare_eq_hash_intf
-      with type Stable.V1.t = M.Stable.V1.t
-       and type 'a Stable.V1.creator = 'a M.Stable.V1.creator
+        with type Stable.V1.t = M.Stable.V1.t
+         and type 'a Stable.V1.creator = 'a M.Stable.V1.creator
   end = struct
     module Stable = struct
       module V1 = struct
@@ -216,7 +217,7 @@ module Versioned_v1 = struct
 
       let versions = M.Stable.versions
 
-      let deserialize_binary_opt = M.Stable.deserialize_binary_opt
+      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
     type t = Stable.V1.t
@@ -233,8 +234,8 @@ module Versioned_v1 = struct
   module Full (M : Intf.Input.Versioned_v1.Full_intf) : sig
     include
       Intf.Output.Versioned_v1.Full_intf
-      with type Stable.V1.t = M.Stable.V1.t
-       and type 'a Stable.V1.creator = 'a M.Stable.V1.creator
+        with type Stable.V1.t = M.Stable.V1.t
+         and type 'a Stable.V1.creator = 'a M.Stable.V1.creator
   end = struct
     module Stable = struct
       module V1 = struct
@@ -253,7 +254,7 @@ module Versioned_v1 = struct
 
       let versions = M.Stable.versions
 
-      let deserialize_binary_opt = M.Stable.deserialize_binary_opt
+      let bin_read_to_latest_opt = M.Stable.bin_read_to_latest_opt
     end
 
     type t = Stable.V1.t

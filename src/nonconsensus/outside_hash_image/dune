@@ -1,5 +1,5 @@
 (library
- (name outside_hash_image_nonconsensus)
+ (name outside_hash_image)
  (public_name outside_hash_image_nonconsensus)
  (libraries snark_params_nonconsensus)
  (preprocessor_deps ../../config.mlh)

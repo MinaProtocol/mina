@@ -2,7 +2,7 @@
  (name structured_log_events_examples)
  (inline_tests)
  (library_flags -linkall)
- (libraries core_kernel yojson)
+ (libraries core_kernel yojson result)
  (preprocess
   (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson ppx_register_event ppx_inline_test))
  (instrumentation (backend bisect_ppx))

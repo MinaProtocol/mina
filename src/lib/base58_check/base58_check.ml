@@ -13,9 +13,8 @@ exception Invalid_base58_check_length of string
 exception Invalid_base58_character of string
 
 (* same as Bitcoin alphabet *)
-let coda_alphabet =
-  B58.make_alphabet
-    "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+let mina_alphabet =
+  B58.make_alphabet "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
 let version_len = 1
 
@@ -32,10 +31,9 @@ struct
   let version_string = String.make 1 version_byte
 
   (* the Base58 library's "convert" routine, used for both
-     encoding and decoding, runs in time O(n^2); limit
-     length of input when encoding to avoid bottlenecks
-   *)
-
+      encoding and decoding, runs in time O(n^2); limit
+      length of input when encoding to avoid bottlenecks
+  *)
   let max_encodable_length = 8192
 
   let compute_checksum payload =
@@ -55,12 +53,12 @@ struct
       failwith (sprintf "Base58_check.encode: input too long (%d bytes)" len) ;
     let checksum = compute_checksum payload in
     let bytes = version_string ^ payload ^ checksum |> Bytes.of_string in
-    B58.encode coda_alphabet bytes |> Bytes.to_string
+    B58.encode mina_alphabet bytes |> Bytes.to_string
 
   let decode_exn s =
     let bytes = Bytes.of_string s in
     let decoded =
-      try B58.decode coda_alphabet bytes |> Bytes.to_string
+      try B58.decode mina_alphabet bytes |> Bytes.to_string
       with B58.Invalid_base58_character ->
         raise (Invalid_base58_character M.description)
     in
@@ -97,8 +95,8 @@ struct
         Or_error.error_string
           (error_str
              (sprintf "version byte \\x%02X, expected \\x%02X" (Char.to_int ch)
-                (Char.to_int version_byte))
-             str)
+                (Char.to_int version_byte) )
+             str )
 end
 
 module Version_bytes = Version_bytes
@@ -126,8 +124,8 @@ let%test_module "base58check tests" =
     let%test "longer_string" =
       test_roundtrip
         "Someday, I wish upon a star, wake up where the clouds are far behind \
-         me, where trouble melts like lemon drops, High above the chimney \
-         top, that's where you'll find me"
+         me, where trouble melts like lemon drops, High above the chimney top, \
+         that's where you'll find me"
 
     let%test "invalid checksum" =
       try

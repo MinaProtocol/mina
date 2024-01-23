@@ -3,7 +3,7 @@ include Bigint
 
 let of_bool (b : bool) : t = if b then one else zero
 
-let of_bit_fold_lsb ({fold} : bool Fold_lib.Fold.t) : t =
+let of_bit_fold_lsb ({ fold } : bool Fold_lib.Fold.t) : t =
   fold ~init:(0, zero) ~f:(fun (i, acc) b ->
       (Int.(i + 1), bit_or (shift_left (of_bool b) i) acc) )
   |> snd

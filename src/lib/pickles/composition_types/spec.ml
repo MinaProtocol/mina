@@ -11,29 +11,29 @@ end
 open Basic
 
 type (_, _, _) Basic.t +=
-  | Field : ('field1, 'field2, < field1: 'field1 ; field2: 'field2 ; .. >) t
-  | Bool : ('bool1, 'bool2, < bool1: 'bool1 ; bool2: 'bool2 ; .. >) t
+  | Field : ('field1, 'field2, < field1 : 'field1 ; field2 : 'field2 ; .. >) t
+  | Bool : ('bool1, 'bool2, < bool1 : 'bool1 ; bool2 : 'bool2 ; .. >) t
   | Digest :
-      ('digest1, 'digest2, < digest1: 'digest1 ; digest2: 'digest2 ; .. >) t
+      ('digest1, 'digest2, < digest1 : 'digest1 ; digest2 : 'digest2 ; .. >) t
   | Challenge :
       ( 'challenge1
       , 'challenge2
-      , < challenge1: 'challenge1 ; challenge2: 'challenge2 ; .. > )
+      , < challenge1 : 'challenge1 ; challenge2 : 'challenge2 ; .. > )
       t
   | Bulletproof_challenge :
       ( 'bp_chal1
       , 'bp_chal2
-      , < bulletproof_challenge1: 'bp_chal1
-        ; bulletproof_challenge2: 'bp_chal2
+      , < bulletproof_challenge1 : 'bp_chal1
+        ; bulletproof_challenge2 : 'bp_chal2
         ; .. > )
       t
-  | Index : ('index1, 'index2, < index1: 'index1 ; index2: 'index2 ; .. >) t
+  | Index : ('index1, 'index2, < index1 : 'index1 ; index2 : 'index2 ; .. >) t
 
 module rec T : sig
   type (_, _, _) t =
     | B : ('a, 'b, 'env) Basic.t -> ('a, 'b, 'env) t
     | Scalar :
-        ('a, 'b, (< challenge1: 'a ; challenge2: 'b ; .. > as 'env)) Basic.t
+        ('a, 'b, (< challenge1 : 'a ; challenge2 : 'b ; .. > as 'env)) Basic.t
         -> ('a Sc.t, 'b Sc.t, 'env) t
     | Vector :
         ('t1, 't2, 'env) t * 'n Nat.t
@@ -48,10 +48,11 @@ end =
 include T
 
 type ('bool, 'env) pack =
-  {pack: 'a 'b. ('a, 'b, 'env) Basic.t -> 'b -> 'bool list array}
+  { pack : 'a 'b. ('a, 'b, 'env) Basic.t -> 'b -> 'bool list array }
 
-let rec pack : type t v env.
-    ('bool, env) pack -> (t, v, env) T.t -> v -> 'bool list array =
+let rec pack :
+    type t v env. ('bool, env) pack -> (t, v, env) T.t -> v -> 'bool list array
+    =
  fun p spec t ->
   match spec with
   | B spec ->
@@ -71,11 +72,14 @@ let rec pack : type t v env.
       Array.concat_map t ~f:(pack p spec)
 
 type ('f, 'env) typ =
-  { typ:
-      'var 'value.    ('value, 'var, 'env) Basic.t
-      -> ('var, 'value, 'f) Snarky_backendless.Typ.t }
+  { typ :
+      'var 'value.
+         ('value, 'var, 'env) Basic.t
+      -> ('var, 'value, 'f) Snarky_backendless.Typ.t
+  }
 
-let rec typ : type f var value env.
+let rec typ :
+    type f var value env.
        (f, env) typ
     -> (value, var, env) T.t
     -> (var, value, f) Snarky_backendless.Typ.t =
@@ -106,7 +110,7 @@ let rec typ : type f var value env.
 
 type 'env exists = T : ('t1, 't2, 'env) T.t -> 'env exists
 
-type generic_spec = {spec: 'env. 'env exists}
+type generic_spec = { spec : 'env. 'env exists }
 
 module ETyp = struct
   type ('var, 'value, 'f) t =
@@ -116,9 +120,12 @@ module ETyp = struct
 end
 
 type ('f, 'env) etyp =
-  {etyp: 'var 'value. ('value, 'var, 'env) Basic.t -> ('var, 'value, 'f) ETyp.t}
+  { etyp :
+      'var 'value. ('value, 'var, 'env) Basic.t -> ('var, 'value, 'f) ETyp.t
+  }
 
-let rec etyp : type f var value env.
+let rec etyp :
+    type f var value env.
     (f, env) etyp -> (value, var, env) T.t -> (var, value, f) ETyp.t =
   let open Snarky_backendless.Typ in
   fun e spec ->
@@ -138,9 +145,7 @@ let rec etyp : type f var value env.
         let open Hlist.HlistId in
         let there [] = () in
         let back () = [] in
-        T
-          ( transport (unit ()) ~there ~back |> transport_var ~there ~back
-          , Fn.id )
+        T (transport (unit ()) ~there ~back |> transport_var ~there ~back, Fn.id)
     | Struct (spec :: specs) ->
         let open Hlist.HlistId in
         let (T (t1, f1)) = etyp e spec in
@@ -159,19 +164,19 @@ module Common (Impl : Snarky_backendless.Snark_intf.Run) = struct
 
   module Env = struct
     type ('other_field, 'other_field_var, 'a) t =
-      < field1: 'other_field
-      ; field2: 'other_field_var
-      ; bool1: bool
-      ; bool2: Boolean.var
-      ; digest1: Digest.Constant.t
-      ; digest2: Digest.t
-      ; challenge1: Challenge.Constant.t
-      ; challenge2: Challenge.t
-      ; bulletproof_challenge1:
+      < field1 : 'other_field
+      ; field2 : 'other_field_var
+      ; bool1 : bool
+      ; bool2 : Boolean.var
+      ; digest1 : Digest.Constant.t
+      ; digest2 : Digest.t
+      ; challenge1 : Challenge.Constant.t
+      ; challenge2 : Challenge.t
+      ; bulletproof_challenge1 :
           Challenge.Constant.t Sc.t Bulletproof_challenge.t
-      ; bulletproof_challenge2: Challenge.t Sc.t Bulletproof_challenge.t
-      ; index1: Index.t
-      ; index2: (Boolean.var, Nat.N8.n) Vector.t
+      ; bulletproof_challenge2 : Challenge.t Sc.t Bulletproof_challenge.t
+      ; index1 : Index.t
+      ; index2 : (Boolean.var, Nat.N8.n) Vector.t
       ; .. >
       as
       'a
@@ -184,7 +189,8 @@ let pack_basic (type field other_field other_field_var)
   let open Impl in
   let module C = Common (Impl) in
   let open C in
-  let pack : type a b.
+  let pack :
+      type a b.
          (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) Basic.t
       -> b
       -> Boolean.var list array =
@@ -193,20 +199,20 @@ let pack_basic (type field other_field other_field_var)
     | Field ->
         field x
     | Bool ->
-        [|[x]|]
+        [| [ x ] |]
     | Digest ->
-        [|Digest.to_bits x|]
+        [| Digest.to_bits x |]
     | Challenge ->
-        [|Challenge.to_bits x|]
+        [| Challenge.to_bits x |]
     | Index ->
-        [|Vector.to_list x|]
+        [| Vector.to_list x |]
     | Bulletproof_challenge ->
-        let {Bulletproof_challenge.prechallenge= Scalar_challenge pre} = x in
-        [|Challenge.to_bits pre|]
+        let { Bulletproof_challenge.prechallenge = Scalar_challenge pre } = x in
+        [| Challenge.to_bits pre |]
     | _ ->
         failwith "unknown basic spec"
   in
-  {pack}
+  { pack }
 
 let pack_basic_unboolean (type field other_field other_field_var)
     (module Impl : Snarky_backendless.Snark_intf.Run with type field = field)
@@ -214,7 +220,8 @@ let pack_basic_unboolean (type field other_field other_field_var)
   let open Impl in
   let module C = Common (Impl) in
   let open C in
-  let pack : type a b.
+  let pack :
+      type a b.
          (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) Basic.t
       -> b
       -> Boolean.var list array =
@@ -223,20 +230,20 @@ let pack_basic_unboolean (type field other_field other_field_var)
     | Field ->
         field x
     | Bool ->
-        [|[x]|]
+        [| [ x ] |]
     | Digest ->
-        [|Digest.Unsafe.to_bits_unboolean x|]
+        [| Digest.Unsafe.to_bits_unboolean x |]
     | Challenge ->
-        [|Challenge.to_bits x|]
+        [| Challenge.to_bits x |]
     | Index ->
-        [|Vector.to_list x|]
+        [| Vector.to_list x |]
     | Bulletproof_challenge ->
-        let {Bulletproof_challenge.prechallenge= Scalar_challenge pre} = x in
-        [|Challenge.to_bits pre|]
+        let { Bulletproof_challenge.prechallenge = Scalar_challenge pre } = x in
+        [| Challenge.to_bits pre |]
     | _ ->
         failwith "unknown basic spec"
   in
-  {pack}
+  { pack }
 
 let pack impl field t = pack (pack_basic_unboolean impl field) t
 
@@ -247,7 +254,8 @@ let typ_basic (type field other_field other_field_var)
   let open Impl in
   let module C = Common (Impl) in
   let open C in
-  let typ : type a b.
+  let typ :
+      type a b.
          (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) Basic.t
       -> (b, a) Impl.Typ.t =
    fun basic ->
@@ -267,7 +275,7 @@ let typ_basic (type field other_field other_field_var)
     | _ ->
         failwith "unknown basic spec"
   in
-  {typ}
+  { typ }
 
 let typ ~challenge ~scalar_challenge impl field t =
   typ (typ_basic ~challenge ~scalar_challenge impl field) t
@@ -280,24 +288,25 @@ let packed_typ_basic (type field other_field other_field_var)
   let module Challenge = Limb_vector.Challenge.Make (Impl) in
   let module Env = struct
     type ('other_field, 'other_field_var, 'a) t =
-      < field1: 'other_field
-      ; field2: 'other_field_var
-      ; bool1: bool
-      ; bool2: Boolean.var
-      ; digest1: Digest.Constant.t
-      ; digest2: Field.t
-      ; challenge1: Challenge.Constant.t
-      ; challenge2: (* Challenge.t *) Field.t
-      ; bulletproof_challenge1:
+      < field1 : 'other_field
+      ; field2 : 'other_field_var
+      ; bool1 : bool
+      ; bool2 : Boolean.var
+      ; digest1 : Digest.Constant.t
+      ; digest2 : Field.t
+      ; challenge1 : Challenge.Constant.t
+      ; challenge2 : (* Challenge.t *) Field.t
+      ; bulletproof_challenge1 :
           Challenge.Constant.t Sc.t Bulletproof_challenge.t
-      ; bulletproof_challenge2: Field.t Sc.t Bulletproof_challenge.t
-      ; index1: Index.t
-      ; index2: Field.t
+      ; bulletproof_challenge2 : Field.t Sc.t Bulletproof_challenge.t
+      ; index1 : Index.t
+      ; index2 : Field.t
       ; .. >
       as
       'a
   end in
-  let etyp : type a b.
+  let etyp :
+      type a b.
          (a, b, ((other_field, other_field_var, 'e) Env.t as 'e)) Basic.t
       -> (b, a, field) ETyp.t = function
     | Field ->
@@ -313,11 +322,11 @@ let packed_typ_basic (type field other_field other_field_var)
     | Bulletproof_challenge ->
         let typ =
           let there
-              {Bulletproof_challenge.prechallenge= Sc.Scalar_challenge pre} =
+              { Bulletproof_challenge.prechallenge = Sc.Scalar_challenge pre } =
             pre
           in
           let back pre =
-            {Bulletproof_challenge.prechallenge= Sc.Scalar_challenge pre}
+            { Bulletproof_challenge.prechallenge = Sc.Scalar_challenge pre }
           in
           Typ.transport Challenge.packed_typ ~there ~back
           |> Typ.transport_var ~there ~back
@@ -326,6 +335,6 @@ let packed_typ_basic (type field other_field other_field_var)
     | _ ->
         failwith "etyp: unhandled variant"
   in
-  {etyp}
+  { etyp }
 
 let packed_typ impl field t = etyp (packed_typ_basic impl field) t

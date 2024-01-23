@@ -7,6 +7,8 @@ let S = ../../Lib/SelectFiles.dhall
 let Cmd = ../../Lib/Cmds.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
@@ -19,24 +21,28 @@ Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
       dirtyWhen = [
-        S.exactly "automation/terraform/infrastructure/templates/testnet-alerts.yml" "tpl",
+        S.strictlyStart (S.contains "automation/terraform/modules/testnet-alerts"),
+        S.exactly "automation/terraform/monitoring/o1-testnet-alerts" "tf",
         S.strictlyStart (S.contains "buildkite/src/Jobs/Release/TestnetAlerts")
       ],
       path = "Release",
-      name = "TestnetAlerts"
+      name = "TestnetAlerts",
+      tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Release ]
     },
     steps = [
       Command.build
         Command.Config::{
           commands = [
-              Cmd.run "cd automation/terraform/infrastructure && terraform init",
-              Cmd.run "terraform apply -auto-approve -target docker_container.sync_alert_rules" ]
+            --- destroy state prior to start to ensure reset
+            Cmd.run "cd automation/terraform/monitoring && terraform init && terraform destroy -auto-approve",
+            Cmd.run "terraform apply -auto-approve -target module.o1testnet_alerts.docker_container.sync_alert_rules"
+          ]
           , label = "Deploy Testnet alert rules"
           , key = "deploy-testnet-alerts"
           , target = Size.Medium
           , depends_on = [ { name = "TestnetAlerts", key = "lint-testnet-alerts" } ]
-          , soft_fail = Some (B/SoftFail.Boolean True)
           , docker = None Docker.Type
+          , `if` = Some "build.env('DEPLOY_ALERTS') == 'true'"
         }
     ]
   }

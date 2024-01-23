@@ -6,8 +6,10 @@ type t =
   | `Coinbase_inc
   | `Account_creation_fee_via_payment
   | `Account_creation_fee_via_fee_payer
+  | `Account_creation_fee_via_fee_receiver
   | `Payment_source_dec
   | `Payment_receiver_inc
+  | `Fee_payment
   | `Delegate_change
   | `Create_token
   | `Mint_tokens ]
@@ -24,10 +26,14 @@ let name = function
       "account_creation_fee_via_payment"
   | `Account_creation_fee_via_fee_payer ->
       "account_creation_fee_via_fee_payer"
+  | `Account_creation_fee_via_fee_receiver ->
+      "account_creation_fee_via_fee_receiver"
   | `Payment_source_dec ->
       "payment_source_dec"
   | `Payment_receiver_inc ->
       "payment_receiver_inc"
+  | `Fee_payment ->
+      "fee_payment"
   | `Delegate_change ->
       "delegate_change"
   | `Create_token ->
