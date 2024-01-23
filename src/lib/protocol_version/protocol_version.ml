@@ -70,7 +70,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   (* when an external transition is deserialized, might contain
      negative numbers
   *)
-  let is_valid t = t.transaction >= 1 && t.network >= 1 && t.patch >= 0
+  let is_valid t = t.transaction >= 1 && t.network >= 0 && t.patch >= 0
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

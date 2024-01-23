@@ -385,13 +385,20 @@ let has_zero_vesting_period = function
   | Zkapp_command p ->
       Zkapp_command.has_zero_vesting_period p
 
+let is_incompatible_version = function
+  | Signed_command _ ->
+      false
+  | Zkapp_command p ->
+      Zkapp_command.is_incompatible_version p
+
 module Well_formedness_error = struct
   (* syntactically-evident errors such that a user command can never succeed *)
   type t =
     | Insufficient_fee
     | Zero_vesting_period
     | Zkapp_too_big of (Error.t[@to_yojson Error_json.error_to_yojson])
-  [@@deriving compare, to_yojson]
+    | Incompatible_version
+  [@@deriving compare, to_yojson, sexp]
 
   let to_string = function
     | Insufficient_fee ->
@@ -400,6 +407,8 @@ module Well_formedness_error = struct
         "Zero vesting period"
     | Zkapp_too_big err ->
         sprintf "Zkapp too big (%s)" (Error.to_string_hum err)
+    | Incompatible_version ->
+        "Set verification-key permission is updated to an incompatible version"
 end
 
 let check_well_formedness ~genesis_constants t :
@@ -408,6 +417,7 @@ let check_well_formedness ~genesis_constants t :
     let open Well_formedness_error in
     [ (has_insufficient_fee, Insufficient_fee)
     ; (has_zero_vesting_period, Zero_vesting_period)
+    ; (is_incompatible_version, Incompatible_version)
     ]
   in
   let errs0 =

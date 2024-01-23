@@ -208,7 +208,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let send_zkapp_batch ~logger node_uri zkapp_commands =
     List.iter zkapp_commands ~f:(fun zkapp_command ->
-        [%log info] "Sending zkApp"
+        [%log info] "Sending $zkapp_command"
           ~metadata:
             [ ("zkapp_command", Mina_base.Zkapp_command.to_yojson zkapp_command)
             ; ( "memo"
