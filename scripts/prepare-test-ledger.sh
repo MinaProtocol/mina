@@ -31,17 +31,26 @@ if [[ ! -f "$ledger_file" ]]; then
   wget -O $ledger_file "$ledger_url"
 fi
 
-ixs_=$(for key in "$@"; do
-  <$ledger_file jq "[.[].pk] |index(\"$key\")"
-done)
+##########################################################
+# Find indexes of BP keys and appoint first non-occupied
+# indices of ledger to serve as such
+##########################################################
 
+# Find index of each BP key (or set null if not found)
+ixs_=()
+for key in "$@"; do
+  ixs_+=( "$(<$ledger_file jq "[.[].pk] |index(\"$key\")")" )
+done
+
+# Substitute nulls with some indices not occupied by
+# other BP keys
 ixs=()
-i=0; for ix in $ixs_; do
+i=0
+for ix in "${ixs_[@]}"; do
   if [[ $ix == null ]]; then
-    not_found=true
-    while $not_found; do
+    while true; do
       found=false
-      for ix_ in $ixs_; do
+      for ix_ in "${ixs_[@]}"; do
         if [[ $i == "$ix_" ]]; then
           found=true
         fi
@@ -49,7 +58,7 @@ i=0; for ix in $ixs_; do
       if $found; then
         i=$((i+1))
       else
-        not_found=false
+        break
       fi
     done
     ixs+=( "$i" )
@@ -58,18 +67,17 @@ i=0; for ix in $ixs_; do
   fi
 done
 
-function join_arr(){
-  local IFS=,
-  echo "$*"
-}
+# Form a comma-separated string of BP key indices
+ixs_str=$(tr " " ,  <<< "${ixs[*]}")
 
-ixs_=$(join_arr "${ixs[@]}")
+##########################################################
+# Calculate and print approximate new balances
+##########################################################
 
 num_accounts=$(<$ledger_file jq length)
 total_balance=$(<$ledger_file jq '[.[].balance | tonumber] | add | round')
-deducted_balance=$(<$ledger_file jq "[.[$ixs_].balance | tonumber] | add | ceil")
+deducted_balance=$(<$ledger_file jq "[.[$ixs_str].balance | tonumber] | add | ceil")
 new_total_balance=$((total_balance-deducted_balance+num_keys*KEY_BALANCE))
-
 echo "Total accounts: $num_accounts, balance: $total_balance, new balance: $new_total_balance" >&2
 
 function make_balance_expr(){
@@ -87,10 +95,18 @@ done } | tr "\n" "," | head -c -1)
 echo "Balance map (warning: may not account well for the balance of delegate):" >&2
 jq <$ledger_file "{$balance_expr}" 1>&2
 
+##########################################################
+# Build new ledger
+##########################################################
+
 function make_expr(){
   i=$1
   key=$2
+
+  # Substitute delegate of some ledger keys with the BP key
   echo ".[range($i; $num_accounts; $num_keys_and_ghost)].delegate = \"$key\""
+
+  # Ensure BP key iytself is in the ledger with non-zero balance
   echo ".[${ixs[$i]}].pk = \"$key\""
   echo ".[${ixs[$i]}].balance = \"$KEY_BALANCE\""
 }
