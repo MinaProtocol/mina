@@ -1198,6 +1198,10 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                 let%bind txn_state_view =
                   get_parent_state_view ~pool last_block_id
                 in
+                let parent_global_slot =
+                  Zkapp_precondition.Protocol_state.Poly
+                  .global_slot_since_genesis txn_state_view
+                in
                 let apply_transaction_phases txns =
                   let%bind phase_1s =
                     Deferred.List.mapi txns ~f:(fun n txn ->
@@ -1205,9 +1209,11 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                           Ledger.apply_transaction_first_pass
                             ~constraint_constants
                             ~global_slot:
-                              (Mina_numbers.Global_slot_since_genesis.of_uint32
-                                 (Unsigned.UInt32.of_int64
-                                    last_global_slot_since_genesis ) )
+                              ( if migration_mode then parent_global_slot
+                              else
+                                Mina_numbers.Global_slot_since_genesis.of_uint32
+                                  (Unsigned.UInt32.of_int64
+                                     last_global_slot_since_genesis ) )
                             ~txn_state_view ledger txn
                         with
                         | Ok partially_applied ->
