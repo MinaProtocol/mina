@@ -17,7 +17,7 @@ let Size = ./Command/Size.dhall
 let triggerCommand = ./Pipeline/TriggerCommand.dhall
 
 let mode = env:BUILDKITE_PIPELINE_MODE as Text ? "PullRequest"
-let include_tags = env:BUILDKITE_PIPELINE_TAGS_INCL as Text ? "Fast"
+let include_tags = env:BUILDKITE_PIPELINE_TAGS_INCL as Text ? "Toolchain"
 let exclude_tags = env:BUILDKITE_PIPELINE_TAGS_EXCL as Text ? ""
 
 let jobs : List JobSpec.Type =
