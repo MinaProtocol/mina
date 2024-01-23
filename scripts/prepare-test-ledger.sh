@@ -9,15 +9,15 @@ KEY_BALANCE=100000
 echo "Script assumes mainnet's start was at epoch 0 on 17th March 2021, if it's not the case, update the script please" >&2
 
 if [[ $# -eq 0 ]]; then
-  echo "No arguments specified: need block producing keys" >&2
+  echo "Usage: ./scripts/prepare-test-ledger.sh <BP key 1> <BP key 2> ... <BP key n>" >&2
   exit 1
 fi
 
 num_keys=$#
 num_keys_and_ghost=$((num_keys + NUM_GHOST_KEYS))
 
-now=`date +%s`
-mainnet_start=`date --date='2021-03-17 00:00:00' -u +%s`
+now=$(date +%s)
+mainnet_start=$(date --date='2021-03-17 00:00:00' -u +%s)
 epoch_now=$(( (now-mainnet_start)/7140/180 ))
 
 ledger_file="$epoch_now.json"
@@ -31,7 +31,7 @@ if [[ ! -f "$ledger_file" ]]; then
   wget -O $ledger_file "$ledger_url"
 fi
 
-ixs_=$(for key in $@; do
+ixs_=$(for key in "$@"; do
   <$ledger_file jq "[.[].pk] |index(\"$key\")"
 done)
 
@@ -42,7 +42,7 @@ i=0; for ix in $ixs_; do
     while $not_found; do
       found=false
       for ix_ in $ixs_; do
-        if [[ $i == $ix_ ]]; then
+        if [[ $i == "$ix_" ]]; then
           found=true
         fi
       done
@@ -52,9 +52,9 @@ i=0; for ix in $ixs_; do
         not_found=false
       fi
     done
-    ixs+=( $i )
+    ixs+=( "$i" )
   else
-    ixs+=( $ix )
+    ixs+=( "$ix" )
   fi
 done
 
