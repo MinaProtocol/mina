@@ -1,3 +1,5 @@
+(* versioned_module.ml -- modules with versioned types *)
+
 open Core_kernel
 open Ppxlib
 open Versioned_util
