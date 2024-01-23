@@ -4,7 +4,7 @@
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp ppx_sexp_conv ppx_compare ppx_inline_test ppx_assert ppx_compare ppx_deriving_yojson ppx_let))
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    ppx_inline_test.config
@@ -18,8 +18,8 @@
    pickles
    random_oracle_input
    snarky.backendless
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    fold_lib
-   marlin_plonk_bindings_pasta_fp_poseidon
-   marlin_plonk_bindings_pasta_fp_vector
-   pasta
+   random_oracle.permutation
 ))

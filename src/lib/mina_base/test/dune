@@ -1,0 +1,43 @@
+(tests
+ (names main)
+ (libraries
+  ;; opam libraries
+  alcotest
+  async_kernel
+  async_unix
+  base
+  base.caml
+  core_kernel
+  integers
+  sexplib0
+  yojson
+  ;; local libraries
+  codable
+  currency
+  fields_derivers.zkapps
+  fields_derivers.json
+  fields_derivers.graphql
+  kimchi_backend.pasta
+  kimchi_backend.pasta.basic
+  mina_base
+  mina_numbers
+  mina_wire_types
+  pickles
+  pickles.backend
+  pickles_types
+  ppx_version.runtime
+  run_in_thread
+  signature_lib
+  random_oracle
+  sgn
+  snarky.backendless
+  snark_params
+  with_hash)
+ (preprocess
+  (pps
+   ppx_base
+   ppx_let
+   ppx_assert))
+ (instrumentation
+  (backend bisect_ppx)))
+
