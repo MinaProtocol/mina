@@ -4076,25 +4076,13 @@ module Queries = struct
       ~resolve:(fun { ctx = coda; _ } () (state_hash_base58_opt : string option)
                     (height_opt : int option) ->
         let open Result.Let_syntax in
-        let get_transition_frontier () =
-          let transition_frontier_pipe = Mina_lib.transition_frontier coda in
-          Pipe_lib.Broadcast_pipe.Reader.peek transition_frontier_pipe
-          |> Result.of_option ~error:"Could not obtain transition frontier"
-        in
         let block_from_state_hash state_hash_base58 =
           let%bind state_hash =
             State_hash.of_base58_check state_hash_base58
             |> Result.map_error ~f:Error.to_string_hum
           in
-          let%bind transition_frontier = get_transition_frontier () in
           let%map breadcrumb =
-            Transition_frontier.find transition_frontier state_hash
-            |> Result.of_option
-                 ~error:
-                   (sprintf
-                      "Block with state hash %s not found in transition \
-                       frontier"
-                      state_hash_base58 )
+            Mina_lib.best_chain_block_by_state_hash coda state_hash
           in
           block_of_breadcrumb coda breadcrumb
         in
@@ -4107,29 +4095,10 @@ module Queries = struct
             *)
             Unsigned.UInt32.of_int height
           in
-          let%bind transition_frontier = get_transition_frontier () in
-          let best_chain_breadcrumbs =
-            Transition_frontier.best_tip_path transition_frontier
+          let%map breadcrumb =
+            Mina_lib.best_chain_block_by_height coda height_uint32
           in
-          let%map desired_breadcrumb =
-            List.find best_chain_breadcrumbs ~f:(fun bc ->
-                let validated_transition =
-                  Transition_frontier.Breadcrumb.validated_transition bc
-                in
-                let block_height =
-                  Mina_block.(
-                    blockchain_length @@ With_hash.data
-                    @@ Validated.forget validated_transition)
-                in
-                Unsigned.UInt32.equal block_height height_uint32 )
-            |> Result.of_option
-                 ~error:
-                   (sprintf
-                      "Could not find block in transition frontier with height \
-                       %d"
-                      height )
-          in
-          block_of_breadcrumb coda desired_breadcrumb
+          block_of_breadcrumb coda breadcrumb
         in
         match (state_hash_base58_opt, height_opt) with
         | Some state_hash_base58, None ->
@@ -4292,85 +4261,108 @@ module Queries = struct
         "The runtime configuration for a blockchain fork intended to be a \
          continuation of the current one."
       ~typ:(non_null Types.json)
-      ~args:Arg.[]
-      ~resolve:(fun { ctx = mina; _ } () ->
-        match Mina_lib.best_tip mina with
-        | `Bootstrapping ->
-            Deferred.Result.fail "Daemon is bootstrapping"
-        | `Active best_tip ->
-            let open Deferred.Result.Let_syntax in
-            let block = Transition_frontier.Breadcrumb.(block best_tip) in
-            let blockchain_length = Mina_block.blockchain_length block in
-            let global_slot =
-              Mina_block.consensus_state block
-              |> Consensus.Data.Consensus_state.curr_global_slot
-            in
-            let staged_ledger =
-              Transition_frontier.Breadcrumb.staged_ledger best_tip
-              |> Staged_ledger.ledger
-            in
-            let protocol_state =
-              Transition_frontier.Breadcrumb.protocol_state best_tip
-            in
-            let consensus =
-              Mina_state.Protocol_state.consensus_state protocol_state
-            in
-            let staking_epoch =
-              Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
-                consensus
-            in
-            let next_epoch =
-              Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
-                consensus
-            in
-            let staking_epoch_seed =
-              Mina_base.Epoch_seed.to_base58_check
-                staking_epoch.Mina_base.Epoch_data.Poly.seed
-            in
-            let next_epoch_seed =
-              Mina_base.Epoch_seed.to_base58_check
-                next_epoch.Mina_base.Epoch_data.Poly.seed
-            in
-            let runtime_config = Mina_lib.runtime_config mina in
-            let%bind staking_ledger =
-              match Mina_lib.staking_ledger mina with
-              | None ->
-                  Deferred.Result.fail "Staking ledger is not initialized."
-              | Some (Genesis_epoch_ledger l) ->
-                  return (Ledger.Any_ledger.cast (module Ledger) l)
-              | Some (Ledger_db l) ->
-                  return (Ledger.Any_ledger.cast (module Ledger.Db) l)
-            in
+      ~args:
+        Arg.
+          [ arg "stateHash" ~doc:"The state hash of the desired block"
+              ~typ:string
+          ; arg "height"
+              ~doc:"The height of the desired block in the best chain" ~typ:int
+          ]
+      ~resolve:(fun { ctx = mina; _ } () state_hash_opt block_height_opt ->
+        let open Deferred.Result.Let_syntax in
+        let%bind breadcrumb =
+          match (state_hash_opt, block_height_opt) with
+          | None, None -> (
+              match Mina_lib.best_tip mina with
+              | `Bootstrapping ->
+                  Deferred.Result.fail "Daemon is bootstrapping"
+              | `Active breadcrumb ->
+                  return breadcrumb )
+          | Some state_hash_base58, None ->
+              let open Result.Monad_infix in
+              State_hash.of_base58_check state_hash_base58
+              |> Result.map_error ~f:Error.to_string_hum
+              >>= Mina_lib.best_chain_block_by_state_hash mina
+              |> Deferred.return
+          | None, Some block_height ->
+              Mina_lib.best_chain_block_by_height mina
+                (Unsigned.UInt32.of_int block_height)
+              |> Deferred.return
+          | Some _, Some _ ->
+              Deferred.Result.fail "Cannot specify both state hash and height"
+        in
+        let block = Transition_frontier.Breadcrumb.block breadcrumb in
+        let blockchain_length = Mina_block.blockchain_length block in
+        let global_slot =
+          Mina_block.consensus_state block
+          |> Consensus.Data.Consensus_state.curr_global_slot
+        in
+        let staged_ledger =
+          Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+          |> Staged_ledger.ledger
+        in
+        let protocol_state =
+          Transition_frontier.Breadcrumb.protocol_state breadcrumb
+        in
+        let consensus =
+          Mina_state.Protocol_state.consensus_state protocol_state
+        in
+        let staking_epoch =
+          Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
+            consensus
+        in
+        let next_epoch =
+          Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
+            consensus
+        in
+        let staking_epoch_seed =
+          Mina_base.Epoch_seed.to_base58_check
+            staking_epoch.Mina_base.Epoch_data.Poly.seed
+        in
+        let next_epoch_seed =
+          Mina_base.Epoch_seed.to_base58_check
+            next_epoch.Mina_base.Epoch_data.Poly.seed
+        in
+        let runtime_config = Mina_lib.runtime_config mina in
+        let%bind staking_ledger =
+          match Mina_lib.staking_ledger mina with
+          | None ->
+              Deferred.Result.fail "Staking ledger is not initialized."
+          | Some (Genesis_epoch_ledger l) ->
+              return (Ledger.Any_ledger.cast (module Ledger) l)
+          | Some (Ledger_db l) ->
+              return (Ledger.Any_ledger.cast (module Ledger.Db) l)
+        in
+        assert (
+          Mina_base.Ledger_hash.equal
+            (Ledger.Any_ledger.M.merkle_root staking_ledger)
+            staking_epoch.ledger.hash ) ;
+        let%bind next_epoch_ledger =
+          match Mina_lib.next_epoch_ledger mina with
+          | None ->
+              Deferred.Result.fail "Next epoch ledger is not initialized."
+          | Some `Notfinalized ->
+              return None
+          | Some (`Finalized (Genesis_epoch_ledger l)) ->
+              return (Some (Ledger.Any_ledger.cast (module Ledger) l))
+          | Some (`Finalized (Ledger_db l)) ->
+              return (Some (Ledger.Any_ledger.cast (module Ledger.Db) l))
+        in
+        Option.iter next_epoch_ledger ~f:(fun ledger ->
             assert (
               Mina_base.Ledger_hash.equal
-                (Ledger.Any_ledger.M.merkle_root staking_ledger)
-                staking_epoch.ledger.hash ) ;
-            let%bind next_epoch_ledger =
-              match Mina_lib.next_epoch_ledger mina with
-              | None ->
-                  Deferred.Result.fail "Next epoch ledger is not initialized."
-              | Some `Notfinalized ->
-                  return None
-              | Some (`Finalized (Genesis_epoch_ledger l)) ->
-                  return (Some (Ledger.Any_ledger.cast (module Ledger) l))
-              | Some (`Finalized (Ledger_db l)) ->
-                  return (Some (Ledger.Any_ledger.cast (module Ledger.Db) l))
-            in
-            let protocol_state_hash =
-              Transition_frontier.Breadcrumb.state_hash best_tip
-            in
-            Option.iter next_epoch_ledger ~f:(fun ledger ->
-                assert (
-                  Mina_base.Ledger_hash.equal
-                    (Ledger.Any_ledger.M.merkle_root ledger)
-                    next_epoch.ledger.hash ) ) ;
-            let%map new_config =
-              Runtime_config.make_fork_config ~staged_ledger ~global_slot
-                ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
-                ~next_epoch_seed ~blockchain_length ~protocol_state_hash
-                runtime_config
-            in
-            Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic )
+                (Ledger.Any_ledger.M.merkle_root ledger)
+                next_epoch.ledger.hash ) ) ;
+        let%bind new_config =
+          Runtime_config.make_fork_config ~staged_ledger ~global_slot
+            ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
+            ~next_epoch_seed ~blockchain_length ~protocol_state runtime_config
+        in
+        let%map () =
+          let open Async.Deferred.Infix in
+          Async_unix.Scheduler.yield () >>| Result.return
+        in
+        Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic )
 
   let thread_graph =
     field "threadGraph"
