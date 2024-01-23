@@ -7,4 +7,5 @@
             sgn snark_profiler_lib genesis_constants digestif bigarray-compat
             ; --
             core core_kernel base base.caml bin_prot splittable_random sexplib0)
- (preprocess (pps ppx_jane)))
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_jane ppx_version)))
