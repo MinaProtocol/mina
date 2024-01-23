@@ -5,7 +5,7 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: {{ include "replayer-cronjobs.fullname" $rootContext }}-{{ .name }}
+  name: mina-cronjob-{{ .name }}
 spec:
   successfulJobsHistoryLimit: 3
   concurrencyPolicy: Forbid
