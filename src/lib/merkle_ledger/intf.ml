@@ -33,8 +33,6 @@ module type Token_id = sig
 
   val default : t
 
-  val next : t -> t
-
   include Hashable.S_binable with type t := t
 
   include Comparable.S_binable with type t := t
@@ -47,7 +45,7 @@ module type Account_id = sig
 
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t [@@deriving sexp]
     end
   end]
@@ -57,6 +55,8 @@ module type Account_id = sig
   val token_id : t -> token_id
 
   val create : key -> token_id -> t
+
+  val derive_token_id : owner:t -> token_id
 
   include Hashable.S_binable with type t := t
 
@@ -86,15 +86,13 @@ module type Account = sig
 
   val balance : t -> balance
 
-  val token_owner : t -> bool
-
   val empty : t
 end
 
 module type Hash = sig
   type t [@@deriving bin_io, compare, equal, sexp, yojson]
 
-  val to_string : t -> string
+  val to_base58_check : t -> string
 
   include Hashable.S_binable with type t := t
 
@@ -124,6 +122,8 @@ module type Key_value_database = sig
        and type config := config
 
   val create_checkpoint : t -> string -> t
+
+  val make_checkpoint : t -> string -> unit
 
   val get_uuid : t -> Uuid.t
 

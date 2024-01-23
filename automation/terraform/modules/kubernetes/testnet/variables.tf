@@ -1,6 +1,6 @@
-terraform {
-  experiments = [module_variable_optional_attrs]
-}
+# terraform {
+#   experiments = [module_variable_optional_attrs]
+# }
 
 # K8s Cluster Vars
 
@@ -26,6 +26,16 @@ variable "expose_graphql" {
   default = false
 }
 
+variable "expose_itn_graphql" {
+  type    = bool
+  default = false
+}
+
+variable "itn_keys" {
+  type    = string
+  default = ""
+}
+
 variable "use_local_charts" {
   type    = bool
   default = false
@@ -41,9 +51,9 @@ variable "deploy_watchdog" {
   default = true
 }
 
-variable "coda_image" {
+variable "mina_image" {
   type    = string
-  default = "codaprotocol/coda-daemon:0.0.13-beta-master-99d1e1f"
+  default = "gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet"
 }
 
 variable "use_custom_entrypoint" {
@@ -56,7 +66,7 @@ variable "custom_entrypoint" {
   default = ""
 }
 
-variable "coda_archive_image" {
+variable "mina_archive_image" {
   type    = string
   default = ""
 }
@@ -66,27 +76,38 @@ variable "mina_archive_schema" {
   default = ""
 }
 
+variable "mina_archive_schema_aux_files" {
+  type    = list(string)
+  default = []
+}
+
 variable "archive_node_count" {
   type    = number
   default = 0
 }
 
-variable "coda_agent_image" {
+variable "mina_agent_image" {
   type    = string
   default = "codaprotocol/coda-user-agent:0.1.4"
 }
 
-variable "coda_agent_active" {
+variable "priority_class" {
+  type    = string
+  default = null
+}
+
+#this var doesn't actually hook up to anything
+variable "mina_agent_active" {
   type    = string
   default = "true"
 }
 
-variable "coda_bots_image" {
+variable "mina_bots_image" {
   type    = string
   default = ""
 }
 
-variable "coda_points_image" {
+variable "mina_points_image" {
   type    = string
   default = ""
 }
@@ -96,21 +117,27 @@ variable "watchdog_image" {
   default = "gcr.io/o1labs-192920/watchdog:latest"
 }
 
+variable "itn_orchestrator_image" {
+  type    = string
+  default = "gcr.io/o1labs-192920/itn_orchestrator_image:latest"
+}
+
+
 # this must be a string to avoid scientific notation truncation
-variable "coda_faucet_amount" {
+variable "mina_faucet_amount" {
   type    = string
   default = "10000000000"
 }
 
 # this must be a string to avoid scientific notation truncation
-variable "coda_faucet_fee" {
+variable "mina_faucet_fee" {
   type    = string
   default = "100000000"
 }
 
 variable "testnet_name" {
   type    = string
-  default = "coda-testnet"
+  default = "mina-testnet"
 }
 
 variable "additional_peers" {
@@ -138,12 +165,17 @@ variable "log_txn_pool_gossip" {
   default = false
 }
 
-# Seed Vars
-
-variable "seed_port" {
-  type    = string
-  default = "10001"
+variable "cpu_request" {
+  type    = number
+  default = 0
 }
+
+variable "mem_request" {
+  type    = string
+  default = "0Mi"
+}
+
+# Seed Vars
 
 variable "seed_region" {
   type    = string
@@ -155,12 +187,33 @@ variable "seed_zone" {
   default = "us-west1-a"
 }
 
-variable "seed_discovery_keypairs" {
-  type = list(any)
-  default = [
-    "CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr",
-    "CAESQKtOnmYHQacRpNvBZDrGLFw/tVB7V4I14Y2xtGcp1sEsEyfcsNoFi7NnUX0T2lQDGQ31KvJRXJ+u/f9JQhJmLsI=,CAESIBMn3LDaBYuzZ1F9E9pUAxkN9SryUVyfrv3/SUISZi7C,12D3KooWB79AmjiywL1kMGeKHizFNQE9naThM2ooHgwFcUzt6Yt1"
-  ]
+# variable "seed_discovery_keypairs" {
+#   type = list(any)
+#   default = [
+#     "CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr",
+#     "CAESQKtOnmYHQacRpNvBZDrGLFw/tVB7V4I14Y2xtGcp1sEsEyfcsNoFi7NnUX0T2lQDGQ31KvJRXJ+u/f9JQhJmLsI=,CAESIBMn3LDaBYuzZ1F9E9pUAxkN9SryUVyfrv3/SUISZi7C,12D3KooWB79AmjiywL1kMGeKHizFNQE9naThM2ooHgwFcUzt6Yt1"
+#   ]
+# }
+
+variable "seed_external_port" {
+  type    = string
+  default = "10001"
+}
+
+variable "seed_configs" {
+  type = list(
+    object({
+      name                = string,
+      class               = string,
+      libp2p_secret       = string,
+      libp2p_secret_pw    = string
+      external_ip         = string,
+      enableArchive       = bool,
+      archiveAddress      = string
+      persist_working_dir = bool,
+    })
+  )
+  default = []
 }
 
 # Block Producer Vars
@@ -171,7 +224,8 @@ variable "log_level" {
 }
 
 variable "block_producer_key_pass" {
-  type = string
+  type    = string
+  default = "naughty blue worm"
 }
 
 variable "block_producer_configs" {
@@ -179,7 +233,8 @@ variable "block_producer_configs" {
     object({
       name                   = string,
       class                  = string,
-      private_key_secret     = string,
+      keypair_name           = string,
+      privkey_password       = string,
       external_port          = number,
       libp2p_secret          = string,
       enable_gossip_flooding = bool,
@@ -189,47 +244,29 @@ variable "block_producer_configs" {
       run_with_bots          = bool,
       enableArchive          = bool,
       archiveAddress         = string
+      persist_working_dir    = bool,
     })
   )
   default = []
 }
 
-variable "seed_configs" {
-  type = list(
-    object({
-      name               = string,
-      class              = string,
-      libp2p_secret      = string,
-      external_port      = number,
-      external_ip        = string,
-      private_key_secret = string,
-      enableArchive      = bool,
-      archiveAddress     = string
-    })
-  )
-  default = []
+variable "plain_node_configs" {
+  default = null
 }
 
 # Snark Worker Vars
+variable "snark_coordinators" {
+  type = list(
+    object({
 
-variable "snark_worker_replicas" {
-  type    = number
-  default = 1
-}
-
-variable "snark_worker_fee" {
-  type    = string
-  default = "0.025"
-}
-
-variable "snark_worker_public_key" {
-  type    = string
-  default = "4vsRCVadXwWMSGA9q81reJRX3BZ5ZKRtgZU7PtGsNq11w2V9tUNf4urZAGncZLUiP4SfWqur7AZsyhJKD41Ke7rJJ8yDibL41ePBeATLUnwNtMTojPDeiBfvTfgHzbAVFktD65vzxMNCvvAJ"
-}
-
-variable "snark_worker_host_port" {
-  type    = number
-  default = 10400
+      snark_coordinator_name       = string
+      snark_worker_replicas        = number
+      snark_worker_fee             = number
+      snark_worker_public_key      = string
+      snark_coordinators_host_port = number
+      persist_working_dir          = bool
+  }))
+  default = []
 }
 
 variable "agent_min_fee" {
@@ -267,7 +304,17 @@ variable "gcloud_seeds" {
   default = []
 }
 
-# Coda network services vars
+variable "worker_cpu_request" {
+  type    = number
+  default = 0
+}
+
+variable "worker_mem_request" {
+  type    = string
+  default = "0Mi"
+}
+
+# Mina network services vars
 
 variable "restart_nodes" {
   type    = bool
@@ -304,25 +351,24 @@ variable "make_report_accounts" {
 variable "archive_configs" {
   type = list(
     object({
-      name                    = string
-      image                   = string
-      serverPort              = string
-      externalPort            = string
-      enableLocalDaemon       = bool
-      enablePostgresDB        = bool
+      name              = string
+      image             = string
+      serverPort        = string
+      externalPort      = string
+      enableLocalDaemon = bool
+      enablePostgresDB  = bool
 
-      postgresHost            = string
-      postgresPort            = string
-      postgresqlUsername      = string
-      postgresqlPassword      = string
-      postgresDB              = string
-      remoteSchemaFile        = string
+      postgresHost         = string
+      postgresPort         = string
+      remoteSchemaFile     = string
+      remoteSchemaAuxFiles = list(string)
 
       persistenceEnabled      = bool
       persistenceSize         = string
       persistenceStorageClass = string
       persistenceAccessModes  = list(string)
-      preemptibleAllowed     = string
+      spotAllowed             = string
+      persist_working_dir     = bool
     })
   )
   default = []
@@ -333,7 +379,18 @@ variable "upload_blocks_to_gcloud" {
   default = false
 }
 
-variable "seed_peers_url" {
+# variable "seed_peers_url" {
+#   type    = string
+#   default = ""
+# }
+
+variable "zkapps_dashboard_key" {
   type    = string
   default = ""
+}
+
+
+variable "enable_working_dir_persitence" {
+  type    = bool
+  default = false
 }

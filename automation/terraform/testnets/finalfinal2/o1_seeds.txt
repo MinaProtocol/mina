@@ -1,6 +1,0 @@
-/dns4/seed-1.finalfinal2.o1test.net/tcp/10000/p2p/12D3KooWGb3tna8uSs1dyTVX5qMRbxQzTXmyGJMLw2hFZePCzSTg
-/dns4/seed-2.finalfinal2.o1test.net/tcp/10001/p2p/12D3KooWHhdinXC7ViTdEe5Z9z2A3qxWonUwqU1imo7cs4VL5pbt
-/dns4/seed-3.finalfinal2.o1test.net/tcp/10002/p2p/12D3KooWNmwrfbAqwfT65z3ksGzt6y6vumGik11p5HsPhBMmu3eR
-/dns4/seed-4.finalfinal2.o1test.net/tcp/10003/p2p/12D3KooWRvprUtP1curcr5eR8nUeNr5uTTPo4ax2gW6efhZWnfPm
-/dns4/seed-5.finalfinal2.o1test.net/tcp/10004/p2p/12D3KooWMSJvBWJL7B8c28xzaHBSZYhukTmqLyjaCq8eoWBYdHWD
-/dns4/seed-6.finalfinal2.o1test.net/tcp/10005/p2p/12D3KooWK61S6DrQLrk7LgU6P9a1Zd4CGdPG4brcHDSLeoDRLWVK

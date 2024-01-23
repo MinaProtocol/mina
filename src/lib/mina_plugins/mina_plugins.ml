@@ -23,5 +23,5 @@ let init_plugins ~logger coda plugin_paths =
             [ ("path", `String path)
             ; ("error", `String (Dynlink.error_message err))
             ] ;
-        raise exn) ;
+        raise exn ) ;
   mina_lib' := None

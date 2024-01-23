@@ -4,11 +4,29 @@ open Signature_lib
 let validate_int16 x =
   let max_port = 1 lsl 16 in
   if 0 <= x && x < max_port then Ok x
-  else Or_error.errorf !"Port not between 0 and %d" max_port
+  else Or_error.errorf "Port not between 0 and %d" max_port
 
 let int16 =
   Command.Arg_type.map Command.Param.int
     ~f:(Fn.compose Or_error.ok_exn validate_int16)
+
+let pubsub_topic_mode =
+  let open Gossip_net.Libp2p in
+  Command.Arg_type.create (fun s ->
+      match s with
+      | "ro" ->
+          RO
+      | "rw" ->
+          RW
+      | "none" ->
+          N
+      | _ ->
+          eprintf "Invalid pubsub topic mode: %s" s ;
+          exit 1 )
+
+let pubsub_topic_mode_to_string mode =
+  let open Gossip_net.Libp2p in
+  match mode with RO -> "ro" | RW -> "rw" | N -> "none"
 
 let public_key_compressed =
   Command.Arg_type.create (fun s ->
@@ -24,7 +42,7 @@ let public_key_compressed =
         exit 1
       in
       try Public_key.of_base58_check_decompress_exn s
-      with e -> error_string (Error.of_exn e))
+      with e -> error_string (Error.of_exn e) )
 
 (* Hack to allow us to deprecate a value without needing to add an mli
  * just for this. We only want to have one "kind" of public key in the
@@ -37,7 +55,7 @@ include (
           | None ->
               failwith "Invalid key"
           | Some pk' ->
-              pk')
+              pk' )
   end :
     sig
       val public_key : Public_key.t Command.Arg_type.t
@@ -49,20 +67,21 @@ let token_id =
 
 let receipt_chain_hash =
   Command.Arg_type.map Command.Param.string
-    ~f:Mina_base.Receipt.Chain_hash.of_string
+    ~f:Mina_base.Receipt.Chain_hash.of_base58_check_exn
 
 let peer : Host_and_port.t Command.Arg_type.t =
   Command.Arg_type.create (fun s -> Host_and_port.of_string s)
 
 let global_slot =
-  Command.Arg_type.map Command.Param.int ~f:Mina_numbers.Global_slot.of_int
+  Command.Arg_type.map Command.Param.int
+    ~f:Mina_numbers.Global_slot_since_genesis.of_int
 
 let txn_fee =
-  Command.Arg_type.map Command.Param.string ~f:Currency.Fee.of_formatted_string
+  Command.Arg_type.map Command.Param.string ~f:Currency.Fee.of_mina_string_exn
 
 let txn_amount =
   Command.Arg_type.map Command.Param.string
-    ~f:Currency.Amount.of_formatted_string
+    ~f:Currency.Amount.of_mina_string_exn
 
 let txn_nonce =
   let open Mina_base in
@@ -89,14 +108,15 @@ let log_level =
             |> String.concat ~sep:", " ) ;
           exit 14
       | Ok ll ->
-          ll)
+          ll )
 
 let user_command =
   Command.Arg_type.create (fun s ->
-      try Mina_base.Signed_command.of_base58_check_exn s
-      with e ->
-        Error.tag (Error.of_exn e) ~tag:"Couldn't decode transaction id"
-        |> Error.raise)
+      match Mina_base.Signed_command.of_base64 s with
+      | Ok s ->
+          s
+      | Error err ->
+          Error.tag err ~tag:"Couldn't decode transaction id" |> Error.raise )
 
 module Work_selection_method = struct
   [%%versioned

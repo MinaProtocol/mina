@@ -1,12 +1,12 @@
 ARG BAKE_VERSION
 
-FROM codaprotocol/coda-daemon:${BAKE_VERSION}
+FROM minaprotocol/mina-daemon:${BAKE_VERSION}
 
 ARG COMMIT_HASH=master
 ARG TESTNET_NAME=testworld
 ARG CONFIG_FILE="/root/daemon.json"
 
-RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/automation/terraform/testnets/${TESTNET_NAME}/genesis_ledger.json -o "${CONFIG_FILE}"
+COPY ../../genesis_ledgers/${TESTNET_NAME}.json "${CONFIG_FILE}"
 
 RUN head ${CONFIG_FILE}
 
@@ -28,7 +28,7 @@ command=$1 \n\
 shift \n\
 while true; do\n\
   rm -f /root/.mina-config/.mina-lock\n\
-  mina "$command" -config-file "'${CONFIG_FILE}'" "$@" 2>&1 >mina.log &\n\
+  catchsegv mina "$command" -config-file "'${CONFIG_FILE}'" "$@" 2>&1 >mina.log &\n\
   mina_pid=$!\n\
   tail -q -f mina.log &\n\
   tail_pid=$!\n\
@@ -44,6 +44,6 @@ done'\
 
 RUN chmod +x init_mina_baked.sh
 
-ENV CODA_TIME_OFFSET 0
+ENV MINA_TIME_OFFSET 0
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/root/init_mina_baked.sh"]

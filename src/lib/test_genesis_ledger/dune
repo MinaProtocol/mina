@@ -1,7 +1,7 @@
 (library
  (public_name test_genesis_ledger)
  (name test_genesis_ledger)
- (libraries genesis_ledger)
+ (libraries genesis_ledger core_kernel genesis_constants)
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp ppx_let)))

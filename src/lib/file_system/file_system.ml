@@ -9,7 +9,10 @@ let dir_exists dir =
   else return false
 
 let remove_dir dir =
-  let%bind _ = Process.run_exn ~prog:"rm" ~args:[ "-rf"; dir ] () in
+  let%bind _ =
+    Monitor.try_with ~here:[%here] (fun () ->
+        Process.run_exn ~prog:"rm" ~args:[ "-rf"; dir ] () )
+  in
   Deferred.unit
 
 let rec rmrf path =
@@ -22,9 +25,9 @@ let rec rmrf path =
       if [%equal: [ `Yes | `No | `Unknown ]] (Core.Sys.file_exists path) `Yes
       then Core.Sys.remove path
 
-let try_finally ~(f : unit -> 'a Deferred.t)
-    ~(finally : unit -> unit Deferred.t) =
-  try_with f
+let try_finally ~(f : unit -> 'a Deferred.t) ~(finally : unit -> unit Deferred.t)
+    =
+  try_with ~here:[%here] f
   >>= function
   | Ok x ->
       Deferred.map (finally ()) ~f:(Fn.const x)

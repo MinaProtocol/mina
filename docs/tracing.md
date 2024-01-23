@@ -5,7 +5,7 @@ When starting a daemon with `-tracing` or using `mina client start-tracing`,
 it will write `*.trace` files into its config directory. They can grow
 quite fast, but for the most part they grow no faster than 5MB/minute.
 
-Most of the integration tests (including full-test) support a `CODA_TRACING`
+Most of the integration tests (including full-test) support a `MINA_TRACING`
 environment variable that specifies the directory the integration tests
 will put their trace files in. If you leave it empty, no tracing will
 occur.
@@ -15,7 +15,7 @@ Chrome trace-viewer to view. You can do this with `src/app/trace-tool`.
 Using it is simple if you have Rust installed: `cd src/app/trace-tool; cargo run --release /path/to/1234.trace > trace.json`.
 Then you can load the file from `chrome://tracing`.
 
-Each row correponds to a "task" as created by either `O1trace.trace_task` or
+Each row corresponds to a "task" as created by either `O1trace.trace_task` or
 `O1trace.trace_recurring_task`. A recurring task starts with `R&`. Internally
 it works by doing one `trace_task` per call, and the `trace-tool` knows how
 to collapse them all into one row.

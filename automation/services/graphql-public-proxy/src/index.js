@@ -13,12 +13,12 @@ const {HttpLink} = require('apollo-link-http');
 const fetch = require('node-fetch');
 const fs = require('fs');
 
-const CODA_GRAPHQL_HOST = process.env["CODA_GRAPHQL_HOST"] || "localhost";
-const CODA_GRAPHQL_PORT = process.env["CODA_GRAPHQL_PORT"] || 3085;
-const CODA_GRAPHQL_PATH = process.env["CODA_GRAPHQL_PATH"] || "/graphql";
+const MINA_GRAPHQL_HOST = process.env["MINA_GRAPHQL_HOST"] || "localhost";
+const MINA_GRAPHQL_PORT = process.env["MINA_GRAPHQL_PORT"] || 3085;
+const MINA_GRAPHQL_PATH = process.env["MINA_GRAPHQL_PATH"] || "/graphql";
 const EXTERNAL_PORT = process.env["EXTERNAL_PORT"] || 3000;
 
-let graphqlUri = "http://" + CODA_GRAPHQL_HOST + ":" + CODA_GRAPHQL_PORT + CODA_GRAPHQL_PATH;
+let graphqlUri = "http://" + MINA_GRAPHQL_HOST + ":" + MINA_GRAPHQL_PORT + MINA_GRAPHQL_PATH;
 
 const hiddenFields = [
   "trackedAccounts",
@@ -39,9 +39,9 @@ const graphiqlString = fs.readFileSync("./index.html");
 const link = new HttpLink({ uri: graphqlUri, fetch });
 
 // Set up proxy server for websocket
-let proxy = httpProxy.createProxyServer({ target: {host: CODA_GRAPHQL_HOST, port: CODA_GRAPHQL_PORT},  ws: true});
+let proxy = httpProxy.createProxyServer({ target: {host: MINA_GRAPHQL_HOST, port: MINA_GRAPHQL_PORT},  ws: true});
 proxy.on('error', err => console.log('Error in proxy server:', err));
-//proxy.listen(CODA_GRAPHQL_PORT);
+//proxy.listen(MINA_GRAPHQL_PORT);
 
 introspectSchema(link)
 .then(remoteSchema => {

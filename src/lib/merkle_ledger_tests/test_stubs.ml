@@ -1,5 +1,12 @@
 open Core
-module Balance = Currency.Balance
+
+module Balance = struct
+  include Currency.Balance
+
+  let to_int = to_nanomina_int
+
+  let of_int = of_nanomina_int_exn
+end
 
 module Account = struct
   (* want bin_io, not available with Account.t *)
@@ -27,13 +34,6 @@ module Account = struct
   let update_balance t bal = { t with Mina_base.Account.Poly.balance = bal }
 
   let token Mina_base.Account.Poly.{ token_id; _ } = token_id
-
-  let token_owner Mina_base.Account.Poly.{ token_permissions; _ } =
-    match token_permissions with
-    | Mina_base.Token_permissions.Token_owned _ ->
-        true
-    | Not_owned _ ->
-        false
 end
 
 module Receipt = Mina_base.Receipt
@@ -41,19 +41,18 @@ module Receipt = Mina_base.Receipt
 module Hash = struct
   module T = struct
     type t = Md5.t [@@deriving sexp, hash, compare, bin_io_unversioned, equal]
-
-    let to_string = Md5.to_hex
-
-    let to_yojson t = `String (Md5.to_hex t)
-
-    let of_yojson = function
-      | `String s ->
-          Ok (Md5.of_hex_exn s)
-      | _ ->
-          Error "expected string"
   end
 
   include T
+
+  include Codable.Make_base58_check (struct
+    type t = T.t [@@deriving bin_io_unversioned]
+
+    let description = "Ledger test hash"
+
+    let version_byte = Base58_check.Version_bytes.ledger_test_hash
+  end)
+
   include Hashable.Make_binable (T)
 
   (* to prevent pre-image attack,
@@ -111,24 +110,24 @@ struct
     { uuid = Uuid_unix.create (); table = Bigstring_frozen.Table.create () }
 
   let create_checkpoint t _ =
-    { uuid = Uuid_unix.create ()
-    ; table =
-        Bigstring_frozen.Table.of_alist_exn
-        @@ Bigstring_frozen.Table.to_alist t.table
-    }
+    { uuid = Uuid_unix.create (); table = Bigstring_frozen.Table.copy t.table }
 
   let close _ = ()
 
   let get t ~key = Bigstring_frozen.Table.find t.table key
+
+  let get_batch t ~keys = List.map keys ~f:(Bigstring_frozen.Table.find t.table)
 
   let set t ~key ~data = Bigstring_frozen.Table.set t.table ~key ~data
 
   let set_batch t ?(remove_keys = []) ~key_data_pairs =
     List.iter key_data_pairs ~f:(fun (key, data) -> set t ~key ~data) ;
     List.iter remove_keys ~f:(fun key ->
-        Bigstring_frozen.Table.remove t.table key)
+        Bigstring_frozen.Table.remove t.table key )
 
   let remove t ~key = Bigstring_frozen.Table.remove t.table key
+
+  let make_checkpoint _ _ = ()
 end
 
 module Storage_locations : Intf.Storage_locations = struct
@@ -165,8 +164,8 @@ module Token_id = Mina_base.Token_id
 module Account_id = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Mina_base.Account_id.Stable.V1.t
+    module V2 = struct
+      type t = Mina_base.Account_id.Stable.V2.t
       [@@deriving sexp, equal, compare, hash]
 
       let to_latest = Fn.id
@@ -181,6 +180,8 @@ module Account_id = struct
   let token_id = Mina_base.Account_id.token_id
 
   let public_key = Mina_base.Account_id.public_key
+
+  let derive_token_id = Mina_base.Account_id.derive_token_id
 
   (* TODO: Non-default tokens *)
   let gen =
@@ -197,7 +198,15 @@ module Base_inputs = struct
   module Key = Key
   module Account_id = Account_id
   module Token_id = Token_id
-  module Balance = Balance
+
+  module Balance = struct
+    include Balance
+
+    let of_int = of_nanomina_int_exn
+
+    let to_int = to_nanomina_int
+  end
+
   module Account = Account
   module Hash = Hash
 end

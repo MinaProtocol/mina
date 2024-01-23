@@ -15,7 +15,7 @@ let print_dhall_type (ty, nm) =
   Caml.close_out oc ;
   ignore
     (Unix.create_process ~prog:"dhall"
-       ~args:[ "format"; "--inplace"; dhall_file ])
+       ~args:[ "format"; "--inplace"; dhall_file ] )
 
 let main ~output_dir () =
   let output_dir =
@@ -36,4 +36,4 @@ let () =
                 current directory)"
              Param.(optional string)
          in
-         main ~output_dir)))
+         main ~output_dir )))

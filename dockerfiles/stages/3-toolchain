@@ -1,0 +1,109 @@
+#################################################################################################
+# The "toolchain" Stage
+# - installs optional tools that are required in our CI/CD but are not required to build mina
+#################################################################################################
+FROM opam-deps AS toolchain
+
+ARG deb_codename=focal
+
+ARG DOCKER_VERSION=19.03.4
+ARG TERRAFORM_VERSION=0.14.11
+ARG DEBS3_VERSION=0.11.6
+ARG DHALL_VERSION=1.41.1
+ARG DHALL_JSON_VERSION=1.7.10
+ARG DHALL_BASH_VERSION=1.0.40
+
+USER root
+
+# OS package dependencies
+# afaict this is the last python dependency of any kind in CI
+RUN apt-get update --yes \
+  && apt-get install --yes \
+    apt-transport-https \
+    apt-utils \
+    awscli \
+    cmake \
+    fakeroot \
+    gnupg2 \
+    jq \
+    libboost-dev \
+    libboost-program-options-dev \
+    libbz2-dev \
+    libffi-dev \
+    libgmp-dev \
+    libgmp3-dev \
+    libgmp10 \
+    libgomp1 \
+    libjemalloc-dev \
+    libpq-dev \
+    libprocps-dev \
+    libsodium-dev \
+    libssl-dev \
+    lsb-release \
+    m4 \
+    pandoc \
+    patchelf \
+    postgresql \
+    postgresql-contrib \
+    perl \
+    pkg-config \
+    python3-sexpdata \
+    rubygems \
+    wget \
+    zlib1g-dev \
+  && rm -rf /var/lib/apt/lists/*
+
+# --- deb-s3 tool
+# Custom version, with lock only on manifest upload
+RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
+    && gem install deb-s3-${DEBS3_VERSION}.gem \
+    && rm -f deb-s3-${DEBS3_VERSION}.gem
+
+# --- Docker Daemon
+RUN curl -sL https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz \
+    | tar --extract --gzip --strip-components 1 --directory=/usr/bin --file=-
+
+# --- Terraform tools
+RUN wget -O- https://apt.releases.hashicorp.com/gpg | \
+    gpg --dearmor | \
+    sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg \
+    gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint \
+    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
+    https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
+    sudo tee /etc/apt/sources.list.d/hashicorp.list \
+    sudo apt-get update \
+    sudo apt-get install terraform
+
+# --- Google Cloud tools
+RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
+    && apt-get update --yes \
+    && apt-get install --yes google-cloud-sdk kubectl \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
+
+# --- Helm tools
+RUN curl https://baltocdn.com/helm/signing.asc | apt-key add - \
+    && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list \
+    && apt-get update --yes \
+    && apt-get install --yes --no-install-recommends helm \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- yarn + nodejs, pinned version
+RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - \
+    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - \
+    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
+    && apt update --yes \
+    && apt install --yes --no-install-recommends nodejs yarn \
+    && rm -rf /var/lib/apt/lists/*
+
+# Dhall
+RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-$DHALL_VERSION-x86_64-linux.tar.bz2 \
+    | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall
+RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-bash-$DHALL_BASH_VERSION-x86_64-linux.tar.bz2 \
+    | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-bash
+RUN curl -sL https://github.com/dhall-lang/dhall-haskell/releases/download/$DHALL_VERSION/dhall-json-$DHALL_JSON_VERSION-x86_64-linux.tar.bz2 \
+    | tar --extract --file=- --bzip2 --directory=/usr ./bin/dhall-to-yaml
+
+USER opam

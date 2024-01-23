@@ -45,7 +45,7 @@ let log ~terms x =
   let open Sequence in
   unfold ~init:(a, 1) ~f:(fun (ai, i) ->
       let t = ai / of_int i in
-      Some ((if Int.(i mod 2 = 0) then neg t else t), (ai * a, Int.(i + 1))))
+      Some ((if Int.(i mod 2 = 0) then neg t else t), (ai * a, Int.(i + 1))) )
   |> Fn.flip take terms |> fold ~init:zero ~f:( + )
 
 (* This computes the number of terms of a taylor series one needs to compute
@@ -62,7 +62,7 @@ let terms_needed ~derivative_magnitude_upper_bound ~bits_of_precision:k =
   least ~such_that:(fun n ->
       let nn = B.of_int n in
       let d = derivative_magnitude_upper_bound Int.(n + 1) in
-      Bignum.(of_bigint (factorial nn) / d > lower_bound))
+      Bignum.(of_bigint (factorial nn) / d > lower_bound) )
 
 let ceil_log2 n = least ~such_that:(fun i -> B.(pow (of_int 2) (of_int i) >= n))
 
@@ -74,7 +74,7 @@ let binary_expansion x =
     ~f:(fun (rem, pt) ->
       let b = Bignum.(rem >= pt) in
       let rem = if b then Bignum.(rem - pt) else rem in
-      Some (b, Bignum.(rem, pt / two)))
+      Some (b, Bignum.(rem, pt / two)) )
 
 module Coeff_integer_part = struct
   type t = [ `Zero | `One ] [@@deriving sexp]
@@ -142,7 +142,7 @@ module Exp = struct
         let per_term_precision = ceil_log2 (B.of_int n) + k in
         if (n * per_term_precision) + per_term_precision < field_size_in_bits
         then Some { per_term_precision; terms_needed = n; total_precision = k }
-        else None)
+        else None )
 
   let params ~field_size_in_bits ~base =
     let abs_log_base =
@@ -181,7 +181,7 @@ module Exp = struct
                 c )
             in
             ( (if i mod 2 = 0 then `Neg else `Pos)
-            , c_frac |> bignum_as_fixed_point per_term_precision ))
+            , c_frac |> bignum_as_fixed_point per_term_precision ) )
       in
       (coefficients, !linear_term_integer_part)
     in
@@ -202,7 +202,7 @@ module Exp = struct
           let x_i = Bignum.(x_i * x) in
           let c = Bignum.(of_bigint c / denom) in
           let c = match sgn with `Pos -> c | `Neg -> Bignum.neg c in
-          (Bignum.(acc + (x_i * c)), x_i))
+          (Bignum.(acc + (x_i * c)), x_i) )
       |> fst
       |> fun acc ->
       Bignum.(
@@ -222,7 +222,7 @@ module Exp = struct
               assert ([%equal: [ `Pos | `Neg ]] sgn `Pos) ;
               Some term
           | Some s ->
-              Some (Floating_point.add_signed ~m s (sgn, term)))
+              Some (Floating_point.add_signed ~m s (sgn, term)) )
       |> Option.value_exn
     in
     match linear_term_integer_part with
@@ -242,7 +242,7 @@ module Exp = struct
     let coefficients =
       Array.map coefficients ~f:(fun (sgn, c) ->
           ( sgn
-          , Floating_point.constant ~m ~value:c ~precision:per_term_precision ))
+          , Floating_point.constant ~m ~value:c ~precision:per_term_precision ) )
     in
     taylor_sum ~m powers coefficients linear_term_integer_part
 end

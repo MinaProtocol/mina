@@ -13,7 +13,7 @@ module T = struct
       | None ->
           let interruption_signal = Ivar.create () in
           Deferred.upon (Ivar.read t.interruption_signal) (fun signal ->
-              Ivar.fill_if_empty interruption_signal (f signal)) ;
+              Ivar.fill_if_empty interruption_signal (f signal) ) ;
           interruption_signal
     in
     { interruption_signal; d = Deferred.Result.map_error ~f t.d }
@@ -58,7 +58,7 @@ module T = struct
           | Ok t' ->
               Ivar.fill_if_empty t'.interruption_signal signal
           | Error _ ->
-              ())) ;
+              () ) ) ;
     let interruption_signal =
       match Ivar.peek t.interruption_signal with
       | Some interruption_signal ->
@@ -72,7 +72,7 @@ module T = struct
                   (Ivar.fill_if_empty interruption_signal)
             | Error signal ->
                 (* [t] was interrupted by [signal], [f] was not run. *)
-                Ivar.fill_if_empty interruption_signal signal) ;
+                Ivar.fill_if_empty interruption_signal signal ) ;
           interruption_signal
     in
     Deferred.upon (Ivar.read interruption_signal) (fun signal ->
@@ -88,7 +88,7 @@ module T = struct
             ()
         | None ->
             (* The computation we bound hasn't resolved, interrupt it. *)
-            Ivar.fill_if_empty t.interruption_signal signal) ;
+            Ivar.fill_if_empty t.interruption_signal signal ) ;
     { interruption_signal; d = Deferred.Result.bind t.d ~f:(fun t' -> t'.d) }
 
   let return a =
@@ -164,9 +164,9 @@ module Deferred_let_syntax = struct
 end
 
 let%test_unit "monad gets interrupted" =
-  Async.Thread_safe.block_on_async_exn (fun () ->
+  Run_in_thread.block_on_async_exn (fun () ->
       let r = ref 0 in
-      let wait i = Async.after (Core.Time.Span.of_ms i) in
+      let wait i = after (Time_ns.Span.of_ms i) in
       let ivar = Ivar.create () in
       don't_wait_for
         (let open Let_syntax in
@@ -179,12 +179,12 @@ let%test_unit "monad gets interrupted" =
       let%bind () = wait 130. in
       Ivar.fill ivar () ;
       let%map () = wait 100. in
-      assert (!r = 1))
+      assert (!r = 1) )
 
 let%test_unit "monad gets interrupted within nested binds" =
-  Async.Thread_safe.block_on_async_exn (fun () ->
+  Run_in_thread.block_on_async_exn (fun () ->
       let r = ref 0 in
-      let wait i = Async.after (Core.Time.Span.of_ms i) in
+      let wait i = after (Time_ns.Span.of_ms i) in
       let ivar = Ivar.create () in
       let rec go () =
         let open Let_syntax in
@@ -199,12 +199,12 @@ let%test_unit "monad gets interrupted within nested binds" =
       let%bind () = wait 130. in
       Ivar.fill ivar () ;
       let%map () = wait 100. in
-      assert (!r = 1))
+      assert (!r = 1) )
 
 let%test_unit "interruptions still run finally blocks" =
-  Async.Thread_safe.block_on_async_exn (fun () ->
+  Run_in_thread.block_on_async_exn (fun () ->
       let r = ref 0 in
-      let wait i = Async.after (Core.Time.Span.of_ms i) in
+      let wait i = after (Time_ns.Span.of_ms i) in
       let ivar = Ivar.create () in
       let rec go () =
         let open Let_syntax in
@@ -219,13 +219,13 @@ let%test_unit "interruptions still run finally blocks" =
       let%bind () = wait 130. in
       Ivar.fill ivar () ;
       let%map () = wait 100. in
-      assert (!r = 2))
+      assert (!r = 2) )
 
 let%test_unit "interruptions branches do not cancel each other" =
-  Async.Thread_safe.block_on_async_exn (fun () ->
+  Run_in_thread.block_on_async_exn (fun () ->
       let r = ref 0 in
       let s = ref 0 in
-      let wait i = Async.after (Core.Time.Span.of_ms i) in
+      let wait i = after (Time_ns.Span.of_ms i) in
       let ivar_r = Ivar.create () in
       let ivar_s = Ivar.create () in
       let rec go r =
@@ -252,4 +252,4 @@ let%test_unit "interruptions branches do not cancel each other" =
       Ivar.fill ivar_s () ;
       let%map () = wait 100. in
       assert (!r = 1) ;
-      assert (!s = 2))
+      assert (!s = 2) )

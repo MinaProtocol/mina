@@ -32,10 +32,10 @@ let verify =
         acc
     | h :: hs ->
         let acc =
-          Protocol_state.hash_abstract ~hash_body:Fn.id
+          Protocol_state.hashes_abstract ~hash_body:Fn.id
             { previous_state_hash = acc; body = h }
         in
-        go acc hs
+        go acc.state_hash hs
   in
   fun ({ descendant; generations } : Input.t) (ancestor : Output.t)
       (proof : Proof.t) ->
@@ -82,13 +82,13 @@ end = struct
           (acc, List.rev hs)
       | body :: bs ->
           let length = Mina_numbers.Length.succ length in
-          let full_state_hash =
-            Protocol_state.hash_abstract ~hash_body:Fn.id
+          let full_state_hashes =
+            Protocol_state.hashes_abstract ~hash_body:Fn.id
               { previous_state_hash = acc; body }
           in
           go
-            ((acc, full_state_hash, length, body) :: hs)
-            full_state_hash length bs
+            ((acc, full_state_hashes.state_hash, length, body) :: hs)
+            full_state_hashes.state_hash length bs
     in
     fun (t : t) ({ descendant; generations } : Input.t) (ancestor : Output.t)
         ~ancestor_length (proof : Proof.t) ->
@@ -99,7 +99,7 @@ end = struct
       let h, to_add = go [] ancestor ancestor_length proof in
       let%map () = check (State_hash.equal h descendant) "Bad merkle proof" in
       List.iter to_add ~f:(fun (prev, h, length, body) ->
-          add t ~prev_hash:prev ~hash:h ~length ~body_hash:body)
+          add t ~prev_hash:prev ~hash:h ~length ~body_hash:body )
 
   let prove (t : t) { Input.descendant; generations } :
       (Output.t * Proof.t) option =
@@ -119,12 +119,13 @@ let%test_unit "completeness" =
         List.folding_map bs ~init:(ancestor, Length.zero)
           ~f:(fun (prev, length) body ->
             let length = Length.succ length in
-            let h =
-              Protocol_state.hash_abstract ~hash_body:Fn.id
+            let hs =
+              Protocol_state.hashes_abstract ~hash_body:Fn.id
                 { previous_state_hash = prev; body }
             in
-            Prover.add prover ~prev_hash:prev ~hash:h ~length ~body_hash:body ;
-            ((h, length), h))
+            Prover.add prover ~prev_hash:prev ~hash:hs.state_hash ~length
+              ~body_hash:body ;
+            ((hs.state_hash, length), hs.state_hash) )
       in
       List.iteri hashes ~f:(fun i h ->
           let input = { Input.generations = i + 1; descendant = h } in
@@ -133,4 +134,4 @@ let%test_unit "completeness" =
             |> Option.value_exn ?here:None ?error:None ?message:None
           in
           [%test_eq: State_hash.t] a ancestor ;
-          assert (verify input a proof)))
+          assert (verify input a proof) ) )

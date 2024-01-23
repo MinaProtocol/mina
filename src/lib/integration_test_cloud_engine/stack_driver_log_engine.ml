@@ -22,34 +22,34 @@ let or_error_list_fold ls ~init ~f =
   let open Or_error.Let_syntax in
   List.fold ls ~init:(return init) ~f:(fun acc_or_error el ->
       let%bind acc = acc_or_error in
-      f acc el)
+      f acc el )
 
 let or_error_list_map ls ~f =
   let open Or_error.Let_syntax in
   or_error_list_fold ls ~init:[] ~f:(fun t el ->
       let%map h = f el in
-      h :: t)
+      h :: t )
 
-let log_filter_of_event_type =
+let log_filter_of_event_type ev_existential =
   let open Event_type in
-  function
-  | Event_type Log_error ->
+  let (Event_type ev_type) = ev_existential in
+  let (module Ty) = event_type_module ev_type in
+  match Ty.parse with
+  | From_error_log _ ->
       [ "jsonPayload.level=(\"Warn\" OR \"Error\" OR \"Faulty_peer\" OR \
          \"Fatal\")"
       ]
-  | Event_type t ->
-      let event_id =
-        to_structured_event_id (Event_type t)
-        |> Option.value_exn
-             ~message:
-               "could not convert event type into log filter; no structured \
-                event id configured"
-      in
+  | From_daemon_log (struct_id, _) ->
       let filter =
         Printf.sprintf "jsonPayload.event_id=\"%s\""
-          (Structured_log_events.string_of_id event_id)
+          (Structured_log_events.string_of_id struct_id)
       in
       [ filter ]
+  | From_puppeteer_log (id, _) ->
+      let filter =
+        Printf.sprintf "jsonPayload.puppeteer_event_type=\"%s\"" id
+      in
+      [ "jsonPayload.puppeteer_script_event=true"; filter ]
 
 let all_event_types_log_filter =
   let event_filters =
@@ -59,7 +59,7 @@ let all_event_types_log_filter =
   let disjunction =
     event_filters
     |> List.map ~f:(fun filter ->
-           nest (filter |> List.map ~f:nest |> String.concat ~sep:" AND "))
+           nest (filter |> List.map ~f:nest |> String.concat ~sep:" AND ") )
     |> String.concat ~sep:" OR "
   in
   [ disjunction ]
@@ -152,7 +152,13 @@ module Subscription = struct
             gcloud_key_file_env
     in
     let create_topic name =
-      run_cmd_or_error "." prog [ "pubsub"; "topics"; "create"; name ]
+      run_cmd_or_error "." prog
+        [ "pubsub"
+        ; "topics"
+        ; "create"
+        ; name
+        ; "--message-retention-duration=3d"
+        ]
     in
     let create_subscription name topic =
       run_cmd_or_error "." prog
@@ -164,6 +170,7 @@ module Subscription = struct
         ; topic
         ; "--topic-project"
         ; project_id
+        ; "--expiration-period=3d"
         ]
     in
     let t = resource_names name in
@@ -226,7 +233,7 @@ module Subscription = struct
         ; subscription_id
         ; "--auto-ack"
         ; "--limit"
-        ; string_of_int 5
+        ; string_of_int 10
         ; "--format"
         ; "table(DATA)"
         ]
@@ -252,22 +259,47 @@ type t =
 
 let event_reader { event_reader; _ } = event_reader
 
-let parse_event_from_log_entry ~network log_entry =
+let parse_event_from_log_entry ~logger ~network log_entry =
   let open Or_error.Let_syntax in
   let open Json_parsing in
-  let%bind app_id = find string log_entry [ "labels"; "k8s-pod/app" ] in
-  let%bind node =
-    Kubernetes_network.lookup_node_by_app_id network app_id
+  let%bind pod_id =
+    find string log_entry [ "resource"; "labels"; "pod_name" ]
+  in
+  let%bind _, node =
+    Kubernetes_network.lookup_node_by_pod_id network pod_id
     |> Option.value_map ~f:Or_error.return
          ~default:
-           (Or_error.errorf "failed to find node by pod app id \"%s\"" app_id)
+           (Or_error.errorf
+              "failed to find node by pod id \"%s\"; known pod ids = [%s]"
+              pod_id
+              (Kubernetes_network.all_pod_ids network |> String.concat ~sep:"; ") )
   in
-  let%bind log =
-    find
-      (parser_from_of_yojson Logger.Message.of_yojson)
-      log_entry [ "jsonPayload" ]
+  let%bind payload = find json log_entry [ "jsonPayload" ] in
+  let%map event =
+    if
+      Result.ok (find bool payload [ "puppeteer_script_event" ])
+      |> Option.value ~default:false
+    then (
+      let%bind msg =
+        parse (parser_from_of_yojson Puppeteer_message.of_yojson) payload
+      in
+      [%log spam] "parsing puppeteer event, puppeteer_event_type = %s"
+        (Option.value msg.puppeteer_event_type ~default:"<NONE>") ;
+      Event_type.parse_puppeteer_event msg )
+    else
+      let%bind msg =
+        parse (parser_from_of_yojson Logger.Message.of_yojson) payload
+      in
+      [%log spam] "parsing daemon structured event, event_id = %s"
+        (Option.value
+           (Option.( >>| ) msg.event_id Structured_log_events.string_of_id)
+           ~default:"<NONE>" ) ;
+      match msg.event_id with
+      | Some _ ->
+          Event_type.parse_daemon_event msg
+      | None ->
+          Event_type.parse_error_log msg
   in
-  let%map event = Event_type.parse_event log in
   (node, event)
 
 let rec pull_subscription_in_background ~logger ~network ~event_writer
@@ -277,19 +309,23 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
     let%bind log_entries =
       Deferred.map (Subscription.pull ~logger subscription) ~f:Or_error.ok_exn
     in
-    if List.length log_entries > 0 then
-      [%log spam] "Parsing events from $n logs"
-        ~metadata:[ ("n", `Int (List.length log_entries)) ]
-    else [%log spam] "No logs were pulled" ;
+    ( match log_entries with
+    | [] ->
+        [%log spam] "No logs were pulled"
+    | log_entries ->
+        [%log spam] "Parsing events from $n logs"
+          ~metadata:[ ("n", `Int (List.length log_entries)) ] ) ;
     let%bind () =
       Deferred.List.iter ~how:`Sequential log_entries ~f:(fun log_entry ->
-          log_entry
-          |> parse_event_from_log_entry ~network
-          |> Or_error.ok_exn
-          |> Pipe.write_without_pushback_if_open event_writer ;
-          Deferred.unit)
+          ( match log_entry |> parse_event_from_log_entry ~logger ~network with
+          | Ok a ->
+              Pipe.write_without_pushback_if_open event_writer a
+          | Error e ->
+              [%log warn] "Error parsing log $error"
+                ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ) ;
+          Deferred.unit )
     in
-    let%bind () = after (Time.Span.of_ms 10000.0) in
+    let%bind () = after (Time.Span.of_ms 5000.0) in
     pull_subscription_in_background ~logger ~network ~event_writer ~subscription
     )
   else Deferred.unit
@@ -297,13 +333,14 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
 let create ~logger ~(network : Kubernetes_network.t) =
   let open Deferred.Or_error.Let_syntax in
   let log_filter =
-    let coda_container_filter = "resource.labels.container_name=\"coda\"" in
+    let mina_container_filter = "resource.labels.container_name=\"mina\"" in
     let filters =
-      [ network.testnet_log_filter; coda_container_filter ]
+      [ network.testnet_log_filter; mina_container_filter ]
       @ all_event_types_log_filter
     in
     String.concat filters ~sep:"\n"
   in
+  [%log debug] "log_filter: %s" log_filter ;
   let%map subscription =
     Subscription.create_with_retry ~logger ~name:network.namespace
       ~filter:log_filter

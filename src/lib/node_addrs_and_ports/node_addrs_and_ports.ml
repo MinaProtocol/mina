@@ -54,7 +54,7 @@ let to_multiaddr (t : t) =
       Some
         (sprintf "/ip4/%s/tcp/%d/p2p/%s"
            (Unix.Inet_addr.to_string t.external_ip)
-           t.libp2p_port peer.peer_id)
+           t.libp2p_port peer.peer_id )
   | None ->
       None
 

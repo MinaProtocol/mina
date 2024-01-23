@@ -7,7 +7,7 @@
       }
     },
     "currency": {
-      "symbol": "CODA",
+      "symbol": "MINA",
       "decimals": 9
     },
     "value": "66000000000000"
@@ -20,7 +20,7 @@
       }
     },
     "currency": {
-      "symbol": "CODA",
+      "symbol": "MINA",
       "decimals": 9
     },
     "value": "1"
