@@ -2088,3 +2088,35 @@ let get_filtered_log_entries
     !in_memory_reverse_structured_log_messages_for_integration_test
   in
   (get_from_idx curr_idx messages [], is_started)
+
+let get_transition_frontier (t : t) =
+  transition_frontier t |> Pipe_lib.Broadcast_pipe.Reader.peek
+  |> Result.of_option ~error:"Could not obtain transition frontier"
+
+let best_chain_block_by_height (t : t) height =
+  let open Result.Let_syntax in
+  let%bind transition_frontier = get_transition_frontier t in
+  Transition_frontier.best_tip_path transition_frontier
+  |> List.find ~f:(fun bc ->
+         let validated_transition =
+           Transition_frontier.Breadcrumb.validated_transition bc
+         in
+         let block_height =
+           Mina_block.(
+             blockchain_length @@ With_hash.data
+             @@ Validated.forget validated_transition)
+         in
+         Unsigned.UInt32.equal block_height height )
+  |> Result.of_option
+       ~error:
+         (sprintf "Could not find block in transition frontier with height %s"
+            (Unsigned.UInt32.to_string height) )
+
+let best_chain_block_by_state_hash (t : t) hash =
+  let open Result.Let_syntax in
+  let%bind transition_frontier = get_transition_frontier t in
+  Transition_frontier.find transition_frontier hash
+  |> Result.of_option
+       ~error:
+         (sprintf "Block with state hash %s not found in transition frontier"
+            (State_hash.to_base58_check hash) )
