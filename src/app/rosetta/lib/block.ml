@@ -842,12 +842,21 @@ module Sql = struct
            AND ai_receiver.id = ac.account_identifier_id
            AND buc.status = 'applied'
            AND buc.sequence_no =
-             (SELECT MIN(buc2.sequence_no)
-              FROM blocks_user_commands buc2
-              INNER JOIN user_commands uc2
-                ON buc2.user_command_id = uc2.id
-                AND uc2.receiver_id = u.receiver_iD
-                AND buc2.block_id = buc.block_id)
+             (SELECT LEAST(
+                (SELECT min(bic2.sequence_no)
+                 FROM blocks_internal_commands bic2
+                 INNER JOIN internal_commands ic2
+                    ON bic2.internal_command_id = ic2.id
+                 WHERE ic2.receiver_id = u.receiver_id
+                    AND bic2.block_id = buc.block_id
+                    AND bic2.status = 'applied'),
+                 (SELECT min(buc2.sequence_no)
+                  FROM blocks_user_commands buc2
+                  INNER JOIN user_commands uc2
+                    ON buc2.user_command_id = uc2.id
+                  WHERE uc2.receiver_id = u.receiver_id
+                    AND buc2.block_id = buc.block_id
+                    AND buc2.status = 'applied')))
          INNER JOIN tokens t
            ON t.id = ai_receiver.token_id
          WHERE buc.block_id = ?
@@ -897,6 +906,23 @@ module Sql = struct
            ON ai.public_key_id = receiver_id
          LEFT JOIN accounts_created ac
            ON ac.account_identifier_id = ai.id
+           AND ac.block_id = bic.block_id
+           AND bic.sequence_no =
+               (SELECT LEAST(
+                   (SELECT min(bic2.sequence_no)
+                    FROM blocks_internal_commands bic2
+                    INNER JOIN internal_commands ic2
+                       ON bic2.internal_command_id = ic2.id
+                    WHERE ic2.receiver_id = i.receiver_id
+                       AND bic2.block_id = bic.block_id
+                       AND bic2.status = 'applied'),
+                    (SELECT min(buc2.sequence_no)
+                     FROM blocks_user_commands buc2
+                     INNER JOIN user_commands uc2
+                       ON buc2.user_command_id = uc2.id
+                     WHERE uc2.receiver_id = i.receiver_id
+                       AND buc2.block_id = bic.block_id
+                       AND buc2.status = 'applied')))
          INNER JOIN tokens t
            ON t.id = ai.token_id
          WHERE bic.block_id = ?
