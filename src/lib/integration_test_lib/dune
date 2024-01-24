@@ -41,6 +41,7 @@
    mina_runtime_config
    mina_base
    mina_lib
+   bounded_types
    genesis_constants
    transition_router
    signature_lib

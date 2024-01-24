@@ -122,7 +122,8 @@ module Challenge_polynomial = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('g, 'fq) t = { challenges : 'fq array; commitment : 'g }
+      type ('g, 'fq) t =
+        { challenges : 'fq Bounded_types.ArrayN16.Stable.V1.t; commitment : 'g }
       [@@deriving version, bin_io, sexp, compare, yojson]
 
       let to_latest = Fn.id
@@ -165,7 +166,7 @@ module Make (Inputs : Inputs_intf) = struct
         type t =
           ( G.Affine.Stable.V1.t
           , Fq.Stable.V1.t
-          , Fq.Stable.V1.t array )
+          , Fq.Stable.V1.t Bounded_types.ArrayN16.Stable.V1.t )
           Pickles_types.Plonk_types.Proof.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
@@ -176,7 +177,7 @@ module Make (Inputs : Inputs_intf) = struct
           -> openings:
                ( G.Affine.t
                , Fq.t
-               , Fq.t array )
+               , Fq.t Bounded_types.ArrayN16.Stable.V1.t )
                Pickles_types.Plonk_types.Openings.Stable.V2.t
           -> 'a
 

@@ -85,7 +85,7 @@ module Rpcs : sig
       module Stable : sig
         module V2 : sig
           type t =
-            { node_ip_addr : Core.Unix.Inet_addr.Stable.V1.t
+            { node_ip_addr : Network_peer.Peer.Inet_addr.Stable.V1.t
             ; node_peer_id : Peer.Id.Stable.V1.t
             ; sync_status : Sync_status.Stable.V1.t
             ; peers : Network_peer.Peer.Stable.V1.t list

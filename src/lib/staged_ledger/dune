@@ -21,6 +21,7 @@
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    random_oracle_input
+   bounded_types
    mina_base.import
    mina_ledger
    quickcheck_lib

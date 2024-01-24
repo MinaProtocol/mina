@@ -25,7 +25,7 @@
    mina_wire_types
    integration_test_lib
    logger
-
+   bounded_types
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../graphql_schema.json)

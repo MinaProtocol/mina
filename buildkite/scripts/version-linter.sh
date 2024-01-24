@@ -26,4 +26,4 @@ pr_branch=origin/${BUILDKITE_BRANCH}
 release_branch=${REMOTE}/$1
 
 echo "--- Run Python version linter with branches: ${pr_branch} ${base_branch} ${release_branch}"
-./scripts/version-linter.py ${pr_branch} ${base_branch} ${release_branch}
+./scripts/version-linter.py ${pr_branch} ${base_branch} ${release_branch} && mina internal audit-type-shapes
