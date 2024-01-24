@@ -402,6 +402,7 @@ module Well_formedness_error = struct
     | Insufficient_fee
     | Zero_vesting_period
     | Zkapp_too_big of (Error.t[@to_yojson Error_json.error_to_yojson])
+    | Transaction_type_disabled
     | Incompatible_version
   [@@deriving compare, to_yojson, sexp]
 
