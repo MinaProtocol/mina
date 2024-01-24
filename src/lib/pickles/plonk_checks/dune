@@ -18,6 +18,7 @@
    ;; local libraries
    pickles_types
    pickles_base
+   pickles.backend
    pickles.composition_types
    kimchi_backend
    kimchi_types

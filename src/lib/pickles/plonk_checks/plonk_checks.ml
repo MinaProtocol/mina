@@ -478,4 +478,152 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
               ~f:(fun f -> Shifted_value.equal Field.equal (f plonk) (f actual))
               [ perm ] )
         |> Boolean.all )
+
+  (* let evaluate_rpn (type t) (module F : Field_intf with type t = t) (* ~(_env : t Scalars.Env.t) *) ~(_rpn_gate : t Kimchi_types.polish_token array) =
+     F.zero *)
+
+  (* let evaluate_rpn (type t) (module F : Field_intf with type t = t) (* ~(_env : t Scalars.Env.t) *) ~(_rpn_gate : t Kimchi_types.polish_token array) =
+     F.zero *)
+
+  (* let evaluate_rpn (type t) (module F : Field_intf with type t = t) ~(_env : t Scalars.Env.t) ~(_rpn_gate : F.t Kimchi_types.polish_token array) =
+     F.zero *)
+
+  (* WORKING: let evaluate_rpn (type t) (module F:  Field_intf with type t = t) (* ~(_env : t Scalars.Env.t) *) ~(_rpn_gate : t Kimchi_types.polish_token array) =
+     F.zero *)
+
+  let evaluate_rpn (type t) (module F : Field_intf with type t = t)
+      ~(_env : t Scalars.Env.t)
+      ~(_evals : (_ * _, _) Plonk_types.Evals.In_circuit.t)
+      ~(gate_rpn : t Kimchi_types.polish_token array) =
+    (* let rec evaluate ~stack ~(_rpn_gate : t Kimchi_types.polish_token array) idx : F.t =
+       if Array.length rpn_gate = 0 then
+         Stack.pop_exn stack
+       else
+         let elt = Array.get rpn_gate idx in
+         match elt with
+         | _ -> F.zero *)
+    let evaluate_cell (evals : (_ * _, _) Plonk_types.Evals.In_circuit.t)
+        (var : Kimchi_types.variable) =
+      (* Kimchi_types.( *)
+      let witness = Vector.to_array evals.w in
+      let coefficients = Vector.to_array evals.coefficients in
+      let permutation_column = Vector.to_array evals.s in
+      let get_eval = match var.row with Curr -> fst | Next -> snd in
+      match[@warning "-4"] var.col with
+      | Witness i ->
+          get_eval witness.(i)
+      | Z ->
+          get_eval evals.z
+      | LookupSorted i ->
+          get_eval
+            (Opt.value_exn
+               (Option.value_exn (Vector.nth evals.lookup_sorted i)) )
+      | LookupAggreg ->
+          get_eval (Opt.value_exn evals.lookup_aggregation)
+      | LookupTable ->
+          get_eval (Opt.value_exn evals.lookup_table)
+      | LookupRuntimeTable ->
+          get_eval (Opt.value_exn evals.runtime_lookup_table)
+      | Index Poseidon ->
+          get_eval evals.poseidon_selector
+      | Index Generic ->
+          get_eval evals.generic_selector
+      | Index CompleteAdd ->
+          get_eval evals.complete_add_selector
+      | Index VarBaseMul ->
+          get_eval evals.mul_selector
+      | Index EndoMul ->
+          get_eval evals.emul_selector
+      | Index EndoMulScalar ->
+          get_eval evals.endomul_scalar_selector
+      | Index RangeCheck0 ->
+          get_eval (Opt.value_exn evals.range_check0_selector)
+      | Index RangeCheck1 ->
+          get_eval (Opt.value_exn evals.range_check1_selector)
+      | Index ForeignFieldAdd ->
+          get_eval (Opt.value_exn evals.foreign_field_add_selector)
+      | Index ForeignFieldMul ->
+          get_eval (Opt.value_exn evals.foreign_field_mul_selector)
+      | Index Xor16 ->
+          get_eval (Opt.value_exn evals.xor_selector)
+      | Index Rot64 ->
+          get_eval (Opt.value_exn evals.rot_selector)
+      | Index i ->
+          failwithf
+            !"Index %{sexp:Scalars.Gate_type.t}\n\
+              %! should have been linearized away"
+            i ()
+      | Permutation i ->
+          get_eval permutation_column.(i)
+      | Coefficient i ->
+          get_eval coefficients.(i)
+      | LookupKindIndex Lookup ->
+          get_eval (Opt.value_exn evals.lookup_gate_lookup_selector)
+      | LookupKindIndex Xor ->
+          get_eval (Opt.value_exn evals.xor_lookup_selector)
+      | LookupKindIndex RangeCheck ->
+          get_eval (Opt.value_exn evals.range_check_lookup_selector)
+      | LookupKindIndex ForeignFieldMul ->
+          get_eval (Opt.value_exn evals.foreign_field_mul_lookup_selector)
+      | LookupRuntimeSelector ->
+          get_eval (Opt.value_exn evals.runtime_lookup_table_selector)
+    in
+
+    let stack = Stack.create () in
+    Array.iteri gate_rpn ~f:(fun _idx token ->
+        Kimchi_types.(
+          match token with
+          | Alpha ->
+              Stack.push stack @@ _env.alpha_pow 1
+              (* JES: CHECK: Where just plain alpha? *)
+          | Beta ->
+              Stack.push stack _env.beta
+          | Gamma ->
+              Stack.push stack _env.gamma
+          | JointCombiner ->
+              Stack.push stack _env.joint_combiner
+          | EndoCoefficient ->
+              Stack.push stack _env.endo_coefficient
+          | Mds mds ->
+              Stack.push stack @@ _env.mds (mds.row, mds.col)
+              (* JES: CHECK: is this (row, col) format *)
+          | VanishesOnZeroKnowledgeAndPreviousRows ->
+              Stack.push stack _env.vanishes_on_zero_knowledge_and_previous_rows
+          | UnnormalizedLagrangeBasis i ->
+              Stack.push stack
+              @@ _env.unnormalized_lagrange_basis
+                   (i.zk_rows, Int32.to_int_exn i.offset)
+          | Literal x ->
+              Stack.push stack x
+          | Dup ->
+              Stack.(push stack @@ top_exn stack)
+          | Cell v ->
+              Stack.push stack @@ evaluate_cell _evals v
+              (* JES: TODO: would be nice to instead somehow do
+                 Stack.push stack @@ _env.var (v.col, v.row) *)
+              (* JES: CHECK: How to v.evaluate here? *)
+          | Pow n ->
+              Stack.(
+                push stack
+                @@ pow2pow (module F) (top_exn stack) (Int32.to_int_exn n))
+              (* JES: CHECK: Correct way to pow here? *)
+          | Add ->
+              Stack.(push stack @@ F.( + ) (pop_exn stack) (pop_exn stack))
+          | Mul ->
+              Stack.(push stack @@ F.( * ) (pop_exn stack) (pop_exn stack))
+          | Sub ->
+              Stack.(push stack @@ F.( - ) (pop_exn stack) (pop_exn stack))
+          | Store ->
+              failwith "Unsupported RPN token: Store"
+          | Load _ ->
+              failwith "Unsupported RPN token: Load"
+          | SkipIf _ ->
+              failwith "Unsupported RPN token: SkipIf"
+          | SkipIfNot _ ->
+              failwith "Unsupported RPN token: SkipIfNot") ) ;
+
+    Stack.pop_exn stack
+
+  (* let evaluate_rpn (* ~(_env : Backend.Tick.Field.t Scalars.Env.t) *) ~(_rpn_gate : t Kimchi_types.polish_token array) =
+     F.zero *)
 end

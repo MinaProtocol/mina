@@ -138,6 +138,16 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
        , 'a )
        Pickles_types.Plonk_types.Evals.In_circuit.t
     -> 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
+
+  val evaluate_rpn :
+       (module Field_intf with type t = 't)
+       (* 't field *)
+       (* 't *)
+       (* (module Internal_Basic.field with type t = 't) *)
+    -> _env:'t Scalars.Env.t
+    -> _evals:('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
+    -> gate_rpn:'t Kimchi_types.polish_token array
+    -> 't
 end
 
 (** [Domain] is re-exported from library Pickles_base *)
