@@ -121,6 +121,9 @@ module Graphql = struct
     query ($public_key: PublicKey!) @encoders(module: "Encoders"){
       account(publicKey: $public_key) {
         nonce
+        delegateAccount {
+          publicKey
+        }
         balance {
           total @ppxCustom(module: "Scalars.Balance")
         }
@@ -192,6 +195,14 @@ module Graphql = struct
       }
     }
   |}]
+
+  module Genesis_ledger_export =
+  [%graphql
+  {|
+         query {
+           fork_config
+         }
+         |}]
 end
 
 (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
@@ -298,7 +309,10 @@ let must_get_best_chain ?max_length ~logger node_uri =
   |> Deferred.bind ~f:Malleable_error.or_hard_error
 
 type account_data =
-  { nonce : Unsigned.uint32; total_balance : Currency.Balance.t }
+  { nonce : Unsigned.uint32
+  ; total_balance : Currency.Balance.t
+  ; delegate : Signature_lib.Public_key.Compressed.t option
+  }
 
 let get_account_data ~logger node_uri ~public_key =
   let open Deferred.Or_error.Let_syntax in
@@ -332,11 +346,29 @@ let get_account_data ~logger node_uri ~public_key =
             |> Option.value_exn ~message:"the nonce from get_balance is None"
             |> Unsigned.UInt32.of_string
         ; total_balance = acc.balance.total
+        ; delegate =
+            Option.map
+              ~f:(fun delegate -> delegate.publicKey)
+              acc.delegateAccount
         }
 
 let must_get_account_data ~logger node_uri ~public_key =
   get_account_data ~logger node_uri ~public_key
   |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+let export_genesis_ledger ~logger node_uri =
+  let open Deferred.Let_syntax in
+  [%log info] "Exporting genesis ledger"
+    ~metadata:[ ("node_uri", `String (Uri.to_string node_uri)) ] ;
+  let q = Graphql.Genesis_ledger_export.(make @@ makeVariables ()) in
+  let%bind response =
+    exec_graphql_request ~logger ~node_uri ~query_name:"fork_config" q
+  in
+  Result.bind response ~f:(fun r ->
+      (r.Graphql.Genesis_ledger_export.fork_config :> Yojson.Safe.t)
+      |> Runtime_config.of_yojson
+      |> Result.map_error ~f:(fun msg -> Error.of_string msg) )
+  |> Malleable_error.or_hard_error
 
 type signed_command_result =
   { id : string; hash : Transaction_hash.t; nonce : Unsigned.uint32 }
