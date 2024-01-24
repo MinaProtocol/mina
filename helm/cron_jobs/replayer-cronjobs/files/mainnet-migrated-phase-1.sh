@@ -14,10 +14,10 @@ install_prereqs () {
 	apt update;
 	echo "Installing libjemalloc2";
 	apt-get -y install libjemalloc2;
-	
+
 	echo "Installing Utils (curl, wget etc.)";
 	apt-get -y install apt-transport-https ca-certificates gnupg curl wget;
-	
+
 	echo "Installing gsutil";
 	echo "deb https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list;
 	curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - ;
@@ -100,6 +100,7 @@ else
   UPLOAD_SCRIPT_NAME=mainnet-migrated-archive-dump-${DATE}_0000.sql
   su postgres -c "cd ~ && pg_dump mainnet_archive_migrated > $UPLOAD_SCRIPT_NAME";
   UPLOAD_ARCHIVE_NAME=$UPLOAD_SCRIPT_NAME.tar.gz
-  su postgres -c "cd ~ && tar -czvf $UPLOAD_ARCHIVE_NAME $UPLOAD_SCRIPT_NAME";
-  su postgres -c "cd ~ && gsutil $KEY_FILE_ARG cp $UPLOAD_ARCHIVE_NAME gs://mina-archive-dumps";
+  mv ~postgres/$UPLOAD_SCRIPT_NAME .
+  tar -czvf $UPLOAD_ARCHIVE_NAME $UPLOAD_SCRIPT_NAME;
+  gsutil $KEY_FILE_ARG cp $UPLOAD_ARCHIVE_NAME gs://mina-archive-dumps;
 fi
