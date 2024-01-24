@@ -4156,21 +4156,28 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let set_proof_cache x = proof_cache := Some x
 
-    let create_trivial_snapp ~constraint_constants () =
+    let create_trivial_snapp ?unique_id ~constraint_constants () =
       let tag, _, (module P), Pickles.Provers.[ trivial_prover ] =
         let trivial_rule : _ Pickles.Inductive_rule.t =
-          let trivial_main (tx_commitment : Zkapp_statement.Checked.t) :
-              unit Checked.t =
-            Impl.run_checked (dummy_constraints ())
-            |> fun () ->
-            Zkapp_statement.Checked.Assert.equal tx_commitment tx_commitment
-            |> return
+          let trivial_main () : unit Checked.t =
+            Impl.run_checked (dummy_constraints ()) ;
+            match unique_id with
+            | None ->
+                Checked.return ()
+            | Some unique_id ->
+                let unique_id' =
+                  Impl.exists
+                    ~compute:(Fn.const (Field.of_int unique_id))
+                    Typ.field
+                in
+                Field.Checked.Assert.equal unique_id'
+                  (Field.Var.constant (Field.of_int unique_id))
           in
           { identifier = "trivial-rule"
           ; prevs = []
           ; main =
-              (fun { public_input = x } ->
-                let () = Impl.run_checked (trivial_main x) in
+              (fun { public_input = _ } ->
+                let () = Impl.run_checked (trivial_main ()) in
                 { previous_proof_statements = []
                 ; public_output = ()
                 ; auxiliary_output = ()
@@ -4196,6 +4203,50 @@ module Make_str (A : Wire_types.Concrete) = struct
       let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
       ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
       , `Prover trivial_prover )
+
+    let%test_unit "creating trivial zkapps with different nonces makes unique \
+                   verification keypairs" =
+      let open Async.Deferred.Let_syntax in
+      let test_distinct_verification ~prover ~valid_vk ~invalid_vk =
+        let stmt : Zkapp_statement.t =
+          { account_update = Zkapp_command.Transaction_commitment.empty
+          ; calls = Zkapp_command.Transaction_commitment.empty
+          }
+        in
+        let%bind (), (), proof = prover stmt in
+        let%bind () =
+          Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ
+            [ (valid_vk, stmt, proof) ]
+          >>| Or_error.ok_exn
+        in
+        let%map invalid_verification =
+          Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ
+            [ (invalid_vk, stmt, proof) ]
+        in
+        assert (Or_error.is_error invalid_verification)
+      in
+      let constraint_constants =
+        Genesis_constants.Constraint_constants.compiled
+      in
+      let `VK vk_a, `Prover prover_a =
+        create_trivial_snapp ~unique_id:0 ~constraint_constants ()
+      in
+      let `VK vk_b, `Prover prover_b =
+        create_trivial_snapp ~unique_id:1 ~constraint_constants ()
+      in
+      assert (
+        not
+          ([%equal:
+             ( Pickles.Side_loaded.Verification_key.t
+             , Snark_params.Tick.Field.t )
+             With_hash.t] vk_a vk_b ) ) ;
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let%bind () =
+            test_distinct_verification ~prover:prover_a ~valid_vk:vk_a.data
+              ~invalid_vk:vk_b.data
+          in
+          test_distinct_verification ~prover:prover_b ~valid_vk:vk_b.data
+            ~invalid_vk:vk_a.data )
 
     let create_zkapp_command ?receiver_auth ?empty_sender
         ~(constraint_constants : Genesis_constants.Constraint_constants.t) spec
