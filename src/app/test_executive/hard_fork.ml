@@ -163,6 +163,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                    ~cliff_amount:2_000_000_000_000 ~vesting_period:1
                    ~vesting_increment:1_000_000_000_000 )
               ()
+            (* cliff after hard fork, vesting with each slot *)
+          ; create ~account_name:"timed4" ~balance:"20000" (* balance in Mina *)
+              ~timing:
+                (make_timing ~min_balance:20_000_000_000_000 ~cliff_time:500_002
+                   ~cliff_amount:2_000_000_000_000 ~vesting_period:1
+                   ~vesting_increment:1_000_000_000_000 )
+              ()
+            (* account finishes vesting at the hard fork. *)
+          ; create ~account_name:"timed5" ~balance:"10000" (* balance in Mina *)
+              ~timing:
+                (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:499_995
+                   ~cliff_amount:2_000_000_000_000 ~vesting_period:1
+                   ~vesting_increment:2_000_000_000_000 )
+              ()
           ; create ~account_name:"vk-proof" ~balance:"10000"
               ~permissions:
                 { Permissions.user_default with
@@ -229,6 +243,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let timed3 =
       Core.String.Map.find_exn (Network.genesis_keypairs network) "timed3"
+    in
+    let timed4 =
+      Core.String.Map.find_exn (Network.genesis_keypairs network) "timed4"
+    in
+    let timed5 =
+      Core.String.Map.find_exn (Network.genesis_keypairs network) "timed5"
     in
     let vk_proof =
       Core.String.Map.find_exn (Network.genesis_keypairs network) "vk-proof"
@@ -463,31 +483,44 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               ~test_config:config ~num_proofs:1 ) )
     in
     let%bind () =
-      section_hard "Check vesting of timed3 account"
-        (let%bind global_slot_since_hard_fork =
-           Integration_test_lib.Graphql_requests
-           .must_get_global_slot_since_hard_fork ~logger
-             (Network.Node.get_ingress_uri node_b)
-         in
-         let%bind balance = get_account_balances timed3 in
-         Balances.log logger ~name:"timed3"
-           ~global_slot:global_slot_since_hard_fork balance ;
-         let num_slots_since_fork_genesis =
-           Mina_numbers.Global_slot_since_hard_fork.to_int
-             global_slot_since_hard_fork
-         in
-         let total = 20_000_000_000_000 in
-         let locked =
-           let calc_balance =
-             (* min balance - cliff amount - vesting *)
-             20_000_000_000_000 - 2_000_000_000_000
-             - (num_slots_since_fork_genesis * 1_000_000_000_000)
+      section_hard "Check vesting of timed3/timed4 account"
+        (let check_balance name key cliff_offset =
+           let%bind global_slot_since_hard_fork =
+             Integration_test_lib.Graphql_requests
+             .must_get_global_slot_since_hard_fork ~logger
+               (Network.Node.get_ingress_uri node_b)
            in
-           max calc_balance 0
+           let%bind balance = get_account_balances key in
+           Balances.log logger ~name ~global_slot:global_slot_since_hard_fork
+             balance ;
+           let num_slots_since_cliff =
+             Mina_numbers.Global_slot_since_hard_fork.to_int
+               global_slot_since_hard_fork
+             - cliff_offset
+           in
+           let total = 20_000_000_000_000 in
+           let locked =
+             let calc_balance =
+               (* min balance - cliff amount - vesting *)
+               20_000_000_000_000 - 2_000_000_000_000
+               - (num_slots_since_cliff * 1_000_000_000_000)
+             in
+             max calc_balance 0
+           in
+           let liquid = Balances.nanomina (total - locked) in
+           let locked = Balances.nanomina locked in
+           Balances.(assert_equal ~expected:(make ~liquid ~locked) balance)
          in
-         let liquid = Balances.nanomina (total - locked) in
-         let locked = Balances.nanomina locked in
-         Balances.(assert_equal ~expected:(make ~liquid ~locked) balance) )
+         let%bind () = check_balance "timed3" timed3 0 in
+         let%map () = check_balance "timed4" timed4 2 in
+         () )
+    in
+    let%bind () =
+      section "Check that timed5 account is fully vested"
+        (let%bind balance = get_account_balances timed5 in
+         Balances.log logger ~name:"timed5" balance ;
+         let expected = Balances.(make_unlocked @@ mina 10_000) in
+         Balances.assert_equal ~expected balance )
     in
     let%bind () =
       section_hard "checking height, global slot since genesis in best chain"
