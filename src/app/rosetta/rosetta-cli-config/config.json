@@ -75,7 +75,7 @@
   "initial_balance_fetch_disabled": false,
   "end_conditions": {
     "reconciliation_coverage": {
-      "index": 50,
+      "tip": true,
       "coverage": 1.0
     }
   }
