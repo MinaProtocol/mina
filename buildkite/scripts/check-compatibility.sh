@@ -88,6 +88,8 @@ function boot_and_sync {
     # print logs
     docker container logs $DAEMON_CONTAINER --follow &
     DOCKER_LOGS_PID=$?
+    echo $DOCKER_LOGS_PID
+    ps -A | grep docker
 
     while [ $SYNCED -eq 0 ]; do
         SYNC_STATUS=$(docker container exec -it $DAEMON_CONTAINER \
