@@ -122,7 +122,7 @@ mina-replayer --archive-uri {db_connection_string} --input-file reference_replay
 
 > :warning: Running a replayer from scratch on a Mainnet database can take up to a couple of days. The recommended best practice is to break the replayer into smaller parts by using the checkpoint capabilities of the replayer.
 
-> :warning: ** You must run replayer from the Mainnet version. You can run it from the Docker image at minaprotocol/mina-archive:1.4.0-c980ba8-bullseye
+> :warning: You must run replayer from the Mainnet version. You can run it from the Docker image at minaprotocol/mina-archive:1.4.0-c980ba8-bullseye
 
 ### Google Cloud bucket with Mainnet precomputed blocks
 
