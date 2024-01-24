@@ -99,7 +99,7 @@ To automatically verify and patch missing blocks, use the [download_missing_bloc
 
 1. Install the required `mina-archive-blocks` and `mina-missing-blocks-auditor` scripts that are packed in the `minaprotocol/mina-rosetta:1.4.0-c980ba8-bullseye` Docker image.
 
-2. Export the `BLOCKS_BUCKET:
+2. Export the `BLOCKS_BUCKET`:
 
    ```sh
    export BLOCKS_BUCKET="https://storage.googleapis.com/my_bucket_with_precomputed_blocks"
