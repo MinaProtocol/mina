@@ -4750,7 +4750,7 @@ let%test_module "staged ledger tests" =
                 apply ~logger ~constraint_constants ~global_slot
                   ~get_completed_work:(Fn.const None) ~verifier
                   ~current_state_view ~state_and_body_hash ~coinbase_receiver
-                  ~supercharge_coinbase:false sl diff
+                  ~supercharge_coinbase:false sl diff ~zkapp_cmd_limit_hardcap
               in
               match (expectation, result) with
               | `Accept, Ok _ | `Reject, Error _ ->
