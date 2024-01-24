@@ -89,7 +89,7 @@ module Constraint_constants = struct
     type t =
       { previous_state_hash : string
       ; previous_length : int
-      ; previous_global_slot : int
+      ; genesis_slot : int
       }
     [@@deriving yojson, sexp, ord, equal]
 
@@ -127,6 +127,12 @@ module Commits = struct
   (** Commit identifiers *)
   type t = { mina : string; marlin : string }
   [@@deriving yojson, sexp, ord, equal]
+
+  module With_date = struct
+    type commits = t
+
+    type t = { commits : commits; commit_date : string }
+  end
 end
 
 let header_version = 1

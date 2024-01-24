@@ -1,0 +1,8 @@
+(library
+ (public_name promise)
+ (name promise)
+ (libraries base async_kernel)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version))
+ (virtual_modules promise)
+ (default_implementation promise.native))
