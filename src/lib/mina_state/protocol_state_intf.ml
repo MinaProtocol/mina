@@ -121,6 +121,25 @@ module type Full = sig
   val genesis_state_hash :
     ?state_hash:State_hash.t option -> Value.t -> State_hash.t
 
+  val snarked_ledger_hash :
+       ( _
+       , ( _
+         , ( _
+           , 'snarked_ledger_hash
+           , _
+           , _
+           , _
+           , _
+           , _
+           , _
+           , _ )
+           Blockchain_state.Poly.t
+         , _
+         , _ )
+         Body.t )
+       Poly.t
+    -> 'snarked_ledger_hash
+
   val genesis_state_hash_checked :
     state_hash:State_hash.var -> var -> State_hash.var Checked.t
 

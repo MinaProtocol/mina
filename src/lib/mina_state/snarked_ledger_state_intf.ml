@@ -250,6 +250,8 @@ module type Full = sig
 
   val merge : t -> t -> t Or_error.t
 
+  val snarked_ledger_hash : ('ledger_hash, _, _, _, _, _) Poly.t -> 'ledger_hash
+
   include Hashable.S_binable with type t := t
 
   include Comparable.S with type t := t

@@ -180,7 +180,12 @@ module Network_config = struct
     let add_accounts accounts_and_keypairs =
       List.map accounts_and_keypairs
         ~f:(fun
-             ( { Test_config.Test_Account.balance; account_name; timing }
+             ( { Test_config.Test_account.balance
+               ; account_name
+               ; timing
+               ; permissions
+               ; zkapp
+               }
              , (pk, sk) )
            ->
           let timing = runtime_timing_of_timing timing in
@@ -194,6 +199,13 @@ module Network_config = struct
                 (* delegation currently unsupported *)
             ; delegate = None
             ; timing
+            ; permissions =
+                Option.map
+                  ~f:Runtime_config.Accounts.Single.Permissions.of_permissions
+                  permissions
+            ; zkapp =
+                Option.map
+                  ~f:Runtime_config.Accounts.Single.Zkapp_account.of_zkapp zkapp
             }
           in
           (account_name, account) )
@@ -208,8 +220,8 @@ module Network_config = struct
     let ledger_is_prefix ledger1 ledger2 =
       List.is_prefix ledger2 ~prefix:ledger1
         ~equal:(fun
-                 ({ account_name = name1; _ } : Test_config.Test_Account.t)
-                 ({ account_name = name2; _ } : Test_config.Test_Account.t)
+                 ({ account_name = name1; _ } : Test_config.Test_account.t)
+                 ({ account_name = name2; _ } : Test_config.Test_account.t)
                -> String.equal name1 name2 )
     in
     let runtime_config =
@@ -266,10 +278,12 @@ module Network_config = struct
                 |> Result.ok_or_failwith
               in
               let ledger_of_epoch_accounts
-                  (epoch_accounts : Test_config.Test_Account.t list) =
+                  (epoch_accounts : Test_config.Test_account.t list) =
                 let epoch_ledger_accounts =
                   List.map epoch_accounts
-                    ~f:(fun { account_name; balance; timing } ->
+                    ~f:(fun
+                         { account_name; balance; timing; permissions; zkapp }
+                       ->
                       let balance = Balance.of_mina_string_exn balance in
                       let timing = runtime_timing_of_timing timing in
                       let genesis_account =
@@ -284,7 +298,20 @@ module Network_config = struct
                               "Epoch ledger account %s not in genesis ledger"
                               account_name ()
                       in
-                      { genesis_account with balance; timing } )
+                      { genesis_account with
+                        balance
+                      ; timing
+                      ; permissions =
+                          Option.map
+                            ~f:
+                              Runtime_config.Accounts.Single.Permissions
+                              .of_permissions permissions
+                      ; zkapp =
+                          Option.map
+                            ~f:
+                              Runtime_config.Accounts.Single.Zkapp_account
+                              .of_zkapp zkapp
+                      } )
                 in
                 (* because we run integration tests with Proof_level = Full, the winner account
                    gets added to the genesis ledger
