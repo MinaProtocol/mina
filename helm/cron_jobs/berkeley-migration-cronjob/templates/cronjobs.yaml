@@ -5,7 +5,7 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: mina-cronjob-{{ .name }}
+  name: berkeley-migration-{{ .name }}
   annotations:
   {{- with $.Values.annotations }}
   {{- toYaml . | nindent 4 }}
@@ -51,12 +51,12 @@ spec:
           - name: {{ .script.secretName }}
             secret:
               defaultMode: 0755
-              secretName: {{ include "replayer-cronjobs.fullname" $rootContext }}-{{ .script.secretName }}
+              secretName: berkeley-migration-{{ .script.secretName }}
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "replayer-cronjobs.fullname" $rootContext }}-{{ .script.secretName }}
+  name: berkeley-migration-{{ .script.secretName }}
   {{- with $.Values.annotations }}
   {{- toYaml . | nindent 4 }}
   {{- end }}
