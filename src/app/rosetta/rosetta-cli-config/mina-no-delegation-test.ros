@@ -2,7 +2,7 @@
 create_account(1){
   create{
     network = {
-      "network":"berkeley-ITN",
+      "network":"PLACEHOLDER_NETWORK_NAME",
       "blockchain":"mina"
     };
     key = generate_key({"curve_type": "pallas"});
@@ -23,7 +23,7 @@ create_account(1){
 payment(10){
   payment_dry_run{
     payment_dry_run.network = {
-      "network":"berkeley-ITN",
+      "network":"PLACEHOLDER_NETWORK_NAME",
       "blockchain":"mina"
     };
     
