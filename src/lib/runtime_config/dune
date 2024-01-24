@@ -5,6 +5,7 @@
    ;; opam libraries
    async
    async_kernel
+   async_unix
    core_kernel
    bin_prot.shape
    base.caml
@@ -14,7 +15,9 @@
    result
    sexplib0
    ;; local libraries
+   block_time
    currency
+   genesis_constants
    data_hash_lib
    kimchi_backend
    kimchi_backend.pasta
@@ -26,6 +29,7 @@
    mina_numbers
    mina_wire_types
    ppx_dhall_type
+   mina_state
    snark_params
    unsigned_extended
    pickles
