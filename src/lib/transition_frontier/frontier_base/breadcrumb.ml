@@ -329,9 +329,9 @@ module For_tests = struct
       ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys () :
       (t -> t Deferred.t) Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
-    let gen_slot_advancement = Int.gen_incl 1 10 in
+    let%bind slot_advancement = Int.gen_incl 1 10 in
     let%bind make_next_consensus_state =
-      Consensus_state_hooks.For_tests.gen_consensus_state ~gen_slot_advancement
+      Consensus_state_hooks.For_tests.gen_consensus_state ~slot_advancement
         ~constraint_constants:
           precomputed_values.Precomputed_values.constraint_constants
         ~constants:precomputed_values.consensus_constants
@@ -379,10 +379,15 @@ module For_tests = struct
         , ( prev_state_hashes.state_hash
           , Option.value_exn prev_state_hashes.state_body_hash ) )
       in
+      let current_global_slot =
+        Mina_numbers.Global_slot_since_genesis.add
+          current_state_view.global_slot_since_genesis
+          (Mina_numbers.Global_slot_span.of_int slot_advancement)
+      in
       let coinbase_receiver = largest_account_public_key in
       let staged_ledger_diff, _invalid_txns =
         Staged_ledger.create_diff parent_staged_ledger ~logger
-          ~global_slot:current_state_view.global_slot_since_genesis
+          ~global_slot:current_global_slot
           ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver ~current_state_view ~supercharge_coinbase
           ~transactions_by_fee:transactions ~get_completed_work ~zkapp_cmd_limit
@@ -398,8 +403,8 @@ module For_tests = struct
                , `Pending_coinbase_update _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
-            ~global_slot:current_state_view.global_slot_since_genesis
-            ~coinbase_receiver ~logger staged_ledger_diff
+            ~global_slot:current_global_slot ~coinbase_receiver ~logger
+            staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
             ~current_state_view ~state_and_body_hash ~supercharge_coinbase
         with
@@ -438,8 +443,7 @@ module For_tests = struct
       let consensus_state =
         make_next_consensus_state
           ~snarked_ledger_hash:
-            (Blockchain_state.snarked_ledger_hash
-               (Protocol_state.blockchain_state previous_protocol_state) )
+            (Blockchain_state.snarked_ledger_hash next_blockchain_state)
           ~previous_protocol_state:
             With_hash.
               { data = previous_protocol_state; hash = previous_state_hashes }

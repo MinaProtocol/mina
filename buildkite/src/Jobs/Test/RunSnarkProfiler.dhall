@@ -5,7 +5,11 @@ let S = ../../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
+
+let DebianVersions = ../../Constants/DebianVersions.dhall
+let Profiles = ../../Constants/Profiles.dhall
 
 let Command = ../../Command/Base.dhall
 let RunInToolchain = ../../Command/RunInToolchain.dhall
@@ -13,9 +17,7 @@ let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
 
-let dependsOn = [
-    { name = "MinaArtifactBullseye", key = "build-deb-pkg" }
-]
+let dependsOn = DebianVersions.dependsOn DebianVersions.DebVersion.Bullseye Profiles.Type.Standard
 
 in 
 
@@ -54,7 +56,8 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = lintDirtyWhen,
         path = "Test",
-        name = "RunSnarkProfiler"
+        name = "RunSnarkProfiler",
+        tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
       },
     steps = [
       buildTestCmd Size.Small dependsOn

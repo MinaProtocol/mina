@@ -12,6 +12,7 @@
   sexplib0
   yojson
   ;; local libraries
+  genesis_constants
   codable
   currency
   fields_derivers.zkapps
@@ -25,6 +26,7 @@
   pickles
   pickles.backend
   pickles_types
+  ppx_deriving_yojson.runtime
   ppx_version.runtime
   run_in_thread
   signature_lib
