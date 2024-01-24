@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "replayer-cronjobs.name" -}}
+{{- define "berkeley-migration-cronjob.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "replayer-cronjobs.fullname" -}}
+{{- define "berkeley-migration-cronjob.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "replayer-cronjobs.chart" -}}
+{{- define "berkeley-migration-cronjob.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "replayer-cronjobs.labels" -}}
-helm.sh/chart: {{ include "replayer-cronjobs.chart" . }}
-{{ include "replayer-cronjobs.selectorLabels" . }}
+{{- define "berkeley-migration-cronjob.labels" -}}
+helm.sh/chart: {{ include "berkeley-migration-cronjob.chart" . }}
+{{ include "berkeley-migration-cronjob.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -45,17 +45,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "replayer-cronjobs.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "replayer-cronjobs.name" . }}
+{{- define "berkeley-migration-cronjob.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "berkeley-migration-cronjob.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "replayer-cronjobs.serviceAccountName" -}}
+{{- define "berkeley-migration-cronjob.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "replayer-cronjobs.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "berkeley-migration-cronjob.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
