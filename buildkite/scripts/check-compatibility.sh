@@ -102,7 +102,9 @@ function boot_and_sync {
         SYNCED=$(echo ${SYNC_STATUS} | grep -c "SYNCED")
     	sleep 5
     done
+    echo "Killing docker logs process"
     kill $DOCKER_LOGS_PID
+    echo "Killed docker logs process"
 }
 
 function rm_docker_container {
