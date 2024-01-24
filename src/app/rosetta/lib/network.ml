@@ -328,7 +328,7 @@ module Status = struct
                      { Sync_status.current_index= Some (Int64.of_int_exn 4)
                      ; target_index= None
                      ; stage= Some "Synced"
-                     ; synced = None
+                     ; synced = Some true
                      } } )
 
       let oldest_block_is_different_env : 'gql Env.Mock.t =
@@ -364,7 +364,7 @@ module Status = struct
                      { Sync_status.current_index= Some (Int64.of_int_exn 4)
                      ; target_index= None
                      ; stage= Some "Synced"
-                     ; synced = None
+                     ; synced = Some true
                      } } )
     end )
 end
