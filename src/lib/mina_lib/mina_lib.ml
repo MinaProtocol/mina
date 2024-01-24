@@ -1391,7 +1391,9 @@ let start t =
       ~log_block_creation:t.config.log_block_creation
       ~block_reward_threshold:t.config.block_reward_threshold
       ~block_produced_bvar:t.components.block_produced_bvar
-      ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net ;
+      ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
+      ~zkapp_cmd_limit_hardcap:
+        t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with
