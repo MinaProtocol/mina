@@ -137,11 +137,11 @@ copy_common_daemon_configs() {
 
   # Copy signature-based Binaries (based on signature type $2 passed into the function)
   cp ./default/src/app/cli/src/mina_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
-  
-  # Copy rosetta-based Binaries 
+
+  # Copy rosetta-based Binaries
   cp ./default/src/app/rosetta/rosetta_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
   cp ./default/src/app/rosetta/ocaml-signer/signer_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
- 
+
   mkdir -p "${BUILDDIR}/etc/mina/rosetta"
   mkdir -p "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   mkdir -p "${BUILDDIR}/etc/mina/rosetta/archive"

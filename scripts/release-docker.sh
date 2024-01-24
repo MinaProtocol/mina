@@ -59,7 +59,7 @@ case "${DEB_CODENAME##*=}" in
 esac
 IMAGE="--build-arg image=${IMAGE}"
 
-# Determine profile for mina name. To preserve backward compatibility standard profile is default. 
+# Determine profile for mina name. To preserve backward compatibility standard profile is default.
 case "${DEB_PROFILE}" in
   standard)
     DOCKER_DEB_PROFILE=""
