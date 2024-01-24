@@ -6,6 +6,10 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: mina-cronjob-{{ .name }}
+  annotations:
+  {{- with $.Values.annotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   successfulJobsHistoryLimit: 3
   concurrencyPolicy: Forbid
@@ -53,6 +57,9 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: {{ include "replayer-cronjobs.fullname" $rootContext }}-{{ .script.secretName }}
+  {{- with $.Values.annotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
 type: Opaque
 data:
   {{- ($rootContext.Files.Glob (printf "files/%s" .script.scriptName)).AsSecrets | nindent 2 }} 

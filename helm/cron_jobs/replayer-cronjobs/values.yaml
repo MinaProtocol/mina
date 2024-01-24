@@ -40,6 +40,8 @@ tolerations: []
 
 affinity: {}
 
+annotations: {}
+
 replayers:
 - name: mainnet-migrated
   schedule: "0 2 * * *"
