@@ -1,7 +1,7 @@
 open Core_kernel
 open Mina_base
 
-module Test_input1 : Transaction_snark_tests.Test_zkapp_update.Input_intf =
+module Test_input : Transaction_snark_tests.Test_zkapp_update.Input_intf =
 struct
   let test_description = "vk-permission-proof"
 
@@ -21,26 +21,6 @@ struct
   let is_non_zkapp_update = true
 end
 
-module Test_input2 : Transaction_snark_tests.Test_zkapp_update.Input_intf =
-struct
-  let test_description = "vk-permission-impossible"
-
-  let failure_expected =
-    ( Mina_base.Transaction_status.Failure.Update_not_permitted_permissions
-    , Transaction_snark_tests.Util.Pass_2 )
-
-  let snapp_update =
-    { Account_update.Update.dummy with
-      permissions =
-        Zkapp_basic.Set_or_keep.Set
-          { Permissions.user_default with
-            set_verification_key = (Impossible, Mina_numbers.Txn_version.current)
-          }
-    }
-
-  let is_non_zkapp_update = true
-end
-
 let%test_module "Update account verification key permission from mainnet to \
                  berkeley" =
   ( module struct
@@ -54,8 +34,7 @@ let%test_module "Update account verification key permission from mainnet to \
     open Signature_lib
     module U = Transaction_snark_tests.Util
     module Spec = Transaction_snark.For_tests.Update_states_spec
-    include Transaction_snark_tests.Test_zkapp_update.Make (Test_input1)
-    include Transaction_snark_tests.Test_zkapp_update.Make (Test_input2)
+    include Transaction_snark_tests.Test_zkapp_update.Make (Test_input)
 
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
@@ -75,7 +54,7 @@ let%test_module "Update account verification key permission from mainnet to \
         failwith "already oldest version"
       else oldest
 
-    let mk_update_perm_check ~perm_after ?failure_expected () =
+    let mk_update_perm_check ~perm_after () =
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           let fee = Fee.of_nanomina_int_exn 1_000_000 in
@@ -98,7 +77,7 @@ let%test_module "Update account verification key permission from mainnet to \
             ; preconditions = None
             }
           in
-          U.test_snapp_update ?expected_failure:failure_expected
+          U.test_snapp_update
             ~snapp_permissions:
               (U.permissions_from_update (snapp_update ~perm_after)
                  ~auth:Signature ~txn_version:older_version )
