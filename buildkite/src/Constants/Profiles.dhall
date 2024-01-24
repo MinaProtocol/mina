@@ -16,7 +16,7 @@ let lowerName = \(profile : Profile) ->
 
 let duneProfile = \(profile : Profile) ->
   merge {
-    Standard = "devnet"
+    Standard = "version1"
     , Lightnet = "lightnet"
   } profile
 
