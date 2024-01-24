@@ -245,6 +245,7 @@ module Protocol = struct
           { k : 'length
           ; slots_per_epoch : 'length
           ; slots_per_sub_window : 'length
+          ; grace_period_slots : 'length
           ; delta : 'delta
           ; genesis_state_timestamp : 'genesis_state_timestamp
           }
@@ -266,6 +267,7 @@ module Protocol = struct
           [ ("k", `Int t.k)
           ; ("slots_per_epoch", `Int t.slots_per_epoch)
           ; ("slots_per_sub_window", `Int t.slots_per_sub_window)
+          ; ("grace_period_slots", `Int t.grace_period_slots)
           ; ("delta", `Int t.delta)
           ; ( "genesis_state_timestamp"
             , `String
@@ -281,6 +283,7 @@ module Protocol = struct
             [ ("k", `Int k)
             ; ("slots_per_epoch", `Int slots_per_epoch)
             ; ("slots_per_sub_window", `Int slots_per_sub_window)
+            ; ("grace_period_slots", `Int grace_period_slots)
             ; ("delta", `Int delta)
             ; ("genesis_state_timestamp", `String time_str)
             ] -> (
@@ -290,6 +293,7 @@ module Protocol = struct
                   { Poly.k
                   ; slots_per_epoch
                   ; slots_per_sub_window
+                  ; grace_period_slots
                   ; delta
                   ; genesis_state_timestamp
                   }
@@ -309,6 +313,7 @@ module Protocol = struct
           ; delta = t.delta
           ; slots_per_epoch = t.slots_per_epoch
           ; slots_per_sub_window = t.slots_per_sub_window
+          ; grace_period_slots = t.grace_period_slots
           ; genesis_state_timestamp =
               Time.to_string_abs
                 (Time.of_span_since_epoch
@@ -369,6 +374,8 @@ include T
 
 [%%inject "slots_per_sub_window", slots_per_sub_window]
 
+[%%inject "grace_period_slots", grace_period_slots]
+
 [%%inject "delta", delta]
 
 [%%inject "pool_max_size", pool_max_size]
@@ -378,6 +385,7 @@ let compiled : t =
       { k
       ; slots_per_epoch
       ; slots_per_sub_window
+      ; grace_period_slots
       ; delta
       ; genesis_state_timestamp =
           genesis_timestamp_of_string genesis_state_timestamp_string |> of_time
