@@ -3,6 +3,7 @@
   "paths": {
     "berkeley_migration":"src/app/berkeley_migration/berkeley_migration.exe",
     "replayer":"src/app/replayer/replayer.exe",
+    "archive_blocks":"src/app/archive_blocks/archive_blocks.exe",
     "mina":"src/app/cli/src/mina.exe",
     "mina_archive":"src/app/archive/archive.exe",
     "mainnet_genesis_ledger": "genesis_ledgers/mainnet.json",

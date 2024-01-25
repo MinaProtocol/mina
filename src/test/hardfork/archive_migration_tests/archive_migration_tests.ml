@@ -569,6 +569,97 @@ module HardForkTests = struct
         HardForkSteps.compare_replayer_outputs reference_replayer_output
           actual_replayer_output ~compare_receipt_chain_hashes:false ;
         Deferred.unit )
+
+let missing_blocks env_file =
+  let env = Settings.of_file_or_fail env_file in
+  let test_name = "missing_blocks" in
+  let temp_dir = Settings.working_dir env test_name in
+  let reference_replayer_input =
+    Filename.concat temp_dir "reference_replayer_input.json"
+  in
+  let reference_replayer_output =
+    Filename.concat temp_dir "reference_replayer_output.json"
+  in
+  let actual_replayer_output =
+    Filename.concat temp_dir "actual_replayer_output.json"
+  in
+
+  Async.Thread_safe.block_on_async_exn (fun () ->
+      let steps = HardForkSteps.create env temp_dir test_name in
+      let%bind conn_str_refrerence_source_db =
+        HardForkSteps.import_hardfork_data_dump steps
+      in
+
+      let%bind target_hash =
+      HardForkSteps.get_latest_canonical_state_hash
+        (Uri.of_string conn_str_refrerence_source_db)
+      in
+
+    let input =
+      BerkeleyTablesAppInput.of_runtime_config_file_exn
+        (Filename.concat env.paths.random_hardfork_folder "genesis_ledger.json") target_hash
+    in
+    BerkeleyTablesAppInput.to_yojson_file input reference_replayer_input ;
+
+    let%bind _ =
+      HardForkSteps.run_compatible_replayer steps conn_str_refrerence_source_db
+        ~input_file:(Filename.basename reference_replayer_input)
+        ~output_file:(Filename.basename reference_replayer_output)
+        ~clear_checkpoints:true
+    in
+
+      let%bind conn_str_missing_blocks_db =
+        HardForkSteps.create_random_mainnet_db steps
+      in
+
+      let%bind conn_str_target_blocks_db =
+        HardForkSteps.create_random_output_db steps
+      in
+
+      let%bind blocks =
+        HardForkSteps.download_precomputed_blocks steps 
+            ~bucket:env.paths.random_hardfork_bucket
+            ~from:2 
+            ~num_blocks:16 
+            ~network:"mainnet"
+      in
+      let%bind _ =
+        HardForkSteps.archive_precomputed_blocks steps blocks
+          conn_str_missing_blocks_db
+      in
+     
+      let%bind _ =
+        HardForkSteps.perform_berkeley_migration steps ~batch_size:2
+          ~genesis_ledger:env.paths.mainnet_genesis_ledger
+          ~source_archive_uri:conn_str_missing_blocks_db
+          ~source_blocks_bucket:env.paths.mainnet_data_bucket
+          ~target_archive_uri:conn_str_target_blocks_db
+          ~end_global_slot:None
+          ~berkeley_migration_app:env.paths.berkeley_migration
+      in
+
+      let%bind _ =
+      HardForkSteps.archive_precomputed_blocks steps blocks
+        conn_str_target_blocks_db
+    in
+      let%bind _ =
+        HardForkSteps.run_migration_replayer steps
+          ~archive_uri:conn_str_target_blocks_db
+          ~input_config:reference_replayer_input ~interval_checkpoint:1
+          ~replayer_app:env.paths.replayer
+          ~output_ledger:actual_replayer_output
+      in
+
+       let%bind _ =
+        HardForkSteps.compare_hashes conn_str_refrerence_source_db
+        conn_str_target_blocks_db 500
+          ~should_contain_pending_blocks:true
+      in
+      HardForkSteps.compare_replayer_outputs reference_replayer_output
+        actual_replayer_output ~compare_receipt_chain_hashes:false;
+
+      Deferred.unit )
+
 end
 
 let env =
@@ -601,4 +692,8 @@ let () =
     , [ test_case "Test for launching node on migrated data" `Quick
           HardForkTests.daemon
       ] )
+    ; ( "missing_blocks"
+      , [ test_case "Test for migration data with missing blocks" `Quick
+            HardForkTests.missing_blocks
+        ] )
     ]

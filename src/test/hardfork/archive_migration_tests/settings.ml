@@ -6,6 +6,7 @@ module Settings = struct
     ; replayer : string
     ; mina : string
     ; mina_archive : string
+    ; archive_blocks : string
     ; mainnet_genesis_ledger : string
     ; mainnet_genesis_block : string
     ; mainnet_data_bucket : string [@default "mina_network_block_data"]

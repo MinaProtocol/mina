@@ -726,6 +726,12 @@ module HardForkSteps = struct
       ~volume:(Printf.sprintf "%s:%s" (Filename.realpath t.working_dir) workdir)
       ~network:"hardfork"
 
+  let archive_precomputed_blocks t blocks conn_str = 
+    run t t.env.paths.archive_blocks ~args:
+    ( [ "--archive-uri"; conn_str; "-precomputed" ]
+    @ blocks )
+ 
+
   let run_compatible_replayer t conn_str ?(clear_checkpoints = false)
       ~input_file ~output_file =
     let workdir = "/workdir" in
@@ -756,15 +762,15 @@ module HardForkSteps = struct
     if clear_checkpoints then clear_checkpoint_files "replayer" t >>| ignore
     else Deferred.unit
 
-  let download_mainnet_precomputed_blocks steps ~from ~num_blocks =
-    let output_folder = steps.working_dir in
+  let download_precomputed_blocks t ~bucket ~from ~num_blocks ~network=
+    let output_folder = t.working_dir in
     let%bind _ =
       Precomputed_blocks.fetch_batch ~height:(Int64.of_int from)
-        ~num_blocks:(Int64.of_int num_blocks) ~bucket:"mina_network_block_data"
+        ~num_blocks:(Int64.of_int num_blocks) ~bucket
         ~output_folder
     in
     Deferred.return
-      ( gather_files_with_prefix output_folder ~substring:"mainnet"
+      ( gather_files_with_prefix output_folder ~substring:network
       |> List.sort ~compare:(fun left right ->
              let get_length file =
                Scanf.sscanf (Filename.basename file) "mainnet-%d-%s"
@@ -773,7 +779,11 @@ module HardForkSteps = struct
              let left = get_length left in
              let right = get_length right in
              left - right ) )
-  
+
+
+  let download_mainnet_precomputed_blocks t ~from ~num_blocks =
+    download_precomputed_blocks t ~from ~num_blocks ~bucket:"mina_network_block_data" ~network:"mainnet"
+
 
   let run_in_background t ~args prog =
     let (args, prog) = match t.env.executor with

@@ -4,6 +4,7 @@
     "berkeley_migration":"/usr/local/bin/mina-berkeley-migration",
     "replayer":"/usr/local/bin/mina-replayer",
     "mina":"/usr/local/bin/mina",
+    "archive_blocks":"/usr/local/bin/mina-archive-blocks",
     "mina_archive":"/usr/local/bin/mina-archive",
     "mainnet_genesis_ledger": "/etc/mina/test/genesis_ledgers/mainnet.json",
     "mainnet_genesis_block": "/etc/mina/test/hardfork/test_data/mainnet_migration/genesis_data_only.sql",
