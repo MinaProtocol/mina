@@ -15,6 +15,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
+  let previous_global_slot = 10000
+
   let config =
     let open Test_config in
     { default with
@@ -38,7 +40,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               { previous_state_hash =
                   "3NKtK83Ms5KgiYnyDqAWDbVLRizxP4dmJEk3GBGYEMPQtQpXRpaD"
               ; previous_length = 30000
-              ; previous_global_slot = 10000
+              ; previous_global_slot
               }
         }
     }
@@ -96,7 +98,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                Zkapp_basic.Set_or_keep.Set
                  ( { initial_minimum_balance = Currency.Balance.of_mina_int_exn 5
                    ; cliff_time =
-                       Mina_numbers.Global_slot_since_genesis.of_int 20000
+                       Mina_numbers.Global_slot_since_genesis.of_int
+                         (10000 + previous_global_slot)
                    ; cliff_amount = Currency.Amount.of_nanomina_int_exn 10_000
                    ; vesting_period = Mina_numbers.Global_slot_span.of_int 2
                    ; vesting_increment =
@@ -193,7 +196,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  ( { initial_minimum_balance =
                        Currency.Balance.of_mina_int_exn 100
                    ; cliff_time =
-                       Mina_numbers.Global_slot_since_genesis.of_int 0
+                       Mina_numbers.Global_slot_since_genesis.of_int
+                         previous_global_slot
                    ; cliff_amount = Currency.Amount.of_mina_int_exn 0
                    ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                    ; vesting_increment = Currency.Amount.of_mina_int_exn 1
@@ -239,7 +243,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                Zkapp_basic.Set_or_keep.Set
                  ( { initial_minimum_balance = Currency.Balance.of_mina_int_exn 5
                    ; cliff_time =
-                       Mina_numbers.Global_slot_since_genesis.of_int 20000
+                       Mina_numbers.Global_slot_since_genesis.of_int
+                         (10000 + previous_global_slot)
                    ; cliff_amount = Currency.Amount.of_nanomina_int_exn 10_000
                    ; vesting_period = Mina_numbers.Global_slot_span.zero
                    ; vesting_increment =
@@ -331,7 +336,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           timing =
             Zkapp_basic.Set_or_keep.Set
               { initial_minimum_balance = Currency.Balance.of_mina_int_exn 9
-              ; cliff_time = Mina_numbers.Global_slot_since_genesis.of_int 14000
+              ; cliff_time =
+                  Mina_numbers.Global_slot_since_genesis.of_int
+                    (4000 + previous_global_slot)
               ; cliff_amount = Currency.Amount.of_nanomina_int_exn 100_000
               ; vesting_period = Mina_numbers.Global_slot_span.of_int 8
               ; vesting_increment = Currency.Amount.of_nanomina_int_exn 2_000
