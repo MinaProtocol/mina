@@ -128,4 +128,9 @@ module For_tests : sig
          | `Fatal_error of exn ] )
        Result.t
        Deferred.t
+  
+  val to_precomputed_block: t  -> logger:Logger.t -> precomputed_values:Precomputed_values.t -> Mina_block.Precomputed.t
+
+  val blockchain_length: t -> Unsigned.UInt32.t
+         
 end

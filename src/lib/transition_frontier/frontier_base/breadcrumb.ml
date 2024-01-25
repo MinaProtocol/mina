@@ -545,4 +545,26 @@ module For_tests = struct
       Async_kernel.Deferred.t =
     Deferred.return
       (Error (`Fatal_error (failwith "deliberately failing for unit tests")))
+  
+  let to_precomputed_block t ~logger ~precomputed_values =
+    let block = block t in
+    let staged_ledger = staged_ledger t
+    in
+    let scheduled_time =
+          Mina_block.(Header.protocol_state @@ header block)
+          |> Mina_state.Protocol_state.blockchain_state
+          |> Mina_state.Blockchain_state.timestamp
+        in
+        Mina_block.Precomputed.of_block ~logger 
+          ~constraint_constants:precomputed_values.Precomputed_values.constraint_constants
+          ~staged_ledger 
+          ~scheduled_time
+          (block_with_hash t)
+      
+  let blockchain_length t =
+    let block = block t in
+    let block_with_hash = Mina_block.wrap_with_hash block in
+    let block = With_hash.data block_with_hash in
+    Mina_block.blockchain_length block
+
 end

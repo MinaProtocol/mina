@@ -10,9 +10,9 @@ let Cmd = ../Lib/Cmds.dhall in
     Command.build
       Command.Config::{
         commands = [
-          Cmd.run "./buildkite/scripts/replayer-test.sh"
+          Cmd.run "./buildkite/scripts/patch-archive-test.sh"
         ],
-        label = "Archive: Replayer test",
+        label = "Archive: Patch archive test",
         key = "replayer-test",
         target = Size.Large,
         depends_on = dependsOn

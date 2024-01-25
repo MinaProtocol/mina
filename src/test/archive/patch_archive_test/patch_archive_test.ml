@@ -112,6 +112,7 @@ let rec rm_file_or_dir path =
 
 let main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
     ~extract_blocks_path ~precomputed ~extensional ~files () =
+  let open Deferred.Let_syntax in
   let () =
     match (precomputed, extensional) with
     | true, false | false, true ->
@@ -281,4 +282,7 @@ let () =
              ~doc:"Blocks are in extensional format"
          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
          main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
-           ~extract_blocks_path ~precomputed ~extensional ~files )))
+           ~extract_blocks_path ~precomputed ~extensional ~files 
+        )
+      )
+    )

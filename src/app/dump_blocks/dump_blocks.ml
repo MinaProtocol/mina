@@ -1,16 +1,23 @@
 open Frontier_base
 open Full_frontier.For_tests
+open Cmdliner
+open Core
+open Archive_lib
 
-let () =
-  let open Core_kernel in
-  Backtrace.elide := false ;
-  Async.Scheduler.set_record_backtraces true
+  let logger = Logger.create ()
 
-let logger = Logger.create ()
 
-let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+  let proof_level = Genesis_constants.Proof_level.None
 
-let constraint_constants = precomputed_values.constraint_constants
+    let precomputed_values =
+      { (Lazy.force Precomputed_values.for_unit_tests) with proof_level }
+
+    let constraint_constants = precomputed_values.constraint_constants
+
+    
+    module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
+
+let accounts_with_secret_keys = (Lazy.force Genesis_ledger.accounts)
 
 (* This executable outputs random block to stderr in sexp and json
    The output is useful for src/lib/mina_block tests when the sexp/json representation changes. *)
@@ -49,6 +56,38 @@ let f make_breadcrumb =
         (Mina_block.Precomputed.to_yojson precomputed) ;
       clean_up_persistent_root ~frontier )
 
+    
+let gen_single_block =
+  Command.basic
+    ~summary:
+      "Generates single arbitrary precomputed block and prints it to the output"
+  (Command.Param.return (fun () ->
+      let verifier = verifier () in
+      Core_kernel.Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:1 ~f
+    ))
+
+let gen_sequence_of_blocks = 
+  Command.basic
+    ~summary:
+      "Generates sequence of blocks to specified location"
+    Command.Let_syntax.(
+      let%map_open size =
+      flag "--size" ~aliases:[ "-s" ] (required int)
+        ~doc:"sequence size"
+      and output_folder = Command.Param.anon Command.Anons.("OUTPUT_FOLDER" %: Command.Param.string) in
+      fun () ->
+        Archive_lib.Processor.For_test.dump_blocks ~trials:1 ~size ~precomputed_values ~logger ~verifier:(verifier ()) ~accounts_with_secret_keys ~path:output_folder
+     )
+
+let commands =
+  [ ( "single", gen_single_block )
+    ; ( "sequence", gen_sequence_of_blocks  )
+  ]
+
+
 let () =
-  let verifier = verifier () in
-  Core_kernel.Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:1 ~f
+Command.run
+  (Command.group ~summary:"Dump blocks main commands"
+     ~preserve_subcommand_order:() commands )
+
+ 

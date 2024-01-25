@@ -4,6 +4,7 @@
  (public_name patch_archive_test)
  (libraries
    async
+   async.async_command
    core_kernel
    caqti
    caqti-async
@@ -22,6 +23,6 @@
    base.caml
    result
  )
- (preprocessor_deps ../../config.mlh)
+ (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_mina ppx_let ppx_hash ppx_compare ppx_sexp_conv h_list.ppx)))

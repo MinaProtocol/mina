@@ -5,6 +5,8 @@ open Mina_transaction
 open Pipe_lib
 open Signature_lib
 
+
+
 let%test_module "Archive node unit tests" =
   ( module struct
     let logger = Logger.create ()
@@ -29,7 +31,7 @@ let%test_module "Archive node unit tests" =
       Uri.of_string
         (Option.value
            (Sys.getenv "MINA_TEST_POSTGRES")
-           ~default:"postgres://admin:codarules@localhost:5432/archiver" )
+           ~default:"postgres://postgres:postgres@localhost:5432/test" )
 
     let conn_lazy =
       lazy
@@ -268,39 +270,11 @@ let%test_module "Archive node unit tests" =
           | Error e ->
               failwith @@ Caqti_error.show e )
 
+
     let%test_unit "Block: read and write" =
       let pool = Lazy.force conn_pool_lazy in
-      Quickcheck.test ~trials:20
-        ( Quickcheck.Generator.with_size ~size:10
-        @@ Quickcheck_lib.gen_imperative_list
-             (Transition_frontier.For_tests.gen_genesis_breadcrumb
-                ~precomputed_values ~verifier () )
-             (Transition_frontier.Breadcrumb.For_tests.gen_non_deferred
-                ?logger:None ~precomputed_values ~verifier ?trust_system:None
-                ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts)
-                () ) )
-        ~f:(fun breadcrumbs ->
-          Thread_safe.block_on_async_exn
-          @@ fun () ->
-          let reader, writer =
-            Strict_pipe.create ~name:"archive"
-              (Buffered (`Capacity 100, `Overflow Crash))
-          in
-          let diffs =
-            List.map
-              ~f:(fun breadcrumb ->
-                Diff.Transition_frontier
-                  (Diff.Builder.breadcrumb_added ~precomputed_values ~logger
-                     breadcrumb ) )
-              breadcrumbs
-          in
-          List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
-          Strict_pipe.Writer.close writer ;
-          let%bind () =
-            Processor.run
-              ~constraint_constants:precomputed_values.constraint_constants pool
-              reader ~logger ~delete_older_than:None
-          in
+      Processor.For_test.archive_random_blocks ~trials:20 ~size:10 ~pool ~precomputed_values ~logger ~verifier ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts)
+      ~f_check:(fun breadcrumbs ->
           match%map
             Mina_caqti.deferred_result_list_fold breadcrumbs ~init:()
               ~f:(fun () breadcrumb ->
