@@ -644,6 +644,7 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
              precomputed_values.constraint_constants )
     ; ledger = None
     ; epoch_data = None
+    ; s3_data_hashes = None
     }
 
 let%test_module "Runtime config" =

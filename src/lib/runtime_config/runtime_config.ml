@@ -450,12 +450,20 @@ module Json_layout = struct
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
+  module Data_hashes = struct
+    type ledger_with_hash = { merkle_root : string; s3_hash : string }
+    [@@deriving yojson]
+
+    type t = ledger_with_hash list [@@deriving yojson]
+  end
+
   type t =
     { daemon : Daemon.t option [@default None]
     ; genesis : Genesis.t option [@default None]
     ; proof : Proof_keys.t option [@default None]
     ; ledger : Ledger.t option [@default None]
     ; epoch_data : Epoch_data.t option [@default None]
+    ; s3_data_hashes : Data_hashes.t option [@default None]
     }
   [@@deriving yojson, fields, dhall_type]
 
@@ -1286,34 +1294,69 @@ module Epoch_data = struct
     { staking; next }
 end
 
+module Data_hashes = struct
+  type ledger_with_hash = Json_layout.Data_hashes.ledger_with_hash =
+    { merkle_root : string; s3_hash : string }
+  [@@deriving yojson, fields, bin_io_unversioned]
+
+  type t = ledger_with_hash list [@@deriving bin_io_unversioned]
+
+  let to_json_layout : t -> Json_layout.Data_hashes.t = Fn.id
+
+  let of_json_layout : Json_layout.Data_hashes.t -> (t, string) Result.t =
+    Result.return
+
+  let to_yojson x = Json_layout.Data_hashes.to_yojson (to_json_layout x)
+
+  let of_yojson json =
+    Result.bind ~f:of_json_layout (Json_layout.Data_hashes.of_yojson json)
+
+  let combine t1 t2 = t1 @ t2
+
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map ledgers =
+      Quickcheck.Generator.(list (both String.gen_nonempty String.gen_nonempty))
+    in
+    List.map ledgers ~f:(fun (merkle_root, s3_hash) ->
+        { merkle_root; s3_hash } )
+end
+
 type t =
   { daemon : Daemon.t option
   ; genesis : Genesis.t option
   ; proof : Proof_keys.t option
   ; ledger : Ledger.t option
   ; epoch_data : Epoch_data.t option
+  ; s3_data_hashes : Data_hashes.t option
   }
 [@@deriving bin_io_unversioned]
 
-let make ?daemon ?genesis ?proof ?ledger ?epoch_data () =
-  { daemon; genesis; proof; ledger; epoch_data }
+let make ?daemon ?genesis ?proof ?ledger ?epoch_data ?s3_data_hashes () =
+  { daemon; genesis; proof; ledger; epoch_data; s3_data_hashes }
 
-let to_json_layout { daemon; genesis; proof; ledger; epoch_data } =
+let to_json_layout
+    { daemon; genesis; proof; ledger; epoch_data; s3_data_hashes } =
   { Json_layout.daemon = Option.map ~f:Daemon.to_json_layout daemon
   ; genesis = Option.map ~f:Genesis.to_json_layout genesis
   ; proof = Option.map ~f:Proof_keys.to_json_layout proof
   ; ledger = Option.map ~f:Ledger.to_json_layout ledger
   ; epoch_data = Option.map ~f:Epoch_data.to_json_layout epoch_data
+  ; s3_data_hashes = Option.map ~f:Data_hashes.to_json_layout s3_data_hashes
   }
 
-let of_json_layout { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
+let of_json_layout
+    { Json_layout.daemon; genesis; proof; ledger; epoch_data; s3_data_hashes } =
   let open Result.Let_syntax in
   let%map daemon = result_opt ~f:Daemon.of_json_layout daemon
   and genesis = result_opt ~f:Genesis.of_json_layout genesis
   and proof = result_opt ~f:Proof_keys.of_json_layout proof
   and ledger = result_opt ~f:Ledger.of_json_layout ledger
-  and epoch_data = result_opt ~f:Epoch_data.of_json_layout epoch_data in
-  { daemon; genesis; proof; ledger; epoch_data }
+  and epoch_data = result_opt ~f:Epoch_data.of_json_layout epoch_data
+  and s3_data_hashes =
+    result_opt ~f:Data_hashes.of_json_layout s3_data_hashes
+  in
+  { daemon; genesis; proof; ledger; epoch_data; s3_data_hashes }
 
 let to_yojson x = Json_layout.to_yojson (to_json_layout x)
 
@@ -1356,6 +1399,7 @@ let default =
   ; proof = None
   ; ledger = None
   ; epoch_data = None
+  ; s3_data_hashes = None
   }
 
 let combine t1 t2 =
@@ -1373,6 +1417,8 @@ let combine t1 t2 =
   ; proof = merge ~combine:Proof_keys.combine t1.proof t2.proof
   ; ledger = opt_fallthrough ~default:t1.ledger t2.ledger
   ; epoch_data = opt_fallthrough ~default:t1.epoch_data t2.epoch_data
+  ; s3_data_hashes =
+      opt_fallthrough ~default:t1.s3_data_hashes t2.s3_data_hashes
   }
 
 let gen =
@@ -1381,12 +1427,14 @@ let gen =
   and genesis = Genesis.gen
   and proof = Proof_keys.gen
   and ledger = Ledger.gen
-  and epoch_data = Epoch_data.gen in
+  and epoch_data = Epoch_data.gen
+  and s3_data_hashes = Data_hashes.gen in
   { daemon = Some daemon
   ; genesis = Some genesis
   ; proof = Some proof
   ; ledger = Some ledger
   ; epoch_data = Some epoch_data
+  ; s3_data_hashes = Some s3_data_hashes
   }
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
