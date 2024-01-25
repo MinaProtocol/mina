@@ -21,6 +21,7 @@
   promise
   kimchi_bindings
   kimchi_types
+  bounded_types
   pasta_bindings
   snarkette
   ppx_version.runtime))

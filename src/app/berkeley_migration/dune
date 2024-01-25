@@ -20,6 +20,7 @@
    async.async_command
    integers
    ;; local libraries
+   bounded_types
    logger
    archive_lib
    block_time
