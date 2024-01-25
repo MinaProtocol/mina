@@ -250,7 +250,6 @@ metadata:
   name: {{ $config.name }}
   labels:
     app: {{ $config.name }}
-    testnet: {{ $.Values.testnetName }}
     role: seed
   annotations:
   {{- with $config.service.annotations }}
@@ -275,9 +274,24 @@ spec:
   - name: tcp-p2p
     port: {{ $.Values.mina.ports.p2p }}
     targetPort: external-port
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $config.name }}-metrics
+  labels:
+    testnet: {{ $.Values.testnetName }}
+    app: {{ $config.name }}
+    role: seed
+spec:
+  type: ClusterIP
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $config.name }}
+  ports:
   - name: metrics-port
     port: {{ $.Values.mina.ports.metrics }}
-    targetPort: {{ $.Values.mina.ports.metrics }}
+    targetPort: metrics-port
 ---
 {{- if $.Values.mina.exposeGraphql }}
 apiVersion: v1
