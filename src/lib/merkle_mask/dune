@@ -1,8 +1,23 @@
 (library
  (name merkle_mask)
  (public_name merkle_mask)
- (flags (:standard -w +a-40..44 -warn-error +a-70))
+ (flags
+  ; Deactivated warnings
+  ; 40: name-out-scope (activate later)
+  ;
+  ; 41: ambiguous name (too many of them for now, activate later)
+  ;
+  ; 42: disambiguated-name (rely on type disambiguation ,not too bad but closer
+  ; module openings may both solve the warning *and* help the reader)
+  ;
+  ; 44: open-shadow-identifier (operation overloading is common in the codebase)
+  (:standard -w +a-40..42-44 -warn-error +a))
  (library_flags -linkall)
+ (modules_without_implementation
+   base_merkle_tree_intf
+   inputs_intf
+   maskable_merkle_tree_intf
+   masking_merkle_tree_intf)
  (libraries
    ;; opam libraries
   async
