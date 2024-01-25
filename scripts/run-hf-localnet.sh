@@ -14,6 +14,10 @@ DELAY_MIN=${DELAY_MIN:-20}
 # Allows to use berkeley ledger when equals to .berkeley
 CONF_SUFFIX=${CONF_SUFFIX:-}
 
+# Allows to specify a specific configuration file
+# Genesis timestamp will be updated before use of configuration file
+CUSTOM_CONF=${CUSTOM_CONF:-}
+
 # Mina executable
 MINA_EXE=mina
 
@@ -35,12 +39,19 @@ while [[ $# -gt 0 ]]; do
       CONF_SUFFIX=".berkeley"; shift ;;
     -m|--mina)
       MINA_EXE="$2"; shift; shift ;;
+    -c|--config)
+      CUSTOM_CONF="$2"; shift; shift ;;
     -*|--*)
       echo "Unknown option $1"; exit 1 ;;
     *)
       KEYS+=("$1") ; shift ;;
   esac
 done
+
+if [[ "$CONF_SUFFIX" != "" ]] && [[ "$CUSTOM_CONF" != "" ]]; then
+  echo "Can't use both --berkeley and --config options" >&2
+  exit 1
+fi
 
 # Check mina command exists
 command -v "$MINA_EXE" >/dev/null || { echo "No 'mina' executable found"; exit 1; }
@@ -68,22 +79,24 @@ if [[ ! -f $CONF_DIR/libp2p_2 ]]; then
   "$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_2 2>/dev/null || \
     "$MINA_EXE" advanced generate-libp2p-keypair --privkey-path $CONF_DIR/libp2p_2 2>/dev/null
 fi
-if [[ ! -f $CONF_DIR/ledger.json ]]; then
+if [[ "$CUSTOM_CONF" == "" ]] && [[ ! -f $CONF_DIR/ledger.json ]]; then
   ( cd $CONF_DIR && "$SCRIPT_DIR/prepare-test-ledger.sh" -c 100000 -b 1000000 $(cat bp.pub) >ledger.json )
 fi
 
-jq --arg timestamp $( d=$(date +%s); date -u -d @$((d - d % 60 + DELAY_MIN*60)) +%FT%H:%M:%S+00:00 ) --slurpfile accounts $CONF_DIR/ledger.json '.ledger.accounts = $accounts[0] | .genesis.genesis_state_timestamp |= $timestamp' > $CONF_DIR/daemon.json << EOF
+timestamp="$( d=$(date +%s); date -u -d @$((d - d % 60 + DELAY_MIN*60)) +%FT%H:%M:%S+00:00 )"
+
+if [[ "$CUSTOM_CONF" == "" ]]; then
+  jq --arg timestamp "$timestamp" --slurpfile accounts $CONF_DIR/ledger.json '.ledger.accounts = $accounts[0] | .genesis.genesis_state_timestamp |= $timestamp' > $CONF_DIR/daemon.json << EOF
 {
   "genesis": {
     "genesis_state_timestamp": "",
     "slots_per_epoch": 48,
     "k": 2,
     "transaction_capacity": { "log_2": 2 },
-    "slots_per_sub_window": 3,
-    "sub_windows_per_window": 3,
     "grace_period_slots": 3
   },
   "proof": {
+    "work_delay": 1,
     "block_window_duration_ms": 25000
   },
   "ledger": {
@@ -93,8 +106,13 @@ jq --arg timestamp $( d=$(date +%s); date -u -d @$((d - d % 60 + DELAY_MIN*60)) 
 }
 EOF
 
-# Convert ledger to berkeley format
-jq '.ledger.accounts = [.ledger.accounts[] | del(.token_permissions, .permissions.stake) | .token = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf" | .token_symbol = "" | if .permissions.set_verification_key == "signature" then .permissions.set_verification_key = {auth:"signature", txn_version: "1"} else . end ]' <$CONF_DIR/daemon.json >$CONF_DIR/daemon.berkeley.json
+  # Convert ledger to berkeley format
+  jq '.ledger.accounts = [.ledger.accounts[] | del(.token_permissions, .permissions.stake) | .token = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf" | .token_symbol = "" | if .permissions.set_verification_key == "signature" then .permissions.set_verification_key = {auth:"signature", txn_version: "1"} else . end ]' <$CONF_DIR/daemon.json >$CONF_DIR/daemon.berkeley.json
+
+else
+  <"$CUSTOM_CONF" jq --arg timestamp "$timestamp" '.genesis.genesis_state_timestamp |= $timestamp' > $CONF_DIR/daemon.json
+fi
+
 
 ##############################################################
 # Launch two Mina nodes and send transactions on an interval
@@ -138,7 +156,7 @@ while kill -0 $sw_pid; do
       exit 0
     fi
     "$MINA_EXE" client send-payment --sender "$(cat $CONF_DIR/bp.pub)" --receiver "$acc" \
-      --amount 0.1 --memo "payment_$i" --rest-server 10313 \
+      --amount 0.1 --memo "payment_$i" --rest-server 10313 2>/dev/null \
       && i=$((i+1)) && echo "Sent tx #$i" || echo "Failed to send tx #$i"
     sleep "$TX_INTERVAL"
   done
