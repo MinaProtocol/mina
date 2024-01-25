@@ -72,6 +72,11 @@
    ppx_version.runtime
    internal_tracing
    itn_logger
+   staged_ledger_diff
+   transaction_snark_work
+   one_or_two
+   mina_wire_types
+   mina_base.import
  )
  (preprocessor_deps ../../../../config.mlh)
  (instrumentation (backend bisect_ppx))

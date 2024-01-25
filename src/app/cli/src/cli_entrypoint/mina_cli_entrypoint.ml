@@ -1817,6 +1817,7 @@ let internal_commands logger =
           Deferred.return ()) )
   ; ("dump-type-shapes", dump_type_shapes)
   ; ("replay-blocks", replay_blocks logger)
+  ; ("pre-verify-block", Internal_commands.pre_verify_block logger)
   ]
 
 let mina_commands logger =
