@@ -1,5 +1,5 @@
 (lang dune 3.3)
-(implicit_transitive_deps false)
+(implicit_transitive_deps true)
 
 (package (name allocation_functor))
 (package (name archive_blocks))
@@ -37,6 +37,7 @@
 (package (name delegation_compliance))
 (package (name dhall_types))
 (package (name direction))
+(package (name disk_caching_stats))
 (package (name display_public_key))
 (package (name downloader))
 (package (name dummy_values))

@@ -170,6 +170,31 @@ val iter2 : ('a, 'n) t -> ('b, 'n) t -> f:('a -> 'b -> unit) -> unit
 
 val for_all : ('a, 'n) t -> f:('a -> bool) -> bool
 
+(** [split v n] splits the vector [v] into two vectors [v1] and [v2] such that
+    [v1] is of size [n] and [v2] is of size [m] where [length v = n + m] and [v1
+    || v2 = v].
+
+    [n] must have been constructed using {Pickles_types.Nat.I.add} whose result
+    is equal the length of [v].
+    More concretely:
+    ```
+    let six = Pickles_types.Nat.N6.n in
+    let eleven = Pickles_types.Nat.N11.n in
+    let v = Pickles_types.Vector.init eleven ~f:(fun i -> i) in
+    (* will split v into two vectors, the first of size 5 and the second of size
+       6
+    *)
+    let v_five, v_six =
+      Pickles_types.Vector.split
+        (* built using Nat.I.add *)
+        v
+        (snd (Pickles_types.Nat.N5.add six))
+    in
+    [...]
+    ```
+    The reason to construct the argument [n] with {add} is to correctly built at
+    compile time an argument that will be smaller or equal to the size of [v].
+*)
 val split : ('a, 'n_m) t -> ('n, 'm, 'n_m) Nat.Adds.t -> ('a, 'n) t * ('a, 'm) t
 
 val rev : ('a, 'n) t -> ('a, 'n) t

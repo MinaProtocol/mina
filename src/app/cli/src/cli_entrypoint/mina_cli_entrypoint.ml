@@ -756,17 +756,29 @@ let setup_daemon logger =
             | Ok (precomputed_values, _) ->
                 precomputed_values
             | Error err ->
-                let json_config, accounts_omitted =
+                let ( json_config
+                    , `Accounts_omitted
+                        ( `Genesis genesis_accounts_omitted
+                        , `Staking staking_accounts_omitted
+                        , `Next next_accounts_omitted ) ) =
                   Runtime_config.to_yojson_without_accounts config
                 in
-                let f i = List.cons ("accounts_omitted", `Int i) in
-                [%log fatal]
-                  "Failed initializing with configuration $config: $error"
-                  ~metadata:
-                    (Option.value_map ~f ~default:Fn.id accounts_omitted
+                let append_accounts_omitted s =
+                  Option.value_map
+                    ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
+                    ~default:Fn.id
+                in
+                let metadata =
+                  append_accounts_omitted "genesis" genesis_accounts_omitted
+                  @@ append_accounts_omitted "staking" staking_accounts_omitted
+                  @@ append_accounts_omitted "next" next_accounts_omitted
                        [ ("config", json_config)
                        ; ("error", Error_json.error_to_yojson err)
-                       ] ) ;
+                       ]
+                in
+                [%log info]
+                  "Initializing with runtime configuration. Ledger name: $name"
+                  ~metadata ;
                 Error.raise err
           in
           let rev_daemon_configs =
@@ -1677,6 +1689,52 @@ let internal_commands logger =
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
                  failwith "early EOF while reading sexp" ) ) )
+  ; ( "run-snark-worker-single"
+    , Command.async
+        ~summary:"Run snark-worker on a sexp provided on a single line of stdin"
+        (let open Command.Let_syntax in
+        let%map_open filename =
+          flag "--file" (required string)
+            ~doc:"File containing the s-expression of the snark work to execute"
+        in
+        fun () ->
+          let open Deferred.Let_syntax in
+          let logger = Logger.create () in
+          Parallel.init_master () ;
+          match%bind
+            Reader.with_file filename ~f:(fun reader ->
+                [%log info] "Created reader for %s" filename ;
+                Reader.read_sexp reader )
+          with
+          | `Ok sexp -> (
+              let%bind worker_state =
+                Snark_worker.Prod.Inputs.Worker_state.create
+                  ~proof_level:Genesis_constants.Proof_level.compiled
+                  ~constraint_constants:
+                    Genesis_constants.Constraint_constants.compiled ()
+              in
+              let sok_message =
+                { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
+                ; prover = Quickcheck.random_value Public_key.Compressed.gen
+                }
+              in
+              let spec =
+                [%of_sexp:
+                  ( Transaction_witness.t
+                  , Ledger_proof.t )
+                  Snark_work_lib.Work.Single.Spec.t] sexp
+              in
+              match%map
+                Snark_worker.Prod.Inputs.perform_single worker_state
+                  ~message:sok_message spec
+              with
+              | Ok _ ->
+                  [%log info] "Successfully worked"
+              | Error err ->
+                  [%log error] "Work didn't work: $err"
+                    ~metadata:[ ("err", Error_json.error_to_yojson err) ] )
+          | `Eof ->
+              failwith "early EOF while reading sexp") )
   ; ( "run-verifier"
     , Command.async
         ~summary:"Run verifier on a proof provided on a single line of stdin"
