@@ -93,11 +93,9 @@ if [[ "$CUSTOM_CONF" == "" ]]; then
     "slots_per_epoch": 48,
     "k": 2,
     "transaction_capacity": { "log_2": 2 },
-    "slots_per_sub_window": 3,
     "grace_period_slots": 3
   },
   "proof": {
-    "sub_windows_per_window": 3,
     "work_delay": 1,
     "block_window_duration_ms": 25000
   },
