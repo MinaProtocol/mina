@@ -5,35 +5,35 @@
  (library_flags -linkall)
  (libraries
    ;; opam libraries
-  base.caml
-  async_kernel
   async
-  sexplib0
+  async_kernel
+  base.base_internalhash_types
+  base.caml
+  bitstring
+  core
+  core.uuid
+  core_kernel
   core_kernel.uuid
   integers
-  bitstring
-  core_kernel
-  yojson
-  core
-  base.base_internalhash_types
-  core.uuid
+  sexplib0
   stdio
+  yojson
   ;; local libraries
   debug_assert
-  merkle_ledger
-  visualization
-  mina_stdlib
   direction
   empty_hashes
   logger
+  merkle_ledger
+  mina_stdlib
+  visualization
   )
  (preprocess
   (pps
-   ppx_mina
    ppx_compare
    ppx_deriving.show
    ppx_deriving_yojson
    ppx_jane
+   ppx_mina
    ppx_version
    ))
  (instrumentation (backend bisect_ppx))
