@@ -45,6 +45,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           work_delay = Some 1
         ; transaction_capacity =
             Some Runtime_config.Proof_keys.Transaction_capacity.small
+        ; fork =
+            Some
+              { previous_state_hash =
+                  "3NKtK83Ms5KgiYnyDqAWDbVLRizxP4dmJEk3GBGYEMPQtQpXRpaD"
+              ; previous_length = 30000
+              ; previous_global_slot = 42185
+              }
         }
     }
 
