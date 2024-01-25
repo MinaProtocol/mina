@@ -37,6 +37,7 @@
    snark_params
    pickles
    kimchi_backend.pasta
+   bounded_types
     )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps

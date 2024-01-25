@@ -37,6 +37,7 @@
     pasta_bindings
     blake2
     staged_ledger_diff
+    bounded_types
     )
   (preprocess (pps ppx_version))
   (instrumentation (backend bisect_ppx))
