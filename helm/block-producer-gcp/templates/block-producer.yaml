@@ -395,6 +395,10 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ $config.name }}
+  labels:
+    app: {{ $config.name }}
+    testnet: {{ $.Values.testnetName }}
+    role: block-producer
 spec:
   type: ClusterIP
   # We want all pods to have their addresses published for the sake of the
@@ -407,6 +411,9 @@ spec:
   - name: tcp-p2p
     port: {{ default $.Values.mina.ports.p2p $config.externalPort }}
     targetPort: external-port
+  - name: metrics-port
+    port: {{ $.Values.mina.ports.metrics }}
+    targetPort: {{ $.Values.mina.ports.metrics }}
 ---
 {{- if $.Values.mina.exposeGraphql }}
 apiVersion: v1
