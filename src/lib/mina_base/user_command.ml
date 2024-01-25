@@ -233,6 +233,12 @@ let minimum_fee = Currency.Fee.minimum_user_command_fee
 
 let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
+let is_disabled = function
+  | Zkapp_command _ ->
+      Mina_compile_config.zkapps_disabled
+  | _ ->
+      false
+
 (* always `Accessed` for fee payer *)
 let accounts_accessed (t : t) (status : Transaction_status.t) :
     (Account_id.t * [ `Accessed | `Not_accessed ]) list =
@@ -396,6 +402,7 @@ module Well_formedness_error = struct
     | Insufficient_fee
     | Zero_vesting_period
     | Zkapp_too_big of (Error.t[@to_yojson Error_json.error_to_yojson])
+    | Transaction_type_disabled
     | Incompatible_version
   [@@deriving compare, to_yojson, sexp]
 
@@ -408,6 +415,8 @@ module Well_formedness_error = struct
         sprintf "Zkapp too big (%s)" (Error.to_string_hum err)
     | Incompatible_version ->
         "Set verification-key permission is updated to an incompatible version"
+    | Transaction_type_disabled ->
+        "Transaction type disabled"
 end
 
 let check_well_formedness ~genesis_constants t :
@@ -417,6 +426,7 @@ let check_well_formedness ~genesis_constants t :
     [ (has_insufficient_fee, Insufficient_fee)
     ; (has_zero_vesting_period, Zero_vesting_period)
     ; (is_incompatible_version, Incompatible_version)
+    ; (is_disabled, Transaction_type_disabled)
     ]
   in
   let errs0 =

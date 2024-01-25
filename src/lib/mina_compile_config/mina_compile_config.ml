@@ -82,3 +82,5 @@ let zkapp_cmd_limit = Some zkapp_cmd_limit
 [%%endif]
 
 let zkapp_cmd_limit_hardcap = 128
+
+let zkapps_disabled = false
