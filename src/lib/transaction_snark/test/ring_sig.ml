@@ -121,19 +121,17 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
       Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
           Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
           let spec = List.hd_exn specs in
-          let tag, _, (module P), Pickles.Provers.[ ringsig_prover; _ ] =
+          let tag, _, (module P), Pickles.Provers.[ ringsig_prover ] =
             Pickles.compile () ~cache:Cache_dir.cache
               ~override_wrap_domain:Pickles_base.Proofs_verified.N1
               ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
-              ~branches:(module Nat.N2)
-              ~max_proofs_verified:(module Nat.N2)
-                (* You have to put 2 here... *)
+              ~branches:(module Nat.N1)
+              ~max_proofs_verified:(module Nat.N0)
               ~name:"ringsig"
               ~constraint_constants:
                 (Genesis_constants.Constraint_constants.to_snark_keys_header
                    constraint_constants )
-              ~choices:(fun ~self ->
-                [ ring_sig_rule ring_member_pks; dummy_rule self ] )
+              ~choices:(fun ~self -> [ ring_sig_rule ring_member_pks ])
           in
           let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
           ( if debug_mode then
