@@ -20,7 +20,6 @@
    ;; local libraries
    bignum_bigint
    bitstring_lib
-   ppx_dhall_type
    codable
    test_util
    unsigned_extended
