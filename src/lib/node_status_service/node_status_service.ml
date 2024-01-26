@@ -103,8 +103,10 @@ let send_node_status_data ~logger ~url node_status_data =
       let metadata =
         [ ("data", node_status_json); ("url", `String (Uri.to_string url)) ]
       in
-      if Cohttp.Code.code_of_status status = 200 then
-        [%log info] "Sent node status data to URL $url" ~metadata
+      if
+        Cohttp.Code.(
+          code_of_status status >= 200 && code_of_status status < 300)
+      then [%log info] "Sent node status data to URL $url" ~metadata
       else
         let extra_metadata =
           match body with
