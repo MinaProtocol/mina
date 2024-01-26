@@ -157,6 +157,13 @@ module Json_layout = struct
         module Verification_key_perm = struct
           type t = { auth : Auth_required.t; txn_version : Txn_version.t }
           [@@deriving dhall_type, sexp, yojson, bin_io_unversioned]
+
+          let of_yojson = function
+            | `String _ as json ->
+                let%map.Result auth = Auth_required.of_yojson json in
+                { auth; txn_version = Txn_version.current }
+            | json ->
+                of_yojson json
         end
 
         type t =
