@@ -26,4 +26,13 @@ pr_branch=origin/${BUILDKITE_BRANCH}
 release_branch=${REMOTE}/$1
 
 echo "--- Run Python version linter with branches: ${pr_branch} ${base_branch} ${release_branch}"
-./scripts/version-linter.py ${pr_branch} ${base_branch} ${release_branch} && mina internal audit-type-shapes
+./scripts/version-linter.py ${pr_branch} ${base_branch} ${release_branch}
+
+echo "--- Install Mina"
+source buildkite/scripts/export-git-env-vars.sh
+echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+apt-get update --quiet --yes \
+apt-get install --quiet --yes --allow-downgrades "${MINA_DEB}=$deb_version"
+
+echo "--- Audit type shapes"
+mina internal audit-type-shapes
