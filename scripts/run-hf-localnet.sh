@@ -97,7 +97,7 @@ if [[ "$CUSTOM_CONF" == "" ]]; then
   },
   "proof": {
     "work_delay": 1,
-    "block_window_duration_ms": 25000
+    "block_window_duration_ms": 30000
   },
   "ledger": {
     "name": "localnet",
