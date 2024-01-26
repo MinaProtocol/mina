@@ -30,9 +30,10 @@ echo "--- Run Python version linter with branches: ${pr_branch} ${base_branch} $
 
 echo "--- Install Mina"
 source buildkite/scripts/export-git-env-vars.sh
-echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
-apt-get update --quiet --yes \
-apt-get install --quiet --yes --allow-downgrades "${MINA_DEB}=$deb_version"
+echo "Installing mina daemon package: mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
+echo "deb [trusted=yes] http://packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_RELEASE" | tee /etc/apt/sources.list.d/mina.list
+apt-get update --yes
+apt-get install --yes --allow-downgrades "mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
 
 echo "--- Audit type shapes"
 mina internal audit-type-shapes
