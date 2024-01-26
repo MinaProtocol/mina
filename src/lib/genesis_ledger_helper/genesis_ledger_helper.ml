@@ -47,6 +47,9 @@ module Tar = struct
         Ok ()
     | Error err ->
         Error (Error.tag err ~tag:"Error extracting tar file")
+
+  let filename_without_extension =
+    String.chop_suffix_if_exists ~suffix:".tar.gz"
 end
 
 let file_exists ?follow_symlinks filename =
@@ -82,9 +85,10 @@ module Ledger = struct
         [ Int.to_string constraint_constants.ledger_depth
         ; Int.to_string (Option.value ~default:0 num_accounts)
         ; List.to_string balances ~f:(fun (i, balance) ->
-              sprintf "%i %s" i (Currency.Balance.to_string balance))
+              sprintf "%i %s" i (Currency.Balance.to_string balance) )
         ; (* Distinguish ledgers when the hash function is different. *)
-          Snark_params.Tick.Field.to_string Mina_base.Account.empty_digest
+          Snark_params.Tick.Field.to_string
+            (Lazy.force Mina_base.Account.empty_digest)
         ; (* Distinguish ledgers when the account record layout has changed. *)
           Bin_prot.Writer.to_string Mina_base.Account.Stable.Latest.bin_writer_t
             Mina_base.Account.empty
@@ -132,38 +136,36 @@ module Ledger = struct
               ] ;
           return None
     in
-    let%bind hash_filename =
-      match config.hash with
-      | Some hash -> (
-          let hash_filename = hash_filename hash ~ledger_name_prefix in
-          let%bind tar_path =
-            Deferred.List.find_map ~f:(file_exists hash_filename) search_paths
-          in
-          match tar_path with
-          | Some _ ->
-              return tar_path
-          | None ->
-              load_from_s3 hash_filename )
-      | None ->
-          return None
+    let search_local filename =
+      Deferred.List.find_map ~f:(file_exists filename) search_paths
     in
-    let search_local_and_s3 ?other_data name =
-      let named_filename =
-        named_filename ~constraint_constants ~num_accounts:config.num_accounts
-          ~balances:config.balances ~ledger_name_prefix ?other_data name
-      in
-      match%bind
-        Deferred.List.find_map ~f:(file_exists named_filename) search_paths
-      with
+    let search_local_and_s3 filename =
+      match%bind search_local filename with
       | Some path ->
           return (Some path)
       | None ->
-          load_from_s3 named_filename
+          load_from_s3 filename
+    in
+    let%bind hash_filename =
+      match config.hash with
+      | Some hash ->
+          let hash_filename = hash_filename hash ~ledger_name_prefix in
+          search_local_and_s3 hash_filename
+      | None ->
+          return None
     in
     match hash_filename with
     | Some filename ->
         return (Some filename)
     | None -> (
+        let search_local_and_s3 ?other_data name =
+          let named_filename =
+            named_filename ~constraint_constants
+              ~num_accounts:config.num_accounts ~balances:config.balances
+              ~ledger_name_prefix ?other_data name
+          in
+          search_local_and_s3 named_filename
+        in
         match (config.base, config.name) with
         | Named name, _ ->
             let named_filename =
@@ -171,7 +173,7 @@ module Ledger = struct
                 ~num_accounts:config.num_accounts ~balances:config.balances
                 ~ledger_name_prefix name
             in
-            Deferred.List.find_map ~f:(file_exists named_filename) search_paths
+            search_local named_filename
         | Accounts accounts, _ ->
             search_local_and_s3 ~other_data:(accounts_hash accounts) "accounts"
         | Hash hash, None ->
@@ -186,14 +188,14 @@ module Ledger = struct
     [%log trace] "Loading $ledger from $path"
       ~metadata:
         [ ("ledger", `String ledger_name_prefix); ("path", `String filename) ] ;
-    let dirname = Uuid.to_string (Uuid_unix.create ()) in
-    (* Unpack the ledger in the autogen directory, since we know that we have
-       write permissions there.
-    *)
+    let dirname =
+      Tar.filename_without_extension @@ Filename.basename filename
+    in
     let dirname = genesis_dir ^/ dirname in
-    let%bind () = Unix.mkdir ~p:() dirname in
-    let open Deferred.Or_error.Let_syntax in
-    let%map () = Tar.extract ~root:dirname ~file:filename () in
+    let%bind () = File_system.create_dir ~clear_if_exists:true dirname in
+    let%map.Deferred.Or_error () =
+      Tar.extract ~root:dirname ~file:filename ()
+    in
     let (packed : Genesis_ledger.Packed.t) =
       match accounts with
       | Some accounts ->
@@ -209,7 +211,7 @@ module Ledger = struct
             let t =
               lazy
                 (Mina_ledger.Ledger.create ~directory_name:dirname
-                   ~depth:constraint_constants.ledger_depth ())
+                   ~depth:constraint_constants.ledger_depth () )
 
             let depth = constraint_constants.ledger_depth
           end) )
@@ -232,8 +234,9 @@ module Ledger = struct
         ; ("path", `String tar_path)
         ; ("dir", `String dirname)
         ] ;
-    let open Deferred.Or_error.Let_syntax in
-    let%map () = Tar.create ~root:dirname ~file:tar_path ~directory:"." () in
+    let%map.Deferred.Or_error () =
+      Tar.create ~root:dirname ~file:tar_path ~directory:"." ()
+    in
     tar_path
 
   let padded_accounts_from_runtime_config_opt ~logger ~proof_level
@@ -255,16 +258,17 @@ module Ledger = struct
             Genesis_constants.Proof_level.equal Full proof_level
       in
       if add_genesis_winner_account then
-        let pk, _ = Mina_state.Consensus_state_hooks.genesis_winner in
+        let genesis_winner_pk, _ =
+          Mina_state.Consensus_state_hooks.genesis_winner
+        in
         match accounts with
         | (_, account) :: _
-          when Public_key.Compressed.equal (Account.public_key account) pk ->
+          when Public_key.Compressed.equal
+                 (Account.public_key account)
+                 genesis_winner_pk ->
             accounts
         | _ ->
-            ( None
-            , Account.create
-                (Account_id.create pk Token_id.default)
-                (Currency.Balance.of_int 1000) )
+            (None, Mina_state.Consensus_state_hooks.genesis_winner_account)
             :: accounts
       else accounts
     in
@@ -296,12 +300,12 @@ module Ledger = struct
       Option.map accounts_opt
         ~f:
           (Lazy.map
-             ~f:(Accounts.pad_with_rev_balances (List.rev config.balances)))
+             ~f:(Accounts.pad_with_rev_balances (List.rev config.balances)) )
     in
     Option.map padded_accounts_with_balances_opt
       ~f:
         (Lazy.map
-           ~f:(Accounts.pad_to (Option.value ~default:0 config.num_accounts)))
+           ~f:(Accounts.pad_to (Option.value ~default:0 config.num_accounts)) )
 
   let packed_genesis_ledger_of_accounts ~depth accounts :
       Genesis_ledger.Packed.t =
@@ -314,8 +318,8 @@ module Ledger = struct
     end) )
 
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      ?(ledger_name_prefix = "genesis_ledger")
-      (config : Runtime_config.Ledger.t) =
+      ?(ledger_name_prefix = "genesis_ledger") (config : Runtime_config.Ledger.t)
+      =
     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
         let padded_accounts_opt =
           padded_accounts_from_runtime_config_opt ~logger ~proof_level
@@ -415,7 +419,7 @@ module Ledger = struct
                     (* Delete the file if it already exists. *)
                     let%bind () =
                       Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                          Sys.remove link_name)
+                          Sys.remove link_name )
                       |> Deferred.ignore_m
                     in
                     (* Add a symlink from the named path to the hash path. *)
@@ -444,7 +448,7 @@ module Ledger = struct
                         ; ("path", `String tar_path)
                         ; ("error", Error_json.error_to_yojson err)
                         ] ;
-                    return (Error err) ) ))
+                    return (Error err) ) ) )
 end
 
 module Epoch_data = struct
@@ -460,7 +464,7 @@ module Epoch_data = struct
           Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
             ~ledger_name_prefix ledger
         in
-        let%bind staking, config' =
+        let%bind staking, staking_config =
           let%map staking_ledger, config', ledger_file =
             load_ledger config.staking.ledger
           in
@@ -472,7 +476,7 @@ module Epoch_data = struct
             }
           , { config.staking with ledger = config' } )
         in
-        let%map next, config'' =
+        let%map next, next_config =
           match config.next with
           | None ->
               [%log trace]
@@ -491,9 +495,19 @@ module Epoch_data = struct
               , Some { Runtime_config.Epoch_data.Data.ledger = config''; seed }
               )
         in
+        (* the staking ledger and the next ledger, if it exists,
+           should have the genesis winner account as the first account, under
+           the conditions where the genesis ledger has that account (proof level
+           is Full, or we've specified `add_genesis_winner = true`
+
+           because the ledger is lazy, we don't want to force it in order to
+           check that invariant
+        *)
         ( Some { Consensus.Genesis_epoch_data.staking; next }
-        , Some { Runtime_config.Epoch_data.staking = config'; next = config'' }
-        )
+        , Some
+            { Runtime_config.Epoch_data.staking = staking_config
+            ; next = next_config
+            } )
 end
 
 (* This hash encodes the data that determines a genesis proof:
@@ -565,10 +579,12 @@ module Genesis_proof = struct
       Consensus.Constants.create ~constraint_constants
         ~protocol_constants:genesis_constants.protocol
     in
+    let open Staged_ledger_diff in
     let protocol_state_with_hashes =
       Mina_state.Genesis_protocol_state.t
         ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
         ~genesis_epoch_data ~constraint_constants ~consensus_constants
+        ~genesis_body_reference
     in
     { Genesis_proof.Inputs.runtime_config
     ; constraint_constants
@@ -580,6 +596,7 @@ module Genesis_proof = struct
     ; protocol_state_with_hashes
     ; constraint_system_digests = None
     ; genesis_constants
+    ; genesis_body_reference
     }
 
   let generate (inputs : Genesis_proof.Inputs.t) =
@@ -597,6 +614,7 @@ module Genesis_proof = struct
              ; genesis_constants = inputs.genesis_constants
              ; consensus_constants = inputs.consensus_constants
              ; constraint_constants = inputs.constraint_constants
+             ; genesis_body_reference = inputs.genesis_body_reference
              }
     | _ ->
         Deferred.return (Genesis_proof.create_values_no_proof inputs)
@@ -606,13 +624,13 @@ module Genesis_proof = struct
     Monitor.try_with_or_error ~here:[%here] ~extract_exn:true (fun () ->
         let%bind wr = Writer.open_file filename in
         Writer.write wr (Proof.Stable.V2.sexp_of_t proof |> Sexp.to_string) ;
-        Writer.close wr)
+        Writer.close wr )
 
   let load filename =
     (* TODO: Use [Reader.load_bin_prot]. *)
     Monitor.try_with_or_error ~here:[%here] ~extract_exn:true (fun () ->
         Reader.file_contents filename
-        >>| Sexp.of_string >>| Proof.Stable.V2.t_of_sexp)
+        >>| Sexp.of_string >>| Proof.Stable.V2.t_of_sexp )
 
   let id_to_json x =
     `String (Sexp.to_string (Pickles.Verification_key.Id.sexp_of_t x))
@@ -637,7 +655,7 @@ module Genesis_proof = struct
       Base_hash.create ~id
         ~state_hash:
           (State_hash.With_state_hashes.state_hash
-             inputs.protocol_state_with_hashes)
+             inputs.protocol_state_with_hashes )
     in
     let use_precomputed_values base_hash =
       match Precomputed_values.compiled with
@@ -651,7 +669,7 @@ module Genesis_proof = struct
                 Base_hash.create ~id:proof_data.blockchain_proof_system_id
                   ~state_hash:
                     (State_hash.With_state_hashes.state_hash
-                       compiled.protocol_state_with_hashes)
+                       compiled.protocol_state_with_hashes )
               in
               Base_hash.equal base_hash compiled_base_hash
           | None ->
@@ -679,7 +697,8 @@ module Genesis_proof = struct
                 | None ->
                     lazy
                       (let (module T), (module B) = Lazy.force b in
-                       Lazy.force @@ Genesis_proof.digests (module T) (module B))
+                       Lazy.force @@ Genesis_proof.digests (module T) (module B)
+                      )
               in
               let blockchain_proof_system_id =
                 match inputs.blockchain_proof_system_id with
@@ -702,6 +721,7 @@ module Genesis_proof = struct
                   ; constraint_system_digests
                   ; proof_data =
                       Some { blockchain_proof_system_id; genesis_proof }
+                  ; genesis_body_reference = inputs.genesis_body_reference
                   }
                 , file )
           | Error err ->
@@ -726,7 +746,7 @@ module Genesis_proof = struct
           Base_hash.create ~id:proof_data.blockchain_proof_system_id
             ~state_hash:
               (State_hash.With_state_hashes.state_hash
-                 compiled.protocol_state_with_hashes)
+                 compiled.protocol_state_with_hashes )
         in
         [%log info]
           "Base hash $computed_hash matches compile-time $compiled_hash, using \
@@ -747,6 +767,7 @@ module Genesis_proof = struct
           ; protocol_state_with_hashes = inputs.protocol_state_with_hashes
           ; constraint_system_digests = compiled.constraint_system_digests
           ; proof_data = Some proof_data
+          ; genesis_body_reference = inputs.genesis_body_reference
           }
         in
         let%map () =
@@ -796,7 +817,7 @@ end
 let load_config_json filename =
   Monitor.try_with_or_error ~here:[%here] (fun () ->
       let%map json = Reader.file_contents filename in
-      Yojson.Safe.from_string json)
+      Yojson.Safe.from_string json )
 
 let load_config_file filename =
   let open Deferred.Or_error.Let_syntax in
@@ -806,26 +827,39 @@ let load_config_file filename =
       | Ok config ->
           Ok config
       | Error err ->
-          Or_error.error_string err)
+          Or_error.error_string err )
+
+let print_config ~logger config =
+  let ledger_name_json =
+    Option.value ~default:`Null
+    @@ let%bind.Option ledger = config.Runtime_config.ledger in
+       let%map.Option name = ledger.name in
+       `String name
+  in
+  let ( json_config
+      , `Accounts_omitted
+          ( `Genesis genesis_accounts_omitted
+          , `Staking staking_accounts_omitted
+          , `Next next_accounts_omitted ) ) =
+    Runtime_config.to_yojson_without_accounts config
+  in
+  let append_accounts_omitted s =
+    Option.value_map
+      ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
+      ~default:Fn.id
+  in
+  let metadata =
+    append_accounts_omitted "genesis" genesis_accounts_omitted
+    @@ append_accounts_omitted "staking" staking_accounts_omitted
+    @@ append_accounts_omitted "next" next_accounts_omitted
+         [ ("name", ledger_name_json); ("config", json_config) ]
+  in
+  [%log info] "Initializing with runtime configuration. Ledger name: $name"
+    ~metadata
 
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~proof_level (config : Runtime_config.t) =
-  let ledger_name_json =
-    match
-      let open Option.Let_syntax in
-      let%bind ledger = config.ledger in
-      ledger.name
-    with
-    | Some name ->
-        `String name
-    | None ->
-        `Null
-  in
-  [%log info] "Initializing with runtime configuration. Ledger name: $name"
-    ~metadata:
-      [ ("name", ledger_name_json)
-      ; ("config", Runtime_config.to_yojson config)
-      ] ;
+  print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
   let genesis_constants = Genesis_constants.compiled in
   let proof_level =
@@ -892,7 +926,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
            ; hash = None
            ; name = None
            ; add_genesis_winner = None
-           })
+           } )
   in
   [%log info] "Loaded genesis ledger from $ledger_file"
     ~metadata:[ ("ledger_file", `String ledger_file) ] ;
@@ -929,7 +963,8 @@ let init_from_inputs ?(genesis_dir = Cache_dir.autogen_path) ~logger
   values
 
 let init_from_config_file ?genesis_dir ~logger ~proof_level
-    (config : Runtime_config.t) =
+    (config : Runtime_config.t) :
+    (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
   let%map inputs, config =
     inputs_from_config_file ?genesis_dir ~logger ~proof_level config
@@ -966,7 +1001,7 @@ let upgrade_old_config ~logger filename json =
             if String.equal key "daemon" then (
               found_daemon := true ;
               false )
-            else List.mem ~equal:String.equal old_fields key)
+            else List.mem ~equal:String.equal old_fields key )
       in
       if List.is_empty old_fields then return json
       else if !found_daemon then (
@@ -994,7 +1029,7 @@ let upgrade_old_config ~logger filename json =
           Deferred.Or_error.try_with ~here:[%here] (fun () ->
               Writer.with_file filename ~f:(fun w ->
                   Deferred.return
-                  @@ Writer.write w (Yojson.Safe.pretty_to_string upgraded_json)))
+                  @@ Writer.write w (Yojson.Safe.pretty_to_string upgraded_json) ) )
           |> Deferred.ignore_m
         in
         upgraded_json )
@@ -1012,5 +1047,5 @@ let%test_module "Account config test" =
           let acc' =
             Accounts.Single.to_account_with_pk acc_config |> Or_error.ok_exn
           in
-          [%test_eq: Account.t] acc acc')
+          [%test_eq: Account.t] acc acc' )
   end )

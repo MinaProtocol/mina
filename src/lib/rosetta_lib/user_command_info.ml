@@ -12,7 +12,7 @@ module Stake_delegation = Mina_base.Stake_delegation
 let pk_to_public_key ~context (`Pk pk) =
   Public_key.Compressed.of_base58_check pk
   |> Result.map_error ~f:(fun _ ->
-         Errors.create ~context `Public_key_format_not_valid)
+         Errors.create ~context `Public_key_format_not_valid )
 
 let account_id (`Pk pk) (`Token_id token_id) =
   { Account_identifier.address = pk
@@ -46,14 +46,15 @@ module Op = struct
             let related_operations =
               op.related_to
               |> Option.bind ~f:(fun relate ->
-                     List.findi plan ~f:(fun _ a -> a_eq relate a.label))
+                     List.findi plan ~f:(fun _ a -> a_eq relate a.label) )
               |> Option.map ~f:(fun (i, _) -> [ operation_identifier i ])
+              |> Option.value ~default:[]
             in
             let%map a =
               f ~related_operations
                 ~operation_identifier:(operation_identifier i) op
             in
-            (i + 1, a :: acc))
+            (i + 1, a :: acc) )
       in
       List.rev rev_data
   end
@@ -137,6 +138,14 @@ module Partial = struct
     let%bind fee_payer_pk = pk_to_public_key ~context:"Fee payer" t.fee_payer in
     let%bind source_pk = pk_to_public_key ~context:"Source" t.source in
     let%bind receiver_pk = pk_to_public_key ~context:"Receiver" t.receiver in
+    let%bind () =
+      Result.ok_if_true
+        (Public_key.Compressed.equal fee_payer_pk source_pk)
+        ~error:
+          (Errors.create
+             (`Operations_not_valid
+               [ Errors.Partial_reason.Fee_payer_and_source_mismatch ] ) )
+    in
     let%bind memo =
       match t.memo with
       | Some memo -> (
@@ -153,19 +162,17 @@ module Partial = struct
               ~error:
                 (Errors.create
                    (`Operations_not_valid
-                     [ Errors.Partial_reason.Amount_not_some ]))
+                     [ Errors.Partial_reason.Amount_not_some ] ) )
           in
           let payload =
-            { Payment_payload.Poly.source_pk
-            ; receiver_pk
+            { Payment_payload.Poly.receiver_pk
             ; amount = Amount_currency.of_uint64 amount
             }
           in
           Signed_command.Payload.Body.Payment payload
       | `Delegation ->
           let payload =
-            Stake_delegation.Set_delegate
-              { delegator = source_pk; new_delegate = receiver_pk }
+            Stake_delegation.Set_delegate { new_delegate = receiver_pk }
           in
           Result.return @@ Signed_command.Payload.Body.Stake_delegation payload
     in
@@ -173,7 +180,8 @@ module Partial = struct
       ~fee:(Fee_currency.of_uint64 t.fee)
       ~fee_payer_pk ~nonce ~body ~memo
       ~valid_until:
-        (Option.map ~f:Mina_numbers.Global_slot.of_uint32 t.valid_until)
+        (Option.map ~f:Mina_numbers.Global_slot_since_genesis.of_uint32
+           t.valid_until )
 end
 
 let forget (t : t) : Partial.t =
@@ -227,7 +235,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
   *)
   let payment =
     let%map () =
-      if Int.equal (List.length ops) 3 then V.return ()
+      if Mina_stdlib.List.Length.Compare.(ops = 3) then V.return ()
       else V.fail Length_mismatch
     and account_a =
       let open Result.Let_syntax in
@@ -272,7 +280,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
       if
         List.for_all ops ~f:(fun op ->
             let p = Option.equal String.equal op.status in
-            p None || p (Some ""))
+            p None || p (Some "") )
       then V.return ()
       else V.fail Status_not_pending
     and payment_amount_x =
@@ -290,8 +298,10 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
       let open Result.Let_syntax in
       let%bind { amount; _ } = find_kind `Fee_payment ops in
       match amount with
-      | Some x ->
+      | Some x when Amount_of.compare_to_int64 x 0L < 1 ->
           V.return (Amount_of.negated x)
+      | Some _ ->
+          V.fail Fee_not_negative
       | None ->
           V.fail Amount_not_some
     in
@@ -316,7 +326,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
   *)
   let delegation =
     let%map () =
-      if Int.equal (List.length ops) 2 then V.return ()
+      if Mina_stdlib.List.Length.Compare.(ops = 2) then V.return ()
       else V.fail Length_mismatch
     and account_a =
       let open Result.Let_syntax in
@@ -350,7 +360,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
       if
         List.for_all ops ~f:(fun op ->
             let p = Option.equal String.equal op.status in
-            p None || p (Some ""))
+            p None || p (Some "") )
       then V.return ()
       else V.fail Status_not_pending
     and payment_amount_y =
@@ -377,7 +387,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
     }
   in
   let partials = [ payment; delegation ] in
-  let oks, errs = List.partition_map partials ~f:Result.ok_fst in
+  let oks, errs = List.partition_map partials ~f:Result.to_either in
   match (oks, errs) with
   | [], errs ->
       (* no Oks *)
@@ -537,9 +547,9 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
                      [ ( "delegate_change_target"
                        , `String
                            (let (`Pk r) = t.receiver in
-                            r) )
-                     ]))
-          })
+                            r ) )
+                     ] ) )
+          } )
 
 let to_operations' (t : t) : Operation.t list =
   to_operations ~failure_status:t.failure_status (forget t)
@@ -624,7 +634,7 @@ let dummies =
         Some
           (`Applied
             (Account_creation_fees_paid.By_receiver
-               (Unsigned.UInt64.of_int 1_000_000)))
+               (Unsigned.UInt64.of_int 1_000_000) ) )
     ; hash = "TXN_1new_HASH"
     ; valid_until = None
     ; memo = Some "hello"

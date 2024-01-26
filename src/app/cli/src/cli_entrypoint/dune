@@ -12,19 +12,21 @@
    base
    core_kernel
    core
+   bin_prot
+   bin_prot.shape
    init
-   tests
    async
    core.daemon
    base.caml
    uri
    async.async_command
    result
+   sexplib0
    ;;local libraries
    verifier
    ledger_proof
    snark_worker
-   mina_transition
+   mina_block
    pipe_lib
    gossip_net
    data_hash_lib
@@ -39,9 +41,9 @@
    currency
    signature_lib
    mina_base
+   mina_base.import
    error_json
    genesis_ledger_helper
-   memory_stats
    consensus
    child_processes
    node_addrs_and_ports
@@ -51,14 +53,19 @@
    genesis_constants
    blake2
    mina_metrics
+   transaction_witness
+   snark_work_lib
+   transaction_snark
    mina_compile_config
+   node_error_service
    mina_user_error
    file_system
    mina_version
    mina_net2
    block_time
-   coda_runtime_config
+   mina_runtime_config
    trust_system
+   protocol_version
    coda_genesis_proof
    with_hash
    block_producer
@@ -66,7 +73,10 @@
    blockchain_snark
    snarky.backendless
    o1trace
+   ppx_version.runtime
+   internal_tracing
+   itn_logger
  )
  (preprocessor_deps ../../../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_here ppx_let ppx_sexp_conv ppx_optcomp ppx_deriving_yojson)))
+ (preprocess (pps ppx_mina ppx_version ppx_here ppx_let ppx_sexp_conv ppx_optcomp ppx_deriving_yojson)))

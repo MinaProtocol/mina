@@ -1,5 +1,6 @@
 (library
   (name transaction_snark_tests)
+  (public_name transaction_snark_tests)
  (libraries
    ;; opam libraries
    ppx_inline_test.config
@@ -11,7 +12,10 @@
    core_kernel
    base64
    yojson
+   integers
    ;; local libraries
+   bounded_types
+   logger
    random_oracle_input
    pickles.backend
    mina_base.import
@@ -19,6 +23,7 @@
    kimchi_backend
    with_hash
    pickles
+   pickles_base
    consensus
    transaction_snark
    snark_params
@@ -35,17 +40,23 @@
    coda_genesis_ledger
    pickles_types
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    cache_dir
    data_hash_lib
    mina_numbers
    random_oracle
    sgn
+   sgn_type
    sexplib0
    test_util
    transaction_witness
+   staged_ledger_diff
+   mina_wire_types
+   block_time
+   zkapps_examples
    )
   (library_flags -linkall)
-  (inline_tests)
+  (inline_tests (flags -verbose -show-counts))
   (preprocess
-    (pps ppx_snarky ppx_version ppx_jane ppx_sexp_conv))
+    (pps ppx_mina ppx_snarky ppx_version ppx_jane ppx_sexp_conv))
   (instrumentation (backend bisect_ppx)))

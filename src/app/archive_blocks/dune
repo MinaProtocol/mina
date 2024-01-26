@@ -20,10 +20,11 @@
    async.async_command
    ;; local libraries
    logger
-   mina_transition
+   mina_block
+   bounded_types
    genesis_constants
    archive_lib
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_coda ppx_let ppx_hash ppx_compare ppx_sexp_conv)))
+ (preprocess (pps ppx_version ppx_mina ppx_let ppx_hash ppx_compare ppx_sexp_conv)))

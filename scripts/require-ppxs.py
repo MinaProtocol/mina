@@ -21,8 +21,9 @@ def dune_paths_ok(dune):
                  or path_prefix4 == ['lib', 'crypto', 'proof-systems']
                  or path_prefix3 == ['lib', 'snarky']
                  or path_prefix3 == ['lib', 'ppx_version']
+                 or path_prefix3 == ['lib', 'bounded_types']
                  or path_prefix3 == ['app', 'reformat']
-                 or path_prefix3 == ['lib', 'ppx_coda']))
+                 or path_prefix3 == ['lib', 'ppx_mina']))
 
 
 dune_paths = list(

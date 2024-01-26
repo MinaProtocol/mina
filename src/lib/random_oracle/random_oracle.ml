@@ -16,12 +16,15 @@ module State = struct
   include Array
 
   let map2 = map2_exn
+
+  let to_array t = t
+
+  let of_array t = t
 end
 
 module Input = Random_oracle_input
 
-let params : Field.t Sponge.Params.t =
-  Sponge.Params.(map pasta_p_kimchi ~f:Field.of_string)
+let params : Field.t Sponge.Params.t = Kimchi_pasta_basic.poseidon_params_fp
 
 module Operations = struct
   let add_assign ~state i x = Field.(state.(i) <- state.(i) + x)
@@ -37,16 +40,14 @@ module Operations = struct
 end
 
 module Digest = struct
-  open Field
-
-  type nonrec t = t
+  type t = Field.t
 
   let to_bits ?length x =
     match length with
     | None ->
-        unpack x
+        Field.unpack x
     | Some length ->
-        List.take (unpack x) length
+        List.take (Field.unpack x) length
 end
 
 include Sponge.Make_hash (Random_oracle_permutation)
@@ -145,7 +146,7 @@ module Legacy = struct
   module State = State
 
   let params : Field.t Sponge.Params.t =
-    Sponge.Params.(map pasta_p_legacy ~f:Field.of_string)
+    Sponge.Params.(map pasta_p_legacy ~f:Kimchi_pasta_basic.Fp.of_string)
 
   module Rounds = struct
     let rounds_full = 63
@@ -158,6 +159,8 @@ module Legacy = struct
   module Inputs = struct
     module Field = Field
     include Rounds
+
+    let alpha = 5
 
     (* Computes x^5 *)
     let to_the_alpha x =
@@ -198,6 +201,8 @@ module Legacy = struct
       module Impl = Pickles.Impls.Step
       open Impl
       module Field = Field
+
+      let alpha = 5
 
       (* Computes x^5 *)
       let to_the_alpha x =

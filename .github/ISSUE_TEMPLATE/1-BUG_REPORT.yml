@@ -1,6 +1,6 @@
 name: "🐛 Bug report"
 description: Something isn't working as expected? Report your bugs here.
-labels: "type: bug"
+labels: ["bug", "triage"]
 body:
   - type: markdown
     attributes:
@@ -55,6 +55,13 @@ body:
       description: Describe what actually happened.
     validations:
       required: true
+  - type: textarea
+    attributes:
+      label: Daemon version
+      description: Use the command "mina version" to get this information.
+      placeholder: Commit 68200c7b409e105d174f079c5c39f7926819784b on branch master
+    validations:
+      required: true      
   - type: dropdown
     id: frequency
     validations:

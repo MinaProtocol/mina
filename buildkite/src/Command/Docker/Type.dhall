@@ -12,6 +12,7 @@
      `propagate-environment`: Bool,
      `mount-buildkite-agent`: Bool,
      `mount-workdir`: Bool,
+     privileged: Bool,
      environment: List Text
   },
   default = {
@@ -19,6 +20,7 @@
     `propagate-environment` = True,
     `mount-buildkite-agent` = False,
     `mount-workdir` = False,
+    privileged = False,
     environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]
   }
 }

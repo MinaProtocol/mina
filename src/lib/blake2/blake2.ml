@@ -19,6 +19,30 @@ module Make () = struct
     let of_string = of_raw_string
 
     let to_string = to_raw_string
+
+    let gen =
+      let char_generator =
+        Base_quickcheck.Generator.of_list
+          [ '0'
+          ; '1'
+          ; '2'
+          ; '3'
+          ; '4'
+          ; '5'
+          ; '6'
+          ; '7'
+          ; '8'
+          ; '9'
+          ; 'A'
+          ; 'B'
+          ; 'C'
+          ; 'D'
+          ; 'E'
+          ; 'F'
+          ]
+      in
+      String.gen_with_length (digest_size_in_bytes * 2) char_generator
+      |> Quickcheck.Generator.map ~f:of_hex
   end
 
   module T1 = struct
@@ -28,10 +52,28 @@ module Make () = struct
 
   [%%versioned_binable
   module Stable = struct
+    (* it would be better to use `with_all_version_tags` on just
+       the module where we need a version tag, but that doesn't
+       (yet) work with %%versioned_binable
+    *)
+    [@@@with_top_version_tag]
+
     module V1 = struct
       type t = T1.t [@@deriving hash, sexp, compare, equal]
 
       let to_latest = Fn.id
+
+      let to_yojson t : Yojson.Safe.t = `String (T1.to_hex t)
+
+      let of_yojson (v : Yojson.Safe.t) =
+        let open Ppx_deriving_yojson_runtime in
+        match v with
+        | `String s ->
+            Option.value_map ~default:(Result.Error "not a hex string")
+              ~f:(fun x -> Result.Ok x)
+              (T1.of_hex_opt s)
+        | _ ->
+            Result.Error "not a string"
 
       module Arg = struct
         type nonrec t = t
@@ -39,11 +81,21 @@ module Make () = struct
         [%%define_locally T1.(to_string, of_string)]
       end
 
-      include Binable.Of_stringable (Arg)
+      include Bounded_types.String.Of_stringable (Arg)
     end
   end]
 
-  [%%define_locally T1.(to_raw_string, digest_string, to_hex)]
+  [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
+
+  [%%define_locally
+  T1.
+    ( of_raw_string
+    , to_raw_string
+    , digest_string
+    , digest_bigstring
+    , to_hex
+    , of_hex
+    , gen )]
 
   (* do not create bin_io serialization *)
   include Hashable.Make (T1)
@@ -68,20 +120,10 @@ module Make () = struct
       ~f:(fun i ->
         let c = Char.to_int s.[i / 8] in
         let j = i mod 8 in
-        Int.((c lsr j) land 1 = 1))
+        Int.((c lsr j) land 1 = 1) )
 end
 
 include Make ()
-
-(* values come from external library digestif, and serialization relies on raw string functions in that library,
-   so check serialization is stable
- *)
-let%test "serialization test V1" =
-  let blake2s = T0.digest_string "serialization test V1" in
-  let known_good_digest = "562733d10582c5832e541fb60e38e7c8" in
-  Ppx_version_runtime.Serialization.check_serialization
-    (module Stable.V1)
-    blake2s known_good_digest
 
 let%test_unit "bits_to_string" =
   [%test_eq: string]
@@ -90,4 +132,4 @@ let%test_unit "bits_to_string" =
 
 let%test_unit "string to bits" =
   Quickcheck.test ~trials:5 String.quickcheck_generator ~f:(fun s ->
-      [%test_eq: string] s (bits_to_string (string_to_bits s)))
+      [%test_eq: string] s (bits_to_string (string_to_bits s)) )

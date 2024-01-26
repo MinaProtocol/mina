@@ -21,7 +21,7 @@ module Legacy_token_id : sig
 end
 
 module Body : sig
-  type t =
+  type t = Mina_wire_types.Mina_base.Signed_command_payload.Body.V2.t =
     | Payment of Payment_payload.t
     | Stake_delegation of Stake_delegation.t
   [@@deriving equal, sexp, hash, yojson]
@@ -33,6 +33,13 @@ module Body : sig
     module V2 : sig
       type nonrec t = t [@@deriving compare, equal, sexp, hash, yojson]
     end
+
+    module V1 : sig
+      type t =
+        | Payment of Payment_payload.Stable.V1.t
+        | Stake_delegation of Stake_delegation.Stable.V1.t
+      [@@deriving compare, equal, sexp, hash, yojson]
+    end
   end]
 
   val tag : t -> Transaction_union_tag.t
@@ -40,10 +47,6 @@ module Body : sig
   val receiver_pk : t -> Signature_lib.Public_key.Compressed.t
 
   val receiver : t -> Account_id.t
-
-  val source_pk : t -> Signature_lib.Public_key.Compressed.t
-
-  val source : t -> Account_id.t
 end
 
 module Common : sig
@@ -52,6 +55,12 @@ module Common : sig
     module Stable : sig
       module V2 : sig
         type ('fee, 'public_key, 'nonce, 'global_slot, 'memo) t =
+              ( 'fee
+              , 'public_key
+              , 'nonce
+              , 'global_slot
+              , 'memo )
+              Mina_wire_types.Mina_base.Signed_command_payload.Common.Poly.V2.t =
           { fee : 'fee
           ; fee_payer_pk : 'public_key
           ; nonce : 'nonce
@@ -59,6 +68,18 @@ module Common : sig
           ; memo : 'memo
           }
         [@@deriving equal, sexp, hash, yojson]
+      end
+
+      module V1 : sig
+        type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t =
+          { fee : 'fee
+          ; fee_token : 'token_id
+          ; fee_payer_pk : 'public_key
+          ; nonce : 'nonce
+          ; valid_until : 'global_slot
+          ; memo : 'memo
+          }
+        [@@deriving compare, equal, sexp, hash, yojson, hlist]
       end
     end]
   end
@@ -70,10 +91,22 @@ module Common : sig
         ( Currency.Fee.Stable.V1.t
         , Public_key.Compressed.Stable.V1.t
         , Mina_numbers.Account_nonce.Stable.V1.t
-        , Mina_numbers.Global_slot.Stable.V1.t
-        , Signed_command_memo.t )
+        , Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+        , Signed_command_memo.Stable.V1.t )
         Poly.Stable.V2.t
-      [@@deriving compare, equal, sexp, hash]
+      [@@deriving compare, equal, sexp, hash, yojson]
+    end
+
+    module V1 : sig
+      type t =
+        ( Currency.Fee.Stable.V1.t
+        , Public_key.Compressed.Stable.V1.t
+        , Token_id.Stable.V1.t
+        , Mina_numbers.Account_nonce.Stable.V1.t
+        , Mina_numbers.Global_slot_legacy.Stable.V1.t
+        , Signed_command_memo.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving compare, equal, sexp, hash, yojson]
     end
   end]
 
@@ -87,7 +120,7 @@ module Common : sig
     ( Currency.Fee.var
     , Public_key.Compressed.var
     , Mina_numbers.Account_nonce.Checked.t
-    , Mina_numbers.Global_slot.Checked.t
+    , Mina_numbers.Global_slot_since_genesis.Checked.t
     , Signed_command_memo.Checked.t )
     Poly.t
 
@@ -109,7 +142,11 @@ module Poly : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type ('common, 'body) t = { common : 'common; body : 'body }
+      type ('common, 'body) t =
+            ( 'common
+            , 'body )
+            Mina_wire_types.Mina_base.Signed_command_payload.Poly.V1.t =
+        { common : 'common; body : 'body }
       [@@deriving equal, sexp, hash, yojson, compare, hlist]
 
       val of_latest :
@@ -127,13 +164,22 @@ module Stable : sig
     type t = (Common.Stable.V2.t, Body.Stable.V2.t) Poly.Stable.V1.t
     [@@deriving compare, equal, sexp, hash, yojson]
   end
+
+  module V1 : sig
+    [@@@with_all_version_tags]
+
+    type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
+    [@@deriving compare, equal, sexp, hash, yojson]
+
+    val to_latest : t -> Latest.t
+  end
 end]
 
 val create :
      fee:Currency.Fee.t
   -> fee_payer_pk:Public_key.Compressed.t
   -> nonce:Mina_numbers.Account_nonce.t
-  -> valid_until:Mina_numbers.Global_slot.t option
+  -> valid_until:Mina_numbers.Global_slot_since_genesis.t option
   -> memo:Signed_command_memo.t
   -> body:Body.t
   -> t
@@ -150,7 +196,7 @@ val fee_excess : t -> Fee_excess.t
 
 val nonce : t -> Mina_numbers.Account_nonce.t
 
-val valid_until : t -> Mina_numbers.Global_slot.t
+val valid_until : t -> Mina_numbers.Global_slot_since_genesis.t
 
 val memo : t -> Signed_command_memo.t
 
@@ -160,15 +206,15 @@ val receiver_pk : t -> Public_key.Compressed.t
 
 val receiver : t -> Account_id.t
 
-val source_pk : t -> Public_key.Compressed.t
-
-val source : t -> Account_id.t
-
 val token : t -> Token_id.t
 
 val amount : t -> Currency.Amount.t option
 
-val accounts_accessed : t -> Account_id.t list
+(** the fee payer is always `Accessed, even for a failing transaction *)
+val account_access_statuses :
+     t
+  -> Transaction_status.t
+  -> (Account_id.t * [ `Accessed | `Not_accessed ]) list
 
 val tag : t -> Transaction_union_tag.t
 

@@ -65,11 +65,12 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
   let broadcast_state ?origin_topic (Any ((module M), t)) =
     M.broadcast_state ?origin_topic t
 
-  let broadcast_transaction_pool_diff ?origin_topic (Any ((module M), t)) =
-    M.broadcast_transaction_pool_diff ?origin_topic t
+  let broadcast_transaction_pool_diff ?origin_topic ?nonce (Any ((module M), t))
+      =
+    M.broadcast_transaction_pool_diff ?origin_topic ?nonce t
 
-  let broadcast_snark_pool_diff ?origin_topic (Any ((module M), t)) =
-    M.broadcast_snark_pool_diff ?origin_topic t
+  let broadcast_snark_pool_diff ?origin_topic ?nonce (Any ((module M), t)) =
+    M.broadcast_snark_pool_diff ?origin_topic ?nonce t
 
   let on_first_connect (Any ((module M), t)) = M.on_first_connect t
 
@@ -81,8 +82,8 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
   let connection_gating (Any ((module M), t)) = M.connection_gating t
 
-  let set_connection_gating (Any ((module M), t)) config =
-    M.set_connection_gating t config
+  let set_connection_gating ?clean_added_peers (Any ((module M), t)) config =
+    M.set_connection_gating ?clean_added_peers t config
 
   let restart_helper (Any ((module M), t)) = M.restart_helper t
 end

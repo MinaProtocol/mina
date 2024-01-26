@@ -1,3 +1,25 @@
+//! The flat vector is a vector of fixed-size elements that we want to expose directly to js-of-ocaml
+//! (so that we can access a `Vec<Field>` cheaply,
+//! by just passing a pointer to a continuous memory region instead of copying.
+//! The wasmvector is a normal heap-allocated vector,
+//! where we leave it on the rust heap and just keep a pointer around.
+//! We use flat for fields, normal for gates etc.
+//!
+//! Accessing Rust vector values is not the same as accessing an array.
+//! Each indexing (e.g. `some_vec[3]`) is costly as it is implemented as a function call.
+//! Knowing that, plus the fact that field elements are implemented as `[u32; 8]`, we know that we incur the cost of following several pointers.
+//! To decrease that cost, we flatten such arrays, going from something like
+//!
+//! ```ignore
+//! [[a0, a1, ..., a7], [b0, b1, ..., b7], ...]
+//! ```
+//!
+//! to a flattened vector like:
+//!
+//! ```ignore
+//! [a0, a1, ..., a7, b0, b1, ..., b7, ...]
+//! ```
+
 use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi};
 
 use std::convert::From;
@@ -50,7 +72,7 @@ impl<'a, T> std::iter::IntoIterator for &'a WasmFlatVector<T> {
     type Item = <&'a Vec<T> as std::iter::IntoIterator>::Item;
     type IntoIter = <&'a Vec<T> as std::iter::IntoIterator>::IntoIter;
     fn into_iter(self) -> Self::IntoIter {
-        (&self.0).into_iter()
+        self.0.iter()
     }
 }
 

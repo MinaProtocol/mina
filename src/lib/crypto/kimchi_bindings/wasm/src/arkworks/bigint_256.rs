@@ -75,12 +75,12 @@ pub fn caml_bigint_256_of_decimal_string(s: String) -> WasmBigInteger256 {
 
 #[wasm_bindgen]
 pub fn caml_bigint_256_num_limbs() -> i32 {
-    return BIGINT256_NUM_LIMBS.try_into().unwrap();
+    BIGINT256_NUM_LIMBS
 }
 
 #[wasm_bindgen]
 pub fn caml_bigint_256_bytes_per_limb() -> i32 {
-    return BIGINT256_LIMB_BYTES.try_into().unwrap();
+    BIGINT256_LIMB_BYTES
 }
 
 #[wasm_bindgen]

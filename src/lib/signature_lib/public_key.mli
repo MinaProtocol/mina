@@ -4,17 +4,14 @@ open Core_kernel
 open Snark_params
 open Tick
 
-type t = Field.t * Field.t [@@deriving sexp, hash]
-
-include Codable.S with type t := t
-
+[%%versioned:
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving bin_io, sexp, compare, hash, yojson, version]
-  end
+    [@@@with_all_version_tags]
 
-  module Latest = V1
-end
+    type t = Field.t * Field.t [@@deriving sexp, hash, compare, yojson]
+  end
+end]
 
 include Comparable.S_binable with type t := t
 
@@ -34,33 +31,30 @@ val of_private_key_exn : Private_key.t -> t
 
 module Compressed : sig
   module Poly : sig
-    type ('field, 'boolean) t = { x : 'field; is_odd : 'boolean }
-
+    [%%versioned:
     module Stable : sig
       module V1 : sig
-        type ('field, 'boolean) t
+        type ('field, 'boolean) t =
+              ('field, 'boolean) Mina_wire_types.Public_key.Compressed.Poly.V1.t =
+          { x : 'field; is_odd : 'boolean }
       end
-
-      module Latest = V1
-    end
-    with type ('field, 'boolean) V1.t = ('field, 'boolean) t
+    end]
   end
 
-  type t = (Field.t, bool) Poly.t [@@deriving sexp, hash]
-
-  include Codable.S with type t := t
-
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io, equal, compare, hash, version]
+      [@@@with_all_version_tags]
+
+      type t = (Field.t, bool) Poly.t [@@deriving sexp, equal, compare, hash]
 
       include Codable.S with type t := t
 
       include Hashable.S_binable with type t := t
     end
+  end]
 
-    module Latest = V1
-  end
+  include Codable.S with type t := t
 
   val gen : t Quickcheck.Generator.t
 

@@ -2,7 +2,8 @@
  (name currency)
  (public_name currency)
  (library_flags -linkall)
- (inline_tests)
+ (flags -w -22) ; Silence ppx_version's warnings
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    base.base_internalhash_types
@@ -15,13 +16,14 @@
    result
    ppx_inline_test.config
    zarith
+   mina_wire_types
    ;; local libraries
    bignum_bigint
    bitstring_lib
-   ppx_dhall_type
    codable
    test_util
    unsigned_extended
+   mina_compile_config
    mina_numbers
    snark_bits
    sgn
@@ -31,12 +33,13 @@
    pickles
    snarky.backendless
    kimchi_backend.common
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps
    ppx_annot
-   ppx_coda
+   ppx_mina
    ppx_version
    ppx_let
    ppx_assert

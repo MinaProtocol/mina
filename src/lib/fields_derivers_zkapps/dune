@@ -18,13 +18,15 @@
    fields_derivers.graphql
    fields_derivers.json
    currency
+   mina_numbers
    snark_params
    pickles
    fields_derivers
+   sgn
    unsigned_extended
    with_hash
  )
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)
  (preprocess

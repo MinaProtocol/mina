@@ -1,4 +1,4 @@
-(* account.ml *)
+(* mina_base_import.ml *)
 
 [%%import "/src/config.mlh"]
 

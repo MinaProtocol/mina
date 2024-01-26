@@ -2,7 +2,7 @@
  (name mina_lib)
  (public_name mina_lib)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    integers
@@ -21,11 +21,12 @@
    result
    bin_prot.shape
    ;; local libraries
+   bounded_types
    transition_chain_prover
    best_tip_prover
    proof_carrying_data
    mina_compile_config
-   coda_runtime_config
+   mina_runtime_config
    ledger_proof
    mina_net2
    network_peer
@@ -35,6 +36,7 @@
    transition_frontier_base
    with_hash
    currency
+   mina_stdlib
    mina_user_error
    gossip_net
    transition_frontier
@@ -70,7 +72,7 @@
    signature_lib
    mina_base
    mina_transaction
-   mina_transition
+   mina_block
    transition_frontier_extensions
    block_time
    error_json
@@ -82,7 +84,6 @@
    timeout_lib
    prover
    verifier
-   non_empty_list
    snark_work_lib
    truth
    ledger_catchup
@@ -91,7 +92,18 @@
    mina_base.import
    data_hash_lib
    transition_handler
-)
+   ppx_version.runtime
+   mina_intf
+   node_error_service
+   mina_transaction_logic
+   pickles.backend
+   pickles
+   snark_params
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   mina_wire_types
+   internal_tracing
+ )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_coda ppx_version ppx_inline_test ppx_deriving.std))
- (synopsis "Coda gut layer"))
+ (preprocess (pps ppx_jane ppx_mina ppx_version ppx_inline_test ppx_deriving.std))
+ (synopsis "Mina gut layer"))

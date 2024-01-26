@@ -1,7 +1,7 @@
 open Core_kernel
 open Pickles_types
 
-module T (Impl : Snarky_backendless.Snark_intf.Run) (N : Vector.Nat_intf) =
+module T (Impl : Snarky_backendless.Snark_intf.Run) (N : Pickles_types.Nat.Intf) =
 struct
   open Impl
 
@@ -16,5 +16,5 @@ struct
     |> Typ.transport
          ~there:(fun x -> Field.Constant.project (Constant.to_bits x))
          ~back:(fun x ->
-           Constant.of_bits (List.take (Field.Constant.unpack x) length))
+           Constant.of_bits (List.take (Field.Constant.unpack x) length) )
 end

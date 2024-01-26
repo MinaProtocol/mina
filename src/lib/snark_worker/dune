@@ -2,13 +2,14 @@
  (name snark_worker)
  (public_name snark_worker)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    async_rpc_kernel
    sexplib0
    async_kernel
    base
+   base.caml
    async
    core
    core_kernel.hash_heap
@@ -17,9 +18,11 @@
    async.async_command
    base.base_internalhash_types
    ppx_hash.runtime-lib
+   result
    async_unix
    bin_prot.shape
    ;; local libraries
+   bounded_types
    one_or_two
    mina_metrics
    logger
@@ -42,11 +45,12 @@
    mina_compile_config
    mina_state
    transaction_protocol_state
+   ppx_version_runtime
  )
  (preprocess
   (pps
     ppx_bin_prot
-    ppx_coda
+    ppx_mina
     ppx_here
     ppx_custom_printf
     ppx_deriving_yojson

@@ -26,16 +26,21 @@
    mina_transaction_logic
    mina_state
    pickles_types
+   pickles_base
    pickles
    genesis_constants
    currency
    sgn
    random_oracle
    kimchi_backend.pasta
+   kimchi_backend.pasta.basic
    data_hash_lib
-   )
- (inline_tests)
+   ppx_version.runtime
+   snark_keys_header
+   mina_version
+ )
+ (inline_tests (flags -verbose -show-counts))
  (preprocess
-  (pps ppx_snarky ppx_coda ppx_version ppx_jane ppx_compare))
+  (pps ppx_snarky ppx_mina ppx_version ppx_jane ppx_compare))
  (instrumentation (backend bisect_ppx))
  (synopsis "blockchain state transition snarking library"))

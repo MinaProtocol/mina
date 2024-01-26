@@ -3,10 +3,13 @@
  (public_name generated_graphql_queries)
  (libraries
    async cohttp core cohttp-async mina_base graphql-async graphql-cohttp yojson
+   graphql_lib base
  )
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../graphql_schema.json)
- (preprocess (pps ppx_jane graphql_ppx ppx_version)))
+ (preprocess (pps ppx_base ppx_version
+                  graphql_ppx -- %{read-lines:../../graphql-ppx-config.inc}
+)))
 
 (rule
  (targets generated_graphql_queries.ml)

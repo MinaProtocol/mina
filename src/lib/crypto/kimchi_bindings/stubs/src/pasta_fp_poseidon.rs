@@ -1,6 +1,6 @@
 use crate::field_vector::fp::CamlFpVector;
-use mina_curves::pasta::fp::Fp;
-use oracle::{
+use mina_curves::pasta::Fp;
+use mina_poseidon::{
     constants::PlonkSpongeConstantsKimchi, permutation::poseidon_block_cipher,
     poseidon::ArithmeticSpongeParams,
 };
@@ -21,7 +21,7 @@ ocaml::custom!(CamlPastaFpPoseidonParams {
 
 #[ocaml::func]
 pub fn caml_pasta_fp_poseidon_params_create() -> CamlPastaFpPoseidonParams {
-    CamlPastaFpPoseidonParams(oracle::pasta::fp_kimchi::params())
+    CamlPastaFpPoseidonParams(mina_poseidon::pasta::fp_kimchi::params())
 }
 
 #[ocaml::func]

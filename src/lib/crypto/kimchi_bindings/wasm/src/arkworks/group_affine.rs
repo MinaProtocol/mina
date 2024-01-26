@@ -1,9 +1,11 @@
 use crate::arkworks::pasta_fp::WasmPastaFp;
 use crate::arkworks::pasta_fq::WasmPastaFq;
 use mina_curves::pasta::{
-    pallas::Affine as AffinePallas, pallas::G_GENERATOR_X as GeneratorPallasX,
-    pallas::G_GENERATOR_Y as GeneratorPallasY, vesta::Affine as AffineVesta,
-    vesta::G_GENERATOR_X as GeneratorVestaX, vesta::G_GENERATOR_Y as GeneratorVestaY,
+    curves::{
+        pallas::G_GENERATOR_X as GeneratorPallasX, pallas::G_GENERATOR_Y as GeneratorPallasY,
+        vesta::G_GENERATOR_X as GeneratorVestaX, vesta::G_GENERATOR_Y as GeneratorVestaY,
+    },
+    Pallas as AffinePallas, Vesta as AffineVesta,
 };
 use wasm_bindgen::prelude::*;
 
@@ -165,13 +167,13 @@ pub fn caml_pasta_pallas_rng(i: u32) -> WasmPallasGProjective {
 
 #[wasm_bindgen]
 pub fn caml_pasta_pallas_endo_base() -> WasmPastaFp {
-    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffine>();
+    let (endo_q, _endo_r) = poly_commitment::srs::endos::<GAffine>();
     WasmPastaFp(endo_q)
 }
 
 #[wasm_bindgen]
 pub fn caml_pasta_pallas_endo_scalar() -> WasmPastaFq {
-    let (_endo_q, endo_r) = commitment_dlog::srs::endos::<GAffine>();
+    let (_endo_q, endo_r) = poly_commitment::srs::endos::<GAffine>();
     WasmPastaFq(endo_r)
 }
 

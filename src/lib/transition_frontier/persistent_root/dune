@@ -19,4 +19,4 @@
    data_hash_lib
    )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_coda ppx_version)))
+ (preprocess (pps ppx_jane ppx_mina ppx_version)))

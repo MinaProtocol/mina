@@ -25,7 +25,7 @@ let command_run =
                database is h and missing-blocks-width is n, then \
                Coda_Archive_missing_blocks will report missing blocks between \
                heights max(1, h-n) and h (default %d)"
-              Archive_lib.Metrics.default_missing_blocks_width)
+              Archive_lib.Metrics.default_missing_blocks_width )
          (optional int)
      and postgres = Flag.Uri.Archive.postgres
      and runtime_config_file =
@@ -41,7 +41,7 @@ let command_run =
      let runtime_config_opt =
        Option.map runtime_config_file ~f:(fun file ->
            Yojson.Safe.from_file file |> Runtime_config.of_yojson
-           |> Result.ok_or_failwith)
+           |> Result.ok_or_failwith )
      in
      fun () ->
        let logger = Logger.create () in
@@ -51,7 +51,7 @@ let command_run =
          ~postgres_address:postgres.value
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
-         ~delete_older_than ~runtime_config_opt ~missing_blocks_width)
+         ~delete_older_than ~runtime_config_opt ~missing_blocks_width )
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)
@@ -108,7 +108,7 @@ let command_prune =
            [ Option.map height ~f:(fun v -> ("height", `Int v))
            ; Option.map num_blocks ~f:(fun v -> ("num_blocks", `Int v))
            ; Option.map timestamp ~f:(fun v ->
-                 ("timestamp", `String (Int64.to_string v)))
+                 ("timestamp", `String (Int64.to_string v)) )
            ]
        in
        match%map.Async.Deferred go () with
@@ -117,6 +117,6 @@ let command_prune =
        | Error err ->
            [%log error] "Failed to purge blocks"
              ~metadata:
-               (("error", `String (Caqti_error.show err)) :: cmd_metadata))
+               (("error", `String (Caqti_error.show err)) :: cmd_metadata) )
 
 let commands = [ ("run", command_run); ("prune", command_prune) ]

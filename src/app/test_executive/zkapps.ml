@@ -1,6 +1,7 @@
 open Core
 open Async
 open Integration_test_lib
+open Mina_base
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
@@ -17,49 +18,41 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    let open Test_config.Block_producer in
-    let keypair () =
-      let private_key = Signature_lib.Private_key.create () in
-      let public_key =
-        Signature_lib.Public_key.of_private_key_exn private_key
-      in
-      { Signature_lib.Keypair.private_key; public_key }
-    in
     { default with
       requires_graphql = true
+    ; genesis_ledger =
+        (let open Test_account in
+        [ create ~account_name:"node-a-key" ~balance:"8000000000" ()
+        ; create ~account_name:"node-b-key" ~balance:"1000000000" ()
+        ; create ~account_name:"fish1" ~balance:"3000" ()
+        ; create ~account_name:"fish2" ~balance:"3000" ()
+        ; create ~account_name:"snark-node-key" ~balance:"0" ()
+        ])
     ; block_producers =
-        [ { balance = "8000000000"; timing = Untimed }
-        ; { balance = "1000000000"; timing = Untimed }
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
         ]
-    ; extra_genesis_accounts =
-        [ { keypair = keypair (); balance = "1000" }
-        ; { keypair = keypair (); balance = "1000" }
-        ]
-    ; num_snark_workers = 2
+    ; num_archive_nodes = 1
+    ; snark_coordinator =
+        Some
+          { node_name = "snark-node"
+          ; account_name = "snark-node-key"
+          ; worker_nodes = 2
+          }
     ; snark_worker_fee = "0.0001"
-    ; work_delay = Some 1
-    ; transaction_capacity =
-        Some Runtime_config.Proof_keys.Transaction_capacity.small
+    ; proof_config =
+        { proof_config_default with
+          work_delay = Some 1
+        ; transaction_capacity =
+            Some Runtime_config.Proof_keys.Transaction_capacity.small
+        }
     }
 
   let transactions_sent = ref 0
 
-  let send_zkapp ~logger node parties =
+  let send_zkapp ~logger node zkapp_command =
     incr transactions_sent ;
-    send_zkapp ~logger node parties
-
-  (* An event which fires when [n] ledger proofs have been emitted *)
-  let ledger_proofs_emitted ~logger ~num_proofs =
-    Wait_condition.network_state ~description:"snarked ledger emitted"
-      ~f:(fun network_state ->
-        [%log info] "snarked ledgers generated = %d"
-          network_state.snarked_ledgers_generated ;
-        let module T = struct
-          type t = (string * Mina_base.State_hash.t) list [@@deriving to_yojson]
-        end in
-        network_state.snarked_ledgers_generated >= num_proofs)
-    |> Wait_condition.with_timeouts ~soft_timeout:(Slots 15)
-         ~hard_timeout:(Slots 20)
+    send_zkapp ~logger node zkapp_command
 
   (* Call [f] [n] times in sequence *)
   let repeat_seq ~n ~f =
@@ -76,130 +69,189 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let sender = List.nth_exn nodes 0 in
     let receiver = List.nth_exn nodes 1 in
     let open Malleable_error.Let_syntax in
-    let%bind sender_pub_key = Util.pub_key_of_node sender in
-    let%bind receiver_pub_key = Util.pub_key_of_node receiver in
+    let%bind sender_pub_key = pub_key_of_node sender in
+    let%bind receiver_pub_key = pub_key_of_node receiver in
     repeat_seq ~n ~f:(fun () ->
-        Network.Node.must_send_payment ~logger sender ~sender_pub_key
-          ~receiver_pub_key ~amount:Currency.Amount.one ~fee
-        >>| ignore)
+        Integration_test_lib.Graphql_requests.must_send_online_payment ~logger
+          (Network.Node.get_ingress_uri sender)
+          ~sender_pub_key ~receiver_pub_key ~amount:Currency.Amount.one ~fee
+        >>| ignore )
+
+  let payment_receiver =
+    Signature_lib.(Public_key.compress (Keypair.create ()).public_key)
+
+  let send_payment_from_zkapp_account ?expected_failure
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~logger
+      ~node_uri (sender : Signature_lib.Keypair.t) nonce =
+    let sender_pk = Signature_lib.Public_key.compress sender.public_key in
+    let receiver_pk = payment_receiver in
+    let amount =
+      Currency.Amount.of_fee constraint_constants.account_creation_fee
+    in
+    let memo = "" in
+    let valid_until = Mina_numbers.Global_slot_since_genesis.max_value in
+    let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+    let payload =
+      let common =
+        { Signed_command_payload.Common.Poly.fee
+        ; fee_payer_pk = sender_pk
+        ; nonce
+        ; valid_until
+        ; memo = Signed_command_memo.empty
+        }
+      in
+      let payment_payload = { Payment_payload.Poly.receiver_pk; amount } in
+      let body = Signed_command_payload.Body.Payment payment_payload in
+      { Signed_command_payload.Poly.common; body }
+    in
+    let raw_signature =
+      Signed_command.sign_payload sender.private_key payload
+      |> Signature.Raw.encode
+    in
+    match expected_failure with
+    | Some failure ->
+        send_invalid_payment ~logger ~sender_pub_key:sender_pk
+          ~receiver_pub_key:receiver_pk ~amount ~fee ~nonce ~memo ~valid_until
+          ~raw_signature ~expected_failure:failure node_uri
+    | None ->
+        incr transactions_sent ;
+        Integration_test_lib.Graphql_requests.must_send_payment_with_raw_sig
+          ~logger ~sender_pub_key:sender_pk ~receiver_pub_key:receiver_pk
+          ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature node_uri
+        |> Malleable_error.ignore_m
 
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let block_producer_nodes = Network.block_producers network in
-    (*TODO: capture snark worker processes' failures*)
+    let block_producer_nodes =
+      Network.block_producers network |> Core.String.Map.data
+    in
+    (* TODO: capture snark worker processes' failures *)
     let%bind () =
       section_hard "Wait for nodes to initialize"
         (wait_for t
-           (Wait_condition.nodes_to_initialize
-              ( Network.seeds network @ block_producer_nodes
-              @ Network.snark_coordinators network )))
+           ( Wait_condition.nodes_to_initialize
+           @@ (Network.all_mina_nodes network |> Core.String.Map.data) ) )
     in
-    let node = List.hd_exn block_producer_nodes in
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.compiled
+    let node =
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
     in
-    let (keypair : Signature_lib.Keypair.t) =
-      (List.nth_exn config.extra_genesis_accounts 0).keypair
+    let constraint_constants = Network.constraint_constants network in
+    let fish1_kp =
+      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
+        .keypair
     in
-    let keypair2 = (List.nth_exn config.extra_genesis_accounts 1).keypair in
+    let fish2_kp =
+      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish2")
+        .keypair
+    in
     let num_zkapp_accounts = 3 in
-    let snapp_keypairs =
+    let zkapp_keypairs =
       List.init num_zkapp_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
     in
+    let single_zkapp_keypair = List.hd_exn zkapp_keypairs in
     let zkapp_account_ids =
-      List.map snapp_keypairs ~f:(fun snapp_keypair ->
-          Mina_base.Account_id.create
-            (snapp_keypair.public_key |> Signature_lib.Public_key.compress)
-            Mina_base.Token_id.default)
+      List.map zkapp_keypairs ~f:(fun zkapp_keypair ->
+          Account_id.create
+            (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
+            Token_id.default )
     in
-    let%bind parties_create_account =
-      (* construct a Parties.t, similar to zkapp_test_transaction create-snapp-account *)
-      let open Mina_base in
-      let amount = Currency.Amount.of_int 10_000_000_000 in
+    let%bind zkapp_command_create_accounts =
+      (* construct a Zkapp_command.t, similar to zkapp_test_transaction create-zkapp-account *)
+      let amount = Currency.Amount.of_mina_int_exn 10 in
       let nonce = Account.Nonce.zero in
       let memo =
-        Signed_command_memo.create_from_string_exn "Snapp create account"
+        Signed_command_memo.create_from_string_exn "Zkapp create account"
       in
-      let fee = Currency.Fee.of_int 20_000_000 in
-      let (parties_spec : Transaction_snark.For_tests.Spec.t) =
-        { sender = (keypair, nonce)
+      let fee = Currency.Fee.of_nanomina_int_exn 20_000_000 in
+      let (zkapp_command_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t)
+          =
+        { sender = (fish1_kp, nonce)
         ; fee
-        ; receivers = []
+        ; fee_payer = None
         ; amount
-        ; zkapp_account_keypairs = snapp_keypairs
+        ; zkapp_account_keypairs = zkapp_keypairs
         ; memo
         ; new_zkapp_account = true
-        ; snapp_update = Party.Update.dummy
-        ; current_auth = Permissions.Auth_required.Signature
-        ; call_data = Snark_params.Tick.Field.zero
-        ; events = []
-        ; sequence_events = []
+        ; snapp_update = Account_update.Update.dummy
+        ; preconditions = None
+        ; authorization_kind = Signature
         }
       in
       return
       @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-           parties_spec
+           zkapp_command_spec
     in
-    let%bind.Deferred parties_update_permissions, permissions_updated =
-      (* construct a Parties.t, similar to zkapp_test_transaction update-permissions *)
-      let open Mina_base in
+    let%bind.Deferred zkapp_command_update_permissions, permissions_updated =
+      (* construct a Zkapp_command.t, similar to zkapp_test_transaction update-permissions *)
       let nonce = Account.Nonce.zero in
       let memo =
-        Signed_command_memo.create_from_string_exn "Snapp update permissions"
+        Signed_command_memo.create_from_string_exn "Zkapp update permissions"
       in
-      (*Lower fee so that parties_create_account gets applied first*)
-      let fee = Currency.Fee.of_int 10_000_000 in
+      (* Lower fee so that zkapp_command_create_accounts gets applied first *)
+      let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
       let new_permissions : Permissions.t =
         { Permissions.user_default with
           edit_state = Permissions.Auth_required.Proof
-        ; edit_sequence_state = Proof
+        ; edit_action_state = Proof
         ; set_delegate = Proof
-        ; set_verification_key = Proof
+        ; set_verification_key = (Proof, Mina_numbers.Txn_version.current)
         ; set_permissions = Proof
         ; set_zkapp_uri = Proof
         ; set_token_symbol = Proof
         ; set_voting_for = Proof
+        ; set_timing = Proof
+        ; send = Proof
         }
       in
-      let (parties_spec : Transaction_snark.For_tests.Spec.t) =
-        { sender = (keypair2, nonce)
+      let (zkapp_command_spec : Transaction_snark.For_tests.Update_states_spec.t)
+          =
+        { sender = (fish2_kp, nonce)
         ; fee
+        ; fee_payer = None
         ; receivers = []
         ; amount = Currency.Amount.zero
-        ; zkapp_account_keypairs = snapp_keypairs
+        ; zkapp_account_keypairs = zkapp_keypairs
         ; memo
         ; new_zkapp_account = false
         ; snapp_update =
-            { Party.Update.dummy with permissions = Set new_permissions }
+            { Account_update.Update.dummy with
+              permissions = Set new_permissions
+            }
         ; current_auth =
             (* current set_permissions permission requires Signature *)
             Permissions.Auth_required.Signature
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
-        ; sequence_events = []
+        ; actions = []
+        ; preconditions = None
         }
       in
-      let%map.Deferred parties =
+      let%map.Deferred zkapp_command =
         Transaction_snark.For_tests.update_states ~constraint_constants
-          parties_spec
+          zkapp_command_spec
       in
-      (parties, new_permissions)
+      (zkapp_command, new_permissions)
     in
-    let%bind.Deferred snapp_update_all, parties_update_all =
-      let open Mina_base in
+    let%bind.Deferred ( zkapp_update_all
+                      , zkapp_command_update_all
+                      , zkapp_command_invalid_nonce
+                      , zkapp_command_insufficient_funds
+                      , zkapp_command_insufficient_replace_fee
+                      , zkapp_command_insufficient_fee
+                      , zkapp_command_cross_network_replay ) =
       let amount = Currency.Amount.zero in
       let nonce = Account.Nonce.of_int 1 in
       let memo =
-        Signed_command_memo.create_from_string_exn "Snapp update all"
+        Signed_command_memo.create_from_string_exn "Zkapp update all"
       in
-      let fee = Currency.Fee.of_int 10_000_000 in
+      let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
       let app_state =
         let len = Zkapp_state.Max_state_size.n |> Pickles_types.Nat.to_int in
         let fields =
           Quickcheck.random_value
             (Quickcheck.Generator.list_with_length len
-               Snark_params.Tick.Field.gen)
+               Snark_params.Tick.Field.gen )
         in
         List.map fields ~f:(fun field -> Zkapp_basic.Set_or_keep.Set field)
         |> Zkapp_state.V.of_list_exn
@@ -218,7 +270,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let new_zkapp_uri = "https://www.minaprotocol.com" in
       let new_token_symbol = "SHEKEL" in
       let new_voting_for = Quickcheck.random_value State_hash.gen in
-      let snapp_update : Party.Update.t =
+      let snapp_update : Account_update.Update.t =
         { app_state
         ; delegate = Set new_delegate
         ; verification_key = Set new_verification_key
@@ -230,50 +282,293 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; voting_for = Set new_voting_for
         }
       in
-      let (parties_spec : Transaction_snark.For_tests.Spec.t) =
-        { sender = (keypair2, nonce)
+      let (zkapp_command_spec : Transaction_snark.For_tests.Update_states_spec.t)
+          =
+        { sender = (fish2_kp, nonce)
         ; fee
+        ; fee_payer = None
         ; receivers = []
         ; amount
-        ; zkapp_account_keypairs = snapp_keypairs
+        ; zkapp_account_keypairs = zkapp_keypairs
         ; memo
         ; new_zkapp_account = false
         ; snapp_update
         ; current_auth = Permissions.Auth_required.Proof
         ; call_data = Snark_params.Tick.Field.zero
         ; events = []
-        ; sequence_events = []
+        ; actions = []
+        ; preconditions = None
         }
       in
-      let%map.Deferred parties_update_all =
+      let%bind.Deferred zkapp_command_update_all =
         Transaction_snark.For_tests.update_states ~constraint_constants
-          parties_spec
+          zkapp_command_spec
       in
-      (snapp_update, parties_update_all)
+      let%bind.Deferred zkapp_command_invalid_nonce =
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          { zkapp_command_spec with
+            sender = (fish2_kp, Account.Nonce.max_value)
+          }
+      in
+      let%bind.Deferred zkapp_command_insufficient_funds =
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          { zkapp_command_spec with fee = Currency.Fee.max_int }
+      in
+      let%bind.Deferred zkapp_command_insufficient_replace_fee =
+        let spec_insufficient_replace_fee :
+            Transaction_snark.For_tests.Update_states_spec.t =
+          { zkapp_command_spec with
+            fee = Currency.Fee.of_nanomina_int_exn 5_000_000
+          }
+        in
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_insufficient_replace_fee
+      in
+      let%bind.Deferred zkapp_command_insufficient_fee =
+        let spec_insufficient_fee :
+            Transaction_snark.For_tests.Update_states_spec.t =
+          { zkapp_command_spec with
+            fee = Currency.Fee.of_nanomina_int_exn 1000
+          }
+        in
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_insufficient_fee
+      in
+
+      let%map.Deferred zkapp_command_cross_network_replay =
+        let spec : Transaction_snark.For_tests.Single_account_update_spec.t =
+          { fee
+          ; fee_payer = (fish2_kp, nonce)
+          ; zkapp_account_keypair = single_zkapp_keypair
+          ; memo
+          ; update = snapp_update
+          ; call_data = Snark_params.Tick.Field.zero
+          ; events = []
+          ; actions = []
+          }
+        in
+        Transaction_snark.For_tests.single_account_update
+          ~chain:Mina_signature_kind.(Other_network "Invalid")
+          ~constraint_constants spec
+      in
+      ( snapp_update
+      , zkapp_command_update_all
+      , zkapp_command_invalid_nonce
+      , zkapp_command_insufficient_funds
+      , zkapp_command_insufficient_replace_fee
+      , zkapp_command_insufficient_fee
+      , zkapp_command_cross_network_replay )
     in
-    let parties_invalid_nonce =
-      let p = parties_update_all in
+    let zkapp_command_invalid_signature =
+      let p = zkapp_command_update_all in
       { p with
         fee_payer =
-          { p.fee_payer with
-            body =
-              { p.fee_payer.body with
-                account_precondition = Mina_base.Account.Nonce.of_int 42
-              }
+          { body = { p.fee_payer.body with nonce = Account.Nonce.of_int 2 }
+          ; authorization = Signature.dummy
           }
       }
     in
-    let parties_invalid_signature =
-      let p = parties_update_all in
-      { p with
-        fee_payer =
-          { body =
-              { p.fee_payer.body with
-                account_precondition = Mina_base.Account.Nonce.of_int 2
-              }
-          ; authorization = Mina_base.Signature.dummy
-          }
-      }
+    let zkapp_command_invalid_proof =
+      let p = zkapp_command_update_all in
+      Zkapp_command.
+        { p with
+          account_updates =
+            Call_forest.map p.account_updates ~f:(fun other_p ->
+                match other_p.Account_update.authorization with
+                | Proof _ ->
+                    { other_p with
+                      authorization =
+                        Control.Proof
+                          (Lazy.force Mina_base.Proof.blockchain_dummy)
+                    }
+                | _ ->
+                    other_p )
+        }
+    in
+    let%bind.Deferred zkapp_command_nonexistent_fee_payer =
+      let new_kp = Signature_lib.Keypair.create () in
+      let memo =
+        Signed_command_memo.create_from_string_exn "Non-existent account"
+      in
+      let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
+      let spec : Transaction_snark.For_tests.Update_states_spec.t =
+        { sender = (new_kp, Account.Nonce.zero)
+        ; fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount = Currency.Amount.zero
+        ; zkapp_account_keypairs = zkapp_keypairs
+        ; memo
+        ; new_zkapp_account = false
+        ; snapp_update = Account_update.Update.dummy
+        ; current_auth = Permissions.Auth_required.None
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; actions = []
+        ; preconditions = None
+        }
+      in
+      Transaction_snark.For_tests.update_states ~constraint_constants spec
+    in
+    let%bind.Deferred ( zkapp_command_mint_token
+                      , zkapp_command_mint_token2
+                      , zkapp_command_token_transfer
+                      , zkapp_command_token_transfer2 ) =
+      (* similar to tokens tests in transaction_snark/tests/zkapp_tokens.ml
+         and `Mina_ledger.Ledger`
+
+         the token owner account has already been created here, so don't
+         need that as a separate transaction
+      *)
+      let account_creation_fee_int =
+        Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
+      in
+      let token_funder = fish1_kp in
+      let token_owner = fish2_kp in
+      let token_accounts =
+        Array.init 4 ~f:(fun _ -> Signature_lib.Keypair.create ())
+      in
+      let custom_token_id =
+        Account_id.derive_token_id
+          ~owner:
+            (Account_id.create
+               (Signature_lib.Public_key.compress token_owner.public_key)
+               Token_id.default )
+      in
+      let custom_token_id2 =
+        Account_id.derive_token_id
+          ~owner:
+            (Account_id.create
+               (Signature_lib.Public_key.compress token_owner.public_key)
+               custom_token_id )
+      in
+      let keymap =
+        List.fold
+          ([ token_funder; token_owner ] @ Array.to_list token_accounts)
+          ~init:Signature_lib.Public_key.Compressed.Map.empty
+          ~f:(fun map { private_key; public_key } ->
+            Signature_lib.Public_key.Compressed.Map.add_exn map
+              ~key:(Signature_lib.Public_key.compress public_key)
+              ~data:private_key )
+      in
+      let fee_payer_pk =
+        Signature_lib.Public_key.compress token_funder.public_key
+      in
+      let%bind.Deferred zkapp_command_mint_token =
+        let open Zkapp_command_builder in
+        let with_dummy_signatures =
+          mk_forest
+            [ mk_node
+                (mk_account_update_body Signature No token_owner
+                   Token_id.default
+                   (-account_creation_fee_int) )
+                [ mk_node
+                    (mk_account_update_body Signature Parents_own_token
+                       token_accounts.(0) custom_token_id 10000 )
+                    []
+                ]
+            ]
+          |> mk_zkapp_command ~memo:"mint token" ~fee:12_000_000 ~fee_payer_pk
+               ~fee_payer_nonce:(Account.Nonce.of_int 1)
+        in
+        replace_authorizations ~keymap with_dummy_signatures
+      in
+      let%bind.Deferred zkapp_command_mint_token2 =
+        let open Zkapp_command_builder in
+        let with_dummy_signatures =
+          mk_forest
+            [ mk_node
+                (mk_account_update_body Signature No token_owner
+                   Token_id.default
+                   (-2 * account_creation_fee_int) )
+                [ mk_node
+                    (mk_account_update_body Signature Parents_own_token
+                       token_owner custom_token_id 0 )
+                    [ mk_node
+                        (mk_account_update_body Signature Parents_own_token
+                           token_accounts.(2) custom_token_id2 500 )
+                        []
+                    ]
+                ]
+            ]
+          |> mk_zkapp_command ~memo:"zkapp to mint token2" ~fee:11_500_000
+               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 2)
+        in
+        replace_authorizations ~keymap with_dummy_signatures
+      in
+      let%bind.Deferred zkapp_command_token_transfer =
+        let open Zkapp_command_builder in
+        (* lower fee than minting Zkapp_command.t *)
+        let with_dummy_signatures =
+          mk_forest
+            [ mk_node
+                (mk_account_update_body Signature No token_owner
+                   Token_id.default
+                   (-account_creation_fee_int) )
+                [ mk_node
+                    (mk_account_update_body Signature Parents_own_token
+                       token_accounts.(0) custom_token_id (-30) )
+                    []
+                ; mk_node
+                    (mk_account_update_body Signature Parents_own_token
+                       token_accounts.(1) custom_token_id 30 )
+                    []
+                ; mk_node
+                    (mk_account_update_body Signature No token_funder
+                       Token_id.default (-50) )
+                    []
+                ; mk_node
+                    (mk_account_update_body Signature No token_funder
+                       Token_id.default 50 )
+                    []
+                ]
+            ]
+          |> mk_zkapp_command ~memo:"zkapp for tokens transfer" ~fee:11_000_000
+               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
+        in
+        replace_authorizations ~keymap with_dummy_signatures
+      in
+      let%map.Deferred zkapp_command_token_transfer2 =
+        let open Zkapp_command_builder in
+        (* lower fee than first tokens transfer *)
+        let with_dummy_signatures =
+          mk_forest
+            [ mk_node
+                (mk_account_update_body Signature No token_owner
+                   Token_id.default
+                   (-account_creation_fee_int) )
+                [ mk_node
+                    (mk_account_update_body Signature Parents_own_token
+                       token_accounts.(1) custom_token_id (-5) )
+                    []
+                ; mk_node
+                    (mk_account_update_body Signature Parents_own_token
+                       token_accounts.(0) custom_token_id 5 )
+                    []
+                ; mk_node
+                    (mk_account_update_body Signature Parents_own_token
+                       token_owner custom_token_id 0 )
+                    [ mk_node
+                        (mk_account_update_body Signature Parents_own_token
+                           token_accounts.(2) custom_token_id2 (-210) )
+                        []
+                    ; mk_node
+                        (mk_account_update_body Signature Parents_own_token
+                           token_accounts.(3) custom_token_id2 210 )
+                        []
+                    ]
+                ]
+            ]
+          |> mk_zkapp_command ~memo:"zkapp for tokens transfer 2"
+               ~fee:10_000_000 ~fee_payer_pk
+               ~fee_payer_nonce:(Account.Nonce.of_int 4)
+        in
+        replace_authorizations ~keymap with_dummy_signatures
+      in
+      ( zkapp_command_mint_token
+      , zkapp_command_mint_token2
+      , zkapp_command_token_transfer
+      , zkapp_command_token_transfer2 )
     in
     let with_timeout =
       let soft_slots = 4 in
@@ -281,17 +576,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let hard_timeout = Network_time_span.Slots (soft_slots * 2) in
       Wait_condition.with_timeouts ~soft_timeout ~hard_timeout
     in
+    let wait_for_zkapp zkapp_command =
+      let%map () =
+        wait_for t @@ with_timeout
+        @@ Wait_condition.zkapp_to_be_included_in_frontier ~has_failures:false
+             ~zkapp_command
+      in
+      [%log info] "ZkApp transaction included in transition frontier"
+    in
     let compatible req_item ledg_item ~equal =
       match (req_item, ledg_item) with
-      | Mina_base.Zkapp_basic.Set_or_keep.Keep, _ ->
+      | Zkapp_basic.Set_or_keep.Keep, _ ->
           true
-      | Set v1, Mina_base.Zkapp_basic.Set_or_keep.Set v2 ->
+      | Set v1, Zkapp_basic.Set_or_keep.Set v2 ->
           equal v1 v2
       | Set _, Keep ->
           false
     in
-    let compatible_updates ~(ledger_update : Mina_base.Party.Update.t)
-        ~(requested_update : Mina_base.Party.Update.t) : bool =
+    let compatible_updates ~(ledger_update : Account_update.Update.t)
+        ~(requested_update : Account_update.Update.t) : bool =
       (* the "update" in the ledger is derived from the account
 
          if the requested update has `Set` for a field, we
@@ -310,7 +613,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Pickles_types.Vector.Vector_8.to_list ledger_update.app_state
         in
         List.for_all2_exn fs_requested fs_ledger ~f:(fun req ledg ->
-            compatible req ledg ~equal:Pickles.Backend.Tick.Field.equal)
+            compatible req ledg ~equal:Pickles.Backend.Tick.Field.equal )
       in
       let delegates_compat =
         compatible requested_update.delegate ledger_update.delegate
@@ -327,7 +630,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let permissions_compat =
         compatible requested_update.permissions ledger_update.permissions
-          ~equal:Mina_base.Permissions.equal
+          ~equal:Permissions.equal
       in
       let zkapp_uris_compat =
         compatible requested_update.zkapp_uri ledger_update.zkapp_uri
@@ -339,11 +642,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let timings_compat =
         compatible requested_update.timing ledger_update.timing
-          ~equal:Mina_base.Party.Update.Timing_info.equal
+          ~equal:Account_update.Update.Timing_info.equal
       in
       let voting_fors_compat =
         compatible requested_update.voting_for ledger_update.voting_for
-          ~equal:Mina_base.State_hash.equal
+          ~equal:State_hash.equal
       in
       List.for_all
         [ app_states_compat
@@ -357,103 +660,211 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
         ~f:Fn.id
     in
-    let wait_for_snapp parties =
-      let%map () =
-        wait_for t @@ with_timeout
-        @@ Wait_condition.snapp_to_be_included_in_frontier ~has_failures:false
-             ~parties
-      in
-      [%log info] "ZkApp transactions included in transition frontier"
+    let snark_work_event_subscription =
+      Event_router.on (event_router t) Snark_work_gossip
+        ~f:(fun _ (_, direction) ->
+          ( match direction with
+          | Sent ->
+              ()
+          | Received ->
+              [%log info] "Received new snark work" ) ;
+          Deferred.return `Continue )
+    in
+    let snark_work_failure_subscription =
+      Event_router.on (event_router t) Snark_work_failed ~f:(fun _ failure ->
+          [%log error]
+            "A snark worker encountered an error while creating a proof: \
+             $failure"
+            ~metadata:
+              [ ("failure", Event_type.Snark_work_failed.to_yojson failure) ] ;
+          Deferred.return `Continue )
     in
     let%bind () =
       section_hard "Send a zkApp transaction to create zkApp accounts"
-        (send_zkapp ~logger node parties_create_account)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_create_accounts )
     in
     let%bind () =
-      section "Send a zkApp transaction to update permissions"
-        (send_zkapp ~logger node parties_update_permissions)
-    in
-    let%bind () =
-      let padding_payments =
-        (* for work_delay=1 and transaction_capacity=4 per block*)
-        let needed = 12 in
-        if !transactions_sent >= needed then 0 else needed - !transactions_sent
-      in
-      let fee = Currency.Fee.of_int 1_000_000 in
-      send_padding_transactions block_producer_nodes ~fee ~logger
-        ~n:padding_payments
-    in
-    let%bind () =
-      section
-        "Wait for snapp to create accounts to be included in transition \
+      section_hard
+        "Wait for zkapp to create accounts to be included in transition \
          frontier"
-        (wait_for_snapp parties_create_account)
+        (wait_for_zkapp zkapp_command_create_accounts)
     in
     let%bind () =
-      section
+      let sender = List.hd_exn zkapp_keypairs in
+      let nonce = Account.Nonce.zero in
+      section_hard "Send a valid payment from zkApp account"
+        (send_payment_from_zkapp_account ~constraint_constants
+           ~node_uri:(Network.Node.get_ingress_uri node)
+           ~logger sender nonce )
+    in
+    let%bind () =
+      section_hard "Send a zkApp transaction to update permissions"
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_update_permissions )
+    in
+    let%bind () =
+      section_hard
         "Wait for zkApp transaction to update permissions to be included in \
          transition frontier"
-        (wait_for_snapp parties_update_permissions)
+        (wait_for_zkapp zkapp_command_update_permissions)
+    in
+    let%bind () =
+      let sender = List.hd_exn zkapp_keypairs in
+      let nonce = Account.Nonce.of_int 1 in
+      section_hard "Send an invalid payment from zkApp account"
+        (send_payment_from_zkapp_account ~constraint_constants ~logger sender
+           nonce
+           ~node_uri:(Network.Node.get_ingress_uri node)
+           ~expected_failure:
+             Network_pool.Transaction_pool.Diff_versioned.Diff_error.(
+               to_string_name Fee_payer_not_permitted_to_send) )
     in
     let%bind () =
       section_hard "Verify that updated permissions are in ledger accounts"
         (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying permissions for account"
-               ~metadata:
-                 [ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
+               ~metadata:[ ("account_id", Account_id.to_yojson account_id) ] ;
              let%bind ledger_permissions =
-               get_account_permissions ~logger node account_id
+               get_account_permissions ~logger
+                 (Network.Node.get_ingress_uri node)
+                 account_id
              in
-             if
-               Mina_base.Permissions.equal ledger_permissions
-                 permissions_updated
-             then (
+             if Permissions.equal ledger_permissions permissions_updated then (
                [%log info] "Ledger, updated permissions are equal" ;
                return () )
              else (
                [%log error] "Ledger, updated permissions differ"
                  ~metadata:
                    [ ( "ledger_permissions"
-                     , Mina_base.Permissions.to_yojson ledger_permissions )
+                     , Permissions.to_yojson ledger_permissions )
                    ; ( "updated_permissions"
-                     , Mina_base.Permissions.to_yojson permissions_updated )
+                     , Permissions.to_yojson permissions_updated )
                    ] ;
                Malleable_error.hard_error
                  (Error.of_string
-                    "Ledger permissions do not match update permissions") )))
+                    "Ledger permissions do not match update permissions" ) ) )
+        )
     in
-    (*Won't be accepted until the previous transactions are applied*)
+    let%bind () =
+      section_hard "Send a zkapp with a different chain id"
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_cross_network_replay "Invalid_proof" )
+    in
+    let%bind () =
+      section_hard "Send a zkapp with an insufficient fee"
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_insufficient_fee "Insufficient fee" )
+    in
+    let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 1) in
+    let%bind () = Malleable_error.lift (after (Time.Span.of_sec 30.0)) in
+    (* Won't be accepted until the previous transactions are applied *)
     let%bind () =
       section_hard "Send a zkApp transaction to update all fields"
-        (send_zkapp ~logger node parties_update_all)
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_update_all )
+    in
+    let%bind () =
+      section_hard "Send a zkapp with an invalid proof"
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_invalid_proof "Invalid_proof" )
+    in
+    let%bind () =
+      section_hard "Send a zkapp with an insufficient replace fee"
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_insufficient_replace_fee "Insufficient_replace_fee" )
+    in
+    let%bind () =
+      section_hard "Send a zkApp transaction with an invalid nonce"
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_invalid_nonce "Invalid_nonce" )
+    in
+    let%bind () =
+      section_hard
+        "Send a zkApp transaction with insufficient_funds, fee too high"
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_insufficient_funds "Insufficient_funds" )
+    in
+    let%bind () =
+      section_hard "Send a zkApp transaction with an invalid signature"
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_invalid_signature "Invalid_signature" )
+    in
+    let%bind () =
+      section_hard "Send a zkApp transaction with a nonexistent fee payer"
+        (send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_nonexistent_fee_payer "Fee_payer_account_not_found" )
     in
     let%bind () =
       section_hard
         "Wait for zkApp transaction to update all fields to be included in \
          transition frontier"
-        (wait_for_snapp parties_update_all)
+        (wait_for_zkapp zkapp_command_update_all)
     in
     let%bind () =
-      section "Send a zkApp transaction with an invalid nonce"
-        (send_invalid_zkapp ~logger node parties_invalid_nonce "Invalid_nonce")
+      section_hard "Send a zkApp transaction to mint token"
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_mint_token )
     in
     let%bind () =
-      section "Send a zkApp transaction with an invalid signature"
-        (send_invalid_zkapp ~logger node parties_invalid_signature
-           "Invalid_signature")
+      section_hard "Send a zkApp transaction to mint 2nd token"
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_mint_token2 )
     in
     let%bind () =
-      section "Verify zkApp transaction updates in ledger"
+      section_hard "Send a zkApp transaction to transfer tokens"
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_token_transfer )
+    in
+    let%bind () =
+      section_hard "Send a zkApp transaction to transfer tokens (2)"
+        (send_zkapp ~logger
+           (Network.Node.get_ingress_uri node)
+           zkapp_command_token_transfer2 )
+    in
+    let%bind () =
+      section_hard "Wait for zkApp transaction to mint token"
+        (wait_for_zkapp zkapp_command_mint_token)
+    in
+    let%bind () =
+      section_hard "Wait for zkApp transaction to mint 2nd token"
+        (wait_for_zkapp zkapp_command_mint_token2)
+    in
+    let%bind () =
+      section_hard "Wait for zkApp transaction to transfer tokens"
+        (wait_for_zkapp zkapp_command_token_transfer)
+    in
+    let%bind () =
+      section_hard "Wait for zkApp transaction to transfer tokens (2)"
+        (wait_for_zkapp zkapp_command_token_transfer2)
+    in
+    let%bind () =
+      section_hard "Verify zkApp transaction updates in ledger"
         (Malleable_error.List.iter zkapp_account_ids ~f:(fun account_id ->
              [%log info] "Verifying updates for account"
-               ~metadata:
-                 [ ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
+               ~metadata:[ ("account_id", Account_id.to_yojson account_id) ] ;
              let%bind ledger_update =
-               get_account_update ~logger node account_id
+               get_account_update ~logger
+                 (Network.Node.get_ingress_uri node)
+                 account_id
              in
              if
                compatible_updates ~ledger_update
-                 ~requested_update:snapp_update_all
+                 ~requested_update:zkapp_update_all
              then (
                [%log info] "Ledger update and requested update are compatible" ;
                return () )
@@ -462,17 +873,37 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  "Ledger update and requested update are incompatible"
                  ~metadata:
                    [ ( "ledger_update"
-                     , Mina_base.Party.Update.to_yojson ledger_update )
+                     , Account_update.Update.to_yojson ledger_update )
                    ; ( "requested_update"
-                     , Mina_base.Party.Update.to_yojson snapp_update_all )
+                     , Account_update.Update.to_yojson zkapp_update_all )
                    ] ;
                Malleable_error.hard_error
                  (Error.of_string
-                    "Ledger update and requested update are incompatible") )))
+                    "Ledger update and requested update are incompatible" ) ) )
+        )
     in
     let%bind () =
-      section "Wait for proof to be emitted"
-        (wait_for t (ledger_proofs_emitted ~logger ~num_proofs:1))
+      let padding_payments =
+        (* for work_delay=1 and transaction_capacity=4 per block*)
+        let needed = 36 in
+        if !transactions_sent >= needed then 0 else needed - !transactions_sent
+      in
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      send_padding_transactions block_producer_nodes ~fee ~logger
+        ~n:padding_payments
     in
-    return ()
+    let%bind () =
+      section_hard "Wait for proof to be emitted"
+        (wait_for t
+           (Wait_condition.ledger_proofs_emitted_since_genesis
+              ~test_config:config ~num_proofs:1 ) )
+    in
+    Event_router.cancel (event_router t) snark_work_event_subscription () ;
+    Event_router.cancel (event_router t) snark_work_failure_subscription () ;
+    section_hard "Running replayer"
+      (let%bind logs =
+         Network.Node.run_replayer ~logger
+           (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
+       in
+       check_replayer_logs ~logger logs )
 end

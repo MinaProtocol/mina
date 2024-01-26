@@ -159,12 +159,12 @@ module Make_weierstrass_checked
     assert_square y (x3 + ax + constant Params.b)
 
   let typ : (t, Curve.t) Typ.t =
-    let unchecked =
+    let (Typ unchecked) =
       Typ.transport
         Typ.(tuple2 F.typ F.typ)
         ~there:Curve.to_affine_exn ~back:Curve.of_affine
     in
-    { unchecked with check = assert_on_curve }
+    Typ { unchecked with check = assert_on_curve }
 
   let negate ((x, y) : t) : t = (x, F.negate y)
 
@@ -184,7 +184,7 @@ module Make_weierstrass_checked
 
   open Let_syntax
 
-  let%snarkydef add' ~div (ax, ay) (bx, by) =
+  let%snarkydef_ add' ~div (ax, ay) (bx, by) =
     let open F in
     let%bind lambda = div (by - ay) (bx - ax) in
     let%bind cx =
@@ -274,7 +274,7 @@ module Make_weierstrass_checked
       (module M : S)
   end
 
-  let%snarkydef double (ax, ay) =
+  let%snarkydef_ double (ax, ay) =
     let open F in
     let%bind x_squared = square ax in
     let%bind lambda =
@@ -283,7 +283,7 @@ module Make_weierstrass_checked
           As_prover.(
             map2 (read typ x_squared) (read typ ay) ~f:(fun x_squared ay ->
                 let open F.Unchecked in
-                (x_squared + x_squared + x_squared + Params.a) * inv (ay + ay)))
+                (x_squared + x_squared + x_squared + Params.a) * inv (ay + ay) ))
     in
     let%bind bx =
       exists typ
@@ -291,7 +291,7 @@ module Make_weierstrass_checked
           As_prover.(
             map2 (read typ lambda) (read typ ax) ~f:(fun lambda ax ->
                 let open F.Unchecked in
-                square lambda - (ax + ax)))
+                square lambda - (ax + ax) ))
     in
     let%bind by =
       exists typ
@@ -319,11 +319,11 @@ module Make_weierstrass_checked
     let choose a1 a2 =
       let open Field.Checked in
       F.map2_ a1 a2 ~f:(fun a1 a2 ->
-          (a1 * cond) + (a2 * (Field.Var.constant Field.one - cond)))
+          (a1 * cond) + (a2 * (Field.Var.constant Field.one - cond)) )
     in
     (choose x1 x2, choose y1 y2)
 
-  let%snarkydef scale (type shifted)
+  let%snarkydef_ scale (type shifted)
       (module Shifted : Shifted.S with type t = shifted) t
       (c : Boolean.var Bitstring_lib.Bitstring.Lsb_first.t) ~(init : shifted) :
       shifted Checked.t =
@@ -335,10 +335,10 @@ module Make_weierstrass_checked
           return acc
       | b :: bs ->
           let%bind acc' =
-            with_label (sprintf "acc_%d" i)
-              (let%bind add_pt = Shifted.add acc pt in
-               let don't_add_pt = acc in
-               Shifted.if_ b ~then_:add_pt ~else_:don't_add_pt)
+            with_label (sprintf "acc_%d" i) (fun () ->
+                let%bind add_pt = Shifted.add acc pt in
+                let don't_add_pt = acc in
+                Shifted.if_ b ~then_:add_pt ~else_:don't_add_pt )
           and pt' = double pt in
           go (i + 1) bs acc' pt'
     in

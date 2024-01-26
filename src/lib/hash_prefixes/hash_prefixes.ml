@@ -11,52 +11,69 @@ end = struct
 
   let create s : t =
     let string_length = String.length s in
-    assert (string_length <= length_in_bytes) ;
-    let diff = length_in_bytes - string_length in
-    let r = s ^ String.init diff (fun _ -> padding_char) in
+    let r =
+      if string_length <= length_in_bytes then
+        let diff = length_in_bytes - string_length in
+        s ^ String.init diff (fun _ -> padding_char)
+      else String.sub s 0 length_in_bytes
+    in
     assert (String.length r = length_in_bytes) ;
     r
 end
 
 include T
 
-let protocol_state = create "CodaProtoState"
+let protocol_state = create "MinaProtoState"
 
-let protocol_state_body = create "CodaProtoStateBody"
+let protocol_state_body = create "MinaProtoStateBody"
 
-let account = create "CodaAccount"
+let account = create "MinaAccount"
 
-let side_loaded_vk = create "CodaSideLoadedVk"
+let side_loaded_vk = create "MinaSideLoadedVk"
 
-let zkapp_account = create "CodaZkappAccount"
+let zkapp_account = create "MinaZkappAccount"
 
-let zkapp_payload = create "CodaZkappPayload"
+let zkapp_payload = create "MinaZkappPayload"
 
-let zkapp_body = create "CodaZkappBody"
+let zkapp_body_mainnet = create "MainnetZkappBody"
 
-let merkle_tree i = create (Printf.sprintf "CodaMklTree%03d" i)
+let zkapp_body_testnet = create "TestnetZkappBody"
 
-let coinbase_merkle_tree i = create (Printf.sprintf "CodaCbMklTree%03d" i)
+let zkapp_body ?(chain = Mina_signature_kind.t) =
+  match chain with
+  | Mainnet ->
+      zkapp_body_mainnet
+  | Testnet ->
+      zkapp_body_testnet
+  | Other_network chain_name ->
+      create (chain_name ^ "ZkappBody")
 
-let merge_snark = create "CodaMergeSnark"
+let merkle_tree i = create (Printf.sprintf "MinaMklTree%03d" i)
 
-let base_snark = create "CodaBaseSnark"
+let coinbase_merkle_tree i = create (Printf.sprintf "MinaCbMklTree%03d" i)
 
-let transition_system_snark = create "CodaTransitionSnark"
+let merge_snark = create "MinaMergeSnark"
+
+let base_snark = create "MinaBaseSnark"
+
+let transition_system_snark = create "MinaTransitionSnark"
 
 let signature_testnet = create "CodaSignature"
 
 let signature_mainnet = create "MinaSignatureMainnet"
 
-let receipt_chain_user_command = create "CodaReceiptUC"
+let signature_other chain_name = create (chain_name ^ "Signature")
 
+let receipt_chain_user_command = create "MinaReceiptUC"
+
+(* leaving this one with "Coda", to preserve the existing hashes *)
 let receipt_chain_zkapp = create "CodaReceiptZkapp"
 
-let epoch_seed = create "CodaEpochSeed"
+let epoch_seed = create "MinaEpochSeed"
 
-let vrf_message = create "CodaVrfMessage"
+let vrf_message = create "MinaVrfMessage"
 
-let vrf_output = create "CodaVrfOutput"
+let vrf_output = create "MinaVrfOutput"
 
 let vrf_evaluation = create "MinaVrfEvaluation"
 
@@ -71,27 +88,27 @@ let coinbase_stack = create "CoinbaseStack"
 
 let coinbase = create "Coinbase"
 
-let checkpoint_list = create "CodaCheckpoints"
+let checkpoint_list = create "MinaCheckpoints"
 
-let bowe_gabizon_hash = create "CodaTockBGHash"
+let bowe_gabizon_hash = create "MinaTockBGHash"
 
-let zkapp_precondition = create "CodaZkappPred"
+let zkapp_precondition = create "MinaZkappPred"
 
 (*for Zkapp_precondition.Account.t*)
-let zkapp_precondition_account = create "CodaZkappPredAcct"
+let zkapp_precondition_account = create "MinaZkappPredAcct"
 
-let zkapp_precondition_protocol_state = create "CodaZkappPredPS"
+let zkapp_precondition_protocol_state = create "MinaZkappPredPS"
 
-(*for Party.Account_precondition.t*)
-let party_account_precondition = create "MinaPartyAccountPred"
+(*for Account_update.Account_precondition.t*)
+let account_update_account_precondition = create "MinaAcctUpdAcctPred"
 
-let party = create "MinaParty"
+let account_update_cons = create "MinaAcctUpdateCons"
 
-let party_cons = create "MinaPartyCons"
+let account_update_node = create "MinaAcctUpdateNode"
 
-let party_node = create "MinaPartyNode"
+let account_update_stack_frame = create "MinaAcctUpdStckFrm"
 
-let party_with_protocol_state_predicate = create "MinaPartyStatePred"
+let account_update_stack_frame_cons = create "MinaActUpStckFrmCons"
 
 let zkapp_uri = create "MinaZkappUri"
 
@@ -99,7 +116,7 @@ let zkapp_event = create "MinaZkappEvent"
 
 let zkapp_events = create "MinaZkappEvents"
 
-let zkapp_sequence_events = create "MinaZkappSeqEvents"
+let zkapp_actions = create "MinaZkappSeqEvents"
 
 let zkapp_memo = create "MinaZkappMemo"
 

@@ -3,13 +3,13 @@ use ark_ff::{
     fields::{Field, FpParameters, PrimeField, SquareRootField},
     FftField, One, UniformRand, Zero,
 };
-use ark_ff::{BigInteger256, FromBytes, ToBytes};
+use ark_ff::{FromBytes, ToBytes};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use mina_curves::pasta::fp::{Fp, FpParameters as Fp_params};
+use mina_curves::pasta::{fields::fp::FpParameters as Fp_params, Fp};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::cmp::Ordering::{Equal, Greater, Less};
-use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionIntoWasmAbi};
+use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi};
 use wasm_bindgen::prelude::*;
 
 #[repr(C)]
@@ -71,8 +71,13 @@ impl IntoWasmAbi for WasmPastaFp {
 
 impl OptionIntoWasmAbi for WasmPastaFp {
     fn none() -> Self::Abi {
-        let max_bigint = WasmBigInteger256(BigInteger256([u64::MAX, u64::MAX, u64::MAX, u64::MAX]));
-        max_bigint.into_abi()
+        <Vec<u8> as OptionIntoWasmAbi>::none()
+    }
+}
+
+impl OptionFromWasmAbi for WasmPastaFp {
+    fn is_none(abi: &Self::Abi) -> bool {
+        <Vec<u8> as OptionFromWasmAbi>::is_none(abi)
     }
 }
 
@@ -113,7 +118,7 @@ pub fn caml_pasta_fp_div(x: WasmPastaFp, y: WasmPastaFp) -> WasmPastaFp {
 
 #[wasm_bindgen]
 pub fn caml_pasta_fp_inv(x: WasmPastaFp) -> Option<WasmPastaFp> {
-    x.0.inverse().map(|x| WasmPastaFp(x))
+    x.0.inverse().map(WasmPastaFp)
 }
 
 #[wasm_bindgen]
@@ -129,7 +134,7 @@ pub fn caml_pasta_fp_is_square(x: WasmPastaFp) -> bool {
 
 #[wasm_bindgen]
 pub fn caml_pasta_fp_sqrt(x: WasmPastaFp) -> Option<WasmPastaFp> {
-    x.0.sqrt().map(|x| WasmPastaFp(x))
+    x.0.sqrt().map(WasmPastaFp)
 }
 
 #[wasm_bindgen]

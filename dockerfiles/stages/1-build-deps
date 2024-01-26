@@ -2,25 +2,33 @@
 # The "build-deps" stage
 # - Installs all compilers/interpreters, tools, and OS packages on the given debian or ubuntu image
 #################################################################################################
-# Supports debian:stretch-slim, debian:buster-slim, and ubuntu:focal
+# Supports debian:buster-slim, debian:bullseye-slim, and ubuntu:focal
 ARG image=ubuntu:focal
 FROM ${image} AS build-deps
 
 # Ocaml Version
-ARG OCAML_VERSION=4.11
-ARG OCAML_REVISION=.2
+ARG OCAML_VERSION=4.14
+ARG OCAML_REVISION=.0
 ARG OCAML_VARIANT=
 ARG OCAML_PACKAGE=
 ARG OPAM_VERSION=2.0.7
 
 # Golang version number used to detemine tarball name
-ARG GO_VERSION=1.16.5
+ARG GO_VERSION=1.19.11
 
 # Go Capnp Version (for capnpc dependency)
-ARG GO_CAPNP_VERSION=v3.0.0-alpha.1
+ARG GO_CAPNP_VERSION=v3.0.0-alpha.5
 
 # Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
-ARG RUST_VERSION=1.58.1
+# This should stay in line with:
+# - src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml
+# - src/lib/crypto/proof-systems/rust-toolchain.toml
+ARG RUST_VERSION=1.72
+# Nightly Rust Version used for WebAssembly builds
+# - src/lib/crypto/kimchi_bindings/wasm/rust-toolchain.toml
+ARG RUST_NIGHTLY=2023-09-01
+# wasm-pack version
+ARG WASM_PACK_VERSION=v0.12.1
 
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.18.4
@@ -28,33 +36,43 @@ ARG ROCKSDB_VERSION=v5.18.4
 # --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \
-  && apt-get install --yes \
-    libboost-dev \
-    libboost-program-options-dev \
-    libbz2-dev \
-    libcap-dev \
-    libffi-dev \
-    libgflags-dev \
-    libgmp-dev \
-    libgmp3-dev \
-    libjemalloc-dev \
-    libpq-dev \
-    libprocps-dev \
-    libsodium-dev \
-    libssl-dev \
-    build-essential \
-    capnproto \
-    cmake \
-    curl \
-    file \
-    git \
-    m4 \
-    pkg-config \
-    rsync \
-    sudo \
-    unzip \
-    zlib1g-dev
+RUN apt-get update --quiet \
+  && apt-get upgrade --quiet --yes \
+  && apt-get install --no-install-recommends --quiet --yes \
+  libboost-dev \
+  libboost-program-options-dev \
+  libbz2-dev \
+  libcap-dev \
+  libffi-dev \
+  libgflags-dev \
+  libgmp-dev \
+  libgmp3-dev \
+  libjemalloc-dev \
+  liblmdb-dev \
+  liblmdb0 \
+  libpq-dev \
+  libprocps-dev \
+  libsodium-dev \
+  libssl-dev \
+  build-essential \
+  ca-certificates \
+  capnproto \
+  cmake \
+  curl \
+  file \
+  git \
+  '(^lld-10$|^lld-11$)' \
+  m4 \
+  pkg-config \
+  rsync \
+  sudo \
+  unzip \
+  zlib1g-dev \
+  && rm -rf /var/lib/apt/lists/*
+
+# Symlink image-specific lld version to a single lld executable
+RUN if command -v ld.lld-10 &> /dev/null; then ln -sf $(which ld.lld-10) /usr/bin/ld.lld; fi
+RUN if command -v ld.lld-11 &> /dev/null; then ln -sf $(which ld.lld-11) /usr/bin/ld.lld; fi
 
 # --- Create opam user (for later) and give sudo to make opam happy
 RUN adduser --uid 65533 --disabled-password --gecos '' opam \
@@ -64,6 +82,9 @@ RUN adduser --uid 65533 --disabled-password --gecos '' opam \
   && chmod 440 /etc/sudoers.d/opam \
   && chown root:root /etc/sudoers.d/opam \
   && chmod 777 /tmp
+
+# --- Quiet git warnings about detatched head states, which are used frequently in later stages
+RUN git config --global advice.detachedHead false
 
 # --- Opam install of a given OPAM_VERSION from github release
 RUN curl -sL \
@@ -75,33 +96,40 @@ RUN curl -sL \
 RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
 
 # --- Rust install via rustup-init to a given RUST_VERSION
+# --- Additionally, install RUST_NIGHTLY via rustup
+# For more about rustup-init see: https://github.com/rust-lang/rustup/blob/master/README.md
+# As opposed to introducing another shell script here (that mostly just determines the platform)
+# we just download the binary for the only platform we care about in this docker environment
 USER opam
 RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
   https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init \
   && chmod +x /tmp/rustup-init \
-  && /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal \
+  && /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal --component rust-src --target wasm32-unknown-unknown \
+  && $HOME/.cargo/bin/rustup toolchain install "nightly-${RUST_NIGHTLY}" --profile minimal --component rust-src --target wasm32-unknown-unknown --no-self-update \
   && rm /tmp/rustup-init
-# For more about rustup-init see: https://github.com/rust-lang/rustup/blob/master/README.md
-# As opposed to introducing another shell script here (that mostly just determines the platform)
-# we just download the binary for the only platform we care about in this docker environment
+USER root
+
+# --- Install rust wasm-pack version WASM_PACK_VERSION manually via curl/tar
+RUN curl -sL https://github.com/rustwasm/wasm-pack/releases/download/${WASM_PACK_VERSION}/wasm-pack-${WASM_PACK_VERSION}-x86_64-unknown-linux-musl.tar.gz \
+  | tar --extract --gzip --strip-components=1 --directory=/usr/bin --file=-
 
 # --- RocksDB Installation of a given ROCKSDB_VERSION
-USER root
 # These flags turn some errors into warnings for running with G++ 9 or higher
 # The build command below checks for the g++ major version and removes CXXFLAGS if its less than 9
 ENV CXXFLAGS '-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess'
 # This builds and installs just the rocksdb static lib for us, and cleans up after itself
+# Send error output to /dev/null as its noisy with compiler warnings
 RUN git clone https://github.com/facebook/rocksdb \
   --depth 1 --shallow-submodules \
   -b "${ROCKSDB_VERSION}" /rocksdb \
   && test $(g++ -dumpversion | cut -c 1 -) -lt 9 \
-    && CXXFLAGS='' make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) \
-    || make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) \
+  && CXXFLAGS='' make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
+  || make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
   && cp /rocksdb/librocksdb.a /usr/local/lib/librocksdb_coda.a \
   && rm -rf /rocksdb \
   && strip -S /usr/local/lib/librocksdb_coda.a
 # Clear CXXFLAGS afterwards to avoid affecting other code
-ENV CXXFLAGS ""
+ENV CXXFLAGS=""
 
 ###########################################################################################
 # Initialize opam in a minimal fashion
@@ -110,7 +138,7 @@ ENV CXXFLAGS ""
 # Set up environment for running as opam user
 WORKDIR /home/opam
 USER opam
-ENV HOME /home/opam
+ENV HOME=/home/opam
 
 # --- Create the following user directory configs as the Opam user:
 ## Add go + rust to the path, unlimit the opam user,
@@ -121,6 +149,8 @@ RUN mkdir --mode=700 ~/.gnupg \
   && echo 'export PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"' >> ~/.bashrc \
   && echo 'ulimit -s unlimited' >> ~/.bashrc \
   && echo "disable-ipv6" >> ~/.gnupg/dirmngr.conf
+
+ENV PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
 # --- Ocaml install of a given OCAML_VERSION via opam switch
 # additionally initializes opam with sandboxing disabled, as we did not install bubblewrap above.

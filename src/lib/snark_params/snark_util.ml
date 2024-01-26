@@ -67,7 +67,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
             map (read_var n) ~f:(fun n ->
                 List.init total_length ~f:(fun i ->
                     Bigint.(
-                      compare (of_field (Field.of_int i)) (of_field n) < 0))))
+                      compare (of_field (Field.of_int i)) (of_field n) < 0) ) ))
     in
     let%map () =
       Field.Checked.Assert.equal
@@ -82,8 +82,8 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
     assert (total_length < Field.size_in_bits) ;
     let%bind mask = n_ones ~total_length u in
     let%bind masked = apply_mask mask bs in
-    with_label __LOC__
-      (Field.Checked.Assert.equal (pack_unsafe masked) (pack_unsafe bs))
+    with_label __LOC__ (fun () ->
+        Field.Checked.Assert.equal (pack_unsafe masked) (pack_unsafe bs) )
 
   let num_bits_int =
     let rec go acc n = if n = 0 then acc else go (1 + acc) (n lsr 1) in
@@ -152,7 +152,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
                As_prover.(
                  map2 (read Boolean.typ less)
                    (read Boolean.typ less_or_equal)
-                   ~f:Tuple2.create))
+                   ~f:Tuple2.create) )
             |> Or_error.ok_exn
           in
           let r = Bigint.(compare (of_field x) (of_field y)) in
@@ -170,7 +170,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
                 [ boolean_assert_lte Boolean.false_ Boolean.false_
                 ; boolean_assert_lte Boolean.false_ Boolean.true_
                 ; boolean_assert_lte Boolean.true_ Boolean.true_
-                ])) ;
+                ] ) ) ;
         assert (
           Or_error.is_error
             (check (boolean_assert_lte Boolean.true_ Boolean.false_)) )
@@ -186,14 +186,16 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
       let%test_unit "n_ones" =
         let total_length = 6 in
         let test n =
-          let t = n_ones ~total_length (Field.Var.constant (Field.of_int n)) in
+          let t () =
+            n_ones ~total_length (Field.Var.constant (Field.of_int n))
+          in
           let handle_with (resp : bool list) =
             handle t (fun (With { request; respond }) ->
                 match request with
                 | N_ones ->
                     respond (Provide resp)
                 | _ ->
-                    unhandled)
+                    unhandled )
           in
           let correct = Int.pow 2 n - 1 in
           let to_bits k =

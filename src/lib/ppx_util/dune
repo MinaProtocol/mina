@@ -2,15 +2,11 @@
  (name ppx_util)
  (public_name ppx_util)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
-   compiler-libs
-   ocaml-migrate-parsetree
    core_kernel
    ppxlib
-   ppxlib.ast
-   ocaml-compiler-libs.common
  )
  (preprocess
   (pps ppx_version ppx_jane ppxlib.metaquot))

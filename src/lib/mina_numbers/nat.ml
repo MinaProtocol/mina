@@ -23,12 +23,11 @@ struct
 
   let to_input_legacy (t : var) =
     let to_bits (t : var) =
-      with_label
-        (sprintf "to_bits: %s" __LOC__)
-        (Field.Checked.choose_preimage_var t ~length:N.length_in_bits)
+      with_label (sprintf "to_bits: %s" __LOC__) (fun () ->
+          Field.Checked.choose_preimage_var t ~length:N.length_in_bits )
     in
     Checked.map (to_bits t) ~f:(fun bits ->
-        Random_oracle.Input.Legacy.bitstring bits)
+        Random_oracle.Input.Legacy.bitstring bits )
 
   let constant n =
     Field.Var.constant
@@ -56,15 +55,16 @@ struct
     let of_bits bs =
       (* TODO: Make this efficient *)
       List.foldi bs ~init:N.zero ~f:(fun i acc b ->
-          if b then N.(logor (shift_left one i) acc) else acc)
+          if b then N.(logor (shift_left one i) acc) else acc )
     in
     of_bits (List.take (Field.unpack x) N.length_in_bits)
 
   let to_field (x : N.t) : Field.t = Field.project (Fold.to_list (Bits.fold x))
 
   let typ : (var, N.t) Typ.t =
+    let (Typ field_typ) = Field.typ in
     Typ.transport
-      { Field.typ with check = range_check }
+      (Typ { field_typ with check = range_check })
       ~there:to_field ~back:of_field
 
   let () = assert (N.length_in_bits * 2 < Field.size_in_bits + 1)
@@ -110,7 +110,7 @@ struct
   let ( < ) a b =
     make_checked (fun () ->
         let open Pickles.Impls.Step in
-        Boolean.( &&& ) (gte b a) (Boolean.not (Field.equal b a)))
+        Boolean.( &&& ) (gte b a) (Boolean.not (Field.equal b a)) )
 
   let ( > ) a b = b < a
 
@@ -196,9 +196,6 @@ end)
 struct
   type t = N.t [@@deriving sexp, compare, hash, yojson]
 
-  (* can't be automatically derived *)
-  let dhall_type = Ppx_dhall_type.Dhall_type.Text
-
   let max_value = N.max_int
 
   include Comparable.Make (N)
@@ -206,6 +203,8 @@ struct
   include (N : module type of N with type t := t)
 
   let sub x y = if x < y then None else Some (N.sub x y)
+
+  let to_field n = Bigint.to_field (Bigint.of_bignum_bigint (N.to_bigint n))
 
   [%%ifdef consensus_mechanism]
 
@@ -223,8 +222,7 @@ struct
   let of_bits = Bits.of_bits
 
   let to_input (t : t) =
-    Random_oracle.Input.Chunked.packed
-      (Field.project (to_bits t), N.length_in_bits)
+    Random_oracle.Input.Chunked.packed (to_field t, N.length_in_bits)
 
   let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 
@@ -234,7 +232,7 @@ struct
     Quickcheck.Generator.map
       ~f:(fun n -> N.of_string (Bignum_bigint.to_string n))
       (Bignum_bigint.gen_incl Bignum_bigint.zero
-         (Bignum_bigint.of_string N.(to_string max_int)))
+         (Bignum_bigint.of_string N.(to_string max_int)) )
 
   let gen_incl min max =
     let open Quickcheck.Let_syntax in
@@ -254,6 +252,8 @@ module Make32 () : UInt32 = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type t = UInt32.Stable.V1.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
@@ -261,18 +261,19 @@ module Make32 () : UInt32 = struct
     end
   end]
 
-  include Make
-            (struct
-              include UInt32
+  include
+    Make
+      (struct
+        include UInt32
 
-              let random () =
-                let mask = if Random.bool () then one else zero in
-                let open UInt32.Infix in
-                logor (mask lsl 31)
-                  ( Int32.max_value |> Random.int32 |> Int64.of_int32
-                  |> UInt32.of_int64 )
-            end)
-            (Bits.UInt32)
+        let random () =
+          let mask = if Random.bool () then one else zero in
+          let open UInt32.Infix in
+          logor (mask lsl 31)
+            ( Int32.max_value |> Random.int32 |> Int64.of_int32
+            |> UInt32.of_int64 )
+      end)
+      (Bits.UInt32)
 
   let to_uint32 = Unsigned_extended.UInt32.to_uint32
 
@@ -287,6 +288,8 @@ module Make64 () : UInt64 = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
+      [@@@with_all_version_tags]
+
       type t = UInt64.Stable.V1.t
       [@@deriving sexp, equal, compare, hash, yojson]
 
@@ -294,17 +297,18 @@ module Make64 () : UInt64 = struct
     end
   end]
 
-  include Make
-            (struct
-              include UInt64
+  include
+    Make
+      (struct
+        include UInt64
 
-              let random () =
-                let mask = if Random.bool () then one else zero in
-                let open UInt64.Infix in
-                logor (mask lsl 63)
-                  (Int64.max_value |> Random.int64 |> UInt64.of_int64)
-            end)
-            (Bits.UInt64)
+        let random () =
+          let mask = if Random.bool () then one else zero in
+          let open UInt64.Infix in
+          logor (mask lsl 63)
+            (Int64.max_value |> Random.int64 |> UInt64.of_int64)
+      end)
+      (Bits.UInt64)
 
   let to_uint64 = Unsigned_extended.UInt64.to_uint64
 

@@ -142,6 +142,13 @@ macro_rules! impl_gate_vector {
             }
 
             #[wasm_bindgen]
+            pub fn [<caml_pasta_ $name:snake _plonk_gate_vector_len>](
+                v: &WasmGateVector,
+            ) -> usize {
+                v.0.len()
+            }
+
+            #[wasm_bindgen]
             pub fn [<caml_pasta_ $name:snake _plonk_gate_vector_wrap>](
                 v: &mut WasmGateVector,
                 t: Wire,
@@ -152,9 +159,19 @@ macro_rules! impl_gate_vector {
 
             #[wasm_bindgen]
             pub fn [<caml_pasta_ $name:snake _plonk_gate_vector_digest>](
+                public_input_size: usize,
                 v: &WasmGateVector
             ) -> Box<[u8]> {
-                Circuit(&(v.0)).digest().to_vec().into_boxed_slice()
+                Circuit::new(public_input_size, &(v.0)).digest().to_vec().into_boxed_slice()
+            }
+
+            #[wasm_bindgen]
+            pub fn [<caml_pasta_ $name:snake _plonk_circuit_serialize>](
+                public_input_size: usize,
+                v: &WasmGateVector
+            ) -> String {
+                let circuit = Circuit::new(public_input_size, &v.0);
+                serde_json::to_string(&circuit).expect("couldn't serialize constraints")
             }
         }
     };
@@ -163,7 +180,7 @@ macro_rules! impl_gate_vector {
 pub mod fp {
     use super::*;
     use crate::arkworks::WasmPastaFp as WasmF;
-    use mina_curves::pasta::fp::Fp as F;
+    use mina_curves::pasta::Fp as F;
 
     impl_gate_vector!(fp, WasmF, F, Fp);
 }
@@ -175,7 +192,7 @@ pub mod fp {
 pub mod fq {
     use super::*;
     use crate::arkworks::WasmPastaFq as WasmF;
-    use mina_curves::pasta::fq::Fq as F;
+    use mina_curves::pasta::Fq as F;
 
     impl_gate_vector!(fq, WasmF, F, Fq);
 }

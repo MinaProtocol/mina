@@ -2,7 +2,7 @@
  (name fields_derivers_zkapps)
  (public_name fields_derivers_zkapps_nonconsensus)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;;opam libraries
    sexplib0
@@ -24,6 +24,10 @@
    currency_nonconsensus
    snark_params_nonconsensus
  )
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../config.mlh)
  (preprocess

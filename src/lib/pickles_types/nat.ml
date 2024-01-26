@@ -4,10 +4,6 @@ type 'a s = Z | S of 'a
 
 type _ t = Z : z t | S : 'n t -> 'n s t
 
-module T = struct
-  type nonrec 'a t = 'a t
-end
-
 type 'a nat = 'a t
 
 type e = T : 'n nat -> e
@@ -30,12 +26,6 @@ module type Intf = sig
   type n
 
   val n : n t
-end
-
-type 'n m = (module Intf with type n = 'n)
-
-module Is_succ = struct
-  type 'n t = Has_pred : 'm t -> 'm s t
 end
 
 module Adds = struct
@@ -261,3 +251,5 @@ let eq_exn : type n m. n nat -> m nat -> (n, m) Type_equal.t =
       t
   | `Not_equal _ ->
       failwithf "eq_exn: %d vs %d" (to_int n) (to_int m) ()
+
+module type I = Add.Intf_transparent

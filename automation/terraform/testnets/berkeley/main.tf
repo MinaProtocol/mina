@@ -50,20 +50,20 @@ variable "fish_count" {
 }
 
 variable "seed_count" {
-  default     = 3
+  default = 3
 }
 
 variable "plain_node_count" {
-  default     = 0
+  default = 0
   # default     = 10
 }
 
 locals {
-  testnet_name = "berkeley"
-  mina_image = "minaprotocol/mina-daemon:1.3.0beta1-release-2.0.0-ba9a0e0-focal-berkeley"
-  mina_archive_image = "minaprotocol/mina-archive:1.3.0beta1-release-2.0.0-ba9a0e0-focal"
-  seed_region = "us-central1"
-  seed_zone = "us-central1-b"
+  testnet_name       = "berkeley"
+  mina_image         = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup1-rampup-b1facec-focal-berkeley" #"minaprotocol/mina-daemon:1.3.2beta2-release-2.0.0-6f9d956-focal-berkeley"
+  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup1-rampup-b1facec-focal"         #"minaprotocol/mina-archive:1.3.2beta2-release-2.0.0-6f9d956-focal"
+  seed_region        = "us-central1"
+  seed_zone          = "us-central1-b"
 
   # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
   make_report_discord_webhook_url = ""
@@ -86,36 +86,30 @@ module "berkeley" {
   k8s_context    = "gke_o1labs-192920_us-central1_coda-infra-central1"
   testnet_name   = local.testnet_name
 
-  mina_image         = local.mina_image
-  mina_archive_image = local.mina_archive_image
-  mina_agent_image   = "codaprotocol/coda-user-agent:0.1.8"
-  mina_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
-  mina_points_image  = "codaprotocol/coda-points-hack:32b.4"
-  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.3"
+  mina_image                  = local.mina_image
+  mina_archive_image          = local.mina_archive_image
+  mina_agent_image            = "codaprotocol/coda-user-agent:0.1.8"
+  mina_bots_image             = "codaprotocol/coda-bots:0.0.13-beta-1"
+  mina_points_image           = "codaprotocol/coda-points-hack:32b.4"
+  watchdog_image              = "gcr.io/o1labs-192920/watchdog:0.4.13"
+  use_embedded_runtime_config = true
 
-  archive_node_count  = 3
-  mina_archive_schema = "create_schema.sql"
-  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/zkapp_tables.sql"]
+  archive_node_count            = 2
+  mina_archive_schema           = "create_schema.sql"
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/b1facecde934ce3969771c34962b878d75321ca7/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/b1facecde934ce3969771c34962b878d75321ca7/src/app/archive/zkapp_tables.sql"]
 
-
-  archive_configs       = [
+  archive_configs = [
     {
-      name = "archive-1"
+      name              = "archive-1"
       enableLocalDaemon = true
       enablePostgresDB  = true
       postgresHost      = "archive-1-postgresql"
     },
     {
-      name = "archive-2"
-      enableLocalDaemon = false
-      enablePostgresDB  = false
-      postgresHost      = "archive-1-postgresql"
-    },
-    {
-      name = "archive-3"
-      enableLocalDaemon = false
+      name              = "archive-2"
+      enableLocalDaemon = true
       enablePostgresDB  = true
-      postgresHost      = "archive-3-postgresql"
+      postgresHost      = "archive-2-postgresql"
     }
   ]
 
@@ -123,13 +117,11 @@ module "berkeley" {
   mina_faucet_amount = "10000000000"
   mina_faucet_fee    = "100000000"
 
-  agent_min_fee = "0.05"
-  agent_max_fee = "0.1"
-  agent_min_tx = "0.0015"
-  agent_max_tx = "0.0015"
+  agent_min_fee         = "0.05"
+  agent_max_fee         = "0.1"
+  agent_min_tx          = "0.0015"
+  agent_max_tx          = "0.0015"
   agent_send_every_mins = "1"
-
-  use_embedded_runtime_config = true
 
   seed_zone   = local.seed_zone
   seed_region = local.seed_region
@@ -140,40 +132,49 @@ module "berkeley" {
   block_producer_key_pass           = "naughty blue worm"
   block_producer_starting_host_port = 10501
 
+  worker_cpu_request = 4
+  cpu_request        = 12
+  worker_mem_request = "6Gi"
+  mem_request        = "16Gi"
+
   snark_coordinators = [
     {
-      snark_worker_replicas = 5
-      snark_worker_fee      = "0.01"
-      snark_worker_public_key = "B62qmQsEHcsPUs5xdtHKjEmWqqhUPRSF2GNmdguqnNvpEZpKftPC69e"
+      snark_coordinator_name       = local.testnet_name
+      snark_worker_replicas        = 5
+      snark_worker_fee             = "0.01"
+      snark_worker_public_key      = "B62qmQsEHcsPUs5xdtHKjEmWqqhUPRSF2GNmdguqnNvpEZpKftPC69e"
       snark_coordinators_host_port = 10401
+      persist_working_dir          = true
     }
   ]
 
-  whales= [
-    for i in range(var.whale_count):{
-      duplicates = 1
-    }
-  ]
-  
-  fishes= [
-    for i in range(var.fish_count):{
-      duplicates = 1
-    }
-  ]
-
-  # nodes_with_user_agent = ["fish-1-1","fish-2-1"]
-  
-  seed_count            = var.seed_count
-
+  seed_count       = var.seed_count
   plain_node_count = 0
 
-  upload_blocks_to_gcloud         = false
+  whales = [
+    for i in range(var.whale_count) : {
+      duplicates = 1
+    }
+  ]
+
+  fishes = [
+    for i in range(var.fish_count) : {
+      duplicates = 1
+    }
+  ]
+
+  upload_blocks_to_gcloud         = true
   restart_nodes                   = false
   restart_nodes_every_mins        = "60"
   make_reports                    = true
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/berkeley.txt"
+  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/berkeley_seeds.txt"
+
+  # a pass must be set to connect the zkapps dash to grafana
+  # leave empty to lock down the zkapps dashboard
+
+  # zkapps_dashboard_key = ""
 }
 

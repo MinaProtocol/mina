@@ -90,6 +90,11 @@ module Flagged_option = struct
   let option_typ ~default t =
     Typ.transport (typ t) ~there:(of_option ~default) ~back:to_option
 
+  let lazy_option_typ ~default t =
+    Typ.transport (typ t)
+      ~there:(fun t -> of_option t ~default:(Lazy.force default))
+      ~back:to_option
+
   [%%endif]
 end
 
@@ -97,7 +102,9 @@ module Set_or_keep = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = Set of 'a | Keep
+      type 'a t = 'a Mina_wire_types.Mina_base.Zkapp_basic.Set_or_keep.V1.t =
+        | Set of 'a
+        | Keep
       [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
@@ -117,7 +124,7 @@ module Set_or_keep = struct
   let deriver inner obj =
     let open Fields_derivers_zkapps.Derivers in
     iso ~map:of_option ~contramap:to_option
-      ((option @@ inner @@ o ()) (o ()))
+      ((option ~js_type:Flagged_option @@ inner @@ o ()) (o ()))
       obj
 
   let gen gen_a =
@@ -159,6 +166,10 @@ module Set_or_keep = struct
       -> f:('a -> Field.Var.t Random_oracle_input.Chunked.t)
       -> Field.Var.t Random_oracle_input.Chunked.t
 
+    val set : 'a -> 'a t
+
+    val keep : dummy:'a -> 'a t
+
     val make_unsafe : Boolean.var -> 'a -> 'a t
   end = struct
     type 'a t = (Boolean.var, 'a) Flagged_option.t
@@ -190,19 +201,22 @@ module Set_or_keep = struct
           | Set x ->
               { Flagged_option.is_some = true; data = of_option (Some x) }
           | Keep ->
-              { Flagged_option.is_some = false; data = of_option None })
+              { Flagged_option.is_some = false; data = of_option None } )
         ~back:(function
           | { Flagged_option.is_some = true; data = x } ->
               Set (Option.value_exn (to_option x))
-          | { Flagged_option.is_some = false; data = x } ->
-              assert (Option.is_none (to_option x)) ;
-              Keep)
+          | { Flagged_option.is_some = false; data = _ } ->
+              Keep )
 
     let to_input (t : _ t) ~f =
       Flagged_option.to_input' t ~f ~field_of_bool:(fun (b : Boolean.var) ->
-          (b :> Field.Var.t))
+          (b :> Field.Var.t) )
 
     let make_unsafe is_keep data = { Flagged_option.is_some = is_keep; data }
+
+    let set data = { Flagged_option.is_some = Boolean.true_; data }
+
+    let keep ~dummy = { Flagged_option.is_some = Boolean.false_; data = dummy }
   end
 
   let typ = Checked.typ
@@ -220,7 +234,9 @@ module Or_ignore = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = Check of 'a | Ignore
+      type 'a t = 'a Mina_wire_types.Mina_base.Zkapp_basic.Or_ignore.V1.t =
+        | Check of 'a
+        | Ignore
       [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
@@ -238,24 +254,23 @@ module Or_ignore = struct
 
   let of_option = function None -> Ignore | Some x -> Check x
 
-  let deriver inner obj =
+  let deriver_base ~js_type inner obj =
     let open Fields_derivers_zkapps.Derivers in
     iso ~map:of_option ~contramap:to_option
-      ((option @@ inner @@ o ()) (o ()))
+      ((option ~js_type @@ inner @@ o ()) (o ()))
       obj
+
+  let deriver inner obj = deriver_base ~js_type:Flagged_option inner obj
+
+  let deriver_interval inner obj ~range_max =
+    deriver_base ~js_type:(Closed_interval range_max) inner obj
 
   [%%ifdef consensus_mechanism]
 
   module Checked : sig
     type 'a t
 
-    val typ_implicit :
-         equal:('a -> 'a -> bool)
-      -> ignore:'a
-      -> ('a_var, 'a) Typ.t
-      -> ('a_var t, 'a Stable.Latest.t) Typ.t
-
-    val typ_explicit :
+    val typ :
       ignore:'a -> ('a_var, 'a) Typ.t -> ('a_var t, 'a Stable.Latest.t) Typ.t
 
     val to_input :
@@ -265,54 +280,39 @@ module Or_ignore = struct
 
     val check : 'a t -> f:('a -> Boolean.var) -> Boolean.var
 
-    val make_unsafe_implicit : 'a -> 'a t
+    val map : f:('a -> 'b) -> 'a t -> 'b t
 
-    val make_unsafe_explicit : Boolean.var -> 'a -> 'a t
+    val data : 'a t -> 'a
+
+    val is_check : 'a t -> Boolean.var
+
+    val make_unsafe : Boolean.var -> 'a -> 'a t
   end = struct
-    type 'a t =
-      | Implicit of 'a
-      | Explicit of (Boolean.var, 'a) Flagged_option.t
+    type 'a t = (Boolean.var, 'a) Flagged_option.t
 
     let to_input t ~f =
-      match t with
-      | Implicit x ->
-          f x
-      | Explicit t ->
-          Flagged_option.to_input' t ~f ~field_of_bool:(fun (b : Boolean.var) ->
-              (b :> Field.Var.t))
+      Flagged_option.to_input' t ~f ~field_of_bool:(fun (b : Boolean.var) ->
+          (b :> Field.Var.t) )
 
-    let check t ~f =
-      match t with
-      | Implicit x ->
-          f x
-      | Explicit { is_some; data } ->
-          Pickles.Impls.Step.Boolean.(any [ not is_some; f data ])
+    let check { Flagged_option.is_some; data } ~f =
+      Pickles.Impls.Step.Boolean.(any [ not is_some; f data ])
 
-    let typ_implicit (type a a_var) ~equal ~(ignore : a) (t : (a_var, a) Typ.t)
-        : (a_var t, a Stable.Latest.t) Typ.t =
-      Typ.transport t
-        ~there:(function Check x -> x | Ignore -> ignore)
-        ~back:(fun x -> if equal x ignore then Ignore else Check x)
-      |> Typ.transport_var
-           ~there:(function Implicit x -> x | Explicit _ -> assert false)
-           ~back:(fun x -> Implicit x)
+    let map = Flagged_option.map
 
-    let typ_explicit (type a_var a) ~ignore (t : (a_var, a) Typ.t) =
-      Typ.transport_var
+    let data = Flagged_option.data
+
+    let is_check = Flagged_option.is_some
+
+    let typ (type a_var a) ~ignore (t : (a_var, a) Typ.t) =
+      Typ.transport
         (Flagged_option.option_typ ~default:ignore t)
-        ~there:(function Implicit _ -> assert false | Explicit t -> t)
-        ~back:(fun t -> Explicit t)
-      |> Typ.transport ~there:to_option ~back:of_option
+        ~there:to_option ~back:of_option
 
-    let make_unsafe_implicit data = Implicit data
-
-    let make_unsafe_explicit is_ignore data =
-      Explicit { is_some = is_ignore; data }
+    let make_unsafe is_ignore data =
+      { Flagged_option.is_some = is_ignore; data }
   end
 
-  let typ_implicit = Checked.typ_implicit
-
-  let typ_explicit = Checked.typ_explicit
+  let typ = Checked.typ
 
   [%%endif]
 end
@@ -370,7 +370,7 @@ module Account_state = struct
 
     let to_input (t : t) =
       Encoding.to_input t ~field_of_bool:(fun (b : Boolean.var) ->
-          (b :> Field.t))
+          (b :> Field.t) )
 
     let check (t : t) ~is_empty =
       Boolean.(
@@ -392,19 +392,19 @@ end
 
 module F = Pickles.Backend.Tick.Field
 
-let invalid_public_key : Public_key.Compressed.t Lazy.t =
-  let open F in
-  let f x =
-    let open Pickles.Backend.Tick.Inner_curve.Params in
-    b + (x * (a + square x))
-  in
-  let rec go i : Public_key.Compressed.t =
-    if not (is_square (f i)) then { x = i; is_odd = false } else go (i + one)
-  in
-  lazy (go zero)
-
 [%%else]
 
 module F = Snark_params.Tick.Field
 
 [%%endif]
+
+module F_map = struct
+  include Hashable.Make (F)
+  include Comparable.Make (F)
+end
+
+let invalid_public_key : Public_key.Compressed.t =
+  { x = F.zero; is_odd = false }
+
+let%test "invalid_public_key is invalid" =
+  Option.is_none (Public_key.decompress invalid_public_key)

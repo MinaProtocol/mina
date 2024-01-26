@@ -80,6 +80,11 @@ variable "watchdog_image" {
   default = "gcr.io/o1labs-192920/watchdog:latest"
 }
 
+variable "itn_orchestrator_image" {
+  type    = string
+  default = "gcr.io/o1labs-192920/itn_orchestrator_image:latest"
+}
+
 # this must be a string to avoid scientific notation truncation
 variable "mina_faucet_amount" {
   type    = string
@@ -121,20 +126,25 @@ variable "seed_discovery_keypairs" {
   ]
 }
 
+variable "seed_external_port" {
+  type    = string
+  default = "10001"
+}
+
 # Block Producer Vars
 
 variable "whales" {
   description = "individual whale block producer node deployment configurations"
-  default = null
+  default     = null
 }
 
 variable "fishes" {
   description = "individual fish block producer node deployment configurations"
-  default = null
+  default     = null
 }
 
 variable "nodes_with_user_agent" {
-  type = list(string)
+  type    = list(string)
   default = []
 }
 
@@ -181,7 +191,15 @@ variable "seed_starting_host_port" {
 
 variable "snark_coordinators" {
   description = "configurations for not just the snark coordinators but also the snark workers they coordinate"
-  type    = list(any)
+  type = list(
+    object({
+      snark_coordinator_name       = string,
+      snark_worker_replicas        = number
+      snark_worker_fee             = number
+      snark_worker_public_key      = string
+      snark_coordinators_host_port = number
+      persist_working_dir          = bool
+  }))
   default = []
 }
 
@@ -253,8 +271,28 @@ variable "make_report_accounts" {
 }
 
 variable "log_precomputed_blocks" {
-  type = bool
+  type    = bool
   default = false
+}
+
+variable "worker_cpu_request" {
+  type    = number
+  default = 0
+}
+
+variable "worker_mem_request" {
+  type    = string
+  default = "0Mi"
+}
+
+variable "cpu_request" {
+  type    = number
+  default = 0
+}
+
+variable "mem_request" {
+  type    = string
+  default = "0Mi"
 }
 
 # Archive-Postgres Vars
@@ -266,7 +304,7 @@ variable "archive_node_count" {
 
 variable "archive_configs" {
   description = "individual archive-node deployment configurations"
-  default = null
+  default     = null
 }
 
 variable "upload_blocks_to_gcloud" {
@@ -275,6 +313,11 @@ variable "upload_blocks_to_gcloud" {
 }
 
 variable "seed_peers_url" {
+  type    = string
+  default = ""
+}
+
+variable "zkapps_dashboard_key" {
   type    = string
   default = ""
 }
