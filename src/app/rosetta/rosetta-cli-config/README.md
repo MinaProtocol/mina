@@ -122,6 +122,6 @@ is unable to run the `mina.ros` file, which will only work with
 Therefore, whenever it is required to run the Construction API
 tests against v.0.8.3 of `rosetta-sdk-go`, `mina-no-delegation-tests.ros`
 config should be used for that instead of `mina.ros`, which is used
-in the CI. In alternative, one can also use [our `rosetta-cli` fork](https://github.com/MinaProtocol/rosetta-cli) which is built against our fork of `rosetta-sdk-go`. `mina-no-delegation-tests.ros` should be deleted once
+in the CI. Alternatively, one can also use [our `rosetta-cli` fork](https://github.com/MinaProtocol/rosetta-cli) which is built against our fork of `rosetta-sdk-go`. `mina-no-delegation-tests.ros` should be deleted once
 [PR #464](https://github.com/coinbase/rosetta-sdk-go/pull/464) to
 `rosetta-sdk-go` is merged.
