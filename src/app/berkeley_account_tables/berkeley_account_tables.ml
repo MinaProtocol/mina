@@ -548,7 +548,7 @@ let zkapp_command_to_transaction ~logger ~pool (cmd : Sql.Zkapp_command.t) :
         let (authorization : Control.t) =
           match body.authorization_kind with
           | Proof _ ->
-              Proof (Lazy.force Proof.transaction_dummy)
+              Proof Proof.transaction_dummy
           | Signature ->
               Signature Signature.dummy
           | None_given ->
@@ -1330,7 +1330,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                           let%bind _block_id, _acct_id_id =
                             query_db ~f:(fun db ->
                                 Processor.Accounts_accessed.add_if_doesn't_exist
-                                  db last_block_id (index, acct) )
+                                  ~logger db last_block_id (index, acct) )
                           in
                           Deferred.unit
                         else Deferred.unit

@@ -17,6 +17,7 @@
    pickles
    pickles_types
    unsigned_extended
+   bounded_types
    key_cache.native
    mina_base
    mina_runtime_config

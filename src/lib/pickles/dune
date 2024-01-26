@@ -64,7 +64,6 @@
    pickles.limb_vector
    pickles_base
    kimchi_backend
-   mina_version
    base58_check
    codable
    random_oracle_input
@@ -83,4 +82,5 @@
    internal_tracing.context_logger
    ppx_version.runtime
    error_json
+   bounded_types
 ))

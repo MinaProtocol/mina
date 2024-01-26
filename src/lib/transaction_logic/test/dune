@@ -19,12 +19,15 @@
    kimchi_backend_common
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
+   bounded_types
    mina_base
    mina_base_import
+   mina_base_test_helpers
+   mina_ledger
+   mina_ledger_test_helpers
    mina_transaction
    mina_transaction_logic
    mina_numbers
-   mina_ledger
    mina_wire_types
    monad_lib
    pasta_bindings

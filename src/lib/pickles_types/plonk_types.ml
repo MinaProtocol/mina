@@ -1253,7 +1253,7 @@ module Openings = struct
     module Stable = struct
       module V1 = struct
         type ('g, 'fq) t =
-          { lr : ('g * 'g) array
+          { lr : ('g * 'g) Bounded_types.ArrayN16.Stable.V1.t
           ; z_1 : 'fq
           ; z_2 : 'fq
           ; delta : 'g
@@ -1289,7 +1289,10 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g_opt t = { unshifted : 'g_opt array; shifted : 'g_opt }
+        type 'g_opt t =
+          { unshifted : 'g_opt Bounded_types.ArrayN16.Stable.V1.t
+          ; shifted : 'g_opt
+          }
         [@@deriving sexp, compare, yojson, hlist, hash, equal]
       end
     end]
@@ -1320,7 +1323,8 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g t = 'g array [@@deriving sexp, compare, yojson, hash, equal]
+        type 'g t = 'g Bounded_types.ArrayN16.Stable.V1.t
+        [@@deriving sexp, compare, yojson, hash, equal]
       end
     end]
   end
@@ -1340,7 +1344,11 @@ module Messages = struct
       [@@@no_toplevel_latest_type]
 
       module V1 = struct
-        type 'g t = { sorted : 'g array; aggreg : 'g; runtime : 'g option }
+        type 'g t =
+          { sorted : 'g Bounded_types.ArrayN16.Stable.V1.t
+          ; aggreg : 'g
+          ; runtime : 'g option
+          }
         [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
       end
     end]
@@ -1472,7 +1480,8 @@ module Shifts = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type 'field t = 'field array [@@deriving sexp, compare, yojson, equal]
+      type 'field t = 'field Bounded_types.ArrayN16.Stable.V1.t
+      [@@deriving sexp, compare, yojson, equal]
     end
   end]
 end

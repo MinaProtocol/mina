@@ -10,7 +10,7 @@ In this RFC, we describe a configuration for the verification key permissions th
 
 ## Motivation
 
-At the launch of the Berkeley network, the Mina Protocol does not yet guarantee backwards compatability of zkApps in future upgrades. Due to this, it is possible for an immutable contract to break -- any interactions with it that require proofs to be verified against it's verification key will no longer be accepted by the chain. Similarly, the on-chain features that the contract relied on may have been removed or modified.
+At the launch of the Berkeley network, the Mina Protocol does not yet guarantee backwards compatibility of zkApps in future upgrades. Due to this, it is possible for an immutable contract to break -- any interactions with it that require proofs to be verified against it's verification key will no longer be accepted by the chain. Similarly, the on-chain features that the contract relied on may have been removed or modified.
 
 We wish for zkApps developers to be able to make their contract immutable without putting their contract at risk to breaking upon a future release, rendering any funds locked up in the contract inaccessible.
 

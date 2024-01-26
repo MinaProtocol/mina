@@ -12,15 +12,16 @@
   sexplib0
   yojson
   ;; local libraries
+  genesis_constants
   codable
   currency
   fields_derivers.zkapps
   fields_derivers.json
   fields_derivers.graphql
-  genesis_constants
   kimchi_backend.pasta
   kimchi_backend.pasta.basic
   mina_base
+  bounded_types
   mina_numbers
   mina_wire_types
   pickles

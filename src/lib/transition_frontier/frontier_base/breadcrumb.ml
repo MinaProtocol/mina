@@ -336,6 +336,7 @@ module For_tests = struct
           precomputed_values.Precomputed_values.constraint_constants
         ~constants:precomputed_values.consensus_constants
     in
+    let zkapp_cmd_limit = None in
     let%map supercharge_coinbase = Quickcheck.Generator.bool in
     fun parent_breadcrumb ->
       let open Deferred.Let_syntax in
@@ -384,7 +385,7 @@ module For_tests = struct
           ~global_slot:current_state_view.global_slot_since_genesis
           ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver ~current_state_view ~supercharge_coinbase
-          ~transactions_by_fee:transactions ~get_completed_work
+          ~transactions_by_fee:transactions ~get_completed_work ~zkapp_cmd_limit
         |> Result.map_error ~f:Staged_ledger.Pre_diff_info.Error.to_error
         |> Or_error.ok_exn
       in

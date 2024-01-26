@@ -250,7 +250,9 @@ module Graphql = struct
                       setPermissions
                       setZkappUri
                       setTokenSymbol
-                      setVerificationKey
+                      setVerificationKey { auth
+                                           txnVersion
+                                         }
                       setVotingFor
                       setTiming
                     }
@@ -282,10 +284,11 @@ let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
     [ ("query", `String query_name)
     ; ("uri", `String (Uri.to_string node_uri))
     ; ("init_delay", `Float initial_delay_sec)
+    ; ("query_obj", `String query_obj#query)
     ]
   in
   [%log info]
-    "Attempting to send GraphQL request \"$query\" to \"$uri\" after \
+    "Attempting to send GraphQL request \"$query_obj\" to \"$uri\" after \
      $init_delay sec"
     ~metadata ;
   let rec retry n =
@@ -487,7 +490,9 @@ let permissions_of_account_permissions account_permissions :
   ; set_zkapp_uri = to_auth_required account_permissions.setZkappUri
   ; set_token_symbol = to_auth_required account_permissions.setTokenSymbol
   ; set_verification_key =
-      to_auth_required account_permissions.setVerificationKey
+      ( to_auth_required account_permissions.setVerificationKey.auth
+      , Mina_numbers.Txn_version.of_string
+          account_permissions.setVerificationKey.txnVersion )
   ; set_voting_for = to_auth_required account_permissions.setVotingFor
   ; set_timing = to_auth_required account_permissions.setTiming
   }
@@ -1077,14 +1082,14 @@ let get_metrics ~logger node_uri =
       ; transaction_pool_size
       }
 
-let start_filtered_log ~logger ~log_filter node_uri =
+let start_filtered_log node_uri ~logger ~log_filter ~retry_delay_sec =
   let open Deferred.Let_syntax in
   let query_obj =
     Graphql.StartFilteredLog.(make @@ makeVariables ~filter:log_filter ())
   in
   let%bind res =
-    exec_graphql_request ~logger:(Logger.null ()) ~retry_delay_sec:10.0
-      ~node_uri ~query_name:"StartFilteredLog" query_obj
+    exec_graphql_request ~logger:(Logger.null ()) ~retry_delay_sec ~node_uri
+      ~query_name:"StartFilteredLog" query_obj
   in
   match res with
   | Ok query_result_obj ->
