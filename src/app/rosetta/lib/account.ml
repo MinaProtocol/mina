@@ -184,12 +184,10 @@ module Sql = struct
     | None -> Deferred.Result.fail (Errors.create @@ `Account_not_found address)
     | Some account_identifier_id ->
        let%bind timing_info_opt =
-        match timing_id with
-        | Some timing_id ->
-         Archive_lib.Processor.Timing_info.load_opt
-           (module Conn)
-           timing_id
-         |> Errors.Lift.sql ~context:"Finding timing info"
+         match timing_id with
+         | Some timing_id ->
+            Archive_lib.Processor.Timing_info.load_opt (module Conn) timing_id
+            |> Errors.Lift.sql ~context:"Finding timing info"
          | None -> return None
        in
        let end_slot =
@@ -197,10 +195,12 @@ module Sql = struct
            (Unsigned.UInt32.of_int64 requested_block_global_slot_since_genesis)
        in
        let%bind (liquid_balance, nonce) =
-        match timing_info_opt with 
-        | None ->
-          Deferred.Result.return (last_relevant_command_balance, UInt64.of_int64 nonce)
-          | Some timing_info ->
+         match timing_info_opt with
+         | None ->
+            (* This account has no special vesting, so just use its last
+               known balance from the command.*)
+            Deferred.Result.return (last_relevant_command_balance, UInt64.of_int64 nonce)
+         | Some timing_info ->
             (* This block was in the genesis ledger and has been
                involved in at least one user or internal command. We need
                to compute the change in its balance between the most recent
