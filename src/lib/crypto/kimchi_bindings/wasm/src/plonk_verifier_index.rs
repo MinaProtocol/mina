@@ -956,8 +956,7 @@ macro_rules! impl_verification_key {
                 fn comm() -> $WasmPolyComm {
                     let g: $WasmG = $G::prime_subgroup_generator().into();
                     $WasmPolyComm {
-                        shifted: None,
-                        unshifted: vec![g].into(),
+                        elems: vec![g].into(),
                     }
                 }
                 fn vec_comm(num: usize) -> WasmVector<$WasmPolyComm> {
