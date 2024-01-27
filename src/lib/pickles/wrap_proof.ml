@@ -36,7 +36,7 @@ let typ : (Checked.t, Constant.t) Typ.t =
     ~value_to_hlist:Constant.to_hlist ~value_of_hlist:Constant.of_hlist
     [ Plonk_types.Messages.typ
         (module Impl)
-        Inner_curve.typ Plonk_types.Features.Full.none ~bool:Boolean.typ
+        Inner_curve.typ Plonk_types.Features.Full.none
         ~dummy:Inner_curve.Params.one
         ~commitment_lengths:(Commitment_lengths.default ~num_chunks:1)
     ; Types.Step.Bulletproof.typ ~length:(Nat.to_int Tock.Rounds.n)

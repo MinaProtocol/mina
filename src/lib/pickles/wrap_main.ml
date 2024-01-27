@@ -390,8 +390,7 @@ let wrap_main
                 exists
                   (Plonk_types.Messages.typ
                      (module Impl)
-                     Inner_curve.typ ~bool:Boolean.typ feature_flags
-                     ~dummy:Inner_curve.Params.one
+                     Inner_curve.typ feature_flags ~dummy:Inner_curve.Params.one
                      ~commitment_lengths:
                        (Commitment_lengths.default ~num_chunks) )
                   ~request:(fun () -> Req.Messages) )

@@ -200,7 +200,6 @@ module Messages : sig
     -> Opt.Flag.t Features.Full.t
     -> dummy:'b
     -> commitment_lengths:((int, 'n) Vector.vec, int, int) Poly.t
-    -> bool:('c, bool, 'f) Snarky_backendless.Typ.t
     -> ( ( 'a
          , 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
          In_circuit.t

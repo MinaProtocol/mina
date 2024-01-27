@@ -14,31 +14,24 @@ val combine_commitments :
   -> add:('g -> 'g -> 'g)
   -> xi:'f
   -> ('g, 'n) Vector.t
-  -> ('g * 'g, 'm) Vector.t
   -> 'g
-
-val combine_evaluations :
-     (int, 'n, 'm) t
-  -> crs_max_degree:int
-  -> mul:('f -> 'f -> 'f)
-  -> add:('f -> 'f -> 'f)
-  -> one:'f
-  -> evaluation_point:'f
-  -> xi:'f
-  -> ('f, 'n) Vector.t
-  -> ('f, 'm) Vector.t
-  -> 'f
 
 val combine_evaluations' :
      ('a, 'n, 'm) t
-  -> shifted_pow:('a -> 'f -> 'f)
   -> mul:('f -> 'f -> 'f)
   -> add:('f -> 'f -> 'f)
   -> one:'f
-  -> evaluation_point:'f
   -> xi:'f
   -> ('f, 'n) Vector.t
-  -> ('f, 'm) Vector.t
+  -> 'f
+
+val combine_evaluations :
+     (int, 'n, 'm) t
+  -> mul:('f -> 'f -> 'f)
+  -> add:('f -> 'f -> 'f)
+  -> one:'f
+  -> xi:'f
+  -> ('f, 'n) Vector.t
   -> 'f
 
 val combine_split_commitments :

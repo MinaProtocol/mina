@@ -1399,8 +1399,7 @@ module Messages = struct
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) g
       ({ runtime_tables; uses_lookups; lookups_per_row_4; _ } :
         Opt.Flag.t Features.Full.t ) ~dummy
-      ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t)
-      ~_bool =
+      ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) =
     let open Snarky_backendless.Typ in
     let { Poly.w = w_lens; z; t } = commitment_lengths in
     let array ~length elt = padded_array_typ ~dummy ~length elt in
