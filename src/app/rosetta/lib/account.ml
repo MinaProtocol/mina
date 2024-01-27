@@ -67,7 +67,7 @@ module Sql = struct
     let query_pending =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup4 int64 int64 int64 int64)
+        Caqti_type.(tup2 (tup4 int64 int64 int64 int64) int)
         {sql|
   WITH RECURSIVE pending_chain AS (
 
@@ -89,7 +89,7 @@ module Sql = struct
 
               )
 
-              SELECT DISTINCT full_chain.height,full_chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce
+              SELECT DISTINCT full_chain.height,full_chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce,timing_id
 
               FROM (SELECT
                     id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
@@ -116,9 +116,9 @@ module Sql = struct
     let query_canonical =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
-        Caqti_type.(tup4 int64 int64 int64 int64)
+        Caqti_type.(tup2 (tup4 int64 int64 int64 int64) int)
         {sql|
-                SELECT b.height,b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce
+                SELECT b.height,b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce,timing_id
 
                 FROM blocks b
                 INNER JOIN accounts_accessed ac ON ac.block_id = b.id
@@ -170,6 +170,7 @@ module Sql = struct
         (module Conn : Caqti_async.CONNECTION)
         ~requested_block_global_slot_since_genesis
         ~last_relevant_command_info
+        ?timing_id
         address =
     let open Deferred.Result.Let_syntax in
     let open Unsigned in
@@ -183,22 +184,23 @@ module Sql = struct
     | None -> Deferred.Result.fail (Errors.create @@ `Account_not_found address)
     | Some account_identifier_id ->
        let%bind timing_info_opt =
-         Archive_lib.Processor.Timing_info.find_by_account_identifier_id_opt
+        match timing_id with
+        | Some timing_id ->
+         Archive_lib.Processor.Timing_info.load_opt
            (module Conn)
-           account_identifier_id
+           timing_id
          |> Errors.Lift.sql ~context:"Finding timing info"
+         | None -> return None
        in
        let end_slot =
          Mina_numbers.Global_slot_since_genesis.of_uint32
            (Unsigned.UInt32.of_int64 requested_block_global_slot_since_genesis)
        in
        let%bind (liquid_balance, nonce) =
-         match timing_info_opt with
-         | None ->
-            (* This account has no special vesting, so just use its last
-               known balance from the command.*)
-            Deferred.Result.return (last_relevant_command_balance, UInt64.of_int64 nonce)
-         | Some timing_info ->
+        match timing_info_opt with 
+        | None ->
+          Deferred.Result.return (last_relevant_command_balance, UInt64.of_int64 nonce)
+          | Some timing_info ->
             (* This block was in the genesis ledger and has been
                involved in at least one user or internal command. We need
                to compute the change in its balance between the most recent
@@ -275,11 +277,12 @@ module Sql = struct
            ~requested_block_global_slot_since_genesis
            ~last_relevant_command_info
            address
-      | Some last_relevant_command_info ->
+      | Some (last_relevant_command_info, timing_id) ->
          find_current_balance
            (module Conn)
            ~requested_block_global_slot_since_genesis
            ~last_relevant_command_info
+           ~timing_id
            address
     in
     Deferred.Result.return (requested_block_identifier, balance_info, nonce)

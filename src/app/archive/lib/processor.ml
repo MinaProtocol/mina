@@ -1221,7 +1221,7 @@ module Timing_info = struct
          |sql} )
       account_identifier_id
 
-  let add_or_update (module Conn : CONNECTION) account_identifier_id
+  let add_if_doesn't_exist (module Conn : CONNECTION) account_identifier_id
       (timing : Account_timing.t) =
     let open Deferred.Result.Let_syntax in
     let slot_to_int64 x =
@@ -1255,25 +1255,18 @@ module Timing_info = struct
     in
     match%bind
       Conn.find_opt
-        (Caqti_request.find_opt Caqti_type.int Caqti_type.int
-           "SELECT id FROM timing_info WHERE account_identifier_id = ?" )
-        account_identifier_id
+        (Caqti_request.find_opt typ Caqti_type.int
+           {sql| SELECT id FROM timing_info
+                 WHERE account_identifier_id = ?
+                 AND initital_minimum_balance = ?
+                 AND cliff_time = ?
+                 AND cliff_amount = ?
+                 AND vesting_period = ?
+                 AND vesting_increment = ? |sql} )
+        values
     with
     | Some id ->
-        Conn.find
-          (Caqti_request.find
-             Caqti_type.(tup2 int typ)
-             Caqti_type.int
-             {sql| UPDATE timing_info SET
-                   initial_minimum_balance = $3,
-                   cliff_time = $4,
-                   cliff_amount = $5,
-                   vesting_period = $6,
-                   vesting_increment = $7
-                   WHERE id = $1
-                   RETURNING id
-             |sql} )
-          (id, values)
+        return id
     | None ->
         Conn.find
           (Caqti_request.find typ Caqti_type.int
@@ -2724,7 +2717,7 @@ module Accounts_accessed = struct
           Voting_for.add_if_doesn't_exist (module Conn) account.voting_for
         in
         let%bind timing_id =
-          Timing_info.add_or_update
+          Timing_info.add_if_doesn't_exist
             (module Conn)
             account_identifier_id account.timing
         in
