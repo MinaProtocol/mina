@@ -1258,7 +1258,7 @@ module Timing_info = struct
         (Caqti_request.find_opt typ Caqti_type.int
            {sql| SELECT id FROM timing_info
                  WHERE account_identifier_id = ?
-                 AND initital_minimum_balance = ?
+                 AND initial_minimum_balance = ?
                  AND cliff_time = ?
                  AND cliff_amount = ?
                  AND vesting_period = ?
