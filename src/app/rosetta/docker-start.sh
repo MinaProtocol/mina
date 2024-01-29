@@ -30,10 +30,11 @@ export MINA_LIBP2P_KEYPAIR_PATH="${MINA_LIBP2P_KEYPAIR_PATH:=$HOME/libp2p-keypai
 export MINA_LIBP2P_PASS=${MINA_LIBP2P_PASS:=''}
 export MINA_NETWORK=${MINA_NETWORK:=mainnet}
 export MINA_SUFFIX=${MINA_SUFFIX:=}
+export MINA_GENESIS_LEDGER_URL=${MINA_GENESIS_LEDGER_URL:=}
 export MINA_CONFIG_FILE=/genesis_ledgers/${MINA_NETWORK}.json
 export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=/data/.mina-config}"
 export MINA_CLIENT_TRUSTLIST=${MINA_CLIENT_TRUSTLIST:=}
-export PEER_LIST_URL=https://storage.googleapis.com/seed-lists/${MINA_NETWORK}_seeds.txt
+export PEER_LIST_URL=${PEER_LIST_URL:=https://storage.googleapis.com/seed-lists/mainnet_seeds.txt}
 # Allows configuring the port that each service runs on.
 # To interact with rosetta, use MINA_ROSETTA_ONLINE_PORT and MINA_ROSETTA_OFFLINE_PORT
 export MINA_GRAPHQL_PORT=${MINA_GRAPHQL_PORT:=3085}
@@ -51,6 +52,14 @@ POSTGRES_DBNAME=${POSTGRES_DBNAME:=archive}
 POSTGRES_DATA_DIR=${POSTGRES_DATA_DIR:=/data/postgresql}
 PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${POSTGRES_DBNAME}
 DUMP_TIME=${DUMP_TIME:=0000}
+
+# Genesis Ledger
+if [ -n "$MINA_GENESIS_LEDGER_URL" ]; then
+    curl -o "$MINA_CONFIG_FILE" "$MINA_GENESIS_LEDGER_URL"
+    echo "Downloaded content from $MINA_GENESIS_LEDGER_URL to $MINA_CONFIG_FILE"
+else
+   echo "Variable MINA_GENESIS_LEDGER_URL is empty, will use $MINA_CONFIG_FILE as Genesis Ledger"
+fi
 
 # Postgres
 echo "========================= INITIALIZING POSTGRESQL ==========================="
