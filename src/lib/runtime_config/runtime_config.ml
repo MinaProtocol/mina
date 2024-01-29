@@ -161,7 +161,7 @@ module Json_layout = struct
           let of_yojson = function
             | `String _ as json ->
                 let%map.Result auth = Auth_required.of_yojson json in
-                { auth; txn_version = Txn_version.current }
+                { auth; txn_version = 1 }
             | json ->
                 of_yojson json
         end
