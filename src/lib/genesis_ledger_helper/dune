@@ -43,6 +43,7 @@
    logger
    mina_base.import
    staged_ledger_diff
+   file_system
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_jane ppx_version ppx_inline_test ppx_let ppx_deriving.std ppx_deriving_yojson ppx_custom_printf)))
