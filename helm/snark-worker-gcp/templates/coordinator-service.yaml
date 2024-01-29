@@ -20,6 +20,21 @@ spec:
     port: {{ $.Values.mina.ports.client }}
     targetPort: client-port
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Values.coordinatorName }}-metrics
+  labels:
+    testnet: {{ $.Values.testnetName }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics-port
+      port: {{ $.Values.mina.ports.metrics }}
+      targetPort: metrics-port
+  selector:
+    app: {{ $.Values.coordinatorName }}
+---
 {{- if $.Values.mina.exposeGraphql }}
 apiVersion: v1
 kind: Service
@@ -36,4 +51,3 @@ spec:
     port: 80
     targetPort: {{ $.Values.mina.ports.graphql }}
 {{- end }}
-
