@@ -753,17 +753,29 @@ let setup_daemon logger =
             | Ok (precomputed_values, _) ->
                 precomputed_values
             | Error err ->
-                let json_config, accounts_omitted =
+                let ( json_config
+                    , `Accounts_omitted
+                        ( `Genesis genesis_accounts_omitted
+                        , `Staking staking_accounts_omitted
+                        , `Next next_accounts_omitted ) ) =
                   Runtime_config.to_yojson_without_accounts config
                 in
-                let f i = List.cons ("accounts_omitted", `Int i) in
-                [%log fatal]
-                  "Failed initializing with configuration $config: $error"
-                  ~metadata:
-                    (Option.value_map ~f ~default:Fn.id accounts_omitted
+                let append_accounts_omitted s =
+                  Option.value_map
+                    ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
+                    ~default:Fn.id
+                in
+                let metadata =
+                  append_accounts_omitted "genesis" genesis_accounts_omitted
+                  @@ append_accounts_omitted "staking" staking_accounts_omitted
+                  @@ append_accounts_omitted "next" next_accounts_omitted
                        [ ("config", json_config)
                        ; ("error", Error_json.error_to_yojson err)
-                       ] ) ;
+                       ]
+                in
+                [%log info]
+                  "Initializing with runtime configuration. Ledger name: $name"
+                  ~metadata ;
                 Error.raise err
           in
           let rev_daemon_configs =
@@ -1535,6 +1547,100 @@ let dump_type_shapes =
              Core_kernel.printf "%s, %s, %s, %s\n" path digest shape_summary
                ty_decl ) ) )
 
+let primitive_ok = function
+  | "array" | "bytes" | "string" | "bigstring" ->
+      false
+  | "int" | "int32" | "int64" | "nativeint" | "char" | "bool" | "float" ->
+      true
+  | "unit" | "option" | "list" ->
+      true
+  | "kimchi_backend_bigint_32_V1" ->
+      true
+  | "Bounded_types.String.t"
+  | "Bounded_types.String.Tagged.t"
+  | "Bounded_types.Array.t" ->
+      true
+  | "8fabab0a-4992-11e6-8cca-9ba2c4686d9e" ->
+      true (* hashtbl *)
+  | "ac8a9ff4-4994-11e6-9a1b-9fb4e933bd9d" ->
+      true (* Make_iterable_binable *)
+  | s ->
+      failwithf "unknown primitive %s" s ()
+
+let audit_type_shapes : Command.t =
+  let rec shape_ok (shape : Sexp.t) : bool =
+    match shape with
+    | List [ Atom "Exp"; exp ] ->
+        exp_ok exp
+    | List [] ->
+        true
+    | _ ->
+        failwithf "bad shape: %s" (Sexp.to_string shape) ()
+  and exp_ok (exp : Sexp.t) : bool =
+    match exp with
+    | List [ Atom "Base"; Atom tyname; List exps ] ->
+        primitive_ok tyname && List.for_all exps ~f:shape_ok
+    | List [ Atom "Record"; List fields ] ->
+        List.for_all fields ~f:(fun field ->
+            match field with
+            | List [ Atom _; sh ] ->
+                shape_ok sh
+            | _ ->
+                failwithf "unhandled rec field: %s" (Sexp.to_string_hum field)
+                  () )
+    | List [ Atom "Tuple"; List exps ] ->
+        List.for_all exps ~f:shape_ok
+    | List [ Atom "Variant"; List ctors ] ->
+        List.for_all ctors ~f:(fun ctor ->
+            match ctor with
+            | List [ Atom _ctr; List exps ] ->
+                List.for_all exps ~f:shape_ok
+            | _ ->
+                failwithf "unhandled variant: %s" (Sexp.to_string_hum ctor) () )
+    | List [ Atom "Poly_variant"; List [ List [ Atom "sorted"; List ctors ] ] ]
+      ->
+        List.for_all ctors ~f:(fun ctor ->
+            match ctor with
+            | List [ Atom _ctr ] ->
+                true
+            | List [ Atom _ctr; List fields ] ->
+                List.for_all fields ~f:shape_ok
+            | _ ->
+                failwithf "unhandled poly variant: %s" (Sexp.to_string_hum ctor)
+                  () )
+    | List [ Atom "Application"; sh; List args ] ->
+        shape_ok sh && List.for_all args ~f:shape_ok
+    | List [ Atom "Rec_app"; Atom _; List args ] ->
+        List.for_all args ~f:shape_ok
+    | List [ Atom "Var"; Atom _ ] ->
+        true
+    | List (Atom ctr :: _) ->
+        failwithf "unhandled ctor (%s) in exp_ok: %s" ctr
+          (Sexp.to_string_hum exp) ()
+    | List [] | List _ | Atom _ ->
+        failwithf "bad format: %s" (Sexp.to_string_hum exp) ()
+  in
+  let handle_shape (path : string) (shape : Bin_prot.Shape.t) (ty_decl : string)
+      (good : int ref) (bad : int ref) =
+    let open Bin_prot.Shape in
+    let path, file = String.lsplit2_exn ~on:':' path in
+    let canonical = eval shape in
+    let shape_sexp = Canonical.to_string_hum canonical |> Sexp.of_string in
+    if not @@ shape_ok shape_sexp then (
+      incr bad ;
+      Core.eprintf "%s has a bad shape in %s (%s):\n%s\n" path file ty_decl
+        (Canonical.to_string_hum canonical) )
+    else incr good
+  in
+  Command.basic ~summary:"Audit shapes of versioned types"
+    (Command.Param.return (fun () ->
+         let bad, good = (ref 0, ref 0) in
+         Ppx_version_runtime.Shapes.iteri
+           ~f:(fun ~key:path ~data:(shape, ty_decl) ->
+             handle_shape path shape ty_decl good bad ) ;
+         Core.printf "good shapes:\n\t%d\nbad shapes:\n\t%d\n%!" !good !bad ;
+         if !bad > 0 then Core.exit 1 ) )
+
 [%%if force_updates]
 
 let rec ensure_testnet_id_still_good logger =
@@ -1805,6 +1911,7 @@ let internal_commands logger =
           Deferred.return ()) )
   ; ("dump-type-shapes", dump_type_shapes)
   ; ("replay-blocks", replay_blocks logger)
+  ; ("audit-type-shapes", audit_type_shapes)
   ]
 
 let mina_commands logger =

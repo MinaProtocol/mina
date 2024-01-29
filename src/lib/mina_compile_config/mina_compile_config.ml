@@ -68,3 +68,19 @@ let max_event_elements = 100
 let max_action_elements = 100
 
 [%%inject "network_id", network]
+
+[%%ifndef zkapp_cmd_limit]
+
+let zkapp_cmd_limit = None
+
+[%%else]
+
+[%%inject "zkapp_cmd_limit", zkapp_cmd_limit]
+
+let zkapp_cmd_limit = Some zkapp_cmd_limit
+
+[%%endif]
+
+let zkapp_cmd_limit_hardcap = 128
+
+let zkapps_disabled = false

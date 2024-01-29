@@ -687,7 +687,7 @@ module Sql = struct
       let fields =
         String.concat ~sep:"," @@ List.map ~f:(fun n -> "u." ^ n)
           Archive_lib.Processor.User_command.Signed_command.Fields.names in
-      Caqti_request.collect Caqti_type.int typ
+      Caqti_request.collect Caqti_type.(tup2 int string) typ
       (sprintf
         {|
          SELECT %s,
@@ -715,17 +715,29 @@ module Sql = struct
            AND ai_receiver.id = ac.account_identifier_id
            AND buc.status = 'applied'
            AND buc.sequence_no =
-             (SELECT MIN(buc2.sequence_no)
-              FROM blocks_user_commands buc2
-              INNER JOIN user_commands uc2
-                ON buc2.user_command_id = uc2.id
-                AND uc2.receiver_id = u.receiver_iD
-                AND buc2.block_id = buc.block_id)
+             (SELECT LEAST(
+                (SELECT min(bic2.sequence_no)
+                 FROM blocks_internal_commands bic2
+                 INNER JOIN internal_commands ic2
+                    ON bic2.internal_command_id = ic2.id
+                 WHERE ic2.receiver_id = u.receiver_id
+                    AND bic2.block_id = buc.block_id
+                    AND bic2.status = 'applied'),
+                 (SELECT min(buc2.sequence_no)
+                  FROM blocks_user_commands buc2
+                  INNER JOIN user_commands uc2
+                    ON buc2.user_command_id = uc2.id
+                  WHERE uc2.receiver_id = u.receiver_id
+                    AND buc2.block_id = buc.block_id
+                    AND buc2.status = 'applied')))
+         INNER JOIN tokens t
+           ON t.id = ai_receiver.token_id
          WHERE buc.block_id = ?
+           AND t.value = ?
         |} fields)
 
     let run (module Conn : Caqti_async.CONNECTION) id =
-      Conn.collect_list query id
+      Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
   end
 
   module Internal_commands = struct
@@ -749,7 +761,7 @@ module Sql = struct
       let fields =
         String.concat ~sep:"," @@ List.map ~f:(fun n -> "i." ^ n)
           Archive_lib.Processor.Internal_command.Fields.names in
-      Caqti_request.collect Caqti_type.int typ
+      Caqti_request.collect Caqti_type.(tup2 int string) typ
       (sprintf
         {|
          SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no)
@@ -767,11 +779,31 @@ module Sql = struct
            ON ai.public_key_id = receiver_id
          LEFT JOIN accounts_created ac
            ON ac.account_identifier_id = ai.id
+           AND ac.block_id = bic.block_id
+           AND bic.sequence_no =
+               (SELECT LEAST(
+                   (SELECT min(bic2.sequence_no)
+                    FROM blocks_internal_commands bic2
+                    INNER JOIN internal_commands ic2
+                       ON bic2.internal_command_id = ic2.id
+                    WHERE ic2.receiver_id = i.receiver_id
+                       AND bic2.block_id = bic.block_id
+                       AND bic2.status = 'applied'),
+                    (SELECT min(buc2.sequence_no)
+                     FROM blocks_user_commands buc2
+                     INNER JOIN user_commands uc2
+                       ON buc2.user_command_id = uc2.id
+                     WHERE uc2.receiver_id = i.receiver_id
+                       AND buc2.block_id = bic.block_id
+                       AND buc2.status = 'applied')))
+         INNER JOIN tokens t
+           ON t.id = ai.token_id
          WHERE bic.block_id = ?
+          AND t.value = ?
       |} fields)
 
     let run (module Conn : Caqti_async.CONNECTION) id =
-      Conn.collect_list query id
+      Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
   end
 
   module Zkapp_commands = struct
@@ -862,7 +894,7 @@ module Sql = struct
       let fields =
         String.concat ~sep:"," @@ List.map ~f:(fun n -> "zaub." ^ n)
           Archive_lib.Processor.Zkapp_account_update_body.Fields.names in
-      Caqti_request.collect Caqti_type.int typ
+      Caqti_request.collect Caqti_type.(tup3 int string int) typ
       (sprintf
         {|
          SELECT %s,
@@ -879,14 +911,18 @@ module Sql = struct
            ON ai.id = zaub.account_identifier_id
          INNER JOIN public_keys pk
            ON ai.public_key_id = pk.id
+         INNER JOIN tokens t
+           ON t.id = ai.token_id
          WHERE zc.id = ?
+           AND t.value = ?
+           AND bzc.block_id = ?
     |} fields)
 
-    let run (module Conn : Caqti_async.CONNECTION) id =
-      Conn.collect_list query id
-  end
-
-  let run (module Conn : Caqti_async.CONNECTION) input =
+    let run (module Conn : Caqti_async.CONNECTION) command_id block_id =
+      Conn.collect_list query (command_id, Mina_base.Token_id.(to_string default), block_id)
+    end
+    
+    let run (module Conn : Caqti_async.CONNECTION) input =
     let module M = struct
       include Deferred.Result
 
@@ -1043,7 +1079,7 @@ module Sql = struct
           (* TODO: check if this holds *)
           let token = Mina_base.Token_id.(to_string default) in
           let%bind raw_zkapp_account_update =
-            Zkapp_account_update.run (module Conn) cmd_id
+            Zkapp_account_update.run (module Conn) cmd_id block_id
             |> Errors.Lift.sql
                  ~context:"Finding zkapp account updates within command"
           in

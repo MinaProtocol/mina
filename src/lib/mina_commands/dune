@@ -15,6 +15,7 @@
    mina_base.import
    kimchi_backend
    mina_metrics
+   bounded_types
    transition_frontier
    sync_status
    pipe_lib

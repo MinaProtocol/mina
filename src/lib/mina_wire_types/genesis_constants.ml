@@ -5,6 +5,7 @@ module Protocol = struct
         { k : 'length
         ; slots_per_epoch : 'length
         ; slots_per_sub_window : 'length
+        ; grace_period_slots : 'length
         ; delta : 'delta
         ; genesis_state_timestamp : 'genesis_state_timestamp
         }

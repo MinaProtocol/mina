@@ -68,7 +68,7 @@ module Base = struct
               Types.Wrap.Statement.Minimal.Stable.V1.t
           ; prev_evals :
               ( Tick.Field.Stable.V1.t
-              , Tick.Field.Stable.V1.t array )
+              , Tick.Field.Stable.V1.t Bounded_types.ArrayN16.Stable.V1.t )
               Plonk_types.All_evals.Stable.V1.t
           ; proof : Wrap_wire_proof.Stable.V1.t
           }

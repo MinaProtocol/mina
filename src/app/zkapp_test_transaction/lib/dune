@@ -20,6 +20,7 @@
    pickles
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
+   bounded_types
    random_oracle
    mina_runtime_config
    transaction_witness

@@ -1330,7 +1330,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                           let%bind _block_id, _acct_id_id =
                             query_db ~f:(fun db ->
                                 Processor.Accounts_accessed.add_if_doesn't_exist
-                                  db last_block_id (index, acct) )
+                                  ~logger db last_block_id (index, acct) )
                           in
                           Deferred.unit
                         else Deferred.unit

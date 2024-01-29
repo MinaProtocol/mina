@@ -19,6 +19,7 @@
    genesis_constants
    signature_lib
    verifier
+   bounded_types
    precomputed_values
    block_time
    trust_system
