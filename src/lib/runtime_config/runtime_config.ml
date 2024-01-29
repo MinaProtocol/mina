@@ -452,9 +452,9 @@ module Json_layout = struct
 
   module Data_hashes = struct
     type ledger_with_hash = { merkle_root : string; s3_hash : string }
-    [@@deriving yojson]
+    [@@deriving yojson, dhall_type]
 
-    type t = ledger_with_hash list [@@deriving yojson]
+    type t = ledger_with_hash list [@@deriving yojson, dhall_type]
   end
 
   type t =
