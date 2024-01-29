@@ -48,6 +48,7 @@
    transition_handler
    o1trace
    ppx_version.runtime
+   bounded_types
  )
  (inline_tests (flags -verbose -show-counts))
  (preprocess
