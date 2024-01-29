@@ -437,8 +437,8 @@ module Sql = struct
 
     let block_fields ?prefix () =
       let names = Archive_lib.Processor.Block.Fields.names in
-      let fields = Option.value_map ~default:names
-        ~f:(fun prefix -> List.map ~f:(fun n -> prefix ^ n) names) prefix in
+      let fields = Option.value_map prefix ~default:names
+        ~f:(fun prefix -> List.map ~f:(fun n -> prefix ^ n) names) in
       String.concat ~sep:"," fields
 
     let query_count_canonical_at_height =
@@ -456,7 +456,8 @@ module Sql = struct
          *)
          (sprintf
         {|
-         SELECT %s,
+         SELECT c.id,
+                %s,
                 pk.value as creator,
                 bw.value as winner
          FROM blocks c
@@ -471,6 +472,7 @@ module Sql = struct
     let query_height_pending =
       let fields = block_fields () in
       let b_fields = block_fields ~prefix:"b." () in
+      let c_fields = block_fields ~prefix:"c." () in
       Caqti_request.find_opt Caqti_type.int64 typ
         (* According to the clarification of the Rosetta spec here
          * https://community.rosetta-api.org/t/querying-block-by-just-its-index/84/3 ,
@@ -487,15 +489,15 @@ module Sql = struct
          (sprintf
         {|
          WITH RECURSIVE chain AS (
-           (SELECT %s
-           FROM blocks b
+           (SELECT id, %s
+           FROM blocks
            WHERE height = (select MAX(height) from blocks)
            ORDER BY timestamp ASC, state_hash ASC
            LIMIT 1)
 
          UNION ALL
 
-           SELECT %s
+           SELECT b.id, %s
            FROM blocks b
            INNER JOIN chain
              ON b.id = chain.parent_id
@@ -503,26 +505,7 @@ module Sql = struct
              AND chain.chain_status <> 'canonical')
 
          SELECT c.id,
-                c.state_hash,
-                c.parent_id,
-                c.parent_hash,
-                c.creator_id,
-                c.block_winner_id,
-                c.last_vrf_output,
-                c.snarked_ledger_hash_id,
-                c.staking_epoch_data_id,
-                c.next_epoch_data_id,
-                c.min_window_density,
-                c.sub_window_densities,
-                c.total_currency,
-                c.ledger_hash,
-                c.height,
-                c.global_slot_since_hard_fork,
-                c.global_slot_since_genesis,
-                c.protocol_version_id,
-                c.proposed_protocol_version_id,
-                c.timestamp,
-                c.chain_status,
+                %s,
                 pk.value as creator,
                 bw.value as winner
          FROM chain c
@@ -531,14 +514,15 @@ module Sql = struct
          INNER JOIN public_keys bw
            ON bw.id = c.block_winner_id
          WHERE c.height = ?
-       |} fields b_fields)
+       |} fields b_fields c_fields)
 
     let query_hash =
       let b_fields = block_fields ~prefix:"b." () in
       Caqti_request.find_opt Caqti_type.string typ
       (sprintf
         {|
-         SELECT %s,
+         SELECT b.id,
+                %s,
                 pk.value as creator,
                 bw.value as winner
          FROM blocks b
@@ -556,7 +540,8 @@ module Sql = struct
         typ
         (sprintf
         {|
-         SELECT %s,
+         SELECT b.id,
+                %s,
                 pk.value as creator,
                 bw.value as winner
          FROM blocks b
@@ -573,7 +558,8 @@ module Sql = struct
       Caqti_request.find_opt Caqti_type.int typ
       (sprintf
         {|
-         SELECT %s,
+         SELECT b.id,
+                %s,
                 pk.value as creator,
                 bw.value as winner
          FROM blocks b
@@ -589,7 +575,8 @@ module Sql = struct
       Caqti_request.find_opt Caqti_type.unit typ
       (sprintf
         {|
-         SELECT %s,
+         SELECT b.id,
+                %s,
                 pk.value as creator,
                 bw.value as winner
          FROM blocks b
