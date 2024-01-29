@@ -20,6 +20,7 @@
    transition_frontier_base
    mina_metrics
    error_json
+   bounded_types
    with_hash
    mina_state
    inline_test_quiet_logs

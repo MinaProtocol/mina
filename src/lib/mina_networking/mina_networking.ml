@@ -201,7 +201,11 @@ module Rpcs = struct
       module T = struct
         type query = Ledger_hash.t * Sync_ledger.Query.t
 
-        type response = Sync_ledger.Answer.t Core.Or_error.t
+        type response =
+          (( Sync_ledger.Answer.t
+           , Bounded_types.Wrapped_error.Stable.V1.t )
+           Result.t
+          [@version_asserted] )
       end
 
       module Caller = T
@@ -229,12 +233,16 @@ module Rpcs = struct
       include Master
     end)
 
-    module V2 = struct
+    module V3 = struct
       module T = struct
         type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
         [@@deriving sexp]
 
-        type response = Sync_ledger.Answer.Stable.V2.t Core.Or_error.Stable.V1.t
+        type response =
+          (( Sync_ledger.Answer.Stable.V2.t
+           , Bounded_types.Wrapped_error.Stable.V1.t )
+           Result.t
+          [@version_asserted] )
         [@@deriving sexp]
 
         let query_of_caller_model = Fn.id
@@ -672,15 +680,7 @@ module Rpcs = struct
       module Stable = struct
         module V2 = struct
           type t =
-            { node_ip_addr : Core.Unix.Inet_addr.Stable.V1.t
-                  [@to_yojson
-                    fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
-                  [@of_yojson
-                    function
-                    | `String s ->
-                        Ok (Unix.Inet_addr.of_string s)
-                    | _ ->
-                        Error "expected string"]
+            { node_ip_addr : Network_peer.Peer.Inet_addr.Stable.V1.t
             ; node_peer_id : Network_peer.Peer.Id.Stable.V1.t
                   [@to_yojson fun peer_id -> `String peer_id]
                   [@of_yojson
@@ -695,8 +695,8 @@ module Rpcs = struct
                 * Trust_system.Peer_status.Stable.V1.t )
                 list
             ; k_block_hashes_and_timestamps :
-                (State_hash.Stable.V1.t * string) list
-            ; git_commit : string
+                (State_hash.Stable.V1.t * Bounded_types.String.Stable.V1.t) list
+            ; git_commit : Bounded_types.String.Stable.V1.t
             ; uptime_minutes : int
             ; block_height_opt : int option [@default None]
             }
@@ -707,15 +707,7 @@ module Rpcs = struct
 
         module V1 = struct
           type t =
-            { node_ip_addr : Core.Unix.Inet_addr.Stable.V1.t
-                  [@to_yojson
-                    fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
-                  [@of_yojson
-                    function
-                    | `String s ->
-                        Ok (Unix.Inet_addr.of_string s)
-                    | _ ->
-                        Error "expected string"]
+            { node_ip_addr : Network_peer.Peer.Inet_addr.Stable.V1.t
             ; node_peer_id : Network_peer.Peer.Id.Stable.V1.t
                   [@to_yojson fun peer_id -> `String peer_id]
                   [@of_yojson
@@ -730,8 +722,8 @@ module Rpcs = struct
                 * Trust_system.Peer_status.Stable.V1.t )
                 list
             ; k_block_hashes_and_timestamps :
-                (State_hash.Stable.V1.t * string) list
-            ; git_commit : string
+                (State_hash.Stable.V1.t * Bounded_types.String.Stable.V1.t) list
+            ; git_commit : Bounded_types.String.Stable.V1.t
             ; uptime_minutes : int
             }
           [@@deriving to_yojson, of_yojson]
@@ -760,7 +752,8 @@ module Rpcs = struct
       module T = struct
         type query = unit [@@deriving sexp, to_yojson]
 
-        type response = Node_status.t Or_error.t
+        type response =
+          (Node_status.t, Bounded_types.Wrapped_error.Stable.V1.t) result
       end
 
       module Caller = T
@@ -798,7 +791,11 @@ module Rpcs = struct
       module T = struct
         type query = unit [@@deriving sexp]
 
-        type response = Node_status.Stable.V2.t Core_kernel.Or_error.Stable.V1.t
+        type response =
+          (( Node_status.Stable.V2.t
+           , Bounded_types.Wrapped_error.Stable.V1.t )
+           Result.t
+          [@version_asserted] )
 
         let query_of_caller_model = Fn.id
 
@@ -825,7 +822,11 @@ module Rpcs = struct
       module T = struct
         type query = unit [@@deriving sexp]
 
-        type response = Node_status.Stable.V1.t Core_kernel.Or_error.Stable.V1.t
+        type response =
+          (( Node_status.Stable.V1.t
+           , Bounded_types.Wrapped_error.Stable.V1.t )
+           Core_kernel.Result.t
+          [@version_asserted] )
 
         let query_of_caller_model = Fn.id
 

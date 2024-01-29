@@ -59,6 +59,7 @@ module T = struct
       | Mismatched_statuses of
           Transaction.t With_status.t * Transaction_status.t
       | Invalid_public_key of Public_key.Compressed.t
+      | ZkApps_exceed_limit of int * int
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -102,6 +103,11 @@ module T = struct
             !"A transaction contained an invalid public key %{sexp: \
               Public_key.Compressed.t}"
             pk
+      | ZkApps_exceed_limit (count, limit) ->
+          Format.asprintf
+            !"There are %{sexp: int} ZkApps in the block when there is a \
+              configured limit of %{sexp: int}"
+            count limit
       | Unexpected e ->
           Error.to_string_hum e
 
@@ -1006,7 +1012,7 @@ module T = struct
 
   let apply_diff ?(skip_verification = false) ~logger ~constraint_constants
       ~global_slot t pre_diff_info ~current_state_view ~state_and_body_hash
-      ~log_prefix =
+      ~log_prefix ~zkapp_cmd_limit_hardcap =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2 t.constraint_constants.transaction_capacity_log_2
@@ -1027,6 +1033,25 @@ module T = struct
       |> Set.to_list
     in
     Ledger.unsafe_preload_accounts_from_parent new_ledger accounts_accessed ;
+    let%bind () =
+      (* Check number of zkApps in a block does not exceed hardcap *)
+      O1trace.thread "zkapp_hardcap_check" (fun () ->
+          let is_zkapp : Transaction.t With_status.t -> bool = function
+            | { With_status.data =
+                  Transaction.Command (Mina_base.User_command.Zkapp_command _)
+              ; status = _
+              } ->
+                true
+            | _ ->
+                false
+          in
+          let zk_app_count = List.count ~f:is_zkapp transactions in
+          if zk_app_count > zkapp_cmd_limit_hardcap then
+            Deferred.Result.fail
+              (Staged_ledger_error.ZkApps_exceed_limit
+                 (zk_app_count, zkapp_cmd_limit_hardcap) )
+          else Deferred.Result.return () )
+    in
     [%log internal] "Update_coinbase_stack"
       ~metadata:
         [ ("transactions", `Int (List.length transactions))
@@ -1198,10 +1223,12 @@ module T = struct
   let check_commands ledger ~verifier (cs : User_command.t With_status.t list) =
     let open Deferred.Or_error.Let_syntax in
     let%bind cs =
-      User_command.Last.to_all_verifiable cs
-        ~find_vk:
-          (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger ~get:Ledger.get
-             ~location_of_account:Ledger.location_of_account )
+      User_command.Applied_sequence.to_all_verifiable cs
+        ~load_vk_cache:(fun account_ids ->
+          let account_ids = Set.to_list account_ids in
+          Zkapp_command.Verifiable.load_vks_from_ledger account_ids
+            ~location_of_account_batch:(Ledger.location_of_account_batch ledger)
+            ~get_batch:(Ledger.get_batch ledger) )
       |> Deferred.return
     in
     let%map xs = Verifier.verify_commands verifier cs in
@@ -1227,7 +1254,7 @@ module T = struct
   let apply ?skip_verification ~constraint_constants ~global_slot t
       ~get_completed_work (witness : Staged_ledger_diff.t) ~logger ~verifier
       ~current_state_view ~state_and_body_hash ~coinbase_receiver
-      ~supercharge_coinbase =
+      ~supercharge_coinbase ~zkapp_cmd_limit_hardcap =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () =
@@ -1260,7 +1287,7 @@ module T = struct
         ~constraint_constants ~global_slot t
         (forget_prediff_info prediff)
         ~logger ~current_state_view ~state_and_body_hash
-        ~log_prefix:"apply_diff"
+        ~log_prefix:"apply_diff" ~zkapp_cmd_limit_hardcap
     in
     [%log internal] "Diff_applied" ;
     [%log debug]
@@ -1282,7 +1309,7 @@ module T = struct
   let apply_diff_unchecked ~constraint_constants ~global_slot t
       (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) ~logger
       ~current_state_view ~state_and_body_hash ~coinbase_receiver
-      ~supercharge_coinbase =
+      ~supercharge_coinbase ~zkapp_cmd_limit_hardcap =
     let open Deferred.Result.Let_syntax in
     let%bind prediff =
       Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
@@ -1294,6 +1321,7 @@ module T = struct
       (forget_prediff_info prediff)
       ~constraint_constants ~global_slot ~logger ~current_state_view
       ~state_and_body_hash ~log_prefix:"apply_diff_unchecked"
+      ~zkapp_cmd_limit_hardcap
 
   module Resources = struct
     module Discarded = struct
@@ -2338,11 +2366,18 @@ let%test_module "staged ledger tests" =
       Quickcheck.random_value ~seed:(`Deterministic "self_pk")
         Public_key.Compressed.gen
 
+    let coinbase_receiver_keypair =
+      Quickcheck.random_value ~seed:(`Deterministic "receiver_pk") Keypair.gen
+
     let coinbase_receiver =
-      Quickcheck.random_value ~seed:(`Deterministic "receiver_pk")
-        Public_key.Compressed.gen
+      Public_key.compress coinbase_receiver_keypair.public_key
 
     let proof_level = Genesis_constants.Proof_level.for_unit_tests
+
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
+    let zkapp_cmd_limit_hardcap = 200
 
     let logger = Logger.null ()
 
@@ -2355,6 +2390,10 @@ let%test_module "staged ledger tests" =
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
             () )
+
+    let find_vk ledger =
+      Zkapp_command.Verifiable.load_vk_from_ledger ~get:(Ledger.get ledger)
+        ~location_of_account:(Ledger.location_of_account ledger)
 
     let supercharge_coinbase ~ledger ~winner ~global_slot =
       (*using staged ledger to confirm coinbase amount is correctly generated*)
@@ -2396,6 +2435,7 @@ let%test_module "staged ledger tests" =
           Sl.apply ~constraint_constants ~global_slot !sl diff' ~logger
             ~verifier ~get_completed_work:(Fn.const None) ~current_state_view
             ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
+            ~zkapp_cmd_limit_hardcap
         with
         | Ok x ->
             x
@@ -2912,12 +2952,8 @@ let%test_module "staged ledger tests" =
               in
               let valid_zkapp_command_with_auths : Zkapp_command.Valid.t =
                 match
-                  Zkapp_command.Valid.to_valid ~status:Applied
-                    ~find_vk:
-                      (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
-                         ~get:Ledger.get
-                         ~location_of_account:Ledger.location_of_account )
-                    zkapp_command_with_auths
+                  Zkapp_command.Valid.to_valid ~failed:false
+                    ~find_vk:(find_vk ledger) zkapp_command_with_auths
                 with
                 | Ok ps ->
                     ps
@@ -3333,6 +3369,7 @@ let%test_module "staged ledger tests" =
                           ( state_hashes.state_hash
                           , state_hashes.state_body_hash |> Option.value_exn )
                         ~coinbase_receiver ~supercharge_coinbase:true
+                        ~zkapp_cmd_limit_hardcap
                     in
                     let checked', diff' =
                       match apply_res with
@@ -4360,6 +4397,7 @@ let%test_module "staged ledger tests" =
                       ~logger ~verifier ~get_completed_work:(Fn.const None)
                       ~current_state_view ~state_and_body_hash
                       ~coinbase_receiver ~supercharge_coinbase:false
+                      ~zkapp_cmd_limit_hardcap
                   with
                   | Ok _x ->
                       assert false
@@ -4466,12 +4504,8 @@ let%test_module "staged ledger tests" =
                 spec
             in
             let valid_zkapp_command =
-              Zkapp_command.Valid.to_valid ~status:Applied
-                ~find_vk:
-                  (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
-                     ~get:Ledger.get
-                     ~location_of_account:Ledger.location_of_account )
-                zkapp_command
+              Zkapp_command.Valid.to_valid ~failed:false
+                ~find_vk:(find_vk ledger) zkapp_command
               |> Or_error.ok_exn
             in
             User_command.Zkapp_command valid_zkapp_command
@@ -4572,7 +4606,7 @@ let%test_module "staged ledger tests" =
                   (Staged_ledger_diff.forget diff)
                   ~logger ~verifier ~get_completed_work:(Fn.const None)
                   ~current_state_view ~state_and_body_hash ~coinbase_receiver
-                  ~supercharge_coinbase:false
+                  ~supercharge_coinbase:false ~zkapp_cmd_limit_hardcap
               with
               | Ok _x -> (
                   let valid_command_1_with_status =
@@ -4619,6 +4653,7 @@ let%test_module "staged ledger tests" =
                       ~logger ~verifier ~get_completed_work:(Fn.const None)
                       ~current_state_view ~state_and_body_hash
                       ~coinbase_receiver ~supercharge_coinbase:false
+                      ~zkapp_cmd_limit_hardcap
                   with
                   | Ok _x ->
                       assert false
@@ -4627,6 +4662,262 @@ let%test_module "staged ledger tests" =
               | Error e ->
                   [%log info] "Error %s" (Staged_ledger_error.to_string e) ;
                   assert false ) )
+
+    let rec lift_deferred_zkapp_commands cmds =
+      match cmds with
+      | { With_status.status; data } :: cmds' ->
+          let%bind data' = data in
+          let%map cmds'' = lift_deferred_zkapp_commands cmds' in
+          { With_status.status; data = User_command.Zkapp_command data' }
+          :: cmds''
+      | [] ->
+          return []
+
+    let test_staged_ledger_diff_validity ~expectation ~setup_test =
+      let make_account () =
+        let keypair = Keypair.create () in
+        let pubkey = Public_key.compress keypair.public_key in
+        let account =
+          Account.create
+            (Account_id.create pubkey Token_id.default)
+            (Balance.of_mina_int_exn 10_000)
+        in
+        (account, keypair)
+      in
+      let get_location ledger account =
+        account |> Account.identifier
+        |> Ledger.location_of_account ledger
+        |> Option.value_exn
+      in
+      let account_a, keypair_a = make_account () in
+      let account_b, keypair_b = make_account () in
+      let init_ledger : Mina_transaction_logic.For_tests.Init_ledger.t =
+        let balance = Fn.compose Unsigned.UInt64.to_int64 Balance.to_uint64 in
+        [| (keypair_a, balance account_a.balance)
+         ; (keypair_b, balance account_b.balance)
+         ; (coinbase_receiver_keypair, 0L)
+        |]
+      in
+      Ledger.with_ledger ~depth:constraint_constants.ledger_depth
+        ~f:(fun ledger ->
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              Mina_transaction_logic.For_tests.Init_ledger.init
+                (module Ledger.Ledger_inner)
+                init_ledger ledger ;
+              (* we could predict these based on the init ledger, but best to use the proper API *)
+              let location_a = get_location ledger account_a in
+              let location_b = get_location ledger account_b in
+              let%bind cmds =
+                setup_test ledger
+                  (account_a, keypair_a.private_key, location_a)
+                  (account_b, keypair_b.private_key, location_b)
+              in
+              (*
+            let cmds = List.map cmds ~f:(fun cmd ->
+              (* this is a test, so it's fine *)
+              let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd) = User_command.to_valid_unsafe cmd in
+              cmd)
+            in
+            *)
+              let diff : Staged_ledger_diff.t =
+                let pre_diff :
+                    Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.Stable
+                    .V2
+                    .t =
+                  { completed_works = []
+                  ; commands = cmds
+                  ; coinbase = Zero
+                  ; internal_command_statuses = [ Applied ]
+                  }
+                in
+                { diff = (pre_diff, None) }
+              in
+              let sl = Sl.create_exn ~constraint_constants ~ledger in
+              let global_slot =
+                Mina_numbers.Global_slot_since_genesis.of_int 1
+              in
+              let current_state, current_state_view =
+                dummy_state_and_view ~global_slot ()
+              in
+              let state_and_body_hash =
+                let state_hashes =
+                  Mina_state.Protocol_state.hashes current_state
+                in
+                ( state_hashes.state_hash
+                , state_hashes.state_body_hash |> Option.value_exn )
+              in
+              let%map result =
+                apply ~logger ~constraint_constants ~global_slot
+                  ~get_completed_work:(Fn.const None) ~verifier
+                  ~current_state_view ~state_and_body_hash ~coinbase_receiver
+                  ~supercharge_coinbase:false sl diff ~zkapp_cmd_limit_hardcap
+              in
+              match (expectation, result) with
+              | `Accept, Ok _ | `Reject, Error _ ->
+                  ()
+              | `Accept, Error _ ->
+                  failwith
+                    "expected staged ledger diff to be accepted, but it was \
+                     rejected"
+              | `Reject, Ok _ ->
+                  failwith
+                    "expected staged ledger diff to be rejected, but it was \
+                     accepted" ) )
+
+    let mk_basic_node ?(preconditions = Account_update.Preconditions.accept)
+        ?(update = Account_update.Update.noop) ~(account : Account.t)
+        ~(authorization : Account_update.Authorization_kind.t) () =
+      Zkapp_command_builder.mk_node
+        { public_key = account.public_key
+        ; token_id = account.token_id
+        ; update
+        ; balance_change = Amount.Signed.zero
+        ; increment_nonce = false
+        ; events = []
+        ; actions = []
+        ; call_data = Pickles.Impls.Step.Field.Constant.zero
+        ; call_depth = 0
+        ; preconditions
+        ; use_full_commitment = true
+        ; implicit_account_creation_fee = false
+        ; may_use_token = Account_update.May_use_token.No
+        ; authorization_kind = authorization
+        }
+        []
+
+    let mk_basic_zkapp_command ?prover ~keymap ~fee ~fee_payer_pk
+        ~fee_payer_nonce nodes =
+      let open Zkapp_command_builder in
+      mk_forest nodes
+      |> mk_zkapp_command ~fee ~fee_payer_pk ~fee_payer_nonce
+      |> replace_authorizations ?prover ~keymap
+
+    let%test_unit "Setting verification keys across differing accounts" =
+      test_staged_ledger_diff_validity ~expectation:`Accept
+        ~setup_test:(fun _ledger (a, privkey_a, _loc_a) (b, privkey_b, _loc_b)
+                    ->
+          let `VK vk_a, `Prover prover_a =
+            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:0
+              ~constraint_constants ()
+          in
+          let `VK vk_b, `Prover _prover_b =
+            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:1
+              ~constraint_constants ()
+          in
+          let keymap =
+            Public_key.Compressed.Map.of_alist_exn
+              [ (a.public_key, privkey_a); (b.public_key, privkey_b) ]
+          in
+          lift_deferred_zkapp_commands
+            [ (* command from A that sets a new verification key *)
+              { status = Applied
+              ; data =
+                  mk_basic_zkapp_command ~keymap
+                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee_payer_pk:a.public_key
+                    ~fee_payer_nonce:(Unsigned.UInt32.of_int 0)
+                    [ mk_basic_node ~account:a ~authorization:Signature
+                        ~update:
+                          { Account_update.Update.noop with
+                            verification_key = Zkapp_basic.Set_or_keep.Set vk_a
+                          }
+                        ()
+                    ]
+              }
+            ; (* command from B that sets a different verification key *)
+              { status = Applied
+              ; data =
+                  mk_basic_zkapp_command ~keymap
+                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee_payer_pk:a.public_key
+                    ~fee_payer_nonce:(Unsigned.UInt32.of_int 1)
+                    [ mk_basic_node ~account:b ~authorization:Signature
+                        ~update:
+                          { Account_update.Update.noop with
+                            verification_key = Zkapp_basic.Set_or_keep.Set vk_b
+                          }
+                        ()
+                    ]
+              }
+            ; (* proven command from A that is valid against the previously set verification key *)
+              { status = Applied
+              ; data =
+                  mk_basic_zkapp_command ~prover:prover_a ~keymap
+                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee_payer_pk:a.public_key
+                    ~fee_payer_nonce:(Unsigned.UInt32.of_int 2)
+                    [ mk_basic_node ~account:a ~authorization:(Proof vk_a.hash)
+                        ()
+                    ]
+              }
+            ] )
+
+    let%test_unit "Verification keys set in failed commands should not be \
+                   usable later" =
+      test_staged_ledger_diff_validity ~expectation:`Accept
+        ~setup_test:(fun _ledger (a, privkey_a, _loc_a) (_b, _privkey_b, _loc_b)
+                    ->
+          let `VK vk_a, `Prover prover_a =
+            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:0
+              ~constraint_constants ()
+          in
+          let `VK vk_b, `Prover _prover_b =
+            Transaction_snark.For_tests.create_trivial_snapp ~unique_id:1
+              ~constraint_constants ()
+          in
+          let keymap =
+            Public_key.Compressed.Map.of_alist_exn [ (a.public_key, privkey_a) ]
+          in
+          lift_deferred_zkapp_commands
+            [ (* successful command from A that sets verification key *)
+              { status = Applied
+              ; data =
+                  mk_basic_zkapp_command ~keymap
+                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee_payer_pk:a.public_key
+                    ~fee_payer_nonce:(Unsigned.UInt32.of_int 0)
+                    [ mk_basic_node ~account:a ~authorization:Signature
+                        ~update:
+                          { Account_update.Update.noop with
+                            verification_key = Zkapp_basic.Set_or_keep.Set vk_a
+                          }
+                        ()
+                    ]
+              }
+              (* failing command from A that sets another verification key *)
+            ; { status =
+                  Failed [ []; [ Account_nonce_precondition_unsatisfied ] ]
+              ; data =
+                  mk_basic_zkapp_command ~keymap
+                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee_payer_pk:a.public_key
+                    ~fee_payer_nonce:(Unsigned.UInt32.of_int 1)
+                    [ mk_basic_node ~account:a ~authorization:Signature
+                        ~preconditions:
+                          { Account_update.Preconditions.accept with
+                            account =
+                              Zkapp_precondition.Account.nonce
+                                (Account.Nonce.of_int 0)
+                          }
+                        ~update:
+                          { Account_update.Update.noop with
+                            verification_key = Zkapp_basic.Set_or_keep.Set vk_b
+                          }
+                        ()
+                    ]
+              }
+            ; (* proven command from A that is valid against the first verification key only *)
+              { status = Applied
+              ; data =
+                  mk_basic_zkapp_command ~prover:prover_a ~keymap
+                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee_payer_pk:a.public_key
+                    ~fee_payer_nonce:(Unsigned.UInt32.of_int 2)
+                    [ mk_basic_node ~account:a ~authorization:(Proof vk_a.hash)
+                        ()
+                    ]
+              }
+            ] )
 
     let%test_unit "Mismatched verification keys in zkApp accounts and \
                    transactions" =
@@ -4696,11 +4987,8 @@ let%test_module "staged ledger tests" =
                   in
                   let valid_zkapp_command =
                     Or_error.ok_exn
-                      (Zkapp_command.Valid.to_valid ~status:Applied
-                         ~find_vk:
-                           (Zkapp_command.Verifiable.find_vk_via_ledger
-                              ~ledger:valid_against_ledger ~get:Ledger.get
-                              ~location_of_account:Ledger.location_of_account )
+                      (Zkapp_command.Valid.to_valid ~failed:false
+                         ~find_vk:(find_vk valid_against_ledger)
                          zkapp_command )
                   in
                   ignore
@@ -4716,18 +5004,8 @@ let%test_module "staged ledger tests" =
                   in
                   let failed_zkapp_command =
                     Or_error.ok_exn
-                      (Zkapp_command.Valid.to_valid
-                         ~status:
-                           Transaction_status.(
-                             Failed
-                               [ []
-                               ; [ Failure.Unexpected_verification_key_hash ]
-                               ])
-                         ~find_vk:
-                           (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
-                              ~get:Ledger.get
-                              ~location_of_account:Ledger.location_of_account )
-                         zkapp_command )
+                      (Zkapp_command.Valid.to_valid ~failed:true
+                         ~find_vk:(find_vk ledger) zkapp_command )
                   in
                   let current_state, current_state_view =
                     dummy_state_and_view ~global_slot ()
@@ -4843,12 +5121,8 @@ let%test_module "staged ledger tests" =
                     ~vk ~ledger zkapp_account_pk ;
                   let invalid_zkapp_command =
                     Or_error.ok_exn
-                      (Zkapp_command.Valid.to_valid ~status:Applied
-                         ~find_vk:
-                           (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
-                              ~get:Ledger.get
-                              ~location_of_account:Ledger.location_of_account )
-                         zkapp_command )
+                      (Zkapp_command.Valid.to_valid ~failed:false
+                         ~find_vk:(find_vk ledger) zkapp_command )
                   in
                   let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
                   let global_slot =
@@ -4896,7 +5170,7 @@ let%test_module "staged ledger tests" =
                           ~get_completed_work:(Fn.const None) ~logger
                           ~verifier:verifier_full ~current_state_view
                           ~state_and_body_hash ~coinbase_receiver
-                          ~supercharge_coinbase:false
+                          ~supercharge_coinbase:false ~zkapp_cmd_limit_hardcap
                       with
                       | Ok _ ->
                           failwith "invalid block should be rejected"
