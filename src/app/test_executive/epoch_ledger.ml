@@ -26,8 +26,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let config =
     let open Test_config in 
     let staking_accounts : Test_Account.t list =
-      [ { account_name = "node-a-key"; balance = "0"; timing = Untimed }
-      ; { account_name = "node-b-key"; balance = "0"; timing = Untimed }
+      [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
+      ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
       ]
     in
     let staking : Test_config.Epoch_data.Data.t =
@@ -37,7 +37,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let epoch_ledger = staking_accounts in
       { epoch_ledger; epoch_seed }
     in
-    (* next accounts contains staking accounts, with balances changed, one new account *)
     let next_accounts : Test_Account.t list =
       [ { account_name = "node-a-key"; balance = "0"; timing = Untimed }
       ; { account_name = "node-b-key"; balance = "0"; timing = Untimed }
@@ -70,6 +69,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       wait_for t 
         (Wait_condition.nodes_to_initialize (Core.String.Map.data all_mina_nodes))
   in 
+    (* Since I made the balances of block producers in genesis ledger and next
+       epoch ledgers to be 0, then blocks would only be produced, if the consensus
+       selects the staking epoch *)
     section "wait for 3 block to be produced"
       (wait_for t (Wait_condition.blocks_to_be_produced 3))
 end
