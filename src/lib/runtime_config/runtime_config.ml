@@ -58,6 +58,14 @@ let of_yojson_generic ~fields of_yojson json =
   dump_on_error json @@ of_yojson
   @@ yojson_strip_fields ~keep_fields:fields json
 
+let rec deferred_list_fold ~init ~f = function
+  | [] ->
+      Async.Deferred.Result.return init
+  | h :: t ->
+      let open Async.Deferred.Result.Let_syntax in
+      let%bind init = f init h in
+      deferred_list_fold ~init ~f t
+
 module Json_layout = struct
   module Accounts = struct
     module Single = struct
@@ -408,6 +416,7 @@ module Json_layout = struct
       ; zkapp_transaction_cost_limit : float option [@default None]
       ; max_event_elements : int option [@default None]
       ; max_action_elements : int option [@default None]
+      ; zkapp_cmd_limit_hardcap : int option [@default None]
       }
     [@@deriving yojson, fields, dhall_type]
 
@@ -1127,6 +1136,7 @@ module Daemon = struct
     ; zkapp_transaction_cost_limit : float option [@default None]
     ; max_event_elements : int option [@default None]
     ; max_action_elements : int option [@default None]
+    ; zkapp_cmd_limit_hardcap : int option [@default None]
     }
   [@@deriving bin_io_unversioned]
 
@@ -1160,6 +1170,9 @@ module Daemon = struct
         opt_fallthrough ~default:t1.max_event_elements t2.max_event_elements
     ; max_action_elements =
         opt_fallthrough ~default:t1.max_action_elements t2.max_action_elements
+    ; zkapp_cmd_limit_hardcap =
+        opt_fallthrough ~default:t1.zkapp_cmd_limit_hardcap
+          t2.zkapp_cmd_limit_hardcap
     }
 
   let gen =
@@ -1170,6 +1183,7 @@ module Daemon = struct
     let%bind zkapp_signed_pair_update_cost = Float.gen_incl 0.0 100.0 in
     let%bind zkapp_transaction_cost_limit = Float.gen_incl 0.0 100.0 in
     let%bind max_event_elements = Int.gen_incl 0 100 in
+    let%bind zkapp_cmd_limit_hardcap = Int.gen_incl 0 1000 in
     let%map max_action_elements = Int.gen_incl 0 1000 in
     { txpool_max_size = Some txpool_max_size
     ; peer_list_url = None
@@ -1179,6 +1193,7 @@ module Daemon = struct
     ; zkapp_transaction_cost_limit = Some zkapp_transaction_cost_limit
     ; max_event_elements = Some max_event_elements
     ; max_action_elements = Some max_action_elements
+    ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
     }
 end
 
@@ -1375,9 +1390,22 @@ let gen =
   }
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
-  Mina_ledger.Ledger.Any_ledger.M.to_list ledger
-  |> Async.Deferred.map
-       ~f:(Mina_stdlib.Result.List.map ~f:Accounts.Single.of_account)
+  let open Async.Deferred.Result.Let_syntax in
+  let yield = Async_unix.Scheduler.yield_every ~n:100 |> Staged.unstage in
+  let%bind accounts =
+    Mina_ledger.Ledger.Any_ledger.M.to_list ledger
+    |> Async.Deferred.map ~f:Result.return
+  in
+  let%map accounts =
+    deferred_list_fold ~init:[]
+      ~f:(fun acc el ->
+        let open Async.Deferred.Infix in
+        let%bind () = yield () >>| Result.return in
+        let%map elt = Accounts.Single.of_account el |> Async.Deferred.return in
+        elt :: acc )
+      accounts
+  in
+  List.rev accounts
 
 let ledger_of_accounts accounts =
   Ledger.
@@ -1390,13 +1418,18 @@ let ledger_of_accounts accounts =
     }
 
 let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
-    ~protocol_state_hash ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
+    ~protocol_state ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
     ~next_epoch_seed (runtime_config : t) =
   let open Async.Deferred.Result.Let_syntax in
   let global_slot =
     Mina_numbers.Global_slot_since_hard_fork.to_int global_slot
   in
   let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
+  let yield () =
+    let open Async.Deferred.Infix in
+    Async_unix.Scheduler.yield () >>| Result.return
+  in
+  let%bind () = yield () in
   let%bind accounts =
     Mina_ledger.Ledger.Any_ledger.cast (module Mina_ledger.Ledger) staged_ledger
     |> ledger_accounts
@@ -1408,16 +1441,37 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
     let%map fork = proof.fork in
     fork.previous_length + blockchain_length
   in
+  let protocol_constants = Mina_state.Protocol_state.constants protocol_state in
+  let genesis =
+    { Genesis.k =
+        Some
+          (Unsigned.UInt32.to_int
+             protocol_constants.Genesis_constants.Protocol.Poly.k )
+    ; delta = Some (Unsigned.UInt32.to_int protocol_constants.delta)
+    ; slots_per_epoch =
+        Some (Unsigned.UInt32.to_int protocol_constants.slots_per_epoch)
+    ; slots_per_sub_window =
+        Some (Unsigned.UInt32.to_int protocol_constants.slots_per_sub_window)
+    ; genesis_state_timestamp =
+        Some
+          (Block_time.to_string_exn protocol_constants.genesis_state_timestamp)
+    ; grace_period_slots =
+        Some (Unsigned.UInt32.to_int protocol_constants.grace_period_slots)
+    }
+  in
   let fork =
     Fork_config.
       { previous_state_hash =
-          Mina_base.State_hash.to_base58_check protocol_state_hash
+          Mina_base.State_hash.to_base58_check
+            protocol_state.Mina_state.Protocol_state.Poly.previous_state_hash
       ; previous_length =
           Option.value ~default:blockchain_length previous_length
       ; previous_global_slot = global_slot
       }
   in
+  let%bind () = yield () in
   let%bind staking_ledger_accounts = ledger_accounts staking_ledger in
+  let%bind () = yield () in
   let%map next_epoch_ledger_accounts =
     match next_epoch_ledger with
     | None ->
@@ -1446,7 +1500,7 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
        artificially add it. In fact, it wouldn't work at all,
        because the new node would try to create this account at
        startup, even though it already exists, leading to an error.*)
-      ~epoch_data
+      ~epoch_data ~genesis
       ~ledger:
         { ledger with
           base = Accounts accounts

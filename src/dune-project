@@ -16,6 +16,7 @@
 (package (name block_storage))
 (package (name block_time))
 (package (name bootstrap_controller))
+(package (name bounded_types))
 (package (name bowe_gabizon_hash))
 (package (name cache_dir))
 (package (name cached))
