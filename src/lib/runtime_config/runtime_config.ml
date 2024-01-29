@@ -416,6 +416,7 @@ module Json_layout = struct
       ; zkapp_transaction_cost_limit : float option [@default None]
       ; max_event_elements : int option [@default None]
       ; max_action_elements : int option [@default None]
+      ; zkapp_cmd_limit_hardcap : int option [@default None]
       }
     [@@deriving yojson, fields, dhall_type]
 
@@ -1135,6 +1136,7 @@ module Daemon = struct
     ; zkapp_transaction_cost_limit : float option [@default None]
     ; max_event_elements : int option [@default None]
     ; max_action_elements : int option [@default None]
+    ; zkapp_cmd_limit_hardcap : int option [@default None]
     }
   [@@deriving bin_io_unversioned]
 
@@ -1168,6 +1170,9 @@ module Daemon = struct
         opt_fallthrough ~default:t1.max_event_elements t2.max_event_elements
     ; max_action_elements =
         opt_fallthrough ~default:t1.max_action_elements t2.max_action_elements
+    ; zkapp_cmd_limit_hardcap =
+        opt_fallthrough ~default:t1.zkapp_cmd_limit_hardcap
+          t2.zkapp_cmd_limit_hardcap
     }
 
   let gen =
@@ -1178,6 +1183,7 @@ module Daemon = struct
     let%bind zkapp_signed_pair_update_cost = Float.gen_incl 0.0 100.0 in
     let%bind zkapp_transaction_cost_limit = Float.gen_incl 0.0 100.0 in
     let%bind max_event_elements = Int.gen_incl 0 100 in
+    let%bind zkapp_cmd_limit_hardcap = Int.gen_incl 0 1000 in
     let%map max_action_elements = Int.gen_incl 0 1000 in
     { txpool_max_size = Some txpool_max_size
     ; peer_list_url = None
@@ -1187,6 +1193,7 @@ module Daemon = struct
     ; zkapp_transaction_cost_limit = Some zkapp_transaction_cost_limit
     ; max_event_elements = Some max_event_elements
     ; max_action_elements = Some max_action_elements
+    ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
     }
 end
 

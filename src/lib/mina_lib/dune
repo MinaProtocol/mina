@@ -21,6 +21,7 @@
    result
    bin_prot.shape
    ;; local libraries
+   bounded_types
    transition_chain_prover
    best_tip_prover
    proof_carrying_data

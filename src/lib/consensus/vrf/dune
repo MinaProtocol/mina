@@ -20,6 +20,7 @@
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    genesis_constants
+   bounded_types
    crypto_params
    random_oracle
    blake2

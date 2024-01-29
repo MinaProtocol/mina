@@ -42,7 +42,8 @@
   promise
   logger
   internal_tracing.context_logger
-  ppx_version.runtime))
+  ppx_version.runtime
+  bounded_types))
 
 (rule
  (targets version.ml)

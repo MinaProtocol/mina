@@ -49,6 +49,17 @@ type block =
   }
 [@@deriving to_yojson]
 
+type sysinfo =
+  { uptime : string
+  ; load : int
+  ; total_ram : int64
+  ; free_ram : int64
+  ; total_swap : int64
+  ; free_swap : int64
+  ; procs : int
+  }
+[@@deriving to_yojson]
+
 type node_status_data =
   { version : int
   ; block_height_at_best_tip : int
@@ -72,6 +83,7 @@ type node_status_data =
   ; pubsub_msg_received : gossip_count
   ; pubsub_msg_broadcasted : gossip_count
   ; received_blocks : block list
+  ; sysinfo : sysinfo
   }
 [@@deriving to_yojson]
 
@@ -91,8 +103,10 @@ let send_node_status_data ~logger ~url node_status_data =
       let metadata =
         [ ("data", node_status_json); ("url", `String (Uri.to_string url)) ]
       in
-      if Cohttp.Code.code_of_status status = 200 then
-        [%log info] "Sent node status data to URL $url" ~metadata
+      if
+        Cohttp.Code.(
+          code_of_status status >= 200 && code_of_status status < 300)
+      then [%log info] "Sent node status data to URL $url" ~metadata
       else
         let extra_metadata =
           match body with
@@ -178,6 +192,32 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~chain_id
       in
       let sync_status =
         sync_status |> Mina_incremental.Status.Observer.value_exn
+      in
+      let sysinfo =
+        match Linux_ext.Sysinfo.sysinfo with
+        | Ok sysinfo ->
+            let open Int64 in
+            let info = sysinfo () in
+            let mem_unit = of_int info.mem_unit in
+            { uptime = Time.Span.to_string info.uptime
+            ; load = info.load15
+            ; total_ram = of_int info.total_ram * mem_unit
+            ; free_ram = of_int info.free_ram * mem_unit
+            ; total_swap = of_int info.total_swap * mem_unit
+            ; free_swap = of_int info.free_swap * mem_unit
+            ; procs = info.procs
+            }
+        | Error e ->
+            [%log error] "Failed to get sysinfo: $error"
+              ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
+            { uptime = ""
+            ; load = 0
+            ; total_ram = 0L
+            ; free_ram = 0L
+            ; total_swap = 0L
+            ; free_swap = 0L
+            ; procs = 0
+            }
       in
       [%log info] "About to send bandwidth request to libp2p" ;
       match%bind Mina_networking.bandwidth_info network with
@@ -352,6 +392,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~chain_id
                       ; is_valid = true
                       ; reason_for_rejection = None
                       } )
+            ; sysinfo
             }
           in
           reset_gauges () ;
