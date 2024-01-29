@@ -640,7 +640,15 @@ module Genesis_proof = struct
         None )
     in
     let filename = filename ~base_hash in
-    Deferred.List.find_map ~f:(file_exists filename) search_paths
+    match%bind
+      Deferred.List.find_map ~f:(file_exists filename) search_paths
+    with
+    | Some filename ->
+        return (Some filename)
+    | None ->
+        [%log warn] "No genesis proof found for $base_hash"
+          ~metadata:[ ("base_hash", Base_hash.to_yojson base_hash) ] ;
+        return None
 
   let generate_inputs ~runtime_config ~proof_level ~ledger ~genesis_epoch_data
       ~constraint_constants ~blockchain_proof_system_id
