@@ -131,7 +131,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
               ~constraint_constants:
                 (Genesis_constants.Constraint_constants.to_snark_keys_header
                    constraint_constants )
-              ~choices:(fun ~self -> [ ring_sig_rule ring_member_pks ])
+              ~choices:(fun ~self:_ -> [ ring_sig_rule ring_member_pks ])
           in
           let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
           ( if debug_mode then
@@ -268,10 +268,11 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
             | _ ->
                 respond Unhandled
           in
-          let (), (), (pi : Pickles.Side_loaded.Proof.t) =
+          let (), (), (pi : _ Pickles.Proof.t) =
             (fun () -> ringsig_prover ~handler tx_statement)
             |> Async.Thread_safe.block_on_async_exn
           in
+          let pi = Pickles.Side_loaded.Proof.of_proof pi in
           let fee_payer =
             let txn_comm =
               Zkapp_command.Transaction_commitment.create_complete transaction
