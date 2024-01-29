@@ -68,7 +68,7 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
             permissions =
               { Permissions.user_default with
                 edit_state = Proof
-              ; set_verification_key = Proof
+              ; set_verification_key = (Proof, Mina_numbers.Txn_version.current)
               ; set_zkapp_uri = Proof
               ; set_token_symbol = Proof
               }
