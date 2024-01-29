@@ -731,6 +731,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
+           ~start_slot_since_genesis:previous_global_slot
            (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
        check_replayer_logs ~logger logs )
