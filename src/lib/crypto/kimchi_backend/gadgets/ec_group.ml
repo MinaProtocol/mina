@@ -23,21 +23,47 @@ let is_on_curve_bignum_point (curve : Curve_params.t)
     = (pow y (of_int 2) - (pow x (of_int 3) + (curve.a * x) + curve.b))
       % curve.modulus)
 
-let log_ec_point (type f) (module Circuit : Snark_intf.Run with type field = f) point name =
+let log_ec_point (type f) (module Circuit : Snark_intf.Run with type field = f)
+    point name =
   let x, y = point in
-  let ff_to_string f = Foreign_field.Element.Standard.to_string_as_prover (module Circuit) f in
-  let is_g_inf g = Affine.equal_as_prover (module Circuit) g (Affine.const_zero (module Circuit)) in
+  let ff_to_string f =
+    Foreign_field.Element.Standard.to_string_as_prover (module Circuit) f
+  in
+  let is_g_inf g =
+    Affine.equal_as_prover
+      (module Circuit)
+      g
+      (Affine.const_zero (module Circuit))
+  in
   let () = Js_of_ocaml.Firebug.console##log (Js_of_ocaml.Js.string name) in
-  let () = Js_of_ocaml.Firebug.console##log (Js_of_ocaml.Js.string (ff_to_string x)) in
-  let () = Js_of_ocaml.Firebug.console##log (Js_of_ocaml.Js.string (ff_to_string y)) in
-  let () = Js_of_ocaml.Firebug.console##log (Js_of_ocaml.Js.string ("is " ^ name ^ " infinity?")) in
+  let () =
+    Js_of_ocaml.Firebug.console##log (Js_of_ocaml.Js.string (ff_to_string x))
+  in
+  let () =
+    Js_of_ocaml.Firebug.console##log (Js_of_ocaml.Js.string (ff_to_string y))
+  in
+  let () =
+    Js_of_ocaml.Firebug.console##log
+      (Js_of_ocaml.Js.string ("is " ^ name ^ " infinity?"))
+  in
   Js_of_ocaml.Firebug.console##log (Js_of_ocaml.Js.bool (is_g_inf point))
 
-let log_bit (type f) (module Circuit : Snark_intf.Run with type field = f) external_checks modulus bit name =
+let log_bit (type f) (module Circuit : Snark_intf.Run with type field = f)
+    external_checks modulus bit name =
   let one = Foreign_field.Element.Standard.one (module Circuit) in
-  let zero = Foreign_field.sub (module Circuit) external_checks one one modulus in
-  let ff_of_bit = Foreign_field.Element.Standard.if_ (module Circuit) bit ~then_:one ~else_:zero in
-  let is_ff_one = Foreign_field.Element.Standard.equal_as_prover (module Circuit) ff_of_bit one in
+  let zero =
+    Foreign_field.sub (module Circuit) external_checks one one modulus
+  in
+  let ff_of_bit =
+    Foreign_field.Element.Standard.if_
+      (module Circuit)
+      bit ~then_:one ~else_:zero
+  in
+  let is_ff_one =
+    Foreign_field.Element.Standard.equal_as_prover
+      (module Circuit)
+      ff_of_bit one
+  in
   let () = Js_of_ocaml.Firebug.console##log (Js_of_ocaml.Js.string name) in
   Js_of_ocaml.Firebug.console##log (Js_of_ocaml.Js.bool is_ff_one)
 
@@ -87,6 +113,7 @@ let add (type f) (module Circuit : Snark_intf.Run with type field = f)
       assert (
         not (Affine.equal_as_prover (module Circuit) left_input right_input) ) ;
       (* Sanity check that both points are not infinity *)
+      let () = log_ec_point (module Circuit) right_input "right_input" in
       assert (
         not
           (Affine.equal_as_prover
@@ -1008,12 +1035,15 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
     List.foldi scalar ~init:(curve.ia.acc, point) (* (acc, base) *)
       ~f:(fun i (acc, base) bit ->
         (* Add: sum = acc + base *)
-        let () = Circuit.as_prover (fun () ->
-          let () = log_ec_point (module Circuit) acc "acc" in
-          let () = log_ec_point (module Circuit) base "base" in
-          let () = log_bit (module Circuit) external_checks curve.modulus bit "bit" in
-          ()
-        ) in
+        let () =
+          Circuit.as_prover (fun () ->
+              let () = log_ec_point (module Circuit) acc "acc" in
+              let () = log_ec_point (module Circuit) base "base" in
+              let () =
+                log_bit (module Circuit) external_checks curve.modulus bit "bit"
+              in
+              () )
+        in
         let sum = add (module Circuit) external_checks curve acc base in
         (* Bounds 1:
          *   Left input is previous result, so already checked.
@@ -1051,15 +1081,18 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
 
         (* Group add conditionally *)
         let acc = Affine.if_ (module Circuit) bit ~then_:sum ~else_:acc in
-        
+
         (acc, double_base) )
   in
 
-  let () = Circuit.as_prover (fun () ->
-    let () = log_ec_point (module Circuit) acc "acc" in
-    let () = log_ec_point (module Circuit) curve.ia.neg_acc "curve.ia.neg_acc" in
-    ()
-  ) in
+  let () =
+    Circuit.as_prover (fun () ->
+        let () = log_ec_point (module Circuit) acc "acc" in
+        let () =
+          log_ec_point (module Circuit) curve.ia.neg_acc "curve.ia.neg_acc"
+        in
+        () )
+  in
 
   (* Subtract init_point from accumulator for final result *)
   add (module Circuit) external_checks curve acc curve.ia.neg_acc
@@ -3598,7 +3631,8 @@ let%test_unit "Ec_group.scalar_mul_properties" =
             Foreign_field.result_row
               (module Runner.Impl)
               ~label:"negation_property_check"
-            (Affine.y negated_a_result) None ;
+              (Affine.y negated_a_result)
+              None ;
 
             (* Assert [-a]P = -(aP) *)
             Affine.assert_equal
