@@ -41,6 +41,7 @@
    with_hash
    zkapps_empty_update
    zkapps_examples
+   bounded_types
    )
   (library_flags -linkall)
   (inline_tests (flags -verbose -show-counts))
