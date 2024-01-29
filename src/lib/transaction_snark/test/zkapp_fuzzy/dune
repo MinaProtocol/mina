@@ -40,6 +40,7 @@
    random_oracle
    sexplib0
    zkapp_command_builder
+   bounded_types
    )
   (link_flags (-linkall))
   (preprocess
