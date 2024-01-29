@@ -18,6 +18,12 @@ CONF_SUFFIX=${CONF_SUFFIX:-}
 # Genesis timestamp will be updated before use of configuration file
 CUSTOM_CONF=${CUSTOM_CONF:-}
 
+# Specify slot_tx_end parameter in the config
+SLOT_TX_END=${SLOT_TX_END:-}
+
+# Specify slot_chain_end parameter in the config
+SLOT_CHAIN_END=${SLOT_CHAIN_END:-}
+
 # Mina executable
 MINA_EXE=mina
 
@@ -41,6 +47,10 @@ while [[ $# -gt 0 ]]; do
       MINA_EXE="$2"; shift; shift ;;
     -c|--config)
       CUSTOM_CONF="$2"; shift; shift ;;
+    --slot-chain-end)
+      SLOT_CHAIN_END="$2"; shift; shift ;;
+    --slot-tx-end)
+      SLOT_TX_END="$2"; shift; shift ;;
     -*|--*)
       echo "Unknown option $1"; exit 1 ;;
     *)
@@ -69,15 +79,17 @@ if [[ ! -f $CONF_DIR/bp ]]; then
   "$MINA_EXE" advanced generate-keypair --privkey-path $CONF_DIR/bp
 fi
 
+libp2p_1_args=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_1" )
+libp2p_2_args=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_2" )
 # We handle error of libp2p key generation because `compatible`'s version
 # has a different command for libp2p key generation
 if [[ ! -f $CONF_DIR/libp2p_1 ]]; then
   "$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_1 2>/dev/null || \
-    "$MINA_EXE" advanced generate-libp2p-keypair --privkey-path $CONF_DIR/libp2p_1 2>/dev/null
+    libp2p_1_args=()
 fi
 if [[ ! -f $CONF_DIR/libp2p_2 ]]; then
   "$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_2 2>/dev/null || \
-    "$MINA_EXE" advanced generate-libp2p-keypair --privkey-path $CONF_DIR/libp2p_2 2>/dev/null
+    libp2p_2_args=()
 fi
 if [[ "$CUSTOM_CONF" == "" ]] && [[ ! -f $CONF_DIR/ledger.json ]]; then
   ( cd $CONF_DIR && "$SCRIPT_DIR/prepare-test-ledger.sh" -c 100000 -b 1000000 $(cat bp.pub) >ledger.json )
@@ -85,8 +97,15 @@ fi
 
 timestamp="$( d=$(date +%s); date -u -d @$((d - d % 60 + DELAY_MIN*60)) +%FT%H:%M:%S+00:00 )"
 
+if [[ "$SLOT_TX_END" != "" ]]; then
+  slot_ends=".daemon.slot_tx_end = $SLOT_TX_END | "
+fi
+if [[ "$SLOT_CHAIN_END" != "" ]]; then
+  slot_ends="$slot_ends .daemon.slot_chain_end = $SLOT_CHAIN_END | "
+fi
+
 if [[ "$CUSTOM_CONF" == "" ]]; then
-  jq --arg timestamp "$timestamp" --slurpfile accounts $CONF_DIR/ledger.json '.ledger.accounts = $accounts[0] | .genesis.genesis_state_timestamp |= $timestamp' > $CONF_DIR/daemon.json << EOF
+  jq --arg timestamp "$timestamp" --slurpfile accounts $CONF_DIR/ledger.json "$slot_ends .ledger.accounts = \$accounts[0] | .genesis.genesis_state_timestamp |= \$timestamp" > $CONF_DIR/daemon.json << EOF
 {
   "genesis": {
     "genesis_state_timestamp": "",
@@ -107,7 +126,7 @@ if [[ "$CUSTOM_CONF" == "" ]]; then
 EOF
 
   # Convert ledger to berkeley format
-  jq '.ledger.accounts = [.ledger.accounts[] | del(.token_permissions, .permissions.stake) | .token = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf" | .token_symbol = "" | if .permissions.set_verification_key == "signature" then .permissions.set_verification_key = {auth:"signature", txn_version: "1"} else . end ]' <$CONF_DIR/daemon.json >$CONF_DIR/daemon.berkeley.json
+  jq '.ledger.accounts = [.ledger.accounts[] | del(.token_permissions, .permissions.stake) | .token = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf" | .token_symbol = "" | select(.permissions.set_verification_key == "signature").permissions.set_verification_key |= {auth:"signature", txn_version: "1"} ]' <$CONF_DIR/daemon.json >$CONF_DIR/daemon.berkeley.json
 
 else
   <"$CUSTOM_CONF" jq --arg timestamp "$timestamp" '.genesis.genesis_state_timestamp |= $timestamp' > $CONF_DIR/daemon.json
@@ -125,7 +144,7 @@ CONF_FILE="$PWD/$CONF_DIR/daemon$CONF_SUFFIX.json"
 
 "$MINA_EXE" daemon --config-file "$CONF_FILE" \
   --peer "/ip4/127.0.0.1/tcp/10312/p2p/$(cat $CONF_DIR/libp2p_2.peerid)" \
-  --libp2p-keypair "$PWD/$CONF_DIR/libp2p_1" --seed \
+  "${libp2p_1_args[@]}" --seed \
   --block-producer-key "$PWD/$CONF_DIR/bp" \
   --config-directory "$PWD/localnet/runtime_1" --file-log-level Info --log-level Error \
   --client-port 10301 --external-port 10302 --rest-port 10303 &
@@ -135,7 +154,7 @@ bp_pid=$!
 echo "Block producer PID: $bp_pid"
 
 "$MINA_EXE" daemon --config-file "$CONF_FILE" \
-  --libp2p-keypair "$PWD/$CONF_DIR/libp2p_2" --seed \
+  "${libp2p_2_args[@]}"  --seed \
   --peer "/ip4/127.0.0.1/tcp/10302/p2p/$(cat $CONF_DIR/libp2p_1.peerid)" \
   --run-snark-worker "$(cat $CONF_DIR/bp.pub)" --work-selection seq \
   --config-directory "$PWD/localnet/runtime_2" --file-log-level Info --log-level Error \
