@@ -235,6 +235,7 @@ module Network_config = struct
             ; zkapp_transaction_cost_limit = None
             ; max_event_elements = None
             ; max_action_elements = None
+            ; zkapp_cmd_limit_hardcap = None
             }
       ; genesis =
           Some

@@ -3467,7 +3467,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       module For_tests = struct
         let gen_consensus_state
             ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-            ~constants ~(gen_slot_advancement : int Quickcheck.Generator.t) :
+            ~constants ~(slot_advancement : int) :
             (   previous_protocol_state:
                   Protocol_state.Value.t
                   Mina_base.State_hash.With_state_hashes.t
@@ -3483,7 +3483,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             |> Mina_base.Frozen_ledger_hash.of_ledger_hash
           in
           let open Quickcheck.Let_syntax in
-          let%bind slot_advancement = gen_slot_advancement in
           let%map producer_vrf_result = Vrf.Output.gen in
           fun ~(previous_protocol_state :
                  Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t
