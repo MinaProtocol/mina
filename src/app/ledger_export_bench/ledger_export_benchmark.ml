@@ -11,8 +11,15 @@ let load_daemon_cfg filename () =
 
 let serialize cfg () = Runtime_config.to_yojson cfg |> Yojson.Safe.to_string
 
+let map_results ~f =
+  List.fold ~init:(Ok []) ~f:(fun acc x ->
+      let open Result.Let_syntax in
+      let%bind accum = acc in
+      let%map y = f x in
+      y :: accum )
+
 let convert accounts () =
-  Runtime_config.(map_results ~f:Accounts.Single.of_account accounts)
+  map_results ~f:Runtime_config.Accounts.Single.of_account accounts
 
 let () =
   let runtime_config = Sys.getenv_exn "RUNTIME_CONFIG" in

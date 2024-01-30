@@ -20,6 +20,7 @@
    core_kernel.uuid
    ppx_inline_test.config
    ;; local libraries
+   bounded_types
    mina_wire_types
    sgn
    syncable_ledger

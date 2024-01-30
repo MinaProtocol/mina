@@ -60,6 +60,7 @@
    zkapps_examples
    cache_dir
    snarky.backendless
+   bounded_types
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_jane ppx_deriving_yojson ppx_mina ppx_version)))

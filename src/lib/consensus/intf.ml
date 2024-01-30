@@ -242,7 +242,7 @@ module type State_hooks = sig
     val gen_consensus_state :
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> constants:Constants.t
-      -> gen_slot_advancement:int Quickcheck.Generator.t
+      -> slot_advancement:int
       -> (   previous_protocol_state:
                protocol_state Mina_base.State_hash.With_state_hashes.t
           -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t

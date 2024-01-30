@@ -80,7 +80,7 @@ ARG UID=0
 WORKDIR /root
 USER 0
 
-RUN git clone $MINA_REPO --branch $MINA_BRANCH --depth 1 \
+RUN git clone $MINA_REPO --branch $MINA_BRANCH --depth 1 mina \
   && cd ./mina
 
 WORKDIR /root/mina
