@@ -140,31 +140,36 @@ module Ledger = struct
         None )
     in
     let load_from_s3 filename =
-      let s3_hash =
-        Option.value_exn ~here:[%here]
-          ~message:
-            (sprintf
-               "Need S3 hash specified in runtime config to verify download \
-                for %s (root hash %s)"
-               ledger_name_prefix
-               (Option.value ~default:"not specified" config.hash) )
-          s3_hash
-      in
-      let s3_path = s3_bucket_prefix ^/ filename in
-      let local_path = Cache_dir.s3_install_path ^/ filename in
-      match%bind Cache_dir.load_from_s3 [ s3_path ] [ local_path ] ~logger with
-      | Ok () ->
-          let%bind () =
-            assert_filehash_equal
-              ~file:(Cache_dir.s3_install_path ^/ filename)
-              ~hash:s3_hash
-          in
-          file_exists filename Cache_dir.s3_install_path
-      | Error _ ->
-          [%log trace] "Could not download $ledger from $uri"
+      match s3_hash with
+      | Some s3_hash -> (
+          let s3_path = s3_bucket_prefix ^/ filename in
+          let local_path = Cache_dir.s3_install_path ^/ filename in
+          match%bind
+            Cache_dir.load_from_s3 [ s3_path ] [ local_path ] ~logger
+          with
+          | Ok () ->
+              let%bind () =
+                assert_filehash_equal
+                  ~file:(Cache_dir.s3_install_path ^/ filename)
+                  ~hash:s3_hash
+              in
+              file_exists filename Cache_dir.s3_install_path
+          | Error _ ->
+              [%log trace] "Could not download $ledger from $uri"
+                ~metadata:
+                  [ ("ledger", `String ledger_name_prefix)
+                  ; ("uri", `String s3_path)
+                  ] ;
+              return None )
+      | None ->
+          [%log error]
+            "Need S3 hash specified in runtime config to verify download for \
+             $ledger_name_prefix (root hash $root_hash), refusing unsafe \
+             download"
             ~metadata:
-              [ ("ledger", `String ledger_name_prefix)
-              ; ("uri", `String s3_path)
+              [ ( "root_hash"
+                , `String (Option.value ~default:"not specified" config.hash) )
+              ; ("ledger_name_prefix", `String ledger_name_prefix)
               ] ;
           return None
     in
@@ -208,8 +213,8 @@ module Ledger = struct
             search_local named_filename
         | Accounts accounts, _ ->
             search_local_and_s3 ~other_data:(accounts_hash accounts) "accounts"
-        | Hash hash, None ->
-            assert ([%equal: string option] (Some hash) config.hash) ;
+        | Hash, None ->
+            assert (Option.is_some config.hash) ;
             return None
         | _, Some name ->
             search_local_and_s3 name )
@@ -347,7 +352,7 @@ module Ledger = struct
     in
     let accounts_opt =
       match config.base with
-      | Hash _ ->
+      | Hash ->
           None
       | Accounts accounts ->
           Some (lazy (add_genesis_winner_account (Accounts.to_full accounts)))
@@ -390,7 +395,7 @@ module Ledger = struct
       let depth = depth
     end) )
 
-  let load ~proof_level ~genesis_dir ~logger ~constraint_constants ~s3_hash
+  let load ~proof_level ~genesis_dir ~logger ~constraint_constants
       ?(ledger_name_prefix = "genesis_ledger") (config : Runtime_config.Ledger.t)
       =
     [%log trace] "Load requested for $name $config"
@@ -405,8 +410,8 @@ module Ledger = struct
         in
         let open Deferred.Let_syntax in
         let%bind tar_path =
-          find_tar ~logger ~genesis_dir ~constraint_constants ~s3_hash
-            ~ledger_name_prefix config
+          find_tar ~logger ~genesis_dir ~constraint_constants
+            ~s3_hash:config.s3_data_hash ~ledger_name_prefix config
         in
         match tar_path with
         | Some tar_path -> (
@@ -431,15 +436,19 @@ module Ledger = struct
                 match config.base with
                 | Accounts _ ->
                     assert false
-                | Hash hash ->
+                | Hash ->
+                    let missing_hash =
+                      Option.value ~default:"not specified" config.hash
+                    in
                     [%log error]
                       "Could not find or generate a $ledger for $root_hash"
                       ~metadata:
                         [ ("ledger", `String ledger_name_prefix)
-                        ; ("root_hash", `String hash)
+                        ; ("root_hash", `String missing_hash)
                         ] ;
                     Deferred.Or_error.errorf
-                      "Could not find a ledger tar file for hash '%s'" hash
+                      "Could not find a ledger tar file for hash '%s'"
+                      missing_hash
                 | Named ledger_name ->
                     let ledger_filename =
                       named_filename ~constraint_constants
@@ -482,7 +491,7 @@ module Ledger = struct
                       (Some name, None)
                   | Accounts accounts, _ ->
                       (Some "accounts", Some (accounts_hash accounts))
-                  | Hash _, None ->
+                  | Hash, None ->
                       (None, None)
                   | _, Some name ->
                       (Some name, None)
@@ -531,16 +540,8 @@ module Ledger = struct
                     return (Error err) ) ) )
 end
 
-let find_s3_hash hashes ledger =
-  let%bind.Option hashes = hashes in
-  let%bind.Option ledger_hash = ledger.Runtime_config.Ledger.hash in
-  List.find_map hashes
-    ~f:(fun { Runtime_config.Data_hashes.merkle_root; s3_hash } ->
-      if String.equal merkle_root ledger_hash then Some s3_hash else None )
-
 module Epoch_data = struct
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      (hashes : Runtime_config.Data_hashes.t option)
       (config : Runtime_config.Epoch_data.t option) =
     let open Deferred.Or_error.Let_syntax in
     match config with
@@ -550,7 +551,6 @@ module Epoch_data = struct
         let ledger_name_prefix = "epoch_ledger" in
         let load_ledger ledger =
           Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-            ~s3_hash:(find_s3_hash hashes ledger)
             ~ledger_name_prefix ledger
         in
         let%bind staking, staking_config =
@@ -994,17 +994,14 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
           "Proof level %s is not compatible with compile-time proof level %s"
           (str proof_level) (str compiled)
   in
-  let s3_hash =
-    let%bind.Option ledger = config.ledger in
-    find_s3_hash config.s3_data_hashes ledger
-  in
   let%bind genesis_ledger, ledger_config, ledger_file =
-    Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants ~s3_hash
+    Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
       (Option.value config.ledger
          ~default:
            { base = Named Mina_compile_config.genesis_ledger
            ; num_accounts = None
            ; balances = []
+           ; s3_data_hash = None
            ; hash = None
            ; name = None
            ; add_genesis_winner = None
@@ -1014,7 +1011,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~metadata:[ ("ledger_file", `String ledger_file) ] ;
   let%bind genesis_epoch_data, genesis_epoch_data_config =
     Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      config.s3_data_hashes config.epoch_data
+      config.epoch_data
   in
   let config =
     { config with

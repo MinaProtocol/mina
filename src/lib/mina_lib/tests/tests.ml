@@ -44,7 +44,6 @@ let%test_module "Epoch ledger sync tests" =
           ; proof = None
           ; ledger = None
           ; epoch_data = None
-          ; s3_data_hashes = None
           }
         in
         match%map

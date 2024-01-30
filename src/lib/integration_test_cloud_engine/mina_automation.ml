@@ -258,6 +258,7 @@ module Network_config = struct
             ; num_accounts = None
             ; balances = []
             ; hash = None
+            ; s3_data_hash = None
             ; name = None
             }
       ; epoch_data =
@@ -329,6 +330,7 @@ module Network_config = struct
                   ; num_accounts = None
                   ; balances = []
                   ; hash = None
+                  ; s3_data_hash = None
                   ; name = None
                   }
                   : Runtime_config.Ledger.t )
@@ -361,7 +363,6 @@ module Network_config = struct
                     ({ ledger; seed } : Runtime_config.Epoch_data.Data.t) )
               in
               ({ staking; next } : Runtime_config.Epoch_data.t) )
-      ; s3_data_hashes = None
       }
     in
     let genesis_constants =

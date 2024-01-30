@@ -338,6 +338,7 @@ module Json_layout = struct
       ; num_accounts : int option [@default None]
       ; balances : Balance_spec.t list [@default []]
       ; hash : string option [@default None]
+      ; s3_data_hash : string option [@default None]
       ; name : string option [@default None]
       ; add_genesis_winner : bool option [@default None]
       }
@@ -430,6 +431,7 @@ module Json_layout = struct
       type t =
         { accounts : Accounts.t option [@default None]
         ; seed : string
+        ; s3_data_hash : string option [@default None]
         ; hash : string option [@default None]
         }
       [@@deriving yojson, fields, dhall_type]
@@ -450,20 +452,12 @@ module Json_layout = struct
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
 
-  module Data_hashes = struct
-    type ledger_with_hash = { merkle_root : string; s3_hash : string }
-    [@@deriving yojson, dhall_type]
-
-    type t = ledger_with_hash list [@@deriving yojson, dhall_type]
-  end
-
   type t =
     { daemon : Daemon.t option [@default None]
     ; genesis : Genesis.t option [@default None]
     ; proof : Proof_keys.t option [@default None]
     ; ledger : Ledger.t option [@default None]
     ; epoch_data : Epoch_data.t option [@default None]
-    ; s3_data_hashes : Data_hashes.t option [@default None]
     }
   [@@deriving yojson, fields, dhall_type]
 
@@ -746,7 +740,8 @@ module Ledger = struct
   type base =
     | Named of string  (** One of the named ledgers in [Genesis_ledger] *)
     | Accounts of Accounts.t  (** A ledger generated from the given accounts *)
-    | Hash of string  (** The ledger with the given root hash *)
+    | Hash
+        (** The ledger with the given root hash stored in the containing Ledger.t *)
   [@@deriving bin_io_unversioned]
 
   type t =
@@ -754,14 +749,21 @@ module Ledger = struct
     ; num_accounts : int option
     ; balances : (int * Currency.Balance.Stable.Latest.t) list
     ; hash : string option
+    ; s3_data_hash : string option
     ; name : string option
     ; add_genesis_winner : bool option
     }
   [@@deriving bin_io_unversioned]
 
   let to_json_layout
-      { base; num_accounts; balances; hash; name; add_genesis_winner } :
-      Json_layout.Ledger.t =
+      { base
+      ; num_accounts
+      ; balances
+      ; hash
+      ; name
+      ; add_genesis_winner
+      ; s3_data_hash
+      } : Json_layout.Ledger.t =
     let balances =
       List.map balances ~f:(fun (number, balance) ->
           { Json_layout.Ledger.Balance_spec.number; balance } )
@@ -771,6 +773,7 @@ module Ledger = struct
       ; num_accounts
       ; balances
       ; hash
+      ; s3_data_hash
       ; name
       ; add_genesis_winner
       }
@@ -780,11 +783,18 @@ module Ledger = struct
         { without_base with name = Some name }
     | Accounts accounts ->
         { without_base with accounts = Some (Accounts.to_json_layout accounts) }
-    | Hash hash ->
-        { without_base with hash = Some hash }
+    | Hash ->
+        without_base
 
   let of_json_layout
-      ({ accounts; num_accounts; balances; hash; name; add_genesis_winner } :
+      ({ accounts
+       ; num_accounts
+       ; balances
+       ; hash
+       ; s3_data_hash
+       ; name
+       ; add_genesis_winner
+       } :
         Json_layout.Ledger.t ) : (t, string) Result.t =
     let open Result.Let_syntax in
     let%map base =
@@ -798,8 +808,8 @@ module Ledger = struct
               return (Named name)
           | None -> (
               match hash with
-              | Some hash ->
-                  return (Hash hash)
+              | Some _ ->
+                  return Hash
               | None ->
                   Error
                     "Runtime_config.Ledger.of_json_layout: Expected a field \
@@ -810,7 +820,14 @@ module Ledger = struct
         ~f:(fun { Json_layout.Ledger.Balance_spec.number; balance } ->
           (number, balance) )
     in
-    { base; num_accounts; balances; hash; name; add_genesis_winner }
+    { base
+    ; num_accounts
+    ; balances
+    ; hash
+    ; s3_data_hash
+    ; name
+    ; add_genesis_winner
+    }
 
   let to_yojson x = Json_layout.Ledger.to_yojson (to_json_layout x)
 
@@ -835,6 +852,7 @@ module Ledger = struct
     ; num_accounts = Some num_accounts
     ; balances
     ; hash
+    ; s3_data_hash = None
     ; name = Some name
     ; add_genesis_winner = Some add_genesis_winner
     }
@@ -1230,6 +1248,7 @@ module Epoch_data = struct
       { Json_layout.Epoch_data.Data.accounts = accounts staking.ledger
       ; seed = staking.seed
       ; hash = staking.ledger.hash
+      ; s3_data_hash = staking.ledger.s3_data_hash
       }
     in
     let next =
@@ -1237,6 +1256,7 @@ module Epoch_data = struct
           { Json_layout.Epoch_data.Data.accounts = accounts n.ledger
           ; seed = n.seed
           ; hash = n.ledger.hash
+          ; s3_data_hash = n.ledger.s3_data_hash
           } )
     in
     { Json_layout.Epoch_data.staking; next }
@@ -1245,15 +1265,15 @@ module Epoch_data = struct
    fun { staking; next } ->
     let open Result.Let_syntax in
     let data (t : [ `Staking | `Next ])
-        { Json_layout.Epoch_data.Data.accounts; seed; hash } =
+        { Json_layout.Epoch_data.Data.accounts; seed; hash; s3_data_hash } =
       let%map base =
         match accounts with
         | Some accounts ->
             return @@ Ledger.Accounts accounts
         | None -> (
             match hash with
-            | Some hash ->
-                return @@ Ledger.Hash hash
+            | Some _ ->
+                return @@ Ledger.Hash
             | None ->
                 let ledger_name =
                   match t with `Staking -> "staking" | `Next -> "next"
@@ -1269,6 +1289,7 @@ module Epoch_data = struct
         ; num_accounts = None
         ; balances = []
         ; hash
+        ; s3_data_hash
         ; name = None
         ; add_genesis_winner = Some false
         }
@@ -1294,69 +1315,34 @@ module Epoch_data = struct
     { staking; next }
 end
 
-module Data_hashes = struct
-  type ledger_with_hash = Json_layout.Data_hashes.ledger_with_hash =
-    { merkle_root : string; s3_hash : string }
-  [@@deriving yojson, fields, bin_io_unversioned]
-
-  type t = ledger_with_hash list [@@deriving bin_io_unversioned]
-
-  let to_json_layout : t -> Json_layout.Data_hashes.t = Fn.id
-
-  let of_json_layout : Json_layout.Data_hashes.t -> (t, string) Result.t =
-    Result.return
-
-  let to_yojson x = Json_layout.Data_hashes.to_yojson (to_json_layout x)
-
-  let of_yojson json =
-    Result.bind ~f:of_json_layout (Json_layout.Data_hashes.of_yojson json)
-
-  let combine t1 t2 = t1 @ t2
-
-  let gen =
-    let open Quickcheck.Generator.Let_syntax in
-    let%map ledgers =
-      Quickcheck.Generator.(list (both String.gen_nonempty String.gen_nonempty))
-    in
-    List.map ledgers ~f:(fun (merkle_root, s3_hash) ->
-        { merkle_root; s3_hash } )
-end
-
 type t =
   { daemon : Daemon.t option
   ; genesis : Genesis.t option
   ; proof : Proof_keys.t option
   ; ledger : Ledger.t option
   ; epoch_data : Epoch_data.t option
-  ; s3_data_hashes : Data_hashes.t option
   }
 [@@deriving bin_io_unversioned]
 
-let make ?daemon ?genesis ?proof ?ledger ?epoch_data ?s3_data_hashes () =
-  { daemon; genesis; proof; ledger; epoch_data; s3_data_hashes }
+let make ?daemon ?genesis ?proof ?ledger ?epoch_data () =
+  { daemon; genesis; proof; ledger; epoch_data }
 
-let to_json_layout
-    { daemon; genesis; proof; ledger; epoch_data; s3_data_hashes } =
+let to_json_layout { daemon; genesis; proof; ledger; epoch_data } =
   { Json_layout.daemon = Option.map ~f:Daemon.to_json_layout daemon
   ; genesis = Option.map ~f:Genesis.to_json_layout genesis
   ; proof = Option.map ~f:Proof_keys.to_json_layout proof
   ; ledger = Option.map ~f:Ledger.to_json_layout ledger
   ; epoch_data = Option.map ~f:Epoch_data.to_json_layout epoch_data
-  ; s3_data_hashes = Option.map ~f:Data_hashes.to_json_layout s3_data_hashes
   }
 
-let of_json_layout
-    { Json_layout.daemon; genesis; proof; ledger; epoch_data; s3_data_hashes } =
+let of_json_layout { Json_layout.daemon; genesis; proof; ledger; epoch_data } =
   let open Result.Let_syntax in
   let%map daemon = result_opt ~f:Daemon.of_json_layout daemon
   and genesis = result_opt ~f:Genesis.of_json_layout genesis
   and proof = result_opt ~f:Proof_keys.of_json_layout proof
   and ledger = result_opt ~f:Ledger.of_json_layout ledger
-  and epoch_data = result_opt ~f:Epoch_data.of_json_layout epoch_data
-  and s3_data_hashes =
-    result_opt ~f:Data_hashes.of_json_layout s3_data_hashes
-  in
-  { daemon; genesis; proof; ledger; epoch_data; s3_data_hashes }
+  and epoch_data = result_opt ~f:Epoch_data.of_json_layout epoch_data in
+  { daemon; genesis; proof; ledger; epoch_data }
 
 let to_yojson x = Json_layout.to_yojson (to_json_layout x)
 
@@ -1399,7 +1385,6 @@ let default =
   ; proof = None
   ; ledger = None
   ; epoch_data = None
-  ; s3_data_hashes = None
   }
 
 let combine t1 t2 =
@@ -1417,8 +1402,6 @@ let combine t1 t2 =
   ; proof = merge ~combine:Proof_keys.combine t1.proof t2.proof
   ; ledger = opt_fallthrough ~default:t1.ledger t2.ledger
   ; epoch_data = opt_fallthrough ~default:t1.epoch_data t2.epoch_data
-  ; s3_data_hashes =
-      opt_fallthrough ~default:t1.s3_data_hashes t2.s3_data_hashes
   }
 
 let gen =
@@ -1427,14 +1410,12 @@ let gen =
   and genesis = Genesis.gen
   and proof = Proof_keys.gen
   and ledger = Ledger.gen
-  and epoch_data = Epoch_data.gen
-  and s3_data_hashes = Data_hashes.gen in
+  and epoch_data = Epoch_data.gen in
   { daemon = Some daemon
   ; genesis = Some genesis
   ; proof = Some proof
   ; ledger = Some ledger
   ; epoch_data = Some epoch_data
-  ; s3_data_hashes = Some s3_data_hashes
   }
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
@@ -1461,6 +1442,7 @@ let ledger_of_accounts accounts =
     ; num_accounts = Some (List.length accounts)
     ; balances = List.mapi accounts ~f:(fun i a -> (i, a.balance))
     ; hash = None
+    ; s3_data_hash = None
     ; name = None
     ; add_genesis_winner = Some false
     }
