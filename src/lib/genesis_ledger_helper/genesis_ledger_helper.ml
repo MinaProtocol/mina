@@ -151,9 +151,7 @@ module Ledger = struct
       | Some s3_hash -> (
           let s3_path = s3_bucket_prefix ^/ filename in
           let local_path = Cache_dir.s3_install_path ^/ filename in
-          match%bind
-            Cache_dir.load_from_s3 [ s3_path ] [ local_path ] ~logger
-          with
+          match%bind Cache_dir.load_from_s3 s3_path local_path ~logger with
           | Ok () ->
               let%bind () =
                 assert_filehash_equal
@@ -162,7 +160,7 @@ module Ledger = struct
               in
               file_exists filename Cache_dir.s3_install_path
           | Error e ->
-              [%log trace] "Could not download $ledger from $uri"
+              [%log trace] "Could not download $ledger from $uri: $error"
                 ~metadata:
                   [ ("ledger", `String ledger_name_prefix)
                   ; ("uri", `String s3_path)

@@ -48,11 +48,11 @@ let possible_paths base =
     ] ~f:(fun d -> d ^/ base)
 
 let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
+  let%bind () = Unix.mkdir ~p:() s3_install_path in
   Deferred.map ~f:Result.join
   @@ Monitor.try_with ~here:[%here] (fun () ->
          let each_uri (uri_string, file_path) =
            let open Deferred.Let_syntax in
-           let%bind () = Unix.mkdir ~p:() s3_install_path in
            [%log trace] "Downloading file from S3"
              ~metadata:
                [ ("url", `String uri_string)
@@ -77,7 +77,5 @@ let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
                ] ;
            Result.return ()
          in
-         Deferred.List.map ~f:each_uri
-           (List.zip_exn s3_bucket_prefix s3_install_path)
-         |> Deferred.map ~f:Result.all_unit )
+         each_uri (s3_bucket_prefix, s3_install_path) )
   |> Deferred.Result.map_error ~f:Error.of_exn
