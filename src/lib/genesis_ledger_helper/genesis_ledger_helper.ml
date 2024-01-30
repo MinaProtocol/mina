@@ -161,11 +161,12 @@ module Ledger = struct
                   ~hash:s3_hash ~logger
               in
               file_exists filename Cache_dir.s3_install_path
-          | Error _ ->
+          | Error e ->
               [%log trace] "Could not download $ledger from $uri"
                 ~metadata:
                   [ ("ledger", `String ledger_name_prefix)
                   ; ("uri", `String s3_path)
+                  ; ("error", `String (Error.to_string_hum e))
                   ] ;
               return None )
       | None ->
