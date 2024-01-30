@@ -5,7 +5,7 @@ set -beo pipefail
 MINA_V1_DAEMON=${MINA_V1_DAEMON:=_build/default/src/app/cli/src/mina.exe}
 FORK_CONFIG_JSON=${FORK_CONFIG_JSON:=fork_config.json}
 
-$MINA_V1_DAEMON daemon --config-file genesis_ledgers/mainnet.json --peer-list-url https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt || exit 1 &
+$MINA_V1_DAEMON daemon --config-file genesis_ledgers/mainnet.json --peer-list-url https://storage.googleapis.com/seed-lists/mainnet_seeds.txt || exit 1 &
 
 function isNotSynced() {
     status=$(curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { syncStatus } " }' localhost:3085/graphql | jq '.data.syncStatus')
