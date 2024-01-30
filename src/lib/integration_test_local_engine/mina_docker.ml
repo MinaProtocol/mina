@@ -169,6 +169,7 @@ module Network_config = struct
             ; balances = []
             ; hash = None
             ; name = None
+            ; s3_data_hash = None
             }
       ; epoch_data =
           Option.map epoch_data ~f:(fun { staking = staking_ledger; next } ->
@@ -205,6 +206,7 @@ module Network_config = struct
                   ; balances = []
                   ; hash = None
                   ; name = None
+                  ; s3_data_hash = None
                   }
                   : Runtime_config.Ledger.t )
               in
