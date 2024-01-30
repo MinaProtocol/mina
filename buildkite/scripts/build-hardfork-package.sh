@@ -53,6 +53,8 @@ echo "--- Fetch fork config from mainnet"
 
 ./scripts/hardfork/export_fork_config.sh
 
+rm -rf ~/.mina-config
+
 echo "--- Clean fork config to generate runtime config for hard-fork"
 
 ./scripts/hardfork/convert_fork_config.sh
