@@ -1673,6 +1673,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                 exit 1 ) ) )
 
 let () =
+  Memtrace.trace_if_requested ();
   Command.(
     run
       (let open Let_syntax in

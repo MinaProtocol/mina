@@ -4,6 +4,7 @@
  (public_name replayer)
  (libraries
    ;; opam libraries
+   memtrace
    stdio
    sexplib0
    result
