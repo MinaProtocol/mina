@@ -130,7 +130,7 @@ module Ledger = struct
     |> Yojson.Safe.to_string |> Blake2.digest_string |> Blake2.to_hex
 
   let find_tar ~logger ~genesis_dir ~constraint_constants ~ledger_name_prefix
-      ~s3_hash (config : Runtime_config.Ledger.t) =
+      (config : Runtime_config.Ledger.t) =
     let search_paths = Cache_dir.possible_paths "" @ [ genesis_dir ] in
     let file_exists filename path =
       let filename = path ^/ filename in
@@ -147,7 +147,7 @@ module Ledger = struct
         None )
     in
     let load_from_s3 filename =
-      match s3_hash with
+      match config.s3_data_hash with
       | Some s3_hash -> (
           let s3_path = s3_bucket_prefix ^/ filename in
           let local_path = Cache_dir.s3_install_path ^/ filename in
@@ -418,7 +418,7 @@ module Ledger = struct
         let open Deferred.Let_syntax in
         let%bind tar_path =
           find_tar ~logger ~genesis_dir ~constraint_constants
-            ~s3_hash:config.s3_data_hash ~ledger_name_prefix config
+            ~ledger_name_prefix config
         in
         match tar_path with
         | Some tar_path -> (
