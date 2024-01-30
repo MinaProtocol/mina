@@ -5,7 +5,11 @@ open Network_peer
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = { secret : string; public : string; peer_id : Peer.Id.Stable.V1.t }
+    type t =
+      { secret : Bounded_types.String.Stable.V1.t
+      ; public : Bounded_types.String.Stable.V1.t
+      ; peer_id : Peer.Id.Stable.V1.t
+      }
 
     let to_latest = Fn.id
   end
