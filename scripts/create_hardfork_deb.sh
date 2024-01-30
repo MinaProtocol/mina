@@ -1,8 +1,8 @@
 #!/bin/bash
 
-source scripts/deb-builder-helpers.sh
-
 RUNTIME_CONFIG_JSON=${RUNTIME_CONFIG_JSON:=runtime_config.json}
+
+source scripts/deb-builder-helpers.sh
 
 echo "------------------------------------------------------------"
 echo "--- Building mainnet deb with hard-fork ledger:"
