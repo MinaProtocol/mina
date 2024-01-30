@@ -284,19 +284,26 @@ module Ledger = struct
                  ( match expected_merkle_root with
                  | Some expected_merkle_root ->
                      if not (Ledger_hash.equal ledger_root expected_merkle_root)
-                     then
-                       failwithf
-                         "Ledger root hash %s loaded from %s does not match \
-                          expected root hash %s"
-                         (Ledger_hash.to_base58_check ledger_root)
-                         filename
-                         (Ledger_hash.to_base58_check expected_merkle_root)
-                         ()
+                     then (
+                       [%log error]
+                         "Ledger root hash $ledger_root loaded from $filename \
+                          does not match root hash expected from the config \
+                          file: $expected_merkle_root"
+                         ~metadata:
+                           [ ("root_hash", Ledger_hash.to_yojson ledger_root)
+                           ; ("filename", `String filename)
+                           ; ( "expected_root_hash"
+                             , Ledger_hash.to_yojson expected_merkle_root )
+                           ] ;
+                       failwith "Ledger root mismatch" )
                  | None ->
                      [%log warn]
-                       "No Merkle root available for ledger loaded from \
-                        $filename"
-                       ~metadata:[ ("filename", `String filename) ] ) ;
+                       "Config file did not specify expected hash for ledger \
+                        loaded from $filename"
+                       ~metadata:
+                         [ ("filename", `String filename)
+                         ; ("root_hash", Ledger_hash.to_yojson ledger_root)
+                         ] ) ;
                  ledger )
 
             let depth = constraint_constants.ledger_depth
