@@ -41,6 +41,7 @@
    with_hash
    zkapps_empty_update
    zkapps_examples
+   bounded_types
    )
   (preprocess
     (pps ppx_snarky ppx_version ppx_jane))

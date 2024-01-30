@@ -234,3 +234,135 @@ delegation(10){
     ];
   }
 }
+
+// Workflow used to create new accounts
+return_funds(10){
+  payment_dry_run{
+    payment_dry_run.network = {
+      "network":"PLACEHOLDER_NETWORK_NAME",
+      "blockchain":"mina"
+    };
+    
+    currency = {
+      "symbol":"MINA",
+      "decimals":9
+    };
+
+    max_fee = "2000000000";
+    min_value = {{max_fee}} + 2;
+
+    // We load the recipient address from an ENV.
+    // The reason we read from ENV variable is that the recipient address here
+    // is the initial sender's address from transfer workflow which is not
+    // accessible by this workflow.
+    // When setting the ENV variable make sure to set it so that it has double
+    // quotes around, otherwise it will give a parsing issue
+    // Set it using export RECIPIENT=\"<sender's address>\"
+    // Eventually we would want it to be automatically set by transfer workflow
+    recipient_address = load_env("RECIPIENT");
+    token_id = load_env("TOKEN_ID");
+    recipient_account_identifier = {
+      "address": {{recipient_address}},
+      "metadata": {
+        "token_id": {{token_id}}
+      }
+    };
+    
+    sender = find_balance({
+      "not_account_identifier":[{{recipient_account_identifier}}],
+      "minimum_balance":{
+        "value": {{min_value}},
+        "currency": {{currency}}
+      }
+    });
+
+    // We send the maximum amount available to the recipient. Don't worry
+    // we will modify this after the dry run to make sure we don't overpay.
+    recipient_amount = {{sender.balance.value}} - {{max_fee}};
+    print_message({
+      "recipient_amount":{{recipient_amount}}
+    });
+
+    sender_amount = 0 - {{recipient_amount}};
+    sender_fee = 0 - {{max_fee}};
+
+    payment_dry_run.preprocess_metadata={"valid_until": "4294967295"};
+    payment_dry_run.confirmation_depth = "1";
+    payment_dry_run.dry_run = true;
+    payment_dry_run.operations = [
+      {
+        "operation_identifier":{"index":0},
+        "type":"fee_payment",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value": {{sender_fee}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":1},
+        "type":"payment_source_dec",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value":{{sender_amount}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":2},
+        "related_operations":[{"index":1}],
+        "type": "payment_receiver_inc",
+        "account":{{recipient_account_identifier}},
+        "amount":{
+          "value":{{recipient_amount}},
+          "currency":{{currency}}
+        }
+      }
+    ];
+  },
+  payment{
+    suggested_fee = find_currency_amount({
+      "currency":{{currency}},
+      "amounts":{{payment_dry_run.suggested_fee}}
+    });
+
+    sender_fee = 0 - {{suggested_fee.value}};
+    recipient_amount = {{sender.balance.value}} - {{suggested_fee.value}};
+    assert({{recipient_amount}});
+    sender_amount = 0 - {{recipient_amount}};
+
+    payment.preprocess_metadata={"valid_until": "4294967295"};
+    payment.network = {{payment_dry_run.network}};
+    payment.confirmation_depth = {{payment_dry_run.confirmation_depth}};
+    payment.operations = [
+      {
+        "operation_identifier":{"index":0},
+        "type":"fee_payment",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value": {{sender_fee}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":1},
+        "type":"payment_source_dec",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value":{{sender_amount}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":2},
+        "related_operations":[{"index":1}],
+        "type": "payment_receiver_inc",
+        "account":{{recipient_account_identifier}},
+        "amount":{
+          "value":{{recipient_amount}},
+          "currency":{{currency}}
+        }
+      }
+    ];
+  }
+}

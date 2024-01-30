@@ -21,6 +21,7 @@
    ;; local libraries
    logger
    mina_block
+   bounded_types
    genesis_constants
    archive_lib
  )
