@@ -22,10 +22,57 @@ let Profiles = ../Constants/Profiles.dhall
 
 in
 
-let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type -> Pipeline.Config.Type = 
+let hardForkPipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type -> Pipeline.Config.Type =
   \(debVersion : DebianVersions.DebVersion) ->
   \(profile: Profiles.Type) ->
-  \(mode: PipelineMode.Type) -> 
+  \(mode: PipelineMode.Type) ->
+    Pipeline.Config::{
+      spec =
+        JobSpec::{
+          dirtyWhen = [
+            S.exactly "buildkite/src/Constants/DebianVersions" "dhall",
+            S.exactly "buildkite/src/Constants/ContainerImages" "dhall",
+            S.exactly "buildkite/src/Command/MinaArtifact" "sh",
+            S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact"),
+            S.strictlyStart (S.contains "dockerfiles/stages"),
+            S.exactly "scripts/rebuild-deb" "sh",
+            S.exactly "scripts/release-docker" "sh",
+            S.exactly "buildkite/scripts/build-hardfork-package" "sh",
+          ],
+          path = "Release",
+          name = "MinaArtifactHardFork${DebianVersions.capitalName debVersion}${Profiles.toSuffixUppercase profile}",
+          tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ],
+          mode = mode
+        },
+      steps = [
+        Libp2p.step debVersion,
+        Command.build
+          Command.Config::{
+            commands = DebianVersions.toolchainRunner debVersion [
+              "DUNE_PROFILE=${Profiles.duneProfile profile}",
+              "AWS_ACCESS_KEY_ID",
+              "AWS_SECRET_ACCESS_KEY",
+              "MINA_BRANCH=$BUILDKITE_BRANCH",
+              "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
+              "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
+            ] "./buildkite/scripts/build-hardfork-package.sh",
+            label = "Build Mina for ${DebianVersions.capitalName debVersion} ${Profiles.toSuffixUppercase profile}",
+            key = "build-deb-pkg",
+            target = Size.XLarge,
+            retries = [
+              Command.Retry::{
+                exit_status = Command.ExitStatus.Code +2,
+                limit = Some 2
+              } ] -- libp2p error
+          },
+      ]
+    }
+in
+
+let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type -> Pipeline.Config.Type =
+  \(debVersion : DebianVersions.DebVersion) ->
+  \(profile: Profiles.Type) ->
+  \(mode: PipelineMode.Type) ->
     Pipeline.Config::{
       spec =
         JobSpec::{
@@ -139,4 +186,5 @@ in
   , bullseye-lightnet  = pipeline DebianVersions.DebVersion.Bullseye Profiles.Type.Lightnet PipelineMode.Type.PullRequest
   , buster  = pipeline DebianVersions.DebVersion.Buster Profiles.Type.Standard PipelineMode.Type.PullRequest
   , focal   = pipeline DebianVersions.DebVersion.Focal Profiles.Type.Standard PipelineMode.Type.PullRequest
+  , bullseyeHardFork = hardForkPipeline DebianVersions.DebVersion.Bullseye Profiles.Type.Standard PipelineMode.Type.PullRequest
   }
