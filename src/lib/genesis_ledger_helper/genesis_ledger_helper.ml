@@ -943,8 +943,8 @@ let print_config ~logger config =
   let metadata =
     append_accounts_omitted "genesis" genesis_accounts_omitted
     @@ append_accounts_omitted "staking" staking_accounts_omitted
-    @@ append_accounts_omitted "next" next_accounts_omitted
-         [ ("name", ledger_name_json); ("config", json_config) ]
+    @@ append_accounts_omitted "next" next_accounts_omitted []
+    @ [ ("name", ledger_name_json); ("config", json_config) ]
   in
   [%log info] "Initializing with runtime configuration. Ledger name: $name"
     ~metadata
