@@ -57,7 +57,7 @@ let hardForkPipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMo
               "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
             ] "./buildkite/scripts/build-hardfork-package.sh",
             label = "Build Mina hard-fork package for ${DebianVersions.capitalName debVersion} ${Profiles.toSuffixUppercase profile}",
-            key = "build-deb-pkg",
+            key = "build-deb-hardfork-pkg",
             target = Size.XLarge,
             retries = [
               Command.Retry::{
