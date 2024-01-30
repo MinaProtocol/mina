@@ -47,6 +47,7 @@ dune build "--profile=${DUNE_PROFILE}" \
   src/app/generate_keypair/generate_keypair.exe \
   src/app/validate_keypair/validate_keypair.exe \
   src/app/cli/src/mina_testnet_signatures.exe \
+  src/app/cli/src/mina_mainnet_signatures.exe \
   src/app/archive/archive.exe \
   src/app/replayer/replayer.exe \
   src/app/extract_blocks/extract_blocks.exe \
