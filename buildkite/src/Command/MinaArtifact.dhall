@@ -64,7 +64,21 @@ let hardForkPipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMo
                 exit_status = Command.ExitStatus.Code +2,
                 limit = Some 2
               } ] -- libp2p error
-          }
+          },
+
+        -- daemon mainnet image
+        let daemonMainnetSpec = DockerImage.ReleaseSpec::{
+          deps=DebianVersions.dependsOn debVersion profile,
+          service="mina-daemon",
+          network="mainnet-hardfork",
+          deb_codename="${DebianVersions.lowerName debVersion}",
+          deb_profile="${Profiles.lowerName profile}",
+          step_key="daemon-mainnet-hard-fork-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
+        }
+
+        in
+
+        DockerImage.generateStep daemonMainnetSpec,
       ]
     }
 in
