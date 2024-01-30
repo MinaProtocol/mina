@@ -36,6 +36,7 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.execute "zkapps" dependsOn,
     TestExecutive.execute "zkapps-timing" dependsOn,
     TestExecutive.execute "zkapps-nonce" dependsOn,
-    TestExecutive.execute "verification-key" dependsOn
+    TestExecutive.execute "verification-key" dependsOn,
+    TestExecutive.execute "slot-end" dependsOn
   ]
 }

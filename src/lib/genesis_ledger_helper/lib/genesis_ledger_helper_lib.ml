@@ -609,6 +609,8 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
               Some precomputed_values.genesis_constants.max_event_elements
           ; max_action_elements =
               Some precomputed_values.genesis_constants.max_action_elements
+          ; slot_tx_end = None
+          ; slot_chain_end = None
           }
     ; genesis =
         Some

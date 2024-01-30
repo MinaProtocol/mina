@@ -80,3 +80,27 @@ let zkapp_cmd_limit = None
 let zkapp_cmd_limit = Some zkapp_cmd_limit
 
 [%%endif]
+
+[%%ifndef slot_tx_end]
+
+let slot_tx_end : int option = None
+
+[%%else]
+
+[%%inject "slot_tx_end", slot_tx_end]
+
+let slot_tx_end = Some slot_tx_end
+
+[%%endif]
+
+[%%ifndef slot_chain_end]
+
+let slot_chain_end : int option = None
+
+[%%else]
+
+[%%inject "slot_chain_end", slot_chain_end]
+
+let slot_chain_end = Some slot_chain_end
+
+[%%endif]

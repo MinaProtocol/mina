@@ -1786,12 +1786,17 @@ let create ?wallets (config : Config.t) =
                 | Some net ->
                     Mina_networking.peers net )
           in
+          let slot_tx_end =
+            Runtime_config.slot_tx_end_or_default
+              config.Config.precomputed_values.runtime_config
+          in
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
+              ~slot_tx_end
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
