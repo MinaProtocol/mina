@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-test-executive' 'mina-receipt-chain-hash-fix' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
+VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-instrumented' 'mina-archive-instrumented' 'mina-rosetta' 'mina-test-executive' 'mina-receipt-chain-hash-fix' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -26,6 +26,7 @@ function usage() {
   echo "      --deb-release         The debian package release channel to pull from (unstable,alpha,beta,stable). Default=unstable"
   echo "      --deb-version         The version string for the debian package to install"
   echo "      --deb-profile         The profile string for the debian package to install"
+  echo "  -i, --instrument          Flag for using instrumented mina"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
@@ -34,6 +35,7 @@ function usage() {
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   --no-upload) NOUPLOAD=1;;
+  -i|--instrument) INSTRUMENT=1;;
   -s|--service) SERVICE="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
   -n|--network) NETWORK="--build-arg network=$2"; shift;;
@@ -63,13 +65,19 @@ IMAGE="--build-arg image=${IMAGE}"
 case "${DEB_PROFILE}" in
   standard)
     DOCKER_DEB_PROFILE=""
-    SERVICE_SUFFIX=""
     ;;
   *)
     DOCKER_DEB_PROFILE="--build-arg deb_profile=${DEB_PROFILE}"
-    SERVICE_SUFFIX="-${DEB_PROFILE}"
     ;;
 esac
+
+
+# Determine profile for mina name. To preserve backward compatibility standard profile is default. 
+if [[ -z "$INSTRUMENT" ]] || [[ "$INSTRUMENT" -eq 0 ]]; then
+  DOCKER_MINA_BUILD_PROFILE=""
+else
+  DOCKER_MINA_BUILD_PROFILE="--build-arg build_profile=instrumented"
+fi
 
 
 # Debug prints for visability
@@ -88,7 +96,12 @@ case "${SERVICE}" in
 mina-archive)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
   DOCKER_CONTEXT="dockerfiles/"
-  SERVICE=${SERVICE}${SERVICE_SUFFIX}
+  ;;
+mina-archive-instrumented)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
+  DOCKER_CONTEXT="dockerfiles/"
+  VERSION="${VERSION}-${NETWORK##*=}"
+  DOCKER_MINA_BUILD_PROFILE="--build-arg build_profile=instrumented"
   ;;
 bot)
   DOCKERFILE_PATH="frontend/bot/Dockerfile"
@@ -98,7 +111,12 @@ mina-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
   DOCKER_CONTEXT="dockerfiles/"
   VERSION="${VERSION}-${NETWORK##*=}"
-  SERVICE=${SERVICE}${SERVICE_SUFFIX}
+  ;;
+mina-daemon-instrumented)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
+  DOCKER_CONTEXT="dockerfiles/"
+  VERSION="${VERSION}-${NETWORK##*=}"
+  DOCKER_MINA_BUILD_PROFILE="--build-arg build_profile=instrumented"
   ;;
 mina-toolchain)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
@@ -142,11 +160,21 @@ itn-orchestrator)
 
 esac
 
-
 REPO="--build-arg MINA_REPO=${MINA_REPO}"
 if [[ -z "${MINA_REPO}" ]]; then
   REPO="--build-arg MINA_REPO=https://github.com/MinaProtocol/mina"
 fi
+
+# Determine profile for mina name. To preserve backward compatibility standard profile is default. 
+case "${DEB_PROFILE}" in
+  standard)
+    DOCKER_DEB_PROFILE=""
+    ;;
+  *)
+    DOCKER_DEB_PROFILE="--build-arg deb_profile=${DEB_PROFILE}"
+    SERVICE=${SERVICE}-lightnet
+    ;;
+esac
 
 DOCKER_REGISTRY="gcr.io/o1labs-192920"
 TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}"
@@ -154,13 +182,16 @@ TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}"
 GITHASH=$(git rev-parse --short=7 HEAD)
 HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}"
 
+echo "building docker with parameters: $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_PROFILE $DOCKER_MINA_BUILD_PROFILE $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t '$TAG'"
+
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
-  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_PROFILE $BRANCH $REPO $extra_build_args -t "$TAG" -
+  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_PROFILE $DOCKER_MINA_BUILD_PROFILE $BRANCH $REPO $extra_build_args -t "$TAG" -
 else
-  docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_PROFILE $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
+  docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_PROFILE $DOCKER_MINA_BUILD_PROFILE $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
 fi
+
 
 if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
   
