@@ -44,7 +44,11 @@ echo "--- Install latest mainnet package"
 
 echo "deb [trusted=yes] http://packages.o1test.net ${MINA_DEB_CODENAME} unstable" | sudo tee /etc/apt/sources.list.d/mina.list
 sudo apt-get update
-sudo apt-get install -y "mina-mainnet"
+# FIXME: This installs a specific version at a specific commit.
+# This is strictly better than excluding the version string though, because
+# including it could select an artifact from *any* previous PR, whether
+# mainnet-compatible or not.
+sudo apt-get install -y "mina-mainnet=1.4.0beta2-compatible-aeca8b8"
 
 # Use the `mina` binary in the path to dump the fork config
 export MINA_V1_DAEMON=mina
