@@ -64,7 +64,7 @@ let hardForkPipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMo
                 exit_status = Command.ExitStatus.Code +2,
                 limit = Some 2
               } ] -- libp2p error
-          },
+          }
       ]
     }
 in
