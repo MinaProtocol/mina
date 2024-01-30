@@ -146,6 +146,8 @@ module Network_config = struct
             ; max_event_elements = None
             ; max_action_elements = None
             ; zkapp_cmd_limit_hardcap = None
+            ; slot_tx_end = None
+            ; slot_chain_end = None
             }
       ; genesis =
           Some

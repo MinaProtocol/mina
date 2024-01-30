@@ -632,6 +632,8 @@ let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
               Some precomputed_values.genesis_constants.max_action_elements
           ; zkapp_cmd_limit_hardcap =
               Some precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
+          ; slot_tx_end = None
+          ; slot_chain_end = None
           }
     ; genesis =
         Some

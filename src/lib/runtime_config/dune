@@ -2,44 +2,52 @@
  (name runtime_config)
  (public_name mina_runtime_config)
  (libraries
-   ;; opam libraries
-   async
-   async_kernel
-   async_unix
-   core_kernel
-   bin_prot.shape
-   base.caml
-   base
-   base64
-   integers
-   result
-   sexplib0
-   ;; local libraries
-   block_time
-   currency
-   genesis_constants
-   data_hash_lib
-   kimchi_backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
-   mina_ledger
-   merkle_ledger
-   mina_base
-   mina_base.import
-   mina_numbers
-   mina_wire_types
-   mina_state
-   snark_params
-   unsigned_extended
-   pickles
-   pickles.backend
-   pickles_types
-   random_oracle
-   with_hash
-   signature_lib
-   staged_ledger
-   bounded_types
-   )
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_custom_printf ppx_sexp_conv ppx_let ppx_deriving_yojson
-                  ppx_fields_conv ppx_version ppx_compare)))
+  ;; opam libraries
+  async
+  async_kernel
+  async_unix
+  core_kernel
+  bin_prot.shape
+  base.caml
+  base
+  base64
+  integers
+  result
+  sexplib0
+  ;; local libraries
+  block_time
+  currency
+  genesis_constants
+  data_hash_lib
+  kimchi_backend
+  kimchi_backend.pasta
+  kimchi_backend.pasta.basic
+  mina_ledger
+  merkle_ledger
+  mina_base
+  mina_base.import
+  mina_numbers
+  mina_wire_types
+  mina_state
+  snark_params
+  unsigned_extended
+  pickles
+  pickles.backend
+  pickles_types
+  random_oracle
+  with_hash
+  signature_lib
+  staged_ledger
+  bounded_types
+  mina_compile_config)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_custom_printf
+   ppx_sexp_conv
+   ppx_let
+   ppx_deriving_yojson
+   ppx_fields_conv
+   ppx_version
+   ppx_compare)))
