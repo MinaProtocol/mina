@@ -24,9 +24,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let config =
     let open Test_config in
-    let staking_accounts : Test_Account.t list =
-      [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
-      ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
+    let staking_accounts : Test_account.t list =
+      let open Test_account in
+      [ create ~account_name:"node-a-key" ~balance:"1000" ~timing:Untimed ()
+      ; create ~account_name:"node-b-key" ~balance:"1000" ~timing:Untimed ()
       ]
     in
     let staking : Test_config.Epoch_data.Data.t =
@@ -36,9 +37,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let epoch_ledger = staking_accounts in
       { epoch_ledger; epoch_seed }
     in
-    let next_accounts : Test_Account.t list =
-      [ { account_name = "node-a-key"; balance = "0"; timing = Untimed }
-      ; { account_name = "node-b-key"; balance = "0"; timing = Untimed }
+    let next_accounts : Test_account.t list =
+      let open Test_account in
+      [ create ~account_name:"node-a-key" ~balance:"0" ~timing:Untimed ()
+      ; create ~account_name:"node-b-key" ~balance:"0" ~timing:Untimed ()
       ]
     in
     let next : Test_config.Epoch_data.Data.t =
