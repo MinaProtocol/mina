@@ -75,8 +75,8 @@ let assert_filehash_equal ~file ~hash ~logger =
           "Verification failure: downloaded $file and expected SHA3-256 = \
            $hash but it had $computed_hash"
           ~metadata:
-            [ ("file", `String file)
-            ; ("hash", `String hash)
+            [ ("path", `String file)
+            ; ("expected_hash", `String hash)
             ; ("computed_hash", `String computed_hash)
             ] ;
         failwith "Tarball hash mismatch" )
@@ -176,7 +176,7 @@ module Ledger = struct
             ~metadata:
               [ ( "root_hash"
                 , `String (Option.value ~default:"not specified" config.hash) )
-              ; ("ledger_name_prefix", `String ledger_name_prefix)
+              ; ("ledger", `String ledger_name_prefix)
               ] ;
           return None
     in
@@ -286,12 +286,12 @@ module Ledger = struct
                      if not (Ledger_hash.equal ledger_root expected_merkle_root)
                      then (
                        [%log error]
-                         "Ledger root hash $ledger_root loaded from $filename \
-                          does not match root hash expected from the config \
-                          file: $expected_merkle_root"
+                         "Ledger root hash $root_hash loaded from $path does \
+                          not match root hash expected from the config file: \
+                          $expected_root_hash"
                          ~metadata:
                            [ ("root_hash", Ledger_hash.to_yojson ledger_root)
-                           ; ("filename", `String filename)
+                           ; ("path", `String filename)
                            ; ( "expected_root_hash"
                              , Ledger_hash.to_yojson expected_merkle_root )
                            ] ;
@@ -301,7 +301,7 @@ module Ledger = struct
                        "Config file did not specify expected hash for ledger \
                         loaded from $filename"
                        ~metadata:
-                         [ ("filename", `String filename)
+                         [ ("path", `String filename)
                          ; ("root_hash", Ledger_hash.to_yojson ledger_root)
                          ] ) ;
                  ledger )
