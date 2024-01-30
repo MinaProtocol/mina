@@ -81,16 +81,20 @@ fi
 
 libp2p_1_args=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_1" )
 libp2p_2_args=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_2" )
+
 # We handle error of libp2p key generation because `compatible`'s version
 # has a different command for libp2p key generation
-if [[ ! -f $CONF_DIR/libp2p_1 ]]; then
-  "$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_1 2>/dev/null || \
-    libp2p_1_args=()
+"$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_1 2>/dev/null || \
+  libp2p_1_args[0]="--discovery-keypair"
+if [[ "${#libp2p_1_args[0]}" == "--discovery-keypair" ]]; then
+  "$MINA_EXE" advanced generate-libp2p-keypair --privkey-path $CONF_DIR/libp2p_1
 fi
-if [[ ! -f $CONF_DIR/libp2p_2 ]]; then
-  "$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_2 2>/dev/null || \
-    libp2p_2_args=()
+"$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_2 2>/dev/null || \
+  libp2p_2_args[0]="--discovery-keypair"
+if [[ "${#libp2p_2_args[0]}" == "--discovery-keypair" ]]; then
+  "$MINA_EXE" advanced generate-libp2p-keypair --privkey-path $CONF_DIR/libp2p_2
 fi
+
 if [[ "$CUSTOM_CONF" == "" ]] && [[ ! -f $CONF_DIR/ledger.json ]]; then
   ( cd $CONF_DIR && "$SCRIPT_DIR/prepare-test-ledger.sh" -c 100000 -b 1000000 $(cat bp.pub) >ledger.json )
 fi
@@ -154,7 +158,7 @@ bp_pid=$!
 echo "Block producer PID: $bp_pid"
 
 "$MINA_EXE" daemon --config-file "$CONF_FILE" \
-  "${libp2p_2_args[@]}"  --seed \
+  "${libp2p_2_args[@]}" --seed \
   --peer "/ip4/127.0.0.1/tcp/10302/p2p/$(cat $CONF_DIR/libp2p_1.peerid)" \
   --run-snark-worker "$(cat $CONF_DIR/bp.pub)" --work-selection seq \
   --config-directory "$PWD/localnet/runtime_2" --file-log-level Info --log-level Error \
