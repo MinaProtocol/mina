@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 set -e
+set -o pipefail
+
 export MINA_LIBP2P_PASS=
 export MINA_PRIVKEY_PASS=
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
@@ -27,7 +29,7 @@ SLOT_CHAIN_END=${SLOT_CHAIN_END:-}
 # Mina executable
 MINA_EXE=mina
 
-echo "Creates a quick-epoch-turnaround configuration in localnet/ and launches two Mina nodes"
+echo "Creates a quick-epoch-turnaround configuration in localnet/ and launches two Mina nodes" >&2
 echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-b|--berkeley]" >&2
 echo "Consider reading script's code for information on optional arguments" >&2
 

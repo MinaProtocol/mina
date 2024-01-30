@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
+set -e
+set -o pipefail
+
 # Number of keys in ledger that won't be re-delegated
-KEY_BALANCE=${KEY_BALANCE:-100000}
+KEY_BALANCE=${KEY_BALANCE:-1000}
 
 # Do not touch accounts with balance below $DELEGATEE_CUTOFF
 DELEGATEE_CUTOFF=${DELEGATEE_CUTOFF:-100000}
@@ -13,11 +16,16 @@ NORM=${NORM:-}
 # Replace top N delegate keys with the specified keys
 REPLACE_TOP=${REPLACE_TOP:-}
 
-echo "Script assumes mainnet's start was at epoch 0 on 17th March 2021, if it's not the case, update the script please" >&2
-echo "Usage: $0 [-r|--replace-top] [-n|--norm] [-c|--delegation_cutoff $DELEGATEE_CUTOFF] [-b|--key-balance $KEY_BALANCE] <BP key 1> <BP key 2> ... <BP key n>" >&2
-echo "Consider reading script's code for information on optional arguments" >&2
-
 MAINNET_START='2021-03-17 00:00:00'
+now=$(date +%s)
+mainnet_start=$(date --date="$MAINNET_START" -u +%s)
+
+# Ledger prefix to use for structuring ledger
+LEDGER_PREFIX=${LEDGER_PREFIX:-staking-$(( (now-mainnet_start)/7140/180 ))}
+
+echo "Script assumes mainnet's start was at epoch 0 on 17th March 2021, if it's not the case, update the script please" >&2
+echo "Usage: $0 [-r|--replace-top] [-n|--norm] [-c|--delegation_cutoff $DELEGATEE_CUTOFF] [-b|--key-balance $KEY_BALANCE] [-p|--ledger-prefix $LEDGER_PREFIX] <BP key 1> <BP key 2> ... <BP key n>" >&2
+echo "Consider reading script's code for information on optional arguments" >&2
 
 ##########################################################
 # Parse arguments
@@ -34,6 +42,8 @@ while [[ $# -gt 0 ]]; do
       DELEGATEE_CUTOFF="$2"; shift; shift ;;
     -b|--key-balance)
       KEY_BALANCE="$2"; shift; shift ;;
+    -p|--ledger-prefix)
+      LEDGER_PREFIX="$2"; shift; shift ;;
     -*|--*)
       echo "Unknown option $1"; exit 1 ;;
     *)
@@ -56,19 +66,20 @@ fi
 # Download ledger
 ##########################################################
 
-now=$(date +%s)
-mainnet_start=$(date --date="$MAINNET_START" -u +%s)
-epoch_now=$(( (now-mainnet_start)/7140/180 ))
+ledger_file="$LEDGER_PREFIX.json"
 
-ledger_file="$epoch_now.json"
-
-echo "Current epoch: $epoch_now" >&2
+echo "Using ledger with prefix: $LEDGER_PREFIX" >&2
 
 if [[ ! -f "$ledger_file" ]]; then
-  ledgers_url="https://storage.googleapis.com/storage/v1/b/mina-staking-ledgers/o?maxResults=1&prefix=staking-$epoch_now"
-  ledger_url=$(curl "$ledgers_url" | jq -r .items[0].mediaLink)
-
-  wget -O $ledger_file "$ledger_url"
+  ledgers_url="https://storage.googleapis.com/storage/v1/b/mina-staking-ledgers/o?maxResults=1000&prefix=$LEDGER_PREFIX"
+  echo "$ledgers_url" >&2
+  ledger_url=$(curl "$ledgers_url" | jq -r '.items | sort_by(.size|tonumber) | last.mediaLink')
+  if [[ "$ledger_url" == null ]]; then
+    echo "Couldn't fine ledger with prefix $LEDGER_PREFIX" >&2
+    exit 2
+  fi
+  curl "$ledger_url" >"$ledger_file"
+  cmp "$ledger_file" >/dev/null <<< "Ledger not found: next staking ledger is not finalized yet" && echo "Next ledger not finalized yet" >&2 && rm "$ledger_file" && exit 2
 fi
 
 keys_=""
@@ -80,7 +91,7 @@ keys_="${keys_:0:-1}"
 tmpfile=$(mktemp)
 
 # jq filter to exclude PKs from the ledger
-<"$epoch_now.json" jq "[.[] | select(.pk | IN($keys_) | not)]" >"$tmpfile"
+<"$ledger_file" jq "[.[] | select(.pk | IN($keys_) | not)]" >"$tmpfile"
 
 num_accounts=$(<"$tmpfile" jq length)
 
