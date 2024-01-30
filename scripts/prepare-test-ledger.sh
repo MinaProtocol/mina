@@ -10,8 +10,11 @@ DELEGATEE_CUTOFF=${DELEGATEE_CUTOFF:-100000}
 # Works well for latger number of keys
 NORM=${NORM:-}
 
+# Replace top N delegate keys with the specified keys
+REPLACE_TOP=${REPLACE_TOP:-}
+
 echo "Script assumes mainnet's start was at epoch 0 on 17th March 2021, if it's not the case, update the script please" >&2
-echo "Usage: $0 [-n|--norm] [-c|--delegation_cutoff $DELEGATEE_CUTOFF] [-b|--key-balance $KEY_BALANCE] <BP key 1> <BP key 2> ... <BP key n>" >&2
+echo "Usage: $0 [-r|--replace-top] [-n|--norm] [-c|--delegation_cutoff $DELEGATEE_CUTOFF] [-b|--key-balance $KEY_BALANCE] <BP key 1> <BP key 2> ... <BP key n>" >&2
 echo "Consider reading script's code for information on optional arguments" >&2
 
 MAINNET_START='2021-03-17 00:00:00'
@@ -23,6 +26,8 @@ MAINNET_START='2021-03-17 00:00:00'
 KEYS=()
 while [[ $# -gt 0 ]]; do
   case $1 in
+    -r|--replace-top)
+      REPLACE_TOP=1; shift ;;
     -n|--norm)
       NORM=1; shift ;;
     -c|--delegation-cutoff)
@@ -35,6 +40,11 @@ while [[ $# -gt 0 ]]; do
       KEYS+=("$1") ; shift ;;
   esac
 done
+
+if [[ "$REPLACE_TOP" != "" ]] && [[ "$NORM" != "" ]]; then
+  echo "Can't use --norm and --replace-top at the same time" >&2
+  exit 1
+fi
 
 num_keys=${#KEYS[@]}
 if [[ $num_keys -eq 0 ]]; then
@@ -78,21 +88,32 @@ num_accounts=$(<"$tmpfile" jq length)
 # Create new ledger in a temporary file
 ##########################################################
 
+TOP_KEYS=()
+if [[ "$REPLACE_TOP" != "" ]]; then
+  top_expr="[group_by(.delegate)[] | [(map(.balance|tonumber)|add), .[0].delegate]] | sort | reverse | map(.[1]) | .[0:$num_keys][]"
+  readarray -t TOP_KEYS < <( jq -r "$top_expr" "$tmpfile" )
+fi
+
 function make_expr(){
   i=$1
-  key=$2
-  interval=$num_keys
-  if [[ "$NORM" != "" ]]; then
-    interval=$(( (RANDOM+RANDOM+RANDOM)*num_keys/32/1024/3+1 ))
-  fi
+  key="${KEYS[$i]}"
 
-  # Substitute delegate of some ledger keys with the BP key
-  echo "((.[range($i; $num_accounts; $interval)] | select ((.balance|tonumber) > $DELEGATEE_CUTOFF)).delegate |= \"$key\")"
+  if [[ "$REPLACE_TOP" == "" ]]; then
+    interval=$num_keys
+    if [[ "$NORM" != "" ]]; then
+      interval=$(( (RANDOM+RANDOM+RANDOM)*num_keys/32/1024/3+1 ))
+    fi
+    # Substitute delegate of some ledger keys with the BP key
+    echo "((.[range($i; $num_accounts; $interval)] | select ((.balance|tonumber) > $DELEGATEE_CUTOFF)).delegate |= \"$key\")"
+  else
+    echo "((.[] | select(.delegate == \"${TOP_KEYS[$i]}\")).delegate |= \"$key\")"
+  fi
   echo ".[$((i+num_accounts))] = {delegate:\"$key\", pk:\"$key\", balance:\"$KEY_BALANCE\"}"
 }
 
-expr=$(for i in "${!KEYS[@]}"; do make_expr $i "${KEYS[$i]}"; done | tr "\n" "|" | head -c -1)
+expr=$(for i in "${!KEYS[@]}"; do make_expr $i; done | tr "\n" "|" | head -c -1)
 expr="$expr | [.[] | select(.delegate | IN($keys_)) |= del(.receipt_chain_hash)]"
+
 
 tmpfile2=$(mktemp)
 <"$tmpfile" jq "$expr" >"$tmpfile2"
