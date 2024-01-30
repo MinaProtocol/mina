@@ -19,6 +19,7 @@
    kimchi_backend_common
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
+   bounded_types
    mina_base
    mina_base_import
    mina_base_test_helpers
