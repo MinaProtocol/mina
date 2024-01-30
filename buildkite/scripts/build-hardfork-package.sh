@@ -8,8 +8,30 @@ export GO=/usr/lib/go/bin/go
 
 MINA_COMMIT_SHA1=$(git rev-parse HEAD)
 
-# TODO: Stop building lib_p2p multiple times by pulling from buildkite-agent artifacts or docker or somewhere
-echo "--- Build libp2p_helper TODO: use the previously uploaded build artifact"
+echo "--- Install latest mainnet package"
+
+echo "deb [trusted=yes] http://packages.o1test.net ${MINA_DEB_CODENAME} unstable" | sudo tee /etc/apt/sources.list.d/mina.list
+sudo apt-get update
+# FIXME: This installs a specific version at a specific commit.
+# This is strictly better than excluding the version string though, because
+# including it could select an artifact from *any* previous PR, whether
+# mainnet-compatible or not.
+sudo apt-get install -y "mina-mainnet=1.4.0beta2-compatible-aeca8b8"
+
+# Use the `mina` binary in the path to dump the fork config
+export MINA_V1_DAEMON=mina
+
+echo "--- Fetch fork config from mainnet"
+
+./scripts/hardfork/export_fork_config.sh
+
+rm -rf ~/.mina-config
+
+echo "--- Clean fork config to generate runtime config for hard-fork"
+
+./scripts/hardfork/convert_fork_config.sh
+
+echo "--- Build libp2p_helper"
 make -C src/app/libp2p_helper
 
 MAINNET_TARGETS=""
@@ -39,29 +61,6 @@ dune build "--profile=${DUNE_PROFILE}" \
   src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe \
   src/app/test_executive/test_executive.exe  \
   src/test/command_line_tests/command_line_tests.exe # 2>&1 | tee /tmp/buildocaml.log
-
-echo "--- Install latest mainnet package"
-
-echo "deb [trusted=yes] http://packages.o1test.net ${MINA_DEB_CODENAME} unstable" | sudo tee /etc/apt/sources.list.d/mina.list
-sudo apt-get update
-# FIXME: This installs a specific version at a specific commit.
-# This is strictly better than excluding the version string though, because
-# including it could select an artifact from *any* previous PR, whether
-# mainnet-compatible or not.
-sudo apt-get install -y "mina-mainnet=1.4.0beta2-compatible-aeca8b8"
-
-# Use the `mina` binary in the path to dump the fork config
-export MINA_V1_DAEMON=mina
-
-echo "--- Fetch fork config from mainnet"
-
-./scripts/hardfork/export_fork_config.sh
-
-rm -rf ~/.mina-config
-
-echo "--- Clean fork config to generate runtime config for hard-fork"
-
-./scripts/hardfork/convert_fork_config.sh
 
 echo "--- Build hardfork package for Debian ${MINA_DEB_CODENAME}"
 make deb
