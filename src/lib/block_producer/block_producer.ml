@@ -165,7 +165,8 @@ let report_transaction_inclusion_failures ~logger failed_txns =
 let generate_next_state ~zkapp_cmd_limit ~constraint_constants
     ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
     ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
-    ~winner_pk ~scheduled_time ~log_block_creation ~block_reward_threshold ~slot_tx_end ~slot_chain_end =
+    ~winner_pk ~scheduled_time ~log_block_creation ~block_reward_threshold
+    ~slot_tx_end ~slot_chain_end =
   let open Interruptible.Let_syntax in
   let global_slot_since_hard_fork =
     Consensus.Data.Block_data.global_slot block_data
@@ -802,8 +803,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~log_block_creation
                 ~winner_pk:winner_pubkey ~block_reward_threshold
-                ~zkapp_cmd_limit:!zkapp_cmd_limit
-                ~slot_tx_end ~slot_chain_end
+                ~zkapp_cmd_limit:!zkapp_cmd_limit ~slot_tx_end ~slot_chain_end
             in
             [%log internal] "Generate_next_state_done" ;
             match next_state_opt with

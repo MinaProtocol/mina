@@ -124,8 +124,8 @@ module Network_config = struct
         ; slots_per_epoch
         ; slots_per_sub_window
         ; txpool_max_size
-         ; slot_tx_end
-         ; slot_chain_end
+        ; slot_tx_end
+        ; slot_chain_end
         } =
       test_config
     in
