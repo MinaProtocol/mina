@@ -169,60 +169,52 @@ module Sql = struct
   let find_current_balance
         (module Conn : Caqti_async.CONNECTION)
         ~requested_block_global_slot_since_genesis
-        ~last_relevant_command_info
-        ?timing_id
-        address =
+        ~last_relevant_command_info ?timing_id () =
     let open Deferred.Result.Let_syntax in
     let open Unsigned in
     let (_, last_relevant_command_global_slot_since_genesis, last_relevant_command_balance, nonce) =
       last_relevant_command_info
     in
-    let pk = Signature_lib.Public_key.Compressed.of_base58_check_exn address in
-    let account_id = Mina_base.Account_id.create pk Mina_base.Token_id.default in
-    match%bind Archive_lib.Processor.Account_identifiers.find_opt (module Conn) account_id |>
-           Errors.Lift.sql ~context:"Finding account identifier" with
-    | None -> Deferred.Result.fail (Errors.create @@ `Account_not_found address)
-    | Some account_identifier_id ->
-       let%bind timing_info_opt =
-         match timing_id with
-         | Some timing_id ->
-            Archive_lib.Processor.Timing_info.load_opt (module Conn) timing_id
-            |> Errors.Lift.sql ~context:"Finding timing info"
-         | None -> return None
-       in
-       let end_slot =
-         Mina_numbers.Global_slot_since_genesis.of_uint32
-           (Unsigned.UInt32.of_int64 requested_block_global_slot_since_genesis)
-       in
-       let%bind (liquid_balance, nonce) =
-         match timing_info_opt with
-         | None ->
-            (* This account has no special vesting, so just use its last
-               known balance from the command.*)
-            Deferred.Result.return (last_relevant_command_balance, UInt64.of_int64 nonce)
-         | Some timing_info ->
-            (* This block was in the genesis ledger and has been
-               involved in at least one user or internal command. We need
-               to compute the change in its balance between the most recent
-               command and the start block (if it has vesting it may have
-               changed). *)
-            let incremental_balance_between_slots =
-              compute_incremental_balance timing_info
-                ~start_slot:
-                  (Mina_numbers.Global_slot_since_genesis.of_int
-                   (Int.of_int64_exn
-                      last_relevant_command_global_slot_since_genesis))
-                ~end_slot
-            in
-            Deferred.Result.return
-              ( UInt64.Infix.(
-                  UInt64.of_int64 last_relevant_command_balance
-                  + incremental_balance_between_slots)
-                |> UInt64.to_int64, UInt64.of_int64 nonce )
-       in
-       let total_balance = last_relevant_command_balance in
-       let balance_info : Balance_info.t = {liquid_balance; total_balance} in
-       Deferred.Result.return (balance_info, nonce)
+    let%bind timing_info_opt =
+      match timing_id with
+      | Some timing_id ->
+         Archive_lib.Processor.Timing_info.load_opt (module Conn) timing_id
+           |> Errors.Lift.sql ~context:"Finding timing info"
+      | None -> return None
+    in
+    let end_slot =
+      Mina_numbers.Global_slot_since_genesis.of_uint32
+        (Unsigned.UInt32.of_int64 requested_block_global_slot_since_genesis)
+    in
+    let%bind (liquid_balance, nonce) =
+      match timing_info_opt with
+      | None ->
+         (* This account has no special vesting, so just use its last
+            known balance from the command.*)
+         Deferred.Result.return (last_relevant_command_balance, UInt64.of_int64 nonce)
+      | Some timing_info ->
+         (* This block was in the genesis ledger and has been
+            involved in at least one user or internal command. We need
+            to compute the change in its balance between the most recent
+            command and the start block (if it has vesting it may have
+            changed). *)
+         let incremental_balance_between_slots =
+           compute_incremental_balance timing_info
+             ~start_slot:
+               (Mina_numbers.Global_slot_since_genesis.of_int
+                (Int.of_int64_exn
+                  last_relevant_command_global_slot_since_genesis))
+             ~end_slot
+           in
+           Deferred.Result.return
+             ( UInt64.Infix.(
+                 UInt64.of_int64 last_relevant_command_balance
+                 + incremental_balance_between_slots)
+               |> UInt64.to_int64, UInt64.of_int64 nonce )
+    in
+    let total_balance = last_relevant_command_balance in
+    let balance_info : Balance_info.t = {liquid_balance; total_balance} in
+    Deferred.Result.return (balance_info, nonce)
 
   (* TODO: either address will have to include a token id, or we pass the
      token id separately, make it optional and use the default token if omitted
@@ -276,14 +268,14 @@ module Sql = struct
            (module Conn)
            ~requested_block_global_slot_since_genesis
            ~last_relevant_command_info
-           address
+           ()
       | Some (last_relevant_command_info, timing_id) ->
          find_current_balance
            (module Conn)
            ~requested_block_global_slot_since_genesis
            ~last_relevant_command_info
            ~timing_id
-           address
+           ()
     in
     Deferred.Result.return (requested_block_identifier, balance_info, nonce)
 end
