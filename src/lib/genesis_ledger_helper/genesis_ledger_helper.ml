@@ -59,7 +59,7 @@ let file_exists ?follow_symlinks filename =
   | _ ->
       false
 
-let assert_filehash_equal ~file ~hash =
+let assert_filehash_equal ~file ~hash ~logger =
   let st = ref (Digestif.SHA3_256.init ()) in
   match%bind
     Reader.with_file file ~f:(fun rdr ->
@@ -69,10 +69,17 @@ let assert_filehash_equal ~file ~hash =
   with
   | `Eof ->
       let computed_hash = Digestif.SHA3_256.(get !st |> to_hex) in
-      if not (String.equal computed_hash hash) then
+      if not (String.equal computed_hash hash) then (
         let%map () = Unix.rename ~src:file ~dst:(file ^ ".incorrect-hash") in
-        failwithf "File %s has hash %s, but found %s in runtime config" file
-          computed_hash hash ()
+        [%log error]
+          "Verification failure: downloaded $file and expected SHA3-256 = \
+           $hash but it had $computed_hash"
+          ~metadata:
+            [ ("file", `String file)
+            ; ("hash", `String hash)
+            ; ("computed_hash", `String computed_hash)
+            ] ;
+        failwith "Tarball hash mismatch" )
       else Deferred.unit
   | _ ->
       failwith "impossible: `Stop not used"
@@ -151,7 +158,7 @@ module Ledger = struct
               let%bind () =
                 assert_filehash_equal
                   ~file:(Cache_dir.s3_install_path ^/ filename)
-                  ~hash:s3_hash
+                  ~hash:s3_hash ~logger
               in
               file_exists filename Cache_dir.s3_install_path
           | Error _ ->
