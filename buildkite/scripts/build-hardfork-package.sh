@@ -64,7 +64,6 @@ dune build "--profile=${DUNE_PROFILE}" \
   src/test/command_line_tests/command_line_tests.exe # 2>&1 | tee /tmp/buildocaml.log
 
 echo "--- Build hardfork package for Debian ${MINA_DEB_CODENAME}"
-make deb
 ./scripts/create_hardfork_deb.sh
 mkdir -p /tmp/artifacts
 cp _build/mina*.deb /tmp/artifacts/.
