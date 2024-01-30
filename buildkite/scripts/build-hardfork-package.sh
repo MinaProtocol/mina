@@ -20,6 +20,7 @@ sudo apt-get install -y "mina-mainnet=1.4.0beta2-compatible-aeca8b8"
 
 # Use the `mina` binary in the path to dump the fork config
 export MINA_V1_DAEMON=mina
+export RUNTIME_CONFIG_JSON=$PWD/runtime-config.json
 
 echo "--- Fetch fork config from mainnet"
 

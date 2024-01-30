@@ -1,7 +1,5 @@
 #!/bin/bash
 
-RUNTIME_CONFIG_JSON=${RUNTIME_CONFIG_JSON:=runtime_config.json}
-
 source scripts/deb-builder-helpers.sh
 
 echo "------------------------------------------------------------"
@@ -13,7 +11,7 @@ create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol C
 copy_common_daemon_configs mainnet mainnet 'mina-seed-lists/mainnet_seeds.txt'
 
 # Copy the overridden runtime config file to the config file location
-cp "${SCRIPTPATH}/../${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
 
 # TODO: call "${BUILDDIR}/usr/local/bin/mina-create-genesis" here to generate the tar files
 
