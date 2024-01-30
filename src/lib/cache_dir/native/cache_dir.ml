@@ -52,6 +52,7 @@ let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
   @@ Monitor.try_with ~here:[%here] (fun () ->
          let each_uri (uri_string, file_path) =
            let open Deferred.Let_syntax in
+           let%bind () = Unix.mkdir ~p:() s3_install_path in
            [%log trace] "Downloading file from S3"
              ~metadata:
                [ ("url", `String uri_string)
