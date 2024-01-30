@@ -28,17 +28,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        (let open Test_account in
-        [ create ~account_name:"receiver-key" ~balance:"9999999" ()
-        ; create ~account_name:"sender-1-key" ~balance:"0" ()
-        ; create ~account_name:"sender-2-key" ~balance:"0" ()
-        ; create ~account_name:"sender-3-key" ~balance:"0" ()
-        ; create ~account_name:"snark-node-key" ~balance:"0" ()
+        [ { Test_Account.account_name = "receiver-key"
+          ; balance = "9999999"
+          ; timing = Untimed
+          }
+        ; { account_name = "sender-1-key"; balance = "0"; timing = Untimed }
+        ; { account_name = "sender-2-key"; balance = "0"; timing = Untimed }
+        ; { account_name = "sender-3-key"; balance = "0"; timing = Untimed }
+        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
         ]
         @ List.init num_extra_keys ~f:(fun i ->
-              create
-                ~account_name:(sprintf "%s-%d" sender_account_prefix i)
-                ~balance:"1000" () ))
+              { Test_Account.account_name =
+                  sprintf "%s-%d" sender_account_prefix i
+              ; balance = "1000"
+              ; timing = Untimed
+              } )
     ; block_producers =
         [ { node_name = "receiver"; account_name = "receiver-key" }
         ; { node_name = "sender-1"; account_name = "sender-1-key" }
