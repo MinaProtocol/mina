@@ -9,6 +9,7 @@ echo "--- Building mainnet deb with hard-fork ledger:"
 
 create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
 
+# TODO(FIXME): Don't use mainnet seeds URL
 copy_common_daemon_configs mainnet mainnet 'mina-seed-lists/mainnet_seeds.txt'
 
 # Copy the overridden runtime config file to the config file location
