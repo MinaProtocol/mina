@@ -246,3 +246,20 @@ spec:
     targetPort: {{ $.Values.mina.itn.port }}
   {{- end }}  
 {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "archive-node.fullname" . }}-metrics
+  labels:
+    testnet: {{ $.Values.testnetName }}
+    app: {{ template "archive-node.fullname" . }}
+spec:
+  type: ClusterIP
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ template "archive-node.fullname" . }}
+  ports:
+  - name: metrics-port
+    port: {{ $.Values.mina.ports.metrics }}
+    targetPort: {{ $.Values.mina.ports.metrics }}

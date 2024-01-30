@@ -4,6 +4,7 @@ metadata:
   name: {{ .Values.name }}
   labels:
     app: {{ .Values.name }}
+    testnet: {{ $.Values.testnetName }}
 spec:
   type: ClusterIP
   ports:
