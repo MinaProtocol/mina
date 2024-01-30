@@ -81,9 +81,11 @@ module First_pass_ledger_hashes = struct
 
   let add =
     let count = ref 0 in
-    fun ledger_hash ->
-      Base.Hash_set.add hash_set (ledger_hash, !count) ;
-      incr count
+    fun ~migration_mode ledger_hash ->
+      if migration_mode then ()
+      else (
+        Base.Hash_set.add hash_set (ledger_hash, !count) ;
+        incr count )
 
   let find ledger_hash =
     Base.Hash_set.find hash_set ~f:(fun (hash, _n) ->
@@ -700,8 +702,8 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
       in
       if not @@ List.is_empty input.first_pass_ledger_hashes then (
         [%log info] "Populating set of first-pass ledger hashes" ;
-        List.iter input.first_pass_ledger_hashes ~f:First_pass_ledger_hashes.add
-        ) ;
+        List.iter input.first_pass_ledger_hashes
+          ~f:(First_pass_ledger_hashes.add ~migration_mode) ) ;
       Option.iter input.last_snarked_ledger_hash ~f:(fun h ->
           [%log info] "Setting last snarked ledger hash" ;
           First_pass_ledger_hashes.set_last_snarked_hash h ) ;
@@ -1219,7 +1221,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                         with
                         | Ok partially_applied ->
                             (* the current ledger may become a snarked ledger *)
-                            First_pass_ledger_hashes.add
+                            First_pass_ledger_hashes.add ~migration_mode
                               (Ledger.merkle_root ledger) ;
                             let%bind () =
                               update_staking_epoch_data ~logger pool
@@ -1283,10 +1285,14 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                 in
                 apply_transaction_phases (List.rev block_txns)
               in
-              ( if
-                Frozen_ledger_hash.equal snarked_hash
-                  (First_pass_ledger_hashes.get_last_snarked_hash ())
-              then
+              ( if migration_mode then
+                [%log info]
+                  "We are doing migration, so the snarked_ledger_hash in \
+                   global_slot_hashes_tbl is irrelevant"
+              else if
+              Frozen_ledger_hash.equal snarked_hash
+                (First_pass_ledger_hashes.get_last_snarked_hash ())
+            then
                 [%log info]
                   "Snarked ledger hash same as in the preceding block, not \
                    checking it again"
@@ -1294,11 +1300,6 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
               Frozen_ledger_hash.equal snarked_hash genesis_snarked_ledger_hash
             then
                 [%log info] "Snarked ledger hash is genesis snarked ledger hash"
-              else if migration_mode then (
-                [%log info]
-                  "We are doing migration, so the snarked_ledger_hash in \
-                   global_slot_hashes_tbl is irrelevant" ;
-                First_pass_ledger_hashes.flush_older_than 1 )
               else
                 match First_pass_ledger_hashes.find snarked_hash with
                 | None ->
