@@ -37,7 +37,7 @@ let hardForkPipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMo
             S.strictlyStart (S.contains "dockerfiles/stages"),
             S.exactly "scripts/rebuild-deb" "sh",
             S.exactly "scripts/release-docker" "sh",
-            S.exactly "buildkite/scripts/build-hardfork-package" "sh",
+            S.exactly "buildkite/scripts/build-hardfork-package" "sh"
           ],
           path = "Release",
           name = "MinaArtifactHardFork${DebianVersions.capitalName debVersion}${Profiles.toSuffixUppercase profile}",
