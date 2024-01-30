@@ -79,8 +79,8 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
     in
     Transition_handler.Validator.validate_transition
       ~context:(module Context)
-      ~frontier ~unprocessed_transition_cache
-      enveloped_initially_validated_transition ~slot_tx_end ~slot_chain_end
+      ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
+      enveloped_initially_validated_transition
   in
   let open Deferred.Let_syntax in
   match cached_initially_validated_transition_result with
