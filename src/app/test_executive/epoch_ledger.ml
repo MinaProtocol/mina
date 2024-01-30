@@ -22,9 +22,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; previous_global_slot = 500000
     }
 
-
   let config =
-    let open Test_config in 
+    let open Test_config in
     let staking_accounts : Test_Account.t list =
       [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
       ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
@@ -49,26 +48,25 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let epoch_ledger = next_accounts in
       { epoch_ledger; epoch_seed }
     in
-    { default with 
-      requires_graphql = true 
+    { default with
+      requires_graphql = true
     ; epoch_data = Some { staking; next = Some next }
     ; genesis_ledger = next_accounts
     ; block_producers =
-    [ { node_name = "node-a"; account_name = "node-a-key" }
-    ; { node_name = "node-b"; account_name = "node-b-key" }
-    ]
-    ; proof_config =
-      { proof_config_default with 
-      fork = Some fork_config }    
-      }      
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
+        ]
+    ; proof_config = { proof_config_default with fork = Some fork_config }
+    }
 
   let run network t =
-    let open Malleable_error.Let_syntax in 
-    let all_mina_nodes = Network.all_mina_nodes network in 
+    let open Malleable_error.Let_syntax in
+    let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
-      wait_for t 
-        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_mina_nodes))
-  in 
+      wait_for t
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data all_mina_nodes) )
+    in
     (* Since I made the balances of block producers in genesis ledger and next
        epoch ledgers to be 0, then blocks would only be produced, if the consensus
        selects the staking epoch *)
