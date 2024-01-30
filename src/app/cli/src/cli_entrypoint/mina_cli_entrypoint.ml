@@ -768,13 +768,19 @@ let setup_daemon logger =
                 let metadata =
                   append_accounts_omitted "genesis" genesis_accounts_omitted
                   @@ append_accounts_omitted "staking" staking_accounts_omitted
-                  @@ append_accounts_omitted "next" next_accounts_omitted
-                       [ ("config", json_config)
-                       ; ("error", Error_json.error_to_yojson err)
-                       ]
+                  @@ append_accounts_omitted "next" next_accounts_omitted []
+                  @ [ ("config", json_config)
+                    ; ( "name"
+                      , `String
+                          (Option.value ~default:"not provided"
+                             (let%bind.Option ledger = config.ledger in
+                              Option.first_some ledger.name ledger.hash ) ) )
+                    ; ("error", Error_json.error_to_yojson err)
+                    ]
                 in
                 [%log info]
-                  "Initializing with runtime configuration. Ledger name: $name"
+                  "Initializing with runtime configuration. Ledger source: \
+                   $name"
                   ~metadata ;
                 Error.raise err
           in
