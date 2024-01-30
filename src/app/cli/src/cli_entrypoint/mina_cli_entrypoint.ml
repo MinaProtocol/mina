@@ -1112,7 +1112,7 @@ let setup_daemon logger =
           in
           let trust_dir = conf_dir ^/ "trust" in
           let%bind () = Async.Unix.mkdir ~p:() trust_dir in
-          let trust_system = Trust_system.create trust_dir in
+          let%bind trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
           let genesis_state_hash =
             (Precomputed_values.genesis_state_hashes precomputed_values)
