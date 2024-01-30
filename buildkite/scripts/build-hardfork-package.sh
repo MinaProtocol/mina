@@ -40,6 +40,15 @@ dune build "--profile=${DUNE_PROFILE}" \
   src/app/test_executive/test_executive.exe  \
   src/test/command_line_tests/command_line_tests.exe # 2>&1 | tee /tmp/buildocaml.log
 
+echo "--- Install latest mainnet package"
+
+echo "deb [trusted=yes] http://packages.o1test.net ${MINA_DEB_CODENAME} unstable" | tee /etc/apt/sources.list.d/mina.list
+apt-get update
+apt-get install -y "mina-mainnet"
+
+# Use the `mina` binary in the path to dump the fork config
+export MINA_V1_DAEMON=mina
+
 echo "--- Fetch fork config from mainnet"
 
 ./scripts/hardfork/export_fork_config.sh
