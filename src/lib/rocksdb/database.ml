@@ -57,21 +57,19 @@ module Batch = struct
     Rocks.write t.db batch ; result
 end
 
-let copy _t = failwith "copy: not implemented"
-
 let remove t ~(key : Bigstring.t) : unit =
   Rocks.delete ?pos:None ?len:None ?opts:None t.db key
+
+let copy t : Bigstring.t =
+  let tlen = Bigstring.length t in
+  let new_t = Bigstring.create tlen in
+  Bigstring.blit ~src:t ~dst:new_t ~src_pos:0 ~dst_pos:0 ~len:tlen ;
+  new_t
 
 let to_alist t : (Bigstring.t * Bigstring.t) list =
   let iterator = Rocks.Iterator.create t.db in
   Rocks.Iterator.seek_to_last iterator ;
   (* iterate backwards and cons, to build list sorted by key *)
-  let copy t =
-    let tlen = Bigstring.length t in
-    let new_t = Bigstring.create tlen in
-    Bigstring.blit ~src:t ~dst:new_t ~src_pos:0 ~dst_pos:0 ~len:tlen ;
-    new_t
-  in
   let rec loop accum =
     if Rocks.Iterator.is_valid iterator then (
       let key = copy (Rocks.Iterator.get_key iterator) in
@@ -81,6 +79,45 @@ let to_alist t : (Bigstring.t * Bigstring.t) list =
     else accum
   in
   loop []
+
+let foldi :
+       t
+    -> init:'a
+    -> f:(int -> 'a -> key:Bigstring.t -> data:Bigstring.t -> 'a)
+    -> 'a =
+ fun t ~init ~f ->
+  let iterator = Rocks.Iterator.create t.db in
+  let rec loop i accum =
+    if Rocks.Iterator.is_valid iterator then (
+      let key = copy (Rocks.Iterator.get_key iterator) in
+      let data = copy (Rocks.Iterator.get_value iterator) in
+      Rocks.Iterator.next iterator ;
+      loop (i + 1) (f i accum ~key ~data) )
+    else accum
+  in
+  loop 0 init
+
+let fold_until :
+       t
+    -> init:'a
+    -> f:
+         (   'a
+          -> key:Bigstring.t
+          -> data:Bigstring.t
+          -> ('a, 'b) Continue_or_stop.t )
+    -> finish:('a -> 'b)
+    -> 'b =
+ fun t ~init ~f ~finish ->
+  let iterator = Rocks.Iterator.create t.db in
+  let rec loop accum =
+    if Rocks.Iterator.is_valid iterator then (
+      let key = copy (Rocks.Iterator.get_key iterator) in
+      let data = copy (Rocks.Iterator.get_value iterator) in
+      Rocks.Iterator.next iterator ;
+      match f accum ~key ~data with Stop _ -> accum | Continue v -> loop v )
+    else accum
+  in
+  finish @@ loop init
 
 let to_bigstring = Bigstring.of_string
 
