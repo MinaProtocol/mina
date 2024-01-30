@@ -14,6 +14,7 @@
    core.uuid
    base.caml
    sexplib0
+   digestif
    ;; local libraries
    mina_ledger
    with_hash
