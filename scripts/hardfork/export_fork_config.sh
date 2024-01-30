@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eo pipefail
+set -beo pipefail
 
 MINA_V1_DAEMON=${MINA_V1_DAEMON:=_build/default/src/app/cli/src/mina.exe}
 FORK_CONFIG_JSON=${FORK_CONFIG_JSON:=fork_config.json}
