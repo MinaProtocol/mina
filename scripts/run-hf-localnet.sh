@@ -86,12 +86,12 @@ libp2p_2_args=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_2" )
 # has a different command for libp2p key generation
 "$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_1 2>/dev/null || \
   libp2p_1_args[0]="--discovery-keypair"
-if [[ "${#libp2p_1_args[0]}" == "--discovery-keypair" ]]; then
+if [[ "${libp2p_1_args[0]}" == "--discovery-keypair" ]]; then
   "$MINA_EXE" advanced generate-libp2p-keypair --privkey-path $CONF_DIR/libp2p_1
 fi
 "$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_2 2>/dev/null || \
   libp2p_2_args[0]="--discovery-keypair"
-if [[ "${#libp2p_2_args[0]}" == "--discovery-keypair" ]]; then
+if [[ "${libp2p_2_args[0]}" == "--discovery-keypair" ]]; then
   "$MINA_EXE" advanced generate-libp2p-keypair --privkey-path $CONF_DIR/libp2p_2
 fi
 
