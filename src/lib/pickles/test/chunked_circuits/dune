@@ -1,5 +1,5 @@
 (tests
- (names chunking_original invalid_proof large_wrap_domain)
+ (names chunking_original invalid_proof large_wrap_domain valid_proof)
  (libraries
   ;; opam libraries
   alcotest
