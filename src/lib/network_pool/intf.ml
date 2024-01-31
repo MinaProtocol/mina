@@ -356,6 +356,7 @@ module type Transaction_pool_diff_intf = sig
       | Overloaded
       | Fee_payer_account_not_found
       | Fee_payer_not_permitted_to_send
+      | After_slot_tx_end
     [@@deriving sexp, yojson]
 
     val to_string_hum : t -> string
@@ -389,6 +390,7 @@ module type Transaction_resource_pool_intf = sig
     -> pool_max_size:int
     -> verifier:Verifier.t
     -> genesis_constants:Genesis_constants.t
+    -> slot_tx_end:Mina_numbers.Global_slot_since_hard_fork.t option
     -> Config.t
 
   val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool
