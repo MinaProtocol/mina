@@ -78,7 +78,7 @@ let hardForkPipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMo
 
         in
 
-        DockerImage.generateStep daemonMainnetSpec,
+        DockerImage.generateStep daemonMainnetSpec
       ]
     }
 in
