@@ -122,7 +122,14 @@ if [[ "$CUSTOM_CONF" == "" ]]; then
   },
   "proof": {
     "work_delay": 1,
-    "block_window_duration_ms": 30000
+    "block_window_duration_ms": 30000,
+    "level": "full",
+    "sub_windows_per_window": 11,
+    "ledger_depth": 20,
+    "transaction_capacity": { "2_to_the": 2 },
+    "coinbase_amount": "720",
+    "supercharged_coinbase_factor": 1,
+    "account_creation_fee": "1"
   },
   "ledger": {
     "name": "localnet",
