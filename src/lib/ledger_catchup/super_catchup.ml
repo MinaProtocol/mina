@@ -130,7 +130,8 @@ let write_graph (_ : t) =
   ()
 
 let verify_transition ~context:(module Context : CONTEXT) ~trust_system
-    ~frontier ~unprocessed_transition_cache enveloped_transition =
+    ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
+    enveloped_transition =
   let open Context in
   let sender = Envelope.Incoming.sender enveloped_transition in
   let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
@@ -151,7 +152,7 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
     in
     Transition_handler.Validator.validate_transition
       ~context:(module Context)
-      ~frontier ~unprocessed_transition_cache
+      ~frontier ~unprocessed_transition_cache ~slot_tx_end ~slot_chain_end
       enveloped_initially_validated_transition
   in
   let state_hash =
@@ -282,6 +283,17 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
         ~metadata:[ ("state_hash", state_hash) ]
         "initial_validate: disconnected chain" ;
       Deferred.Or_error.fail @@ Error.of_string "disconnected chain"
+  | Error `Non_empty_staged_ledger_diff_after_stop_slot ->
+      [%log warn]
+        ~metadata:[ ("state_hash", state_hash) ]
+        "initial_validate: transition with non empty staged ledger diff after \
+         slot_tx_end" ;
+      Deferred.Or_error.fail @@ Error.of_string "non empty staged ledger diff"
+  | Error `Block_after_after_stop_slot ->
+      [%log warn]
+        ~metadata:[ ("state_hash", state_hash) ]
+        "initial_validate: block after slot_chain_end" ;
+      Deferred.Or_error.fail @@ Error.of_string "block after stop slot"
 
 let find_map_ok ?how xs ~f =
   let res = Ivar.create () in
@@ -633,9 +645,16 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
       ; ("state_hash", state_hash)
       ]
     "initial_validate: verification of proofs complete" ;
+  let slot_tx_end =
+    Runtime_config.slot_tx_end_or_default precomputed_values.runtime_config
+  in
+  let slot_chain_end =
+    Runtime_config.slot_chain_end_or_default precomputed_values.runtime_config
+  in
   verify_transition
     ~context:(module Context)
-    ~trust_system ~frontier ~unprocessed_transition_cache tv
+    ~trust_system ~frontier ~unprocessed_transition_cache ~slot_tx_end
+    ~slot_chain_end tv
   |> Deferred.map ~f:(Result.map_error ~f:(fun e -> `Error e))
 
 open Frontier_base
