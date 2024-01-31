@@ -1,5 +1,5 @@
 (tests
- (names test_chunked_circuits)
+ (names chunking_original chunking_1)
  (libraries
   ;; opam libraries
   alcotest
