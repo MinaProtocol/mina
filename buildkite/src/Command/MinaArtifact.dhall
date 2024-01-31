@@ -68,7 +68,10 @@ let hardForkPipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMo
 
         -- daemon mainnet image
         let daemonMainnetSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion profile,
+          deps=[{
+              name =  "MinaArtifactHardFork${DebianVersions.capitalName debVersion}${Profiles.toSuffixUppercase profile}",
+              key = "build-deb-hardfork-pkg"
+          }],
           service="mina-daemon",
           network="mainnet-hardfork",
           deb_codename="${DebianVersions.lowerName debVersion}",
