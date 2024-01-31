@@ -166,15 +166,30 @@ let generate_next_state ~zkapp_cmd_limit ~constraint_constants
     ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
     ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
     ~winner_pk ~scheduled_time ~log_block_creation ~block_reward_threshold
-    ~zkapp_cmd_limit_hardcap =
+    ~zkapp_cmd_limit_hardcap ~slot_tx_end ~slot_chain_end =
   let open Interruptible.Let_syntax in
-  let previous_protocol_state_body_hash =
-    Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
+  let global_slot_since_hard_fork =
+    Consensus.Data.Block_data.global_slot block_data
   in
-  let previous_protocol_state_hash =
-    (Protocol_state.hashes_with_body
-       ~body_hash:previous_protocol_state_body_hash previous_protocol_state )
-      .state_hash
+  match slot_chain_end with
+  | Some slot_chain_end
+    when Mina_numbers.Global_slot_since_hard_fork.(
+           global_slot_since_hard_fork >= slot_chain_end) ->
+      [%log info] "Reached slot_chain_end $slot_chain_end, not producing blocks"
+        ~metadata:
+          [ ( "slot_chain_end"
+            , Mina_numbers.Global_slot_since_hard_fork.to_yojson slot_chain_end
+            )
+          ] ;
+      Interruptible.return None
+  | None | Some _ -> (
+      let previous_protocol_state_body_hash =
+        Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
+      in
+      let previous_protocol_state_hash =
+        (Protocol_state.hashes_with_body
+           ~body_hash:previous_protocol_state_body_hash previous_protocol_state )
+          .state_hash
   in
   let previous_state_view =
     Protocol_state.body previous_protocol_state
@@ -195,6 +210,20 @@ let generate_next_state ~zkapp_cmd_limit ~constraint_constants
         Consensus.Data.Block_data.coinbase_receiver block_data
       in
       let diff =
+            match slot_tx_end with
+            | Some slot_tx_end
+              when Mina_numbers.Global_slot_since_hard_fork.(
+                     global_slot_since_hard_fork >= slot_tx_end) ->
+                [%log info]
+                  "Reached slot_tx_end $slot_tx_end, producing empty block"
+                  ~metadata:
+                    [ ( "slot_tx_end"
+                      , Mina_numbers.Global_slot_since_hard_fork.to_yojson
+                          slot_tx_end )
+                    ] ;
+                Result.return
+                  Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff
+            | Some _ | None ->
         O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
             [%log internal] "Create_staged_ledger_diff" ;
             (* TODO: handle transaction inclusion failures here *)
@@ -374,7 +403,7 @@ let generate_next_state ~zkapp_cmd_limit ~constraint_constants
             ; is_new_stack
             }
           in
-          Some (protocol_state, internal_transition, witness) )
+          Some (protocol_state, internal_transition, witness) ) )
 
 module Precomputed = struct
   type t = Precomputed.t =
@@ -617,6 +646,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state ~net
     ~zkapp_cmd_limit_hardcap =
   let open Context in
+  let constraint_constants = precomputed_values.constraint_constants in
+  let consensus_constants = precomputed_values.consensus_constants in
   O1trace.sync_thread "produce_blocks" (fun () ->
       let genesis_breadcrumb =
         let started = ref false in
@@ -655,6 +686,13 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
       in
       let log_bootstrap_mode () =
         [%log info] "Pausing block production while bootstrapping"
+      in
+      let slot_tx_end =
+        Runtime_config.slot_tx_end_or_default precomputed_values.runtime_config
+      in
+      let slot_chain_end =
+        Runtime_config.slot_chain_end_or_default
+          precomputed_values.runtime_config
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
       let produce ivar (scheduled_time, block_data, winner_pubkey) =
@@ -757,6 +795,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                 ~transactions ~get_completed_work ~logger ~log_block_creation
                 ~winner_pk:winner_pubkey ~block_reward_threshold
                 ~zkapp_cmd_limit:!zkapp_cmd_limit ~zkapp_cmd_limit_hardcap
+                ~slot_tx_end ~slot_chain_end
             in
             [%log internal] "Generate_next_state_done" ;
             match next_state_opt with
@@ -1046,6 +1085,40 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
             in
             let i' = Mina_numbers.Length.succ epoch_data_for_vrf.epoch in
             let new_global_slot = epoch_data_for_vrf.global_slot in
+            let log_if_slot_diff_is_less_than =
+              let current_global_slot =
+                Consensus.Data.Consensus_time.(
+                  to_global_slot
+                    (of_time_exn ~constants:consensus_constants
+                       (Block_time.now time_controller) ))
+              in
+              fun ~diff_limit ~every ~message -> function
+                | None ->
+                    ()
+                | Some slot ->
+                    let slot_diff =
+                      let open Mina_numbers in
+                      Option.map ~f:Global_slot_span.to_int
+                      @@ Global_slot_since_hard_fork.diff slot
+                           current_global_slot
+                    in
+                    Option.iter slot_diff ~f:(fun slot_diff' ->
+                        if slot_diff' <= diff_limit && slot_diff' mod every = 0
+                        then
+                          [%log info] message
+                            ~metadata:[ ("slot_diff", `Int slot_diff') ] )
+            in
+            log_if_slot_diff_is_less_than ~diff_limit:480 ~every:60
+              ~message:
+                "Block producer will stop producing blocks after $slot_diff \
+                 slots"
+              slot_chain_end ;
+            log_if_slot_diff_is_less_than ~diff_limit:480 ~every:60
+              ~message:
+                "Block producer will begin producing only empty blocks after \
+                 $slot_diff slots"
+              slot_tx_end ;
+
             let generate_genesis_proof_if_needed () =
               match Broadcast_pipe.Reader.peek frontier_reader with
               | Some transition_frontier ->
