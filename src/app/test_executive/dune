@@ -59,6 +59,7 @@
    zkapps_examples
    cache_dir
    snarky.backendless
+   block_time
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_jane ppx_deriving_yojson ppx_mina ppx_version)))

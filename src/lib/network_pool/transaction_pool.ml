@@ -65,7 +65,7 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V2 = struct
+      module V3 = struct
         type t =
           | Insufficient_replace_fee
           | Duplicate
@@ -78,6 +78,7 @@ module Diff_versioned = struct
           | Overloaded
           | Fee_payer_account_not_found
           | Fee_payer_not_permitted_to_send
+          | After_slot_tx_end
         [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
@@ -99,6 +100,7 @@ module Diff_versioned = struct
       | Overloaded
       | Fee_payer_account_not_found
       | Fee_payer_not_permitted_to_send
+      | After_slot_tx_end
     [@@deriving sexp, yojson]
 
     let to_string_name = function
@@ -124,6 +126,8 @@ module Diff_versioned = struct
           "fee_payer_account_not_found"
       | Fee_payer_not_permitted_to_send ->
           "fee_payer_not_permitted_to_send"
+      | After_slot_tx_end ->
+          "after_slot_tx_end"
 
     let to_string_hum = function
       | Insufficient_replace_fee ->
@@ -152,6 +156,9 @@ module Diff_versioned = struct
           "Fee payer account was not found in the best tip ledger"
       | Fee_payer_not_permitted_to_send ->
           "Fee payer account permissions don't allow sending funds"
+      | After_slot_tx_end ->
+          "This transaction was submitted after the slot defined to stop \
+           accepting transactions"
   end
 
   module Rejected = struct
@@ -160,7 +167,7 @@ module Diff_versioned = struct
       [@@@no_toplevel_latest_type]
 
       module V3 = struct
-        type t = (User_command.Stable.V2.t * Diff_error.Stable.V2.t) list
+        type t = (User_command.Stable.V2.t * Diff_error.Stable.V3.t) list
         [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
@@ -281,8 +288,20 @@ struct
               *)
         ; verifier : (Verifier.t[@sexp.opaque])
         ; genesis_constants : Genesis_constants.t
+        ; slot_tx_end : Mina_numbers.Global_slot_since_hard_fork.t option
         }
-      [@@deriving sexp_of, make]
+      [@@deriving sexp_of]
+
+      (* remove next line if there's a way to force [@@deriving make] write a
+         named parameter instead of an optional parameter *)
+      let make ~trust_system ~pool_max_size ~verifier ~genesis_constants
+          ~slot_tx_end =
+        { trust_system
+        ; pool_max_size
+        ; verifier
+        ; genesis_constants
+        ; slot_tx_end
+        }
     end
 
     let make_config = Config.make
@@ -453,6 +472,8 @@ struct
           Unwanted_fee_token
       | Expired _ ->
           Expired
+      | After_slot_tx_end ->
+          After_slot_tx_end
 
     let indexed_pool_error_metadata = function
       | Command_error.Invalid_nonce (`Between (low, hi), nonce) ->
@@ -486,6 +507,8 @@ struct
             , Mina_numbers.Global_slot_since_genesis.to_yojson
                 global_slot_since_genesis )
           ]
+      | After_slot_tx_end ->
+          []
 
     let indexed_pool_error_log_info e =
       ( Diff_versioned.Diff_error.to_string_name
@@ -773,7 +796,7 @@ struct
       let t =
         { pool =
             Indexed_pool.empty ~constraint_constants ~consensus_constants
-              ~time_controller
+              ~time_controller ~slot_tx_end:config.Config.slot_tx_end
         ; locally_generated_uncommitted =
             Hashtbl.create
               ( module Transaction_hash.User_command_with_valid_signature.Stable
@@ -927,6 +950,8 @@ struct
           (*apply*)
           | Fee_payer_account_not_found
           | Fee_payer_not_permitted_to_send
+          (*Indexed_pool*)
+          | After_slot_tx_end
         [@@deriving sexp, yojson, compare]
 
         let to_string_hum = Diff_versioned.Diff_error.to_string_hum
@@ -939,7 +964,8 @@ struct
           | Duplicate
           | Overloaded
           | Fee_payer_account_not_found
-          | Fee_payer_not_permitted_to_send ->
+          | Fee_payer_not_permitted_to_send
+          | After_slot_tx_end ->
               false
           | Overflow | Bad_token | Unwanted_fee_token ->
               true
@@ -1833,7 +1859,7 @@ let%test_module _ =
                 User_command.forget_check )
            txs )
 
-    let setup_test ?(verifier = verifier) ?permissions () =
+    let setup_test ?(verifier = verifier) ?permissions ?slot_tx_end () =
       let frontier, best_tip_diff_w =
         Mock_transition_frontier.create ?permissions ()
       in
@@ -1844,7 +1870,7 @@ let%test_module _ =
       let trust_system = Trust_system.null () in
       let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
-          ~genesis_constants:Genesis_constants.compiled
+          ~genesis_constants:Genesis_constants.compiled ~slot_tx_end
       in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
@@ -3035,4 +3061,46 @@ let%test_module _ =
               String.is_substring (Error.to_string_hum e) ~substring:"proof"
           | _ ->
               false )
+
+    let%test_unit "transactions added before slot_tx_end are accepted" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let curr_slot =
+            Mina_numbers.(
+              Global_slot_since_hard_fork.of_uint32
+              @@ Global_slot_since_genesis.to_uint32 @@ current_global_slot ())
+          in
+          let slot_tx_end =
+            Mina_numbers.Global_slot_since_hard_fork.(succ @@ succ curr_slot)
+          in
+          let%bind t = setup_test ~slot_tx_end () in
+          assert_pool_txs t [] ;
+          add_commands t independent_cmds >>| assert_pool_apply independent_cmds )
+
+    let%test_unit "transactions added at slot_tx_end are rejected" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let curr_slot =
+            Mina_numbers.(
+              Global_slot_since_hard_fork.of_uint32
+              @@ Global_slot_since_genesis.to_uint32 @@ current_global_slot ())
+          in
+          let%bind t = setup_test ~slot_tx_end:curr_slot () in
+          assert_pool_txs t [] ;
+          add_commands t independent_cmds >>| assert_pool_apply [] )
+
+    let%test_unit "transactions added after slot_tx_end are rejected" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let curr_slot =
+            Mina_numbers.(
+              Global_slot_since_hard_fork.of_uint32
+              @@ Global_slot_since_genesis.to_uint32 @@ current_global_slot ())
+          in
+          let slot_tx_end =
+            Option.value_exn
+            @@ Mina_numbers.(
+                 Global_slot_since_hard_fork.(
+                   sub curr_slot @@ Global_slot_span.of_int 1))
+          in
+          let%bind t = setup_test ~slot_tx_end () in
+          assert_pool_txs t [] ;
+          add_commands t independent_cmds >>| assert_pool_apply [] )
   end )

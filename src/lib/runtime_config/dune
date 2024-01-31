@@ -35,6 +35,7 @@
    with_hash
    signature_lib
    staged_ledger
+   mina_compile_config
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_sexp_conv ppx_let ppx_deriving_yojson

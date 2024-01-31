@@ -124,6 +124,8 @@ module Network_config = struct
         ; slots_per_epoch
         ; slots_per_sub_window
         ; txpool_max_size
+        ; slot_tx_end
+        ; slot_chain_end
         } =
       test_config
     in
@@ -221,6 +223,8 @@ module Network_config = struct
             ; zkapp_transaction_cost_limit = None
             ; max_event_elements = None
             ; max_action_elements = None
+            ; slot_tx_end
+            ; slot_chain_end
             }
       ; genesis =
           Some
