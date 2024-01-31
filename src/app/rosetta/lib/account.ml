@@ -65,7 +65,7 @@ module Sql = struct
       Int.pow 2 Genesis_constants.Constraint_constants.compiled.transaction_capacity_log_2
 
     let query_pending =
-      Caqti_request.find_opt
+      Mina_caqti.find_opt_req
         Caqti_type.(tup2 string int64)
         Caqti_type.(tup4 int64 int64 int64 int64)
         {sql|
@@ -114,7 +114,7 @@ module Sql = struct
 |sql}
 
     let query_canonical =
-      Caqti_request.find_opt
+      Mina_caqti.find_opt_req
         Caqti_type.(tup2 string int64)
         Caqti_type.(tup4 int64 int64 int64 int64)
         {sql|
