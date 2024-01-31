@@ -278,8 +278,8 @@ module Make (Inputs : Inputs_intf) = struct
               List.iter accounts ~f:(fun account ->
                   Mask.Attached.parent_set_notify mask account ) ) )
 
-  let set_batch t locations_and_accounts =
-    Base.set_batch t locations_and_accounts ;
+  let set_batch ?hash_cache t locations_and_accounts =
+    Base.set_batch ?hash_cache t locations_and_accounts ;
     batch_notify_mask_children t (List.map locations_and_accounts ~f:snd)
 
   let set_batch_accounts t addresses_and_accounts =

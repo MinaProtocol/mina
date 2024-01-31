@@ -117,7 +117,8 @@ module type S = sig
 
   val set : t -> Location.t -> account -> unit
 
-  val set_batch : t -> (Location.t * account) list -> unit
+  val set_batch :
+    ?hash_cache:hash Addr.Map.t -> t -> (Location.t * account) list -> unit
 
   val get_at_index_exn : t -> int -> account
 

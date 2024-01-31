@@ -59,7 +59,10 @@ module Make (Inputs : Inputs_intf) : sig
     Inputs.Base.t -> (Inputs.Location.t * Inputs.Hash.t) list -> unit
 
   val set_batch :
-    Inputs.Base.t -> (Inputs.Location.t * Inputs.Account.t) list -> unit
+       ?hash_cache:Inputs.Hash.t Inputs.Location.Addr.Map.t
+    -> Inputs.Base.t
+    -> (Inputs.Location.t * Inputs.Account.t) list
+    -> unit
 
   val set_batch_accounts :
     Inputs.Base.t -> (Inputs.Location.Addr.t * Inputs.Account.t) list -> unit
@@ -84,7 +87,18 @@ end = struct
       | addr, Some account ->
           Some (addr, account) )
 
-  let rec compute_affected_locations_and_hashes t locations_and_hashes acc =
+  let lookup_hash ?hash_cache ~compute loc =
+    let res =
+      let%bind.Option addr =
+        Option.try_with (fun () -> Inputs.Location.to_path_exn loc)
+      in
+      let%bind.Option m = hash_cache in
+      Map.find m addr
+    in
+    match res with Some x -> x | _ -> compute ()
+
+  let rec compute_affected_locations_and_hashes ?hash_cache t
+      locations_and_hashes acc =
     let ledger_depth = Inputs.ledger_depth t in
     if not @@ List.is_empty locations_and_hashes then
       let height =
@@ -105,11 +119,13 @@ end = struct
                        the hash now.
                     *)
                     let parent_hash =
-                      let left_hash, right_hash =
-                        Inputs.Location.order_siblings location hash
-                          sibling_hash
-                      in
-                      Inputs.Hash.merge ~height left_hash right_hash
+                      lookup_hash ?hash_cache parent_location
+                        ~compute:(fun () ->
+                          let left_hash, right_hash =
+                            Inputs.Location.order_siblings location hash
+                              sibling_hash
+                          in
+                          Inputs.Hash.merge ~height left_hash right_hash )
                     in
                     `Hash parent_hash
                 | Some (`Hash _) ->
@@ -127,27 +143,32 @@ end = struct
                   (* We haven't recorded the sibling, so query the ledger to get
                      the hash.
                   *)
-                  let sibling_location = Inputs.Location.sibling location in
-                  let sibling_hash = Inputs.get_hash t sibling_location in
                   let parent_hash =
-                    let left_hash, right_hash =
-                      Inputs.Location.order_siblings location hash sibling_hash
-                    in
-                    Inputs.Hash.merge ~height left_hash right_hash
+                    lookup_hash ?hash_cache key ~compute:(fun () ->
+                        let sibling_location =
+                          Inputs.Location.sibling location
+                        in
+                        let sibling_hash = Inputs.get_hash t sibling_location in
+                        let left_hash, right_hash =
+                          Inputs.Location.order_siblings location hash
+                            sibling_hash
+                        in
+                        Inputs.Hash.merge ~height left_hash right_hash )
                   in
                   (key, parent_hash) :: acc
               | `Hash parent_hash ->
                   (* We have already computed the hash above. *)
                   (key, parent_hash) :: acc )
         in
-        compute_affected_locations_and_hashes t rev_parent_locations_and_hashes
+        compute_affected_locations_and_hashes ?hash_cache t
+          rev_parent_locations_and_hashes
           (List.rev_append rev_parent_locations_and_hashes acc)
       else acc
     else acc
 
-  let set_hash_batch t locations_and_hashes =
+  let set_hash_batch ?hash_cache t locations_and_hashes =
     Inputs.set_raw_hash_batch t
-      (compute_affected_locations_and_hashes t locations_and_hashes
+      (compute_affected_locations_and_hashes ?hash_cache t locations_and_hashes
          locations_and_hashes )
 
   let compute_last_index addresses =
@@ -188,13 +209,17 @@ end = struct
 
   (* TODO: When we do batch on a database, we should add accounts, locations and hashes
      simulatenously for full atomicity. *)
-  let set_batch t locations_and_accounts =
+  let set_batch ?hash_cache t locations_and_accounts =
     set_raw_addresses t locations_and_accounts ;
     Inputs.set_raw_account_batch t locations_and_accounts ;
-    set_hash_batch t
+    set_hash_batch ?hash_cache t
     @@ List.map locations_and_accounts ~f:(fun (location, account) ->
-           ( Inputs.location_of_hash_addr (Inputs.Location.to_path_exn location)
-           , Inputs.Hash.hash_account account ) )
+           let addr = Inputs.Location.to_path_exn location in
+           let account_hash =
+             lookup_hash ?hash_cache location ~compute:(fun () ->
+                 Inputs.Hash.hash_account account )
+           in
+           (Inputs.location_of_hash_addr addr, account_hash) )
 
   let set_batch_accounts t addresses_and_accounts =
     set_batch t
@@ -210,4 +235,6 @@ end = struct
     let num_accounts = List.length accounts in
     List.(zip_exn (take addresses num_accounts) accounts)
     |> set_batch_accounts t
+
+  let set_hash_batch = set_hash_batch ?hash_cache:None
 end
