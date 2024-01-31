@@ -411,6 +411,8 @@ module Json_layout = struct
       ; max_event_elements : int option [@default None]
       ; max_action_elements : int option [@default None]
       ; zkapp_cmd_limit_hardcap : int option [@default None]
+      ; slot_tx_end : int option [@default None]
+      ; slot_chain_end : int option [@default None]
       }
     [@@deriving yojson, fields]
 
@@ -1156,6 +1158,8 @@ module Daemon = struct
     ; max_event_elements : int option [@default None]
     ; max_action_elements : int option [@default None]
     ; zkapp_cmd_limit_hardcap : int option [@default None]
+    ; slot_tx_end : int option [@default None]
+    ; slot_chain_end : int option [@default None]
     }
   [@@deriving bin_io_unversioned]
 
@@ -1192,6 +1196,9 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap =
         opt_fallthrough ~default:t1.zkapp_cmd_limit_hardcap
           t2.zkapp_cmd_limit_hardcap
+    ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
+    ; slot_chain_end =
+        opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
     }
 
   let gen =
@@ -1213,6 +1220,8 @@ module Daemon = struct
     ; max_event_elements = Some max_event_elements
     ; max_action_elements = Some max_action_elements
     ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
+    ; slot_tx_end = None
+    ; slot_chain_end = None
     }
 end
 
@@ -1532,6 +1541,15 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
       ~proof:(Proof_keys.make ~fork ()) ()
   in
   combine runtime_config update
+
+let slot_tx_end_or_default, slot_chain_end_or_default =
+  let f compile get_runtime t =
+    Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
+    @@ Option.value_map t.daemon ~default:compile ~f:(fun daemon ->
+           Option.merge compile ~f:(fun _c r -> r) @@ get_runtime daemon )
+  in
+  ( f Mina_compile_config.slot_tx_end (fun d -> d.slot_tx_end)
+  , f Mina_compile_config.slot_chain_end (fun d -> d.slot_chain_end) )
 
 module Test_configs = struct
   let bootstrap =

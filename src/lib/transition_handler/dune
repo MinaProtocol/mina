@@ -54,6 +54,8 @@
    kimchi_backend.pasta.basic
    internal_tracing
    transition_frontier_extensions
+   staged_ledger_diff
+   runtime_config
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_jane)))
