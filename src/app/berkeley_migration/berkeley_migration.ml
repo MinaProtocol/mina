@@ -411,10 +411,18 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
   let mainnet_pool =
-    Caqti_async.connect_pool ~max_size:128 mainnet_archive_uri
+    Caqti_async.connect_pool
+      ~pool_config:
+        Caqti_pool_config.(
+          merge_left (default_from_env ()) (create ~max_size:128 ()))
+      mainnet_archive_uri
   in
   let migrated_pool =
-    Caqti_async.connect_pool ~max_size:128 migrated_archive_uri
+    Caqti_async.connect_pool
+      ~pool_config:
+        Caqti_pool_config.(
+          merge_left (default_from_env ()) (create ~max_size:128 ()))
+      migrated_archive_uri
   in
   match (mainnet_pool, migrated_pool) with
   | Error e, _ | _, Error e ->
