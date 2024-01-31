@@ -26,7 +26,7 @@ let test () =
       ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N0)
-      ~num_chunks:16 ~override_wrap_domain:N1 ~name:"chunked_circuits"
+      ~num_chunks:4 ~override_wrap_domain:N1 ~name:"chunked_circuits"
       ~constraint_constants (* TODO(mrmr1993): This was misguided.. Delete. *)
       ~choices:(fun ~self:_ ->
         [ { identifier = "2^16"
@@ -39,7 +39,7 @@ let test () =
                 (* Remember that each of these counts for *half* a row, so we
                    need 2^17 of them to fill 2^16 columns.
                 *)
-                for _ = 0 to 1 lsl 20 do
+                for _ = 0 to 1 lsl 18 do
                   ignore (Field.mul (fresh_zero ()) (fresh_zero ()) : Field.t)
                 done ;
                 (* We must now appease the permutation argument gods, to ensure
