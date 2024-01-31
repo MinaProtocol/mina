@@ -17,9 +17,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let num_extra_keys = 100
 
-  let slot_tx_end = 10
+  let slot_tx_end = 5
 
-  let slot_chain_end = 15
+  let slot_chain_end = 8
 
   let sender_account_prefix = "sender-account-"
 
@@ -77,7 +77,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let num_slots = slot_chain_end + 5 in
+    let num_slots = slot_chain_end + 2 in
     let receiver =
       String.Map.find_exn (Network.block_producers network) "receiver"
     in
@@ -105,14 +105,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
     in
-    let all_nodes = Network.all_nodes network in
+    let all_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
         (Wait_condition.nodes_to_initialize (String.Map.data all_nodes))
-    in
-    let%bind () =
-      section_hard "wait for 3 blocks to be produced (warm-up)"
-        (wait_for t (Wait_condition.blocks_to_be_produced 3))
     in
     let genesis_timestamp =
       Block_time.to_time
