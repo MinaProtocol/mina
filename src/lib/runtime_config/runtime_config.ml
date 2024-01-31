@@ -378,10 +378,13 @@ module Json_layout = struct
     type t =
       { txpool_max_size : int option [@default None]
       ; peer_list_url : string option [@default None]
+      ; slot_tx_end : int option [@default None]
+      ; slot_chain_end : int option [@default None]
       }
     [@@deriving yojson, dhall_type]
 
-    let fields = [| "txpool_max_size"; "peer_list_url" |]
+    let fields =
+      [| "txpool_max_size"; "peer_list_url"; "slot_tx_end"; "slot_chain_end" |]
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
@@ -1090,7 +1093,11 @@ module Daemon = struct
      a command line argument. Putting it in the config makes the network explicitly
      rely on a certain number of nodes, reducing decentralisation. See #14766 *)
   type t = Json_layout.Daemon.t =
-    { txpool_max_size : int option; peer_list_url : string option }
+    { txpool_max_size : int option
+    ; peer_list_url : string option
+    ; slot_tx_end : int option
+    ; slot_chain_end : int option
+    }
   [@@deriving bin_io_unversioned]
 
   let to_json_layout : t -> Json_layout.Daemon.t = Fn.id
@@ -1107,12 +1114,19 @@ module Daemon = struct
     { txpool_max_size =
         opt_fallthrough ~default:t1.txpool_max_size t2.txpool_max_size
     ; peer_list_url = opt_fallthrough ~default:t1.peer_list_url t2.peer_list_url
+    ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
+    ; slot_chain_end =
+        opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
     }
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     let%map txpool_max_size = Int.gen_incl 0 1000 in
-    { txpool_max_size = Some txpool_max_size; peer_list_url = None }
+    { txpool_max_size = Some txpool_max_size
+    ; peer_list_url = None
+    ; slot_tx_end = None
+    ; slot_chain_end = None
+    }
 end
 
 module Epoch_data = struct
@@ -1366,6 +1380,16 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
       ~proof:(Proof_keys.make ~fork ()) ()
   in
   combine runtime_config update
+
+let slot_tx_end_or_default, slot_chain_end_or_default =
+  let f compile get_runtime t =
+    Option.value_map t.daemon ~default:compile ~f:(fun daemon ->
+        Option.merge compile ~f:(fun _c r -> r)
+        @@ Option.map ~f:Mina_numbers.Global_slot.of_int
+        @@ get_runtime daemon )
+  in
+  ( f Mina_compile_config.slot_tx_end (fun d -> d.slot_tx_end)
+  , f Mina_compile_config.slot_chain_end (fun d -> d.slot_chain_end) )
 
 module Test_configs = struct
   let bootstrap =

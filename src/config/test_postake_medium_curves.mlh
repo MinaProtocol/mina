@@ -32,3 +32,5 @@
 [%%import "/src/config/fork.mlh"]
 [%%import "/src/config/features/dev.mlh"]
 [%%undef compaction_interval]
+[%%undef slot_tx_end]
+[%%undef slot_chain_end]

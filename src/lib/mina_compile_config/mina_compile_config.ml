@@ -48,3 +48,27 @@ let rpc_heartbeat_timeout_sec = 60.0
 let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
 
 [%%inject "generate_genesis_proof", generate_genesis_proof]
+
+[%%ifndef slot_tx_end]
+
+let slot_tx_end : Mina_numbers.Global_slot.t option = None
+
+[%%else]
+
+[%%inject "slot_tx_end", slot_tx_end]
+
+let slot_tx_end = Some (Mina_numbers.Global_slot.of_int slot_tx_end)
+
+[%%endif]
+
+[%%ifndef slot_chain_end]
+
+let slot_chain_end : Mina_numbers.Global_slot.t option = None
+
+[%%else]
+
+[%%inject "slot_chain_end", slot_chain_end]
+
+let slot_chain_end = Some (Mina_numbers.Global_slot.of_int slot_chain_end)
+
+[%%endif]
