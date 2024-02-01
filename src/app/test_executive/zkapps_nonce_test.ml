@@ -16,6 +16,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
+  let previous_global_slot = 42185
+
   let config =
     let open Test_config in
     { default with
@@ -45,6 +47,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           work_delay = Some 1
         ; transaction_capacity =
             Some Runtime_config.Proof_keys.Transaction_capacity.medium
+        ; fork =
+            Some
+              { previous_state_hash =
+                  "3NKtK83Ms5KgiYnyDqAWDbVLRizxP4dmJEk3GBGYEMPQtQpXRpaD"
+              ; previous_length = 30000
+              ; previous_global_slot
+              }
         }
     }
 
@@ -377,6 +386,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
+           ~start_slot_since_genesis:previous_global_slot
            ( List.hd_exn
            @@ (Network.archive_nodes network |> Core.String.Map.data) )
        in

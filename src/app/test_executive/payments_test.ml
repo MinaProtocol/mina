@@ -17,6 +17,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
+  let previous_global_slot = 42185
+
   (* TODO: refactor all currency values to decimal represenation *)
   (* TODO: test account creation fee *)
   let config =
@@ -29,9 +31,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; create ~account_name:"untimed-node-b-key" ~balance:"300000" ()
         ; create ~account_name:"timed-node-c-key" ~balance:"30000"
             ~timing:
-              (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
-                 ~cliff_amount:0 ~vesting_period:4
-                 ~vesting_increment:5_000_000_000_000 )
+              (make_timing ~min_balance:10_000_000_000_000
+                 ~cliff_time:(8 + previous_global_slot) ~cliff_amount:0
+                 ~vesting_period:4 ~vesting_increment:5_000_000_000_000 )
             (* 30_000_000_000_000 mina is the total.  initially, the balance will be 10k mina.  after 8 global slots, the cliff is hit, although the cliff amount is 0.  4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
             ()
         ; create ~account_name:"snark-node-key1" ~balance:"0" ()
@@ -57,6 +59,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           work_delay = Some 1
         ; transaction_capacity =
             Some Runtime_config.Proof_keys.Transaction_capacity.small
+        ; fork =
+            Some
+              { previous_state_hash =
+                  "3NKtK83Ms5KgiYnyDqAWDbVLRizxP4dmJEk3GBGYEMPQtQpXRpaD"
+              ; previous_length = 30000
+              ; previous_global_slot = 42185
+              }
         }
     }
 

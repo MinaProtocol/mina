@@ -24,6 +24,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (let open Test_account in
         [ create ~account_name:"node-key" ~balance:"1000" () ])
     ; block_producers = [ { node_name = "node"; account_name = "node-key" } ]
+    ; proof_config =
+        { proof_config_default with
+          fork =
+            Some
+              { previous_state_hash =
+                  "3NKtK83Ms5KgiYnyDqAWDbVLRizxP4dmJEk3GBGYEMPQtQpXRpaD"
+              ; previous_length = 30000
+              ; previous_global_slot = 42185
+              }
+        }
     }
 
   let run network t =

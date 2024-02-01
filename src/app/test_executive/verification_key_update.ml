@@ -97,6 +97,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; worker_nodes = 2
           }
     ; snark_worker_fee = "0.0001"
+    ; proof_config =
+        { proof_config_default with
+          fork =
+            Some
+              { previous_state_hash =
+                  "3NKtK83Ms5KgiYnyDqAWDbVLRizxP4dmJEk3GBGYEMPQtQpXRpaD"
+              ; previous_length = 30000
+              ; previous_global_slot = 42185
+              }
+        }
     }
 
   let logger = Logger.create ()
