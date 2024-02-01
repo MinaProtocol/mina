@@ -21,6 +21,7 @@
    stdio
    base.caml
    result
+   bounded_types
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

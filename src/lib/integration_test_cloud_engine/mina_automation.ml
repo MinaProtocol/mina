@@ -125,6 +125,8 @@ module Network_config = struct
          ; slots_per_sub_window
          ; grace_period_slots
          ; txpool_max_size
+         ; slot_tx_end
+         ; slot_chain_end
          }
           : Test_config.t ) =
       test_config
@@ -235,6 +237,9 @@ module Network_config = struct
             ; zkapp_transaction_cost_limit = None
             ; max_event_elements = None
             ; max_action_elements = None
+            ; zkapp_cmd_limit_hardcap = None
+            ; slot_tx_end
+            ; slot_chain_end
             }
       ; genesis =
           Some
@@ -257,6 +262,7 @@ module Network_config = struct
             ; num_accounts = None
             ; balances = []
             ; hash = None
+            ; s3_data_hash = None
             ; name = None
             }
       ; epoch_data =
@@ -328,6 +334,7 @@ module Network_config = struct
                   ; num_accounts = None
                   ; balances = []
                   ; hash = None
+                  ; s3_data_hash = None
                   ; name = None
                   }
                   : Runtime_config.Ledger.t )

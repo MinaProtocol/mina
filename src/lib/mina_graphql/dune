@@ -24,6 +24,7 @@
    splittable_random
    stdio
    ;; local libraries
+   bounded_types
    mina_generators
    mina_wire_types
    network_pool

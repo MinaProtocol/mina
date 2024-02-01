@@ -14,9 +14,11 @@
    core.uuid
    base.caml
    sexplib0
+   digestif
    ;; local libraries
    mina_ledger
    with_hash
+   bounded_types
    blockchain_snark
    error_json
    mina_state
