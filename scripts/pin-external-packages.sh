@@ -11,5 +11,4 @@ for pkg in $PACKAGES; do
     opam pin -y add src/external/$pkg
 done
 
-opam pin add -y https://github.com/tweag/check_opam_switch#d0aa49884e0f9fd4bbb2cd1a32b798a12
-f84b603
+opam pin add -y https://github.com/tweag/check_opam_switch.git#d0aa49884e0f9fd4bbb2cd1a32b798a12
