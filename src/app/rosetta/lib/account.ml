@@ -66,8 +66,8 @@ module Sql = struct
 
     let query_pending =
       Mina_caqti.find_opt_req
-        Caqti_type.(tup2 string int64)
-        Caqti_type.(tup4 int64 int64 int64 int64)
+        Caqti_type.(t2 string int64)
+        Caqti_type.(t4 int64 int64 int64 int64)
         {sql|
   WITH RECURSIVE pending_chain AS (
 
@@ -115,8 +115,8 @@ module Sql = struct
 
     let query_canonical =
       Mina_caqti.find_opt_req
-        Caqti_type.(tup2 string int64)
-        Caqti_type.(tup4 int64 int64 int64 int64)
+        Caqti_type.(t2 string int64)
+        Caqti_type.(t4 int64 int64 int64 int64)
         {sql|
                 SELECT b.height,b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce
 
