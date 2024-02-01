@@ -26,7 +26,7 @@ let () =
   let cfg = load_daemon_cfg runtime_config () in
   let accounts =
     match cfg.ledger with
-    | None | Some { base = Named _; _ } | Some { base = Hash _; _ } ->
+    | None | Some { base = Named _; _ } | Some { base = Hash; _ } ->
         []
     | Some { base = Accounts accs; _ } ->
         List.map ~f:Runtime_config.Accounts.Single.to_account accs

@@ -5,7 +5,7 @@ module Unparented_blocks = struct
 
   let query =
     Mina_caqti.collect_req Caqti_type.unit
-      Caqti_type.(tup4 int string int string)
+      Caqti_type.(t4 int string int string)
       {sql|
            SELECT id, state_hash, height, parent_hash FROM blocks
            WHERE parent_id IS NULL
@@ -46,7 +46,7 @@ module Chain_status = struct
 
   let query_canonical_chain =
     Mina_caqti.collect_req Caqti_type.int64
-      Caqti_type.(tup3 int string string)
+      Caqti_type.(t3 int string string)
       {sql| WITH RECURSIVE chain AS (
 
                (SELECT id, state_hash, parent_id, chain_status

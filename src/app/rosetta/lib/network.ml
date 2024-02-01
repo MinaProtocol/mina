@@ -76,9 +76,8 @@ end
 module Sql = struct
   let oldest_block_query =
     Mina_caqti.find_req Caqti_type.unit
-      Caqti_type.(tup2 int64 string)
-      "SELECT height, state_hash FROM blocks ORDER BY timestamp ASC, \
-       state_hash ASC LIMIT 1"
+      Caqti_type.(t2 int64 string)
+      "SELECT height, state_hash FROM blocks ORDER BY timestamp ASC, state_hash ASC LIMIT 1"
 
   let max_height_delta =
     match Sys.getenv "MINA_ROSETTA_MAX_HEIGHT_DELTA" with
@@ -90,9 +89,8 @@ module Sql = struct
   let latest_block_query =
     Mina_caqti.find_req
       Caqti_type.unit
-      Caqti_type.(tup3 int64 string int64)
-      (sprintf
-         {sql| SELECT height, state_hash, timestamp FROM blocks b
+      Caqti_type.(t3 int64 string int64)
+      (sprintf {sql| SELECT height, state_hash, timestamp FROM blocks b
                      WHERE height = (select MAX(height) - %Ld FROM blocks)
                      ORDER BY timestamp ASC, state_hash ASC
                      LIMIT 1

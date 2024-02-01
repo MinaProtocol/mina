@@ -231,7 +231,7 @@ module Mainnet = struct
       let decode ((typ, receiver_id, fee, token), hash) =
         Ok { typ; receiver_id; fee; token; hash }
       in
-      let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
+      let rep = Caqti_type.(t2 (t4 string int int64 int64) string) in
       Caqti_type.custom ~encode ~decode rep
 
     let load (module Conn : CONNECTION) ~(id : int) =

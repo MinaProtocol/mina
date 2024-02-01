@@ -36,7 +36,7 @@ module Subchain = struct
 
   let query_from_start =
     Mina_caqti.collect_req
-      Caqti_type.(tup2 string string)
+      Caqti_type.(t2 string string)
       Archive_lib.Processor.Block.typ
       (make_sql
          ~join_condition:
@@ -68,7 +68,7 @@ end
 module Blocks_and_user_commands = struct
   let query =
     Mina_caqti.collect_req Caqti_type.int
-      Caqti_type.(tup2 int int)
+      Caqti_type.(t2 int int)
       {sql| SELECT user_command_id, sequence_no
             FROM blocks_user_commands
             WHERE block_id = ?
@@ -168,7 +168,7 @@ end
 module Blocks_and_zkapp_commands = struct
   let query =
     Mina_caqti.collect_req Caqti_type.int
-      Caqti_type.(tup2 int int)
+      Caqti_type.(t2 int int)
       {sql| SELECT zkapp_command_id, sequence_no
             FROM blocks_zkapp_commands
             WHERE block_id = ?
