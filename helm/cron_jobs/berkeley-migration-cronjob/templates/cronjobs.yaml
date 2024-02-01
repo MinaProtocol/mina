@@ -1,0 +1,67 @@
+{{- $rootContext := . }}
+{{- range $replayer := .Values.replayers }}
+{{- with $replayer -}}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: berkeley-migration-{{ .name }}
+  annotations:
+  {{- with $.Values.annotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  successfulJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 1
+  schedule: {{ .schedule }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - command:
+            - /bin/bash
+            - -c
+            - /scripts/{{ .script.scriptName }}
+            env:
+            - name: GCLOUD_KEYFILE
+              value: /gcloud/keyfile.json
+            name: {{ .name }}
+            image: {{ .image.repository }}:{{ .image.tag }}
+            imagePullPolicy: {{ .image.pullPolicy }}
+            {{- with .resources }}
+            resources:
+            {{- toYaml . | nindent 14 }}
+            {{- end }}
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /gcloud/
+              name: gcloud-keyfile-cronjobs
+            - mountPath: /scripts/
+              name: {{ .script.secretName }}
+          restartPolicy: Never
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - name: gcloud-keyfile-cronjobs
+            secret:
+              defaultMode: 256
+              secretName: gcloud-keyfile-cronjobs
+          - name: {{ .script.secretName }}
+            secret:
+              defaultMode: 0755
+              secretName: berkeley-migration-{{ .script.secretName }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: berkeley-migration-{{ .script.secretName }}
+  {{- with $.Values.annotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+type: Opaque
+data:
+  {{- ($rootContext.Files.Glob (printf "files/%s" .script.scriptName)).AsSecrets | nindent 2 }} 
+{{- end }}
+{{- end }}
