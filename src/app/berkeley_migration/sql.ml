@@ -7,7 +7,7 @@ module Mainnet = struct
   module Public_key = struct
     let find_by_id (module Conn : CONNECTION) id =
       Conn.find
-        (Caqti_request.find Caqti_type.int Caqti_type.string
+        (Mina_caqti.find_req Caqti_type.int Caqti_type.string
            "SELECT value FROM public_keys WHERE id = ?" )
         id
   end
@@ -15,7 +15,7 @@ module Mainnet = struct
   module Snarked_ledger_hash = struct
     let find_by_id (module Conn : CONNECTION) id =
       Conn.find
-        (Caqti_request.find Caqti_type.int Caqti_type.string
+        (Mina_caqti.find_req Caqti_type.int Caqti_type.string
            "SELECT value FROM snarked_ledger_hashes WHERE id = ?" )
         id
   end
@@ -65,7 +65,7 @@ module Mainnet = struct
 
     let id_from_state_hash (module Conn : CONNECTION) state_hash =
       Conn.find
-        (Caqti_request.find Caqti_type.string Caqti_type.int
+        (Mina_caqti.find_req Caqti_type.string Caqti_type.int
            {sql| SELECT id
                  FROM blocks
                  WHERE state_hash = ?
@@ -74,7 +74,7 @@ module Mainnet = struct
 
     let load (module Conn : CONNECTION) ~(id : int) =
       Conn.find
-        (Caqti_request.find Caqti_type.int typ
+        (Mina_caqti.find_req Caqti_type.int typ
            {sql| SELECT state_hash, parent_id, parent_hash, creator_id,
                         block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id,
                         next_epoch_data_id, ledger_hash, height, global_slot,
@@ -84,7 +84,7 @@ module Mainnet = struct
 
     let canonical_blocks (module Conn : CONNECTION) =
       Conn.collect_list
-        (Caqti_request.collect Caqti_type.unit Caqti_type.int
+        (Mina_caqti.collect_req Caqti_type.unit Caqti_type.int
            {sql| SELECT id
                  FROM blocks
                  WHERE chain_status = 'canonical'
@@ -92,7 +92,7 @@ module Mainnet = struct
 
     let blocks_at_or_below (module Conn : CONNECTION) slot =
       Conn.collect_list
-        (Caqti_request.collect Caqti_type.int Caqti_type.int
+        (Mina_caqti.collect_req Caqti_type.int Caqti_type.int
            {sql| SELECT id,parent_id,global_slot_since_genesis FROM blocks
                  WHERE global_slot_since_genesis <= $1
                  AND chain_status <> 'orphaned'
@@ -139,7 +139,7 @@ module Mainnet = struct
 
     let load_block (module Conn : CONNECTION) ~block_id =
       Conn.collect_list
-        (Caqti_request.collect Caqti_type.int typ
+        (Mina_caqti.collect_req Caqti_type.int typ
            {sql| SELECT block_id, user_command_id,
                sequence_no,
                status,failure_reason,
@@ -176,7 +176,7 @@ module Mainnet = struct
 
     let load_block (module Conn : CONNECTION) ~block_id =
       Conn.collect_list
-        (Caqti_request.collect Caqti_type.int typ
+        (Mina_caqti.collect_req Caqti_type.int typ
            {sql| SELECT block_id, internal_command_id,
                  sequence_no, secondary_sequence_no,
                  receiver_account_creation_fee_paid,
@@ -207,7 +207,7 @@ module Mainnet = struct
 
     let load (module Conn : CONNECTION) ~(id : int) =
       Conn.find
-        (Caqti_request.find Caqti_type.int typ
+        (Mina_caqti.find_req Caqti_type.int typ
            {sql| SELECT type,receiver_id,fee,token,hash
                  FROM internal_commands
                  WHERE id = ?
@@ -256,7 +256,7 @@ module Mainnet = struct
 
     let load (module Conn : CONNECTION) ~(id : int) =
       Conn.find
-        (Caqti_request.find Caqti_type.int typ
+        (Mina_caqti.find_req Caqti_type.int typ
            {sql| SELECT type,fee_payer_id,source_id,receiver_id,
                  fee_token,token,
                  nonce,amount,fee,valid_until,memo,hash
@@ -270,14 +270,14 @@ module Berkeley = struct
   module Block = struct
     let count (module Conn : CONNECTION) =
       Conn.find
-        (Caqti_request.find Caqti_type.unit Caqti_type.int
+        (Mina_caqti.find_req Caqti_type.unit Caqti_type.int
            {sql| SELECT count (*)
                  FROM blocks
            |sql} )
 
     let greatest_block_height (module Conn : CONNECTION) =
       Conn.find
-        (Caqti_request.find Caqti_type.unit Caqti_type.int64
+        (Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
            {sql| SELECT height
                  FROM blocks
                  WHERE chain_status <> 'orphaned'
