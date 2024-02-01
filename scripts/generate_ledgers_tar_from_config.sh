@@ -13,10 +13,14 @@ config_file_input=$1
 genesis_dir=$2
 config_file_output=$3
 
+function update_perm(){
+  echo ".$1.accounts=[.$1.accounts[] | select(.permissions.set_verification_key == \"signature\").permissions.set_verification_key |= {auth:\"signature\", txn_version: \"1\"}]"
+}
+
 # preprocess config file
 config_file_tmp=$(mktemp)
 echo "preprocessing config file..."
-jq -r '.proof.supercharged_coinbase_factor = 1 | if .proof.fork | has("previous_global_slot") then .proof.fork.genesis_slot = .proof.fork.previous_global_slot | del(.proof.fork.previous_global_slot) else . end' "$config_file_input" >"$config_file_tmp"
+<"$config_file_input" >"$config_file_tmp" jq "$(update_perm ledger) | $(update_perm epoch_data.next) | $(update_perm epoch_data.staking) | .proof.supercharged_coinbase_factor = 1"
 
 echo "generating genesis ledger... (this may take a while)"
 tmp_hash_json_file=$(mktemp)
