@@ -1248,18 +1248,20 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                                 ] ;
                             Error.raise err )
                   in
-                  Deferred.List.iter phase_1s ~f:(fun partial ->
+                  Deferred.List.map phase_1s ~f:(fun partial ->
                       match
                         Ledger.apply_transaction_second_pass ledger partial
                       with
-                      | Ok _applied ->
+                      | Ok applied ->
                           let%bind () =
                             update_staking_epoch_data ~logger pool
                               ~last_block_id ~ledger ~staking_epoch_ledger
                               ~staking_seed
+                          and () =
+                            update_next_epoch_data ~logger pool ~last_block_id
+                              ~ledger ~next_epoch_ledger ~next_seed
                           in
-                          update_next_epoch_data ~logger pool ~last_block_id
-                            ~ledger ~next_epoch_ledger ~next_seed
+                          return applied
                       | Error err ->
                           (* must be a zkApp *)
                           ( match partial with
@@ -1337,60 +1339,51 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                     ] ;
                 Deferred.unit )
               else
-                let%bind accounts_before =
-                  if migration_mode then Ledger.to_list ledger else return []
-                in
-                let%bind () = run_transactions () in
+                let%bind transactions_applied = run_transactions () in
                 let%bind () =
                   if migration_mode then
-                    let accounts_before_set =
-                      Account_set.of_list accounts_before
+                    let accounts_created =
+                      List.concat_map transactions_applied
+                        ~f:Ledger.Transaction_applied.new_accounts
                     in
-                    let account_ids_before =
-                      Account_id.Set.map accounts_before_set ~f:(fun acct ->
-                          Account_id.create acct.public_key acct.token_id )
+                    let accounts_accessed =
+                      List.concat_map transactions_applied
+                        ~f:(fun txn_applied ->
+                          let txn =
+                            Ledger.Transaction_applied.transaction txn_applied
+                            |> With_status.data
+                          in
+                          let status =
+                            Ledger.Transaction_applied.transaction_status
+                              txn_applied
+                          in
+                          Mina_transaction.Transaction.account_access_statuses
+                            txn status )
+                      |> List.filter_map ~f:(fun (account_id, status) ->
+                             match status with
+                             | `Accessed ->
+                                 Some account_id
+                             | `Not_accessed ->
+                                 None )
                     in
-                    let%bind accounts_after = Ledger.to_list ledger in
-                    Deferred.List.iter accounts_after ~f:(fun acct ->
-                        let acct_id = Account.identifier acct in
-                        let%bind () =
-                          if
-                            not @@ Account_id.Set.mem account_ids_before acct_id
-                          then (
-                            (* new account *)
-                            [%log info]
-                              "Adding account id %s to accounts_created for \
-                               block with state hash %s"
-                              ( Account_id.to_yojson acct_id
-                              |> Yojson.Safe.to_string )
-                              (State_hash.to_base58_check state_hash) ;
-                            let%bind _block_id, _acct_id_id =
-                              query_db ~f:(fun db ->
-                                  Processor.Accounts_created
-                                  .add_if_doesn't_exist db last_block_id acct_id
-                                    constraint_constants.account_creation_fee )
-                            in
-                            Deferred.unit )
-                          else Deferred.unit
+                    let%bind () =
+                      Deferred.List.iter accounts_created ~f:(fun acct_id ->
+                          query_db ~f:(fun db ->
+                              Processor.Accounts_created.add_if_doesn't_exist db
+                                last_block_id acct_id
+                                constraint_constants.account_creation_fee )
+                          |> Deferred.ignore_m )
+                    in
+
+                    Deferred.List.iter accounts_accessed ~f:(fun acct_id ->
+                        let index =
+                          Ledger.index_of_account_exn ledger acct_id
                         in
-                        let%bind () =
-                          (* new or modified account *)
-                          if not @@ Account_set.mem accounts_before_set acct
-                          then
-                            let index =
-                              Ledger.index_of_account_exn ledger
-                                (Account.identifier acct)
-                            in
-                            let%bind _block_id, _acct_id_id =
-                              query_db ~f:(fun db ->
-                                  Processor.Accounts_accessed
-                                  .add_if_doesn't_exist db last_block_id ~logger
-                                    (index, acct) )
-                            in
-                            Deferred.unit
-                          else Deferred.unit
-                        in
-                        Deferred.unit )
+                        let acct = Ledger.get_at_index_exn ledger index in
+                        query_db ~f:(fun db ->
+                            Processor.Accounts_accessed.add_if_doesn't_exist db
+                              last_block_id ~logger (index, acct) )
+                        |> Deferred.ignore_m )
                   else (
                     check_ledger_hash_at_slot state_hash ledger_hash ;
                     Deferred.unit )
