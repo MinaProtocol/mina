@@ -51,18 +51,20 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
       ~rounds:tick_rounds e.evals
   in
   let ft_eval0 : Tick.Field.t =
-    if Option.is_some custom_gate_type then
-      Type1Minus.ft_eval0
-        (module Tick.Field)
-        plonk ~env ~domain
-        (Plonk_types.Evals.to_in_circuit combined_evals)
-        (fst e.public_input)
-    else
-      Type1.ft_eval0
-        (module Tick.Field)
-        plonk ~env ~domain
-        (Plonk_types.Evals.to_in_circuit combined_evals)
-        (fst e.public_input)
+    match custom_gate_type with
+    | Some custom_gate_type ->
+        Type1Minus.ft_eval0
+          (module Tick.Field)
+          plonk ~env ~custom_gate_type (* ~map_constant:Fn.id *)
+          ~domain
+          (Plonk_types.Evals.to_in_circuit combined_evals)
+          (fst e.public_input)
+    | None ->
+        Type1.ft_eval0
+          (module Tick.Field)
+          plonk ~env ~domain
+          (Plonk_types.Evals.to_in_circuit combined_evals)
+          (fst e.public_input)
   in
   let T = AB.eq in
   let challenge_polys =

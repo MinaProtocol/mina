@@ -1034,14 +1034,16 @@ struct
       in
       let ft_eval0 : Field.t =
         with_label "ft_eval0" (fun () ->
-            if Option.is_some custom_gate_type then
-              Plonk_checks.Type1Minus.ft_eval0
-                (module Field)
-                ~env ~domain plonk_minimal combined_evals evals1.public_input
-            else
-              Plonk_checks.Type1.ft_eval0
-                (module Field)
-                ~env ~domain plonk_minimal combined_evals evals1.public_input )
+            match custom_gate_type with
+            | Some custom_gate_type ->
+                Plonk_checks.Type1Minus.ft_eval0
+                  (module Field)
+                  ~env ~custom_gate_type ~map_constant:Field.constant ~domain
+                  plonk_minimal combined_evals evals1.public_input
+            | None ->
+                Plonk_checks.Type1.ft_eval0
+                  (module Field)
+                  ~env ~domain plonk_minimal combined_evals evals1.public_input )
       in
 
       print_fp "ft_eval0" ft_eval0 ;

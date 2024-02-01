@@ -89,11 +89,27 @@ val scalars_env :
   -> 't Scalars.Env.t
 
 module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : sig
-  val ft_eval0 :
-       't field
-    -> domain:< shifts : 't array ; .. >
+  val evaluate_rpn :
+       (module Field_intf with type t = 't)
+       (* -> (module Field_intf with type t = 'u) *)
     -> env:'t Scalars.Env.t
-    -> ( 't
+         (* -> _evals:('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t *)
+         (* -> gate_rpn:Kimchi_pasta_basic.Fp.t Kimchi_types.polish_token array *)
+    -> gate_rpn:'u Kimchi_types.polish_token array
+    -> map_constant:('u -> 't)
+    -> (* -> map_constant:(Kimchi_pasta_basic.Fp.t -> 't) *)
+       't
+
+  val ft_eval0 :
+       't field (* -> 'u field *)
+    -> domain:< shifts : 't array ; .. > (* -> const_map:('a -> 'b) *)
+    -> env:'t Scalars.Env.t
+         (* -> ?custom_gate_type:Kimchi_pasta_basic.Fp.t Kimchi_types.polish_token array *)
+    -> ?custom_gate_type:'u Kimchi_types.polish_token array
+    -> ?map_constant:('u -> 't)
+    -> (* -> ?map_constant:(Kimchi_pasta_basic.Fp.t -> 't) *)
+       (* -> ?custom_gate_type:Kimchi_pasta_basic.Fp.t Kimchi_types.polish_token array *)
+       ( 't
        , 't
        , 'b )
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
@@ -138,16 +154,6 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
        , 'a )
        Pickles_types.Plonk_types.Evals.In_circuit.t
     -> 't Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
-
-  val evaluate_rpn :
-       (module Field_intf with type t = 't)
-       (* 't field *)
-       (* 't *)
-       (* (module Internal_Basic.field with type t = 't) *)
-    -> _env:'t Scalars.Env.t
-    -> _evals:('t * 't, 'a) Pickles_types.Plonk_types.Evals.In_circuit.t
-    -> gate_rpn:'t Kimchi_types.polish_token array
-    -> 't
 end
 
 (** [Domain] is re-exported from library Pickles_base *)

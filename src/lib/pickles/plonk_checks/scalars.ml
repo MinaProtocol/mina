@@ -3,7 +3,8 @@
 (* turn off fragile pattern-matching warning from sexp ppx *)
 [@@@warning "-4"]
 
-type curr_or_next = Curr | Next [@@deriving hash, eq, compare, sexp]
+type curr_or_next = Kimchi_types.curr_or_next = Curr | Next
+[@@deriving hash, eq, compare, sexp]
 
 module Gate_type = struct
   module T = struct
@@ -48,19 +49,19 @@ module Lookup_pattern = struct
 end
 
 module Column = struct
-  open Core_kernel
-
   module T = struct
-    type t =
+    type t = Kimchi_types.column =
       | Witness of int
-      | Index of Gate_type.t
-      | Coefficient of int
-      | LookupTable
+      | Z
       | LookupSorted of int
       | LookupAggreg
+      | LookupTable
       | LookupKindIndex of Lookup_pattern.t
       | LookupRuntimeSelector
       | LookupRuntimeTable
+      | Index of Gate_type.t
+      | Coefficient of int
+      | Permutation of int
     [@@deriving hash, eq, compare, sexp]
   end
 
