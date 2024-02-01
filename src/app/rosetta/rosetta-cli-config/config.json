@@ -35,7 +35,7 @@
    "force_retry":                false,
    "stale_depth":                3,
    "broadcast_limit":            0,
-   "ignore_broadcast_failures":  false,
+   "ignore_broadcast_failures":  true,
    "clear_broadcasts":           false,
    "broadcast_behind_tip":       false,
    "block_broadcast_limit":      0,

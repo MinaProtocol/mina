@@ -66,7 +66,7 @@ module Sql = struct
 
     let query_pending =
       Caqti_request.find_opt
-        Caqti_type.(tup2 string int64)
+        Caqti_type.(tup3 string int64 string)
         Caqti_type.(tup2 (tup4 int64 int64 int64 int64) int)
         {sql|
   WITH RECURSIVE pending_chain AS (
@@ -105,9 +105,11 @@ module Sql = struct
               INNER JOIN accounts_accessed aa ON full_chain.id = aa.block_id
               INNER JOIN account_identifiers ai on ai.id = aa.account_identifier_id
               INNER JOIN public_keys pks ON ai.public_key_id = pks.id
+              INNER JOIN tokens t ON ai.token_id = t.id
 
               WHERE pks.value = $1
               AND full_chain.height <= $2
+              AND t.value = $3
 
               ORDER BY full_chain.height DESC
               LIMIT 1
@@ -115,7 +117,7 @@ module Sql = struct
 
     let query_canonical =
       Caqti_request.find_opt
-        Caqti_type.(tup2 string int64)
+        Caqti_type.(tup3 string int64 string)
         Caqti_type.(tup2 (tup4 int64 int64 int64 int64) int)
         {sql|
                 SELECT b.height,b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce,timing_id
@@ -124,10 +126,12 @@ module Sql = struct
                 INNER JOIN accounts_accessed ac ON ac.block_id = b.id
                 INNER JOIN account_identifiers ai on ai.id = ac.account_identifier_id
                 INNER JOIN public_keys pks ON ai.public_key_id = pks.id
+                INNER JOIN tokens t ON ai.token_id = t.id
 
                 WHERE pks.value = $1
                 AND b.height <= $2
                 AND b.chain_status = 'canonical'
+                AND t.value = $3
 
                 ORDER BY (b.height) DESC
                 LIMIT 1
@@ -137,9 +141,10 @@ module Sql = struct
         address =
       let open Deferred.Result.Let_syntax in
       let%bind has_canonical_height = Sql.Block.run_has_canonical_height (module Conn) ~height:requested_block_height in
+      let token_id = Mina_base.Token_id.(to_string default) in
       Conn.find_opt
         (if has_canonical_height then query_canonical else query_pending)
-        (address, requested_block_height)
+        (address, requested_block_height, token_id)
   end
 
   let compute_incremental_balance
