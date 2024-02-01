@@ -27,10 +27,13 @@ SLOT_TX_END=${SLOT_TX_END:-}
 SLOT_CHAIN_END=${SLOT_CHAIN_END:-}
 
 # Mina executable
-MINA_EXE=mina
+MINA_EXE=${MINA_EXE:-mina}
+
+# Genesis ledger directory
+GENESIS_LEDGER_DIR=${GENESIS_LEDGER_DIR:-}
 
 echo "Creates a quick-epoch-turnaround configuration in localnet/ and launches two Mina nodes" >&2
-echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-b|--berkeley]" >&2
+echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-b|--berkeley] [-c|--config ./config.json] [--slot-tx-end 100] [--slot-chain-end 130] [--genesis-ledger-dir ./genesis]" >&2
 echo "Consider reading script's code for information on optional arguments" >&2
 
 ##########################################################
@@ -53,6 +56,8 @@ while [[ $# -gt 0 ]]; do
       SLOT_CHAIN_END="$2"; shift; shift ;;
     --slot-tx-end)
       SLOT_TX_END="$2"; shift; shift ;;
+    --genesis-ledger-dir)
+      GENESIS_LEDGER_DIR="$2"; shift; shift ;;
     -*|--*)
       echo "Unknown option $1"; exit 1 ;;
     *)
@@ -148,29 +153,34 @@ fi
 
 ##############################################################
 # Launch two Mina nodes and send transactions on an interval
-#############################################################
+##############################################################
+
+CONF_FILE="$PWD/$CONF_DIR/daemon$CONF_SUFFIX.json"
+COMMON_ARGS=( --config-file "$CONF_FILE" --file-log-level Info --log-level Error --seed )
+
+if [[ "$GENESIS_LEDGER_DIR" != "" ]]; then
+  COMMON_ARGS+=( --genesis-ledger-dir "$GENESIS_LEDGER_DIR" )
+fi
 
 # Clean runtime directories
 rm -Rf localnet/runtime_1 localnet/runtime_2
 
-CONF_FILE="$PWD/$CONF_DIR/daemon$CONF_SUFFIX.json"
-
-"$MINA_EXE" daemon --config-file "$CONF_FILE" \
+"$MINA_EXE" daemon "${COMMON_ARGS[@]}" \
   --peer "/ip4/127.0.0.1/tcp/10312/p2p/$(cat $CONF_DIR/libp2p_2.peerid)" \
-  "${libp2p_1_args[@]}" --seed \
+  "${libp2p_1_args[@]}" \
   --block-producer-key "$PWD/$CONF_DIR/bp" \
-  --config-directory "$PWD/localnet/runtime_1" --file-log-level Info --log-level Error \
+  --config-directory "$PWD/localnet/runtime_1" \
   --client-port 10301 --external-port 10302 --rest-port 10303 &
 
 bp_pid=$!
 
 echo "Block producer PID: $bp_pid"
 
-"$MINA_EXE" daemon --config-file "$CONF_FILE" \
-  "${libp2p_2_args[@]}" --seed \
+"$MINA_EXE" daemon "${COMMON_ARGS[@]}" \
+  "${libp2p_2_args[@]}" \
   --peer "/ip4/127.0.0.1/tcp/10302/p2p/$(cat $CONF_DIR/libp2p_1.peerid)" \
   --run-snark-worker "$(cat $CONF_DIR/bp.pub)" --work-selection seq \
-  --config-directory "$PWD/localnet/runtime_2" --file-log-level Info --log-level Error \
+  --config-directory "$PWD/localnet/runtime_2" \
   --client-port 10311 --external-port 10312 --rest-port 10313 &
 
 sw_pid=$!
