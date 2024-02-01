@@ -262,7 +262,7 @@
 
         packages = {
           inherit (ocamlPackages)
-            mina mina_tests mina-ocaml-format mina_client_sdk test_executive;
+            mina devnet mainnet mina_tests mina-ocaml-format mina_client_sdk test_executive;
           inherit (pkgs) libp2p_helper marlin_plonk_bindings_stubs;
         };
 
