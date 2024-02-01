@@ -16,10 +16,6 @@ let PipelineTag = ./Pipeline/Tag.dhall
 let Size = ./Command/Size.dhall
 let triggerCommand = ./Pipeline/TriggerCommand.dhall
 
-let mode = env:BUILDKITE_PIPELINE_MODE as Text ? "PullRequest"
-let include_tags = env:BUILDKITE_PIPELINE_TAGS_INCL as Text ? "Fast"
-let exclude_tags = env:BUILDKITE_PIPELINE_TAGS_EXCL as Text ? ""
-
 let jobs : List JobSpec.Type =
   List/map
     Pipeline.CompoundType
@@ -35,7 +31,10 @@ let prefixCommands = [
 
 
 -- Run a job if we touched a dirty path
-let commands: PipelineFilter.Type -> PipelineMode.Type -> List Cmd.Type  =  \(filter: PipelineFilter.Type) -> \(mode: PipelineMode.Type) ->
+let commands: PipelineFilter.Type -> PipelineMode.Type -> Size -> List Cmd.Type  =  
+  \(filter: PipelineFilter.Type) -> 
+  \(mode: PipelineMode.Type) ->
+  \(agent_size: Size) -> 
   Prelude.List.map 
     JobSpec.Type 
     Cmd.Type 

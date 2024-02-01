@@ -26,8 +26,6 @@ let config : Pipeline.Config.Type = Pipeline.Config::{
   steps = [
     Command.build Command.Config::{
       commands = [
-        Cmd.run "export BUILDKITE_PIPELINE_MODE=${mode}",
-        Cmd.run "export BUILDKITE_PIPELINE_FILTER=${filter}",
         Cmd.run "./buildkite/scripts/generate-jobs.sh > buildkite/src/gen/Jobs.dhall",
         Cmd.quietly "dhall-to-yaml --quoted <<< '(./buildkite/src/Monorepo.dhall) { mode=(./buildkite/src/Pipeline/Mode.dhall).Type.${mode}, filter=(./buildkite/src/Pipeline/Filter.dhall).Type.${filter}  }' | buildkite-agent pipeline upload"
       ],
