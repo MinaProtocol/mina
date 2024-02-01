@@ -1365,6 +1365,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                                  Some account_id
                              | `Not_accessed ->
                                  None )
+                      |> List.dedup_and_sort ~compare:Account_id.compare
                     in
                     let%bind () =
                       Deferred.List.iter accounts_created ~f:(fun acct_id ->
