@@ -30,15 +30,19 @@ TEST_EXECUTIVE_DEPS=", mina-logproc, python3, nodejs, yarn, google-cloud-sdk, ku
 case "${MINA_DEB_CODENAME}" in
   bookworm|jammy)
     DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
+    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   bullseye|focal)
     DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
+    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   buster)
     DAEMON_DEPS=", libffi6, libjemalloc2, libpq-dev, libprocps7, mina-logproc"
+    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   stretch|bionic)
     DAEMON_DEPS=", libffi6, libjemalloc1, libpq-dev, libprocps6, mina-logproc"
+    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc1"
     ;;
   *)
     echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1
@@ -48,9 +52,13 @@ esac
 case "${DUNE_PROFILE}" in
   devnet)
     MINA_DEB_NAME="mina-berkeley"
-    ;;
+    DEB_SUFFIX=""
+   ;;
   *)
-    MINA_DEB_NAME="mina-berkeley-${DUNE_PROFILE}"
+    # use dune profile as suffix but replace underscode to dashes sor deb builder won't complain
+    MINA_DEB_NAME="mina-berkeley-${DUNE_PROFILE//_/-}"
+    # use dune profile as suffix but replace underscode to dashes sor deb builder won't complain
+    DEB_SUFFIX="-${DUNE_PROFILE//_/-}"
     ;;
 esac
 
@@ -192,139 +200,201 @@ copy_common_daemon_configs() {
 }
 
 ##################################### GENERATE KEYPAIR PACKAGE #######################################
-if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
-then
+build_keypair_deb() {
+  if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
+  then
 
-  echo "------------------------------------------------------------"
-  echo "--- Building generate keypair deb:"
+    echo "------------------------------------------------------------"
+    echo "--- Building generate keypair deb:"
 
-  create_control_file mina-generate-keypair "${SHARED_DEPS}" 'Utility to regenerate mina private public keys in new format'
+    create_control_file mina-generate-keypair "${SHARED_DEPS}" 'Utility to regenerate mina private public keys in new format'
 
-  # Binaries
-  cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
-  cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
+    # Binaries
+    cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
+    cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
 
-  build_deb mina-generate-keypair
+    build_deb mina-generate-keypair
 
-fi # only builds on mainnet-like branches
+  fi # only builds on mainnet-like branches
+}
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
 
 
 ##################################### LOGPROC PACKAGE #######################################
+build_logproc_deb() {
+  create_control_file mina-logproc "${SHARED_DEPS}" 'Utility for processing mina-daemon log output'
 
-create_control_file mina-logproc "${SHARED_DEPS}" 'Utility for processing mina-daemon log output'
+  # Binaries
+  cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
 
-# Binaries
-cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
-
-build_deb mina-logproc
-
+  build_deb mina-logproc
+}
 ##################################### END LOGPROC PACKAGE #######################################
 
 ##################################### GENERATE RECEIPT CHAIN HASH FIX PACKAGE #######################################
+build_receipt_chain_hash_fix_deb () {
+  create_control_file mina-receipt-chain-hash-fix "${SHARED_DEPS}${DAEMON_DEPS}" 'Tool to run automated fix against a archive database for receipt chain hash.'
 
-create_control_file mina-receipt-chain-hash-fix "${SHARED_DEPS}${DAEMON_DEPS}" 'Tool to run automated fix against a archive database for receipt chain hash.'
+  mkdir -p "${BUILDDIR}/etc/mina/receipt-chain-hash-fix-script"
 
-mkdir -p "${BUILDDIR}/etc/mina/receipt-chain-hash-fix-script"
+  # Binaries
+  cp ../scripts/migrate-itn-data.sh "${BUILDDIR}/etc/mina/receipt-chain-hash-fix-script/migrate-itn-data.sh"
+  cp ./default/src/app/last_vrf_output_to_b64/last_vrf_output_to_b64.exe "${BUILDDIR}/usr/local/bin/mina-last-vrf-output-to-b64"
+  cp ./default/src/app/receipt_chain_hash_to_b58/receipt_chain_hash_to_b58.exe "${BUILDDIR}/usr/local/bin/mina-receipt-chain-hash-to-b58"
 
-# Binaries
-cp ../scripts/migrate-itn-data.sh "${BUILDDIR}/etc/mina/receipt-chain-hash-fix-script/migrate-itn-data.sh"
-cp ./default/src/app/last_vrf_output_to_b64/last_vrf_output_to_b64.exe "${BUILDDIR}/usr/local/bin/mina-last-vrf-output-to-b64"
-cp ./default/src/app/receipt_chain_hash_to_b58/receipt_chain_hash_to_b58.exe "${BUILDDIR}/usr/local/bin/mina-receipt-chain-hash-to-b58"
-
-build_deb mina-receipt-chain-hash-fix
-
+  build_deb mina-receipt-chain-hash-fix
+}
 ##################################### END RECEIPT CHAIN HASH FIX PACKAGE #######################################
 
 ##################################### GENERATE TEST_EXECUTIVE PACKAGE #######################################
+build_test_executive_deb () {
+  create_control_file mina-test-executive "${SHARED_DEPS}${TEST_EXECUTIVE_DEPS}" 'Tool to run automated tests against a full mina testnet with multiple nodes.'
 
-create_control_file mina-test-executive "${SHARED_DEPS}${TEST_EXECUTIVE_DEPS}" 'Tool to run automated tests against a full mina testnet with multiple nodes.'
+  # Binaries
+  cp ./default/src/app/test_executive/test_executive.exe "${BUILDDIR}/usr/local/bin/mina-test-executive"
 
-# Binaries
-cp ./default/src/app/test_executive/test_executive.exe "${BUILDDIR}/usr/local/bin/mina-test-executive"
-
-build_deb mina-test-executive
+  build_deb mina-test-executive
+}
+##################################### END TEST_EXECUTIVE PACKAGE #######################################
 
 ##################################### GENERATE BATCH TXN TOOL PACKAGE #######################################
+build_batch_txn_deb() {
 
-create_control_file mina-batch-txn "${SHARED_DEPS}" 'Load transaction tool against a mina node.'
+  create_control_file mina-batch-txn "${SHARED_DEPS}" 'Load transaction tool against a mina node.'
 
-# Binaries
-cp ./default/src/app/batch_txn_tool/batch_txn_tool.exe "${BUILDDIR}/usr/local/bin/mina-batch-txn"
+  # Binaries
+  cp ./default/src/app/batch_txn_tool/batch_txn_tool.exe "${BUILDDIR}/usr/local/bin/mina-batch-txn"
 
-build_deb mina-batch-txn
-
+  build_deb mina-batch-txn
+}
 ##################################### END BATCH TXN TOOL PACKAGE #######################################
 
 ##################################### GENERATE TEST SUITE PACKAGE #######################################
+build_test_suite_deb() {
+  create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.'
 
+  # Binaries
+  cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
 
-create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.'
+  build_deb mina-test-suite
 
-# Binaries
-cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
-
-build_deb mina-test-suite
-
+}
 ##################################### END TEST SUITE PACKAGE #######################################
 
 ##################################### MAINNET PACKAGE #######################################
-if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
-then
+build_daemon_deb() {
+ 
+  if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
+  then
+
+    echo "------------------------------------------------------------"
+    echo "--- Building mainnet deb without keys:"
+
+    create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
+
+    copy_common_daemon_configs mainnet mainnet 'mina-seed-lists/mainnet_seeds.txt'
+
+    build_deb mina-mainnet
+
+  fi # only builds on mainnet-like branches
+  ##################################### END MAINNET PACKAGE #######################################
+
+  ##################################### DEVNET PACKAGE #######################################
+  if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
+  then
+
+    echo "------------------------------------------------------------"
+    echo "--- Building testnet signatures deb without keys:"
+
+    copy_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network'
+
+    copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
+
+    build_deb mina-devnet
+
+  fi # only builds on mainnet-like branches
+  ##################################### END DEVNET PACKAGE #######################################
+
+  ##################################### BERKELEY PACKAGE #######################################
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Berkeley testnet signatures deb without keys:"
+
+  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
+
+  copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
+
+  build_deb "${MINA_DEB_NAME}"
+
+  ##################################### END BERKELEY PACKAGE #######################################
+}
+
+##################################### ARCHIVE PACKAGE ##########################################
+build_archive_deb () {
+  ARCHIVE_DEB=mina-archive${DEB_SUFFIX}
 
   echo "------------------------------------------------------------"
-  echo "--- Building mainnet deb without keys:"
+  echo "--- Building archive deb"
 
-  create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
 
-  copy_common_daemon_configs mainnet mainnet 'mina-seed-lists/mainnet_seeds.txt'
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
+ Compatible with Mina Daemon'
 
-  build_deb mina-mainnet
+  cp ./default/src/app/archive/archive.exe "${BUILDDIR}/usr/local/bin/mina-archive"
+  cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
+  cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
+  cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
 
-fi # only builds on mainnet-like branches
-##################################### END MAINNET PACKAGE #######################################
+  cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
+  cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-replayer"
+  cp ./default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILDDIR}/usr/local/bin/mina-swap-bad-balances"
 
-##################################### DEVNET PACKAGE #######################################
-if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
-then
+  build_deb "$ARCHIVE_DEB"
 
-  echo "------------------------------------------------------------"
-  echo "--- Building testnet signatures deb without keys:"
-
-  copy_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network'
-
-  copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
-
-  build_deb mina-devnet
-
-fi # only builds on mainnet-like branches
-##################################### END DEVNET PACKAGE #######################################
+}
+##################################### END ARCHIVE PACKAGE ######################################
 
 ##################################### ZKAPP TEST TXN #######################################
-echo "------------------------------------------------------------"
-echo "--- Building Mina Berkeley ZkApp test transaction tool:"
+build_zkapp_test_transaction_deb () {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Berkeley ZkApp test transaction tool:"
 
-create_control_file mina-zkapp-test-transaction "${SHARED_DEPS}${DAEMON_DEPS}" 'Utility to generate ZkApp transactions in Mina GraphQL format'
+  create_control_file mina-zkapp-test-transaction "${SHARED_DEPS}${DAEMON_DEPS}" 'Utility to generate ZkApp transactions in Mina GraphQL format'
 
-# Binaries
-cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-test-transaction"
+  # Binaries
+  cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-test-transaction"
 
-build_deb mina-zkapp-test-transaction
-
+  build_deb mina-zkapp-test-transaction 
+}
 ##################################### END ZKAPP TEST TXN PACKAGE #######################################
 
-##################################### BERKELEY PACKAGE #######################################
-echo "------------------------------------------------------------"
-echo "--- Building Mina Berkeley testnet signatures deb without keys:"
+# always build log proc since it is often an dependency
+# TODO: remove logproc as external dependency 
+build_logproc_deb
+   
+if [ $# -eq 0 ]
+  then
+    echo "No arguments supplied. Building all known debian packages"
+    build_keypair_deb
+    build_archive_deb
+    build_batch_txn_deb
+    build_daemon_deb
+    build_receipt_chain_hash_fix_deb
+    build_test_executive_deb
+    build_test_suite_deb
+    build_zkapp_test_transaction_deb
 
-mkdir -p "${BUILDDIR}/DEBIAN"
-create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
-
-copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
-
-build_deb "${MINA_DEB_NAME}"
-
-##################################### END BERKELEY PACKAGE #######################################
+  else 
+    for i in "$@"; do
+      if [[ $(type -t "build_${i}_deb") == function ]]
+        then 
+          echo "Building $i debian package"
+          "build_${i}_deb"
+      else 
+        echo "invalid debian package name '$i'"
+        exit 1
+      fi
+    done
+fi
 
 # TODO: Find a way to package keys properly without blocking/locking in CI
 # TODO: Keys should be their own package, which this 'non-noprovingkeys' deb depends on
