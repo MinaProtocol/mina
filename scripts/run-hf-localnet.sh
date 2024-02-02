@@ -32,8 +32,11 @@ MINA_EXE=${MINA_EXE:-mina}
 # Genesis ledger directory
 GENESIS_LEDGER_DIR=${GENESIS_LEDGER_DIR:-}
 
+# Slot duration (a.k.a. block window duration), seconds
+SLOT=${SLOT:-30}
+
 echo "Creates a quick-epoch-turnaround configuration in localnet/ and launches two Mina nodes" >&2
-echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-b|--berkeley] [-c|--config ./config.json] [--slot-tx-end 100] [--slot-chain-end 130] [--genesis-ledger-dir ./genesis]" >&2
+echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-s|--slot $SLOT] [-b|--berkeley] [-c|--config ./config.json] [--slot-tx-end 100] [--slot-chain-end 130] [--genesis-ledger-dir ./genesis]" >&2
 echo "Consider reading script's code for information on optional arguments" >&2
 
 ##########################################################
@@ -50,6 +53,8 @@ while [[ $# -gt 0 ]]; do
       CONF_SUFFIX=".berkeley"; shift ;;
     -m|--mina)
       MINA_EXE="$2"; shift; shift ;;
+    -s|--slot)
+      SLOT="$2"; shift; shift ;;
     -c|--config)
       CUSTOM_CONF="$2"; shift; shift ;;
     --slot-chain-end)
@@ -115,8 +120,10 @@ if [[ "$SLOT_CHAIN_END" != "" ]]; then
   slot_ends="$slot_ends .daemon.slot_chain_end = $SLOT_CHAIN_END | "
 fi
 
+update_config_expr=".genesis.genesis_state_timestamp = \"$timestamp\" | .proof.block_window_duration_ms = ${SLOT}000"
+
 if [[ "$CUSTOM_CONF" == "" ]]; then
-  jq --arg timestamp "$timestamp" --slurpfile accounts $CONF_DIR/ledger.json "$slot_ends .ledger.accounts = \$accounts[0] | .genesis.genesis_state_timestamp |= \$timestamp" > $CONF_DIR/daemon.json << EOF
+  jq --slurpfile accounts $CONF_DIR/ledger.json "$slot_ends .ledger.accounts = \$accounts[0] | $update_config_expr" > $CONF_DIR/daemon.json << EOF
 {
   "genesis": {
     "genesis_state_timestamp": "",
@@ -127,7 +134,6 @@ if [[ "$CUSTOM_CONF" == "" ]]; then
   },
   "proof": {
     "work_delay": 1,
-    "block_window_duration_ms": 30000,
     "level": "full",
     "sub_windows_per_window": 11,
     "ledger_depth": 20,
@@ -147,7 +153,7 @@ EOF
   jq '.ledger.accounts = [.ledger.accounts[] | del(.token_permissions, .permissions.stake) | .token = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf" | .token_symbol = "" | select(.permissions.set_verification_key == "signature").permissions.set_verification_key |= {auth:"signature", txn_version: "1"} ]' <$CONF_DIR/daemon.json >$CONF_DIR/daemon.berkeley.json
 
 else
-  <"$CUSTOM_CONF" jq --arg timestamp "$timestamp" '.genesis.genesis_state_timestamp |= $timestamp' > $CONF_DIR/daemon.json
+  <"$CUSTOM_CONF" jq "$update_config_expr" > $CONF_DIR/daemon.json
 fi
 
 
