@@ -2,8 +2,8 @@
 
 set -eo pipefail
 
-curl https://media.githubusercontent.com/media/MinaProtocol/mina/testing/hard-fork-internal/genesis_ledgers/mainnet.json > mainnet.json
-curl https://media.githubusercontent.com/media/MinaProtocol/mina/testing/hard-fork-internal/genesis_ledgers/devnet.json > devnet.json
+curl https://media.githubusercontent.com/media/MinaProtocol/mina/testing/hard-fork-internal/genesis_ledgers/mainnet.json > genesis_ledgers/mainnet.json
+curl https://media.githubusercontent.com/media/MinaProtocol/mina/testing/hard-fork-internal/genesis_ledgers/devnet.json > genesis_ledgers/devnet.json
 
 # execute pre-processing steps like zexe-standardize.sh if set
 if [ -n "${PREPROCESSOR}" ]; then echo "--- Executing preprocessor" && ${PREPROCESSOR}; fi
