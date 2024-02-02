@@ -20,7 +20,8 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = [
           S.strictlyStart (S.contains "src"),
-          S.exactly "buildkite/src/Jobs/Test/NixBuild" "dhall"
+          S.exactly "buildkite/src/Jobs/Test/NixBuild" "dhall",
+	  S.exactly "buildkite/scripts/test-nix" "sh"
         ],
         path = "Test",
         name = "NixBuildTest",
