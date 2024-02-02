@@ -2,11 +2,8 @@
 
 set -eo pipefail
 
-sudo apt-get update
-sudo apt-get install git-lfs
-git lfs install
-git lfs pull
-git checkout HEAD
+curl https://github.com/MinaProtocol/mina/raw/testing/hard-fork-internal/genesis_ledgers/mainnet.json > genesis_ledgers/mainnet.json
+curl https://github.com/MinaProtocol/mina/raw/testing/hard-fork-internal/genesis_ledgers/devnet.json > genesis_ledgers/devnet.json
 
 # execute pre-processing steps like zexe-standardize.sh if set
 if [ -n "${PREPROCESSOR}" ]; then echo "--- Executing preprocessor" && ${PREPROCESSOR}; fi
