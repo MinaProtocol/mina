@@ -2,6 +2,9 @@
 
 set -eo pipefail
 
+git lfs install
+git checkout HEAD
+
 # execute pre-processing steps like zexe-standardize.sh if set
 if [ -n "${PREPROCESSOR}" ]; then echo "--- Executing preprocessor" && ${PREPROCESSOR}; fi
 
