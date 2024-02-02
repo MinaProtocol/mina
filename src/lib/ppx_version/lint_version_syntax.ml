@@ -124,6 +124,13 @@ let is_jane_street_prefix prefix =
   | _ ->
       false
 
+let is_bounded_type prefix =
+  match Longident.flatten_exn prefix with
+  | "Bounded_types" :: _ ->
+      true
+  | _ ->
+      false
+
 (* N.B.: most versioned modules are within "Stable" modules, but that's not true
    for modules in RPC type definitions, so we can't rely on that name
 *)
@@ -150,6 +157,7 @@ let is_versioned_module_lident = function
   | Ldot (prefix, vn)
     when is_version_module vn
          && (not @@ is_jane_street_prefix prefix)
+         && (not @@ is_bounded_type prefix)
          && is_stable_prefix prefix ->
       true
   | _ ->

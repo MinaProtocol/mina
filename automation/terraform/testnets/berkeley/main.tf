@@ -60,8 +60,8 @@ variable "plain_node_count" {
 
 locals {
   testnet_name       = "berkeley"
-  mina_image         = "minaprotocol/mina-daemon:focal-berkeley-latest" #"minaprotocol/mina-daemon:1.3.2beta2-release-2.0.0-6f9d956-focal-berkeley"
-  mina_archive_image = "minaprotocol/mina-archive:focal-latest"         #"minaprotocol/mina-archive:1.3.2beta2-release-2.0.0-6f9d956-focal"
+  mina_image         = "gcr.io/o1labs-192920/mina-daemon:2.0.0rampup1-rampup-b1facec-focal-berkeley" #"minaprotocol/mina-daemon:1.3.2beta2-release-2.0.0-6f9d956-focal-berkeley"
+  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:2.0.0rampup1-rampup-b1facec-focal"         #"minaprotocol/mina-archive:1.3.2beta2-release-2.0.0-6f9d956-focal"
   seed_region        = "us-central1"
   seed_zone          = "us-central1-b"
 
@@ -94,9 +94,9 @@ module "berkeley" {
   watchdog_image              = "gcr.io/o1labs-192920/watchdog:0.4.13"
   use_embedded_runtime_config = true
 
-  archive_node_count            = 3
+  archive_node_count            = 2
   mina_archive_schema           = "create_schema.sql"
-  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/8468f29424fa5e70cfedf69ee281f4fa24037dfe/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/8468f29424fa5e70cfedf69ee281f4fa24037dfe/src/app/archive/zkapp_tables.sql"]
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/b1facecde934ce3969771c34962b878d75321ca7/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/b1facecde934ce3969771c34962b878d75321ca7/src/app/archive/zkapp_tables.sql"]
 
   archive_configs = [
     {
@@ -107,15 +107,9 @@ module "berkeley" {
     },
     {
       name              = "archive-2"
-      enableLocalDaemon = false
-      enablePostgresDB  = false
-      postgresHost      = "archive-1-postgresql"
-    },
-    {
-      name              = "archive-3"
-      enableLocalDaemon = false
+      enableLocalDaemon = true
       enablePostgresDB  = true
-      postgresHost      = "archive-3-postgresql"
+      postgresHost      = "archive-2-postgresql"
     }
   ]
 
@@ -145,10 +139,12 @@ module "berkeley" {
 
   snark_coordinators = [
     {
+      snark_coordinator_name       = local.testnet_name
       snark_worker_replicas        = 5
       snark_worker_fee             = "0.01"
       snark_worker_public_key      = "B62qmQsEHcsPUs5xdtHKjEmWqqhUPRSF2GNmdguqnNvpEZpKftPC69e"
       snark_coordinators_host_port = 10401
+      persist_working_dir          = true
     }
   ]
 
@@ -167,10 +163,6 @@ module "berkeley" {
     }
   ]
 
-  # nodes_with_user_agent = ["fish-1-1","fish-2-1"]
-
-
-
   upload_blocks_to_gcloud         = true
   restart_nodes                   = false
   restart_nodes_every_mins        = "60"
@@ -182,8 +174,7 @@ module "berkeley" {
 
   # a pass must be set to connect the zkapps dash to grafana
   # leave empty to lock down the zkapps dashboard
-  
-  # zkapps_dashboard_key = ""
 
+  # zkapps_dashboard_key = ""
 }
 

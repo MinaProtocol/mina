@@ -9,7 +9,7 @@ open Runner
  *)
 
 module CliTests = struct
-  let test_background_daemon () =
+  let test_background_daemon mina_path =
     let test_case config =
       let open Deferred.Or_error.Let_syntax in
       let bootstrapper = MinaBootstrapper.create config in
@@ -19,9 +19,10 @@ module CliTests = struct
       let%map _ = MinaCli.stop_daemon mina_cli in
       ()
     in
-    Async.Thread_safe.block_on_async_exn (fun () -> TestRunner.run test_case)
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        TestRunner.run test_case mina_path )
 
-  let test_daemon_recover () =
+  let test_daemon_recover mina_path =
     let test_case config =
       let open Deferred.Or_error.Let_syntax in
       let bootstrapper = MinaBootstrapper.create config in
@@ -35,16 +36,26 @@ module CliTests = struct
       let%map _ = MinaCli.stop_daemon mina_cli in
       ()
     in
-    Async.Thread_safe.block_on_async_exn (fun () -> TestRunner.run test_case)
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        TestRunner.run test_case mina_path )
 end
+
+let mina_path =
+  let doc = "Path Path to mina daemon executable" in
+  Cmdliner.Arg.(
+    required
+    & opt (some string) None
+    & info [ "mina-path" ] ~doc ~docv:"MINA_PATH")
 
 let () =
   let open Alcotest in
-  run "Test commadline."
-    [ ( "commadnline-tests"
+  run_with_args "Test commadline." mina_path
+    [ ( "background"
       , [ test_case "The mina daemon works in background mode" `Quick
             CliTests.test_background_daemon
-        ; test_case "The mina daemon recovers from crash" `Quick
+        ] )
+    ; ( "restart"
+      , [ test_case "The mina daemon recovers from crash" `Quick
             CliTests.test_daemon_recover
         ] )
     ]

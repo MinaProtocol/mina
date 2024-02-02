@@ -1,3 +1,6 @@
 [%%define fork_previous_length 3757]
 [%%define fork_previous_state_hash "3NKR3QYJ7qwxiGgX39umahgdT8BH5yXBQwQtpYZdvodCXcsndK7f"]
 [%%define fork_genesis_slot 12796]
+[%%undef zkapp_cmd_limit]
+[%%undef slot_tx_end]
+[%%undef slot_chain_end]
