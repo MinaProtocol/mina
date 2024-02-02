@@ -677,7 +677,8 @@ module Sql = struct
       Caqti_request.collect Caqti_type.(tup2 int string) typ
       (sprintf
         {|
-         SELECT %s,
+         SELECT u.id,
+                %s,
                 pk_payer.value as fee_payer,
                 pk_source.value as source,
                 pk_receiver.value as receiver,
@@ -752,6 +753,7 @@ module Sql = struct
       (sprintf
         {|
          SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no)
+           i.id,
            %s,
            ac.creation_fee,
            pk.value as receiver,

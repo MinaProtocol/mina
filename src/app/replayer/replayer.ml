@@ -142,6 +142,7 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
     ; num_accounts = None
     ; balances = []
     ; hash = None
+    ; s3_data_hash = None
     ; name = None
     ; add_genesis_winner = Some true
     }
@@ -1287,6 +1288,11 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
               Frozen_ledger_hash.equal snarked_hash genesis_snarked_ledger_hash
             then
                 [%log info] "Snarked ledger hash is genesis snarked ledger hash"
+              else if migration_mode then (
+                [%log info]
+                  "We are doing migration, so the snarked_ledger_hash in \
+                   global_slot_hashes_tbl is irrelevant" ;
+                First_pass_ledger_hashes.flush_older_than 1 )
               else
                 match First_pass_ledger_hashes.find snarked_hash with
                 | None ->

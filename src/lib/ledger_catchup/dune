@@ -67,4 +67,5 @@
    o1trace
    mina_net2
    internal_tracing
+   runtime_config
 ))
