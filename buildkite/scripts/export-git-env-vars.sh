@@ -55,6 +55,8 @@ else
               RELEASE=alpha ;;
             *beta*) # any tag including the string `beta`
               RELEASE=beta ;;
+            *berkeley*) # any tag including the string `berkeley`
+              RELEASE=berkeley ;;
             *rampup*) # any tag including the string `rampup`
               RELEASE=rampup ;;
             ?*) # Any other non-empty tag. ? matches a single character and * matches 0 or more characters.
