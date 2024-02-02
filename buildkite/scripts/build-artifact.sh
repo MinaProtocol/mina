@@ -2,7 +2,8 @@
 
 set -eo pipefail
 
-curl https://github.com/git-lfs/git-lfs/releases/download/v3.4.1/git-lfs-linux-amd64-v3.4.1.tar.gz | tar xvz
+wget https://github.com/git-lfs/git-lfs/releases/download/v3.4.1/git-lfs-linux-amd64-v3.4.1.tar.gz
+tar xvzf git-lfs-linux-amd64-v3.4.1.tar.gz
 git-lfs-3.4.1/install.sh
 git lfs install
 git lfs pull
