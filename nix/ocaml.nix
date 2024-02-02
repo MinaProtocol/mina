@@ -256,6 +256,26 @@ let
       # Same as above, but wrapped with version info.
       mina = wrapMina self.mina-dev { };
 
+      mainnet-pkg = self.mina-dev.overrideAttrs (s: {
+        version = "mainnet";
+        configurePhase = ''
+          ${s.configurePhase}
+          export DUNE_PROFILE=mainnet
+          '';
+      });
+
+      mainnet = wrapMina self.mainnet-pkg { };
+
+      devnet-pkg = self.mina-dev.overrideAttrs (s: {
+        version = "devnet";
+        configurePhase = ''
+          ${s.configurePhase}
+          export DUNE_PROFILE=devnet
+          '';
+      });
+
+      devnet = wrapMina self.devnet-pkg { };
+
       # Unit tests
       mina_tests = runMinaCheck {
         name = "tests";

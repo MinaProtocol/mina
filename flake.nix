@@ -287,7 +287,7 @@
         # Main user-facing binaries.
         packages = rec {
           inherit (ocamlPackages)
-            mina mina_tests mina-ocaml-format test_executive;
+            mina devnet mainnet mina_tests mina-ocaml-format test_executive;
           inherit (pkgs)
             libp2p_helper kimchi_bindings_stubs snarky_js leaderboard
             validation trace-tool zkapp-cli;
