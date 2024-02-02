@@ -62,6 +62,8 @@ module Network_config = struct
         ; slots_per_epoch
         ; slots_per_sub_window
         ; txpool_max_size
+        ; slot_tx_end
+        ; slot_chain_end
         ; _
         } =
       test_config
@@ -146,6 +148,8 @@ module Network_config = struct
             ; max_event_elements = None
             ; max_action_elements = None
             ; zkapp_cmd_limit_hardcap = None
+            ; slot_tx_end
+            ; slot_chain_end
             }
       ; genesis =
           Some
@@ -169,6 +173,7 @@ module Network_config = struct
             ; balances = []
             ; hash = None
             ; name = None
+            ; s3_data_hash = None
             }
       ; epoch_data =
           Option.map epoch_data ~f:(fun { staking = staking_ledger; next } ->
@@ -205,6 +210,7 @@ module Network_config = struct
                   ; balances = []
                   ; hash = None
                   ; name = None
+                  ; s3_data_hash = None
                   }
                   : Runtime_config.Ledger.t )
               in

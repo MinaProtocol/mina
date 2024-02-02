@@ -116,6 +116,7 @@ let%test_module "transaction_status" =
       let config =
         Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
           ~verifier ~genesis_constants:precomputed_values.genesis_constants
+          ~slot_tx_end:None
       in
       let transaction_pool, _, local_sink =
         Transaction_pool.create ~config

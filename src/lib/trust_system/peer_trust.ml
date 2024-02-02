@@ -51,6 +51,8 @@ module type Input_intf = sig
     | Peer_banned of
         { sender_id : Peer_id.t; expiration : Time.t; action : string }
     [@@deriving register_event]
+
+  val remove_dir : Config.t -> unit Deferred.t
 end
 
 module Time_with_json = struct
@@ -109,7 +111,18 @@ module Make0 (Inputs : Input_intf) = struct
 
   let create db_dir =
     let reader, writer = Strict_pipe.create Strict_pipe.Synchronous in
-    { db = Some (Db.create db_dir)
+    let db = Db.create db_dir in
+    let%map db =
+      (* Check that the database is parseable, otherwise remove it. *)
+      try
+        ignore (Db.to_alist db : _ list) ;
+        Deferred.return db
+      with _ ->
+        Db.close db ;
+        let%map () = remove_dir db_dir in
+        Db.create db_dir
+    in
+    { db = Some db
     ; upcall_reader = reader
     ; upcall_writer = writer
     ; actions_writers = []
@@ -275,6 +288,8 @@ let%test_module "peer_trust" =
             ; action : string
             }
         [@@deriving register_event { msg = "Peer banned" }]
+
+      let remove_dir _ = Deferred.return ()
     end)
 
     (* We want to check the output of the pipe in these tests, but it's
@@ -288,7 +303,10 @@ let%test_module "peer_trust" =
       upcall_pipe_out := []
 
     let setup_mock_db () =
-      let res = Peer_trust_test.create () in
+      let res =
+        Async_unix__Thread_safe.block_on_async_exn (fun () ->
+            Peer_trust_test.create () )
+      in
       don't_wait_for
       @@ Strict_pipe.Reader.iter_without_pushback res.upcall_reader
            ~f:(fun v_ext ->
@@ -483,4 +501,6 @@ module Make (Action : Action_intf) = Make0 (struct
       (Record.Stable.Latest)
   module Action = Action
   include Log_events
+
+  let remove_dir = File_system.remove_dir
 end)

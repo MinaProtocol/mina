@@ -57,7 +57,8 @@
   logger
   internal_tracing.context_logger
   ppx_version.runtime
-  error_json)
+  error_json
+  pickles_optional_custom_gates_circuits)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
