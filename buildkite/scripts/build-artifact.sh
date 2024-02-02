@@ -2,7 +2,8 @@
 
 set -eo pipefail
 
-git lfs install
+git install lfs
+git lfs pull
 git checkout HEAD
 
 # execute pre-processing steps like zexe-standardize.sh if set
