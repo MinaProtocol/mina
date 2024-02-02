@@ -103,7 +103,7 @@ cat <<EOF >"$MINA_CONFIG_FILE"
       { "pk": "${ZKAPP_ACCOUNT_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
       { "pk": "${ZKAPP_ACCOUNT_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
       { "pk": "${TIME_VESTING_ACCOUNT_1_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null, "timing": { "initial_minimum_balance": "1000000", "cliff_time": "10", "cliff_amount": "1000000", "vesting_period": "1", "vesting_increment": "0" } },
-      { "pk": "${TIME_VESTING_ACCOUNT_2_PUB_KEY}", "balance": "3000000", "delegate": null, "sk": null, "timing": { "initial_minimum_balance": "1000000", "cliff_time": "5", "cliff_amount": "1000000", "vesting_period": "1", "vesting_increment": "100000" } }
+      { "pk": "${TIME_VESTING_ACCOUNT_2_PUB_KEY}", "balance": "2000000", "delegate": null, "sk": null, "timing": { "initial_minimum_balance": "1000000", "cliff_time": "5", "cliff_amount": "1000000", "vesting_period": "1", "vesting_increment": "200000" } }
     ]
   }
 }
@@ -266,6 +266,18 @@ if [[ "$MODE" == "full" ]]; then
 
   echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
   rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE}
+
+  # wait until block height 11 is reached before starting check:data
+  # so it gives enough time to vest the time-vesting accounts
+  current_block_height=$(mina client status --json | jq -r '.blockchain_length')
+  while [[ ${current_block_height} -lt 11 ]]; do
+    current_block_height=$(mina client status --json | jq -r '.blockchain_length')
+    echo "Waiting for block height 11 to be reached..."
+    echo "Current block height is: ${current_block_height}"
+    sleep 30
+  done
+
+  echo "========================= ROSETTA CLI: CHECK:DATA ==========================="
 
   echo "========================= ROSETTA CLI: CHECK:DATA ==========================="
   rosetta-cli check:data --configuration-file ${ROSETTA_CONFIGURATION_FILE}
