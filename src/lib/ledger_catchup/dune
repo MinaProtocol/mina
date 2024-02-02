@@ -62,4 +62,5 @@
    marlin_plonk_bindings_pasta_fp
    pasta
    mina_net2
+   runtime_config
 ))

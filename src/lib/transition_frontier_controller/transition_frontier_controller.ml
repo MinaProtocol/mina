@@ -102,7 +102,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       (Precomputed_values.consensus_constants precomputed_values)
     ~logger ~trust_system ~time_controller ~frontier
     ~transition_reader:network_transition_reader ~valid_transition_writer
-    ~unprocessed_transition_cache ;
+    ~unprocessed_transition_cache ~precomputed_values ;
   Strict_pipe.Reader.iter_without_pushback valid_transition_reader
     ~f:(fun (`Block b, `Valid_cb vc) ->
       Strict_pipe.Writer.write primary_transition_writer (`Block b, `Valid_cb vc) )

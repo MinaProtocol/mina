@@ -309,6 +309,7 @@ module type Transaction_pool_diff_intf = sig
       | Unwanted_fee_token
       | Expired
       | Overloaded
+      | After_slot_tx_end
     [@@deriving sexp, yojson]
 
     val to_string_hum : t -> string
@@ -338,6 +339,7 @@ module type Transaction_resource_pool_intf = sig
        trust_system:Trust_system.t
     -> pool_max_size:int
     -> verifier:Verifier.t
+    -> slot_tx_end:Mina_numbers.Global_slot.t option
     -> Config.t
 
   val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool
