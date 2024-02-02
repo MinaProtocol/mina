@@ -82,6 +82,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let%map.Quickcheck u32 = T.gen_incl u32_1 u32_2 in
     of_uint32 u32
 
+  let dhall_type = Ppx_dhall_type.Dhall_type.Text
+
   let zero = of_uint32 T.zero
 
   let one = of_uint32 T.one
