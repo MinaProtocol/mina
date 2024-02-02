@@ -37,6 +37,7 @@ RUN apt-get update --quiet --yes \
         ca-certificates \
         dnsutils \
         tzdata \
+        gnupg2 \
         postgresql \
         postgresql-contrib \
         apt-utils \
