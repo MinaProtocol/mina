@@ -45,6 +45,11 @@ variable "mina_archive_schema" {
   default = ""
 }
 
+variable "mina_archive_schema_aux_files" {
+  type    = list(string)
+  default = []
+}
+
 variable "mina_agent_image" {
   type    = string
   default = "codaprotocol/coda-user-agent:0.1.4"
@@ -120,16 +125,16 @@ variable "seed_discovery_keypairs" {
 
 variable "whales" {
   description = "individual whale block producer node deployment configurations"
-  default = null
+  default     = null
 }
 
 variable "fishes" {
   description = "individual fish block producer node deployment configurations"
-  default = null
+  default     = null
 }
 
 variable "nodes_with_user_agent" {
-  type = list(string)
+  type    = list(string)
   default = []
 }
 
@@ -176,15 +181,15 @@ variable "seed_starting_host_port" {
 
 variable "snark_coordinators" {
   description = "configurations for not just the snark coordinators but also the snark workers they coordinate"
-  type    = list(    
+  type = list(
     object({
 
-      snark_coordinator_name = string,
-      snark_worker_replicas = number
-      snark_worker_fee      = number
-      snark_worker_public_key = string
+      snark_coordinator_name       = string,
+      snark_worker_replicas        = number
+      snark_worker_fee             = number
+      snark_worker_public_key      = string
       snark_coordinators_host_port = number
-    }))
+  }))
   default = []
 }
 
@@ -256,7 +261,7 @@ variable "make_report_accounts" {
 }
 
 variable "log_precomputed_blocks" {
-  type = bool
+  type    = bool
   default = false
 }
 
@@ -269,7 +274,7 @@ variable "archive_node_count" {
 
 variable "archive_configs" {
   description = "individual archive-node deployment configurations"
-  default = null
+  default     = null
 }
 
 variable "upload_blocks_to_gcloud" {
@@ -280,4 +285,9 @@ variable "upload_blocks_to_gcloud" {
 variable "seed_peers_url" {
   type    = string
   default = ""
+}
+
+variable "seed_external_port" {
+  type    = string
+  default = "10001"
 }

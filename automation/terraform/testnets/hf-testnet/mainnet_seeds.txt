@@ -1,0 +1,3 @@
+/dns4/seed-1.hf-testnet.o1test.net/tcp/10000/p2p/12D3KooWCa1d7G3SkRxy846qTvdAFX69NnoYZ32orWVLqJcDVGHW
+/dns4/seed-2.hf-testnet.o1test.net/tcp/10001/p2p/12D3KooWK4NfthViCTyLgVQa1WvqDC1NccVxGruCXCZUt3GqvFvn
+/dns4/seed-3.hf-testnet.o1test.net/tcp/10002/p2p/12D3KooWNofeYVAJXA3WGg2qCDhs3GEe71kTmKpFQXRbZmCz1Vr7
