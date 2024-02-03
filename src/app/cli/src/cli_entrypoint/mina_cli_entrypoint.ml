@@ -700,7 +700,6 @@ let setup_daemon logger =
                       "Could not parse configuration from $config_file: $error"
                       ~metadata:
                         [ ("config_file", `String config_file)
-                        ; ("config_json", config_json)
                         ; ("error", `String err)
                         ] ;
                     failwithf "Could not parse configuration file: %s" err () )
@@ -717,11 +716,8 @@ let setup_daemon logger =
                 precomputed_values
             | Error err ->
                 [%log fatal]
-                  "Failed initializing with configuration $config: $error"
-                  ~metadata:
-                    [ ("config", Runtime_config.to_yojson config)
-                    ; ("error", Error_json.error_to_yojson err)
-                    ] ;
+                  "Failed initializing with configuration: $error"
+                  ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
                 Error.raise err
           in
           let rev_daemon_configs =
