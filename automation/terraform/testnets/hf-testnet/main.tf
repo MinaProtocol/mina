@@ -92,7 +92,7 @@ module "hf-testnet" {
 
   archive_node_count            = 2
   mina_archive_schema           = "create_schema.sql"
-  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/06691e343be1ddad036c1fc4a6c94afc12afc4ee/src/app/archive/create_schema.sql"]
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/46a00e9bd0db591da68326f7b2a8d190660733fc/src/app/archive/create_schema.sql"]
 
   archive_configs = [
     {
