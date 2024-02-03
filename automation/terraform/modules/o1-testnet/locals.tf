@@ -86,6 +86,7 @@ locals {
     persistenceSize         = "8Gi"
     persistenceStorageClass = "ssd-delete"
     persistenceAccessModes  = ["ReadWriteOnce"]
+    spotAllowed             = "false"
     preemptibleAllowed      = "false"
   }
 

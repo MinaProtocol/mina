@@ -54,22 +54,13 @@ variable "seed_count" {
 }
 
 locals {
-  testnet_name       = "hf-testnet"
-  mina_image         = "gcr.io/o1labs-192920/mina-daemon:1.4.0-c980ba8-bullseye-mainnet"
-  mina_archive_image = "gcr.io/o1labs-192920/mina-archive:1.4.0-c980ba8-bullseye"
-  seed_region        = "us-east1"
-  seed_zone          = "us-east1-b"
-
-  # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
-  make_report_discord_webhook_url = <<EOT
-    ${file("../../../discord_webhook_url.txt")}
-  EOT
-
-  # replace with `make_report_accounts = ""` if not in use (will fail if file not present)
-  # make_report_accounts = <<EOT
-  #   ${file("../../../${local.testnet_name}-accounts.csv")}
-  # EOT
-  make_report_accounts = ""
+  testnet_name                    = "hf-testnet"
+  mina_image                      = "gcr.io/o1labs-192920/mina-daemon:1.4.0-c980ba8-bullseye-mainnet"
+  mina_archive_image              = "gcr.io/o1labs-192920/mina-archive:1.4.0-c980ba8-bullseye"
+  seed_region                     = "us-east1"
+  seed_zone                       = "us-east1-b"
+  make_report_discord_webhook_url = ""
+  make_report_accounts            = ""
 }
 
 module "hf-testnet" {
