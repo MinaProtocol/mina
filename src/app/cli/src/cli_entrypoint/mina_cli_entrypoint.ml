@@ -715,8 +715,7 @@ let setup_daemon logger =
             | Ok (precomputed_values, _) ->
                 precomputed_values
             | Error err ->
-                [%log fatal]
-                  "Failed initializing with configuration: $error"
+                [%log fatal] "Failed initializing with configuration: $error"
                   ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
                 Error.raise err
           in
