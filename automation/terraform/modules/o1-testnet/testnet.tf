@@ -50,7 +50,7 @@ module "kubernetes_testnet" {
   agent_send_every_mins = var.agent_send_every_mins
 
   additional_peers = [for peer in local.static_peers : peer.full_peer]
-  runtime_config   = var.use_embedded_runtime_config ? "" : data.local_file.genesis_ledger.content
+  runtime_config   = var.use_embedded_runtime_config ? "" : ""
 
   seed_zone   = var.seed_zone
   seed_region = var.seed_region
@@ -62,7 +62,7 @@ module "kubernetes_testnet" {
 
   snark_coordinators = var.snark_coordinators
 
-  block_producer_key_pass = var.block_producer_key_pass
+  # block_producer_key_pass = var.block_producer_key_pass
   block_producer_configs = [for i, bp in local.block_producer_configs :
     {
       name  = bp.name

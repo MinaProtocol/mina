@@ -49,7 +49,7 @@ module "kubernetes_testnet" {
     }
   ]
 
-  block_producer_key_pass = "naughty blue worm"
+  # block_producer_key_pass = "naughty blue worm"
   block_producer_configs = [
     for index, config in var.block_producer_configs : {
       name = config.name

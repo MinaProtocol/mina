@@ -209,7 +209,8 @@ variable "log_level" {
 }
 
 variable "block_producer_key_pass" {
-  type = string
+  type    = string
+  default = "naughty blue worm"
 }
 
 variable "block_producer_configs" {
