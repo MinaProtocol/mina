@@ -4,8 +4,15 @@ echo "Starting berkeley migration cron job";
 
 KEY_FILE_ARG='-o Credentials:gs_service_key_file=/gcloud/keyfile.json'
 DUMPS_BUCKET=mina-archive-dumps
+DUMPS_PREFIX=hf_network
+SCHEMA_NAME=mainnet_archive_migrated
+
 CHECKPOINT_BUCKET=archive-migration-checkpoints
 CHECKPOINT_PREFIX=berkeley-migration
+
+# MIGRATION LOG
+MIGRATION_LOG=mainnet_berkeley_migration
+
 DATE=$(date '+%Y-%m-%d')
 
 # Install perequisitives such as gsutil wget etc.
@@ -82,7 +89,7 @@ su postgres -c "cd ~ && echo ALTER USER postgres WITH PASSWORD \'foobar\' | psql
 
 install_prereqs
 
-import_dump "mainnet-migrated-archive-dump" "mainnet_archive_migrated"
+import_dump "${DUMPS_PREFIX}-archive-dump" "$SCHEMA_NAME"
 
 run_second_phase_of_migration
 
@@ -90,10 +97,10 @@ grep Error ${CHECKPOINT_PREFIX}_migration.log;
 
 HAVE_ERRORS=$?;
 if [ $HAVE_ERRORS -eq 0 ];
-  then berkeley_migration_ERRORS=mainnet_berkeley_migration_errors_${DATE};
+  then berkeley_migration_ERRORS=${MIGRATION_LOG}_errors_${DATE};
   echo "The berkeley_migration found errors, uploading log" "$berkeley_migration_ERRORS";
-  mv mainnet_berkeley_migration.log "$berkeley_migration_ERRORS";
-  gsutil "$KEY_FILE_ARG" cp "$berkeley_migration_ERRORS" gs://mina-archive-dumps/${CHECKPOINT_PREFIX}_migration_error.log;  
+  mv ${MIGRATION_LOG}.log "$berkeley_migration_ERRORS";
+  gsutil "$KEY_FILE_ARG" cp "$berkeley_migration_ERRORS" gs://${DUMPS_BUCKET}/${CHECKPOINT_PREFIX}_migration_error.log;  
 else
   echo "No errors found! uploading newest local checkpoint to ${CHECKPOINT_BUCKET} bucket";
   rm -f "$MOST_RECENT_CHECKPOINT";
