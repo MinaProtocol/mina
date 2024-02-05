@@ -47,7 +47,9 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
   else Deferred.return ()
 
 let engines : engine list =
-  [ ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S)) ]
+  [ ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S))
+  ; ("local", (module Integration_test_local_engine : Intf.Engine.S))
+  ]
 
 let tests : test list =
   [ ( "peers-reliability"
@@ -66,6 +68,7 @@ let tests : test list =
     , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
   ; ("block-reward", (module Block_reward_test.Make : Intf.Test.Functor_intf))
   ; ("hard-fork", (module Hard_fork.Make : Intf.Test.Functor_intf))
+  ; ("slot-end", (module Slot_end_test.Make : Intf.Test.Functor_intf))
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =

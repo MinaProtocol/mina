@@ -18,6 +18,7 @@
   currency
   data_hash_lib
   genesis_constants
+  bounded_types
   genesis_ledger
   logger
   mina_base

@@ -17,6 +17,8 @@ then
     git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt
 fi
 
+# Fetch a fresh copy of the repo
+git fetch origin
 
 source buildkite/scripts/handle-fork.sh
 

@@ -46,8 +46,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Proof_cache = Proof_cache
   module Cache = Cache
   module Storables = Compile.Storables
+  module Ro = Ro
 
-  exception Return_digest = Compile.Return_digest
+  type chunking_data = Verify.Instance.chunking_data =
+    { num_chunks : int; domain_size : int; zk_rows : int }
 
   let verify_promise = Verify.verify
 
@@ -230,7 +232,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             Plonk_verification_key_evals.map (Lazy.force d.wrap_key)
               ~f:(fun x -> x.(0))
         ; max_proofs_verified =
-            Pickles_base.Proofs_verified.of_nat
+            Pickles_base.Proofs_verified.of_nat_exn
               (Nat.Add.n d.max_proofs_verified)
         ; actual_wrap_domain_size
         }
@@ -250,6 +252,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ; branches = Verification_key.Max_branches.n
         ; feature_flags =
             Plonk_types.(Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags)
+        ; num_chunks = 1
+        ; zk_rows = 3
         }
 
     module Proof = struct
@@ -293,7 +297,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     { constraints = 0 }
                 }
               in
-              Verify.Instance.T (max_proofs_verified, m, vk, x, p) )
+              Verify.Instance.T (max_proofs_verified, m, None, vk, x, p) )
           |> Verify.verify_heterogenous )
 
     let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred
@@ -309,21 +313,20 @@ module Make_str (_ : Wire_types.Concrete) = struct
     Compile.compile_with_wrap_main_override_promise
 
   let compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
-      ?return_early_digest_exception ?override_wrap_domain ~public_input
-      ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
-      ~choices () =
+      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
+      ~max_proofs_verified ~name ?constraint_constants ?commits ~choices () =
     compile_with_wrap_main_override_promise ?self ?cache ?storables ?proof_cache
-      ?disk_keys ?return_early_digest_exception ?override_wrap_domain
-      ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
-      ~constraint_constants ~choices ()
+      ?disk_keys ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
+      ~branches ~max_proofs_verified ~name ?constraint_constants ?commits
+      ~choices ()
 
   let compile ?self ?cache ?storables ?proof_cache ?disk_keys
-      ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ~constraint_constants ~choices () =
+      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
+      ~max_proofs_verified ~name ?constraint_constants ?commits ~choices () =
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
-        ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
-        ~max_proofs_verified ~name ~constraint_constants ~choices ()
+        ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
+        ~max_proofs_verified ~name ?constraint_constants ?commits ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -388,19 +391,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
-                ~constraint_constants:
-                  (* Dummy values *)
-                  { sub_windows_per_window = 0
-                  ; ledger_depth = 0
-                  ; work_delay = 0
-                  ; block_window_duration_ms = 0
-                  ; transaction_capacity = Log_2 0
-                  ; pending_coinbase_depth = 0
-                  ; coinbase_amount = Unsigned.UInt64.of_int 0
-                  ; supercharged_coinbase_factor = 0
-                  ; account_creation_fee = Unsigned.UInt64.of_int 0
-                  ; fork = None
-                  }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
@@ -439,19 +429,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
-                ~constraint_constants:
-                  (* Dummy values *)
-                  { sub_windows_per_window = 0
-                  ; ledger_depth = 0
-                  ; work_delay = 0
-                  ; block_window_duration_ms = 0
-                  ; transaction_capacity = Log_2 0
-                  ; pending_coinbase_depth = 0
-                  ; coinbase_amount = Unsigned.UInt64.of_int 0
-                  ; supercharged_coinbase_factor = 0
-                  ; account_creation_fee = Unsigned.UInt64.of_int 0
-                  ; fork = None
-                  }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
@@ -506,19 +483,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
-                ~constraint_constants:
-                  (* Dummy values *)
-                  { sub_windows_per_window = 0
-                  ; ledger_depth = 0
-                  ; work_delay = 0
-                  ; block_window_duration_ms = 0
-                  ; transaction_capacity = Log_2 0
-                  ; pending_coinbase_depth = 0
-                  ; coinbase_amount = Unsigned.UInt64.of_int 0
-                  ; supercharged_coinbase_factor = 0
-                  ; account_creation_fee = Unsigned.UInt64.of_int 0
-                  ; fork = None
-                  }
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; prevs = [ self ]
@@ -614,19 +578,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
-                ~constraint_constants:
-                  (* Dummy values *)
-                  { sub_windows_per_window = 0
-                  ; ledger_depth = 0
-                  ; work_delay = 0
-                  ; block_window_duration_ms = 0
-                  ; transaction_capacity = Log_2 0
-                  ; pending_coinbase_depth = 0
-                  ; coinbase_amount = Unsigned.UInt64.of_int 0
-                  ; supercharged_coinbase_factor = 0
-                  ; account_creation_fee = Unsigned.UInt64.of_int 0
-                  ; fork = None
-                  }
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -746,19 +697,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
-                ~constraint_constants:
-                  (* Dummy values *)
-                  { sub_windows_per_window = 0
-                  ; ledger_depth = 0
-                  ; work_delay = 0
-                  ; block_window_duration_ms = 0
-                  ; transaction_capacity = Log_2 0
-                  ; pending_coinbase_depth = 0
-                  ; coinbase_amount = Unsigned.UInt64.of_int 0
-                  ; supercharged_coinbase_factor = 0
-                  ; account_creation_fee = Unsigned.UInt64.of_int 0
-                  ; fork = None
-                  }
                 ~choices:(fun ~self ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -858,19 +796,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
-                ~constraint_constants:
-                  (* Dummy values *)
-                  { sub_windows_per_window = 0
-                  ; ledger_depth = 0
-                  ; work_delay = 0
-                  ; block_window_duration_ms = 0
-                  ; transaction_capacity = Log_2 0
-                  ; pending_coinbase_depth = 0
-                  ; coinbase_amount = Unsigned.UInt64.of_int 0
-                  ; supercharged_coinbase_factor = 0
-                  ; account_creation_fee = Unsigned.UInt64.of_int 0
-                  ; fork = None
-                  }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -911,19 +836,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
-                ~constraint_constants:
-                  (* Dummy values *)
-                  { sub_windows_per_window = 0
-                  ; ledger_depth = 0
-                  ; work_delay = 0
-                  ; block_window_duration_ms = 0
-                  ; transaction_capacity = Log_2 0
-                  ; pending_coinbase_depth = 0
-                  ; coinbase_amount = Unsigned.UInt64.of_int 0
-                  ; supercharged_coinbase_factor = 0
-                  ; account_creation_fee = Unsigned.UInt64.of_int 0
-                  ; fork = None
-                  }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -1096,12 +1008,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 Snark_keys_header.header_version
             ; kind
             ; constraint_constants
-            ; commits =
-                { mina = Mina_version.commit_id
-                ; marlin = Mina_version.marlin_commit_id
-                }
+            ; commits = { mina = "[NOT SPECIFIED]"; marlin = "[NOT SPECIFIED]" }
             ; length = (* This is a dummy, it gets filled in on read/write. *) 0
-            ; commit_date = Mina_version.commit_date
+            ; commit_date = "UNKNOWN"
             ; constraint_system_hash
             ; identifying_hash =
                 (* TODO: Proper identifying hash. *)
@@ -1127,6 +1036,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Wrap_domains.Make (A) (A_value) (A) (A_value) (A) (A_value)
             in
             M.f full_signature prev_varss_n prev_varss_length ~feature_flags
+              ~num_chunks:1
               ~max_proofs_verified:(module Max_proofs_verified)
           in
           let module Branch_data = struct
@@ -1147,7 +1057,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           end in
           let proofs_verifieds = Vector.singleton 2 in
           let (T inner_step_data as step_data) =
-            Step_branch_data.create ~index:0 ~feature_flags
+            Step_branch_data.create ~index:0 ~feature_flags ~num_chunks:1
               ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
               ~branches:Branches.n ~self ~public_input:(Input typ)
               ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
@@ -1449,7 +1359,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         V.f Max_local_max_proofs_verifieds.length
                           (M.f prev_messages_for_next_wrap_proof)
                       in
-                      O.create pairing_vk
+                      O.create_with_public_evals pairing_vk
                         Vector.(
                           map2 (Vector.trim_front sgs lte) prev_challenges
                             ~f:(fun commitment cs ->
@@ -1522,7 +1432,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       let tick_combined_evals =
                         Plonk_checks.evals_of_split_evals
                           (module Tick.Field)
-                          proof.openings.evals
+                          proof.proof.openings.evals
                           ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta:As_field.zeta
                           ~zetaw
                       in
@@ -1563,6 +1473,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ~endo:Endo.Step_inner_curve.base
                           ~mds:Tick_field_sponge.params.mds
                           ~srs_length_log2:Common.Max_degree.step_log2
+                          ~zk_rows:3
                           ~field_of_hex:(fun s ->
                             Kimchi_pasta.Pasta.Bigint256.of_hex_string s
                             |> Kimchi_pasta.Pasta.Fp.of_bigint )
@@ -1575,11 +1486,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (* Note: We do not pad here. *)
                           ~actual_proofs_verified:
                             (Nat.Add.create actual_proofs_verified)
-                          { evals = proof.openings.evals; public_input = x_hat }
+                          { evals = proof.proof.openings.evals
+                          ; public_input =
+                              (let x1, x2 = x_hat in
+                               ([| x1 |], [| x2 |]) )
+                          }
                           ~r ~xi ~zeta ~zetaw
                           ~old_bulletproof_challenges:prev_challenges
                           ~env:tick_env ~domain:tick_domain
-                          ~ft_eval1:proof.openings.ft_eval1
+                          ~ft_eval1:proof.proof.openings.ft_eval1
                           ~plonk:tick_plonk_minimal
                       in
                       let chal = Challenge.Constant.of_tick_field in
@@ -1770,10 +1685,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             ~to_option:Opt.to_option next_statement
                       ; prev_evals =
                           { Plonk_types.All_evals.evals =
-                              { public_input = x_hat
-                              ; evals = proof.openings.evals
+                              { public_input =
+                                  (let x1, x2 = x_hat in
+                                   ([| x1 |], [| x2 |]) )
+                              ; evals = proof.proof.openings.evals
                               }
-                          ; ft_eval1 = proof.openings.ft_eval1
+                          ; ft_eval1 = proof.proof.openings.ft_eval1
                           }
                       }
                       : _ P.Base.Wrap.t )
@@ -1820,6 +1737,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
             ; wrap_domains
             ; step_domains
+            ; num_chunks = 1
+            ; zk_rows = 3
             }
           in
           Types_map.add_exn self data ;
@@ -1879,7 +1798,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
-                ~name:"recurse-on-bad" ~constraint_constants
+                ~name:"recurse-on-bad"
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; feature_flags = Plonk_types.Features.none_bool
@@ -2007,19 +1926,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
-                ~constraint_constants:
-                  (* Dummy values *)
-                  { sub_windows_per_window = 0
-                  ; ledger_depth = 0
-                  ; work_delay = 0
-                  ; block_window_duration_ms = 0
-                  ; transaction_capacity = Log_2 0
-                  ; pending_coinbase_depth = 0
-                  ; coinbase_amount = Unsigned.UInt64.of_int 0
-                  ; supercharged_coinbase_factor = 0
-                  ; account_creation_fee = Unsigned.UInt64.of_int 0
-                  ; fork = None
-                  }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
@@ -2058,19 +1964,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
-                ~constraint_constants:
-                  (* Dummy values *)
-                  { sub_windows_per_window = 0
-                  ; ledger_depth = 0
-                  ; work_delay = 0
-                  ; block_window_duration_ms = 0
-                  ; transaction_capacity = Log_2 0
-                  ; pending_coinbase_depth = 0
-                  ; coinbase_amount = Unsigned.UInt64.of_int 0
-                  ; supercharged_coinbase_factor = 0
-                  ; account_creation_fee = Unsigned.UInt64.of_int 0
-                  ; fork = None
-                  }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
@@ -2110,19 +2003,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
-                ~constraint_constants:
-                  (* Dummy values *)
-                  { sub_windows_per_window = 0
-                  ; ledger_depth = 0
-                  ; work_delay = 0
-                  ; block_window_duration_ms = 0
-                  ; transaction_capacity = Log_2 0
-                  ; pending_coinbase_depth = 0
-                  ; coinbase_amount = Unsigned.UInt64.of_int 0
-                  ; supercharged_coinbase_factor = 0
-                  ; account_creation_fee = Unsigned.UInt64.of_int 0
-                  ; fork = None
-                  }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
@@ -2187,19 +2067,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
-                ~constraint_constants:
-                  (* Dummy values *)
-                  { sub_windows_per_window = 0
-                  ; ledger_depth = 0
-                  ; work_delay = 0
-                  ; block_window_duration_ms = 0
-                  ; transaction_capacity = Log_2 0
-                  ; pending_coinbase_depth = 0
-                  ; coinbase_amount = Unsigned.UInt64.of_int 0
-                  ; supercharged_coinbase_factor = 0
-                  ; account_creation_fee = Unsigned.UInt64.of_int 0
-                  ; fork = None
-                  }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = [ side_loaded_tag ]
@@ -2355,19 +2222,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
-                ~constraint_constants:
-                  (* Dummy values *)
-                  { sub_windows_per_window = 0
-                  ; ledger_depth = 0
-                  ; work_delay = 0
-                  ; block_window_duration_ms = 0
-                  ; transaction_capacity = Log_2 0
-                  ; pending_coinbase_depth = 0
-                  ; coinbase_amount = Unsigned.UInt64.of_int 0
-                  ; supercharged_coinbase_factor = 0
-                  ; account_creation_fee = Unsigned.UInt64.of_int 0
-                  ; fork = None
-                  }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
@@ -2406,19 +2260,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
-                ~constraint_constants:
-                  (* Dummy values *)
-                  { sub_windows_per_window = 0
-                  ; ledger_depth = 0
-                  ; work_delay = 0
-                  ; block_window_duration_ms = 0
-                  ; transaction_capacity = Log_2 0
-                  ; pending_coinbase_depth = 0
-                  ; coinbase_amount = Unsigned.UInt64.of_int 0
-                  ; supercharged_coinbase_factor = 0
-                  ; account_creation_fee = Unsigned.UInt64.of_int 0
-                  ; fork = None
-                  }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
@@ -2458,19 +2299,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
-                ~constraint_constants:
-                  (* Dummy values *)
-                  { sub_windows_per_window = 0
-                  ; ledger_depth = 0
-                  ; work_delay = 0
-                  ; block_window_duration_ms = 0
-                  ; transaction_capacity = Log_2 0
-                  ; pending_coinbase_depth = 0
-                  ; coinbase_amount = Unsigned.UInt64.of_int 0
-                  ; supercharged_coinbase_factor = 0
-                  ; account_creation_fee = Unsigned.UInt64.of_int 0
-                  ; fork = None
-                  }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = []
@@ -2538,19 +2366,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
-                ~constraint_constants:
-                  (* Dummy values *)
-                  { sub_windows_per_window = 0
-                  ; ledger_depth = 0
-                  ; work_delay = 0
-                  ; block_window_duration_ms = 0
-                  ; transaction_capacity = Log_2 0
-                  ; pending_coinbase_depth = 0
-                  ; coinbase_amount = Unsigned.UInt64.of_int 0
-                  ; supercharged_coinbase_factor = 0
-                  ; account_creation_fee = Unsigned.UInt64.of_int 0
-                  ; fork = None
-                  }
                 ~choices:(fun ~self:_ ->
                   [ { identifier = "main"
                     ; prevs = [ side_loaded_tag ]

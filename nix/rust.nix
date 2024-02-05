@@ -141,10 +141,10 @@ in
         version = deps.wasm-bindgen.version;
         src = final.fetchCrate {
           inherit pname version;
-          sha256 = "sha256-0rK+Yx4/Jy44Fw5VwJ3tG243ZsyOIBBehYU54XP/JGk=";
+          sha256 = "sha256-0u9bl+FkXEK2b54n7/l9JOCtKo+pb42GF9E1EnAUQa0=";
         };
 
-        cargoSha256 = "sha256-vcpxcRlW1OKoD64owFF6mkxSqmNrvY+y3Ckn5UwEQ50=";
+        cargoSha256 = "sha256-AsZBtE2qHJqQtuCt/wCAgOoxYMfvDh8IzBPAOkYSYko=";
         nativeBuildInputs = [ final.pkg-config ];
 
         buildInputs = with final;
@@ -158,14 +158,14 @@ in
 
         # other tests, like --test=wasm-bindgen, require it to be ran in the
         # wasm-bindgen monorepo
-        cargoTestFlags = [ "--test=interface-types --test=reference" ];
+        cargoTestFlags = [ "--test=reference" ];
       };
     in
     rustPlatform.buildRustPackage {
       pname = "plonk_wasm";
       version = "0.1.0";
       src = final.lib.sourceByRegex ../src [
-        "^lib(/crypto(/kimchi(/wasm(/.*)?)?)?)?$"
+        "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
         "^lib(/crypto(/proof-systems(/.*)?)?)?$"
       ];
       sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";

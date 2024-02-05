@@ -24,6 +24,7 @@
    splittable_random
    stdio
    ;; local libraries
+   bounded_types
    mina_generators
    mina_wire_types
    network_pool
@@ -60,6 +61,7 @@
    graphql_lib
    block_time
    currency
+   merkle_ledger
    mina_lib
    mina_commands
    mina_state

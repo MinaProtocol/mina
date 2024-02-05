@@ -22,6 +22,10 @@ let on_job_exit ctx elapsed_time =
   Option.iter (Thread.Fiber.of_context ctx) ~f:(fun thread ->
       on_job_exit' thread elapsed_time )
 
+let on_new_fiber (fiber : Thread.Fiber.t) =
+  Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
+      Plugin.on_new_fiber fiber )
+
 let current_sync_fiber = ref None
 
 (* grabs the parent fiber, returning the fiber (if available) and a reset function to call after exiting the child fiber *)
@@ -72,7 +76,8 @@ let exec_thread ~exec_same_thread ~exec_new_thread name =
         | Some fiber ->
             fiber
         | None ->
-            Thread.Fiber.register name parent
+            let fib = Thread.Fiber.register name parent in
+            on_new_fiber fib ; fib
       in
       exec_new_thread fiber
   in
@@ -86,9 +91,9 @@ let thread name f =
       let ctx = with_o1trace ~name ctx in
       match Scheduler.within_context ctx f with
       | Error () ->
-          (* Scheduler.within_context will send the actual error to the parent monitor asynchronously.
-           * At this point, the thread has crashed, so we just return a Deferred that will never resolve *)
-          Deferred.create (Fn.const ())
+          failwithf
+            "timing task `%s` failed, exception reported to parent monitor" name
+            ()
       | Ok x ->
           x )
 
@@ -102,18 +107,21 @@ let sync_thread name f =
       let start_time = Time_ns.now () in
       let ctx = Scheduler.current_execution_context () in
       let ctx = with_o1trace ~name ctx in
-      match
-        Scheduler.Private.with_execution_context (Scheduler.Private.t ()) ctx
-          ~f:(fun () -> Result.try_with f)
-      with
-      | Error exn ->
-          Exn.reraise exn "exception caught by O1trace.sync_thread"
+      match Scheduler.within_context ctx f with
+      | Error () ->
+          failwithf
+            "sync timing task `%s` failed, exception reported to parent monitor"
+            name ()
       | Ok result ->
           let elapsed_time = Time_ns.abs_diff (Time_ns.now ()) start_time in
           on_job_exit' fiber elapsed_time ;
           result )
 
-let () = Stdlib.(Async_kernel.Tracing.fns := { on_job_enter; on_job_exit })
+let () =
+  Stdlib.(Async_kernel.Tracing.fns := { on_job_enter; on_job_exit }) ;
+  Scheduler.Expert.run_every_cycle_end (fun () ->
+      Plugins.dispatch (fun (module Plugin : Plugins.Plugin_intf) ->
+          Plugin.on_cycle_end () ) )
 
 (*
 let () =
@@ -126,12 +134,6 @@ let () =
 
 let%test_module "thread tests" =
   ( module struct
-    exception Test_exn
-
-    let is_test_exn exn =
-      (* there isn't a great way to compare the exn to the one that was thrown due to how async mangles the exn, so we do this instead *)
-      String.is_substring (Exn.to_string exn) ~substring:"(Test_exn)"
-
     let child_of n =
       match
         let prev_sync_fiber = !current_sync_fiber in
@@ -220,32 +222,6 @@ let%test_module "thread tests" =
                              stop () ;
                              Deferred.unit ) ) ) ;
                   Deferred.unit ) ) )
-
-    let%test_unit "exceptions are handled properly when raised in first cycle \
-                   of a thread" =
-      test (fun stop ->
-          match%map
-            Monitor.try_with (fun () ->
-                thread "test" (fun () -> raise Test_exn) )
-          with
-          | Ok _ ->
-              failwith "expected a failure"
-          | Error exn ->
-              assert (is_test_exn exn) ;
-              stop () )
-
-    let%test_unit "exceptions are handled properly when raised in first cycle \
-                   of a sync_thread" =
-      test (fun stop ->
-          match%map
-            Monitor.try_with (fun () ->
-                sync_thread "test" (fun () -> raise Test_exn) )
-          with
-          | Ok _ ->
-              failwith "expected a failure"
-          | Error exn ->
-              assert (is_test_exn exn) ;
-              stop () )
 
     (* TODO: recursion tests *)
   end )

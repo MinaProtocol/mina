@@ -100,11 +100,12 @@ end
 
 module Poly_comm : sig
   module Without_degree_bound : sig
-    type 'a t = 'a array
+    type 'a t = 'a Bounded_types.ArrayN16.Stable.V1.t
   end
 
   module With_degree_bound : sig
-    type 'a t = { unshifted : 'a array; shifted : 'a }
+    type 'a t =
+      { unshifted : 'a Bounded_types.ArrayN16.Stable.V1.t; shifted : 'a }
   end
 end
 
@@ -389,18 +390,23 @@ module All_evals : sig
 
       include Sigs.Full.S2 with type ('a, 'b) t := ('a, 'b) t
     end
+
+    module Latest = V1
   end
 
   module In_circuit : sig
     type ('f, 'f_multi, 'bool) t =
       { evals :
-          ('f * 'f, 'f_multi * 'f_multi, 'bool) With_public_input.In_circuit.t
+          ( 'f_multi * 'f_multi
+          , 'f_multi * 'f_multi
+          , 'bool )
+          With_public_input.In_circuit.t
       ; ft_eval1 : 'f
       }
   end
 
-  type ('f, 'f_multi) t = ('f, 'f_multi) Stable.V1.t =
-    { evals : ('f * 'f, 'f_multi * 'f_multi) With_public_input.t
+  type ('f, 'f_multi) t =
+    { evals : ('f_multi * 'f_multi, 'f_multi * 'f_multi) With_public_input.t
     ; ft_eval1 : 'f
     }
   [@@deriving sexp, compare, yojson, hash, equal]
@@ -409,6 +415,7 @@ module All_evals : sig
 
   val typ :
        (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+    -> num_chunks:int
     -> Opt.Flag.t Features.Full.t
     -> ( ( 'f Snarky_backendless.Cvar.t
          , 'f Snarky_backendless.Cvar.t array

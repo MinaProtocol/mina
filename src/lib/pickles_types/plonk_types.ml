@@ -1190,6 +1190,8 @@ module All_evals = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type ('f, 'f_multi) t =
         { evals : ('f * 'f, 'f_multi * 'f_multi) With_public_input.Stable.V1.t
@@ -1199,10 +1201,19 @@ module All_evals = struct
     end
   end]
 
+  type ('f, 'f_multi) t =
+    { evals : ('f_multi * 'f_multi, 'f_multi * 'f_multi) With_public_input.t
+    ; ft_eval1 : 'f
+    }
+  [@@deriving sexp, compare, yojson, hash, equal, hlist]
+
   module In_circuit = struct
     type ('f, 'f_multi, 'bool) t =
       { evals :
-          ('f * 'f, 'f_multi * 'f_multi, 'bool) With_public_input.In_circuit.t
+          ( 'f_multi * 'f_multi
+          , 'f_multi * 'f_multi
+          , 'bool )
+          With_public_input.In_circuit.t
       ; ft_eval1 : 'f
       }
     [@@deriving hlist]
@@ -1212,21 +1223,22 @@ module All_evals = struct
       : (b1, b2) t =
     { evals =
         With_public_input.map t.evals
-          ~f1:(Tuple_lib.Double.map ~f:f1)
+          ~f1:(Tuple_lib.Double.map ~f:f2)
           ~f2:(Tuple_lib.Double.map ~f:f2)
     ; ft_eval1 = f1 t.ft_eval1
     }
 
   let typ (type f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      feature_flags =
+      ~num_chunks feature_flags =
     let open Impl.Typ in
-    let single = array ~length:1 field in
+    let single = array ~length:num_chunks field in
+    let dummy = Array.init num_chunks ~f:(fun _ -> Impl.Field.Constant.zero) in
     let evals =
       With_public_input.typ
         (module Impl)
-        feature_flags (tuple2 field field) (tuple2 single single)
-        ~dummy:Impl.Field.Constant.([| zero |], [| zero |])
+        feature_flags (tuple2 single single) (tuple2 single single)
+        ~dummy:(dummy, dummy)
     in
     of_hlistable [ evals; Impl.Field.typ ] ~var_to_hlist:In_circuit.to_hlist
       ~var_of_hlist:In_circuit.of_hlist ~value_to_hlist:to_hlist
@@ -1241,7 +1253,7 @@ module Openings = struct
     module Stable = struct
       module V1 = struct
         type ('g, 'fq) t =
-          { lr : ('g * 'g) array
+          { lr : ('g * 'g) Bounded_types.ArrayN16.Stable.V1.t
           ; z_1 : 'fq
           ; z_2 : 'fq
           ; delta : 'g
@@ -1277,7 +1289,10 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g_opt t = { unshifted : 'g_opt array; shifted : 'g_opt }
+        type 'g_opt t =
+          { unshifted : 'g_opt Bounded_types.ArrayN16.Stable.V1.t
+          ; shifted : 'g_opt
+          }
         [@@deriving sexp, compare, yojson, hlist, hash, equal]
       end
     end]
@@ -1308,7 +1323,8 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g t = 'g array [@@deriving sexp, compare, yojson, hash, equal]
+        type 'g t = 'g Bounded_types.ArrayN16.Stable.V1.t
+        [@@deriving sexp, compare, yojson, hash, equal]
       end
     end]
   end
@@ -1328,7 +1344,11 @@ module Messages = struct
       [@@@no_toplevel_latest_type]
 
       module V1 = struct
-        type 'g t = { sorted : 'g array; aggreg : 'g; runtime : 'g option }
+        type 'g t =
+          { sorted : 'g Bounded_types.ArrayN16.Stable.V1.t
+          ; aggreg : 'g
+          ; runtime : 'g option
+          }
         [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
       end
     end]
@@ -1460,7 +1480,8 @@ module Shifts = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type 'field t = 'field array [@@deriving sexp, compare, yojson, equal]
+      type 'field t = 'field Bounded_types.ArrayN16.Stable.V1.t
+      [@@deriving sexp, compare, yojson, equal]
     end
   end]
 end

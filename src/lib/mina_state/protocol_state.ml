@@ -254,6 +254,10 @@ module Make_str (A : Wire_types.Concrete) = struct
   let constants { Poly.Stable.Latest.body = { Body.Poly.constants; _ }; _ } =
     constants
 
+  let snarked_ledger_hash
+      { Poly.Stable.Latest.body = { Body.Poly.blockchain_state; _ }; _ } =
+    Blockchain_state.snarked_ledger_hash blockchain_state
+
   [%%ifdef consensus_mechanism]
 
   let create_var = create'

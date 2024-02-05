@@ -22,6 +22,7 @@
    ppx_inline_test.config
    uri
    ;;local libraries
+   bounded_types
    mina_wire_types
    kimchi_backend
    child_processes
@@ -74,6 +75,7 @@
    error_json
    ppx_deriving_yojson.runtime
    ppx_version.runtime
+   o1trace
  )
  (inline_tests (flags -verbose -show-counts))
  (modes native)

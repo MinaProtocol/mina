@@ -147,7 +147,7 @@ let
         MINA_COMMIT_DATE = "<unknown>";
         MINA_BRANCH = "<unknown>";
 
-        DUNE_PROFILE = "devnet";
+        DUNE_PROFILE = "dev";
 
         NIX_LDFLAGS =
           optionalString (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64)
@@ -269,9 +269,29 @@ let
           mv _build/default/src/app/cli/src/mina.exe $out/bin/mina
         '';
       });
-        
+
       with-instrumentation = wrapMina self.with-instrumentation-dev { };
-      
+
+      mainnet-pkg = self.mina-dev.overrideAttrs (s: {
+        version = "mainnet";
+        configurePhase = ''
+          ${s.configurePhase}
+          export DUNE_PROFILE=mainnet
+          '';
+      });
+
+      mainnet = wrapMina self.mainnet-pkg { };
+
+      devnet-pkg = self.mina-dev.overrideAttrs (s: {
+        version = "devnet";
+        configurePhase = ''
+          ${s.configurePhase}
+          export DUNE_PROFILE=devnet
+          '';
+      });
+
+      devnet = wrapMina self.devnet-pkg { };
+
       # Unit tests
       mina_tests = runMinaCheck {
         name = "tests";
