@@ -55,7 +55,7 @@ case "${DUNE_PROFILE}" in
     DEB_SUFFIX=""
    ;;
   *)
-    # use dune profile as suffix but replace underscode to dashes sor deb builder won't complain
+    # use dune profile as suffix but replace underscore to dashes so deb builder won't complain
     MINA_DEB_NAME="mina-berkeley-${DUNE_PROFILE//_/-}"
     # use dune profile as suffix but replace underscode to dashes sor deb builder won't complain
     DEB_SUFFIX="-${DUNE_PROFILE//_/-}"
