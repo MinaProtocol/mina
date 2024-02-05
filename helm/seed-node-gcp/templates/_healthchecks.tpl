@@ -25,6 +25,7 @@ readinessProbe:
       "-c",
       "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 0 && updateSyncStatusLabel {{ .name }}"
     ]
+{{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
 
 {{/*
