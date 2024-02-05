@@ -35,7 +35,11 @@ spec:
         command:
         - bash
         - -c
+        {{- if $.Values.mina.compatible }}
+        - mina advanced generate-libp2p-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
+        {{- else }}
         - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
+        {{- end }}
         volumeMounts:
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
@@ -82,8 +86,11 @@ spec:
           "-run-snark-coordinator", "$(CODA_SNARK_KEY)",
           "-snark-worker-fee", "$(CODA_SNARK_FEE)",
           "-work-selection", "$(WORK_SELECTION)",
-          "-enable-peer-exchange", "true",
-          "-libp2p-keypair", "/root/libp2p-keys/key",
+          {{- $keypairMode := "-libp2p-keypair" -}}
+          {{- if $.Values.mina.compatible }}
+          {{- $keypairMode = "-discovery-keypair" -}}
+          {{- end }}
+          {{ printf "%s" $keypairMode }}, "/root/libp2p-keys/key",
           {{- if $.Values.mina.logTxnPoolGossip }}
           "-log-txn-pool-gossip", "true",
           {{- end -}}
