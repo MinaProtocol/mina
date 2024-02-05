@@ -156,7 +156,7 @@ module Json_layout = struct
 
         module Verification_key_perm = struct
           type t = { auth : Auth_required.t; txn_version : Txn_version.t }
-          [@@deriving dhall_type, sexp, yojson, bin_io_unversioned]
+          [@@deriving sexp, yojson, bin_io_unversioned]
         end
 
         type t =
