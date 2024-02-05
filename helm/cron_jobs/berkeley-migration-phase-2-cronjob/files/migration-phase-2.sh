@@ -4,8 +4,10 @@ echo "Starting berkeley migration cron job";
 
 KEY_FILE_ARG="${KEY_FILE_ARG:-}"
 DUMPS_BUCKET="${DUMPS_BUCKET:-}"
-DUMPS_PREFIX="${DUMPS_PREFIX:-}"
-SCHEMA_NAME="${SCHEMA_NAME:-}"
+DUMPS_PREFIX_FROM="${DUMPS_PREFIX_FROM:-}"
+SCHEMA_NAME_FROM="${SCHEMA_NAME_FROM:-}"
+SCHEMA_NAME_TO="${SCHEMA_NAME_TO:-}"
+DUMPS_PREFIX_TO="${DUMPS_PREFIX_TO:-}"
 
 CHECKPOINT_BUCKET="${CHECKPOINT_BUCKET:-}"
 CHECKPOINT_PREFIX="${CHECKPOINT_PREFIX:-}"
@@ -70,6 +72,30 @@ import_dump () {
 
 }
 
+# Creates target empty schema .
+# Should be used on initial migration steps (when there is no existing partially migrated schema)
+import_dump_frist_time () {
+
+	PREFIX=$1
+	SCHEMA=$2
+
+	echo "Importing ${SCHEMA} archive..."
+
+	echo "Fetching newest schema from"
+
+	wget https://raw.githubusercontent.com/MinaProtocol/mina/berkeley/src/app/archive/create_schema.sql
+	ARCHIVE_SQL=create_schema.sql
+	mv $ARCHIVE_SQL ~postgres/;
+	echo "Creating schema and importing archive dump";
+	su postgres -c "cd ~ && echo CREATE DATABASE $SCHEMA | psql";
+	su postgres -c "cd ~ && psql -d $SCHEMA < $ARCHIVE_SQL";
+
+	echo "Deleting archive SQL file";
+	su postgres -c "cd ~ && rm -f $ARCHIVE_SQL";
+	rm -f $ARCHIVE_SQL
+
+}
+
 run_second_phase_of_migration() {
 
 	echo "Starting migration Phase 2";
@@ -79,7 +105,7 @@ run_second_phase_of_migration() {
     MOST_RECENT_CHECKPOINT=$(basename "$MOST_RECENT_CHECKPOINT_URI");
     
 	echo "Running replayer in migration mode";
-	mina-replayer --migration-mode --archive-uri postgres://postgres:postgres@localhost:5432/mainnet_migrated_archive --input-file "$MOST_RECENT_CHECKPOINT" --checkpoint-interval 100 --checkpoint-file-prefix $CHECKPOINT_PREFIX &> "${CHECKPOINT_PREFIX}_migration".log
+	mina-replayer --migration-mode --archive-uri postgres://postgres:postgres@localhost:5432/${SCHEMA_NAME_FROM} --input-file "$MOST_RECENT_CHECKPOINT" --checkpoint-interval 100 --checkpoint-file-prefix $CHECKPOINT_PREFIX &> "${CHECKPOINT_PREFIX}_migration".log
 	echo "Done running replayer in migration mode";
 
 }
@@ -89,7 +115,9 @@ su postgres -c "cd ~ && echo ALTER USER postgres WITH PASSWORD \'foobar\' | psql
 
 install_prereqs
 
-import_dump "${DUMPS_PREFIX}-archive-dump" "$SCHEMA_NAME"
+import_dump "${DUMPS_PREFIX_FROM}-archive-dump" $SCHEMA_NAME_FROM
+
+import_dump "${DUMPS_PREFIX_TO}-archive-dump" $SCHEMA_NAME_TO
 
 run_second_phase_of_migration
 
@@ -110,4 +138,12 @@ else
   mv "$DISK_CHECKPOINT" "$TODAY_CHECKPOINT";
   echo "Uploading checkpoint file" "$TODAY_CHECKPOINT";
   gsutil "$KEY_FILE_ARG" cp "$UPLOAD_ARCHIVE_NAME" gs://$CHECKPOINT_BUCKET;
+
+  echo "uploading migrated schema to ${DUMPS_BUCKET} bucket";
+  UPLOAD_SCRIPT_NAME=${DUMPS_PREFIX_TO}-archive-dump-${DATE}_0000.sql
+  su postgres -c "cd ~ && pg_dump $SCHEMA_NAME_TO > $UPLOAD_SCRIPT_NAME";
+  UPLOAD_ARCHIVE_NAME=$UPLOAD_SCRIPT_NAME.tar.gz
+  mv ~postgres/$UPLOAD_SCRIPT_NAME .
+  tar -czvf $UPLOAD_ARCHIVE_NAME $UPLOAD_SCRIPT_NAME;
+  gsutil $KEY_FILE_ARG cp $UPLOAD_ARCHIVE_NAME gs://$DUMPS_BUCKET;
 fi

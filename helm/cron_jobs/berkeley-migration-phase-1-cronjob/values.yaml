@@ -58,13 +58,13 @@ replayers:
   - name: SCHEMA_NAME_FROM
     value: archive_balances_migrated
   - name: SCHEMA_NAME_TO
-    value: mainnet_archive_migrated
+    value: archive_partially_migrated
   - name: DUMPS_PREFIX_TO
-    value: mainnet-migrated
+    value: mainnet-partially-migrated
   - name: PRECOMP_BLOCKS_BUCKET
     value: mina_network_block_data
   - name: NETWORK_NAME
-    value: hf_network
+    value: mainnet
   - name: MIGRATION_LOG
     value: mainnet_berkeley_migration
 # - name: test-run

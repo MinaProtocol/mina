@@ -48,7 +48,6 @@ import_dump () {
 
 	echo "Importing ${SCHEMA} archive..."
 
-
 	echo "Fetching newest dump from ${DUMPS_BUCKET} starting with ${PREFIX}"
 
 	ARCHIVE_DUMP_URI=$(gsutil $KEY_FILE_ARG ls gs://${DUMPS_BUCKET}/${PREFIX}-*.sql.tar.gz | sort -r | head -n 1);
@@ -74,16 +73,40 @@ import_dump () {
 
 }
 
+# Creates target empty schema .
+# Should be used on initial migration steps (when there is no existing partially migrated schema)
+import_dump_frist_time () {
+
+	PREFIX=$1
+	SCHEMA=$2
+
+	echo "Importing ${SCHEMA} archive..."
+
+	echo "Fetching newest schema from"
+
+	wget https://raw.githubusercontent.com/MinaProtocol/mina/berkeley/src/app/archive/create_schema.sql
+	ARCHIVE_SQL=create_schema.sql
+	mv $ARCHIVE_SQL ~postgres/;
+	echo "Creating schema and importing archive dump";
+	su postgres -c "cd ~ && echo CREATE DATABASE $SCHEMA | psql";
+	su postgres -c "cd ~ && psql -d $SCHEMA < $ARCHIVE_SQL";
+
+	echo "Deleting archive SQL file";
+	su postgres -c "cd ~ && rm -f $ARCHIVE_SQL";
+	rm -f $ARCHIVE_SQL
+
+}
+
 run_first_phase_of_migration() {
 
 
 	echo "Starting migration Phase 1";
 
 	echo "Downloading genesis_ledger/mainnet.json from newest rampup ";
-	wget https://raw.githubusercontent.com/MinaProtocol/mina/rampup/genesis_ledgers/mainnet.json
+	wget https://raw.githubusercontent.com/MinaProtocol/mina/berkeley/genesis_ledgers/mainnet.json
 	
 	echo "Running berkeley migration app";
-	mina-berkeley-migration --mainnet-archive-uri postgres://postgres:foobar@localhost/archive_balances_migrated --migrated-archive-uri postgres://postgres:foobar@localhost/mainnet_archive_migrated --batch-size 100 --config-file mainnet.json --mainnet-blocks-bucket $PRECOMP_BLOCKS_BUCKET &> ${MIGRATION_LOG}.log
+	mina-berkeley-migration --mainnet-archive-uri postgres://postgres:foobar@localhost/${SCHEMA_NAME_FROM} --migrated-archive-uri postgres://postgres:foobar@localhost/${SCHEMA_NAME_TO} --batch-size 100 --config-file mainnet.json --mainnet-blocks-bucket $PRECOMP_BLOCKS_BUCKET &> ${MIGRATION_LOG}.log
 	echo "Done running berkeley migration app";
 
 }
@@ -94,9 +117,9 @@ su postgres -c "cd ~ && echo ALTER USER postgres WITH PASSWORD \'foobar\' | psql
 
 install_prereqs
 
-import_dump "${DUMPS_PREFIX}-archive-dump" $SCHEMA_NAME_FROM
+import_dump "${DUMPS_PREFIX_FROM}-archive-dump" $SCHEMA_NAME_FROM
 
-import_dump "${DUMPS_PREFIX}-archive-dump" $SCHEMA_NAME_TO
+import_dump "${DUMPS_PREFIX_TO}-archive-dump" $SCHEMA_NAME_TO
 
 run_first_phase_of_migration
 
@@ -104,7 +127,7 @@ grep Error ${MIGRATION_LOG}.log;
 
 HAVE_ERRORS=$?;
 if [ $HAVE_ERRORS -eq 0 ];
-  then berkeley_migration_ERRORS=${MIGRATION_LOG}_errors_${DATE};
+  then berkeley_migration_ERRORS=${MIGRATION_LOG}_errors_${DATE}.log;
   echo "The berkeley_migration found errors, uploading log" $berkeley_migration_ERRORS;
   mv ${MIGRATION_LOG}.log $berkeley_migration_ERRORS;
   gsutil $KEY_FILE_ARG cp $berkeley_migration_ERRORS gs:/$DUMPS_BUCKET/$berkeley_migration_ERRORS;  
