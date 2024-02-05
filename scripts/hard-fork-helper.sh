@@ -7,8 +7,8 @@ get_height()
 
 get_fork_config()
 { curl --location "http://localhost:${1}/graphql" \
---header 'Content-Type: application/json' \
---data '{"query":"query MyQuery {\n  fork_config\n}\n","variables":{}}' | jq '.data.fork_config'
+--header "Content-Type: application/json" \
+--data "{\"query\":\"query MyQuery {\n  fork_config\n}\n\",\"variables\":{}}" | jq '.data.fork_config'
 }
 
 wait_for_block() {
@@ -26,15 +26,8 @@ wait_for_block() {
     echo "At block #$height."
 }
 
-check_userCommands()
-{ curl --location "http://localhost:${1}/graphql" \
---header "Content-Type: application/json" \
---data "{\"query\":\"query MyQuery {\n  version\n  bestChain(maxLength: 10) {\n    commandTransactionCount\n  }\n}\",\"variables\":{}}" \
-| jq 'any(.data.bestChain[]; .commandTransactionCount >0)'
-}
-
 blocks_withUserCommands()
-{ curl --location "http://localhost:${1}/graphql"\
+{ curl --location "http://localhost:${1}/graphql" \
 --header "Content-Type: application/json" \
 --data "{\"query\":\"query MyQuery {\n  version\n  bestChain(maxLength: 10) {\n    commandTransactionCount\n  }\n}\",\"variables\":{}}" \
 | jq '[.data.bestChain[] | select(.commandTransactionCount>0)] | length'
