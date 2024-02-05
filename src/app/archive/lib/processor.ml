@@ -1231,37 +1231,43 @@ module Timing_info = struct
     let slot_span_to_int64 x =
       Mina_numbers.Global_slot_span.to_uint32 x |> Unsigned.UInt32.to_int64
     in
+    let values =
+      match timing with
+      | Timed timing ->
+          { account_identifier_id
+          ; initial_minimum_balance =
+              Currency.Balance.to_string timing.initial_minimum_balance
+          ; cliff_time = slot_to_int64 timing.cliff_time
+          ; cliff_amount = Currency.Amount.to_string timing.cliff_amount
+          ; vesting_period = slot_span_to_int64 timing.vesting_period
+          ; vesting_increment =
+              Currency.Amount.to_string timing.vesting_increment
+          }
+      | Untimed ->
+          let zero = "0" in
+          { account_identifier_id
+          ; initial_minimum_balance = zero
+          ; cliff_time = 0L
+          ; cliff_amount = zero
+          ; vesting_period = 0L
+          ; vesting_increment = zero
+          }
+    in
     match%bind
       Conn.find_opt
-        (Caqti_request.find_opt Caqti_type.int Caqti_type.int
-           "SELECT id FROM timing_info WHERE account_identifier_id = ?" )
-        account_identifier_id
+        (Caqti_request.find_opt typ Caqti_type.int
+           {sql| SELECT id FROM timing_info
+                 WHERE account_identifier_id = ?
+                 AND initial_minimum_balance = ?
+                 AND cliff_time = ?
+                 AND cliff_amount = ?
+                 AND vesting_period = ?
+                 AND vesting_increment = ? |sql} )
+        values
     with
     | Some id ->
         return id
     | None ->
-        let values =
-          match timing with
-          | Timed timing ->
-              { account_identifier_id
-              ; initial_minimum_balance =
-                  Currency.Balance.to_string timing.initial_minimum_balance
-              ; cliff_time = slot_to_int64 timing.cliff_time
-              ; cliff_amount = Currency.Amount.to_string timing.cliff_amount
-              ; vesting_period = slot_span_to_int64 timing.vesting_period
-              ; vesting_increment =
-                  Currency.Amount.to_string timing.vesting_increment
-              }
-          | Untimed ->
-              let zero = "0" in
-              { account_identifier_id
-              ; initial_minimum_balance = zero
-              ; cliff_time = 0L
-              ; cliff_amount = zero
-              ; vesting_period = 0L
-              ; vesting_increment = zero
-              }
-        in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO timing_info
