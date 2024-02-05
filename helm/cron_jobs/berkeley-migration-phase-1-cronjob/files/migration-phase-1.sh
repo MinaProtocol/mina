@@ -5,18 +5,18 @@ echo "Starting migration cron job";
 KEY_FILE_ARG='-o Credentials:gs_service_key_file=/gcloud/keyfile.json'
 
 # DUMPS
-DUMPS_BUCKET=mina-archive-dumps
-DUMPS_PREFIX_FROM=mainnet
-SCHEMA_NAME_FROM=archive_balances_migrated
-SCHEMA_NAME_TO=mainnet_archive_migrated
-DUMPS_PREFIX_TO=mainnet-migrated
+DUMPS_BUCKET="${DUMPS_BUCKET:-}"
+DUMPS_PREFIX_FROM="${DUMPS_PREFIX_FROM:-}"
+SCHEMA_NAME_FROM="${SCHEMA_NAME_FROM:-}"
+SCHEMA_NAME_TO="${SCHEMA_NAME_TO:-}"
+DUMPS_PREFIX_TO="${DUMPS_PREFIX_TO:-}"
 
 # PRECOMPUTED LOGS
-PRECOMP_BLOCKS_BUCKET=mina_network_block_data
-NETWORK_NAME=hf_network
+PRECOMP_BLOCKS_BUCKET="${PRECOMP_BLOCKS_BUCKET:-}"
+NETWORK_NAME="${NETWORK_NAME:-}"
 
 # MIGRATION LOG
-MIGRATION_LOG=mainnet_berkeley_migration
+MIGRATION_LOG="${MIGRATION_LOG:-}"
 DATE=$(date '+%Y-%m-%d')
 
 # Install perequisitives such as gsutil wget etc.
