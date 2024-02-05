@@ -184,7 +184,7 @@ let mainnet_protocol_version =
   *)
   Protocol_version.create ~transaction:1 ~network:0 ~patch:0
 
-let mainnet_block_to_extensional ~logger ~mainnet_pool
+let mainnet_block_to_extensional ~logger ~mainnet_pool ~prefix
     ~(genesis_block : Mina_block.t) (block : Sql.Mainnet.Block.t) ~bucket
     ~batch_size =
   let query_mainnet_db ~f = Mina_caqti.query ~f mainnet_pool in
@@ -211,21 +211,22 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool
           ; ("num_blocks", `Int (Int64.to_int_exn num_blocks))
           ] ;
       let%bind () =
-        Precomputed_block.fetch_batch ~height:block.height ~num_blocks ~bucket
+        Precomputed_block.fetch_batch ~prefix ~height:block.height ~num_blocks
+          ~bucket
       in
       [%log info] "Done fetching first batch of precomputed blocks" ;
       first_batch := false ;
       Deferred.unit )
     else if Int64.(equal (block.height % batch_size)) 0L then (
       [%log info] "Deleting all precomputed blocks" ;
-      let%bind () = Precomputed_block.delete_fetched () in
+      let%bind () = Precomputed_block.delete_fetched ~prefix in
       [%log info] "Fetching batch of precomputed blocks"
         ~metadata:
           [ ("height", `Int (Int64.to_int_exn block.height))
           ; ("num_blocks", `Int (Int64.to_int_exn batch_size))
           ] ;
       let%bind () =
-        Precomputed_block.fetch_batch ~height:block.height
+        Precomputed_block.fetch_batch ~prefix ~height:block.height
           ~num_blocks:batch_size ~bucket
       in
       [%log info] "Done fetching batch of precomputed blocks" ;
@@ -252,7 +253,7 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool
     else
       let%map json =
         Precomputed_block.last_vrf_output ~state_hash:block.state_hash
-          ~height:block.height
+          ~height:block.height ~prefix
       in
       Consensus_vrf.Output.Truncated.of_yojson json |> Result.ok_or_failwith
   in
@@ -272,7 +273,7 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool
     else
       let%map json =
         Precomputed_block.staking_epoch_data ~state_hash:block.state_hash
-          ~height:block.height
+          ~height:block.height ~prefix
       in
       match Mina_base.Epoch_data.Value.of_yojson json with
       | Ok epoch_data ->
@@ -287,7 +288,7 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool
     else
       let%map json =
         Precomputed_block.next_epoch_data ~state_hash:block.state_hash
-          ~height:block.height
+          ~height:block.height ~prefix
       in
       match Mina_base.Epoch_data.Value.of_yojson json with
       | Ok epoch_data ->
@@ -302,7 +303,7 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool
     else
       match%map
         Precomputed_block.min_window_density ~state_hash:block.state_hash
-          ~height:block.height
+          ~height:block.height ~prefix
       with
       | `String s ->
           Mina_numbers.Length.of_string s
@@ -316,7 +317,7 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool
     else
       match%map
         Precomputed_block.total_currency ~state_hash:block.state_hash
-          ~height:block.height
+          ~height:block.height ~prefix
       with
       | `String s ->
           Currency.Amount.of_string s
@@ -330,7 +331,7 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool
     else
       match%map
         Precomputed_block.subwindow_densities ~state_hash:block.state_hash
-          ~height:block.height
+          ~height:block.height ~prefix
       with
       | `List items ->
           List.map items ~f:(function
@@ -405,7 +406,7 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool
       : Archive_lib.Extensional.Block.t )
 
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
-    ~end_global_slot ~mina_network_blocks_bucket ~batch_size () =
+    ~end_global_slot ~mina_network_blocks_bucket ~batch_size ~prefix () =
   let logger = Logger.create () in
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
@@ -502,7 +503,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
               block.height block.state_hash ;
             let%bind extensional_block =
               mainnet_block_to_extensional ~logger ~mainnet_pool ~genesis_block
-                block ~bucket:mina_network_blocks_bucket ~batch_size
+                block ~bucket:mina_network_blocks_bucket ~batch_size ~prefix
             in
             query_migrated_db ~f:(fun db ->
                 match%map
@@ -518,7 +519,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                       block.state_hash (Caqti_error.show err) () ) )
       in
       [%log info] "Deleting all precomputed blocks" ;
-      let%bind () = Precomputed_block.delete_fetched () in
+      let%bind () = Precomputed_block.delete_fetched ~prefix in
       [%log info] "Done migrating mainnet blocks!" ;
       Deferred.unit
 
@@ -557,6 +558,10 @@ let () =
            Param.flag "--batch-size" ~aliases:[ "-batch-size" ]
              Param.(required int)
              ~doc:"Batch size used when downloading precomputed blocks"
+         and prefix =
+           Param.flag "--blocks-prefix" ~aliases:[ "-blocks-prefix" ]
+             Param.(required string)
+             ~doc:"Block prefix used when downloading precomputed blocks"
          in
          main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
-           ~end_global_slot ~mina_network_blocks_bucket ~batch_size )))
+           ~end_global_slot ~mina_network_blocks_bucket ~batch_size ~prefix )))
