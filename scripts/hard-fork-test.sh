@@ -5,11 +5,11 @@ SLOT_CHAIN_END="${SLOT_CHAIN_END:-30}"
 
 # Slot duration in seconds to be used for both version
 MAIN_SLOT="${MAIN_SLOT:-90}"
-FORK_SLOT="${MAIN_SLOT:-30}"
+FORK_SLOT="${FORK_SLOT:-30}"
 
 # Delay before genesis slot in minutes to be used for both version
-MAIN_DELAY="${MAIN_SLOT:-15}"
-FORK_DELAY="${MAIN_SLOT:-15}"
+MAIN_DELAY="${MAIN_DELAY:-15}"
+FORK_DELAY="${FORK_DELAY:-15}"
 
 # script should be run from mina root directory.
 source ./scripts/hard-fork-helper.sh
