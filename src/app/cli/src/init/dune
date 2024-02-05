@@ -36,6 +36,7 @@
    graphql-async
    mirage-crypto-ec
    ;;local libraries
+   bounded_types
    snark_profiler_lib
    archive_lib
    mina_wire_types

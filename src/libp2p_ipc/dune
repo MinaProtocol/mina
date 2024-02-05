@@ -24,6 +24,7 @@
    pipe_lib
    network_peer
    o1trace
+   bounded_types
  )
  (preprocess (pps ppx_version ppx_jane))
  (instrumentation (backend bisect_ppx)))

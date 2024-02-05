@@ -53,6 +53,7 @@
    sync_handler
    with_hash
    inline_test_quiet_logs
+   bounded_types
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina ppx_version ppx_inline_test ppx_deriving.std))

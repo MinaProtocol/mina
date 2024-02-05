@@ -19,6 +19,7 @@
    async.async_command
    ;; local libraries
    currency
+   bounded_types
    mina_stdlib
    logger
  )
