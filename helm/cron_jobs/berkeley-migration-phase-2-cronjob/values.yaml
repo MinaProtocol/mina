@@ -51,20 +51,14 @@ replayers:
     secretName: migration
     scriptName: migration-phase-2.sh
   env:
-  - name: KEY_FILE_ARG
-    value: '-o Credentials:gs_service_key_file=/gcloud/keyfile.json'
-  - name: DUMPS_BUCKET
-    value: mina-archive-dumps
-  - name: DUMPS_PREFIX
-    value: hf_network
-  - name: SCHEMA_NAME
-    value: mainnet_archive_migrated
-  - name: CHECKPOINT_BUCKET
-    value: archive-migration-checkpoints
-  - name: CHECKPOINT_PREFIX
-    value: berkeley-migration
-  - name: MIGRATION_LOG
-    value: mainnet_berkeley_migration
+  - name: DUMPS_PREFIX_FROM
+    value: mainnet-partially-migrated
+  - name: SCHEMA_NAME_FROM
+    value: archive_partially_migrated
+  - name: SCHEMA_NAME_TO
+    value: archive_migrated
+  - name: DUMPS_PREFIX_TO
+    value: mainnet-migrated
 # - name: test-run
 #   schedule: "0 2 * * *"
 #   image: *image
