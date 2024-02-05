@@ -48,9 +48,9 @@ done
 
 # 4. Check that no blocks are created from slot 130 to slot 140
 sleep 1m
-height1=get_height 10303
+height1=$(get_height 10303)
 sleep 5m
-height2=get_height 10303
+height2=$(get_height 10303)
 echo "Block height is $height2 at slot 140 and should be the same as $height1 at slot 130."
 echo "No blocks are produced."
 
@@ -73,7 +73,7 @@ FORK_CONFIG_JSON=localnet/fork_config.json RUNTIME_CONFIG_JSON=localnet/config.j
 
 # Sleep for 60 slots (one epoch + a few more slots)
 sleep $((FORK_SLOT*60+FORK_DELAY*60+60))s
-height1=get_height 10303
+height1=$(get_height 10303)
 echo "Block height is $height1 at slot 80 and should be greater than 0."
 echo "Blocks are produced."
 # Wait until slot 100 of the new network, check that there are blocks created with >50% occupancy and there are transactions in last 10 blocks prior to slot 100
