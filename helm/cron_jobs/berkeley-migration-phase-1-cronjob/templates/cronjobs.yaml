@@ -27,6 +27,7 @@ spec:
             env:
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
+            {{- toYaml .env | nindent 12 }}
             name: {{ .name }}
             image: {{ .image.repository }}:{{ .image.tag }}
             imagePullPolicy: {{ .image.pullPolicy }}
