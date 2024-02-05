@@ -550,8 +550,7 @@ let () =
                "NN Last global slot since genesis to include in the migration \
                 (if omitted, only canonical blocks will be migrated)"
          and mina_network_blocks_bucket =
-           Param.flag "--blocks-bucket"
-             ~aliases:[ "-blocks-bucket" ]
+           Param.flag "--blocks-bucket" ~aliases:[ "-blocks-bucket" ]
              Param.(required string)
              ~doc:"Bucket with precomputed mainnet blocks"
          and batch_size =
