@@ -1,6 +1,7 @@
 testnetName: "testnet"
 annotations: {}
 mina:
+  compatible: false
   runtimeConfig:
     enabled: false
     genesisLedgerURL: ""
