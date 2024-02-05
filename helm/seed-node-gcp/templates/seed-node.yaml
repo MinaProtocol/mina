@@ -121,7 +121,11 @@ spec:
           {{- if $.Values.mina.runtimeConfig.enabled }}
           "-config-file", "/root/config/genesis_ledger.json",
           {{- end }}
-          "-libp2p-keypair", "/root/libp2p-keys/key",
+          {{- $keypairMode := "-libp2p-keypair" -}}
+          {{- if $.Values.mina.compatible }}
+          {{- $keypairMode = "-discovery-keypair" -}}
+          {{- end }}
+          {{ printf "%s" $keypairMode }}, "/root/libp2p-keys/key",
           {{- range $.Values.mina.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}
