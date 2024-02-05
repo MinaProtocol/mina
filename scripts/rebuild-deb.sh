@@ -55,10 +55,11 @@ case "${DUNE_PROFILE}" in
     DEB_SUFFIX=""
    ;;
   *)
+
     # use dune profile as suffix but replace underscore to dashes so deb builder won't complain
-    MINA_DEB_NAME="mina-berkeley-${DUNE_PROFILE//_/-}"
-    # use dune profile as suffix but replace underscode to dashes sor deb builder won't complain
-    DEB_SUFFIX="-${DUNE_PROFILE//_/-}"
+    _SUFFIX=${DUNE_PROFILE//_/-}
+    MINA_DEB_NAME="mina-berkeley-${_SUFFIX}"
+    DEB_SUFFIX="-${_SUFFIX}"
     ;;
 esac
 
@@ -385,8 +386,8 @@ if [ $# -eq 0 ]
 
   else 
     for i in "$@"; do
-      if [[ $(type -t "build_${i}_deb") == function ]]
-        then 
+      if [[ $(type -t "build_${i}_deb") == function ]] 
+      then 
           echo "Building $i debian package"
           "build_${i}_deb"
       else 
