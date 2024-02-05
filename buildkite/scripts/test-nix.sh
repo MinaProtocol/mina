@@ -14,6 +14,11 @@ fi
 mkdir -p "${XDG_CONFIG_HOME-${HOME}/.config}/nix"
 echo 'experimental-features = nix-command flakes' > "${XDG_CONFIG_HOME-${HOME}/.config}/nix/nix.conf"
 
+# There's an error in CI syncing submodules saying
+# "...' is not owned by current user"
+# run chown to the current user to fix it
+chown -R "${USER}" /workdir
+
 git config --global --add safe.directory /workdir
 
 git fetch 
