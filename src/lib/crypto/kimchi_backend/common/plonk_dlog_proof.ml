@@ -505,7 +505,7 @@ module Make (Inputs : Inputs_intf) = struct
     to_backend_with_public_evals' chal_polys (List.to_array primary_input) t
 
   (* Extract challenges and commitments from the (optional) message *)
-  let extract_challenges_and_commitments ?message =
+  let extract_challenges_and_commitments ~message =
     let chal_polys =
       match (message : message option) with Some s -> s | None -> []
     in
@@ -522,12 +522,12 @@ module Make (Inputs : Inputs_intf) = struct
     (challenges, commitments)
 
   let create ?message pk ~primary ~auxiliary =
-    let prev_chals, prev_comms = extract_challenges_and_commitments ?message in
+    let prev_chals, prev_comms = extract_challenges_and_commitments ~message in
     let res = Backend.create pk ~primary ~auxiliary ~prev_chals ~prev_comms in
     of_backend_with_public_evals res
 
   let create_async ?message pk ~primary ~auxiliary =
-    let prev_chals, prev_comms = extract_challenges_and_commitments ?message in
+    let prev_chals, prev_comms = extract_challenges_and_commitments ~message in
     let%map.Promise res =
       Backend.create_async pk ~primary ~auxiliary ~prev_chals ~prev_comms
     in
