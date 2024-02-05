@@ -39,7 +39,7 @@ spec:
         - -c
         {{- if $.Values.mina.compatible }}
         - mina advanced generate-libp2p-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
-        {{- else -}}
+        {{- else }}
         - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
         {{- end }}
         volumeMounts:
