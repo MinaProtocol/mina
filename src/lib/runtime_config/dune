@@ -29,8 +29,6 @@
    mina_numbers
    mina_wire_types
    mina_state
-   signature_lib
-   ppx_dhall_type
    snark_params
    unsigned_extended
    pickles
@@ -38,10 +36,11 @@
    pickles_types
    random_oracle
    with_hash
+   signature_lib
    staged_ledger
    bounded_types
    mina_compile_config
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_sexp_conv ppx_let ppx_deriving_yojson
-                  ppx_fields_conv ppx_dhall_type ppx_version ppx_compare)))
+                  ppx_fields_conv ppx_version ppx_compare)))

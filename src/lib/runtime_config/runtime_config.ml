@@ -8,7 +8,7 @@ module Fork_config = struct
     ; previous_length : int (* number of blocks produced since genesis *)
     ; previous_global_slot : int (* global slot since genesis *)
     }
-  [@@deriving yojson, dhall_type, bin_io_unversioned]
+  [@@deriving yojson, bin_io_unversioned]
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -77,7 +77,7 @@ module Json_layout = struct
           ; vesting_period : Mina_numbers.Global_slot_span.t
           ; vesting_increment : Currency.Amount.t
           }
-        [@@deriving yojson, fields, dhall_type, sexp]
+        [@@deriving yojson, fields, sexp]
 
         let fields = Fields.names |> Array.of_list
 
@@ -87,7 +87,7 @@ module Json_layout = struct
       module Permissions = struct
         module Auth_required = struct
           type t = None | Either | Proof | Signature | Impossible
-          [@@deriving dhall_type, sexp, bin_io_unversioned]
+          [@@deriving sexp, bin_io_unversioned]
 
           let to_yojson = function
             | None ->
@@ -178,7 +178,7 @@ module Json_layout = struct
           ; set_voting_for : Auth_required.t [@default None]
           ; set_timing : Auth_required.t [@default None]
           }
-        [@@deriving yojson, fields, dhall_type, sexp, bin_io_unversioned]
+        [@@deriving yojson, fields, sexp, bin_io_unversioned]
 
         let fields = Fields.names |> Array.of_list
 
@@ -210,9 +210,6 @@ module Json_layout = struct
           type t = Snark_params.Tick.Field.t
           [@@deriving sexp, bin_io_unversioned]
 
-          (* can't be automatically derived *)
-          let dhall_type = Ppx_dhall_type.Dhall_type.Text
-
           let to_yojson t = `String (Snark_params.Tick.Field.to_string t)
 
           let of_yojson = function
@@ -227,9 +224,6 @@ module Json_layout = struct
         module Verification_key = struct
           type t = Pickles.Side_loaded.Verification_key.Stable.Latest.t
           [@@deriving sexp, bin_io_unversioned]
-
-          (* can't be automatically derived *)
-          let dhall_type = Ppx_dhall_type.Dhall_type.Text
 
           let to_yojson t =
             `String (Pickles.Side_loaded.Verification_key.to_base64 t)
@@ -264,7 +258,7 @@ module Json_layout = struct
           ; proved_state : bool
           ; zkapp_uri : string
           }
-        [@@deriving sexp, fields, dhall_type, yojson, bin_io_unversioned]
+        [@@deriving sexp, fields, yojson, bin_io_unversioned]
 
         let fields = Fields.names |> Array.of_list
 
@@ -302,7 +296,7 @@ module Json_layout = struct
         ; permissions : Permissions.t option [@default None]
         ; token_symbol : string option [@default None]
         }
-      [@@deriving sexp, fields, yojson, dhall_type]
+      [@@deriving sexp, fields, yojson]
 
       let fields = Fields.names |> Array.of_list
 
@@ -324,13 +318,13 @@ module Json_layout = struct
         }
     end
 
-    type t = Single.t list [@@deriving yojson, dhall_type]
+    type t = Single.t list [@@deriving yojson]
   end
 
   module Ledger = struct
     module Balance_spec = struct
       type t = { number : int; balance : Currency.Balance.t }
-      [@@deriving yojson, dhall_type]
+      [@@deriving yojson]
     end
 
     type t =
@@ -342,7 +336,7 @@ module Json_layout = struct
       ; name : string option [@default None]
       ; add_genesis_winner : bool option [@default None]
       }
-    [@@deriving yojson, fields, dhall_type]
+    [@@deriving yojson, fields]
 
     let fields = Fields.names |> Array.of_list
 
@@ -352,11 +346,10 @@ module Json_layout = struct
   module Proof_keys = struct
     module Transaction_capacity = struct
       type t =
-        { log_2 : int option
-              [@default None] [@key "2_to_the"] [@dhall_type.key "two_to_the"]
+        { log_2 : int option [@default None] [@key "2_to_the"]
         ; txns_per_second_x10 : int option [@default None]
         }
-      [@@deriving yojson, dhall_type]
+      [@@deriving yojson]
 
       (* we don't deriving the field names here, because the first one differs from the
          field in the record type
@@ -384,7 +377,7 @@ module Json_layout = struct
       ; account_creation_fee : Currency.Fee.t option [@default None]
       ; fork : Fork_config.t option [@default None]
       }
-    [@@deriving yojson, fields, dhall_type]
+    [@@deriving yojson, fields]
 
     let fields = Fields.names |> Array.of_list
 
@@ -400,7 +393,7 @@ module Json_layout = struct
       ; grace_period_slots : int option [@default None]
       ; genesis_state_timestamp : string option [@default None]
       }
-    [@@deriving yojson, fields, dhall_type]
+    [@@deriving yojson, fields]
 
     let fields = Fields.names |> Array.of_list
 
@@ -421,7 +414,7 @@ module Json_layout = struct
       ; slot_tx_end : int option [@default None]
       ; slot_chain_end : int option [@default None]
       }
-    [@@deriving yojson, fields, dhall_type]
+    [@@deriving yojson, fields]
 
     let fields = Fields.names |> Array.of_list
 
@@ -436,7 +429,7 @@ module Json_layout = struct
         ; s3_data_hash : string option [@default None]
         ; hash : string option [@default None]
         }
-      [@@deriving yojson, dhall_type, fields]
+      [@@deriving yojson, fields]
 
       let fields = Fields.names |> Array.of_list
 
@@ -447,7 +440,7 @@ module Json_layout = struct
       { staking : Data.t
       ; next : (Data.t option[@default None]) (*If None then next = staking*)
       }
-    [@@deriving yojson, fields, dhall_type]
+    [@@deriving yojson, fields]
 
     let fields = Fields.names |> Array.of_list
 
@@ -461,7 +454,7 @@ module Json_layout = struct
     ; ledger : Ledger.t option [@default None]
     ; epoch_data : Epoch_data.t option [@default None]
     }
-  [@@deriving yojson, fields, dhall_type]
+  [@@deriving yojson, fields]
 
   let fields = Fields.names |> Array.of_list
 
