@@ -2,16 +2,16 @@
 
 echo "Starting berkeley migration cron job";
 
-KEY_FILE_ARG='-o Credentials:gs_service_key_file=/gcloud/keyfile.json'
-DUMPS_BUCKET=mina-archive-dumps
-DUMPS_PREFIX=hf_network
-SCHEMA_NAME=mainnet_archive_migrated
+KEY_FILE_ARG="${KEY_FILE_ARG:-}"
+DUMPS_BUCKET="${DUMPS_BUCKET:-}"
+DUMPS_PREFIX="${DUMPS_PREFIX:-}"
+SCHEMA_NAME="${SCHEMA_NAME:-}"
 
-CHECKPOINT_BUCKET=archive-migration-checkpoints
-CHECKPOINT_PREFIX=berkeley-migration
+CHECKPOINT_BUCKET="${CHECKPOINT_BUCKET:-}"
+CHECKPOINT_PREFIX="${CHECKPOINT_PREFIX:-}"
 
 # MIGRATION LOG
-MIGRATION_LOG=mainnet_berkeley_migration
+MIGRATION_LOG="${MIGRATION_LOG:-}"
 
 DATE=$(date '+%Y-%m-%d')
 
