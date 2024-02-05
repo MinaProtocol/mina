@@ -1,0 +1,60 @@
+image: &image
+  repository: gcr.io/o1labs-192920/mina-rosetta
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "2.0.0rampup4-14047c5-bullseye"
+
+gcloudKeyfileRef: ref+gcpsecrets://o1labs-192920/blockDataUploadGcpKeyfile
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+podAnnotations: {}
+podLabels: {}
+
+resources: &resources
+  limits:
+    memory: 32.0Gi
+    cpu: 20.0
+  requests:
+    memory: 1Gi
+    cpu: 1
+
+# Additional volumes on the output Deployment definition.
+volumes: []
+# - name: foo
+#   secret:
+#     secretName: mysecret
+#     optional: false
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts: []
+# - name: foo
+#   mountPath: "/etc/foo"
+#   readOnly: true
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+annotations: {}
+
+replayers:
+- name: mainnet-migrated
+  schedule: "0 2 * * *"
+  image: *image
+  resources: *resources
+  script:
+    secretName: mainnet-migrated
+    scriptName: mainnet-migrated-phase-1.sh
+# - name: test-run
+#   schedule: "0 2 * * *"
+#   image: *image
+#   resources: *resources
+#   script:
+#     secretName: test-run
+#     scriptName: test-run.sh
+

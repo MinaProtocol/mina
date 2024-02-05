@@ -1,9 +1,22 @@
 #!/bin/bash
 
-echo "Starting berkeley migration cron job";
+echo "Starting migration cron job";
 
 KEY_FILE_ARG='-o Credentials:gs_service_key_file=/gcloud/keyfile.json'
+
+# DUMPS
 DUMPS_BUCKET=mina-archive-dumps
+DUMPS_PREFIX_FROM=mainnet
+SCHEMA_NAME_FROM=archive_balances_migrated
+SCHEMA_NAME_TO=mainnet_archive_migrated
+DUMPS_PREFIX_TO=mainnet-migrated
+
+# PRECOMPUTED LOGS
+PRECOMP_BLOCKS_BUCKET=mina_network_block_data
+NETWORK_NAME=hf_network
+
+# MIGRATION LOG
+MIGRATION_LOG=mainnet_berkeley_migration
 DATE=$(date '+%Y-%m-%d')
 
 # Install perequisitives such as gsutil wget etc.
@@ -27,7 +40,7 @@ install_prereqs () {
 
 
 # Imports dumps based on prefix and schema
-# Downloads archive from 'mina-archive-dumps' bucket and untars it and finally imports into local database
+# Downloads archive from '$DUMPS_BUCKET' bucket and untars it and finally imports into local database
 import_dump () {
 
 	PREFIX=$1
@@ -70,7 +83,7 @@ run_first_phase_of_migration() {
 	wget https://raw.githubusercontent.com/MinaProtocol/mina/rampup/genesis_ledgers/mainnet.json
 	
 	echo "Running berkeley migration app";
-	mina-berkeley-migration --mainnet-archive-uri postgres://postgres:foobar@localhost/archive_balances_migrated --migrated-archive-uri postgres://postgres:foobar@localhost/mainnet_archive_migrated --batch-size 100 --config-file mainnet.json --mainnet-blocks-bucket "mina_network_block_data" &> mainnet_berkeley_migration.log
+	mina-berkeley-migration --mainnet-archive-uri postgres://postgres:foobar@localhost/archive_balances_migrated --migrated-archive-uri postgres://postgres:foobar@localhost/mainnet_archive_migrated --batch-size 100 --config-file mainnet.json --mainnet-blocks-bucket $PRECOMP_BLOCKS_BUCKET &> ${MIGRATION_LOG}.log
 	echo "Done running berkeley migration app";
 
 }
@@ -81,26 +94,26 @@ su postgres -c "cd ~ && echo ALTER USER postgres WITH PASSWORD \'foobar\' | psql
 
 install_prereqs
 
-import_dump "mainnet-archive-dump" "archive_balances_migrated"
+import_dump "${DUMPS_PREFIX}-archive-dump" $SCHEMA_NAME_FROM
 
-import_dump "mainnet-migrated-archive-dump" "mainnet_archive_migrated"
+import_dump "${DUMPS_PREFIX}-archive-dump" $SCHEMA_NAME_TO
 
 run_first_phase_of_migration
 
-grep Error mainnet_berkeley_migration.log;
+grep Error ${MIGRATION_LOG}.log;
 
 HAVE_ERRORS=$?;
 if [ $HAVE_ERRORS -eq 0 ];
-  then berkeley_migration_ERRORS=mainnet_berkeley_migration_errors_${DATE};
+  then berkeley_migration_ERRORS=${MIGRATION_LOG}_errors_${DATE};
   echo "The berkeley_migration found errors, uploading log" $berkeley_migration_ERRORS;
-  mv mainnet_berkeley_migration.log $berkeley_migration_ERRORS;
-  gsutil $KEY_FILE_ARG cp $berkeley_migration_ERRORS gs://mina-archive-dumps/$berkeley_migration_ERRORS;  
+  mv ${MIGRATION_LOG}.log $berkeley_migration_ERRORS;
+  gsutil $KEY_FILE_ARG cp $berkeley_migration_ERRORS gs:/$DUMPS_BUCKET/$berkeley_migration_ERRORS;  
 else
   echo "No errors found! uploading migrated schema to ${DUMPS_BUCKET} bucket";
-  UPLOAD_SCRIPT_NAME=mainnet-migrated-archive-dump-${DATE}_0000.sql
-  su postgres -c "cd ~ && pg_dump mainnet_archive_migrated > $UPLOAD_SCRIPT_NAME";
+  UPLOAD_SCRIPT_NAME=${DUMPS_PREFIX_TO}-archive-dump-${DATE}_0000.sql
+  su postgres -c "cd ~ && pg_dump $SCHEMA_NAME_TO > $UPLOAD_SCRIPT_NAME";
   UPLOAD_ARCHIVE_NAME=$UPLOAD_SCRIPT_NAME.tar.gz
   mv ~postgres/$UPLOAD_SCRIPT_NAME .
   tar -czvf $UPLOAD_ARCHIVE_NAME $UPLOAD_SCRIPT_NAME;
-  gsutil $KEY_FILE_ARG cp $UPLOAD_ARCHIVE_NAME gs://mina-archive-dumps;
+  gsutil $KEY_FILE_ARG cp $UPLOAD_ARCHIVE_NAME gs://$DUMPS_BUCKET;
 fi
