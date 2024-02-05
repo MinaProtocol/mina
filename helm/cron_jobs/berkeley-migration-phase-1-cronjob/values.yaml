@@ -1,8 +1,8 @@
 image: &image
-  repository: gcr.io/o1labs-192920/mina-rosetta
+  repository: gcr.io/o1labs-192920/mina-archive-berkeley-archive-migration
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "2.0.0rampup4-14047c5-bullseye"
+  tag: "2.0.0berkeley-rc1-dkijania-migration-package-c89d556-bullseye"
 
 gcloudKeyfileRef: ref+gcpsecrets://o1labs-192920/blockDataUploadGcpKeyfile
 
@@ -43,13 +43,13 @@ affinity: {}
 annotations: {}
 
 replayers:
-- name: mainnet-migrated
+- name: migration
   schedule: "0 2 * * *"
   image: *image
   resources: *resources
   script:
-    secretName: mainnet-migrated
-    scriptName: mainnet-migrated-phase-1.sh
+    secretName: migration
+    scriptName: migration-phase-1.sh
 # - name: test-run
 #   schedule: "0 2 * * *"
 #   image: *image
