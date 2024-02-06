@@ -4,11 +4,15 @@ module Ledger = Mina_ledger.Ledger
 
 type t = Ledger.t
 
+module Hashes = struct
+  type t = { s3_data_hash : string; hash : string } [@@deriving to_yojson]
+end
+
 module Hash_json = struct
-  type epoch_data = { staking_hash : string; next_hash : string option }
+  type epoch_data = { staking : Hashes.t; next : Hashes.t option }
   [@@deriving to_yojson]
 
-  type t = { genesis_hash : string; epoch_data : epoch_data option }
+  type t = { ledger : Hashes.t; epoch_data : epoch_data option }
   [@@deriving to_yojson]
 end
 
@@ -33,25 +37,42 @@ let main ~config_file ~genesis_dir ~proof_level ~hash_output_file () =
     @@ Genesis_ledger_helper.init_from_config_file ?genesis_dir
          ~logger:(Logger.create ()) ~proof_level config
   in
+  let append_genesis_dir =
+    Option.value_map genesis_dir ~default:ident ~f:(^/)
+in
   Option.value_map hash_output_file ~default:Deferred.unit ~f:(fun path ->
-      let ledger_hash ledger =
-        Mina_base.State_hash.to_base58_check @@ Mina_ledger.Ledger.merkle_root
-        @@ Lazy.force ledger
+      let ledger_hash ledger_name_prefix ledger =
+        let hash =
+          Lazy.force ledger |> Mina_ledger.Ledger.merkle_root
+          |> Mina_base.State_hash.to_base58_check
+        in
+        let%map s3_data_hash =
+          Genesis_ledger_helper.(
+            Ledger.hash_filename ~ledger_name_prefix hash |> append_genesis_dir |> sha3_hash)
+        in
+        { Hashes.s3_data_hash; hash }
       in
-      let genesis_hash =
-        ledger_hash @@ Genesis_ledger.Packed.t precomputed_values.genesis_ledger
+      let%bind ledger =
+        ledger_hash "genesis_ledger"
+        @@ Genesis_ledger.Packed.t precomputed_values.genesis_ledger
       in
-      let epoch_data =
-        Option.map precomputed_values.genesis_epoch_data ~f:(fun data ->
-            { Hash_json.staking_hash = ledger_hash data.staking.ledger
-            ; next_hash =
-                Option.map data.next ~f:(fun data -> ledger_hash data.ledger)
-            } )
+      let%bind epoch_data =
+        Option.value_map ~default:(return None)
+          precomputed_values.genesis_epoch_data ~f:(fun data ->
+            let%bind staking =
+              ledger_hash "epoch_ledger" data.staking.ledger
+            in
+            let%map next =
+              Option.value_map ~default:(return None) data.next
+                ~f:(fun { ledger; _ } ->
+                  ledger_hash "epoch_ledger" ledger >>| Option.some )
+            in
+            Some { Hash_json.staking; next } )
       in
       Async.Writer.save path
         ~contents:
           (Yojson.Safe.to_string
-             (Hash_json.to_yojson { genesis_hash; epoch_data }) ) )
+             (Hash_json.to_yojson { ledger; epoch_data }) ) )
 
 let () =
   Command.run
