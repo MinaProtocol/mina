@@ -20,13 +20,15 @@ type t =
       * [ `Global_slot_since_genesis of Mina_numbers.Global_slot_since_genesis.t
         ]
   | Unwanted_fee_token of Token_id.t
+  | After_slot_tx_end
 [@@deriving sexp, to_yojson]
 
 let grounds_for_diff_rejection : t -> bool = function
   | Expired _
   | Invalid_nonce _
   | Insufficient_funds _
-  | Insufficient_replace_fee _ ->
+  | Insufficient_replace_fee _
+  | After_slot_tx_end ->
       false
   | Overflow | Bad_token | Unwanted_fee_token _ ->
       true

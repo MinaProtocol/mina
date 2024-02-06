@@ -1253,7 +1253,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         let next_global_sub_window =
           Global_sub_window.of_global_slot ~constants next_global_slot
         in
-
         (*
           Compute the relative sub-window indexes in [0, sub_windows_per_window) needed for ring-shifting
          *)
@@ -1312,9 +1311,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let min_window_density =
           if
             same_sub_window
-            || UInt32.compare
-                 ( Mina_numbers.Global_slot_since_hard_fork.to_uint32
-                 @@ Global_slot.slot_number next_global_slot )
+            || Mina_numbers.Global_slot_since_hard_fork.compare
+                 (Global_slot.slot_number next_global_slot)
                  constants.grace_period_end
                < 0
           then prev_min_window_density
@@ -1412,9 +1410,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             let%bind in_grace_period =
               Global_slot.Checked.( < ) next_global_slot
                 (Global_slot.Checked.of_slot_number ~constants
-                   (Mina_numbers.Global_slot_since_hard_fork.Checked.Unsafe
-                    .of_field
-                      (Length.Checked.to_field constants.grace_period_end) ) )
+                   constants.grace_period_end )
             in
             if_
               Boolean.(same_sub_window ||| in_grace_period)
@@ -1479,9 +1475,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             let min_window_density =
               if
                 sub_window_diff = 0
-                || UInt32.compare
-                     ( Mina_numbers.Global_slot_since_hard_fork.to_uint32
-                     @@ Global_slot.slot_number next_global_slot )
+                || Mina_numbers.Global_slot_since_hard_fork.compare
+                     (Global_slot.slot_number next_global_slot)
                      constants.grace_period_end
                    < 0
               then prev_min_window_density
@@ -3472,7 +3467,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       module For_tests = struct
         let gen_consensus_state
             ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-            ~constants ~(gen_slot_advancement : int Quickcheck.Generator.t) :
+            ~constants ~(slot_advancement : int) :
             (   previous_protocol_state:
                   Protocol_state.Value.t
                   Mina_base.State_hash.With_state_hashes.t
@@ -3488,7 +3483,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             |> Mina_base.Frozen_ledger_hash.of_ledger_hash
           in
           let open Quickcheck.Let_syntax in
-          let%bind slot_advancement = gen_slot_advancement in
           let%map producer_vrf_result = Vrf.Output.gen in
           fun ~(previous_protocol_state :
                  Protocol_state.Value.t Mina_base.State_hash.With_state_hashes.t

@@ -7,6 +7,7 @@
    async_kernel
    core_kernel
    ;; local libraries
+   mina_numbers
    crypto_params
    currency
    pasta_bindings
@@ -24,6 +25,7 @@
    random_oracle_input
    snarky.backendless
    snark_params
+   bounded_types
    sgn
    signature_lib
    tuple_lib

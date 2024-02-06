@@ -295,8 +295,8 @@ module type Full = sig
         ; zkapp_account_keypair : Signature_lib.Keypair.t
         ; memo : Signed_command_memo.t
         ; update : Account_update.Update.t
-        ; actions : Tick.Field.t array list
-        ; events : Tick.Field.t array list
+        ; actions : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; events : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
         ; call_data : Tick.Field.t
         }
     end
@@ -332,8 +332,8 @@ module type Full = sig
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
         ; current_auth : Permissions.Auth_required.t
-        ; actions : Tick.Field.t array list
-        ; events : Tick.Field.t array list
+        ; actions : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; events : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
         }
@@ -380,7 +380,8 @@ module type Full = sig
       -> unit
 
     val create_trivial_snapp :
-         constraint_constants:Genesis_constants.Constraint_constants.t
+         ?unique_id:int
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> unit
       -> [> `VK of (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t ]
          * [> `Prover of
@@ -406,8 +407,8 @@ module type Full = sig
         ; new_zkapp_account : bool
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
-        ; actions : Tick.Field.t array list
-        ; events : Tick.Field.t array list
+        ; actions : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; events : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
         }
