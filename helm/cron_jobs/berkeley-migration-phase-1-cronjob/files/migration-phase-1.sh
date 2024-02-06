@@ -143,8 +143,8 @@ run_first_phase_of_migration
 grep Error ${MIGRATION_LOG}.log;
 
 HAVE_ERRORS=$?;
-if [ $HAVE_ERRORS -eq 0 ];
-  then berkeley_migration_ERRORS=${MIGRATION_LOG}_errors_${DATE}.log;
+if [ $HAVE_ERRORS -eq 0 ]; then 
+  berkeley_migration_ERRORS=${MIGRATION_LOG}_errors_${DATE}.log;
   echo "The berkeley_migration found errors, uploading log" $berkeley_migration_ERRORS;
   mv ${MIGRATION_LOG}.log $berkeley_migration_ERRORS;
   gsutil -o "$KEY_FILE_ARG" cp $berkeley_migration_ERRORS gs://$DUMPS_BUCKET/$berkeley_migration_ERRORS;  

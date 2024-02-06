@@ -116,7 +116,6 @@ else
 	run_second_phase_of_migration
 fi
 
-
 grep Error ${CHECKPOINT_PREFIX}.log;
 
 HAVE_ERRORS=$?;
