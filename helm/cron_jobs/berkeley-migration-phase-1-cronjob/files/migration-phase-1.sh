@@ -2,21 +2,31 @@
 
 echo "Starting migration cron job";
 
-KEY_FILE_ARG='-o Credentials:gs_service_key_file=/gcloud/keyfile.json'
+set -x
+
+KEY_FILE_ARG="Credentials:gs_service_key_file=/gcloud/keyfile.json"
 
 # DUMPS
 DUMPS_BUCKET="${DUMPS_BUCKET:-}"
+
 DUMPS_PREFIX_FROM="${DUMPS_PREFIX_FROM:-}"
 SCHEMA_NAME_FROM="${SCHEMA_NAME_FROM:-}"
-SCHEMA_NAME_TO="${SCHEMA_NAME_TO:-}"
+
 DUMPS_PREFIX_TO="${DUMPS_PREFIX_TO:-}"
+SCHEMA_NAME_TO="${SCHEMA_NAME_TO:-}"
+
+# GENESIS_LEDGER
+GENESIS_LEDGER_URI="${GENESIS_LEDGER_URI:-https://github.com/MinaProtocol/mina/raw/testing/hard-fork-internal/genesis_ledgers/devnet.json}"
+
+#ARCHIVE
+CREATE_SCRIPT_URI="${CREATE_SCRIPT_URI:-https://raw.githubusercontent.com/MinaProtocol/mina/berkeley/src/app/archive}"
 
 # PRECOMPUTED LOGS
 PRECOMP_BLOCKS_BUCKET="${PRECOMP_BLOCKS_BUCKET:-}"
 NETWORK_NAME="${NETWORK_NAME:-}"
 
 # MIGRATION LOG
-MIGRATION_LOG="${MIGRATION_LOG:-}"
+MIGRATION_LOG="${DUMPS_PREFIX_TO:-}"
 DATE=$(date '+%Y-%m-%d')
 
 # Install perequisitives such as gsutil wget etc.
@@ -50,12 +60,12 @@ import_dump () {
 
 	echo "Fetching newest dump from ${DUMPS_BUCKET} starting with ${PREFIX}"
 
-	ARCHIVE_DUMP_URI=$(gsutil $KEY_FILE_ARG ls gs://${DUMPS_BUCKET}/${PREFIX}-*.sql.tar.gz | sort -r | head -n 1);
+	ARCHIVE_DUMP_URI=$(gsutil -o "$KEY_FILE_ARG" ls gs://${DUMPS_BUCKET}/${PREFIX}-*.sql.tar.gz | sort -r | head -n 1);
 	ARCHIVE_DUMP=$(basename $ARCHIVE_DUMP_URI);
 	ARCHIVE_SQL=$(basename $ARCHIVE_DUMP_URI .tar.gz);
 
 	echo "Found lastest dump: " $ARCHIVE_DUMP_URI " . Downloading ...";
-	gsutil $KEY_FILE_ARG cp $ARCHIVE_DUMP_URI . ;
+	gsutil -o "$KEY_FILE_ARG" cp $ARCHIVE_DUMP_URI . ;
 
 	echo " Unpacking archive dump";
 	tar -xzvf $ARCHIVE_DUMP;
@@ -76,17 +86,18 @@ import_dump () {
 # Creates target empty schema .
 # Should be used on initial migration steps (when there is no existing partially migrated schema)
 import_dump_frist_time () {
+	SCHEMA=$1
 
-	PREFIX=$1
-	SCHEMA=$2
+	echo "Creating ${SCHEMA} archive..."
 
-	echo "Importing ${SCHEMA} archive..."
+	echo "Fetching newest schema from "
 
-	echo "Fetching newest schema from"
-
-	wget https://raw.githubusercontent.com/MinaProtocol/mina/berkeley/src/app/archive/create_schema.sql
+	wget "${CREATE_SCRIPT_URI}"/create_schema.sql
+	wget "${CREATE_SCRIPT_URI}"/zkapp_tables.sql
+	
 	ARCHIVE_SQL=create_schema.sql
 	mv $ARCHIVE_SQL ~postgres/;
+	mv zkapp_tables.sql ~postgres/;
 	echo "Creating schema and importing archive dump";
 	su postgres -c "cd ~ && echo CREATE DATABASE $SCHEMA | psql";
 	su postgres -c "cd ~ && psql -d $SCHEMA < $ARCHIVE_SQL";
@@ -102,11 +113,11 @@ run_first_phase_of_migration() {
 
 	echo "Starting migration Phase 1";
 
-	echo "Downloading genesis_ledger/mainnet.json from newest rampup ";
-	wget https://raw.githubusercontent.com/MinaProtocol/mina/berkeley/genesis_ledgers/mainnet.json
+	echo "Downloading genesis_ledger";
+	wget $GENESIS_LEDGER_URI -O genesis_ledger.json
 	
 	echo "Running berkeley migration app";
-	mina-berkeley-migration --mainnet-archive-uri postgres://postgres:foobar@localhost/${SCHEMA_NAME_FROM} --migrated-archive-uri postgres://postgres:foobar@localhost/${SCHEMA_NAME_TO} --batch-size 100 --config-file mainnet.json --mainnet-blocks-bucket $PRECOMP_BLOCKS_BUCKET &> ${MIGRATION_LOG}.log
+	mina-berkeley-migration --mainnet-archive-uri postgres://postgres:foobar@localhost/${SCHEMA_NAME_FROM} --migrated-archive-uri postgres://postgres:foobar@localhost/${SCHEMA_NAME_TO} --batch-size 100 --config-file genesis_ledger.json --blocks-bucket $PRECOMP_BLOCKS_BUCKET --network $NETWORK_NAME &> ${MIGRATION_LOG}.log
 	echo "Done running berkeley migration app";
 
 }
@@ -119,7 +130,13 @@ install_prereqs
 
 import_dump "${DUMPS_PREFIX_FROM}-archive-dump" $SCHEMA_NAME_FROM
 
-import_dump "${DUMPS_PREFIX_TO}-archive-dump" $SCHEMA_NAME_TO
+if [[ "$1" == "--first-job" ]]
+then 
+	import_dump_frist_time $SCHEMA_NAME_TO
+else 
+	import_dump "${DUMPS_PREFIX_TO}-archive-dump" $SCHEMA_NAME_TO
+fi
+
 
 run_first_phase_of_migration
 
@@ -130,7 +147,7 @@ if [ $HAVE_ERRORS -eq 0 ];
   then berkeley_migration_ERRORS=${MIGRATION_LOG}_errors_${DATE}.log;
   echo "The berkeley_migration found errors, uploading log" $berkeley_migration_ERRORS;
   mv ${MIGRATION_LOG}.log $berkeley_migration_ERRORS;
-  gsutil $KEY_FILE_ARG cp $berkeley_migration_ERRORS gs:/$DUMPS_BUCKET/$berkeley_migration_ERRORS;  
+  gsutil -o "$KEY_FILE_ARG" cp $berkeley_migration_ERRORS gs://$DUMPS_BUCKET/$berkeley_migration_ERRORS;  
 else
   echo "No errors found! uploading migrated schema to ${DUMPS_BUCKET} bucket";
   UPLOAD_SCRIPT_NAME=${DUMPS_PREFIX_TO}-archive-dump-${DATE}_0000.sql
@@ -138,5 +155,5 @@ else
   UPLOAD_ARCHIVE_NAME=$UPLOAD_SCRIPT_NAME.tar.gz
   mv ~postgres/$UPLOAD_SCRIPT_NAME .
   tar -czvf $UPLOAD_ARCHIVE_NAME $UPLOAD_SCRIPT_NAME;
-  gsutil $KEY_FILE_ARG cp $UPLOAD_ARCHIVE_NAME gs://$DUMPS_BUCKET;
+  gsutil -o "$KEY_FILE_ARG" cp $UPLOAD_ARCHIVE_NAME gs://$DUMPS_BUCKET;
 fi
