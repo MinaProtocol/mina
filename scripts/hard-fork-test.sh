@@ -63,7 +63,10 @@ get_fork_config 10303 > localnet/fork_config.json
 
 # mkdir -p localnet/genesis && scripts/generate_ledgers_tar_from_config.sh localnet/fork_config.json localnet/genesis localnet/config.json
 
-FORK_CONFIG_JSON=localnet/fork_config.json RUNTIME_CONFIG_JSON=localnet/config.json ./scripts/hardfork/convert_fork_config.sh
+FORK_CONFIG_JSON=localnet/fork_config.json RUNTIME_CONFIG_JSON=localnet/pre_config.json ./scripts/hardfork/convert_fork_config.sh
+
+# Conversion specific for testing between Mainnet 1.x and Berkeley
+<localnet/pre_config.json jq '.transaction_capacity.log_2 = 2 | grace_period_slots = 3' >localnet/config.json
 
 # 8. Node is shutdown and restarted with mina-fork and the config from previous step 
 ./scripts/run-hf-localnet.sh -m "$FORK_MINA_EXE" -d "$FORK_DELAY" -i "$FORK_SLOT" \
