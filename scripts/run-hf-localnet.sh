@@ -91,19 +91,19 @@ if [[ ! -f $CONF_DIR/bp ]]; then
   "$MINA_EXE" advanced generate-keypair --privkey-path $CONF_DIR/bp
 fi
 
-libp2p_1_args=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_1" )
-libp2p_2_args=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_2" )
+NODE_ARGS_1=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_1" )
+NODE_ARGS_2=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_2" )
 
 # We handle error of libp2p key generation because `compatible`'s version
 # has a different command for libp2p key generation
 "$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_1 2>/dev/null || \
-  libp2p_1_args[0]="--discovery-keypair"
-if [[ "${libp2p_1_args[0]}" == "--discovery-keypair" ]]; then
+  NODE_ARGS_1[0]="--discovery-keypair"
+if [[ "${NODE_ARGS_1[0]}" == "--discovery-keypair" ]]; then
   "$MINA_EXE" advanced generate-libp2p-keypair --privkey-path $CONF_DIR/libp2p_1
 fi
 "$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_2 2>/dev/null || \
-  libp2p_2_args[0]="--discovery-keypair"
-if [[ "${libp2p_2_args[0]}" == "--discovery-keypair" ]]; then
+  NODE_ARGS_2[0]="--discovery-keypair"
+if [[ "${NODE_ARGS_2[0]}" == "--discovery-keypair" ]]; then
   "$MINA_EXE" advanced generate-libp2p-keypair --privkey-path $CONF_DIR/libp2p_2
 fi
 
@@ -165,7 +165,11 @@ CONF_FILE="$PWD/$CONF_DIR/daemon$CONF_SUFFIX.json"
 COMMON_ARGS=( --config-file "$CONF_FILE" --file-log-level Info --log-level Error --seed )
 
 if [[ "$GENESIS_LEDGER_DIR" != "" ]]; then
-  COMMON_ARGS+=( --genesis-ledger-dir "$GENESIS_LEDGER_DIR" )
+  rm -Rf localnet/genesis_{1,2}
+  cp -Rf "$GENESIS_LEDGER_DIR" localnet/genesis_1
+  cp -Rf "$GENESIS_LEDGER_DIR" localnet/genesis_2
+  NODE_ARGS_1+=( --genesis-ledger-dir "$PWD/localnet/genesis_1" )
+  NODE_ARGS_2+=( --genesis-ledger-dir "$PWD/localnet/genesis_2" )
 fi
 
 # Clean runtime directories
@@ -173,7 +177,7 @@ rm -Rf localnet/runtime_1 localnet/runtime_2
 
 "$MINA_EXE" daemon "${COMMON_ARGS[@]}" \
   --peer "/ip4/127.0.0.1/tcp/10312/p2p/$(cat $CONF_DIR/libp2p_2.peerid)" \
-  "${libp2p_1_args[@]}" \
+  "${NODE_ARGS_1[@]}" \
   --block-producer-key "$PWD/$CONF_DIR/bp" \
   --config-directory "$PWD/localnet/runtime_1" \
   --client-port 10301 --external-port 10302 --rest-port 10303 &
@@ -183,7 +187,7 @@ bp_pid=$!
 echo "Block producer PID: $bp_pid"
 
 "$MINA_EXE" daemon "${COMMON_ARGS[@]}" \
-  "${libp2p_2_args[@]}" \
+  "${NODE_ARGS_2[@]}" \
   --peer "/ip4/127.0.0.1/tcp/10302/p2p/$(cat $CONF_DIR/libp2p_1.peerid)" \
   --run-snark-worker "$(cat $CONF_DIR/bp.pub)" --work-selection seq \
   --config-directory "$PWD/localnet/runtime_2" \
