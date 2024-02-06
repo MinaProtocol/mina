@@ -73,7 +73,7 @@ let hardForkPipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMo
               key = "build-deb-hardfork-pkg"
           }],
           service="mina-daemon",
-          network="mainnet-hardfork",
+          network="devnet-hardfork",
           deb_codename="${DebianVersions.lowerName debVersion}",
           deb_profile="${Profiles.lowerName profile}",
           step_key="daemon-mainnet-hard-fork-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"

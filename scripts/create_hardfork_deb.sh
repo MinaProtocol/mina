@@ -3,16 +3,16 @@
 source scripts/deb-builder-helpers.sh
 
 echo "------------------------------------------------------------"
-echo "--- Building mainnet deb with hard-fork ledger:"
+echo "--- Building devnet deb with hard-fork ledger:"
 
-create_control_file mina-mainnet-hardfork "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
+create_control_file mina-devnet-hardfork "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
 
-# TODO(FIXME): Don't use mainnet seeds URL
-copy_common_daemon_configs mainnet mainnet 'mina-seed-lists/mainnet_seeds.txt'
+# TODO(FIXME): Don't use devnet seeds URL
+copy_common_daemon_configs devnet devnet 'mina-seed-lists/devnet_seeds.txt'
 
 # Copy the overridden runtime config file to the config file location
 cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
 
 # TODO: call "${BUILDDIR}/usr/local/bin/mina-create-genesis" here to generate the tar files
 
-build_deb mina-mainnet-hardfork
+build_deb mina-devnet-hardfork

@@ -16,13 +16,13 @@ sudo apt-get update
 # This is strictly better than excluding the version string though, because
 # including it could select an artifact from *any* previous PR, whether
 # mainnet-compatible or not.
-sudo apt-get install -y "mina-mainnet=1.4.0beta2-compatible-aeca8b8"
+sudo apt-get install -y "mina-devnet=1.4.0beta2-testing-hard-fork-internal-with-stop-slot-b7ed6d9"
 
 # Use the `mina` binary in the path to dump the fork config
 export MINA_V1_DAEMON=mina
 export RUNTIME_CONFIG_JSON=$PWD/runtime-config.json
 
-echo "--- Fetch fork config from mainnet"
+echo "--- Fetch fork config from qanet"
 
 ./scripts/hardfork/export_fork_config.sh
 
