@@ -479,7 +479,7 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
           match online_status with
           | `Offline ->
               (* nothing to do if offline before genesis *)
-              ( if after_genesis () then
+              ( if (not is_seed) && after_genesis () then
                 match !next_helper_restart with
                 | None ->
                     next_helper_restart :=
