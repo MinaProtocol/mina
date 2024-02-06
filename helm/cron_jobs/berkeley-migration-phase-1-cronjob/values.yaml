@@ -54,19 +54,19 @@ replayers:
   - name: DUMPS_BUCKET
     value: mina-archive-dumps
   - name: DUMPS_PREFIX_FROM
-    value: "mainnet"
+    value: o1labs-speedrun-hf-rc-1
   - name: SCHEMA_NAME_FROM
-    value: archive_balances_migrated
+    value: archive
   - name: SCHEMA_NAME_TO
     value: archive_partially_migrated
   - name: DUMPS_PREFIX_TO
-    value: mainnet-partially-migrated
+    value: o1labs-speedrun-hf-rc-1-partially-migrated
   - name: PRECOMP_BLOCKS_BUCKET
     value: mina_network_block_data
   - name: NETWORK_NAME
-    value: mainnet
+    value: o1labs-speedrun-hf-rc-1
   - name: MIGRATION_LOG
-    value: mainnet_berkeley_migration
+    value: o1labs-speedrun-hf-rc-1_migration
 # - name: test-run
 #   schedule: "0 2 * * *"
 #   image: *image
