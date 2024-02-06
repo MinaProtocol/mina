@@ -2,3 +2,5 @@
 [%%undef fork_previous_state_hash]
 [%%undef fork_genesis_slot]
 [%%undef zkapp_cmd_limit]
+[%%undef slot_tx_end]
+[%%undef slot_chain_end]

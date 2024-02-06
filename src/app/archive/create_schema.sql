@@ -49,7 +49,7 @@ CREATE TABLE account_identifiers
 */
 CREATE TABLE timing_info
 ( id                      serial    PRIMARY KEY
-, account_identifier_id   int       NOT NULL UNIQUE REFERENCES account_identifiers(id)
+, account_identifier_id   int       NOT NULL REFERENCES account_identifiers(id)
 , initial_minimum_balance text      NOT NULL
 , cliff_time              bigint    NOT NULL
 , cliff_amount            text      NOT NULL
