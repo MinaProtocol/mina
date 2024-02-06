@@ -1,5 +1,8 @@
 testnetName: "testnet"
 annotations: {}
+bootstrap:
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
 mina:
   compatible: false
   runtimeConfig:
