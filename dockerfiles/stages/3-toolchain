@@ -100,7 +100,7 @@ RUN wget -O- https://apt.releases.hashicorp.com/gpg | \
 RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
     && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
     && apt-get update --yes \
-    && apt-get install --yes google-cloud-sdk kubectl \
+    && apt-get install --yes google-cloud-sdk=462.0.1-0 kubectl=1:462.0.1-0  \
     && rm -rf /var/lib/apt/lists/*
 
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
