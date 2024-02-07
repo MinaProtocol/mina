@@ -410,11 +410,6 @@ module Ledger = struct
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
       ?(ledger_name_prefix = "genesis_ledger") (config : Runtime_config.Ledger.t)
       =
-    [%log trace] "Load requested for $name $config"
-      ~metadata:
-        [ ("name", `String ledger_name_prefix)
-        ; ("config", Runtime_config.Ledger.to_yojson config)
-        ] ;
     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
         let padded_accounts_opt =
           padded_accounts_from_runtime_config_opt ~logger ~proof_level
