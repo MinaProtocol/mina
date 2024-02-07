@@ -1364,9 +1364,10 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let%map mina =
             Mina_lib.create ~wallets
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~chain_id ~is_seed ~super_catchup:(not no_super_catchup)
-                 ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
-                 ~gossip_net_params ~proposed_protocol_version_opt
+                 ~file_log_level ~log_level ~log_json ~chain_id ~is_seed
+                 ~super_catchup:(not no_super_catchup) ~disable_node_status
+                 ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
+                 ~proposed_protocol_version_opt
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method )

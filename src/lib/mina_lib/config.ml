@@ -60,5 +60,8 @@ type t =
   ; uptime_send_node_commit : bool [@default false]
   ; stop_time : int
   ; graphql_control_port : int option [@default None]
+  ; file_log_level : Logger.Level.t [@default Logger.Level.Info]
+  ; log_level : Logger.Level.t [@default Logger.Level.Info]
+  ; log_json : bool [@default false]
   }
 [@@deriving make]

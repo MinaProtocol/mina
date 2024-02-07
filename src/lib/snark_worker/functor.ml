@@ -361,20 +361,23 @@ module Make (Inputs : Intf.Inputs_intf) :
           (optional bool)
           ~doc:
             "true|false Shutdown when disconnected from daemon (default:true)"
+      and log_json = Cli_lib.Flag.Log.json
+      and log_level = Cli_lib.Flag.Log.level
+      and file_log_level = Cli_lib.Flag.Log.file_log_level
       and conf_dir = Cli_lib.Flag.conf_dir in
       fun () ->
         let logger =
           Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
         in
+        Cli_lib.Stdout_log.setup log_json log_level ;
         Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
-            let logrotate_max_size = 1024 * 10 in
-            let logrotate_num_rotate = 1 in
-            Logger.Consumer_registry.register ~id:Logger.Logger_id.snark_worker
-              ~processor:(Logger.Processor.raw ())
+            let max_size = 1024 * 1024 * 10 in
+            Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
+              ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
               ~transport:
                 (Logger_file_system.dumb_logrotate ~directory:conf_dir
-                   ~log_filename:"mina-snark-worker.log"
-                   ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ) ;
+                   ~log_filename:"mina-snark-worker.log" ~max_size
+                   ~num_rotate:10 ) ) ;
         Signal.handle [ Signal.term ] ~f:(fun _signal ->
             [%log info]
               !"Received signal to terminate. Aborting snark worker process" ;
@@ -388,12 +391,20 @@ module Make (Inputs : Intf.Inputs_intf) :
           ~logger ~proof_level daemon_port
           (Option.value ~default:true shutdown_on_disconnect))
 
-  let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect =
-    [ "-daemon-address"
+  let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect ~conf_dir
+      ~log_json ~log_level ~file_log_level =
+    [ "--daemon-address"
     ; Host_and_port.to_string daemon_address
-    ; "-proof-level"
+    ; "--proof-level"
     ; Genesis_constants.Proof_level.to_string proof_level
-    ; "-shutdown-on-disconnect"
+    ; "--shutdown-on-disconnect"
     ; Bool.to_string shutdown_on_disconnect
+    ; "--config-directory"
+    ; conf_dir
+    ; "--file-log-level"
+    ; Logger.Level.show file_log_level
+    ; "--log-level"
+    ; Logger.Level.show log_level
     ]
+    @ if log_json then [ "--log_json" ] else []
 end

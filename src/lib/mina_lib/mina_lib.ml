@@ -177,7 +177,8 @@ let log_snark_coordinator_warning (config : Config.t) snark_worker =
         ()
 
 module Snark_worker = struct
-  let run_process ~logger ~proof_level pids client_port kill_ivar num_threads =
+  let run_process ~logger ~proof_level ~conf_dir ~file_log_level ~log_json
+      ~log_level pids client_port kill_ivar num_threads =
     let env =
       Option.map
         ~f:(fun num -> `Extend [ ("RAYON_NUM_THREADS", string_of_int num) ])
@@ -191,7 +192,8 @@ module Snark_worker = struct
           :: Snark_worker.arguments ~proof_level
                ~daemon_address:
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
-               ~shutdown_on_disconnect:false )
+               ~shutdown_on_disconnect:false ~conf_dir ~file_log_level ~log_json
+               ~log_level )
     in
     Child_processes.Termination.register_process pids snark_worker_process
       Snark_worker ;
@@ -261,9 +263,11 @@ module Snark_worker = struct
         log_snark_worker_warning t ;
         let%map snark_worker_process =
           run_process ~logger:t.config.logger
-            ~proof_level:t.config.precomputed_values.proof_level t.config.pids
-            t.config.gossip_net_params.addrs_and_ports.client_port kill_ivar
-            t.config.snark_worker_config.num_threads
+            ~proof_level:t.config.precomputed_values.proof_level
+            ~conf_dir:t.config.conf_dir ~log_level:t.config.log_level
+            ~log_json:t.config.log_json ~file_log_level:t.config.file_log_level
+            t.config.pids t.config.gossip_net_params.addrs_and_ports.client_port
+            kill_ivar t.config.snark_worker_config.num_threads
         in
         [%log' debug t.config.logger]
           ~metadata:
