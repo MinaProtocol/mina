@@ -689,11 +689,8 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
       in
       let%bind target_state_hash =
         match epoch_ledgers_state_hash_opt with
-        | Some epoch_ledgers_state_hash ->
-            [%log info] "Retrieving fork block state_hash" ;
-            query_db ~f:(fun db ->
-                Sql.Parent_block.get_parent_state_hash db
-                  epoch_ledgers_state_hash )
+        | Some hash ->
+            return hash
         | None ->
             [%log info]
               "Searching for block with greatest height on canonical chain" ;
