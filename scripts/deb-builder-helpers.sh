@@ -135,6 +135,10 @@ copy_common_daemon_configs() {
   cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
   cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
 
+  cp ./default/src/app/cli/src/mina_testnet_signatures.exe ./default/src/app/cli/src/mina_devnet_signatures.exe
+  cp ./default/src/app/rosetta/rosetta_testnet_signatures.exe ./default/src/app/rosetta/rosetta_devnet_signatures.exe
+  cp ./default/src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe ./default/src/app/rosetta/ocaml-signer/signer_devnet_signatures.exe
+  
   # Copy signature-based Binaries (based on signature type $2 passed into the function)
   cp ./default/src/app/cli/src/mina_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
   
