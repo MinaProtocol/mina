@@ -201,9 +201,15 @@ while ! "$MINA_EXE" accounts import --privkey-path "$PWD/$CONF_DIR/bp" --rest-se
   sleep 1m
 done
 
+# Export staged ledger
+# Will succeed after bootstrap is over
+while ! "$MINA_EXE" ledger export staged-ledger --daemon-port 10311 > localnet/exported_staged_ledger.json; do
+  sleep 1m
+done
+
 i=0
 while kill -0 $sw_pid; do
-  <"$CONF_FILE" jq -r '.ledger.accounts[].pk' | shuf | while read acc; do
+  <localnet/exported_staged_ledger.json jq -r '.[].pk' | shuf | while read acc; do
     if ! kill -0 $sw_pid; then
       exit 0
     fi
