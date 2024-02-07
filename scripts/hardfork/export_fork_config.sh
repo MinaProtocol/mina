@@ -2,26 +2,4 @@
 
 set -beo pipefail
 
-MINA_V1_DAEMON=${MINA_V1_DAEMON:=_build/default/src/app/cli/src/mina.exe}
-FORK_CONFIG_JSON=${FORK_CONFIG_JSON:=fork_config.json}
-
-$MINA_V1_DAEMON daemon || exit 1 &
-
-function isNotSynced() {
-    status=$(curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { syncStatus } " }' localhost:3085/graphql | jq '.data.syncStatus')
-    if [ "${status}" == '"SYNCED"' ]; then
-        return 1
-    else
-        return 0
-    fi
-}
-
-while isNotSynced; do
-    sleep 10s
-done
-
-echo "Node synced"
-
-curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { fork_config } " }' localhost:3085/graphql | jq '.data.fork_config' > $FORK_CONFIG_JSON
-
-$MINA_V1_DAEMON client stop-daemon
+curl 'https://drive.usercontent.google.com/download?id=1r8BtQdp6QJz9WVevzBw8fn44EY5KQoNT&export=download&confirm=t' > $FORK_CONFIG_JSON
