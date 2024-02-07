@@ -59,5 +59,8 @@ type t =
   ; uptime_url : Uri.t option [@default None]
   ; uptime_submitter_keypair : Keypair.t option [@default None]
   ; stop_time : int
+  ; file_log_level : Logger.Level.t [@default Logger.Level.Info]
+  ; log_level : Logger.Level.t [@default Logger.Level.Info]
+  ; log_json : bool [@default false]
   }
 [@@deriving make]

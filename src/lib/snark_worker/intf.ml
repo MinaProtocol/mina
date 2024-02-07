@@ -138,6 +138,10 @@ module type S0 = sig
        proof_level:Genesis_constants.Proof_level.t
     -> daemon_address:Host_and_port.t
     -> shutdown_on_disconnect:bool
+    -> conf_dir:string
+    -> log_json:bool
+    -> log_level:Logger.Level.t
+    -> file_log_level:Logger.Level.t
     -> string list
 end
 

@@ -1274,9 +1274,9 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let%map coda =
             Mina_lib.create ~wallets
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~chain_id ~is_seed ~super_catchup:(not no_super_catchup)
-                 ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
-                 ~gossip_net_params
+                 ~file_log_level ~log_level ~log_json ~chain_id ~is_seed
+                 ~super_catchup:(not no_super_catchup) ~disable_node_status
+                 ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
                  ~initial_protocol_version:current_protocol_version
                  ~proposed_protocol_version_opt
                  ~work_selection_method:
