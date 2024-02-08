@@ -1,6 +1,6 @@
 {
   "daemon": {
-    "genesis_state_timestamp": "2024-02-08T13:15:00+00:00",
+    "genesis_state_timestamp": "2024-02-08T13:30:00+00:00",
     "txpool_max_size": 3000
   },
   "ledger": {
