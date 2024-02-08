@@ -208,6 +208,7 @@ HELM="helm"
 HELM_ARGS="--namespace=$NAMESPACE \
            --values=$(values common) \
            --set=frontend.nodePort=$NODE_PORT \
+           --set-file=mina.runtimeConfig=$(resource daemon.json) \
            ${MINA_IMAGE:+--set=mina.image=${MINA_IMAGE}} \
            $HELM_ARGS"
 
