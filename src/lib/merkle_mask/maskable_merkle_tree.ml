@@ -32,6 +32,8 @@ module Make (Inputs : Inputs_intf) = struct
     Uuid.Table.create ()
 
   module Node = struct
+    [@@@coverage off]
+
     type t = Mask.Attached.t
 
     type attached =
@@ -86,7 +88,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   module Graphviz = Visualization.Make_ocamlgraph (Node)
 
-  let to_graph () =
+  let[@coverage off] to_graph () =
     let masks = List.concat @@ Uuid.Table.data registered_masks in
     let uuid_to_masks_table =
       Uuid.Table.of_alist_exn
@@ -103,7 +105,7 @@ module Make (Inputs : Inputs_intf) = struct
                    add_edge graph_with_mask_and_child mask ) ) )
 
   module Debug = struct
-    let visualize ~filename =
+    let[@coverage off] visualize ~filename =
       Out_channel.with_file filename ~f:(fun output_channel ->
           let graph = to_graph () in
           Graphviz.output_graph output_channel graph )
@@ -132,7 +134,7 @@ module Make (Inputs : Inputs_intf) = struct
         iter_descendants ~f (Mask.Attached.get_uuid child_mask) ;
         f child_mask )
 
-  let unregister_mask_error_msg ~uuid ~parent_uuid suffix =
+  let[@coverage off] unregister_mask_error_msg ~uuid ~parent_uuid suffix =
     sprintf "Couldn't unregister mask with UUID %s from parent %s, %s"
       (Uuid.to_string_hum uuid)
       (Uuid.to_string_hum parent_uuid)
@@ -166,12 +168,13 @@ module Make (Inputs : Inputs_intf) = struct
       match grandchildren with
       | `Check -> (
           match Hashtbl.find registered_masks (Mask.Attached.get_uuid mask) with
-          | Some children ->
-              failwith @@ error_msg
-              @@ sprintf
-                   !"mask has children that must be unregistered first: \
-                     %{sexp: Uuid.t list}"
-                   (List.map ~f:Mask.Attached.get_uuid children)
+          | Some children -> (
+              (( failwith @@ error_msg
+               @@ sprintf
+                    !"mask has children that must be unregistered first: \
+                      %{sexp: Uuid.t list}"
+                    (List.map ~f:Mask.Attached.get_uuid children) )
+               [@coverage off] ) )
           | None ->
               true )
       | `I_promise_I_am_reparenting_this_mask ->
