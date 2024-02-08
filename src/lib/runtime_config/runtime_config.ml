@@ -1297,7 +1297,7 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
     ~protocol_state ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
     ~next_epoch_seed (runtime_config : t) =
   let open Async.Deferred.Result.Let_syntax in
-  let global_slot = Mina_numbers.Global_slot.to_int global_slot in
+  let global_slot_since_genesis = Mina_numbers.Global_slot.to_int global_slot in
   let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
   let yield () =
     let open Async.Deferred.Infix in
@@ -1309,7 +1309,7 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
     |> ledger_accounts
   in
   let ledger = Option.value_exn runtime_config.ledger in
-  let blockchain_length =
+  let fork_blockchain_length =
     let open Option.Let_syntax in
     let%bind proof = runtime_config.proof in
     let%map fork = proof.fork in
@@ -1334,9 +1334,9 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
     Fork_config.
       { state_hash =
           Mina_base.State_hash.to_base58_check
-            protocol_state.Mina_state.Protocol_state.Poly.previous_state_hash
+            (Mina_state.Protocol_state.hashes protocol_state).state_hash
       ; blockchain_length =
-          Option.value ~default:blockchain_length blockchain_length
+          Option.value ~default:blockchain_length fork_blockchain_length
       ; global_slot_since_genesis
       }
   in
