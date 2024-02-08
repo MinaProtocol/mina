@@ -627,6 +627,221 @@ module Make (Test : Test_intf) = struct
         [%test_result: Account.t] ~message:"account in mask should be unchanged"
           ~expect:acct1
           (Mask.Attached.get attached_mask loc |> Option.value_exn) )
+
+  let%test_unit "unregistering an unregistered mask is a failure" =
+    Test.with_instances (fun maskable mask ->
+        let attached_mask = Maskable.register_mask maskable mask in
+        let _unatt =
+          Maskable.unregister_mask_exn ~grandchildren:`Recursive ~loc:"1"
+            attached_mask
+        in
+        match
+          Maskable.unregister_mask_exn ~grandchildren:`Recursive ~loc:"2"
+            attached_mask
+        with
+        | exception _ ->
+            ()
+        | _unatt ->
+            assert false )
+
+  let%test_module "Simple tests" =
+    ( module struct
+      module State = struct
+        type account =
+          ( Key.t
+          , Token_id.t
+          , string
+          , Balance.t
+          , Unsigned.uint32
+          , Pasta_bindings.Fp.t
+          , Key.t option
+          , Pasta_bindings.Fp.t
+          , Mina_base.Account.Timing.Stable.V2.t
+          , Mina_base.Permissions.t
+          , Mina_base.Zkapp_account.Stable.V2.t option )
+          Mina_base.Account.Poly.t
+
+        type state =
+          { accounts : account list
+          ; attached_mask : Mask.Attached.t (* attached_mask *)
+          ; mask : Mask.t (* unattached_mask *)
+          ; maskable : Test.Base.t
+          }
+
+        let create_new_attached_mask { maskable; _ } =
+          let mask = Mask.create ~depth:Test.depth () in
+          Maskable.register_mask maskable mask
+
+        let get_addr_and_accounts { attached_mask; accounts; _ } =
+          List.map accounts ~f:(fun a ->
+              let addr =
+                match create_existing_account_exn attached_mask a with
+                | Test.Location.Account addr ->
+                    addr
+                | _ ->
+                    assert false
+              in
+              (addr, a) )
+      end
+
+      let with_state ?(num_accounts = 5) ?(initialize_mask = true) f =
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            [%test_result: Int.t] ~expect:0
+              (Mask.Attached.num_accounts attached_mask) ;
+            let accounts =
+              let balances =
+                Quickcheck.random_value
+                  (Quickcheck.Generator.list_with_length num_accounts
+                     Balance.gen )
+              in
+              let account_ids = Account_id.gen_accounts num_accounts in
+              List.map2_exn account_ids balances ~f:Account.create
+            in
+            (* add accounts to mask *)
+            if initialize_mask then (
+              List.iter accounts ~f:(fun account ->
+                  ignore @@ create_new_account_exn attached_mask account ) ;
+              [%test_result: Int.t] ~expect:num_accounts
+                (Mask.Attached.num_accounts attached_mask) ) ;
+            (* do your thing *)
+            f { State.accounts; attached_mask; mask; maskable } ;
+            Mask.Attached.close attached_mask )
+
+      let%test_unit "unsafe preload" =
+        with_state (fun { accounts; attached_mask; _ } ->
+            let account_ids = List.map ~f:Account.identifier accounts in
+            Mask.Attached.unsafe_preload_accounts_from_parent attached_mask
+              account_ids
+            (* Check that it is equal to expected balance put in -- see above
+               ?*) )
+
+      let%test_unit "check default state only have (mina) tokens without owner"
+          =
+        with_state (fun { accounts; attached_mask; _ } ->
+            List.iter accounts ~f:(fun account ->
+                let pk = Account.public_key account in
+                let tokens = Mask.Attached.tokens attached_mask pk in
+                (* Default state accounts only hold MINA tokens *)
+                assert (Token_id.Set.length tokens = 1) ;
+                let tid = Token_id.Set.choose_exn tokens in
+
+                (* TODO: Check that tid = 0x0..01, that is, it's MINA. *)
+
+                (* MINA tokens have no owner by hypothesis *)
+                assert (
+                  Option.is_none (Mask.Attached.token_owner attached_mask tid) ) ) )
+
+      let accounts_in_mask accounts attached_mask =
+        (* The set of accounts of unique accounts should be the same size
+           of initial list of accounts. *)
+        Async.Deferred.upon (Mask.Attached.accounts attached_mask)
+          (fun account_set ->
+            assert (
+              List.for_all accounts ~f:(fun acct ->
+                  Account_id.Set.mem account_set (Account.identifier acct) )
+              && Mina_stdlib.List.Length.Compare.(
+                   accounts = Account_id.Set.length account_set) ) )
+
+      let%test_unit "counting accounts with different techniques yield the \
+                     same results" =
+        with_state (fun { accounts; attached_mask; _ } ->
+            accounts_in_mask accounts attached_mask )
+
+      let%test_unit "counting accounts with different token_owner yield the \
+                     same results" =
+        with_state (fun { accounts; attached_mask; _ } ->
+            assert (
+              Mina_stdlib.List.Length.Compare.(
+                accounts
+                = Account_id.Set.length
+                    (Mask.Attached.token_owners attached_mask)) ) )
+
+      let%test_unit "counting accounts with iteri yield the same results" =
+        with_state (fun { accounts; attached_mask; _ } ->
+            assert (
+              (* Computing length through iteri should yield the correct length *)
+              let other_count =
+                let n = ref 0 in
+                Mask.Attached.iteri attached_mask ~f:(fun _ _ -> incr n) ;
+                !n
+              in
+              Mina_stdlib.List.Length.Compare.(accounts = other_count) ) )
+
+      let%test_unit "test_set_get" =
+        with_state ~initialize_mask:false (fun { accounts; attached_mask; _ } ->
+            List.iteri accounts ~f:(fun i account ->
+                Mask.Attached.set_at_index_exn attached_mask i account ;
+                [%test_eq: Int.t] i
+                  (Mask.Attached.index_of_account_exn attached_mask
+                     (Account.identifier account) ) ) )
+
+      let%test_unit "copy should behave like the original" =
+        with_state (fun { attached_mask; accounts; _ } ->
+            let attached_mask_copy = Mask.Attached.copy attached_mask in
+            [%test_eq: Int.t]
+              (Mask.Attached.num_accounts attached_mask)
+              (Mask.Attached.num_accounts attached_mask_copy) ;
+            accounts_in_mask accounts attached_mask_copy ;
+            match
+              Maskable.unregister_mask_exn ~loc:__LOC__ attached_mask_copy
+            with
+            | exception Failure _ ->
+                () (* this is expected *)
+            | _unatt ->
+                assert false )
+
+      let%test_unit "set_batch_accounts (attached)" =
+        with_state ~initialize_mask:true (fun state ->
+            (* Get addresses and accounts from default state initialization *)
+            let addresses_and_accounts = State.get_addr_and_accounts state in
+
+            let attached' = State.create_new_attached_mask state in
+            [%test_result: Int.t]
+              (Mask.Attached.num_accounts attached')
+              ~expect:0 ;
+
+            Mask.Attached.set_batch_accounts attached' addresses_and_accounts ;
+            [%test_eq: Int.t]
+              (Mask.Attached.num_accounts attached')
+              (Mask.Attached.num_accounts state.attached_mask) )
+
+      let%test_unit "set_batch_accounts (maskable)" =
+        with_state ~initialize_mask:true
+          (fun ({ maskable; attached_mask = _; _ } as state) ->
+            (* Get addresses and accounts from default state initialization *)
+            let addresses_and_accounts = State.get_addr_and_accounts state in
+
+            Maskable.set_batch_accounts maskable addresses_and_accounts ;
+            Async.Deferred.upon (Maskable.accounts maskable) (fun id_set ->
+                [%test_eq: Int.t]
+                  (Account_id.Set.length id_set)
+                  (List.length addresses_and_accounts) ) )
+
+      let%test_unit "set_all_accounts_rooted_at_exn" =
+        with_state ~initialize_mask:true (fun state ->
+            (* Get addresses and accounts from default state initialization *)
+            let addresses_and_accounts = State.get_addr_and_accounts state in
+
+            let attached'' = State.create_new_attached_mask state in
+            let addr, accounts =
+              let addr, account = List.hd_exn addresses_and_accounts in
+              (addr, [ account ])
+            in
+            Mask.Attached.set_all_accounts_rooted_at_exn attached'' addr
+              accounts ;
+            [%test_result: Int.t]
+              (Mask.Attached.num_accounts attached'')
+              ~expect:1 )
+
+      let%test_unit "attached mask has a parent" =
+        with_state (fun { attached_mask; _ } ->
+            match Mask.Attached.get_parent attached_mask with
+            | _parent ->
+                ()
+            | exception _ ->
+                assert false )
+    end )
 end
 
 module type Depth_S = sig
