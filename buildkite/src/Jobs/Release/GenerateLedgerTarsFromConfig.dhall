@@ -21,6 +21,8 @@ let Size = ../../Command/Size.dhall
 let profile = Profiles.Type.Standard
 let debVersion = DebianVersions.DebVersion.Bullseye
 
+let network = "mainnet-hardfork"
+
 in
 
 -- TODO: Refactor the dhall interface so that we don't need to keep nesting docker containers.
@@ -94,6 +96,7 @@ Pipeline.build
             , "MINA_BRANCH=$BUILDKITE_BRANCH"
             , "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT"
             , "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
+            , "TESTNET_NAME=${network}"
           ] "./buildkite/scripts/build-hardfork-package2.sh"
           , label = "Ledger tar file generation"
           , key = "generate-ledger-tars-from-config"
@@ -102,7 +105,7 @@ Pipeline.build
       , DockerImage.generateStep DockerImage.ReleaseSpec::{
           deps = [{ name = "GenerateLedgerTarsFromConfig", key = "generate-ledger-tars-from-config" }]
           , service = "mina-daemon"
-          , network = "mainnet-hardfork"
+          , network
           , deb_codename = "${DebianVersions.lowerName debVersion}"
           , deb_profile = "${Profiles.lowerName profile}"
           -- , deb_version = "mina-mainnet-hardfork_\\\${GITTAG}-\\\${GITBRANCH}-\\\${GITHASH}"
