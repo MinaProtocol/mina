@@ -19,16 +19,16 @@ type errorResponse struct {
 	Msg string `json:"error"`
 }
 
-func writeErrorResponse(app *App, w *http.ResponseWriter, msg string) {
-	app.Log.Debugf("Responding with error: %s", msg)
+func writeErrorResponse(log logging.StandardLogger, w *http.ResponseWriter, msg string) {
+	log.Debugf("Responding with error: %s", msg)
 	bs, err := json.Marshal(errorResponse{msg})
 	if err == nil {
 		_, err2 := io.Copy(*w, bytes.NewReader(bs))
 		if err2 != nil {
-			app.Log.Debugf("Failed to respond with error status: %v", err2)
+			log.Debugf("Failed to respond with error status: %v", err2)
 		}
 	} else {
-		app.Log.Fatal("Failed to json-marshal error message")
+		log.Fatal("Failed to json-marshal error message")
 	}
 }
 
@@ -69,14 +69,18 @@ type AwsContext struct {
 	BucketName *string
 	Prefix     string
 	Context    context.Context
-	Log        *logging.ZapEventLogger
+	Log        logging.StandardLogger
 }
 
+type BlockDataHash string
+
+type AppSaveFunc = func(time.Time, MetaToBeSaved, BlockDataHash, Pk, []byte) error
+
 type App struct {
-	Log           *logging.ZapEventLogger
+	Log           logging.StandardLogger
 	SubmitCounter *AttemptCounter
 	Whitelist     *WhitelistMVar
-	Save          func(ObjectsToSave)
+	Save          AppSaveFunc
 	Now           nowFunc
 }
 
@@ -89,14 +93,23 @@ type Paths struct {
 	Block string
 }
 
-func MakePathsImpl(submittedAt string, blockHash string, submitter Pk) (res Paths) {
-	res.Meta = strings.Join([]string{"submissions", submittedAt[:10], submittedAt + "-" + submitter.String() + ".json"}, "/")
-	res.Block = "blocks/" + blockHash + ".dat"
+func MakePaths(submittedAt time.Time, blockHash BlockDataHash, submitter Pk) (res Paths) {
+	submittedAtStr := submittedAt.UTC().Format(time.RFC3339)
+	res.Meta = strings.Join([]string{"submissions", submittedAtStr[:10], submittedAtStr + "-" + submitter.String() + ".json"}, "/")
+	res.Block = "blocks/" + string(blockHash) + ".dat"
 	return
 }
-func makePaths(submittedAt time.Time, blockHash string, submitter Pk) Paths {
-	submittedAtStr := submittedAt.UTC().Format(time.RFC3339)
-	return MakePathsImpl(submittedAtStr, blockHash, submitter)
+
+func ToObjectsToSave(submittedAt time.Time, meta MetaToBeSaved, blockHash BlockDataHash, submitter Pk, blockData []byte) (ObjectsToSave, error) {
+	ps := MakePaths(submittedAt, blockHash, submitter)
+	metaBytes, err := json.Marshal(meta)
+	if err != nil {
+		return nil, err
+	}
+	toSave := make(ObjectsToSave)
+	toSave[ps.Meta] = metaBytes
+	toSave[ps.Block] = blockData
+	return toSave, nil
 }
 
 // TODO consider using pointers and doing `== nil` comparison
@@ -116,7 +129,7 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err1 != nil || int64(len(body)) != r.ContentLength {
 		h.app.Log.Debugf("Error while reading /submit request's body: %v", err1)
 		w.WriteHeader(400)
-		writeErrorResponse(h.app, &w, "Error reading the body")
+		writeErrorResponse(h.app.Log, &w, "Error reading the body")
 		return
 	}
 
@@ -124,21 +137,21 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := json.Unmarshal(body, &req); err != nil {
 		h.app.Log.Debugf("Error while unmarshaling JSON of /submit request's body: %v", err)
 		w.WriteHeader(400)
-		writeErrorResponse(h.app, &w, "Error decoding payload")
+		writeErrorResponse(h.app.Log, &w, "Error decoding payload")
 		return
 	}
 
 	if !req.CheckRequiredFields() {
 		h.app.Log.Debug("One of required fields wasn't provided")
 		w.WriteHeader(400)
-		writeErrorResponse(h.app, &w, "One of required fields wasn't provided")
+		writeErrorResponse(h.app.Log, &w, "One of required fields wasn't provided")
 		return
 	}
 
 	wl := h.app.Whitelist.ReadWhitelist()
-	if (*wl)[req.Submitter] == nil {
+	if _, has := wl[req.Submitter]; !has {
 		w.WriteHeader(401)
-		writeErrorResponse(h.app, &w, "Submitter is not registered")
+		writeErrorResponse(h.app.Log, &w, "Submitter is not registered")
 		return
 	}
 
@@ -146,7 +159,7 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if req.Data.CreatedAt.Add(TIME_DIFF_DELTA).After(submittedAt) {
 		h.app.Log.Debugf("Field created_at is a timestamp in future: %v", submittedAt)
 		w.WriteHeader(400)
-		writeErrorResponse(h.app, &w, "Field created_at is a timestamp in future")
+		writeErrorResponse(h.app.Log, &w, "Field created_at is a timestamp in future")
 		return
 	}
 
@@ -154,26 +167,23 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.app.Log.Errorf("Error while making sign payload: %v", err)
 		w.WriteHeader(500)
-		writeErrorResponse(h.app, &w, "Unexpected server error")
+		writeErrorResponse(h.app.Log, &w, "Unexpected server error")
 		return
 	}
 
 	hash := blake2b.Sum256(payload)
 	if !verifySig(&req.Submitter, &req.Sig, hash[:], NetworkId()) {
 		w.WriteHeader(401)
-		writeErrorResponse(h.app, &w, "Invalid signature")
+		writeErrorResponse(h.app.Log, &w, "Invalid signature")
 		return
 	}
 
 	passesAttemptLimit := h.app.SubmitCounter.RecordAttempt(req.Submitter)
 	if !passesAttemptLimit {
 		w.WriteHeader(429)
-		writeErrorResponse(h.app, &w, "Too many requests per hour")
+		writeErrorResponse(h.app.Log, &w, "Too many requests per hour")
 		return
 	}
-
-	blockHash := req.GetBlockDataHash()
-	ps := makePaths(submittedAt, blockHash, req.Submitter)
 
 	remoteAddr := r.Header.Get("X-Forwarded-For")
 	if remoteAddr == "" {
@@ -181,22 +191,19 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		remoteAddr = r.RemoteAddr
 	}
 
-	metaBytes, err1 := req.MakeMetaToBeSaved(remoteAddr)
-	if err1 != nil {
-		h.app.Log.Errorf("Error while marshaling JSON for metaToBeSaved: %v", err1)
+	meta := req.MakeMetaToBeSaved(remoteAddr)
+
+	err = h.app.Save(submittedAt, meta, BlockDataHash(req.GetBlockDataHash()), req.Submitter, req.Data.Block.data)
+	if err != nil {
+		h.app.Log.Errorf("Error saving data: %v", err)
 		w.WriteHeader(500)
-		writeErrorResponse(h.app, &w, "Unexpected server error")
+		writeErrorResponse(h.app.Log, &w, "Unexpected server error")
 		return
 	}
 
-	toSave := make(ObjectsToSave)
-	toSave[ps.Meta] = metaBytes
-	toSave[ps.Block] = []byte(req.Data.Block.data)
-	h.app.Save(toSave)
-
-	_, err2 := io.Copy(w, bytes.NewReader([]byte("{\"status\":\"ok\"}")))
-	if err2 != nil {
-		h.app.Log.Debugf("Error while responding with ok status to the user: %v", err2)
+	_, err = io.Copy(w, bytes.NewReader([]byte("{\"status\":\"ok\"}")))
+	if err != nil {
+		h.app.Log.Debugf("Error while responding with ok status to the user: %v", err)
 	}
 }
 
