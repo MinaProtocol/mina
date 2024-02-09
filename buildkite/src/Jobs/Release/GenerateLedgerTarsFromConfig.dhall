@@ -85,8 +85,8 @@ let network = "mainnet-hardfork"
 
 in  Pipeline.build
       Pipeline.Config::{
-      , spec = JobSpec::{
-        , dirtyWhen = [ S.everything ]
+        spec = JobSpec::{
+          dirtyWhen = [ S.everything ]
         , path = "Release"
         , name = "GenerateLedgerTarsFromConfig"
         , tags = [ PipelineTag.Type.Release ]
@@ -95,7 +95,7 @@ in  Pipeline.build
       , steps =
         [ Command.build
             Command.Config::{
-            , commands =
+              commands =
                 DebianVersions.toolchainRunner
                   debVersion
                   [ "DUNE_PROFILE=\$DUNE_PROFILE"
@@ -114,19 +114,16 @@ in  Pipeline.build
             }
         , DockerImage.generateStep
             DockerImage.ReleaseSpec::{
-            , deps =
+              deps =
               [ { name = "GenerateLedgerTarsFromConfig"
                 , key = "generate-ledger-tars-from-config"
                 }
               ]
             , service = "mina-daemon"
-            , network
+            , network = network
             , deb_codename = "${DebianVersions.lowerName debVersion}"
             , deb_profile = "${Profiles.lowerName profile}"
-            , step_key =
-                "daemon-berkeley-${DebianVersions.lowerName
-                                     debVersion}${Profiles.toLabelSegment
-                                                    profile}-docker-image"
+            , step_key = "daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
             }
         ]
       }
