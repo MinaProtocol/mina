@@ -34,6 +34,13 @@ open Async
 open Rosetta_lib
 open Rosetta_models
 
+module Get_coinbase_and_genesis_memoized = struct
+  let query =
+    Memoize.build
+    @@ fun ~graphql_uri () ->
+    Graphql.query (Get_coinbase_and_genesis.make ()) graphql_uri
+end
+
 let account_id = User_command_info.account_id
 
 module Block_query = struct
@@ -1156,11 +1163,7 @@ module Specific = struct
         -> graphql_uri:Uri.t
         -> 'gql Real.t =
      fun ~logger ~db ~graphql_uri ->
-      { gql =
-          ( Memoize.build
-          @@ fun ~graphql_uri () ->
-          Graphql.query (Get_coinbase_and_genesis.make ()) graphql_uri )
-            ~graphql_uri
+      { gql = Get_coinbase_and_genesis_memoized.query ~graphql_uri
       ; logger
       ; db_block =
           (fun query ->

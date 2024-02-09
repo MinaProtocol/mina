@@ -1,6 +1,6 @@
 module Serializing = Graphql_lib.Serializing
 module Scalars = Graphql_lib.Scalars
-module Get_status =
+module Get_genesis_block_identifier =
 [%graphql
 {|
   query {
@@ -12,6 +12,13 @@ module Get_status =
         }
       }
     }
+  }
+|}]
+
+module Get_status =
+[%graphql
+{|
+  query {
     bestChain(maxLength: 1) {
       stateHash @ppxCustom(module: "Scalars.String_json")
       protocolState {
@@ -38,6 +45,28 @@ open Async
 open Rosetta_lib
 open Rosetta_models
 
+module Get_status_t = struct
+  type t =
+    {
+        genesis_block_identifier : Get_genesis_block_identifier.t
+      ; status : Get_status.t
+    }
+
+  module Get_genesis_block_identifier_memoized = struct
+    let query =
+      Memoize.build
+      @@ fun ~graphql_uri () ->
+      Graphql.query
+        Get_genesis_block_identifier.(make @@ makeVariables ())
+        graphql_uri
+  end
+
+  let query = fun ~graphql_uri () ->
+    let open Deferred.Result.Let_syntax in
+    let%bind genesis_block_identifier = Get_genesis_block_identifier_memoized.query ~graphql_uri () in
+    let%map status = Graphql.query Get_status.(make @@ makeVariables ()) graphql_uri in
+    { genesis_block_identifier; status }
+end
 
 module Sql = struct
   let oldest_block_query =
@@ -185,7 +214,7 @@ module Status = struct
         =
      fun ~db ~graphql_uri ->
       let (module Db : Caqti_async.CONNECTION) = db in
-      { gql= (fun () -> Graphql.query Get_status.(make @@ makeVariables ()) graphql_uri)
+      { gql= Get_status_t.query ~graphql_uri
       ; db_oldest_block=
           (fun () ->
             match !oldest_block_ref with
@@ -199,8 +228,8 @@ module Status = struct
                 result )
       ; db_latest_block=
           (fun () ->
-             Errors.Lift.sql ~context:"Latest db block query"
-             @@ Db.find Sql.latest_block_query ())
+            Errors.Lift.sql ~context:"Latest db block query"
+            @@ Db.find Sql.latest_block_query ())
       ; validate_network_choice= Validate_choice.Real.validate }
   end
 
@@ -213,17 +242,19 @@ module Status = struct
           ~network_identifier:network.network_identifier
       in
       let%bind latest_node_block =
-        match res.Get_status.bestChain with
+        match res.Get_status_t.status.bestChain with
         | None | Some [||] ->
             M.fail (Errors.create `Chain_info_missing)
         | Some chain ->
             M.return (Array.last chain)
       in
       let genesis_block_height =
-        res.genesisBlock.protocolState.consensusState.blockHeight
-        |> Unsigned.UInt32.to_int64
+        res.genesis_block_identifier.genesisBlock.protocolState.consensusState
+          .blockHeight |> Unsigned.UInt32.to_int64
       in
-      let genesis_block_state_hash = res.genesisBlock.stateHash in
+      let genesis_block_state_hash =
+        res.genesis_block_identifier.genesisBlock.stateHash
+      in
       let%bind (latest_db_block_height,latest_db_block_hash, latest_db_block_timestamp) = env.db_latest_block () in
       let%map (oldest_db_block_height,oldest_db_block_hash) = env.db_oldest_block () in
       { Network_status_response.current_block_identifier=
@@ -239,15 +270,15 @@ module Status = struct
               (Block_identifier.create oldest_db_block_height oldest_db_block_hash)
           )
       ; peers=
-          (let peer_objs = (res.daemonStatus).peers |> Array.to_list in
+          (let peer_objs = (res.status.daemonStatus).peers |> Array.to_list in
            List.map peer_objs ~f:(fun po -> po.peerId |> Peer.create))
       ; sync_status=
           Some
             { Sync_status.current_index=
                 Some ((latest_node_block.protocolState).consensusState).blockHeight
             ; target_index= None
-            ; stage= Some (sync_status_to_string res.syncStatus)
-            ; synced = (Some (is_synced res.syncStatus))
+            ; stage= Some (sync_status_to_string res.status.syncStatus)
+            ; synced = (Some (is_synced res.status.syncStatus))
             } }
   end
 
@@ -258,28 +289,32 @@ module Status = struct
       module Mock = Impl (Result)
 
       let build ~best_chain_missing = {
-        Get_status.genesisBlock = {
-          stateHash = "GENESIS_HASH";
-          protocolState = {
-            consensusState = {
-              blockHeight = Unsigned.UInt32.one
+        Get_status_t.genesis_block_identifier = {
+            genesisBlock = {
+            stateHash = "GENESIS_HASH";
+            protocolState = {
+              consensusState = {
+                blockHeight = Unsigned.UInt32.one
+              };
             };
           };
         };
-        bestChain = if best_chain_missing then None
-          else Some [|{
-              stateHash = "STATE_HASH_TIP";
-              protocolState = {
-                blockchainState = {utcDate = Int64.of_int_exn 1_594_854_566};
-                consensusState = {blockHeight = Int64.of_int_exn 4 }
-              }
-            }|];
-        daemonStatus = {
-          peers = [|{peerId = "dev.o1test.net"}|]
-        };
-        syncStatus = `SYNCED;
-        initialPeers = [||];
-        networkID = "mina:testnet"
+        status = {
+          bestChain = if best_chain_missing then None
+            else Some [|{
+                stateHash = "STATE_HASH_TIP";
+                protocolState = {
+                  blockchainState = {utcDate = Int64.of_int_exn 1_594_854_566};
+                  consensusState = {blockHeight = Int64.of_int_exn 4 }
+                }
+                }|];
+          daemonStatus = {
+            peers = [|{peerId = "dev.o1test.net"}|]
+          };
+          syncStatus = `SYNCED;
+          initialPeers = [||];
+          networkID = "mina:testnet"
+        }
       }
 
       let no_chain_info_env : 'gql Env.Mock.t =
@@ -376,21 +411,21 @@ module Options = struct
       M.return @@
       { Network_options_response.version=
           Version.create "1.4.9" "1.0.0"
-      ; allow=
-          { Allow.operation_statuses= Lazy.force Operation_statuses.all
-          ; operation_types= Lazy.force Operation_types.all
-          ; errors= Lazy.force Errors.all_errors
-          ; historical_balance_lookup=
-              true
-              (* TODO: #6872 We should expose info for the timestamp_start_index via GraphQL then consume it here *)
-          ; timestamp_start_index=
-              None
-              (* If we implement the /call endpoint we'll need to list its supported methods here *)
-          ; call_methods= []
-          ; balance_exemptions= []
-          ; mempool_coins= false
-          ; block_hash_case = Some `Case_sensitive
-          ; transaction_hash_case = Some `Case_sensitive } }
+         ; allow=
+             { Allow.operation_statuses= Lazy.force Operation_statuses.all
+             ; operation_types= Lazy.force Operation_types.all
+             ; errors= Lazy.force Errors.all_errors
+             ; historical_balance_lookup=
+                 true
+                 (* TODO: #6872 We should expose info for the timestamp_start_index via GraphQL then consume it here *)
+             ; timestamp_start_index=
+                 None
+                 (* If we implement the /call endpoint we'll need to list its supported methods here *)
+             ; call_methods= []
+             ; balance_exemptions= []
+             ; mempool_coins= false
+             ; block_hash_case = Some `Case_sensitive
+             ; transaction_hash_case = Some `Case_sensitive } }
   end
 
   module Real = Impl (Deferred.Result)
