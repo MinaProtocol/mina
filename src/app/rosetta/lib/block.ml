@@ -331,7 +331,7 @@ module Zkapp_command_info = struct
               M.return
                 { Operation.operation_identifier
                 ; related_operations
-                ; status=Some (Operation_statuses.name `Success)
+                ; status = Some (Operation_statuses.name `Success)
                 ; account =
                     Some
                       (account_id t.fee_payer
@@ -339,8 +339,9 @@ module Zkapp_command_info = struct
                 ; _type = Operation_types.name `Zkapp_fee_payer_dec
                 ; amount =
                     Some
-                      (Amount_of.(negated @@ token (`Token_id Amount_of.Token_id.default)
-                         t.fee ))
+                      Amount_of.(
+                        negated
+                        @@ token (`Token_id Amount_of.Token_id.default) t.fee)
                 ; coin_change = None
                 ; metadata = None
                 }
@@ -349,12 +350,12 @@ module Zkapp_command_info = struct
               let amount =
                 match String.chop_prefix ~prefix:"-" upd.balance_change with
                 | Some amount ->
-                  Some
+                    Some
                       Amount_of.(
                         negated @@ token upd.token
                         @@ Unsigned_extended.UInt64.of_string amount)
                 | None ->
-                  Some
+                    Some
                       Amount_of.(
                         token upd.token
                         @@ Unsigned_extended.UInt64.of_string upd.balance_change)
@@ -444,8 +445,10 @@ module Sql = struct
 
     let block_fields ?prefix () =
       let names = Archive_lib.Processor.Block.Fields.names in
-      let fields = Option.value_map prefix ~default:names
-        ~f:(fun prefix -> List.map ~f:(fun n -> prefix ^ n) names) in
+      let fields =
+        Option.value_map prefix ~default:names ~f:(fun prefix ->
+            List.map ~f:(fun n -> prefix ^ n) names )
+      in
       String.concat ~sep:"," fields
 
     let query_count_canonical_at_height =
@@ -461,8 +464,8 @@ module Sql = struct
         (* The archive database will only reconcile the canonical columns for
          * blocks older than k + epsilon
          *)
-         (sprintf
-        {|
+        (sprintf
+           {|
          SELECT c.id,
                 %s,
                 pk.value as creator,
@@ -474,7 +477,8 @@ module Sql = struct
            ON bw.id = c.block_winner_id
          WHERE c.height = ?
            AND c.chain_status = 'canonical'
-        |} c_fields)
+        |}
+           c_fields )
 
     let query_height_pending =
       let fields = block_fields () in
@@ -493,8 +497,8 @@ module Sql = struct
          * + epsilon)
          * requests since recursive queries stress PostgreSQL.
          *)
-         (sprintf
-        {|
+        (sprintf
+           {|
          WITH RECURSIVE chain AS (
            (SELECT id, %s
            FROM blocks
@@ -521,13 +525,14 @@ module Sql = struct
          INNER JOIN public_keys bw
            ON bw.id = c.block_winner_id
          WHERE c.height = ?
-       |} fields b_fields c_fields)
+       |}
+           fields b_fields c_fields )
 
     let query_hash =
       let b_fields = block_fields ~prefix:"b." () in
       Caqti_request.find_opt Caqti_type.string typ
-      (sprintf
-        {|
+        (sprintf
+           {|
          SELECT b.id,
                 %s,
                 pk.value as creator,
@@ -538,7 +543,8 @@ module Sql = struct
          INNER JOIN public_keys bw
          ON bw.id = b.block_winner_id
          WHERE b.state_hash = ?
-        |} b_fields)
+        |}
+           b_fields )
 
     let query_both =
       let b_fields = block_fields ~prefix:"b." () in
@@ -546,7 +552,7 @@ module Sql = struct
         Caqti_type.(tup2 string int64)
         typ
         (sprintf
-        {|
+           {|
          SELECT b.id,
                 %s,
                 pk.value as creator,
@@ -558,13 +564,14 @@ module Sql = struct
            ON bw.id = b.block_winner_id
          WHERE b.state_hash = ?
            AND b.height = ?
-        |} b_fields)
+        |}
+           b_fields )
 
     let query_by_id =
       let b_fields = block_fields ~prefix:"b." () in
       Caqti_request.find_opt Caqti_type.int typ
-      (sprintf
-        {|
+        (sprintf
+           {|
          SELECT b.id,
                 %s,
                 pk.value as creator,
@@ -575,13 +582,14 @@ module Sql = struct
          INNER JOIN public_keys bw
            ON bw.id = b.block_winner_id
          WHERE b.id = ?
-        |} b_fields)
+        |}
+           b_fields )
 
     let query_best =
       let b_fields = block_fields ~prefix:"b." () in
       Caqti_request.find_opt Caqti_type.unit typ
-      (sprintf
-        {|
+        (sprintf
+           {|
          SELECT b.id,
                 %s,
                 pk.value as creator,
@@ -594,7 +602,8 @@ module Sql = struct
          WHERE b.height = (select MAX(b.height) from blocks b)
          ORDER BY timestamp ASC, state_hash ASC
          LIMIT 1
-        |} b_fields)
+        |}
+           b_fields )
 
     let run_by_id (module Conn : Caqti_async.CONNECTION) id =
       Conn.find_opt query_by_id id
@@ -679,11 +688,16 @@ module Sql = struct
 
     let query =
       let fields =
-        String.concat ~sep:"," @@ List.map ~f:(fun n -> "u." ^ n)
-          Archive_lib.Processor.User_command.Signed_command.Fields.names in
-      Caqti_request.collect Caqti_type.(tup2 int string) typ
-      (sprintf
-        {|
+        String.concat ~sep:","
+        @@ List.map
+             ~f:(fun n -> "u." ^ n)
+             Archive_lib.Processor.User_command.Signed_command.Fields.names
+      in
+      Caqti_request.collect
+        Caqti_type.(tup2 int string)
+        typ
+        (sprintf
+           {|
          SELECT u.id,
                 %s,
                 pk_payer.value as fee_payer,
@@ -729,7 +743,8 @@ module Sql = struct
            ON t.id = ai_receiver.token_id
          WHERE buc.block_id = ?
            AND t.value = ?
-        |} fields)
+        |}
+           fields )
 
     let run (module Conn : Caqti_async.CONNECTION) id =
       Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
@@ -754,11 +769,16 @@ module Sql = struct
 
     let query =
       let fields =
-        String.concat ~sep:"," @@ List.map ~f:(fun n -> "i." ^ n)
-          Archive_lib.Processor.Internal_command.Fields.names in
-      Caqti_request.collect Caqti_type.(tup2 int string) typ
-      (sprintf
-        {|
+        String.concat ~sep:","
+        @@ List.map
+             ~f:(fun n -> "i." ^ n)
+             Archive_lib.Processor.Internal_command.Fields.names
+      in
+      Caqti_request.collect
+        Caqti_type.(tup2 int string)
+        typ
+        (sprintf
+           {|
          SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no)
            i.id,
            %s,
@@ -796,7 +816,8 @@ module Sql = struct
            ON t.id = ai.token_id
          WHERE bic.block_id = ?
           AND t.value = ?
-      |} fields)
+      |}
+           fields )
 
     let run (module Conn : Caqti_async.CONNECTION) id =
       Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
@@ -888,11 +909,16 @@ module Sql = struct
 
     let query =
       let fields =
-        String.concat ~sep:"," @@ List.map ~f:(fun n -> "zaub." ^ n)
-          Archive_lib.Processor.Zkapp_account_update_body.Fields.names in
-      Caqti_request.collect Caqti_type.(tup3 int string int) typ
-      (sprintf
-        {|
+        String.concat ~sep:","
+        @@ List.map
+             ~f:(fun n -> "zaub." ^ n)
+             Archive_lib.Processor.Zkapp_account_update_body.Fields.names
+      in
+      Caqti_request.collect
+        Caqti_type.(tup3 int string int)
+        typ
+        (sprintf
+           {|
          SELECT %s,
                 pk.value as account,
                 bzc.status
@@ -912,13 +938,15 @@ module Sql = struct
          WHERE zc.id = ?
            AND t.value = ?
            AND bzc.block_id = ?
-    |} fields)
+    |}
+           fields )
 
     let run (module Conn : Caqti_async.CONNECTION) command_id block_id =
-      Conn.collect_list query (command_id, Mina_base.Token_id.(to_string default), block_id)
-    end
-    
-    let run (module Conn : Caqti_async.CONNECTION) input =
+      Conn.collect_list query
+        (command_id, Mina_base.Token_id.(to_string default), block_id)
+  end
+
+  let run (module Conn : Caqti_async.CONNECTION) input =
     let module M = struct
       include Deferred.Result
 
