@@ -3,7 +3,7 @@
     "txpool_max_size": 3000
   },
   "genesis": {
-    "genesis_state_timestamp": "2024-02-09T11:00:00+00:00"
+    "genesis_state_timestamp": "2024-02-09T13:20:00+00:00"
   },
   "ledger": {
     "hash": "3NKvig8aAK1DqPviypuPHGTaDd9crVroqTMqPB21L4ob5JsSpfnj",

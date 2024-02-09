@@ -459,7 +459,7 @@ spec:
         emptyDir: {}
       - name: uptime-keys
         secret:
-          secretName: {{ $config.name }}-uptime-key-secret
+          secretName: {{ $config.keypairName }}
           defaultMode: 256
           items:
           - key: key
