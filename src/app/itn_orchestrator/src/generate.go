@@ -305,7 +305,6 @@ func (p *GenParams) Generate(round int) GeneratedRound {
 		}))
 	}
 	cmds = append(cmds, withComment(fmt.Sprintf("Starting round %d, %s after start", round, formatDur(roundStartMin, 0)), discovery(DiscoveryParams{
-		OffsetMin:        15,
 		NoBlockProducers: p.SendFromNonBpsOnly,
 	})))
 	sendersOutName := "participant"
@@ -340,7 +339,6 @@ func (p *GenParams) Generate(round int) GeneratedRound {
 	for _, waitSec := range stopWaits {
 		cmds = append(cmds, withComment(fmt.Sprintf("Running round %d, %s after start, waiting for %s", round, formatDur(roundStartMin, elapsed), formatDur(0, waitSec)), GenWait(waitSec)))
 		cmds = append(cmds, discovery(DiscoveryParams{
-			OffsetMin:          15,
 			OnlyBlockProducers: p.StopOnlyBps,
 		}))
 		exceptRefName := "group"
