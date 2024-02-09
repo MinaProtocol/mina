@@ -17,16 +17,19 @@ jq "{\
     },\
     ledger: {\
         add_genesis_winner: false,\
-        hash: \$hashes.genesis_hash\
+        hash: \$hashes.genesis.ledger_hash,\
+        s3_data_hash: \$hashes.genesis.s3_data_hash\
     },\
     epoch_data: {\
         staking: {\
             seed: .epoch_data.staking.seed,\
-            hash: \$hashes.epoch_data.staking_hash\
+            hash: \$hashes.staking.ledger_hash,\
+            s3_data_hash: \$hashes.staking.s3_data_hash\
         },\
         next: {\
             seed: .epoch_data.next.seed,\
-            hash: \$hashes.epoch_data.next_hash\
+            hash: \$hashes.next_staking.ledger_hash,\
+            s3_data_hash: \$hashes.next_staking.s3_data_hash\
         }\
     }\
   }" -M --argjson hashes "$(cat $LEDGER_HASHES_JSON)" $FORK_CONFIG_JSON
