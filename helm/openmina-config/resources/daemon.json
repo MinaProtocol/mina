@@ -1,23 +1,25 @@
 {
   "daemon": {
-    "genesis_state_timestamp": "2024-02-08T13:30:00+00:00",
     "txpool_max_size": 3000
+  },
+  "genesis": {
+    "genesis_state_timestamp": "2024-02-09T11:00:00+00:00"
   },
   "ledger": {
     "hash": "3NKvig8aAK1DqPviypuPHGTaDd9crVroqTMqPB21L4ob5JsSpfnj",
     "name": "devnet",
     "add_genesis_winner": false,
-    "s3_data_hash": "d87855dcdd20db2e1afeff2ce008356a846bf00c92745cdf8b6dd422dc812f0d"
+    "s3_data_hash": "a9b210751022855119f00ab6b423fb0fa6ca678d59c957a4f68fd97bc538faa3"
   },
   "epoch_data": {
     "staking": {
       "seed": "2vbZRewiphtua2p2cv6gTuvG3a4pa9HeCZHECNmZSzLrvswaxNjq",
-      "s3_data_hash": "f0ac86ab33b492883c079e33d6dfaf3e8e74088c79e01aac69a526e3e288e198",
+      "s3_data_hash": "90448d5c88e73f1861cb4fc910ba02f3646abd854842b72f0679ffaee831e3f6",
       "hash": "3NLvv6TauSgxkuMijzZV1V5nKgzN79kmcLJ82JPbDL4tnXKDwKBf"
     },
     "next": {
       "seed": "2vbFT42TCkHk5VKHocnnJzXMYhH4uKxKRSFHmDJikM1RxBUfjRMQ",
-      "s3_data_hash": "e14eb7e975a466a76619c6948a70aca75442255ff579e9e2c4ff38020bde9be4",
+      "s3_data_hash": "885b7d86ce0d6178e6c9577077b59d5d6b8df9b676c9a46b72d0db6389dfe875",
       "hash": "3NKW956kKT9aZAHtYEpbR8Q8ota7qdN5j5soQQuMr6mzgsFUXAEz"
     }
   }

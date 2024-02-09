@@ -19,7 +19,7 @@ Options:
 EOF
 }
 
-TEMP=$(getopt -o 'hn:' --long 'help,namespace:' -n "$0" -- "$@")
+TEMP=$(getopt -o 'dhn:' --long 'delete,help,namespace:' -n "$0" -- "$@")
 
 if [ $? -ne 0 ]; then
 	echo 'Terminating...' >&2
@@ -29,8 +29,14 @@ fi
 eval set -- "$TEMP"
 unset TEMP
 
+DELETE=false
+
 while true; do
     case "$1" in
+        '-d'|'--delete')
+            DELETE=true
+            shift
+        ;;
         '-h'|'--help')
             usage
             exit 0
@@ -69,6 +75,9 @@ for KEY in "$@"; do
     else
         echo "WARN: no public key for $KEY"
         continue
+    fi
+    if $DELETE; then
+      kubectl delete --namespace="$NAMESPACE" secret "$NAME"
     fi
     kubectl create --namespace="$NAMESPACE" secret generic "$NAME" --from-file=key="$KEY" --from-file=pub="$PUB"
 done
