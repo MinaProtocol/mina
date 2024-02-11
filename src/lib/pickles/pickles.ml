@@ -361,6 +361,51 @@ module Make_str (_ : Wire_types.Concrete) = struct
     in
     (self, cache_handle, proof_module, adjust_provers provers)
 
+  let compile_async ?self ?cache ?storables ?proof_cache ?disk_keys
+      ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
+      ~max_proofs_verified ~name ~constraint_constants ~choices () =
+    let choices ~self =
+      let choices = choices ~self in
+      let rec go :
+          type a b c d e f g h i j.
+             (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Deferred).t
+          -> (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Promise).t =
+        function
+        | [] ->
+            []
+        | { identifier; prevs; main; feature_flags } :: rest ->
+            { identifier
+            ; prevs
+            ; main =
+                (fun x ->
+                  Promise.create (fun callback ->
+                      Deferred.don't_wait_for
+                        (let%map res = main x in
+                         callback res ) ) )
+            ; feature_flags
+            }
+            :: go rest
+      in
+      go choices
+    in
+    let self, cache_handle, proof_module, provers =
+      compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
+        ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
+        ~max_proofs_verified ~name ~constraint_constants ~choices ()
+    in
+    let rec adjust_provers :
+        type a1 a2 a3 s1 s2_inner.
+           (a1, a2, a3, s1, s2_inner Promise.t) H3_2.T(Prover).t
+        -> (a1, a2, a3, s1, s2_inner Deferred.t) H3_2.T(Prover).t = function
+      | [] ->
+          []
+      | prover :: tl ->
+          (fun ?handler public_input ->
+            Promise.to_deferred (prover ?handler public_input) )
+          :: adjust_provers tl
+    in
+    (self, cache_handle, proof_module, adjust_provers provers)
+
   module Provers = H3_2.T (Prover)
   module Proof0 = Proof
 

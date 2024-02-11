@@ -495,4 +495,59 @@ module type S = sig
            * ('max_proofs_verified, 'max_proofs_verified) Proof.t )
            Deferred.t )
          H3_2.T(Prover).t
+
+  (** This compiles a series of inductive rules defining a set into a proof
+      system for proving membership in that set, with a prover corresponding
+      to each inductive rule. *)
+  val compile_async :
+       ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
+    -> ?cache:Key_cache.Spec.t list
+    -> ?storables:Storables.t
+    -> ?proof_cache:Proof_cache.t
+    -> ?disk_keys:
+         (Cache.Step.Key.Verification.t, 'branches) Vector.t
+         * Cache.Wrap.Key.Verification.t
+    -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+    -> public_input:
+         ( 'var
+         , 'value
+         , 'a_var
+         , 'a_value
+         , 'ret_var
+         , 'ret_value )
+         Inductive_rule.public_input
+    -> auxiliary_typ:('auxiliary_var, 'auxiliary_value) Impls.Step.Typ.t
+    -> branches:(module Nat.Intf with type n = 'branches)
+    -> max_proofs_verified:
+         (module Nat.Add.Intf with type n = 'max_proofs_verified)
+    -> name:string
+    -> constraint_constants:Snark_keys_header.Constraint_constants.t
+    -> choices:
+         (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
+          -> ( 'prev_varss
+             , 'prev_valuess
+             , 'widthss
+             , 'heightss
+             , 'a_var
+             , 'a_value
+             , 'ret_var
+             , 'ret_value
+             , 'auxiliary_var
+             , 'auxiliary_value )
+             H4_6.T(Inductive_rule.Deferred).t )
+    -> unit
+    -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
+       * Cache_handle.t
+       * (module Proof_intf
+            with type t = ('max_proofs_verified, 'max_proofs_verified) Proof.t
+             and type statement = 'value )
+       * ( 'prev_valuess
+         , 'widthss
+         , 'heightss
+         , 'a_value
+         , ( 'ret_value
+           * 'auxiliary_value
+           * ('max_proofs_verified, 'max_proofs_verified) Proof.t )
+           Deferred.t )
+         H3_2.T(Prover).t
 end
