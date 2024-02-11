@@ -791,64 +791,50 @@ struct
       in
       let { Domains.h } = Vector.nth_exn step_domains branch_data.index in
       ksprintf Common.time "step-prover %d (%d)" branch_data.index
-        (Domain.size h)
-        (fun () ->
-          let promise_or_error =
-            (* Use a try_with to give an informative backtrace.
-               If we don't do this, the backtrace will be obfuscated by the
-               Promise, and it's significantly harder to track down errors.
-               This only applies to errors in the 'witness generation' stage;
-               proving errors are emitted inside the promise, and are therefore
-               unaffected.
-            *)
-            Or_error.try_with ~backtrace:true (fun () ->
-                [%log internal] "Step_generate_witness_conv" ;
-                Impls.Step.generate_witness_conv
-                  ~f:(fun { Impls.Step.Proof_inputs.auxiliary_inputs
-                          ; public_inputs
-                          } next_statement_hashed ->
-                    [%log internal] "Backend_tick_proof_create_async" ;
-                    let create_proof () =
-                      Backend.Tick.Proof.create_async ~primary:public_inputs
-                        ~auxiliary:auxiliary_inputs
-                        ~message:
-                          (Lazy.force prev_challenge_polynomial_commitments)
-                        pk
-                    in
-                    let%map.Promise proof =
-                      match proof_cache with
-                      | None ->
-                          create_proof ()
-                      | Some proof_cache -> (
-                          match
-                            Proof_cache.get_step_proof proof_cache ~keypair:pk
-                              ~public_input:public_inputs
-                          with
-                          | None ->
-                              if
-                                Proof_cache
-                                .is_env_var_set_requesting_error_for_proofs ()
-                              then failwith "Regenerated proof" ;
-                              let%map.Promise proof = create_proof () in
-                              Proof_cache.set_step_proof proof_cache ~keypair:pk
-                                ~public_input:public_inputs proof.proof ;
-                              proof
-                          | Some proof ->
-                              Promise.return
-                                ( { proof; public_evals = None }
-                                  : Tick.Proof.with_public_evals ) )
-                    in
-                    [%log internal] "Backend_tick_proof_create_async_done" ;
-                    (proof, next_statement_hashed) )
-                  ~input_typ:Impls.Step.Typ.unit ~return_typ:input
-                  (fun () () ->
-                    Impls.Step.handle
-                      (fun () -> conv_inv (branch_data.main ~step_domains ()))
-                      handler ) )
+        (Domain.size h) (fun () ->
+          [%log internal] "Step_generate_witness_conv" ;
+          let builder =
+            Impls.Step.generate_witness_manual ~handlers:[ handler ]
+              ~input_typ:Impls.Step.Typ.unit ~return_typ:input ()
           in
-          (* Re-raise any captured errors, complete with their backtrace. *)
-          Or_error.ok_exn promise_or_error )
-        ()
+          let res =
+            builder.run_circuit (fun () () ->
+                conv_inv (branch_data.main ~step_domains ()) )
+          in
+          let ( { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
+              , next_statement_hashed ) =
+            builder.finish_computation res
+          in
+          [%log internal] "Backend_tick_proof_create_async" ;
+          let create_proof () =
+            Backend.Tick.Proof.create_async ~primary:public_inputs
+              ~auxiliary:auxiliary_inputs
+              ~message:(Lazy.force prev_challenge_polynomial_commitments)
+              pk
+          in
+          let%map.Promise proof =
+            match proof_cache with
+            | None ->
+                create_proof ()
+            | Some proof_cache -> (
+                match
+                  Proof_cache.get_step_proof proof_cache ~keypair:pk
+                    ~public_input:public_inputs
+                with
+                | None ->
+                    if Proof_cache.is_env_var_set_requesting_error_for_proofs ()
+                    then failwith "Regenerated proof" ;
+                    let%map.Promise proof = create_proof () in
+                    Proof_cache.set_step_proof proof_cache ~keypair:pk
+                      ~public_input:public_inputs proof.proof ;
+                    proof
+                | Some proof ->
+                    Promise.return
+                      ( { proof; public_evals = None }
+                        : Tick.Proof.with_public_evals ) )
+          in
+          [%log internal] "Backend_tick_proof_create_async_done" ;
+          (proof, next_statement_hashed) )
     in
     let prev_evals =
       extract_from_proofs
