@@ -307,7 +307,9 @@ module type S = sig
 
       val typ : (Checked.t, t) Impls.Step.Typ.t
 
-      val of_compiled : _ Tag.t -> t
+      val of_compiled_promise : _ Tag.t -> t Promise.t
+
+      val of_compiled : _ Tag.t -> t Deferred.t
 
       module Max_branches : Nat.Add.Intf
 

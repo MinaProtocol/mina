@@ -55,5 +55,6 @@ val step_main :
       -> ( (Unfinalized.t, 'max_proofs_verified) Pickles_types.Vector.t
          , Impls.Step.Field.t
          , (Impls.Step.Field.t, 'max_proofs_verified) Pickles_types.Vector.t )
-         Import.Types.Step.Statement.t )
+         Import.Types.Step.Statement.t
+         Promise.t )
      Core_kernel.Staged.t

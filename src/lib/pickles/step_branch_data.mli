@@ -45,6 +45,7 @@ type ( 'a_var
              , (Impls.Step.Field.t, 'max_proofs_verified) Pickles_types.Vector.t
              )
              Import.Types.Step.Statement.t
+             Promise.t
       ; requests :
           (module Requests.Step.S
              with type auxiliary_value = 'auxiliary_value
@@ -123,3 +124,4 @@ val create :
      , 'g
      , 'h )
      t
+     Promise.t

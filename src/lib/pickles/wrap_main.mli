@@ -14,7 +14,8 @@ val wrap_main :
        Wrap_verifier.index'
      , 'branches )
      Pickles_types.Vector.t
-     Core_kernel.Lazy.t
+     Promise.t
+     Lazy.t
   -> (int, 'branches) Pickles_types.Vector.t
   -> (Import.Domains.t, 'branches) Pickles_types.Vector.t
   -> srs:Kimchi_bindings.Protocol.SRS.Fp.t
@@ -42,3 +43,5 @@ val wrap_main :
            , Wrap_main_inputs.Impl.Field.t )
            Import.Types.Wrap.Statement.In_circuit.t
         -> unit )
+       Promise.t
+       Lazy.t

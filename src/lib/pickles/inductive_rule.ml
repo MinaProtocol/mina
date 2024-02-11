@@ -114,7 +114,7 @@ type ( 'prev_vars
   ; prevs : ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
   ; main :
          'a_var main_input
-      -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return
+      -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return Promise.t
   ; feature_flags : bool Pickles_types.Plonk_types.Features.t
   }
 

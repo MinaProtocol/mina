@@ -1,6 +1,5 @@
 open Core_kernel
 open Pickles_types
-open Import
 open Poly_types
 
 (* Compute the domains corresponding to wrap_main *)
@@ -27,13 +26,14 @@ struct
     in
     let dummy_step_keys =
       lazy
-        (Vector.init num_choices ~f:(fun _ ->
-             let num_chunks = (* TODO *) 1 in
-             let g =
-               Array.init num_chunks ~f:(fun _ ->
-                   Backend.Tock.Inner_curve.(to_affine_exn one) )
-             in
-             Verification_key.dummy_step_commitments g ) )
+        (Promise.return
+           (Vector.init num_choices ~f:(fun _ ->
+                let num_chunks = (* TODO *) 1 in
+                let g =
+                  Array.init num_chunks ~f:(fun _ ->
+                      Backend.Tock.Inner_curve.(to_affine_exn one) )
+                in
+                Verification_key.dummy_step_commitments g ) ) )
     in
     Timer.clock __LOC__ ;
     let srs = Backend.Tick.Keypair.load_urs () in
@@ -42,12 +42,13 @@ struct
         dummy_step_keys dummy_step_widths dummy_step_domains max_proofs_verified
     in
     Timer.clock __LOC__ ;
+    let%bind.Promise main = Lazy.force main in
     let t =
       Fix_domains.domains
         (module Impls.Wrap)
         (Impls.Wrap.input ~feature_flags ())
         (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
-        main
+        (fun input -> Promise.return (main input))
     in
     Timer.clock __LOC__ ; t
 
@@ -57,12 +58,15 @@ struct
       Common.wrap_domains
         ~proofs_verified:(Nat.to_int (Nat.Add.n max_proofs_verified))
     in
-    ( if debug then
-      let res' =
-        f_debug full_signature num_choices choices_length ~feature_flags
-          ~max_proofs_verified
-      in
-      [%test_eq: Domains.t] res res' ) ;
+    (*let%map.Promise () =
+        if debug then
+          let%map.Promise res' =
+            f_debug full_signature num_choices choices_length ~feature_flags
+              ~max_proofs_verified
+          in
+          [%test_eq: Domains.t] res res'
+        else Promise.return ()
+      in*)
     res
 end
 [@@warning "-60"]

@@ -176,7 +176,8 @@ let step_main :
         -> ( (Unfinalized.t, max_proofs_verified) Vector.t
            , Field.t
            , (Field.t, max_proofs_verified) Vector.t )
-           Types.Step.Statement.t )
+           Types.Step.Statement.t
+           Promise.t )
        Staged.t =
  fun (module Req) max_proofs_verified ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length
@@ -266,24 +267,63 @@ let step_main :
     | Input_and_output (input_typ, output_typ) ->
         (input_typ, output_typ)
   in
-  let main () : _ Types.Step.Statement.t =
+  let main () : _ Types.Step.Statement.t Promise.t =
     let open Impls.Step in
     let logger = Internal_tracing_context_logger.get () in
+    let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
+                                         with type n = max_proofs_verified )
+    in
+    let T = Max_proofs_verified.eq in
+    let app_state = exists input_typ ~request:(fun () -> Req.App_state) in
+    let module Optional_wrap_key = struct
+      type (_, _, _, _) t =
+        Step_main_inputs.Inner_curve.Constant.t array
+        Plonk_verification_key_evals.t
+        option
+    end in
+    (* Here, we prefetch the known wrap keys for all compiled rules.
+       These keys may resolve asynchronously due to key generation for other
+       pickles rules, but we want to preserve the single-threaded behavior of
+       pickles to maximize our chanes of successful debugging.
+       Hence, we preload here, and pass the values in as needed when we create
+       [datas] below.
+    *)
+    let%bind.Promise known_wrap_keys =
+      let rec go :
+          type a1 a2 n m.
+             (a1, a2, n, m) H4.T(Tag).t
+          -> (a1, a2, n, m) H4.T(Optional_wrap_key).t Promise.t = function
+        | [] ->
+            Promise.return ([] : _ H4.T(Optional_wrap_key).t)
+        | tag :: tags ->
+            let%bind.Promise opt_wrap_key =
+              match Type_equal.Id.same_witness self.id tag.id with
+              | Some T ->
+                  Promise.return None
+              | None -> (
+                  match tag.kind with
+                  | Compiled ->
+                      let%map.Promise wrap_key =
+                        Lazy.force
+                        @@ (Types_map.lookup_compiled tag.id).wrap_key
+                      in
+                      Some wrap_key
+                  | Side_loaded ->
+                      Promise.return None )
+            in
+            let%map.Promise rest = go tags in
+            (opt_wrap_key :: rest : _ H4.T(Optional_wrap_key).t)
+      in
+      go rule.prevs
+    in
+    let%map.Promise { Inductive_rule.previous_proof_statements
+                    ; public_output = ret_var
+                    ; auxiliary_output = auxiliary_var
+                    } =
+      (* Run the application logic of the rule on the predecessor statements *)
+      with_label "rule_main" (fun () -> rule.main { public_input = app_state })
+    in
     with_label "step_main" (fun () ->
-        let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
-                                             with type n = max_proofs_verified
-                                         )
-        in
-        let T = Max_proofs_verified.eq in
-        let app_state = exists input_typ ~request:(fun () -> Req.App_state) in
-        let { Inductive_rule.previous_proof_statements
-            ; public_output = ret_var
-            ; auxiliary_output = auxiliary_var
-            } =
-          (* Run the application logic of the rule on the predecessor statements *)
-          with_label "rule_main" (fun () ->
-              rule.main { public_input = app_state } )
-        in
         let () =
           exists Typ.unit ~request:(fun () ->
               let ret_value = As_prover.read output_typ ret_var in
@@ -487,28 +527,35 @@ let step_main :
                     ; feature_flags = basic.feature_flags
                     }
                   in
-                  let module M =
-                    H4.Map (Tag) (Types_map.For_step)
-                      (struct
-                        let f :
-                            type a1 a2 n m.
-                               (a1, a2, n, m) Tag.t
-                            -> (a1, a2, n, m) Types_map.For_step.t =
-                         fun tag ->
+                  let rec go :
+                      type a1 a2 n m.
+                         (a1, a2, n, m) H4.T(Tag).t
+                      -> (a1, a2, n, m) H4.T(Optional_wrap_key).t
+                      -> (a1, a2, n, m) H4.T(Types_map.For_step).t =
+                   fun tags optional_wrap_keys ->
+                    match (tags, optional_wrap_keys) with
+                    | [], [] ->
+                        []
+                    | tag :: tags, optional_wrap_key :: optional_wrap_keys ->
+                        let data =
                           match Type_equal.Id.same_witness self.id tag.id with
-                          | Some T ->
-                              self_data
                           | None -> (
                               match tag.kind with
                               | Compiled ->
-                                  Types_map.For_step.of_compiled
+                                  Types_map.For_step
+                                  .of_compiled_with_known_wrap_key
+                                    ~wrap_key:
+                                      (Option.value_exn optional_wrap_key)
                                     (Types_map.lookup_compiled tag.id)
                               | Side_loaded ->
                                   Types_map.For_step.of_side_loaded
                                     (Types_map.lookup_side_loaded tag.id) )
-                      end)
+                          | Some T ->
+                              self_data
+                        in
+                        data :: go tags optional_wrap_keys
                   in
-                  M.f rule.prevs
+                  go rule.prevs known_wrap_keys
                 in
                 go prevs datas messages_for_next_wrap_proofs unfinalized_proofs
                   previous_proof_statements proofs_verified ~actual_wrap_domains

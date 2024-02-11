@@ -99,8 +99,9 @@ module Compiled = struct
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; wrap_key :
-        Tick.Inner_curve.Affine.t array Plonk_verification_key_evals.t Lazy.t
-    ; wrap_vk : Impls.Wrap.Verification_key.t Lazy.t
+        Tick.Inner_curve.Affine.t array Plonk_verification_key_evals.t Promise.t
+        Lazy.t
+    ; wrap_vk : Impls.Wrap.Verification_key.t Promise.t Lazy.t
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
@@ -120,12 +121,14 @@ module Compiled = struct
       ; wrap_key
       ; feature_flags
       } =
+    let%bind.Promise wrap_key = Lazy.force wrap_key in
+    let%map.Promise wrap_vk = Lazy.force wrap_vk in
     { Basic.max_proofs_verified
     ; wrap_domains
     ; public_input
     ; branches = Vector.length step_domains
-    ; wrap_key = Lazy.force wrap_key
-    ; wrap_vk = Lazy.force wrap_vk
+    ; wrap_key
+    ; wrap_vk
     ; feature_flags
     }
 end
@@ -174,12 +177,12 @@ module For_step = struct
     ; feature_flags
     }
 
-  let of_compiled
+  let of_compiled_with_known_wrap_key ~wrap_key
       ({ branches
        ; max_proofs_verified
        ; proofs_verifieds
        ; public_input
-       ; wrap_key
+       ; wrap_key = _
        ; wrap_domains
        ; step_domains
        ; feature_flags
@@ -192,12 +195,16 @@ module For_step = struct
         `Known (Vector.map proofs_verifieds ~f:Impls.Step.Field.of_int)
     ; public_input
     ; wrap_key =
-        Plonk_verification_key_evals.map (Lazy.force wrap_key)
+        Plonk_verification_key_evals.map wrap_key
           ~f:(Array.map ~f:Step_main_inputs.Inner_curve.constant)
     ; wrap_domain = `Known wrap_domains.h
     ; step_domains = `Known step_domains
     ; feature_flags
     }
+
+  let of_compiled ({ wrap_key; _ } as t : _ Compiled.t) =
+    let%map.Promise wrap_key = Lazy.force wrap_key in
+    of_compiled_with_known_wrap_key ~wrap_key t
 end
 
 type t =
@@ -230,13 +237,14 @@ let lookup_side_loaded :
   d
 
 let lookup_basic :
-    type var value n m. (var, value, n, m) Tag.t -> (var, value, n, m) Basic.t =
+    type var value n m.
+    (var, value, n, m) Tag.t -> (var, value, n, m) Basic.t Promise.t =
  fun t ->
   match t.kind with
   | Compiled ->
       Compiled.to_basic (lookup_compiled t.id)
   | Side_loaded ->
-      Side_loaded.to_basic (lookup_side_loaded t.id)
+      Promise.return @@ Side_loaded.to_basic (lookup_side_loaded t.id)
 
 let max_proofs_verified :
     type n1. (_, _, n1, _) Tag.t -> (module Nat.Add.Intf with type n = n1) =

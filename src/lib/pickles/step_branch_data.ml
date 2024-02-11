@@ -42,6 +42,7 @@ type ( 'a_var
              , Impls.Step.Field.t
              , (Impls.Step.Field.t, 'max_proofs_verified) Vector.t )
              Types.Step.Statement.t
+             Promise.t
       ; requests :
           (module Requests.Step.S
              with type statement = 'a_value
@@ -148,7 +149,7 @@ let create
     |> unstage
   in
   Timer.clock __LOC__ ;
-  let own_domains =
+  let%map.Promise own_domains =
     let main =
       step
         ~step_domains:

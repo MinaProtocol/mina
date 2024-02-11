@@ -14,7 +14,7 @@ val domains :
                                              .t )
   -> ('a, 'b, 'field) Import.Spec.ETyp.t
   -> ('c, 'd, 'field) Import.Spec.ETyp.t
-  -> ('a -> 'c)
-  -> Import.Domains.t
+  -> ('a -> 'c Promise.t)
+  -> Import.Domains.t Promise.t
 
 val rough_domains : Import.Domains.t

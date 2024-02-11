@@ -40,18 +40,21 @@ module Step : sig
        prev_challenges:int
     -> Key_cache.Spec.t list
     -> ?s_p:storable
-    -> Key.Proving.t lazy_t
+    -> Key.Proving.t Promise.t Lazy.t
     -> ?s_v:vk_storable
-    -> Key.Verification.t lazy_t
+    -> Key.Verification.t Promise.t Lazy.t
     -> ('a, 'b) Impls.Step.Typ.t
     -> ('c, 'd) Impls.Step.Typ.t
-    -> ('a -> unit -> 'c)
+    -> ('a -> unit -> 'c Promise.t)
     -> ( Impls.Step.Proving_key.t
-       * [> `Cache_hit | `Generated_something | `Locally_generated ] )
-       lazy_t
+       * ([> `Cache_hit | `Generated_something | `Locally_generated ] as 'e) )
+       Promise.t
+       Lazy.t
        * ( Kimchi_bindings.Protocol.VerifierIndex.Fp.t
-         * [> `Cache_hit | `Generated_something | `Locally_generated ] )
-         lazy_t
+         * ([> `Cache_hit | `Generated_something | `Locally_generated ] as 'e)
+         )
+         Promise.t
+         Lazy.t
 end
 
 module Wrap : sig
@@ -93,16 +96,18 @@ module Wrap : sig
        prev_challenges:Core_kernel.Int.t
     -> Key_cache.Spec.t list
     -> ?s_p:storable
-    -> Key.Proving.t lazy_t
+    -> Key.Proving.t Promise.t Lazy.t
     -> ?s_v:vk_storable
-    -> Key.Verification.t lazy_t
+    -> Key.Verification.t Promise.t Lazy.t
     -> ('a, 'b) Impls.Wrap.Typ.t
     -> ('c, 'd) Impls.Wrap.Typ.t
-    -> ('a -> unit -> 'c)
+    -> ('a -> unit -> 'c) Promise.t Lazy.t
     -> ( Impls.Wrap.Proving_key.t
        * [> `Cache_hit | `Generated_something | `Locally_generated ] )
-       lazy_t
+       Promise.t
+       Lazy.t
        * ( Verification_key.Stable.V2.t
          * [> `Cache_hit | `Generated_something | `Locally_generated ] )
-         lazy_t
+         Promise.t
+         Lazy.t
 end

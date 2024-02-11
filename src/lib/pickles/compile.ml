@@ -122,6 +122,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            Wrap_verifier.index'
          , 'branches )
          Vector.t
+         Promise.t
          Lazy.t
       -> (int, 'branches) Pickles_types.Vector.t
       -> (Import.Domains.t, 'branches) Pickles_types.Vector.t
@@ -153,6 +154,8 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                , Impls.Wrap.Field.t )
                Composition_types.Wrap.Statement.t
             -> unit )
+           Promise.t
+           Lazy.t
         (** An override for wrap_main, which allows for adversarial testing
               with an 'invalid' pickles statement by passing a dummy proof.
           *)
@@ -293,10 +296,8 @@ struct
 
   module Lazy_keys = struct
     type t =
-      (Impls.Step.Proving_key.t * Dirty.t) Lazy.t
-      * (Kimchi_bindings.Protocol.VerifierIndex.Fp.t * Dirty.t) Lazy.t
-
-    (* TODO Think this is right.. *)
+      (Impls.Step.Proving_key.t * Dirty.t) Promise.t Lazy.t
+      * (Kimchi_bindings.Protocol.VerifierIndex.Fp.t * Dirty.t) Promise.t Lazy.t
   end
 
   let log_step main _typ name index =
@@ -320,7 +321,7 @@ struct
     if profile_constraints then
       Snarky_log.to_file (sprintf "step-snark-%s-%d.json" name index) log
 
-  let log_wrap main typ name id =
+  let _log_wrap main typ name id =
     let module Constraints = Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
     let log =
       let sys = Backend.Tock.R1CS_constraint_system.create () in
@@ -511,18 +512,19 @@ struct
       let module V = H4.To_vector (Int) in
       V.f prev_varss_length (M.f choices)
     in
-    let step_data =
+    let%bind.Promise step_data =
       let i = ref 0 in
       Timer.clock __LOC__ ;
       let rec f :
           type a b c d.
-          (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(Branch_data).t = function
+          (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(Branch_data).t Promise.t
+          = function
         | [] ->
-            []
+            Promise.return ([] : _ H4.T(Branch_data).t)
         | rule :: rules ->
-            let first =
+            let%bind.Promise first =
               Timer.clock __LOC__ ;
-              let res =
+              let%map.Promise res =
                 Common.time "make step data" (fun () ->
                     Step_branch_data.create ~index:!i ~feature_flags
                       ~actual_feature_flags:rule.feature_flags
@@ -533,7 +535,8 @@ struct
               in
               Timer.clock __LOC__ ; incr i ; res
             in
-            first :: f rules
+            let%map.Promise rest = f rules in
+            (first :: rest : _ H4.T(Branch_data).t)
       in
       f choices
     in
@@ -548,7 +551,7 @@ struct
       let module V = H4.To_vector (Domains) in
       V.f prev_varss_length (M.f step_data)
     in
-    let cache_handle = ref (Lazy.return `Cache_hit) in
+    let cache_handle = ref (Lazy.return (Promise.return `Cache_hit)) in
     let accum_dirty t = cache_handle := Cache_handle.(!cache_handle + t) in
     Timer.clock __LOC__ ;
     let step_keypairs =
@@ -565,22 +568,25 @@ struct
             let f (T b : _ Branch_data.t) =
               let (T (typ, _conv, conv_inv)) = etyp in
               let main () () =
-                let res = b.main ~step_domains () in
+                let%map.Promise res = b.main ~step_domains () in
                 Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
               in
               let () = if true then log_step main typ name b.index in
               let open Impls.Step in
               (* HACK: TODO docs *)
-              if return_early_digest_exception then
-                raise
-                  (Return_digest
-                     ( constraint_system ~input_typ:Typ.unit ~return_typ:typ main
-                     |> R1CS_constraint_system.digest ) ) ;
+              if return_early_digest_exception then failwith "TODO: Delete me" ;
 
               let k_p =
                 lazy
-                  (let cs =
-                     constraint_system ~input_typ:Typ.unit ~return_typ:typ main
+                  (let%map.Promise cs =
+                     let constraint_builder =
+                       Impl.constraint_system_manual ~input_typ:Typ.unit
+                         ~return_typ:typ
+                     in
+                     let%map.Promise res =
+                       constraint_builder.run_circuit main
+                     in
+                     constraint_builder.finish_computation res
                    in
                    let cs_hash =
                      Md5.to_hex (R1CS_constraint_system.digest cs)
@@ -597,10 +603,12 @@ struct
               let k_v =
                 match disk_keys with
                 | Some ks ->
-                    Lazy.return ks.(b.index)
+                    Lazy.return (Promise.return ks.(b.index))
                 | None ->
                     lazy
-                      (let id, _header, index, cs = Lazy.force k_p in
+                      (let%map.Promise id, _header, index, cs =
+                         Lazy.force k_p
+                       in
                        let digest = R1CS_constraint_system.digest cs in
                        ( id
                        , snark_keys_header
@@ -619,8 +627,8 @@ struct
                       (Snarky_backendless.Typ.unit ())
                       typ main )
               in
-              accum_dirty (Lazy.map pk ~f:snd) ;
-              accum_dirty (Lazy.map vk ~f:snd) ;
+              accum_dirty (Lazy.map pk ~f:(Promise.map ~f:snd)) ;
+              accum_dirty (Lazy.map vk ~f:(Promise.map ~f:snd)) ;
               res
           end)
       in
@@ -630,8 +638,17 @@ struct
     let step_vks =
       let module V = H4.To_vector (Lazy_keys) in
       lazy
-        (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
-             Tick.Keypair.full_vk_commitments (fst (Lazy.force vk)) ) )
+        (let step_keypairs = V.f prev_varss_length step_keypairs in
+         let%map.Promise () =
+           (* Wait for keypair promises to resolve. *)
+           Vector.fold ~init:(Promise.return ()) step_keypairs
+             ~f:(fun acc (_, vk) ->
+               let%bind.Promise _ = Lazy.force vk in
+               acc )
+         in
+         Vector.map step_keypairs ~f:(fun (_, vk) ->
+             Tick.Keypair.full_vk_commitments
+               (fst (Option.value_exn @@ Promise.peek @@ Lazy.force vk)) ) )
     in
     Timer.clock __LOC__ ;
     let wrap_requests, wrap_main =
@@ -657,12 +674,17 @@ struct
     let (wrap_pk, wrap_vk), disk_key =
       let open Impls.Wrap in
       let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
-      let main x () : unit = wrap_main (conv x) in
-      let () = if true then log_wrap main typ name self.id in
+      let main =
+        lazy
+          (let%map.Promise wrap_main = Lazy.force wrap_main in
+           fun x () -> wrap_main (conv x) )
+      in
+      (*let () = if true then log_wrap main typ name self.id in*)
       let self_id = Type_equal.Id.uid self.id in
       let disk_key_prover =
         lazy
-          (let cs =
+          (let%map.Promise main = Lazy.force main in
+           let cs =
              constraint_system ~input_typ:typ
                ~return_typ:(Snarky_backendless.Typ.unit ())
                main
@@ -678,7 +700,7 @@ struct
         match disk_keys with
         | None ->
             lazy
-              (let id, _header, cs = Lazy.force disk_key_prover in
+              (let%map.Promise id, _header, cs = Lazy.force disk_key_prover in
                let digest = R1CS_constraint_system.digest cs in
                ( id
                , snark_keys_header
@@ -686,7 +708,7 @@ struct
                    (Md5.to_hex digest)
                , digest ) )
         | Some (_, (_id, header, digest)) ->
-            Lazy.return (self_id, header, digest)
+            Lazy.return @@ Promise.return (self_id, header, digest)
       in
       let r =
         Common.time "wrap read or generate " (fun () ->
@@ -700,21 +722,28 @@ struct
     in
     Timer.clock __LOC__ ;
     let wrap_vk =
-      Lazy.map wrap_vk ~f:(fun ((wrap_vk, _) as res) ->
-          let computed_domain_size = wrap_vk.index.domain.log_size_of_group in
-          let (Pow_2_roots_of_unity proposed_domain_size) = wrap_domains.h in
-          if computed_domain_size <> proposed_domain_size then
-            failwithf
-              "This circuit was compiled for proofs using the wrap domain of \
-               size %d, but the actual wrap domain size for the circuit has \
-               size %d. You should pass the ~override_wrap_domain argument to \
-               set the correct domain size."
-              proposed_domain_size computed_domain_size () ;
-          res )
+      Lazy.map wrap_vk
+        ~f:
+          (Promise.map ~f:(fun ((wrap_vk, _) as res) ->
+               let computed_domain_size =
+                 wrap_vk.Verification_key.index.domain.log_size_of_group
+               in
+               let (Pow_2_roots_of_unity proposed_domain_size) =
+                 wrap_domains.h
+               in
+               if computed_domain_size <> proposed_domain_size then
+                 failwithf
+                   "This circuit was compiled for proofs using the wrap domain \
+                    of size %d, but the actual wrap domain size for the \
+                    circuit has size %d. You should pass the \
+                    ~override_wrap_domain argument to set the correct domain \
+                    size."
+                   proposed_domain_size computed_domain_size () ;
+               res ) )
     in
-    accum_dirty (Lazy.map wrap_pk ~f:snd) ;
-    accum_dirty (Lazy.map wrap_vk ~f:snd) ;
-    let wrap_vk = Lazy.map wrap_vk ~f:fst in
+    accum_dirty (Lazy.map wrap_pk ~f:(Promise.map ~f:snd)) ;
+    accum_dirty (Lazy.map wrap_vk ~f:(Promise.map ~f:snd)) ;
+    let wrap_vk = Lazy.map wrap_vk ~f:(Promise.map ~f:fst) in
     let module S =
       Step.Make (Arg_var) (Arg_value)
         (struct
@@ -745,21 +774,21 @@ struct
              Promise.t =
        fun (T b as branch_data) (step_pk, step_vk) ->
         let _, prev_vars_length = b.proofs_verified in
-        let step handler next_state =
-          let wrap_vk = Lazy.force wrap_vk in
+        let step ~proof_cache ~maxes handler next_state =
+          let%bind.Promise wrap_vk = Lazy.force wrap_vk in
+          let%bind.Promise step_pk = Lazy.force step_pk in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
             ~self ~step_domains
             ~self_dlog_plonk_index:
               ((* TODO *) Plonk_verification_key_evals.map
                  ~f:(fun x -> [| x |])
                  wrap_vk.commitments )
-            ~public_input ~auxiliary_typ ~feature_flags
-            (fst (Lazy.force step_pk))
-            wrap_vk.index
+            ~public_input ~auxiliary_typ ~feature_flags ~proof_cache ~maxes
+            (fst step_pk) wrap_vk.index
         in
-        let step_vk = fst (Lazy.force step_vk) in
         let wrap ?handler next_state =
-          let wrap_vk = Lazy.force wrap_vk in
+          let%bind.Promise step_vk, _ = Lazy.force step_vk in
+          let%bind.Promise wrap_vk = Lazy.force wrap_vk in
           let%bind.Promise ( proof
                            , return_value
                            , auxiliary_value
@@ -793,6 +822,8 @@ struct
                   *)
                   Some tweak_statement
             in
+            let%bind.Promise wrap_main = Lazy.force wrap_main in
+            let%bind.Promise wrap_pk = Lazy.force wrap_pk in
             Wrap.wrap ~proof_cache ~max_proofs_verified:Max_proofs_verified.n
               ~feature_flags ~actual_feature_flags:b.feature_flags
               full_signature.maxes wrap_requests ?tweak_statement
@@ -801,9 +832,7 @@ struct
                    ~f:(fun x -> [| x |])
                    wrap_vk.commitments )
               wrap_main ~typ ~step_vk ~step_plonk_indices:(Lazy.force step_vks)
-              ~actual_wrap_domains
-              (fst (Lazy.force wrap_pk))
-              proof
+              ~actual_wrap_domains (fst wrap_pk) proof
           in
           ( return_value
           , auxiliary_value
@@ -849,10 +878,12 @@ struct
       ; max_proofs_verified
       ; public_input = typ
       ; wrap_key =
-          Lazy.map wrap_vk ~f:(fun x ->
-              Plonk_verification_key_evals.map (Verification_key.commitments x)
-                ~f:(fun x -> [| x |]) )
-      ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
+          Lazy.map wrap_vk
+            ~f:
+              (Promise.map ~f:(fun x ->
+                   Plonk_verification_key_evals.map
+                     (Verification_key.commitments x) ~f:(fun x -> [| x |]) ) )
+      ; wrap_vk = Lazy.map wrap_vk ~f:(Promise.map ~f:Verification_key.index)
       ; wrap_domains
       ; step_domains
       ; feature_flags
