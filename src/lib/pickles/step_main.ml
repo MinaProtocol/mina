@@ -276,9 +276,10 @@ let step_main :
     let T = Max_proofs_verified.eq in
     let app_state = exists input_typ ~request:(fun () -> Req.App_state) in
     let module Optional_wrap_key = struct
-      type (_, _, _, _) t =
-        Step_main_inputs.Inner_curve.Constant.t array
-        Plonk_verification_key_evals.t
+      type (_, _, _, 'branches) t =
+        ( Step_main_inputs.Inner_curve.Constant.t array
+          Plonk_verification_key_evals.t
+        * (Import.Domains.t, 'branches) Vector.t )
         option
     end in
     (* Here, we prefetch the known wrap keys for all compiled rules.
@@ -303,11 +304,21 @@ let step_main :
               | None -> (
                   match tag.kind with
                   | Compiled ->
-                      let%map.Promise wrap_key =
-                        Lazy.force
-                        @@ (Types_map.lookup_compiled tag.id).wrap_key
+                      let compiled = Types_map.lookup_compiled tag.id in
+                      let%map.Promise wrap_key = Lazy.force @@ compiled.wrap_key
+                      and step_domains =
+                        let%map.Promise () =
+                          (* Wait for promises to resolve. *)
+                          Vector.fold ~init:(Promise.return ())
+                            compiled.step_domains ~f:(fun acc step_domain ->
+                              let%bind.Promise _ = step_domain in
+                              acc )
+                        in
+                        Vector.map
+                          ~f:(fun x -> Option.value_exn @@ Promise.peek x)
+                          compiled.step_domains
                       in
-                      Some wrap_key
+                      Some (wrap_key, step_domains)
                   | Side_loaded ->
                       Promise.return None )
             in
@@ -542,10 +553,12 @@ let step_main :
                           | None -> (
                               match tag.kind with
                               | Compiled ->
+                                  let wrap_key, step_domains =
+                                    Option.value_exn optional_wrap_key
+                                  in
                                   Types_map.For_step
-                                  .of_compiled_with_known_wrap_key
-                                    ~wrap_key:
-                                      (Option.value_exn optional_wrap_key)
+                                  .of_compiled_with_known_wrap_key ~wrap_key
+                                    ~step_domains
                                     (Types_map.lookup_compiled tag.id)
                               | Side_loaded ->
                                   Types_map.For_step.of_side_loaded

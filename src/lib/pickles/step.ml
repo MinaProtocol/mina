@@ -804,7 +804,9 @@ struct
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
           ~wrap_rounds:Tock.Rounds.n
       in
-      let { Domains.h } = Vector.nth_exn step_domains branch_data.index in
+      let%bind.Promise { Domains.h } =
+        Vector.nth_exn step_domains branch_data.index
+      in
       ksprintf Common.time "step-prover %d (%d)" branch_data.index
         (Domain.size h) (fun () ->
           [%log internal] "Step_generate_witness_conv" ;

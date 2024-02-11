@@ -66,9 +66,13 @@ module type S = sig
 
     type t
 
-    val verification_key : Verification_key.t Lazy.t
+    val verification_key_promise : Verification_key.t Promise.t Lazy.t
 
-    val id : Verification_key.Id.t Lazy.t
+    val verification_key : Verification_key.t Deferred.t Lazy.t
+
+    val id_promise : Verification_key.Id.t Promise.t Lazy.t
+
+    val id : Verification_key.Id.t Deferred.t Lazy.t
 
     val verify : (statement * t) list -> unit Or_error.t Deferred.t
 
@@ -235,6 +239,7 @@ module type S = sig
       ; main :
              'a_var main_input
           -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return
+             Promise.t
       ; feature_flags : bool Pickles_types.Plonk_types.Features.t
       }
   end
@@ -273,7 +278,7 @@ module type S = sig
   module Cache_handle : sig
     type t
 
-    val generate_or_load : t -> Dirty.t
+    val generate_or_load : t -> Dirty.t Promise.t
   end
 
   module Storables : sig

@@ -22,7 +22,7 @@ type ( 'a_var
           'proofs_verified Nat.t * ('prev_vars, 'proofs_verified) Hlist.Length.t
       ; index : int
       ; lte : ('proofs_verified, 'max_proofs_verified) Nat.Lte.t
-      ; domains : Domains.t
+      ; domains : Domains.t Promise.t
       ; rule :
           ( 'prev_vars
           , 'prev_values
@@ -36,7 +36,7 @@ type ( 'a_var
           , 'auxiliary_value )
           Inductive_rule.t
       ; main :
-             step_domains:(Domains.t, 'branches) Vector.t
+             step_domains:(Domains.t Promise.t, 'branches) Vector.t
           -> unit
           -> ( (Unfinalized.t, 'max_proofs_verified) Vector.t
              , Impls.Step.Field.t
@@ -133,6 +133,16 @@ let create
   in
   Timer.clock __LOC__ ;
   let step ~step_domains =
+    let%map.Promise step_domains =
+      let%map.Promise () =
+        (* Wait for promises to resolve. *)
+        Vector.fold ~init:(Promise.return ()) step_domains
+          ~f:(fun acc step_domain ->
+            let%bind.Promise _ = step_domain in
+            acc )
+      in
+      Vector.map ~f:(fun x -> Option.value_exn @@ Promise.peek x) step_domains
+    in
     Step_main.step_main requests
       (Nat.Add.create max_proofs_verified)
       rule
@@ -148,12 +158,26 @@ let create
       ~local_branches_length ~lte ~self
     |> unstage
   in
+  (* Rebinding trick: we set off the outer promise immediately, as we would if
+     it was not there, and then we chain off the promise in the main function
+     itself.
+     Notably, this ensures that we don't initialize on every call of the
+     function, which is the whole idea of the [stage] above.
+  *)
+  let step ~step_domains =
+    let step = step ~step_domains in
+    fun () ->
+      let%bind.Promise step = step in
+      step ()
+  in
+  (* Now that we've triggered the promise computation, we rebind. *)
   Timer.clock __LOC__ ;
-  let%map.Promise own_domains =
+  let own_domains =
     let main =
       step
         ~step_domains:
-          (Vector.init branches ~f:(fun _ -> Fix_domains.rough_domains))
+          (Vector.init branches ~f:(fun _ ->
+               Promise.return Fix_domains.rough_domains ) )
     in
     let etyp =
       Impls.Step.input ~proofs_verified:max_proofs_verified

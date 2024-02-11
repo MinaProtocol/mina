@@ -90,9 +90,13 @@ module type Proof_intf = sig
 
   type t
 
-  val verification_key : Verification_key.t Lazy.t
+  val verification_key_promise : Verification_key.t Promise.t Lazy.t
 
-  val id : Cache.Wrap.Key.Verification.t Lazy.t
+  val verification_key : Verification_key.t Deferred.t Lazy.t
+
+  val id_promise : Cache.Wrap.Key.Verification.t Promise.t Lazy.t
+
+  val id : Cache.Wrap.Key.Verification.t Deferred.t Lazy.t
 
   val verify : (statement * t) list -> unit Or_error.t Deferred.t
 
@@ -125,7 +129,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          Promise.t
          Lazy.t
       -> (int, 'branches) Pickles_types.Vector.t
-      -> (Import.Domains.t, 'branches) Pickles_types.Vector.t
+      -> (Import.Domains.t Promise.t, 'branches) Pickles_types.Vector.t
       -> (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
       -> ('max_proofs_verified, 'max_local_max_proofs_verifieds) Requests.Wrap.t
          * (   ( ( Impls.Wrap.Field.t
@@ -512,19 +516,18 @@ struct
       let module V = H4.To_vector (Int) in
       V.f prev_varss_length (M.f choices)
     in
-    let%bind.Promise step_data =
+    let step_data =
       let i = ref 0 in
       Timer.clock __LOC__ ;
       let rec f :
           type a b c d.
-          (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(Branch_data).t Promise.t
-          = function
+          (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(Branch_data).t = function
         | [] ->
-            Promise.return ([] : _ H4.T(Branch_data).t)
+            []
         | rule :: rules ->
-            let%bind.Promise first =
+            let first =
               Timer.clock __LOC__ ;
-              let%map.Promise res =
+              let res =
                 Common.time "make step data" (fun () ->
                     Step_branch_data.create ~index:!i ~feature_flags
                       ~actual_feature_flags:rule.feature_flags
@@ -535,20 +538,22 @@ struct
               in
               Timer.clock __LOC__ ; incr i ; res
             in
-            let%map.Promise rest = f rules in
-            (first :: rest : _ H4.T(Branch_data).t)
+            first :: f rules
       in
       f choices
     in
     Timer.clock __LOC__ ;
     let step_domains =
+      let module DomainsPromise = struct
+        type t = Domains.t Promise.t
+      end in
       let module M =
-        H4.Map (Branch_data) (E04 (Domains))
+        H4.Map (Branch_data) (E04 (DomainsPromise))
           (struct
             let f (T b : _ Branch_data.t) = b.domains
           end)
       in
-      let module V = H4.To_vector (Domains) in
+      let module V = H4.To_vector (DomainsPromise) in
       V.f prev_varss_length (M.f step_data)
     in
     let cache_handle = ref (Lazy.return (Promise.return `Cache_hit)) in
@@ -903,20 +908,25 @@ module Side_loaded = struct
     let to_input (t : t) =
       to_input ~field_of_int:Impls.Step.Field.Constant.of_int t
 
-    let of_compiled tag : t =
+    let of_compiled_promise tag : t Promise.t =
       let d = Types_map.lookup_compiled tag.Tag.id in
+      let%bind.Promise wrap_key = Lazy.force d.wrap_key in
+      let%map.Promise wrap_vk = Lazy.force d.wrap_vk in
       let actual_wrap_domain_size =
         Common.actual_wrap_domain_size
-          ~log_2_domain_size:(Lazy.force d.wrap_vk).domain.log_size_of_group
+          ~log_2_domain_size:wrap_vk.domain.log_size_of_group
       in
-      { wrap_vk = Some (Lazy.force d.wrap_vk)
-      ; wrap_index =
-          Plonk_verification_key_evals.map (Lazy.force d.wrap_key) ~f:(fun x ->
-              x.(0) )
-      ; max_proofs_verified =
-          Pickles_base.Proofs_verified.of_nat (Nat.Add.n d.max_proofs_verified)
-      ; actual_wrap_domain_size
-      }
+      ( { wrap_vk = Some wrap_vk
+        ; wrap_index =
+            Plonk_verification_key_evals.map wrap_key ~f:(fun x -> x.(0))
+        ; max_proofs_verified =
+            Pickles_base.Proofs_verified.of_nat
+              (Nat.Add.n d.max_proofs_verified)
+        ; actual_wrap_domain_size
+        }
+        : t )
+
+    let of_compiled tag = of_compiled_promise tag |> Promise.to_deferred
 
     module Max_width = Width.Max
   end
@@ -1152,18 +1162,22 @@ let compile_with_wrap_main_override_promise :
           include Max_local_max_proofs_verified
         end)
 
-    let id = wrap_disk_key
+    let id_promise = wrap_disk_key
 
-    let verification_key = wrap_vk
+    let id = Lazy.map ~f:Promise.to_deferred wrap_disk_key
+
+    let verification_key_promise = wrap_vk
+
+    let verification_key = Lazy.map ~f:Promise.to_deferred wrap_vk
 
     let verify_promise ts =
+      let%bind.Promise verification_key = Lazy.force verification_key_promise in
       verify_promise
         ( module struct
           include Max_proofs_verified
         end )
         (module Value)
-        (Lazy.force verification_key)
-        ts
+        verification_key ts
 
     let verify ts = verify_promise ts |> Promise.to_deferred
   end in
@@ -1217,7 +1231,7 @@ let wrap_main_dummy_override _ _ _ _ _ _ _ =
       assert_r1cs x y z
     done
   in
-  (requests, wrap_main)
+  (requests, Lazy.return @@ Promise.return @@ wrap_main)
 
 module Make_adversarial_test (M : sig
   val tweak_statement :
@@ -1309,19 +1323,20 @@ struct
             As_prover.Ref.create (fun () ->
                 Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15 )
           in
-          { previous_proof_statements =
-              [ { public_input = ()
-                ; proof = dummy_proof
-                ; proof_must_verify = Boolean.false_
-                }
-              ; { public_input = ()
-                ; proof = dummy_proof
-                ; proof_must_verify = Boolean.false_
-                }
-              ]
-          ; public_output = ()
-          ; auxiliary_output = ()
-          } )
+          Promise.return
+            { Inductive_rule.previous_proof_statements =
+                [ { public_input = ()
+                  ; proof = dummy_proof
+                  ; proof_must_verify = Boolean.false_
+                  }
+                ; { public_input = ()
+                  ; proof = dummy_proof
+                  ; proof_must_verify = Boolean.false_
+                  }
+                ]
+            ; public_output = ()
+            ; auxiliary_output = ()
+            } )
     ; feature_flags = Plonk_types.Features.none_bool
     }
 
@@ -1397,19 +1412,20 @@ struct
                       let proof =
                         exists (Typ.Internal.ref ()) ~request:(fun () -> Proof)
                       in
-                      { previous_proof_statements =
-                          [ { public_input = ()
-                            ; proof
-                            ; proof_must_verify = Boolean.true_
-                            }
-                          ; { public_input = ()
-                            ; proof
-                            ; proof_must_verify = Boolean.true_
-                            }
-                          ]
-                      ; public_output = ()
-                      ; auxiliary_output = ()
-                      } )
+                      Promise.return
+                        { Inductive_rule.previous_proof_statements =
+                            [ { public_input = ()
+                              ; proof
+                              ; proof_must_verify = Boolean.true_
+                              }
+                            ; { public_input = ()
+                              ; proof
+                              ; proof_must_verify = Boolean.true_
+                              }
+                            ]
+                        ; public_output = ()
+                        ; auxiliary_output = ()
+                        } )
                 }
               ] ) )
 

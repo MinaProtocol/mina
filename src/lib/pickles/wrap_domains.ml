@@ -18,7 +18,8 @@ struct
       ~max_proofs_verified =
     let num_choices = Hlist.Length.to_nat choices_length in
     let dummy_step_domains =
-      Vector.init num_choices ~f:(fun _ -> Fix_domains.rough_domains)
+      Vector.init num_choices ~f:(fun _ ->
+          Promise.return Fix_domains.rough_domains )
     in
     let dummy_step_widths =
       Vector.init num_choices ~f:(fun _ ->

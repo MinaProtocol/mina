@@ -103,7 +103,7 @@ module Compiled = struct
         Lazy.t
     ; wrap_vk : Impls.Wrap.Verification_key.t Promise.t Lazy.t
     ; wrap_domains : Domains.t
-    ; step_domains : (Domains.t, 'branches) Vector.t
+    ; step_domains : (Domains.t Promise.t, 'branches) Vector.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     }
 
@@ -177,14 +177,14 @@ module For_step = struct
     ; feature_flags
     }
 
-  let of_compiled_with_known_wrap_key ~wrap_key
+  let of_compiled_with_known_wrap_key ~wrap_key ~step_domains
       ({ branches
        ; max_proofs_verified
        ; proofs_verifieds
        ; public_input
        ; wrap_key = _
        ; wrap_domains
-       ; step_domains
+       ; step_domains = _
        ; feature_flags
        ; wrap_vk = _
        } :
@@ -202,9 +202,19 @@ module For_step = struct
     ; feature_flags
     }
 
-  let of_compiled ({ wrap_key; _ } as t : _ Compiled.t) =
-    let%map.Promise wrap_key = Lazy.force wrap_key in
-    of_compiled_with_known_wrap_key ~wrap_key t
+  let of_compiled ({ wrap_key; step_domains; _ } as t : _ Compiled.t) =
+    let%map.Promise wrap_key = Lazy.force wrap_key
+    and step_domains =
+      let%map.Promise () =
+        (* Wait for promises to resolve. *)
+        Vector.fold ~init:(Promise.return ()) step_domains
+          ~f:(fun acc step_domain ->
+            let%bind.Promise _ = step_domain in
+            acc )
+      in
+      Vector.map ~f:(fun x -> Option.value_exn @@ Promise.peek x) step_domains
+    in
+    of_compiled_with_known_wrap_key ~wrap_key ~step_domains t
 end
 
 type t =

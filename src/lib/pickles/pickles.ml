@@ -1159,7 +1159,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Step_branch_data.t
           end in
           let proofs_verifieds = Vector.singleton 2 in
-          let%bind.Promise (T inner_step_data as step_data) =
+          let (T inner_step_data as step_data) =
             Step_branch_data.create ~index:0 ~feature_flags
               ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
               ~branches:Branches.n ~self ~public_input:(Input typ)
@@ -1849,7 +1849,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             }
           in
           Types_map.add_exn self data ;
-          Promise.return (prover, wrap_vk, disk_key)
+          (prover, wrap_vk, disk_key)
       end
 
       let step, wrap_vk, wrap_disk_key = M.compile
@@ -1863,11 +1863,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let verification_key = wrap_vk
 
         let verify ts =
+          let%bind.Promise verification_key = Lazy.force verification_key in
           verify_promise
             (module Max_proofs_verified)
             (module A_value)
-            (Lazy.force verification_key)
-            ts
+            verification_key ts
 
         let _statement (T p : t) =
           p.statement.messages_for_next_step_proof.app_state
@@ -1916,19 +1916,20 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             exists (Typ.Internal.ref ()) ~request:(fun () ->
                                 Proof )
                           in
-                          { previous_proof_statements =
-                              [ { public_input = ()
-                                ; proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ; { public_input = ()
-                                ; proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ]
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements =
+                                [ { public_input = ()
+                                  ; proof
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ; { public_input = ()
+                                  ; proof
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ]
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -2054,10 +2055,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (fun { public_input = self } ->
                           dummy_constraints () ;
                           Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements = []
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -2105,10 +2107,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (fun { public_input = self } ->
                           dummy_constraints () ;
                           Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements = []
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -2157,10 +2160,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (fun { public_input = self } ->
                           dummy_constraints () ;
                           Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements = []
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -2254,15 +2258,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           let is_base_case = Field.equal Field.zero self in
                           let self_correct = Field.(equal (one + prev) self) in
                           Boolean.Assert.any [ self_correct; is_base_case ] ;
-                          { previous_proof_statements =
-                              [ { public_input = prev
-                                ; proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ]
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements =
+                                [ { public_input = prev
+                                  ; proof
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ]
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -2272,13 +2277,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let (), (), b1 =
             Common.time "b1" (fun () ->
                 Promise.block_on_async_exn (fun () ->
+                    let%bind.Promise vk =
+                      Side_loaded.Verification_key.of_compiled_promise
+                        No_recursion.tag
+                    in
                     step
                       ~handler:
                         (handler No_recursion.example_input
                            (Side_loaded.Proof.of_proof
                               No_recursion.example_proof )
-                           (Side_loaded.Verification_key.of_compiled
-                              No_recursion.tag ) )
+                           vk )
                       Field.Constant.one ) )
           in
           Or_error.ok_exn
@@ -2290,13 +2298,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let (), (), b2 =
             Common.time "b2" (fun () ->
                 Promise.block_on_async_exn (fun () ->
+                    let%bind.Promise vk =
+                      Side_loaded.Verification_key.of_compiled_promise
+                        Fake_1_recursion.tag
+                    in
                     step
                       ~handler:
                         (handler Fake_1_recursion.example_input
                            (Side_loaded.Proof.of_proof
                               Fake_1_recursion.example_proof )
-                           (Side_loaded.Verification_key.of_compiled
-                              Fake_1_recursion.tag ) )
+                           vk )
                       Field.Constant.one ) )
           in
           Or_error.ok_exn
@@ -2308,13 +2319,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let (), (), b3 =
             Common.time "b3" (fun () ->
                 Promise.block_on_async_exn (fun () ->
+                    let%bind.Promise vk =
+                      Side_loaded.Verification_key.of_compiled_promise
+                        Fake_2_recursion.tag
+                    in
                     step
                       ~handler:
                         (handler Fake_2_recursion.example_input
                            (Side_loaded.Proof.of_proof
                               Fake_2_recursion.example_proof )
-                           (Side_loaded.Verification_key.of_compiled
-                              Fake_2_recursion.tag ) )
+                           vk )
                       Field.Constant.one ) )
           in
           Or_error.ok_exn
@@ -2402,10 +2416,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (fun { public_input = self } ->
                           dummy_constraints () ;
                           Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements = []
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -2453,10 +2468,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (fun { public_input = self } ->
                           dummy_constraints () ;
                           Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements = []
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -2505,10 +2521,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (fun { public_input = self } ->
                           dummy_constraints () ;
                           Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements = []
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -2605,15 +2622,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           let is_base_case = Field.equal Field.zero self in
                           let self_correct = Field.(equal (one + prev) self) in
                           Boolean.Assert.any [ self_correct; is_base_case ] ;
-                          { previous_proof_statements =
-                              [ { public_input = prev
-                                ; proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ]
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements =
+                                [ { public_input = prev
+                                  ; proof
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ]
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -2623,13 +2641,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let (), (), b1 =
             Common.time "b1" (fun () ->
                 Promise.block_on_async_exn (fun () ->
+                    let%bind.Promise vk =
+                      Side_loaded.Verification_key.of_compiled_promise
+                        No_recursion.tag
+                    in
                     step
                       ~handler:
                         (handler No_recursion.example_input
                            (Side_loaded.Proof.of_proof
                               No_recursion.example_proof )
-                           (Side_loaded.Verification_key.of_compiled
-                              No_recursion.tag ) )
+                           vk )
                       Field.Constant.one ) )
           in
           Or_error.ok_exn
@@ -2641,13 +2662,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let (), (), b2 =
             Common.time "b2" (fun () ->
                 Promise.block_on_async_exn (fun () ->
+                    let%bind.Promise vk =
+                      Side_loaded.Verification_key.of_compiled_promise
+                        Fake_1_recursion.tag
+                    in
                     step
                       ~handler:
                         (handler Fake_1_recursion.example_input
                            (Side_loaded.Proof.of_proof
                               Fake_1_recursion.example_proof )
-                           (Side_loaded.Verification_key.of_compiled
-                              Fake_1_recursion.tag ) )
+                           vk )
                       Field.Constant.one ) )
           in
           Or_error.ok_exn
@@ -2659,13 +2683,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let (), (), b3 =
             Common.time "b3" (fun () ->
                 Promise.block_on_async_exn (fun () ->
+                    let%bind.Promise vk =
+                      Side_loaded.Verification_key.of_compiled_promise
+                        Fake_2_recursion.tag
+                    in
                     step
                       ~handler:
                         (handler Fake_2_recursion.example_input
                            (Side_loaded.Proof.of_proof
                               Fake_2_recursion.example_proof )
-                           (Side_loaded.Verification_key.of_compiled
-                              Fake_2_recursion.tag ) )
+                           vk )
                       Field.Constant.one ) )
           in
           Or_error.ok_exn

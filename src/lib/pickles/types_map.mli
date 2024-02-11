@@ -75,7 +75,8 @@ module Compiled : sig
         Lazy.t
     ; wrap_vk : Impls.Wrap.Verification_key.t Promise.t Lazy.t
     ; wrap_domains : Import.Domains.t
-    ; step_domains : (Import.Domains.t, 'branches) Pickles_types.Vector.t
+    ; step_domains :
+        (Import.Domains.t Promise.t, 'branches) Pickles_types.Vector.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     }
 end
@@ -107,8 +108,9 @@ module For_step : sig
        wrap_key:
          Step_main_inputs.Inner_curve.Constant.t array
          Plonk_verification_key_evals.t
-    -> ('a, 'b, 'c, 'd) Compiled.t
-    -> ('a, 'b, 'c, 'd) t
+    -> step_domains:(Import.Domains.t, 'branches) Vector.t
+    -> ('a, 'b, 'c, 'branches) Compiled.t
+    -> ('a, 'b, 'c, 'branches) t
 
   val of_compiled : ('a, 'b, 'c, 'd) Compiled.t -> ('a, 'b, 'c, 'd) t Promise.t
 end
