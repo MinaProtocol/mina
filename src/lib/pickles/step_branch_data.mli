@@ -35,7 +35,7 @@ type ( 'a_var
           , 'ret_value
           , 'auxiliary_var
           , 'auxiliary_value )
-          Inductive_rule.t
+          Inductive_rule.Promise.t
             (* Main functions to compute *)
       ; main :
              step_domains:
@@ -111,7 +111,7 @@ val create :
      , 'ret_value
      , 'a
      , 'b )
-     Inductive_rule.t
+     Inductive_rule.Promise.t
   -> ( 'a_var
      , 'a_value
      , 'ret_var

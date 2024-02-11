@@ -324,7 +324,7 @@ val compile_with_wrap_main_override_promise :
            , 'ret_value
            , 'auxiliary_var
            , 'auxiliary_value )
-           H4_6.T(Inductive_rule).t )
+           H4_6.T(Inductive_rule.Promise).t )
   -> unit
   -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t

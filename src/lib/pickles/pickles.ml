@@ -324,6 +324,25 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let compile ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
       ~max_proofs_verified ~name ~constraint_constants ~choices () =
+    let choices ~self =
+      let choices = choices ~self in
+      let rec go :
+          type a b c d e f g h i j.
+             (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule).t
+          -> (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Promise).t =
+        function
+        | [] ->
+            []
+        | { identifier; prevs; main; feature_flags } :: rest ->
+            { identifier
+            ; prevs
+            ; main = (fun x -> Promise.return (main x))
+            ; feature_flags
+            }
+            :: go rest
+      in
+      go choices
+    in
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
         ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
@@ -1021,7 +1040,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let tagname = "" in
         Tag.create ~kind:Compiled tagname
 
-      let rule : _ Inductive_rule.t =
+      let rule : _ Inductive_rule.Promise.t =
         let open Impls.Step in
         { identifier = "main"
         ; prevs = [ tag; tag ]
@@ -1049,7 +1068,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         }
 
       module M = struct
-        module IR = Inductive_rule.T (A) (A_value) (A) (A_value) (A) (A_value)
+        module IR =
+          Inductive_rule.Promise.T (A) (A_value) (A) (A_value) (A) (A_value)
 
         let max_local_max_proofs_verifieds ~self (type n)
             (module Max_proofs_verified : Nat.Intf with type n = n) branches

@@ -187,7 +187,10 @@ module type S = sig
       *)
       }
 
-    (** This type models an "inductive rule". It includes
+    module Make (M : sig
+      type _ t
+    end) : sig
+      (** This type models an "inductive rule". It includes
         - the list of previous statements which this one assumes
         - the snarky main function
 
@@ -223,25 +226,35 @@ module type S = sig
           auxiliary data, to be returned to the prover but not exposed in the
           public input.
     *)
-    type ( 'prev_vars
-         , 'prev_values
-         , 'widths
-         , 'heights
-         , 'a_var
-         , 'a_value
-         , 'ret_var
-         , 'ret_value
-         , 'auxiliary_var
-         , 'auxiliary_value )
-         t =
-      { identifier : string
-      ; prevs : ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
-      ; main :
-             'a_var main_input
-          -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return
-             Promise.t
-      ; feature_flags : bool Pickles_types.Plonk_types.Features.t
-      }
+      type ( 'prev_vars
+           , 'prev_values
+           , 'widths
+           , 'heights
+           , 'a_var
+           , 'a_value
+           , 'ret_var
+           , 'ret_value
+           , 'auxiliary_var
+           , 'auxiliary_value )
+           t =
+        { identifier : string
+        ; prevs : ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
+        ; main :
+               'a_var main_input
+            -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return M.t
+        ; feature_flags : bool Pickles_types.Plonk_types.Features.t
+        }
+    end
+
+    module Promise : sig
+      include module type of Make (Promise)
+    end
+
+    module Deferred : sig
+      include module type of Make (Deferred)
+    end
+
+    include module type of Make (Id)
   end
 
   val verify_promise :
@@ -411,7 +424,7 @@ module type S = sig
              , 'ret_value
              , 'auxiliary_var
              , 'auxiliary_value )
-             H4_6.T(Inductive_rule).t )
+             H4_6.T(Inductive_rule.Promise).t )
     -> unit
     -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
        * Cache_handle.t

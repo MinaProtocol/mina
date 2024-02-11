@@ -50,7 +50,7 @@ val step_main :
      , 'ret_value
      , 'auxiliary_var
      , 'auxiliary_value )
-     Inductive_rule.t
+     Inductive_rule.Promise.t
   -> (   unit
       -> ( (Unfinalized.t, 'max_proofs_verified) Pickles_types.Vector.t
          , Impls.Step.Field.t

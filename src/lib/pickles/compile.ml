@@ -259,7 +259,8 @@ module Make
     (Auxiliary_value : T0) =
 struct
   module IR =
-    Inductive_rule.T (Arg_var) (Arg_value) (Ret_var) (Ret_value) (Auxiliary_var)
+    Inductive_rule.Promise.T (Arg_var) (Arg_value) (Ret_var) (Ret_value)
+      (Auxiliary_var)
       (Auxiliary_value)
   module HIR = H4.T (IR)
 
@@ -1035,7 +1036,7 @@ let compile_with_wrap_main_override_promise :
              , ret_value
              , auxiliary_var
              , auxiliary_value )
-             H4_6.T(Inductive_rule).t )
+             H4_6.T(Inductive_rule.Promise).t )
     -> unit
     -> (var, value, max_proofs_verified, branches) Tag.t
        * Cache_handle.t
@@ -1115,7 +1116,7 @@ let compile_with_wrap_main_override_promise :
          , ret_value
          , auxiliary_var
          , auxiliary_value )
-         H4_6.T(Inductive_rule).t
+         H4_6.T(Inductive_rule.Promise).t
       -> (v1ss, v2ss, wss, hss) H4.T(M.IR).t = function
     | [] ->
         []
@@ -1314,7 +1315,7 @@ struct
     ; fork = None
     }
 
-  let rule self : _ Inductive_rule.t =
+  let rule self : _ Inductive_rule.Promise.t =
     { identifier = "main"
     ; prevs = [ self; self ]
     ; main =
