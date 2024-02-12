@@ -222,4 +222,3 @@ else
 		upload_dump
 	fi
 fi
-sleep infinity
