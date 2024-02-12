@@ -135,8 +135,8 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type ->  PipelineMode.Type 
 
 in
 {
-  bullseye  = pipeline DebianVersions.DebVersion.Bullseye Profiles.Type.Standard PipelineMode.Type.PullRequest
-  , bullseye-lightnet  = pipeline DebianVersions.DebVersion.Bullseye Profiles.Type.Lightnet PipelineMode.Type.PullRequest
-  , buster  = pipeline DebianVersions.DebVersion.Buster Profiles.Type.Standard PipelineMode.Type.PullRequest
-  , focal   = pipeline DebianVersions.DebVersion.Focal Profiles.Type.Standard PipelineMode.Type.PullRequest
-  }
+  bullseye  = pipeline DebianVersions.DebVersion.Bullseye
+  , buster  = pipeline DebianVersions.DebVersion.Buster
+  , focal   = pipeline DebianVersions.DebVersion.Focal
+  , bookworm = pipeline DebianVersions.DebVersion.Bookworm
+}

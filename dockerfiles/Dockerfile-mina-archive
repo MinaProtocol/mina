@@ -22,7 +22,7 @@ COPY scripts/archive-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Dependencies
-RUN apt-get update --quiet --yes \
+RUN apt-get update --allow-unauthenticated --quiet --yes \
     && apt-get upgrade --quiet --yes \
     && apt-get install --quiet --yes --no-install-recommends \
         procps \

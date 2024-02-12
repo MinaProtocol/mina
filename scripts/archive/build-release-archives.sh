@@ -16,7 +16,7 @@ cd _build
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgomp1, libpq-dev, "
 case "${MINA_DEB_CODENAME}" in
-  buster|focal|bullseye)
+  bookworm|buster|focal|bullseye)
     ARCHIVE_DEPS="libjemalloc2"
     ;;
   stretch|bionic)
