@@ -108,7 +108,7 @@ let hardForkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
                   , "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
                   , "TESTNET_NAME=${network}"
                   ]
-                  "./buildkite/scripts/build-hardfork-package2.sh"
+                  "./buildkite/scripts/build-hardfork-package.sh"
             , label = "Ledger tar file generation"
             , key = generateLedgersJobKey
             , target = Size.XLarge
