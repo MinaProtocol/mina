@@ -866,7 +866,9 @@ module Submit = struct
         Caqti_type.custom ~encode ~decode (to_rep spec)
 
       let query =
-        Caqti_request.find_opt params_typ Caqti_type.string
+        Mina_caqti.find_opt_req
+          params_typ
+          Caqti_type.string
           {sql| SELECT uc.id FROM user_commands uc
                 INNER JOIN public_keys AS pks ON pks.id = uc.source_id
                 INNER JOIN public_keys AS pkr ON pkr.id = uc.receiver_id

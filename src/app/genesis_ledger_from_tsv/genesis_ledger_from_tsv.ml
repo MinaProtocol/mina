@@ -67,15 +67,11 @@ let amount_geq_min_balance ~amount ~initial_min_balance =
 let generate_delegate_account ~logger delegatee_pk =
   [%log info] "Generating account for delegatee $delegatee"
     ~metadata:[ ("delegatee", `String delegatee_pk) ] ;
-  let pk = Some delegatee_pk in
-  let balance = Currency.Balance.zero in
-  let timing = None in
-  let delegate = None in
   { Runtime_config.Json_layout.Accounts.Single.default with
-    pk
-  ; balance
-  ; timing
-  ; delegate
+    pk = delegatee_pk
+  ; balance = Currency.Balance.zero
+  ; timing = None
+  ; delegate = None
   }
 
 let generate_missing_delegate_accounts ~logger =
@@ -97,7 +93,6 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
     ~delegatee_pk =
   [%log info] "Processing record for $wallet_pk"
     ~metadata:[ ("wallet_pk", `String wallet_pk) ] ;
-  let pk = Some wallet_pk in
   let balance = Currency.Balance.of_mina_string_exn amount in
   let initial_minimum_balance =
     (* if omitted in the TSV, use balance *)
@@ -135,7 +130,9 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
           .initial_minimum_balance
         ; cliff_time
         ; cliff_amount
-        ; vesting_period
+        ; vesting_period =
+            Global_slot_since_genesis.(
+              diff vesting_period zero |> Option.value_exn)
         ; vesting_increment
         }
   in
@@ -144,7 +141,7 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
     if no_delegatee delegatee_pk then None else Some delegatee_pk
   in
   { Runtime_config.Json_layout.Accounts.Single.default with
-    pk
+    pk = wallet_pk
   ; balance
   ; timing
   ; delegate
