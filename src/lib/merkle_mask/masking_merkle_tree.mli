@@ -1,3 +1,10 @@
+(** Implements a mask in front of a Merkle tree; see RFC 0004 and
+    docs/specs/merkle_tree.md *)
+
+(** Builds a Merkle tree mask.
+
+    It's a Merkle tree, with some additional operations.
+*)
 module Make (I : Inputs_intf.S) :
   Masking_merkle_tree_intf.S
     with module Location = I.Location

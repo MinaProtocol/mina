@@ -1,3 +1,5 @@
+(** Merkle trees that can have associated masks *)
+
 module type Inputs_intf = sig
   include Inputs_intf.S
 

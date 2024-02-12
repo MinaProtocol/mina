@@ -1,5 +1,3 @@
-(* maskable_merkle_tree.ml -- Merkle tree that can have associated masks *)
-
 open Core
 
 module type Inputs_intf = sig
@@ -27,7 +25,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let logger = Logger.create ()
 
-  (** Maps parent ledger UUIDs to child masks. *)
+  (* Maps parent ledger UUIDs to child masks. *)
   let (registered_masks : Mask.Attached.t list Uuid.Table.t) =
     Uuid.Table.create ()
 
@@ -188,7 +186,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     unregister_mask_exn_do ~trigger_signal ~loc mask
 
-  (** a set calls the Base implementation set, notifies registered mask childen *)
+  (* [set] calls the Base implementation set, notifies registered mask childen *)
   let set t location account =
     Base.set t location account ;
     let uuid = get_uuid t in
