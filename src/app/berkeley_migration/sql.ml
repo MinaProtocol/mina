@@ -92,13 +92,13 @@ module Mainnet = struct
 
     let mark_as_canonical (module Conn : CONNECTION) id =
       Conn.exec
-        (Caqti_request.exec Caqti_type.int
+        (Mina_caqti.exec_req Caqti_type.int
            "UPDATE blocks SET chain_status='canonical' WHERE id = ?" )
         id
 
     let get_highest_canonical_block (module Conn : CONNECTION) =
       Conn.find
-        (Caqti_request.find Caqti_type.unit Caqti_type.int
+        (Mina_caqti.find_req Caqti_type.unit Caqti_type.int
            "SELECT id FROM blocks WHERE chain_status='canonical' ORDER BY \
             height DESC LIMIT 1" )
 
