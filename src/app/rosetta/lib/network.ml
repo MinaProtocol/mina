@@ -75,7 +75,7 @@ end
 
 module Sql = struct
   let oldest_block_query =
-    Caqti_request.find Caqti_type.unit
+    Mina_caqti.find_req Caqti_type.unit
       Caqti_type.(tup2 int64 string)
       "SELECT height, state_hash FROM blocks ORDER BY timestamp ASC, \
        state_hash ASC LIMIT 1"
@@ -88,7 +88,8 @@ module Sql = struct
         0L
 
   let latest_block_query =
-    Caqti_request.find Caqti_type.unit
+    Mina_caqti.find_req
+      Caqti_type.unit
       Caqti_type.(tup3 int64 string int64)
       (sprintf
          {sql| SELECT height, state_hash, timestamp FROM blocks b
