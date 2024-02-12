@@ -18,6 +18,7 @@
    ;; local libraries
    logger
    bounded_types
+   mina_caqti
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
