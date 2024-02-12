@@ -10,6 +10,13 @@ source ~/.profile
 curl -o config.json.gz $CONFIG_JSON_GZ_URL
 gunzip config.json.gz
 
+# TODO: At this stage, we need to migrate the json accounts into the new network's format.
+#       For now, this is hard-coded to the mainnet -> berkeley migration, but we need to select
+#       a migration to perform in the future.
+
+# NB: we use sed here instead of jq, because jq is extremely slow at processing this file
+sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "1"}/' config.json
+
 dune build --profile="$DUNE_PROFILE" src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/logproc/logproc.exe
 
 mkdir hardfork_ledgers
