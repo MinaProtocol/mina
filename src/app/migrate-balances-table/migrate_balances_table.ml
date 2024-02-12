@@ -14,7 +14,13 @@ let query_db pool ~f ~item =
 let main ~archive_uri () =
   let logger = Logger.create () in
   let archive_uri = Uri.of_string archive_uri in
-  match Caqti_async.connect_pool ~max_size:128 archive_uri with
+  match
+    Caqti_async.connect_pool
+      ~pool_config:
+        Caqti_pool_config.(
+          merge_left (default_from_env ()) (create ~max_size:128 ()))
+      archive_uri
+  with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]

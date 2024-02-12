@@ -187,7 +187,10 @@ let command =
               "MINA_ROSETTA_MAX_DB_POOL_SIZE not set or invalid. Please set \
                this to a number (try 64 or 128)"
         in
-        match Caqti_async.connect_pool ~max_size:max_pool_size archive_uri with
+        match Caqti_async.connect_pool       ~pool_config:
+        Caqti_pool_config.(
+          merge_left (default_from_env ()) (create ~max_size:max_pool_size ()))
+ archive_uri with
         | Error e ->
             [%log error]
               ~metadata:[ ("error", `String (Caqti_error.show e)) ]

@@ -19,7 +19,7 @@ module Mainnet = struct
 
     let find_by_id (module Conn : CONNECTION) id =
       Conn.find
-        (Caqti_request.find Caqti_type.int Caqti_type.string
+        (Mina_caqti.find_req Caqti_type.int Caqti_type.string
            "SELECT value FROM public_keys WHERE id = ?" )
         id
   end
@@ -27,7 +27,7 @@ module Mainnet = struct
   module Snarked_ledger_hash = struct
     let find_by_id (module Conn : CONNECTION) id =
       Conn.find
-        (Caqti_request.find Caqti_type.int Caqti_type.string
+        (Mina_caqti.find_req Caqti_type.int Caqti_type.string
            "SELECT value FROM snarked_ledger_hashes WHERE id = ?" )
         id
   end
@@ -79,7 +79,7 @@ module Mainnet = struct
 
     let id_from_state_hash (module Conn : CONNECTION) state_hash =
       Conn.find
-        (Caqti_request.find Caqti_type.string Caqti_type.int
+        (Mina_caqti.find_req Caqti_type.string Caqti_type.int
            {sql| SELECT id
                  FROM blocks
                  WHERE state_hash = ?
@@ -88,7 +88,7 @@ module Mainnet = struct
 
     let load (module Conn : CONNECTION) ~(id : int) =
       Conn.find
-        (Caqti_request.find Caqti_type.int typ
+        (Mina_caqti.find_req Caqti_type.int typ
            {sql| SELECT id, state_hash, parent_id, parent_hash, creator_id,
                         block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id,
                         next_epoch_data_id, ledger_hash, height, global_slot,
@@ -98,7 +98,7 @@ module Mainnet = struct
 
     let canonical_blocks (module Conn : CONNECTION) =
       Conn.collect_list
-        (Caqti_request.collect Caqti_type.unit Caqti_type.int
+        (Mina_caqti.collect_req Caqti_type.unit Caqti_type.int
            {sql| SELECT id
                  FROM blocks
                  WHERE chain_status = 'canonical'
@@ -106,7 +106,7 @@ module Mainnet = struct
 
     let full_canonical_blocks (module Conn : CONNECTION) =
       Conn.collect_list
-        (Caqti_request.collect Caqti_type.unit typ
+        (Mina_caqti.collect_req Caqti_type.unit typ
            {sql| SELECT id, state_hash, parent_id, parent_hash, creator_id,
                         block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id,
                         next_epoch_data_id, ledger_hash, height, global_slot,
@@ -118,21 +118,21 @@ module Mainnet = struct
 
     let mark_as_canonical (module Conn : CONNECTION) id =
       Conn.exec
-        (Caqti_request.exec Caqti_type.int
+        (Mina_caqti.exec_req Caqti_type.int
            "UPDATE blocks SET chain_status='canonical' WHERE id = ?" )
         id
 
     let get_highest_canonical_block (module Conn : CONNECTION) =
       Conn.find
-        (Caqti_request.find Caqti_type.unit Caqti_type.int
+        (Mina_caqti.find_req Caqti_type.unit Caqti_type.int
            "SELECT id FROM blocks WHERE chain_status='canonical' ORDER BY \
             height DESC LIMIT 1" )
 
     let get_subchain (module Conn : CONNECTION) ~start_block_id ~end_block_id =
       (* derive query from type `t` *)
       Conn.collect_list
-        (Caqti_request.collect
-           Caqti_type.(tup2 int int)
+        (Mina_caqti.collect_req
+           Caqti_type.(t2 int int)
            Caqti_type.int
            {sql| WITH RECURSIVE chain AS (
                     SELECT id, parent_id, height
@@ -196,7 +196,7 @@ module Mainnet = struct
 
     let load_block (module Conn : CONNECTION) ~block_id =
       Conn.collect_list
-        (Caqti_request.collect Caqti_type.int typ
+        (Mina_caqti.collect_req Caqti_type.int typ
            {sql| SELECT block_id, user_command_id,
                sequence_no,
                status,failure_reason,
@@ -235,7 +235,7 @@ module Mainnet = struct
 
     let load_block (module Conn : CONNECTION) ~block_id =
       Conn.collect_list
-        (Caqti_request.collect Caqti_type.int typ
+        (Mina_caqti.collect_req Caqti_type.int typ
            {sql| SELECT block_id, internal_command_id,
                  sequence_no, secondary_sequence_no,
                  receiver_account_creation_fee_paid,
@@ -266,12 +266,12 @@ module Mainnet = struct
       let decode ((typ, receiver_id, fee, token), hash) =
         Ok { typ; receiver_id; fee; token; hash }
       in
-      let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
+      let rep = Caqti_type.(t2 (t4 string int int64 int64) string) in
       Caqti_type.custom ~encode ~decode rep
 
     let load (module Conn : CONNECTION) ~(id : int) =
       Conn.find
-        (Caqti_request.find Caqti_type.int typ
+        (Mina_caqti.find_req Caqti_type.int typ
            {sql| SELECT type,receiver_id,fee,token,hash
                  FROM internal_commands
                  WHERE id = ?
@@ -338,7 +338,7 @@ module Mainnet = struct
 
     let load (module Conn : CONNECTION) ~(id : int) =
       Conn.find
-        (Caqti_request.find Caqti_type.int typ
+        (Mina_caqti.find_req Caqti_type.int typ
            {sql| SELECT type,fee_payer_id,source_id,receiver_id,
                  fee_token,token,
                  nonce,amount,fee,valid_until,memo,hash
@@ -352,14 +352,14 @@ module Berkeley = struct
   module Block = struct
     let count (module Conn : CONNECTION) =
       Conn.find
-        (Caqti_request.find Caqti_type.unit Caqti_type.int
+        (Mina_caqti.find_req Caqti_type.unit Caqti_type.int
            {sql| SELECT count (*)
                  FROM blocks
            |sql} )
 
     let greatest_block_height (module Conn : CONNECTION) =
       Conn.find
-        (Caqti_request.find Caqti_type.unit Caqti_type.int64
+        (Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
            {sql| SELECT height
                  FROM blocks
                  WHERE chain_status <> 'orphaned'
@@ -369,7 +369,7 @@ module Berkeley = struct
 
     let genesis_block_id (module Conn : CONNECTION) =
       Conn.find
-        (Caqti_request.find Caqti_type.unit Caqti_type.int
+        (Mina_caqti.find_req Caqti_type.unit Caqti_type.int
            {sql| SELECT id
                  FROM blocks
                  WHERE height = 1
@@ -388,7 +388,7 @@ module Berkeley = struct
 
     let load (module Conn : CONNECTION) =
       Conn.find
-        (Caqti_request.find Caqti_type.int typ
+        (Mina_caqti.find_req Caqti_type.int typ
            {sql| SELECT pk.value, t.value
                  FROM account_identifiers ai
                  INNER JOIN tokens t ON ai.token_id = t.id
@@ -400,7 +400,7 @@ module Berkeley = struct
   module Accounts_accessed = struct
     let greatest_ledger_index (module Conn : CONNECTION) =
       Conn.find_opt
-        (Caqti_request.find_opt Caqti_type.int Caqti_type.int
+        (Mina_caqti.find_opt_req Caqti_type.int Caqti_type.int
            {sql| SELECT ledger_index
                  FROM accounts_accessed
                  WHERE block_id = $1
