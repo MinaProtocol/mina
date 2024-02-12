@@ -27,7 +27,14 @@ NETWORK_NAME="${NETWORK_NAME:-}"
 
 # MIGRATION LOG
 MIGRATION_LOG="${DUMPS_PREFIX_TO:-}"
-DATE=$(date '+%Y-%m-%d')
+
+DATE=$(date '+%Y-%m-%d_%H%M')
+INITIAL_RUN=${INITIAL_RUN:-false}
+
+END_GLOBAL_HASH="${END_GLOBAL_HASH:-}"
+
+PG_CONN_STRING=postgres://postgres:postgres@localhost:5432
+
 
 # Install perequisitives such as gsutil wget etc.
 install_prereqs () {
@@ -42,8 +49,8 @@ install_prereqs () {
 	apt-get -y install apt-transport-https ca-certificates gnupg curl wget;
 
 	echo "Installing gsutil";
-	echo "deb https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list;
-	curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - ;
+	echo "deb https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list;
+	curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - ;
 	apt-get update && apt-get install -y google-cloud-cli ;
 
 }
@@ -117,26 +124,31 @@ run_first_phase_of_migration() {
 	wget $GENESIS_LEDGER_URI -O genesis_ledger.json
 	
 	echo "Running berkeley migration app";
-	mina-berkeley-migration --mainnet-archive-uri postgres://postgres:foobar@localhost/${SCHEMA_NAME_FROM} --migrated-archive-uri postgres://postgres:foobar@localhost/${SCHEMA_NAME_TO} --batch-size 100 --config-file genesis_ledger.json --blocks-bucket $PRECOMP_BLOCKS_BUCKET --network $NETWORK_NAME &> ${MIGRATION_LOG}.log
+	
+	if [ -z "${END_GLOBAL_HASH}" ]; then
+		mina-berkeley-migration --mainnet-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_FROM}" --migrated-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_TO}" --batch-size 500 --config-file genesis_ledger.json --blocks-bucket "$PRECOMP_BLOCKS_BUCKET" --network "$NETWORK_NAME"  &> "${MIGRATION_LOG}".log
+	else
+		mina-berkeley-migration --mainnet-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_FROM}" --migrated-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_TO}" --batch-size 500 --config-file genesis_ledger.json --blocks-bucket "$PRECOMP_BLOCKS_BUCKET" --network "$NETWORK_NAME" --fork-state-hash $END_GLOBAL_HASH &> "${MIGRATION_LOG}".log
+	fi
+	
 	echo "Done running berkeley migration app";
 
 }
 
 service postgresql start;
-su postgres -c "cd ~ && echo ALTER USER postgres WITH PASSWORD \'foobar\' | psql";
+su postgres -c "cd ~ && echo ALTER USER postgres WITH PASSWORD \'postgres\' | psql";
 	
 
 install_prereqs
 
 import_dump "${DUMPS_PREFIX_FROM}-archive-dump" $SCHEMA_NAME_FROM
 
-if [[ "$1" == "--first-job" ]]
+if [[ "$INITIAL_RUN" == "true" ]]
 then 
 	import_dump_frist_time $SCHEMA_NAME_TO
 else 
 	import_dump "${DUMPS_PREFIX_TO}-archive-dump" $SCHEMA_NAME_TO
 fi
-
 
 run_first_phase_of_migration
 
@@ -144,10 +156,10 @@ grep Error ${MIGRATION_LOG}.log;
 
 HAVE_ERRORS=$?;
 if [ $HAVE_ERRORS -eq 0 ]; then 
-  berkeley_migration_ERRORS=${MIGRATION_LOG}_errors_${DATE}.log;
-  echo "The berkeley_migration found errors, uploading log" $berkeley_migration_ERRORS;
-  mv ${MIGRATION_LOG}.log $berkeley_migration_ERRORS;
-  gsutil -o "$KEY_FILE_ARG" cp $berkeley_migration_ERRORS gs://$DUMPS_BUCKET/$berkeley_migration_ERRORS;  
+  ERROR_LOG=${MIGRATION_LOG}_errors_${DATE}.log;
+  echo "The berkeley_migration found errors, uploading log" $ERROR_LOG;
+  mv ${MIGRATION_LOG}.log $ERROR_LOG;
+  gsutil -o "$KEY_FILE_ARG" cp $ERROR_LOG gs://$DUMPS_BUCKET/$ERROR_LOG;  
 else
   echo "No errors found! uploading migrated schema to ${DUMPS_BUCKET} bucket";
   UPLOAD_SCRIPT_NAME=${DUMPS_PREFIX_TO}-archive-dump-${DATE}_0000.sql

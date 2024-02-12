@@ -8,12 +8,15 @@ DUMPS_BUCKET="${DUMPS_BUCKET:-}"
 DUMPS_PREFIX_FROM="${DUMPS_PREFIX_FROM:-}"
 DUMPS_PREFIX_TO="${DUMPS_PREFIX_TO:-}"
 
-SCHEMA_NAME="${SCHEMA_NAME:-}"
+SCHEMA_NAME_FROM="${SCHEMA_NAME_FROM:-}"
 
 CHECKPOINT_BUCKET="${CHECKPOINT_BUCKET:-}"
 CHECKPOINT_PREFIX="${CHECKPOINT_PREFIX:-}"
 
-DATE=$(date '+%Y-%m-%d')
+DATE=$(date '+%Y-%m-%d_%H%M')
+INITIAL_RUN=${INITIAL_RUN:-false}
+
+PG_CONN_STRING=postgres://postgres:postgres@localhost:5432
 
 # Install perequisitives such as gsutil wget etc.
 install_prereqs () {
@@ -82,7 +85,7 @@ run_second_phase_of_migration_first_time() {
 	echo '{ "genesis_ledger": { "accounts": '$(cat accounts.json)' } }' | jq > initial_config.json
 	
 	echo "Running replayer in migration mode";
-	mina-replayer --migration-mode --archive-uri postgres://postgres:foobar@localhost:5432/${SCHEMA_NAME} --input-file initial_config.json --checkpoint-interval 100 --checkpoint-file-prefix $CHECKPOINT_PREFIX &> "${CHECKPOINT_PREFIX}".log
+	mina-replayer --migration-mode --archive-uri ${PG_CONN_STRING}/${SCHEMA_NAME_FROM} --input-file initial_config.json --checkpoint-interval 100 --checkpoint-file-prefix $CHECKPOINT_PREFIX &> "${CHECKPOINT_PREFIX}".log
 	echo "Done running replayer in migration mode";
 
 }
@@ -97,19 +100,19 @@ run_second_phase_of_migration() {
     gsutil -o "$KEY_FILE_ARG" cp $MOST_RECENT_CHECKPOINT_URI . ;
              
 	echo "Running replayer in migration mode";
-	mina-replayer --migration-mode --archive-uri postgres://postgres:foobar@localhost:5432/${SCHEMA_NAME} --input-file "$MOST_RECENT_CHECKPOINT" --checkpoint-interval 100 --checkpoint-file-prefix $CHECKPOINT_PREFIX &> "${CHECKPOINT_PREFIX}".log
+	mina-replayer --migration-mode --archive-uri ${PG_CONN_STRING}/${SCHEMA_NAME_FROM} --input-file "$MOST_RECENT_CHECKPOINT" --checkpoint-interval 100 --checkpoint-file-prefix $CHECKPOINT_PREFIX &> "${CHECKPOINT_PREFIX}".log
 	echo "Done running replayer in migration mode";
 
 }
 
 service postgresql start;
-su postgres -c "cd ~ && echo ALTER USER postgres WITH PASSWORD \'foobar\' | psql";
+su postgres -c "cd ~ && echo ALTER USER postgres WITH PASSWORD \'postgres\' | psql";
 
 install_prereqs
 
-import_dump "${DUMPS_PREFIX_FROM}-archive-dump" $SCHEMA_NAME
+import_dump "${DUMPS_PREFIX_FROM}-archive-dump" $SCHEMA_NAME_FROM
 
-if [[ "$1" == "--first-job" ]]
+if [[ "$INITIAL_RUN" == "true" ]]
 then 
 	run_second_phase_of_migration_first_time
 else 
@@ -120,15 +123,14 @@ grep Error ${CHECKPOINT_PREFIX}.log;
 
 HAVE_ERRORS=$?;
 if [ $HAVE_ERRORS -eq 0 ]; then 
-  berkeley_migration_ERRORS=${CHECKPOINT_PREFIX}_errors_${DATE};
-  echo "Errors found in ${CHECKPOINT_PREFIX}.log, uploading log" "$berkeley_migration_ERRORS";
-  mv ${CHECKPOINT_PREFIX}.log "$berkeley_migration_ERRORS";
-  gsutil -o "$KEY_FILE_ARG" cp "$berkeley_migration_ERRORS" gs://${CHECKPOINT_BUCKET};  
+  ERROR_LOG=${CHECKPOINT_PREFIX}_errors_${DATE};
+  echo "Errors found in ${CHECKPOINT_PREFIX}.log, uploading log" "$ERROR_LOG";
+  mv ${CHECKPOINT_PREFIX}.log "$ERROR_LOG";
+  gsutil -o "$KEY_FILE_ARG" cp "$ERROR_LOG" gs://${CHECKPOINT_BUCKET};  
 else
   echo "No errors found! uploading newest local checkpoint to ${CHECKPOINT_BUCKET} bucket";
   rm -f "$MOST_RECENT_CHECKPOINT";
   DISK_CHECKPOINT=$(ls -t ${CHECKPOINT_PREFIX}-checkpoint*.json | head -n 1);
-  DATE=$(date +%F);
   TODAY_CHECKPOINT=$CHECKPOINT_PREFIX-checkpoint-$DATE.json;
   mv "$DISK_CHECKPOINT" "$TODAY_CHECKPOINT";
   echo "Uploading checkpoint file" "$TODAY_CHECKPOINT";
@@ -136,11 +138,9 @@ else
 
   echo "uploading migrated schema to ${DUMPS_BUCKET} bucket";
   UPLOAD_SCRIPT_NAME=${DUMPS_PREFIX_TO}-archive-dump-${DATE}_0000.sql
-  su postgres -c "cd ~ && pg_dump $SCHEMA_NAME > $UPLOAD_SCRIPT_NAME";
+  su postgres -c "cd ~ && pg_dump $SCHEMA_NAME_FROM > $UPLOAD_SCRIPT_NAME";
   UPLOAD_ARCHIVE_NAME=$UPLOAD_SCRIPT_NAME.tar.gz
   mv ~postgres/$UPLOAD_SCRIPT_NAME .
   tar -czvf $UPLOAD_ARCHIVE_NAME $UPLOAD_SCRIPT_NAME;
   gsutil -o $KEY_FILE_ARG cp $UPLOAD_ARCHIVE_NAME gs://$DUMPS_BUCKET;
 fi
-
-sleep infinity
