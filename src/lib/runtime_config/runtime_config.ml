@@ -1456,9 +1456,9 @@ let ledger_of_accounts accounts =
     ; add_genesis_winner = Some false
     }
 
-let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
-    ~protocol_state ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
-    ~next_epoch_seed (runtime_config : t) =
+let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
+    ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger ~next_epoch_seed
+    (runtime_config : t) =
   let open Async.Deferred.Result.Let_syntax in
   let global_slot =
     Mina_numbers.Global_slot_since_hard_fork.to_int global_slot
@@ -1474,37 +1474,10 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
     |> ledger_accounts
   in
   let ledger = Option.value_exn runtime_config.ledger in
-  let previous_length =
-    let open Option.Let_syntax in
-    let%bind proof = runtime_config.proof in
-    let%map fork = proof.fork in
-    fork.previous_length + blockchain_length
-  in
-  let protocol_constants = Mina_state.Protocol_state.constants protocol_state in
-  let genesis =
-    { Genesis.k =
-        Some
-          (Unsigned.UInt32.to_int
-             protocol_constants.Genesis_constants.Protocol.Poly.k )
-    ; delta = Some (Unsigned.UInt32.to_int protocol_constants.delta)
-    ; slots_per_epoch =
-        Some (Unsigned.UInt32.to_int protocol_constants.slots_per_epoch)
-    ; slots_per_sub_window =
-        Some (Unsigned.UInt32.to_int protocol_constants.slots_per_sub_window)
-    ; genesis_state_timestamp =
-        Some
-          (Block_time.to_string_exn protocol_constants.genesis_state_timestamp)
-    ; grace_period_slots =
-        Some (Unsigned.UInt32.to_int protocol_constants.grace_period_slots)
-    }
-  in
   let fork =
     Fork_config.
-      { previous_state_hash =
-          Mina_base.State_hash.to_base58_check
-            protocol_state.Mina_state.Protocol_state.Poly.previous_state_hash
-      ; previous_length =
-          Option.value ~default:blockchain_length previous_length
+      { previous_state_hash = Mina_base.State_hash.to_base58_check state_hash
+      ; previous_length = blockchain_length
       ; previous_global_slot = global_slot
       }
   in
@@ -1539,7 +1512,7 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
        artificially add it. In fact, it wouldn't work at all,
        because the new node would try to create this account at
        startup, even though it already exists, leading to an error.*)
-      ~epoch_data ~genesis
+      ~epoch_data
       ~ledger:
         { ledger with
           base = Accounts accounts
