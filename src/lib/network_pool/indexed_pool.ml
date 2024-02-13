@@ -350,8 +350,8 @@ let current_global_slot t =
       |> to_global_slot)
   in
   match t.constraint_constants.fork with
-  | Some { previous_global_slot; _ } ->
-      Mina_numbers.Global_slot.(add previous_global_slot current_slot)
+  | Some { global_slot_since_genesis; _ } ->
+      Mina_numbers.Global_slot.(add global_slot_since_genesis current_slot)
   | None ->
       current_slot
 
