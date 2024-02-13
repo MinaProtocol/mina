@@ -107,6 +107,7 @@ let hardForkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
                   , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
                   , "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
                   , "TESTNET_NAME=${network}"
+                  , "GENESIS_TIMESTAMP=\$GENESIS_TIMESTAMP"
                   ]
                   "./buildkite/scripts/build-hardfork-package.sh"
             , label = "Ledger tar file generation"
