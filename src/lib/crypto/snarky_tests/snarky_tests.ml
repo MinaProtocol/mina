@@ -643,10 +643,10 @@ module Protocol_circuits = struct
     let digest2 = Core.Md5.to_hex hash2 in
 
     let check = String.(digest1 = expected1) in
-    print_hash check expected1 digest1 ;
+    print_hash (not check) expected1 digest1 ;
     assert check ;
     let check = String.(digest2 = expected2) in
-    print_hash check expected2 digest2 ;
+    print_hash (not check) expected2 digest2 ;
     assert check ;
     ()
 
