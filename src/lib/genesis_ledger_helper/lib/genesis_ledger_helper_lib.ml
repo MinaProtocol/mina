@@ -478,8 +478,8 @@ let make_constraint_constants
                 State_hash.of_base58_check_exn previous_state_hash
             ; previous_length = Mina_numbers.Length.of_int previous_length
             ; genesis_slot =
-                Mina_numbers.Global_slot_since_genesis.of_int
-                  previous_global_slot
+                Mina_numbers.Global_slot_since_genesis.(
+                  succ @@ of_int previous_global_slot)
             } )
   }
 
