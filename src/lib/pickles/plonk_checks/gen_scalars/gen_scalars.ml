@@ -276,10 +276,10 @@ let () =
         a Env.t) =
 |ocaml}
 
-external fp_linearization_minus : bool -> string * (string * string) array
+external fp_linearization_minus : unit -> string * (string * string) array
   = "fp_linearization_strings_minus"
 
-let fp_constant_term, fp_index_terms = fp_linearization_minus true
+let fp_constant_term, fp_index_terms = fp_linearization_minus ()
 
 let () = output_string fp_constant_term
 

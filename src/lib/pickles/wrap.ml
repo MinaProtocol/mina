@@ -55,8 +55,7 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
     | Some custom_gate_type ->
         Type1Minus.ft_eval0
           (module Tick.Field)
-          plonk ~env ~custom_gate_type (* ~map_constant:Fn.id *)
-          ~domain
+          plonk ~env ~custom_gate_type ~map_constant:Fn.id ~domain
           (Plonk_types.Evals.to_in_circuit combined_evals)
           (fst e.public_input)
     | None ->

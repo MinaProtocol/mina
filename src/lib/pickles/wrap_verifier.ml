@@ -545,32 +545,123 @@ struct
 
   let check_bulletproof ~pcs_batch ~(sponge : Sponge.t)
       ~(xi : Scalar_challenge.t)
-      ~(advice :
-         Other_field.Packed.t Shifted_value.Type1.t
-         Types.Step.Bulletproof.Advice.t )
+      ~(* JES: pub input commitment *)
+      (advice :
+        Other_field.Packed.t Shifted_value.Type1.t
+        Types.Step.Bulletproof.Advice.t )
       ~polynomials:(without_degree_bound, with_degree_bound)
       ~openings_proof:
+        (* JES: list of opening proof commitments *)
         ({ lr; delta; z_1; z_2; challenge_polynomial_commitment } :
           ( Inner_curve.t
           , Other_field.Packed.t Shifted_value.Type1.t )
           Openings.Bulletproof.t ) =
     with_label __LOC__ (fun () ->
+        (* JES: sponge DEBUG *)
+        as_prover (fun () ->
+            let state = Sponge.state sponge in
+            printf "ocaml sponge_state = \n" ;
+
+            Array.iter state ~f:(fun value ->
+                let value = As_prover.read Digest.typ value in
+                let value = Digest.Constant.to_tick_field value in
+
+                printf "  %s\n" @@ Backend.Tick.Bigint.to_hex
+                @@ Pasta_bindings.Fp.to_bigint value ) ) ;
+
+        (* JES: combined_inner_product DEBUG *)
+        as_prover (fun () ->
+            let (Shifted_value.Type1.Shifted_value (value : Field.t)) =
+              advice.combined_inner_product
+            in
+            let value = As_prover.read Field.typ value in
+
+            printf "ocaml combined_inner_product = %s\n"
+            @@ Backend.Tick.Bigint.to_hex @@ Bigint.of_field value ) ;
+
         Other_field.Packed.absorb_shifted sponge advice.combined_inner_product ;
+
         (* combined_inner_product should be equal to
            sum_i < t, r^i pows(beta_i) >
            = sum_i r^i < t, pows(beta_i) >
 
            That is checked later.
         *)
+
+        (* JES: xi DEBUG *)
+        as_prover (fun () ->
+            let xi = As_prover.read Scalar_challenge.typ xi in
+            printf "ocaml xi = %s\n" @@ Backend.Tick.Bigint.to_hex
+            @@ Pasta_bindings.Fp.to_bigint
+            @@ Scalar_challenge.Constant.to_field xi ) ;
+
+        (* JES: sponge DEBUG *)
+        as_prover (fun () ->
+            let state = Sponge.state sponge in
+            printf "ocaml sponge_state = \n" ;
+
+            Array.iter state ~f:(fun value ->
+                let value = As_prover.read Digest.typ value in
+                let value = Digest.Constant.to_tick_field value in
+
+                printf "  %s\n" @@ Backend.Tick.Bigint.to_hex
+                @@ Pasta_bindings.Fp.to_bigint value ) ) ;
+
         let u =
           let t = Sponge.squeeze_field sponge in
           group_map t
         in
+
+        (* JES: u DEBUG *)
+        as_prover (fun () ->
+            let x = As_prover.read Field.typ (fst u) in
+            let y = As_prover.read Field.typ (snd u) in
+            printf "ocaml u = (%s, %s)\n"
+              (Backend.Tick.Bigint.to_hex @@ Bigint.of_field x)
+              (Backend.Tick.Bigint.to_hex @@ Bigint.of_field y) ) ;
+
+        (* JES: delta DEBUG *)
+        as_prover (fun () ->
+            let delta = As_prover.read Inner_curve.typ delta in
+            let x, y = Inner_curve.Constant.to_affine_exn delta in
+            printf "ocaml delta = (%s, %s)\n"
+              (Backend.Tick.Bigint.to_hex @@ Bigint.of_field x)
+              (Backend.Tick.Bigint.to_hex @@ Bigint.of_field y) ) ;
+
+        (* JES: challenge_polynomial_commitment DEBUG *)
+        as_prover (fun () ->
+            let challenge_polynomial_commitment =
+              As_prover.read Inner_curve.typ challenge_polynomial_commitment
+            in
+            let x, y =
+              Inner_curve.Constant.to_affine_exn challenge_polynomial_commitment
+            in
+            printf "ocaml challenge_polynomial_commitment = (%s, %s)\n"
+              (Backend.Tick.Bigint.to_hex @@ Bigint.of_field x)
+              (Backend.Tick.Bigint.to_hex @@ Bigint.of_field y) ) ;
+
         let open Inner_curve in
         let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
           Split_commitments.combine pcs_batch ~xi without_degree_bound
             with_degree_bound
         in
+
+        (* JES: without_degree_bound DEBUG *)
+        Vector.iter without_degree_bound ~f:(fun data ->
+            Opt.iter data ~f:(fun comm ->
+                let p1 =
+                  Inner_curve.to_field_elements
+                  @@ Split_commitments.Point.underlying comm.(0)
+                in
+                let x = Option.value_exn @@ List.nth p1 0 in
+                let y = Option.value_exn @@ List.nth p1 1 in
+                as_prover (fun () ->
+                    let x = As_prover.read Field.typ x in
+                    let y = As_prover.read Field.typ y in
+                    printf "ocaml = (%s, %s)\n"
+                      (Backend.Tick.Bigint.to_hex @@ Bigint.of_field x)
+                      (Backend.Tick.Bigint.to_hex @@ Bigint.of_field y) ) ) ) ;
+
         let scale_fast =
           scale_fast ~num_bits:Other_field.Packed.Constant.size_in_bits
         in
@@ -597,6 +688,11 @@ struct
           in
           z_1_g_plus_b_u + z2_h
         in
+        (* JES: DEBUG *)
+        as_prover (fun () ->
+            let success = equal_g lhs rhs in
+            let success = As_prover.read Boolean.typ success in
+            printf "ocaml bulletproof_success = %b\n" success ) ;
         (`Success (equal_g lhs rhs), challenges) )
 
   module Opt = struct

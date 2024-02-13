@@ -366,7 +366,6 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
           match token with
           | Alpha ->
               Stack.push stack @@ env.alpha_pow 1
-              (* JES: CHECK: Where just plain alpha? *)
           | Beta ->
               Stack.push stack env.beta
           | Gamma ->
@@ -377,7 +376,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
               Stack.push stack env.endo_coefficient
           | Mds mds ->
               Stack.push stack @@ env.mds (mds.row, mds.col)
-              (* JES: CHECK: is this (row, col) format *)
+              (* JES: CHECK this: is this (row, col) format *)
           | VanishesOnZeroKnowledgeAndPreviousRows ->
               Stack.push stack env.vanishes_on_zero_knowledge_and_previous_rows
           | UnnormalizedLagrangeBasis i ->
@@ -393,8 +392,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
           | Pow n ->
               Stack.(
                 push stack
-                @@ pow2pow (module F) (top_exn stack) (Int32.to_int_exn n))
-              (* JES: CHECK: Correct way to pow here? *)
+                @@ pow2pow (module F) (pop_exn stack) (Int32.to_int_exn n))
           | Add ->
               Stack.(push stack @@ F.( + ) (pop_exn stack) (pop_exn stack))
           | Mul ->

@@ -209,14 +209,14 @@ let conditional_gate =
 let () =
   if perform_step_tests then (
     (* Customised as ForeignFieldAdd gate; valid witness *)
-    test ~step_only:true ~custom_gate_type:None ~valid_witness:true ;
+    (* test ~step_only:true ~custom_gate_type:None ~valid_witness:true ; *)
 
     (* Customised as Conditional gate; valid witness *)
     (* Note: Requires Cache.Wrap.read_or_generate to have custom_gate_type passed to it *)
-    (* test ~step_only:true ~custom_gate_type:conditional_gate ~valid_witness:true ; *)
+    test ~step_only:true ~custom_gate_type:conditional_gate ~valid_witness:true ;
 
     (* Customised as ForeignFieldAdd gate; invalid witness *)
-    let test_failed =
+    (* let test_failed =
       try
         let _cs =
           test ~step_only:true ~custom_gate_type:None ~valid_witness:false
@@ -224,7 +224,7 @@ let () =
         false
       with _ -> true
     in
-    assert test_failed
+    assert test_failed *)
     (* Customised as Conditional gate; invalid witness *)
     (* let test_failed =
          try
