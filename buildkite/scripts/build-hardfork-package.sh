@@ -62,6 +62,7 @@ FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hardfork_ledger_hashes.json scri
 
 echo "--- Build hardfork package for Debian ${MINA_DEB_CODENAME}"
 MINA_BUILD_MAINNET=1 RUNTIME_CONFIG_JSON=new_config.json LEDGER_TARBALLS="$(echo hardfork_ledgers/*.tar.gz)" ./scripts/create_hardfork_deb.sh
+MINA_BUILD_MAINNET=1 RUNTIME_CONFIG_JSON=new_config.json LEDGER_TARBALLS="$(echo hardfork_ledgers/*.tar.gz)" ./scripts/archive/build-release-archives.sh
 mkdir -p /tmp/artifacts
 cp _build/mina*.deb /tmp/artifacts/.
 
