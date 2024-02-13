@@ -112,9 +112,9 @@ run_first_phase_of_migration() {
 	
 	
 	if [ -z "${FORK_STATE_HASH}" ]; then
-		mina-berkeley-migration --mainnet-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_FROM}" --migrated-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_TO}" --batch-size 5 --config-file genesis_ledger.json --blocks-bucket "$PRECOMP_BLOCKS_BUCKET" --network "$NETWORK_NAME"  &> "${MIGRATION_LOG}".log
+		mina-berkeley-migration --mainnet-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_FROM}" --migrated-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_TO}" --batch-size ${PRECOMPUTED_BLOCKS_DOWNLOAD_BATCH_SIZE} --config-file genesis_ledger.json --blocks-bucket "$PRECOMP_BLOCKS_BUCKET" --network "$NETWORK_NAME"  &> "${MIGRATION_LOG}".log
 	else
-		mina-berkeley-migration --mainnet-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_FROM}" --migrated-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_TO}" --batch-size 5 --config-file genesis_ledger.json --blocks-bucket "$PRECOMP_BLOCKS_BUCKET" --network "$NETWORK_NAME" --fork-state-hash $FORK_STATE_HASH &> "${MIGRATION_LOG}".log
+		mina-berkeley-migration --mainnet-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_FROM}" --migrated-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_TO}" --batch-size ${PRECOMPUTED_BLOCKS_DOWNLOAD_BATCH_SIZE} --config-file genesis_ledger.json --blocks-bucket "$PRECOMP_BLOCKS_BUCKET" --network "$NETWORK_NAME" --fork-state-hash $FORK_STATE_HASH &> "${MIGRATION_LOG}".log
 	fi
     echo "Done running berkeley migration app";
 
@@ -125,7 +125,9 @@ run_second_phase_of_migration() {
 	INPUT_FILE=$1
 
 	echo "Running replayer in migration mode";
+	
 	mina-replayer --migration-mode --archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_TO}" --input-file "$INPUT_FILE" --checkpoint-interval 100 --checkpoint-file-prefix "$CHECKPOINT_PREFIX" &> "${CHECKPOINT_PREFIX}".log
+	
 	echo "Done running replayer in migration mode";
 }
 
@@ -166,7 +168,16 @@ upload_error () {
 
 upload_replayer_checkpoint () {
   echo "No errors found! uploading newest local checkpoint to ${CHECKPOINT_BUCKET} bucket";
+  COUNT_CHECKPOINTS=$(ls -t "${CHECKPOINT_PREFIX}"-checkpoint*.json | wc -l)
+  
+  if [ $COUNT_CHECKPOINTS == 1  ]; then
+	echo " There are no new checkpoints apart from the on downloaded before migration \
+	    It means that no transactions are archived before this and last migration "
+	return 
+  fi
+
   rm -f "$MOST_RECENT_CHECKPOINT";
+
   DISK_CHECKPOINT=$(ls -t "${CHECKPOINT_PREFIX}"-checkpoint*.json | head -n 1);
   TODAY_CHECKPOINT=$CHECKPOINT_PREFIX-checkpoint-${DATE}.json;
   mv "$DISK_CHECKPOINT" "$TODAY_CHECKPOINT";
