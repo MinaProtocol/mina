@@ -70,13 +70,22 @@ let t_of_value (v : value) : Genesis_constants.Protocol.t =
   ; genesis_state_timestamp = Block_time.to_int64 v.genesis_state_timestamp
   }
 
-let to_input (t : value) =
+let to_input
+    ({ k
+     ; delta
+     ; slots_per_epoch
+     ; slots_per_sub_window
+     ; grace_period_slots
+     ; genesis_state_timestamp
+     } :
+      value ) =
   Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
-    [| T.to_input t.k
-     ; T.to_input t.delta
-     ; T.to_input t.slots_per_epoch
-     ; T.to_input t.slots_per_sub_window
-     ; Block_time.to_input t.genesis_state_timestamp
+    [| T.to_input k
+     ; T.to_input delta
+     ; T.to_input slots_per_epoch
+     ; T.to_input slots_per_sub_window
+     ; T.to_input grace_period_slots
+     ; Block_time.to_input genesis_state_timestamp
     |]
 
 [%%if defined consensus_mechanism]
@@ -95,19 +104,29 @@ let typ =
     ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
-let var_to_input (var : var) =
-  let k = T.Checked.to_input var.k
-  and delta = T.Checked.to_input var.delta
-  and slots_per_epoch = T.Checked.to_input var.slots_per_epoch
-  and slots_per_sub_window = T.Checked.to_input var.slots_per_sub_window in
+let var_to_input
+    ({ k
+     ; delta
+     ; slots_per_epoch
+     ; slots_per_sub_window
+     ; grace_period_slots
+     ; genesis_state_timestamp
+     } :
+      var ) =
+  let k = T.Checked.to_input k
+  and delta = T.Checked.to_input delta
+  and slots_per_epoch = T.Checked.to_input slots_per_epoch
+  and slots_per_sub_window = T.Checked.to_input slots_per_sub_window
+  and grace_period_slots = T.Checked.to_input grace_period_slots in
   let genesis_state_timestamp =
-    Block_time.Checked.to_input var.genesis_state_timestamp
+    Block_time.Checked.to_input genesis_state_timestamp
   in
   Array.reduce_exn ~f:Random_oracle.Input.Chunked.append
     [| k
      ; delta
      ; slots_per_epoch
      ; slots_per_sub_window
+     ; grace_period_slots
      ; genesis_state_timestamp
     |]
 
