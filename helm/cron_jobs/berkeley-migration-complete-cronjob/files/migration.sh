@@ -172,7 +172,7 @@ upload_replayer_checkpoint () {
   
   if [ $COUNT_CHECKPOINTS == 1  ]; then
 	echo " There are no new checkpoints apart from the on downloaded before migration \
-	    It means that no transactions are archived before this and last migration "
+It means that no transactions are archived before this and last migration "
 	return 
   fi
 
