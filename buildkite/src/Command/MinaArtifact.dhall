@@ -127,6 +127,32 @@ let hardForkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
             , deb_profile = "${Profiles.lowerName profile}"
             , step_key = "daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
             }
+        , DockerImage.generateStep
+            DockerImage.ReleaseSpec::{
+              deps =
+              [ { name = pipelineName
+                , key = generateLedgersJobKey
+                }
+              ]
+            , service = "mina-archive"
+            , network = network
+            , deb_codename = "${DebianVersions.lowerName debVersion}"
+            , deb_profile = "${Profiles.lowerName profile}"
+            , step_key = "archive-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
+            }
+        , DockerImage.generateStep
+            DockerImage.ReleaseSpec::{
+              deps =
+              [ { name = pipelineName
+                , key = generateLedgersJobKey
+                }
+              ]
+            , service = "mina-rosetta"
+            , network = network
+            , deb_codename = "${DebianVersions.lowerName debVersion}"
+            -- , deb_profile = "${Profiles.lowerName profile}"
+            , step_key = "rosetta-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
+            }
         ]
       }
 
