@@ -49,7 +49,7 @@ replayers:
   resources: *resources
   script:
     secretName: migration
-    scriptName: migration-phase-1.sh
+    scriptName: migration.sh
   env:
   - name: DUMPS_BUCKET
     value: mina-archive-dumps
