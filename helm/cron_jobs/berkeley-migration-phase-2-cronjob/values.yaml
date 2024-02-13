@@ -51,14 +51,22 @@ replayers:
     secretName: migration
     scriptName: migration-phase-2.sh
   env:
+  - name: DUMPS_BUCKET
+    value: mina-archive-dumps
   - name: DUMPS_PREFIX_FROM
     value: mainnet-partially-migrated
   - name: SCHEMA_NAME_FROM
     value: archive_partially_migrated
-  - name: SCHEMA_NAME_TO
-    value: archive_migrated
   - name: DUMPS_PREFIX_TO
     value: mainnet-migrated
+  - name: CHECKPOINT_BUCKET
+    value: archive-migration-checkpoints
+  - name: CHECKPOINT_PREFIX
+    value: o1labs-hf-test-pre-fork-run-2-replayer-migration
+  - name: MIGRATION_LOG
+    value: o1labs-hf-test-pre-fork-run-2_migration
+  - name: INITIAL_RUN
+    value: false
 # - name: test-run
 #   schedule: "0 2 * * *"
 #   image: *image

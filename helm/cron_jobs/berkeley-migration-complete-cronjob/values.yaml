@@ -73,9 +73,9 @@ replayers:
     value: "https://storage.googleapis.com/o1labs-gitops-infrastructure/o1labs-hf-test-pre-fork-run-2/o1labs-hf-test-pre-fork-run-2-ledger.json"
   - name: CREATE_SCRIPT_URI
     value: "https://raw.githubusercontent.com/MinaProtocol/mina/berkeley/src/app/archive"
-  - name: CHECKPOINT_PREFIX
-    value: archive-migration-checkpoints
   - name: CHECKPOINT_BUCKET
+    value: archive-migration-checkpoints
+  - name: CHECKPOINT_PREFIX
     value: o1labs-hf-test-pre-fork-run-2-replayer-migration
 #  - name: FORK_STATE_HASH
 #    value: ""

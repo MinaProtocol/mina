@@ -31,7 +31,7 @@ MIGRATION_LOG="${DUMPS_PREFIX_TO:-}"
 DATE=$(date '+%Y-%m-%d_%H%M')
 INITIAL_RUN=${INITIAL_RUN:-false}
 
-END_GLOBAL_HASH="${END_GLOBAL_HASH:-}"
+FORK_STATE_HASH="${FORK_STATE_HASH:-}"
 
 PG_CONN_STRING=postgres://postgres:postgres@localhost:5432
 
@@ -125,10 +125,10 @@ run_first_phase_of_migration() {
 	
 	echo "Running berkeley migration app";
 	
-	if [ -z "${END_GLOBAL_HASH}" ]; then
+	if [ -z "${FORK_STATE_HASH}" ]; then
 		mina-berkeley-migration --mainnet-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_FROM}" --migrated-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_TO}" --batch-size 500 --config-file genesis_ledger.json --blocks-bucket "$PRECOMP_BLOCKS_BUCKET" --network "$NETWORK_NAME"  &> "${MIGRATION_LOG}".log
 	else
-		mina-berkeley-migration --mainnet-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_FROM}" --migrated-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_TO}" --batch-size 500 --config-file genesis_ledger.json --blocks-bucket "$PRECOMP_BLOCKS_BUCKET" --network "$NETWORK_NAME" --fork-state-hash $END_GLOBAL_HASH &> "${MIGRATION_LOG}".log
+		mina-berkeley-migration --mainnet-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_FROM}" --migrated-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_TO}" --batch-size 500 --config-file genesis_ledger.json --blocks-bucket "$PRECOMP_BLOCKS_BUCKET" --network "$NETWORK_NAME" --fork-state-hash $FORK_STATE_HASH &> "${MIGRATION_LOG}".log
 	fi
 	
 	echo "Done running berkeley migration app";
