@@ -4259,7 +4259,9 @@ module Queries = struct
     io_field "fork_config"
       ~doc:
         "The runtime configuration for a blockchain fork intended to be a \
-         continuation of the current one."
+         continuation of the current one. By default, this returns the newest \
+         block that appeared before the transaction stop slot provided in the \
+         configuration, or the best tip if no such block exists."
       ~typ:(non_null Types.json)
       ~args:
         Arg.
@@ -4270,14 +4272,61 @@ module Queries = struct
           ]
       ~resolve:(fun { ctx = mina; _ } () state_hash_opt block_height_opt ->
         let open Deferred.Result.Let_syntax in
+        let runtime_config = Mina_lib.runtime_config mina in
         let%bind breadcrumb =
           match (state_hash_opt, block_height_opt) with
           | None, None -> (
               match Mina_lib.best_tip mina with
               | `Bootstrapping ->
                   Deferred.Result.fail "Daemon is bootstrapping"
-              | `Active breadcrumb ->
-                  return breadcrumb )
+              | `Active breadcrumb -> (
+                  let target_height =
+                    match runtime_config.daemon with
+                    | Some daemon ->
+                        daemon.slot_tx_end
+                    | None ->
+                        None
+                  in
+                  match target_height with
+                  | None ->
+                      return breadcrumb
+                  | Some txn_stop_slot ->
+                      (* NB: Here we use the correct notion of the stop slot: we
+                         want to stop at an offset from genesis. This is
+                         inconsistent with the uses across the rest of the code
+                         -- the stop slot is being used as since hard-fork
+                         instead, which is the incorrect version -- but I refuse
+                         to propagate that error to here.
+                      *)
+                      let stop_slot =
+                        Mina_numbers.Global_slot.of_int txn_stop_slot
+                      in
+                      let rec find_block_older_than_stop_slot breadcrumb =
+                        let protocol_state =
+                          Transition_frontier.Breadcrumb.protocol_state
+                            breadcrumb
+                        in
+                        let global_slot =
+                          Mina_state.Protocol_state.consensus_state
+                            protocol_state
+                          |> Consensus.Data.Consensus_state
+                             .global_slot_since_genesis
+                        in
+                        if Mina_numbers.Global_slot.( <= ) global_slot stop_slot
+                        then return breadcrumb
+                        else
+                          let parent_hash =
+                            Transition_frontier.Breadcrumb.parent_hash
+                              breadcrumb
+                          in
+                          let%bind breadcrumb =
+                            Deferred.return
+                            @@ Mina_lib.best_chain_block_by_state_hash mina
+                                 parent_hash
+                          in
+                          find_block_older_than_stop_slot breadcrumb
+                      in
+                      find_block_older_than_stop_slot breadcrumb ) )
           | Some state_hash_base58, None ->
               let open Result.Monad_infix in
               State_hash.of_base58_check state_hash_base58
@@ -4324,7 +4373,6 @@ module Queries = struct
           Mina_base.Epoch_seed.to_base58_check
             next_epoch.Mina_base.Epoch_data.Poly.seed
         in
-        let runtime_config = Mina_lib.runtime_config mina in
         let%bind staking_ledger =
           match Mina_lib.staking_ledger mina with
           | None ->
