@@ -2065,10 +2065,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           match constraint_constants.fork with
           | None ->
               (Length.zero, Mina_numbers.Global_slot_since_genesis.zero)
-          | Some { previous_length; genesis_slot; _ } ->
+          | Some { blockchain_length; global_slot_since_genesis; _ } ->
               (*Note: global_slot_since_genesis at fork point is the same as global_slot_since_genesis in the new genesis. This value is used to check transaction validity and existence of locked tokens.
                 For reviewers, should this be incremented by 1 because it's technically a new block? we don't really know how many slots passed since the fork point*)
-              (previous_length, genesis_slot)
+              (blockchain_length, global_slot_since_genesis)
         in
         let default_epoch_data =
           Genesis_epoch_data.Data.
@@ -3606,12 +3606,12 @@ module Make_str (A : Wire_types.Concrete) = struct
         | Some fork ->
             assert (
               Mina_numbers.Global_slot_since_genesis.(
-                equal fork.genesis_slot
+                equal fork.global_slot_since_genesis
                   previous_consensus_state.global_slot_since_genesis) ) ;
             assert (
               Mina_numbers.Length.(
                 equal
-                  (succ fork.previous_length)
+                  (succ fork.blockchain_length)
                   previous_consensus_state.blockchain_length) ) ) ;
         let global_slot =
           Core_kernel.Time.now () |> Time.of_time
@@ -3687,12 +3687,12 @@ module Make_str (A : Wire_types.Concrete) = struct
             assert (
               Mina_numbers.Global_slot_since_genesis.(
                 equal
-                  (add fork.genesis_slot slot_diff)
+                  (add fork.global_slot_since_genesis slot_diff)
                   next_consensus_state.global_slot_since_genesis) ) ;
             assert (
               Mina_numbers.Length.(
                 equal
-                  (succ (succ fork.previous_length))
+                  (succ (succ fork.blockchain_length))
                   next_consensus_state.blockchain_length) ) ) ;
         (* build pieces needed to apply "update_var" *)
         let checked_computation =
@@ -3788,14 +3788,15 @@ module Make_str (A : Wire_types.Concrete) = struct
         let constraint_constants_with_fork =
           let fork_constants =
             Some
-              { Genesis_constants.Fork_constants.previous_state_hash =
+              { Genesis_constants.Fork_constants.state_hash =
                   Result.ok_or_failwith
                     (State_hash.of_yojson
                        (`String
                          "3NL3bc213VQEFx6XTLbc3HxHqHH9ANbhHxRxSnBcRzXcKgeFA6TY"
                          ) )
-              ; previous_length = Mina_numbers.Length.of_int 100
-              ; genesis_slot = Mina_numbers.Global_slot_since_genesis.of_int 200
+              ; blockchain_length = Mina_numbers.Length.of_int 100
+              ; global_slot_since_genesis =
+                  Mina_numbers.Global_slot_since_genesis.of_int 200
               }
           in
           { constraint_constants with fork = fork_constants }
