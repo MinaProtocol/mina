@@ -29,6 +29,7 @@ type GenParams struct {
 	MinBalanceChange, MaxBalanceChange, DeploymentFee                    uint64
 	PaymentAmount, MinZkappFee, MaxZkappFee, FundFee                     uint64
 	MinPaymentFee, MaxPaymentFee                                         uint64
+	ZkappSoftLimit                                                       int
 }
 
 type GeneratedCommand struct {
@@ -87,8 +88,26 @@ func loadKeys(p KeyloaderParams) GeneratedCommand {
 	return GeneratedCommand{Action: KeyloaderAction{}.Name(), Params: p}
 }
 
-func discovery(p DiscoveryParams) GeneratedCommand {
+func Discovery(p DiscoveryParams) GeneratedCommand {
 	return GeneratedCommand{Action: DiscoveryAction{}.Name(), Params: p}
+}
+
+type SetZkappSoftLimitRefParams struct {
+	Nodes ComplexValue `json:"nodes"`
+	Limit *int         `json:"limit"`
+}
+
+func ZkappSoftLimit(nodesRef int, nodesName string, zkappSoftLimit int) GeneratedCommand {
+	var limit *int
+	if zkappSoftLimit >= 0 {
+		limit = &zkappSoftLimit
+	}
+	nodes := LocalComplexValue(nodesRef, nodesName)
+	nodes.OnEmpty = emptyArrayRawMessage
+	return GeneratedCommand{Action: SetZkappSoftLimitAction{}.Name(), Params: SetZkappSoftLimitRefParams{
+		Nodes: nodes,
+		Limit: limit,
+	}}
 }
 
 type SampleRefParams struct {
@@ -304,25 +323,38 @@ func (p *GenParams) Generate(round int) GeneratedRound {
 			PasswordEnv: p.PasswordEnv,
 		}))
 	}
-	cmds = append(cmds, withComment(fmt.Sprintf("Starting round %d, %s after start", round, formatDur(roundStartMin, 0)), discovery(DiscoveryParams{
+	roundStartMsg := fmt.Sprintf("Starting round %d, %s after start", round, formatDur(roundStartMin, 0))
+	cmds = append(cmds, withComment(roundStartMsg, Discovery(DiscoveryParams{
 		NoBlockProducers: p.SendFromNonBpsOnly,
 	})))
-	sendersOutName := "participant"
+	participantsName := "participant"
+	participantsRef := -1
+	if p.ZkappSoftLimit > -2 {
+		if p.SendFromNonBpsOnly {
+			// Need to perform wide discovery for zkapp soft limit
+			cmds = append(cmds, Discovery(DiscoveryParams{}))
+			participantsRef--
+		}
+		msg := fmt.Sprintf("Setting zkapp soft limit to %d", p.ZkappSoftLimit)
+		cmds = append(cmds, withComment(msg, ZkappSoftLimit(-1, "participant", p.ZkappSoftLimit)))
+		participantsRef--
+	}
 	if 1-p.SenderRatio > 1e-6 {
-		sendersOutName = "group1"
-		cmds = append(cmds, sample(-1, "participant", []float64{p.SenderRatio}))
+		cmds = append(cmds, sample(participantsRef, participantsName, []float64{p.SenderRatio}))
+		participantsName = "group1"
+		participantsRef = -1
 	}
 	if onlyPayments {
 		cmds = append(cmds, loadKeys(KeyloaderParams{Dir: paymentsKeysDir}))
-		cmds = append(cmds, payments(-1, -2, sendersOutName, paymentParams))
+		cmds = append(cmds, payments(-1, participantsRef-1, participantsName, paymentParams))
 	} else if onlyZkapps {
 		cmds = append(cmds, loadKeys(KeyloaderParams{Dir: zkappsKeysDir}))
-		cmds = append(cmds, zkapps(-1, -2, sendersOutName, zkappParams))
+		cmds = append(cmds, zkapps(-1, participantsRef-1, participantsName, zkappParams))
 	} else {
 		cmds = append(cmds, loadKeys(KeyloaderParams{Dir: zkappsKeysDir}))
 		cmds = append(cmds, loadKeys(KeyloaderParams{Dir: paymentsKeysDir}))
-		cmds = append(cmds, zkapps(-2, -3, sendersOutName, zkappParams))
-		cmds = append(cmds, payments(-2, -4, sendersOutName, paymentParams))
+		cmds = append(cmds, zkapps(-2, participantsRef-2, participantsName, zkappParams))
+		cmds = append(cmds, payments(-2, participantsRef-3, participantsName, paymentParams))
 		cmds = append(cmds, join(-1, "participant", -2, "participant"))
 	}
 	sendersCmdId := len(cmds)
@@ -338,7 +370,7 @@ func (p *GenParams) Generate(round int) GeneratedRound {
 	elapsed := 0
 	for _, waitSec := range stopWaits {
 		cmds = append(cmds, withComment(fmt.Sprintf("Running round %d, %s after start, waiting for %s", round, formatDur(roundStartMin, elapsed), formatDur(0, waitSec)), GenWait(waitSec)))
-		cmds = append(cmds, discovery(DiscoveryParams{
+		cmds = append(cmds, Discovery(DiscoveryParams{
 			OnlyBlockProducers: p.StopOnlyBps,
 		}))
 		exceptRefName := "group"
