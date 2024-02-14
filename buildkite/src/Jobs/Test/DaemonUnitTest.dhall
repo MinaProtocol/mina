@@ -1,5 +1,7 @@
 let Prelude = ../../External/Prelude.dhall
 
+let List/map = Prelude.List.map
+
 let Cmd = ../../Lib/Cmds.dhall
 let S = ../../Lib/SelectFiles.dhall
 let D = S.PathPattern
