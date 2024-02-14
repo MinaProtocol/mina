@@ -1,9 +1,5 @@
 let Prelude = ../../External/Prelude.dhall
 
-let List/map = Prelude.List.map
-
-let Optional/map = Prelude.Optional.map
-
 let Cmd = ../../Lib/Cmds.dhall
 let S = ../../Lib/SelectFiles.dhall
 let D = S.PathPattern
@@ -18,13 +14,6 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
-let B = ../../External/Buildkite.dhall
--- Retry bits
-let B/ExitStatus = B.definitions/automaticRetry/properties/exit_status/Type
-let B/AutoRetryChunk = B.definitions/automaticRetry/Type.Type
-let B/Retry = B.definitions/commandStep/properties/retry/properties/automatic/Type
-let B/Manual = B.definitions/commandStep/properties/retry/properties/manual/Type
-
 let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(cmd_target : Size) ->
   let command_key = "unit-test-${profile}"
   in
@@ -35,49 +24,7 @@ let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \
       key = command_key,
       target = cmd_target,
       docker = None Docker.Type,
-      artifact_paths = [ S.contains "core_dumps/*" ],
-      retry =
-            Some {
-                -- we only consider automatic retries
-                automatic = Some (
-                  -- and for every retry
-                  let xs : List B/AutoRetryChunk =
-                      List/map
-                        Command.Retry.Type
-                        B/AutoRetryChunk
-                        (\(retry : Command.Retry.Type) ->
-                        {
-                          -- we always require the exit status
-                          exit_status = Some (
-                              merge
-                                { Code = \(i : Integer) -> B/ExitStatus.Integer i
-                                , Any = B/ExitStatus.String "*" }
-                              retry.exit_status),
-                          -- but limit is optional
-                          limit =
-                            Optional/map
-                            Natural
-                            Integer
-                            Natural/toInteger
-                            retry.limit
-                      })
-                      -- per https://buildkite.com/docs/agent/v3#exit-codes:
-                      [
-                        -- infra error
-                        Command.Retry::{ exit_status = Command.ExitStatus.Code -1, limit = Some 4 },
-                        -- infra error
-                        Command.Retry::{ exit_status = Command.ExitStatus.Code +255, limit = Some 4 },
-                        -- Git checkout error
-                        Command.Retry::{ exit_status = Command.ExitStatus.Code +128, limit = Some 4 }
-                      ]
-                  in
-                  B/Retry.ListAutomaticRetry/Type xs),
-                manual = Some (B/Manual.Manual/Type {
-                  allowed = Some True,
-                  permit_on_passed = Some True,
-                  reason = None Text
-                })
-            }
+      artifact_paths = [ S.contains "core_dumps/*" ]
     }
 
 in
