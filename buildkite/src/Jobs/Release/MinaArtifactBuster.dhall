@@ -11,7 +11,7 @@ in
 
 Pipeline.build 
     (ArtifactPipelines.pipeline 
-        Artifacts.All
+        Artifacts.AllButTests
         DebianVersions.DebVersion.Buster 
         Profiles.Type.Standard 
         PipelineMode.Type.PullRequest

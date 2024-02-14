@@ -2,10 +2,13 @@ let Prelude = ../External/Prelude.dhall
 let Text/concatSep = Prelude.Text.concatSep
 let Profiles = ./Profiles.dhall
 
-let Artifact : Type  = < Daemon | Archive | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction >
+let Artifact : Type  = < Daemon | Archive | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | TestSuite >
 
-let All = [ Artifact.Daemon , Artifact.Archive , Artifact.TestExecutive , Artifact.BatchTxn , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
-   
+let All = [ Artifact.Daemon , Artifact.Archive , Artifact.TestExecutive , Artifact.BatchTxn , Artifact.Rosetta , Artifact.ZkappTestTransaction, Artifact.TestSuite ]
+
+let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
+
+
 let capitalName = \(artifact : Artifact) ->
   merge {
     Daemon = "Daemon"
@@ -54,4 +57,5 @@ in
   , toDebianName = toDebianName
   , toDebianNames = toDebianNames
   , All = All 
+  , AllButTests = AllButTests 
 }
