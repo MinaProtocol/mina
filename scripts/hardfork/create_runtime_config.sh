@@ -13,8 +13,9 @@ GENESIS_TIMESTAMP=${GENESIS_TIMESTAMP:=$(date -u +"%Y-%m-%dT%H:%M:%SZ" -d "10 mi
 ORIGINAL_GENESIS_TIMESTAMP=$(jq '.genesis.genesis_state_timestamp' $FORKING_FROM_CONFIG_JSON | sed 's/"//g')
 
 DIFFERENCE_IN_SECONDS=$(($(date -d "$GENESIS_TIMESTAMP" "+%s") - $(date -d "$ORIGINAL_GENESIS_TIMESTAMP" "+%s")))
-# TODO: Don't hard-code 180s per slot here!
-DIFFERENCE_IN_SLOTS=$(($DIFFERENCE_IN_SECONDS / 180))
+# Default: mainnet currently uses 180s per slot
+SECONDS_PER_SLOT=${SECONDS_PER_SLOT:=180}
+DIFFERENCE_IN_SLOTS=$(($DIFFERENCE_IN_SECONDS / $SECONDS_PER_SLOT))
 
 jq "{\
     genesis: {\
