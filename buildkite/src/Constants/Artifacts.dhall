@@ -40,7 +40,7 @@ let toDebianName = \(artifact : Artifact) ->
     , BatchTxn = "batch_txn"
     , Rosetta = "" 
     , ZkappTestTransaction = "zkapp_test_transaction"
-    , TestSuite = "test-suite"
+    , TestSuite = "test_suite"
   } artifact
 
 let toDebianNames = \(artifacts : List Artifact) -> 
