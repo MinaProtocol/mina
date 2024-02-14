@@ -49,7 +49,7 @@ module type Receipt_chain_database_intf = sig
 end
 ```
 
-`prove` will provide a merkle list of a proving receipt `h_1` and it's corresponding transaction `t_1` to a resulting_receipt `r_k` and it's corresponding transaction `r_k`, inclusively. Therefore, the output will be in the form of [(t_1, r_1), ... (t_k, r_k)], where $r_i = h(r_{i-1}, i_k)$ for $i = 2...k$
+`prove` will provide a merkle list of a proving receipt `h_1` and its corresponding transaction `t_1` to a resulting_receipt `r_k` and its corresponding transaction `t_k`, inclusively. Therefore, the output will be in the form of [(t_1, r_1), ... (t_k, r_k)], where $r_i = h(t_{i}, r_{i-1})$ for $i = 2...k$
 
 `add` stores a transaction into a client's database as a value. The key is computed by using the transaction payload and the previous receipt_chain_hash. This receipt_chain_hash is computed within the `add` function. As a result, the computed `receipt_chain_hash` is returned
 
