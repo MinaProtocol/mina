@@ -66,7 +66,7 @@ function verify_size_and_md5 {
 
 }
 
-if [ -z "$TESTNET_NAME" ]; then
+if [ -z ${TESTNET_NAME+x} ]; then
   case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
     rampup|berkeley|release/2.0.0|develop)
       TESTNET_NAME="berkeley"
