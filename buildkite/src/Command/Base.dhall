@@ -191,7 +191,9 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                       -- Git checkout error
                       Retry::{ exit_status = ExitStatus.Code +128, limit = Some 4 },
                       -- SIGTERM
-                      Retry::{ exit_status = ExitStatus.Code +143, limit = Some 4 }
+                      Retry::{ exit_status = ExitStatus.Code +143, limit = Some 4 },
+                      -- Docker error
+                      Retry::{ exit_status = ExitStatus.Code +125, limit = Some 4 }
                     ] #
                     -- and the retries that are passed in (if any)
                     c.retries)
