@@ -233,7 +233,7 @@ let pipeline : List Artifacts.Type -> DebianVersions.DebVersion  -> Profiles.Typ
               "MINA_BRANCH=$BUILDKITE_BRANCH",
               "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
               "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
-            ] "./buildkite/scripts/build-artifact.sh ${Artifacts.toDebianNames artifacts}",
+            ] "./buildkite/scripts/build-release.sh ${Artifacts.toDebianNames artifacts}",
             label = "Build Mina for ${DebianVersions.capitalName debVersion} ${Profiles.toSuffixUppercase profile}",
             key = "build-deb-pkg",
             target = Size.XLarge,
