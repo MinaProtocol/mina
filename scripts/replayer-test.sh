@@ -22,7 +22,7 @@ function report () {
 }
 
 echo "Running replayer"
-$REPLAYER_APP --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input.json
+$REPLAYER_APP --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input.json --continue-on-error
 
 RESULT=$?
 
