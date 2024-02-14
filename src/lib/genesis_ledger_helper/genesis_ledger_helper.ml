@@ -411,8 +411,8 @@ module Ledger = struct
     end) )
 
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      ?(ledger_name_prefix = "genesis_ledger") (config : Runtime_config.Ledger.t)
-      =
+      ?(create_name_symlink = true) ?(ledger_name_prefix = "genesis_ledger")
+      (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
         let padded_accounts_opt =
           padded_accounts_from_runtime_config_opt ~logger ~proof_level
@@ -507,7 +507,7 @@ module Ledger = struct
                       (Some name, None)
                 in
                 match (tar_path, name) with
-                | Ok tar_path, Some name ->
+                | Ok tar_path, Some name when create_name_symlink ->
                     let link_name =
                       genesis_dir
                       ^/ named_filename ~constraint_constants
@@ -530,7 +530,7 @@ module Ledger = struct
                         ; ("named_tar_path", `String link_name)
                         ] ;
                     Ok (packed, config, link_name)
-                | Ok tar_path, None ->
+                | Ok tar_path, _ ->
                     return (Ok (packed, config, tar_path))
                 | Error err, _ ->
                     let root_hash =
@@ -551,8 +551,8 @@ module Ledger = struct
 end
 
 module Epoch_data = struct
-  let load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      (config : Runtime_config.Epoch_data.t option) =
+  let load ?create_name_symlink ~proof_level ~genesis_dir ~logger
+      ~constraint_constants (config : Runtime_config.Epoch_data.t option) =
     let open Deferred.Or_error.Let_syntax in
     match config with
     | None ->
@@ -560,8 +560,8 @@ module Epoch_data = struct
     | Some config ->
         let ledger_name_prefix = "epoch_ledger" in
         let load_ledger ledger =
-          Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-            ~ledger_name_prefix ledger
+          Ledger.load ?create_name_symlink ~proof_level ~genesis_dir ~logger
+            ~constraint_constants ~ledger_name_prefix ledger
         in
         let%bind staking, staking_config =
           let%map staking_ledger, config', ledger_file =
@@ -945,8 +945,9 @@ let print_config ~logger config =
   [%log info] "Initializing with runtime configuration. Ledger name: $name"
     ~metadata
 
-let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~proof_level (config : Runtime_config.t) =
+let inputs_from_config_file ?create_name_symlink
+    ?(genesis_dir = Cache_dir.autogen_path) ~logger ~proof_level
+    (config : Runtime_config.t) =
   print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
   let genesis_constants = Genesis_constants.compiled in
@@ -1005,7 +1006,8 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
           (str proof_level) (str compiled)
   in
   let%bind genesis_ledger, ledger_config, ledger_file =
-    Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+    Ledger.load ?create_name_symlink ~proof_level ~genesis_dir ~logger
+      ~constraint_constants
       (Option.value config.ledger
          ~default:
            { base = Named Mina_compile_config.genesis_ledger
@@ -1020,8 +1022,8 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   [%log info] "Loaded genesis ledger from $ledger_file"
     ~metadata:[ ("ledger_file", `String ledger_file) ] ;
   let%bind genesis_epoch_data, genesis_epoch_data_config =
-    Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      config.epoch_data
+    Epoch_data.load ?create_name_symlink ~proof_level ~genesis_dir ~logger
+      ~constraint_constants config.epoch_data
   in
   let config =
     { config with
@@ -1040,12 +1042,13 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   (proof_inputs, config)
 
-let init_from_config_file ?genesis_dir ~logger ~proof_level
+let init_from_config_file ?create_name_symlink ?genesis_dir ~logger ~proof_level
     (config : Runtime_config.t) :
     (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
   let%map inputs, config =
-    inputs_from_config_file ?genesis_dir ~logger ~proof_level config
+    inputs_from_config_file ?create_name_symlink ?genesis_dir ~logger
+      ~proof_level config
   in
   let values = Genesis_proof.create_values_no_proof inputs in
   (values, config)

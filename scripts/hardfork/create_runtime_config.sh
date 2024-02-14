@@ -11,7 +11,7 @@ GENESIS_TIMESTAMP=${GENESIS_TIMESTAMP:=$(date -u +"%Y-%m-%dT%H:%M:%SZ" -d "10 mi
 # jq expression below could be written with less code,
 # but we aimed for maximum verbosity
 
-# Epoch data is explicitely cleared of null and empty objects
+# Epoch data is explicitly cleared of nulls and empty objects
 
 jq "{\
     genesis: {\
