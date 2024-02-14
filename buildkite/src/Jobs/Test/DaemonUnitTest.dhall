@@ -14,7 +14,7 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
-let B = ../External/Buildkite.dhall
+let B = ../../External/Buildkite.dhall
 -- Retry bits
 let B/ExitStatus = B.definitions/automaticRetry/properties/exit_status/Type
 let B/AutoRetryChunk = B.definitions/automaticRetry/Type.Type
