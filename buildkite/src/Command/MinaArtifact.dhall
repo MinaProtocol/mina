@@ -23,7 +23,7 @@ let Artifacts = ../Constants/Artifacts.dhall
 in
 
 --- NB: unlike the regular artifact piopeline, the hardfork pipeline receives many of its parameters as env vars
-let hardForkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
+let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
   \(debVersion : DebianVersions.DebVersion) ->
       --- TODO: Refactor the dhall interface so that we don't need to keep nesting docker containers.
       --- I've already refactored some of it such that everything works in the root docker contains,
@@ -264,5 +264,5 @@ let pipeline : List Artifacts.Type -> DebianVersions.DebVersion  -> Profiles.Typ
 in
 {
   pipeline = pipeline
-  , hardForkPipeline = hardForkPipeline
+  , hardforkPipeline = hardforkPipeline
 }
