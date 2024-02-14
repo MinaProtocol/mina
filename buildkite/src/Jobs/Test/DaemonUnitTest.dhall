@@ -14,6 +14,13 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
+let B = ../External/Buildkite.dhall
+-- Retry bits
+let B/ExitStatus = B.definitions/automaticRetry/properties/exit_status/Type
+let B/AutoRetryChunk = B.definitions/automaticRetry/Type.Type
+let B/Retry = B.definitions/commandStep/properties/retry/properties/automatic/Type
+let B/Manual = B.definitions/commandStep/properties/retry/properties/manual/Type
+
 let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \(path : Text) -> \(cmd_target : Size) ->
   let command_key = "unit-test-${profile}"
   in
