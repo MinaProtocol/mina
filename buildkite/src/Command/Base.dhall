@@ -192,7 +192,7 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                       Retry::{ exit_status = ExitStatus.Code +128, limit = Some 4 }
                     ] #
                     -- and the retries that are passed in (if any)
-                    c.retries
+                    c.retries)
                 in
                 B/Retry.ListAutomaticRetry/Type xs),
               manual = Some (B/Manual.Manual/Type {
