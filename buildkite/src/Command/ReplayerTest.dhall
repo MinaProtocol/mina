@@ -1,4 +1,4 @@
-let B = ../../External/Buildkite.dhall
+let B = ../External/Buildkite.dhall
 
 let Prelude = ../External/Prelude.dhall
 
