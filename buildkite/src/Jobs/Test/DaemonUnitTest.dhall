@@ -43,9 +43,9 @@ let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \
                   -- and for every retry
                   let xs : List B/AutoRetryChunk =
                       List/map
-                        Retry.Type
+                        Command.Retry.Type
                         B/AutoRetryChunk
-                        (\(retry : Retry.Type) ->
+                        (\(retry : Command.Retry.Type) ->
                         {
                           -- we always require the exit status
                           exit_status = Some (
@@ -64,11 +64,11 @@ let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \
                       -- per https://buildkite.com/docs/agent/v3#exit-codes:
                       [
                         -- infra error
-                        Retry::{ exit_status = ExitStatus.Code -1, limit = Some 4 },
+                        Command.Retry::{ exit_status = Command.ExitStatus.Code -1, limit = Some 4 },
                         -- infra error
-                        Retry::{ exit_status = ExitStatus.Code +255, limit = Some 4 },
+                        Command.Retry::{ exit_status = Command.ExitStatus.Code +255, limit = Some 4 },
                         -- Git checkout error
-                        Retry::{ exit_status = ExitStatus.Code +128, limit = Some 4 }
+                        Command.Retry::{ exit_status = Command.ExitStatus.Code +128, limit = Some 4 }
                       ]
                   in
                   B/Retry.ListAutomaticRetry/Type xs),
