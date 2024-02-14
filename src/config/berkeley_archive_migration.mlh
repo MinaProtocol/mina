@@ -7,10 +7,10 @@
 [%%import "/src/config/txpool_size.mlh"]
 [%%import "/src/config/account_creation_fee/realistic.mlh"]
 [%%import "/src/config/amount_defaults/realistic.mlh"]
-[%%import "/src/config/protocol_version/current.mlh"]
+[%%import "/src/config/protocol_version/version1.mlh"]
 [%%import "/src/config/supercharged_coinbase_factor/one.mlh"]
 
-(* custom consensus parameters for the testnet release *)
+(* custom consensus parameters for the mainnet release *)
 [%%define consensus_mechanism "proof_of_stake"]
 [%%define k 290]
 [%%define delta 0]
@@ -36,17 +36,15 @@
 [%%define download_snark_keys false]
 [%%define generate_genesis_proof false]
 
-[%%define itn_features true]
+[%%define itn_features false]
 
 [%%define print_versioned_types false]
 
 [%%define daemon_expiry "2024-12-10 14:00:00-07:00"]
 [%%define test_full_epoch false]
 [%%import "/src/config/fork.mlh"]
-[%%import "/src/config/features/public_testnet.mlh"]
+[%%import "/src/config/features/mainnet.mlh"]
 (* 2*block_window_duration *)
 [%%define compaction_interval 360000]
 [%%define vrf_poll_interval 5000]
-[%%define zkapp_cmd_limit 24]
-[%%undef slot_tx_end]
-[%%undef slot_chain_end]
+[%%undef zkapp_cmd_limit]

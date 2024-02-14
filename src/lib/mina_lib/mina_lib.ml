@@ -490,16 +490,17 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
                                "Offline for too long; restarting libp2p_helper" ;
                              Mina_networking.restart_helper net ;
                              next_helper_restart := None ;
-                             match !offline_shutdown with
-                             | None ->
-                                 offline_shutdown :=
-                                   Some
-                                     (Async.Clock.Event.run_after
-                                        offline_shutdown_delay
-                                        (fun () -> raise Offline_shutdown)
-                                        () )
-                             | Some _ ->
-                                 () )
+                             if not is_seed then
+                               match !offline_shutdown with
+                               | None ->
+                                   offline_shutdown :=
+                                     Some
+                                       (Async.Clock.Event.run_after
+                                          offline_shutdown_delay
+                                          (fun () -> raise Offline_shutdown)
+                                          () )
+                               | Some _ ->
+                                   () )
                            () )
                 | Some _ ->
                     () ) ;
