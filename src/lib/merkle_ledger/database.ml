@@ -290,25 +290,13 @@ module Make (Inputs : Inputs_intf) :
       Result.map location_result ~f:(fun location ->
           set mdb key location ; location )
 
-    let last_location_address mdb =
-      match
-        last_location_key () |> get_raw mdb |> Result.of_option ~error:()
-        |> Result.bind ~f:(Location.parse ~ledger_depth:mdb.depth)
-      with
-      | Error () ->
-          None
-      | Ok parsed_location ->
-          Some (Location.to_path_exn parsed_location)
-
     let last_location mdb =
-      match
-        last_location_key () |> get_raw mdb |> Result.of_option ~error:()
-        |> Result.bind ~f:(Location.parse ~ledger_depth:mdb.depth)
-      with
-      | Error () ->
-          None
-      | Ok parsed_location ->
-          Some parsed_location
+      last_location_key () |> get_raw mdb
+      |> Option.bind ~f:(fun data ->
+             Location.parse ~ledger_depth:mdb.depth data |> Result.ok )
+
+    let last_location_address mdb =
+      Option.map (last_location mdb) ~f:Location.to_path_exn
   end
 
   let get_at_index_exn mdb index =
