@@ -43,9 +43,9 @@ The recommended way to enable this cache is:
 
 For a concrete example, see commit [61afcaee844d5966331ddaee11fd8820f6dc1c8a](https://github.com/MinaProtocol/mina/commit/61afcaee844d5966331ddaee11fd8820f6dc1c8a).
 
-Then, to update the cache for a set of tests, we can run the tests to update their contents. For example, to update the tests in `delegate`, `app_state`, `token_symbol`, `permissions`, and `voting_for`, we can run:
+Then, to update the cache for a set of tests, we can run the tests to update their contents. For example, to update the tests in all of the directories containing a `proof_cache.json` file, we can run:
 ```bash
-for DIR in ./delegate ./app_state ./token_symbol ./permissions ./voting_for; do
+for DIR in $(find -name proof_cache.json | sed 's/\/proof_cache.json//'); do
   # Initialize the target file
   echo [] > $DIR/proof_cache.json;
   # Stage the new file for a git commit

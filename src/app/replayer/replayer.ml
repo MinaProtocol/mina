@@ -602,8 +602,12 @@ let try_slot ~logger pool slot =
   go ~slot ~tries_left:num_tries
 
 let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
-    ~max_canonical_slot ~checkpoint_output_folder_opt ~checkpoint_file_prefix =
-  if Int64.( <= ) last_global_slot_since_genesis max_canonical_slot then (
+    ~max_canonical_slot ~checkpoint_output_folder_opt ~checkpoint_file_prefix
+    ~migration_mode =
+  if
+    migration_mode
+    || Int64.( <= ) last_global_slot_since_genesis max_canonical_slot
+  then (
     (* start replaying at the slot after the one we've just finished with *)
     let start_slot_since_genesis = Int64.succ last_global_slot_since_genesis in
     let%map replayer_checkpoint =
@@ -685,11 +689,8 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
       in
       let%bind target_state_hash =
         match epoch_ledgers_state_hash_opt with
-        | Some epoch_ledgers_state_hash ->
-            [%log info] "Retrieving fork block state_hash" ;
-            query_db ~f:(fun db ->
-                Sql.Parent_block.get_parent_state_hash db
-                  epoch_ledgers_state_hash )
+        | Some hash ->
+            return hash
         | None ->
             [%log info]
               "Searching for block with greatest height on canonical chain" ;
@@ -1140,11 +1141,12 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                 Core.exit 1 )
           | Some (state_hash, ledger_hash, snarked_hash) ->
               let write_checkpoint_file ~checkpoint_output_folder_opt
-                  ~checkpoint_file_prefix () =
+                  ~checkpoint_file_prefix ~migration_mode () =
                 let write_checkpoint () =
                   write_replayer_checkpoint ~logger ~ledger
                     ~last_global_slot_since_genesis ~max_canonical_slot
                     ~checkpoint_output_folder_opt ~checkpoint_file_prefix
+                    ~migration_mode
                 in
                 if last_block then write_checkpoint ()
                 else
@@ -1393,7 +1395,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                 let%bind () = check_account_accessed state_hash in
                 log_state_hash_on_next_slot last_global_slot_since_genesis ;
                 write_checkpoint_file ~checkpoint_output_folder_opt
-                  ~checkpoint_file_prefix ()
+                  ~checkpoint_file_prefix ~migration_mode ()
         in
         (* a sequence is a command type, slot, sequence number triple *)
         let get_internal_cmd_sequence (ic : Sql.Internal_command.t) =
