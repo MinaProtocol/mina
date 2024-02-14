@@ -24,7 +24,49 @@ let buildTestCmd : Text -> Text -> Size -> Command.Type = \(profile : Text) -> \
       key = command_key,
       target = cmd_target,
       docker = None Docker.Type,
-      artifact_paths = [ S.contains "core_dumps/*" ]
+      artifact_paths = [ S.contains "core_dumps/*" ],
+      retry =
+            Some {
+                -- we only consider automatic retries
+                automatic = Some (
+                  -- and for every retry
+                  let xs : List B/AutoRetryChunk =
+                      List/map
+                        Retry.Type
+                        B/AutoRetryChunk
+                        (\(retry : Retry.Type) ->
+                        {
+                          -- we always require the exit status
+                          exit_status = Some (
+                              merge
+                                { Code = \(i : Integer) -> B/ExitStatus.Integer i
+                                , Any = B/ExitStatus.String "*" }
+                              retry.exit_status),
+                          -- but limit is optional
+                          limit =
+                            Optional/map
+                            Natural
+                            Integer
+                            Natural/toInteger
+                            retry.limit
+                      })
+                      -- per https://buildkite.com/docs/agent/v3#exit-codes:
+                      [
+                        -- infra error
+                        Retry::{ exit_status = ExitStatus.Code -1, limit = Some 4 },
+                        -- infra error
+                        Retry::{ exit_status = ExitStatus.Code +255, limit = Some 4 },
+                        -- Git checkout error
+                        Retry::{ exit_status = ExitStatus.Code +128, limit = Some 4 }
+                      ]
+                  in
+                  B/Retry.ListAutomaticRetry/Type xs),
+                manual = Some (B/Manual.Manual/Type {
+                  allowed = Some True,
+                  permit_on_passed = Some True,
+                  reason = None Text
+                })
+            }
     }
 
 in
