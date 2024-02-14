@@ -19,7 +19,7 @@ echo "--- Migrate accounts to new network format"
 # NB: we use sed here instead of jq, because jq is extremely slow at processing this file
 sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "1"}/' config.json
 
-./buildkite/scripts/build-artifacts.sh
+./buildkite/scripts/build-artifact.sh
 
 echo "--- Generate hardfork ledger tarballs"
 mkdir hardfork_ledgers
