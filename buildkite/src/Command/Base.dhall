@@ -51,7 +51,7 @@ let B/DependsOn =
     depends =
     \(keys : List Text) ->
         OuterUnion/Type.ListDependsOn/Type
-          (List/map Text InnerUnion/Type (\(k: Text) -> InnerUnion/Type.DependsOn/Type { allow_failure = None Bool, step = Some k }) keys)
+          (List/map Text InnerUnion/Type (\(k: Text) -> InnerUnion/Type.DependsOn/Type { allow_failure = Some False, step = Some k }) keys)
   }
 
 let B/ArtifactPaths = B.definitions/commandStep/properties/artifact_paths/Type
@@ -186,17 +186,15 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                       Retry::{ exit_status = ExitStatus.Code -1, limit = Some 4 },
                       -- infra error
                       Retry::{ exit_status = ExitStatus.Code +255, limit = Some 4 },
-                      -- common/flake error
-                      Retry::{ exit_status = ExitStatus.Code +1, limit = Some 4 },
                       -- apt-get update race condition error
                       Retry::{ exit_status = ExitStatus.Code +100, limit = Some 4 },
                       -- Git checkout error
-                      Retry::{ exit_status = ExitStatus.Code +128, limit = Some 4 }
+                      Retry::{ exit_status = ExitStatus.Code +128, limit = Some 4 },
+                      -- SIGTERM
+                      Retry::{ exit_status = ExitStatus.Code +143, limit = Some 4 }
                     ] #
                     -- and the retries that are passed in (if any)
-                    c.retries #
-                    -- Other job-specific errors
-                    [ Retry::{ exit_status = ExitStatus.Any, limit = Some 4 } ])
+                    c.retries)
                 in
                 B/Retry.ListAutomaticRetry/Type xs),
               manual = Some (B/Manual.Manual/Type {
