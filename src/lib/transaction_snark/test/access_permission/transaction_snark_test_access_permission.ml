@@ -12,7 +12,7 @@ let%test_module "Access permission tests" =
   ( module struct
     let () = Backtrace.elide := false
 
-    let sk = Private_key.create ()
+    let sk = Quickcheck.random_value Private_key.gen
 
     let pk = Public_key.of_private_key_exn sk
 
