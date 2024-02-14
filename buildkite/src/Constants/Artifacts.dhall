@@ -17,6 +17,7 @@ let capitalName = \(artifact : Artifact) ->
     , BatchTxn = "BatchTxn"
     , Rosetta = "Rosetta"
     , ZkappTestTransaction = "ZkappTestTransaction"
+    , TestSuite = "TestSuite"
   } artifact
 
 let lowerName = \(artifact : Artifact) ->
@@ -27,6 +28,7 @@ let lowerName = \(artifact : Artifact) ->
     , BatchTxn = "batch_txn"
     , Rosetta = "rosetta"
     , ZkappTestTransaction = "zkapp_test_transaction"
+    , TestSuite = "test_suite"
   } artifact
 
 
@@ -38,6 +40,7 @@ let toDebianName = \(artifact : Artifact) ->
     , BatchTxn = "batch_txn"
     , Rosetta = "" 
     , ZkappTestTransaction = "zkapp_test_transaction"
+    , TestSuite = "test-suite"
   } artifact
 
 let toDebianNames = \(artifacts : List Artifact) -> 
