@@ -736,35 +736,101 @@ let genesis_constants =
       ] )
 
 module AccountObj = struct
-  module AnnotatedBalance = struct
-    type t =
+  module CommonBalance = struct
+    type 'state balance =
       { total : Balance.t
       ; unknown : Balance.t
-      ; timing : Mina_base.Account_timing.t
-      ; breadcrumb : Transition_frontier.Breadcrumb.t option
+      ; timing : Account_timing.t
+      ; state_context : 'state option
       }
 
-    let min_balance (b : t) =
-      match (b.timing, b.breadcrumb) with
-      | Untimed, _ ->
-          Some Balance.zero
-      | Timed _, None ->
-          None
-      | Timed timing_info, Some crumb ->
-          let consensus_state =
-            Transition_frontier.Breadcrumb.consensus_state crumb
-          in
-          let global_slot =
-            Consensus.Data.Consensus_state.global_slot_since_genesis
-              consensus_state
-          in
-          Some
-            (Account.min_balance_at_slot ~global_slot
-               ~cliff_time:timing_info.cliff_time
-               ~cliff_amount:timing_info.cliff_amount
-               ~vesting_period:timing_info.vesting_period
-               ~vesting_increment:timing_info.vesting_increment
-               ~initial_minimum_balance:timing_info.initial_minimum_balance )
+    module Make (T : sig
+      type t
+
+      val global_slot : t -> Mina_numbers.Global_slot_since_genesis.t
+    end) =
+    struct
+      type t = T.t balance
+
+      let min_balance b =
+        match (b.timing, b.state_context) with
+        | Untimed, _ ->
+            Some Balance.zero
+        | Timed _, None ->
+            None
+        | Timed timing_info, Some state_context ->
+            let global_slot = T.global_slot state_context in
+            Some
+              (Account.min_balance_at_slot ~global_slot
+                 ~cliff_time:timing_info.cliff_time
+                 ~cliff_amount:timing_info.cliff_amount
+                 ~vesting_period:timing_info.vesting_period
+                 ~vesting_increment:timing_info.vesting_increment
+                 ~initial_minimum_balance:timing_info.initial_minimum_balance )
+
+      let fields () =
+        [ field "total" ~typ:(non_null balance)
+            ~doc:"The amount of MINA owned by the account"
+            ~args:Arg.[]
+            ~resolve:(fun _ b -> b.total)
+        ; field "unknown" ~typ:(non_null balance)
+            ~doc:
+              "The amount of MINA owned by the account whose origin is \
+               currently unknown"
+            ~deprecated:(Deprecated None)
+            ~args:Arg.[]
+            ~resolve:(fun _ b -> b.unknown)
+        ; field "liquid" ~typ:balance
+            ~doc:
+              "The amount of MINA owned by the account which is currently \
+               available. Can be null if bootstrapping."
+            ~deprecated:(Deprecated None)
+            ~args:Arg.[]
+            ~resolve:(fun _ b ->
+              Option.map (min_balance b) ~f:(fun min_balance ->
+                  let total_balance : uint64 = Balance.to_uint64 b.total in
+                  let min_balance_uint64 = Balance.to_uint64 min_balance in
+                  Balance.of_uint64
+                    ( if
+                      Unsigned.UInt64.compare total_balance min_balance_uint64
+                      > 0
+                    then Unsigned.UInt64.sub total_balance min_balance_uint64
+                    else Unsigned.UInt64.zero ) ) )
+        ; field "locked" ~typ:balance
+            ~doc:
+              "The amount of MINA owned by the account which is currently \
+               locked. Can be null if bootstrapping."
+            ~deprecated:(Deprecated None)
+            ~args:Arg.[]
+            ~resolve:(fun _ b -> min_balance b)
+        ]
+    end
+  end
+
+  module GenesisAnnotatedBalance = struct
+    include CommonBalance.Make (struct
+      type t = Consensus.Data.Consensus_state.Value.t
+
+      let global_slot consensus_state =
+        Consensus.Data.Consensus_state.global_slot_since_genesis consensus_state
+    end)
+
+    let obj =
+      obj "AnnotatedGenesisBalance"
+        ~doc:
+          "A total genesis balance annotated with the amount that is unknown \
+           with the invariant unknown <= total, as well as the genesis liquid \
+           and locked balances." ~fields:(fun _ -> fields ())
+  end
+
+  module AnnotatedBalance = struct
+    include CommonBalance.Make (struct
+      type t = Transition_frontier.Breadcrumb.t
+
+      let global_slot crumb =
+        Consensus.Data.Consensus_state.global_slot_since_genesis
+        @@ Transition_frontier.Breadcrumb.consensus_state crumb
+    end)
 
     let obj =
       obj "AnnotatedBalance"
@@ -772,62 +838,29 @@ module AccountObj = struct
           "A total balance annotated with the amount that is currently unknown \
            with the invariant unknown <= total, as well as the currently \
            liquid and locked balances." ~fields:(fun _ ->
-          [ field "total" ~typ:(non_null balance)
-              ~doc:"The amount of MINA owned by the account"
-              ~args:Arg.[]
-              ~resolve:(fun _ (b : t) -> b.total)
-          ; field "unknown" ~typ:(non_null balance)
-              ~doc:
-                "The amount of MINA owned by the account whose origin is \
-                 currently unknown"
-              ~deprecated:(Deprecated None)
-              ~args:Arg.[]
-              ~resolve:(fun _ (b : t) -> b.unknown)
-          ; field "liquid" ~typ:balance
-              ~doc:
-                "The amount of MINA owned by the account which is currently \
-                 available. Can be null if bootstrapping."
-              ~deprecated:(Deprecated None)
-              ~args:Arg.[]
-              ~resolve:(fun _ (b : t) ->
-                Option.map (min_balance b) ~f:(fun min_balance ->
-                    let total_balance : uint64 = Balance.to_uint64 b.total in
-                    let min_balance_uint64 = Balance.to_uint64 min_balance in
-                    Balance.of_uint64
-                      ( if
-                        Unsigned.UInt64.compare total_balance min_balance_uint64
-                        > 0
-                      then Unsigned.UInt64.sub total_balance min_balance_uint64
-                      else Unsigned.UInt64.zero ) ) )
-          ; field "locked" ~typ:balance
-              ~doc:
-                "The amount of MINA owned by the account which is currently \
-                 locked. Can be null if bootstrapping."
-              ~deprecated:(Deprecated None)
-              ~args:Arg.[]
-              ~resolve:(fun _ (b : t) -> min_balance b)
-          ; field "blockHeight" ~typ:(non_null length)
-              ~doc:"Block height at which balance was measured"
-              ~args:Arg.[]
-              ~resolve:(fun _ (b : t) ->
-                match b.breadcrumb with
-                | None ->
-                    Unsigned.UInt32.zero
-                | Some crumb ->
-                    Transition_frontier.Breadcrumb.consensus_state crumb
-                    |> Consensus.Data.Consensus_state.blockchain_length )
-            (* TODO: Mutually recurse with "block" instead -- #5396 *)
-          ; field "stateHash" ~typ:state_hash
-              ~doc:
-                "Hash of block at which balance was measured. Can be null if \
-                 bootstrapping. Guaranteed to be non-null for direct account \
-                 lookup queries when not bootstrapping. Can also be null when \
-                 accessed as nested properties (eg. via delegators). "
-              ~args:Arg.[]
-              ~resolve:(fun _ (b : t) ->
-                Option.map b.breadcrumb ~f:(fun crumb ->
-                    Transition_frontier.Breadcrumb.state_hash crumb ) )
-          ] )
+          fields ()
+          @ [ field "blockHeight" ~typ:(non_null length)
+                ~doc:"Block height at which balance was measured"
+                ~args:Arg.[]
+                ~resolve:(fun _ (b : t) ->
+                  match b.state_context with
+                  | None ->
+                      Unsigned.UInt32.zero
+                  | Some crumb ->
+                      Consensus.Data.Consensus_state.blockchain_length
+                      @@ Transition_frontier.Breadcrumb.consensus_state crumb )
+              (* TODO: Mutually recurse with "block" instead -- #5396 *)
+            ; field "stateHash" ~typ:state_hash
+                ~doc:
+                  "Hash of block at which balance was measured. Can be null if \
+                   bootstrapping. Guaranteed to be non-null for direct account \
+                   lookup queries when not bootstrapping. Can also be null \
+                   when accessed as nested properties (eg. via delegators). "
+                ~args:Arg.[]
+                ~resolve:(fun _ (b : t) ->
+                  Option.map b.state_context
+                    ~f:Transition_frontier.Breadcrumb.state_hash )
+            ] )
   end
 
   module Partial_account = struct
@@ -836,7 +869,7 @@ module AccountObj = struct
         ; token_id
         ; token_symbol
         ; nonce
-        ; balance
+        ; balance : AnnotatedBalance.t
         ; receipt_chain_hash
         ; delegate
         ; voting_for
@@ -854,7 +887,7 @@ module AccountObj = struct
       ; token_id
       ; token_symbol
       ; nonce
-      ; balance = balance.AnnotatedBalance.total
+      ; balance = balance.CommonBalance.total
       ; receipt_chain_hash
       ; delegate
       ; voting_for
@@ -863,7 +896,7 @@ module AccountObj = struct
       ; zkapp
       }
 
-    let of_full_account ?breadcrumb
+    let of_full_account ?state_context
         { Account.Poly.public_key
         ; token_id
         ; token_symbol
@@ -881,10 +914,10 @@ module AccountObj = struct
       ; token_symbol = Some token_symbol
       ; nonce = Some nonce
       ; balance =
-          { AnnotatedBalance.total = balance
+          { CommonBalance.total = balance
           ; unknown = balance
           ; timing
-          ; breadcrumb
+          ; state_context
           }
       ; receipt_chain_hash = Some receipt_chain_hash
       ; delegate
@@ -908,7 +941,7 @@ module AccountObj = struct
       in
       match account with
       | Some (account, breadcrumb) ->
-          of_full_account ~breadcrumb account
+          of_full_account ~state_context:breadcrumb account
       | None ->
           Account.
             { Poly.public_key = Account_id.public_key account_id
@@ -917,10 +950,10 @@ module AccountObj = struct
             ; nonce = None
             ; delegate = None
             ; balance =
-                { AnnotatedBalance.total = Balance.zero
+                { CommonBalance.total = Balance.zero
                 ; unknown = Balance.zero
                 ; timing = Timing.Untimed
-                ; breadcrumb = None
+                ; state_context = None
                 }
             ; receipt_chain_hash = None
             ; voting_for = None

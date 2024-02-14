@@ -6806,6 +6806,69 @@
         },
         {
           "kind": "OBJECT",
+          "name": "AnnotatedGenesisBalance",
+          "description":
+            "A total genesis balance annotated with the amount that is unknown with the invariant unknown <= total, as well as the genesis liquid and locked balances.",
+          "fields": [
+            {
+              "name": "total",
+              "description": "The amount of MINA owned by the account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Balance",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "unknown",
+              "description":
+                "The amount of MINA owned by the account whose origin is currently unknown",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Balance",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": true,
+              "deprecationReason": null
+            },
+            {
+              "name": "liquid",
+              "description":
+                "The amount of MINA owned by the account which is currently available. Can be null if bootstrapping.",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Balance", "ofType": null },
+              "isDeprecated": true,
+              "deprecationReason": null
+            },
+            {
+              "name": "locked",
+              "description":
+                "The amount of MINA owned by the account which is currently locked. Can be null if bootstrapping.",
+              "args": [],
+              "type": { "kind": "SCALAR", "name": "Balance", "ofType": null },
+              "isDeprecated": true,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
           "name": "CompletedWork",
           "description": "Completed snark works",
           "fields": [
@@ -14124,6 +14187,46 @@
                   "name": "Block",
                   "ofType": null
                 }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "genesisAccountBalance",
+              "description":
+                "Find any genesis account state via a public key and token",
+              "args": [
+                {
+                  "name": "token",
+                  "description":
+                    "Token of genesis account being retrieved (defaults to MINA)",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "TokenId",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "publicKey",
+                  "description":
+                    "Public key of genesis account being retrieved",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "PublicKey",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "OBJECT",
+                "name": "AnnotatedGenesisBalance",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null

@@ -1872,7 +1872,8 @@ module Queries = struct
               Ledger.location_of_account ledger (Account_id.create pk token)
             in
             let%map account = Ledger.get ledger location in
-            Types.AccountObj.Partial_account.of_full_account ~breadcrumb account
+            Types.AccountObj.Partial_account.of_full_account
+              ~state_context:breadcrumb account
             |> Types.AccountObj.lift mina pk ) )
 
   let accounts_for_pk =
@@ -1893,8 +1894,8 @@ module Queries = struct
                   Ledger.location_of_account ledger (Account_id.create pk token)
                 in
                 let%map account = Ledger.get ledger location in
-                Types.AccountObj.Partial_account.of_full_account ~breadcrumb
-                  account
+                Types.AccountObj.Partial_account.of_full_account
+                  ~state_context:breadcrumb account
                 |> Types.AccountObj.lift mina pk )
         | None ->
             [] )
@@ -1925,7 +1926,7 @@ module Queries = struct
                      let account = Option.value_exn @@ Ledger.get ledger loc in
                      let partial_account =
                        Types.AccountObj.Partial_account.of_full_account
-                         ~breadcrumb account
+                         ~state_context:breadcrumb account
                      in
                      Types.AccountObj.lift mina account.public_key
                        partial_account
@@ -2060,6 +2061,44 @@ module Queries = struct
             }
         ; hash
         } )
+
+  let genesis_balance =
+    field "genesisAccountBalance"
+      ~typ:Types.AccountObj.GenesisAnnotatedBalance.obj
+      ~args:
+        Arg.
+          [ arg "publicKey" ~doc:"Public key of genesis account being retrieved"
+              ~typ:(non_null Types.Input.PublicKey.arg_typ)
+          ; arg' "token"
+              ~doc:"Token of genesis account being retrieved (defaults to MINA)"
+              ~typ:Types.Input.TokenId.arg_typ ~default:Token_id.default
+          ]
+      ~doc:"Find any genesis account state via a public key and token"
+      ~resolve:(fun { ctx = mina; _ } () pk token ->
+        let precomputed_values = (Mina_lib.config mina).precomputed_values in
+        let genesis_ledger = precomputed_values.genesis_ledger in
+        let protocol_state =
+          Precomputed_values.genesis_state_with_hashes precomputed_values
+        in
+
+        let consensus_state =
+          Mina_state.Protocol_state.consensus_state protocol_state.data
+        in
+        let account =
+          try
+            Option.some @@ snd
+            @@ Genesis_ledger.Packed.find_account_record_exn genesis_ledger
+                 ~f:(fun account ->
+                   Token_id.equal account.token_id token
+                   && Public_key.Compressed.equal account.public_key pk )
+          with _ -> None
+        in
+        Option.map account ~f:(fun account ->
+            let account =
+              Types.AccountObj.Partial_account.of_full_account
+                ~state_context:consensus_state account
+            in
+            account.Account.Poly.balance ) )
 
   (* used by best_chain, block below *)
   let block_of_breadcrumb mina breadcrumb =
@@ -2550,6 +2589,7 @@ module Queries = struct
     ; best_chain
     ; block
     ; genesis_block
+    ; genesis_balance
     ; initial_peers
     ; get_peers
     ; pooled_user_commands
