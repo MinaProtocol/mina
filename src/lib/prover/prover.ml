@@ -80,7 +80,7 @@ module Worker_state = struct
             with
             sok_digest = Sok_message.Digest.default
           }
-        , Proof.transaction_dummy )
+        , Lazy.force Proof.transaction_dummy )
 
   let create { logger; proof_level; constraint_constants; _ } : t Deferred.t =
     Deferred.return
@@ -175,9 +175,11 @@ module Worker_state = struct
                      ~constraint_constants
                      { transition = block
                      ; prev_state = Blockchain_snark.Blockchain.state chain
-                     ; prev_state_proof = Mina_base.Proof.blockchain_dummy
+                     ; prev_state_proof =
+                         Lazy.force Mina_base.Proof.blockchain_dummy
                      ; txn_snark = t
-                     ; txn_snark_proof = Mina_base.Proof.transaction_dummy
+                     ; txn_snark_proof =
+                         Lazy.force Mina_base.Proof.transaction_dummy
                      }
                      ~handler:
                        (Consensus.Data.Prover_state.handler state_for_handler
@@ -185,7 +187,7 @@ module Worker_state = struct
                      next_state
                    |> Or_error.map ~f:(fun () ->
                           Blockchain_snark.Blockchain.create ~state:next_state
-                            ~proof:Mina_base.Proof.blockchain_dummy )
+                            ~proof:(Lazy.force Mina_base.Proof.blockchain_dummy) )
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
@@ -208,7 +210,7 @@ module Worker_state = struct
                  Deferred.return
                  @@ Ok
                       (Blockchain_snark.Blockchain.create
-                         ~proof:Mina_base.Proof.blockchain_dummy
+                         ~proof:(Lazy.force Mina_base.Proof.blockchain_dummy)
                          ~state:next_state )
 
                let verify _ _ = Deferred.return (Ok ())

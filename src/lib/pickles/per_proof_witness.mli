@@ -1,3 +1,5 @@
+(** The information required to recursively verify a Pickles proof. *)
+
 open Pickles_types
 module Impl = Impls.Step
 
@@ -26,12 +28,8 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       , Impl.Field.t Pickles_types.Shifted_value.Type1.t
       , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
         , Impl.Boolean.var )
-        Pickles_types.Plonk_types.Opt.t
-      , ( scalar_challenge
-          Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup
-          .t
-        , Impl.Boolean.var )
-        Pickles_types.Plonk_types.Opt.t
+        Pickles_types.Opt.t
+      , (scalar_challenge, Impl.Boolean.var) Pickles_types.Opt.t
       , Impl.Boolean.var
       , unit
       , Import.Digest.Make(Impl).t
@@ -78,7 +76,7 @@ module Constant : sig
 
   type scalar_challenge = challenge Import.Scalar_challenge.t
 
-  type ('statement, 'max_proofs_verified, _) t =
+  type ('statement, 'max_proofs_verified) t =
     { app_state : 'statement
     ; wrap_proof : Wrap_proof.Constant.t
     ; proof_state :
@@ -86,10 +84,7 @@ module Constant : sig
         , scalar_challenge
         , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
         , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t option
-        , scalar_challenge
-          Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup
-          .t
-          option
+        , scalar_challenge option
         , bool
         , unit
         , Import.Digest.Constant.t
@@ -112,14 +107,13 @@ module Constant : sig
     }
 
   module No_app_state : sig
-    type nonrec (_, 'max_proofs_verified, 'num_branches) t =
-      (unit, 'max_proofs_verified, 'num_branches) t
+    type nonrec (_, 'max_proofs_verified, _) t = (unit, 'max_proofs_verified) t
   end
 end
 
 val typ :
-     feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+     feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
+  -> num_chunks:int
   -> ('avar, 'aval) Impl.Typ.t
   -> 'n Pickles_types.Nat.t
-  -> 'm Pickles_types.Nat.t
-  -> (('avar, 'n, 'm) t, ('aval, 'n, 'm) Constant.t) Impl.Typ.t
+  -> (('avar, 'n, _) t, ('aval, 'n) Constant.t) Impl.Typ.t

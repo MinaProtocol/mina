@@ -15,7 +15,7 @@ Chrome trace-viewer to view. You can do this with `src/app/trace-tool`.
 Using it is simple if you have Rust installed: `cd src/app/trace-tool; cargo run --release /path/to/1234.trace > trace.json`.
 Then you can load the file from `chrome://tracing`.
 
-Each row correponds to a "task" as created by either `O1trace.trace_task` or
+Each row corresponds to a "task" as created by either `O1trace.trace_task` or
 `O1trace.trace_recurring_task`. A recurring task starts with `R&`. Internally
 it works by doing one `trace_task` per call, and the `trace-tool` knows how
 to collapse them all into one row.

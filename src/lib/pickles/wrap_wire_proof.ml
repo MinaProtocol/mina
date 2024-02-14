@@ -1,6 +1,5 @@
 open Core_kernel
 open Pickles_types
-open Plonk_types
 module Columns = Nat.N15
 module Columns_vec = Vector.Vector_15
 module Coefficients = Nat.N15
@@ -9,6 +8,8 @@ module Quotient_polynomial = Nat.N7
 module Quotient_polynomial_vec = Vector.Vector_7
 module Permuts_minus_1 = Nat.N6
 module Permuts_minus_1_vec = Vector.Vector_6
+
+[@@@warning "-4"]
 
 module Commitments = struct
   [%%versioned
@@ -26,6 +27,8 @@ module Commitments = struct
             Quotient_polynomial_vec.Stable.V1.t
         }
       [@@deriving compare, sexp, yojson, hash, equal]
+
+      [@@@warning "+4"]
 
       let to_latest = Fn.id
     end
@@ -47,6 +50,8 @@ module Commitments = struct
     ; t_comm = Vector.of_array_and_length_exn t_comm Quotient_polynomial.n
     }
 end
+
+[@@@warning "-4"]
 
 module Evaluations = struct
   [%%versioned
@@ -78,6 +83,8 @@ module Evaluations = struct
             Backend.Tock.Field.Stable.V1.t * Backend.Tock.Field.Stable.V1.t
         }
       [@@deriving compare, sexp, yojson, hash, equal]
+
+      [@@@warning "+4"]
 
       let to_latest = Fn.id
     end
@@ -169,6 +176,8 @@ module Evaluations = struct
     }
 end
 
+[@@@warning "-4"]
+
 [%%versioned
 module Stable = struct
   module V1 = struct
@@ -183,6 +192,8 @@ module Stable = struct
             (* TODO-URGENT: Validate bulletproof length on the rust side *)
       }
     [@@deriving compare, sexp, yojson, hash, equal]
+
+    [@@@warning "+4"]
 
     let to_latest = Fn.id
   end
