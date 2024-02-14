@@ -2318,6 +2318,7 @@ module Queries = struct
           Transition_frontier.Breadcrumb.staged_ledger breadcrumb
           |> Staged_ledger.ledger
         in
+        let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
         let protocol_state =
           Transition_frontier.Breadcrumb.protocol_state breadcrumb
         in
@@ -2372,8 +2373,8 @@ module Queries = struct
                 next_epoch.ledger.hash ) ) ;
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger ~global_slot
-            ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
-            ~next_epoch_seed ~blockchain_length ~protocol_state runtime_config
+            ~state_hash ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
+            ~next_epoch_seed ~blockchain_length runtime_config
         in
         let%map () =
           let open Async.Deferred.Infix in
