@@ -51,7 +51,7 @@ let B/DependsOn =
     depends =
     \(keys : List Text) ->
         OuterUnion/Type.ListDependsOn/Type
-          (List/map Text InnerUnion/Type (\(k: Text) -> InnerUnion/Type.DependsOn/Type { allow_failure = None Bool, step = Some k }) keys)
+          (List/map Text InnerUnion/Type (\(k: Text) -> InnerUnion/Type.DependsOn/Type { allow_failure = Some False, step = Some k }) keys)
   }
 
 let B/ArtifactPaths = B.definitions/commandStep/properties/artifact_paths/Type
