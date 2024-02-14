@@ -77,12 +77,6 @@ let is_dirty_proof = function
   | _ ->
       true
 
-let accounts_of_ledger = function
-  | { Runtime_config.Ledger.base = Accounts accounts; _ } ->
-      Some accounts
-  | _ ->
-      None
-
 let extract_accounts_exn = function
   | { Runtime_config.Ledger.base = Accounts accounts
     ; num_accounts = None
