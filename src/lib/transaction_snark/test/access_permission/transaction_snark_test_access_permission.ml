@@ -10,6 +10,12 @@ module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 
 let%test_module "Access permission tests" =
   ( module struct
+    let proof_cache =
+      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+      @@ Yojson.Safe.from_file "proof_cache.json"
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let () = Backtrace.elide := false
 
     let sk = Quickcheck.random_value Private_key.gen
@@ -21,7 +27,7 @@ let%test_module "Access permission tests" =
     let account_id = Account_id.create pk_compressed Token_id.default
 
     let tag, _, p_module, Pickles.Provers.[ prover ] =
-      Zkapps_examples.compile () ~cache:Cache_dir.cache
+      Zkapps_examples.compile () ~cache:Cache_dir.cache ~proof_cache
         ~auxiliary_typ:Impl.Typ.unit
         ~branches:(module Nat.N1)
         ~max_proofs_verified:(module Nat.N0)
@@ -223,4 +229,11 @@ let%test_module "Access permission tests" =
         (Proof vk_hash) Signature
 
     let%test_unit "Signature with Signature" = run_test Signature Signature
+
+    let () =
+      match Sys.getenv_opt "PROOF_CACHE_OUT" with
+      | Some path ->
+          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
+      | None ->
+          ()
   end )
