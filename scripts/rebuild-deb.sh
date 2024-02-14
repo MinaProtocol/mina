@@ -256,7 +256,7 @@ build_batch_txn_deb() {
 ##################################### END BATCH TXN TOOL PACKAGE #######################################
 
 ##################################### GENERATE TEST SUITE PACKAGE #######################################
-build_test_suite_deb() {
+build_functional_test_suite_deb() {
   create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.'
 
   # Binaries
@@ -365,7 +365,7 @@ if [ $# -eq 0 ]
     build_batch_txn_deb
     build_daemon_deb
     build_test_executive_deb
-    build_test_suite_deb
+    build_functional_test_suite_deb
     build_zkapp_test_transaction_deb
 
   else 

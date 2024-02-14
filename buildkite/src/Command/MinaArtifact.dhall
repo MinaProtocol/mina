@@ -80,7 +80,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
           },
         
-        TestSuite = 
+        FunctionalTestSuite = 
           DockerImage.ReleaseSpec::{
             deps=DebianVersions.dependsOn debVersion profile,
             service="mina-test-suite",
@@ -88,7 +88,6 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             step_key="test-suite-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
             network="berkeley"
           }
-          
       } artifact
 in 
 
