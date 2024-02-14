@@ -147,3 +147,9 @@ module Fp_poly_comm = Kimchi_backend_common.Poly_comm.Make (struct
      fun unshifted shifted : t -> { shifted; unshifted }
   end
 end)
+
+(* poseidon params *)
+
+let poseidon_params_fp = Sponge.Params.(map pasta_p_kimchi ~f:Fp.of_string)
+
+let poseidon_params_fq = Sponge.Params.(map pasta_q_kimchi ~f:Fq.of_string)
