@@ -11,8 +11,6 @@ GENESIS_TIMESTAMP=${GENESIS_TIMESTAMP:=$(date -u +"%Y-%m-%dT%H:%M:%SZ" -d "10 mi
 # jq expression below could be written with less code,
 # but we aimed for maximum verbosity
 
-# Epoch data is explicitly cleared of nulls and empty objects
-
 jq "{\
     genesis: {\
         genesis_state_timestamp: \"$GENESIS_TIMESTAMP\"\
@@ -25,7 +23,7 @@ jq "{\
         hash: \$hashes[0].ledger.hash,\
         s3_data_hash: \$hashes[0].ledger.s3_data_hash\
     },\
-    epoch_data: ({\
+    epoch_data: {\
         staking: {\
             seed: .epoch_data.staking.seed,\
             hash: \$hashes[0].epoch_data.staking.hash,\
@@ -36,6 +34,6 @@ jq "{\
             hash: \$hashes[0].epoch_data.next.hash,\
             s3_data_hash: \$hashes[0].epoch_data.next.s3_data_hash\
         }\
-      } | del(..|nulls) | del(..|select(.=={})) )\
-    } | del(.epoch_data|select(.=={}))" -M \
+    }\
+  }" -M \
   --slurpfile hashes "$LEDGER_HASHES_JSON" "$FORK_CONFIG_JSON"
