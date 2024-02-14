@@ -115,7 +115,7 @@ let Config =
     , artifact_paths = [] : List SelectFiles.Type
     , env = [] : List TaggedKey.Type
     , retries = [] : List Retry.Type
-    , flake_retry_limit = Some 4
+    , flake_retry_limit = Some 0
     , soft_fail = None B/SoftFail
     , skip = None B/Skip
     , `if` = None B/If
@@ -198,9 +198,7 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                       Retry::{ exit_status = ExitStatus.Code +128, limit = Some 4 }
                     ] #
                     -- and the retries that are passed in (if any)
-                    c.retries #
-                    -- Other job-specific errors
-                    [ Retry::{ exit_status = ExitStatus.Any, limit = Some 4 } ])
+                    c.retries)
                 in
                 B/Retry.ListAutomaticRetry/Type xs),
               manual = Some (B/Manual.Manual/Type {
