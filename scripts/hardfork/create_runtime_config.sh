@@ -10,7 +10,7 @@ FORKING_FROM_CONFIG_JSON=${FORKING_FROM_CONFIG_JSON:=genesis_ledgers/mainnet.jso
 GENESIS_TIMESTAMP=${GENESIS_TIMESTAMP:=$(date -u +"%Y-%m-%dT%H:%M:%SZ" -d "10 mins")}
 
 # Pull the original genesis timestamp from the pre-fork config file
-ORIGINAL_GENESIS_TIMESTAMP=$(jq '.genesis.genesis_state_timestamp' $FORKING_FROM_CONFIG_JSON | sed 's/"//g')
+ORIGINAL_GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$FORKING_FROM_CONFIG_JSON")
 
 DIFFERENCE_IN_SECONDS=$(($(date -d "$GENESIS_TIMESTAMP" "+%s") - $(date -d "$ORIGINAL_GENESIS_TIMESTAMP" "+%s")))
 # Default: mainnet currently uses 180s per slot
