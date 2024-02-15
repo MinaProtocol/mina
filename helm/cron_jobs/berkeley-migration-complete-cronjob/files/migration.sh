@@ -112,21 +112,20 @@ run_first_phase_of_migration() {
 	
 	
 	if [ -z "${FORK_STATE_HASH}" ]; then
-		mina-berkeley-migration --mainnet-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_FROM}" --migrated-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_TO}" --batch-size ${PRECOMPUTED_BLOCKS_DOWNLOAD_BATCH_SIZE} --config-file genesis_ledger.json --blocks-bucket "$PRECOMP_BLOCKS_BUCKET" --network "$NETWORK_NAME"  &> "${MIGRATION_LOG}".log
+		mina-berkeley-migration --mainnet-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_FROM}" --migrated-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_TO}" --batch-size ${PRECOMPUTED_BLOCKS_DOWNLOAD_BATCH_SIZE} --config-file genesis_ledger.json --blocks-bucket "$PRECOMP_BLOCKS_BUCKET" --network "$NETWORK_NAME" | tee "${MIGRATION_LOG}".log
 	else
-		mina-berkeley-migration --mainnet-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_FROM}" --migrated-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_TO}" --batch-size ${PRECOMPUTED_BLOCKS_DOWNLOAD_BATCH_SIZE} --config-file genesis_ledger.json --blocks-bucket "$PRECOMP_BLOCKS_BUCKET" --network "$NETWORK_NAME" --fork-state-hash $FORK_STATE_HASH &> "${MIGRATION_LOG}".log
+		mina-berkeley-migration --mainnet-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_FROM}" --migrated-archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_TO}" --batch-size ${PRECOMPUTED_BLOCKS_DOWNLOAD_BATCH_SIZE} --config-file genesis_ledger.json --blocks-bucket "$PRECOMP_BLOCKS_BUCKET" --network "$NETWORK_NAME" --fork-state-hash $FORK_STATE_HASH | tee "${MIGRATION_LOG}".log
 	fi
     echo "Done running berkeley migration app";
 
 }
-
 
 run_second_phase_of_migration() {
 	INPUT_FILE=$1
 
 	echo "Running replayer in migration mode";
 	
-	mina-replayer --migration-mode --archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_TO}" --input-file "$INPUT_FILE" --checkpoint-interval 100 --checkpoint-file-prefix "$CHECKPOINT_PREFIX" &> "${CHECKPOINT_PREFIX}".log
+	mina-replayer --migration-mode --archive-uri ${PG_CONN_STRING}/"${SCHEMA_NAME_TO}" --input-file "$INPUT_FILE" --checkpoint-interval 100 --checkpoint-file-prefix "$CHECKPOINT_PREFIX" | tee "${CHECKPOINT_PREFIX}".log
 	
 	echo "Done running replayer in migration mode";
 }
@@ -168,16 +167,28 @@ upload_error () {
 
 upload_replayer_checkpoint () {
   echo "No errors found! uploading newest local checkpoint to ${CHECKPOINT_BUCKET} bucket";
-  COUNT_CHECKPOINTS=$(ls -t "${CHECKPOINT_PREFIX}"-checkpoint*.json | wc -l)
+  COUNT_CHECKPOINTS=$(ls -t "${CHECKPOINT_PREFIX}"-checkpoint*.json 2> /dev/null | wc -l)
   
-  if [ $COUNT_CHECKPOINTS == 1  ]; then
-	echo " There are no new checkpoints apart from the on downloaded before migration \
+  if [ "$PHASE_2_INITIAL_RUN" == "true" ]; then
+	
+	if [ "$COUNT_CHECKPOINTS" -eq "0" ]; then
+		echo " There are no new checkpoints. It means that no transactions are archived before \
+current and last migration or there are no canoncial block apart from genesis (when FORK_STATE_HASH env var is empty)"
+		return 
+    fi
+
+  else 
+	
+	if [ "$COUNT_CHECKPOINTS" -eq "1" ]; then
+	  echo " There are no new checkpoints apart from the on downloaded before migration \
 It means that no transactions are archived before this and last migration "
-	return 
+	  return 
+	else
+	  rm -f "$MOST_RECENT_CHECKPOINT";	
+	fi
+	
   fi
-
-  rm -f "$MOST_RECENT_CHECKPOINT";
-
+  
   DISK_CHECKPOINT=$(ls -t "${CHECKPOINT_PREFIX}"-checkpoint*.json | head -n 1);
   TODAY_CHECKPOINT=$CHECKPOINT_PREFIX-checkpoint-${DATE}.json;
   mv "$DISK_CHECKPOINT" "$TODAY_CHECKPOINT";
@@ -194,42 +205,67 @@ upload_dump () {
   gsutil -o "$KEY_FILE_ARG" cp "$UPLOAD_ARCHIVE_NAME" gs://"$DUMPS_BUCKET"
 }
 
+determine_migration_state () {
+	MIGRATED_DUMPS_COUNT=$(gsutil ls gs://${DUMPS_BUCKET}/${DUMPS_PREFIX_FROM}-*.sql.tar.gz 2> /dev/null | wc -l)
+	if [ "$MIGRATED_DUMPS_COUNT" -eq 0 ]; then 
+		echo "No migrated dumps found. Assuming this is phase 1 initial run"
+		PHASE_1_INITIAL_RUN=true
+	else
+		echo "Already migrated dumps found. Assuming this is phase 1 incremental run"
+		PHASE_1_INITIAL_RUN=false
+	fi
+
+	CHECKPOINTS_COUNT=$(gsutil -o "$KEY_FILE_ARG" ls gs://"$CHECKPOINT_BUCKET"/"$CHECKPOINT_PREFIX"-checkpoint-*.json 2> /dev/null | wc -l )
+	if [ "$CHECKPOINTS_COUNT" -eq 0 ]; then 
+		echo "No migrated checkpoints found. Assuming this is phase 2 initial run"
+		PHASE_2_INITIAL_RUN=true
+	else
+		echo "Already migrated dumps found. Assuming this is phase 2 incremental run"
+		PHASE_2_INITIAL_RUN=false
+	fi
+}
+
+
 service postgresql start;
 su postgres -c "echo ALTER USER postgres WITH PASSWORD \'postgres\' | psql";
 
 install_prereqs
 
+determine_migration_state
 
-if [ "$INITIAL_RUN" == "true" ]; then
-	import_dump "${DUMPS_PREFIX_FROM}-archive-dump" "$SCHEMA_NAME_FROM"
+import_dump "${DUMPS_PREFIX_FROM}-archive-dump" "$SCHEMA_NAME_FROM"
+
+if [ "$PHASE_1_INITIAL_RUN" == "true" ]; then
 	import_dump_first_time "$SCHEMA_NAME_TO"
-	run_first_phase_of_migration
-
-	grep Error "${MIGRATION_LOG}".log;
-	HAVE_ERRORS=$?;
-	
-	if [ $HAVE_ERRORS -eq 0 ]; then 
-		upload_error "${MIGRATION_LOG}" "${CHECKPOINT_BUCKET}"
-	else
-		run_second_phase_of_migration_first_time
-		upload_replayer_checkpoint
-		upload_dump
-	fi
 else 
-
-	import_dump "${DUMPS_PREFIX_FROM}-archive-dump" "$SCHEMA_NAME_FROM"
-	import_dump "${DUMPS_PREFIX_TO}-archive-dump" "$SCHEMA_NAME_TO"
-	
-	run_first_phase_of_migration
-	
-	grep Error "${MIGRATION_LOG}".log;
-	HAVE_ERRORS=$?;
-	
-	if [ $HAVE_ERRORS -eq 0 ]; then 
-		upload_error "${MIGRATION_LOG}" "${CHECKPOINT_BUCKET}"
-	else
-		run_second_phase_of_migration_based_on_checkpoint
-		upload_replayer_checkpoint
-		upload_dump
-	fi
+	import_dump "${DUMPS_PREFIX_TO}-archive-dump" "$SCHEMA_NAME_TO"	
 fi
+
+run_first_phase_of_migration
+
+grep Error "${MIGRATION_LOG}".log;
+HAVE_ERRORS=$?;
+	
+if [ $HAVE_ERRORS -eq 0 ]; then 
+	upload_error "${MIGRATION_LOG}" "${CHECKPOINT_BUCKET}"
+	echo "first phase of migration ended with error.. second phase won't be ran. Exiting..."
+	exit 1
+fi
+
+if [ "$PHASE_2_INITIAL_RUN" == "true" ]; then
+	run_second_phase_of_migration_first_time
+else
+	run_second_phase_of_migration_based_on_checkpoint	
+fi
+
+grep Error "${CHECKPOINT_PREFIX}".log;
+HAVE_ERRORS=$?;
+	
+if [ $HAVE_ERRORS -eq 0 ]; then 
+	upload_error "${MIGRATION_LOG}" "${CHECKPOINT_BUCKET}"
+	echo "second phase of migration ended with error.. won't upload any artifacts. Exiting..."
+	exit 1
+fi
+
+upload_replayer_checkpoint
+upload_dump
