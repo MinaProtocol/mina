@@ -47,8 +47,7 @@ module Chain_hash = struct
 
   let equal = Stable.Latest.equal
 
-  let empty =
-    of_hash (Hash_prefix_create.salt "CodaReceiptEmpty" |> Random_oracle.digest)
+  let empty = of_hash Random_oracle.Legacy.(salt "CodaReceiptEmpty" |> digest)
 
   let cons_signed_command_payload (e : Signed_command_elt.t) (t : t) =
     let open Random_oracle.Legacy in

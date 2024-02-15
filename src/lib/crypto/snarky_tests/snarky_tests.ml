@@ -627,7 +627,7 @@ module Protocol_circuits = struct
 
   let transaction () : unit =
     let expected1 = "b8879f677f622a1d86648030701f43e1" in
-    let expected2 = "a58d09e2904bad2e3f983b3f9b0cf78f" in
+    let expected2 = "c17f6cef52fc6c73d389c0128e41a924" in
     let digest =
       Transaction_snark.constraint_system_digests ~constraint_constants ()
     in

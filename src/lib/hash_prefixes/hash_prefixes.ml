@@ -64,7 +64,7 @@ let signature_mainnet = create "MinaSignatureMainnet"
 
 let signature_other chain_name = create (chain_name ^ "Signature")
 
-let receipt_chain_user_command = create "MinaReceiptUC"
+let receipt_chain_user_command = create "CodaReceiptUC"
 
 (* leaving this one with "Coda", to preserve the existing hashes *)
 let receipt_chain_zkapp = create "CodaReceiptZkapp"
