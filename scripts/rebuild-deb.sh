@@ -17,7 +17,7 @@ if [ $# -eq 0 ]
     build_daemon_deb
     build_receipt_chain_hash_fix_deb
     build_test_executive_deb
-    build_test_suite_deb
+    build_functional_test_suite_deb
     build_zkapp_test_transaction_deb
 
   else 
