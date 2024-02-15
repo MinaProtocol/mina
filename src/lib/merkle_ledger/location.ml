@@ -10,8 +10,6 @@ module Bigstring = struct
 
       let to_latest = Fn.id
 
-      let equal = Bigstring.equal
-
       let hash t = Bigstring.to_string t |> String.hash
 
       let hash_fold_t hash_state t =
@@ -27,8 +25,7 @@ module Bigstring = struct
     end
   end]
 
-  [%%define_locally
-  Bigstring.(get, length, equal, create, to_string, set, blit, sub)]
+  [%%define_locally Bigstring.(get, length, create, to_string, set, blit, sub)]
 
   include Hashable.Make (Stable.Latest)
 end
