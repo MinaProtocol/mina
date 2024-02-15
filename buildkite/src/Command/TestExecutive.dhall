@@ -30,7 +30,7 @@ in
         depends_on = dependsOn,
         retries = [
           -- common/flake error
-          Command.Retry::{ exit_status = Command.ExitStatus.Code +1, limit = Some 4 },
+          Command.Retry::{ exit_status = Command.ExitStatus.Code +1, limit = Some 4 }
         ]
       }
 }
