@@ -11,8 +11,8 @@ in
 
 Pipeline.build 
     (ArtifactPipelines.pipeline 
-        Artifacts.AllButTests
-        DebianVersions.DebVersion.Focal 
-        Profiles.Type.Standard 
+        [ Artifacts.Type.Archive ]
+        DebianVersions.DebVersion.Bullseye 
+        Profiles.Type.BerkeleyMigration
         PipelineMode.Type.PullRequest
     )

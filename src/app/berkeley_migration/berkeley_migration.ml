@@ -406,7 +406,7 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool ~network
       : Archive_lib.Extensional.Block.t )
 
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
-    ~end_global_slot ~mina_network_blocks_bucket ~batch_size ~network () =
+    ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network () =
   let logger = Logger.create () in
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
@@ -449,19 +449,38 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
         Mina_block.genesis ~precomputed_values
       in
       let%bind mainnet_block_ids =
-        match end_global_slot with
+        match fork_state_hash with
         | None ->
             [%log info] "Querying mainnet canonical blocks" ;
             query_mainnet_db ~f:(fun db ->
                 Sql.Mainnet.Block.canonical_blocks db () )
-        | Some slot ->
+        | Some state_hash ->
             [%log info]
-              "Querying mainnet blocks at or below global slot since genesis \
-               %d (but not orphaned blocks)"
-              slot ;
+              "Mark the chain leads to target state hash %s to be canonical"
+              state_hash ;
+            let%bind fork_id =
+              query_mainnet_db ~f:(fun db ->
+                  Sql.Mainnet.Block.id_from_state_hash db state_hash )
+            in
+            let%bind highest_canonical_block_id =
+              query_mainnet_db ~f:(fun db ->
+                  Sql.Mainnet.Block.get_highest_canonical_block db () )
+            in
+            let%bind subchain_blocks =
+              query_mainnet_db ~f:(fun db ->
+                  Sql.Mainnet.Block.get_subchain db
+                    ~start_block_id:highest_canonical_block_id
+                    ~end_block_id:fork_id )
+            in
+            let%bind () =
+              Deferred.List.iter subchain_blocks ~f:(fun id ->
+                  query_mainnet_db ~f:(fun db ->
+                      Sql.Mainnet.Block.mark_as_canonical db id ) )
+            in
             query_mainnet_db ~f:(fun db ->
-                Sql.Mainnet.Block.blocks_at_or_below db slot )
+                Sql.Mainnet.Block.canonical_blocks db () )
       in
+
       [%log info] "Found %d mainnet blocks" (List.length mainnet_block_ids) ;
       let%bind mainnet_blocks_unsorted =
         Deferred.List.map mainnet_block_ids ~f:(fun id ->
@@ -543,12 +562,12 @@ let () =
              ~doc:
                "PATH to the configuration file containing the berkeley genesis \
                 ledger"
-         and end_global_slot =
-           Param.flag "--end-global-slot" ~aliases:[ "-end-global-slot" ]
-             Param.(optional int)
+         and fork_state_hash =
+           Param.flag "--fork-state-hash" ~aliases:[ "-fork-state-hash" ]
+             Param.(optional string)
              ~doc:
-               "NN Last global slot since genesis to include in the migration \
-                (if omitted, only canonical blocks will be migrated)"
+               "String state hash of the fork for the migration (if omitted, \
+                only canonical blocks will be migrated)"
          and mina_network_blocks_bucket =
            Param.flag "--blocks-bucket" ~aliases:[ "-blocks-bucket" ]
              Param.(required string)
@@ -563,4 +582,4 @@ let () =
              ~doc:"Network name used when downloading precomputed blocks"
          in
          main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
-           ~end_global_slot ~mina_network_blocks_bucket ~batch_size ~network )))
+           ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network )))
