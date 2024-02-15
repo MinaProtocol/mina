@@ -28,5 +28,5 @@ build_keypair_deb
 build_archive_deb
 build_batch_txn_deb
 build_test_executive_deb
-build_test_suite_deb
+build_functional_test_suite_deb
 build_zkapp_test_transaction_deb
