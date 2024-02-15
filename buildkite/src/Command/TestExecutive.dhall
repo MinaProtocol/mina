@@ -31,8 +31,6 @@ in
         retries = [
           -- common/flake error
           Command.Retry::{ exit_status = Command.ExitStatus.Code +1, limit = Some 4 },
-          -- Blindly retry 4 more times anyway. Why not.
-          Command.Retry::{ exit_status = Command.ExitStatus.Any, limit = Some 4 }
         ]
       }
 }
