@@ -22,3 +22,6 @@ for ledger_tarball in $LEDGER_TARBALLS; do
 done
 
 build_deb mina-mainnet-hardfork
+
+build_keypair_deb
+build_archive_deb
