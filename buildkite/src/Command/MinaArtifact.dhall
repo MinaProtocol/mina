@@ -212,8 +212,16 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             service="mina-zkapp-test-transaction",
             deb_codename="${DebianVersions.lowerName debVersion}",
             step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
+          },
+        
+        FunctionalTestSuite = 
+          DockerImage.ReleaseSpec::{
+            deps=DebianVersions.dependsOn debVersion profile,
+            service="mina-test-suite",
+            deb_codename="${DebianVersions.lowerName debVersion}",
+            step_key="test-suite-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
+            network="berkeley"
           }
-
       } artifact
 in 
 

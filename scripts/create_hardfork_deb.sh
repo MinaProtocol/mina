@@ -27,7 +27,6 @@ build_logproc_deb
 build_keypair_deb
 build_archive_deb
 build_batch_txn_deb
-build_receipt_chain_hash_fix_deb
 build_test_executive_deb
 build_test_suite_deb
 build_zkapp_test_transaction_deb
