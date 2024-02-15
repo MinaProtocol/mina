@@ -1,4 +1,4 @@
-# A set defining OCaml parts&dependencies of Mina
+# A set defining OCaml parts&dependencies of Minaocamlnix
 { inputs, ... }@args:
 let
   opam-nix = inputs.opam-nix.lib.${pkgs.system};
@@ -66,7 +66,7 @@ let
     filter {
       root = ../.;
       include =
-        [ (inDirectory "src") "dune" "dune-project" "./graphql_schema.json" ];
+        [ (inDirectory "src") "dune" "dune-project" "./graphql_schema.json" "genesis_ledgers/default.json" ];
     };
 
   overlay = self: super:
