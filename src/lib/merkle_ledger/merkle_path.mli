@@ -8,8 +8,6 @@ module type S = sig
   type t = elem list [@@deriving sexp, equal]
 
   val implied_root : t -> hash -> hash
-
-  val check_path : t -> hash -> hash -> bool
 end
 
 module Make (Hash : sig

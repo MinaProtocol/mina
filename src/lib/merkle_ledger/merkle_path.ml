@@ -10,8 +10,6 @@ module type S = sig
   type t = elem list [@@deriving sexp, equal]
 
   val implied_root : t -> hash -> hash
-
-  val check_path : t -> hash -> hash -> bool
 end
 
 module Make (Hash : sig
@@ -38,7 +36,4 @@ end) : S with type hash := Hash.t = struct
         in
         (acc, height + 1) )
     |> fst
-
-  let check_path t leaf_hash root_hash =
-    Hash.equal (implied_root t leaf_hash) root_hash
 end
