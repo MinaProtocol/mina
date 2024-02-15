@@ -110,7 +110,7 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
                   , "GENESIS_TIMESTAMP=\$GENESIS_TIMESTAMP"
                   ]
                   "./buildkite/scripts/build-hardfork-package.sh"
-            , label = "Ledger tar file generation"
+            , label = "Build Mina Hardfork Package for ${DebianVersions.capitalName debVersion}"
             , key = generateLedgersJobKey
             , target = Size.XLarge
             }

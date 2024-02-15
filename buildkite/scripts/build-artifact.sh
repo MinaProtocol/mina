@@ -2,7 +2,7 @@
 
 set -eo pipefail
 
-([ -z "$DUNE_PROFILE" ]) && echo "required env vars were not provided" && exit 1
+([ -z ${DUNE_PROFILE+x} ]) && echo "required env vars were not provided" && exit 1
 
 source ~/.profile
 
@@ -19,6 +19,7 @@ echo "--- Build all major tagets required for packaging"
 echo "Building from Commit SHA: ${MINA_COMMIT_SHA1}"
 echo "Rust Version: $(rustc --version)"
 dune build "--profile=${DUNE_PROFILE}" \
+  ${MAINNET_TARGETS} \
   src/app/logproc/logproc.exe \
   src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
   src/app/generate_keypair/generate_keypair.exe \
