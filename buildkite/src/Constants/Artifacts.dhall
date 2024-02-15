@@ -2,10 +2,12 @@ let Prelude = ../External/Prelude.dhall
 let Text/concatSep = Prelude.Text.concatSep
 let Profiles = ./Profiles.dhall
 
-let Artifact : Type  = < Daemon | Archive | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction >
+let Artifact : Type  = < Daemon | Archive | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
 
-let All = [ Artifact.Daemon , Artifact.Archive , Artifact.TestExecutive , Artifact.BatchTxn , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
-   
+let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
+
+let All = AllButTests # [ Artifact.FunctionalTestSuite ]
+
 let capitalName = \(artifact : Artifact) ->
   merge {
     Daemon = "Daemon"
@@ -14,6 +16,7 @@ let capitalName = \(artifact : Artifact) ->
     , BatchTxn = "BatchTxn"
     , Rosetta = "Rosetta"
     , ZkappTestTransaction = "ZkappTestTransaction"
+    , FunctionalTestSuite = "FunctionalTestSuite"
   } artifact
 
 let lowerName = \(artifact : Artifact) ->
@@ -24,7 +27,9 @@ let lowerName = \(artifact : Artifact) ->
     , BatchTxn = "batch_txn"
     , Rosetta = "rosetta"
     , ZkappTestTransaction = "zkapp_test_transaction"
+    , FunctionalTestSuite = "functional_test_suite"
   } artifact
+
 
 
 let toDebianName = \(artifact : Artifact) ->
@@ -35,6 +40,7 @@ let toDebianName = \(artifact : Artifact) ->
     , BatchTxn = "batch_txn"
     , Rosetta = "" 
     , ZkappTestTransaction = "zkapp_test_transaction"
+    , FunctionalTestSuite = "functional_test_suite"
   } artifact
 
 let toDebianNames = \(artifacts : List Artifact) -> 
@@ -54,4 +60,5 @@ in
   , toDebianName = toDebianName
   , toDebianNames = toDebianNames
   , All = All 
+  , AllButTests = AllButTests 
 }
