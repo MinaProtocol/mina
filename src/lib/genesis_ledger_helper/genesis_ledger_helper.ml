@@ -171,9 +171,9 @@ module Ledger = struct
                   ] ;
               return None )
       | None ->
-          [%log error]
+          [%log warn]
             "Need S3 hash specified in runtime config to verify download for \
-             $ledger (root hash $root_hash), refusing unsafe download"
+             $ledger (root hash $root_hash), not attempting"
             ~metadata:
               [ ( "root_hash"
                 , `String (Option.value ~default:"not specified" config.hash) )
@@ -530,7 +530,7 @@ module Ledger = struct
                         ; ("named_tar_path", `String link_name)
                         ] ;
                     Ok (packed, config, link_name)
-                | Ok tar_path, None ->
+                | Ok tar_path, _ ->
                     return (Ok (packed, config, tar_path))
                 | Error err, _ ->
                     let root_hash =

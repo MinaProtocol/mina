@@ -231,21 +231,6 @@ build_logproc_deb() {
 }
 ##################################### END LOGPROC PACKAGE #######################################
 
-##################################### GENERATE RECEIPT CHAIN HASH FIX PACKAGE #######################################
-build_receipt_chain_hash_fix_deb () {
-  create_control_file mina-receipt-chain-hash-fix "${SHARED_DEPS}${DAEMON_DEPS}" 'Tool to run automated fix against a archive database for receipt chain hash.'
-
-  mkdir -p "${BUILDDIR}/etc/mina/receipt-chain-hash-fix-script"
-
-  # Binaries
-  cp ../scripts/migrate-itn-data.sh "${BUILDDIR}/etc/mina/receipt-chain-hash-fix-script/migrate-itn-data.sh"
-  cp ./default/src/app/last_vrf_output_to_b64/last_vrf_output_to_b64.exe "${BUILDDIR}/usr/local/bin/mina-last-vrf-output-to-b64"
-  cp ./default/src/app/receipt_chain_hash_to_b58/receipt_chain_hash_to_b58.exe "${BUILDDIR}/usr/local/bin/mina-receipt-chain-hash-to-b58"
-
-  build_deb mina-receipt-chain-hash-fix
-}
-##################################### END RECEIPT CHAIN HASH FIX PACKAGE #######################################
-
 ##################################### GENERATE TEST_EXECUTIVE PACKAGE #######################################
 build_test_executive_deb () {
   create_control_file mina-test-executive "${SHARED_DEPS}${TEST_EXECUTIVE_DEPS}" 'Tool to run automated tests against a full mina testnet with multiple nodes.'
