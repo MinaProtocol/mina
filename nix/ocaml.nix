@@ -207,6 +207,8 @@ let
             src/app/replayer/replayer.exe \
             src/app/swap_bad_balances/swap_bad_balances.exe \
             src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
+          # TODO figure out purpose of the line below
+          # dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
           # Building documentation fails, because not everything in the source tree compiles. Ignore the errors.
           dune build @doc || true
         '';
@@ -224,7 +226,8 @@ let
 
         installPhase = ''
           mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
-          mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
+          # TODO uncomment when genesis is generated above
+          # mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
           pushd _build/default
           cp src/app/cli/src/mina.exe $out/bin/mina
           cp src/app/logproc/logproc.exe $out/bin/logproc
