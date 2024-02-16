@@ -148,3 +148,9 @@ module type S = sig
   *)
   val detached_signal : t -> unit Async_kernel.Deferred.t
 end
+
+module type NULL = sig
+  include S
+
+  val create : depth:int -> unit -> t
+end
