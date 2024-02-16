@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
-SLOT_TX_END="${SLOT_TX_END:-15}"
-SLOT_CHAIN_END="${SLOT_CHAIN_END:-30}"
+SLOT_TX_END="${SLOT_TX_END:-30}"
+SLOT_CHAIN_END="${SLOT_CHAIN_END:-$((SLOT_TX_END+8))}"
 
 # Slot duration in seconds to be used for both version
 MAIN_SLOT="${MAIN_SLOT:-90}"
 FORK_SLOT="${FORK_SLOT:-30}"
 
 # Delay before genesis slot in minutes to be used for both version
-MAIN_DELAY="${MAIN_DELAY:-10}"
+MAIN_DELAY="${MAIN_DELAY:-20}"
 FORK_DELAY="${FORK_DELAY:-10}"
 
 # script should be run from mina root directory.
@@ -21,22 +21,27 @@ MAIN_MINA_EXE="$1"
 FORK_MINA_EXE="$2"
 FORK_RUNTIME_GENESIS_LEDGER_EXE="$3"
 
+stop_nodes(){
+  "$1" client stop-daemon --daemon-port 10301
+  "$1" client stop-daemon --daemon-port 10311
+}
+
 # 1. Node is started
 ./scripts/run-hf-localnet.sh -m "$MAIN_MINA_EXE" -d "$MAIN_DELAY" -i "$MAIN_SLOT" \
   -s "$MAIN_SLOT" --slot-tx-end "$SLOT_TX_END" --slot-chain-end "$SLOT_CHAIN_END" &
 
 MAIN_NETWORK_PID=$!
 
-# Sleep until slot_tx_end plus one minute
-sleep $((MAIN_SLOT*(SLOT_TX_END-10)+MAIN_DELAY*60+60))s
+# Sleep until slot_tx_end minus 5 slots plus one minute (to account for rounding)
+sleep $((MAIN_SLOT*(SLOT_TX_END-5)+MAIN_DELAY*60+60))s
 
 # 2. Check that there are many blocks >50% of slots occupied from slot 0 to slot $((SLOT_TX_END / 2)) and that there are some user commands in blocks corresponding to slots
 blockHeight=$(get_height 10303)
-echo "Block height is $blockHeight at slot $((SLOT_TX_END / 2))."
+echo "Block height is $blockHeight at slot $((SLOT_TX_END-5))."
 echo "Blocks are produced."
 
 all_blocks_empty=true
-for i in {1..10}
+for i in {1..5}
 do
   sleep "${MAIN_SLOT}s"
   usercmds=$(blocks_withUserCommands 10303)
@@ -46,14 +51,15 @@ do
 done
 if $all_blocks_empty; then
   echo "Assertion failed: all blocks are empty" >&2
+  stop_nodes "$MAIN_MINA_EXE"
   exit 3
 fi
 
 # 3. Check that transactions stop getting included from slot SLOT_TX_END to slot SLOT_CHAIN_END, i.e. there are some blocks, with no user commands, coinbase set to 0.
-sleep $((MAIN_SLOT*(SLOT_CHAIN_END-SLOT_TX_END-10)))s
+sleep $((MAIN_SLOT*(SLOT_CHAIN_END-SLOT_TX_END-5)))s
 
 all_blocks_empty=false
-for i in {1..10}
+for i in {1..5}
 do
   sleep "${MAIN_SLOT}s"
   usercmds=$(blocks_withUserCommands 10303)
@@ -64,6 +70,7 @@ do
 done
 if [[ ! $all_blocks_empty ]]; then
   echo "Assertion failed: not all blocks are empty" >&2
+  stop_nodes "$MAIN_MINA_EXE"
   exit 3
 fi
 
@@ -74,6 +81,7 @@ sleep 5m
 height2=$(get_height 10303)
 if [[ $(( height2 - height1 )) -gt 0 ]]; then
   echo "Assertion failed: there should be no change in blockheight." >&2
+  stop_nodes "$MAIN_MINA_EXE"
   exit 3
 fi
 
@@ -87,8 +95,7 @@ while [[ "$(stat -c %s localnet/fork_config.json)" == 0 ]] || [[ "$(head -c 4 lo
 done
 
 # 7. Runtime config is converted with a script to have only ledger hashes in the config
-"$MAIN_MINA_EXE" client stop-daemon --daemon-port 10301
-"$MAIN_MINA_EXE" client stop-daemon --daemon-port 10311
+stop_nodes "$MAIN_MINA_EXE"
 
 sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "1"}/' localnet/fork_config.json
 
@@ -108,13 +115,15 @@ wait "$MAIN_NETWORK_PID"
 
 # 9. Check that network eventually creates some blocks
 
-sleep $((FORK_SLOT*60+FORK_DELAY*60+60))s
+sleep $((FORK_SLOT*10+FORK_DELAY*60+60))s
 height1=$(get_height 10303)
 if [[ $height1 == 0 ]]; then
-  echo "My assertion failed: block height $height1 should be greater than 0." >&2
+  echo "Assertion failed: block height $height1 should be greater than 0." >&2
+  stop_nodes "$FORK_MINA_EXE"
   exit 3
 fi
 echo "Blocks are produced."
+
 # Wait and check that there are blocks created with >50% occupancy and there are transactions in last 10 blocks
 
 all_blocks_empty=true
@@ -128,8 +137,8 @@ do
 done
 if $all_blocks_empty; then
   echo "Assertion failed: all blocks are empty" >&2
+  stop_nodes "$FORK_MINA_EXE"
   exit 3
 fi
 
-"$FORK_MINA_EXE" client stop-daemon --daemon-port 10301
-"$FORK_MINA_EXE" client stop-daemon --daemon-port 10311
+stop_nodes "$FORK_MINA_EXE"
