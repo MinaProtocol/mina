@@ -1,12 +1,6 @@
 open Core_kernel
 
-module type Inputs_intf = sig
-  include Base_inputs_intf.S
-
-  module Location : Location_intf.S
-end
-
-module Make (Inputs : Inputs_intf) : sig
+module Make (Inputs : Base_inputs_intf.Intf) : sig
   include
     Base_ledger_intf.S
       with module Addr = Inputs.Location.Addr

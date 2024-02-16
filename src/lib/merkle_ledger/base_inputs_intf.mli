@@ -16,3 +16,9 @@ module type S = sig
 
   module Hash : Intf.Hash with type account := Account.t
 end
+
+module type Intf = sig
+  include S
+
+  module Location : Location_intf.S
+end

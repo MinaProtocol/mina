@@ -37,13 +37,7 @@ module type S = sig
   module M : Base_intf with type t = witness
 end
 
-module type Inputs_intf = sig
-  include Base_inputs_intf.S
-
-  module Location : Location_intf.S
-end
-
-module Make_base (Inputs : Inputs_intf) :
+module Make_base (Inputs : Base_inputs_intf.Intf) :
   S
     with module Location = Inputs.Location
     with type key := Inputs.Key.t
