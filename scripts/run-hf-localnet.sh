@@ -111,7 +111,7 @@ if [[ "$CUSTOM_CONF" == "" ]] && [[ ! -f $CONF_DIR/ledger.json ]]; then
   ( cd $CONF_DIR && "$SCRIPT_DIR/prepare-test-ledger.sh" -c 100000 -b 1000000 $(cat bp.pub) >ledger.json )
 fi
 
-timestamp="$( d=$(date +%s); date -u -d @$((d - d % 60 + DELAY_MIN*60)) +%FT%H:%M:%S+00:00 )"
+timestamp="$( d=$(date +%s); date -u -d @$((d - d % 60 + DELAY_MIN*60)) '+%F %H:%M:%S+00:00' )"
 
 if [[ "$SLOT_TX_END" != "" ]]; then
   slot_ends=".daemon.slot_tx_end = $SLOT_TX_END | "
@@ -120,49 +120,41 @@ if [[ "$SLOT_CHAIN_END" != "" ]]; then
   slot_ends="$slot_ends .daemon.slot_chain_end = $SLOT_CHAIN_END | "
 fi
 
-update_config_expr=".genesis.genesis_state_timestamp = \"$timestamp\" | .proof.block_window_duration_ms = ${SLOT}000"
+update_config_expr="$slot_ends .genesis.genesis_state_timestamp = \"$timestamp\""
 
-if [[ "$CUSTOM_CONF" == "" ]]; then
-  jq --slurpfile accounts $CONF_DIR/ledger.json "$slot_ends .ledger.accounts = \$accounts[0] | $update_config_expr" > $CONF_DIR/daemon.json << EOF
+jq "$update_config_expr" > $CONF_DIR/base.json << EOF
 {
   "genesis": {
-    "genesis_state_timestamp": "",
     "slots_per_epoch": 48,
     "k": 2,
-    "transaction_capacity": { "log_2": 2 },
     "grace_period_slots": 3
   },
   "proof": {
     "work_delay": 1,
     "level": "full",
-    "sub_windows_per_window": 11,
-    "ledger_depth": 20,
     "transaction_capacity": { "2_to_the": 2 },
-    "coinbase_amount": "720",
-    "supercharged_coinbase_factor": 1,
-    "account_creation_fee": "1"
-  },
-  "ledger": {
-    "name": "localnet",
-    "accounts": []
+    "block_window_duration_ms": ${SLOT}000
   }
 }
 EOF
 
+MAINNET_TO_BERKELEY_EXPR='.ledger.accounts = [.ledger.accounts[] | del(.token_permissions, .permissions.stake) | .token = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf" | .token_symbol = "" | select(.permissions.set_verification_key == "signature").permissions.set_verification_key |= {auth:"signature", txn_version: "1"} ]'
+
+if [[ "$CUSTOM_CONF" == "" ]]; then
+  { echo '{"ledger": {"accounts": '; cat $CONF_DIR/ledger.json; echo '}}'; } > $CONF_DIR/daemon.json
   # Convert ledger to berkeley format
-  jq '.ledger.accounts = [.ledger.accounts[] | del(.token_permissions, .permissions.stake) | .token = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf" | .token_symbol = "" | select(.permissions.set_verification_key == "signature").permissions.set_verification_key |= {auth:"signature", txn_version: "1"} ]' <$CONF_DIR/daemon.json >$CONF_DIR/daemon.berkeley.json
-
+  jq "$MAINNET_TO_BERKELEY_EXPR" <$CONF_DIR/daemon.json >$CONF_DIR/daemon.berkeley.json
 else
-  <"$CUSTOM_CONF" jq "$update_config_expr" > $CONF_DIR/daemon.json
+  cp "$CUSTOM_CONF" $CONF_DIR/daemon.json
 fi
-
 
 ##############################################################
 # Launch two Mina nodes and send transactions on an interval
 ##############################################################
 
-CONF_FILE="$PWD/$CONF_DIR/daemon$CONF_SUFFIX.json"
-COMMON_ARGS=( --config-file "$CONF_FILE" --file-log-level Info --log-level Error --seed )
+COMMON_ARGS=( --file-log-level Info --log-level Error --seed )
+COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/base.json" )
+COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/daemon$CONF_SUFFIX.json" )
 
 if [[ "$GENESIS_LEDGER_DIR" != "" ]]; then
   rm -Rf localnet/genesis_{1,2}
