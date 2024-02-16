@@ -50,14 +50,18 @@ module T = struct
     let hash ~ledger_depth depth = UInt8.of_int (ledger_depth - depth)
   end
 
+  [@@@warning "-4"] (* disabled because of deriving sexp *)
+
   type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
   [@@deriving hash, sexp, compare]
 
-  let is_generic = function Generic _ -> true | _ -> false
+  [@@@warning "+4"]
 
-  let is_account = function Account _ -> true | _ -> false
+  let is_generic = function Generic _ -> true | Account _ | Hash _ -> false
 
-  let is_hash = function Hash _ -> true | _ -> false
+  let is_account = function Account _ -> true | Generic _ | Hash _ -> false
+
+  let is_hash = function Hash _ -> true | Account _ | Generic _ -> false
 
   let height ~ledger_depth : t -> int = function
     | Generic _ ->
@@ -169,7 +173,7 @@ module T = struct
     match location with
     | Hash addr ->
         loop addr
-    | _ ->
+    | Account _ | Generic _ ->
         failwith "can only get merkle path dependencies of a hash location"
 
   type location = t [@@deriving sexp, compare]

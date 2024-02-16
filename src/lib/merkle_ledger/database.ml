@@ -5,6 +5,8 @@ module Make (Inputs : Database_intf.Inputs_intf) = struct
   open Inputs
 
   module Db_error = struct
+    [@@@warning "-4"] (* due to deriving sexp below *)
+
     type t = Account_location_not_found | Out_of_leaves | Malformed_database
     [@@deriving sexp]
   end
@@ -555,7 +557,7 @@ module Make (Inputs : Database_intf.Inputs_intf) = struct
 
   let get_or_create_account mdb account_id account =
     match Account_location.get mdb account_id with
-    | Error Account_location_not_found -> (
+    | Error Db_error.Account_location_not_found -> (
         match Account_location.allocate mdb account_id with
         | Ok location ->
             set mdb location account ;
@@ -564,7 +566,7 @@ module Make (Inputs : Database_intf.Inputs_intf) = struct
         | Error err ->
             Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
         )
-    | Error err ->
+    | Error ((Db_error.Malformed_database | Db_error.Out_of_leaves) as err) ->
         Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
     | Ok location ->
         Ok (`Existed, location)
