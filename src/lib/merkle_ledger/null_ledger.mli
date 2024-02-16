@@ -1,6 +1,6 @@
-module Make (Inputs : Base_inputs_intf.Intf) : sig
+module Make (Inputs : Intf.Inputs.Intf) : sig
   include
-    Base_ledger_intf.NULL
+    Intf.Ledger.NULL
       with module Addr = Inputs.Location.Addr
       with module Location = Inputs.Location
       with type key := Inputs.Key.t

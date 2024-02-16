@@ -35,7 +35,7 @@ module type Inputs_intf = sig
   module Location : Location_intf.S
 
   module Ledger :
-    Base_ledger_intf.S
+    Intf.Ledger.S
       with module Addr = Location.Addr
        and module Location = Location
        and type account_id := Account_id.t

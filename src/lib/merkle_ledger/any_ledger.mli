@@ -1,5 +1,5 @@
-module Make_base (Inputs : Base_inputs_intf.Intf) :
-  Base_ledger_intf.ANY
+module Make_base (Inputs : Intf.Inputs.Intf) :
+  Intf.Ledger.ANY
     with module Location = Inputs.Location
     with type key := Inputs.Key.t
      and type token_id := Inputs.Token_id.t

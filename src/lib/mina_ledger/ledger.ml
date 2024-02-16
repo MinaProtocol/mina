@@ -106,7 +106,7 @@ module Ledger_inner = struct
   end
 
   module Db :
-    Merkle_ledger.Base_ledger_intf.DATABASE
+    Merkle_ledger.Intf.Ledger.DATABASE
       with module Location = Location_at_depth
       with module Addr = Location_at_depth.Addr
       with type root_hash := Ledger_hash.t
@@ -122,7 +122,7 @@ module Ledger_inner = struct
   module Null = Null_ledger.Make (Inputs)
 
   module Any_ledger :
-    Merkle_ledger.Base_ledger_intf.ANY
+    Merkle_ledger.Intf.Ledger.ANY
       with module Location = Location_at_depth
       with type account := Account.t
        and type key := Public_key.Compressed.t
