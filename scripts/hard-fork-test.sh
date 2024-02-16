@@ -8,8 +8,8 @@ MAIN_SLOT="${MAIN_SLOT:-90}"
 FORK_SLOT="${FORK_SLOT:-30}"
 
 # Delay before genesis slot in minutes to be used for both version
-MAIN_DELAY="${MAIN_DELAY:-15}"
-FORK_DELAY="${FORK_DELAY:-15}"
+MAIN_DELAY="${MAIN_DELAY:-10}"
+FORK_DELAY="${FORK_DELAY:-10}"
 
 # script should be run from mina root directory.
 source ./scripts/hard-fork-helper.sh
@@ -17,12 +17,15 @@ source ./scripts/hard-fork-helper.sh
 # Executable built off mainnet branch
 MAIN_MINA_EXE="$1"
 
-# Executable built off fork branch (e.g. berkeley)
+# Executables built off fork branch (e.g. berkeley)
 FORK_MINA_EXE="$2"
+FORK_RUNTIME_GENESIS_LEDGER_EXE="$3"
 
 # 1. Node is started
 ./scripts/run-hf-localnet.sh -m "$MAIN_MINA_EXE" -d "$MAIN_DELAY" -i "$MAIN_SLOT" \
   -s "$MAIN_SLOT" --slot-tx-end "$SLOT_TX_END" --slot-chain-end "$SLOT_CHAIN_END" &
+
+MAIN_NETWORK_PID=$!
 
 # Sleep until slot_tx_end plus one minute
 sleep $((MAIN_SLOT*(SLOT_TX_END-10)+MAIN_DELAY*60+60))s
@@ -75,21 +78,27 @@ if [[ $(( height2 - height1 )) -gt 0 ]]; then
 fi
 
 # 6. Transition root is extracted into a new runtime config
-get_fork_config 10303 > localnet/fork_config.json
+get_fork_config 10313 > localnet/fork_config.json
 
 # 7. Runtime config is converted with a script to have only ledger hashes in the config
 "$MAIN_MINA_EXE" client stop-daemon --daemon-port 10301
 "$MAIN_MINA_EXE" client stop-daemon --daemon-port 10311
 
-FORK_CONFIG_JSON=localnet/fork_config.json RUNTIME_CONFIG_JSON=localnet/pre_config.json ./scripts/hardfork/convert_fork_config.sh
+sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "1"}/' localnet/fork_config.json
 
-# Conversion specific for testing between Mainnet 1.x and Berkeley
-<localnet/pre_config.json jq 'del(.proof.ledger_depth) | del(.proof.supercharged_coinbase_factor) | .genesis.grace_period_slots = 3' >localnet/config.json
+rm -Rf localnet/hf_ledgers
+mkdir localnet/hf_ledgers
 
-sleep 5m
+"$FORK_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/hf_ledgers --hash-output-file localnet/hf_ledger_hashes.json
+
+export GENESIS_TIMESTAMP="$( d=$(date +%s); date -u -d @$((d - d % 60 + FORK_DELAY*60)) '+%F %H:%M:%S+00:00' )"
+FORKING_FROM_CONFIG_JSON=localnet/config/base.json SECONDS_PER_SLOT=90 FORK_CONFIG_JSON=localnet/fork_config.json LEDGER_HASHES_JSON=localnet/hf_ledger_hashes.json scripts/hardfork/create_runtime_config.sh > localnet/config.json
+
+wait "$MAIN_NETWORK_PID"
+
 # 8. Node is shutdown and restarted with mina-fork and the config from previous step 
 ./scripts/run-hf-localnet.sh -m "$FORK_MINA_EXE" -d "$FORK_DELAY" -i "$FORK_SLOT" \
-  -s "$FORK_SLOT" -c localnet/config.json &
+  -s "$FORK_SLOT" -c localnet/config.json --genesis-ledger-dir localnet/hf_ledgers &
 
 # 9. Check that network eventually creates some blocks
 
