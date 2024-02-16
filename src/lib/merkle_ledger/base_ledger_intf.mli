@@ -154,3 +154,61 @@ module type NULL = sig
 
   val create : depth:int -> unit -> t
 end
+
+module type ANY = sig
+  type key
+
+  type token_id
+
+  type token_id_set
+
+  type account_id
+
+  type account_id_set
+
+  type account
+
+  type hash
+
+  module Location : Location_intf.S
+
+  (** The type of the witness for a base ledger exposed here so that it can
+   * be easily accessed from outside this module *)
+  type witness [@@deriving sexp_of]
+
+  module type Base_intf =
+    S
+      with module Addr = Location.Addr
+      with module Location = Location
+      with type key := key
+       and type token_id := token_id
+       and type token_id_set := token_id_set
+       and type account_id := account_id
+       and type account_id_set := account_id_set
+       and type hash := hash
+       and type root_hash := hash
+       and type account := account
+
+  val cast : (module Base_intf with type t = 'a) -> 'a -> witness
+
+  module M : Base_intf with type t = witness
+end
+
+module type DATABASE = sig
+  include S
+
+  val create : ?directory_name:string -> depth:int -> unit -> t
+
+  (** create_checkpoint would create the checkpoint and open a db connection to that checkpoint *)
+  val create_checkpoint : t -> directory_name:string -> unit -> t
+
+  (** make_checkpoint would only create the checkpoint *)
+  val make_checkpoint : t -> directory_name:string -> unit
+
+  val with_ledger : depth:int -> f:(t -> 'a) -> 'a
+
+  module For_tests : sig
+    val gen_account_location :
+      ledger_depth:int -> Location.t Core.Quickcheck.Generator.t
+  end
+end

@@ -16,7 +16,6 @@
  (modules_without_implementation
   base_inputs_intf
   base_ledger_intf
-  database_intf
   graphviz_intf
   intf
   location_intf

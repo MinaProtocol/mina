@@ -1,5 +1,5 @@
 module Make (Inputs : Base_inputs_intf.DATABASE) :
-  Database_intf.S
+  Base_ledger_intf.DATABASE
     with module Location = Inputs.Location
      and module Addr = Inputs.Location.Addr
      and type key := Inputs.Key.t

@@ -5,7 +5,7 @@ open Mina_base
 module Location : Merkle_ledger.Location_intf.S
 
 module Db :
-  Merkle_ledger.Database_intf.S
+  Merkle_ledger.Base_ledger_intf.DATABASE
     with module Location = Location
     with module Addr = Location.Addr
     with type root_hash := Ledger_hash.t
@@ -18,7 +18,7 @@ module Db :
      and type account_id_set := Account_id.Set.t
 
 module Any_ledger :
-  Merkle_ledger.Any_ledger.S
+  Merkle_ledger.Base_ledger_intf.ANY
     with module Location = Location
     with type account := Account.t
      and type key := Public_key.Compressed.t
