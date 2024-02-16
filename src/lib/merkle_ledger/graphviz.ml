@@ -1,8 +1,8 @@
 open Core
 open Async
 
-module Make (Inputs : Graphviz_intf.Inputs_intf) :
-  Graphviz_intf.S
+module Make (Inputs : Intf.Graphviz.I) :
+  Intf.Graphviz.S
     with type addr := Inputs.Location.Addr.t
      and type ledger := Inputs.Ledger.t = struct
   open Inputs
