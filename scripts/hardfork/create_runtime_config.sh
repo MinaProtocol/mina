@@ -26,9 +26,9 @@ jq "{\
     },\
     proof: {\
         fork: {\
-            previous_state_hash: .proof.fork.previous_state_hash,\
-            previous_length: .proof.fork.previous_length,\
-            previous_global_slot: $DIFFERENCE_IN_SLOTS,\
+            state_hash: .proof.fork.state_hash,\
+            blockchain_length: .proof.fork.blockchain_length,\
+            global_slot_since_genesis: $DIFFERENCE_IN_SLOTS,\
         },\
     },\
     ledger: {\
