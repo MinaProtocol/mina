@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
 SLOT_TX_END="${SLOT_TX_END:-30}"
 SLOT_CHAIN_END="${SLOT_CHAIN_END:-$((SLOT_TX_END+8))}"
 
@@ -16,7 +18,7 @@ MAIN_DELAY="${MAIN_DELAY:-20}"
 FORK_DELAY="${FORK_DELAY:-10}"
 
 # script should be run from mina root directory.
-source ./scripts/hard-fork-helper.sh
+source "$SCRIPT_DIR"/test-helper.sh
 
 # Executable built off mainnet branch
 MAIN_MINA_EXE="$1"
@@ -34,7 +36,7 @@ stop_nodes(){
 NOW_UNIX_TS=$(date +%s)
 MAIN_GENESIS_UNIX_TS=$((NOW_UNIX_TS - NOW_UNIX_TS%60 + MAIN_DELAY*60))
 export GENESIS_TIMESTAMP="$(date -u -d @$MAIN_GENESIS_UNIX_TS '+%F %H:%M:%S+00:00')"
-./scripts/run-hf-localnet.sh -m "$MAIN_MINA_EXE" -i "$MAIN_SLOT" \
+"$SCRIPT_DIR"/run-localnet.sh -m "$MAIN_MINA_EXE" -i "$MAIN_SLOT" \
   -s "$MAIN_SLOT" --slot-tx-end "$SLOT_TX_END" --slot-chain-end "$SLOT_CHAIN_END" &
 
 MAIN_NETWORK_PID=$!
@@ -119,7 +121,7 @@ mkdir localnet/hf_ledgers
 NOW_UNIX_TS=$(date +%s)
 FORK_GENESIS_UNIX_TS=$((NOW_UNIX_TS - NOW_UNIX_TS%60 + FORK_DELAY*60))
 export GENESIS_TIMESTAMP="$( date -u -d @$FORK_GENESIS_UNIX_TS '+%F %H:%M:%S+00:00' )"
-FORKING_FROM_CONFIG_JSON=localnet/config/base.json SECONDS_PER_SLOT="$MAIN_SLOT" FORK_CONFIG_JSON=localnet/fork_config.json LEDGER_HASHES_JSON=localnet/hf_ledger_hashes.json scripts/hardfork/create_runtime_config.sh > localnet/config.json
+FORKING_FROM_CONFIG_JSON=localnet/config/base.json SECONDS_PER_SLOT="$MAIN_SLOT" FORK_CONFIG_JSON=localnet/fork_config.json LEDGER_HASHES_JSON=localnet/hf_ledger_hashes.json "$SCRIPT_DIR"/create_runtime_config.sh > localnet/config.json
 
 expected_genesis_slot=$(((FORK_GENESIS_UNIX_TS-MAIN_GENESIS_UNIX_TS)/MAIN_SLOT))
 expected_modified_fork_data="{\"blockchain_length\":$latest_height,\"global_slot_since_genesis\":$expected_genesis_slot,\"state_hash\":\"$latest_shash\"}"
@@ -134,7 +136,7 @@ fi
 wait "$MAIN_NETWORK_PID"
 
 # 8. Node is shutdown and restarted with mina-fork and the config from previous step 
-./scripts/run-hf-localnet.sh -m "$FORK_MINA_EXE" -d "$FORK_DELAY" -i "$FORK_SLOT" \
+"$SCRIPT_DIR"/run-localnet.sh -m "$FORK_MINA_EXE" -d "$FORK_DELAY" -i "$FORK_SLOT" \
   -s "$FORK_SLOT" -c localnet/config.json --genesis-ledger-dir localnet/hf_ledgers &
 
 sleep $((FORK_DELAY*60))s
