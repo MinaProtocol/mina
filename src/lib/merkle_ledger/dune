@@ -16,32 +16,32 @@
  (modules_without_implementation database_intf)
  (libraries
    ;; opam libraries
-  bitstring
-  async_kernel
-  core_kernel.uuid
-  bin_prot.shape
-  sexplib0
-  integers
-  core.uuid
   async
-  core
-  extlib
-  rocks
-  core_kernel
-  base.caml
-  base.base_internalhash_types
+  async_kernel
   async_unix
+  base.base_internalhash_types
+  base.caml
+  bin_prot.shape
+  bitstring
+  core
+  core.uuid
+  core_kernel
+  core_kernel.uuid
+  extlib
+  integers
+  rocks
+  sexplib0
   ;; local libraries
-  merkle_address
-  immutable_array
-  direction
-  cache_dir
-  empty_hashes
-  key_value_database
-  mina_stdlib
-  visualization
-  ppx_version.runtime
   bounded_types
+  cache_dir
+  direction
+  empty_hashes
+  immutable_array
+  key_value_database
+  merkle_address
+  mina_stdlib
+  ppx_version.runtime
+  visualization
   )
  (preprocess
   (pps ppx_mina ppx_version ppx_jane ppx_compare ppx_deriving.show ppx_deriving_yojson))
