@@ -80,6 +80,12 @@ fi
 # 6. Transition root is extracted into a new runtime config
 get_fork_config 10313 > localnet/fork_config.json
 
+while [[ "$(stat -c %s localnet/fork_config.json)" == 0 ]] || [[ "$(head -c 4 localnet/fork_config.json)" == "null" ]]; do
+  echo "Failed to fetch fork config" >&2
+  sleep 1m
+  get_fork_config 10313 > localnet/fork_config.json
+done
+
 # 7. Runtime config is converted with a script to have only ledger hashes in the config
 "$MAIN_MINA_EXE" client stop-daemon --daemon-port 10301
 "$MAIN_MINA_EXE" client stop-daemon --daemon-port 10311
