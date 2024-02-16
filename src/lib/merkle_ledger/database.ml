@@ -1,6 +1,6 @@
 open Core
 
-module Make (Inputs : Database_intf.Inputs_intf) = struct
+module Make (Inputs : Base_inputs_intf.DATABASE) = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   open Inputs
 

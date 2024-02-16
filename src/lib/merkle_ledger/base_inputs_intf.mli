@@ -22,3 +22,14 @@ module type Intf = sig
 
   module Location : Location_intf.S
 end
+
+module type DATABASE = sig
+  include Intf
+
+  module Location_binable :
+    Core_kernel.Hashable.S_binable with type t := Location.t
+
+  module Kvdb : Intf.Key_value_database with type config := string
+
+  module Storage_locations : Intf.Storage_locations
+end

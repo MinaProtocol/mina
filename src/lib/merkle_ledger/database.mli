@@ -1,4 +1,4 @@
-module Make (Inputs : Database_intf.Inputs_intf) :
+module Make (Inputs : Base_inputs_intf.DATABASE) :
   Database_intf.S
     with module Location = Inputs.Location
      and module Addr = Inputs.Location.Addr
