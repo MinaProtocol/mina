@@ -15,8 +15,7 @@
  (library_flags -linkall)
  (modules_without_implementation
    graphviz_intf
-   location_intf
-   syncable_intf)
+   location_intf)
  (libraries
    ;; opam libraries
   async
