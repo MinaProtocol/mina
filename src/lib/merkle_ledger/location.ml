@@ -1,4 +1,3 @@
-open Core
 open Unsigned
 
 (* add functions to library module Bigstring so we can derive hash for the type t below *)
@@ -6,7 +5,7 @@ module Bigstring = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = Core_kernel.Bigstring.Stable.V1.t [@@deriving sexp, compare]
+      type t = Bigstring.Stable.V1.t [@@deriving sexp, compare]
 
       let to_latest = Fn.id
 
@@ -18,9 +17,9 @@ module Bigstring = struct
       include Bounded_types.String.Of_stringable (struct
         type nonrec t = t
 
-        let of_string s = Core_kernel.Bigstring.of_string s
+        let of_string s = Bigstring.of_string s
 
-        let to_string s = Core_kernel.Bigstring.to_string s
+        let to_string s = Bigstring.to_string s
       end)
     end
   end]

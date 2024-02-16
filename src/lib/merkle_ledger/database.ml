@@ -1,5 +1,3 @@
-open Core
-
 module Make (Inputs : Intf.Inputs.DATABASE) = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   open Inputs
@@ -46,6 +44,8 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   let depth t = t.depth
 
   let create ?directory_name ~depth () =
+    let open Core in
+    (* for ^/ and Unix below *)
     assert (depth < 0xfe) ;
     let uuid = Uuid_unix.create () in
     let directory =

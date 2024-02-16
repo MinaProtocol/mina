@@ -1,4 +1,3 @@
-open Core
 open Async
 
 module Make (Inputs : Intf.Graphviz.I) :

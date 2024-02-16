@@ -1,5 +1,3 @@
-open Core_kernel
-
 module Make (Inputs : Intf.Inputs.Intf) : sig
   include
     Intf.Ledger.NULL

@@ -13,8 +13,6 @@
  * Props to @nholland for showing me this trick.
  * *)
 
-open Core_kernel
-
 module Make_base (Inputs : Intf.Inputs.Intf) :
   Intf.Ledger.ANY
     with module Location = Inputs.Location

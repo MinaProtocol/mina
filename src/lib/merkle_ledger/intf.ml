@@ -1,4 +1,53 @@
-open Core
+module type LOCATION = sig
+  module Addr : module type of Merkle_address
+
+  module Prefix : sig
+    val generic : Unsigned.UInt8.t
+
+    val account : Unsigned.UInt8.t
+
+    val hash : ledger_depth:int -> int -> Unsigned.UInt8.t
+  end
+
+  type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
+  [@@deriving sexp, hash, compare]
+
+  val is_generic : t -> bool
+
+  val is_account : t -> bool
+
+  val is_hash : t -> bool
+
+  val height : ledger_depth:int -> t -> int
+
+  val root_hash : t
+
+  val last_direction : Addr.t -> Direction.t
+
+  val build_generic : Bigstring.t -> t
+
+  val parse : ledger_depth:int -> Bigstring.t -> (t, unit) Result.t
+
+  val prefix_bigstring : Unsigned.UInt8.t -> Bigstring.t -> Bigstring.t
+
+  val to_path_exn : t -> Addr.t
+
+  val serialize : ledger_depth:int -> t -> Bigstring.t
+
+  val parent : t -> t
+
+  val next : t -> t Option.t
+
+  val prev : t -> t Option.t
+
+  val sibling : t -> t
+
+  val order_siblings : t -> 'a -> 'a -> 'a * 'a
+
+  val merkle_path_dependencies_exn : t -> (t * Direction.t) list
+
+  include Comparable.S with type t := t
+end
 
 module type Key = sig
   type t [@@deriving sexp]
@@ -211,14 +260,13 @@ module Inputs = struct
 
     module Hash : Hash with type account := Account.t
 
-    module Location : Location_intf.S
+    module Location : LOCATION
   end
 
   module type DATABASE = sig
     include Intf
 
-    module Location_binable :
-      Core_kernel.Hashable.S_binable with type t := Location.t
+    module Location_binable : Hashable.S_binable with type t := Location.t
 
     module Kvdb : Key_value_database with type config := string
 
@@ -397,7 +445,7 @@ module Ledger = struct
 
     type hash
 
-    module Location : Location_intf.S
+    module Location : LOCATION
 
     (** The type of the witness for a base ledger exposed here so that it can
    * be easily accessed from outside this module *)
@@ -436,7 +484,7 @@ module Ledger = struct
 
     module For_tests : sig
       val gen_account_location :
-        ledger_depth:int -> Location.t Core.Quickcheck.Generator.t
+        ledger_depth:int -> Location.t Quickcheck.Generator.t
     end
   end
 end
