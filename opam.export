@@ -149,8 +149,8 @@ installed: [
   "mew.0.1.0"
   "mew_vi.0.5.0"
   "minicli.5.0.2"
-  "mirage-crypto-ec.0.11.0"
   "mirage-crypto.0.11.0"
+  "mirage-crypto-ec.0.11.0"
   "mirage-crypto-rng.0.11.0"
   "mirage-crypto-rng-async.0.11.0"
   "mmap.1.1.0"
@@ -227,6 +227,7 @@ installed: [
   "re.1.9.0"
   "re2.v0.14.0"
   "react.1.2.1"
+  "reason.3.8.2"
   "res.5.0.1"
   "result.1.5"
   "rpc_parallel.v0.14.0"
@@ -349,6 +350,40 @@ Cap'n Proto is a multi-language code generation framework designed for
       "sha256=03aac06742f3d4ec8a189f0db65d46393b7497e8637ece15c39ff4ec01117b8b"
   }
 }
+package "check_opam_switch" {
+  opam-version: "2.0"
+  version: "~dev"
+  synopsis:
+    "A tool to check that the current opam environment is up to date with an opam.export file"
+  description:
+    "A tool to check that the current opam environment is up to date with an opam.export file"
+  maintainer: "yves.stan.lecornec@tweag.io"
+  depends: [
+    "dune" {>= "3.3"}
+    "opam-core" {>= "2.0.0"}
+    "opam-format" {>= "2.0.0"}
+    "minicli" {>= "5.0.0"}
+    "odoc" {with-doc}
+  ]
+  build: [
+    ["dune" "subst"] {dev}
+    [
+      "dune"
+      "build"
+      "-p"
+      name
+      "-j"
+      jobs
+      "@install"
+      "@runtest" {with-test}
+      "@doc" {with-doc}
+    ]
+  ]
+  url {
+    src:
+      "git+https://github.com/tweag/check_opam_switch.git#d0aa49884e0f9fd4bbb2cd1a32b798a12"
+  }
+}
 package "graphql_ppx" {
   opam-version: "2.0"
   version: "1.2.2"
@@ -368,6 +403,7 @@ package "graphql_ppx" {
     "ocaml" {>= "4.06"}
     "ppxlib" {>= "0.21.0"}
     "result" {>= "1.5"}
+    "reason"
   ]
   build: [
     ["dune" "build" "-p" name "-j" jobs]
