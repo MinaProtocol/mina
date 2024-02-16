@@ -430,13 +430,12 @@ let make_constraint_constants
       ( match config.fork with
       | None ->
           default.fork
-      | Some { previous_state_hash; previous_length; previous_global_slot } ->
+      | Some { state_hash; blockchain_length; global_slot_since_genesis } ->
           Some
-            { previous_state_hash =
-                State_hash.of_base58_check_exn previous_state_hash
-            ; previous_length = Mina_numbers.Length.of_int previous_length
-            ; previous_global_slot =
-                Mina_numbers.Global_slot.of_int previous_global_slot
+            { state_hash = State_hash.of_base58_check_exn state_hash
+            ; blockchain_length = Mina_numbers.Length.of_int blockchain_length
+            ; global_slot_since_genesis =
+                Mina_numbers.Global_slot.of_int global_slot_since_genesis
             } )
   }
 
@@ -465,13 +464,12 @@ let runtime_config_of_constraint_constants
   ; account_creation_fee = Some constraint_constants.account_creation_fee
   ; fork =
       Option.map constraint_constants.fork
-        ~f:(fun { previous_state_hash; previous_length; previous_global_slot }
-           ->
-          { Runtime_config.Fork_config.previous_state_hash =
-              State_hash.to_base58_check previous_state_hash
-          ; previous_length = Mina_numbers.Length.to_int previous_length
-          ; previous_global_slot =
-              Mina_numbers.Global_slot.to_int previous_global_slot
+        ~f:(fun { state_hash; blockchain_length; global_slot_since_genesis } ->
+          { Runtime_config.Fork_config.state_hash =
+              State_hash.to_base58_check state_hash
+          ; blockchain_length = Mina_numbers.Length.to_int blockchain_length
+          ; global_slot_since_genesis =
+              Mina_numbers.Global_slot.to_int global_slot_since_genesis
           } )
   }
 
