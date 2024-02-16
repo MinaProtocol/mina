@@ -1,4 +1,4 @@
-module type S = sig
+module type Intf = sig
   module Key : Intf.Key
 
   module Token_id : Intf.Token_id
@@ -15,10 +15,6 @@ module type S = sig
        and type balance := Balance.t
 
   module Hash : Intf.Hash with type account := Account.t
-end
-
-module type Intf = sig
-  include S
 
   module Location : Location_intf.S
 end
