@@ -6,7 +6,7 @@
 set +e
 
 function get_shas {
-  SHAS=$(git log -n 10 --format="%h" --abbrev=7 --no-merges)
+  SHAS=$(git log -n 30 --format="%h" --abbrev=7 --no-merges)
 }
 
 function image_tag {
