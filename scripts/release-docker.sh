@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-test-executive' 'mina-receipt-chain-hash-fix' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator' 'delegation-verify')
+VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-test-executive' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator' 'delegation-verify')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -116,10 +116,6 @@ mina-batch-txn)
 mina-rosetta)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
   ;;
-mina-receipt-chain-hash-fix)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-receipt-chain-hash-fix"
-  DOCKER_CONTEXT="dockerfiles/"
-  ;;
 mina-zkapp-test-transaction)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-zkapp-test-transaction"
   ;;
@@ -138,6 +134,10 @@ delegation-backend-toolchain)
 itn-orchestrator)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-itn-orchestrator"
   DOCKER_CONTEXT="src/app/itn_orchestrator"
+  ;;
+mina-test-suite)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-test-suite"
+  DOCKER_CONTEXT="dockerfiles/"
   ;;
 
 delegation-verify)
