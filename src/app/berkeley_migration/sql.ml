@@ -32,8 +32,8 @@ module Mainnet = struct
       ; next_epoch_data_id : int
       ; ledger_hash : string
       ; height : int64
-      ; global_slot_since_hard_fork : int64
       ; global_slot_since_genesis : int64
+      ; global_slot_since_hard_fork : int64
       ; timestamp : int64
       ; chain_status : string
       }
@@ -90,14 +90,43 @@ module Mainnet = struct
                  WHERE chain_status = 'canonical'
          |sql} )
 
-    let blocks_at_or_below (module Conn : CONNECTION) slot =
+    let mark_as_canonical (module Conn : CONNECTION) id =
+      Conn.exec
+        (Caqti_request.exec Caqti_type.int
+           "UPDATE blocks SET chain_status='canonical' WHERE id = ?" )
+        id
+
+    let get_highest_canonical_block (module Conn : CONNECTION) =
+      Conn.find
+        (Caqti_request.find Caqti_type.unit Caqti_type.int
+           "SELECT id FROM blocks WHERE chain_status='canonical' ORDER BY \
+            height DESC LIMIT 1" )
+
+    let get_subchain (module Conn : CONNECTION) ~start_block_id ~end_block_id =
+      (* derive query from type `t` *)
       Conn.collect_list
-        (Caqti_request.collect Caqti_type.int Caqti_type.int
-           {sql| SELECT id,parent_id,global_slot_since_genesis FROM blocks
-                 WHERE global_slot_since_genesis <= $1
-                 AND chain_status <> 'orphaned'
-           |sql} )
-        slot
+        (Caqti_request.collect
+           Caqti_type.(tup2 int int)
+           Caqti_type.int
+           {sql| WITH RECURSIVE chain AS (
+                    SELECT id, parent_id, height
+                    FROM blocks b WHERE b.id = $1
+      
+                    UNION ALL
+      
+                    SELECT b.id, b.parent_id, b.height 
+                    FROM blocks b
+      
+                    INNER JOIN chain
+      
+                    ON b.id = chain.parent_id AND (chain.id <> $2 OR b.id = $2)
+      
+                 )
+      
+                 SELECT id
+                 FROM chain ORDER BY height ASC
+               |sql} )
+        (end_block_id, start_block_id)
   end
 
   module Block_user_command = struct

@@ -25,5 +25,9 @@ dune build "${path}" --profile="${profile}" -j16
 echo "--- Check for changes to verification keys"
 time dune runtest "src/app/print_blockchain_snark_vk" --profile="${profile}" -j16
 
+# Turn on the proof-cache assertion, so that CI will fail if the proofs need to
+# be updated.
+export ERROR_ON_PROOF=true
+
 echo "--- Run unit tests"
 time dune runtest "${path}" --profile="${profile}" -j16 || (./scripts/link-coredumps.sh)

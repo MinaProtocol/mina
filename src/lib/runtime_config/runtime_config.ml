@@ -1,22 +1,22 @@
 open Core_kernel
 
 module Fork_config = struct
-  (* Note that previous_length might be smaller than the gernesis_slot
+  (* Note that length might be smaller than the gernesis_slot
      or equal if a block was produced in every slot possible. *)
   type t =
-    { previous_state_hash : string
-    ; previous_length : int (* number of blocks produced since genesis *)
-    ; previous_global_slot : int (* global slot since genesis *)
+    { state_hash : string
+    ; blockchain_length : int (* number of blocks produced since genesis *)
+    ; global_slot_since_genesis : int (* global slot since genesis *)
     }
   [@@deriving yojson, bin_io_unversioned]
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
-    let%bind previous_global_slot = Int.gen_incl 0 1_000_000 in
-    let%bind previous_length = Int.gen_incl 0 previous_global_slot in
+    let%bind global_slot_since_genesis = Int.gen_incl 0 1_000_000 in
+    let%bind blockchain_length = Int.gen_incl 0 global_slot_since_genesis in
     let%map state_hash = Mina_base.State_hash.gen in
-    let previous_state_hash = Mina_base.State_hash.to_base58_check state_hash in
-    { previous_state_hash; previous_length; previous_global_slot }
+    let state_hash = Mina_base.State_hash.to_base58_check state_hash in
+    { state_hash; blockchain_length; global_slot_since_genesis }
 end
 
 let yojson_strip_fields ~keep_fields = function
@@ -1449,11 +1449,11 @@ let ledger_of_accounts accounts =
     ; add_genesis_winner = Some false
     }
 
-let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
-    ~protocol_state ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
-    ~next_epoch_seed (runtime_config : t) =
+let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
+    ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger ~next_epoch_seed
+    (runtime_config : t) =
   let open Async.Deferred.Result.Let_syntax in
-  let global_slot =
+  let global_slot_since_genesis =
     Mina_numbers.Global_slot_since_hard_fork.to_int global_slot
   in
   let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
@@ -1467,38 +1467,11 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
     |> ledger_accounts
   in
   let ledger = Option.value_exn runtime_config.ledger in
-  let previous_length =
-    let open Option.Let_syntax in
-    let%bind proof = runtime_config.proof in
-    let%map fork = proof.fork in
-    fork.previous_length + blockchain_length
-  in
-  let protocol_constants = Mina_state.Protocol_state.constants protocol_state in
-  let genesis =
-    { Genesis.k =
-        Some
-          (Unsigned.UInt32.to_int
-             protocol_constants.Genesis_constants.Protocol.Poly.k )
-    ; delta = Some (Unsigned.UInt32.to_int protocol_constants.delta)
-    ; slots_per_epoch =
-        Some (Unsigned.UInt32.to_int protocol_constants.slots_per_epoch)
-    ; slots_per_sub_window =
-        Some (Unsigned.UInt32.to_int protocol_constants.slots_per_sub_window)
-    ; genesis_state_timestamp =
-        Some
-          (Block_time.to_string_exn protocol_constants.genesis_state_timestamp)
-    ; grace_period_slots =
-        Some (Unsigned.UInt32.to_int protocol_constants.grace_period_slots)
-    }
-  in
   let fork =
     Fork_config.
-      { previous_state_hash =
-          Mina_base.State_hash.to_base58_check
-            protocol_state.Mina_state.Protocol_state.Poly.previous_state_hash
-      ; previous_length =
-          Option.value ~default:blockchain_length previous_length
-      ; previous_global_slot = global_slot
+      { state_hash = Mina_base.State_hash.to_base58_check state_hash
+      ; blockchain_length
+      ; global_slot_since_genesis
       }
   in
   let%bind () = yield () in
@@ -1523,24 +1496,18 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
             { ledger = ledger_of_accounts accounts; seed = next_epoch_seed } )
     }
   in
-  let update =
-    make
-    (* add_genesis_winner must be set to false, because this
-       config effectively creates a continuation of the current
-       blockchain state and therefore the genesis ledger already
-       contains the winner of the previous block. No need to
-       artificially add it. In fact, it wouldn't work at all,
-       because the new node would try to create this account at
-       startup, even though it already exists, leading to an error.*)
-      ~epoch_data ~genesis
-      ~ledger:
-        { ledger with
-          base = Accounts accounts
-        ; add_genesis_winner = Some false
-        }
-      ~proof:(Proof_keys.make ~fork ()) ()
-  in
-  combine runtime_config update
+  make
+  (* add_genesis_winner must be set to false, because this
+     config effectively creates a continuation of the current
+     blockchain state and therefore the genesis ledger already
+     contains the winner of the previous block. No need to
+     artificially add it. In fact, it wouldn't work at all,
+     because the new node would try to create this account at
+     startup, even though it already exists, leading to an error.*)
+    ~epoch_data
+    ~ledger:
+      { ledger with base = Accounts accounts; add_genesis_winner = Some false }
+    ~proof:(Proof_keys.make ~fork ()) ()
 
 let slot_tx_end_or_default, slot_chain_end_or_default =
   let f compile get_runtime t =
