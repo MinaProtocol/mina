@@ -24,32 +24,25 @@ module Get_balance =
     }
 |}]
 
-module Node_runtime_config =
+module Get_genesis_balance =
 [%graphql
 {|
- query runtime_config {
-   runtimeConfig
- }
+ query get_genesis_balance($public_key: PublicKey!) {
+      genesisAccountBalance(publicKey: $public_key) {
+          liquid @ppxCustom(module: "Scalars.UInt64")
+          total @ppxCustom(module: "Scalars.UInt64")
+        }
+    }
 |}]
 
 let genesis_ledger_balance ~graphql_uri public_key : (Unsigned.UInt64.t, Errors.t) Deferred.Result.t =
   let open Deferred.Result.Let_syntax in
-  let%bind gql_response = Graphql.query (Node_runtime_config.make ()) graphql_uri in
-  let%map config =
-    (gql_response.Node_runtime_config.runtimeConfig :> Yojson.Safe.t)
-    |> Runtime_config.of_yojson
-    |> Result.map_error ~f:(fun e -> Errors.create @@ `Graphql_mina_query e)
-    |> Deferred.return
-  in
+  let%map gql_response = Graphql.query Get_genesis_balance.(make @@ makeVariables ~public_key:(`String public_key) ()) graphql_uri in
+  let response = gql_response.Get_genesis_balance.genesisAccountBalance in
   let balance =
     let open Option.Let_syntax in
-    let%bind ledger = config.ledger in
-    match ledger.base with
-      | Runtime_config.Ledger.Accounts accounts ->
-         let open Runtime_config.Accounts.Single in
-         let%map account = List.find accounts ~f:(fun a -> String.equal a.pk public_key) in
-         MinaCurrency.Balance.to_uint64 account.balance
-      | _ -> None
+    let%map balance = response in
+    balance.total
   in
   Option.value balance ~default:Unsigned.UInt64.zero
 
