@@ -16,7 +16,7 @@ module type Data_source = sig
   type submission
 
   val is_cassandra : t -> bool
-  
+
   val submitted_at : submission -> string
 
   val block_hash : submission -> string
@@ -28,7 +28,7 @@ module type Data_source = sig
   val load_submissions : t -> submission list Deferred.Or_error.t
 
   val load_block : block_hash:string -> t -> string Deferred.Or_error.t
-  
+
   val load_block_from_submission : submission -> string Deferred.Or_error.t
 
   val verify_blockchain_snarks :
@@ -55,7 +55,7 @@ module Filesystem = struct
     }
 
   type raw =
-    { submitted_at : string
+    { created_at : string
     ; peer_id : string
     ; snark_work : string option [@default None]
     ; remote_addr : string
@@ -81,7 +81,7 @@ module Filesystem = struct
     { submitter
     ; snark_work
     ; block_hash = meta.block_hash
-    ; submitted_at = meta.submitted_at
+    ; submitted_at = meta.created_at
     }
 
   let submitted_at ({ submitted_at; _ } : submission) = submitted_at
@@ -119,8 +119,8 @@ module Filesystem = struct
           with _ -> Error (Error.of_string "Fail to load block") )
         |> Ivar.fill ivar )
 
-  (* Dummy impl, not to be used in the context of Filesystem module. 
-     It is only intended to fulfill the interface requirements of the 
+  (* Dummy impl, not to be used in the context of Filesystem module.
+     It is only intended to fulfill the interface requirements of the
      Data_source module signature for the Filesystem module *)
   let load_block_from_submission submission =
     let _ = submission in
@@ -259,19 +259,19 @@ module Cassandra = struct
     in
     Deferred.Or_error.bind (return s3_path) ~f:(fun s3_path ->
         Process.run ~prog:aws_cli ~args:[ "s3"; "cp"; s3_path; "-" ] () )
-    
+
   let load_block_from_submission (submission : submission) =
     let open Deferred.Or_error.Let_syntax in
     match submission.raw_block with
     | None ->
-      (* If not found in Submission, try loading from S3 *)
-      load_from_s3 ~block_hash:submission.block_hash
+        (* If not found in Submission, try loading from S3 *)
+        load_from_s3 ~block_hash:submission.block_hash
     | Some b ->
         String.chop_prefix_exn b ~prefix:"0x"
-        |> Hex.Safe.of_hex |> Option.value_exn |> return 
+        |> Hex.Safe.of_hex |> Option.value_exn |> return
 
   (* The 'blocks' table is no longer actively used in the Cassandra schema.
-     However, 'load_block' is retained for reference purposes and in case of 
+     However, 'load_block' is retained for reference purposes and in case of
      schema rollbacks or data migration needs. *)
   let load_block ~block_hash { conf; _ } =
     let open Deferred.Or_error.Let_syntax in
@@ -310,7 +310,7 @@ module Cassandra = struct
                (List.hd_exn @@ String.split ~on:' ' submission.submitted_at)
                submission.submitted_at
                (Public_key.Compressed.to_base58_check submission.submitter) )
-          [ ("validation_error", sprintf "'%s'" (Error.to_string_hum e)) 
+          [ ("validation_error", sprintf "'%s'" (Error.to_string_hum e))
           ; ("raw_block", "NULL")
           ; ("snark_work", "NULL")
           ; ("verified", "true")
