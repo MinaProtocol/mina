@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-test-executive' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator' 'delegation-verify')
+VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-test-executive' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -138,10 +138,6 @@ itn-orchestrator)
 mina-test-suite)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-test-suite"
   DOCKER_CONTEXT="dockerfiles/"
-  ;;
-
-delegation-verify)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-stateless-verifier"
   ;;
 esac
 
