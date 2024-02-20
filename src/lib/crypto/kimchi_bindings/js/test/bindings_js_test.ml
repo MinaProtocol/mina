@@ -600,8 +600,7 @@ let _ =
     end )
 
 let eq_poly_comm ~field_equal (x : _ poly_comm) (y : _ poly_comm) =
-  Array.for_all2 (eq_affine ~field_equal) x.unshifted y.unshifted
-  && Option.equal (eq_affine ~field_equal) x.shifted y.shifted
+  Array.for_all2 (eq_affine ~field_equal) x.elems y.elems
 
 module Backend = Kimchi_backend.Pasta.Pallas_based_plonk
 
@@ -700,7 +699,7 @@ let _ =
          let inputs2 = Array.init 64 Pasta_fp.of_int in
          let affines =
            Array.init 16 (fun i ->
-               try lcomm1.unshifted.(i)
+               try lcomm1.elems.(i)
                with _ -> Pasta_vesta.random () |> Pasta_vesta.to_affine )
          in
          let res = batch_accumulator_check second affines inputs2 in
@@ -732,7 +731,7 @@ let _ =
          let inputs2 = Array.init 64 Pasta_fq.of_int in
          let affines =
            Array.init 16 (fun i ->
-               try lcomm1.unshifted.(i)
+               try lcomm1.elems.(i)
                with _ -> Pasta_pallas.random () |> Pasta_pallas.to_affine )
          in
          let res = batch_accumulator_check second affines inputs2 in

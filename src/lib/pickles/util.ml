@@ -24,17 +24,6 @@ let rec absorb :
       Array.iter
         ~f:(Fn.compose (List.iter ~f:absorb_field) g1_to_field_elements)
         t
-  | Type.With_degree_bound ->
-      let Pickles_types.Plonk_types.Poly_comm.With_degree_bound.
-            { unshifted; shifted } =
-        t
-      in
-      let absorb x =
-        absorb ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt
-          Type.PC (mask_g1_opt x)
-      in
-      Array.iter unshifted ~f:absorb ;
-      absorb shifted
   | ty1 :: ty2 ->
       let absorb t =
         absorb t ~absorb_field ~absorb_scalar ~g1_to_field_elements ~mask_g1_opt

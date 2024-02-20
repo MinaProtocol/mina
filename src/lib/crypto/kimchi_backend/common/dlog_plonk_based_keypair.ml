@@ -207,8 +207,6 @@ module Make (Inputs : Inputs_intf) = struct
       match Inputs.Poly_comm.of_backend_without_degree_bound c with
       | `Without_degree_bound x ->
           x.(0)
-      | `With_degree_bound _ ->
-          assert false
     in
     { sigma_comm =
         Pickles_types.Vector.init Pickles_types.Plonk_types.Permuts.n
@@ -232,8 +230,6 @@ module Make (Inputs : Inputs_intf) = struct
       match Inputs.Poly_comm.of_backend_without_degree_bound c with
       | `Without_degree_bound x ->
           x
-      | `With_degree_bound _ ->
-          assert false
     in
     let lookup f =
       let open Option.Let_syntax in

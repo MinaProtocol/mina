@@ -83,8 +83,7 @@ type nonrec 'caml_f proof_evaluations =
   ; foreign_field_mul_lookup_selector : 'caml_f array point_evaluations option
   }
 
-type nonrec 'caml_g poly_comm =
-  { unshifted : 'caml_g array; shifted : 'caml_g option }
+type nonrec 'caml_g poly_comm = { elems : 'caml_g array } [@@boxed]
 
 type nonrec ('caml_g, 'caml_f) recursion_challenge =
   { chals : 'caml_f array; comm : 'caml_g poly_comm }

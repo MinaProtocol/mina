@@ -207,9 +207,7 @@ module Stable = struct
               ; srs
               ; evals =
                   (let g (x, y) =
-                     { Kimchi_types.unshifted = [| Kimchi_types.Finite (x, y) |]
-                     ; shifted = None
-                     }
+                     { Kimchi_types.elems = [| Kimchi_types.Finite (x, y) |] }
                    in
                    { sigma_comm = Array.map ~f:g (Vector.to_array c.sigma_comm)
                    ; coefficients_comm =

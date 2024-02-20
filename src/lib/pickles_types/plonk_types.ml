@@ -1285,40 +1285,6 @@ module Openings = struct
 end
 
 module Poly_comm = struct
-  module With_degree_bound = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type 'g_opt t =
-          { unshifted : 'g_opt Bounded_types.ArrayN16.Stable.V1.t
-          ; shifted : 'g_opt
-          }
-        [@@deriving sexp, compare, yojson, hlist, hash, equal]
-      end
-    end]
-
-    let padded_array_typ0 = padded_array_typ
-
-    let typ (type f g g_var bool_var)
-        (g : (g_var, g, f) Snarky_backendless.Typ.t) ~length
-        ~dummy_group_element
-        ~(bool : (bool_var, bool, f) Snarky_backendless.Typ.t) :
-        ((bool_var * g_var) t, g Or_infinity.t t, f) Snarky_backendless.Typ.t =
-      let open Snarky_backendless.Typ in
-      let g_inf =
-        transport (tuple2 bool g)
-          ~there:(function
-            | Or_infinity.Infinity ->
-                (false, dummy_group_element)
-            | Finite x ->
-                (true, x) )
-          ~back:(fun (b, x) -> if b then Infinity else Finite x)
-      in
-      let arr = padded_array_typ0 ~length ~dummy:Or_infinity.Infinity g_inf in
-      of_hlistable [ arr; g_inf ] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-  end
-
   module Without_degree_bound = struct
     [%%versioned
     module Stable = struct
@@ -1433,17 +1399,11 @@ module Messages = struct
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) g
       ({ runtime_tables; uses_lookups; lookups_per_row_4; _ } :
         Opt.Flag.t Features.Full.t ) ~dummy
-      ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) ~bool
-      =
+      ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) =
     let open Snarky_backendless.Typ in
     let { Poly.w = w_lens; z; t } = commitment_lengths in
     let array ~length elt = padded_array_typ ~dummy ~length elt in
     let wo n = array ~length:(Vector.reduce_exn n ~f:Int.max) g in
-    let _w n =
-      With_degree_bound.typ g
-        ~length:(Vector.reduce_exn n ~f:Int.max)
-        ~dummy_group_element:dummy ~bool
-    in
     let lookup =
       Lookup.opt_typ Impl.Boolean.typ ~uses_lookup:uses_lookups
         ~lookups_per_row_4 ~runtime_tables ~dummy:[| dummy |]

@@ -220,8 +220,7 @@ struct
   let check_bulletproof ~pcs_batch ~(sponge : Sponge.t) ~xi
       ~(* Corresponds to y in figure 7 of WTS *)
        (* sum_i r^i sum_j xi^j f_j(beta_i) *)
-      (advice : _ Bulletproof.Advice.t)
-      ~polynomials:(without_degree_bound, with_degree_bound)
+      (advice : _ Bulletproof.Advice.t) ~polynomials:without_degree_bound
       ~opening:
         ({ lr; delta; z_1; z_2; challenge_polynomial_commitment } :
           (Inner_curve.t, Other_field.t Shifted_value.Type2.t) Bulletproof.t ) =
@@ -242,12 +241,6 @@ struct
           with_label "combined_polynomial" (fun () ->
               Pcs_batch.combine_split_commitments pcs_batch
                 ~reduce_without_degree_bound:Array.to_list
-                ~reduce_with_degree_bound:(fun { Plonk_types.Poly_comm
-                                                 .With_degree_bound
-                                                 .unshifted
-                                               ; shifted
-                                               } ->
-                  Array.to_list unshifted @ [ shifted ] )
                 ~scale_and_add:(fun ~(acc :
                                        [ `Maybe_finite of
                                          Boolean.var * Inner_curve.t
@@ -283,15 +276,7 @@ struct
                   | `Maybe_finite x ->
                       Some (`Maybe_finite x) )
                 (Vector.map without_degree_bound
-                   ~f:(Array.map ~f:(fun x -> `Finite x)) )
-                (Vector.map with_degree_bound
-                   ~f:
-                     (let open Plonk_types.Poly_comm.With_degree_bound in
-                     fun { shifted; unshifted } ->
-                       let f x = `Maybe_finite x in
-                       { unshifted = Array.map ~f unshifted
-                       ; shifted = f shifted
-                       }) ) )
+                   ~f:(Array.map ~f:(fun x -> `Finite x)) ) )
           |> function `Finite x -> x | `Maybe_finite _ -> assert false
         in
         let lr_prod, challenges = bullet_reduce sponge lr in
@@ -347,7 +332,7 @@ struct
   let lagrange_commitment ~domain srs i =
     let d = Int.pow 2 (Domain.log2_size domain) in
     match[@warning "-4"]
-      (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment srs d i).unshifted
+      (Kimchi_bindings.Protocol.SRS.Fq.lagrange_commitment srs d i).elems
     with
     | [| Finite g |] ->
         Inner_curve.Constant.of_affine g
@@ -598,7 +583,7 @@ struct
                      (Wrap_hack.Padded_length.add
                         num_commitments_without_degree_bound ) )
                 ~sponge:sponge_before_evaluations ~xi ~advice ~opening
-                ~polynomials:(without_degree_bound, []) )
+                ~polynomials:without_degree_bound )
         in
         let joint_combiner = None in
         assert_eq_deferred_values
