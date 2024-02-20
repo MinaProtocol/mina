@@ -87,13 +87,11 @@ module Make_verifier (Source : Submission.Data_source) = struct
     if Known_blocks.is_known block_hash then ()
     else
       let load_block_action =
-        if Source.is_cassandra src then
-          Source.load_block_from_submission sub
-        else
-          Source.load_block src ~block_hash
+        if Source.is_cassandra src then Source.load_block_from_submission sub
+        else Source.load_block src ~block_hash
       in
-      Known_blocks.add ?validate ~verify_blockchain_snarks ~block_hash load_block_action
-
+      Known_blocks.add ?validate ~verify_blockchain_snarks ~block_hash
+        load_block_action
 
   let verify ~validate (submission : Source.submission) =
     let open Deferred.Result.Let_syntax in
