@@ -6,6 +6,8 @@ open Mina_base
 module Ledger = Mina_ledger.Ledger
 module Processor = Archive_lib.Processor
 module Load_data = Archive_lib.Load_data
+module Account_comparables = Comparable.Make_binable (Account.Stable.Latest)
+module Account_set = Account_comparables.Set
 
 (* identify a target block B containing staking and next epoch ledgers
    to be used in a hard fork, by giving its state hash
@@ -29,6 +31,8 @@ type input =
   { target_epoch_ledgers_state_hash : State_hash.t option [@default None]
   ; start_slot_since_genesis : int64 [@default 0L]
   ; genesis_ledger : Runtime_config.Ledger.t
+  ; first_pass_ledger_hashes : Ledger_hash.t list [@default []]
+  ; last_snarked_ledger_hash : Ledger_hash.t option [@default None]
   }
 [@@deriving yojson]
 
@@ -61,6 +65,44 @@ let create_ledger_as_list ledger =
   let%map accounts = Ledger.to_list ledger in
   List.map accounts ~f:(fun acc ->
       Genesis_ledger_helper.Accounts.Single.of_account acc None )
+
+module First_pass_ledger_hashes = struct
+  (* ledger hashes after 1st pass, indexed by order of occurrence *)
+
+  module T = struct
+    type t = Ledger_hash.Stable.Latest.t * int
+    [@@deriving bin_io_unversioned, compare, sexp, hash]
+  end
+
+  include T
+  include Hashable.Make_binable (T)
+
+  let hash_set = Hash_set.create ()
+
+  let add =
+    let count = ref 0 in
+    fun ~migration_mode ledger_hash ->
+      if migration_mode then ()
+      else (
+        Base.Hash_set.add hash_set (ledger_hash, !count) ;
+        incr count )
+
+  let find ledger_hash =
+    Base.Hash_set.find hash_set ~f:(fun (hash, _n) ->
+        Ledger_hash.equal hash ledger_hash )
+
+  (* once we find a snarked ledger hash corresponding to a ledger hash, don't need to store earlier ones *)
+  let flush_older_than ndx =
+    let elts = Base.Hash_set.to_list hash_set in
+    List.iter elts ~f:(fun ((_hash, n) as elt) ->
+        if n < ndx then Base.Hash_set.remove hash_set elt )
+
+  let get_last_snarked_hash, set_last_snarked_hash =
+    let last_snarked_hash = ref Ledger_hash.empty_hash in
+    let getter () = !last_snarked_hash in
+    let setter hash = last_snarked_hash := hash in
+    (getter, setter)
+end
 
 let create_output ~target_epoch_ledgers_state_hash ~target_fork_state_hash
     ~ledger ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger ~next_seed
@@ -102,13 +144,24 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
     ; num_accounts = None
     ; balances = []
     ; hash = None
+    ; s3_data_hash = None
     ; name = None
     ; add_genesis_winner = Some true
     }
   in
+  let first_pass_ledger_hashes =
+    let elts = Base.Hash_set.to_list First_pass_ledger_hashes.hash_set in
+    List.sort elts ~compare:(fun (_h1, n1) (_h2, n2) -> Int.compare n1 n2)
+    |> List.map ~f:(fun (h, _n) -> h)
+  in
+  let last_snarked_ledger_hash =
+    Some (First_pass_ledger_hashes.get_last_snarked_hash ())
+  in
   { target_epoch_ledgers_state_hash = None
   ; start_slot_since_genesis
   ; genesis_ledger
+  ; first_pass_ledger_hashes
+  ; last_snarked_ledger_hash
   }
 
 (* map from global slots (since genesis) to state hash, ledger hash, snarked ledger hash triples *)
@@ -117,42 +170,6 @@ let global_slot_hashes_tbl :
   Int64.Table.create ()
 
 let get_slot_hashes slot = Hashtbl.find global_slot_hashes_tbl slot
-
-module First_pass_ledger_hashes = struct
-  (* ledger hashes after 1st pass, indexed by order of occurrence *)
-
-  module T = struct
-    type t = Ledger_hash.Stable.Latest.t * int
-    [@@deriving bin_io_unversioned, compare, sexp, hash]
-  end
-
-  include T
-  include Hashable.Make_binable (T)
-
-  let hash_set = Hash_set.create ()
-
-  let add =
-    let count = ref 0 in
-    fun ledger_hash ->
-      Base.Hash_set.add hash_set (ledger_hash, !count) ;
-      incr count
-
-  let find ledger_hash =
-    Base.Hash_set.find hash_set ~f:(fun (hash, _n) ->
-        Ledger_hash.equal hash ledger_hash )
-
-  (* once we find a snarked ledger hash corresponding to a ledger hash, don't need to store earlier ones *)
-  let flush_older_than ndx =
-    let elts = Base.Hash_set.to_list hash_set in
-    List.iter elts ~f:(fun ((_hash, n) as elt) ->
-        if n < ndx then Base.Hash_set.remove hash_set elt )
-
-  let get_last_snarked_hash, set_last_snarked_hash =
-    let last_snarked_hash = ref Ledger_hash.empty_hash in
-    let getter () = !last_snarked_hash in
-    let setter hash = last_snarked_hash := hash in
-    (getter, setter)
-end
 
 let process_block_infos_of_state_hash ~logger pool ~state_hash ~start_slot ~f =
   match%bind
@@ -585,8 +602,12 @@ let try_slot ~logger pool slot =
   go ~slot ~tries_left:num_tries
 
 let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
-    ~max_canonical_slot =
-  if Int64.( <= ) last_global_slot_since_genesis max_canonical_slot then (
+    ~max_canonical_slot ~checkpoint_output_folder_opt ~checkpoint_file_prefix
+    ~migration_mode =
+  if
+    migration_mode
+    || Int64.( <= ) last_global_slot_since_genesis max_canonical_slot
+  then (
     (* start replaying at the slot after the one we've just finished with *)
     let start_slot_since_genesis = Int64.succ last_global_slot_since_genesis in
     let%map replayer_checkpoint =
@@ -596,7 +617,15 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
       input_to_yojson input |> Yojson.Safe.pretty_to_string
     in
     let checkpoint_file =
-      sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
+      let checkpoint_filename =
+        sprintf "%s-checkpoint-%Ld.json" checkpoint_file_prefix
+          start_slot_since_genesis
+      in
+      match checkpoint_output_folder_opt with
+      | Some parent ->
+          Filename.concat parent checkpoint_filename
+      | None ->
+          checkpoint_filename
     in
     [%log info] "Writing checkpoint file"
       ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
@@ -609,8 +638,9 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
         [ ("max_canonical_slot", `String (Int64.to_string max_canonical_slot)) ] ;
     Deferred.unit )
 
-let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
-    ~checkpoint_interval () =
+let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
+    ~continue_on_error ~checkpoint_interval ~checkpoint_output_folder_opt
+    ~checkpoint_file_prefix () =
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -659,11 +689,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       in
       let%bind target_state_hash =
         match epoch_ledgers_state_hash_opt with
-        | Some epoch_ledgers_state_hash ->
-            [%log info] "Retrieving fork block state_hash" ;
-            query_db ~f:(fun db ->
-                Sql.Parent_block.get_parent_state_hash db
-                  epoch_ledgers_state_hash )
+        | Some hash ->
+            return hash
         | None ->
             [%log info]
               "Searching for block with greatest height on canonical chain" ;
@@ -674,6 +701,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
               max_slot ;
             try_slot ~logger pool max_slot
       in
+      if not @@ List.is_empty input.first_pass_ledger_hashes then (
+        [%log info] "Populating set of first-pass ledger hashes" ;
+        List.iter input.first_pass_ledger_hashes
+          ~f:(First_pass_ledger_hashes.add ~migration_mode) ) ;
+      Option.iter input.last_snarked_ledger_hash ~f:(fun h ->
+          [%log info] "Setting last snarked ledger hash" ;
+          First_pass_ledger_hashes.set_last_snarked_hash h ) ;
       [%log info]
         "Loading block information using target state hash and start slot" ;
       let%bind block_ids, oldest_block_id =
@@ -1106,10 +1140,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                    is not the start slot" ;
                 Core.exit 1 )
           | Some (state_hash, ledger_hash, snarked_hash) ->
-              let write_checkpoint_file () =
+              let write_checkpoint_file ~checkpoint_output_folder_opt
+                  ~checkpoint_file_prefix ~migration_mode () =
                 let write_checkpoint () =
                   write_replayer_checkpoint ~logger ~ledger
                     ~last_global_slot_since_genesis ~max_canonical_slot
+                    ~checkpoint_output_folder_opt ~checkpoint_file_prefix
+                    ~migration_mode
                 in
                 if last_block then write_checkpoint ()
                 else
@@ -1166,6 +1203,10 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                 let%bind txn_state_view =
                   get_parent_state_view ~pool last_block_id
                 in
+                let parent_global_slot =
+                  Zkapp_precondition.Protocol_state.Poly
+                  .global_slot_since_genesis txn_state_view
+                in
                 let apply_transaction_phases txns =
                   let%bind phase_1s =
                     Deferred.List.mapi txns ~f:(fun n txn ->
@@ -1173,14 +1214,16 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                           Ledger.apply_transaction_first_pass
                             ~constraint_constants
                             ~global_slot:
-                              (Mina_numbers.Global_slot_since_genesis.of_uint32
-                                 (Unsigned.UInt32.of_int64
-                                    last_global_slot_since_genesis ) )
+                              ( if migration_mode then parent_global_slot
+                              else
+                                Mina_numbers.Global_slot_since_genesis.of_uint32
+                                  (Unsigned.UInt32.of_int64
+                                     last_global_slot_since_genesis ) )
                             ~txn_state_view ledger txn
                         with
                         | Ok partially_applied ->
                             (* the current ledger may become a snarked ledger *)
-                            First_pass_ledger_hashes.add
+                            First_pass_ledger_hashes.add ~migration_mode
                               (Ledger.merkle_root ledger) ;
                             let%bind () =
                               update_staking_epoch_data ~logger pool
@@ -1207,18 +1250,20 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                                 ] ;
                             Error.raise err )
                   in
-                  Deferred.List.iter phase_1s ~f:(fun partial ->
+                  Deferred.List.map phase_1s ~f:(fun partial ->
                       match
                         Ledger.apply_transaction_second_pass ledger partial
                       with
-                      | Ok _applied ->
+                      | Ok applied ->
                           let%bind () =
                             update_staking_epoch_data ~logger pool
                               ~last_block_id ~ledger ~staking_epoch_ledger
                               ~staking_seed
+                          and () =
+                            update_next_epoch_data ~logger pool ~last_block_id
+                              ~ledger ~next_epoch_ledger ~next_seed
                           in
-                          update_next_epoch_data ~logger pool ~last_block_id
-                            ~ledger ~next_epoch_ledger ~next_seed
+                          return applied
                       | Error err ->
                           (* must be a zkApp *)
                           ( match partial with
@@ -1244,10 +1289,14 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                 in
                 apply_transaction_phases (List.rev block_txns)
               in
-              ( if
-                Frozen_ledger_hash.equal snarked_hash
-                  (First_pass_ledger_hashes.get_last_snarked_hash ())
-              then
+              ( if migration_mode then
+                [%log info]
+                  "We are doing migration, so the snarked_ledger_hash in \
+                   global_slot_hashes_tbl is irrelevant"
+              else if
+              Frozen_ledger_hash.equal snarked_hash
+                (First_pass_ledger_hashes.get_last_snarked_hash ())
+            then
                 [%log info]
                   "Snarked ledger hash same as in the preceding block, not \
                    checking it again"
@@ -1263,7 +1312,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                         "Current snarked ledger hash not among first-pass \
                          ledger hashes, but we haven't yet found one. The \
                          transaction that created this ledger hash might have \
-                         been in a replayer run that created a checkpoint file" ;
+                         been in an older replayer run that created a \
+                         checkpoint file without saved first-pass ledger \
+                         hashes" ;
                       First_pass_ledger_hashes.set_last_snarked_hash
                         snarked_hash )
                     else
@@ -1290,11 +1341,61 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                     ] ;
                 Deferred.unit )
               else
-                let%bind () = run_transactions () in
-                check_ledger_hash_at_slot state_hash ledger_hash ;
+                let%bind transactions_applied = run_transactions () in
+                let%bind () =
+                  if migration_mode then
+                    let accounts_created =
+                      List.concat_map transactions_applied
+                        ~f:Ledger.Transaction_applied.new_accounts
+                    in
+                    let accounts_accessed =
+                      List.concat_map transactions_applied
+                        ~f:(fun txn_applied ->
+                          let txn =
+                            Ledger.Transaction_applied.transaction txn_applied
+                            |> With_status.data
+                          in
+                          let status =
+                            Ledger.Transaction_applied.transaction_status
+                              txn_applied
+                          in
+                          Mina_transaction.Transaction.account_access_statuses
+                            txn status )
+                      |> List.filter_map ~f:(fun (account_id, status) ->
+                             match status with
+                             | `Accessed ->
+                                 Some account_id
+                             | `Not_accessed ->
+                                 None )
+                      |> List.dedup_and_sort ~compare:Account_id.compare
+                    in
+                    let%bind () =
+                      Deferred.List.iter accounts_created ~f:(fun acct_id ->
+                          query_db ~f:(fun db ->
+                              Processor.Accounts_created.add_if_doesn't_exist db
+                                last_block_id acct_id
+                                constraint_constants.account_creation_fee )
+                          |> Deferred.ignore_m )
+                    in
+
+                    Deferred.List.iter accounts_accessed ~f:(fun acct_id ->
+                        let index =
+                          Ledger.index_of_account_exn ledger acct_id
+                        in
+                        let acct = Ledger.get_at_index_exn ledger index in
+                        query_db ~f:(fun db ->
+                            Processor.Accounts_accessed.add_if_doesn't_exist db
+                              last_block_id ~logger (index, acct) )
+                        |> Deferred.ignore_m )
+                  else (
+                    check_ledger_hash_at_slot state_hash ledger_hash ;
+                    Deferred.unit )
+                in
+                (* don't check ledger hash, because depth changed from mainnet *)
                 let%bind () = check_account_accessed state_hash in
                 log_state_hash_on_next_slot last_global_slot_since_genesis ;
-                write_checkpoint_file ()
+                write_checkpoint_file ~checkpoint_output_folder_opt
+                  ~checkpoint_file_prefix ~migration_mode ()
         in
         (* a sequence is a command type, slot, sequence number triple *)
         let get_internal_cmd_sequence (ic : Sql.Internal_command.t) =
@@ -1574,12 +1675,20 @@ let () =
       Command.async ~summary:"Replay transactions from Mina archive database"
         (let%map input_file =
            Param.flag "--input-file"
-             ~doc:"file File containing the genesis ledger"
+             ~doc:"file File containing the starting ledger"
              Param.(required string)
          and output_file_opt =
            Param.flag "--output-file"
              ~doc:"file File containing the resulting ledger"
              Param.(optional string)
+         and migration_mode =
+           Param.flag "--migration-mode"
+             ~doc:
+               "If this flag is turned on then migration mode would be \
+                started, which means ledger hash check would be disabled and \
+                this app would populates the `accounts_accessed` and \
+                `accounts_created` tables"
+             Param.no_arg
          and archive_uri =
            Param.flag "--archive-uri"
              ~doc:
@@ -1593,6 +1702,15 @@ let () =
            Param.flag "--checkpoint-interval"
              ~doc:"NN Write checkpoint file every NN slots"
              Param.(optional int)
+         and checkpoint_output_folder_opt =
+           Param.flag "--checkpoint-output-folder"
+             ~doc:"file Folder containing the resulting checkpoints"
+             Param.(optional string)
+         and checkpoint_file_prefix =
+           Param.flag "--checkpoint-file-prefix"
+             ~doc:"string Checkpoint file prefix (default: 'replayer')"
+             Param.(optional_with_default "replayer" string)
          in
-         main ~input_file ~output_file_opt ~archive_uri ~checkpoint_interval
-           ~continue_on_error )))
+         main ~input_file ~output_file_opt ~migration_mode ~archive_uri
+           ~checkpoint_interval ~continue_on_error ~checkpoint_output_folder_opt
+           ~checkpoint_file_prefix )))

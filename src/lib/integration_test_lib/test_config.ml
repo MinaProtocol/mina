@@ -10,18 +10,33 @@ module Container_images = struct
     }
 end
 
-module Test_Account = struct
+module Test_account = struct
   type t =
     { account_name : string
     ; balance : string
     ; timing : Mina_base.Account_timing.t
+    ; permissions : Mina_base.Permissions.t option
+    ; zkapp : Mina_base.Zkapp_account.t option
+    }
+
+  let create ~account_name ~balance ?timing ?permissions ?zkapp () =
+    { account_name
+    ; balance
+    ; timing =
+        ( match timing with
+        | None ->
+            Mina_base.Account_timing.Untimed
+        | Some timing ->
+            timing )
+    ; permissions
+    ; zkapp
     }
 end
 
 module Epoch_data = struct
   module Data = struct
     (* the seed is a field value in Base58Check format *)
-    type t = { epoch_ledger : Test_Account.t list; epoch_seed : string }
+    type t = { epoch_ledger : Test_account.t list; epoch_seed : string }
   end
 
   type t = { staking : Data.t; next : Data.t option }
@@ -46,7 +61,7 @@ type t =
   { requires_graphql : bool
         (* temporary flag to enable/disable graphql ingress deployments *)
         (* testnet topography *)
-  ; genesis_ledger : Test_Account.t list
+  ; genesis_ledger : Test_account.t list
   ; epoch_data : Epoch_data.t option
   ; block_producers : Block_producer_node.t list
   ; snark_coordinator : Snark_coordinator_node.t option
@@ -60,7 +75,10 @@ type t =
   ; delta : int
   ; slots_per_epoch : int
   ; slots_per_sub_window : int
+  ; grace_period_slots : int
   ; txpool_max_size : int
+  ; slot_tx_end : int option
+  ; slot_chain_end : int option
   }
 
 let proof_config_default : Runtime_config.Proof_keys.t =
@@ -91,8 +109,11 @@ let default =
   ; k = 20
   ; slots_per_epoch = 3 * 8 * 20
   ; slots_per_sub_window = 2
+  ; grace_period_slots = 140
   ; delta = 0
   ; txpool_max_size = 3000
+  ; slot_tx_end = None
+  ; slot_chain_end = None
   }
 
 let transaction_capacity_log_2 (config : t) =

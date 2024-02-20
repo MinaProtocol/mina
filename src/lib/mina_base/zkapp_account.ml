@@ -145,7 +145,8 @@ module Zkapp_uri = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = string [@@deriving sexp, equal, compare, hash, yojson]
+        type t = Bounded_types.String.Stable.V1.t
+        [@@deriving sexp, equal, compare, hash, yojson]
 
         let to_latest = Fn.id
 
@@ -170,9 +171,9 @@ module Zkapp_uri = struct
 
       include
         Binable.Of_binable_without_uuid
-          (Core_kernel.String.Stable.V1)
+          (Bounded_types.String.Stable.V1)
           (struct
-            type t = string
+            type t = Bounded_types.String.Stable.V1.t
 
             let to_binable = Fn.id
 

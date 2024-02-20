@@ -26,9 +26,10 @@ end
 
 module Fork_constants = struct
   type t =
-    { previous_state_hash : Pickles.Backend.Tick.Field.Stable.Latest.t
-    ; previous_length : Mina_numbers.Length.Stable.Latest.t
-    ; genesis_slot : Mina_numbers.Global_slot_since_genesis.Stable.Latest.t
+    { state_hash : Pickles.Backend.Tick.Field.Stable.Latest.t
+    ; blockchain_length : Mina_numbers.Length.Stable.Latest.t
+    ; global_slot_since_genesis :
+        Mina_numbers.Global_slot_since_genesis.Stable.Latest.t
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 end
@@ -67,15 +68,14 @@ module Constraint_constants = struct
     ; account_creation_fee = Currency.Fee.to_uint64 t.account_creation_fee
     ; fork =
         ( match t.fork with
-        | Some { previous_length; previous_state_hash; genesis_slot } ->
+        | Some { blockchain_length; state_hash; global_slot_since_genesis } ->
             Some
-              { previous_length = Unsigned.UInt32.to_int previous_length
-              ; previous_state_hash =
-                  Pickles.Backend.Tick.Field.to_string previous_state_hash
-              ; genesis_slot =
+              { blockchain_length = Unsigned.UInt32.to_int blockchain_length
+              ; state_hash = Pickles.Backend.Tick.Field.to_string state_hash
+              ; global_slot_since_genesis =
                   Unsigned.UInt32.to_int
                     (Mina_numbers.Global_slot_since_genesis.to_uint32
-                       genesis_slot )
+                       global_slot_since_genesis )
               }
         | None ->
             None )
@@ -154,26 +154,27 @@ module Constraint_constants = struct
         Core_kernel.Int.ceil_log2
           (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
 
-      [%%ifndef fork_previous_length]
+      [%%ifndef fork_blockchain_length]
 
       let fork = None
 
       [%%else]
 
-      [%%inject "fork_previous_length", fork_previous_length]
+      [%%inject "fork_blockchain_length", fork_blockchain_length]
 
-      [%%inject "fork_previous_state_hash", fork_previous_state_hash]
+      [%%inject "fork_state_hash", fork_state_hash]
 
-      [%%inject "fork_genesis_slot", fork_genesis_slot]
+      [%%inject "fork_global_slot_since_genesis", fork_genesis_slot]
 
       let fork =
         Some
-          { Fork_constants.previous_state_hash =
-              Data_hash_lib.State_hash.of_base58_check_exn
-                fork_previous_state_hash
-          ; previous_length = Mina_numbers.Length.of_int fork_previous_length
-          ; genesis_slot =
-              Mina_numbers.Global_slot_since_genesis.of_int fork_genesis_slot
+          { Fork_constants.state_hash =
+              Data_hash_lib.State_hash.of_base58_check_exn fork_state_hash
+          ; blockchain_length =
+              Mina_numbers.Length.of_int fork_blockchain_length
+          ; global_slot_since_genesis =
+              Mina_numbers.Global_slot_since_genesis.of_int
+                fork_global_slot_since_genesis
           }
 
       [%%endif]
@@ -245,6 +246,7 @@ module Protocol = struct
           { k : 'length
           ; slots_per_epoch : 'length
           ; slots_per_sub_window : 'length
+          ; grace_period_slots : 'length
           ; delta : 'delta
           ; genesis_state_timestamp : 'genesis_state_timestamp
           }
@@ -266,6 +268,7 @@ module Protocol = struct
           [ ("k", `Int t.k)
           ; ("slots_per_epoch", `Int t.slots_per_epoch)
           ; ("slots_per_sub_window", `Int t.slots_per_sub_window)
+          ; ("grace_period_slots", `Int t.grace_period_slots)
           ; ("delta", `Int t.delta)
           ; ( "genesis_state_timestamp"
             , `String
@@ -281,6 +284,7 @@ module Protocol = struct
             [ ("k", `Int k)
             ; ("slots_per_epoch", `Int slots_per_epoch)
             ; ("slots_per_sub_window", `Int slots_per_sub_window)
+            ; ("grace_period_slots", `Int grace_period_slots)
             ; ("delta", `Int delta)
             ; ("genesis_state_timestamp", `String time_str)
             ] -> (
@@ -290,6 +294,7 @@ module Protocol = struct
                   { Poly.k
                   ; slots_per_epoch
                   ; slots_per_sub_window
+                  ; grace_period_slots
                   ; delta
                   ; genesis_state_timestamp
                   }
@@ -309,6 +314,7 @@ module Protocol = struct
           ; delta = t.delta
           ; slots_per_epoch = t.slots_per_epoch
           ; slots_per_sub_window = t.slots_per_sub_window
+          ; grace_period_slots = t.grace_period_slots
           ; genesis_state_timestamp =
               Time.to_string_abs
                 (Time.of_span_since_epoch
@@ -335,6 +341,7 @@ module T = struct
     ; zkapp_transaction_cost_limit : float
     ; max_event_elements : int
     ; max_action_elements : int
+    ; zkapp_cmd_limit_hardcap : int
     }
   [@@deriving to_yojson, sexp_of, bin_io_unversioned]
 
@@ -368,6 +375,8 @@ include T
 
 [%%inject "slots_per_sub_window", slots_per_sub_window]
 
+[%%inject "grace_period_slots", grace_period_slots]
+
 [%%inject "delta", delta]
 
 [%%inject "pool_max_size", pool_max_size]
@@ -377,6 +386,7 @@ let compiled : t =
       { k
       ; slots_per_epoch
       ; slots_per_sub_window
+      ; grace_period_slots
       ; delta
       ; genesis_state_timestamp =
           genesis_timestamp_of_string genesis_state_timestamp_string |> of_time
@@ -392,6 +402,7 @@ let compiled : t =
       Mina_compile_config.zkapp_transaction_cost_limit
   ; max_event_elements = Mina_compile_config.max_event_elements
   ; max_action_elements = Mina_compile_config.max_action_elements
+  ; zkapp_cmd_limit_hardcap = Mina_compile_config.zkapp_cmd_limit_hardcap
   }
 
 let for_unit_tests = compiled

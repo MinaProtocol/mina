@@ -177,6 +177,14 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
       (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
   }
 
+let time ~logger ~label f =
+  let start = Time.now () in
+  let x = f () in
+  let stop = Time.now () in
+  [%log info] "%s took %s" label
+    (Time.Span.to_string_hum (Time.diff stop start)) ;
+  x
+
 let rec load_with_max_length :
        context:(module CONTEXT)
     -> max_length:int
@@ -283,6 +291,8 @@ let rec load_with_max_length :
       ~snarked_ledger_hash:genesis_ledger_hash
   in
   match
+    time ~label:"Persistent_frontier.Instsance.check_database" ~logger
+    @@ fun () ->
     Persistent_frontier.Instance.check_database
       ~genesis_state_hash:
         (State_hash.With_state_hashes.state_hash

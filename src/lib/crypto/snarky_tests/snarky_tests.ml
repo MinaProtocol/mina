@@ -611,7 +611,7 @@ module Protocol_circuits = struct
     ()
 
   let blockchain () : unit =
-    let expected = "3bfa747c59356e008201cc8e6af10f77" in
+    let expected = "36786c300e37c2a2f1341ad6374aa113" in
     let digest =
       Blockchain_snark.Blockchain_snark_state.constraint_system_digests
     in
@@ -627,7 +627,7 @@ module Protocol_circuits = struct
 
   let transaction () : unit =
     let expected1 = "b8879f677f622a1d86648030701f43e1" in
-    let expected2 = "dc5ff6a480ceb21b1e0333d2b0262b67" in
+    let expected2 = "c17f6cef52fc6c73d389c0128e41a924" in
     let digest =
       Transaction_snark.constraint_system_digests ~constraint_constants ()
     in
@@ -643,10 +643,10 @@ module Protocol_circuits = struct
     let digest2 = Core.Md5.to_hex hash2 in
 
     let check = String.(digest1 = expected1) in
-    print_hash check expected1 digest1 ;
+    print_hash (not check) expected1 digest1 ;
     assert check ;
     let check = String.(digest2 = expected2) in
-    print_hash check expected2 digest2 ;
+    print_hash (not check) expected2 digest2 ;
     assert check ;
     ()
 

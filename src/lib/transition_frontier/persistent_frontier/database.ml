@@ -36,7 +36,7 @@ module Schema = struct
         [@@@no_toplevel_latest_type]
 
         module V1 = struct
-          type t = string * State_hash.Stable.V1.t
+          type t = Bounded_types.String.Stable.V1.t * State_hash.Stable.V1.t
 
           let to_latest = Fn.id
         end

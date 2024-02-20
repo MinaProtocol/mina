@@ -24,7 +24,7 @@ module User_command = struct
       *)
       type t =
         { sequence_no : int
-        ; command_type : string
+        ; command_type : Bounded_types.String.Stable.V1.t
         ; fee_payer : Public_key.Compressed.Stable.V1.t
         ; source : Public_key.Compressed.Stable.V1.t
         ; receiver : Public_key.Compressed.Stable.V1.t
@@ -37,7 +37,7 @@ module User_command = struct
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
-        ; status : string
+        ; status : Bounded_types.String.Stable.V1.t
         ; failure_reason : Transaction_status.Failure.Stable.V2.t option
         }
       [@@deriving yojson, equal]
@@ -57,13 +57,13 @@ module Internal_command = struct
       type t =
         { sequence_no : int
         ; secondary_sequence_no : int
-        ; command_type : string
+        ; command_type : Bounded_types.String.Stable.V1.t
         ; receiver : Public_key.Compressed.Stable.V1.t
         ; fee : Currency.Fee.Stable.V1.t
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
-        ; status : string
+        ; status : Bounded_types.String.Stable.V1.t
         ; failure_reason : Transaction_status.Failure.Stable.V2.t option
         }
       [@@deriving yojson, equal]
@@ -86,7 +86,7 @@ module Zkapp_command = struct
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
               [@of_yojson Transaction_hash.of_yojson]
-        ; status : string
+        ; status : Bounded_types.String.Stable.V1.t
         ; failure_reasons :
             Transaction_status.Failure.Collection.Display.Stable.V1.t option
         }
@@ -111,7 +111,7 @@ module Block = struct
         ; parent_hash : State_hash.Stable.V1.t
         ; creator : Public_key.Compressed.Stable.V1.t
         ; block_winner : Public_key.Compressed.Stable.V1.t
-        ; last_vrf_output : string
+        ; last_vrf_output : Consensus_vrf.Output.Truncated.Stable.V1.t
         ; snarked_ledger_hash : Frozen_ledger_hash.Stable.V1.t
         ; staking_epoch_data : Mina_base.Epoch_data.Value.Stable.V1.t
         ; next_epoch_data : Mina_base.Epoch_data.Value.Stable.V1.t

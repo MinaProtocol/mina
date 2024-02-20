@@ -230,3 +230,9 @@ val vrf_evaluator : t -> Vrf_evaluator.t
 val genesis_ledger : t -> Mina_ledger.Ledger.t Lazy.t
 
 val vrf_evaluation_state : t -> Block_producer.Vrf_evaluation_state.t
+
+val best_chain_block_by_height :
+  t -> Unsigned.UInt32.t -> (Transition_frontier.Breadcrumb.t, string) Result.t
+
+val best_chain_block_by_state_hash :
+  t -> State_hash.t -> (Transition_frontier.Breadcrumb.t, string) Result.t

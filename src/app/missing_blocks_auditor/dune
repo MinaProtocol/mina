@@ -17,6 +17,7 @@
    async.async_command
    ;; local libraries
    logger
+   bounded_types
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

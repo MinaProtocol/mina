@@ -695,7 +695,7 @@ module Update = struct
         ; verification_key :
             Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t
         ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
-        ; zkapp_uri : string Set_or_keep.Stable.V1.t
+        ; zkapp_uri : Bounded_types.String.Stable.V1.t Set_or_keep.Stable.V1.t
         ; token_symbol :
             Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
         ; timing : Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
@@ -1111,7 +1111,10 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Pickles.Backend.Tick.Field.Stable.V1.t array list
+        type t =
+          Pickles.Backend.Tick.Field.Stable.V1.t
+          Bounded_types.ArrayN16.Stable.V1.t
+          list
         [@@deriving sexp, equal, hash, compare, yojson]
 
         let to_latest = Fn.id

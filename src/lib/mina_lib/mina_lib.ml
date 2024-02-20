@@ -462,6 +462,13 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
   let open Mina_incremental.Status in
   let restart_delay = Time.Span.of_min 5. in
   let offline_shutdown_delay = Time.Span.of_min 25. in
+  let after_genesis =
+    let genesis_timestamp =
+      Genesis_constants.(
+        genesis_timestamp_of_string genesis_state_timestamp_string)
+    in
+    fun () -> Time.(( >= ) (now ())) genesis_timestamp
+  in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
@@ -471,29 +478,32 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
         else
           match online_status with
           | `Offline ->
-              ( match !next_helper_restart with
-              | None ->
-                  next_helper_restart :=
-                    Some
-                      (Async.Clock.Event.run_after restart_delay
-                         (fun () ->
-                           [%log info]
-                             "Offline for too long; restarting libp2p_helper" ;
-                           Mina_networking.restart_helper net ;
-                           next_helper_restart := None ;
-                           match !offline_shutdown with
-                           | None ->
-                               offline_shutdown :=
-                                 Some
-                                   (Async.Clock.Event.run_after
-                                      offline_shutdown_delay
-                                      (fun () -> raise Offline_shutdown)
-                                      () )
-                           | Some _ ->
-                               () )
-                         () )
-              | Some _ ->
-                  () ) ;
+              (* nothing to do if offline before genesis *)
+              ( if after_genesis () then
+                match !next_helper_restart with
+                | None ->
+                    next_helper_restart :=
+                      Some
+                        (Async.Clock.Event.run_after restart_delay
+                           (fun () ->
+                             [%log info]
+                               "Offline for too long; restarting libp2p_helper" ;
+                             Mina_networking.restart_helper net ;
+                             next_helper_restart := None ;
+                             if not is_seed then
+                               match !offline_shutdown with
+                               | None ->
+                                   offline_shutdown :=
+                                     Some
+                                       (Async.Clock.Event.run_after
+                                          offline_shutdown_delay
+                                          (fun () -> raise Offline_shutdown)
+                                          () )
+                               | Some _ ->
+                                   () )
+                           () )
+                | Some _ ->
+                    () ) ;
               let is_empty = function `Empty -> true | _ -> false in
               if is_empty first_connection then (
                 [%str_log info] Connecting ;
@@ -572,10 +582,12 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
       | Some _ ->
           ()
       | None ->
-          bootstrap_timeout :=
-            Some
-              (Timeout.create () bootstrap_timeout_duration
-                 ~f:log_bootstrap_error_and_restart )
+          (* don't check bootstrap timeout before genesis *)
+          if after_genesis () then
+            bootstrap_timeout :=
+              Some
+                (Timeout.create () bootstrap_timeout_duration
+                   ~f:log_bootstrap_error_and_restart )
     in
     let stop_bootstrap_timeout () =
       match !bootstrap_timeout with
@@ -585,7 +597,7 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
       | None ->
           ()
     in
-    let handle_status_change sync_status =
+    let handle_status_change (sync_status : Sync_status.t) =
       ( match sync_status with
       | `Offline ->
           start_offline_timeout ()
@@ -1380,7 +1392,9 @@ let start t =
       ~log_block_creation:t.config.log_block_creation
       ~block_reward_threshold:t.config.block_reward_threshold
       ~block_produced_bvar:t.components.block_produced_bvar
-      ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net ;
+      ~vrf_evaluation_state:t.vrf_evaluation_state ~net:t.components.net
+      ~zkapp_cmd_limit_hardcap:
+        t.config.precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap ;
   perform_compaction t ;
   let () =
     match t.config.node_status_url with
@@ -1786,12 +1800,17 @@ let create ?wallets (config : Config.t) =
                 | Some net ->
                     Mina_networking.peers net )
           in
+          let slot_tx_end =
+            Runtime_config.slot_tx_end_or_default
+              config.Config.precomputed_values.runtime_config
+          in
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
+              ~slot_tx_end
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
@@ -2337,3 +2356,35 @@ let verifier { processes = { verifier; _ }; _ } = verifier
 let vrf_evaluator { processes = { vrf_evaluator; _ }; _ } = vrf_evaluator
 
 let genesis_ledger t = Genesis_proof.genesis_ledger t.config.precomputed_values
+
+let get_transition_frontier (t : t) =
+  transition_frontier t |> Pipe_lib.Broadcast_pipe.Reader.peek
+  |> Result.of_option ~error:"Could not obtain transition frontier"
+
+let best_chain_block_by_height (t : t) height =
+  let open Result.Let_syntax in
+  let%bind transition_frontier = get_transition_frontier t in
+  Transition_frontier.best_tip_path transition_frontier
+  |> List.find ~f:(fun bc ->
+         let validated_transition =
+           Transition_frontier.Breadcrumb.validated_transition bc
+         in
+         let block_height =
+           Mina_block.(
+             blockchain_length @@ With_hash.data
+             @@ Validated.forget validated_transition)
+         in
+         Unsigned.UInt32.equal block_height height )
+  |> Result.of_option
+       ~error:
+         (sprintf "Could not find block in transition frontier with height %s"
+            (Unsigned.UInt32.to_string height) )
+
+let best_chain_block_by_state_hash (t : t) hash =
+  let open Result.Let_syntax in
+  let%bind transition_frontier = get_transition_frontier t in
+  Transition_frontier.find transition_frontier hash
+  |> Result.of_option
+       ~error:
+         (sprintf "Block with state hash %s not found in transition frontier"
+            (State_hash.to_base58_check hash) )
