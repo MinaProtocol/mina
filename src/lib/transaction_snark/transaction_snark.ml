@@ -3335,9 +3335,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       val verify : (t * Sok_message.t) list -> unit Or_error.t Async.Deferred.t
 
-      val id : Pickles.Verification_key.Id.t Lazy.t
+      val id : Pickles.Verification_key.Id.t Async.Deferred.t Lazy.t
 
-      val verification_key : Pickles.Verification_key.t Lazy.t
+      val verification_key : Pickles.Verification_key.t Async.Deferred.t Lazy.t
 
       val verify_against_digest : t -> unit Or_error.t Async.Deferred.t
 
@@ -4194,6 +4194,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ((), (), Pickles.Side_loaded.Proof.of_proof proof)
       in
       let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
+      let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk) in
       ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
       , `Prover trivial_prover )
 

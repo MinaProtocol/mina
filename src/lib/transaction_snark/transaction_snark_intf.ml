@@ -51,9 +51,9 @@ module type Full = sig
 
       val verify : (t * Sok_message.t) list -> unit Or_error.t Async.Deferred.t
 
-      val id : Pickles.Verification_key.Id.t Lazy.t
+      val id : Pickles.Verification_key.Id.t Async.Deferred.t Lazy.t
 
-      val verification_key : Pickles.Verification_key.t Lazy.t
+      val verification_key : Pickles.Verification_key.t Async.Deferred.t Lazy.t
 
       val verify_against_digest : t -> unit Or_error.t Async.Deferred.t
 
