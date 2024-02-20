@@ -34,7 +34,7 @@ def set_error():
 
 def branch_commits(branch,n):
   print ('Retrieving', branch, 'head commit...')
-  result=subprocess.run(['git','log','-n',str(n),'--format="%h"','--abbrev=7','--no-merges',f'{branch}'],
+  result=subprocess.run(['git','log','-n',1,'--format="%h"','--abbrev=7','--no-merges',f'{branch}'],
                         capture_output=True)
   output=result.stdout.decode('ascii')
   print ('command stdout:', output)
