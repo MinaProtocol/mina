@@ -1,86 +1,158 @@
 #!/usr/bin/env bash
 
-# Usage: ./scripts/prepare-test-ledger.sh <BP key 1> <BP key 2> ... <BP key n>
+set -e
+set -o pipefail
 
 # Number of keys in ledger that won't be re-delegated
-NUM_GHOST_KEYS=${NUM_GHOST_KEYS:-0}
-KEY_BALANCE=100000
+KEY_BALANCE=${KEY_BALANCE:-1000}
+
+# Do not touch accounts with balance below $DELEGATEE_CUTOFF
+DELEGATEE_CUTOFF=${DELEGATEE_CUTOFF:-100000}
+
+# Use (approximate) normal distribution for keys
+# Works well for latger number of keys
+NORM=${NORM:-}
+
+# Replace top N delegate keys with the specified keys
+REPLACE_TOP=${REPLACE_TOP:-}
+
+MAINNET_START='2021-03-17 00:00:00'
+now=$(date +%s)
+mainnet_start=$(date --date="$MAINNET_START" -u +%s)
+
+# Ledger prefix to use for structuring ledger
+LEDGER_PREFIX=${LEDGER_PREFIX:-staking-$(( (now-mainnet_start)/7140/180 ))}
 
 echo "Script assumes mainnet's start was at epoch 0 on 17th March 2021, if it's not the case, update the script please" >&2
+echo "Usage: $0 [-r|--replace-top] [-n|--norm] [-c|--delegation_cutoff $DELEGATEE_CUTOFF] [-b|--key-balance $KEY_BALANCE] [-p|--ledger-prefix $LEDGER_PREFIX] <BP key 1> <BP key 2> ... <BP key n>" >&2
+echo "Consider reading script's code for information on optional arguments" >&2
 
-if [[ $# -eq 0 ]]; then
-  echo "Usage: ./scripts/prepare-test-ledger.sh <BP key 1> <BP key 2> ... <BP key n>" >&2
+##########################################################
+# Parse arguments
+##########################################################
+
+KEYS=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -r|--replace-top)
+      REPLACE_TOP=1; shift ;;
+    -n|--norm)
+      NORM=1; shift ;;
+    -c|--delegation-cutoff)
+      DELEGATEE_CUTOFF="$2"; shift; shift ;;
+    -b|--key-balance)
+      KEY_BALANCE="$2"; shift; shift ;;
+    -p|--ledger-prefix)
+      LEDGER_PREFIX="$2"; shift; shift ;;
+    -*|--*)
+      echo "Unknown option $1"; exit 1 ;;
+    *)
+      KEYS+=("$1") ; shift ;;
+  esac
+done
+
+if [[ "$REPLACE_TOP" != "" ]] && [[ "$NORM" != "" ]]; then
+  echo "Can't use --norm and --replace-top at the same time" >&2
   exit 1
 fi
 
-num_keys=$#
-num_keys_and_ghost=$((num_keys + NUM_GHOST_KEYS))
+num_keys=${#KEYS[@]}
+if [[ $num_keys -eq 0 ]]; then
+  echo "No keys specified" >&2
+  exit 1
+fi
 
-now=$(date +%s)
-mainnet_start=$(date --date='2021-03-17 00:00:00' -u +%s)
-epoch_now=$(( (now-mainnet_start)/7140/180 ))
+##########################################################
+# Download ledger
+##########################################################
 
-ledger_file="$epoch_now.json"
+ledger_file="$LEDGER_PREFIX.json"
 
-echo "Current epoch: $epoch_now" >&2
+echo "Using ledger with prefix: $LEDGER_PREFIX" >&2
 
 if [[ ! -f "$ledger_file" ]]; then
-  ledgers_url="https://storage.googleapis.com/storage/v1/b/mina-staking-ledgers/o?maxResults=1&prefix=staking-$epoch_now"
-  ledger_url=$(curl "$ledgers_url" | jq -r .items[0].mediaLink)
-
-  wget -O $ledger_file "$ledger_url"
+  ledgers_url="https://storage.googleapis.com/storage/v1/b/mina-staking-ledgers/o?maxResults=1000&prefix=$LEDGER_PREFIX"
+  echo "$ledgers_url" >&2
+  ledger_url=$(curl "$ledgers_url" | jq -r '.items | sort_by(.size|tonumber) | last.mediaLink')
+  if [[ "$ledger_url" == null ]]; then
+    echo "Couldn't fine ledger with prefix $LEDGER_PREFIX" >&2
+    exit 2
+  fi
+  curl "$ledger_url" >"$ledger_file"
+  cmp "$ledger_file" >/dev/null <<< "Ledger not found: next staking ledger is not finalized yet" && echo "Next ledger not finalized yet" >&2 && rm "$ledger_file" && exit 2
 fi
 
 keys_=""
-for key in "$@"; do
+for key in "${KEYS[@]}"; do
   keys_="\"$key\",$keys_"
 done
 keys_="${keys_:0:-1}"
 
-# jq filter to exclude block PKs from the ledger
-pre_filter="[.[] | select(.pk | IN($keys_) | not)]"
+tmpfile=$(mktemp)
+
+# jq filter to exclude PKs from the ledger
+<"$ledger_file" jq "[.[] | select(.pk | IN($keys_) | not)]" >"$tmpfile"
+
+num_accounts=$(<"$tmpfile" jq length)
 
 ##########################################################
-# Calculate and print approximate new balances
+# Create new ledger in a temporary file
 ##########################################################
 
-num_accounts=$(<$ledger_file jq "$pre_filter | length")
-total_balance=$(<$ledger_file jq "$pre_filter | [.[].balance | tonumber] | add | round")
-new_total_balance=$((total_balance+num_keys*KEY_BALANCE))
-echo "Total accounts: $num_accounts, balance: $total_balance, new balance: $new_total_balance" >&2
-
-function make_balance_expr(){
-  i=$1
-  key=$2
-  echo "$key: (((([.[range($i; $num_accounts; $num_keys_and_ghost)].balance | tonumber] | add) + $KEY_BALANCE)/$new_total_balance*10000|round/100 | tostring) + \"%\")"
-}
-
-balance_expr=$({ i=0; while [[ $i -lt $num_keys ]]; do
-  j=$((i+1))
-  make_balance_expr $i "${!j}"
-  i=$j
-done } | tr "\n" "," | head -c -1)
-
-echo "Balance map:" >&2
-jq <$ledger_file "$pre_filter | {$balance_expr}" 1>&2
-
-##########################################################
-# Build new ledger
-##########################################################
+TOP_KEYS=()
+if [[ "$REPLACE_TOP" != "" ]]; then
+  top_expr="[group_by(.delegate)[] | [(map(.balance|tonumber)|add), .[0].delegate]] | sort | reverse | map(.[1]) | .[0:$num_keys][]"
+  readarray -t TOP_KEYS < <( jq -r "$top_expr" "$tmpfile" )
+fi
 
 function make_expr(){
   i=$1
-  key=$2
+  key="${KEYS[$i]}"
 
-  # Substitute delegate of some ledger keys with the BP key
-  echo ".[range($i; $num_accounts; $num_keys_and_ghost)].delegate = \"$key\""
-  echo ".[$((i+num_accounts))] = {pk:\"$key\", balance:\"$KEY_BALANCE\"}"
+  if [[ "$REPLACE_TOP" == "" ]]; then
+    interval=$num_keys
+    if [[ "$NORM" != "" ]]; then
+      interval=$(( (RANDOM+RANDOM+RANDOM)*num_keys/32/1024/3+1 ))
+    fi
+    # Substitute delegate of some ledger keys with the BP key
+    echo "((.[range($i; $num_accounts; $interval)] | select ((.balance|tonumber) > $DELEGATEE_CUTOFF)).delegate |= \"$key\")"
+  else
+    echo "((.[] | select(.delegate == \"${TOP_KEYS[$i]}\")).delegate |= \"$key\")"
+  fi
+  echo ".[$((i+num_accounts))] = {delegate:\"$key\", pk:\"$key\", balance:\"$KEY_BALANCE\"}"
 }
 
-expr=$({ i=0; while [[ $i -lt $num_keys ]]; do
-  j=$((i+1))
-  make_expr $i "${!j}"
-  i=$j
-done } | tr "\n" "|" | head -c -1)
+expr=$(for i in "${!KEYS[@]}"; do make_expr $i; done | tr "\n" "|" | head -c -1)
+expr="$expr | [.[] | select(.delegate | IN($keys_)) |= del(.receipt_chain_hash)]"
 
-jq <$ledger_file "$pre_filter | $expr"
+
+tmpfile2=$(mktemp)
+<"$tmpfile" jq "$expr" >"$tmpfile2"
+mv "$tmpfile2" "$tmpfile"
+
+##########################################################
+# Calculate and print new stake distribution
+##########################################################
+
+total_balance=$(<"$tmpfile" jq "[.[].balance | tonumber] | add | round")
+echo "Total accounts: $((num_accounts+num_keys)), balance: $total_balance" >&2
+
+function make_balance_expr(){
+  label="$1"
+  keys="$2"
+  echo "$label: ((([.[] | select(.delegate | IN($keys)) | .balance | tonumber] | add))/$total_balance*10000|round/100 )"
+}
+
+balance_expr=$({
+  make_balance_expr all "$keys_"
+  for key in "${KEYS[@]}"; do
+    make_balance_expr "$key" "\"$key\""
+  done } | tr "\n" "," | head -c -1)
+
+echo "Stake distribution:" >&2
+<"$tmpfile" jq "{$balance_expr} | to_entries | sort_by(.value) | reverse | from_entries | map_values((.|tostring) + \"%\")" 1>&2
+
+# Print ledger and remove temporary file
+
+cat "$tmpfile"
+rm "$tmpfile"
