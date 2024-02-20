@@ -1,5 +1,5 @@
 (library
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (name kimchi_pasta)
  (public_name kimchi_backend.pasta)
  (flags -warn-error -27)
@@ -8,14 +8,22 @@
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
  (libraries
-  run_in_thread
-  kimchi
-  kimchi_backend_common
-  hex
-  pickles_types
-  key_cache
-  sgn_type
-  snarky.backendless
+  ;; opam libraries
+  ppx_inline_test.config
+  sexplib0
+  core_kernel
+  bin_prot.shape
+  base.caml
+  ;; local libraries
   sponge
+  pickles_types
+  kimchi_backend.common
+  promise
+  kimchi_bindings
+  kimchi_pasta_basic
+  bounded_types
+  kimchi_pasta_constraint_system
+  kimchi_types
+  pasta_bindings
   snarkette
-  core_kernel))
+  ppx_version.runtime))

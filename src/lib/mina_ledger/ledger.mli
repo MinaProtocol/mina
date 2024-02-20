@@ -56,6 +56,7 @@ module Maskable :
      and type root_hash := Ledger_hash.t
      and type unattached_mask := Mask.t
      and type attached_mask := Mask.Attached.t
+     and type accumulated_t := Mask.accumulated_t
      and type t := Any_ledger.M.t
 
 include
@@ -73,12 +74,16 @@ include
      and type t = Mask.Attached.t
      and type attached_mask = Mask.Attached.t
      and type unattached_mask = Mask.t
+     and type accumulated_t = Mask.accumulated_t
 
 (* We override the type of unregister_mask_exn that comes from
    Merkle_mask.Maskable_merkle_tree_intf.S because at this level callers aren't
    doing reparenting and shouldn't be able to turn off the check parameter.
 *)
 val unregister_mask_exn : loc:string -> Mask.Attached.t -> Mask.t
+
+val unsafe_preload_accounts_from_parent :
+  Mask.Attached.t -> Account_id.t list -> unit
 
 (* The maskable ledger is t = Mask.Attached.t because register/unregister
  * work off of this type *)
@@ -101,181 +106,50 @@ val register_mask : t -> Mask.t -> Mask.Attached.t
 
 val commit : Mask.Attached.t -> unit
 
-module Transaction_applied : sig
-  open Transaction_logic
-
-  module Signed_command_applied : sig
-    module Common : sig
-      type t = Transaction_applied.Signed_command_applied.Common.t =
-        { user_command : Signed_command.t With_status.t
-        ; previous_receipt_chain_hash : Receipt.Chain_hash.t
-        ; fee_payer_timing : Account.Timing.t
-        ; source_timing : Account.Timing.t option
-        }
-      [@@deriving sexp]
-    end
-
-    module Body : sig
-      type t = Transaction_applied.Signed_command_applied.Body.t =
-        | Payment of { previous_empty_accounts : Account_id.t list }
-        | Stake_delegation of
-            { previous_delegate : Public_key.Compressed.t option }
-        | Create_new_token of { created_token : Token_id.t }
-        | Create_token_account
-        | Mint_tokens
-        | Failed
-      [@@deriving sexp]
-    end
-
-    type t = Transaction_applied.Signed_command_applied.t =
-      { common : Common.t; body : Body.t }
-    [@@deriving sexp]
-  end
-
-  module Parties_applied : sig
-    type t = Transaction_applied.Parties_applied.t =
-      { accounts : (Account_id.t * Account.t option) list
-      ; command : Parties.t With_status.t
-      }
-    [@@deriving sexp]
-  end
-
-  module Command_applied : sig
-    type t = Transaction_applied.Command_applied.t =
-      | Signed_command of Signed_command_applied.t
-      | Parties of Parties_applied.t
-    [@@deriving sexp]
-  end
-
-  module Fee_transfer_applied : sig
-    type t = Transaction_applied.Fee_transfer_applied.t =
-      { fee_transfer : Fee_transfer.t
-      ; previous_empty_accounts : Account_id.t list
-      ; receiver_timing : Account.Timing.t
-      ; balances : Transaction_status.Fee_transfer_balance_data.t
-      }
-    [@@deriving sexp]
-  end
-
-  module Coinbase_applied : sig
-    type t = Transaction_applied.Coinbase_applied.t =
-      { coinbase : Coinbase.t
-      ; previous_empty_accounts : Account_id.t list
-      ; receiver_timing : Account.Timing.t
-      ; balances : Transaction_status.Coinbase_balance_data.t
-      }
-    [@@deriving sexp]
-  end
-
-  module Varying : sig
-    type t = Transaction_applied.Varying.t =
-      | Command of Command_applied.t
-      | Fee_transfer of Fee_transfer_applied.t
-      | Coinbase of Coinbase_applied.t
-    [@@deriving sexp]
-  end
-
-  type t = Transaction_applied.t =
-    { previous_hash : Ledger_hash.t; varying : Varying.t }
-  [@@deriving sexp]
-
-  val transaction : t -> Transaction.t With_status.t
-
-  val user_command_status : t -> Transaction_status.t
-end
+include
+  Mina_transaction_logic.S with type ledger := t and type location := Location.t
 
 (** Raises if the ledger is full, or if an account already exists for the given
     [Account_id.t].
 *)
 val create_new_account_exn : t -> Account_id.t -> Account.t -> unit
 
-val apply_user_command :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Mina_numbers.Global_slot.t
-  -> t
-  -> Signed_command.With_valid_signature.t
-  -> Transaction_applied.Signed_command_applied.t Or_error.t
-
-val apply_fee_transfer :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Mina_numbers.Global_slot.t
-  -> t
-  -> Fee_transfer.t
-  -> Transaction_applied.Fee_transfer_applied.t Or_error.t
-
-val apply_coinbase :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Mina_numbers.Global_slot.t
-  -> t
-  -> Coinbase.t
-  -> Transaction_applied.Coinbase_applied.t Or_error.t
-
-val apply_transaction :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
-  -> t
-  -> Transaction.t
-  -> Transaction_applied.t Or_error.t
-
-val apply_parties_unchecked :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> state_view:Snapp_predicate.Protocol_state.View.t
-  -> t
-  -> Parties.t
-  -> ( Transaction_applied.Parties_applied.t
-     * ( ( (Party.t, unit) Parties.Call_forest.t
-         , (Party.t, unit) Parties.Call_forest.t list
-         , Token_id.t
-         , Currency.Amount.t
-         , t
-         , bool
-         , unit
-         , Transaction_status.Failure.t option )
-         Parties_logic.Local_state.t
-       * Currency.Amount.Signed.t ) )
-     Or_error.t
-
-val undo :
-     constraint_constants:Genesis_constants.Constraint_constants.t
-  -> t
-  -> Transaction_applied.t
-  -> unit Or_error.t
+(** update action state, returned slot is new last action slot
+    made available here so we can use this logic in the Zkapp_command generators
+*)
+val update_action_state :
+     Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
+  -> Zkapp_account.Actions.t
+  -> txn_global_slot:Mina_numbers.Global_slot_since_genesis.t
+  -> last_action_slot:Mina_numbers.Global_slot_since_genesis.t
+  -> Snark_params.Tick.Field.t Pickles_types.Vector.Vector_5.t
+     * Mina_numbers.Global_slot_since_genesis.t
 
 val has_locked_tokens :
-     global_slot:Mina_numbers.Global_slot.t
+     global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> account_id:Account_id.t
   -> t
   -> bool Or_error.t
 
-val merkle_root_after_parties_exn :
+val merkle_root_after_zkapp_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_state_view:Snapp_predicate.Protocol_state.View.t
+  -> global_slot:Mina_numbers.Global_slot_since_genesis.t
+  -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
   -> t
-  -> Parties.Valid.t
-  -> Ledger_hash.t * [ `Next_available_token of Token_id.t ]
+  -> Zkapp_command.Valid.t
+  -> Ledger_hash.t
 
 val merkle_root_after_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Mina_numbers.Global_slot.t
+  -> txn_global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> t
   -> Signed_command.With_valid_signature.t
-  -> Ledger_hash.t * [ `Next_available_token of Token_id.t ]
+  -> Ledger_hash.t
 
 (** Raises if the ledger is full. *)
 val create_empty_exn : t -> Account_id.t -> Path.t * Account.t
 
 val num_accounts : t -> int
-
-(** Generate an initial ledger state. There can't be a regular Quickcheck
-    generator for this type because you need to detach a mask from it's parent
-    when you're done with it - the GC doesn't take care of that. *)
-val gen_initial_ledger_state :
-  ( Signature_lib.Keypair.t
-  * Currency.Amount.t
-  * Mina_numbers.Account_nonce.t
-  * Account_timing.t )
-  array
-  Quickcheck.Generator.t
 
 type init_state =
   ( Signature_lib.Keypair.t
@@ -285,7 +159,29 @@ type init_state =
   array
 [@@deriving sexp_of]
 
+(** Generate an initial ledger state. There can't be a regular Quickcheck
+    generator for this type because you need to detach a mask from its parent
+    when you're done with it - the GC doesn't take care of that. *)
+val gen_initial_ledger_state : init_state Quickcheck.Generator.t
+
 (** Apply a generated state to a blank, concrete ledger. *)
 val apply_initial_ledger_state : t -> init_state -> unit
 
-module Ledger_inner : Transaction_logic.Ledger_intf with type t = t
+module Ledger_inner : Ledger_intf.S with type t = t
+
+module For_tests : sig
+  open Currency
+  open Mina_numbers
+
+  val validate_timing_with_min_balance :
+       account:Account.t
+    -> txn_amount:Amount.t
+    -> txn_global_slot:Global_slot_since_genesis.t
+    -> (Account.Timing.t * [> `Min_balance of Balance.t ]) Or_error.t
+
+  val validate_timing :
+       account:Account.t
+    -> txn_amount:Amount.t
+    -> txn_global_slot:Global_slot_since_genesis.t
+    -> Account.Timing.t Or_error.t
+end

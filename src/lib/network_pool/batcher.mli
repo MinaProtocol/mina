@@ -24,10 +24,10 @@ val create :
   -> ?max_weight_per_call:int
   -> (   [ `Init of 'init | `Partially_validated of 'partially_validated ] list
       -> [ `Valid of 'result
-         | `Potentially_invalid of 'partially_validated
+         | `Potentially_invalid of 'partially_validated * Error.t
          | Verifier.invalid ]
          list
-         Deferred.Or_error.t)
+         Deferred.Or_error.t )
   -> ('init, 'partially_validated, 'result) t
 
 val verify :

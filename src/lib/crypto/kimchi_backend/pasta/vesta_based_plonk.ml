@@ -1,30 +1,27 @@
 open Core_kernel
 open Kimchi_backend_common
-open Basic
+open Kimchi_pasta_basic
 module Field = Fp
 module Curve = Vesta
 
 module Bigint = struct
-  module R = struct
-    include Field.Bigint
+  include Field.Bigint
 
-    let of_data _ = failwith __LOC__
+  let of_data _ = failwith __LOC__
 
-    let to_field = Field.of_bigint
+  let to_field = Field.of_bigint
 
-    let of_field = Field.to_bigint
-  end
+  let of_field = Field.to_bigint
 end
 
-let field_size : Bigint.R.t = Field.size
+let field_size : Bigint.t = Field.size
 
 module Verification_key = struct
   type t =
-    ( Kimchi.Foundations.Fp.t
-    , Kimchi.Protocol.SRS.Fp.t
-    , Kimchi.Foundations.Fq.t Kimchi.Foundations.or_infinity
-      Kimchi.Protocol.poly_comm )
-    Kimchi.Protocol.VerifierIndex.verifier_index
+    ( Pasta_bindings.Fp.t
+    , Kimchi_bindings.Protocol.SRS.Fp.t
+    , Pasta_bindings.Fq.t Kimchi_types.or_infinity Kimchi_types.poly_comm )
+    Kimchi_types.VerifierIndex.verifier_index
 
   let to_string _ = failwith __LOC__
 
@@ -34,34 +31,19 @@ module Verification_key = struct
 end
 
 module R1CS_constraint_system =
-  Plonk_constraint_system.Make (Field) (Kimchi.Protocol.Gates.Vector.Fp)
-    (struct
-      let params =
-        Sponge.Params.(
-          map pasta_p_3 ~f:(fun x ->
-              Field.of_bigint (Bigint256.of_decimal_string x)))
-    end)
+  Kimchi_pasta_constraint_system.Vesta_constraint_system
 
-module Var = Var
-
-let lagrange : int -> _ Kimchi.Protocol.poly_comm array =
-  Memo.general ~hashable:Int.hashable (fun domain_log2 ->
-      Array.map
-        Precomputed.Lagrange_precomputations.(
-          vesta.(index_of_domain_log2 domain_log2))
-        ~f:(fun unshifted ->
-          { Kimchi.Protocol.unshifted =
-              Array.map unshifted ~f:(fun (x, y) ->
-                  Kimchi.Foundations.Finite (x, y))
-          ; shifted = None
-          }))
+let lagrange srs domain_log2 : _ Kimchi_types.poly_comm array =
+  let domain_size = Int.pow 2 domain_log2 in
+  Array.init domain_size ~f:(fun i ->
+      Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs domain_size i )
 
 let with_lagrange f (vk : Verification_key.t) =
-  f (lagrange vk.domain.log_size_of_group) vk
+  f (lagrange vk.srs vk.domain.log_size_of_group) vk
 
 let with_lagranges f (vks : Verification_key.t array) =
   let lgrs =
-    Array.map vks ~f:(fun vk -> lagrange vk.domain.log_size_of_group)
+    Array.map vks ~f:(fun vk -> lagrange vk.srs vk.domain.log_size_of_group)
   in
   f lgrs vks
 
@@ -72,13 +54,13 @@ module Keypair = Dlog_plonk_based_keypair.Make (struct
   let name = "vesta"
 
   module Rounds = Rounds
-  module Urs = Kimchi.Protocol.SRS.Fp
-  module Index = Kimchi.Protocol.Index.Fp
+  module Urs = Kimchi_bindings.Protocol.SRS.Fp
+  module Index = Kimchi_bindings.Protocol.Index.Fp
   module Curve = Curve
   module Poly_comm = Fp_poly_comm
   module Scalar_field = Field
-  module Verifier_index = Kimchi.Protocol.VerifierIndex.Fp
-  module Gate_vector = Kimchi.Protocol.Gates.Vector.Fp
+  module Verifier_index = Kimchi_bindings.Protocol.VerifierIndex.Fp
+  module Gate_vector = Kimchi_bindings.Protocol.Gates.Vector.Fp
   module Constraint_system = R1CS_constraint_system
 end)
 
@@ -90,30 +72,31 @@ module Proof = Plonk_dlog_proof.Make (struct
 
   module Backend = struct
     type t =
-      ( Kimchi.Foundations.Fq.t Kimchi.Foundations.or_infinity
-      , Kimchi.Foundations.Fp.t )
-      Kimchi.Protocol.prover_proof
+      ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+      , Pasta_bindings.Fp.t )
+      Kimchi_types.prover_proof
 
-    include Kimchi.Protocol.Proof.Fp
+    type with_public_evals =
+      ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+      , Pasta_bindings.Fp.t )
+      Kimchi_types.proof_with_public
 
-    let verify = with_lagrange verify
+    include Kimchi_bindings.Protocol.Proof.Fp
 
-    let batch_verify =
-      with_lagranges (fun lgrs vks ts ->
-          Run_in_thread.run_in_thread (fun () -> batch_verify lgrs vks ts))
+    let batch_verify vks ts =
+      Promise.run_in_thread (fun () -> batch_verify vks ts)
 
-    let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
-        prev_comms =
+    let create_aux ~f:backend_create (pk : Keypair.t) primary auxiliary
+        prev_chals prev_comms =
       (* external values contains [1, primary..., auxiliary ] *)
       let external_values i =
         let open Field.Vector in
-        if i = 0 then Field.one
-        else if i - 1 < length primary then get primary (i - 1)
-        else get auxiliary (i - 1 - length primary)
+        if i < length primary then get primary i
+        else get auxiliary (i - length primary)
       in
 
       (* compute witness *)
-      let computed_witness =
+      let computed_witness, runtime_tables =
         R1CS_constraint_system.compute_witness pk.cs external_values
       in
       let num_rows = Array.length computed_witness.(0) in
@@ -125,30 +108,32 @@ module Proof = Plonk_dlog_proof.Make (struct
             for row = 0 to num_rows - 1 do
               Field.Vector.emplace_back witness computed_witness.(col).(row)
             done ;
-            witness)
+            witness )
       in
-      create pk.index witness_cols prev_chals prev_comms
+      backend_create pk.index witness_cols runtime_tables prev_chals prev_comms
 
-    let create_async (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
+    let create_async (pk : Keypair.t) ~primary ~auxiliary ~prev_chals
+        ~prev_comms =
       create_aux pk primary auxiliary prev_chals prev_comms
-        ~f:(fun pk auxiliary_input prev_challenges prev_sgs ->
-          Run_in_thread.run_in_thread (fun () ->
-              create pk auxiliary_input prev_challenges prev_sgs))
+        ~f:(fun index witness runtime_tables prev_chals prev_sgs ->
+          Promise.run_in_thread (fun () ->
+              Kimchi_bindings.Protocol.Proof.Fp.create index witness
+                runtime_tables prev_chals prev_sgs ) )
 
-    let create (pk : Keypair.t) primary auxiliary prev_chals prev_comms =
-      create_aux pk primary auxiliary prev_chals prev_comms ~f:create
+    let create (pk : Keypair.t) ~primary ~auxiliary ~prev_chals ~prev_comms =
+      create_aux pk primary auxiliary prev_chals prev_comms
+        ~f:Kimchi_bindings.Protocol.Proof.Fp.create
   end
 
-  module Verifier_index = Kimchi.Protocol.VerifierIndex.Fp
+  module Verifier_index = Kimchi_bindings.Protocol.VerifierIndex.Fp
   module Index = Keypair
 
   module Evaluations_backend = struct
-    type t = Scalar_field.t Kimchi.Protocol.proof_evaluations
+    type t = Scalar_field.t Kimchi_types.proof_evaluations
   end
 
   module Opening_proof_backend = struct
-    type t =
-      (Curve.Affine.Backend.t, Scalar_field.t) Kimchi.Protocol.opening_proof
+    type t = (Curve.Affine.Backend.t, Scalar_field.t) Kimchi_types.opening_proof
   end
 
   module Poly_comm = Fp_poly_comm
@@ -158,15 +143,16 @@ end)
 module Proving_key = struct
   type t = Keypair.t
 
-  include Core_kernel.Binable.Of_binable
-            (Core_kernel.Unit)
-            (struct
-              type nonrec t = t
+  include
+    Core_kernel.Binable.Of_binable
+      (Core_kernel.Unit)
+      (struct
+        type nonrec t = t
 
-              let to_binable _ = ()
+        let to_binable _ = ()
 
-              let of_binable () = failwith "TODO"
-            end)
+        let of_binable () = failwith "TODO"
+      end)
 
   let is_initialized _ = `Yes
 
@@ -183,8 +169,10 @@ module Oracles = Plonk_dlog_oracles.Make (struct
   module Proof = Proof
 
   module Backend = struct
-    include Kimchi.Protocol.Oracles.Fp
+    include Kimchi_bindings.Protocol.Oracles.Fp
 
     let create = with_lagrange create
+
+    let create_with_public_evals = with_lagrange create_with_public_evals
   end
 end)

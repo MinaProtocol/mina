@@ -1,9 +1,24 @@
 open Async_kernel
 open Core_kernel
-open Currency
 open Mina_base
 open Pipe_lib
-open Signature_lib
+
+type metrics_t =
+  { block_production_delay : int list
+  ; transaction_pool_diff_received : int
+  ; transaction_pool_diff_broadcasted : int
+  ; transactions_added_to_pool : int
+  ; transaction_pool_size : int
+  }
+
+type best_chain_block =
+  { state_hash : string
+  ; command_transaction_count : int
+  ; creator_pk : string
+  ; height : Mina_numbers.Length.t
+  ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+  ; global_slot_since_hard_fork : Mina_numbers.Global_slot_since_hard_fork.t
+  }
 
 (* TODO: malleable error -> or error *)
 
@@ -33,80 +48,29 @@ module Engine = struct
 
       val id : t -> string
 
+      val infra_id : t -> string
+
       val network_keypair : t -> Network_keypair.t option
 
       val start : fresh_state:bool -> t -> unit Malleable_error.t
 
       val stop : t -> unit Malleable_error.t
 
-      val send_payment :
-           logger:Logger.t
-        -> t
-        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
-        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
-        -> fee:Currency.Fee.t
-        -> unit Deferred.Or_error.t
-
-      val must_send_payment :
-           logger:Logger.t
-        -> t
-        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
-        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
-        -> amount:Currency.Amount.t
-        -> fee:Currency.Fee.t
-        -> unit Malleable_error.t
-
-      (** returned string is the transaction id *)
-      val send_snapp :
-           logger:Logger.t
-        -> t
-        -> parties:Mina_base.Parties.t
-        -> string Deferred.Or_error.t
-
-      val get_balance :
-           logger:Logger.t
-        -> t
-        -> account_id:Mina_base.Account_id.t
-        -> Currency.Balance.t Deferred.Or_error.t
-
-      val must_get_balance :
-           logger:Logger.t
-        -> t
-        -> account_id:Mina_base.Account_id.t
-        -> Currency.Balance.t Malleable_error.t
-
-      val get_account_permissions :
-           logger:Logger.t
-        -> t
-        -> account_id:Mina_base.Account_id.t
-        -> Mina_base.Permissions.t Deferred.Or_error.t
-
-      (** the returned Update.t is constructed from the fields of the
-          given account, as if it had been applied to the account
+      (** Returns true when [start] was most recently called, or false if
+          [stop] was more recent.
       *)
-      val get_account_update :
-           logger:Logger.t
-        -> t
-        -> account_id:Mina_base.Account_id.t
-        -> Mina_base.Party.Update.t Deferred.Or_error.t
+      val should_be_running : t -> bool
 
-      val get_peer_id :
-           logger:Logger.t
-        -> t
-        -> (string * string list) Async_kernel.Deferred.Or_error.t
-
-      val must_get_peer_id :
-        logger:Logger.t -> t -> (string * string list) Malleable_error.t
-
-      val get_best_chain :
-        logger:Logger.t -> t -> string list Async_kernel.Deferred.Or_error.t
-
-      val must_get_best_chain :
-        logger:Logger.t -> t -> string list Malleable_error.t
+      val get_ingress_uri : t -> Uri.t
 
       val dump_archive_data :
         logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t
+
+      val run_replayer :
+           ?start_slot_since_genesis:int
+        -> logger:Logger.t
+        -> t
+        -> string Malleable_error.t
 
       val dump_mina_logs :
         logger:Logger.t -> t -> log_file:string -> unit Malleable_error.t
@@ -123,19 +87,23 @@ module Engine = struct
 
     val genesis_constants : t -> Genesis_constants.t
 
-    val seeds : t -> Node.t list
+    val seeds : t -> Node.t Core.String.Map.t
 
-    val block_producers : t -> Node.t list
+    val all_non_seed_nodes : t -> Node.t Core.String.Map.t
 
-    val snark_coordinators : t -> Node.t list
+    val block_producers : t -> Node.t Core.String.Map.t
 
-    val archive_nodes : t -> Node.t list
+    val snark_coordinators : t -> Node.t Core.String.Map.t
 
-    val all_nodes : t -> Node.t list
+    val archive_nodes : t -> Node.t Core.String.Map.t
 
-    val keypairs : t -> Signature_lib.Keypair.t list
+    val all_mina_nodes : t -> Node.t Core.String.Map.t
 
-    val initialize : logger:Logger.t -> t -> unit Malleable_error.t
+    val all_nodes : t -> Node.t Core.String.Map.t
+
+    val genesis_keypairs : t -> Network_keypair.t Core.String.Map.t
+
+    val initialize_infra : logger:Logger.t -> t -> unit Malleable_error.t
   end
 
   module type Network_manager_intf = sig
@@ -145,11 +113,11 @@ module Engine = struct
 
     type t
 
-    val create : logger:Logger.t -> Network_config.t -> t Deferred.t
+    val create : logger:Logger.t -> Network_config.t -> t Malleable_error.t
 
-    val deploy : t -> Network.t Deferred.t
+    val deploy : t -> Network.t Malleable_error.t
 
-    val destroy : t -> unit Deferred.t
+    val destroy : t -> unit Malleable_error.t
 
     val cleanup : t -> unit Deferred.t
   end
@@ -229,9 +197,18 @@ module Dsl = struct
       ; global_slot : int
       ; snarked_ledgers_generated : int
       ; blocks_generated : int
+      ; num_transition_frontier_loaded_from_persistence : int
+      ; num_persisted_frontier_loaded : int
+      ; num_persisted_frontier_fresh_boot : int
+      ; num_bootstrap_required : int
+      ; num_persisted_frontier_dropped : int
       ; node_initialization : bool String.Map.t
       ; gossip_received : Gossip_state.t String.Map.t
       ; best_tips_by_node : State_hash.t String.Map.t
+      ; blocks_produced_by_node : State_hash.t list String.Map.t
+      ; blocks_seen_by_node : State_hash.Set.t String.Map.t
+      ; blocks_including_txn :
+          State_hash.Set.t Mina_transaction.Transaction_hash.Map.t
       }
 
     val listen :
@@ -252,6 +229,19 @@ module Dsl = struct
 
     type t
 
+    type wait_condition_id =
+      | Nodes_to_initialize
+      | Blocks_to_be_produced
+      | Nodes_to_synchronize
+      | Signed_command_to_be_included_in_frontier
+      | Ledger_proofs_emitted_since_genesis
+      | Block_height_growth
+      | Zkapp_to_be_included_in_frontier
+      | Persisted_frontier_loaded
+      | Transition_frontier_loaded_from_persistence
+
+    val wait_condition_id : t -> wait_condition_id
+
     val with_timeouts :
          ?soft_timeout:Network_time_span.t
       -> ?hard_timeout:Network_time_span.t
@@ -264,59 +254,25 @@ module Dsl = struct
 
     val blocks_to_be_produced : int -> t
 
+    val block_height_growth : height_growth:int -> t
+
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
 
-    val payment_to_be_included_in_frontier :
-         sender_pub_key:Public_key.Compressed.t
-      -> receiver_pub_key:Public_key.Compressed.t
-      -> amount:Amount.t
+    val signed_command_to_be_included_in_frontier :
+         txn_hash:Mina_transaction.Transaction_hash.t
+      -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
       -> t
 
-    val snapp_to_be_included_in_frontier : parties:Mina_base.Parties.t -> t
-  end
+    val ledger_proofs_emitted_since_genesis :
+      test_config:Test_config.t -> num_proofs:int -> t
 
-  module type Util_intf = sig
-    module Engine : Engine.S
+    val zkapp_to_be_included_in_frontier :
+      has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t
 
-    val pub_key_of_node :
-         Engine.Network.Node.t
-      -> Signature_lib.Public_key.Compressed.t Malleable_error.t
+    val persisted_frontier_loaded : Engine.Network.Node.t -> t
 
-    val priv_key_of_node :
-      Engine.Network.Node.t -> Signature_lib.Private_key.t Malleable_error.t
-
-    val check_common_prefixes :
-         tolerance:int
-      -> logger:Logger.t
-      -> string list list
-      -> ( unit Malleable_error.Result_accumulator.t
-         , Malleable_error.Hard_fail.t )
-         result
-         Async_kernel.Deferred.t
-
-    val fetch_connectivity_data :
-         logger:Logger.t
-      -> Engine.Network.Node.t list
-      -> ( (Engine.Network.Node.t * (string * string list)) list
-           Malleable_error.Result_accumulator.t
-         , Malleable_error.Hard_fail.t )
-         result
-         Deferred.t
-
-    val assert_peers_completely_connected :
-         (Engine.Network.Node.t * (string * string list)) list
-      -> ( unit Malleable_error.Result_accumulator.t
-         , Malleable_error.Hard_fail.t )
-         result
-         Deferred.t
-
-    val assert_peers_cant_be_partitioned :
-         max_disconnections:int
-      -> (Engine.Network.Node.t * (string * string list)) list
-      -> ( unit Malleable_error.Result_accumulator.t
-         , Malleable_error.Hard_fail.t )
-         result
-         Deferred.t
+    val transition_frontier_loaded_from_persistence :
+      fresh_data:bool -> sync_needed:bool -> t
   end
 
   module type S = sig
@@ -335,8 +291,6 @@ module Dsl = struct
          and module Event_router := Event_router
          and module Network_state := Network_state
 
-    module Util : Util_intf with module Engine := Engine
-
     type t
 
     val section_hard : string -> 'a Malleable_error.t -> 'a Malleable_error.t
@@ -344,6 +298,8 @@ module Dsl = struct
     val section : string -> unit Malleable_error.t -> unit Malleable_error.t
 
     val network_state : t -> Network_state.t
+
+    val event_router : t -> Event_router.t
 
     val wait_for : t -> Wait_condition.t -> unit Malleable_error.t
 
@@ -364,7 +320,9 @@ module Dsl = struct
       -> log_error_accumulator
 
     val lift_accumulated_log_errors :
-      log_error_accumulator -> Test_error.remote_error Test_error.Set.t
+         ?exit_code:int
+      -> log_error_accumulator
+      -> Test_error.remote_error Test_error.Set.t
   end
 end
 

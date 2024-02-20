@@ -27,7 +27,7 @@ let add_fast (type f)
     mk (fun () ->
         if eq y1 y2 then zero
         else if !same_x_bool then inv (!!y2 - !!y1)
-        else zero)
+        else zero )
   in
   let x21_inv =
     mk (fun () -> if !same_x_bool then zero else inv (!!x2 - !!x1))
@@ -38,24 +38,23 @@ let add_fast (type f)
           let x1_squared = square !!x1 in
           let y1 = !!y1 in
           (x1_squared + x1_squared + x1_squared) / (y1 + y1)
-        else (!!y2 - !!y1) / (!!x2 - !!x1))
+        else (!!y2 - !!y1) / (!!x2 - !!x1) )
   in
   let x3 = mk (fun () -> square !!s - (!!x1 + !!x2)) in
   let y3 = mk (fun () -> (!!s * (!!x1 - !!x3)) - !!y1) in
   let p3 = (x3, y3) in
   with_label "add_fast" (fun () ->
       assert_
-        [ { annotation = Some __LOC__
-          ; basic =
-              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-                (EC_add_complete
-                   { p1; p2; p3; inf; same_x; slope = s; inf_z; x21_inv })
-          }
-        ] ;
-      p3)
+        { Snarky_backendless.Constraint.annotation = Some __LOC__
+        ; basic =
+            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+              (EC_add_complete
+                 { p1; p2; p3; inf; same_x; slope = s; inf_z; x21_inv } )
+        } ;
+      p3 )
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit)
+    (Impl : Snarky_backendless.Snark_intf.Run)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t) =
 struct
   open Impl
@@ -72,7 +71,7 @@ struct
 
   let scale_fast_msb_bits base
       (Pickles_types.Shifted_value.Type1.Shifted_value
-        (bits_msb : Boolean.var array)) : Field.t * Field.t =
+        (bits_msb : Boolean.var array) ) : Field.t * Field.t =
     let ((x_base, y_base) as base) = seal base in
     let ( !! ) = As_prover.read_var in
     let mk f = exists Field.typ ~compute:f in
@@ -88,29 +87,29 @@ struct
       let double x = x + x in
       let bs =
         Array.init bits_per_chunk ~f:(fun i ->
-            (bits_msb.(Int.((chunk * bits_per_chunk) + i)) :> Field.t))
+            (bits_msb.(Int.((chunk * bits_per_chunk) + i)) :> Field.t) )
       in
       let n_acc_prev = !n_acc in
       n_acc :=
         mk (fun () ->
-            Array.fold bs ~init:!!n_acc_prev ~f:(fun acc b -> double acc + !!b)) ;
+            Array.fold bs ~init:!!n_acc_prev ~f:(fun acc b -> double acc + !!b) ) ;
       let accs, slopes =
         Array.fold_map bs ~init:!acc ~f:(fun (x_acc, y_acc) b ->
             let s1 =
               mk (fun () ->
                   (!!y_acc - (!!y_base * (double !!b - one)))
-                  / (!!x_acc - !!x_base))
+                  / (!!x_acc - !!x_base) )
             in
             let s1_squared = mk (fun () -> square !!s1) in
             let s2 =
               mk (fun () ->
                   (double !!y_acc / (double !!x_acc + !!x_base - !!s1_squared))
-                  - !!s1)
+                  - !!s1 )
             in
             let x_res = mk (fun () -> !!x_base + square !!s2 - !!s1_squared) in
             let y_res = mk (fun () -> ((!!x_acc - !!x_res) * !!s2) - !!y_acc) in
             let acc' = (x_res, y_res) in
-            (acc', (acc', s1)))
+            (acc', (acc', s1)) )
         |> snd |> Array.unzip
       in
       let accs = Array.append [| !acc |] accs in
@@ -126,12 +125,11 @@ struct
         :: !rounds_rev
     done ;
     assert_
-      [ { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (EC_scale { state = Array.of_list_rev !rounds_rev })
-        }
-      ] ;
+      { Snarky_backendless.Constraint.annotation = Some __LOC__
+      ; basic =
+          Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+            (EC_scale { state = Array.of_list_rev !rounds_rev })
+      } ;
     (* TODO: Return n_acc ? *)
     !acc
 
@@ -154,7 +152,7 @@ struct
       exists (Typ.array ~length:num_bits Field.typ) ~compute:(fun () ->
           let open Field.Constant in
           unpack !!scalar |> Fn.flip List.take num_bits
-          |> Array.of_list_rev_map ~f:(fun b -> if b then one else zero))
+          |> Array.of_list_rev_map ~f:(fun b -> if b then one else zero) )
     in
     let acc = ref (add_fast base base) in
     let n_acc = ref Field.zero in
@@ -164,29 +162,29 @@ struct
       let double x = x + x in
       let bs =
         Array.init bits_per_chunk ~f:(fun i ->
-            bits_msb.(Int.((chunk * bits_per_chunk) + i)))
+            bits_msb.(Int.((chunk * bits_per_chunk) + i)) )
       in
       let n_acc_prev = !n_acc in
       n_acc :=
         mk (fun () ->
-            Array.fold bs ~init:!!n_acc_prev ~f:(fun acc b -> double acc + !!b)) ;
+            Array.fold bs ~init:!!n_acc_prev ~f:(fun acc b -> double acc + !!b) ) ;
       let accs, slopes =
         Array.fold_map bs ~init:!acc ~f:(fun (x_acc, y_acc) b ->
             let s1 =
               mk (fun () ->
                   (!!y_acc - (!!y_base * (double !!b - one)))
-                  / (!!x_acc - !!x_base))
+                  / (!!x_acc - !!x_base) )
             in
             let s1_squared = mk (fun () -> square !!s1) in
             let s2 =
               mk (fun () ->
                   (double !!y_acc / (double !!x_acc + !!x_base - !!s1_squared))
-                  - !!s1)
+                  - !!s1 )
             in
             let x_res = mk (fun () -> !!x_base + square !!s2 - !!s1_squared) in
             let y_res = mk (fun () -> ((!!x_acc - !!x_res) * !!s2) - !!y_acc) in
             let acc' = (x_res, y_res) in
-            (acc', (acc', s1)))
+            (acc', (acc', s1)) )
         |> snd |> Array.unzip
       in
       let accs = Array.append [| !acc |] accs in
@@ -202,12 +200,11 @@ struct
         :: !rounds_rev
     done ;
     assert_
-      [ { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (EC_scale { state = Array.of_list_rev !rounds_rev })
-        }
-      ] ;
+      { Snarky_backendless.Constraint.annotation = Some __LOC__
+      ; basic =
+          Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
+            (EC_scale { state = Array.of_list_rev !rounds_rev })
+      } ;
     Field.Assert.equal !n_acc scalar ;
     let bits_lsb =
       let bs = Array.map bits_msb ~f:Boolean.Unsafe.of_cvar in
@@ -218,7 +215,7 @@ struct
   let scale_fast_unpack base scalar ~num_bits :
       (Field.t * Field.t) * Boolean.var array =
     with_label "scale_fast_unpack" (fun () ->
-        scale_fast_unpack base scalar ~num_bits)
+        scale_fast_unpack base scalar ~num_bits )
 
   let scale_fast base s ~num_bits =
     let r, _bits = scale_fast_unpack base s ~num_bits in
@@ -253,7 +250,7 @@ struct
   *)
   let scale_fast2 (g : G.t)
       (Pickles_types.Shifted_value.Type2.Shifted_value
-        ((s_div_2 : Field.t), (s_odd : Boolean.var))) ~(num_bits : int) : G.t =
+        ((s_div_2 : Field.t), (s_odd : Boolean.var)) ) ~(num_bits : int) : G.t =
     let s_div_2_bits = num_bits - 1 in
     (* The number of chunks need for scaling by s_div_2. *)
     let chunks_needed = chunks_needed ~num_bits:s_div_2_bits in
@@ -265,13 +262,13 @@ struct
     with_label __LOC__ (fun () ->
         for i = s_div_2_bits to Array.length bits_lsb - 1 do
           Field.Assert.equal Field.zero (bits_lsb.(i) :> Field.t)
-        done) ;
+        done ) ;
     with_label __LOC__ (fun () ->
-        G.if_ s_odd ~then_:h ~else_:(add_fast h (G.negate g)))
+        G.if_ s_odd ~then_:h ~else_:(add_fast h (G.negate g)) )
 
   let scale_fast2' (type scalar_field)
       (module Scalar_field : Scalar_field_intf
-        with type Constant.t = scalar_field) g (s : Scalar_field.t) ~num_bits =
+        with type Constant.t = scalar_field ) g (s : Scalar_field.t) ~num_bits =
     let ((s_div_2, s_odd) as s_parts) =
       with_label __LOC__ (fun () ->
           exists
@@ -282,7 +279,7 @@ struct
                   let s = read Scalar_field.typ s in
                   let open Scalar_field.Constant in
                   let s_odd = Bigint.test_bit (to_bigint s) 0 in
-                  ((if s_odd then s - one else s) / of_int 2, s_odd)))
+                  ((if s_odd then s - one else s) / of_int 2, s_odd)) )
     in
 
     (* In this case, it's safe to use this field to compute
@@ -291,82 +288,9 @@ struct
 
        in the other field. *)
     with_label __LOC__ (fun () ->
-        Field.Assert.equal Field.((of_int 2 * s_div_2) + (s_odd :> Field.t)) s) ;
-    scale_fast2 g (Shifted_value s_parts) ~num_bits
+        Field.Assert.equal Field.((of_int 2 * s_div_2) + (s_odd :> Field.t)) s ) ;
+    scale_fast2 g (Pickles_types.Shifted_value.Type2.Shifted_value s_parts)
+      ~num_bits
 
   let scale_fast a b = with_label __LOC__ (fun () -> scale_fast a b)
-
-  let%test_module "curve_ops" =
-    ( module struct
-      module T = Internal_Basic
-
-      let random_point =
-        let rec pt x =
-          let y2 = G.Params.(T.Field.(b + (x * (a + (x * x))))) in
-          if T.Field.is_square y2 then (x, T.Field.sqrt y2)
-          else pt T.Field.(x + one)
-        in
-        G.Constant.of_affine (pt (T.Field.of_int 0))
-
-      let n = Field.size_in_bits
-
-      let%test_unit "scale fast 2" =
-        Quickcheck.test ~trials:5 Field.Constant.gen ~f:(fun s ->
-            let input =
-              let s_odd = T.Bigint.test_bit (T.Bigint.of_field s) 0 in
-              Field.Constant.((if s_odd then s - one else s) / of_int 2, s_odd)
-            in
-            T.Test.test_equal ~equal:G.Constant.equal
-              ~sexp_of_t:G.Constant.sexp_of_t
-              (Typ.tuple2 G.typ (Typ.tuple2 Field.typ Boolean.typ))
-              G.typ
-              (fun (g, s) ->
-                make_checked (fun () ->
-                    scale_fast2 ~num_bits:n g (Shifted_value s)))
-              (fun (g, _) ->
-                let x =
-                  let chunks_needed = chunks_needed ~num_bits:(n - 1) in
-                  let actual_bits_used = chunks_needed * bits_per_chunk in
-                  Pickles_types.Pcs_batch.pow ~one:G.Constant.Scalar.one
-                    ~mul:G.Constant.Scalar.( * )
-                    G.Constant.Scalar.(of_int 2)
-                    actual_bits_used
-                  |> G.Constant.Scalar.( + )
-                       (G.Constant.Scalar.project (Field.Constant.unpack s))
-                in
-                G.Constant.scale g x)
-              (random_point, input))
-
-      let%test_unit "scale fast" =
-        let open Pickles_types in
-        let shift =
-          Shifted_value.Type1.Shift.create (module G.Constant.Scalar)
-        in
-        Quickcheck.test ~trials:10
-          Quickcheck.Generator.(
-            map (list_with_length n Bool.quickcheck_generator) ~f:(fun bs ->
-                Field.Constant.project bs |> Field.Constant.unpack))
-          ~f:(fun xs ->
-            try
-              T.Test.test_equal ~equal:G.Constant.equal
-                ~sexp_of_t:G.Constant.sexp_of_t
-                (Typ.tuple2 G.typ (Typ.list ~length:n Boolean.typ))
-                G.typ
-                (fun (g, s) ->
-                  make_checked (fun () ->
-                      scale_fast ~num_bits:n g (Shifted_value (Field.project s))))
-                (fun (g, s) ->
-                  let open G.Constant.Scalar in
-                  let s = project s in
-                  let x =
-                    Shifted_value.Type1.to_field
-                      (module G.Constant.Scalar)
-                      ~shift (Shifted_value s)
-                  in
-                  G.Constant.scale g x)
-                (random_point, xs)
-            with e ->
-              eprintf !"Input %{sexp: bool list}\n%!" xs ;
-              raise e)
-    end )
 end

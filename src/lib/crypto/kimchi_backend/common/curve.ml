@@ -11,7 +11,7 @@ module type Input_intf = sig
   end
 
   module Affine : sig
-    type t = BaseField.t Kimchi.Foundations.or_infinity
+    type t = BaseField.t Kimchi_types.or_infinity
   end
 
   type t
@@ -88,38 +88,42 @@ struct
     module Backend = struct
       include C.Affine
 
-      let zero () = Kimchi.Foundations.Infinity
+      let zero () = Kimchi_types.Infinity
 
-      let create x y = Kimchi.Foundations.Finite (x, y)
+      let create x y = Kimchi_types.Finite (x, y)
     end
 
     module Stable = struct
       module V1 = struct
         module T = struct
           type t = BaseField.Stable.Latest.t * BaseField.Stable.Latest.t
-          [@@deriving
-            version { asserted }, equal, bin_io, sexp, compare, yojson, hash]
+          [@@deriving equal, bin_io, sexp, compare, yojson, hash]
         end
+
+        (* asserts the versioned-ness of V1
+           to do this properly, we'd move the Stable module outside the functor
+        *)
+        let __versioned__ = ()
 
         include T
 
         exception Invalid_curve_point of t
 
-        include Binable.Of_binable
-                  (T)
-                  (struct
-                    let on_curve (x, y) =
-                      BaseField.Stable.Latest.equal (y_squared x)
-                        (BaseField.square y)
+        include
+          Binable.Of_binable
+            (T)
+            (struct
+              let on_curve (x, y) =
+                BaseField.Stable.Latest.equal (y_squared x) (BaseField.square y)
 
-                    type t = T.t
+              type t = T.t
 
-                    let to_binable = Fn.id
+              let to_binable = Fn.id
 
-                    let of_binable t =
-                      if not (on_curve t) then raise (Invalid_curve_point t) ;
-                      t
-                  end)
+              let of_binable t =
+                if not (on_curve t) then raise (Invalid_curve_point t) ;
+                t
+            end)
       end
 
       module Latest = V1
@@ -182,15 +186,16 @@ struct
 
   let of_affine (x, y) = C.of_affine_coordinates x y
 
-  include Binable.Of_binable
-            (Affine)
-            (struct
-              type nonrec t = t
+  include
+    Binable.Of_binable
+      (Affine)
+      (struct
+        type nonrec t = t
 
-              let to_binable = to_affine_exn
+        let to_binable = to_affine_exn
 
-              let of_binable = of_affine
-            end)
+        let of_binable = of_affine
+      end)
 
   let ( + ) = add
 

@@ -1,7 +1,34 @@
 (library
  (name vrf_evaluator)
  (public_name vrf_evaluator)
- (libraries async core rpc_parallel child_processes mina_base consensus signature_lib random_oracle logger.file_system)
+ (libraries
+   ;; opam libraries
+   async_unix
+   async_kernel
+   rpc_parallel
+   core
+   async
+   core_kernel
+   bin_prot.shape
+   sexplib0
+   base.caml
+   integers
+   ;; local libraries
+   mina_wire_types
+   error_json
+   currency
+   unsigned_extended
+   interruptible
+   signature_lib
+   consensus
+   mina_base
+   child_processes
+   mina_numbers
+   genesis_constants
+   logger
+   logger.file_system
+   ppx_version.runtime
+ )
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane)))
+ (preprocess (pps ppx_mina ppx_version ppx_jane)))

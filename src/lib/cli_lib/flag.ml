@@ -182,7 +182,7 @@ module Host = struct
 
   let is_localhost host =
     Option.value_map ~default:false (Unix.Host.getbyname host) ~f:(fun host ->
-        Core.Unix.Host.have_address_in_common host localhost)
+        Core.Unix.Host.have_address_in_common host localhost )
 end
 
 let example_host = "154.97.53.97"
@@ -216,13 +216,13 @@ module Host_and_port = struct
       ~examples:(create_examples example_port)
       "HOST:PORT/LOCALHOST-PORT"
       (sprintf "%s. If HOST is omitted, then localhost is assumed to be HOST."
-         description)
+         description )
 
   module Client = struct
     let daemon =
       create ~name:"--daemon-port" ~aliases:[ "daemon-port" ] ~arg_type
         (make_doc_builder "Client to local daemon communication"
-           Port.default_client)
+           Port.default_client )
         (Resolve_with_default (Port.to_host_and_port Port.default_client))
   end
 
@@ -230,7 +230,7 @@ module Host_and_port = struct
     let archive =
       create ~name:"--archive-address" ~aliases:[ "archive-address" ] ~arg_type
         (make_doc_builder "Daemon to archive process communication"
-           Port.default_archive)
+           Port.default_archive )
         Optional
   end
 end
@@ -294,7 +294,8 @@ module Uri = struct
         ~arg_type:(Command.Arg_type.map Command.Param.string ~f:Uri.of_string)
         doc_builder
         (Resolve_with_default
-           (Uri.of_string "postgres://admin:codarules@postgres:5432/archiver"))
+           (Uri.of_string "postgres://admin:codarules@postgres:5432/archiver")
+        )
   end
 end
 
@@ -323,6 +324,16 @@ module Log = struct
     in
     flag "--file-log-level" ~aliases:[ "file-log-level" ] ~doc
       (optional_with_default Logger.Level.Trace log_level)
+
+  let file_log_rotations =
+    let open Command.Param in
+    flag "--file-log-rotations"
+      ~doc:
+        (Printf.sprintf
+           "Number of file log rotations before overwriting old logs (default: \
+            %d)"
+           Default.file_log_rotations )
+      (optional_with_default Default.file_log_rotations int)
 end
 
 type signed_command_common =
@@ -345,10 +356,8 @@ let signed_command_common : signed_command_common Command.Param.t =
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
-           (Currency.Fee.to_formatted_string
-              Mina_compile_config.default_transaction_fee)
-           (Currency.Fee.to_formatted_string
-              Mina_base.Signed_command.minimum_fee))
+           (Currency.Fee.to_mina_string Currency.Fee.default_transaction_fee)
+           (Currency.Fee.to_mina_string Mina_base.Signed_command.minimum_fee) )
       (optional txn_fee)
   and nonce =
     flag "--nonce" ~aliases:[ "nonce" ]
@@ -362,7 +371,7 @@ let signed_command_common : signed_command_common Command.Param.t =
       ~doc:"STRING Memo accompanying the transaction" (optional string)
   in
   { sender
-  ; fee = Option.value fee ~default:Mina_compile_config.default_transaction_fee
+  ; fee = Option.value fee ~default:Currency.Fee.default_transaction_fee
   ; nonce
   ; memo
   }
@@ -393,10 +402,8 @@ module Signed_command = struct
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
-           (Currency.Fee.to_formatted_string
-              Mina_compile_config.default_transaction_fee)
-           (Currency.Fee.to_formatted_string
-              Mina_base.Signed_command.minimum_fee))
+           (Currency.Fee.to_mina_string Currency.Fee.default_transaction_fee)
+           (Currency.Fee.to_mina_string Mina_base.Signed_command.minimum_fee) )
       (optional txn_fee)
 
   let valid_until =
@@ -424,6 +431,6 @@ module Signed_command = struct
       ~doc:
         (sprintf
            "STRING Memo accompanying the transaction (up to %d characters)"
-           Mina_base.Signed_command_memo.max_input_length)
+           Mina_base.Signed_command_memo.max_input_length )
       (optional string)
 end

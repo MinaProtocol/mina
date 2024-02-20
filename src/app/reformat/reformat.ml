@@ -17,7 +17,8 @@ let dirs_trustlist =
   ; "zexe"
   ; "proof-systems"
   ; "snarky"
-  ; "_opam" ]
+  ; "_opam"
+  ; ".direnv" ]
 
 let rec fold_over_files ~path ~process_path ~init ~f =
   let%bind all = Sys.ls_dir path in
@@ -71,7 +72,7 @@ let main dry_run check path =
   in
   exit 0
 
-let cli =
+let _cli =
   let open Command.Let_syntax in
   Command.async ~summary:"Format all ml and mli files"
     (let%map_open path =

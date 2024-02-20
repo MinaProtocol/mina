@@ -1,8 +1,15 @@
+use crate::arkworks::CamlFp;
 use crate::{gate_vector::fp::CamlPastaFpPlonkGateVectorPtr, srs::fp::CamlFpSrs};
 use ark_poly::EvaluationDomain;
+use kimchi::circuits::lookup::runtime_tables::caml::CamlRuntimeTableCfg;
+use kimchi::circuits::lookup::runtime_tables::RuntimeTableCfg;
+use kimchi::circuits::lookup::tables::caml::CamlLookupTable;
+use kimchi::circuits::lookup::tables::LookupTable;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
-use kimchi::index::{expr_linearization, Index as DlogIndex};
-use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
+use kimchi::{linearization::expr_linearization, prover_index::ProverIndex};
+use mina_curves::pasta::{Fp, Pallas, Vesta, VestaParameters};
+use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
+use poly_commitment::{evaluation_proof::OpeningProof, SRS as _};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
@@ -11,7 +18,7 @@ use std::{
 
 /// Boxed so that we don't store large proving indexes in the OCaml heap.
 #[derive(ocaml_gen::CustomType)]
-pub struct CamlPastaFpPlonkIndex(pub Box<DlogIndex<GAffine>>);
+pub struct CamlPastaFpPlonkIndex(pub Box<ProverIndex<Vesta, OpeningProof<Vesta>>>);
 pub type CamlPastaFpPlonkIndexPtr<'a> = ocaml::Pointer<'a, CamlPastaFpPlonkIndex>;
 
 extern "C" fn caml_pasta_fp_plonk_index_finalize(v: ocaml::Raw) {
@@ -21,15 +28,26 @@ extern "C" fn caml_pasta_fp_plonk_index_finalize(v: ocaml::Raw) {
     }
 }
 
-ocaml::custom!(CamlPastaFpPlonkIndex {
-    finalize: caml_pasta_fp_plonk_index_finalize,
-});
+impl ocaml::custom::Custom for CamlPastaFpPlonkIndex {
+    const NAME: &'static str = "CamlPastaFpPlonkIndex\0";
+    const USED: usize = 1;
+    /// Encourage the GC to free when there are > 12 in memory
+    const MAX: usize = 12;
+    const OPS: ocaml::custom::CustomOps = ocaml::custom::CustomOps {
+        identifier: Self::NAME.as_ptr() as *const ocaml::sys::Char,
+        finalize: Some(caml_pasta_fp_plonk_index_finalize),
+        ..ocaml::custom::DEFAULT_CUSTOM_OPS
+    };
+}
 
 #[ocaml_gen::func]
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_index_create(
     gates: CamlPastaFpPlonkGateVectorPtr,
     public: ocaml::Int,
+    lookup_tables: Vec<CamlLookupTable<CamlFp>>,
+    runtime_tables: Vec<CamlRuntimeTableCfg<CamlFp>>,
+    prev_challenges: ocaml::Int,
     srs: CamlFpSrs,
 ) -> Result<CamlPastaFpPlonkIndex, ocaml::Error> {
     let gates: Vec<_> = gates
@@ -43,37 +61,46 @@ pub fn caml_pasta_fp_plonk_index_create(
         })
         .collect();
 
+    let runtime_tables: Vec<RuntimeTableCfg<Fp>> =
+        runtime_tables.into_iter().map(Into::into).collect();
+
+    let lookup_tables: Vec<LookupTable<Fp>> = lookup_tables.into_iter().map(Into::into).collect();
+
     // create constraint system
-    let cs = match ConstraintSystem::<Fp>::create(
-        gates,
-        vec![],
-        oracle::pasta::fp_3::params(),
-        public as usize,
-    ) {
-        None => {
-            return Err(ocaml::Error::failwith(
-                "caml_pasta_fp_plonk_index_create: could not create constraint system",
-            )
-            .err()
-            .unwrap())
+    let cs = match ConstraintSystem::<Fp>::create(gates)
+        .public(public as usize)
+        .prev_challenges(prev_challenges as usize)
+        .max_poly_size(Some(srs.0.max_poly_size()))
+        .lookup(lookup_tables)
+        .runtime(if runtime_tables.is_empty() {
+            None
+        } else {
+            Some(runtime_tables)
+        })
+        .build()
+    {
+        Err(e) => {
+            return Err(e.into())
         }
-        Some(cs) => cs,
+        Ok(cs) => cs,
     };
 
     // endo
-    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
+    let (endo_q, _endo_r) = poly_commitment::srs::endos::<Pallas>();
 
     // Unsafe if we are in a multi-core ocaml
     {
-        let ptr: &mut commitment_dlog::srs::SRS<GAffine> =
+        let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
         ptr.add_lagrange_basis(cs.domain.d1);
     }
 
     // create index
-    Ok(CamlPastaFpPlonkIndex(Box::new(
-        DlogIndex::<GAffine>::create(cs, oracle::pasta::fq_3::params(), endo_q, srs.clone()),
-    )))
+    let mut index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.clone());
+    // Compute and cache the verifier index digest
+    index.compute_verifier_index_digest::<DefaultFqSponge<VestaParameters, PlonkSpongeConstantsKimchi>>();
+
+    Ok(CamlPastaFpPlonkIndex(Box::new(index)))
 }
 
 #[ocaml_gen::func]
@@ -132,12 +159,12 @@ pub fn caml_pasta_fp_plonk_index_read(
     }
 
     // deserialize the index
-    let mut t = DlogIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))?;
-    t.cs.fr_sponge_params = oracle::pasta::fp_3::params();
+    let mut t = ProverIndex::<Vesta, OpeningProof<Vesta>>::deserialize(
+        &mut rmp_serde::Deserializer::new(r),
+    )?;
     t.srs = srs.clone();
-    t.fq_sponge_params = oracle::pasta::fq_3::params();
 
-    let (linearization, powers_of_alpha) = expr_linearization(t.cs.domain.d1, false, &None);
+    let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 

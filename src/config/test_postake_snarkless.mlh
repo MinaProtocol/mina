@@ -9,7 +9,7 @@
 [%%import "/src/config/account_creation_fee/standard.mlh"]
 [%%import "/src/config/amount_defaults/standard.mlh"]
 [%%import "/src/config/protocol_version/current.mlh"]
-[%%import "/src/config/supercharged_coinbase_factor/two.mlh"]
+[%%import "/src/config/supercharged_coinbase_factor/one.mlh"]
 
 [%%define time_offsets true]
 
@@ -33,3 +33,6 @@
 [%%import "/src/config/features/dev.mlh"]
 [%%define compaction_interval 360000]
 [%%define vrf_poll_interval 0]
+[%%undef zkapp_cmd_limit]
+[%%undef slot_tx_end]
+[%%undef slot_chain_end]

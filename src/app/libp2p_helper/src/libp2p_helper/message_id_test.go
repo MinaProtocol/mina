@@ -42,17 +42,24 @@ func testPubsubMsgIdFun(t *testing.T, topic string) {
 	gossipSubp.D = 4
 	gossipSubp.Dlo = 2
 	gossipSubp.Dhi = 6
-	require.NoError(t, configurePubsub(alice, 100, nil, pubsub.WithGossipSubParams(gossipSubp)))
-	require.NoError(t, configurePubsub(bob, 100, nil, pubsub.WithGossipSubParams(gossipSubp)))
-	require.NoError(t, configurePubsub(carol, 100, nil, pubsub.WithGossipSubParams(gossipSubp)))
+	require.NoError(t, configurePubsub(alice, 100, nil, nil, pubsub.WithGossipSubParams(gossipSubp)))
+	require.NoError(t, configurePubsub(bob, 100, nil, nil, pubsub.WithGossipSubParams(gossipSubp)))
+	require.NoError(t, configurePubsub(carol, 100, nil, nil, pubsub.WithGossipSubParams(gossipSubp)))
 
 	// Subscribe to the topic
 	testSubscribeDo(t, alice, topic, 21, 58)
+	// Timeouts between subscriptions are needed because otherwise each process would try to discover peers
+	// and will only find that no other peers are connected to the same topic.
+	// That said, pubsub's implementation is imperfect
+	time.Sleep(time.Second)
 	testSubscribeDo(t, bob, topic, 21, 58)
+	time.Sleep(time.Second)
 	testSubscribeDo(t, carol, topic, 21, 58)
+	time.Sleep(time.Second)
 
 	_ = testOpenStreamDo(t, bob, alice.P2p.Host, appAPort, 9900, string(newProtocol))
 	_ = testOpenStreamDo(t, carol, alice.P2p.Host, appAPort, 9900, string(newProtocol))
+
 	<-trapA.IncomingStream
 	<-trapA.IncomingStream
 
@@ -60,8 +67,7 @@ func testPubsubMsgIdFun(t *testing.T, topic string) {
 	testPublishDo(t, alice, topic, msg, 21)
 	testPublishDo(t, bob, topic, msg, 21)
 
-	time.Sleep(time.Millisecond * 100)
-
+	time.Sleep(time.Second)
 	n := 0
 loop:
 	for {

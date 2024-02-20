@@ -57,7 +57,7 @@ module Index = struct
           let rec go acc i =
             if i = ledger_depth then acc else go (f acc (Vector.get t i)) (i + 1)
           in
-          go init 0)
+          go init 0 )
     }
 
   let fold ~ledger_depth t =
@@ -90,7 +90,8 @@ module Token_symbol = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = string [@@deriving sexp, equal, compare, hash, yojson]
+        type t = Bounded_types.String.Stable.V1.t
+        [@@deriving sexp, equal, compare, hash, yojson]
 
         let to_latest = Fn.id
 
@@ -108,20 +109,21 @@ module Token_symbol = struct
               Result.try_with (fun () -> check res)
               |> Result.map ~f:(Fn.const res)
               |> Result.map_error
-                   ~f:(Fn.const "Token_symbol.of_yojson: symbol is too long"))
+                   ~f:(Fn.const "Token_symbol.of_yojson: symbol is too long") )
       end
 
       include T
 
-      include Binable.Of_binable
-                (Core_kernel.String.Stable.V1)
-                (struct
-                  type t = string
+      include
+        Binable.Of_binable_without_uuid
+          (Bounded_types.String.Stable.V1)
+          (struct
+            type t = Bounded_types.String.Stable.V1.t
 
-                  let to_binable = Fn.id
+            let to_binable = Fn.id
 
-                  let of_binable x = check x ; x
-                end)
+            let of_binable x = check x ; x
+          end)
     end
   end]
 
@@ -142,38 +144,18 @@ module Token_symbol = struct
         if byte_index < String.length x then
           let c = x.[byte_index] |> Char.to_int in
           c land (1 lsl (i mod 8)) <> 0
-        else false)
+        else false )
 
   let of_bits x : t =
     let c, j, chars =
       Pickles_types.Vector.fold x ~init:(0, 0, []) ~f:(fun (c, j, chars) x ->
           let c = c lor ((if x then 1 else 0) lsl j) in
-          if j = 7 then (0, 0, Char.of_int_exn c :: chars) else (c, j + 1, chars))
+          if j = 7 then (0, 0, Char.of_int_exn c :: chars) else (c, j + 1, chars) )
     in
     assert (c = 0) ;
     assert (j = 0) ;
     let chars = List.drop_while ~f:(fun c -> Char.to_int c = 0) chars in
     String.of_char_list (List.rev chars)
-
-  let%test_unit "to_bits of_bits roundtrip" =
-    Quickcheck.test ~trials:30 ~seed:(`Deterministic "")
-      (Quickcheck.Generator.list_with_length
-         (Pickles_types.Nat.to_int Num_bits.n)
-         Quickcheck.Generator.bool)
-      ~f:(fun x ->
-        let v = Pickles_types.Vector.of_list_and_length_exn x Num_bits.n in
-        Pickles_types.Vector.iter2
-          (to_bits (of_bits v))
-          v
-          ~f:(fun x y -> assert (Bool.equal x y)))
-
-  let%test_unit "of_bits to_bits roundtrip" =
-    Quickcheck.test ~trials:30 ~seed:(`Deterministic "")
-      (let open Quickcheck.Generator.Let_syntax in
-      let%bind len = Int.gen_incl 0 max_length in
-      String.gen_with_length len
-        (Char.gen_uniform_inclusive Char.min_value Char.max_value))
-      ~f:(fun x -> assert (String.equal (of_bits (to_bits x)) x))
 
   let to_field (x : t) : Field.t =
     Field.project (Pickles_types.Vector.to_list (to_bits x))
@@ -192,7 +174,7 @@ module Token_symbol = struct
             Pickles.Scalar_challenge.to_field_checked' ~num_bits m
               (Kimchi_backend_common.Scalar_challenge.create t)
           in
-          actual_packed)
+          actual_packed )
     in
     Field.Checked.Assert.equal t actual
 
@@ -203,11 +185,12 @@ module Token_symbol = struct
     of_bits
       (Pickles_types.Vector.of_list_and_length_exn
          (List.take (Field.unpack x) num_bits)
-         Num_bits.n)
+         Num_bits.n )
 
   let typ : (var, t) Typ.t =
+    let (Typ typ) = Field.typ in
     Typ.transport
-      { Field.typ with check = range_check }
+      (Typ { typ with check = range_check })
       ~there:to_field ~back:of_field
 
   let var_to_input (x : var) = Random_oracle_input.Chunked.packed (x, num_bits)
@@ -217,13 +200,15 @@ module Token_symbol = struct
   [%%endif]
 end
 
+(* the `token_symbol` describes a token id owned by the account id
+   from this account, not the token id used by this account
+*)
 module Poly = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
       type ( 'pk
-           , 'tid
-           , 'token_permissions
+           , 'id
            , 'token_symbol
            , 'amount
            , 'nonce
@@ -232,12 +217,10 @@ module Poly = struct
            , 'state_hash
            , 'timing
            , 'permissions
-           , 'snapp_opt
-           , 'snapp_uri )
+           , 'zkapp_opt )
            t =
         { public_key : 'pk
-        ; token_id : 'tid
-        ; token_permissions : 'token_permissions
+        ; token_id : 'id
         ; token_symbol : 'token_symbol
         ; balance : 'amount
         ; nonce : 'nonce
@@ -246,43 +229,16 @@ module Poly = struct
         ; voting_for : 'state_hash
         ; timing : 'timing
         ; permissions : 'permissions
-        ; snapp : 'snapp_opt
-        ; snapp_uri : 'snapp_uri
+        ; zkapp : 'zkapp_opt
         }
-      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
+      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist, annot]
 
       let to_latest = Fn.id
     end
-
-    module V1 = struct
-      type ( 'pk
-           , 'tid
-           , 'token_permissions
-           , 'amount
-           , 'nonce
-           , 'receipt_chain_hash
-           , 'delegate
-           , 'state_hash
-           , 'timing
-           , 'permissions
-           , 'snapp_opt )
-           t =
-        { public_key : 'pk
-        ; token_id : 'tid
-        ; token_permissions : 'token_permissions
-        ; balance : 'amount
-        ; nonce : 'nonce
-        ; receipt_chain_hash : 'receipt_chain_hash
-        ; delegate : 'delegate
-        ; voting_for : 'state_hash
-        ; timing : 'timing
-        ; permissions : 'permissions
-        ; snapp : 'snapp_opt
-        }
-      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
-    end
   end]
 end
+
+let token = Poly.token_id
 
 module Key = struct
   [%%versioned
@@ -308,18 +264,16 @@ module Binable_arg = struct
     module V2 = struct
       type t =
         ( Public_key.Compressed.Stable.V1.t
-        , Token_id.Stable.V1.t
-        , Token_permissions.Stable.V1.t
+        , Token_id.Stable.V2.t
         , Token_symbol.Stable.V1.t
         , Balance.Stable.V1.t
         , Nonce.Stable.V1.t
         , Receipt.Chain_hash.Stable.V1.t
         , Public_key.Compressed.Stable.V1.t option
         , State_hash.Stable.V1.t
-        , Timing.Stable.V1.t
+        , Timing.Stable.V2.t
         , Permissions.Stable.V2.t
-        , Snapp_account.Stable.V2.t option
-        , string )
+        , Zkapp_account.Stable.V2.t option )
         (* TODO: Cache the digest of this? *)
         Poly.Stable.V2.t
       [@@deriving sexp, equal, hash, compare, yojson]
@@ -333,42 +287,22 @@ end
 
 let check = Fn.id
 
-[%%if not feature_snapps]
-
-let check (t : Binable_arg.t) =
-  let t = check t in
-  match t.snapp with
-  | None ->
-      t
-  | Some _ ->
-      failwith "Snapp accounts not supported"
-
-[%%endif]
-
-[%%if not feature_tokens]
-
-let check (t : Binable_arg.t) =
-  let t = check t in
-  if Token_id.equal Token_id.default t.token_id then t
-  else failwith "Token accounts not supported"
-
-[%%endif]
-
 [%%versioned_binable
 module Stable = struct
   module V2 = struct
     type t = Binable_arg.Stable.V2.t
     [@@deriving sexp, equal, hash, compare, yojson]
 
-    include Binable.Of_binable
-              (Binable_arg.Stable.V2)
-              (struct
-                type nonrec t = t
+    include
+      Binable.Of_binable_without_uuid
+        (Binable_arg.Stable.V2)
+        (struct
+          type nonrec t = t
 
-                let to_binable = check
+          let to_binable = check
 
-                let of_binable = check
-              end)
+          let of_binable = check
+        end)
 
     let to_latest = Fn.id
 
@@ -378,15 +312,12 @@ end]
 
 [%%define_locally Stable.Latest.(public_key)]
 
-let token { Poly.token_id; _ } = token_id
-
 let identifier ({ public_key; token_id; _ } : t) =
   Account_id.create public_key token_id
 
 type value =
   ( Public_key.Compressed.t
   , Token_id.t
-  , Token_permissions.t
   , Token_symbol.t
   , Balance.t
   , Nonce.t
@@ -395,8 +326,7 @@ type value =
   , State_hash.t
   , Timing.t
   , Permissions.t
-  , Snapp_account.t option
-  , string )
+  , Zkapp_account.t option )
   Poly.t
 [@@deriving sexp]
 
@@ -411,7 +341,6 @@ let initialize account_id : t =
   in
   { public_key
   ; token_id
-  ; token_permissions = Token_permissions.default
   ; token_symbol = ""
   ; balance = Balance.zero
   ; nonce = Nonce.zero
@@ -420,47 +349,14 @@ let initialize account_id : t =
   ; voting_for = State_hash.dummy
   ; timing = Timing.Untimed
   ; permissions = Permissions.user_default
-  ; snapp = None
-  ; snapp_uri = ""
+  ; zkapp = None
   }
 
-let hash_snapp_account_opt = function
+let hash_zkapp_account_opt = function
   | None ->
-      Lazy.force Snapp_account.default_digest
-  | Some (a : Snapp_account.t) ->
-      Snapp_account.digest a
-
-(* This preimage cannot be attained by any string, due to the trailing [true]
-   added below.
-*)
-let snapp_uri_non_preimage =
-  lazy (Random_oracle_input.Chunked.field_elements [| Field.zero; Field.zero |])
-
-let hash_snapp_uri_opt (snapp_uri_opt : string option) =
-  let input =
-    match snapp_uri_opt with
-    | Some snapp_uri ->
-        (* We use [length*8 + 1] to pass a final [true] after the end of the
-           string, to ensure that trailing null bytes don't alias in the hash
-           preimage.
-        *)
-        let bits = Array.create ~len:((String.length snapp_uri * 8) + 1) true in
-        String.foldi snapp_uri ~init:() ~f:(fun i () c ->
-            let c = Char.to_int c in
-            (* Insert the bits into [bits], LSB order. *)
-            for j = 0 to 7 do
-              (* [Int.test_bit c j] *)
-              bits.((i * 8) + j) <- Int.bit_and c (1 lsl j) <> 0
-            done) ;
-        Random_oracle_input.Chunked.packeds
-          (Array.map ~f:(fun b -> (field_of_bool b, 1)) bits)
-    | None ->
-        Lazy.force snapp_uri_non_preimage
-  in
-  Random_oracle.pack_input input
-  |> Random_oracle.hash ~init:Hash_prefix_states.snapp_uri
-
-let hash_snapp_uri (snapp_uri : string) = hash_snapp_uri_opt (Some snapp_uri)
+      Lazy.force Zkapp_account.default_digest
+  | Some (a : Zkapp_account.t) ->
+      Zkapp_account.digest a
 
 let delegate_opt = Option.value ~default:Public_key.Compressed.empty
 
@@ -470,14 +366,12 @@ let to_input (t : t) =
   Poly.Fields.fold ~init:[]
     ~public_key:(f Public_key.Compressed.to_input)
     ~token_id:(f Token_id.to_input) ~balance:(f Balance.to_input)
-    ~token_permissions:(f Token_permissions.to_input)
     ~token_symbol:(f Token_symbol.to_input) ~nonce:(f Nonce.to_input)
     ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
     ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
     ~voting_for:(f State_hash.to_input) ~timing:(f Timing.to_input)
-    ~snapp:(f (Fn.compose field hash_snapp_account_opt))
+    ~zkapp:(f (Fn.compose field hash_zkapp_account_opt))
     ~permissions:(f Permissions.to_input)
-    ~snapp_uri:(f (Fn.compose field hash_snapp_uri))
   |> List.reduce_exn ~f:append
 
 let crypto_hash_prefix = Hash_prefix.account
@@ -490,8 +384,7 @@ let crypto_hash t =
 
 type var =
   ( Public_key.Compressed.var
-  , Token_id.var
-  , Token_permissions.var
+  , Token_id.Checked.t
   , Token_symbol.var
   , Balance.var
   , Nonce.Checked.t
@@ -500,68 +393,50 @@ type var =
   , State_hash.var
   , Timing.var
   , Permissions.Checked.t
-  , Field.Var.t * Snapp_account.t option As_prover.Ref.t
-  (* TODO: This is a hack that lets us avoid unhashing snapp accounts when we don't need to *)
-  , string Data_as_hash.t )
+    (* TODO: This is a hack that lets us avoid unhashing zkApp accounts when we don't need to *)
+  , Field.Var.t * Zkapp_account.t option As_prover.Ref.t )
   Poly.t
 
 let identifier_of_var ({ public_key; token_id; _ } : var) =
   Account_id.Checked.create public_key token_id
 
-let typ' snapp =
-  let spec =
-    Data_spec.
-      [ Public_key.Compressed.typ
-      ; Token_id.typ
-      ; Token_permissions.typ
-      ; Token_symbol.typ
-      ; Balance.typ
-      ; Nonce.typ
-      ; Receipt.Chain_hash.typ
-      ; Typ.transport Public_key.Compressed.typ ~there:delegate_opt
-          ~back:(fun delegate ->
-            if Public_key.Compressed.(equal empty) delegate then None
-            else Some delegate)
-      ; State_hash.typ
-      ; Timing.typ
-      ; Permissions.typ
-      ; snapp
-      ; Data_as_hash.typ ~hash:hash_snapp_uri
-      ]
-  in
-  Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+let typ' zkapp =
+  Typ.of_hlistable
+    [ Public_key.Compressed.typ
+    ; Token_id.typ
+    ; Token_symbol.typ
+    ; Balance.typ
+    ; Nonce.typ
+    ; Receipt.Chain_hash.typ
+    ; Typ.transport Public_key.Compressed.typ ~there:delegate_opt
+        ~back:(fun delegate ->
+          if Public_key.Compressed.(equal empty) delegate then None
+          else Some delegate )
+    ; State_hash.typ
+    ; Timing.typ
+    ; Permissions.typ
+    ; zkapp
+    ]
+    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
     ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let typ : (var, value) Typ.t =
-  let snapp :
-      ( Field.Var.t * Snapp_account.t option As_prover.Ref.t
-      , Snapp_account.t option )
+  let zkapp :
+      ( Field.Var.t * Zkapp_account.t option As_prover.Ref.t
+      , Zkapp_account.t option )
       Typ.t =
     let account :
-        (Snapp_account.t option As_prover.Ref.t, Snapp_account.t option) Typ.t =
+        (Zkapp_account.t option As_prover.Ref.t, Zkapp_account.t option) Typ.t =
       Typ.Internal.ref ()
     in
-    let alloc =
-      let open Typ.Alloc in
-      let%map x = Typ.field.alloc and y = account.alloc in
-      (x, y)
-    in
-    let read (_, y) = account.read y in
-    let store y =
-      let open Typ.Store in
-      let x = hash_snapp_account_opt y in
-      let%map x = Typ.field.store x and y = account.store y in
-      (x, y)
-    in
-    let check (x, _) = Typ.field.check x in
-    { alloc; read; store; check }
+    Typ.(Field.typ * account)
+    |> Typ.transport ~there:(fun x -> (hash_zkapp_account_opt x, x)) ~back:snd
   in
-  typ' snapp
+  typ' zkapp
 
 let var_of_t
     ({ public_key
      ; token_id
-     ; token_permissions
      ; token_symbol
      ; balance
      ; nonce
@@ -570,13 +445,11 @@ let var_of_t
      ; voting_for
      ; timing
      ; permissions
-     ; snapp
-     ; snapp_uri
+     ; zkapp
      } :
-      value) =
+      value ) =
   { Poly.public_key = Public_key.Compressed.var_of_t public_key
-  ; token_id = Token_id.var_of_t token_id
-  ; token_permissions = Token_permissions.var_of_t token_permissions
+  ; token_id = Token_id.Checked.constant token_id
   ; token_symbol = Token_symbol.var_of_value token_symbol
   ; balance = Balance.var_of_t balance
   ; nonce = Nonce.Checked.constant nonce
@@ -585,16 +458,14 @@ let var_of_t
   ; voting_for = State_hash.var_of_t voting_for
   ; timing = Timing.var_of_t timing
   ; permissions = Permissions.Checked.constant permissions
-  ; snapp = Field.Var.constant (hash_snapp_account_opt snapp)
-  ; snapp_uri = Field.Var.constant (hash_snapp_uri snapp_uri)
+  ; zkapp = Field.Var.constant (hash_zkapp_account_opt zkapp)
   }
 
 module Checked = struct
   module Unhashed = struct
     type t =
       ( Public_key.Compressed.var
-      , Token_id.var
-      , Token_permissions.var
+      , Token_id.Checked.t
       , Token_symbol.var
       , Balance.var
       , Nonce.Checked.t
@@ -603,15 +474,14 @@ module Checked = struct
       , State_hash.var
       , Timing.var
       , Permissions.Checked.t
-      , Snapp_account.Checked.t
-      , string Data_as_hash.t )
+      , Zkapp_account.Checked.t )
       Poly.t
 
     let typ : (t, Stable.Latest.t) Typ.t =
       typ'
-        (Typ.transport Snapp_account.typ
-           ~there:(fun t -> Option.value t ~default:Snapp_account.default)
-           ~back:(fun t -> Some t))
+        (Typ.transport Zkapp_account.typ
+           ~there:(fun t -> Option.value t ~default:Zkapp_account.default)
+           ~back:(fun t -> Some t) )
   end
 
   let to_input (t : var) =
@@ -619,61 +489,61 @@ module Checked = struct
     let open Random_oracle.Input.Chunked in
     List.reduce_exn ~f:append
       (Poly.Fields.fold ~init:[]
-         ~snapp:(f (fun (x, _) -> field x))
+         ~zkapp:(f (fun (x, _) -> field x))
          ~permissions:(f Permissions.Checked.to_input)
          ~public_key:(f Public_key.Compressed.Checked.to_input)
-         ~token_id:
-           (* We use [run_checked] here to avoid routing the [Checked.t]
-              monad throughout this calculation.
-           *)
-           (f Token_id.Checked.to_input)
+         ~token_id:(f Token_id.Checked.to_input)
          ~token_symbol:(f Token_symbol.var_to_input)
-         ~token_permissions:(f Token_permissions.var_to_input)
          ~balance:(f Balance.var_to_input) ~nonce:(f Nonce.Checked.to_input)
          ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
          ~delegate:(f Public_key.Compressed.Checked.to_input)
          ~voting_for:(f State_hash.var_to_input)
-         ~timing:(f Timing.var_to_input) ~snapp_uri:(f Data_as_hash.to_input))
+         ~timing:(f Timing.var_to_input) )
 
   let digest t =
     make_checked (fun () ->
         Random_oracle.Checked.(
-          hash ~init:crypto_hash_prefix (pack_input (to_input t))))
+          hash ~init:crypto_hash_prefix (pack_input (to_input t))) )
 
   let balance_upper_bound = Bignum_bigint.(one lsl Balance.length_in_bits)
 
   let amount_upper_bound = Bignum_bigint.(one lsl Amount.length_in_bits)
 
-  let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
+  let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount
+      ~(vesting_period : Mina_numbers.Global_slot_span.Checked.var)
       ~vesting_increment ~initial_minimum_balance =
-    let%bind before_cliff = Global_slot.Checked.(global_slot < cliff_time) in
+    let%bind before_cliff =
+      Global_slot_since_genesis.Checked.(global_slot < cliff_time)
+    in
     let%bind else_branch =
       make_checked (fun () ->
-          let _, slot_diff =
+          let _, (slot_diff : Mina_numbers.Global_slot_span.Checked.var) =
             Tick.Run.run_checked
-              (Global_slot.Checked.sub_or_zero global_slot cliff_time)
+              (Global_slot_since_genesis.Checked.diff_or_zero global_slot
+                 cliff_time )
           in
           let cliff_decrement = cliff_amount in
-          let min_balance_less_cliff_decrement, _ =
+          let min_balance_less_cliff_decrement =
             Tick.Run.run_checked
-              (Balance.Checked.sub_amount_flagged initial_minimum_balance
-                 cliff_decrement)
+              (Balance.Checked.sub_amount_or_zero initial_minimum_balance
+                 cliff_decrement )
           in
-          let num_periods, _ =
+          let (num_periods : Mina_numbers.Global_slot_span.Checked.var), _ =
             Tick.Run.run_checked
-              (Global_slot.Checked.div_mod slot_diff vesting_period)
+              (Global_slot_span.Checked.div_mod slot_diff vesting_period)
           in
           let vesting_decrement =
             Tick.Run.Field.mul
-              (Global_slot.Checked.to_field num_periods)
+              (Global_slot_span.Checked.to_field num_periods)
               (Amount.pack_var vesting_increment)
           in
           let min_balance_less_cliff_and_vesting_decrements =
             Tick.Run.run_checked
-              (Balance.Checked.sub_or_zero min_balance_less_cliff_decrement
-                 (Balance.Checked.Unsafe.of_field vesting_decrement))
+              (Balance.Checked.sub_amount_or_zero
+                 min_balance_less_cliff_decrement
+                 Amount.(Checked.Unsafe.of_field vesting_decrement) )
           in
-          min_balance_less_cliff_and_vesting_decrements)
+          min_balance_less_cliff_and_vesting_decrements )
     in
     Balance.Checked.if_ before_cliff ~then_:initial_minimum_balance
       ~else_:else_branch
@@ -698,6 +568,43 @@ module Checked = struct
     in
     (*Note: Untimed accounts will always have zero min balance*)
     Boolean.not zero_min_balance
+
+  let has_permission ?signature_verifies ~to_ (account : var) =
+    let signature_verifies =
+      match signature_verifies with
+      | Some signature_verifies ->
+          signature_verifies
+      | None -> (
+          match to_ with
+          | `Send ->
+              Boolean.true_
+          | `Receive ->
+              Boolean.false_
+          | `Set_delegate ->
+              Boolean.true_
+          | `Increment_nonce ->
+              Boolean.true_
+          | `Access ->
+              failwith
+                "Account.Checked.has_permission: signature_verifies argument \
+                 must be given for access permission" )
+    in
+    match to_ with
+    | `Send ->
+        Permissions.Auth_required.Checked.eval_no_proof account.permissions.send
+          ~signature_verifies
+    | `Receive ->
+        Permissions.Auth_required.Checked.eval_no_proof
+          account.permissions.receive ~signature_verifies
+    | `Set_delegate ->
+        Permissions.Auth_required.Checked.eval_no_proof
+          account.permissions.set_delegate ~signature_verifies
+    | `Increment_nonce ->
+        Permissions.Auth_required.Checked.eval_no_proof
+          account.permissions.increment_nonce ~signature_verifies
+    | `Access ->
+        Permissions.Auth_required.Checked.eval_no_proof
+          account.permissions.access ~signature_verifies
 end
 
 [%%endif]
@@ -707,7 +614,6 @@ let digest = crypto_hash
 let empty =
   { Poly.public_key = Public_key.Compressed.empty
   ; token_id = Token_id.default
-  ; token_permissions = Token_permissions.default
   ; token_symbol = Token_symbol.default
   ; balance = Balance.zero
   ; nonce = Nonce.zero
@@ -718,11 +624,10 @@ let empty =
   ; permissions =
       Permissions.user_default
       (* TODO: This should maybe be Permissions.empty *)
-  ; snapp = None
-  ; snapp_uri = ""
+  ; zkapp = None
   }
 
-let empty_digest = digest empty
+let empty_digest = lazy (digest empty)
 
 let create account_id balance =
   let public_key = Account_id.public_key account_id in
@@ -733,7 +638,6 @@ let create account_id balance =
   in
   { Poly.public_key
   ; token_id
-  ; token_permissions = Token_permissions.default
   ; token_symbol = Token_symbol.default
   ; balance
   ; nonce = Nonce.zero
@@ -742,13 +646,12 @@ let create account_id balance =
   ; voting_for = State_hash.dummy
   ; timing = Timing.Untimed
   ; permissions = Permissions.user_default
-  ; snapp = None
-  ; snapp_uri = ""
+  ; zkapp = None
   }
 
 let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     ~cliff_amount ~vesting_period ~vesting_increment =
-  if Global_slot.(equal vesting_period zero) then
+  if Global_slot_span.(equal vesting_period zero) then
     Or_error.errorf
       !"Error creating timed account for account id %{sexp: Account_id.t}: \
         vesting period must be greater than zero"
@@ -763,14 +666,13 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     Or_error.return
       { Poly.public_key
       ; token_id
-      ; token_permissions = Token_permissions.default
       ; token_symbol = Token_symbol.default
       ; balance
       ; nonce = Nonce.zero
       ; receipt_chain_hash = Receipt.Chain_hash.empty
       ; delegate
       ; voting_for = State_hash.dummy
-      ; snapp = None
+      ; zkapp = None
       ; permissions = Permissions.user_default
       ; timing =
           Timing.Timed
@@ -780,21 +682,44 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
             ; vesting_period
             ; vesting_increment
             }
-      ; snapp_uri = ""
       }
 
 (* no vesting after cliff time + 1 slot *)
 let create_time_locked public_key balance ~initial_minimum_balance ~cliff_time =
   create_timed public_key balance ~initial_minimum_balance ~cliff_time
-    ~vesting_period:Global_slot.(succ zero)
+    ~vesting_period:Global_slot_span.(succ zero)
     ~vesting_increment:initial_minimum_balance
+
+let initial_minimum_balance Poly.{ timing; _ } =
+  match timing with
+  | Timing.Untimed ->
+      None
+  | Timed t ->
+      Some t.initial_minimum_balance
+
+let cliff_time Poly.{ timing; _ } =
+  match timing with Timing.Untimed -> None | Timed t -> Some t.cliff_time
+
+let cliff_amount Poly.{ timing; _ } =
+  match timing with Timing.Untimed -> None | Timed t -> Some t.cliff_amount
+
+let vesting_increment Poly.{ timing } =
+  match timing with
+  | Timing.Untimed ->
+      None
+  | Timed t ->
+      Some t.vesting_increment
+
+let vesting_period Poly.{ timing; _ } =
+  match timing with Timing.Untimed -> None | Timed t -> Some t.vesting_period
 
 let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
     ~vesting_increment ~initial_minimum_balance =
   let open Unsigned in
-  if Global_slot.(global_slot < cliff_time) then initial_minimum_balance
+  if Global_slot_since_genesis.(global_slot < cliff_time) then
+    initial_minimum_balance
     (* If vesting period is zero then everything vests immediately at the cliff *)
-  else if Global_slot.(equal vesting_period zero) then Balance.zero
+  else if Global_slot_span.(equal vesting_period zero) then Balance.zero
   else
     match Balance.(initial_minimum_balance - cliff_amount) with
     | None ->
@@ -803,7 +728,16 @@ let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
         (* take advantage of fact that global slots are uint32's *)
         let num_periods =
           UInt32.(
-            Infix.((global_slot - cliff_time) / vesting_period)
+            let global_slot_u32 =
+              Global_slot_since_genesis.to_uint32 global_slot
+            in
+            let cliff_time_u32 =
+              Global_slot_since_genesis.to_uint32 cliff_time
+            in
+            let vesting_period_u32 =
+              Global_slot_span.to_uint32 vesting_period
+            in
+            Infix.((global_slot_u32 - cliff_time_u32) / vesting_period_u32)
             |> to_int64 |> UInt64.of_int64)
         in
         let vesting_decrement =
@@ -829,17 +763,19 @@ let incremental_balance_between_slots ~start_slot ~end_slot ~cliff_time
     ~cliff_amount ~vesting_period ~vesting_increment ~initial_minimum_balance :
     Unsigned.UInt64.t =
   let open Unsigned in
-  let min_balance_at_start_slot =
-    min_balance_at_slot ~global_slot:start_slot ~cliff_time ~cliff_amount
-      ~vesting_period ~vesting_increment ~initial_minimum_balance
-    |> Balance.to_amount |> Amount.to_uint64
-  in
-  let min_balance_at_end_slot =
-    min_balance_at_slot ~global_slot:end_slot ~cliff_time ~cliff_amount
-      ~vesting_period ~vesting_increment ~initial_minimum_balance
-    |> Balance.to_amount |> Amount.to_uint64
-  in
-  UInt64.Infix.(min_balance_at_start_slot - min_balance_at_end_slot)
+  if Global_slot_since_genesis.(end_slot <= start_slot) then UInt64.zero
+  else
+    let min_balance_at_start_slot =
+      min_balance_at_slot ~global_slot:start_slot ~cliff_time ~cliff_amount
+        ~vesting_period ~vesting_increment ~initial_minimum_balance
+      |> Balance.to_amount |> Amount.to_uint64
+    in
+    let min_balance_at_end_slot =
+      min_balance_at_slot ~global_slot:end_slot ~cliff_time ~cliff_amount
+        ~vesting_period ~vesting_increment ~initial_minimum_balance
+      |> Balance.to_amount |> Amount.to_uint64
+    in
+    UInt64.Infix.(min_balance_at_start_slot - min_balance_at_end_slot)
 
 let has_locked_tokens ~global_slot (account : t) =
   match account.timing with
@@ -858,33 +794,212 @@ let has_locked_tokens ~global_slot (account : t) =
       in
       Balance.(curr_min_balance > zero)
 
-let gen =
+let final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
+    ~vesting_period ~vesting_increment =
+  let open Unsigned in
+  let to_vest =
+    Balance.(initial_minimum_balance - cliff_amount)
+    |> Option.value_map ~default:UInt64.zero ~f:Balance.to_uint64
+  in
+  let vest_incr = Amount.to_uint64 vesting_increment in
+  let periods =
+    let open UInt64 in
+    let open Infix in
+    (to_vest / vest_incr)
+    + if equal (rem to_vest vest_incr) zero then zero else one
+  in
+  let open UInt32 in
+  let open Infix in
+  Global_slot_since_genesis.of_uint32
+  @@ Global_slot_since_genesis.to_uint32 cliff_time
+     + (UInt64.to_uint32 periods * Global_slot_span.to_uint32 vesting_period)
+
+let timing_final_vesting_slot = function
+  | Timing.Untimed ->
+      Global_slot_since_genesis.zero
+  | Timed
+      { initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment
+      } ->
+      final_vesting_slot ~initial_minimum_balance ~cliff_time ~cliff_amount
+        ~vesting_period ~vesting_increment
+
+let has_permission ~control ~to_ (account : t) =
+  match to_ with
+  | `Access ->
+      Permissions.Auth_required.check account.permissions.access control
+  | `Send ->
+      Permissions.Auth_required.check account.permissions.send control
+  | `Receive ->
+      Permissions.Auth_required.check account.permissions.receive control
+  | `Set_delegate ->
+      Permissions.Auth_required.check account.permissions.set_delegate control
+  | `Increment_nonce ->
+      Permissions.Auth_required.check account.permissions.increment_nonce
+        control
+
+(** [true] iff account has permissions set that enable them to transfer Mina (assuming the command is signed) *)
+let has_permission_to_send account =
+  has_permission ~control:Control.Tag.Signature ~to_:`Access account
+  && has_permission ~control:Control.Tag.Signature ~to_:`Send account
+
+(** [true] iff account has permissions set that enable them to receive Mina *)
+let has_permission_to_receive account =
+  has_permission ~control:Control.Tag.None_given ~to_:`Access account
+  && has_permission ~control:Control.Tag.None_given ~to_:`Receive account
+
+(** [true] iff account has permissions set that enable them to set their delegate (assuming the command is signed) *)
+let has_permission_to_set_delegate account =
+  has_permission ~control:Control.Tag.Signature ~to_:`Access account
+  && has_permission ~control:Control.Tag.Signature ~to_:`Set_delegate account
+
+(** [true] iff account has permissions set that enable them to increment their nonce (assuming the command is signed) *)
+let has_permission_to_increment_nonce account =
+  has_permission ~control:Control.Tag.Signature ~to_:`Access account
+  && has_permission ~control:Control.Tag.Signature ~to_:`Increment_nonce account
+
+let liquid_balance_at_slot ~global_slot (account : t) =
+  match account.timing with
+  | Untimed ->
+      account.balance
+  | Timed
+      { initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment
+      } ->
+      Balance.sub_amount account.balance
+        (Balance.to_amount
+           (min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount
+              ~vesting_period ~vesting_increment ~initial_minimum_balance ) )
+      |> Option.value_exn
+
+let gen : t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind public_key = Public_key.Compressed.gen in
   let%bind token_id = Token_id.gen in
   let%map balance = Currency.Balance.gen in
   create (Account_id.create public_key token_id) balance
 
-let gen_with_constrained_balance ~low ~high =
+let gen_with_constrained_balance ~low ~high : t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind public_key = Public_key.Compressed.gen in
   let%bind token_id = Token_id.gen in
   let%map balance = Currency.Balance.gen_incl low high in
   create (Account_id.create public_key token_id) balance
 
-let gen_timed =
-  let open Quickcheck.Let_syntax in
-  let%bind public_key = Public_key.Compressed.gen in
-  let%bind token_id = Token_id.gen in
-  let account_id = Account_id.create public_key token_id in
-  let%bind balance = Currency.Balance.gen in
-  let%bind initial_minimum_balance = Currency.Balance.gen in
-  let%bind cliff_time = Global_slot.gen in
-  let%bind cliff_amount = Amount.gen in
+let gen_any_vesting_range =
+  let open Quickcheck.Generator.Let_syntax in
+  let open Global_slot_since_genesis in
   (* vesting period must be at least one to avoid division by zero *)
-  let%bind vesting_period =
-    Int.gen_incl 1 100 >>= Fn.compose return Global_slot.of_int
+  let%bind vesting_period = Int.gen_incl 1 1000 >>| Global_slot_span.of_int in
+  let%bind vesting_end = gen_incl (of_int 1) max_value in
+  let%map cliff_time = gen_incl (of_int 1) vesting_end in
+  (cliff_time, vesting_end, vesting_period)
+
+let gen_with_vesting_period vesting_period =
+  let open Quickcheck.Generator.Let_syntax in
+  let open Global_slot_since_genesis in
+  let min_vesting_end =
+    Global_slot_span.(succ vesting_period |> to_uint32)
+    |> Global_slot_since_genesis.of_uint32
   in
-  let%map vesting_increment = Amount.gen in
-  create_timed account_id balance ~initial_minimum_balance ~cliff_time
-    ~cliff_amount ~vesting_period ~vesting_increment
+  let%bind vesting_end = gen_incl min_vesting_end max_value in
+  let max_cliff_time = Option.value_exn @@ sub vesting_end vesting_period in
+  let%map cliff_time = gen_incl (of_int 1) max_cliff_time in
+  (cliff_time, vesting_end, vesting_period)
+
+let gen_vesting_details ~(cliff_time : Global_slot_since_genesis.t)
+    ~(vesting_end : Global_slot_since_genesis.t)
+    ~(vesting_period : Global_slot_span.t) (initial_minimum_balance : Balance.t)
+    : Timing.as_record Quickcheck.Generator.t =
+  let open Unsigned in
+  let open Quickcheck in
+  let open Generator.Let_syntax in
+  let vesting_slots =
+    let open Global_slot_since_genesis in
+    let open UInt32.Infix in
+    to_uint32 vesting_end - to_uint32 cliff_time
+  in
+  (* We need to arrange vesting schedule so that all funds are vested before the
+     maximum global slot, which is 2 ^ 32. *)
+  let vesting_periods_count =
+    Unsigned.UInt32.div vesting_slots
+      (Global_slot_span.to_uint32 vesting_period)
+    |> UInt64.of_uint32
+  in
+  let max_cliff_amt =
+    Balance.(initial_minimum_balance - Amount.of_uint64 vesting_periods_count)
+    |> Option.value_map ~f:Balance.to_amount ~default:Amount.zero
+  in
+  let%map cliff_amount =
+    if UInt64.(compare vesting_periods_count zero) > 0 then
+      Amount.(gen_incl zero max_cliff_amt)
+    else return @@ Balance.to_amount initial_minimum_balance
+  in
+  let to_vest =
+    Balance.(initial_minimum_balance - cliff_amount)
+    |> Option.value_map ~default:Unsigned.UInt64.zero ~f:Balance.to_uint64
+  in
+  let vesting_increment =
+    if Unsigned.UInt64.(equal vesting_periods_count zero) then Amount.one
+      (* This value does not matter anyway. *)
+    else
+      let vi = UInt64.Infix.(to_vest / vesting_periods_count) in
+      let rnd = UInt64.Infix.(to_vest mod vesting_periods_count) in
+      (if UInt64.(compare rnd zero) > 0 then UInt64.succ vi else vi)
+      |> Amount.of_uint64
+  in
+  { Timing.As_record.is_timed = true
+  ; initial_minimum_balance
+  ; cliff_time
+  ; cliff_amount
+  ; vesting_period
+  ; vesting_increment
+  }
+
+let gen_timing (account_balance : Balance.t) =
+  let open Quickcheck.Generator.Let_syntax in
+  let%bind initial_minimum_balance = Balance.(gen_incl one account_balance)
+  and cliff_time, vesting_end, vesting_period = gen_any_vesting_range in
+  gen_vesting_details ~vesting_period ~cliff_time ~vesting_end
+    initial_minimum_balance
+
+let gen_timing_at_least_one_vesting_period (account_balance : Balance.t) =
+  let open Quickcheck.Generator.Let_syntax in
+  let%bind initial_minimum_balance = Balance.(gen_incl one account_balance)
+  (* vesting period must be at least one to avoid division by zero *)
+  and cliff_time, vesting_end, vesting_period =
+    gen_with_vesting_period @@ Global_slot_span.of_int 2
+  in
+  gen_vesting_details ~vesting_period ~cliff_time ~vesting_end
+    initial_minimum_balance
+
+let gen_timed : t Quickcheck.Generator.t =
+  let open Quickcheck in
+  let open Generator.Let_syntax in
+  let%bind account =
+    gen_with_constrained_balance ~low:Balance.one ~high:Balance.max_int
+  in
+  let%map timing = gen_timing account.balance in
+  { account with timing = Timing.of_record timing }
+
+let deriver obj =
+  let open Fields_derivers_zkapps in
+  let ( !. ) = ( !. ) ~t_fields_annots:Poly.t_fields_annots in
+  let receipt_chain_hash =
+    needs_custom_js ~js_type:field ~name:"ReceiptChainHash" field
+  in
+  finish "Account" ~t_toplevel_annots:Poly.t_toplevel_annots
+  @@ Poly.Fields.make_creator ~public_key:!.public_key
+       ~token_id:!.Token_id.deriver ~token_symbol:!.string ~balance:!.balance
+       ~nonce:!.uint32 ~receipt_chain_hash:!.receipt_chain_hash
+       ~delegate:!.(option ~js_type:Or_undefined (public_key @@ o ()))
+       ~voting_for:!.field ~timing:!.Timing.deriver
+       ~permissions:!.Permissions.deriver
+       ~zkapp:!.(option ~js_type:Or_undefined (Zkapp_account.deriver @@ o ()))
+       obj

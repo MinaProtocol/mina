@@ -7,10 +7,9 @@ module Stable = struct
   module V2 = struct
     type t =
       ( Ledger_hash.Stable.V1.t
-      , Account_id.Stable.V1.t
-      , Account.Stable.V2.t
-      , Token_id.Stable.V1.t )
-      Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
+      , Account_id.Stable.V2.t
+      , Account.Stable.V2.t )
+      Sparse_ledger_lib.Sparse_ledger.T.Stable.V2.t
     [@@deriving yojson, sexp]
 
     let to_latest = Fn.id
@@ -33,16 +32,17 @@ end
 
 module Global_state = struct
   type t =
-    { ledger : sparse_ledger
+    { first_pass_ledger : sparse_ledger
+    ; second_pass_ledger : sparse_ledger
     ; fee_excess : Currency.Amount.Signed.t
-    ; protocol_state : Snapp_predicate.Protocol_state.View.t
+    ; supply_increase : Currency.Amount.Signed.t
+    ; protocol_state : Zkapp_precondition.Protocol_state.View.t
+    ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     }
   [@@deriving sexp, to_yojson]
 end
 
-module GS = Global_state
-module M =
-  Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Token_id) (Account_id) (Account)
+module M = Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Account_id) (Account)
 
 type account_state = [ `Added | `Existed ] [@@deriving equal]
 
@@ -50,10 +50,7 @@ type account_state = [ `Added | `Existed ] [@@deriving equal]
     This ledger has an invalid root hash, and cannot be used except as a
     placeholder.
 *)
-let empty ~depth () =
-  M.of_hash
-    ~next_available_token:Token_id.(next default)
-    ~depth Outside_hash_image.t
+let empty ~depth () = M.of_hash ~depth Outside_hash_image.t
 
 module L = struct
   type t = M.t ref
@@ -65,11 +62,17 @@ module L = struct
     Option.try_with (fun () ->
         let account = M.get_exn !t loc in
         if Public_key.Compressed.(equal empty account.public_key) then None
-        else Some account)
+        else Some account )
     |> Option.bind ~f:Fn.id
 
   let location_of_account : t -> Account_id.t -> location option =
-   fun t id -> Option.try_with (fun () -> M.find_index_exn !t id)
+   fun t id ->
+    try
+      let loc = M.find_index_exn !t id in
+      let account = M.get_exn !t loc in
+      if Public_key.Compressed.(equal empty account.public_key) then None
+      else Some loc
+    with _ -> None
 
   let set : t -> location -> Account.t -> unit =
    fun t loc a -> t := M.set_exn !t loc a
@@ -103,24 +106,15 @@ module L = struct
         if Public_key.Compressed.(equal empty a.public_key) then (
           set t loc to_set ;
           (`Added, loc) )
-        else (`Existed, loc))
+        else (`Existed, loc) )
 
   let create_new_account t id to_set =
     get_or_create_account t id to_set |> Or_error.map ~f:ignore
-
-  let remove_accounts_exn : t -> Account_id.t list -> unit =
-   fun _t _xs -> failwith "remove_accounts_exn: not implemented"
 
   let merkle_root : t -> Ledger_hash.t = fun t -> M.merkle_root !t
 
   let with_ledger : depth:int -> f:(t -> 'a) -> 'a =
    fun ~depth:_ ~f:_ -> failwith "with_ledger: not implemented"
-
-  let next_available_token : t -> Token_id.t =
-   fun t -> M.next_available_token !t
-
-  let set_next_available_token : t -> Token_id.t -> unit =
-   fun t token -> t := { !t with next_available_token = token }
 
   (** Create a new ledger mask 'on top of' the given ledger.
 
@@ -147,8 +141,6 @@ module L = struct
   let empty ~depth () = ref (empty ~depth ())
 end
 
-module T = Transaction_logic.Make (L)
-
 [%%define_locally
 M.
   ( of_hash
@@ -158,28 +150,12 @@ M.
   , set_exn
   , find_index_exn
   , add_path
+  , add_wide_path_unsafe
   , merkle_root
-  , iteri
-  , next_available_token )]
+  , iteri )]
 
-let apply_parties_unchecked_with_states ~constraint_constants ~state_view
-    ~fee_excess ledger c =
-  let open T in
-  apply_parties_unchecked_aux ~constraint_constants ~state_view ~fee_excess
-    (ref ledger) c ~init:[]
-    ~f:(fun acc ({ ledger; fee_excess; protocol_state }, local_state) ->
-      ( { GS.ledger = !ledger; fee_excess; protocol_state }
-      , { local_state with ledger = !(local_state.ledger) } )
-      :: acc)
-  |> Result.map ~f:(fun (party_applied, states) ->
-         (* We perform a [List.rev] here to ensure that the states are in order
-            wrt. the parties that generated the states.
-         *)
-         (party_applied, List.rev states))
-
-let of_root ~depth ~next_available_token (h : Ledger_hash.t) =
-  of_hash ~depth ~next_available_token
-    (Ledger_hash.of_digest (h :> Random_oracle.Digest.t))
+let of_root ~depth (h : Ledger_hash.t) =
+  of_hash ~depth (Ledger_hash.of_digest (h :> Random_oracle.Digest.t))
 
 let get_or_initialize_exn account_id t idx =
   let account = get_exn t idx in
@@ -202,22 +178,6 @@ let has_locked_tokens_exn ~global_slot ~account_id t =
   let idx = find_index_exn t account_id in
   let _, account = get_or_initialize_exn account_id t idx in
   Account.has_locked_tokens ~global_slot account
-
-let apply_transaction_logic f t x =
-  let open Or_error.Let_syntax in
-  let t' = ref t in
-  let%map app = f t' x in
-  (!t', app)
-
-let apply_user_command ~constraint_constants ~txn_global_slot =
-  apply_transaction_logic
-    (T.apply_user_command ~constraint_constants ~txn_global_slot)
-
-let apply_transaction' = T.apply_transaction
-
-let apply_transaction ~constraint_constants ~txn_state_view =
-  apply_transaction_logic
-    (T.apply_transaction ~constraint_constants ~txn_state_view)
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
 
@@ -244,4 +204,4 @@ let handler t =
           let index = find_index_exn !ledger pk in
           respond (Provide index)
       | _ ->
-          unhandled)
+          unhandled )

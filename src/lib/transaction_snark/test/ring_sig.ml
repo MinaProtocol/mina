@@ -7,18 +7,18 @@ module Impl = Pickles.Impls.Step
 module Inner_curve = Snark_params.Tick.Inner_curve
 module Nat = Pickles_types.Nat
 module Local_state = Mina_state.Local_state
-module Parties_segment = Transaction_snark.Parties_segment
+module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 module Statement = Transaction_snark.Statement
 open Snark_params.Tick
 open Snark_params.Tick.Let_syntax
 
 (* check a signature on msg against a public key *)
-let check_sig pk msg sigma : (Boolean.var, _) Checked.t =
+let check_sig pk msg sigma : Boolean.var Checked.t =
   let%bind (module S) = Inner_curve.Checked.Shifted.create () in
   Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
 
 (* verify witness signature against public keys *)
-let%snarkydef verify_sig pubkeys msg sigma =
+let%snarkydef_ verify_sig pubkeys msg sigma =
   let%bind pubkeys =
     exists
       (Typ.list ~length:(List.length pubkeys) Inner_curve.typ)
@@ -36,10 +36,10 @@ type _ Snarky_backendless.Request.t +=
 
 let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
     _ Pickles.Inductive_rule.t =
-  let ring_sig_main (tx_commitment : Snapp_statement.Checked.t) :
-      (unit, _) Checked.t =
+  let ring_sig_main (tx_commitment : Zkapp_statement.Checked.t) : unit Checked.t
+      =
     let msg_var =
-      Snapp_statement.Checked.to_field_elements tx_commitment
+      Zkapp_statement.Checked.to_field_elements tx_commitment
       |> Random_oracle_input.Chunked.field_elements
     in
     let%bind sigma_var =
@@ -50,15 +50,13 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
   { identifier = "ring-sig-rule"
   ; prevs = []
   ; main =
-      (fun [] x ->
-        ring_sig_main x |> Run.run_checked
-        |> fun _ :
-               unit
-               Pickles_types.Hlist0.H1
-                 (Pickles_types.Hlist.E01(Pickles.Inductive_rule.B))
-               .t ->
-        [])
-  ; main_value = (fun [] _ -> [])
+      (fun { public_input = x } ->
+        Run.run_checked @@ ring_sig_main x ;
+        { previous_proof_statements = []
+        ; public_output = ()
+        ; auxiliary_output = ()
+        } )
+  ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
   }
 
 let%test_unit "1-of-1" =
@@ -75,9 +73,9 @@ let%test_unit "1-of-1" =
            Typ.(Schnorr.Chunked.Signature.typ * Schnorr.chunked_message_typ ())
            ~compute:As_prover.(return (sigma, msg))
        in
-       check_witness [ pk ] msg_var sigma_var)
+       check_witness [ pk ] msg_var sigma_var )
       |> Checked.map ~f:As_prover.return
-      |> Fn.flip run_and_check () |> Or_error.ok_exn |> snd)
+      |> run_and_check |> Or_error.ok_exn )
 
 let%test_unit "1-of-2" =
   let gen =
@@ -96,13 +94,13 @@ let%test_unit "1-of-2" =
        and msg_var =
          exists (Schnorr.chunked_message_typ ()) ~compute:(As_prover.return msg)
        in
-       check_witness [ pk0; pk1 ] msg_var sigma1_var)
+       check_witness [ pk0; pk1 ] msg_var sigma1_var )
       |> Checked.map ~f:As_prover.return
-      |> Fn.flip run_and_check () |> Or_error.ok_exn |> snd)
+      |> run_and_check |> Or_error.ok_exn )
 
-(* test a snapp tx with a 3-party ring *)
-let%test_unit "ring-signature snapp tx with 3 parties" =
-  let open Transaction_logic.For_tests in
+(* test a snapp tx with a 3-account_update ring *)
+let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
+  let open Mina_transaction_logic.For_tests in
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     (* secret keys of ring participants*)
@@ -113,7 +111,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
     and test_spec = Test_spec.gen in
     (ring_member_sks, sign_index, test_spec)
   in
-  (* set to true to print vk, parties *)
+  (* set to true to print vk, zkapp_command *)
   let debug_mode : bool = false in
   Quickcheck.test ~trials:1 gen
     ~f:(fun (ring_member_sks, sign_index, { init_ledger; specs }) ->
@@ -123,19 +121,16 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
       Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
           Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
           let spec = List.hd_exn specs in
-          let tag, _, (module P), Pickles.Provers.[ ringsig_prover; _ ] =
-            Pickles.compile ~cache:Cache_dir.cache
-              (module Snapp_statement.Checked)
-              (module Snapp_statement)
-              ~typ:Snapp_statement.typ
-              ~branches:(module Nat.N2)
-              ~max_branching:(module Nat.N2) (* You have to put 2 here... *)
+          let tag, _, (module P), Pickles.Provers.[ ringsig_prover ] =
+            Pickles.compile () ~cache:Cache_dir.cache
+              ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
+              ~branches:(module Nat.N1)
+              ~max_proofs_verified:(module Nat.N0)
               ~name:"ringsig"
               ~constraint_constants:
                 (Genesis_constants.Constraint_constants.to_snark_keys_header
-                   constraint_constants)
-              ~choices:(fun ~self ->
-                [ ring_sig_rule ring_member_pks; dummy_rule self ])
+                   constraint_constants )
+              ~choices:(fun ~self:_ -> [ ring_sig_rule ring_member_pks ])
           in
           let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
           ( if debug_mode then
@@ -143,7 +138,7 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
             |> printf "vk:\n%s\n\n" )
           |> fun () ->
-          let Transaction_logic.For_tests.Transaction_spec.
+          let Mina_transaction_logic.For_tests.Transaction_spec.
                 { sender = sender, sender_nonce
                 ; receiver = ringsig_account_pk
                 ; amount
@@ -152,108 +147,116 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             spec
           in
           let fee = Amount.of_string "1000000" in
-          let vk = With_hash.of_data ~hash_data:Snapp_account.digest_vk vk in
+          let vk = With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk in
           let total = Option.value_exn (Amount.add fee amount) in
           (let _is_new, _loc =
              let pk = Public_key.compress sender.public_key in
              let id = Account_id.create pk Token_id.default in
              Ledger.get_or_create_account ledger id
                (Account.create id
-                  Balance.(Option.value_exn (add_amount zero total)))
+                  Balance.(Option.value_exn (add_amount zero total)) )
              |> Or_error.ok_exn
            in
            let _is_new, loc =
              let id = Account_id.create ringsig_account_pk Token_id.default in
              Ledger.get_or_create_account ledger id
-               (Account.create id Balance.(of_int 0))
+               (Account.create id Balance.zero)
              |> Or_error.ok_exn
            in
            let a = Ledger.get ledger loc |> Option.value_exn in
            Ledger.set ledger loc
              { a with
-               snapp =
+               zkapp =
                  Some
-                   { (Option.value ~default:Snapp_account.default a.snapp) with
+                   { (Option.value ~default:Zkapp_account.default a.zkapp) with
                      verification_key = Some vk
                    }
-             }) ;
+             } ) ;
           let sender_pk = sender.public_key |> Public_key.compress in
-          let fee_payer =
-            { Party.Fee_payer.data =
-                { body =
-                    { public_key = sender_pk
-                    ; update = Party.Update.noop
-                    ; token_id = ()
-                    ; balance_change = Amount.to_fee fee
-                    ; events = []
-                    ; sequence_events = []
-                    ; call_data = Field.zero
-                    ; call_depth = 0
-                    ; increment_nonce = ()
-                    ; protocol_state = Snapp_predicate.Protocol_state.accept
-                    ; use_full_commitment = ()
-                    }
-                ; predicate = sender_nonce
+          let fee_payer : Account_update.Fee_payer.t =
+            { Account_update.Fee_payer.body =
+                { public_key = sender_pk
+                ; fee = Amount.to_fee fee
+                ; valid_until = None
+                ; nonce = sender_nonce
                 }
                 (* Real signature added in below *)
             ; authorization = Signature.dummy
             }
           in
-          let sender_party_data : Party.Predicated.t =
+          let sender_account_update_data : Account_update.Simple.t =
             { body =
                 { public_key = sender_pk
-                ; update = Party.Update.noop
+                ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
                 ; increment_nonce = true
+                ; implicit_account_creation_fee = true
                 ; events = []
-                ; sequence_events = []
+                ; actions = []
                 ; call_data = Field.zero
                 ; call_depth = 0
-                ; protocol_state = Snapp_predicate.Protocol_state.accept
+                ; preconditions =
+                    { Account_update.Preconditions.network =
+                        Zkapp_precondition.Protocol_state.accept
+                    ; account =
+                        Zkapp_precondition.Account.nonce
+                          (Account.Nonce.succ sender_nonce)
+                    ; valid_while = Ignore
+                    }
+                ; may_use_token = No
                 ; use_full_commitment = false
+                ; authorization_kind = Signature
                 }
-            ; predicate = Nonce (Account.Nonce.succ sender_nonce)
+            ; authorization = Signature Signature.dummy
             }
           in
-          let snapp_party_data : Party.Predicated.t =
-            { Party.Predicated.Poly.body =
+          let snapp_account_update_data : Account_update.Simple.t =
+            { body =
                 { public_key = ringsig_account_pk
-                ; update = Party.Update.noop
+                ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.(of_unsigned amount)
                 ; events = []
-                ; sequence_events = []
+                ; actions = []
                 ; call_data = Field.zero
                 ; call_depth = 0
                 ; increment_nonce = false
-                ; protocol_state = Snapp_predicate.Protocol_state.accept
+                ; implicit_account_creation_fee = true
+                ; preconditions =
+                    { Account_update.Preconditions.network =
+                        Zkapp_precondition.Protocol_state.accept
+                    ; account = Zkapp_precondition.Account.accept
+                    ; valid_while = Ignore
+                    }
+                ; may_use_token = No
                 ; use_full_commitment = false
+                ; authorization_kind = Proof (With_hash.hash vk)
                 }
-            ; predicate = Full Snapp_predicate.Account.accept
+            ; authorization =
+                Proof (Lazy.force Mina_base.Proof.transaction_dummy)
             }
           in
-          let protocol_state = Snapp_predicate.Protocol_state.accept in
+          let protocol_state = Zkapp_precondition.Protocol_state.accept in
           let ps =
-            Parties.Call_forest.of_parties_list
-              ~party_depth:(fun (p : Party.Predicated.t) -> p.body.call_depth)
-              [ sender_party_data; snapp_party_data ]
-            |> Parties.Call_forest.accumulate_hashes_predicated
+            Zkapp_command.Call_forest.With_hashes.of_zkapp_command_simple_list
+              [ sender_account_update_data; snapp_account_update_data ]
           in
-          let other_parties_hash = Parties.Call_forest.hash ps in
-          let protocol_state_predicate_hash =
-            Snapp_predicate.Protocol_state.digest protocol_state
-          in
+          let account_updates_hash = Zkapp_command.Call_forest.hash ps in
           let memo = Signed_command_memo.empty in
           let memo_hash = Signed_command_memo.hash memo in
-          let transaction : Parties.Transaction_commitment.t =
-            Parties.Transaction_commitment.create ~other_parties_hash
-              ~protocol_state_predicate_hash ~memo_hash
+          let transaction : Zkapp_command.Transaction_commitment.t =
+            Zkapp_command.Transaction_commitment.create ~account_updates_hash
           in
-          let at_party = Parties.Call_forest.hash ps in
-          let tx_statement : Snapp_statement.t = { transaction; at_party } in
+          let tx_statement : Zkapp_statement.t =
+            { account_update =
+                Account_update.Body.digest
+                  (Account_update.of_simple snapp_account_update_data).body
+            ; calls = (Zkapp_command.Digest.Forest.empty :> field)
+            }
+          in
           let msg =
-            tx_statement |> Snapp_statement.to_field_elements
+            tx_statement |> Zkapp_statement.to_field_elements
             |> Random_oracle_input.Chunked.field_elements
           in
           let signing_sk = List.nth_exn ring_member_sks sign_index in
@@ -265,15 +268,18 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
             | _ ->
                 respond Unhandled
           in
-          let pi : Pickles.Side_loaded.Proof.t =
-            (fun () -> ringsig_prover ~handler [] tx_statement)
+          let (), (), (pi : _ Pickles.Proof.t) =
+            (fun () -> ringsig_prover ~handler tx_statement)
             |> Async.Thread_safe.block_on_async_exn
           in
+          let pi = Pickles.Side_loaded.Proof.of_proof pi in
           let fee_payer =
             let txn_comm =
-              Parties.Transaction_commitment.with_fee_payer transaction
+              Zkapp_command.Transaction_commitment.create_complete transaction
+                ~memo_hash
                 ~fee_payer_hash:
-                  Party.Predicated.(digest (of_fee_payer fee_payer.data))
+                  (Zkapp_command.Digest.Account_update.create
+                     (Account_update.of_fee_payer fee_payer) )
             in
             { fee_payer with
               authorization =
@@ -281,44 +287,49 @@ let%test_unit "ring-signature snapp tx with 3 parties" =
                   (Random_oracle.Input.Chunked.field txn_comm)
             }
           in
-          let sender =
+          let sender : Account_update.Simple.t =
             let sender_signature =
               Signature_lib.Schnorr.Chunked.sign sender.private_key
                 (Random_oracle.Input.Chunked.field transaction)
             in
-            { Party.data = sender_party_data
+            { body = sender_account_update_data.body
             ; authorization = Signature sender_signature
             }
           in
-          let parties : Parties.t =
-            { fee_payer
-            ; other_parties =
-                [ sender
-                ; { data = snapp_party_data; authorization = Proof pi }
-                ]
-            ; memo
-            }
+          let zkapp_command : Zkapp_command.t =
+            Zkapp_command.of_simple
+              { fee_payer
+              ; account_updates =
+                  [ sender
+                  ; { body = snapp_account_update_data.body
+                    ; authorization = Proof pi
+                    }
+                  ]
+              ; memo
+              }
           in
           ( if debug_mode then
             (* print fee payer *)
-            Party.Fee_payer.to_yojson fee_payer
+            Account_update.Fee_payer.to_yojson fee_payer
             |> Yojson.Safe.pretty_to_string
             |> printf "fee_payer:\n%s\n\n"
             |> fun () ->
-            (* print other_party data *)
-            List.iteri parties.other_parties ~f:(fun idx (p : Party.t) ->
-                Party.Predicated.to_yojson p.data
+            (* print other_account_update data *)
+            Zkapp_command.Call_forest.iteri zkapp_command.account_updates
+              ~f:(fun idx (p : Account_update.t) ->
+                Account_update.Body.to_yojson p.body
                 |> Yojson.Safe.pretty_to_string
-                |> printf "other_party #%d data:\n%s\n\n" idx)
+                |> printf "other_account_update #%d body:\n%s\n\n" idx )
             |> fun () ->
-            (* print other_party proof *)
+            (* print other_account_update proof *)
             Pickles.Side_loaded.Proof.Stable.V2.sexp_of_t pi
             |> Sexp.to_string |> Base64.encode_exn
-            |> printf "other_party_proof:\n%s\n\n"
+            |> printf "other_account_update_proof:\n%s\n\n"
             |> fun () ->
             (* print protocol_state *)
-            Snapp_predicate.Protocol_state.to_yojson protocol_state
+            Zkapp_precondition.Protocol_state.to_yojson protocol_state
             |> Yojson.Safe.pretty_to_string
             |> printf "protocol_state:\n%s\n\n" )
-          |> fun () -> apply_parties ledger [ parties ])
-      |> fun ((), ()) -> ())
+          |> fun () ->
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )

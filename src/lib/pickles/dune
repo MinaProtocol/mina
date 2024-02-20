@@ -1,39 +1,86 @@
 (library
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (name pickles)
  (public_name pickles)
- (flags -warn-error -22+34+33+27)
+ (modules_without_implementation
+  full_signature
+  type
+  intf
+  pickles_intf)
+ ; Deactivated warnings
+ ; 40: name-out-scope (activate later)
+ ;
+ ; 41: ambiguous name (too many of them for now, activate later)
+ ;
+ ; 42: disambiguated-name (rely on type disambiguation ,not too bad but closer
+ ; module openings may both solve the warning *and* help the reader)
+ ;
+ ; 44: open-shadow-identifier (operation overloading is common in the codebase)
+ (flags
+  (:standard -w +a-40..42-44
+             -warn-error +a-27)
+   -open Core_kernel)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps
    ppx_version
-   ppx_coda
+   ppx_mina
    ppx_jane
    ppx_compare
    ppx_deriving_yojson
    h_list.ppx))
  (libraries
-  digestif
-  mina_version
-  base58_check
-  base64
-  codable
-  kimchi_backend
-  random_oracle_input
-  pickles_base
-  pickles.composition_types
-  pickles.limb_vector
-  pickles.plonk_checks
-  pickles.precomputed
-  pickles.one_hot_vector
-  pickles.pseudo
-  snarky_log
-  sponge
-  group_map
-  snarky_group_map
-  snarky_curve
-  snarky.backendless
-  key_cache
-  core_kernel
-  snark_keys_header))
+   ;; opam libraries
+   stdio
+   integers
+   result
+   base.caml
+   bignum.bigint
+   core_kernel
+   base64
+   digestif
+   ppx_inline_test.config
+   sexplib0
+   base
+   async_kernel
+   bin_prot.shape
+   ;; local libraries
+   mina_wire_types
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
+   kimchi_backend.pasta
+   kimchi_backend.pasta.basic
+   kimchi_backend.pasta.constraint_system
+   bitstring_lib
+   snarky.intf
+   pickles.backend
+   pickles_types
+   snarky.backendless
+   snarky_group_map
+   sponge
+   pickles.pseudo
+   pickles.limb_vector
+   pickles_base
+   kimchi_backend
+   base58_check
+   codable
+   random_oracle_input
+   pickles.composition_types
+   pickles.plonk_checks
+   pickles.one_hot_vector
+   snarky_log
+   group_map
+   snarky_curve
+   key_cache
+   snark_keys_header
+   tuple_lib
+   promise
+   kimchi_backend.common
+   logger
+   internal_tracing.context_logger
+   ppx_version.runtime
+   error_json
+   bounded_types
+))

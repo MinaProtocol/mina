@@ -790,7 +790,7 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
      always triggered. If you move away from the default, the checkpoint
      may not contain up-to-date data if WAL writing is not always
      enabled.*)
-  let checkpoint_create db ?log_size_for_flush:(l = 0) ~dir =
+  let checkpoint_create db ?log_size_for_flush:(l = 0) ~dir () =
     let checkpoint_create_raw =
       foreign "rocksdb_checkpoint_create"
         ( CheckpointObject.t @-> string @-> Views.int_to_uint64_t

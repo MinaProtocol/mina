@@ -8,6 +8,8 @@ module T = struct
 
   type view = unit
 
+  let name = "transition_registry"
+
   let create ~logger:_ _frontier = (State_hash.Table.create (), ())
 
   let notify t state_hash =
@@ -16,10 +18,10 @@ module T = struct
           List.iter ls ~f:(fun ivar ->
               if Ivar.is_full ivar then
                 [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-              Ivar.fill ivar ()) ;
+              Ivar.fill ivar () ) ;
           None
       | None ->
-          None)
+          None )
 
   let register t state_hash =
     Deferred.create (fun ivar ->
@@ -27,14 +29,14 @@ module T = struct
           | Some ls ->
               ivar :: ls
           | None ->
-              [ ivar ]))
+              [ ivar ] ) )
 
   let handle_diffs transition_registry _ diffs_with_mutants =
     List.iter diffs_with_mutants ~f:(function
       | Diff.Full.With_mutant.E (New_node (Full breadcrumb), _) ->
           notify transition_registry (Breadcrumb.state_hash breadcrumb)
       | _ ->
-          ()) ;
+          () ) ;
     None
 end
 

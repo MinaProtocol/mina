@@ -37,14 +37,6 @@ module Test_inputs = struct
 
         let to_latest = Fn.id
       end
-
-      module V1 = struct
-        type t = Transaction_snark.Statement.Stable.V1.t One_or_two.Stable.V1.t
-        [@@deriving hash, compare, sexp]
-
-        let to_latest : t -> V2.t =
-          One_or_two.map ~f:Transaction_snark.Statement.Stable.V1.to_latest
-      end
     end]
 
     module Work = Hashable.Make_binable (Stable.Latest)
@@ -60,7 +52,7 @@ module Test_inputs = struct
         | None ->
             fee
         | Some fee' ->
-            Currency.Fee.min fee fee')
+            Currency.Fee.min fee fee' )
   end
 
   module Staged_ledger = struct
@@ -94,6 +86,7 @@ end
 
 module Implementation_inputs = struct
   open Mina_base
+  open Mina_transaction
   module Ledger_hash = Ledger_hash
   module Sparse_ledger = Mina_ledger.Sparse_ledger
   module Transaction = Transaction

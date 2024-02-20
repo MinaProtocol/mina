@@ -56,11 +56,11 @@ let%test_module "Database integration test" =
                 |> Sequence.fold ~init:[ [] ] ~f:(fun acc _ ->
                        acc
                        @ List.map acc ~f:(List.cons Direction.Left)
-                       @ List.map acc ~f:(List.cons Direction.Right))
+                       @ List.map acc ~f:(List.cons Direction.Right) )
               in
               List.iter accounts ~f:(fun account ->
                   let account_id = Account.identifier account in
-                  ignore @@ DB.get_or_create_account db account_id account) ;
+                  ignore @@ DB.get_or_create_account db account_id account ) ;
               let binary_tree = Binary_tree.set_accounts accounts in
               Sequence.iter
                 (enumerate_dir_combinations Depth.depth |> Sequence.of_list)
@@ -72,5 +72,5 @@ let%test_module "Database integration test" =
                   let binary_hash =
                     Binary_tree.get_inner_hash_at_addr_exn binary_tree dirs
                   in
-                  assert (Hash.equal binary_hash db_hash))))
+                  assert (Hash.equal binary_hash db_hash) ) ) )
   end )

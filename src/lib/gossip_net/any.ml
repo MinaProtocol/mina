@@ -12,7 +12,7 @@ module type S = sig
 
   include Intf.Gossip_net_intf with module Rpc_intf := Rpc_intf and type t := t
 
-  type 't creator = Rpc_intf.rpc_handler list -> 't Deferred.t
+  type 't creator = Rpc_intf.rpc_handler list -> Message.sinks -> 't Deferred.t
 
   type creatable = Creatable : 't implementation * 't creator -> creatable
 
@@ -30,12 +30,12 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
   type t = Any : 't implementation * 't -> t
 
-  type 't creator = rpc_handler list -> 't Deferred.t
+  type 't creator = rpc_handler list -> Message.sinks -> 't Deferred.t
 
   type creatable = Creatable : 't implementation * 't creator -> creatable
 
-  let create (Creatable ((module M), creator)) impls =
-    let%map gossip_net = creator impls in
+  let create (Creatable ((module M), creator)) impls sinks =
+    let%map gossip_net = creator impls sinks in
     Any ((module M), gossip_net)
 
   let peers (Any ((module M), t)) = M.peers t
@@ -62,23 +62,28 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
 
   let query_random_peers (Any ((module M), t)) = M.query_random_peers t
 
-  let broadcast (Any ((module M), t)) = M.broadcast t
+  let broadcast_state ?origin_topic (Any ((module M), t)) =
+    M.broadcast_state ?origin_topic t
+
+  let broadcast_transaction_pool_diff ?origin_topic ?nonce (Any ((module M), t))
+      =
+    M.broadcast_transaction_pool_diff ?origin_topic ?nonce t
+
+  let broadcast_snark_pool_diff ?origin_topic ?nonce (Any ((module M), t)) =
+    M.broadcast_snark_pool_diff ?origin_topic ?nonce t
 
   let on_first_connect (Any ((module M), t)) = M.on_first_connect t
 
   let on_first_high_connectivity (Any ((module M), t)) =
     M.on_first_high_connectivity t
 
-  let received_message_reader (Any ((module M), t)) =
-    M.received_message_reader t
-
   let ban_notification_reader (Any ((module M), t)) =
     M.ban_notification_reader t
 
   let connection_gating (Any ((module M), t)) = M.connection_gating t
 
-  let set_connection_gating (Any ((module M), t)) config =
-    M.set_connection_gating t config
+  let set_connection_gating ?clean_added_peers (Any ((module M), t)) config =
+    M.set_connection_gating ?clean_added_peers t config
 
   let restart_helper (Any ((module M), t)) = M.restart_helper t
 end

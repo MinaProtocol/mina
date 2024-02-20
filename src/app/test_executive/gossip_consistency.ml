@@ -6,6 +6,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Engine
   open Dsl
 
+  open Test_common.Make (Inputs)
+
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
@@ -13,60 +15,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let block_producer_balance = "1000" (* 1_000_000_000_000 *)
-
   let config =
-    let n = 3 in
     let open Test_config in
     { default with
       requires_graphql = true
+    ; genesis_ledger =
+        (let open Test_account in
+        [ create ~account_name:"node-a-key" ~balance:"1000" ()
+        ; create ~account_name:"node-b-key" ~balance:"1000" ()
+        ])
     ; block_producers =
-        List.init n ~f:(fun _ ->
-            { Block_producer.balance = block_producer_balance
-            ; timing = Untimed
-            })
+        [ { node_name = "node-a"; account_name = "node-a-key" }
+        ; { node_name = "node-b"; account_name = "node-b-key" }
+        ]
     }
-
-  let send_payments ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee ~node
-      n =
-    let open Malleable_error.Let_syntax in
-    let rec go n =
-      if n = 0 then return ()
-      else
-        let%bind () =
-          let%map () =
-            Network.Node.must_send_payment ~logger ~sender_pub_key
-              ~receiver_pub_key ~amount ~fee node
-          in
-          [%log info] "gossip_consistency test: payment #%d sent." n ;
-          ()
-        in
-        go (n - 1)
-    in
-    go n
-
-  let wait_for_payments ~logger ~dsl ~sender_pub_key ~receiver_pub_key ~amount n
-      =
-    let open Malleable_error.Let_syntax in
-    let rec go n =
-      if n = 0 then return ()
-      else
-        (* confirm payment *)
-        let%bind () =
-          let%map () =
-            wait_for dsl
-              (Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
-                 ~receiver_pub_key ~amount)
-          in
-          [%log info]
-            "gossip_consistency test: payment #%d successfully included in \
-             frontier."
-            n ;
-          ()
-        in
-        go (n - 1)
-    in
-    go n
 
   let run network t =
     let open Malleable_error.Let_syntax in
@@ -74,31 +36,31 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "gossip_consistency test: starting..." ;
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize (Network.all_nodes network))
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data (Network.all_mina_nodes network)) )
     in
     [%log info] "gossip_consistency test: done waiting for initializations" ;
-    let receiver_bp = Caml.List.nth (Network.block_producers network) 0 in
-    let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
-    let sender_bp =
-      Core_kernel.List.nth_exn (Network.block_producers network) 1
+    let receiver_bp =
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
     in
-    let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
+    let%bind receiver_pub_key = pub_key_of_node receiver_bp in
+    let sender_bp =
+      Core.String.Map.find_exn (Network.block_producers network) "node-b"
+    in
+    let%bind sender_pub_key = pub_key_of_node sender_bp in
     let num_payments = 3 in
-    let fee = Currency.Fee.of_int 10_000_000 in
-    let amount = Currency.Amount.of_int 10_000_000 in
+    let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
+    let amount = Currency.Amount.of_nanomina_int_exn 10_000_000 in
     [%log info] "gossip_consistency test: will now send %d payments"
       num_payments ;
-    let%bind () =
+    let%bind hashlist =
       send_payments ~logger ~sender_pub_key ~receiver_pub_key ~node:sender_bp
         ~fee ~amount num_payments
     in
     [%log info]
       "gossip_consistency test: sending payments done. will now wait for \
        payments" ;
-    let%bind () =
-      wait_for_payments ~logger ~dsl:t ~sender_pub_key ~receiver_pub_key ~amount
-        num_payments
-    in
+    let%bind () = wait_for_payments ~logger ~dsl:t ~hashlist num_payments in
     [%log info] "gossip_consistency test: finished waiting for payments" ;
     let gossip_states = (network_state t).gossip_received in
     let num_transactions_seen =
@@ -118,7 +80,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (Printf.sprintf
                "transactions seen = %d, which is less than (numpayments = %d) \
                 - 1"
-               num_transactions_seen num_payments)
+               num_transactions_seen num_payments )
         in
         [%log error]
           "gossip_consistency test: TEST FAILURE.  transactions seen = %d, \
@@ -138,8 +100,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "gossip_consistency test: inter = %d; union = %d " inter union ;
     let ratio =
       if union = 0 then 1. else Float.of_int inter /. Float.of_int union
-      (* Gossip_state.consistency_ratio Transactions_gossip
-         (Map.data (network_state t).gossip_received) *)
     in
     [%log info] "gossip_consistency test: consistency ratio = %f" ratio ;
     let threshold = 0.95 in
@@ -149,7 +109,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Malleable_error.soft_error_string ~value:()
             (Printf.sprintf
                "consistency ratio = %f, which is less than threshold = %f" ratio
-               threshold)
+               threshold )
         in
         [%log error]
           "gossip_consistency test: TEST FAILURE. consistency ratio = %f, \

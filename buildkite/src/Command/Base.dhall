@@ -51,7 +51,7 @@ let B/DependsOn =
     depends =
     \(keys : List Text) ->
         OuterUnion/Type.ListDependsOn/Type
-          (List/map Text InnerUnion/Type (\(k: Text) -> InnerUnion/Type.DependsOn/Type { allow_failure = None Bool, step = Some k }) keys)
+          (List/map Text InnerUnion/Type (\(k: Text) -> InnerUnion/Type.DependsOn/Type { allow_failure = Some False, step = Some k }) keys)
   }
 
 let B/ArtifactPaths = B.definitions/commandStep/properties/artifact_paths/Type
@@ -66,12 +66,14 @@ let TaggedKey = {
   default = {=}
 }
 
+let ExitStatus = <Code : Integer | Any>
+
 -- Retry requires you feed an exit status (as a string so we can support
 -- negative codes), and optionally a limit to the number of times this command
 -- should be retried.
 let Retry = {
   Type = {
-    exit_status : Integer,
+    exit_status : ExitStatus,
     limit : Optional Natural
   },
   default = {
@@ -99,9 +101,11 @@ let Config =
       , docker_login : Optional DockerLogin.Type
       , summon : Optional Summon.Type
       , retries : List Retry.Type
+      , flake_retry_limit: Optional Natural
       , soft_fail : Optional B/SoftFail
       , skip: Optional B/Skip
-      , if : Optional B/If
+      , `if` : Optional B/If
+      , timeout_in_minutes : Optional Integer
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
@@ -111,9 +115,11 @@ let Config =
     , artifact_paths = [] : List SelectFiles.Type
     , env = [] : List TaggedKey.Type
     , retries = [] : List Retry.Type
+    , flake_retry_limit = Some 0
     , soft_fail = None B/SoftFail
     , skip = None B/Skip
-    , if = None B/If
+    , `if` = None B/If
+    , timeout_in_minutes = None Integer
     }
   }
 
@@ -121,7 +127,9 @@ let targetToAgent = \(target : Size) ->
   merge { XLarge = toMap { size = "generic" },
           Large = toMap { size = "generic" },
           Medium = toMap { size = "generic" },
-          Small = toMap { size = "generic" }
+          Small = toMap { size = "generic" },
+          Integration = toMap { size = "integration" },
+          QA = toMap { size = "qa" }
         }
         target
 
@@ -149,6 +157,7 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                      else Some (B/ArtifactPaths.String (SelectFiles.compile c.artifact_paths)),
     key = Some c.key,
     label = Some c.label,
+    timeout_in_minutes = c.timeout_in_minutes,
     retry =
           Some {
               -- we only consider automatic retries
@@ -161,7 +170,11 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                       (\(retry : Retry.Type) ->
                       {
                         -- we always require the exit status
-                        exit_status = Some (B/ExitStatus.Integer retry.exit_status),
+                        exit_status = Some (
+                            merge
+                              { Code = \(i : Integer) -> B/ExitStatus.Integer i
+                              , Any = B/ExitStatus.String "*" }
+                            retry.exit_status),
                         -- but limit is optional
                         limit =
                           Optional/map
@@ -171,25 +184,36 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                           retry.limit
                     })
                     -- per https://buildkite.com/docs/agent/v3#exit-codes:
-                    ([
+                    (
+                      [
                       -- infra error
-                      Retry::{ exit_status = -1, limit = Some 2 },
+                      Retry::{ exit_status = ExitStatus.Code -1, limit = Some 4 },
+                      -- infra error
+                      Retry::{ exit_status = ExitStatus.Code +255, limit = Some 4 },
                       -- common/flake error
-                      Retry::{ exit_status = +1, limit = Some 1 },
+                      Retry::{ exit_status = ExitStatus.Code +1, limit = c.flake_retry_limit },
                       -- apt-get update race condition error
-                      Retry::{ exit_status = +100, limit = Some 2 },
+                      Retry::{ exit_status = ExitStatus.Code +100, limit = Some 4 },
                       -- Git checkout error
-                      Retry::{ exit_status = +128, limit = Some 2 }
+                      Retry::{ exit_status = ExitStatus.Code +128, limit = Some 4 },
+                      -- SIGTERM
+                      Retry::{ exit_status = ExitStatus.Code +143, limit = Some 4 },
+                      -- Docker error
+                      Retry::{ exit_status = ExitStatus.Code +125, limit = Some 4 }
                     ] #
                     -- and the retries that are passed in (if any)
                     c.retries)
                 in
                 B/Retry.ListAutomaticRetry/Type xs),
-              manual = None B/Manual
+              manual = Some (B/Manual.Manual/Type {
+                allowed = Some True,
+                permit_on_passed = Some True,
+                reason = None Text
+              })
           },
     soft_fail = c.soft_fail,
     skip = c.skip,
-    if = c.if,
+    `if` = c.`if`,
     plugins =
       let dockerPart =
         Optional/toList
@@ -225,5 +249,5 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
       if Prelude.List.null (Map.Entry Text Plugins) allPlugins then None B/Plugins else Some (B/Plugins.Plugins/Type allPlugins)
   }
 
-in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey, Retry = Retry}
+in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey, Retry = Retry, ExitStatus = ExitStatus}
 

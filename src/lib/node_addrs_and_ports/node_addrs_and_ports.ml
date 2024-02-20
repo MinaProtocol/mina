@@ -18,8 +18,8 @@ module Display = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { external_ip : string
-        ; bind_ip : string
+        { external_ip : Bounded_types.String.Stable.V1.t
+        ; bind_ip : Bounded_types.String.Stable.V1.t
         ; peer : Peer.Display.Stable.V1.t option
         ; libp2p_port : int
         ; client_port : int
@@ -54,7 +54,7 @@ let to_multiaddr (t : t) =
       Some
         (sprintf "/ip4/%s/tcp/%d/p2p/%s"
            (Unix.Inet_addr.to_string t.external_ip)
-           t.libp2p_port peer.peer_id)
+           t.libp2p_port peer.peer_id )
   | None ->
       None
 

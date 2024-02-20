@@ -16,12 +16,15 @@ module State = struct
   include Array
 
   let map2 = map2_exn
+
+  let to_array t = t
+
+  let of_array t = t
 end
 
 module Input = Random_oracle_input
 
-let params : Field.t Sponge.Params.t =
-  Sponge.Params.(map pasta_p_3 ~f:Field.of_string)
+let params : Field.t Sponge.Params.t = Kimchi_pasta_basic.poseidon_params_fp
 
 module Operations = struct
   let add_assign ~state i x = Field.(state.(i) <- state.(i) + x)
@@ -36,71 +39,18 @@ module Operations = struct
   let copy a = Array.map a ~f:Fn.id
 end
 
-[%%ifdef consensus_mechanism]
-
-module Inputs = Pickles.Tick_field_sponge.Inputs
-
-[%%else]
-
-module Inputs = struct
-  module Field = Field
-
-  let rounds_full = 55
-
-  let initial_ark = false
-
-  let rounds_partial = 0
-
-  (* Computes x^7 *)
-  let to_the_alpha x =
-    let open Field in
-    square (square x * x) * x
-
-  module Operations = Operations
-end
-
-[%%endif]
-
 module Digest = struct
-  open Field
-
-  type nonrec t = t
+  type t = Field.t
 
   let to_bits ?length x =
     match length with
     | None ->
-        unpack x
+        Field.unpack x
     | Some length ->
-        List.take (unpack x) length
+        List.take (Field.unpack x) length
 end
 
-module Ocaml_permutation = Sponge.Poseidon (Inputs)
-
-[%%ifdef consensus_mechanism]
-
-module Permutation : Sponge.Intf.Permutation with module Field = Field = struct
-  module Field = Field
-
-  let add_assign = Ocaml_permutation.add_assign
-
-  let copy = Ocaml_permutation.copy
-
-  let params = Kimchi_pasta_fp_poseidon.create ()
-
-  let block_cipher _params (s : Field.t array) =
-    let v = Kimchi.FieldVectors.Fp.create () in
-    Array.iter s ~f:(Kimchi.FieldVectors.Fp.emplace_back v) ;
-    Kimchi_pasta_fp_poseidon.block_cipher params v ;
-    Array.init (Array.length s) ~f:(Kimchi.FieldVectors.Fp.get v)
-end
-
-[%%else]
-
-module Permutation = Ocaml_permutation
-
-[%%endif]
-
-include Sponge.Make_hash (Permutation)
+include Sponge.Make_hash (Random_oracle_permutation)
 
 let update ~state = update ~state params
 
@@ -133,8 +83,7 @@ module Checked = struct
   let update ~state xs = update params ~state xs
 
   let hash ?init xs =
-    O1trace.measure "Random_oracle.hash" (fun () ->
-        hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs)
+    hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs
 
   let pack_input =
     Input.Chunked.pack_to_fields
@@ -152,7 +101,7 @@ let read_typ ({ field_elements; packeds } : _ Input.Chunked.t) =
   }
 
 let read_typ' input : _ Pickles.Impls.Step.Internal_Basic.As_prover.t =
- fun _ x -> (x, read_typ input)
+ fun _ -> read_typ input
 
 [%%endif]
 
@@ -190,23 +139,14 @@ let%test_unit "sponge checked-unchecked" =
     (fun (x, y) -> hash [| x; y |])
     (x, y)
 
-let%test_unit "check rust implementation of block-cipher" =
-  let open Pickles.Impls.Step in
-  let module T = Internal_Basic in
-  Quickcheck.test (Quickcheck.Generator.list_with_length 3 T.Field.gen)
-    ~f:(fun s ->
-      let s () = Array.of_list s in
-      [%test_eq: T.Field.t array]
-        (Ocaml_permutation.block_cipher params (s ()))
-        (Permutation.block_cipher params (s ())))
-
 [%%endif]
 
 module Legacy = struct
   module Input = Random_oracle_input.Legacy
+  module State = State
 
   let params : Field.t Sponge.Params.t =
-    Sponge.Params.(map pasta_p ~f:Field.of_string)
+    Sponge.Params.(map pasta_p_legacy ~f:Kimchi_pasta_basic.Fp.of_string)
 
   module Rounds = struct
     let rounds_full = 63
@@ -219,6 +159,8 @@ module Legacy = struct
   module Inputs = struct
     module Field = Field
     include Rounds
+
+    let alpha = 5
 
     (* Computes x^5 *)
     let to_the_alpha x =
@@ -259,6 +201,8 @@ module Legacy = struct
       module Impl = Pickles.Impls.Step
       open Impl
       module Field = Field
+
+      let alpha = 5
 
       (* Computes x^5 *)
       let to_the_alpha x =

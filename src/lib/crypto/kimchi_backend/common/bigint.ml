@@ -37,6 +37,8 @@ module type Intf = sig
 
   val length_in_bytes : int
 
+  val to_hex : t -> string
+
   val to_hex_string : t -> string
 
   val of_hex_string : ?reverse:bool -> string -> t
@@ -56,9 +58,11 @@ module Make
 
   let length_in_bytes = num_limbs * bytes_per_limb
 
-  let to_hex_string t =
+  let to_hex t =
     let data = to_bytes t in
-    "0x" ^ String.uppercase (Hex.encode ~reverse:true (Bytes.to_string data))
+    String.uppercase (Hex.encode ~reverse:true (Bytes.to_string data))
+
+  let to_hex_string t = "0x" ^ to_hex t
 
   let sexp_of_t t = to_hex_string t |> Sexp.of_string
 
@@ -81,10 +85,13 @@ module Make
   include Bin_prot.Utils.Of_minimal (struct
     type nonrec t = t
 
+    (* increment if serialization changes *)
+    let version = 1
+
     let bin_shape_t =
       Bin_prot.Shape.basetype
         (Bin_prot.Shape.Uuid.of_string
-           (sprintf "kimchi_backend_bigint_%d" M.length_in_bytes))
+           (sprintf "kimchi_backend_bigint_%d_V%d" M.length_in_bytes version) )
         []
 
     let __bin_read_t__ _buf ~pos_ref _vint =

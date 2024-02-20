@@ -1,7 +1,7 @@
 # kubectl apply -f helm/cron_jobs/gossipqa-txn-burst-cronjob.yaml
 # the above command, with this accompanying file, needs only be run once.  it does not get run in CI.  this file is provided here for future reference
 # make sure you're in the gossipqa namespace
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: gossipqa-txn-burst-cronjob
@@ -17,26 +17,24 @@ spec:
             - /bin/bash
             - -c
             - '
-ORIGIN_ACCT_KEY=/keys/whale-key1/online-whale-account-1-key;
-RETURNER_ACCT_KEY=/keys/whale-key2/online-whale-account-2-key;
+ORIGIN_ACCT_KEY=/keys/whale-1-key/whale-1-key;
+RETURNER_ACCT_KEY=/keys/whale-2-key/whale-2-key;
 
 echo "origin acct: $ORIGIN_ACCT_KEY";
 echo "returner acct: $RETURNER_ACCT_KEY";
 
-printf "/dns4/seed-1.gossip-data.o1test.net/tcp/10000/p2p/12D3KooWNG8JcntzQsRmLWK29oyG8nEVMBjT3VLd3FHjTm78u8ZG\n/dns4/seed-2.gossip-data.o1test.net/tcp/10001/p2p/12D3KooWT1hnGjh2g6v5idFR6SpP7j17tGTocjYt7r8f362Hm1cp" > /gossip-data_seed_list.txt;
+printf "/ip4/34.152.17.2/tcp/10000/p2p/12D3KooWLsKcaX7TYaurdkYB8WmoUXNKqNUo94w6H4LhzqEYAGc5\n/ip4/34.95.14.84/tcp/10001/p2p/12D3KooW9rebvJT88ZX8mUjCJpKNqyMVTvknri4xqv2d2FwU5DDj\n/ip4/34.95.27.69/tcp/10002/p2p/12D3KooWNsBZvge1nGMxrdGRKgnXctdHAQ4SJDFhNEkHELhJzCSf\n" > /gossipqa_seed_list.txt;
 
-curl https://raw.githubusercontent.com/MinaProtocol/mina/feature/gossip-qa-ledger/genesis_ledgers/devnet.json > /gossip-data-config.json
-
-sleep 60;
+curl https://raw.githubusercontent.com/MinaProtocol/mina/135a81a3c7836bd101afa23ddc846c55ea5919ed/automation/terraform/testnets/gossipqa/genesis_ledger.json > /gossipqa-genesis_ledger.json;
 
 echo "booting mina daemon";
-mina daemon --config-dir /.mina-config --config-file /gossip-data-config.json --generate-genesis-proof true --peer-list-file /gossip-data_seed_list.txt &
+
+mina daemon --config-file /gossipqa-genesis_ledger.json --peer-list-file /gossipqa_seed_list.txt &
 
 echo "sleeping";
 sleep 480;
 echo "done sleeping";
 while true; do
-  tail -n 5 /.mina-config/mina.log;
   DAEMON_STATUS=$(mina client status);
   echo "Daemon Status: $DAEMON_STATUS";
   STATUS=$(mina client status | grep "Sync status");
@@ -71,7 +69,7 @@ echo "ran batch txns";
               value: ""
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
-            image: gcr.io/o1labs-192920/mina-txn-burst-app@sha256:8c4a7e0c092dcdbe0f5d8bebefb374181012dfb08e7cd60f99ee88969f1b26e8
+            image: gcr.io/o1labs-192920/mina-txn-burst-app@sha256:815a5dafc70fb994dfe8e5af46dd6a9287a2e6634e50bc9229576d76fb7a2ce7
             imagePullPolicy: IfNotPresent
             name: gossipqa-txn-burst-cronjob
             resources:
@@ -82,10 +80,10 @@ echo "ran batch txns";
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
             volumeMounts:
-            - mountPath: /keys/whale-key1/
-              name: whale-key1
-            - mountPath: /keys/whale-key2/
-              name: whale-key2
+            - mountPath: /keys/whale-1-key/
+              name: whale-1-key
+            - mountPath: /keys/whale-2-key/
+              name: whale-2-key
             # - mountPath: /config
             #   name: daemon-config
           dnsPolicy: ClusterFirst
@@ -101,54 +99,54 @@ echo "ran batch txns";
             #   }
             # },
             {
-              "name": "whale-key1",
+              "name": "whale-1-key",
               "secret": {
                 "defaultMode": 0600,
                 "items": [
                   {
                     "key": "key",
-                    "path": "online-whale-account-1-key"
+                    "path": "whale-1-key"
                   },
                   {
                     "key": "pub",
-                    "path": "online-whale-account-1-key.pub"
+                    "path": "whale-1-key.pub"
                   }
                 ],
-                "secretName": "online-whale-account-1-key"
+                "secretName": "whale-1-key"
               }
             },
             {
-              "name": "whale-key2",
+              "name": "whale-2-key",
               "secret": {
                 "defaultMode": 0600,
                 "items": [
                   {
                     "key": "key",
-                    "path": "online-whale-account-2-key"
+                    "path": "whale-2-key"
                   },
                   {
                     "key": "pub",
-                    "path": "online-whale-account-2-key.pub"
+                    "path": "whale-2-key.pub"
                   }
                 ],
-                "secretName": "online-whale-account-2-key"
+                "secretName": "whale-2-key"
               }
             },
             {
-              "name": "whale-key3",
+              "name": "whale-3-key",
               "secret": {
                 "defaultMode": 0600,
                 "items": [
                   {
                     "key": "key",
-                    "path": "online-whale-account-3-key"
+                    "path": "whale-3-key"
                   },
                   {
                     "key": "pub",
-                    "path": "online-whale-account-3-key.pub"
+                    "path": "whale-3-key.pub"
                   }
                 ],
-                "secretName": "online-whale-account-3-key"
+                "secretName": "whale-3-key"
               }
             }
 

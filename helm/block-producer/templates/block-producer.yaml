@@ -24,6 +24,9 @@ spec:
         prometheus.io/port: {{ $.Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      {{- if $.Values.priorityClass }}
+      priorityClassName: {{ $.Values.priorityClass }}
+      {{- end }}
       initContainers:
       - name: fix-perms
         image: busybox
@@ -60,7 +63,7 @@ spec:
           mountPath: /root/.mina-config
         env:
           - name: MINA_PRIVKEY_PASS
-            value: {{ $.Values.mina.privkeyPass | quote }}
+            value: {{ $config.privateKeyPW | quote }}
       {{ if $config.libp2pSecret -}}
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}
@@ -73,6 +76,22 @@ spec:
           mountPath: /libp2p-keys
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
+        env:
+          - name: MINA_LIBP2P_PASS
+            value: {{ $config.privateKeyPW | quote }}
+      {{- else -}}
+      - name: libp2p-perms
+        image: {{ $.Values.mina.image | quote }}
+        command:
+        - bash
+        - -c
+        - mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key && /bin/chmod -R 0700 /root/libp2p-keys/
+        volumeMounts:
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        env:
+          - name: MINA_LIBP2P_PASS
+            value: {{ $config.privateKeyPW | quote }}
       {{- end }}
       containers:
       {{ if $config.runWithUserAgent -}}
@@ -112,10 +131,10 @@ spec:
           - name: CODA_PUBLIC_KEY
             valueFrom:
               secretKeyRef:
-                name: {{ $config.privateKeySecret }}
+                name: {{ $config.keypairName }}
                 key: pub
           - name: MINA_PRIVKEY_PASS
-            value: {{ $.Values.mina.privkeyPass | quote }}
+            value: {{ $config.privateKeyPW | quote }}
           - name: PYTHONUNBUFFERED
             value: "1"
         ports:
@@ -142,14 +161,14 @@ spec:
                 name: echo-service-key
                 key: pub
           - name: ECHO_PASSWORD
-            value: {{ $.Values.mina.privkeyPass | quote }}
+            value: {{ $config.privateKeyPW | quote }}
           - name: FAUCET_PUBLICKEY
             valueFrom:
               secretKeyRef:
                 name: faucet-service-key
                 key: pub
           - name: FAUCET_PASSWORD
-            value: {{ $.Values.mina.privkeyPass | quote }}
+            value: {{ $config.privateKeyPW | quote }}
           - name: DISCORD_API_KEY
             valueFrom:
               secretKeyRef:
@@ -169,8 +188,8 @@ spec:
         resources:
           limits:
           requests:
-            memory: 14.0Gi
-            cpu: 8.0
+            memory: {{ $.Values.mina.memRequest }}
+            cpu: {{ $.Values.mina.cpuRequest }}
         image: {{ $.Values.mina.image }}
         {{ if $.Values.mina.useCustomEntrypoint -}}
         command: [{{ $.Values.mina.customEntrypoint }}]
@@ -196,9 +215,7 @@ spec:
           {{- if $config.enableGossipFlooding }}
           "-enable-flooding", "true",
           {{- end -}}
-          {{- if $config.libp2pSecret }}
-          "-discovery-keypair", "/root/libp2p-keys/key",
-          {{- end -}}
+          "-libp2p-keypair", "/root/libp2p-keys/key",
           {{- range $.Values.mina.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end -}}
@@ -218,7 +235,7 @@ spec:
           "-upload-blocks-to-gcloud", "true",
           {{- end }}
           {{- if $.Values.mina.runtimeConfig }}
-          "-config-file", "/config/daemon.json",
+          "-config-file", "/root/config/daemon.json",
           {{- end -}}
           "-generate-genesis-proof", {{ $.Values.mina.generateGenesisProof | quote }},
           {{- if $config.enableArchive }}
@@ -243,11 +260,9 @@ spec:
         - name: GCLOUD_BLOCK_UPLOAD_BUCKET
           value: "mina_network_block_data"
         - name: MINA_PRIVKEY_PASS
-          value: {{ $.Values.mina.privkeyPass | quote }}
-        {{- if $config.libp2pSecret }}
+          value: {{ $config.privateKeyPW | quote }}
         - name: MINA_LIBP2P_PASS
-          value: {{ $.Values.mina.privkeyPass | quote }}
-        {{- end }}
+          value: {{ $config.privateKeyPW | quote }}
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         ports:
@@ -264,6 +279,12 @@ spec:
           protocol: TCP
           containerPort: {{ default $.Values.mina.ports.p2p $config.externalPort }}
           hostPort: {{ default $.Values.mina.ports.external $config.externalPort }}
+        {{- if $.Values.mina.exposeItnGraphql }}
+        - name: http-itn-graphql
+          protocol: TCP
+          port: {{ $.Values.mina.itn.port }}
+          targetPort: {{ $.Values.mina.itn.port }}
+        {{- end }}  
 {{$data := dict "name" $config.name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.daemon.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
@@ -272,23 +293,28 @@ spec:
           mountPath: /root/wallet-keys
         - name: config-dir
           mountPath: /root/.mina-config
-        {{- if $config.libp2pSecret }}
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
-        {{- end }}
         {{- if $.Values.mina.uploadBlocksToGCloud }}
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
         {{- end }}
         {{- if $.Values.mina.runtimeConfig }}
         - name: daemon-config
-          mountPath: "/config/"
+          mountPath: "/root/config/"
         {{- end }}
 {{- include "nodeSelector.preemptible" $.Values | indent 6 }}
       volumes:
+      - name: config-dir
+      {{- if $.Values.persist_working_dir }}
+        persistentVolumeClaim:
+          claimName: pvc-{{ $config.name }}
+      {{- else}}
+        emptyDir: {}
+      {{- end }}
       - name: private-keys
         secret:
-          secretName: {{ $config.privateKeySecret }}
+          secretName: {{ $config.keypairName }}
           defaultMode: 256
           items:
           - key: key
@@ -327,8 +353,6 @@ spec:
             path: faucet-key.pub
       {{ end -}}
       - name: wallet-keys
-        emptyDir: {}
-      - name: config-dir
         emptyDir: {}
       - name: actual-libp2p
         emptyDir: {}
@@ -379,6 +403,28 @@ spec:
     protocol: TCP
     port: 80
     targetPort: {{ $.Values.mina.ports.graphql }}
+  {{- if $.Values.mina.exposeItnGraphql }}
+  - name: http-itn-graphql
+    protocol: TCP
+    port: {{ $.Values.mina.itn.port }}
+    targetPort: {{ $.Values.mina.itn.port }}
+  {{- end }}  
 {{- end }}
 ---
+{{- if $.Values.persist_working_dir }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-{{ $config.name }}
+spec:
+  accessModes:
+      - {{ $.Values.storage.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ $.Values.storage.size | quote }}
+  storageClassName: "{{ $.Values.storage.storageClass }}"
+---
 {{ end }}
+---
+{{ end }}
+---

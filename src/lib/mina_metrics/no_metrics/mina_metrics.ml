@@ -35,12 +35,16 @@ module type Histogram = sig
   type t
 
   val observe : t -> float -> unit
+
+  val buckets : t -> int list
 end
 
 module Histogram = struct
   type t = unit
 
   let observe : t -> float -> unit = fun _ _ -> ()
+
+  let buckets () = []
 end
 
 module Runtime = struct
@@ -64,17 +68,47 @@ module Cryptography = struct
 
   let snark_work_merge_time_sec : Snark_work_histogram.t = ()
 
-  let snark_work_base_time_sec : Snark_work_histogram.t = ()
+  let snark_work_zkapp_base_time_sec : Counter.t = ()
+
+  let snark_work_base_time_sec : Counter.t = ()
+
+  let snark_work_zkapp_base_submissions : Counter.t = ()
+
+  let snark_work_base_submissions : Counter.t = ()
+
+  let zkapp_proof_updates : Counter.t = ()
+
+  let zkapp_transaction_length : Counter.t = ()
 end
 
 module Bootstrap = struct
   let bootstrap_time_ms : Gauge.t = ()
+
+  let staking_epoch_ledger_sync_ms : Counter.t = ()
+
+  let next_epoch_ledger_sync_ms : Counter.t = ()
+
+  let root_snarked_ledger_sync_ms : Counter.t = ()
+
+  let num_of_root_snarked_ledger_retargeted : Gauge.t = ()
 end
 
 module Transaction_pool = struct
   let useful_transactions_received_time_sec : Gauge.t = ()
 
   let pool_size : Gauge.t = ()
+
+  let transactions_added_to_pool : Counter.t = ()
+
+  let vk_refcount_table_size : Gauge.t = ()
+
+  let zkapp_transactions_added_to_pool : Counter.t = ()
+
+  let zkapp_transaction_size : Counter.t = ()
+
+  let zkapp_updates : Counter.t = ()
+
+  let zkapp_proof_updates : Counter.t = ()
 end
 
 module Network = struct
@@ -100,6 +134,14 @@ module Network = struct
     module Validation_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
+
+    module Processing_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Rejection_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
   end
 
   module Snark_work = struct
@@ -114,6 +156,14 @@ module Network = struct
     module Validation_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
+
+    module Processing_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Rejection_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
   end
 
   module Transaction = struct
@@ -126,6 +176,14 @@ module Network = struct
     let received : Counter.t = ()
 
     module Validation_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Processing_time = struct
+      let update : Time.Span.t -> unit = Fn.ignore
+    end
+
+    module Rejection_time = struct
       let update : Time.Span.t -> unit = Fn.ignore
     end
   end
@@ -259,6 +317,8 @@ module Network = struct
   let rpc_latency_ms_summary : Rpc_latency_histogram.t = ()
 
   let ipc_latency_ns_summary : Ipc_latency_histogram.t = ()
+
+  let ipc_logs_received_total : Counter.t = ()
 end
 
 module Pipe = struct
@@ -291,6 +351,8 @@ module Snark_work = struct
   let snark_work_assigned_rpc : Counter.t = ()
 
   let snark_work_timed_out_rpc : Counter.t = ()
+
+  let snark_work_failed_rpc : Counter.t = ()
 
   let snark_pool_size : Gauge.t = ()
 
@@ -337,6 +399,10 @@ module Block_producer = struct
   let slots_won : Counter.t = ()
 
   let blocks_produced : Counter.t = ()
+
+  module Block_production_delay_histogram = Histogram
+
+  let block_production_delay : Block_production_delay_histogram.t = ()
 end
 
 module Transition_frontier = struct
@@ -376,6 +442,8 @@ module Transition_frontier = struct
 
   let best_tip_user_txns : Gauge.t = ()
 
+  let best_tip_zkapp_txns : Gauge.t = ()
+
   let best_tip_coinbase : Gauge.t = ()
 
   let longest_fork : Gauge.t = ()
@@ -388,7 +456,7 @@ module Transition_frontier = struct
 
   let best_tip_block_height : Gauge.t = ()
 
-  let root_snarked_ledger_accounts : Gauge.t = ()
+  let root_snarked_ledger_accounts : Counter.t = ()
 
   let root_snarked_ledger_total_currency : Gauge.t = ()
 end

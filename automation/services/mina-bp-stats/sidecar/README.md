@@ -15,6 +15,7 @@ The sidecar takes 2 approaches to configuration, a pair of envars, or a configur
 - `MINA_NODE_URL` - The URL that the sidecar will reach out to to get statistics from
 
 #### Config File
+[config-file]: #config-file
 The mina metrics sidecar will also look at `/etc/mina-sidecar.json` for its configuration variables, and the file should look like this:
 
 ```
@@ -93,7 +94,7 @@ $ dpkg -i ./mina-bp-stats-sidecar.deb
 
 #### Configuring and Running
 
-See the [Configuration](#Configuration) section above for what should be in the `/etc/mina-sidecar.json` file.
+See the [Config File](#config-file) section above for what should be in the `/etc/mina-sidecar.json` file.
 
 To (optionally) enable the service to run on reboot you can use:
 

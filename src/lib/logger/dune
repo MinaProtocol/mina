@@ -1,10 +1,14 @@
 (library
- (name logger)
  (public_name logger)
- (library_flags -linkall)
- (inline_tests)
- (libraries core_kernel yojson interpolator_lib structured_log_events)
- (preprocess
-  (pps ppx_version ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson))
+ (name logger)
+ (libraries
+   ;; opam libraries
+   core_kernel
+   sexplib0
+   ;; local libraries
+   interpolator_lib
+ )
  (instrumentation (backend bisect_ppx))
- (synopsis "Logging library"))
+ (preprocess (pps ppx_version ppx_mina ppx_jane ppx_deriving_yojson ppx_deriving.std))
+ (virtual_modules logger)
+ (default_implementation logger.native))

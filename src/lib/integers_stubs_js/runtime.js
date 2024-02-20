@@ -141,7 +141,7 @@ function integers_uint32_to_int(i) {
 //Provides: integers_uint32_to_int64
 //Requires: caml_int64_create_lo_mi_hi
 function integers_uint32_to_int64(i) {
-    return caml_int64_create_lo_mi_hi(i.value & 0xffffff, (i.value >>> 24) & 0xffffff, (i.value >>> 31) & 0xffff);
+    return caml_int64_create_lo_mi_hi(i.value & 0xffffff, (i.value >>> 24) & 0xffffff, 0);
 }
 
 //Provides: integers_uint32_to_string

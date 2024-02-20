@@ -2,27 +2,29 @@
  (name runtime_genesis_ledger)
  (public_name runtime_genesis_ledger)
  (libraries
-   ;; opam deps
+   ;;opam libraries
+   base
+   core_kernel
+   async_kernel
    async
    core
-   ;; libraries
-   blockchain_snark
-   mina_base
+   result
+   async.async_command
+   yojson
+   async_unix
+   ;;local libraries
+   genesis_constants
+   mina_runtime_config
    mina_ledger
-   coda_genesis_proof
-   mina_state
    genesis_ledger_helper
-   coda_runtime_config
-   snark_params
-   snarky.backendless
-   staged_ledger)
+   bounded_types
+   logger
+   cache_dir
+   precomputed_values
+   coda_genesis_ledger
+   consensus
+   mina_base
+ )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let ppx_optcomp ppx_deriving_yojson)))
-
-(rule
- (targets genesis_filename.txt)
- (deps
-  (:< gen/gen.exe))
- (action
-  (run %{<})))

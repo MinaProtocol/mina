@@ -255,7 +255,7 @@ end = struct
               Or_error.try_with (fun () ->
                   Answer.Child_hashes_are
                     ( MT.get_inner_hash_at_addr_exn mt lchild
-                    , MT.get_inner_hash_at_addr_exn mt rchild ))
+                    , MT.get_inner_hash_at_addr_exn mt rchild ) )
             with
             | Ok answer ->
                 Either.First answer
@@ -280,7 +280,7 @@ end = struct
             else
               let addresses_and_accounts =
                 List.sort ~compare:(fun (addr1, _) (addr2, _) ->
-                    Addr.compare addr1 addr2)
+                    Addr.compare addr1 addr2 )
                 @@ MT.get_all_accounts_rooted_at_exn mt a
                 (* can't actually throw *)
               in
@@ -306,7 +306,7 @@ end = struct
                         && [%equal: Addr.t option] expected_address
                              (Some actual_address)
                       then (Addr.next actual_address, true)
-                      else (expected_address, false))
+                      else (expected_address, false) )
                 in
                 if not is_compact then (
                   (* indicates our ledger is invalid somehow. *)
@@ -321,7 +321,7 @@ end = struct
                                  `Tuple
                                    [ Addr.to_yojson addr
                                    ; Account.to_yojson account
-                                   ])) )
+                                   ] ) ) )
                       ]
                     "Missing an account at address: $missing_address inside \
                      the list: $addresses_and_accounts" ;
@@ -339,7 +339,7 @@ end = struct
             in
             Either.First
               (Num_accounts
-                 (len, MT.get_inner_hash_at_addr_exn mt content_root_addr))
+                 (len, MT.get_inner_hash_at_addr_exn mt content_root_addr) )
       in
       match response_or_punish with
       | Either.First answer ->
@@ -418,6 +418,11 @@ end = struct
        we'll requeue the address and it'll be overwritten. *)
     MT.set_all_accounts_rooted_at_exn t.tree addr content ;
     Addr.Table.remove t.waiting_content addr ;
+    [%log' trace t.logger]
+      ~metadata:
+        [ ("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected) ]
+      "Found content addr $address, with hash $hash, removing from waiting \
+       content" ;
     let actual = MT.get_inner_hash_at_addr_exn t.tree addr in
     if Hash.equal actual expected then `Success
     else `Hash_mismatch (expected, actual)
@@ -520,7 +525,6 @@ end = struct
     (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
     let actual = complete_with_empties content_hash height (MT.depth t.tree) in
     if Hash.equal actual rh then (
-      MT.make_space_for t.tree n ;
       Addr.Table.clear t.waiting_parents ;
       (* We should use this information to set the empty account slots empty and
          start syncing at the content root. See #1972. *)
@@ -537,8 +541,8 @@ end = struct
         -> unit Deferred.t =
      fun (root_hash, query, env) ->
       (* NOTE: think about synchronization here. This is deferred now, so
-          the t and the underlying ledger can change while processing is
-          happening. *)
+         the t and the underlying ledger can change while processing is
+         happening. *)
       let already_done =
         match Ivar.peek t.validity_listener with Some `Ok -> true | _ -> false
       in
@@ -600,7 +604,7 @@ end = struct
               | `Good children_to_verify ->
                   (* TODO #312: Make sure we don't write too much *)
                   List.iter children_to_verify ~f:(fun (addr, hash) ->
-                      handle_node t addr hash) ;
+                      handle_node t addr hash ) ;
                   credit_fulfilled_request () )
           | Query.What_contents addr, Answer.Contents_are leaves -> (
               match add_content t addr leaves with
@@ -681,7 +685,7 @@ end = struct
               [ ("old_root_hash", Root_hash.to_yojson root_hash)
               ; ("new_root_hash", Root_hash.to_yojson h)
               ]
-            "New_goal: changing target from $old_root_hash to $new_root_hash") ;
+            "New_goal: changing target from $old_root_hash to $new_root_hash" ) ;
       Ivar.fill_if_empty t.validity_listener
         (`Target_changed (t.desired_root, h)) ;
       t.validity_listener <- Ivar.create () ;
@@ -691,7 +695,7 @@ end = struct
       `New )
     else if
       Option.fold t.auxiliary_data ~init:false ~f:(fun _ saved_data ->
-          equal data saved_data)
+          equal data saved_data )
     then (
       [%log' debug t.logger] "New_goal to same hash, not doing anything" ;
       `Repeat )
@@ -711,7 +715,7 @@ end = struct
       | `Ok ->
           Some t.tree
       | `Target_changed _ ->
-          None)
+          None )
 
   let wait_until_valid t h =
     if not (Root_hash.equal h (desired_root_exn t)) then
@@ -721,7 +725,7 @@ end = struct
         | `Target_changed payload ->
             `Target_changed payload
         | `Ok ->
-            `Ok t.tree)
+            `Ok t.tree )
 
   let fetch t rh ~data ~equal =
     ignore (new_goal t rh ~data ~equal : [ `New | `Repeat | `Update_data ]) ;

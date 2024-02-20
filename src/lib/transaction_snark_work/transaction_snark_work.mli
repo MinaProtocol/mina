@@ -6,21 +6,17 @@ module Statement : sig
   type t = Transaction_snark.Statement.t One_or_two.t
   [@@deriving compare, sexp, yojson, equal]
 
+  include Comparable.S with type t := t
+
   include Hashable.S with type t := t
 
   module Stable : sig
     module V2 : sig
       type t [@@deriving bin_io, compare, sexp, version, yojson, equal]
 
-      include Hashable.S_binable with type t := t
-    end
-
-    module V1 : sig
-      type t [@@deriving bin_io, compare, sexp, version, yojson, equal]
+      include Comparable.S with type t := t
 
       include Hashable.S_binable with type t := t
-
-      val to_latest : t -> V2.t
     end
   end
   with type V2.t = t
@@ -45,12 +41,6 @@ module Info : sig
     module V2 : sig
       type t [@@deriving compare, to_yojson, version, sexp, bin_io]
     end
-
-    module V1 : sig
-      type t [@@deriving compare, to_yojson, version, sexp, bin_io]
-
-      val to_latest : t -> V2.t
-    end
   end
   with type V2.t = t
 end
@@ -59,9 +49,9 @@ end
        be in this particular bundle. The easiest way would be to
        SOK with
        H(all_statements_in_bundle || fee || public_key)
-    *)
+*)
 
-type t =
+type t = Mina_wire_types.Transaction_snark_work.V2.t =
   { fee : Fee.t
   ; proofs : Ledger_proof.t One_or_two.t
   ; prover : Public_key.Compressed.t
@@ -76,7 +66,7 @@ val statement : t -> Statement.t
 
 module Stable : sig
   module V2 : sig
-    type t [@@deriving sexp, compare, bin_io, yojson, version]
+    type t [@@deriving equal, sexp, compare, bin_io, yojson, version]
   end
 end
 with type V2.t = t

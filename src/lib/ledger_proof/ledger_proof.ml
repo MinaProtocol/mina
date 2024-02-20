@@ -16,11 +16,20 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
 
   let statement (t : t) = Transaction_snark.statement t
 
+  let statement_with_sok (t : t) = Transaction_snark.statement_with_sok t
+
   let sok_digest = Transaction_snark.sok_digest
 
-  let statement_target (t : Transaction_snark.Statement.t) = t.target
+  let statement_target (t : Mina_state.Snarked_ledger_state.t) = t.target
+
+  let statement_with_sok_target (t : Mina_state.Snarked_ledger_state.With_sok.t)
+      =
+    t.target
 
   let underlying_proof = Transaction_snark.proof
+
+  let snarked_ledger_hash =
+    Fn.compose Mina_state.Snarked_ledger_state.snarked_ledger_hash statement
 
   let create ~statement ~sok_digest ~proof =
     Transaction_snark.create ~statement:{ statement with sok_digest } ~proof
@@ -31,5 +40,5 @@ include Prod
 module For_tests = struct
   let mk_dummy_proof statement =
     create ~statement ~sok_digest:Sok_message.Digest.default
-      ~proof:Proof.transaction_dummy
+      ~proof:(Lazy.force Proof.transaction_dummy)
 end

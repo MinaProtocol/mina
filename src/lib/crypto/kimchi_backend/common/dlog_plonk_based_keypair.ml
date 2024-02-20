@@ -25,7 +25,7 @@ module type Inputs_intf = sig
 
     type t
 
-    val wrap : t -> Kimchi.Protocol.wire -> Kimchi.Protocol.wire -> unit
+    val wrap : t -> Kimchi_types.wire -> Kimchi_types.wire -> unit
   end
 
   module Urs : sig
@@ -45,15 +45,38 @@ module type Inputs_intf = sig
   end
 
   module Constraint_system : sig
-    type t = (Scalar_field.t, Gate_vector.t) Plonk_constraint_system.t
+    type t
 
-    val finalize_and_get_gates : t -> Gate_vector.t
+    val get_primary_input_size : t -> int
+
+    val get_prev_challenges : t -> int option
+
+    val set_prev_challenges : t -> int -> unit
+
+    val finalize_and_get_gates :
+         t
+      -> Gate_vector.t
+         * Scalar_field.t Kimchi_types.lookup_table array
+         * Scalar_field.t Kimchi_types.runtime_table_cfg array
   end
 
   module Index : sig
     type t
 
-    val create : Gate_vector.t -> int -> Urs.t -> t
+    (** [create
+          gates
+          nb_public
+          runtime_tables_cfg
+          nb_prev_challanges
+          srs] *)
+    val create :
+         Gate_vector.t
+      -> int
+      -> Scalar_field.t Kimchi_types.lookup_table array
+      -> Scalar_field.t Kimchi_types.runtime_table_cfg array
+      -> int
+      -> Urs.t
+      -> t
   end
 
   module Curve : sig
@@ -81,7 +104,7 @@ module type Inputs_intf = sig
       ( Scalar_field.t
       , Urs.t
       , Poly_comm.Backend.t )
-      Kimchi.Protocol.VerifierIndex.verifier_index
+      Kimchi_types.VerifierIndex.verifier_index
 
     val create : Index.t -> t
   end
@@ -90,11 +113,7 @@ end
 module Make (Inputs : Inputs_intf) = struct
   open Core_kernel
 
-  type t =
-    { index : Inputs.Index.t
-    ; cs :
-        (Inputs.Scalar_field.t, Inputs.Gate_vector.t) Plonk_constraint_system.t
-    }
+  type t = { index : Inputs.Index.t; cs : Inputs.Constraint_system.t }
 
   let name =
     sprintf "%s_%d_v4" Inputs.name (Pickles_types.Nat.to_int Inputs.Rounds.n)
@@ -127,9 +146,9 @@ module Make (Inputs : Inputs_intf) = struct
                     | None ->
                         Or_error.errorf
                           "Could not read the URS from disk; its format did \
-                           not match the expected format"))
+                           not match the expected format" ) )
               (fun _ urs path ->
-                Or_error.try_with (fun () -> Inputs.Urs.write None urs path))
+                Or_error.try_with (fun () -> Inputs.Urs.write None urs path) )
           in
           let u =
             match Key_cache.Sync.read specs store () with
@@ -143,7 +162,7 @@ module Make (Inputs : Inputs_intf) = struct
                       | On_disk _ ->
                           true
                       | S3 _ ->
-                          false))
+                          false ) )
                     store () urs
                 in
                 urs
@@ -153,10 +172,26 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (set_urs_info, load)
 
-  let create cs =
-    let gates = Inputs.Constraint_system.finalize_and_get_gates cs in
-    let public_input_size = Set_once.get_exn cs.public_input_size [%here] in
-    let index = Inputs.Index.create gates public_input_size (load_urs ()) in
+  let create ~prev_challenges cs =
+    let gates, fixed_lookup_tables, runtime_table_cfgs =
+      Inputs.Constraint_system.finalize_and_get_gates cs
+    in
+    let public_input_size =
+      Inputs.Constraint_system.get_primary_input_size cs
+    in
+    let prev_challenges =
+      match Inputs.Constraint_system.get_prev_challenges cs with
+      | None ->
+          Inputs.Constraint_system.set_prev_challenges cs prev_challenges ;
+          prev_challenges
+      | Some prev_challenges' ->
+          assert (prev_challenges = prev_challenges') ;
+          prev_challenges'
+    in
+    let index =
+      Inputs.Index.create gates public_input_size fixed_lookup_tables
+        runtime_table_cfgs prev_challenges (load_urs ())
+    in
     { index; cs }
 
   let vk t = Inputs.Verifier_index.create t.index
@@ -176,10 +211,10 @@ module Make (Inputs : Inputs_intf) = struct
           assert false
     in
     { sigma_comm =
-        Pickles_types.Vector.init Pickles_types.Dlog_plonk_types.Permuts.n
+        Pickles_types.Vector.init Pickles_types.Plonk_types.Permuts.n
           ~f:(fun i -> g t.evals.sigma_comm.(i))
     ; coefficients_comm =
-        Pickles_types.Vector.init Pickles_types.Dlog_plonk_types.Columns.n
+        Pickles_types.Vector.init Pickles_types.Plonk_types.Columns.n
           ~f:(fun i -> g t.evals.coefficients_comm.(i))
     ; generic_comm = g t.evals.generic_comm
     ; psm_comm = g t.evals.psm_comm
@@ -187,5 +222,52 @@ module Make (Inputs : Inputs_intf) = struct
     ; mul_comm = g t.evals.mul_comm
     ; emul_comm = g t.evals.emul_comm
     ; endomul_scalar_comm = g t.evals.endomul_scalar_comm
+    }
+
+  let full_vk_commitments (t : Inputs.Verifier_index.t) :
+      ( Inputs.Curve.Affine.t array
+      , Inputs.Curve.Affine.t array option )
+      Pickles_types.Plonk_verification_key_evals.Step.t =
+    let g c : Inputs.Curve.Affine.t array =
+      match Inputs.Poly_comm.of_backend_without_degree_bound c with
+      | `Without_degree_bound x ->
+          x
+      | `With_degree_bound _ ->
+          assert false
+    in
+    let lookup f =
+      let open Option.Let_syntax in
+      let%bind l = t.lookup_index in
+      f l >>| g
+    in
+    { sigma_comm =
+        Pickles_types.Vector.init Pickles_types.Plonk_types.Permuts.n
+          ~f:(fun i -> g t.evals.sigma_comm.(i))
+    ; coefficients_comm =
+        Pickles_types.Vector.init Pickles_types.Plonk_types.Columns.n
+          ~f:(fun i -> g t.evals.coefficients_comm.(i))
+    ; generic_comm = g t.evals.generic_comm
+    ; psm_comm = g t.evals.psm_comm
+    ; complete_add_comm = g t.evals.complete_add_comm
+    ; mul_comm = g t.evals.mul_comm
+    ; emul_comm = g t.evals.emul_comm
+    ; endomul_scalar_comm = g t.evals.endomul_scalar_comm
+    ; xor_comm = Option.map ~f:g t.evals.xor_comm
+    ; range_check0_comm = Option.map ~f:g t.evals.range_check0_comm
+    ; range_check1_comm = Option.map ~f:g t.evals.range_check1_comm
+    ; foreign_field_add_comm = Option.map ~f:g t.evals.foreign_field_add_comm
+    ; foreign_field_mul_comm = Option.map ~f:g t.evals.foreign_field_mul_comm
+    ; rot_comm = Option.map ~f:g t.evals.rot_comm
+    ; lookup_table_comm =
+        Pickles_types.Vector.init
+          Pickles_types.Plonk_types.Lookup_sorted_minus_1.n ~f:(fun i ->
+            lookup (fun l -> Option.try_with (fun () -> l.lookup_table.(i))) )
+    ; lookup_table_ids = lookup (fun l -> l.table_ids)
+    ; runtime_tables_selector = lookup (fun l -> l.runtime_tables_selector)
+    ; lookup_selector_lookup = lookup (fun l -> l.lookup_selectors.lookup)
+    ; lookup_selector_xor = lookup (fun l -> l.lookup_selectors.xor)
+    ; lookup_selector_range_check =
+        lookup (fun l -> l.lookup_selectors.range_check)
+    ; lookup_selector_ffmul = lookup (fun l -> l.lookup_selectors.ffmul)
     }
 end

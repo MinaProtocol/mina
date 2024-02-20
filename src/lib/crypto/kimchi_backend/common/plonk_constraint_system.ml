@@ -4,6 +4,30 @@ open Unsigned.Size_t
 
 (* TODO: open Core here instead of opening it multiple times below *)
 
+module Kimchi_gate_type = struct
+  (* Alias to allow deriving sexp *)
+  type t = Kimchi_types.gate_type =
+    | Zero
+    | Generic
+    | Poseidon
+    | CompleteAdd
+    | VarBaseMul
+    | EndoMul
+    | EndoMulScalar
+    | Lookup
+    | CairoClaim
+    | CairoInstruction
+    | CairoFlags
+    | CairoTransition
+    | RangeCheck0
+    | RangeCheck1
+    | ForeignFieldAdd
+    | ForeignFieldMul
+    | Xor16
+    | Rot64
+  [@@deriving sexp]
+end
+
 (** A gate interface, parameterized by a field. *)
 module type Gate_vector_intf = sig
   open Unsigned
@@ -14,19 +38,23 @@ module type Gate_vector_intf = sig
 
   val create : unit -> t
 
-  val add : t -> field Kimchi.Protocol.circuit_gate -> unit
+  val add : t -> field Kimchi_types.circuit_gate -> unit
 
-  val get : t -> int -> field Kimchi.Protocol.circuit_gate
+  val get : t -> int -> field Kimchi_types.circuit_gate
 
-  val digest : t -> bytes
+  val len : t -> int
+
+  val digest : int -> t -> bytes
+
+  val to_json : int -> t -> string
 end
 
 (** A row indexing in a constraint system. *)
 module Row = struct
   open Core_kernel
 
-  (** Either a public input row, 
-      or a non-public input row that starts at index 0. 
+  (** Either a public input row,
+      or a non-public input row that starts at index 0.
     *)
   type t = Public_input of int | After_public_input of int
   [@@deriving hash, sexp, compare]
@@ -50,30 +78,30 @@ module Position = struct
 
   (** Generates a full row of positions that each points to itself. *)
   let create_cols (row : 'row) : _ t array =
-    Array.init Constants.permutation_cols (fun i -> { row; col = i })
+    Array.init Constants.permutation_cols ~f:(fun i -> { row; col = i })
 
-  (** Given a number of columns, 
+  (** Given a number of columns,
       append enough column wires to get an entire row.
       The wire appended will simply point to themselves,
-      so as to not take part in the permutation argument. 
+      so as to not take part in the permutation argument.
     *)
   let append_cols (row : 'row) (cols : _ t array) : _ t array =
     let padding_offset = Array.length cols in
     assert (padding_offset <= Constants.permutation_cols) ;
     let padding_len = Constants.permutation_cols - padding_offset in
     let padding =
-      Array.init padding_len (fun i -> { row; col = i + padding_offset })
+      Array.init padding_len ~f:(fun i -> { row; col = i + padding_offset })
     in
     Array.append cols padding
 
-  (** Converts an array of [Constants.columns] to [Constants.permutation_cols]. 
-    This is useful to truncate arrays of cells to the ones that only matter for the permutation argument. 
+  (** Converts an array of [Constants.columns] to [Constants.permutation_cols].
+    This is useful to truncate arrays of cells to the ones that only matter for the permutation argument.
     *)
   let cols_to_perms cols = Array.slice cols 0 Constants.permutation_cols
 
-  (** Converts a [Position.t] into the Rust-compatible type [Kimchi.Protocol.wire]. 
+  (** Converts a [Position.t] into the Rust-compatible type [Kimchi_types.wire].
     *)
-  let to_rust_wire { row; col } : Kimchi.Protocol.wire = { row; col }
+  let to_rust_wire { row; col } : Kimchi_types.wire = { row; col }
 end
 
 (** A gate. *)
@@ -84,7 +112,7 @@ module Gate_spec = struct
 
   (** A gate/row/constraint consists of a type (kind), a row, the other cells its columns/cells are connected to (wired_to), and the selector polynomial associated with the gate. *)
   type ('row, 'f) t =
-    { kind : (Kimchi.Protocol.gate_type[@sexp.opaque])
+    { kind : Kimchi_gate_type.t
     ; wired_to : 'row Position.t array
     ; coeffs : 'f array
     }
@@ -101,7 +129,7 @@ module Gate_spec = struct
     { t with wired_to }
 
   (* TODO: just send the array to Rust directly *)
-  let to_rust_gate { kind; wired_to; coeffs } : _ Kimchi.Protocol.circuit_gate =
+  let to_rust_gate { kind; wired_to; coeffs } : _ Kimchi_types.circuit_gate =
     let typ = kind in
     let wired_to = Array.map ~f:Position.to_rust_wire wired_to in
     let wires =
@@ -120,7 +148,7 @@ end
 module Plonk_constraint = struct
   open Core_kernel
 
-  (** A PLONK constraint (or gate) can be [Basic], [Poseidon], [EC_add_complete], [EC_scale], [EC_endoscale], or [EC_endoscalar]. *)
+  (** A PLONK constraint (or gate) can be [Basic], [Poseidon], [EC_add_complete], [EC_scale], [EC_endoscale], [EC_endoscalar], [RangeCheck0], [RangeCheck1], [Xor] *)
   module T = struct
     type ('v, 'f) t =
       | Basic of { l : 'f * 'v; r : 'f * 'v; o : 'f * 'v; m : 'f; c : 'f }
@@ -140,6 +168,148 @@ module Plonk_constraint = struct
       | EC_endoscale of
           { state : 'v Endoscale_round.t array; xs : 'v; ys : 'v; n_acc : 'v }
       | EC_endoscalar of { state : 'v Endoscale_scalar_round.t array }
+      | Lookup of
+          { w0 : 'v; w1 : 'v; w2 : 'v; w3 : 'v; w4 : 'v; w5 : 'v; w6 : 'v }
+      | RangeCheck0 of
+          { v0 : 'v (* Value to constrain to 88-bits *)
+          ; v0p0 : 'v (* MSBs *)
+          ; v0p1 : 'v (* vpX are 12-bit plookup chunks *)
+          ; v0p2 : 'v
+          ; v0p3 : 'v
+          ; v0p4 : 'v
+          ; v0p5 : 'v
+          ; v0c0 : 'v (* vcX are 2-bit crumbs *)
+          ; v0c1 : 'v
+          ; v0c2 : 'v
+          ; v0c3 : 'v
+          ; v0c4 : 'v
+          ; v0c5 : 'v
+          ; v0c6 : 'v
+          ; v0c7 : 'v (* LSBs *)
+          ; (* Coefficients *)
+            compact : 'f
+                (* Limbs mode coefficient: 0 (standard 3-limb) or 1 (compact 2-limb) *)
+          }
+      | RangeCheck1 of
+          { (* Current row *)
+            v2 : 'v (* Value to constrain to 88-bits *)
+          ; v12 : 'v (* Optional value used in compact 2-limb mode *)
+          ; v2c0 : 'v (* MSBs, 2-bit crumb *)
+          ; v2p0 : 'v (* vpX are 12-bit plookup chunks *)
+          ; v2p1 : 'v
+          ; v2p2 : 'v
+          ; v2p3 : 'v
+          ; v2c1 : 'v (* vcX are 2-bit crumbs *)
+          ; v2c2 : 'v
+          ; v2c3 : 'v
+          ; v2c4 : 'v
+          ; v2c5 : 'v
+          ; v2c6 : 'v
+          ; v2c7 : 'v
+          ; v2c8 : 'v (* LSBs *)
+          ; (* Next row *) v2c9 : 'v
+          ; v2c10 : 'v
+          ; v2c11 : 'v
+          ; v0p0 : 'v
+          ; v0p1 : 'v
+          ; v1p0 : 'v
+          ; v1p1 : 'v
+          ; v2c12 : 'v
+          ; v2c13 : 'v
+          ; v2c14 : 'v
+          ; v2c15 : 'v
+          ; v2c16 : 'v
+          ; v2c17 : 'v
+          ; v2c18 : 'v
+          ; v2c19 : 'v
+          }
+      | Xor of
+          { in1 : 'v
+          ; in2 : 'v
+          ; out : 'v
+          ; in1_0 : 'v
+          ; in1_1 : 'v
+          ; in1_2 : 'v
+          ; in1_3 : 'v
+          ; in2_0 : 'v
+          ; in2_1 : 'v
+          ; in2_2 : 'v
+          ; in2_3 : 'v
+          ; out_0 : 'v
+          ; out_1 : 'v
+          ; out_2 : 'v
+          ; out_3 : 'v
+          }
+      | ForeignFieldAdd of
+          { left_input_lo : 'v
+          ; left_input_mi : 'v
+          ; left_input_hi : 'v
+          ; right_input_lo : 'v
+          ; right_input_mi : 'v
+          ; right_input_hi : 'v
+          ; field_overflow : 'v
+          ; carry : 'v
+          ; (* Coefficients *) foreign_field_modulus0 : 'f
+          ; foreign_field_modulus1 : 'f
+          ; foreign_field_modulus2 : 'f
+          ; sign : 'f
+          }
+      | ForeignFieldMul of
+          { left_input0 : 'v
+          ; left_input1 : 'v
+          ; left_input2 : 'v
+          ; right_input0 : 'v
+          ; right_input1 : 'v
+          ; right_input2 : 'v
+          ; remainder01 : 'v
+          ; remainder2 : 'v
+          ; quotient0 : 'v
+          ; quotient1 : 'v
+          ; quotient2 : 'v
+          ; quotient_hi_bound : 'v
+          ; product1_lo : 'v
+          ; product1_hi_0 : 'v
+          ; product1_hi_1 : 'v
+          ; carry0 : 'v
+          ; carry1_0 : 'v
+          ; carry1_12 : 'v
+          ; carry1_24 : 'v
+          ; carry1_36 : 'v
+          ; carry1_48 : 'v
+          ; carry1_60 : 'v
+          ; carry1_72 : 'v
+          ; carry1_84 : 'v
+          ; carry1_86 : 'v
+          ; carry1_88 : 'v
+          ; carry1_90 : 'v
+          ; (* Coefficients *) foreign_field_modulus2 : 'f
+          ; neg_foreign_field_modulus0 : 'f
+          ; neg_foreign_field_modulus1 : 'f
+          ; neg_foreign_field_modulus2 : 'f
+          }
+      | Rot64 of
+          { (* Current row *)
+            word : 'v
+          ; rotated : 'v
+          ; excess : 'v
+          ; bound_limb0 : 'v
+          ; bound_limb1 : 'v
+          ; bound_limb2 : 'v
+          ; bound_limb3 : 'v
+          ; bound_crumb0 : 'v
+          ; bound_crumb1 : 'v
+          ; bound_crumb2 : 'v
+          ; bound_crumb3 : 'v
+          ; bound_crumb4 : 'v
+          ; bound_crumb5 : 'v
+          ; bound_crumb6 : 'v
+          ; bound_crumb7 : 'v
+          ; (* Coefficients *) two_to_rot : 'f (* Rotation scalar 2^rot *)
+          }
+      | AddFixedLookupTable of { id : int32; data : 'f array array }
+      | AddRuntimeTableCfg of { id : int32; first_column : 'f array }
+      | Raw of
+          { kind : Kimchi_gate_type.t; values : 'v array; coeffs : 'f array }
     [@@deriving sexp]
 
     (** map t *)
@@ -177,6 +347,288 @@ module Plonk_constraint = struct
             { state =
                 Array.map ~f:(fun x -> Endoscale_scalar_round.map ~f x) state
             }
+      | Lookup { w0; w1; w2; w3; w4; w5; w6 } ->
+          Lookup
+            { w0 = f w0
+            ; w1 = f w1
+            ; w2 = f w2
+            ; w3 = f w3
+            ; w4 = f w4
+            ; w5 = f w5
+            ; w6 = f w6
+            }
+      | RangeCheck0
+          { v0
+          ; v0p0
+          ; v0p1
+          ; v0p2
+          ; v0p3
+          ; v0p4
+          ; v0p5
+          ; v0c0
+          ; v0c1
+          ; v0c2
+          ; v0c3
+          ; v0c4
+          ; v0c5
+          ; v0c6
+          ; v0c7
+          ; compact
+          } ->
+          RangeCheck0
+            { v0 = f v0
+            ; v0p0 = f v0p0
+            ; v0p1 = f v0p1
+            ; v0p2 = f v0p2
+            ; v0p3 = f v0p3
+            ; v0p4 = f v0p4
+            ; v0p5 = f v0p5
+            ; v0c0 = f v0c0
+            ; v0c1 = f v0c1
+            ; v0c2 = f v0c2
+            ; v0c3 = f v0c3
+            ; v0c4 = f v0c4
+            ; v0c5 = f v0c5
+            ; v0c6 = f v0c6
+            ; v0c7 = f v0c7
+            ; compact
+            }
+      | RangeCheck1
+          { (* Current row *) v2
+          ; v12
+          ; v2c0
+          ; v2p0
+          ; v2p1
+          ; v2p2
+          ; v2p3
+          ; v2c1
+          ; v2c2
+          ; v2c3
+          ; v2c4
+          ; v2c5
+          ; v2c6
+          ; v2c7
+          ; v2c8
+          ; (* Next row *) v2c9
+          ; v2c10
+          ; v2c11
+          ; v0p0
+          ; v0p1
+          ; v1p0
+          ; v1p1
+          ; v2c12
+          ; v2c13
+          ; v2c14
+          ; v2c15
+          ; v2c16
+          ; v2c17
+          ; v2c18
+          ; v2c19
+          } ->
+          RangeCheck1
+            { (* Current row *) v2 = f v2
+            ; v12 = f v12
+            ; v2c0 = f v2c0
+            ; v2p0 = f v2p0
+            ; v2p1 = f v2p1
+            ; v2p2 = f v2p2
+            ; v2p3 = f v2p3
+            ; v2c1 = f v2c1
+            ; v2c2 = f v2c2
+            ; v2c3 = f v2c3
+            ; v2c4 = f v2c4
+            ; v2c5 = f v2c5
+            ; v2c6 = f v2c6
+            ; v2c7 = f v2c7
+            ; v2c8 = f v2c8
+            ; (* Next row *) v2c9 = f v2c9
+            ; v2c10 = f v2c10
+            ; v2c11 = f v2c11
+            ; v0p0 = f v0p0
+            ; v0p1 = f v0p1
+            ; v1p0 = f v1p0
+            ; v1p1 = f v1p1
+            ; v2c12 = f v2c12
+            ; v2c13 = f v2c13
+            ; v2c14 = f v2c14
+            ; v2c15 = f v2c15
+            ; v2c16 = f v2c16
+            ; v2c17 = f v2c17
+            ; v2c18 = f v2c18
+            ; v2c19 = f v2c19
+            }
+      | Xor
+          { in1
+          ; in2
+          ; out
+          ; in1_0
+          ; in1_1
+          ; in1_2
+          ; in1_3
+          ; in2_0
+          ; in2_1
+          ; in2_2
+          ; in2_3
+          ; out_0
+          ; out_1
+          ; out_2
+          ; out_3
+          } ->
+          Xor
+            { in1 = f in1
+            ; in2 = f in2
+            ; out = f out
+            ; in1_0 = f in1_0
+            ; in1_1 = f in1_1
+            ; in1_2 = f in1_2
+            ; in1_3 = f in1_3
+            ; in2_0 = f in2_0
+            ; in2_1 = f in2_1
+            ; in2_2 = f in2_2
+            ; in2_3 = f in2_3
+            ; out_0 = f out_0
+            ; out_1 = f out_1
+            ; out_2 = f out_2
+            ; out_3 = f out_3
+            }
+      | ForeignFieldAdd
+          { left_input_lo
+          ; left_input_mi
+          ; left_input_hi
+          ; right_input_lo
+          ; right_input_mi
+          ; right_input_hi
+          ; field_overflow
+          ; carry
+          ; (* Coefficients *) foreign_field_modulus0
+          ; foreign_field_modulus1
+          ; foreign_field_modulus2
+          ; sign
+          } ->
+          ForeignFieldAdd
+            { left_input_lo = f left_input_lo
+            ; left_input_mi = f left_input_mi
+            ; left_input_hi = f left_input_hi
+            ; right_input_lo = f right_input_lo
+            ; right_input_mi = f right_input_mi
+            ; right_input_hi = f right_input_hi
+            ; field_overflow = f field_overflow
+            ; carry = f carry
+            ; (* Coefficients *) foreign_field_modulus0
+            ; foreign_field_modulus1
+            ; foreign_field_modulus2
+            ; sign
+            }
+      | ForeignFieldMul
+          { left_input0
+          ; left_input1
+          ; left_input2
+          ; right_input0
+          ; right_input1
+          ; right_input2
+          ; remainder01
+          ; remainder2
+          ; quotient0
+          ; quotient1
+          ; quotient2
+          ; quotient_hi_bound
+          ; product1_lo
+          ; product1_hi_0
+          ; product1_hi_1
+          ; carry0
+          ; carry1_0
+          ; carry1_12
+          ; carry1_24
+          ; carry1_36
+          ; carry1_48
+          ; carry1_60
+          ; carry1_72
+          ; carry1_84
+          ; carry1_86
+          ; carry1_88
+          ; carry1_90
+          ; (* Coefficients *) foreign_field_modulus2
+          ; neg_foreign_field_modulus0
+          ; neg_foreign_field_modulus1
+          ; neg_foreign_field_modulus2
+          } ->
+          ForeignFieldMul
+            { left_input0 = f left_input0
+            ; left_input1 = f left_input1
+            ; left_input2 = f left_input2
+            ; right_input0 = f right_input0
+            ; right_input1 = f right_input1
+            ; right_input2 = f right_input2
+            ; remainder01 = f remainder01
+            ; remainder2 = f remainder2
+            ; quotient0 = f quotient0
+            ; quotient1 = f quotient1
+            ; quotient2 = f quotient2
+            ; quotient_hi_bound = f quotient_hi_bound
+            ; product1_lo = f product1_lo
+            ; product1_hi_0 = f product1_hi_0
+            ; product1_hi_1 = f product1_hi_1
+            ; carry0 = f carry0
+            ; carry1_0 = f carry1_0
+            ; carry1_12 = f carry1_12
+            ; carry1_24 = f carry1_24
+            ; carry1_36 = f carry1_36
+            ; carry1_48 = f carry1_48
+            ; carry1_60 = f carry1_60
+            ; carry1_72 = f carry1_72
+            ; carry1_84 = f carry1_84
+            ; carry1_86 = f carry1_86
+            ; carry1_88 = f carry1_88
+            ; carry1_90 = f carry1_90
+            ; (* Coefficients *) foreign_field_modulus2
+            ; neg_foreign_field_modulus0
+            ; neg_foreign_field_modulus1
+            ; neg_foreign_field_modulus2
+            }
+      | Rot64
+          { (* Current row *) word
+          ; rotated
+          ; excess
+          ; bound_limb0
+          ; bound_limb1
+          ; bound_limb2
+          ; bound_limb3
+          ; bound_crumb0
+          ; bound_crumb1
+          ; bound_crumb2
+          ; bound_crumb3
+          ; bound_crumb4
+          ; bound_crumb5
+          ; bound_crumb6
+          ; bound_crumb7
+          ; (* Coefficients *) two_to_rot
+          } ->
+          Rot64
+            { word = f word
+            ; rotated = f rotated
+            ; excess = f excess
+            ; bound_limb0 = f bound_limb0
+            ; bound_limb1 = f bound_limb1
+            ; bound_limb2 = f bound_limb2
+            ; bound_limb3 = f bound_limb3
+            ; bound_crumb0 = f bound_crumb0
+            ; bound_crumb1 = f bound_crumb1
+            ; bound_crumb2 = f bound_crumb2
+            ; bound_crumb3 = f bound_crumb3
+            ; bound_crumb4 = f bound_crumb4
+            ; bound_crumb5 = f bound_crumb5
+            ; bound_crumb6 = f bound_crumb6
+            ; bound_crumb7 = f bound_crumb7
+            ; (* Coefficients *) two_to_rot
+            }
+      | AddFixedLookupTable { id; data } ->
+          (* TODO: see a possible better API -
+             https://github.com/MinaProtocol/mina/issues/13984 *)
+          AddFixedLookupTable { id; data }
+      | AddRuntimeTableCfg { id; first_column } ->
+          AddRuntimeTableCfg { id; first_column }
+      | Raw { kind; values; coeffs } ->
+          Raw { kind; values = Array.map ~f values; coeffs }
 
     (** [eval (module F) get_variable gate] checks that [gate]'s polynomial is
         satisfied by the assignments given by [get_variable].
@@ -252,9 +704,17 @@ type ('f, 'rust_gates) circuit =
   | Unfinalized_rev of (unit, 'f) Gate_spec.t list
       (** A circuit still being written. *)
   | Compiled of Core_kernel.Md5.t * 'rust_gates
-      (** Once finalized, a circuit is represented as a digest 
-    and a list of gates that corresponds to the circuit. 
+      (** Once finalized, a circuit is represented as a digest
+    and a list of gates that corresponds to the circuit.
   *)
+
+type 'f fixed_lookup_tables =
+  | Unfinalized_fixed_lookup_tables_rev of 'f Kimchi_types.lookup_table list
+  | Compiled_fixed_lookup_tables of 'f Kimchi_types.lookup_table array
+
+type 'f runtime_tables_cfg =
+  | Unfinalized_runtime_tables_cfg_rev of 'f Kimchi_types.runtime_table_cfg list
+  | Compiled_runtime_tables_cfg of 'f Kimchi_types.runtime_table_cfg array
 
 (** The constraint system. *)
 type ('f, 'rust_gates) t =
@@ -269,10 +729,19 @@ type ('f, 'rust_gates) t =
        The finalized tag contains the digest of the circuit.
     *)
     mutable gates : ('f, 'rust_gates) circuit
+        (* Witnesses values corresponding to each runtime lookups *)
+  ; mutable runtime_lookups_rev : (V.t * (V.t * V.t)) list
+        (* The user-provided lookup tables associated with this circuit. *)
+  ; mutable fixed_lookup_tables : 'f fixed_lookup_tables
+        (* The user-provided runtime table configurations associated with this
+            circuit. *)
+  ; mutable runtime_tables_cfg : 'f runtime_tables_cfg
   ; (* The row to use the next time we add a constraint. *)
     mutable next_row : int
   ; (* The size of the public input (which fills the first rows of our constraint system. *)
     public_input_size : int Core_kernel.Set_once.t
+  ; (* The number of previous recursion challenges. *)
+    prev_challenges : int Core_kernel.Set_once.t
   ; (* Whatever is not public input. *)
     mutable auxiliary_input_size : int
   ; (* Queue (of size 1) of generic gate. *)
@@ -295,6 +764,57 @@ type ('f, 'rust_gates) t =
   ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
   }
 
+let get_public_input_size sys = sys.public_input_size
+
+let get_rows_len sys = List.length sys.rows_rev
+
+let get_prev_challenges sys = sys.prev_challenges
+
+let set_prev_challenges sys challenges =
+  Core_kernel.Set_once.set_exn sys.prev_challenges [%here] challenges
+
+let get_concatenated_fixed_lookup_table_size sys =
+  match sys.fixed_lookup_tables with
+  | Unfinalized_fixed_lookup_tables_rev _ ->
+      failwith
+        "Cannot get the fixed lookup tables before finalizing the constraint \
+         system"
+  | Compiled_fixed_lookup_tables flts ->
+      let get_table_size (flt : _ Kimchi_types.lookup_table) =
+        if Array.length flt.data = 0 then 0
+        else Array.length (Array.get flt.data 0)
+      in
+      Array.fold_left (fun acc flt -> acc + get_table_size flt) 0 flts
+
+let get_concatenated_runtime_lookup_table_size sys =
+  match sys.runtime_tables_cfg with
+  | Unfinalized_runtime_tables_cfg_rev _ ->
+      failwith
+        "Cannot get the runtime table configurations before finalizing the \
+         constraint system"
+  | Compiled_runtime_tables_cfg rt_cfgs ->
+      Array.fold_left
+        (fun acc (rt_cfg : _ Kimchi_types.runtime_table_cfg) ->
+          acc + Array.length rt_cfg.first_column )
+        0 rt_cfgs
+
+let finalize_fixed_lookup_tables sys =
+  match sys.fixed_lookup_tables with
+  | Unfinalized_fixed_lookup_tables_rev fixed_lt_rev ->
+      sys.fixed_lookup_tables <-
+        Compiled_fixed_lookup_tables
+          (Core_kernel.Array.of_list_rev fixed_lt_rev)
+  | Compiled_fixed_lookup_tables _ ->
+      failwith "Fixed lookup tables have already been finalized"
+
+let finalize_runtime_lookup_tables sys =
+  match sys.runtime_tables_cfg with
+  | Unfinalized_runtime_tables_cfg_rev rt_cfgs_rev ->
+      sys.runtime_tables_cfg <-
+        Compiled_runtime_tables_cfg (Core_kernel.Array.of_list_rev rt_cfgs_rev)
+  | Compiled_runtime_tables_cfg _ ->
+      failwith "Runtime table configurations have already been finalized"
+
 (* TODO: shouldn't that Make create something bounded by a signature? As we know what a back end should be? Check where this is used *)
 
 (* TODO: glossary of terms in this file (terms, reducing, feeding) + module doc *)
@@ -304,15 +824,87 @@ type ('f, 'rust_gates) t =
 (** ? *)
 module Make
     (Fp : Field.S)
-    (* We create a type for gate vector, instead of using `Gate.t list`. If we did, we would have to convert it to a `Gate.t array` to pass it across the FFI boundary, where then it gets converted to a `Vec<Gate>`; it's more efficient to just create the `Vec<Gate>` directly. 
+    (* We create a type for gate vector, instead of using `Gate.t list`. If we did, we would have to convert it to a `Gate.t array` to pass it across the FFI boundary, where then it gets converted to a `Vec<Gate>`; it's more efficient to just create the `Vec<Gate>` directly.
     *)
     (Gates : Gate_vector_intf with type field := Fp.t)
     (Params : sig
       val params : Fp.t Params.t
-    end) =
-struct
+    end) : sig
+  open Core_kernel
+
+  type nonrec t = (Fp.t, Gates.t) t
+
+  val create : unit -> t
+
+  val get_public_input_size : t -> int Set_once.t
+
+  val get_primary_input_size : t -> int
+
+  val set_primary_input_size : t -> int -> unit
+
+  val get_auxiliary_input_size : t -> int
+
+  val set_auxiliary_input_size : t -> int -> unit
+
+  val get_prev_challenges : t -> int option
+
+  val set_prev_challenges : t -> int -> unit
+
+  val get_rows_len : t -> int
+
+  val next_row : t -> int
+
+  val get_concatenated_fixed_lookup_table_size : t -> int
+
+  val get_concatenated_runtime_lookup_table_size : t -> int
+
+  (** Finalize the fixed lookup tables. The function can not be called twice *)
+  val finalize_fixed_lookup_tables : t -> unit
+
+  (** Finalize the runtime lookup table configurations. The function can not be
+      called twice. *)
+  val finalize_runtime_lookup_tables : t -> unit
+
+  val add_constraint :
+       ?label:string
+    -> t
+    -> ( Fp.t Snarky_backendless.Cvar.t
+       , Fp.t )
+       Snarky_backendless.Constraint.basic
+    -> unit
+
+  val compute_witness :
+       t
+    -> (int -> Fp.t)
+    -> Fp.t array array * Fp.t Kimchi_types.runtime_table array
+
+  val finalize : t -> unit
+
+  val finalize_and_get_gates :
+       t
+    -> Gates.t
+       * Fp.t Kimchi_types.lookup_table array
+       * Fp.t Kimchi_types.runtime_table_cfg array
+
+  val num_constraints : t -> int
+
+  val digest : t -> Md5.t
+
+  val to_json : t -> string
+end = struct
   open Core_kernel
   open Pickles_types
+
+  (* Used by compute_witness to build the runtime tables from the Lookup
+     constraint *)
+  module MapRuntimeTable = struct
+    module T = struct
+      type t = int32 * Fp.t [@@deriving hash, sexp, compare]
+    end
+
+    include T
+    include Core_kernel.Hashable.Make (T)
+  end
 
   type nonrec t = (Fp.t, Gates.t) t
 
@@ -320,7 +912,7 @@ struct
       a hash table that maps each position to the next one.
       For example, if one of the equivalence class is [pos1, pos3, pos7],
       the function will return a hashtable that maps pos1 to pos3,
-      pos3 to pos7, and pos7 to pos1. 
+      pos3 to pos7, and pos7 to pos1.
     *)
   let equivalence_classes_to_hashtbl sys =
     let module Relative_position = struct
@@ -339,20 +931,22 @@ struct
               Relative_position.Hash_set.of_list data
           | Some ps ->
               List.iter ~f:(Hash_set.add ps) data ;
-              ps)) ;
+              ps ) ) ;
     let res = Relative_position.Table.create () in
     Hashtbl.iter equivalence_classes ~f:(fun ps ->
         let rotate_left = function [] -> [] | x :: xs -> xs @ [ x ] in
-        let ps = Hash_set.to_list ps in
+        let ps =
+          Hash_set.to_list ps |> List.sort ~compare:[%compare: Row.t Position.t]
+        in
         List.iter2_exn ps (rotate_left ps) ~f:(fun input output ->
-            Hashtbl.add_exn res ~key:input ~data:output)) ;
+            Hashtbl.add_exn res ~key:input ~data:output ) ) ;
     res
 
-  (** Compute the witness, given the constraint system `sys` 
+  (** Compute the witness, given the constraint system `sys`
       and a function that converts the indexed secret inputs to their concrete values.
    *)
   let compute_witness (sys : t) (external_values : int -> Fp.t) :
-      Fp.t array array =
+      Fp.t array array * Fp.t Kimchi_types.runtime_table array =
     let internal_values : Fp.t Internal_var.Table.t =
       Internal_var.Table.create ()
     in
@@ -360,11 +954,11 @@ struct
     let num_rows = public_input_size + sys.next_row in
     let res =
       Array.init Constants.columns ~f:(fun _ ->
-          Array.create ~len:num_rows Fp.zero)
+          Array.create ~len:num_rows Fp.zero )
     in
     (* Public input *)
     for i = 0 to public_input_size - 1 do
-      res.(0).(i) <- external_values (i + 1)
+      res.(0).(i) <- external_values i
     done ;
     let find t k =
       match Hashtbl.find t k with
@@ -383,7 +977,7 @@ struct
             | Internal x ->
                 find internal_values x
           in
-          Fp.(acc + (s * x)))
+          Fp.(acc + (s * x)) )
     in
     (* Update the witness table with the value of the variables from each row. *)
     List.iteri (List.rev sys.rows_rev) ~f:(fun i_after_input cols ->
@@ -398,13 +992,66 @@ struct
                 let lc = find sys.internal_vars var in
                 let value = compute lc in
                 res.(col_idx).(row_idx) <- value ;
-                Hashtbl.set internal_values ~key:var ~data:value)) ;
+                Hashtbl.set internal_values ~key:var ~data:value ) ) ;
+
+    let map_runtime_tables = MapRuntimeTable.Table.create () in
+    let runtime_tables : Fp.t Kimchi_types.runtime_table array =
+      match sys.runtime_tables_cfg with
+      | Unfinalized_runtime_tables_cfg_rev _ ->
+          failwith
+            "Attempted to generate a witness for an unfinalized constraint \
+             system"
+      | Compiled_runtime_tables_cfg cfgs ->
+          Array.mapi cfgs ~f:(fun rt_idx { Kimchi_types.id; first_column } ->
+              let data =
+                Array.mapi first_column ~f:(fun i v ->
+                    ignore
+                    (* `add` leaves the value unchanged if the index has been
+                       already used. Therefore, it keeps the first value.
+                       This handles the case that the first column has
+                       duplicated index values.
+                    *)
+                    @@ MapRuntimeTable.Table.add map_runtime_tables ~key:(id, v)
+                         ~data:(i, rt_idx) ;
+                    (* default padding value for lookup *)
+                    Fp.zero )
+              in
+              let rt : Fp.t Kimchi_types.runtime_table = { id; data } in
+              rt )
+    in
+
+    (* Fill in the used entries of the runtime lookup tables. *)
+    List.iter (List.rev sys.runtime_lookups_rev) ~f:(fun (id, (idx, v)) ->
+        let compute_value x = compute ([ (Fp.one, x) ], None) in
+        let vid = compute_value id in
+        let vidx = compute_value idx in
+        let vv = compute_value v in
+        (* FIXME: we should have a int32 here. We are not sure the ID will be a
+           int32. We should enforce that.
+           See https://github.com/MinaProtocol/mina/issues/13955
+        *)
+        let id_int32 = Int32.of_string @@ Fp.to_string vid in
+        (* Using find allows to handle fixed lookup tables
+           As the map has been built from the runtime table configurations,
+           except in the case that a runtime table and a fixed table shares the
+           same ID, the lookups in fixed lookup tables will return None.
+           See https://github.com/MinaProtocol/mina/issues/14016
+        *)
+        let v =
+          MapRuntimeTable.Table.find map_runtime_tables (id_int32, vidx)
+        in
+        if Option.is_some v then
+          let i, rt_idx = Option.value_exn v in
+          let rt = runtime_tables.(rt_idx) in
+          (* Important note: we do not check if the value has been set before.
+             Therefore, it will always use the latest value *)
+          rt.data.(i) <- vv ) ;
     (* Return the witness. *)
-    res
+    (res, runtime_tables)
 
   let union_find sys v =
     Hashtbl.find_or_add sys.union_finds v ~default:(fun () ->
-        Union_find.create v)
+        Union_find.create v )
 
   (** Creates an internal variable and assigns it the value lc and constant. *)
   let create_internal ?constant sys lc : V.t =
@@ -416,8 +1063,12 @@ struct
   (* Initializes a constraint system. *)
   let create () : t =
     { public_input_size = Set_once.create ()
+    ; prev_challenges = Set_once.create ()
     ; internal_vars = Internal_var.Table.create ()
     ; gates = Unfinalized_rev [] (* Gates.create () *)
+    ; runtime_lookups_rev = []
+    ; fixed_lookup_tables = Unfinalized_fixed_lookup_tables_rev []
+    ; runtime_tables_cfg = Unfinalized_runtime_tables_cfg_rev []
     ; rows_rev = []
     ; next_row = 0
     ; equivalence_classes = V.Table.create ()
@@ -427,14 +1078,14 @@ struct
     ; union_finds = V.Table.create ()
     }
 
-  (* TODO *)
-  let to_json _ = `List []
-
   (** Returns the number of auxiliary inputs. *)
   let get_auxiliary_input_size t = t.auxiliary_input_size
 
   (** Returns the number of public inputs. *)
   let get_primary_input_size t = Set_once.get_exn t.public_input_size [%here]
+
+  (** Returns the number of previous challenges. *)
+  let get_prev_challenges t = Set_once.get t.prev_challenges
 
   (* Non-public part of the witness. *)
   let set_auxiliary_input_size t x = t.auxiliary_input_size <- x
@@ -443,9 +1094,29 @@ struct
   let set_primary_input_size (sys : t) num_pub_inputs =
     Set_once.set_exn sys.public_input_size [%here] num_pub_inputs
 
+  (** Sets the number of previous challenges. It must and can only be called once. *)
+  let set_prev_challenges (sys : t) num_prev_challenges =
+    Set_once.set_exn sys.prev_challenges [%here] num_prev_challenges
+
+  let get_public_input_size (sys : t) = get_public_input_size sys
+
+  let get_rows_len (sys : t) = get_rows_len sys
+
+  let next_row (sys : t) = sys.next_row
+
+  let get_concatenated_fixed_lookup_table_size (sys : t) =
+    get_concatenated_fixed_lookup_table_size sys
+
+  let get_concatenated_runtime_lookup_table_size (sys : t) =
+    get_concatenated_runtime_lookup_table_size sys
+
+  let finalize_fixed_lookup_tables = finalize_fixed_lookup_tables
+
+  let finalize_runtime_lookup_tables = finalize_runtime_lookup_tables
+
   (** Adds {row; col} to the system's wiring under a specific key.
       A key is an external or internal variable.
-      The row must be given relative to the start of the circuit 
+      The row must be given relative to the start of the circuit
       (so at the start of the public-input rows). *)
   let wire' sys key row (col : int) =
     ignore (union_find sys key : V.t Union_find.t) ;
@@ -469,7 +1140,7 @@ struct
         let num_vars = min Constants.permutation_cols (Array.length vars) in
         let vars_for_perm = Array.slice vars 0 num_vars in
         Array.iteri vars_for_perm ~f:(fun col x ->
-            Option.iter x ~f:(fun x -> wire sys x sys.next_row col)) ;
+            Option.iter x ~f:(fun x -> wire sys x sys.next_row col) ) ;
         (* Add to gates. *)
         let open Position in
         sys.gates <- Unfinalized_rev ({ kind; wired_to = [||]; coeffs } :: gates) ;
@@ -478,20 +1149,35 @@ struct
         (* Add to row. *)
         sys.rows_rev <- vars :: sys.rows_rev
 
-  (** Adds zero-knowledgeness to the gates/rows, 
+  (** Adds zero-knowledgeness to the gates/rows,
       and convert into Rust type [Gates.t].
       This can only be called once.
     *)
   let rec finalize_and_get_gates sys =
     match sys with
-    | { gates = Compiled (_, gates); _ } ->
-        gates
+    | { gates = Compiled (_, gates)
+      ; fixed_lookup_tables = Compiled_fixed_lookup_tables fixed_lookup_tables
+      ; runtime_tables_cfg = Compiled_runtime_tables_cfg runtime_tables_cfg
+      ; _
+      } ->
+        (gates, fixed_lookup_tables, runtime_tables_cfg)
+    (* Finalizing lookup tables and runtime table cfgs first *)
+    | { fixed_lookup_tables = Unfinalized_fixed_lookup_tables_rev _; _ } ->
+        finalize_fixed_lookup_tables sys ;
+        finalize_and_get_gates sys
+    | { runtime_tables_cfg = Unfinalized_runtime_tables_cfg_rev _; _ } ->
+        finalize_runtime_lookup_tables sys ;
+        finalize_and_get_gates sys
     | { pending_generic_gate = Some (l, r, o, coeffs); _ } ->
         (* Finalize any pending generic constraint first. *)
         add_row sys [| l; r; o |] Generic coeffs ;
         sys.pending_generic_gate <- None ;
         finalize_and_get_gates sys
-    | { gates = Unfinalized_rev gates_rev; _ } ->
+    | { gates = Unfinalized_rev gates_rev
+      ; fixed_lookup_tables = Compiled_fixed_lookup_tables fixed_lookup_tables
+      ; runtime_tables_cfg = Compiled_runtime_tables_cfg runtime_tables_cfg
+      ; _
+      } ->
         let rust_gates = Gates.create () in
 
         (* Create rows for public input. *)
@@ -501,7 +1187,7 @@ struct
         let pub_selectors = [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero |] in
         let pub_input_gate_specs_rev = ref [] in
         for row = 0 to public_input_size - 1 do
-          let public_var = V.External (row + 1) in
+          let public_var = V.External row in
           wire' sys public_var (Row.Public_input row) 0 ;
           pub_input_gate_specs_rev :=
             { Gate_spec.kind = Generic
@@ -522,7 +1208,7 @@ struct
           { gate with
             wired_to =
               Array.init Constants.permutation_cols ~f:(fun col ->
-                  permutation { row; col })
+                  permutation { row; col } )
           }
         in
 
@@ -531,7 +1217,7 @@ struct
         let public_gates =
           List.mapi public_gates ~f:(fun absolute_row gate ->
               update_gate_with_permutation_info (Row.Public_input absolute_row)
-                gate)
+                gate )
         in
 
         (* construct all the other gates (except zero-knowledge rows) *)
@@ -539,7 +1225,7 @@ struct
         let gates =
           List.mapi gates ~f:(fun relative_row gate ->
               update_gate_with_permutation_info
-                (Row.After_public_input relative_row) gate)
+                (Row.After_public_input relative_row) gate )
         in
 
         (* concatenate and convert to absolute rows *)
@@ -551,23 +1237,39 @@ struct
         let add_gates gates =
           List.iter gates ~f:(fun g ->
               let g = to_absolute_row g in
-              Gates.add rust_gates (Gate_spec.to_rust_gate g))
+              Gates.add rust_gates (Gate_spec.to_rust_gate g) )
         in
         add_gates public_gates ;
         add_gates gates ;
 
         (* compute the circuit's digest *)
-        let digest = Gates.digest rust_gates in
+        let digest = Gates.digest public_input_size rust_gates in
         let md5_digest = Md5.digest_bytes digest in
 
         (* drop the gates, we don't need them anymore *)
         sys.gates <- Compiled (md5_digest, rust_gates) ;
 
         (* return the gates *)
-        rust_gates
+        (rust_gates, fixed_lookup_tables, runtime_tables_cfg)
 
   (** Calls [finalize_and_get_gates] and ignores the result. *)
-  let finalize t = ignore (finalize_and_get_gates t : Gates.t)
+  let finalize t =
+    ignore
+      ( finalize_and_get_gates t
+        : Gates.t
+          * Fp.t Kimchi_types.lookup_table array
+          * Fp.t Kimchi_types.runtime_table_cfg array )
+
+  let num_constraints sys =
+    let gates, _, _ = finalize_and_get_gates sys in
+    Gates.len gates
+
+  let to_json (sys : t) : string =
+    (* TODO: add lookup tables and runtime table cfgs *)
+    (* https://github.com/MinaProtocol/mina/issues/13886 *)
+    let gates, _, _ = finalize_and_get_gates sys in
+    let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
+    Gates.to_json public_input_size gates
 
   (* Returns a hash of the circuit. *)
   let rec digest (sys : t) =
@@ -577,9 +1279,9 @@ struct
     | Compiled (digest, _) ->
         digest
 
-  (** Regroup terms that share the same variable. 
+  (** Regroup terms that share the same variable.
       For example, (3, i2) ; (2, i2) can be simplified to (5, i2).
-      It assumes that the list of given terms is sorted, 
+      It assumes that the list of given terms is sorted,
       and that i0 is the smallest one.
       For example, `i0 = 1` and `terms = [(_, 2); (_, 2); (_; 4); ...]`
 
@@ -590,7 +1292,7 @@ struct
     List.fold terms ~init:Int.Map.empty ~f:(fun acc (x, i) ->
         Map.change acc i ~f:(fun y ->
             let res = match y with None -> x | Some y -> Fp.add x y in
-            if Fp.(equal zero res) then None else Some res))
+            if Fp.(equal zero res) then None else Some res ) )
 
   (** Converts a [Cvar.t] to a `(terms, terms_length, has_constant)`.
       if `has_constant` is set, then terms start with a constant term in the form of (c, 0).
@@ -610,11 +1312,11 @@ struct
     let terms = accumulate_terms terms in
     let terms_list =
       Map.fold_right ~init:[] terms ~f:(fun ~key ~data acc ->
-          (data, key) :: acc)
+          (data, key) :: acc )
     in
     Some (terms_list, Map.length terms, has_constant_term)
 
-  (** Adds a generic constraint to the constraint system. 
+  (** Adds a generic constraint to the constraint system.
       As there are two generic gates per row, we queue
       every other generic gate.
       *)
@@ -629,8 +1331,8 @@ struct
         add_row sys [| l; r; o; l2; r2; o2 |] Generic coeffs ;
         sys.pending_generic_gate <- None
 
-  (** Converts a number of scaled additions \sum s_i * x_i 
-      to as many constraints as needed, 
+  (** Converts a number of scaled additions \sum s_i * x_i
+      to as many constraints as needed,
       creating temporary variables for each new row/constraint,
       and returning the output variable.
 
@@ -642,7 +1344,7 @@ struct
       - internal_var_1 = s1 * x1 + s2 * x2
       - internal_var_2 = 1 * internal_var_1 + s3 * x3
       - return (1, internal_var_2)
-      
+
       It assumes that the list of terms is not empty. *)
   let completely_reduce sys (terms : (Fp.t * int) list) =
     (* just adding constrained variables without values *)
@@ -664,20 +1366,20 @@ struct
     go terms
 
   (** Converts a linear combination of variables into a set of constraints.
-      It returns the output variable as (1, `Var res), 
-      unless the output is a constant, in which case it returns (c, `Constant). 
+      It returns the output variable as (1, `Var res),
+      unless the output is a constant, in which case it returns (c, `Constant).
     *)
   let reduce_lincom sys (x : Fp.t Snarky_backendless.Cvar.t) =
     let constant, terms =
       Fp.(
-        Snarky_backendless.Cvar.to_constant_and_terms ~add ~mul ~zero:(of_int 0)
-          ~equal ~one:(of_int 1))
+        Snarky_backendless.Cvar.to_constant_and_terms ~add ~mul ~zero ~equal
+          ~one)
         x
     in
     let terms = accumulate_terms terms in
     let terms_list =
       Map.fold_right ~init:[] terms ~f:(fun ~key ~data acc ->
-          (data, key) :: acc)
+          (data, key) :: acc )
     in
     match (constant, Map.is_empty terms) with
     | Some c, true ->
@@ -725,7 +1427,7 @@ struct
       (constr :
         ( Fp.t Snarky_backendless.Cvar.t
         , Fp.t )
-        Snarky_backendless.Constraint.basic) =
+        Snarky_backendless.Constraint.basic ) =
     let red = reduce_lincom sys in
     (* reduce any [Cvar.t] to a single internal variable *)
     let reduce_to_v (x : Fp.t Snarky_backendless.Cvar.t) : V.t =
@@ -849,7 +1551,7 @@ struct
                 add_generic_constraint ~l:x1
                   [| s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2 |]
                   sys ;
-                Hashtbl.set sys.cached_constants ratio x1 )
+                Hashtbl.set sys.cached_constants ~key:ratio ~data:x1 )
         | `Constant, `Var x2 -> (
             (* s1 = s2 * x2
                x2 = s1 / s2
@@ -862,7 +1564,7 @@ struct
                 add_generic_constraint ~r:x2
                   [| Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1 |]
                   sys ;
-                Hashtbl.set sys.cached_constants ratio x2 )
+                Hashtbl.set sys.cached_constants ~key:ratio ~data:x2 )
         | `Constant, `Constant ->
             assert (Fp.(equal s1 s2)) )
     | Plonk_constraint.T (Basic { l; r; o; m; c }) ->
@@ -993,6 +1695,7 @@ struct
              ; None
              ; None
              ; None
+             ; None
             |]
           in
           add_row sys vars Zero [||]
@@ -1016,7 +1719,6 @@ struct
         (*
         //! 0   1   2   3   4   5   6   7      8   9      10      11   12   13   14
         //! x1  y1  x2  y2  x3  y3  inf same_x s   inf_z  x21_inv
-
         *)
         let x1, y1 = reduce_curve_point p1 in
         let x2, y2 = reduce_curve_point p2 in
@@ -1116,7 +1818,7 @@ struct
              ; Some round.b4
             |]
           in
-          add_row sys row Kimchi.Protocol.EndoMul [||]
+          add_row sys row Kimchi_types.EndoMul [||]
         in
         Array.iter state ~f:add_endoscale_round ;
         (* Last row. *)
@@ -1128,6 +1830,7 @@ struct
            ; Some (reduce_to_v xs)
            ; Some (reduce_to_v ys)
            ; Some (reduce_to_v n_acc)
+           ; None
            ; None
            ; None
            ; None
@@ -1160,12 +1863,470 @@ struct
              ; None
             |]
           in
-          add_row sys row Kimchi.Protocol.EndoMulScalar [||]
+          add_row sys row Kimchi_types.EndoMulScalar [||]
         in
         Array.iter state
           ~f:
             (Fn.compose add_endoscale_scalar_round
-               (Endoscale_scalar_round.map ~f:reduce_to_v))
+               (Endoscale_scalar_round.map ~f:reduce_to_v) )
+    | Plonk_constraint.T (Lookup { w0; w1; w2; w3; w4; w5; w6 }) ->
+        (* table ID *)
+        let red_w0 = reduce_to_v w0 in
+        (* idx1 *)
+        let red_w1 = reduce_to_v w1 in
+        (* v1 *)
+        let red_w2 = reduce_to_v w2 in
+        (* idx2 *)
+        let red_w3 = reduce_to_v w3 in
+        (* v2 *)
+        let red_w4 = reduce_to_v w4 in
+        (* idx3 *)
+        let red_w5 = reduce_to_v w5 in
+        (* v3 *)
+        let red_w6 = reduce_to_v w6 in
+        let vars =
+          [| Some red_w0
+           ; Some red_w1
+           ; Some red_w2
+           ; Some red_w3
+           ; Some red_w4
+           ; Some red_w5
+           ; Some red_w6
+          |]
+        in
+        let lookup1 = (red_w0, (red_w1, red_w2)) in
+        let lookup2 = (red_w0, (red_w3, red_w4)) in
+        let lookup3 = (red_w0, (red_w5, red_w6)) in
+        (* We populate with the first lookup. In the case the user uses the same
+           index multiple times, the last value will be used *)
+        sys.runtime_lookups_rev <-
+          lookup3 :: lookup2 :: lookup1 :: sys.runtime_lookups_rev ;
+        add_row sys vars Lookup [||]
+    | Plonk_constraint.T
+        (RangeCheck0
+          { v0
+          ; v0p0
+          ; v0p1
+          ; v0p2
+          ; v0p3
+          ; v0p4
+          ; v0p5
+          ; v0c0
+          ; v0c1
+          ; v0c2
+          ; v0c3
+          ; v0c4
+          ; v0c5
+          ; v0c6
+          ; v0c7
+          ; compact
+          } ) ->
+        (*
+        //! 0   1   2   3   4   5   6   7   8   9  10  11  12  13  14
+        //! v vp0 vp1 vp2 vp3 vp4 vp5 vc0 vc1 vc2 vc3 vc4 vc5 vc6 vc7
+        *)
+        let vars =
+          [| Some (reduce_to_v v0)
+           ; Some (reduce_to_v v0p0) (* MSBs *)
+           ; Some (reduce_to_v v0p1)
+           ; Some (reduce_to_v v0p2)
+           ; Some (reduce_to_v v0p3)
+           ; Some (reduce_to_v v0p4)
+           ; Some (reduce_to_v v0p5)
+           ; Some (reduce_to_v v0c0)
+           ; Some (reduce_to_v v0c1)
+           ; Some (reduce_to_v v0c2)
+           ; Some (reduce_to_v v0c3)
+           ; Some (reduce_to_v v0c4)
+           ; Some (reduce_to_v v0c5)
+           ; Some (reduce_to_v v0c6)
+           ; Some (reduce_to_v v0c7) (* LSBs *)
+          |]
+        in
+        let coeff = if Fp.equal compact Fp.one then Fp.one else Fp.zero in
+        add_row sys vars RangeCheck0 [| coeff |]
+    | Plonk_constraint.T
+        (RangeCheck1
+          { (* Current row *) v2
+          ; v12
+          ; v2c0
+          ; v2p0
+          ; v2p1
+          ; v2p2
+          ; v2p3
+          ; v2c1
+          ; v2c2
+          ; v2c3
+          ; v2c4
+          ; v2c5
+          ; v2c6
+          ; v2c7
+          ; v2c8
+          ; (* Next row *) v2c9
+          ; v2c10
+          ; v2c11
+          ; v0p0
+          ; v0p1
+          ; v1p0
+          ; v1p1
+          ; v2c12
+          ; v2c13
+          ; v2c14
+          ; v2c15
+          ; v2c16
+          ; v2c17
+          ; v2c18
+          ; v2c19
+          } ) ->
+        (*
+        //!       0      1      2     3    4    5    6     7     8     9    10    11    12   13     14
+        //! Curr: v2   v12   v2c0  v2p0 v2p1 v2p2 v2p3  v2c1  v2c2  v2c3  v2c4  v2c5  v2c6 v2c7   v2c8
+        //! Next: v2c9 v2c10 v2c11 v0p0 v0p1 v1p0 v1p1 v2c12 v2c13 v2c14 v2c15 v2c16 v2c17 v2c18 v2c19
+        *)
+        let vars_curr =
+          [| (* Current row *) Some (reduce_to_v v2)
+           ; Some (reduce_to_v v12)
+           ; Some (reduce_to_v v2c0) (* MSBs *)
+           ; Some (reduce_to_v v2p0)
+           ; Some (reduce_to_v v2p1)
+           ; Some (reduce_to_v v2p2)
+           ; Some (reduce_to_v v2p3)
+           ; Some (reduce_to_v v2c1)
+           ; Some (reduce_to_v v2c2)
+           ; Some (reduce_to_v v2c3)
+           ; Some (reduce_to_v v2c4)
+           ; Some (reduce_to_v v2c5)
+           ; Some (reduce_to_v v2c6)
+           ; Some (reduce_to_v v2c7)
+           ; Some (reduce_to_v v2c8) (* LSBs *)
+          |]
+        in
+        let vars_next =
+          [| (* Next row *) Some (reduce_to_v v2c9)
+           ; Some (reduce_to_v v2c10)
+           ; Some (reduce_to_v v2c11)
+           ; Some (reduce_to_v v0p0)
+           ; Some (reduce_to_v v0p1)
+           ; Some (reduce_to_v v1p0)
+           ; Some (reduce_to_v v1p1)
+           ; Some (reduce_to_v v2c12)
+           ; Some (reduce_to_v v2c13)
+           ; Some (reduce_to_v v2c14)
+           ; Some (reduce_to_v v2c15)
+           ; Some (reduce_to_v v2c16)
+           ; Some (reduce_to_v v2c17)
+           ; Some (reduce_to_v v2c18)
+           ; Some (reduce_to_v v2c19)
+          |]
+        in
+        add_row sys vars_curr RangeCheck1 [||] ;
+        add_row sys vars_next Zero [||]
+    | Plonk_constraint.T
+        (Xor
+          { in1
+          ; in2
+          ; out
+          ; in1_0
+          ; in1_1
+          ; in1_2
+          ; in1_3
+          ; in2_0
+          ; in2_1
+          ; in2_2
+          ; in2_3
+          ; out_0
+          ; out_1
+          ; out_2
+          ; out_3
+          } ) ->
+        (* | Column |          Curr    | Next (gadget responsibility) |
+           | ------ | ---------------- | ---------------------------- |
+           |      0 | copy     `in1`   | copy     `in1'`              |
+           |      1 | copy     `in2`   | copy     `in2'`              |
+           |      2 | copy     `out`   | copy     `out'`              |
+           |      3 | plookup0 `in1_0` |                              |
+           |      4 | plookup1 `in1_1` |                              |
+           |      5 | plookup2 `in1_2` |                              |
+           |      6 | plookup3 `in1_3` |                              |
+           |      7 | plookup0 `in2_0` |                              |
+           |      8 | plookup1 `in2_1` |                              |
+           |      9 | plookup2 `in2_2` |                              |
+           |     10 | plookup3 `in2_3` |                              |
+           |     11 | plookup0 `out_0` |                              |
+           |     12 | plookup1 `out_1` |                              |
+           |     13 | plookup2 `out_2` |                              |
+           |     14 | plookup3 `out_3` |                              |
+        *)
+        let curr_row =
+          [| Some (reduce_to_v in1)
+           ; Some (reduce_to_v in2)
+           ; Some (reduce_to_v out)
+           ; Some (reduce_to_v in1_0)
+           ; Some (reduce_to_v in1_1)
+           ; Some (reduce_to_v in1_2)
+           ; Some (reduce_to_v in1_3)
+           ; Some (reduce_to_v in2_0)
+           ; Some (reduce_to_v in2_1)
+           ; Some (reduce_to_v in2_2)
+           ; Some (reduce_to_v in2_3)
+           ; Some (reduce_to_v out_0)
+           ; Some (reduce_to_v out_1)
+           ; Some (reduce_to_v out_2)
+           ; Some (reduce_to_v out_3)
+          |]
+        in
+        (* The raw gate after a Xor16 gate is a Const to check that all values are zero.
+           For that, the first coefficient is 1 and the rest will be zero.
+           This will be included in the gadget for a chain of Xors, not here.*)
+        add_row sys curr_row Xor16 [||]
+    | Plonk_constraint.T
+        (ForeignFieldAdd
+          { left_input_lo
+          ; left_input_mi
+          ; left_input_hi
+          ; right_input_lo
+          ; right_input_mi
+          ; right_input_hi
+          ; field_overflow
+          ; carry
+          ; (* Coefficients *) foreign_field_modulus0
+          ; foreign_field_modulus1
+          ; foreign_field_modulus2
+          ; sign
+          } ) ->
+        (*
+        //! | Gate   | `ForeignFieldAdd`        | Circuit/gadget responsibility  |
+        //! | ------ | ------------------------ | ------------------------------ |
+        //! | Column | `Curr`                   | `Next`                         |
+        //! | ------ | ------------------------ | ------------------------------ |
+        //! |      0 | `left_input_lo`  (copy)  | `result_lo` (copy)             |
+        //! |      1 | `left_input_mi`  (copy)  | `result_mi` (copy)             |
+        //! |      2 | `left_input_hi`  (copy)  | `result_hi` (copy)             |
+        //! |      3 | `right_input_lo` (copy)  |                                |
+        //! |      4 | `right_input_mi` (copy)  |                                |
+        //! |      5 | `right_input_hi` (copy)  |                                |
+        //! |      6 | `field_overflow` (copy?) |                                |
+        //! |      7 | `carry`                  |                                |
+        //! |      8 |                          |                                |
+        //! |      9 |                          |                                |
+        //! |     10 |                          |                                |
+        //! |     11 |                          |                                |
+        //! |     12 |                          |                                |
+        //! |     13 |                          |                                |
+        //! |     14 |                          |                                |
+        *)
+        let vars =
+          [| (* Current row *) Some (reduce_to_v left_input_lo)
+           ; Some (reduce_to_v left_input_mi)
+           ; Some (reduce_to_v left_input_hi)
+           ; Some (reduce_to_v right_input_lo)
+           ; Some (reduce_to_v right_input_mi)
+           ; Some (reduce_to_v right_input_hi)
+           ; Some (reduce_to_v field_overflow)
+           ; Some (reduce_to_v carry)
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+           ; None
+          |]
+        in
+        add_row sys vars ForeignFieldAdd
+          [| foreign_field_modulus0
+           ; foreign_field_modulus1
+           ; foreign_field_modulus2
+           ; sign
+          |]
+    | Plonk_constraint.T
+        (ForeignFieldMul
+          { left_input0
+          ; left_input1
+          ; left_input2
+          ; right_input0
+          ; right_input1
+          ; right_input2
+          ; remainder01
+          ; remainder2
+          ; quotient0
+          ; quotient1
+          ; quotient2
+          ; quotient_hi_bound
+          ; product1_lo
+          ; product1_hi_0
+          ; product1_hi_1
+          ; carry0
+          ; carry1_0
+          ; carry1_12
+          ; carry1_24
+          ; carry1_36
+          ; carry1_48
+          ; carry1_60
+          ; carry1_72
+          ; carry1_84
+          ; carry1_86
+          ; carry1_88
+          ; carry1_90
+          ; (* Coefficients *) foreign_field_modulus2
+          ; neg_foreign_field_modulus0
+          ; neg_foreign_field_modulus1
+          ; neg_foreign_field_modulus2
+          } ) ->
+        (*
+          | col | `ForeignFieldMul`       | `Zero`                     |
+          | --- | ----------------------- | -------------------------- |
+          |   0 | `left_input0`    (copy) | `remainder01`       (copy) |
+          |   1 | `left_input1`    (copy) | `remainder2`        (copy) |
+          |   2 | `left_input2`    (copy) | `quotient0`         (copy) |
+          |   3 | `right_input0`   (copy) | `quotient1`         (copy) |
+          |   4 | `right_input1`   (copy) | `quotient2`         (copy) |
+          |   5 | `right_input2`   (copy) | `quotient_hi_bound` (copy) |
+          |   6 | `product1_lo`    (copy) | `product1_hi_0`     (copy) |
+          |   7 | `carry1_0`    (plookup) | `product1_hi_1`    (dummy) |
+          |   8 | `carry1_12    (plookup) | `carry1_48`      (plookup) |
+          |   9 | `carry1_24`   (plookup) | `carry1_60`      (plookup) |
+          |  10 | `carry1_36`   (plookup) | `carry1_72`      (plookup) |
+          |  11 | `carry1_84`             | `carry0`                   |
+          |  12 | `carry1_86`             |                            |
+          |  13 | `carry1_88`             |                            |
+          |  14 | `carry1_90`             |                            |
+        *)
+        (* Current row *)
+        let vars_curr =
+          [| Some (reduce_to_v left_input0)
+           ; Some (reduce_to_v left_input1)
+           ; Some (reduce_to_v left_input2)
+           ; Some (reduce_to_v right_input0)
+           ; Some (reduce_to_v right_input1)
+           ; Some (reduce_to_v right_input2)
+           ; Some (reduce_to_v product1_lo)
+           ; Some (reduce_to_v carry1_0)
+           ; Some (reduce_to_v carry1_12)
+           ; Some (reduce_to_v carry1_24)
+           ; Some (reduce_to_v carry1_36)
+           ; Some (reduce_to_v carry1_84)
+           ; Some (reduce_to_v carry1_86)
+           ; Some (reduce_to_v carry1_88)
+           ; Some (reduce_to_v carry1_90)
+          |]
+        in
+        (* Next row *)
+        let vars_next =
+          [| Some (reduce_to_v remainder01)
+           ; Some (reduce_to_v remainder2)
+           ; Some (reduce_to_v quotient0)
+           ; Some (reduce_to_v quotient1)
+           ; Some (reduce_to_v quotient2)
+           ; Some (reduce_to_v quotient_hi_bound)
+           ; Some (reduce_to_v product1_hi_0)
+           ; Some (reduce_to_v product1_hi_1)
+           ; Some (reduce_to_v carry1_48)
+           ; Some (reduce_to_v carry1_60)
+           ; Some (reduce_to_v carry1_72)
+           ; Some (reduce_to_v carry0)
+           ; None
+           ; None
+           ; None
+          |]
+        in
+        add_row sys vars_curr ForeignFieldMul
+          [| foreign_field_modulus2
+           ; neg_foreign_field_modulus0
+           ; neg_foreign_field_modulus1
+           ; neg_foreign_field_modulus2
+          |] ;
+        add_row sys vars_next Zero [||]
+    | Plonk_constraint.T
+        (Rot64
+          { word
+          ; rotated
+          ; excess
+          ; bound_limb0
+          ; bound_limb1
+          ; bound_limb2
+          ; bound_limb3
+          ; bound_crumb0
+          ; bound_crumb1
+          ; bound_crumb2
+          ; bound_crumb3
+          ; bound_crumb4
+          ; bound_crumb5
+          ; bound_crumb6
+          ; bound_crumb7
+          ; (* Coefficients *) two_to_rot
+          } ) ->
+        (*
+        //! | Gate   | `Rot64`             | `RangeCheck0` gadgets (designer's duty)                   |
+        //! | ------ | ------------------- | --------------------------------------------------------- |
+        //! | Column | `Curr`              | `Next`           | `Next` + 1      | `Next`+ 2, if needed |
+        //! | ------ | ------------------- | ---------------- | --------------- | -------------------- |
+        //! |      0 | copy `word`         |`shifted`         |   copy `excess` |    copy      `word`  |
+        //! |      1 | copy `rotated`      | 0                |              0  |                  0   |
+        //! |      2 |      `excess`       | 0                |              0  |                  0   |
+        //! |      3 |      `bound_limb0`  | `shifted_limb0`  |  `excess_limb0` |        `word_limb0`  |
+        //! |      4 |      `bound_limb1`  | `shifted_limb1`  |  `excess_limb1` |        `word_limb1`  |
+        //! |      5 |      `bound_limb2`  | `shifted_limb2`  |  `excess_limb2` |        `word_limb2`  |
+        //! |      6 |      `bound_limb3`  | `shifted_limb3`  |  `excess_limb3` |        `word_limb3`  |
+        //! |      7 |      `bound_crumb0` | `shifted_crumb0` | `excess_crumb0` |       `word_crumb0`  |
+        //! |      8 |      `bound_crumb1` | `shifted_crumb1` | `excess_crumb1` |       `word_crumb1`  |
+        //! |      9 |      `bound_crumb2` | `shifted_crumb2` | `excess_crumb2` |       `word_crumb2`  |
+        //! |     10 |      `bound_crumb3` | `shifted_crumb3` | `excess_crumb3` |       `word_crumb3`  |
+        //! |     11 |      `bound_crumb4` | `shifted_crumb4` | `excess_crumb4` |       `word_crumb4`  |
+        //! |     12 |      `bound_crumb5` | `shifted_crumb5` | `excess_crumb5` |       `word_crumb5`  |
+        //! |     13 |      `bound_crumb6` | `shifted_crumb6` | `excess_crumb6` |       `word_crumb6`  |
+        //! |     14 |      `bound_crumb7` | `shifted_crumb7` | `excess_crumb7` |       `word_crumb7`  |
+        *)
+        let vars_curr =
+          [| (* Current row *) Some (reduce_to_v word)
+           ; Some (reduce_to_v rotated)
+           ; Some (reduce_to_v excess)
+           ; Some (reduce_to_v bound_limb0)
+           ; Some (reduce_to_v bound_limb1)
+           ; Some (reduce_to_v bound_limb2)
+           ; Some (reduce_to_v bound_limb3)
+           ; Some (reduce_to_v bound_crumb0)
+           ; Some (reduce_to_v bound_crumb1)
+           ; Some (reduce_to_v bound_crumb2)
+           ; Some (reduce_to_v bound_crumb3)
+           ; Some (reduce_to_v bound_crumb4)
+           ; Some (reduce_to_v bound_crumb5)
+           ; Some (reduce_to_v bound_crumb6)
+           ; Some (reduce_to_v bound_crumb7)
+          |]
+        in
+        add_row sys vars_curr Rot64 [| two_to_rot |]
+    | Plonk_constraint.T (AddFixedLookupTable { id; data }) -> (
+        match sys.fixed_lookup_tables with
+        | Unfinalized_fixed_lookup_tables_rev fixed_lookup_tables ->
+            let lt : Fp.t Kimchi_types.lookup_table list =
+              { id; data } :: fixed_lookup_tables
+            in
+            sys.fixed_lookup_tables <- Unfinalized_fixed_lookup_tables_rev lt
+        | Compiled_fixed_lookup_tables _ ->
+            failwith
+              "Trying to add a fixed lookup tables when it has been already \
+               finalized" )
+    | Plonk_constraint.T (AddRuntimeTableCfg { id; first_column }) -> (
+        match sys.runtime_tables_cfg with
+        | Unfinalized_runtime_tables_cfg_rev runtime_tables_cfg ->
+            let rt_cfg : Fp.t Kimchi_types.runtime_table_cfg list =
+              { id; first_column } :: runtime_tables_cfg
+            in
+            sys.runtime_tables_cfg <- Unfinalized_runtime_tables_cfg_rev rt_cfg
+        | Compiled_runtime_tables_cfg _ ->
+            failwith
+              "Trying to add a runtime table configuration  it has been \
+               already finalized" )
+    | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
+        let values =
+          Array.init 15 ~f:(fun i ->
+              (* Insert [None] if the index is beyond the end of the [values]
+                 array.
+              *)
+              Option.try_with (fun () -> reduce_to_v values.(i)) )
+        in
+        add_row sys values kind coeffs
     | constr ->
         failwithf "Unhandled constraint %s"
           Obj.(Extension_constructor.name (Extension_constructor.of_val constr))

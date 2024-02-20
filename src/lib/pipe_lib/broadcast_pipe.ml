@@ -22,7 +22,7 @@ let create a =
     Pipe.add_consumer root_r ~downstream_flushed:(fun () ->
         let%map () = Ivar.read !downstream_flushed_v in
         (* Sub-pipes are never closed without closing the master pipe. *)
-        `Ok)
+        `Ok )
   in
   don't_wait_for
     (Pipe.iter ~flushed:(Consumer consumer) root_r ~f:(fun v ->
@@ -30,17 +30,17 @@ let create a =
          let inner_pipes = Int.Table.data t.pipes in
          let%bind () =
            Deferred.List.iter ~how:`Parallel inner_pipes ~f:(fun p ->
-               Pipe.write p v)
+               Pipe.write p v )
          in
          Pipe.Consumer.values_sent_downstream consumer ;
          let%bind () =
            Deferred.List.iter ~how:`Parallel inner_pipes ~f:(fun p ->
-               Deferred.ignore_m @@ Pipe.downstream_flushed p)
+               Deferred.ignore_m @@ Pipe.downstream_flushed p )
          in
          if Ivar.is_full !downstream_flushed_v then
            [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
          Ivar.fill !downstream_flushed_v () ;
-         Deferred.unit)) ;
+         Deferred.unit ) ) ;
   (t, t)
 
 exception Already_closed of string
@@ -73,7 +73,7 @@ module Reader = struct
           Int.Table.remove t.pipes reader_id ;
           b
         in
-        d)
+        d )
 
   (* The sub-pipes have no downstream consumer, so the downstream flushed should
      always be determined and return `Ok. *)
@@ -86,14 +86,14 @@ module Reader = struct
         Pipe.fold r ~init ~f:(fun acc v ->
             let%map res = f acc v in
             Pipe.Consumer.values_sent_downstream consumer ;
-            res))
+            res ) )
 
   let iter t ~f =
     prepare_pipe t ~default_value:() ~f:(fun r ->
         let consumer = add_trivial_consumer r in
         Pipe.iter ~flushed:(Consumer consumer) r ~f:(fun v ->
             let%map () = f v in
-            Pipe.Consumer.values_sent_downstream consumer))
+            Pipe.Consumer.values_sent_downstream consumer ) )
 
   let iter_until t ~f =
     let rec loop ~consumer reader =
@@ -107,7 +107,7 @@ module Reader = struct
     in
     prepare_pipe t ~default_value:() ~f:(fun reader ->
         let consumer = add_trivial_consumer reader in
-        loop ~consumer reader)
+        loop ~consumer reader )
 end
 
 module Writer = struct
@@ -118,13 +118,13 @@ module Writer = struct
         t.cache <- x ;
         let%bind () = Pipe.write t.root_pipe x in
         let%bind _ = Pipe.downstream_flushed t.root_pipe in
-        Deferred.unit)
+        Deferred.unit )
 
   let close t =
     guard_already_closed ~context:"Writer.close" t (fun () ->
         Pipe.close t.root_pipe ;
         Int.Table.iter t.pipes ~f:(fun w -> Pipe.close w) ;
-        Int.Table.clear t.pipes)
+        Int.Table.clear t.pipes )
 end
 
 let map t ~f =
@@ -171,7 +171,7 @@ let%test_unit "listeners properly receive updates" =
         ~expect:next_value (Reader.peek r) ;
       (*6*)
       Writer.close w ;
-      Deferred.both d1 d2 >>| Fn.ignore)
+      Deferred.both d1 d2 >>| Fn.ignore )
 
 let%test_module _ =
   ( module struct
@@ -201,7 +201,7 @@ let%test_module _ =
                    counts.immediate_iterations <-
                      counts.immediate_iterations + 1 ;
                    let%map () = after @@ Time_ns.Span.of_sec 1. in
-                   counts.deferred_iterations <- counts.deferred_iterations + 1)
+                   counts.deferred_iterations <- counts.deferred_iterations + 1 )
           in
           setup_reader counts1 ;
           (* The reader doesn't run until we yield. *)
@@ -226,5 +226,5 @@ let%test_module _ =
           assert_immediate counts2 1 ;
           assert_deferred counts2 0 ;
           let%bind () = Writer.write pipe_w () in
-          assert_both counts1 3 ; assert_both counts2 2 ; Deferred.return true)
+          assert_both counts1 3 ; assert_both counts2 2 ; Deferred.return true )
   end )

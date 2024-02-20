@@ -39,10 +39,6 @@ end = struct
 
   let create ~depth () = { uuid = Uuid_unix.create (); depth }
 
-  let remove_accounts_exn _t keys =
-    if List.is_empty keys then ()
-    else failwith "remove_accounts_exn: null ledgers cannot be mutated"
-
   let empty_hash_at_height =
     Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
 
@@ -57,12 +53,35 @@ end = struct
       let h = Location.height ~ledger_depth:t.depth k in
       if h >= t.depth then []
       else
-        let sibling_dir = Location.last_direction (Location.to_path_exn k) in
+        let dir = Location.last_direction (Location.to_path_exn k) in
         let hash = empty_hash_at_height h in
-        Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
+        Direction.map dir ~left:(`Left hash) ~right:(`Right hash)
         :: loop (Location.parent k)
     in
     loop location
+
+  let merkle_path_batch t locations = List.map ~f:(merkle_path t) locations
+
+  let wide_merkle_path t location =
+    let location =
+      if Location.is_account location then
+        Location.Hash (Location.to_path_exn location)
+      else location
+    in
+    assert (Location.is_hash location) ;
+    let rec loop k =
+      let h = Location.height ~ledger_depth:t.depth k in
+      if h >= t.depth then []
+      else
+        let dir = Location.last_direction (Location.to_path_exn k) in
+        let hash = empty_hash_at_height h in
+        Direction.map dir ~left:(`Left (hash, hash)) ~right:(`Right (hash, hash))
+        :: loop (Location.parent k)
+    in
+    loop location
+
+  let wide_merkle_path_batch t locations =
+    List.map ~f:(wide_merkle_path t) locations
 
   let merkle_root t = empty_hash_at_height t.depth
 
@@ -70,6 +89,11 @@ end = struct
 
   let merkle_path_at_index_exn t index =
     merkle_path_at_addr_exn t (Addr.of_int_exn ~ledger_depth:t.depth index)
+
+  let get_hash_batch_exn t locations =
+    List.map locations ~f:(fun location ->
+        empty_hash_at_height
+          (Addr.height ~ledger_depth:t.depth (Location.to_path_exn location)) )
 
   let index_of_account_exn _t =
     failwith "index_of_account_exn: null ledgers are empty"
@@ -103,7 +127,7 @@ end = struct
   let location_of_account_batch _t accts =
     List.map accts ~f:(fun acct -> (acct, None))
 
-  let accounts _t = Account_id.Set.empty
+  let accounts _t = Async.Deferred.return Account_id.Set.empty
 
   let token_owner _t _tid = None
 
@@ -111,22 +135,17 @@ end = struct
 
   let tokens _t _pk = Token_id.Set.empty
 
-  let next_available_token _t = Token_id.(next default)
-
-  let set_next_available_token _t _tid =
-    failwith "set_next_available_token: null ledgers cannot be mutated"
-
   let iteri _t ~f:_ = ()
 
-  let fold_until _t ~init ~f:_ ~finish = finish init
+  let fold_until _t ~init ~f:_ ~finish = Async.Deferred.return @@ finish init
 
   let foldi_with_ignored_accounts _t _ ~init ~f:_ = init
 
   let foldi _t ~init ~f:_ = init
 
-  let to_list _t = []
+  let to_list _t = Async.Deferred.return []
 
-  let make_space_for _t _tot = ()
+  let to_list_sequential _t = []
 
   let get_all_accounts_rooted_at_exn t addr =
     let first_node, last_node =
@@ -138,10 +157,10 @@ end = struct
       zip_exn
         (map
            ~f:(Addr.of_int_exn ~ledger_depth:t.depth)
-           (range first_index last_index))
+           (range first_index last_index) )
         (init
            (1 lsl Addr.height ~ledger_depth:t.depth addr)
-           ~f:(Fn.const Account.empty)))
+           ~f:(Fn.const Account.empty) ))
 
   let set_all_accounts_rooted_at_exn _t =
     failwith "set_all_accounts_rooted_at_exn: null ledgers cannot be mutated"

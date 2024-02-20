@@ -22,6 +22,7 @@ module Ledger_inner = struct
       | Hash of Location_at_depth.Addr.t
     [@@deriving hash, sexp, compare]
 
+    include Comparable.Make_binable (Arg)
     include Hashable.Make_binable (Arg) [@@deriving sexp, compare, hash, yojson]
   end
 
@@ -29,7 +30,7 @@ module Ledger_inner = struct
     Rocksdb.Database
 
   module Storage_locations : Intf.Storage_locations = struct
-    let key_value_db_dir = "coda_key_value_db"
+    let key_value_db_dir = "mina_key_value_db"
   end
 
   module Hash = struct
@@ -44,7 +45,7 @@ module Ledger_inner = struct
         type t = Ledger_hash.Stable.V1.t
         [@@deriving sexp, compare, hash, equal, yojson]
 
-        type _unused = unit constraint t = Arg.t
+        let (_ : (t, Arg.t) Type_equal.t) = Type_equal.T
 
         let to_latest = Fn.id
 
@@ -56,7 +57,8 @@ module Ledger_inner = struct
 
         let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
-        let empty_account = Ledger_hash.of_digest Account.empty_digest
+        let empty_account =
+          Ledger_hash.of_digest (Lazy.force Account.empty_digest)
       end
     end]
   end
@@ -73,16 +75,9 @@ module Ledger_inner = struct
 
         let balance Account.Poly.{ balance; _ } = balance
 
-        let token Account.Poly.{ token_id; _ } = token_id
-
         let empty = Account.empty
 
-        let token_owner ({ token_permissions; _ } : t) =
-          match token_permissions with
-          | Token_owned _ ->
-              true
-          | Not_owned _ ->
-              false
+        let token = Account.Poly.token_id
       end
     end]
 
@@ -95,7 +90,13 @@ module Ledger_inner = struct
     module Key = Public_key.Compressed
     module Token_id = Token_id
     module Account_id = Account_id
-    module Balance = Currency.Balance
+
+    module Balance = struct
+      include Currency.Balance
+
+      let to_int = to_nanomina_int
+    end
+
     module Account = Account.Stable.Latest
     module Hash = Hash.Stable.Latest
     module Kvdb = Kvdb
@@ -164,6 +165,7 @@ module Ledger_inner = struct
        and type root_hash := Hash.t
        and type unattached_mask := Mask.t
        and type attached_mask := Mask.Attached.t
+       and type accumulated_t := Mask.accumulated_t
        and type t := Any_ledger.M.t =
   Merkle_mask.Maskable_merkle_tree.Make (struct
     include Inputs
@@ -270,7 +272,12 @@ module Ledger_inner = struct
 
   let packed t = Any_ledger.cast (module Mask.Attached) t
 
-  let register_mask t mask = Maskable.register_mask (packed t) mask
+  let register_mask t mask =
+    let accumulated = Mask.Attached.to_accumulated t in
+    Maskable.register_mask ~accumulated (packed t) mask
+
+  let unsafe_preload_accounts_from_parent =
+    Maskable.unsafe_preload_accounts_from_parent
 
   let unregister_mask_exn ~loc mask = Maskable.unregister_mask_exn ~loc mask
 
@@ -281,13 +288,15 @@ module Ledger_inner = struct
 
   type attached_mask = Mask.Attached.t
 
+  type accumulated_t = Mask.accumulated_t
+
   (* inside MaskedLedger, the functor argument has assigned to location, account, and path
      but the module signature for the functor result wants them, so we declare them here *)
   type location = Location.t
 
   (* TODO: Don't allocate: see Issue #1191 *)
   let fold_until t ~init ~f ~finish =
-    let accounts = to_list t in
+    let%map.Async.Deferred accounts = to_list t in
     List.fold_until accounts ~init ~f ~finish
 
   let create_new_account_exn t account_id account =
@@ -299,7 +308,7 @@ module Ledger_inner = struct
         (sprintf
            !"Could not create a new account with pk \
              %{sexp:Public_key.Compressed.t}: Account already exists"
-           (Account_id.public_key account_id))
+           (Account_id.public_key account_id) )
 
   let create_new_account t account_id account =
     Or_error.try_with (fun () -> create_new_account_exn t account_id account)
@@ -317,7 +326,7 @@ module Ledger_inner = struct
       Result.of_option (get ledger loc)
         ~error:
           (Error.of_string
-             "get_or_create: Account was not found in the ledger after creation")
+             "get_or_create: Account was not found in the ledger after creation" )
     in
     (action, account, loc)
 
@@ -330,7 +339,7 @@ module Ledger_inner = struct
         failwith "create_empty for a key already present"
     | `Added, new_loc ->
         Debug_assert.debug_assert (fun () ->
-            [%test_eq: Ledger_hash.t] start_hash (merkle_root ledger)) ;
+            [%test_eq: Ledger_hash.t] start_hash (merkle_root ledger) ) ;
         (merkle_path ledger new_loc, Account.empty)
 
   let _handler t =
@@ -340,7 +349,7 @@ module Ledger_inner = struct
         | `Left h ->
             h
         | `Right h ->
-            h)
+            h )
     in
     stage (fun (With { request; respond }) ->
         match request with
@@ -358,11 +367,40 @@ module Ledger_inner = struct
             let index = index_of_account_exn t pk in
             respond (Provide index)
         | _ ->
-            unhandled)
+            unhandled )
 end
 
 include Ledger_inner
-include Transaction_logic.Make (Ledger_inner)
+include Mina_transaction_logic.Make (Ledger_inner)
+
+(* use mask to restore ledger after application *)
+let merkle_root_after_zkapp_command_exn ~constraint_constants ~global_slot
+    ~txn_state_view ledger zkapp_command =
+  let mask = Mask.create ~depth:(depth ledger) () in
+  let masked_ledger = register_mask ledger mask in
+  let _applied =
+    Or_error.ok_exn
+      (apply_zkapp_command_unchecked ~constraint_constants ~global_slot
+         ~state_view:txn_state_view masked_ledger
+         (Zkapp_command.Valid.forget zkapp_command) )
+  in
+  let root = merkle_root masked_ledger in
+  ignore (unregister_mask_exn ~loc:__LOC__ masked_ledger : unattached_mask) ;
+  root
+
+(* use mask to restore ledger after application *)
+let merkle_root_after_user_command_exn ~constraint_constants ~txn_global_slot
+    ledger cmd =
+  let mask = Mask.create ~depth:(depth ledger) () in
+  let masked_ledger = register_mask ledger mask in
+  let _applied =
+    Or_error.ok_exn
+      (apply_user_command ~constraint_constants ~txn_global_slot masked_ledger
+         cmd )
+  in
+  let root = merkle_root masked_ledger in
+  ignore (unregister_mask_exn ~loc:__LOC__ masked_ledger : unattached_mask) ;
+  root
 
 type init_state =
   ( Signature_lib.Keypair.t
@@ -379,7 +417,7 @@ let gen_initial_ledger_state : init_state Quickcheck.Generator.t =
   let%bind balances =
     let gen_balance =
       let%map whole_balance = Int.gen_incl 500_000_000 1_000_000_000 in
-      Currency.Amount.of_int (whole_balance * 1_000_000_000)
+      Currency.Amount.of_mina_int_exn whole_balance
     in
     Quickcheck_lib.replicate_gen gen_balance n_accounts
   in
@@ -408,24 +446,216 @@ let apply_initial_ledger_state : t -> init_state -> unit =
       let account = Account.initialize account_id in
       let account' =
         { account with
-          balance = Currency.Balance.of_int (Currency.Amount.to_int balance)
+          balance =
+            Currency.Balance.of_nanomina_int_exn
+              (Currency.Amount.to_nanomina_int balance)
         ; nonce
         ; timing
         }
       in
-      create_new_account_exn t account_id account')
+      create_new_account_exn t account_id account' )
 
-let%test_unit "parties payment test" =
-  let open Transaction_logic.For_tests in
+let%test_unit "tokens test" =
+  let open Mina_transaction_logic.For_tests in
+  let open Zkapp_command_builder in
+  let constraint_constants =
+    Genesis_constants.Constraint_constants.for_unit_tests
+  in
+  let keypair_and_amounts = Quickcheck.random_value (Init_ledger.gen ()) in
+  let ledger_get_exn ledger pk token =
+    match
+      Ledger_inner.get_or_create ledger (Account_id.create pk token)
+      |> Or_error.ok_exn
+    with
+    | `Added, _, _ ->
+        failwith "Account did not exist"
+    | `Existed, acct, _ ->
+        acct
+  in
+  let pk =
+    let kp, _ = keypair_and_amounts.(0) in
+    Public_key.compress kp.public_key
+  in
+  let main (ledger : t) =
+    let execute_zkapp_command_transaction
+        (account_updates :
+          (Account_update.Body.Simple.t, unit, unit) Zkapp_command.Call_forest.t
+          ) : unit =
+      let _, ({ nonce; _ } : Account.t), _ =
+        Ledger_inner.get_or_create ledger
+          (Account_id.create pk Token_id.default)
+        |> Or_error.ok_exn
+      in
+      let zkapp_command =
+        mk_zkapp_command ~fee:7 ~fee_payer_pk:pk ~fee_payer_nonce:nonce
+          account_updates
+      in
+      match
+        apply_zkapp_command_unchecked ~constraint_constants
+          ~global_slot:
+            (Mina_numbers.Global_slot_since_genesis.succ
+               view.global_slot_since_genesis )
+          ~state_view:view ledger zkapp_command
+      with
+      | Ok ({ command = { status; _ }; _ }, _) -> (
+          match status with
+          | Transaction_status.Applied ->
+              ()
+          | Failed failures ->
+              let indexed_failures :
+                  (int * Transaction_status.Failure.t list) list =
+                Transaction_status.Failure.Collection.to_display failures
+              in
+              let formatted_failures =
+                List.map indexed_failures ~f:(fun (ndx, fails) ->
+                    sprintf "Index: %d  Failures: %s" ndx
+                      ( List.map fails ~f:Transaction_status.Failure.to_string
+                      |> String.concat ~sep:"," ) )
+                |> String.concat ~sep:"; "
+              in
+              failwithf "Transaction failed: %s" formatted_failures () )
+      | Error err ->
+          failwithf "Error executing transaction: %s" (Error.to_string_hum err)
+            ()
+    in
+    let token_funder, _ = keypair_and_amounts.(1) in
+    let token_funder_pk = token_funder.public_key |> Public_key.compress in
+    let token_owner = Keypair.create () in
+    let token_owner_pk = token_owner.public_key |> Public_key.compress in
+    let token_account1 = Keypair.create () in
+    let token_account2 = Keypair.create () in
+    (* patch ledger so that token funder account has Proof send permission and a
+       zkapp acount dummy verification key
+
+       allows use of Proof authorization in `create_token` zkApp, below
+    *)
+    iteri ledger ~f:(fun _n acct ->
+        if Public_key.Compressed.equal acct.public_key token_funder_pk then
+          let acct_id = Account_id.create token_funder_pk Token_id.default in
+          let loc = Option.value_exn @@ location_of_account ledger acct_id in
+          let acct_with_zkapp =
+            { acct with
+              permissions =
+                { acct.permissions with send = Permissions.Auth_required.Proof }
+            ; zkapp =
+                Some
+                  { Zkapp_account.default with
+                    verification_key =
+                      Some
+                        With_hash.
+                          { data = Side_loaded_verification_key.dummy
+                          ; hash = Zkapp_account.dummy_vk_hash ()
+                          }
+                  }
+            }
+          in
+          set ledger loc acct_with_zkapp ) ;
+    let account_creation_fee =
+      Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
+    in
+    let create_token :
+        (Account_update.Body.Simple.t, unit, unit) Zkapp_command.Call_forest.t =
+      mk_forest
+        [ mk_node
+            (mk_account_update_body
+               (Proof (Zkapp_account.dummy_vk_hash ()))
+               No token_funder Token_id.default
+               (-(4 * account_creation_fee)) )
+            []
+        ; mk_node
+            (mk_account_update_body Signature No token_owner Token_id.default
+               (3 * account_creation_fee) )
+            []
+        ]
+    in
+    let custom_token_id =
+      Account_id.derive_token_id
+        ~owner:(Account_id.create token_owner_pk Token_id.default)
+    in
+    let token_minting =
+      mk_forest
+        [ mk_node
+            (mk_account_update_body Signature No token_owner Token_id.default
+               (-account_creation_fee) )
+            [ mk_node
+                (mk_account_update_body None_given Parents_own_token
+                   token_account1 custom_token_id 100 )
+                []
+            ]
+        ]
+    in
+    let token_transfers =
+      mk_forest
+        [ mk_node
+            (mk_account_update_body Signature No token_owner Token_id.default
+               (-account_creation_fee) )
+            [ mk_node
+                (mk_account_update_body Signature Parents_own_token
+                   token_account1 custom_token_id (-30) )
+                []
+            ; mk_node
+                (mk_account_update_body None_given Parents_own_token
+                   token_account2 custom_token_id 30 )
+                []
+            ; mk_node
+                (mk_account_update_body Signature Parents_own_token
+                   token_account1 custom_token_id (-10) )
+                []
+            ; mk_node
+                (mk_account_update_body None_given Parents_own_token
+                   token_account2 custom_token_id 10 )
+                []
+            ; mk_node
+                (mk_account_update_body Signature Parents_own_token
+                   token_account2 custom_token_id (-5) )
+                []
+            ; mk_node
+                (mk_account_update_body None_given Parents_own_token
+                   token_account1 custom_token_id 5 )
+                []
+            ]
+        ]
+    in
+    let check_token_balance k balance =
+      [%test_eq: Currency.Balance.t]
+        (ledger_get_exn ledger
+           (Public_key.compress k.Keypair.public_key)
+           custom_token_id )
+          .balance
+        (Currency.Balance.of_nanomina_int_exn balance)
+    in
+    execute_zkapp_command_transaction create_token ;
+    (* Check that token_owner exists *)
+    ledger_get_exn ledger token_owner_pk Token_id.default |> ignore ;
+    execute_zkapp_command_transaction token_minting ;
+    check_token_balance token_account1 100 ;
+    execute_zkapp_command_transaction token_transfers ;
+    check_token_balance token_account1 65 ;
+    check_token_balance token_account2 35
+  in
+  Ledger_inner.with_ledger ~depth ~f:(fun ledger ->
+      Init_ledger.init
+        (module Ledger_inner)
+        [| keypair_and_amounts.(0); keypair_and_amounts.(1) |]
+        ledger ;
+      main ledger )
+
+let%test_unit "zkapp_command payment test" =
+  let open Mina_transaction_logic.For_tests in
   let module L = Ledger_inner in
+  let constraint_constants =
+    { Genesis_constants.Constraint_constants.for_unit_tests with
+      account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
+    }
+  in
   Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
       let ts1 : Signed_command.t list = List.map specs ~f:command_send in
-      let ts2 : Parties.t list =
+      let ts2 : Zkapp_command.t list =
         List.map specs ~f:(fun s ->
             let use_full_commitment =
               Quickcheck.random_value Bool.quickcheck_generator
             in
-            party_send ~use_full_commitment s)
+            account_update_send ~use_full_commitment s )
       in
       L.with_ledger ~depth ~f:(fun l1 ->
           L.with_ledger ~depth ~f:(fun l2 ->
@@ -435,17 +665,29 @@ let%test_unit "parties payment test" =
               let%bind () =
                 iter_err ts1 ~f:(fun t ->
                     apply_user_command_unchecked l1 t ~constraint_constants
-                      ~txn_global_slot)
+                      ~txn_global_slot )
               in
               let%bind () =
                 iter_err ts2 ~f:(fun t ->
-                    apply_parties_unchecked l2 t ~constraint_constants
-                      ~state_view:view)
+                    let%bind res, _ =
+                      apply_zkapp_command_unchecked l2 t ~constraint_constants
+                        ~global_slot:txn_global_slot ~state_view:view
+                    in
+                    match res.command.status with
+                    | Transaction_status.Applied ->
+                        Ok ()
+                    | Transaction_status.Failed failure ->
+                        Or_error.error_string
+                          (Yojson.Safe.pretty_to_string
+                             (Transaction_status.Failure.Collection.to_yojson
+                                failure ) ) )
               in
-              let accounts = List.concat_map ~f:Parties.accounts_accessed ts2 in
+              let accounts =
+                List.concat_map ~f:Zkapp_command.accounts_referenced ts2
+              in
               (* TODO: Hack. The nonces are inconsistent between the 2
                  versions. See the comment in
-                 [Transaction_logic.For_tests.party_send] for more info.
+                 [Mina_transaction_logic.For_tests.account_update_send] for more info.
               *)
               L.iteri l1 ~f:(fun index account ->
                   L.set_at_index_exn l1 index
@@ -454,6 +696,71 @@ let%test_unit "parties payment test" =
                         account.nonce |> Mina_numbers.Account_nonce.to_uint32
                         |> Unsigned.UInt32.(mul (of_int 2))
                         |> Mina_numbers.Account_nonce.to_uint32
-                    }) ;
-              test_eq (module L) accounts l1 l2))
-      |> Or_error.ok_exn)
+                    } ) ;
+              test_eq (module L) accounts l1 l2 ) )
+      |> Or_error.ok_exn )
+
+let%test_unit "user_command application on masked ledger" =
+  let open Mina_transaction_logic.For_tests in
+  let module L = Ledger_inner in
+  let constraint_constants =
+    { Genesis_constants.Constraint_constants.for_unit_tests with
+      account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
+    }
+  in
+  Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+      let cmds = List.map specs ~f:command_send in
+      L.with_ledger ~depth ~f:(fun l ->
+          Init_ledger.init (module L) init_ledger l ;
+          let init_merkle_root = L.merkle_root l in
+          let m =
+            Maskable.register_mask
+              (Any_ledger.cast (module L) l)
+              (Mask.create ~depth:(L.depth l) ())
+          in
+          let () =
+            iter_err cmds
+              ~f:
+                (apply_user_command_unchecked ~constraint_constants
+                   ~txn_global_slot l )
+            |> Or_error.ok_exn
+          in
+          assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;
+          (*Parent updates reflected in child masks*)
+          assert (Ledger_hash.equal (L.merkle_root l) (L.merkle_root m)) ) )
+
+let%test_unit "zkapp_command application on masked ledger" =
+  let open Mina_transaction_logic.For_tests in
+  let module L = Ledger_inner in
+  let constraint_constants =
+    { Genesis_constants.Constraint_constants.for_unit_tests with
+      account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
+    }
+  in
+  Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+      let cmds =
+        List.map specs ~f:(fun spec ->
+            let use_full_commitment =
+              Quickcheck.random_value Bool.quickcheck_generator
+            in
+            account_update_send ~use_full_commitment ~double_sender_nonce:false
+              spec )
+      in
+      L.with_ledger ~depth ~f:(fun l ->
+          Init_ledger.init (module L) init_ledger l ;
+          let init_merkle_root = L.merkle_root l in
+          let m =
+            Maskable.register_mask
+              (Any_ledger.cast (module L) l)
+              (Mask.create ~depth:(L.depth l) ())
+          in
+          let () =
+            iter_err cmds
+              ~f:
+                (apply_zkapp_command_unchecked ~constraint_constants
+                   ~global_slot:txn_global_slot ~state_view:view l )
+            |> Or_error.ok_exn
+          in
+          assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;
+          (*Parent updates reflected in child masks*)
+          assert (Ledger_hash.equal (L.merkle_root l) (L.merkle_root m)) ) )

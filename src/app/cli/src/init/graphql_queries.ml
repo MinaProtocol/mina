@@ -1,17 +1,18 @@
 (* exclude from bisect_ppx to avoid type error on GraphQL modules *)
 [@@@coverage exclude_file]
 
-module Decoders = Graphql_lib.Decoders
+module Scalars = Graphql_lib.Scalars
+module Encoders = Mina_graphql.Types.Input
 
 module Get_tracked_accounts =
 [%graphql
 {|
-query {
+query @encoders(module: "Encoders"){
   trackedAccounts {
-    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+    public_key: publicKey
     locked
     balance {
-      total @bsDecoder(fn: "Decoders.balance")
+      total
     }
   }
 }
@@ -20,10 +21,10 @@ query {
 module Get_tracked_account =
 [%graphql
 {|
-query ($public_key: PublicKey, $token: UInt64) {
+query ($public_key: PublicKey!, $token: TokenId) @encoders(module: "Encoders"){
   account(publicKey: $public_key, token: $token) {
     balance {
-      total @bsDecoder(fn: "Decoders.balance")
+      total
     }
   }
 }
@@ -32,9 +33,9 @@ query ($public_key: PublicKey, $token: UInt64) {
 module Get_all_accounts =
 [%graphql
 {|
-query ($public_key: PublicKey) {
+query ($public_key: PublicKey!) @encoders(module: "Encoders"){
   accounts(publicKey: $public_key) {
-    token @bsDecoder(fn: "Decoders.token")
+    tokenId
   }
 }
 |}]
@@ -42,9 +43,9 @@ query ($public_key: PublicKey) {
 module Create_account =
 [%graphql
 {|
-mutation ($password: String) {
+mutation ($password: String!) @encoders(module: "Encoders"){
   createAccount(input: {password: $password}) {
-    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+    account: account { public_key : publicKey }
   }
 }
 |}]
@@ -52,9 +53,9 @@ mutation ($password: String) {
 module Create_hd_account =
 [%graphql
 {|
-mutation ($hd_index: UInt32) {
+mutation ($hd_index: UInt32!) @encoders(module: "Encoders"){
   createHDAccount(input: {index: $hd_index}) {
-    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+    account : account { public_key: publicKey }
   }
 }
 |}]
@@ -62,9 +63,9 @@ mutation ($hd_index: UInt32) {
 module Unlock_account =
 [%graphql
 {|
-mutation ($password: String, $public_key: PublicKey) {
+mutation ($password: String!, $public_key: PublicKey!) @encoders(module: "Encoders"){
   unlockAccount(input: {password: $password, publicKey: $public_key }) {
-    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+    account: account { public_key: publicKey }
   }
 }
 |}]
@@ -72,9 +73,9 @@ mutation ($password: String, $public_key: PublicKey) {
 module Lock_account =
 [%graphql
 {|
-mutation ($public_key: PublicKey) {
+mutation ($public_key: PublicKey!) @encoders(module: "Encoders"){
   lockAccount(input: {publicKey: $public_key }) {
-    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+    public_key: publicKey
   }
 }
 |}]
@@ -90,8 +91,8 @@ module Snark_pool =
 {|
 query snarkPool {
   snarkPool {
-  fee @bsDecoder(fn: "Decoders.uint64")
-  prover @bsDecoder(fn: "Decoders.public_key")
+  fee
+  prover
   work_ids: workIds
 }
 }
@@ -103,13 +104,23 @@ module Pending_snark_work =
 query pendingSnarkWork {
   pendingSnarkWork {
     workBundle {
-      source_ledger_hash: sourceLedgerHash
-      target_ledger_hash: targetLedgerHash
+      source_first_pass_ledger_hash: sourceFirstPassLedgerHash
+      target_first_pass_ledger_hash: targetFirstPassLedgerHash
+      source_second_pass_ledger_hash: sourceSecondPassLedgerHash
+      target_second_pass_ledger_hash: targetSecondPassLedgerHash
       fee_excess: feeExcess {
-        sign
-        fee_magnitude: feeMagnitude @bsDecoder(fn: "Decoders.uint64")
+        feeTokenLeft
+        feeExcessLeft {
+          sign
+          feeMagnitude
+        }
+        feeTokenRight
+        feeExcessRight {
+          sign
+          feeMagnitude
+        }
       }
-      supply_increase: supplyIncrease @bsDecoder(fn: "Decoders.uint64")
+      supply_increase : supplyIncrease
       work_id: workId
       }
     }
@@ -119,10 +130,10 @@ query pendingSnarkWork {
 module Set_coinbase_receiver =
 [%graphql
 {|
-mutation ($public_key: PublicKey) {
+mutation ($public_key: PublicKey) @encoders(module: "Encoders"){
   setCoinbaseReceiver(input : {publicKey: $public_key}) {
-    lastCoinbaseReceiver @bsDecoder(fn: "Decoders.optional_public_key")
-    currentCoinbaseReceiver @bsDecoder(fn: "Decoders.optional_public_key")
+    lastCoinbaseReceiver
+    currentCoinbaseReceiver
     }
   }
 |}]
@@ -130,9 +141,9 @@ mutation ($public_key: PublicKey) {
 module Set_snark_worker =
 [%graphql
 {|
-mutation ($public_key: PublicKey) {
+mutation ($public_key: PublicKey) @encoders(module: "Encoders"){
   setSnarkWorker (input : {publicKey: $public_key}) {
-      lastSnarkWorker @bsDecoder(fn: "Decoders.optional_public_key")
+      lastSnarkWorker
     }
   }
 |}]
@@ -140,9 +151,9 @@ mutation ($public_key: PublicKey) {
 module Set_snark_work_fee =
 [%graphql
 {|
-mutation ($fee: UInt64!) {
+mutation ($fee: UInt64!) @encoders(module: "Encoders"){
   setSnarkWorkFee(input: {fee: $fee}) {
-    lastFee @bsDecoder(fn: "Decoders.uint64")
+    lastFee
     }
 }
 |}]
@@ -150,14 +161,8 @@ mutation ($fee: UInt64!) {
 module Send_payment =
 [%graphql
 {|
-mutation ($sender: PublicKey!,
-          $receiver: PublicKey!,
-          $amount: UInt64!,
-          $token: UInt64,                                                                                                                                                                                                                              $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String) {
-  sendPayment(input:
-    {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+mutation ($input: SendPaymentInput!) @encoders(module: "Encoders"){
+  sendPayment(input: $input){
     payment {
       id
     }
@@ -172,7 +177,7 @@ mutation ($sender: PublicKey!,
           $receiver: PublicKey!,
           $fee: UInt64!,
           $nonce: UInt32,
-          $memo: String) {
+          $memo: String) @encoders(module: "Encoders"){
   sendDelegation(input:
     {from: $sender, to: $receiver, fee: $fee, nonce: $nonce, memo: $memo}) {
     delegation {
@@ -182,65 +187,10 @@ mutation ($sender: PublicKey!,
 }
 |}]
 
-module Send_create_token =
-[%graphql
-{|
-mutation ($sender: PublicKey,
-          $receiver: PublicKey!,
-          $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String) {
-  createToken(input:
-    {feePayer: $sender, tokenOwner: $receiver, fee: $fee, nonce: $nonce, memo: $memo}) {
-    createNewToken {
-      id
-    }
-  }
-}
-|}]
-
-module Send_create_token_account =
-[%graphql
-{|
-mutation ($sender: PublicKey,
-          $tokenOwner: PublicKey!,
-          $receiver: PublicKey!,
-          $token: TokenId!,
-          $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String) {
-  createTokenAccount(input:
-    {feePayer: $sender, tokenOwner: $tokenOwner, receiver: $receiver, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
-    createNewTokenAccount {
-      id
-    }
-  }
-}
-|}]
-
-module Send_mint_tokens =
-[%graphql
-{|
-mutation ($sender: PublicKey!,
-          $receiver: PublicKey,
-          $token: TokenId!,
-          $amount: UInt64!,
-          $fee: UInt64!,
-          $nonce: UInt32,
-          $memo: String) {
-  mintTokens(input:
-    {tokenOwner: $sender, receiver: $receiver, token: $token, amount: $amount, fee: $fee, nonce: $nonce, memo: $memo}) {
-    mintTokens {
-      id
-    }
-  }
-}
-|}]
-
 module Export_logs =
 [%graphql
 {|
-mutation ($basename: String) {
+mutation ($basename: String) @encoders(module: "Encoders"){
   exportLogs(basename: $basename) {
     exportLogs {
       tarfile
@@ -249,18 +199,10 @@ mutation ($basename: String) {
 }
 |}]
 
-module Get_token_owner =
-[%graphql
-{|
-query tokenOwner($token: TokenId!) {
-  tokenOwner(token: $token)
-}
-|}]
-
 module Get_inferred_nonce =
 [%graphql
 {|
-query nonce($public_key: PublicKey) {
+query nonce($public_key: PublicKey!) @encoders(module: "Encoders"){
   account(publicKey: $public_key) {
     inferredNonce
   }
@@ -270,54 +212,21 @@ query nonce($public_key: PublicKey) {
 module Pooled_user_commands =
 [%graphql
 {|
-query user_commands($public_key: PublicKey) {
+query user_commands($public_key: PublicKey) @encoders(module: "Encoders"){
   pooledUserCommands(publicKey: $public_key) @bsRecord {
     id
-    isDelegation
+    kind
     nonce
-    from @bsDecoder(fn: "Decoders.public_key")
-    to_: to @bsDecoder(fn: "Decoders.public_key")
-    amount @bsDecoder(fn: "Decoders.amount")
-    fee @bsDecoder(fn: "Decoders.fee")
-    memo @bsDecoder(fn: "Mina_base.Signed_command_memo.of_base58_check_exn")
+    feePayer { public_key: publicKey }
+    receiver { public_key: publicKey }
+    amount
+    fee
+    memo
   }
 }
 |}]
 
-module Pooled_snapp_commands =
-[%graphql
-{|
-query snapp_commands($public_key: PublicKey) {
-  pooledSnappCommands(publicKey: $public_key) {
-    id
-    hash
-    nonce
-    feePayer { publicKey @bsDecoder(fn: "Decoders.public_key")
-               nonce @bsDecoder(fn: "Decoders.optional_nonce_from_string")
-               balance { total @bsDecoder(fn: "Decoders.balance") }
-               delegate @bsDecoder(fn: "Decoders.optional_account_id")
-               receiptChainHash @bsDecoder(fn: "Decoders.optional_receipt_chain_hash_from_string")
-               snappUri
-               tokenSymbol
-               timing { initialMinimumBalance @bsDecoder(fn: "Decoders.optional_balance")
-                        cliffTime @bsDecoder(fn: "Decoders.optional_global_slot")
-                        vestingPeriod @bsDecoder(fn: "Decoders.optional_global_slot")
-                        vestingIncrement @bsDecoder(fn: "Decoders.optional_amount")
-                      }
-              }
-    fee @bsDecoder(fn: "Decoders.fee")
-    feeToken @bsDecoder(fn: "Decoders.token")
-  }
-}
-|}]
-
-module Next_available_token =
-[%graphql
-{|
-query next_available_token {
-  nextAvailableToken @bsDecoder(fn: "Decoders.token")
-}
-|}]
+module Pooled_zkapp_commands = Generated_graphql_queries.Pooled_zkapp_commands
 
 module Time_offset = [%graphql {|
 query time_offset {
@@ -340,7 +249,7 @@ query get_peers {
 module Add_peers =
 [%graphql
 {|
-mutation ($peers: [NetworkPeer!]!, $seed: Boolean) {
+mutation ($peers: [NetworkPeer!]!, $seed: Boolean) @encoders(module: "Encoders"){
   addPeers(peers: $peers, seed: $seed) {
     host
     libp2pPort
@@ -352,7 +261,7 @@ mutation ($peers: [NetworkPeer!]!, $seed: Boolean) {
 module Archive_precomputed_block =
 [%graphql
 {|
-mutation ($block: PrecomputedBlock!) {
+mutation ($block: PrecomputedBlock!) @encoders(module: "Encoders"){
   archivePrecomputedBlock(block: $block) {
       applied
   }
@@ -362,7 +271,7 @@ mutation ($block: PrecomputedBlock!) {
 module Archive_extensional_block =
 [%graphql
 {|
-mutation ($block: ExtensionalBlock!) {
+mutation ($block: ExtensionalBlock!) @encoders(module: "Encoders"){
   archiveExtensionalBlock(block: $block) {
       applied
   }
@@ -372,7 +281,7 @@ mutation ($block: ExtensionalBlock!) {
 module Send_rosetta_transaction =
 [%graphql
 {|
-mutation ($transaction: RosettaTransaction!) {
+mutation ($transaction: RosettaTransaction!) @encoders(module: "Encoders"){
   sendRosettaTransaction(input: $transaction) {
     userCommand {
       id
@@ -384,9 +293,9 @@ mutation ($transaction: RosettaTransaction!) {
 module Import_account =
 [%graphql
 {|
-mutation ($path: String!, $password: String!) {
+mutation ($path: String!, $password: String!) @encoders(module: "Encoders"){
   importAccount (path: $path, password: $password) {
-    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+    public_key: publicKey
     already_imported: alreadyImported
     success
   }
@@ -396,5 +305,11 @@ mutation ($path: String!, $password: String!) {
 module Runtime_config = [%graphql {|
 query {
   runtimeConfig
+}
+|}]
+
+module Thread_graph = [%graphql {|
+query {
+  threadGraph
 }
 |}]
