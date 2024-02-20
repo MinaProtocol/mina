@@ -50,7 +50,7 @@ module Mainnet = struct
     Caqti_request.find_opt Caqti_type.string Caqti_type.int
       {sql| 
           SELECT global_slot_since_genesis FROM blocks 
-          WHERE state_hash = ? and chain_status <> 'orphaned'
+          WHERE state_hash = ?
           LIMIT 1
           |sql}
 
@@ -101,7 +101,7 @@ module Mainnet = struct
                   inner join blocks on blocks.id = blocks_internal_commands.block_id 
                   inner join internal_commands on internal_commands.id = blocks_internal_commands.internal_command_id 
                   where global_slot_since_genesis < ?
-                  and chain_status <> 'orphaned' 
+                  and chain_status = 'canonical' 
           |sql}
 
   let user_commands_hashes_query =
@@ -110,7 +110,7 @@ module Mainnet = struct
                   inner join blocks on blocks.id = blocks_user_commands.block_id 
                   inner join user_commands on user_commands.id = blocks_user_commands.user_command_id 
                   where global_slot_since_genesis < ? 
-                  and chain_status <> 'orphaned' 
+                  and chain_status = 'canonical' 
           |sql}
 
   let user_commands_hashes (module Conn : CONNECTION) end_global_slot =
@@ -226,23 +226,65 @@ module Berkeley = struct
   let find_block_by_ledger_hash (module Conn : CONNECTION) hash =
     Conn.find_opt find_block_by_ledger_hash_query hash
 
-  let count_pending_blocks_query =
-    Caqti_request.find Caqti_type.string Caqti_type.int
-      {sql| select count(*) from blocks 
-            where chain_status = 'pending'
+  let get_all_canonical_blocks_till_height_query =
+    Caqti_request.find Caqti_type.int Caqti_type.int
+      {sql|
+        WITH RECURSIVE chain AS 
+        (  
+          SELECT id, parent_id, chain_status FROM blocks 
+          WHERE height = ? AND chain_status = 'canonical' 
+          
+          UNION ALL 
+
+          SELECT b.id, b.parent_id, b.chain_status FROM blocks b
+          INNER JOIN chain ON b.id = chain.parent_id AND (chain.id <> 0 OR b.id = 0)
+        ) SELECT count(*) FROM chain where chain_status = 'canonical';
       |sql}
 
-  let count_orphaned_blocks_query =
-    Caqti_request.find Caqti_type.string Caqti_type.int
-      {sql| select count(*) from blocks 
-            where chain_status = 'orphaned'
+  let get_all_canonical_blocks_till_height (module Conn : CONNECTION) height =
+    Conn.find get_all_canonical_blocks_till_height_query height
+
+  let get_all_blocks_till_height_query =
+    Caqti_request.find Caqti_type.int Caqti_type.int
+      {sql|
+          SELECT count(*) FROM blocks WHERE height <= ?;
+        |sql}
+
+  let get_all_blocks_till_height (module Conn : CONNECTION) height =
+    Conn.find get_all_blocks_till_height_query height
+
+  let get_account_accessed_count_query =
+    Caqti_request.find Caqti_type.unit Caqti_type.int
+      {sql| SELECT count(*) FROM accounts_accessed; |sql}
+
+  let count_account_accessed (module Conn : CONNECTION) =
+    Conn.find get_account_accessed_count_query ()
+
+  let get_account_id_accessed_in_commands_query =
+    Caqti_request.find Caqti_type.unit Caqti_type.int
+      {sql| 
+        select count(distinct ids.account_identifier_id) FROM 
+
+        ( 
+          select distinct account_identifier_id from accounts_accessed where account_identifier_id in 
+                ( select a.id from account_identifiers a inner join user_commands 
+                on public_key_id = fee_payer_id 
+                OR public_key_id = receiver_id 
+                OR public_key_id = source_id
+              )
+              
+              UNION ALL 
+        
+          select distinct account_identifier_id from accounts_accessed where account_identifier_id in 
+                      (  select a.id from account_identifiers a inner join internal_commands 
+                        on public_key_id = receiver_id
+                      )
+        ) as ids
+     
       |sql}
 
-  let count_pending_blocks (module Conn : CONNECTION) =
-    Conn.find count_pending_blocks_query "pending"
-
-  let count_orphaned_blocks (module Conn : CONNECTION) =
-    Conn.find count_orphaned_blocks_query "orphaned"
+  let get_account_id_accessed_in_commands (module Conn : CONNECTION) =
+    Conn.find get_account_id_accessed_in_commands_query ()
 
   module Block_info = struct
     type t =

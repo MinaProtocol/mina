@@ -4,20 +4,64 @@ open Core_kernel
 open Async
 open Yojson.Basic.Util
 
-module ReplayerOutput = struct
-  type t =
-    { target_epoch_ledgers_state_hash : string
-    ; target_fork_state_hash : string
-    ; target_genesis_ledger : Runtime_config.Ledger.t
-    ; target_epoch_data : Runtime_config.Epoch_data.t option
-    }
-  [@@deriving yojson]
+module Check = struct
+  type t = Ok | Error of string list | Skipped of string
 
-  let of_json_file_exn file =
-    Yojson.Safe.from_file file |> of_yojson |> Result.ok_or_failwith
+  let ok = Ok
+
+  let skipped reason = Skipped reason
+
+  let err error = Error [ error ]
+
+  let errors errors = Error errors
+
+  let combine checks =
+    List.fold checks ~init:ok ~f:(fun acc item ->
+        match (acc, item) with
+        | Error e1, Error e2 ->
+            errors (e1 @ e2)
+        | Error e, _ ->
+            errors e
+        | _, Error e ->
+            errors e
+        | Skipped reason1, Skipped reason2 ->
+            Skipped (String.concat ~sep:" and " [ reason1; reason2 ])
+        | _, _ ->
+            Ok )
 end
 
+let test_count = 12
+
 let exit_code = ref 0
+
+module Test = struct
+  type t = { check : Check.t; name : string }
+
+  let of_check check ~name ~idx =
+    { check; name = sprintf "[%d/%d] %s check " idx test_count name }
+
+  let print_errors error_messages =
+    if List.length error_messages > 10 then (
+      Async.printf " Details (truncated to only 10 errors out of %d ): \n"
+        (List.length error_messages) ;
+      List.iter (List.take error_messages 10) ~f:(fun error_message ->
+          Async.printf " - %s\n" error_message ) )
+    else (
+      printf " - Details : \n" ;
+      List.iter error_messages ~f:(fun error_message ->
+          Async.printf "\t%s\n" error_message ) )
+
+  let eval t =
+    match t.check with
+    | Ok ->
+        Async.printf "%s ... ✅ \n" t.name
+    | Error error_messages ->
+        exit_code := !exit_code + 1 ;
+        Async.printf "%s ... ❌ \n" t.name ;
+        print_errors error_messages
+    | Skipped reason ->
+        Async.printf "%s skipping check due to '%s' ... ⚠️ \n" t.name reason
+end
 
 let get_migration_end_slot_for_state_hash ~query_mainnet_db state_hash =
   let open Deferred.Let_syntax in
@@ -28,41 +72,54 @@ let get_migration_end_slot_for_state_hash ~query_mainnet_db state_hash =
   Deferred.return
     (Option.value_exn maybe_slot
        ~message:
-         (Printf.sprintf "Cannot find slot has for state hash: %s" state_hash) )
+         (Printf.sprintf "Cannot find slot for state hash: %s" state_hash) )
 
-let assert_migrated_db_contains_only_canonical_blocks query_migrated_db =
-  let%bind pending_blocks =
-    query_migrated_db ~f:(fun db -> Sql.Berkeley.count_orphaned_blocks db)
+let assert_migrated_db_contains_only_canonical_blocks query_migrated_db height =
+  let%bind canonical_blocks_count =
+    query_migrated_db ~f:(fun db ->
+        Sql.Berkeley.get_all_canonical_blocks_till_height db height )
   in
-  let%bind orphaned_blocks =
-    query_migrated_db ~f:(fun db -> Sql.Berkeley.count_pending_blocks db)
+  let%bind all_blocks_till_height =
+    query_migrated_db ~f:(fun db ->
+        Sql.Berkeley.get_all_blocks_till_height db height )
   in
-  match orphaned_blocks + pending_blocks with
-  | 0 ->
-      Deferred.return None
-  | _ ->
-      Deferred.return
-        (Some
-           (sprintf
-              "Expected to have at only canonical block while having %d \
-               orphaned and %d pending"
-              orphaned_blocks pending_blocks ) )
+  if Int.equal all_blocks_till_height canonical_blocks_count then
+    Deferred.return Check.ok
+  else
+    Deferred.return
+      (Check.err
+         (sprintf "Expected to have only %d canonical block while having %d"
+            canonical_blocks_count all_blocks_till_height ) )
 
-let printout_errors_or_success error_messages ~check_name =
-  let print_errors error_messages =
-    if List.length error_messages > 10 then (
-      Async.printf " - Details (truncated to only 10 errors): " ;
-      List.iter (List.take error_messages 10) ~f:(fun error_message ->
-          printf "\t%s\n" error_message ) )
-    else printf " - Details : " ;
-    List.iter error_messages ~f:(fun error_message ->
-        printf "\t%s\n" error_message )
+let assert_migrated_db_has_account_accessed query_migrated_db =
+  let%bind account_accessed_count =
+    query_migrated_db ~f:(fun db -> Sql.Berkeley.count_account_accessed db)
   in
-  if List.length error_messages > 1 then (
-    exit_code := !exit_code + 1 ;
-    printf "%s check ... ❌ \n" check_name ;
-    print_errors error_messages )
-  else printf "%s check ... ✅ \n" check_name
+  if Int.( > ) account_accessed_count 0 then Deferred.return Check.ok
+  else
+    Deferred.return
+      (Check.err
+         (sprintf
+            "Expected to have at least one entry in account accessed table" ) )
+
+let assert_all_user_and_interal_commands_account_ids_appear_in_accounts_accessed
+    query_migrated_db =
+  let%bind account_accessed_in_commands_count =
+    query_migrated_db ~f:(fun db ->
+        Sql.Berkeley.get_account_id_accessed_in_commands db )
+  in
+  let%bind account_accessed =
+    query_migrated_db ~f:(fun db -> Sql.Berkeley.count_account_accessed db)
+  in
+  if Int.equal account_accessed account_accessed_in_commands_count then
+    Deferred.return Check.ok
+  else
+    Deferred.return
+      (Check.err
+         (sprintf
+            "Unmigrated accounts in user or internal commands found. Expected: \
+             '%d' unique accounts based on commands tables but got '%d'"
+            account_accessed account_accessed_in_commands_count ) )
 
 let compare_db_content ~mainnet_archive_uri ~migrated_archive_uri
     ~fork_state_hash () =
@@ -82,28 +139,49 @@ let compare_db_content ~mainnet_archive_uri ~migrated_archive_uri
 
   match (mainnet_pool, migrated_pool) with
   | Error _e, _ | _, Error _e ->
-      failwith " Failed to create Caqti pools for Postgresql ❌. Exiting \n"
+      failwithf "Connection failed to orignal and migrated schema" ()
   | Ok mainnet_pool, Ok migrated_pool ->
-      printf "[1/9] Connection to orignal and migrated schema succesful ✅ \n" ;
+      Test.of_check Check.ok ~name:"Connection to orignal and migrated schema"
+        ~idx:1
+      |> Test.eval ;
 
       let query_mainnet_db = Mina_caqti.query mainnet_pool in
       let query_migrated_db = Mina_caqti.query migrated_pool in
+
       let%bind end_global_slot =
         get_migration_end_slot_for_state_hash ~query_mainnet_db fork_state_hash
       in
+
+      let%bind fork_block_height =
+        query_migrated_db ~f:(fun db ->
+            Sql.Mainnet.blockchain_length_for_state_hash db fork_state_hash )
+      in
+      let fork_block_height =
+        match fork_block_height with
+        | Some height ->
+            height
+        | None ->
+            failwith
+              "Migrated data is corrupted cannot get fork block height ❌. \
+               Exiting \n"
+      in
       let compare_hashes ~fetch_data_sql ~find_element_sql ~name =
         let%bind expected_hashes = query_mainnet_db ~f:fetch_data_sql in
-        Deferred.List.filter_map expected_hashes ~f:(fun hash ->
-            let%bind element_id = find_element_sql hash in
-            if element_id |> Option.is_none then
-              return
-                (Some
-                   (sprintf "Cannot find %s hash ('%s') in migrated database"
-                      name hash ) )
-            else return None )
+        let%bind checks =
+          Deferred.List.map expected_hashes ~f:(fun hash ->
+              let%bind element_id = find_element_sql hash in
+              if element_id |> Option.is_none then
+                return
+                  (Check.err
+                     (sprintf "Cannot find %s hash ('%s') in migrated database"
+                        name hash ) )
+              else return Check.ok )
+        in
+
+        Deferred.return (Check.combine checks)
       in
 
-      let%bind error_messages =
+      let%bind check =
         compare_hashes
           ~fetch_data_sql:(fun db ->
             Sql.Mainnet.user_commands_hashes db end_global_slot )
@@ -112,10 +190,9 @@ let compare_db_content ~mainnet_archive_uri ~migrated_archive_uri
                 Sql.Berkeley.find_user_command_id_by_hash db hash ) )
           ~name:"user_commands"
       in
-      printout_errors_or_success error_messages
-        ~check_name:"[2/9] No missing user commands" ;
+      Test.of_check check ~name:"No missing user commands" ~idx:2 |> Test.eval ;
 
-      let%bind error_messages =
+      let%bind check =
         compare_hashes
           ~fetch_data_sql:(fun db ->
             Sql.Mainnet.internal_commands_hashes db end_global_slot )
@@ -124,15 +201,23 @@ let compare_db_content ~mainnet_archive_uri ~migrated_archive_uri
                 Sql.Berkeley.find_internal_command_id_by_hash db hash ) )
           ~name:"internal_commands"
       in
-      printout_errors_or_success error_messages
-        ~check_name:"[3/9] No missing internal commands" ;
-      let%bind error_message =
+      Test.of_check check ~name:"No missing internal commands" ~idx:3
+      |> Test.eval ;
+
+      let%bind check =
         assert_migrated_db_contains_only_canonical_blocks query_migrated_db
+          fork_block_height
       in
-      printout_errors_or_success
-        (List.filter_map [ error_message ] ~f:(fun x -> x))
-        ~check_name:"[4/9] Only canonical blocks in migrated archive" ;
-      let%bind error_messages =
+      Test.of_check check ~name:"Only canonical blocks in migrated archive"
+        ~idx:4
+      |> Test.eval ;
+
+      let%bind check =
+        assert_migrated_db_has_account_accessed query_migrated_db
+      in
+      Test.of_check check ~name:"Account accessed sanity" ~idx:5 |> Test.eval ;
+
+      let%bind check =
         compare_hashes
           ~fetch_data_sql:(fun db ->
             Sql.Mainnet.block_hashes_only_canonical db end_global_slot )
@@ -141,9 +226,21 @@ let compare_db_content ~mainnet_archive_uri ~migrated_archive_uri
                 Sql.Berkeley.find_block_by_state_hash db hash ) )
           ~name:"block_state_hashes"
       in
-      printout_errors_or_success error_messages
-        ~check_name:"[5/9] No missing block state hashes " ;
-      let%bind _ =
+      Test.of_check check ~name:"No missing Blocks by state hashes" ~idx:6
+      |> Test.eval ;
+
+      let%bind check =
+        assert_all_user_and_interal_commands_account_ids_appear_in_accounts_accessed
+          query_migrated_db
+      in
+      Test.of_check check
+        ~name:
+          "All user and internal commands accounts appears in account accessed \
+           table"
+        ~idx:7
+      |> Test.eval ;
+
+      let%bind check =
         compare_hashes
           ~fetch_data_sql:(fun db ->
             Sql.Mainnet.block_parent_hashes_no_orphaned db end_global_slot )
@@ -152,9 +249,10 @@ let compare_db_content ~mainnet_archive_uri ~migrated_archive_uri
                 Sql.Berkeley.find_block_by_parent_hash db hash ) )
           ~name:"orphaned block"
       in
-      printout_errors_or_success error_messages
-        ~check_name:"[6/9] No orphaned blocks in migrated schema" ;
-      let%bind _ =
+      Test.of_check check ~name:"No orphaned blocks in migrated schema" ~idx:8
+      |> Test.eval ;
+
+      let%bind check =
         compare_hashes
           ~fetch_data_sql:(fun db ->
             Sql.Mainnet.ledger_hashes_no_orphaned db end_global_slot )
@@ -163,8 +261,11 @@ let compare_db_content ~mainnet_archive_uri ~migrated_archive_uri
                 Sql.Berkeley.find_block_by_ledger_hash db hash ) )
           ~name:"ledger_hashes"
       in
-      printout_errors_or_success error_messages
-        ~check_name:"[7/9] No orphaned ledger hashes in migrated schema" ;
+
+      Test.of_check check ~name:"No orphaned ledger hashes in migrated schema"
+        ~idx:9
+      |> Test.eval ;
+
       let%bind expected_hashes =
         query_mainnet_db ~f:(fun db ->
             Sql.Common.block_state_hashes db end_global_slot )
@@ -173,23 +274,22 @@ let compare_db_content ~mainnet_archive_uri ~migrated_archive_uri
         query_migrated_db ~f:(fun db ->
             Sql.Common.block_state_hashes db end_global_slot )
       in
-      let error_messages =
-        List.filter_map expected_hashes
-          ~f:(fun (expected_child, expected_parent) ->
-            if
-              List.exists actual_hashes ~f:(fun (actual_child, actual_parent) ->
-                  String.equal expected_child actual_child
-                  && String.equal expected_parent actual_parent )
-            then None
-            else
-              Some
-                (sprintf
-                   "Relation between blocks is skewed. Cannot find original \
-                    subchain '%s' -> '%s' in migrated database"
-                   expected_child expected_parent ) )
-      in
-      printout_errors_or_success error_messages
-        ~check_name:"[8/9] Block relation parent -> child preserved" ;
+
+      List.map expected_hashes ~f:(fun (expected_child, expected_parent) ->
+          if
+            List.exists actual_hashes ~f:(fun (actual_child, actual_parent) ->
+                String.equal expected_child actual_child
+                && String.equal expected_parent actual_parent )
+          then Check.ok
+          else
+            Check.err
+              (sprintf
+                 "Relation between blocks is skewed. Cannot find original \
+                  subchain '%s' -> '%s' in migrated database"
+                 expected_child expected_parent ) )
+      |> Check.combine
+      |> Test.of_check ~name:"Block relation parent -> child preserved" ~idx:10
+      |> Test.eval ;
       Deferred.unit
 
 let get_forked_blockchain uri fork_point =
@@ -209,148 +309,177 @@ let check_forked_chain ~migrated_archive_uri ~fork_state_hash =
 
   match forked_blockchain with
   | [] ->
-      Async.printf
-        "[9/9] Fork state hash does not exist. Skipping check ... ⚠️ \n" ;
-      Deferred.unit
+      Deferred.return (Check.skipped "Forked state hash does not exist")
   | [ _fork_point ] ->
-      Async.printf "[9/9] Forked blockchain is empty. Skipping check ... ⚠️ \n" ;
-      Deferred.unit
+      Deferred.return (Check.skipped "Forked blockchain is empty")
   | fork_point :: fork_chain ->
-      List.mapi fork_chain ~f:(fun idx block ->
-          let idx_64 = Int64.of_int idx in
-          let protocol_version_check =
-            if Int.( <> ) block.protocol_version_id 2 then
-              Some
-                (sprintf "block with id (%d) has unexpected protocol version"
-                   block.id )
-            else None
-          in
-          let global_slot_since_hardfork_check =
-            if Int64.( = ) block.global_slot_since_hard_fork idx_64 then
-              Some
-                (sprintf
-                   "block with id (%d) has unexpected \
-                    global_slot_since_hard_fork"
-                   block.id )
-            else None
-          in
-          let global_slot_since_genesis_check =
-            if
-              Int64.( > ) block.global_slot_since_genesis
-                (Int64.( + ) fork_point.global_slot_since_genesis
-                   (Int64.( + ) idx_64 Int64.one) )
-            then
-              Some
-                (sprintf
-                   "block with id (%d) has unexpected global_slot_since_genesis"
-                   block.id )
-            else None
-          in
-          let block_height_check =
-            if Int.( > ) block.height (fork_point.height + idx + 1) then
-              Some
-                (sprintf
-                   "block with id (%d) has unexpected global_slot_since_genesis"
-                   block.id )
-            else None
-          in
+      Deferred.return
+        ( List.mapi fork_chain ~f:(fun idx block ->
+              let idx_64 = Int64.of_int idx in
+              let protocol_version_check =
+                if Int.( <> ) block.protocol_version_id 2 then
+                  Check.err
+                    (sprintf
+                       "block with id (%d) has unexpected protocol version"
+                       block.id )
+                else Check.ok
+              in
+              let global_slot_since_hardfork_check =
+                if Int64.( = ) block.global_slot_since_hard_fork idx_64 then
+                  Check.err
+                    (sprintf
+                       "block with id (%d) has unexpected \
+                        global_slot_since_hard_fork"
+                       block.id )
+                else Check.ok
+              in
+              let global_slot_since_genesis_check =
+                if
+                  Int64.( > ) block.global_slot_since_genesis
+                    (Int64.( + ) fork_point.global_slot_since_genesis
+                       (Int64.( + ) idx_64 Int64.one) )
+                then
+                  Check.err
+                    (sprintf
+                       "block with id (%d) has unexpected \
+                        global_slot_since_genesis"
+                       block.id )
+                else Check.ok
+              in
+              let block_height_check =
+                if Int.( > ) block.height (fork_point.height + idx + 1) then
+                  Check.err
+                    (sprintf
+                       "block with id (%d) has unexpected \
+                        global_slot_since_genesis"
+                       block.id )
+                else Check.ok
+              in
 
-          List.filter_map
-            [ protocol_version_check
-            ; global_slot_since_genesis_check
-            ; global_slot_since_hardfork_check
-            ; block_height_check
-            ] ~f:(fun check -> check) )
-      |> List.join
-      |> printout_errors_or_success ~check_name:"[2/9] Consistency of new fork" ;
-      Deferred.unit
+              Check.combine
+                [ protocol_version_check
+                ; global_slot_since_genesis_check
+                ; global_slot_since_hardfork_check
+                ; block_height_check
+                ] )
+        |> Check.combine )
 
-  let compare_replayer_outputs expected actual ~compare_receipt_chain_hashes =
-    let expected_output = ReplayerOutput.of_json_file_exn expected in
-    let actual_output = ReplayerOutput.of_json_file_exn actual in
+let compare_migrated_replayer_output ~migrated_replayer_output ~fork_config_file
+    =
+  let compare_script_download_uri =
+    "https://raw.githubusercontent.com/MinaProtocol/mina/berkeley/scripts/compare-replayer-and-fork-config.sh"
+  in
+  let%bind tmpd = Async.Unix.mkdtemp "berkeley_migration_verifier_output" in
+  let compare_script_name = "compare_fork_and_replayer_script.sh" in
+  let compare_script = Filename.concat tmpd compare_script_name in
 
-    let get_accounts (output : ReplayerOutput.t) file =
-      match output.target_genesis_ledger.base with
-      | Named _ ->
-          failwithf "%s file does not have any account" file ()
-      | Accounts accounts ->
-          accounts
-      | Hash _ ->
-          failwithf "%s file does not have any account" file ()
-    in
+  let%bind result =
+    Process.run ~prog:"wget"
+      ~args:[ compare_script_download_uri; "-O"; compare_script ]
+      ()
+  in
+  let download_check =
+    match result with
+    | Error exn ->
+        Check.err
+          (sprintf "Internal error: Cannot download compare script, due to '%s'"
+             (Error.to_string_hum exn) )
+    | Ok _ ->
+        Check.ok
+  in
+  let%bind result =
+    Process.run ~prog:"chmod" ~args:[ "755"; compare_script ] ()
+  in
+  let update_perms_check =
+    match result with
+    | Error exn ->
+        Check.err
+          (sprintf "Internal error: Cannot download compare script, due to '%s'"
+             (Error.to_string_hum exn) )
+    | Ok _ ->
+        Check.ok
+  in
+  let%bind result =
+    Process.run ~prog:"cp"
+      ~args:[ migrated_replayer_output; fork_config_file; tmpd ]
+      ()
+  in
+  let copy_files =
+    match result with
+    | Error exn ->
+        Check.err
+          (sprintf
+             "Internal error: Cannot copy files to temp directory, due to '%s'"
+             (Error.to_string_hum exn) )
+    | Ok _ ->
+        Check.ok
+  in
+  let%bind result =
+    Process.run
+      ~prog:(String.concat ~sep:"/" [ "."; compare_script_name ])
+      ~args:[ migrated_replayer_output; fork_config_file ]
+      ~working_dir:tmpd ~accept_nonzero_exit:[ 1 ] ()
+  in
+  let run_check =
+    match result with
+    | Ok output ->
+        if String.is_empty output then Check.ok
+        else (
+          Out_channel.write_all (Filename.concat tmpd "diff.out") ~data:output ;
+          Check.err
+            (sprintf
+               "Discrepances found between fork config and replayer files. \
+                Please refer to '%s' folder for more details"
+               tmpd ) )
+    | Error exn ->
+        Check.err
+          (sprintf "Exception while comparing files: %s..."
+             (Error.to_string_hum exn) )
+  in
+  Deferred.return
+    (Check.combine
+       [ download_check; update_perms_check; copy_files; run_check ] )
 
-    let expected_accounts = get_accounts expected_output expected in
-    let actual_accounts = get_accounts actual_output actual in
-
-    List.iter expected_accounts ~f:(fun expected_account ->
-        let get_value_or_none option = Option.value option ~default:"None" in
-        let compare_balances (actual_account : Runtime_config.Accounts.Single.t)
-            (expected_account : Runtime_config.Accounts.Single.t) =
-          if
-            Currency.Balance.( = ) expected_account.balance
-              actual_account.balance
-          then ()
-          else
-            failwithf
-              "Incorrect balance for account %s when comparing replayer \
-               outputs expected:(%s) vs actual(%s)"
-              expected_account.pk expected actual ()
-        in
-        let compare_receipt (actual_account : Runtime_config.Accounts.Single.t)
-            (expected_account : Runtime_config.Accounts.Single.t) =
-          let expected_receipt_chain_hash =
-            get_value_or_none expected_account.receipt_chain_hash
-          in
-          let actual_account_receipt_chain_hash =
-            get_value_or_none actual_account.receipt_chain_hash
-          in
-          if
-            String.( = ) expected_receipt_chain_hash
-              actual_account_receipt_chain_hash
-          then ()
-          else
-            failwithf
-              "Incorrect receipt chain hash for account %s when comparing \
-               replayer outputs expected:(%s) vs actual(%s)"
-              expected_account.pk expected_receipt_chain_hash
-              actual_account_receipt_chain_hash ()
-        in
-        let compare_delegation
-            (actual_account : Runtime_config.Accounts.Single.t)
-            (expected_account : Runtime_config.Accounts.Single.t) =
-          let expected_delegation =
-            get_value_or_none expected_account.delegate
-          in
-          let actual_delegation = get_value_or_none actual_account.delegate in
-          if String.( = ) expected_delegation actual_delegation then ()
-          else
-            failwithf
-              "Incorrect delegation for account %s when comparing replayer \
-               outputs expected:(%s) vs actual(%s)"
-              expected_account.pk expected_delegation actual_delegation ()
-        in
-
-        match
-          List.find actual_accounts ~f:(fun actual_account ->
-              String.( = ) expected_account.pk actual_account.pk )
-        with
-        | Some actual_account ->
-            compare_balances actual_account expected_account ;
-            if compare_receipt_chain_hashes then
-              compare_receipt actual_account expected_account ;
-            compare_delegation actual_account expected_account
+let main ~mainnet_archive_uri ~migrated_archive_uri ~migrated_replayer_output
+    ~fork_config_file () =
+  let fork_config =
+    match
+      Yojson.Safe.from_file fork_config_file |> Runtime_config.of_yojson
+    with
+    | Ok fork_config ->
+        fork_config
+    | Error err ->
+        failwithf "Cannot parse fork config '%s' due to : '%s'" fork_config_file
+          err ()
+  in
+  let fork_state_hash =
+    match fork_config.proof with
+    | Some proof -> (
+        match proof.fork with
+        | Some fork ->
+            fork.state_hash
         | None ->
             failwithf
-              "Cannot find account in actual file %s when comparing replayer \
-               outputs expected:(%s) vs actual(%s)"
-              expected_account.pk expected actual () )
-
-let main ~mainnet_archive_uri ~migrated_archive_uri ~fork_state_hash () =
+              "Cannot parse fork config: Missing fork element under proof  in \
+               fork config '%s' "
+              fork_config_file () )
+    | None ->
+        failwithf
+          "Cannot parse fork config: missing proof element in fork config '%s' "
+          fork_config_file ()
+  in
   let%bind _ =
     compare_db_content ~mainnet_archive_uri ~migrated_archive_uri
       ~fork_state_hash ()
   in
-  let%bind _ = check_forked_chain ~migrated_archive_uri ~fork_state_hash in
+  let%bind forked_chain_check =
+    check_forked_chain ~migrated_archive_uri ~fork_state_hash
+  in
+  Test.of_check forked_chain_check ~name:"Forked chain" ~idx:11 |> Test.eval ;
+  let%bind fork_comparision =
+    compare_migrated_replayer_output ~migrated_replayer_output ~fork_config_file
+  in
+  Test.of_check fork_comparision ~name:"Fork config" ~idx:12 |> Test.eval ;
   if Int.equal !exit_code 1 then
     Deferred.Or_error.error_string
       (sprintf
@@ -372,18 +501,16 @@ let () =
            Param.flag "--migrated-archive-uri"
              ~doc:"URI URI for connecting to the migrated archive database"
              Param.(required string)
-         and fork_state_hash =
-           Param.flag "--fork-state-hash" ~aliases:[ "-fork-state-hash" ]
-             Param.(required string)
-             ~doc:"String state hash of the fork for the migration"
          and migrated_replayer_output =
-          Param.flag "--migrated-replayer-output" ~aliases:[ "-migrated-replayer-output" ]
-            Param.(required string)
-            ~doc:"Path Path to migrated replayer output"
-         and mainnet_replayer_output =
-           Param.flag "--mainnet-replayer-output" ~aliases:[ "-mainnet-replayer-output" ]
+           Param.flag "--migrated-replayer-output"
+             ~aliases:[ "-migrated-replayer-output" ]
              Param.(required string)
-             ~doc:"String Path to mainnet replayer output"
+             ~doc:"Path Path to migrated replayer output"
+         and fork_config_file =
+           Param.flag "--fork-config-file" ~aliases:[ "-fork-config-file" ]
+             Param.(required string)
+             ~doc:"String Path to fork config file"
          in
 
-         main ~mainnet_archive_uri ~migrated_archive_uri ~fork_state_hash ~migrated_replayer_output ~mainnet_replayer_output )))
+         main ~mainnet_archive_uri ~migrated_archive_uri
+           ~migrated_replayer_output ~fork_config_file )))
