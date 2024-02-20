@@ -143,8 +143,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              constraint_constants )
         ~choices:(fun ~self:_ -> [ Trivial_rule2.rule ])
     in
-    let vk1 = Pickles.Side_loaded.Verification_key.of_compiled tag1 in
-    let vk2 = Pickles.Side_loaded.Verification_key.of_compiled tag2 in
+    let%bind.Async.Deferred vk1 =
+      Pickles.Side_loaded.Verification_key.of_compiled tag1
+    in
+    let%bind.Async.Deferred vk2 =
+      Pickles.Side_loaded.Verification_key.of_compiled tag2
+    in
     let%bind.Async.Deferred account_update1, _ =
       trivial_prover1 ~handler:Trivial_rule1.handler ()
     in

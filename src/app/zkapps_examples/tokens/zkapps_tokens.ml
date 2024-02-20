@@ -691,7 +691,13 @@ module P = struct
   let verification_key =
     Lazy.bind p_module ~f:(fun (module P : Proof_intf) -> P.verification_key)
 
+  (* this is annoying *)
+  let verification_key_promise = lazy (failwith "not implemented")
+
   let id = Lazy.bind p_module ~f:(fun (module P : Proof_intf) -> P.id)
+
+  (* this is annoying *)
+  let id_promise = lazy (failwith "not implemented")
 
   let verify statements =
     let module P : Proof_intf = (val Lazy.force p_module) in
