@@ -4194,6 +4194,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ((), (), Pickles.Side_loaded.Proof.of_proof proof)
       in
       let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
+      (* we just block on the Deferred since this is only used for tests *)
       let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk) in
       ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
       , `Prover trivial_prover )
