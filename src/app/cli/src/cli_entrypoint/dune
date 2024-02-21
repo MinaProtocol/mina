@@ -72,6 +72,7 @@
    ppx_version.runtime
    internal_tracing
    itn_logger
+   kvdb_cmp_lib
  )
  (preprocessor_deps ../../../../config.mlh)
  (instrumentation (backend bisect_ppx))

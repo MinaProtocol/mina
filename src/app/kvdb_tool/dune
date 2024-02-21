@@ -1,0 +1,10 @@
+(executable
+ (package kvdb_tool)
+ (name kvdb_tool)
+ (public_name kvdb_tool)
+ (modules kvdb_tool)
+ (libraries kvdb_cmp_lib core)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
