@@ -225,7 +225,6 @@ registry at
 `docker run --rm -it
 us-west2-docker.pkg.dev/o1labs-192920/nix-containers/mina-image-full:develop` .
 
-Available images:
 The `slim` image only has the Mina daemon itself, whereas `full` images also
 contain many useful tools, such as coreutils, fake init, jq, etc.
 
