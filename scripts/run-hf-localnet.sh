@@ -11,13 +11,16 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 TX_INTERVAL=${TX_INTERVAL:-30s}
 
 # Delay between now and genesis timestamp, in minutes
+# Ignored if GENESIS_TIMESTAMP variable is specified
 DELAY_MIN=${DELAY_MIN:-20}
 
 # Allows to use berkeley ledger when equals to .berkeley
 CONF_SUFFIX=${CONF_SUFFIX:-}
 
-# Allows to specify a specific configuration file
-# Genesis timestamp will be updated before use of configuration file
+# Allows to specify a specific configuration file.
+# If specified, ledger will not be generated.
+# Specified config file is applied the latest and
+# will override settings set by this script.
 CUSTOM_CONF=${CUSTOM_CONF:-}
 
 # Specify slot_tx_end parameter in the config
@@ -78,6 +81,10 @@ fi
 # Check mina command exists
 command -v "$MINA_EXE" >/dev/null || { echo "No 'mina' executable found"; exit 1; }
 
+# Genesis timestamp to use in config
+calculated_timestamp="$( d=$(date +%s); date -u -d @$((d - d % 60 + DELAY_MIN*60)) '+%F %H:%M:%S+00:00' )"
+GENESIS_TIMESTAMP=${GENESIS_TIMESTAMP:-"$calculated_timestamp"}
+
 ##########################################################
 # Generate configuration in localnet/config
 ##########################################################
@@ -111,8 +118,6 @@ if [[ "$CUSTOM_CONF" == "" ]] && [[ ! -f $CONF_DIR/ledger.json ]]; then
   ( cd $CONF_DIR && "$SCRIPT_DIR/prepare-test-ledger.sh" -c 100000 -b 1000000 $(cat bp.pub) >ledger.json )
 fi
 
-timestamp="$( d=$(date +%s); date -u -d @$((d - d % 60 + DELAY_MIN*60)) '+%F %H:%M:%S+00:00' )"
-
 if [[ "$SLOT_TX_END" != "" ]]; then
   slot_ends=".daemon.slot_tx_end = $SLOT_TX_END | "
 fi
@@ -120,7 +125,7 @@ if [[ "$SLOT_CHAIN_END" != "" ]]; then
   slot_ends="$slot_ends .daemon.slot_chain_end = $SLOT_CHAIN_END | "
 fi
 
-update_config_expr="$slot_ends .genesis.genesis_state_timestamp = \"$timestamp\""
+update_config_expr="$slot_ends .genesis.genesis_state_timestamp = \"$GENESIS_TIMESTAMP\""
 
 jq "$update_config_expr" > $CONF_DIR/base.json << EOF
 {

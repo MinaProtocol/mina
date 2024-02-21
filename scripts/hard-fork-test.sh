@@ -31,14 +31,15 @@ stop_nodes(){
 }
 
 # 1. Node is started
-d=$(date +%s)
-export GENESIS_TIMESTAMP="$(date -u -d @$((d - d%60 + MAIN_DELAY*60)) '+%F %H:%M:%S+00:00')"
+NOW_UNIX_TS=$(date +%s)
+MAIN_GENESIS_UNIX_TS=$((NOW_UNIX_TS - NOW_UNIX_TS%60 + MAIN_DELAY*60))
+export GENESIS_TIMESTAMP="$(date -u -d @$MAIN_GENESIS_UNIX_TS '+%F %H:%M:%S+00:00')"
 ./scripts/run-hf-localnet.sh -m "$MAIN_MINA_EXE" -i "$MAIN_SLOT" \
   -s "$MAIN_SLOT" --slot-tx-end "$SLOT_TX_END" --slot-chain-end "$SLOT_CHAIN_END" &
 
 MAIN_NETWORK_PID=$!
 
-sleep $((MAIN_SLOT * BEST_CHAIN_QUERY_FROM - d%60 + MAIN_DELAY*60))s
+sleep $((MAIN_SLOT * BEST_CHAIN_QUERY_FROM - NOW_UNIX_TS%60 + MAIN_DELAY*60))s
 
 # 2. Check that there are many blocks >50% of slots occupied from slot 0 to slot
 # $BEST_CHAIN_QUERY_FROM and that there are some user commands in blocks corresponding to slots
@@ -115,14 +116,28 @@ mkdir localnet/hf_ledgers
 
 "$FORK_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/hf_ledgers --hash-output-file localnet/hf_ledger_hashes.json
 
-export GENESIS_TIMESTAMP="$( d=$(date +%s); date -u -d @$((d - d % 60 + FORK_DELAY*60)) '+%F %H:%M:%S+00:00' )"
-FORKING_FROM_CONFIG_JSON=localnet/config/base.json SECONDS_PER_SLOT=90 FORK_CONFIG_JSON=localnet/fork_config.json LEDGER_HASHES_JSON=localnet/hf_ledger_hashes.json scripts/hardfork/create_runtime_config.sh > localnet/config.json
+NOW_UNIX_TS=$(date +%s)
+FORK_GENESIS_UNIX_TS=$((NOW_UNIX_TS - NOW_UNIX_TS%60 + FORK_DELAY*60))
+export GENESIS_TIMESTAMP="$( date -u -d @$FORK_GENESIS_UNIX_TS '+%F %H:%M:%S+00:00' )"
+FORKING_FROM_CONFIG_JSON=localnet/config/base.json SECONDS_PER_SLOT="$MAIN_SLOT" FORK_CONFIG_JSON=localnet/fork_config.json LEDGER_HASHES_JSON=localnet/hf_ledger_hashes.json scripts/hardfork/create_runtime_config.sh > localnet/config.json
+
+expected_genesis_slot=$(((FORK_GENESIS_UNIX_TS-MAIN_GENESIS_UNIX_TS)/MAIN_SLOT))
+expected_modified_fork_data="{\"blockchain_length\":$latest_height,\"global_slot_since_genesis\":$expected_genesis_slot,\"state_hash\":\"$latest_shash\"}"
+modified_fork_data="$(jq -cS '.proof.fork' localnet/config.json)"
+if [[ "$modified_fork_data" != "$expected_modified_fork_data" ]]; then
+  echo "Assertion failed: unexpected modified fork data" >&2
+  exit 3
+fi
+
+# TODO check ledgers in localnet/config.json
 
 wait "$MAIN_NETWORK_PID"
 
 # 8. Node is shutdown and restarted with mina-fork and the config from previous step 
 ./scripts/run-hf-localnet.sh -m "$FORK_MINA_EXE" -d "$FORK_DELAY" -i "$FORK_SLOT" \
   -s "$FORK_SLOT" -c localnet/config.json --genesis-ledger-dir localnet/hf_ledgers &
+
+# TODO consider checking block height right after start to be +1 of $latest_height
 
 # 9. Check that network eventually creates some blocks
 
