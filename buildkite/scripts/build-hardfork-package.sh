@@ -2,7 +2,6 @@
 
 set -eo pipefail
 
-# TODO: remove DUNE_PROFILE and configure using NETWORK_NAME
 ([ -z ${CONFIG_JSON_GZ_URL+x} ] || [ -z ${NETWORK_NAME+x} ] || [ -z ${MINA_DEB_CODENAME+x} ]) && echo "required env vars were not provided" && exit 1
 
 # Set the DUNE_PROFILE from the NETWORK_NAME. For now, these are 1-1, but in the future, this may need to be a case statement
