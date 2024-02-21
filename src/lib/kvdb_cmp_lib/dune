@@ -1,0 +1,18 @@
+(library
+ (package kvdb_cmp_lib)
+ (name kvdb_cmp_lib)
+ (modules kvdb_cmp_lib)
+ (libraries
+  ;; opam libraries
+  core
+  async
+  ;; local libraries
+  hex
+  rocksdb
+  file_system)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane)))
