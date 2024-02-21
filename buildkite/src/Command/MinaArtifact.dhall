@@ -100,6 +100,7 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
                 DebianVersions.toolchainRunner
                   debVersion
                   [ "DUNE_PROFILE=\$DUNE_PROFILE"
+                  , "NETWORK_NAME=\$NETWORK_NAME"
                   , "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL"
                   , "AWS_ACCESS_KEY_ID"
                   , "AWS_SECRET_ACCESS_KEY"
