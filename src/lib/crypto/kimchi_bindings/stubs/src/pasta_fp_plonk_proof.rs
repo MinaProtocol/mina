@@ -62,10 +62,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
                     .iter()
                     .map(Into::<Fp>::into)
                     .collect();
-                let comm = PolyComm::<Vesta> {
-                    unshifted: vec![sg],
-                    shifted: None,
-                };
+                let comm = PolyComm::<Vesta> { elems: vec![sg] };
                 RecursionChallenge { chals, comm }
             })
             .collect()
@@ -130,10 +127,7 @@ pub fn caml_pasta_fp_plonk_proof_create_and_verify(
                     .iter()
                     .map(Into::<Fp>::into)
                     .collect();
-                let comm = PolyComm::<Vesta> {
-                    unshifted: vec![sg],
-                    shifted: None,
-                };
+                let comm = PolyComm::<Vesta> { elems: vec![sg] };
                 RecursionChallenge { chals, comm }
             })
             .collect()
@@ -975,8 +969,7 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProofWithPublic<CamlGVesta, Caml
     fn comm() -> PolyComm<Vesta> {
         let g = Vesta::prime_subgroup_generator();
         PolyComm {
-            shifted: Some(g),
-            unshifted: vec![g, g, g],
+            elems: vec![g, g, g],
         }
     }
 
