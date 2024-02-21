@@ -220,7 +220,7 @@ $ chmod 0700 /path/to
 ```
 
 Additionally, you must provide a list of peers to connect to bootstrap the node.
-The list of peers depends on the network you want to connect to and is announced when the network is being launched. For Mainnet, the list of peers is avaialable at:
+The list of peers depends on the network you want to connect to and is announced when the network is being launched. For Mainnet, the list of peers is available at:
 https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt.
 
 The `daemon.json` config file also contains bootstrap data that is specific to the network the node is trying to connect to and must be tailored specifically for a particular network. This file can also override some of the configuration options selected during compilation. The `daemon.json` file can be extracted from the Docker image
@@ -335,7 +335,7 @@ To override these constants, pass a json file to `runtime_genesis_ledger.exe` wi
 
 The exe then packages the overridden constants along with the genesis ledger and the genesis proof for the daemon to consume.
 
-<b> 2. Constants that can be overriden at runtime are:</b>
+<b> 2. Constants that can be overridden at runtime are:</b>
 
 - genesis_state_timestamp
 - transaction pool max size

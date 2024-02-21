@@ -200,8 +200,7 @@ pub fn caml_pasta_fq_plonk_index_decode(
             .map_err(|e| JsError::new(&format!("caml_pasta_fq_plonk_index_decode: {}", e)))?;
 
     index.srs = srs.0.clone();
-    let (linearization, powers_of_alpha) =
-        expr_linearization(Some(&index.cs.feature_flags), true, 3);
+    let (linearization, powers_of_alpha) = expr_linearization(Some(&index.cs.feature_flags), true);
     index.linearization = linearization;
     index.powers_of_alpha = powers_of_alpha;
 
@@ -244,7 +243,7 @@ pub fn caml_pasta_fq_plonk_index_read(
     )
     .map_err(|err| JsValue::from_str(&format!("caml_pasta_fq_plonk_index_read: {err}")))?;
     t.srs = srs.0.clone();
-    let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true, 3);
+    let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 

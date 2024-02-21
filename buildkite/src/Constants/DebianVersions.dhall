@@ -70,6 +70,7 @@ let minimalDirtyWhen = [
   S.exactly "scripts/rebuild-deb" "sh",
   S.exactly "scripts/release-docker" "sh",
   S.exactly "buildkite/scripts/build-artifact" "sh",
+  S.exactly "buildkite/scripts/check-compatibility" "sh",
   -- Snark profiler dirtyWhen
   S.exactly "buildkite/src/Jobs/Test/RunSnarkProfiler" "dhall",
   S.exactly "buildkite/scripts/run-snark-transaction-profiler" "sh",
@@ -86,6 +87,9 @@ let bullseyeDirtyWhen = [
   S.strictly (S.contains "Makefile"),
   S.exactly "buildkite/scripts/connect-to-berkeley" "sh",
   S.exactly "buildkite/scripts/connect-to-mainnet-on-compatible" "sh",
+  S.exactly "buildkite/scripts/rosetta-integration-tests" "sh",
+  S.exactly "buildkite/scripts/rosetta-integration-tests-full" "sh",
+  S.exactly "buildkite/scripts/rosetta-integration-tests-fast" "sh",
   S.strictlyStart (S.contains "buildkite/src/Jobs/Test")
 ] # minimalDirtyWhen
 

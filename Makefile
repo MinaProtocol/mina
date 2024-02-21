@@ -125,11 +125,6 @@ rosetta_lib_encodings_nonconsensus: ocaml_checks
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/nonconsensus/rosetta_lib/test/test_encodings.exe --profile=nonconsensus_mainnet
 	$(info Build complete)
 
-dhall_types: ocaml_checks
-	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/dhall_types/dump_dhall_types.exe --profile=dev
-	$(info Build complete)
-
 replayer: ocaml_checks
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/replayer/replayer.exe --profile=devnet
@@ -309,8 +304,10 @@ endif
 %.conv.tex.png: %.conv.tex
 	cd $(dir $@) && pdflatex -halt-on-error -shell-escape $(notdir $<)
 
+# TODO: this, but smarter so we don't have to add every library
 doc_diagram_sources=$(addprefix docs/res/,*.dot *.tex *.conv.tex)
 doc_diagram_sources+=$(addprefix rfcs/res/,*.dot *.tex *.conv.tex)
+doc_diagram_sources+=$(addprefix src/lib/transition_frontier/res/,*.dot *.tex *.conv.tex)
 doc_diagrams: $(addsuffix .png,$(wildcard $(doc_diagram_sources)))
 
 ########################################

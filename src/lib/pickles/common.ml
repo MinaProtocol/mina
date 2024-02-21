@@ -42,7 +42,7 @@ let actual_wrap_domain_size ~log_2_domain_size =
     | _ ->
         assert false
   in
-  Pickles_base.Proofs_verified.of_int d
+  Pickles_base.Proofs_verified.of_int_exn d
 
 let hash_messages_for_next_step_proof ~app_state
     (t : _ Types.Step.Proof_state.Messages_for_next_step_proof.t) =
@@ -230,8 +230,8 @@ let tick_public_input_of_statement ~max_proofs_verified
     (Backend.Tick.Field.Vector.length input)
     ~f:(Backend.Tick.Field.Vector.get input)
 
-let ft_comm ~add:( + ) ~scale ~endoscale:_ ~negate
-    ~verification_key:(m : _ array Plonk_verification_key_evals.t) ~alpha:_
+let ft_comm ~add:( + ) ~scale ~negate
+    ~verification_key:(m : _ array Plonk_verification_key_evals.t)
     ~(plonk : _ Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t)
     ~t_comm =
   let reduce_chunks comm =

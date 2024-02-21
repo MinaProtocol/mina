@@ -12,7 +12,6 @@
  (libraries
    ;; opam libraries
    bin_prot.shape
-   ppx_inline_test.config
    sexplib0
    core_kernel
    base.caml

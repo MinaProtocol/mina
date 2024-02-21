@@ -2098,14 +2098,14 @@ module Make_str (A : Wire_types.Concrete) = struct
         let open Basic in
         let module M = H4.T (Pickles.Tag) in
         let s = Basic.spec t in
-        let prev_should_verify =
+        let prev_must_verify =
           match proof_level with
           | Genesis_constants.Proof_level.Full ->
               true
           | _ ->
               false
         in
-        let b = Boolean.var_of_value prev_should_verify in
+        let b = Boolean.var_of_value prev_must_verify in
         match t with
         | Proved ->
             { identifier = "proved"
@@ -3270,14 +3270,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       (s1, s2)
 
     let rule ~proof_level self : _ Pickles.Inductive_rule.t =
-      let prev_should_verify =
+      let prev_must_verify =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
             true
         | _ ->
             false
       in
-      let b = Boolean.var_of_value prev_should_verify in
+      let b = Boolean.var_of_value prev_must_verify in
       { identifier = "merge"
       ; prevs = [ self; self ]
       ; main =
@@ -3318,6 +3318,13 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~constraint_constants:
         (Genesis_constants.Constraint_constants.to_snark_keys_header
            constraint_constants )
+      ~commits:
+        { commits =
+            { mina = Mina_version.commit_id
+            ; marlin = Mina_version.marlin_commit_id
+            }
+        ; commit_date = Mina_version.commit_date
+        }
       ~choices:(fun ~self ->
         let zkapp_command x =
           Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x

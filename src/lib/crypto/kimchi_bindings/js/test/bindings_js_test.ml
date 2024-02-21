@@ -1040,6 +1040,7 @@ let eq_verifier_index ~field_equal ~other_field_equal
     ; lookup_index = _
     ; public = public1
     ; prev_challenges = prev_challenges1
+    ; zk_rows = zk_rows1
     }
     { VerifierIndex.domain = { log_size_of_group = i2_1; group_gen = f2 }
     ; max_poly_size = i2_2
@@ -1049,6 +1050,7 @@ let eq_verifier_index ~field_equal ~other_field_equal
     ; lookup_index = _
     ; public = public2
     ; prev_challenges = prev_challenges2
+    ; zk_rows = zk_rows2
     } =
   i1_1 = i2_1 && field_equal f1 f2 && i1_2 = i2_2
   && List.for_all2
@@ -1065,6 +1067,7 @@ let eq_verifier_index ~field_equal ~other_field_equal
   && eq_verification_shifts ~field_equal shifts1 shifts2
   && public1 = public2
   && prev_challenges1 = prev_challenges2
+  && zk_rows1 = zk_rows2
 
 let _ =
   let open Pasta_fp_verifier_index in

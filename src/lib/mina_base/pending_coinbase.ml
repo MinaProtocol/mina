@@ -259,6 +259,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
+    let init (t : t) = t.init
+
+    let curr (t : t) = t.curr
+
     type var = Stack_hash.var Poly.t
 
     let gen : t Quickcheck.Generator.t =
@@ -527,6 +531,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         let to_latest = Fn.id
       end
     end]
+
+    let data (t : t) = t.data
+
+    let state (t : t) = t.state
   end
 
   module Hash_versioned = struct

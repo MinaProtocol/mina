@@ -83,7 +83,7 @@ let split_field (x : Field.t) : Field.t * Boolean.var =
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
     (type max_proofs_verified branches prev_varss max_local_max_proofs_verifieds)
-    ~feature_flags
+    ~num_chunks ~feature_flags
     (full_signature :
       ( max_proofs_verified
       , branches
@@ -262,7 +262,9 @@ let wrap_main
               let evals =
                 let ty =
                   let ty =
-                    Plonk_types.All_evals.typ (module Impl) feature_flags
+                    Plonk_types.All_evals.typ
+                      (module Impl)
+                      ~num_chunks:1 feature_flags
                   in
                   Vector.typ ty Max_proofs_verified.n
                 in
@@ -390,7 +392,8 @@ let wrap_main
                      (module Impl)
                      Inner_curve.typ ~bool:Boolean.typ feature_flags
                      ~dummy:Inner_curve.Params.one
-                     ~commitment_lengths:Commitment_lengths.default )
+                     ~commitment_lengths:
+                       (Commitment_lengths.default ~num_chunks) )
                   ~request:(fun () -> Req.Messages) )
           in
           let sponge = Wrap_verifier.Opt.create sponge_params in

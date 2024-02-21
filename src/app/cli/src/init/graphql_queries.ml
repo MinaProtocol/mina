@@ -109,13 +109,18 @@ query pendingSnarkWork {
       source_second_pass_ledger_hash: sourceSecondPassLedgerHash
       target_second_pass_ledger_hash: targetSecondPassLedgerHash
       fee_excess: feeExcess {
-        sign
-        fee_magnitude: feeMagnitude
+        feeTokenLeft
+        feeExcessLeft {
+          sign
+          feeMagnitude
+        }
+        feeTokenRight
+        feeExcessRight {
+          sign
+          feeMagnitude
+        }
       }
-      supply_change: supplyChange {
-        sign
-        fee_magnitude: feeMagnitude
-      }
+      supply_increase : supplyIncrease
       work_id: workId
       }
     }
