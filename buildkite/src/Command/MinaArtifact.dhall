@@ -79,7 +79,7 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
       --- TODO: profile is currently hard-coded for standard networks, but should be determined from env vars
       let profile = Profiles.Type.Standard
       --- TODO: network is currently hard-coded, but should be determined from env vars
-      let network = "mainnet-hardfork"
+      let network = "\\\${NETWORK_NAME}-hardfork"
       let pipelineName = "MinaArtifactHardfork${DebianVersions.capitalName debVersion}${Profiles.toSuffixUppercase profile}"
       let generateLedgersJobKey = "generate-ledger-tars-from-config"
 
@@ -99,14 +99,14 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
               commands =
                 DebianVersions.toolchainRunner
                   debVersion
-                  [ "DUNE_PROFILE=\$DUNE_PROFILE"
+                  [ "NETWORK_NAME=\$NETWORK_NAME"
                   , "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL"
                   , "AWS_ACCESS_KEY_ID"
                   , "AWS_SECRET_ACCESS_KEY"
                   , "MINA_BRANCH=\$BUILDKITE_BRANCH"
                   , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
                   , "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
-                  , "TESTNET_NAME=${network}"
+                  , "TESTNET_NAME=\$NETWORK_NAME-hardfork"
                   , "GENESIS_TIMESTAMP=\$GENESIS_TIMESTAMP"
                   ]
                   "./buildkite/scripts/build-hardfork-package.sh"
