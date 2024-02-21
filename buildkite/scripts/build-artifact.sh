@@ -23,6 +23,7 @@ dune build "--profile=${DUNE_PROFILE}" \
   src/app/logproc/logproc.exe \
   src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
   src/app/kvdb_cat/kvdb_cat.exe \
+  src/app/kvdb_cmp/kvdb_cmp.exe \
   src/app/generate_keypair/generate_keypair.exe \
   src/app/validate_keypair/validate_keypair.exe \
   src/app/cli/src/mina_testnet_signatures.exe \
