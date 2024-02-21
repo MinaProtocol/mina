@@ -137,11 +137,33 @@ wait "$MAIN_NETWORK_PID"
 ./scripts/run-hf-localnet.sh -m "$FORK_MINA_EXE" -d "$FORK_DELAY" -i "$FORK_SLOT" \
   -s "$FORK_SLOT" -c localnet/config.json --genesis-ledger-dir localnet/hf_ledgers &
 
-# TODO consider checking block height right after start to be +1 of $latest_height
+sleep $((FORK_DELAY*60))s
+
+earliest_str=""
+while [[ "$earliest_str" == "" ]] || [[ "$earliest_str" == "," ]]; do
+  earliest_str=$(get_height_and_slot_of_earliest 10303 2>/dev/null)
+  sleep "$FORK_SLOT"s
+done
+IFS=, read -ra earliest <<< "$earliest_str"
+earliest_height=${earliest[0]}
+earliest_slot=${earliest[1]}
+if [[ $earliest_height != $((latest_height+1)) ]]; then
+  echo "Assertion failed: unexpected block height $earliest_height at the beginning of the fork" >&2
+  stop_nodes "$FORK_MINA_EXE"
+  exit 3
+fi
+
+# TODO shouldn't comparison be against expected_genesis_slot+1 ?
+# This would normally be equality, but sometimes VRF might be such that first slot isn't occupied
+if [[ $earliest_slot -lt $expected_genesis_slot ]]; then
+  echo "Assertion failed: unexpected slot $earliest_slot at the beginning of the fork" >&2
+  stop_nodes "$FORK_MINA_EXE"
+  exit 3
+fi
 
 # 9. Check that network eventually creates some blocks
 
-sleep $((FORK_SLOT*10+FORK_DELAY*60+60))s
+sleep $((FORK_SLOT*10))s
 height1=$(get_height 10303)
 if [[ $height1 == 0 ]]; then
   echo "Assertion failed: block height $height1 should be greater than 0." >&2
