@@ -209,7 +209,8 @@ branches, or otherwise changing the dependency tree of Mina.
 
 TL;DR:
 ```
-$(nix build mina#mina-image-full --print-out-paths ) | docker load
+$(nix build mina#mina-image-full) | docker load
+# Also available: mina-image-slim, mina-archive-image-full
 ```
 
 Since a "pure" build can happen entirely inside the Nix sandbox, we can use its
@@ -225,9 +226,8 @@ registry at
 us-west2-docker.pkg.dev/o1labs-192920/nix-containers/mina-image-full:develop` .
 
 Available images:
-- **mina-image-full** - full Mina daemon image with useful tools, such as coreutils, fake init, jq, etc.
-- **mina-image-slim** - has Mina daemon only
-- **mina-archive-image-full** - full Mina archive image with useful tools
+The `slim` image only has the Mina daemon itself, whereas `full` images also
+contain many useful tools, such as coreutils, fake init, jq, etc.
 
 ### Debian package
 
