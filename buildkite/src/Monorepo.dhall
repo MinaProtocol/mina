@@ -36,7 +36,7 @@ let prefixCommands = [
 
 -- Run a job if we touched a dirty path
 let commands: PipelineFilter.Type -> PipelineMode.Type -> List Cmd.Type  =  \(filter: PipelineFilter.Type) -> \(mode: PipelineMode.Type) ->
-  Prelude.List.map 
+  List/map
     JobSpec.Type 
     Cmd.Type 
     (\(job: JobSpec.Type) ->
@@ -59,25 +59,39 @@ let commands: PipelineFilter.Type -> PipelineMode.Type -> List Cmd.Type  =  \(fi
             else
               echo "Skipping ${job.name} because this is a ${filter} stage"
             fi
-          else 
+          elif [ "${targetMode}" == "Stable" ]; then
             if [ "${isIncluded}" == "True" ]; then
               echo "Triggering ${job.name} because this is a stable buildkite run"
               ${Cmd.format trigger}
             else 
               echo "Skipping ${job.name} because this is a ${filter} stage"
             fi
+          else
+            echo "Skipping ${job.name} because this is a stable buildkite run"
           fi
         '',
         Stable = ''
-          if [ "${targetMode}" == "PullRequest" ]; then
-            echo "Skipping ${job.name} because this is a PR buildkite run"
-          else 
+          if [ "${targetMode}" == "Stable" ]; then
             if [ "${isIncluded}" == "True" ]; then
               echo "Triggering ${job.name} because this is a stable buildkite run"
               ${Cmd.format trigger}
             else
               echo "Skipping ${job.name} because this is a ${filter} stage"
             fi
+          else
+            echo "Skipping ${job.name} because this is a PR buildkite run"
+          fi
+        '',
+        PackageGeneration = ''
+          if [ "${targetMode}" == "PackageGeneration" ]; then
+            if [ "${isIncluded}" == "True" ]; then
+              echo "Triggering ${job.name} because this is a package generation run"
+              ${Cmd.format trigger}
+            else
+              echo "Skipping ${job.name} because this is a ${filter} stage"
+            fi
+          else
+            echo "Skipping ${job.name} because this is a package generation run"
           fi
         ''
       }
