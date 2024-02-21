@@ -79,6 +79,7 @@
 (package (name key_gen))
 (package (name keys_lib))
 (package (name key_value_database))
+(package (name kvdb_cat))
 (package (name kimchi_backend))
 (package (name kimchi_bindings))
 (package (name kimchi_types))
