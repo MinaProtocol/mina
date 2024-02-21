@@ -1,0 +1,14 @@
+(executable
+ (package kvdb_cat)
+ (name kvdb_cat)
+ (public_name kvdb_cat)
+ (libraries
+   ;; opam libraries
+   core
+   ;; local libraries
+   hex
+   rocksdb
+ )
+ (preprocessor_deps ../../config.mlh)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_let)))
