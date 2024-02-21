@@ -2,7 +2,11 @@
 
 set -eo pipefail
 
-([ -z ${DUNE_PROFILE+x} ] || [ -z ${CONFIG_JSON_GZ_URL+x} ] || [ -z ${MINA_DEB_CODENAME+x} ]) && echo "required env vars were not provided" && exit 1
+([ -z ${DUNE_PROFILE+x} ] || [ -z ${CONFIG_JSON_GZ_URL+x} ] || [ -z ${FORKING_FROM_NETWORK+x} ] || [ -z ${MINA_DEB_CODENAME+x} ]) && echo "required env vars were not provided" && exit 1
+
+# Set the base network config for ./scripts/hardfork/create_runtime_config.sh
+export FORKING_FROM_CONFIG_JSON="genesis_ledgers/${FORKING_FROM_NETWORK}.json"
+[ ! -f "${FORKING_FROM_CONFIG_JSON}" ] && echo "${FORKING_FROM_NETWORK} is not a known network name; check for existing network configs in 'genesis_ledgers/'" && exit 1
 
 source ~/.profile
 
