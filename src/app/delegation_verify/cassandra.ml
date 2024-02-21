@@ -46,7 +46,8 @@ let query ~conf q =
     optional conf.credentials ~f:(fun { username; password } ->
         [ "--username"; username; "--password"; password ] )
     @ optional conf.connection ~f:(fun { hostname; port; use_ssl } ->
-          (if use_ssl then [ "--ssl" ] else []) @ [ hostname; Int.to_string port ] )
+          (if use_ssl then [ "--ssl" ] else [])
+          @ [ hostname; Int.to_string port ] )
   in
   Process.run_lines ~prog:conf.executable ~stdin:q ~args ()
 
