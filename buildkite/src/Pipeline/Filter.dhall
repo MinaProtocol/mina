@@ -5,13 +5,14 @@
 let Prelude = ../External/Prelude.dhall
 let Tag = ./Tag.dhall
 
-let Filter : Type = < FastOnly | Long | LongAndVeryLong | TearDownOnly | ToolchainsOnly | AllTests >
+let Filter : Type = < FastOnly | Long | LongAndVeryLong | TearDownOnly | ToolchainsOnly | AllTests | Maintenance >
 
 let tags: Filter -> List Tag.Type = \(filter: Filter) -> 
   merge {
     FastOnly = [ Tag.Type.Fast ]
     , LongAndVeryLong = [ Tag.Type.Long, Tag.Type.VeryLong ]
     , Long = [ Tag.Type.Long ]
+    , Maintenance = [ Tag.Type.Maintenance ]
     , TearDownOnly = [ Tag.Type.TearDown ]
     , ToolchainsOnly = [ Tag.Type.Toolchain ]
     , AllTests = [ Tag.Type.Lint, Tag.Type.Release, Tag.Type.Test ]
@@ -22,6 +23,7 @@ let show: Filter -> Text = \(filter: Filter) ->
     FastOnly = "FastOnly"
     , LongAndVeryLong = "LongAndVeryLong"
     , Long = "Long"
+    , Maintenance = "Maintenance"
     , ToolchainsOnly = "Toolchain"
     , TearDownOnly = "TearDownOnly"
     , AllTests = "AllTests"
