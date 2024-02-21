@@ -1,4 +1,6 @@
 open Core
+open Command
+open Command.Let_syntax
 
 (* returns true if all the dbs are equal as K-V pairs *)
 let check_db_equalities db_dirs =
@@ -32,9 +34,7 @@ let%test "different DBs are unequal " =
          Rocksdb.Database.set db1 ~key:(Bigstring.of_string "a")
            ~data:(Bigstring.of_string "1") )
 
-let cmd =
-  let open Command in
-  let open Command.Let_syntax in
+let eq_cmd =
   basic ~summary:"Compare RocksDB databases for equality"
     (let%map rocksdb_dirs =
        Param.flag "--rocksdb-dir"
@@ -47,3 +47,27 @@ let cmd =
            "Error: need at least 2 occurrences of --rocksdb-dir to compare\n" ;
          exit 1 ) ;
        if check_db_equalities rocksdb_dirs then exit 0 else exit 1 )
+
+let to_hex (b : Bigstring.t) = Hex.Safe.to_hex (Bigstring.to_string b)
+
+let cat_cmd =
+  basic
+    ~summary:
+      "Dump a RocksDB database into a key-ordered list of hex-encoded \
+       key/value pairs"
+    (let%map dir =
+       Param.flag "--rocksdb-dir"
+         ~doc:"Directory storing the RocksDB (default: current directory)"
+         Param.(required string)
+     in
+     fun () ->
+       let db = Rocksdb.Database.create dir in
+       let all_pairs = Rocksdb.Database.to_alist db in
+       printf "[" ;
+       List.iter all_pairs ~f:(fun (k, v) ->
+           printf "[\"%s\", \"%s\"],\n" (to_hex k) (to_hex v) ) ;
+       printf "]" )
+
+let cmds =
+  Command.group ~summary:"Tools for manipulating RocksDB databases"
+    [ ("eq", eq_cmd); ("cat", cat_cmd) ]

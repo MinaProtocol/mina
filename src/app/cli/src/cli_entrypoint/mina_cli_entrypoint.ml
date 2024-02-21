@@ -1918,6 +1918,7 @@ let internal_commands logger =
   ; ("dump-type-shapes", dump_type_shapes)
   ; ("replay-blocks", replay_blocks logger)
   ; ("audit-type-shapes", audit_type_shapes)
+  ; ("kvdb", Kvdb_cmp_lib.cmds)
   ]
 
 let mina_commands logger =

@@ -1,7 +1,6 @@
 (library
- (package kvdb_cmp_lib)
  (name kvdb_cmp_lib)
- (modules kvdb_cmp_lib)
+ (public_name kvdb_cmp_lib)
  (libraries
   ;; opam libraries
   core

@@ -1,6 +1,0 @@
-(executable
- (package kvdb_cmp)
- (name kvdb_cmp)
- (public_name kvdb_cmp)
- (modules kvdb_cmp)
- (libraries kvdb_cmp_lib core))
