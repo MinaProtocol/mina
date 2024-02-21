@@ -3,6 +3,10 @@
 SLOT_TX_END="${SLOT_TX_END:-30}"
 SLOT_CHAIN_END="${SLOT_CHAIN_END:-$((SLOT_TX_END+8))}"
 
+# Slot from which to start calling bestchain query
+# to find last non-empty block
+BEST_CHAIN_QUERY_FROM="${BEST_CHAIN_QUERY_FROM:-$((SLOT_TX_END-5))}"
+
 # Slot duration in seconds to be used for both version
 MAIN_SLOT="${MAIN_SLOT:-90}"
 FORK_SLOT="${FORK_SLOT:-30}"
@@ -27,52 +31,53 @@ stop_nodes(){
 }
 
 # 1. Node is started
-./scripts/run-hf-localnet.sh -m "$MAIN_MINA_EXE" -d "$MAIN_DELAY" -i "$MAIN_SLOT" \
+d=$(date +%s)
+export GENESIS_TIMESTAMP="$(date -u -d @$((d - d%60 + MAIN_DELAY*60)) '+%F %H:%M:%S+00:00')"
+./scripts/run-hf-localnet.sh -m "$MAIN_MINA_EXE" -i "$MAIN_SLOT" \
   -s "$MAIN_SLOT" --slot-tx-end "$SLOT_TX_END" --slot-chain-end "$SLOT_CHAIN_END" &
 
 MAIN_NETWORK_PID=$!
 
-# Sleep until slot_tx_end minus 5 slots plus one minute (to account for rounding)
-sleep $((MAIN_SLOT*(SLOT_TX_END-5)+MAIN_DELAY*60+60))s
+sleep $((MAIN_SLOT * BEST_CHAIN_QUERY_FROM - d%60 + MAIN_DELAY*60))s
 
-# 2. Check that there are many blocks >50% of slots occupied from slot 0 to slot $((SLOT_TX_END / 2)) and that there are some user commands in blocks corresponding to slots
+# 2. Check that there are many blocks >50% of slots occupied from slot 0 to slot
+# $BEST_CHAIN_QUERY_FROM and that there are some user commands in blocks corresponding to slots
 blockHeight=$(get_height 10303)
-echo "Block height is $blockHeight at slot $((SLOT_TX_END-5))."
-echo "Blocks are produced."
+echo "Block height is $blockHeight at slot $BEST_CHAIN_QUERY_FROM."
 
-all_blocks_empty=true
-for i in {1..5}
-do
-  sleep "${MAIN_SLOT}s"
-  usercmds=$(blocks_withUserCommands 10303)
-  if [[ $usercmds != 0 ]]; then
-    all_blocks_empty=false
-  fi
-done
-if $all_blocks_empty; then
-  echo "Assertion failed: all blocks are empty" >&2
+if [[ $((2*blockHeight)) -lt $BEST_CHAIN_QUERY_FROM ]]; then
+  echo "Assertion failed: slot occupancy is below 50%" >&2
   stop_nodes "$MAIN_MINA_EXE"
   exit 3
 fi
 
-# 3. Check that transactions stop getting included from slot SLOT_TX_END to slot SLOT_CHAIN_END, i.e. there are some blocks, with no user commands, coinbase set to 0.
-sleep $((MAIN_SLOT*(SLOT_CHAIN_END-SLOT_TX_END-5)))s
-
-all_blocks_empty=false
-for i in {1..5}
-do
+last_ne_str="$(for i in $(seq $BEST_CHAIN_QUERY_FROM $SLOT_CHAIN_END); do
+  blocks $((10303+10*(i%2))) 2>/dev/null || true
   sleep "${MAIN_SLOT}s"
-  usercmds=$(blocks_withUserCommands 10303)
-  echo "Checking if blocks are empty"
-  if [[ $usercmds == 0 ]]; then
-    all_blocks_empty=true
-  fi
-done
-if [[ ! $all_blocks_empty ]]; then
-  echo "Assertion failed: not all blocks are empty" >&2
+done | latest_nonempty_block)"
+
+IFS=, read -ra latest_ne <<< "$last_ne_str"
+
+max_slot=${latest_ne[0]}
+echo "Last occupied slot of pre-fork chain: $max_slot"
+if [[ $max_slot -ge $SLOT_CHAIN_END ]]; then
+  echo "Assertion failed: block with slot $max_slot created after slot chain end" >&2
   stop_nodes "$MAIN_MINA_EXE"
   exit 3
 fi
+
+latest_shash="${latest_ne[1]}"
+latest_height=${latest_ne[2]}
+latest_slot=${latest_ne[3]}
+
+echo "Latest non-empty block: $latest_shash, height: $latest_height, slot: $latest_slot"
+if [[ $latest_slot -ge $SLOT_TX_END ]]; then
+  echo "Assertion failed: non-empty block with slot $latest_slot created after slot tx end" >&2
+  stop_nodes "$MAIN_MINA_EXE"
+  exit 3
+fi
+
+expected_fork_data="{\"blockchain_length\":$latest_height,\"global_slot_since_genesis\":$latest_slot,\"state_hash\":\"$latest_shash\"}"
 
 # 4. Check that no new blocks are created
 sleep 1m
@@ -80,7 +85,7 @@ height1=$(get_height 10303)
 sleep 5m
 height2=$(get_height 10303)
 if [[ $(( height2 - height1 )) -gt 0 ]]; then
-  echo "Assertion failed: there should be no change in blockheight." >&2
+  echo "Assertion failed: there should be no change in blockheight after slot chain end." >&2
   stop_nodes "$MAIN_MINA_EXE"
   exit 3
 fi
@@ -96,6 +101,12 @@ done
 
 # 7. Runtime config is converted with a script to have only ledger hashes in the config
 stop_nodes "$MAIN_MINA_EXE"
+
+fork_data="$(jq -cS '.proof.fork' localnet/fork_config.json)"
+if [[ "$fork_data" != "$expected_fork_data" ]]; then
+  echo "Assertion failed: unexpected fork data" >&2
+  exit 3
+fi
 
 sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "1"}/' localnet/fork_config.json
 
@@ -130,13 +141,13 @@ all_blocks_empty=true
 for i in {1..10}
 do
   sleep "${FORK_SLOT}s"
-  usercmds=$(blocks_withUserCommands 10303)
+  usercmds=$(blocks_with_user_commands 10303)
   if [[ $usercmds != 0 ]]; then
     all_blocks_empty=false
   fi
 done
 if $all_blocks_empty; then
-  echo "Assertion failed: all blocks are empty" >&2
+  echo "Assertion failed: all blocks in fork chain are empty" >&2
   stop_nodes "$FORK_MINA_EXE"
   exit 3
 fi
