@@ -179,6 +179,7 @@ copy_common_daemon_configs() {
   cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/berkeley.json"
   # Set the default configuration based on Network name ($1)
   cp ../genesis_ledgers/${1}.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+  cp ../scripts/verify-packaged-fork-config.sh "${BUILDDIR}/usr/local/bin/mina-verify-packaged-fork-config"
 
   # Update the mina.service with a new default PEERS_URL based on Seed List URL $3
   mkdir -p "${BUILDDIR}/usr/lib/systemd/user/"
