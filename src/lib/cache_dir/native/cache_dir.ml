@@ -48,20 +48,20 @@ let possible_paths base =
     ; manual_install_path
     ] ~f:(fun d -> d ^/ base)
 
-let load_from_gs  gs_install_path ~gs_bucket_prefix ~gs_object_name ~logger =
+let load_from_gs gs_install_path ~gs_bucket_prefix ~gs_object_name ~logger =
   let%bind () = Unix.mkdir ~p:() (Filename.dirname gs_install_path) in
   Deferred.map ~f:Result.join
   @@ Monitor.try_with ~here:[%here] (fun () ->
          let each_uri (uri_string, file_path) =
            let open Deferred.Let_syntax in
-           [%log trace] "Downloading file from S3"
+           [%log trace] "Downloading file from Google Storage"
              ~metadata:
                [ ("url", `String uri_string)
                ; ("local_file_path", `String file_path)
                ] ;
            let%map _result =
              Process.run ~prog:"gsutil"
-               ~args:[ "-m"; "cp"; uri_string; gs_install_path ]
+               ~args:[ "-m"; "cp"; uri_string; file_path ]
                ()
            in
            [%log trace] "Download finished"

@@ -103,6 +103,8 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
                   , "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL"
                   , "AWS_ACCESS_KEY_ID"
                   , "AWS_SECRET_ACCESS_KEY"
+                  , "GOOGLE_APPLICATION_CREDENTIALS"
+                  , "GCLOUD_API_KEY"
                   , "MINA_BRANCH=\$BUILDKITE_BRANCH"
                   , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
                   , "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
