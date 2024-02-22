@@ -665,22 +665,19 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
          except that we don't consider loading from a tar file
       *)
       let query_db = Mina_caqti.query pool in
-      let%bind padded_accounts =
-        match
-          Genesis_ledger_helper.Ledger.padded_accounts_from_runtime_config_opt
-            ~logger ~proof_level input.genesis_ledger
-            ~ledger_name_prefix:"genesis_ledger"
+      let%bind packed_ledger =
+        match%bind
+          Genesis_ledger_helper.Ledger.load ~proof_level
+            ~genesis_dir:Cache_dir.autogen_path ~logger ~constraint_constants
+            input.genesis_ledger
         with
-        | None ->
+        | Error e ->
             [%log fatal]
-              "Could not load accounts from input runtime genesis ledger" ;
+              "Could not load accounts from input runtime genesis ledger %s"
+              (Error.to_string_hum e) ;
             exit 1
-        | Some accounts ->
-            return accounts
-      in
-      let packed_ledger =
-        Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-          ~depth:constraint_constants.ledger_depth padded_accounts
+        | Ok (packed_ledger, _, _) ->
+            return packed_ledger
       in
       let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
       let epoch_ledgers_state_hash_opt =
