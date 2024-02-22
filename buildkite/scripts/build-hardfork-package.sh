@@ -59,6 +59,8 @@ RUNTIME_CONFIG_JSON=new_config.json LEDGER_TARBALLS="$(echo hardfork_ledgers/*.t
 mkdir -p /tmp/artifacts
 cp _build/mina*.deb /tmp/artifacts/.
 
+aws s3 sync --exclude "*" --include "*_ledger_*" --acl public-read hardfork_ledgers/*.tar.gz s3://snark-keys.o1test.net/
+
 echo "--- Upload debs to amazon s3 repo"
 make publish_debs
 
