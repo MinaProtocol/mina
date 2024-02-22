@@ -47,4 +47,4 @@ Pull requests on CI will run the ['Build Mina daemon debian package' job](https:
   - `_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --config-file PATH/TO/YOUR/config.json`
 * upload the generated ledger and proof files to S3
   - You will need the access keys for the `snark-keys` bucket, and the `aws` tool installed to use this command
-  - `aws s3 sync --exclude "*" --include "genesis_*" --acl public-read /tmp/coda_cache_dir/genesis_* s3://snark-keys.o1test.net/`
+  - `gsutil rsync -r -a public-read /tmp/coda_cache_dir/genesis_* gs://mina-genesis-ledgers/`

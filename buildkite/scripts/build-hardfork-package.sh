@@ -54,6 +54,9 @@ _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --confi
 echo "--- Create hardfork config"
 FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hardfork_ledger_hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
 
+echo "--- Uploading ledger tarballs"
+gsutil -m cp -n -a public-read hardfork_ledgers/*.tar.gz gs://mina-genesis-ledgers
+
 echo "--- Build hardfork package for Debian ${MINA_DEB_CODENAME}"
 RUNTIME_CONFIG_JSON=new_config.json LEDGER_TARBALLS="$(echo hardfork_ledgers/*.tar.gz)" ./scripts/create_hardfork_deb.sh
 mkdir -p /tmp/artifacts
