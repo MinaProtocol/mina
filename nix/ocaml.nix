@@ -262,6 +262,8 @@ let
       mainnet-pkg = self.mina-dev.overrideAttrs (s: {
         version = "mainnet";
         DUNE_PROFILE = "mainnet";
+        # For compatibility with Docker build
+        MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
       });
 
       mainnet = wrapMina self.mainnet-pkg { };
@@ -269,6 +271,8 @@ let
       devnet-pkg = self.mina-dev.overrideAttrs (s: {
         version = "devnet";
         DUNE_PROFILE = "devnet";
+        # For compatibility with Docker build
+        MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
       });
 
       devnet = wrapMina self.devnet-pkg { };
