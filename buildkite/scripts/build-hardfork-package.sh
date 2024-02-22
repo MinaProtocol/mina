@@ -59,7 +59,27 @@ RUNTIME_CONFIG_JSON=new_config.json LEDGER_TARBALLS="$(echo hardfork_ledgers/*.t
 mkdir -p /tmp/artifacts
 cp _build/mina*.deb /tmp/artifacts/.
 
-aws s3 sync --exclude "*" --include "*_ledger_*" --acl public-read hardfork_ledgers/*.tar.gz s3://snark-keys.o1test.net/
+existing_files=$(aws s3 ls s3://snark-keys.o1test.net/ | awk '{print $4}')
+error=0
+for file in hardfork_ledgers/*; do
+  filename=$(basename "$file")
+
+  if echo "$existing_files" | grep -q "$filename"; then
+    echo "Error: File $filename already exists in the bucket."
+    echo "Clobbering this file WILL INVALIDATE any existing s3_data_hash entries using this Merkle root."
+    echo "The safest resolution is to force a new Merkle root by changing the config.json and re-running this script."
+    echo ""
+    echo "Please resolve this conflict manually."
+    error=1
+  else
+    aws s3 cp "$file" s3://snark-keys.o1test.net/
+  fi
+done
+
+if [ $error -ne 0 ]; then
+  echo "Error: One or more files already exist in the bucket. Refusing to publish debs."
+  exit 1
+fi
 
 echo "--- Upload debs to amazon s3 repo"
 make publish_debs
