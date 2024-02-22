@@ -149,24 +149,27 @@ module Ledger = struct
           ~metadata:[ ("path", `String filename) ] ;
         None )
     in
-    let load_from_s3 filename =
+    let load_from_gs filename =
       match config.s3_data_hash with
       | Some s3_hash -> (
-          let s3_path = s3_bucket_prefix ^/ filename in
-          let local_path = Cache_dir.s3_install_path ^/ filename in
-          match%bind Cache_dir.load_from_s3 s3_path local_path ~logger with
+          let local_path = Cache_dir.gs_install_path ^/ filename in
+          match%bind
+            Cache_dir.load_from_gs
+              ~gs_bucket_prefix:Cache_dir.gs_ledger_bucket_prefix
+              ~gs_object_name:filename local_path ~logger
+          with
           | Ok () ->
               let%bind () =
                 assert_filehash_equal
-                  ~file:(Cache_dir.s3_install_path ^/ filename)
+                  ~file:(Cache_dir.gs_install_path ^/ filename)
                   ~hash:s3_hash ~logger
               in
-              file_exists filename Cache_dir.s3_install_path
+              file_exists filename Cache_dir.gs_install_path
           | Error e ->
               [%log trace] "Could not download $ledger from $uri: $error"
                 ~metadata:
                   [ ("ledger", `String ledger_name_prefix)
-                  ; ("uri", `String s3_path)
+                  ; ("uri", `String local_path)
                   ; ("error", `String (Error.to_string_hum e))
                   ] ;
               return None )
@@ -184,18 +187,18 @@ module Ledger = struct
     let search_local filename =
       Deferred.List.find_map ~f:(file_exists filename) search_paths
     in
-    let search_local_and_s3 filename =
+    let search_local_and_gs filename =
       match%bind search_local filename with
       | Some path ->
           return (Some path)
       | None ->
-          load_from_s3 filename
+          load_from_gs filename
     in
     let%bind hash_filename =
       match config.hash with
       | Some hash ->
           let hash_filename = hash_filename hash ~ledger_name_prefix in
-          search_local_and_s3 hash_filename
+          search_local_and_gs hash_filename
       | None ->
           return None
     in
@@ -203,13 +206,13 @@ module Ledger = struct
     | Some filename ->
         return (Some filename)
     | None -> (
-        let search_local_and_s3 ?other_data name =
+        let search_local_and_gs ?other_data name =
           let named_filename =
             named_filename ~constraint_constants
               ~num_accounts:config.num_accounts ~balances:config.balances
               ~ledger_name_prefix ?other_data name
           in
-          search_local_and_s3 named_filename
+          search_local_and_gs named_filename
         in
         match (config.base, config.name) with
         | Named name, _ ->
@@ -220,12 +223,12 @@ module Ledger = struct
             in
             search_local named_filename
         | Accounts accounts, _ ->
-            search_local_and_s3 ~other_data:(accounts_hash accounts) "accounts"
+            search_local_and_gs ~other_data:(accounts_hash accounts) "accounts"
         | Hash, None ->
             assert (Option.is_some config.hash) ;
             return None
         | _, Some name ->
-            search_local_and_s3 name )
+            search_local_and_gs name )
 
   let load_from_tar ?(genesis_dir = Cache_dir.autogen_path) ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
