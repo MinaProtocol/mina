@@ -3,7 +3,7 @@ open Async
 module Ledger = Mina_ledger.Ledger
 
 module Hashes = struct
-  type t = { s3_data_hash : string; hash : string } [@@deriving to_yojson]
+  type t = { tar_data_hash : string; hash : string } [@@deriving to_yojson]
 end
 
 module Hash_json = struct
@@ -42,8 +42,8 @@ let generate_ledger_tarball ~genesis_dir ~ledger_name_prefix ledger =
     Mina_base.State_hash.to_base58_check
     @@ Mina_ledger.Ledger.merkle_root ledger
   in
-  let%map s3_data_hash = Genesis_ledger_helper.sha3_hash tar_path in
-  { Hashes.s3_data_hash; hash }
+  let%map tar_data_hash = Genesis_ledger_helper.sha3_hash tar_path in
+  { Hashes.tar_data_hash; hash }
 
 let generate_hash_json ~genesis_dir ledger staking_ledger next_ledger =
   let%bind ledger_hashes =

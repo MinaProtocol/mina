@@ -144,7 +144,7 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
     ; num_accounts = None
     ; balances = []
     ; hash = None
-    ; s3_data_hash = None
+    ; tar_data_hash = None
     ; name = None
     ; add_genesis_winner = Some true
     }

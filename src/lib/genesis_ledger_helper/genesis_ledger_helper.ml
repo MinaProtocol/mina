@@ -150,7 +150,7 @@ module Ledger = struct
         None )
     in
     let load_from_gs filename =
-      match config.s3_data_hash with
+      match config.tar_data_hash with
       | Some s3_hash -> (
           let local_path = Cache_dir.gs_install_path ^/ filename in
           match%bind
@@ -1014,7 +1014,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
            { base = Named Mina_compile_config.genesis_ledger
            ; num_accounts = None
            ; balances = []
-           ; s3_data_hash = None
+           ; tar_data_hash = None
            ; hash = None
            ; name = None
            ; add_genesis_winner = None
