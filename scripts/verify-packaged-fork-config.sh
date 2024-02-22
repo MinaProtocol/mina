@@ -70,7 +70,7 @@ function generate_ledgers_tar_from_config() {
     
     echo "updating config file..."
     
-    GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$config_file_input")
+    GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$PACKAGED_CONFIG_JSON")
     
     # Pull the original genesis timestamp from the pre-fork config file
     ORIGINAL_GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$FORKING_FROM_CONFIG_JSON")
