@@ -38,8 +38,7 @@ type ( 'a_var
           Inductive_rule.Promise.t
             (* Main functions to compute *)
       ; main :
-             step_domains:
-               (Import.Domains.t Promise.t, 'branches) Pickles_types.Vector.t
+             step_domains:(Import.Domains.t, 'branches) Pickles_types.Vector.t
           -> unit
           -> ( (Unfinalized.t, 'max_proofs_verified) Pickles_types.Vector.t
              , Impls.Step.Field.t
@@ -101,6 +100,7 @@ val create :
   -> auxiliary_typ:('a, 'b) Impls.Step.Typ.t
   -> 'c
   -> 'd
+  -> chain_to:unit Promise.t
   -> ( 'e
      , 'f
      , 'g

@@ -45,7 +45,7 @@ module Step : sig
     -> Key.Verification.t Promise.t Lazy.t
     -> ('a, 'b) Impls.Step.Typ.t
     -> ('c, 'd) Impls.Step.Typ.t
-    -> ('a -> unit -> 'c Promise.t)
+    -> ('a -> unit -> 'c Promise.t) Promise.t
     -> ( Impls.Step.Proving_key.t
        * ([> `Cache_hit | `Generated_something | `Locally_generated ] as 'e) )
        Promise.t

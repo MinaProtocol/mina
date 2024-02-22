@@ -305,7 +305,7 @@ struct
       * (Kimchi_bindings.Protocol.VerifierIndex.Fp.t * Dirty.t) Promise.t Lazy.t
   end
 
-  let log_step main _typ name index =
+  let _log_step main _typ name index =
     let module Constraints = Snarky_log.Constraints (Impls.Step.Internal_Basic) in
     let log =
       let weight =
@@ -522,10 +522,11 @@ struct
       Timer.clock __LOC__ ;
       let rec f :
           type a b c d.
-          (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(Branch_data).t = function
-        | [] ->
+             (a, b, c, d) H4.T(IR).t * unit Promise.t
+          -> (a, b, c, d) H4.T(Branch_data).t = function
+        | [], _ ->
             []
-        | rule :: rules ->
+        | rule :: rules, chain_to ->
             let first =
               Timer.clock __LOC__ ;
               let res =
@@ -535,13 +536,15 @@ struct
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~public_input ~auxiliary_typ
                       Arg_var.to_field_elements Arg_value.to_field_elements rule
-                      ~wrap_domains ~proofs_verifieds )
+                      ~wrap_domains ~proofs_verifieds ~chain_to )
               in
               Timer.clock __LOC__ ; incr i ; res
             in
-            first :: f rules
+            let (T b) = first in
+            let chain_to = Promise.map b.domains ~f:(fun _ -> ()) in
+            first :: f (rules, chain_to)
       in
-      f choices
+      f (choices, Promise.return ())
     in
     Timer.clock __LOC__ ;
     let step_domains =
@@ -557,6 +560,18 @@ struct
       let module V = H4.To_vector (DomainsPromise) in
       V.f prev_varss_length (M.f step_data)
     in
+
+    let all_step_domains =
+      let%map.Promise () =
+        (* Wait for promises to resolve. *)
+        Vector.fold ~init:(Promise.return ()) step_domains
+          ~f:(fun acc step_domain ->
+            let%bind.Promise _ = step_domain in
+            acc )
+      in
+      Vector.map ~f:(fun x -> Option.value_exn @@ Promise.peek x) step_domains
+    in
+
     let cache_handle = ref (Lazy.return (Promise.return `Cache_hit)) in
     let accum_dirty t = cache_handle := Cache_handle.(!cache_handle + t) in
     Timer.clock __LOC__ ;
@@ -573,11 +588,15 @@ struct
 
             let f (T b : _ Branch_data.t) =
               let (T (typ, _conv, conv_inv)) = etyp in
-              let main () () =
-                let%map.Promise res = b.main ~step_domains () in
-                Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
+              let main_promise : (unit -> unit -> _ Promise.t) Promise.t =
+                let%map.Promise step_domains = all_step_domains in
+                let main () () =
+                  let%map.Promise res = b.main ~step_domains () in
+                  Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
+                in
+                main
               in
-              let () = if true then log_step main typ name b.index in
+              (* let () = if true then log_step main typ name b.index in *)
               let open Impls.Step in
               (* HACK: TODO docs *)
               if return_early_digest_exception then failwith "TODO: Delete me" ;
@@ -585,6 +604,7 @@ struct
               let k_p =
                 lazy
                   (let%map.Promise cs =
+                     let%bind.Promise main = main_promise in
                      let constraint_builder =
                        Impl.constraint_system_manual ~input_typ:Typ.unit
                          ~return_typ:typ
@@ -631,7 +651,7 @@ struct
                       ~prev_challenges:(Nat.to_int (fst b.proofs_verified))
                       cache ~s_p:step_storable k_p ~s_v:step_vk_storable k_v
                       (Snarky_backendless.Typ.unit ())
-                      typ main )
+                      typ main_promise )
               in
               accum_dirty (Lazy.map pk ~f:(Promise.map ~f:snd)) ;
               accum_dirty (Lazy.map vk ~f:(Promise.map ~f:snd)) ;
@@ -784,7 +804,7 @@ struct
           let%bind.Promise wrap_vk = Lazy.force wrap_vk in
           let%bind.Promise step_pk = Lazy.force step_pk in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
-            ~self ~step_domains
+            ~self ~step_domains:all_step_domains
             ~self_dlog_plonk_index:
               ((* TODO *) Plonk_verification_key_evals.map
                  ~f:(fun x -> [| x |])

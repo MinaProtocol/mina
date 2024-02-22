@@ -1229,23 +1229,42 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
               ~branches:Branches.n ~self ~public_input:(Input typ)
               ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
-              rule ~wrap_domains ~proofs_verifieds
+              rule ~wrap_domains ~proofs_verifieds ~chain_to:(Promise.return ())
+            (* TODO? *)
           in
           let step_domains = Vector.singleton inner_step_data.domains in
+          let all_step_domains =
+            let%map.Promise () =
+              (* Wait for promises to resolve. *)
+              Vector.fold ~init:(Promise.return ()) step_domains
+                ~f:(fun acc step_domain ->
+                  let%bind.Promise _ = step_domain in
+                  acc )
+            in
+            Vector.map
+              ~f:(fun x -> Option.value_exn @@ Promise.peek x)
+              step_domains
+          in
+
           let step_keypair =
             let etyp =
               Impls.Step.input ~proofs_verified:Max_proofs_verified.n
                 ~wrap_rounds:Tock.Rounds.n
             in
             let (T (typ, _conv, conv_inv)) = etyp in
-            let main () () =
-              let%map.Promise res = inner_step_data.main ~step_domains () in
-              Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
+            let main_promise : (unit -> unit -> _ Promise.t) Promise.t =
+              let%map.Promise step_domains = all_step_domains in
+              let main () () =
+                let%map.Promise res = inner_step_data.main ~step_domains () in
+                Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
+              in
+              main
             in
             let open Impls.Step in
             let k_p =
               lazy
                 (let%map.Promise cs =
+                   let%bind.Promise main = main_promise in
                    let constraint_builder =
                      Impl.constraint_system_manual ~input_typ:Typ.unit
                        ~return_typ:typ
@@ -1281,7 +1300,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 (Nat.to_int (fst inner_step_data.proofs_verified))
               [] k_p k_v
               (Snarky_backendless.Typ.unit ())
-              typ main
+              typ main_promise
           in
           let step_vks =
             lazy
@@ -1384,7 +1403,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 S.f branch_data ~feature_flags ~prevs_length:prev_vars_length
                   ~self ~public_input:(Input typ) ~proof_cache:None
                   ~maxes:(module Maxes)
-                  ~auxiliary_typ:Impls.Step.Typ.unit ~step_domains
+                  ~auxiliary_typ:Impls.Step.Typ.unit
+                  ~step_domains:all_step_domains
                   ~self_dlog_plonk_index:
                     ((* TODO *) Plonk_verification_key_evals.map
                        ~f:(fun x -> [| x |])

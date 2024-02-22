@@ -92,7 +92,7 @@ module Step = struct
               header path ) )
 
   let read_or_generate ~prev_challenges cache ?(s_p = storable) k_p
-      ?(s_v = vk_storable) k_v typ return_typ main =
+      ?(s_v = vk_storable) k_v typ return_typ main_promise =
     let open Impls.Step in
     let pk =
       lazy
@@ -107,6 +107,7 @@ module Step = struct
          | Error _e ->
              let%map.Promise r =
                Common.time "stepkeygen" (fun () ->
+                   let%bind.Promise main = main_promise in
                    let%map.Promise constraint_system =
                      let constraint_builder =
                        constraint_system_manual ~input_typ:typ ~return_typ
