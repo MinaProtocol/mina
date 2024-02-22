@@ -29,19 +29,20 @@ fi
 
 MINA_EXE=${MINA_EXE:-"mina"}
 MINA_GENESIS_EXE=${MINA_GENESIS_EXE:-"mina-create-genesis"}
-PACKAGED_CONFIG_JSON=${PACKAGED_CONFIG_JSON:-/var/lib/coda/config_*.json}
+found_config=$(echo /var/lib/coda/config_*.json)
+PACKAGED_CONFIG_JSON=${PACKAGED_CONFIG_JSON:-$found_config}
 GENESIS_LEDGER_DIR=${GENESIS_LEDGER_DIR:-"/var/lib/coda"}
 
-export MINA_PRIVKEY_PASS=''
+export MINA_LIBP2P_PASS=''
 
 workdir=$2
 mkdir -p "$workdir"
-mkdir -p "$workdir/genesis"
+mkdir -p "$workdir/ledgers"
 mkdir -p "$workdir/keys"
 chmod 700 "$workdir/keys"
 
 if [ ! -e "$workdir/keys/p2p" ]; then
-    yes '\n' | "$MINA_EXE" libp2p generate-keypair --privkey-path "$workdir/keys/p2p"
+    "$MINA_EXE" libp2p generate-keypair --privkey-path "$workdir/keys/p2p"
 fi
 
 # This is a copy of scripts/generate_ledgers_tar_from_config.sh so that this script can be
@@ -87,9 +88,9 @@ function generate_ledgers_tar_from_config() {
     echo "new config file: $config_file_output"
 }
 
-RUNTIME_GENESIS_LEDGER_EXE=$MINA_GENESIS_EXE generate_ledgers_tar_from_config "$1" "$workdir/genesis" "$workdir/config-substituted.json"
+RUNTIME_GENESIS_LEDGER_EXE=$MINA_GENESIS_EXE generate_ledgers_tar_from_config "$1" "$workdir/ledgers" "$workdir/config-substituted.json"
 
-result=$(jq --slurpfile a "$workdir/config-substituted.json" --slurpfile b "$PACKAGED_CONFIG_JSON" -n '\
+result=$(jq --slurpfile a "$workdir/config-substituted.json" --slurpfile b "$PACKAGED_CONFIG_JSON" -n '
   ($a[0].epoch_data.staking.hash == $b[0].epoch_data.staking.hash and
    $a[0].epoch_data.next.hash == $b[0].epoch_data.next.hash and
 $a[0].ledger.hash == $b[0].ledger.hash)')
@@ -113,13 +114,15 @@ function extract_ledgers() {
     "$MINA_EXE" client stop
 }
 
-extract_ledgers "$PACKAGED_CONFIG_JSON" "$GENESIS_LEDGER_DIR" "$workdir/packaged-"
-extract_ledgers "$workdir/config-substituted.json" "$workdir/ledgers" "$workdir/reference-"
+extract_ledgers "$PACKAGED_CONFIG_JSON" "$GENESIS_LEDGER_DIR" "$workdir/packaged"
+extract_ledgers "$workdir/config-substituted.json" "$workdir/ledgers" "$workdir/reference"
 
 error=0
 for file in "$workdir"/packaged-*.json; do
     name=$(basename "$file")
     name=${name%.json}
+    name=${name#packaged-}
+
     if ! diff "$file" "$workdir/reference-$name.json"; then
         echo "Error: $file does not match reference"
         error=1
