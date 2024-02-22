@@ -38,6 +38,7 @@ export MINA_LIBP2P_PASS=''
 workdir=$2
 mkdir -p "$workdir"
 mkdir -p "$workdir/ledgers"
+mkdir -p "$workdir/ledgers-backup"
 mkdir -p "$workdir/keys"
 chmod 700 "$workdir/keys"
 
@@ -115,7 +116,9 @@ function extract_ledgers() {
 }
 
 extract_ledgers "$PACKAGED_CONFIG_JSON" "$GENESIS_LEDGER_DIR" "$workdir/packaged"
+mv -t "$workdir/ledgers-backup" /var/lib/coda/*.tar.gz
 extract_ledgers "$workdir/config-substituted.json" "$workdir/ledgers" "$workdir/reference"
+mv -t /var/lib/coda "$workdir/ledgers-backup"/*
 
 error=0
 for file in "$workdir"/packaged-*.json; do
