@@ -120,6 +120,8 @@ mv -t "$workdir/ledgers-backup" /var/lib/coda/*.tar.gz
 extract_ledgers "$workdir/config-substituted.json" "$workdir/ledgers" "$workdir/reference"
 mv -t /var/lib/coda "$workdir/ledgers-backup"/*
 
+echo "Performing final comparisons..."
+
 error=0
 for file in "$workdir"/packaged-*.json; do
     name=$(basename "$file")
