@@ -332,7 +332,7 @@ module Json_layout = struct
       ; num_accounts : int option [@default None]
       ; balances : Balance_spec.t list [@default []]
       ; hash : string option [@default None]
-      ; s3_data_hash : string option [@default None]
+      ; tar_data_hash : string option [@default None]
       ; name : string option [@default None]
       ; add_genesis_winner : bool option [@default None]
       }
@@ -426,7 +426,7 @@ module Json_layout = struct
       type t =
         { accounts : Accounts.t option [@default None]
         ; seed : string
-        ; s3_data_hash : string option [@default None]
+        ; tar_data_hash : string option [@default None]
         ; hash : string option [@default None]
         }
       [@@deriving yojson, fields]
@@ -744,7 +744,7 @@ module Ledger = struct
     ; num_accounts : int option
     ; balances : (int * Currency.Balance.Stable.Latest.t) list
     ; hash : string option
-    ; s3_data_hash : string option
+    ; tar_data_hash : string option
     ; name : string option
     ; add_genesis_winner : bool option
     }
@@ -757,7 +757,7 @@ module Ledger = struct
       ; hash
       ; name
       ; add_genesis_winner
-      ; s3_data_hash
+      ; tar_data_hash
       } : Json_layout.Ledger.t =
     let balances =
       List.map balances ~f:(fun (number, balance) ->
@@ -768,7 +768,7 @@ module Ledger = struct
       ; num_accounts
       ; balances
       ; hash
-      ; s3_data_hash
+      ; tar_data_hash
       ; name
       ; add_genesis_winner
       }
@@ -786,7 +786,7 @@ module Ledger = struct
        ; num_accounts
        ; balances
        ; hash
-       ; s3_data_hash
+       ; tar_data_hash
        ; name
        ; add_genesis_winner
        } :
@@ -819,7 +819,7 @@ module Ledger = struct
     ; num_accounts
     ; balances
     ; hash
-    ; s3_data_hash
+    ; tar_data_hash
     ; name
     ; add_genesis_winner
     }
@@ -847,7 +847,7 @@ module Ledger = struct
     ; num_accounts = Some num_accounts
     ; balances
     ; hash
-    ; s3_data_hash = None
+    ; tar_data_hash = None
     ; name = Some name
     ; add_genesis_winner = Some add_genesis_winner
     }
@@ -1250,7 +1250,7 @@ module Epoch_data = struct
       { Json_layout.Epoch_data.Data.accounts = accounts staking.ledger
       ; seed = staking.seed
       ; hash = staking.ledger.hash
-      ; s3_data_hash = staking.ledger.s3_data_hash
+      ; tar_data_hash = staking.ledger.tar_data_hash
       }
     in
     let next =
@@ -1258,7 +1258,7 @@ module Epoch_data = struct
           { Json_layout.Epoch_data.Data.accounts = accounts n.ledger
           ; seed = n.seed
           ; hash = n.ledger.hash
-          ; s3_data_hash = n.ledger.s3_data_hash
+          ; tar_data_hash = n.ledger.tar_data_hash
           } )
     in
     { Json_layout.Epoch_data.staking; next }
@@ -1267,7 +1267,7 @@ module Epoch_data = struct
    fun { staking; next } ->
     let open Result.Let_syntax in
     let data (t : [ `Staking | `Next ])
-        { Json_layout.Epoch_data.Data.accounts; seed; hash; s3_data_hash } =
+        { Json_layout.Epoch_data.Data.accounts; seed; hash; tar_data_hash } =
       let%map base =
         match accounts with
         | Some accounts ->
@@ -1291,7 +1291,7 @@ module Epoch_data = struct
         ; num_accounts = None
         ; balances = []
         ; hash
-        ; s3_data_hash
+        ; tar_data_hash
         ; name = None
         ; add_genesis_winner = Some false
         }
@@ -1444,7 +1444,7 @@ let ledger_of_accounts accounts =
     ; num_accounts = Some (List.length accounts)
     ; balances = List.mapi accounts ~f:(fun i a -> (i, a.balance))
     ; hash = None
-    ; s3_data_hash = None
+    ; tar_data_hash = None
     ; name = None
     ; add_genesis_winner = Some false
     }
