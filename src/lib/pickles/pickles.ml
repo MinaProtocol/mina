@@ -1296,6 +1296,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                  , digest ) )
             in
             Cache.Step.read_or_generate
+              ~run_in_sequence:(fun f -> f ())
               ~prev_challenges:
                 (Nat.to_int (fst inner_step_data.proofs_verified))
               [] k_p k_v

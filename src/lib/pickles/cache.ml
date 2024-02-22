@@ -91,8 +91,9 @@ module Step = struct
                 (Kimchi_bindings.Protocol.VerifierIndex.Fp.write (Some true) x)
               header path ) )
 
-  let read_or_generate ~prev_challenges cache ?(s_p = storable) k_p
-      ?(s_v = vk_storable) k_v typ return_typ main_promise =
+  let read_or_generate ~(run_in_sequence : (unit -> _ Promise.t) -> _ Promise.t)
+      ~prev_challenges cache ?(s_p = storable) k_p ?(s_v = vk_storable) k_v typ
+      return_typ main_promise =
     let open Impls.Step in
     let pk =
       lazy
@@ -109,13 +110,14 @@ module Step = struct
                Common.time "stepkeygen" (fun () ->
                    let%bind.Promise main = main_promise in
                    let%map.Promise constraint_system =
-                     let constraint_builder =
-                       constraint_system_manual ~input_typ:typ ~return_typ
-                     in
-                     let%map.Promise res =
-                       constraint_builder.run_circuit main
-                     in
-                     constraint_builder.finish_computation res
+                     run_in_sequence (fun () ->
+                         let constraint_builder =
+                           constraint_system_manual ~input_typ:typ ~return_typ
+                         in
+                         let%map.Promise res =
+                           constraint_builder.run_circuit main
+                         in
+                         constraint_builder.finish_computation res )
                    in
                    constraint_system |> Keypair.generate ~prev_challenges )
              in

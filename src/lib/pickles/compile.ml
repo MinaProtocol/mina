@@ -250,6 +250,23 @@ module Storables = struct
     }
 end
 
+let create_lock () =
+  let lock = ref (Promise.return ()) in
+  let open Promise.Let_syntax in
+  let run_in_sequence (f : unit -> 'a Promise.t) : 'a Promise.t =
+    (* await the current lock *)
+    let%bind () = !lock in
+    (* create a new lock *)
+    let unlock = ref (fun () -> ()) in
+    lock := Promise.create (fun resolve -> unlock := resolve) ;
+    (* run the function and unlock *)
+    try
+      let%map res = f () in
+      !unlock () ; res
+    with exn -> !unlock () ; raise exn
+  in
+  run_in_sequence
+
 module Make
     (Arg_var : Statement_var_intf)
     (Arg_value : Statement_value_intf)
@@ -571,6 +588,7 @@ struct
       in
       Vector.map ~f:(fun x -> Option.value_exn @@ Promise.peek x) step_domains
     in
+    let run_in_sequence = create_lock () in
 
     let cache_handle = ref (Lazy.return (Promise.return `Cache_hit)) in
     let accum_dirty t = cache_handle := Cache_handle.(!cache_handle + t) in
@@ -583,11 +601,10 @@ struct
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
           ~wrap_rounds:Tock.Rounds.n
       in
-      let create_keys (T b : _ Branch_data.t) chain_to =
+      let create_keys (T b : _ Branch_data.t) =
         let (T (typ, _conv, conv_inv)) = etyp in
         let main_promise : (unit -> unit -> _ Promise.t) Promise.t =
-          let%bind.Promise step_domains = all_step_domains in
-          let%map.Promise () = chain_to in
+          let%map.Promise step_domains = all_step_domains in
           let main () () =
             let%map.Promise res = b.main ~step_domains () in
             Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
@@ -599,23 +616,18 @@ struct
         (* HACK: TODO docs *)
         if return_early_digest_exception then failwith "TODO: Delete me" ;
 
-        let stop_waiting_for_circuit = ref (fun () -> ()) in
-        let next_chain_to =
-          Promise.create (fun resolve -> stop_waiting_for_circuit := resolve)
-        in
-
         let k_p =
           lazy
             (let%map.Promise cs =
                let%bind.Promise main = main_promise in
-               let constraint_builder =
-                 Impl.constraint_system_manual ~input_typ:Typ.unit
-                   ~return_typ:typ
-               in
-               let%map.Promise res = constraint_builder.run_circuit main in
-               constraint_builder.finish_computation res
+               run_in_sequence (fun () ->
+                   let constraint_builder =
+                     Impl.constraint_system_manual ~input_typ:Typ.unit
+                       ~return_typ:typ
+                   in
+                   let%map.Promise res = constraint_builder.run_circuit main in
+                   constraint_builder.finish_computation res )
              in
-             !stop_waiting_for_circuit () ;
              let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
              ( Type_equal.Id.uid self.id
              , snark_keys_header
@@ -645,7 +657,7 @@ struct
         in
         let ((pk, vk) as res) =
           Common.time "step read or generate" (fun () ->
-              Cache.Step.read_or_generate (* ~stop_waiting_for_circuit *)
+              Cache.Step.read_or_generate ~run_in_sequence
                 ~prev_challenges:(Nat.to_int (fst b.proofs_verified))
                 cache ~s_p:step_storable k_p ~s_v:step_vk_storable k_v
                 (Snarky_backendless.Typ.unit ())
@@ -653,19 +665,18 @@ struct
         in
         accum_dirty (Lazy.map pk ~f:(Promise.map ~f:snd)) ;
         accum_dirty (Lazy.map vk ~f:(Promise.map ~f:snd)) ;
-        (res, next_chain_to)
+        res
       in
       let rec f :
           type a b c d.
-             (a, b, c, d) H4.T(Branch_data).t * unit Promise.t
+             (a, b, c, d) H4.T(Branch_data).t
           -> (a, b, c, d) H4.T(E04(Lazy_keys)).t = function
-        | [], _ ->
+        | [] ->
             []
-        | data :: rest, chain_to ->
-            let first, chain_to = create_keys data chain_to in
-            first :: f (rest, chain_to)
+        | data :: rest ->
+            create_keys data :: f rest
       in
-      f (step_data, Promise.return ())
+      f step_data
     in
 
     Timer.clock __LOC__ ;

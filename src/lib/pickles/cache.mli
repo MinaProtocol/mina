@@ -37,7 +37,10 @@ module Step : sig
   val vk_storable : vk_storable
 
   val read_or_generate :
-       prev_challenges:int
+       run_in_sequence:
+         (   (unit -> Backend.Tick.R1CS_constraint_system.t Promise.t)
+          -> Backend.Tick.R1CS_constraint_system.t Promise.t )
+    -> prev_challenges:int
     -> Key_cache.Spec.t list
     -> ?s_p:storable
     -> Key.Proving.t Promise.t Lazy.t
