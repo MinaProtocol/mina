@@ -17,8 +17,8 @@ Inputs:
 
 Ensures:
 - The accounts listed in config.json are the ones in the PACKAGED_CONFIG_JSON
-- The genesis ledger directory tarfile contents match a reference copies created
-  anew from config.json
+- The genesis ledger directory tarfile contents match reference copies created
+  fresh from config.json. This takes a long time (>20min) due to rehashing.
 
 Outputs:
 - Exit code 0 if validated, 1 otherwise.
