@@ -21,25 +21,18 @@ function deferred_run(func) {
 }
 
 // Provides: deferred_map
+// Requires: deferred_of_promise
 function deferred_map(deferred, func) {
-  var newDeferred = {
-    promise: deferred.promise
-      .then(func) // the ocaml types don't know this, but func can actually be async or sync
-      .then(function (value) {
-        newDeferred.value = value;
-        newDeferred.isDetermined = true;
-        return value;
-      })
-      .catch(function (err) {
-        newDeferred.error = err;
-        newDeferred.isError = true;
-        newDeferred.isDetermined = true;
-        throw err;
-      }),
-    isError: false,
-    isDetermined: false,
-  };
-  return newDeferred;
+  return deferred_of_promise(
+    deferred.promise.then(function (value) {
+      // we might be given a `func` with multiple arguments,
+      // have to match ocaml call semantics
+      if (func.length === 1) return func(value);
+      return function () {
+        return func.apply(null, [value].concat(Array.from(arguments)));
+      };
+    })
+  );
 }
 
 // Provides: deferred_bind

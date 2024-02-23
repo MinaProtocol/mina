@@ -136,7 +136,6 @@ let wrap_main
     let%map.Lazy step_keys = step_keys in
     let%bind.Promise step_domains = step_domains in
     let%map.Promise step_keys = step_keys in
-    print_endline ":(" ;
     fun ({ proof_state =
              { deferred_values =
                  { plonk
