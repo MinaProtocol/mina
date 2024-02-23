@@ -160,23 +160,65 @@ module Json_layout = struct
         end
 
         type t =
-          { edit_state : Auth_required.t [@default None]
-          ; send : Auth_required.t [@default None]
-          ; receive : Auth_required.t [@default None]
-          ; access : Auth_required.t [@default None]
-          ; set_delegate : Auth_required.t [@default None]
-          ; set_permissions : Auth_required.t [@default None]
+          { edit_state : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.edit_state]
+          ; send : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.send]
+          ; receive : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.receive]
+          ; access : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.access]
+          ; set_delegate : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.set_delegate]
+          ; set_permissions : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.set_permissions]
           ; set_verification_key : Verification_key_perm.t
                 [@default
-                  { auth = None
-                  ; txn_version = Mina_numbers.Txn_version.current
+                  { auth =
+                      Auth_required.of_account_perm
+                        (fst
+                           Mina_base.Permissions.user_default
+                             .set_verification_key )
+                  ; txn_version =
+                      snd
+                        Mina_base.Permissions.user_default.set_verification_key
                   }]
-          ; set_zkapp_uri : Auth_required.t [@default None]
-          ; edit_action_state : Auth_required.t [@default None]
-          ; set_token_symbol : Auth_required.t [@default None]
-          ; increment_nonce : Auth_required.t [@default None]
-          ; set_voting_for : Auth_required.t [@default None]
-          ; set_timing : Auth_required.t [@default None]
+          ; set_zkapp_uri : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.set_zkapp_uri]
+          ; edit_action_state : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.edit_action_state]
+          ; set_token_symbol : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.set_token_symbol]
+          ; increment_nonce : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.increment_nonce]
+          ; set_voting_for : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.set_voting_for]
+          ; set_timing : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.set_timing]
           }
         [@@deriving yojson, fields, dhall_type, sexp, bin_io_unversioned]
 

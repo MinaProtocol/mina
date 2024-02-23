@@ -30,7 +30,7 @@ val wrap_main :
            , Impls.Wrap.Boolean.var
            , Impls.Wrap.Field.t
            , Impls.Wrap.Field.t
-           , 'b
+           , Impls.Wrap.Field.t
            , ( Impls.Wrap.Field.t Import.Scalar_challenge.t
                Import.Types.Bulletproof_challenge.t
              , 'c )
