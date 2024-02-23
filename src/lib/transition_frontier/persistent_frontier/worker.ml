@@ -37,32 +37,8 @@ module Worker = struct
   (* nothing to close *)
   let close _ = Deferred.unit
 
-  type apply_diff_error =
-    [ `Apply_diff of [ `New_node | `Root_transitioned | `Best_tip_changed ] ]
-
-  type apply_diff_error_internal =
-    [ `Not_found of
-      [ `New_root_transition
-      | `Old_root_transition
-      | `Parent_transition of State_hash.t
-      | `Arcs of State_hash.t
-      | `Best_tip ] ]
-
-  let apply_diff_error_internal_to_string = function
-    | `Not_found `New_root_transition ->
-        "new root transition not found"
-    | `Not_found `Old_root_transition ->
-        "old root transition not found"
-    | `Not_found (`Parent_transition hash) ->
-        Printf.sprintf "parent transition %s not found"
-          (State_hash.to_base58_check hash)
-    | `Not_found `Best_tip ->
-        "best tip not found"
-    | `Not_found (`Arcs hash) ->
-        Printf.sprintf "arcs not found for %s" (State_hash.to_base58_check hash)
-
-  let apply_diff (type mutant) ~old_root ~arcs_cache (t : t)
-      (diff : mutant Diff.Lite.t) : Database.batch_t -> unit =
+  let apply_diff (type mutant) ~old_root ~arcs_cache (diff : mutant Diff.Lite.t)
+      : Database.batch_t -> unit =
     match diff with
     | New_node (Lite transition) ->
         Database.add ~arcs_cache ~transition
@@ -137,7 +113,7 @@ module Worker = struct
             Database.find_arcs_and_root t.db ~arcs_cache ~parent_hashes
           in
           List.map diffs_to_apply ~f:(fun (Diff.Lite.E.E diff) ->
-              apply_diff ~old_root ~arcs_cache t diff )
+              apply_diff ~old_root ~arcs_cache diff )
         in
         let handle_emitted_proof = function
           | { Diff.Root_transition.just_emitted_a_proof = true; _ } ->
