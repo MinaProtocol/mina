@@ -114,7 +114,7 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
             , key = generateLedgersJobKey
             , target = Size.XLarge
             }
-        , DockerImage.generateStep
+        , DockerImage.generateStepWithExtras
             DockerImage.ReleaseSpec::{
               deps =
               [ { name = pipelineName
@@ -127,6 +127,11 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
             , deb_profile = "${Profiles.lowerName profile}"
             , step_key = "daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
             }
+            [ Cmd.runInDocker Cmd.Docker::{ 
+                image = "gcr.io/o1labs-192920/mina-daemon:\$GITHASH-${DebianVersions.lowerName debVersion}-${network}"
+              , extraEnv = [ "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL" ]
+              } "curl \$CONFIG_JSON_GZ_URL > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config config.json /workdir/verification"
+            ]
         , DockerImage.generateStep
             DockerImage.ReleaseSpec::{
               deps =
