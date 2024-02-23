@@ -2,9 +2,9 @@
 
 set -eo pipefail
 
-eval $(opam config env)
-export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
-export GO=/usr/lib/go/bin/go
+([ -z ${DUNE_PROFILE+x} ]) && echo "required env vars were not provided" && exit 1
+
+source ~/.profile
 
 MINA_COMMIT_SHA1=$(git rev-parse HEAD)
 
@@ -19,6 +19,7 @@ echo "--- Build all major tagets required for packaging"
 echo "Building from Commit SHA: ${MINA_COMMIT_SHA1}"
 echo "Rust Version: $(rustc --version)"
 dune build "--profile=${DUNE_PROFILE}" \
+  ${MAINNET_TARGETS} \
   src/app/logproc/logproc.exe \
   src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
   src/app/generate_keypair/generate_keypair.exe \
@@ -39,16 +40,3 @@ dune build "--profile=${DUNE_PROFILE}" \
   src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe \
   src/app/test_executive/test_executive.exe  \
   src/test/command_line_tests/command_line_tests.exe # 2>&1 | tee /tmp/buildocaml.log
-
-echo "--- Bundle all packages for Debian ${MINA_DEB_CODENAME}"
-echo " Includes mina daemon, archive-node, rosetta, generate keypair for berkeley"
-[[ ${MINA_BUILD_MAINNET} ]] && echo " MINA_BUILD_MAINNET is true so this includes the mainnet and devnet packages for mina-daemon as well"
-
-echo "--- Prepare debian packages"
-./scripts/rebuild-deb.sh $@
-
-echo "--- Upload debs to amazon s3 repo"
-./buildkite/scripts/publish-deb.sh
-
-echo "--- Git diff after build is complete:"
-git diff --exit-code -- .

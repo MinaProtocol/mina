@@ -59,30 +59,33 @@ let file_exists ?follow_symlinks filename =
   | _ ->
       false
 
-let assert_filehash_equal ~file ~hash ~logger =
+let sha3_hash ledger_file =
   let st = ref (Digestif.SHA3_256.init ()) in
-  match%bind
-    Reader.with_file file ~f:(fun rdr ->
+  match%map
+    Reader.with_file ledger_file ~f:(fun rdr ->
         Reader.read_one_chunk_at_a_time rdr ~handle_chunk:(fun buf ~pos ~len ->
             st := Digestif.SHA3_256.feed_bigstring !st buf ~off:pos ~len ;
             Deferred.return `Continue ) )
   with
   | `Eof ->
-      let computed_hash = Digestif.SHA3_256.(get !st |> to_hex) in
-      if not (String.equal computed_hash hash) then (
-        let%map () = Unix.rename ~src:file ~dst:(file ^ ".incorrect-hash") in
-        [%log error]
-          "Verification failure: downloaded $file and expected SHA3-256 = \
-           $hash but it had $computed_hash"
-          ~metadata:
-            [ ("path", `String file)
-            ; ("expected_hash", `String hash)
-            ; ("computed_hash", `String computed_hash)
-            ] ;
-        failwith "Tarball hash mismatch" )
-      else Deferred.unit
+      Digestif.SHA3_256.(get !st |> to_hex)
   | _ ->
       failwith "impossible: `Stop not used"
+
+let assert_filehash_equal ~file ~hash ~logger =
+  let%bind computed_hash = sha3_hash file in
+  if String.equal computed_hash hash then Deferred.unit
+  else
+    let%map () = Unix.rename ~src:file ~dst:(file ^ ".incorrect-hash") in
+    [%log error]
+      "Verification failure: downloaded $file and expected SHA3-256 = $hash \
+       but it had $computed_hash"
+      ~metadata:
+        [ ("path", `String file)
+        ; ("expected_hash", `String hash)
+        ; ("computed_hash", `String computed_hash)
+        ] ;
+    failwith "Tarball hash mismatch"
 
 module Ledger = struct
   let hash_filename hash ~ledger_name_prefix =
@@ -410,11 +413,6 @@ module Ledger = struct
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
       ?(ledger_name_prefix = "genesis_ledger") (config : Runtime_config.Ledger.t)
       =
-    [%log trace] "Load requested for $name $config"
-      ~metadata:
-        [ ("name", `String ledger_name_prefix)
-        ; ("config", Runtime_config.Ledger.to_yojson config)
-        ] ;
     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
         let padded_accounts_opt =
           padded_accounts_from_runtime_config_opt ~logger ~proof_level
@@ -532,7 +530,7 @@ module Ledger = struct
                         ; ("named_tar_path", `String link_name)
                         ] ;
                     Ok (packed, config, link_name)
-                | Ok tar_path, None ->
+                | Ok tar_path, _ ->
                     return (Ok (packed, config, tar_path))
                 | Error err, _ ->
                     let root_hash =
