@@ -336,10 +336,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         | { identifier; prevs; main; feature_flags } :: rest ->
             { identifier
             ; prevs
-            ; main =
-                (fun x ->
-                  let r = main x in
-                  Promise.return r )
+            ; main = (fun x -> Promise.return (main x))
             ; feature_flags
             }
             :: go rest

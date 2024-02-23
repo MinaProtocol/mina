@@ -604,83 +604,87 @@ struct
       let disk_keys =
         Option.map disk_keys ~f:(fun (xs, _) -> Vector.to_array xs)
       in
-      let etyp =
-        Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-          ~wrap_rounds:Tock.Rounds.n
-      in
-      let create_keys (T b : _ Branch_data.t) =
-        (* let () = if true then log_step main typ name b.index in *)
-        let open Impls.Step in
-        (* HACK: TODO docs *)
-        if return_early_digest_exception then failwith "TODO: Delete me" ;
+      let module M =
+        H4.Map (Branch_data) (E04 (Lazy_keys))
+          (struct
+            let etyp =
+              Impls.Step.input ~proofs_verified:Max_proofs_verified.n
+                ~wrap_rounds:Tock.Rounds.n
 
-        let k_p =
-          lazy
-            (let (T (typ, _conv, conv_inv)) = etyp in
-             let%bind.Promise main = b.main ~step_domains:all_step_domains in
-             run_in_sequence (fun () ->
-                 print_endline ("start: create cs hash for " ^ b.rule.identifier) ;
-                 let main () () =
-                   let%map.Promise res = main () in
-                   Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
-                 in
-                 let constraint_builder =
-                   Impl.constraint_system_manual ~input_typ:Typ.unit
-                     ~return_typ:typ
-                 in
-                 let%map.Promise res = constraint_builder.run_circuit main in
-                 let cs = constraint_builder.finish_computation res in
-                 let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
-                 print_endline ("done: create cs hash for " ^ b.rule.identifier) ;
-                 ( Type_equal.Id.uid self.id
-                 , snark_keys_header
-                     { type_ = "step-proving-key"
-                     ; identifier = name ^ "-" ^ b.rule.identifier
-                     }
-                     cs_hash
-                 , b.index
-                 , cs ) ) )
-        in
-        let k_v =
-          match disk_keys with
-          | Some ks ->
-              Lazy.return (Promise.return ks.(b.index))
-          | None ->
-              lazy
-                (let%map.Promise id, _header, index, cs = Lazy.force k_p in
-                 let digest = R1CS_constraint_system.digest cs in
-                 ( id
-                 , snark_keys_header
-                     { type_ = "step-verification-key"
-                     ; identifier = name ^ "-" ^ b.rule.identifier
-                     }
-                     (Md5.to_hex digest)
-                 , index
-                 , digest ) )
-        in
-        let ((pk, vk) as res) =
-          Common.time "step read or generate" (fun () ->
-              Cache.Step.read_or_generate
-                ~prev_challenges:(Nat.to_int (fst b.proofs_verified))
-                cache ~s_p:step_storable k_p ~s_v:step_vk_storable k_v )
-        in
-        accum_dirty (Lazy.map pk ~f:(Promise.map ~f:snd)) ;
-        accum_dirty (Lazy.map vk ~f:(Promise.map ~f:snd)) ;
-        res
+            let f (T b : _ Branch_data.t) =
+              (* let () = if true then log_step main typ name b.index in *)
+              let open Impls.Step in
+              (* HACK: TODO docs *)
+              if return_early_digest_exception then failwith "TODO: Delete me" ;
+
+              let k_p =
+                lazy
+                  (let (T (typ, _conv, conv_inv)) = etyp in
+                   let%bind.Promise main =
+                     b.main ~step_domains:all_step_domains
+                   in
+                   run_in_sequence (fun () ->
+                       print_endline
+                         ("start: create cs hash for " ^ b.rule.identifier) ;
+                       let main () () =
+                         let%map.Promise res = main () in
+                         Impls.Step.with_label "conv_inv" (fun () ->
+                             conv_inv res )
+                       in
+                       let constraint_builder =
+                         Impl.constraint_system_manual ~input_typ:Typ.unit
+                           ~return_typ:typ
+                       in
+                       let%map.Promise res =
+                         constraint_builder.run_circuit main
+                       in
+                       let cs = constraint_builder.finish_computation res in
+                       let cs_hash =
+                         Md5.to_hex (R1CS_constraint_system.digest cs)
+                       in
+                       print_endline
+                         ("done: create cs hash for " ^ b.rule.identifier) ;
+                       ( Type_equal.Id.uid self.id
+                       , snark_keys_header
+                           { type_ = "step-proving-key"
+                           ; identifier = name ^ "-" ^ b.rule.identifier
+                           }
+                           cs_hash
+                       , b.index
+                       , cs ) ) )
+              in
+              let k_v =
+                match disk_keys with
+                | Some ks ->
+                    Lazy.return (Promise.return ks.(b.index))
+                | None ->
+                    lazy
+                      (let%map.Promise id, _header, index, cs =
+                         Lazy.force k_p
+                       in
+                       let digest = R1CS_constraint_system.digest cs in
+                       ( id
+                       , snark_keys_header
+                           { type_ = "step-verification-key"
+                           ; identifier = name ^ "-" ^ b.rule.identifier
+                           }
+                           (Md5.to_hex digest)
+                       , index
+                       , digest ) )
+              in
+              let ((pk, vk) as res) =
+                Common.time "step read or generate" (fun () ->
+                    Cache.Step.read_or_generate
+                      ~prev_challenges:(Nat.to_int (fst b.proofs_verified))
+                      cache ~s_p:step_storable k_p ~s_v:step_vk_storable k_v )
+              in
+              accum_dirty (Lazy.map pk ~f:(Promise.map ~f:snd)) ;
+              accum_dirty (Lazy.map vk ~f:(Promise.map ~f:snd)) ;
+              res
+          end)
       in
-      (* TODO refactor back to H4.Map *)
-      let rec f :
-          type a b c d.
-             (a, b, c, d) H4.T(Branch_data).t
-          -> (a, b, c, d) H4.T(E04(Lazy_keys)).t = function
-        | [] ->
-            []
-        | data :: rest ->
-            create_keys data :: f rest
-      in
-      f step_data
+      M.f step_data
     in
-
     Timer.clock __LOC__ ;
     let step_vks =
       let module V = H4.To_vector (Lazy_keys) in
