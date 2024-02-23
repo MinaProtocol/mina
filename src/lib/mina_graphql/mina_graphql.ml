@@ -2331,7 +2331,7 @@ module Queries = struct
                              .global_slot_since_genesis
                         in
                         if
-                          Mina_numbers.Global_slot_since_genesis.( <= )
+                          Mina_numbers.Global_slot_since_genesis.( < )
                             global_slot stop_slot
                         then return breadcrumb
                         else
