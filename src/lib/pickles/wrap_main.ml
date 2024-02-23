@@ -97,7 +97,7 @@ let wrap_main
       Vector.t
       Promise.t
       Lazy.t ) (step_widths : (int, branches) Vector.t)
-    (step_domains : (Domains.t Promise.t, branches) Vector.t) ~srs
+    (step_domains : (Domains.t, branches) Vector.t Promise.t) ~srs
     (max_proofs_verified :
       (module Nat.Add.Intf with type n = max_proofs_verified) ) :
     (max_proofs_verified, max_local_max_proofs_verifieds) Requests.Wrap.t
@@ -134,17 +134,8 @@ let wrap_main
   Timer.clock __LOC__ ;
   let main =
     let%map.Lazy step_keys = step_keys in
-    let%bind.Promise step_keys = step_keys in
-    let%map.Promise step_domains =
-      let%map.Promise () =
-        (* Wait for promises to resolve. *)
-        Vector.fold ~init:(Promise.return ()) step_domains
-          ~f:(fun acc step_domain ->
-            let%bind.Promise _ = step_domain in
-            acc )
-      in
-      Vector.map ~f:(fun x -> Option.value_exn @@ Promise.peek x) step_domains
-    in
+    let%bind.Promise step_domains = step_domains in
+    let%map.Promise step_keys = step_keys in
     fun ({ proof_state =
              { deferred_values =
                  { plonk

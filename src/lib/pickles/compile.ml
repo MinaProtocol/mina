@@ -129,7 +129,7 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          Promise.t
          Lazy.t
       -> (int, 'branches) Pickles_types.Vector.t
-      -> (Import.Domains.t Promise.t, 'branches) Pickles_types.Vector.t
+      -> (Import.Domains.t, 'branches) Pickles_types.Vector.t Promise.t
       -> (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
       -> ('max_proofs_verified, 'max_local_max_proofs_verifieds) Requests.Wrap.t
          * (   ( ( Impls.Wrap.Field.t
@@ -252,6 +252,7 @@ end
 
 let create_lock () =
   let lock = ref (Promise.return ()) in
+
   let open Promise.Let_syntax in
   let run_in_sequence (f : unit -> 'a Promise.t) : 'a Promise.t =
     (* acquire the lock *)
@@ -267,6 +268,18 @@ let create_lock () =
     with exn -> !unlock () ; raise exn
   in
   run_in_sequence
+
+(* turn a vector of promises into a promise of a vector *)
+let promise_all (type a n) (vec : (a Promise.t, n) Vector.t) :
+    (a, n) Vector.t Promise.t =
+  let open Promise.Let_syntax in
+  let%map () =
+    (* Wait for promises to resolve. *)
+    Vector.fold ~init:(Promise.return ()) vec ~f:(fun acc el ->
+        let%bind _ = el in
+        acc )
+  in
+  Vector.map ~f:(fun x -> Option.value_exn @@ Promise.peek x) vec
 
 module Make
     (Arg_var : Statement_var_intf)
@@ -579,16 +592,7 @@ struct
       V.f prev_varss_length (M.f step_data)
     in
 
-    let all_step_domains =
-      let%map.Promise () =
-        (* Wait for promises to resolve. *)
-        Vector.fold ~init:(Promise.return ()) step_domains
-          ~f:(fun acc step_domain ->
-            let%bind.Promise _ = step_domain in
-            acc )
-      in
-      Vector.map ~f:(fun x -> Option.value_exn @@ Promise.peek x) step_domains
-    in
+    let all_step_domains = promise_all step_domains in
     let run_in_sequence = create_lock () in
 
     let cache_handle = ref (Lazy.return (Promise.return `Cache_hit)) in
@@ -702,7 +706,7 @@ struct
       | None ->
           let srs = Tick.Keypair.load_urs () in
           Wrap_main.wrap_main ~feature_flags ~srs full_signature
-            prev_varss_length step_vks proofs_verifieds step_domains
+            prev_varss_length step_vks proofs_verifieds all_step_domains
             max_proofs_verified
       | Some { wrap_main; tweak_statement = _ } ->
           (* Instead of creating a proof using the pickles wrap circuit, we
@@ -714,7 +718,7 @@ struct
              testing.
           *)
           wrap_main wrap_domains full_signature prev_varss_length step_vks
-            proofs_verifieds step_domains max_proofs_verified
+            proofs_verifieds all_step_domains max_proofs_verified
     in
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
