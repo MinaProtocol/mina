@@ -40,11 +40,8 @@ val step_main :
        , 'self_branches )
        Types_map.Compiled.basic
   -> known_wrap_keys:
-       ( 'prev_vars
-       , 'prev_values
-       , 'local_signature
-       , 'local_branches )
-       Pickles_types.Hlist.H4.T(Types_map.Compiled.Optional_wrap_key).t
+       'local_branches
+       Pickles_types.Hlist.H1.T(Types_map.For_step.Optional_wrap_key).t
   -> self:('var, 'value, 'max_proofs_verified, 'self_branches) Tag.t
   -> ( 'prev_vars
      , 'prev_values

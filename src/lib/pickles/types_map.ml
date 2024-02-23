@@ -107,17 +107,6 @@ module Compiled = struct
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     }
 
-  module Optional_wrap_key = struct
-    type 'branches resolved_wrap_key =
-      { wrap_key :
-          Tick.Inner_curve.Affine.t array Plonk_verification_key_evals.t
-      ; step_domains : (Domains.t, 'branches) Vector.t
-      }
-
-    type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
-      'branches resolved_wrap_key option
-  end
-
   type packed =
     | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1, 'n2) t -> packed
 
@@ -188,7 +177,18 @@ module For_step = struct
     ; feature_flags
     }
 
-  let of_compiled_with_known_wrap_key ~wrap_key ~step_domains
+  module Optional_wrap_key = struct
+    type 'branches known =
+      { wrap_key :
+          Tick.Inner_curve.Affine.t array Plonk_verification_key_evals.t
+      ; step_domains : (Domains.t, 'branches) Vector.t
+      }
+
+    type 'branches t = 'branches known option
+  end
+
+  let of_compiled_with_known_wrap_key
+      ({ wrap_key; step_domains } : _ Optional_wrap_key.known)
       ({ branches
        ; max_proofs_verified
        ; proofs_verifieds
@@ -225,7 +225,7 @@ module For_step = struct
       in
       Vector.map ~f:(fun x -> Option.value_exn @@ Promise.peek x) step_domains
     in
-    of_compiled_with_known_wrap_key ~wrap_key ~step_domains t
+    of_compiled_with_known_wrap_key { wrap_key; step_domains } t
 end
 
 type t =

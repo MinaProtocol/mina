@@ -136,18 +136,18 @@ let create
   (* Here, we prefetch the known wrap keys for all compiled rules.
      These keys may resolve asynchronously due to key generation for other
      pickles rules, but we want to preserve the single-threaded behavior of
-     pickles to maximize our chanes of successful debugging.
+     pickles to maximize our chances of successful debugging.
      Hence, we preload here, and pass the values in as needed when we create
      [datas] below.
   *)
+  let module Optional_wrap_key = Types_map.For_step.Optional_wrap_key in
   let known_wrap_keys =
     let rec go :
         type a1 a2 n m.
-           (a1, a2, n, m) H4.T(Tag).t
-        -> (a1, a2, n, m) H4.T(Types_map.Compiled.Optional_wrap_key).t Promise.t
-        = function
+        (a1, a2, n, m) H4.T(Tag).t -> m H1.T(Optional_wrap_key).t Promise.t =
+      function
       | [] ->
-          Promise.return ([] : _ H4.T(Types_map.Compiled.Optional_wrap_key).t)
+          Promise.return ([] : _ H1.T(Optional_wrap_key).t)
       | tag :: tags ->
           let%bind.Promise opt_wrap_key =
             match Type_equal.Id.same_witness self.id tag.id with
@@ -170,15 +170,12 @@ let create
                         ~f:(fun x -> Option.value_exn @@ Promise.peek x)
                         compiled.step_domains
                     in
-                    Some
-                      { Types_map.Compiled.Optional_wrap_key.wrap_key
-                      ; step_domains
-                      }
+                    Some { Optional_wrap_key.wrap_key; step_domains }
                 | Side_loaded ->
                     Promise.return None )
           in
           let%map.Promise rest = go tags in
-          (opt_wrap_key :: rest : _ H4.T(Types_map.Compiled.Optional_wrap_key).t)
+          (opt_wrap_key :: rest : _ H1.T(Optional_wrap_key).t)
     in
     go rule.prevs
   in

@@ -79,18 +79,6 @@ module Compiled : sig
         (Import.Domains.t Promise.t, 'branches) Pickles_types.Vector.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     }
-
-  module Optional_wrap_key : sig
-    type 'branches resolved_wrap_key =
-      { wrap_key :
-          Backend.Tick.Inner_curve.Affine.t array
-          Pickles_types.Plonk_verification_key_evals.t
-      ; step_domains : (Import.Domains.t, 'branches) Pickles_types.Vector.t
-      }
-
-    type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
-      'branches resolved_wrap_key option
-  end
 end
 
 module For_step : sig
@@ -116,11 +104,19 @@ module For_step : sig
 
   val of_side_loaded : ('a, 'b, 'c, 'd) Side_loaded.t -> ('a, 'b, 'c, 'd) t
 
+  module Optional_wrap_key : sig
+    type 'branches known =
+      { wrap_key :
+          Backend.Tick.Inner_curve.Affine.t array
+          Pickles_types.Plonk_verification_key_evals.t
+      ; step_domains : (Import.Domains.t, 'branches) Pickles_types.Vector.t
+      }
+
+    type 'branches t = 'branches known option
+  end
+
   val of_compiled_with_known_wrap_key :
-       wrap_key:
-         Step_main_inputs.Inner_curve.Constant.t array
-         Plonk_verification_key_evals.t
-    -> step_domains:(Import.Domains.t, 'branches) Vector.t
+       'branches Optional_wrap_key.known
     -> ('a, 'b, 'c, 'branches) Compiled.t
     -> ('a, 'b, 'c, 'branches) t
 

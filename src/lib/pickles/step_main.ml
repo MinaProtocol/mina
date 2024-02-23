@@ -161,11 +161,7 @@ let step_main :
          , self_branches )
          Types_map.Compiled.basic
     -> known_wrap_keys:
-         ( prev_vars
-         , prev_values
-         , local_signature
-         , local_branches )
-         H4.T(Types_map.Compiled.Optional_wrap_key).t
+         local_branches H1.T(Types_map.For_step.Optional_wrap_key).t
     -> self:(var, value, max_proofs_verified, self_branches) Tag.t
     -> ( prev_vars
        , prev_values
@@ -499,11 +495,7 @@ let step_main :
                   let rec go :
                       type a1 a2 n m.
                          (a1, a2, n, m) H4.T(Tag).t
-                      -> ( a1
-                         , a2
-                         , n
-                         , m )
-                         H4.T(Types_map.Compiled.Optional_wrap_key).t
+                      -> m H1.T(Types_map.For_step.Optional_wrap_key).t
                       -> (a1, a2, n, m) H4.T(Types_map.For_step).t =
                    fun tags optional_wrap_keys ->
                     match (tags, optional_wrap_keys) with
@@ -515,15 +507,9 @@ let step_main :
                           | None -> (
                               match tag.kind with
                               | Compiled ->
-                                  let { Types_map.Compiled.Optional_wrap_key
-                                        .wrap_key
-                                      ; step_domains
-                                      } =
-                                    Option.value_exn optional_wrap_key
-                                  in
                                   Types_map.For_step
-                                  .of_compiled_with_known_wrap_key ~wrap_key
-                                    ~step_domains
+                                  .of_compiled_with_known_wrap_key
+                                    (Option.value_exn optional_wrap_key)
                                     (Types_map.lookup_compiled tag.id)
                               | Side_loaded ->
                                   Types_map.For_step.of_side_loaded
