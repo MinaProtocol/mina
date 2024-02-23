@@ -14,8 +14,9 @@
    merkle_ledger
    transition_frontier_base
    mina_base
+   mina_ledger
    logger
    data_hash_lib
    )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_coda ppx_version)))
+ (preprocess (pps ppx_jane ppx_mina ppx_version)))

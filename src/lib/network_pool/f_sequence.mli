@@ -38,6 +38,8 @@ val foldl : ('a -> 'e -> 'a) -> 'a -> 'e t -> 'a
 
 val foldr : ('e -> 'a -> 'a) -> 'a -> 'e t -> 'a
 
+val findi : 'a t -> f:('a -> bool) -> int option
+
 val iter : 'e t -> f:('e -> unit) -> unit
 
 val to_seq : 'e t -> 'e Sequence.t

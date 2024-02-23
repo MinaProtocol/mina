@@ -2,6 +2,10 @@
  (name outside_hash_image)
  (public_name outside_hash_image_nonconsensus)
  (libraries snark_params_nonconsensus)
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_version ppx_optcomp))
