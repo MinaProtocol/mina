@@ -6,7 +6,9 @@ let autogen_path = Filename.temp_dir_name ^/ "coda_cache_dir"
 let s3_install_path = "/tmp/s3_cache_dir"
 
 let s3_keys_bucket_prefix =
-  "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net"
+  Option.value
+    (Sys.getenv "MINA_LEDGER_S3_BUCKET")
+    ~default:"https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net"
 
 let manual_install_path = "/var/lib/coda"
 
@@ -28,12 +30,7 @@ let cache =
   ; dir s3_install_path false
   ; dir autogen_path true
   ; Key_cache.Spec.S3
-      { bucket_prefix =
-          Option.value
-            (Sys.getenv "MINA_LEDGER_S3_BUCKET")
-            ~default:s3_keys_bucket_prefix
-      ; install_path = s3_install_path
-      }
+      { bucket_prefix = s3_keys_bucket_prefix; install_path = s3_install_path }
   ]
 
 let env_path =
