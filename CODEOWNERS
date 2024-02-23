@@ -54,5 +54,3 @@
 /src/lib/unsigned_extended/ @MinaProtocol/crypto-eng-reviewers
 
 /src/nonconsensus @MinaProtocol/protocol-eng-reviewers
-
-graphql_schema.json @MinaProtocol/product-eng-reviewers
