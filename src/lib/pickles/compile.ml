@@ -609,15 +609,6 @@ struct
           ~wrap_rounds:Tock.Rounds.n
       in
       let create_keys (T b : _ Branch_data.t) =
-        let (T (typ, _conv, conv_inv)) = etyp in
-        let main_promise : (unit -> unit -> _ Promise.t) Promise.t =
-          let%map.Promise step_domains = all_step_domains in
-          let main () () =
-            let%map.Promise res = b.main ~step_domains () in
-            Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
-          in
-          main
-        in
         (* let () = if true then log_step main typ name b.index in *)
         let open Impls.Step in
         (* HACK: TODO docs *)
@@ -625,27 +616,30 @@ struct
 
         let k_p =
           lazy
-            ( print_endline ("start: create cs hash for " ^ b.rule.identifier) ;
-              let%map.Promise cs =
-                let%bind.Promise main = main_promise in
-                run_in_sequence (fun () ->
-                    let constraint_builder =
-                      Impl.constraint_system_manual ~input_typ:Typ.unit
-                        ~return_typ:typ
-                    in
-                    let%map.Promise res = constraint_builder.run_circuit main in
-                    constraint_builder.finish_computation res )
-              in
-              let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
-              print_endline ("done: create cs hash for " ^ b.rule.identifier) ;
-              ( Type_equal.Id.uid self.id
-              , snark_keys_header
-                  { type_ = "step-proving-key"
-                  ; identifier = name ^ "-" ^ b.rule.identifier
-                  }
-                  cs_hash
-              , b.index
-              , cs ) )
+            (let (T (typ, _conv, conv_inv)) = etyp in
+             let%bind.Promise step_domains = all_step_domains in
+             run_in_sequence (fun () ->
+                 print_endline ("start: create cs hash for " ^ b.rule.identifier) ;
+                 let main () () =
+                   let%map.Promise res = b.main ~step_domains () in
+                   Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
+                 in
+                 let constraint_builder =
+                   Impl.constraint_system_manual ~input_typ:Typ.unit
+                     ~return_typ:typ
+                 in
+                 let%map.Promise res = constraint_builder.run_circuit main in
+                 let cs = constraint_builder.finish_computation res in
+                 let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
+                 print_endline ("done: create cs hash for " ^ b.rule.identifier) ;
+                 ( Type_equal.Id.uid self.id
+                 , snark_keys_header
+                     { type_ = "step-proving-key"
+                     ; identifier = name ^ "-" ^ b.rule.identifier
+                     }
+                     cs_hash
+                 , b.index
+                 , cs ) ) )
         in
         let k_v =
           match disk_keys with
@@ -731,19 +725,24 @@ struct
       let main =
         lazy
           (let%map.Promise wrap_main = Lazy.force wrap_main in
-           fun x () -> wrap_main (conv x) )
+           fun x () ->
+             let input = conv x in
+             print_endline "created input for wrap_main" ;
+             wrap_main input )
       in
       (*let () = if true then log_wrap main typ name self.id in*)
       let self_id = Type_equal.Id.uid self.id in
       let disk_key_prover =
         lazy
           (let%map.Promise main = Lazy.force main in
+           print_endline "start: create cs hash for wrap" ;
            let cs =
              constraint_system ~input_typ:typ
                ~return_typ:(Snarky_backendless.Typ.unit ())
                main
            in
            let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
+           print_endline "done: create cs hash for wrap" ;
            ( self_id
            , snark_keys_header
                { type_ = "wrap-proving-key"; identifier = name }
