@@ -11,6 +11,20 @@ module Plonk_constraint_system : sig
 
   val get_public_input_size : ('a, 'b) t -> int Core_kernel.Set_once.t
 
+  (** Return the size of all the fixed lookup tables concatenated, without the
+      built-in XOR and RangeCheck tables *)
+  val get_concatenated_fixed_lookup_table_size : ('a, 'b) t -> int
+
+  (** Return the size of all the runtime lookup tables concatenated *)
+  val get_concatenated_runtime_lookup_table_size : ('a, 'b) t -> int
+
+  (** Finalize the fixed lookup tables. The function can not be called twice *)
+  val finalize_fixed_lookup_tables : _ t -> unit
+
+  (** Finalize the runtime lookup table configurations. The function can not be
+      called twice. *)
+  val finalize_runtime_lookup_tables : _ t -> unit
+
   val get_rows_len : ('a, 'b) t -> int
 end
 
