@@ -3,7 +3,13 @@ open Core
 
 type 'a parser = Yojson.Safe.t -> 'a Ppx_deriving_yojson_runtime.error_or
 
-type connection_conf = { hostname : string; port : int; ssl : bool }
+type connection_conf =
+  { hostname : string
+  ; port : int
+  ; ssl : bool
+  ; connect_timeout : int
+  ; request_timeout : int
+  }
 
 type credentials = { username : string; password : string }
 
@@ -23,7 +29,17 @@ let make_conn_conf () : connection_conf option =
     |> Option.map
          ~f:(List.mem ~equal:String.equal [ "1"; "TRUE"; "true"; "YES"; "yes" ])
   in
-  { hostname; port; ssl }
+  let connect_timeout =
+    Sys.getenv "CONNECT_TIMEOUT"
+    |> Option.map ~f:Int.of_string
+    |> Option.value ~default:30
+  in
+  let request_timeout =
+    Sys.getenv "REQUEST_TIMEOUT"
+    |> Option.map ~f:Int.of_string
+    |> Option.value ~default:30
+  in
+  { hostname; port; ssl; connect_timeout; request_timeout }
 
 let make_cred_conf () : credentials option =
   let open Option.Let_syntax in
@@ -45,8 +61,16 @@ let query ~conf q =
   let args =
     optional conf.credentials ~f:(fun { username; password } ->
         [ "--username"; username; "--password"; password ] )
-    @ optional conf.connection ~f:(fun { hostname; port; ssl } ->
-          (if ssl then [ "--ssl" ] else []) @ [ hostname; Int.to_string port ] )
+    @ optional conf.connection
+        ~f:(fun { hostname; port; ssl; connect_timeout; request_timeout } ->
+          (if ssl then [ "--ssl" ] else [])
+          @ [ hostname
+            ; Int.to_string port
+            ; "--connect-timeout"
+            ; Int.to_string connect_timeout
+            ; "--request-timeout"
+            ; Int.to_string request_timeout
+            ] )
   in
   Process.run_lines ~prog:conf.executable ~stdin:q ~args ()
 
