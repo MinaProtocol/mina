@@ -1,7 +1,7 @@
 // Provides: deferred_run
 function deferred_run(func) {
   var deferred = {
-    promise: Promise.resolve()
+    promise: globalThis.Promise.resolve()
       .then(func) // the ocaml types don't know this, but func can actually be async or sync
       .then(function (value) {
         deferred.value = value;
@@ -92,7 +92,7 @@ function deferred_peek(deferred) {
 // Provides: deferred_value_exn
 function deferred_value_exn(deferred) {
   if (!deferred.isDetermined) {
-    throw Error("Deferred has not returned yet.");
+    throw Error('Deferred has not returned yet.');
   }
   if (deferred.isError) {
     throw deferred.error;
@@ -103,7 +103,7 @@ function deferred_value_exn(deferred) {
 // Provides: deferred_return
 function deferred_return(value) {
   return {
-    promise: Promise.resolve(value),
+    promise: globalThis.Promise.resolve(value),
     value: value,
     isError: false,
     isDetermined: true,
@@ -113,7 +113,7 @@ function deferred_return(value) {
 // Provides: deferred_create
 function deferred_create(promise_creator) {
   var deferred = {
-    promise: new Promise(function (resolve) {
+    promise: new globalThis.Promise(function (resolve) {
       promise_creator(resolve);
     })
       .then(function (value) {
