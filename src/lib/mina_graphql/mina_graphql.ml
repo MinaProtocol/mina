@@ -4312,7 +4312,7 @@ module Queries = struct
                           |> Consensus.Data.Consensus_state
                              .global_slot_since_genesis
                         in
-                        if Mina_numbers.Global_slot.( <= ) global_slot stop_slot
+                        if Mina_numbers.Global_slot.( < ) global_slot stop_slot
                         then return breadcrumb
                         else
                           let parent_hash =
