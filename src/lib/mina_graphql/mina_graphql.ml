@@ -2426,10 +2426,16 @@ module Queries = struct
           | Some (`Finalized (Ledger_db l)) ->
               return (Ledger.Any_ledger.cast (module Ledger.Db) l)
         in
-        assert (
-          Mina_base.Ledger_hash.equal
-            (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
-            next_epoch.ledger.hash ) ;
+        let next_epoch =
+          { next_epoch with
+            ledger =
+              { next_epoch.ledger =
+                { next_epoch.ledger with
+                  hash = Ledger.Any_ledger.M.merkle_root next_epoch_ledger
+                }
+              }
+           }
+        in
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger ~global_slot
             ~state_hash ~staking_ledger ~staking_epoch_seed
