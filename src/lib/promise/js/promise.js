@@ -1,5 +1,13 @@
 // Provides: deferred_run
 function deferred_run(func) {
+  if (func.length > 1) {
+    // we add this restriction to be able to use .then(func) below,
+    // which allows us to implement external functions that are synchronous
+    // in native Rust with async functions in JS
+    throw Error(
+      'deferred_run cannot be called with a function that takes more than 1 argument.'
+    );
+  }
   var deferred = {
     promise: globalThis.Promise.resolve()
       .then(func) // the ocaml types don't know this, but func can actually be async or sync
@@ -39,8 +47,8 @@ function deferred_map(deferred, func) {
 function deferred_bind(deferred, func) {
   var newDeferred = {
     promise: deferred.promise
-      .then(func)
-      .then(function (anotherDeferred) {
+      .then(function (input) {
+        var anotherDeferred = func(input);
         return anotherDeferred.promise;
       })
       .then(function (value) {
