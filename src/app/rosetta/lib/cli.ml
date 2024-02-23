@@ -29,7 +29,7 @@ let logger_setup log_json log_level =
     else
       Logger.Processor.pretty ~log_level
         ~config:
-          { Logproc_lib.Interpolator.mode= Inline
+          { Interpolator_lib.Interpolator.mode= Inline
           ; max_interpolation_length= 50
           ; pretty_print= true }
   in
