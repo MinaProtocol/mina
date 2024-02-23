@@ -666,11 +666,9 @@ struct
         in
         let ((pk, vk) as res) =
           Common.time "step read or generate" (fun () ->
-              Cache.Step.read_or_generate ~run_in_sequence
+              Cache.Step.read_or_generate
                 ~prev_challenges:(Nat.to_int (fst b.proofs_verified))
-                cache ~s_p:step_storable k_p ~s_v:step_vk_storable k_v
-                (Snarky_backendless.Typ.unit ())
-                typ main_promise )
+                cache ~s_p:step_storable k_p ~s_v:step_vk_storable k_v )
         in
         accum_dirty (Lazy.map pk ~f:(Promise.map ~f:snd)) ;
         accum_dirty (Lazy.map vk ~f:(Promise.map ~f:snd)) ;

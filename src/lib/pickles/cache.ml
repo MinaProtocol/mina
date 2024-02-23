@@ -91,42 +91,23 @@ module Step = struct
                 (Kimchi_bindings.Protocol.VerifierIndex.Fp.write (Some true) x)
               header path ) )
 
-  let read_or_generate ~(run_in_sequence : (unit -> _ Promise.t) -> _ Promise.t)
-      ~prev_challenges cache ?(s_p = storable) k_p ?(s_v = vk_storable) k_v typ
-      return_typ main_promise =
+  let read_or_generate ~prev_challenges cache ?(s_p = storable) k_p
+      ?(s_v = vk_storable) k_v =
     let open Impls.Step in
     let pk =
       lazy
-        (let%bind.Promise k_p = Lazy.force k_p in
-         let _, _, i, _ = k_p in
+        (let%map.Promise k_p = Lazy.force k_p in
+         let _, _, i, sys = k_p in
          match
            Common.time "step keypair read" (fun () ->
                Key_cache.Sync.read cache s_p k_p )
          with
          | Ok (pk, dirty) ->
-             Common.time "step keypair create" (fun () ->
-                 Promise.return (pk, dirty) )
+             Common.time "step keypair create" (fun () -> (pk, dirty))
          | Error _e ->
-             let%map.Promise r =
+             let r =
                Common.time "stepkeygen" (fun () ->
-                   let%bind.Promise main = main_promise in
-                   let%map.Promise constraint_system =
-                     run_in_sequence (fun () ->
-                         print_endline
-                           ( "[read_or_generate] Generating cs - "
-                           ^ Int.to_string i ) ;
-                         let constraint_builder =
-                           constraint_system_manual ~input_typ:typ ~return_typ
-                         in
-                         let%map.Promise res =
-                           constraint_builder.run_circuit main
-                         in
-                         print_endline
-                           ( "[read_or_generate] Ran circuit - "
-                           ^ Int.to_string i ) ;
-                         constraint_builder.finish_computation res )
-                   in
-                   constraint_system |> Keypair.generate ~prev_challenges )
+                   sys |> Keypair.generate ~prev_challenges )
              in
              Timer.clock __LOC__ ;
              print_endline

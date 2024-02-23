@@ -37,18 +37,12 @@ module Step : sig
   val vk_storable : vk_storable
 
   val read_or_generate :
-       run_in_sequence:
-         (   (unit -> Backend.Tick.R1CS_constraint_system.t Promise.t)
-          -> Backend.Tick.R1CS_constraint_system.t Promise.t )
-    -> prev_challenges:int
+       prev_challenges:int
     -> Key_cache.Spec.t list
     -> ?s_p:storable
     -> Key.Proving.t Promise.t Lazy.t
     -> ?s_v:vk_storable
     -> Key.Verification.t Promise.t Lazy.t
-    -> ('a, 'b) Impls.Step.Typ.t
-    -> ('c, 'd) Impls.Step.Typ.t
-    -> ('a -> unit -> 'c Promise.t) Promise.t
     -> ( Impls.Step.Proving_key.t
        * ([> `Cache_hit | `Generated_something | `Locally_generated ] as 'e) )
        Promise.t
