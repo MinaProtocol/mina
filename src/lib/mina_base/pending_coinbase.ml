@@ -84,9 +84,11 @@ module Make_str (A : Wire_types.Concrete) = struct
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type t [@@deriving sexp, yojson, compare, equal]
+        type t [@@deriving sexp, to_yojson, compare, equal]
       end
     end]
+
+    val of_yojson : Yojson.Safe.t -> (t, string) result
 
     val of_int : int -> t
 
@@ -734,8 +736,13 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     module Hash = struct
+      (* the type below triggers the ppx derivers to insert unused `rec` flags, so we ignore such warnings *)
+      [@@@warning "-39"]
+
       type t = Hash_builder.t constraint t = Hash_versioned.t
       [@@deriving equal, compare, sexp, yojson, hash]
+
+      [@@@warning "+39"]
 
       type var = Hash_builder.var
 
