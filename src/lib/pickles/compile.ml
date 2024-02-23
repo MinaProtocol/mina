@@ -279,6 +279,7 @@ let promise_all (type a n) (vec : (a Promise.t, n) Vector.t) :
         let%bind _ = el in
         acc )
   in
+  print_endline "promise_all awaited" ;
   Vector.map ~f:(fun x -> Option.value_exn @@ Promise.peek x) vec
 
 module Make
@@ -548,6 +549,7 @@ struct
       let module V = H4.To_vector (Int) in
       V.f prev_varss_length (M.f choices)
     in
+    (* TODO: remove the `chain_to` promise and just use create_lock *)
     let step_data =
       let i = ref 0 in
       Timer.clock __LOC__ ;
@@ -579,16 +581,16 @@ struct
     in
     Timer.clock __LOC__ ;
     let step_domains =
-      let module DomainsPromise = struct
+      let module Domains_promise = struct
         type t = Domains.t Promise.t
       end in
       let module M =
-        H4.Map (Branch_data) (E04 (DomainsPromise))
+        H4.Map (Branch_data) (E04 (Domains_promise))
           (struct
             let f (T b : _ Branch_data.t) = b.domains
           end)
       in
-      let module V = H4.To_vector (DomainsPromise) in
+      let module V = H4.To_vector (Domains_promise) in
       V.f prev_varss_length (M.f step_data)
     in
 
@@ -623,25 +625,27 @@ struct
 
         let k_p =
           lazy
-            (let%map.Promise cs =
-               let%bind.Promise main = main_promise in
-               run_in_sequence (fun () ->
-                   let constraint_builder =
-                     Impl.constraint_system_manual ~input_typ:Typ.unit
-                       ~return_typ:typ
-                   in
-                   let%map.Promise res = constraint_builder.run_circuit main in
-                   constraint_builder.finish_computation res )
-             in
-             let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
-             ( Type_equal.Id.uid self.id
-             , snark_keys_header
-                 { type_ = "step-proving-key"
-                 ; identifier = name ^ "-" ^ b.rule.identifier
-                 }
-                 cs_hash
-             , b.index
-             , cs ) )
+            ( print_endline ("start: create cs hash for " ^ b.rule.identifier) ;
+              let%map.Promise cs =
+                let%bind.Promise main = main_promise in
+                run_in_sequence (fun () ->
+                    let constraint_builder =
+                      Impl.constraint_system_manual ~input_typ:Typ.unit
+                        ~return_typ:typ
+                    in
+                    let%map.Promise res = constraint_builder.run_circuit main in
+                    constraint_builder.finish_computation res )
+              in
+              let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
+              print_endline ("done: create cs hash for " ^ b.rule.identifier) ;
+              ( Type_equal.Id.uid self.id
+              , snark_keys_header
+                  { type_ = "step-proving-key"
+                  ; identifier = name ^ "-" ^ b.rule.identifier
+                  }
+                  cs_hash
+              , b.index
+              , cs ) )
         in
         let k_v =
           match disk_keys with
@@ -672,6 +676,7 @@ struct
         accum_dirty (Lazy.map vk ~f:(Promise.map ~f:snd)) ;
         res
       in
+      (* TODO refactor back to H4.Map *)
       let rec f :
           type a b c d.
              (a, b, c, d) H4.T(Branch_data).t
@@ -696,6 +701,7 @@ struct
                let%bind.Promise _ = Lazy.force vk in
                acc )
          in
+         print_endline "step_vks awaited" ;
          Vector.map step_keypairs ~f:(fun (_, vk) ->
              Tick.Keypair.full_vk_commitments
                (fst (Option.value_exn @@ Promise.peek @@ Lazy.force vk)) ) )
