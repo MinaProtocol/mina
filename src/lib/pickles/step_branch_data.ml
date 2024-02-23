@@ -22,13 +22,6 @@ type ( 'a_var
           'proofs_verified Nat.t * ('prev_vars, 'proofs_verified) Hlist.Length.t
       ; index : int
       ; lte : ('proofs_verified, 'max_proofs_verified) Nat.Lte.t
-      ; known_wrap_keys :
-          ( 'prev_vars
-          , 'prev_values
-          , 'local_widths
-          , 'local_branches )
-          H4.T(Types_map.Compiled.Optional_wrap_key).t
-          Promise.t
       ; domains : Domains.t Promise.t
       ; rule :
           ( 'prev_vars
@@ -43,18 +36,13 @@ type ( 'a_var
           , 'auxiliary_value )
           Inductive_rule.Promise.t
       ; main :
-             step_domains:(Domains.t, 'branches) Vector.t
-          -> known_wrap_keys:
-               ( 'prev_vars
-               , 'prev_values
-               , 'local_widths
-               , 'local_branches )
-               H4.T(Types_map.Compiled.Optional_wrap_key).t
-          -> unit
-          -> ( (Unfinalized.t, 'max_proofs_verified) Vector.t
-             , Impls.Step.Field.t
-             , (Impls.Step.Field.t, 'max_proofs_verified) Vector.t )
-             Types.Step.Statement.t
+             step_domains:(Domains.t, 'branches) Vector.t Promise.t
+          -> (   unit
+              -> ( (Unfinalized.t, 'max_proofs_verified) Vector.t
+                 , Impls.Step.Field.t
+                 , (Impls.Step.Field.t, 'max_proofs_verified) Vector.t )
+                 Types.Step.Statement.t
+                 Promise.t )
              Promise.t
       ; requests :
           (module Requests.Step.S
@@ -145,23 +133,6 @@ let create
     | Input_and_output (input_typ, output_typ) ->
         Impls.Step.Typ.(input_typ * output_typ)
   in
-  Timer.clock __LOC__ ;
-  let step ~step_domains ~known_wrap_keys =
-    Step_main.step_main requests
-      (Nat.Add.create max_proofs_verified)
-      rule
-      ~basic:
-        { public_input = typ
-        ; proofs_verifieds
-        ; wrap_domains
-        ; step_domains
-        ; feature_flags
-        }
-      ~public_input ~auxiliary_typ ~self_branches:branches ~proofs_verified
-      ~local_signature:widths ~local_signature_length ~local_branches:heights
-      ~local_branches_length ~lte ~known_wrap_keys ~self
-    |> unstage
-  in
   (* Here, we prefetch the known wrap keys for all compiled rules.
      These keys may resolve asynchronously due to key generation for other
      pickles rules, but we want to preserve the single-threaded behavior of
@@ -212,6 +183,23 @@ let create
     go rule.prevs
   in
   Timer.clock __LOC__ ;
+  let step ~step_domains ~known_wrap_keys =
+    Step_main.step_main requests
+      (Nat.Add.create max_proofs_verified)
+      rule
+      ~basic:
+        { public_input = typ
+        ; proofs_verifieds
+        ; wrap_domains
+        ; step_domains
+        ; feature_flags
+        }
+      ~public_input ~auxiliary_typ ~self_branches:branches ~proofs_verified
+      ~local_signature:widths ~local_signature_length ~local_branches:heights
+      ~local_branches_length ~lte ~known_wrap_keys ~self
+    |> unstage
+  in
+  Timer.clock __LOC__ ;
   let own_domains =
     let%bind.Promise known_wrap_keys = known_wrap_keys in
     let main =
@@ -231,6 +219,11 @@ let create
       (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
       etyp main
   in
+  let step ~step_domains =
+    let%bind.Promise known_wrap_keys = known_wrap_keys in
+    let%map.Promise step_domains = step_domains in
+    step ~step_domains ~known_wrap_keys
+  in
   Timer.clock __LOC__ ;
   T
     { proofs_verified = (self_width, proofs_verified)
@@ -238,7 +231,6 @@ let create
     ; lte
     ; rule
     ; domains = own_domains
-    ; known_wrap_keys
     ; main = step
     ; requests
     ; feature_flags = actual_feature_flags

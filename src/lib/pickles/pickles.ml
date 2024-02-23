@@ -1254,32 +1254,23 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Impls.Step.input ~proofs_verified:Max_proofs_verified.n
                 ~wrap_rounds:Tock.Rounds.n
             in
-            let (T (typ, _conv, conv_inv)) = etyp in
-            let main_promise : (unit -> unit -> _ Promise.t) Promise.t =
-              let%bind.Promise step_domains = all_step_domains in
-              let%map.Promise known_wrap_keys =
-                inner_step_data.known_wrap_keys
-              in
-              let main () () =
-                let%map.Promise res =
-                  inner_step_data.main ~step_domains ~known_wrap_keys ()
-                in
-                Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
-              in
-              main
-            in
             let open Impls.Step in
             let k_p =
               lazy
-                (let%map.Promise cs =
-                   let%bind.Promise main = main_promise in
-                   let constraint_builder =
-                     Impl.constraint_system_manual ~input_typ:Typ.unit
-                       ~return_typ:typ
-                   in
-                   let%map.Promise res = constraint_builder.run_circuit main in
-                   constraint_builder.finish_computation res
+                (let (T (typ, _conv, conv_inv)) = etyp in
+                 let%bind.Promise main =
+                   inner_step_data.main ~step_domains:all_step_domains
                  in
+                 let main () () =
+                   let%map.Promise res = main () in
+                   Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
+                 in
+                 let constraint_builder =
+                   Impl.constraint_system_manual ~input_typ:Typ.unit
+                     ~return_typ:typ
+                 in
+                 let%map.Promise res = constraint_builder.run_circuit main in
+                 let cs = constraint_builder.finish_computation res in
                  let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
                  ( Type_equal.Id.uid self.id
                  , snark_keys_header
