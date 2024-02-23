@@ -2331,7 +2331,7 @@ module Queries = struct
                              .global_slot_since_genesis
                         in
                         if
-                          Mina_numbers.Global_slot_since_genesis.( <= )
+                          Mina_numbers.Global_slot_since_genesis.( < )
                             global_slot stop_slot
                         then return breadcrumb
                         else
@@ -2407,25 +2407,34 @@ module Queries = struct
             (Ledger.Any_ledger.M.merkle_root staking_ledger)
             staking_epoch.ledger.hash ) ;
         let%bind next_epoch_ledger =
-          match Mina_lib.next_epoch_ledger mina with
+          match
+            (* We always want to return the next epoch ledger here, in case we
+               need to hard-fork from a block where it is unfinalized. The
+               safety concern doesn't apply here, because we are only using
+               this to build a snapshot, and never applying it back to the
+               running network.
+            *)
+            Mina_lib.next_epoch_ledger
+              ~unsafe_always_return_ledger_as_if_finalized:true mina
+          with
           | None ->
               Deferred.Result.fail "Next epoch ledger is not initialized."
           | Some `Notfinalized ->
-              return None
+              failwith "next_epoch_ledger returned a disallowed value"
           | Some (`Finalized (Genesis_epoch_ledger l)) ->
-              return (Some (Ledger.Any_ledger.cast (module Ledger) l))
+              return (Ledger.Any_ledger.cast (module Ledger) l)
           | Some (`Finalized (Ledger_db l)) ->
-              return (Some (Ledger.Any_ledger.cast (module Ledger.Db) l))
+              return (Ledger.Any_ledger.cast (module Ledger.Db) l)
         in
-        Option.iter next_epoch_ledger ~f:(fun ledger ->
-            assert (
-              Mina_base.Ledger_hash.equal
-                (Ledger.Any_ledger.M.merkle_root ledger)
-                next_epoch.ledger.hash ) ) ;
+        assert (
+          Mina_base.Ledger_hash.equal
+            (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
+            next_epoch.ledger.hash ) ;
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger ~global_slot
-            ~state_hash ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
-            ~next_epoch_seed ~blockchain_length runtime_config
+            ~state_hash ~staking_ledger ~staking_epoch_seed
+            ~next_epoch_ledger:(Some next_epoch_ledger) ~next_epoch_seed
+            ~blockchain_length runtime_config
         in
         let%map () =
           let open Async.Deferred.Infix in
