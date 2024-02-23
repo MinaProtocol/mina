@@ -278,7 +278,6 @@ let step_main :
     in
     let T = Max_proofs_verified.eq in
     let app_state = exists input_typ ~request:(fun () -> Req.App_state) in
-    print_endline ("Step_main '" ^ rule.identifier ^ "' - calling main") ;
     let%map.Promise { Inductive_rule.previous_proof_statements
                     ; public_output = ret_var
                     ; auxiliary_output = auxiliary_var
@@ -286,8 +285,6 @@ let step_main :
       (* Run the application logic of the rule on the predecessor statements *)
       with_label "rule_main" (fun () -> rule.main { public_input = app_state })
     in
-
-    print_endline ("Step_main '" ^ rule.identifier ^ "' - rest of the circuit") ;
     with_label "step_main" (fun () ->
         let () =
           exists Typ.unit ~request:(fun () ->

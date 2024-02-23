@@ -97,7 +97,7 @@ module Step = struct
     let pk =
       lazy
         (let%map.Promise k_p = Lazy.force k_p in
-         let _, _, i, sys = k_p in
+         let _, _, _, sys = k_p in
          match
            Common.time "step keypair read" (fun () ->
                Key_cache.Sync.read cache s_p k_p )
@@ -110,8 +110,6 @@ module Step = struct
                    sys |> Keypair.generate ~prev_challenges )
              in
              Timer.clock __LOC__ ;
-             print_endline
-               ("[read_or_generate] Generated keypair - " ^ Int.to_string i) ;
              ignore
                ( Key_cache.Sync.write cache s_p k_p (Keypair.pk r)
                  : unit Or_error.t ) ;

@@ -279,7 +279,6 @@ let promise_all (type a n) (vec : (a Promise.t, n) Vector.t) :
         let%bind _ = el in
         acc )
   in
-  print_endline "promise_all awaited" ;
   Vector.map ~f:(fun x -> Option.value_exn @@ Promise.peek x) vec
 
 module Make
@@ -549,7 +548,6 @@ struct
       let module V = H4.To_vector (Int) in
       V.f prev_varss_length (M.f choices)
     in
-    (* TODO: remove the `chain_to` promise and just use create_lock *)
     let step_data =
       let i = ref 0 in
       Timer.clock __LOC__ ;
@@ -624,8 +622,6 @@ struct
                      b.main ~step_domains:all_step_domains
                    in
                    run_in_sequence (fun () ->
-                       print_endline
-                         ("start: create cs hash for " ^ b.rule.identifier) ;
                        let main () () =
                          let%map.Promise res = main () in
                          Impls.Step.with_label "conv_inv" (fun () ->
@@ -642,8 +638,6 @@ struct
                        let cs_hash =
                          Md5.to_hex (R1CS_constraint_system.digest cs)
                        in
-                       print_endline
-                         ("done: create cs hash for " ^ b.rule.identifier) ;
                        ( Type_equal.Id.uid self.id
                        , snark_keys_header
                            { type_ = "step-proving-key"
@@ -697,7 +691,6 @@ struct
                let%bind.Promise _ = Lazy.force vk in
                acc )
          in
-         print_endline "step_vks awaited" ;
          Vector.map step_keypairs ~f:(fun (_, vk) ->
              Tick.Keypair.full_vk_commitments
                (fst (Option.value_exn @@ Promise.peek @@ Lazy.force vk)) ) )
@@ -731,19 +724,13 @@ struct
         lazy
           (let%map.Promise wrap_main = Lazy.force wrap_main in
            let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
-           let main x () =
-             let input = conv x in
-             print_endline "created input for wrap_main" ;
-             wrap_main input
-           in
-           print_endline "start: create cs hash for wrap" ;
+           let main x () = wrap_main (conv x) in
            let cs =
              constraint_system ~input_typ:typ
                ~return_typ:(Snarky_backendless.Typ.unit ())
                main
            in
            let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
-           print_endline "done: create cs hash for wrap" ;
            ( self_id
            , snark_keys_header
                { type_ = "wrap-proving-key"; identifier = name }

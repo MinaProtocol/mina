@@ -133,13 +133,9 @@ let wrap_main
   in
   Timer.clock __LOC__ ;
   let main =
-    print_endline "wrap main: start" ;
     let%map.Lazy step_keys = step_keys in
-    print_endline "wrap main: kicked off lazy step_keys" ;
     let%bind.Promise step_domains = step_domains in
-    print_endline "wrap main: awaited step_domains" ;
     let%map.Promise step_keys = step_keys in
-    print_endline "wrap main: awaited step_keys" ;
     fun ({ proof_state =
              { deferred_values =
                  { plonk
