@@ -6,6 +6,8 @@ let Artifact : Type  = < Daemon | Archive | TestExecutive | BatchTxn | Rosetta |
 
 let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
 
+let Main = [ Artifact.Daemon , Artifact.Archive , Artifact.Rosetta ]
+
 let All = AllButTests # [ Artifact.FunctionalTestSuite ]
 
 let capitalName = \(artifact : Artifact) ->
@@ -30,6 +32,16 @@ let lowerName = \(artifact : Artifact) ->
     , FunctionalTestSuite = "functional_test_suite"
   } artifact
 
+let dockerName = \(artifact : Artifact) ->
+  merge {
+    Daemon = "mina-daemon"
+    , Archive = "mina-archive"
+    , TestExecutive = "mina-test-executive"
+    , BatchTxn = "mina-batch-txn"
+    , Rosetta = "mina-rosetta" 
+    , ZkappTestTransaction = "mina-zkapp-test-transaction"
+    , FunctionalTestSuite = "mina-test-suite"
+  } artifact
 
 
 let toDebianName = \(artifact : Artifact) ->
@@ -59,6 +71,8 @@ in
   , lowerName = lowerName
   , toDebianName = toDebianName
   , toDebianNames = toDebianNames
+  , dockerName = dockerName
   , All = All 
   , AllButTests = AllButTests 
+  , Main = Main
 }
