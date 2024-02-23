@@ -47,7 +47,8 @@ val staking_ledger :
   t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t option
 
 val next_epoch_ledger :
-     t
+     ?unsafe_always_return_ledger_as_if_finalized:bool
+  -> t
   -> [ `Finalized of Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
      | `Notfinalized ]
      option
