@@ -254,12 +254,13 @@ let create_lock () =
   let lock = ref (Promise.return ()) in
   let open Promise.Let_syntax in
   let run_in_sequence (f : unit -> 'a Promise.t) : 'a Promise.t =
-    (* await the current lock *)
-    let%bind () = !lock in
-    (* create a new lock *)
+    (* acquire the lock *)
+    let existing_lock = !lock in
     let unlock = ref (fun () -> ()) in
     lock := Promise.create (fun resolve -> unlock := resolve) ;
-    (* run the function and unlock *)
+    (* await the existing lock *)
+    let%bind () = existing_lock in
+    (* run the function and release the lock *)
     try
       let%map res = f () in
       !unlock () ; res
