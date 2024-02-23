@@ -640,7 +640,7 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
 
 let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
     ~continue_on_error ~checkpoint_interval ~checkpoint_output_folder_opt
-    ~checkpoint_file_prefix () =
+    ~checkpoint_file_prefix ~genesis_dir_opt () =
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -665,22 +665,20 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
          except that we don't consider loading from a tar file
       *)
       let query_db = Mina_caqti.query pool in
-      let%bind padded_accounts =
-        match
-          Genesis_ledger_helper.Ledger.padded_accounts_from_runtime_config_opt
-            ~logger ~proof_level input.genesis_ledger
-            ~ledger_name_prefix:"genesis_ledger"
+      let%bind packed_ledger =
+        match%bind
+          Genesis_ledger_helper.Ledger.load ~proof_level
+            ~genesis_dir:
+              (Option.value ~default:Cache_dir.autogen_path genesis_dir_opt)
+            ~logger ~constraint_constants input.genesis_ledger
         with
-        | None ->
+        | Error e ->
             [%log fatal]
-              "Could not load accounts from input runtime genesis ledger" ;
+              "Could not load accounts from input runtime genesis ledger %s"
+              (Error.to_string_hum e) ;
             exit 1
-        | Some accounts ->
-            return accounts
-      in
-      let packed_ledger =
-        Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-          ~depth:constraint_constants.ledger_depth padded_accounts
+        | Ok (packed_ledger, _, _) ->
+            return packed_ledger
       in
       let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
       let epoch_ledgers_state_hash_opt =
@@ -1706,6 +1704,10 @@ let () =
            Param.flag "--checkpoint-output-folder"
              ~doc:"file Folder containing the resulting checkpoints"
              Param.(optional string)
+         and genesis_dir_opt =
+           Param.flag "--genesis-ledger-dir"
+             ~doc:"DIR Directory that contains the genesis ledger"
+             Param.(optional string)
          and checkpoint_file_prefix =
            Param.flag "--checkpoint-file-prefix"
              ~doc:"string Checkpoint file prefix (default: 'replayer')"
@@ -1713,4 +1715,4 @@ let () =
          in
          main ~input_file ~output_file_opt ~migration_mode ~archive_uri
            ~checkpoint_interval ~continue_on_error ~checkpoint_output_folder_opt
-           ~checkpoint_file_prefix )))
+           ~checkpoint_file_prefix ~genesis_dir_opt )))
