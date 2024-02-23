@@ -60,7 +60,7 @@ end
 let remove t ~(key : Bigstring.t) : unit =
   Rocks.delete ?pos:None ?len:None ?opts:None t.db key
 
-let copy t : Bigstring.t =
+let copy_bigstring t : Bigstring.t =
   let tlen = Bigstring.length t in
   let new_t = Bigstring.create tlen in
   Bigstring.blit ~src:t ~dst:new_t ~src_pos:0 ~dst_pos:0 ~len:tlen ;
@@ -72,8 +72,8 @@ let to_alist t : (Bigstring.t * Bigstring.t) list =
   (* iterate backwards and cons, to build list sorted by key *)
   let rec loop accum =
     if Rocks.Iterator.is_valid iterator then (
-      let key = copy (Rocks.Iterator.get_key iterator) in
-      let value = copy (Rocks.Iterator.get_value iterator) in
+      let key = copy_bigstring (Rocks.Iterator.get_key iterator) in
+      let value = copy_bigstring (Rocks.Iterator.get_value iterator) in
       Rocks.Iterator.prev iterator ;
       loop ((key, value) :: accum) )
     else accum
@@ -89,8 +89,8 @@ let foldi :
   let iterator = Rocks.Iterator.create t.db in
   let rec loop i accum =
     if Rocks.Iterator.is_valid iterator then (
-      let key = copy (Rocks.Iterator.get_key iterator) in
-      let data = copy (Rocks.Iterator.get_value iterator) in
+      let key = copy_bigstring (Rocks.Iterator.get_key iterator) in
+      let data = copy_bigstring (Rocks.Iterator.get_value iterator) in
       Rocks.Iterator.next iterator ;
       loop (i + 1) (f i accum ~key ~data) )
     else accum
@@ -111,8 +111,8 @@ let fold_until :
   let iterator = Rocks.Iterator.create t.db in
   let rec loop accum =
     if Rocks.Iterator.is_valid iterator then (
-      let key = copy (Rocks.Iterator.get_key iterator) in
-      let data = copy (Rocks.Iterator.get_value iterator) in
+      let key = copy_bigstring (Rocks.Iterator.get_key iterator) in
+      let data = copy_bigstring (Rocks.Iterator.get_value iterator) in
       Rocks.Iterator.next iterator ;
       match f accum ~key ~data with Stop _ -> accum | Continue v -> loop v )
     else accum
