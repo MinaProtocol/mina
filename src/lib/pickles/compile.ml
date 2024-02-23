@@ -721,20 +721,17 @@ struct
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
       let open Impls.Wrap in
-      let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
-      let main =
-        lazy
-          (let%map.Promise wrap_main = Lazy.force wrap_main in
-           fun x () ->
-             let input = conv x in
-             print_endline "created input for wrap_main" ;
-             wrap_main input )
-      in
       (*let () = if true then log_wrap main typ name self.id in*)
       let self_id = Type_equal.Id.uid self.id in
       let disk_key_prover =
         lazy
-          (let%map.Promise main = Lazy.force main in
+          (let%map.Promise wrap_main = Lazy.force wrap_main in
+           let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
+           let main x () =
+             let input = conv x in
+             print_endline "created input for wrap_main" ;
+             wrap_main input
+           in
            print_endline "start: create cs hash for wrap" ;
            let cs =
              constraint_system ~input_typ:typ
@@ -767,9 +764,7 @@ struct
         Common.time "wrap read or generate " (fun () ->
             Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
               ~prev_challenges:2 cache ~s_p:wrap_storable disk_key_prover
-              ~s_v:wrap_vk_storable disk_key_verifier typ
-              (Snarky_backendless.Typ.unit ())
-              main )
+              ~s_v:wrap_vk_storable disk_key_verifier )
       in
       (r, disk_key_verifier)
     in

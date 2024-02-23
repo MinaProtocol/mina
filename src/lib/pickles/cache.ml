@@ -230,24 +230,23 @@ module Wrap = struct
               header path ) )
 
   let read_or_generate ~prev_challenges cache ?(s_p = storable) k_p
-      ?(s_v = vk_storable) k_v typ return_typ main =
+      ?(s_v = vk_storable) k_v =
     let module Vk = Verification_key in
     let open Impls.Wrap in
     let pk =
       lazy
-        (let%bind.Promise k = Lazy.force k_p in
+        (let%map.Promise k = Lazy.force k_p in
+         let _, _, sys = k in
          match
            Common.time "wrap key read" (fun () ->
                Key_cache.Sync.read cache s_p k )
          with
          | Ok (pk, d) ->
-             Promise.return (pk, d)
+             (pk, d)
          | Error _e ->
-             let%map.Promise main = Lazy.force main in
              let r =
                Common.time "wrapkeygen" (fun () ->
-                   constraint_system ~input_typ:typ ~return_typ main
-                   |> Keypair.generate ~prev_challenges )
+                   sys |> Keypair.generate ~prev_challenges )
              in
              ignore
                ( Key_cache.Sync.write cache s_p k (Keypair.pk r)

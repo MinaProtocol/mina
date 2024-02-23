@@ -1371,9 +1371,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Common.time "wrap read or generate " (fun () ->
                   Cache.Wrap.read_or_generate ~prev_challenges:2 []
                     (Lazy.map ~f:Promise.return disk_key_prover)
-                    (Lazy.map ~f:Promise.return disk_key_verifier)
-                    typ Typ.unit
-                    (lazy (Promise.return main)) )
+                    (Lazy.map ~f:Promise.return disk_key_verifier) )
             in
             (r, disk_key_verifier)
           in

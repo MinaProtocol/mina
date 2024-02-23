@@ -96,9 +96,6 @@ module Wrap : sig
     -> Key.Proving.t Promise.t Lazy.t
     -> ?s_v:vk_storable
     -> Key.Verification.t Promise.t Lazy.t
-    -> ('a, 'b) Impls.Wrap.Typ.t
-    -> ('c, 'd) Impls.Wrap.Typ.t
-    -> ('a -> unit -> 'c) Promise.t Lazy.t
     -> ( Impls.Wrap.Proving_key.t
        * [> `Cache_hit | `Generated_something | `Locally_generated ] )
        Promise.t
