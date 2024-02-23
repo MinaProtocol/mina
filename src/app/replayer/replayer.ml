@@ -640,7 +640,7 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
 
 let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
     ~continue_on_error ~checkpoint_interval ~checkpoint_output_folder_opt
-    ~checkpoint_file_prefix () =
+    ~checkpoint_file_prefix ~genesis_dir_opt () =
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -668,8 +668,9 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
       let%bind packed_ledger =
         match%bind
           Genesis_ledger_helper.Ledger.load ~proof_level
-            ~genesis_dir:Cache_dir.autogen_path ~logger ~constraint_constants
-            input.genesis_ledger
+            ~genesis_dir:
+              (Option.value ~default:Cache_dir.autogen_path genesis_dir_opt)
+            ~logger ~constraint_constants input.genesis_ledger
         with
         | Error e ->
             [%log fatal]
@@ -1703,6 +1704,10 @@ let () =
            Param.flag "--checkpoint-output-folder"
              ~doc:"file Folder containing the resulting checkpoints"
              Param.(optional string)
+         and genesis_dir_opt =
+           Param.flag "--genesis-ledger-dir"
+             ~doc:"DIR Directory that contains the genesis ledger"
+             Param.(optional string)
          and checkpoint_file_prefix =
            Param.flag "--checkpoint-file-prefix"
              ~doc:"string Checkpoint file prefix (default: 'replayer')"
@@ -1710,4 +1715,4 @@ let () =
          in
          main ~input_file ~output_file_opt ~migration_mode ~archive_uri
            ~checkpoint_interval ~continue_on_error ~checkpoint_output_folder_opt
-           ~checkpoint_file_prefix )))
+           ~checkpoint_file_prefix ~genesis_dir_opt )))
