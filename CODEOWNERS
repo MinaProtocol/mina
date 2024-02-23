@@ -30,7 +30,6 @@
 /src/lib/blake2/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/cli_lib/ @MinaProtocol/product-eng-reviewers
 /src/lib/mina_commands @MinaProtocol/product-eng-reviewers
-/src/lib/mina_graphql @MinaProtocol/product-eng-reviewers
 /src/lib/mina_numbers/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/crs/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/crypto_params/ @MinaProtocol/crypto-eng-reviewers
@@ -53,3 +52,5 @@
 /src/lib/unsigned_extended/ @MinaProtocol/crypto-eng-reviewers
 
 /src/nonconsensus @MinaProtocol/protocol-eng-reviewers
+
+graphql_schema.json @MinaProtocol/product-eng-reviewers
