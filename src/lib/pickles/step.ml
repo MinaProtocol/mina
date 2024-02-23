@@ -805,6 +805,7 @@ struct
           ~wrap_rounds:Tock.Rounds.n
       in
       let%bind.Promise step_domains = step_domains in
+      let%bind.Promise known_wrap_keys = branch_data.known_wrap_keys in
       let { Domains.h } = Vector.nth_exn step_domains branch_data.index in
       ksprintf Common.time "step-prover %d (%d)" branch_data.index
         (Domain.size h) (fun () ->
@@ -815,7 +816,8 @@ struct
           in
           let%bind.Promise res =
             builder.run_circuit (fun () () ->
-                Promise.map ~f:conv_inv (branch_data.main ~step_domains ()) )
+                Promise.map ~f:conv_inv
+                  (branch_data.main ~step_domains ~known_wrap_keys ()) )
           in
           let ( { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
               , next_statement_hashed ) =

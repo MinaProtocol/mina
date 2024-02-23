@@ -618,10 +618,13 @@ struct
           lazy
             (let (T (typ, _conv, conv_inv)) = etyp in
              let%bind.Promise step_domains = all_step_domains in
+             let%bind.Promise known_wrap_keys = b.known_wrap_keys in
              run_in_sequence (fun () ->
                  print_endline ("start: create cs hash for " ^ b.rule.identifier) ;
                  let main () () =
-                   let%map.Promise res = b.main ~step_domains () in
+                   let%map.Promise res =
+                     b.main ~step_domains ~known_wrap_keys ()
+                   in
                    Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
                  in
                  let constraint_builder =

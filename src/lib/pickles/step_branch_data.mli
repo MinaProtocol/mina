@@ -23,6 +23,13 @@ type ( 'a_var
           * ('prev_vars, 'proofs_verified) Pickles_types.Hlist.Length.t
       ; index : int
       ; lte : ('proofs_verified, 'max_proofs_verified) Pickles_types.Nat.Lte.t
+      ; known_wrap_keys :
+          ( 'prev_vars
+          , 'prev_values
+          , 'local_widths
+          , 'local_branches )
+          Pickles_types.Hlist.H4.T(Types_map.Compiled.Optional_wrap_key).t
+          Promise.t
       ; domains : Import.Domains.t Promise.t
       ; rule :
           ( 'prev_vars
@@ -39,6 +46,12 @@ type ( 'a_var
             (* Main functions to compute *)
       ; main :
              step_domains:(Import.Domains.t, 'branches) Pickles_types.Vector.t
+          -> known_wrap_keys:
+               ( 'prev_vars
+               , 'prev_values
+               , 'local_widths
+               , 'local_branches )
+               Pickles_types.Hlist.H4.T(Types_map.Compiled.Optional_wrap_key).t
           -> unit
           -> ( (Unfinalized.t, 'max_proofs_verified) Pickles_types.Vector.t
              , Impls.Step.Field.t

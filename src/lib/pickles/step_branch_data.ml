@@ -22,6 +22,13 @@ type ( 'a_var
           'proofs_verified Nat.t * ('prev_vars, 'proofs_verified) Hlist.Length.t
       ; index : int
       ; lte : ('proofs_verified, 'max_proofs_verified) Nat.Lte.t
+      ; known_wrap_keys :
+          ( 'prev_vars
+          , 'prev_values
+          , 'local_widths
+          , 'local_branches )
+          H4.T(Types_map.Compiled.Optional_wrap_key).t
+          Promise.t
       ; domains : Domains.t Promise.t
       ; rule :
           ( 'prev_vars
@@ -37,6 +44,12 @@ type ( 'a_var
           Inductive_rule.Promise.t
       ; main :
              step_domains:(Domains.t, 'branches) Vector.t
+          -> known_wrap_keys:
+               ( 'prev_vars
+               , 'prev_values
+               , 'local_widths
+               , 'local_branches )
+               H4.T(Types_map.Compiled.Optional_wrap_key).t
           -> unit
           -> ( (Unfinalized.t, 'max_proofs_verified) Vector.t
              , Impls.Step.Field.t
@@ -133,7 +146,7 @@ let create
         Impls.Step.Typ.(input_typ * output_typ)
   in
   Timer.clock __LOC__ ;
-  let step ~step_domains =
+  let step ~step_domains ~known_wrap_keys =
     Step_main.step_main requests
       (Nat.Add.create max_proofs_verified)
       rule
@@ -146,16 +159,66 @@ let create
         }
       ~public_input ~auxiliary_typ ~self_branches:branches ~proofs_verified
       ~local_signature:widths ~local_signature_length ~local_branches:heights
-      ~local_branches_length ~lte ~self
+      ~local_branches_length ~lte ~known_wrap_keys ~self
     |> unstage
   in
-  (* Now that we've triggered the promise computation, we rebind. *)
+  (* Here, we prefetch the known wrap keys for all compiled rules.
+     These keys may resolve asynchronously due to key generation for other
+     pickles rules, but we want to preserve the single-threaded behavior of
+     pickles to maximize our chanes of successful debugging.
+     Hence, we preload here, and pass the values in as needed when we create
+     [datas] below.
+  *)
+  let known_wrap_keys =
+    let rec go :
+        type a1 a2 n m.
+           (a1, a2, n, m) H4.T(Tag).t
+        -> (a1, a2, n, m) H4.T(Types_map.Compiled.Optional_wrap_key).t Promise.t
+        = function
+      | [] ->
+          Promise.return ([] : _ H4.T(Types_map.Compiled.Optional_wrap_key).t)
+      | tag :: tags ->
+          let%bind.Promise opt_wrap_key =
+            match Type_equal.Id.same_witness self.id tag.id with
+            | Some T ->
+                Promise.return None
+            | None -> (
+                match tag.kind with
+                | Compiled ->
+                    let compiled = Types_map.lookup_compiled tag.id in
+                    let%map.Promise wrap_key = Lazy.force @@ compiled.wrap_key
+                    and step_domains =
+                      let%map.Promise () =
+                        (* Wait for promises to resolve. *)
+                        Vector.fold ~init:(Promise.return ())
+                          compiled.step_domains ~f:(fun acc step_domain ->
+                            let%bind.Promise _ = step_domain in
+                            acc )
+                      in
+                      Vector.map
+                        ~f:(fun x -> Option.value_exn @@ Promise.peek x)
+                        compiled.step_domains
+                    in
+                    Some
+                      { Types_map.Compiled.Optional_wrap_key.wrap_key
+                      ; step_domains
+                      }
+                | Side_loaded ->
+                    Promise.return None )
+          in
+          let%map.Promise rest = go tags in
+          (opt_wrap_key :: rest : _ H4.T(Types_map.Compiled.Optional_wrap_key).t)
+    in
+    go rule.prevs
+  in
   Timer.clock __LOC__ ;
   let own_domains =
+    let%bind.Promise known_wrap_keys = known_wrap_keys in
     let main =
       step
         ~step_domains:
           (Vector.init branches ~f:(fun _ -> Fix_domains.rough_domains))
+        ~known_wrap_keys
     in
     let etyp =
       Impls.Step.input ~proofs_verified:max_proofs_verified
@@ -175,6 +238,7 @@ let create
     ; lte
     ; rule
     ; domains = own_domains
+    ; known_wrap_keys
     ; main = step
     ; requests
     ; feature_flags = actual_feature_flags

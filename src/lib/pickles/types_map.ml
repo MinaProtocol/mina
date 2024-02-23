@@ -107,6 +107,17 @@ module Compiled = struct
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
     }
 
+  module Optional_wrap_key = struct
+    type 'branches resolved_wrap_key =
+      { wrap_key :
+          Tick.Inner_curve.Affine.t array Plonk_verification_key_evals.t
+      ; step_domains : (Domains.t, 'branches) Vector.t
+      }
+
+    type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
+      'branches resolved_wrap_key option
+  end
+
   type packed =
     | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1, 'n2) t -> packed
 

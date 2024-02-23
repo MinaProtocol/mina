@@ -336,7 +336,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
         | { identifier; prevs; main; feature_flags } :: rest ->
             { identifier
             ; prevs
-            ; main = (fun x -> Promise.return (main x))
+            ; main =
+                (fun x ->
+                  let r = main x in
+                  Promise.return r )
             ; feature_flags
             }
             :: go rest
@@ -1253,9 +1256,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
             in
             let (T (typ, _conv, conv_inv)) = etyp in
             let main_promise : (unit -> unit -> _ Promise.t) Promise.t =
-              let%map.Promise step_domains = all_step_domains in
+              let%bind.Promise step_domains = all_step_domains in
+              let%map.Promise known_wrap_keys =
+                inner_step_data.known_wrap_keys
+              in
               let main () () =
-                let%map.Promise res = inner_step_data.main ~step_domains () in
+                let%map.Promise res =
+                  inner_step_data.main ~step_domains ~known_wrap_keys ()
+                in
                 Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
               in
               main

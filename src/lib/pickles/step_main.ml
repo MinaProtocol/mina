@@ -160,6 +160,12 @@ let step_main :
          , max_proofs_verified
          , self_branches )
          Types_map.Compiled.basic
+    -> known_wrap_keys:
+         ( prev_vars
+         , prev_values
+         , local_signature
+         , local_branches )
+         H4.T(Types_map.Compiled.Optional_wrap_key).t
     -> self:(var, value, max_proofs_verified, self_branches) Tag.t
     -> ( prev_vars
        , prev_values
@@ -181,7 +187,8 @@ let step_main :
        Staged.t =
  fun (module Req) max_proofs_verified ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length
-     ~proofs_verified ~lte ~public_input ~auxiliary_typ ~basic ~self rule ->
+     ~proofs_verified ~lte ~public_input ~auxiliary_typ ~basic ~known_wrap_keys
+     ~self rule ->
   let module Typ_with_max_proofs_verified = struct
     type ('var, 'value, 'local_max_proofs_verified, 'local_branches) t =
       ( ( 'var
@@ -275,58 +282,7 @@ let step_main :
     in
     let T = Max_proofs_verified.eq in
     let app_state = exists input_typ ~request:(fun () -> Req.App_state) in
-    let module Optional_wrap_key = struct
-      type (_, _, _, 'branches) t =
-        ( Step_main_inputs.Inner_curve.Constant.t array
-          Plonk_verification_key_evals.t
-        * (Import.Domains.t, 'branches) Vector.t )
-        option
-    end in
-    (* Here, we prefetch the known wrap keys for all compiled rules.
-       These keys may resolve asynchronously due to key generation for other
-       pickles rules, but we want to preserve the single-threaded behavior of
-       pickles to maximize our chanes of successful debugging.
-       Hence, we preload here, and pass the values in as needed when we create
-       [datas] below.
-    *)
-    let%bind.Promise known_wrap_keys =
-      let rec go :
-          type a1 a2 n m.
-             (a1, a2, n, m) H4.T(Tag).t
-          -> (a1, a2, n, m) H4.T(Optional_wrap_key).t Promise.t = function
-        | [] ->
-            Promise.return ([] : _ H4.T(Optional_wrap_key).t)
-        | tag :: tags ->
-            let%bind.Promise opt_wrap_key =
-              match Type_equal.Id.same_witness self.id tag.id with
-              | Some T ->
-                  Promise.return None
-              | None -> (
-                  match tag.kind with
-                  | Compiled ->
-                      let compiled = Types_map.lookup_compiled tag.id in
-                      let%map.Promise wrap_key = Lazy.force @@ compiled.wrap_key
-                      and step_domains =
-                        let%map.Promise () =
-                          (* Wait for promises to resolve. *)
-                          Vector.fold ~init:(Promise.return ())
-                            compiled.step_domains ~f:(fun acc step_domain ->
-                              let%bind.Promise _ = step_domain in
-                              acc )
-                        in
-                        Vector.map
-                          ~f:(fun x -> Option.value_exn @@ Promise.peek x)
-                          compiled.step_domains
-                      in
-                      Some (wrap_key, step_domains)
-                  | Side_loaded ->
-                      Promise.return None )
-            in
-            let%map.Promise rest = go tags in
-            (opt_wrap_key :: rest : _ H4.T(Optional_wrap_key).t)
-      in
-      go rule.prevs
-    in
+    print_endline ("Step_main '" ^ rule.identifier ^ "' - calling main") ;
     let%map.Promise { Inductive_rule.previous_proof_statements
                     ; public_output = ret_var
                     ; auxiliary_output = auxiliary_var
@@ -334,6 +290,8 @@ let step_main :
       (* Run the application logic of the rule on the predecessor statements *)
       with_label "rule_main" (fun () -> rule.main { public_input = app_state })
     in
+
+    print_endline ("Step_main '" ^ rule.identifier ^ "' - rest of the circuit") ;
     with_label "step_main" (fun () ->
         let () =
           exists Typ.unit ~request:(fun () ->
@@ -541,7 +499,11 @@ let step_main :
                   let rec go :
                       type a1 a2 n m.
                          (a1, a2, n, m) H4.T(Tag).t
-                      -> (a1, a2, n, m) H4.T(Optional_wrap_key).t
+                      -> ( a1
+                         , a2
+                         , n
+                         , m )
+                         H4.T(Types_map.Compiled.Optional_wrap_key).t
                       -> (a1, a2, n, m) H4.T(Types_map.For_step).t =
                    fun tags optional_wrap_keys ->
                     match (tags, optional_wrap_keys) with
@@ -553,7 +515,10 @@ let step_main :
                           | None -> (
                               match tag.kind with
                               | Compiled ->
-                                  let wrap_key, step_domains =
+                                  let { Types_map.Compiled.Optional_wrap_key
+                                        .wrap_key
+                                      ; step_domains
+                                      } =
                                     Option.value_exn optional_wrap_key
                                   in
                                   Types_map.For_step
