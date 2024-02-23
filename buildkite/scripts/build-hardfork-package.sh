@@ -67,18 +67,12 @@ for file in hardfork_ledgers/*; do
   else
     aws s3 cp "$file" s3://snark-keys.o1test.net/
   fi
+done
 
 echo "--- Build hardfork package for Debian ${MINA_DEB_CODENAME}"
 RUNTIME_CONFIG_JSON=new_config.json LEDGER_TARBALLS="$(echo hardfork_ledgers/*.tar.gz)" ./scripts/create_hardfork_deb.sh
 mkdir -p /tmp/artifacts
 cp _build/mina*.deb /tmp/artifacts/.
-
-done
-
-if [ $error -ne 0 ]; then
-  echo "Error: One or more files already exist in the bucket. Refusing to publish debs."
-  exit 1
-fi
 
 echo "--- Upload debs to amazon s3 repo"
 make publish_debs
