@@ -5,7 +5,7 @@ When it has synchronized, the `fork_config` GraphQL endpoint produces the protoc
 state needed to start the new chain:
 
 ```sh
-curl --location "http://localhost:${1}/graphql" \
+curl --location "http://localhost:3085/graphql" \
  --header "Content-Type: application/json" \
  --data "{\"query\":\"query MyQuery {\n  fork_config\n}\n\",\"variables\":{}}" | jq '.data.fork_config' > fork_config.json
  ```
