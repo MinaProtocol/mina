@@ -21,6 +21,34 @@ set -eo pipefail
 
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
 
+if [[ "$NIX_CACHE_NAR_SECRET" != "" ]]; then
+  echo "$NIX_CACHE_NAR_SECRET" > /tmp/nix-cache-secret
+  echo "Configuring the NAR signing secret"
+  NIX_SECRET_KEY=/tmp/nix-cache-secret
+fi
+
+if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
+  echo "GCP uploading configured (for nix binaries)"
+  cat <<'EOF'> /tmp/nix-post-build
+#!/bin/sh
+
+set -eu
+set -f # disable globbing
+export IFS=' '
+
+echo $OUT_PATHS | tr ' ' '\n' >> /tmp/nix-paths
+EOF
+  chmod +x /tmp/nix-post-build
+  NIX_POST_BUILD_HOOK=/tmp/nix-post-build
+fi
+
+if [[ "$NIX_POST_BUILD_HOOK" != "" ]]; then
+  NIX_OPTS+=( --post-build-hook "$NIX_POST_BUILD_HOOK" )
+fi
+if [[ "$NIX_SECRET_KEY" != "" ]]; then
+  NIX_OPTS+=( --secret-key-files "$NIX_SECRET_KEY" )
+fi
+
 INIT_DIR="$PWD"
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
@@ -67,5 +95,16 @@ fi
 git apply "$SCRIPT_DIR"/localnet-patches/berkeley-{1,2}.patch
 nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet" --out-link "$INIT_DIR/fork-devnet"
 git apply -R "$SCRIPT_DIR"/localnet-patches/berkeley-{1,2}.patch
+
+if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
+  mkdir -p $HOME/.aws
+  cat <<EOF> $HOME/.aws/credentials
+[default]
+aws_access_key_id=$NIX_CACHE_GCP_ID
+aws_secret_access_key=$NIX_CACHE_GCP_SECRET
+EOF
+
+  nix --experimental-features nix-command copy --to "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" --stdin </tmp/nix-paths
+fi
 
 "$SCRIPT_DIR"/test.sh compatible-devnet/bin/mina fork-devnet/bin/{mina,runtime_genesis_ledger} && echo "HF test completed successfully"
