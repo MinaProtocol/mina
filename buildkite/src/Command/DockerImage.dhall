@@ -55,7 +55,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
               "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --deb-profile ${spec.deb_profile} --repo ${spec.repo} --extra-args \\\"${spec.extra_args}\\\""
         )
     ]
-    
+
     in
 
     Command.build
