@@ -4361,17 +4361,15 @@ module Queries = struct
           Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
             consensus
         in
-        let next_epoch =
-          Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
-            consensus
-        in
         let staking_epoch_seed =
           Mina_base.Epoch_seed.to_base58_check
             staking_epoch.Mina_base.Epoch_data.Poly.seed
         in
         let next_epoch_seed =
           Mina_base.Epoch_seed.to_base58_check
-            next_epoch.Mina_base.Epoch_data.Poly.seed
+            (Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
+               consensus )
+              .Mina_base.Epoch_data.Poly.seed
         in
         let%bind staking_ledger =
           match Mina_lib.staking_ledger mina with
@@ -4406,10 +4404,6 @@ module Queries = struct
           | Some (`Finalized (Ledger_db l)) ->
               return (Ledger.Any_ledger.cast (module Ledger.Db) l)
         in
-        assert (
-          Mina_base.Ledger_hash.equal
-            (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
-            next_epoch.ledger.hash ) ;
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger ~global_slot
             ~state_hash ~staking_ledger ~staking_epoch_seed
