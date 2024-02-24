@@ -12,7 +12,7 @@ curl --location "http://localhost:${1}/graphql" \
 
  You may now shut down the node. ⚠️ **⚠️ Back up the config directory.⚠️** ⚠️ `mv ~/.mina-config ~/mina-1-final-config`. This is your last chance to save or archive the transition frontier as it existed at the end of the chain.
 
- Now that you have moved the old config directory, build or install Mina 2.0. Use `mina-create-genesis` (or, `dune exec --profile=mainnet src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe`) to bundle the ledgers and kickstart the new config. The 1.4 ledger format is slightly different than the 2.0 format which now includes a version number. A simple sed command corrects for this difference. This step will take some time, as it must hash the exported ledgers.
+ Now that you have moved the old config directory, build or install Mina 2.0. Use `mina-create-genesis` (or, `dune exec --profile=mainnet src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe`) to bundle the ledgers and kickstart the new config. The 1.5 ledger format is slightly different than the 2.0 format which now includes a version number. A simple sed command corrects for this difference. This step will take some time, as it must hash the exported ledgers.
 
 
 ```sh
