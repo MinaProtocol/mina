@@ -5,6 +5,7 @@ let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 let PipelineTag = ../../Pipeline/Tag.dhall
+let PipelineMode = ../../Pipeline/Mode.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
@@ -29,7 +30,8 @@ Pipeline.build
         ],
         path = "Test",
         name = "HFTest",
-        tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Test ]
+        mode = PipelineMode.Type.Stable,
+        tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
       },
     steps = [
       Command.build
@@ -43,7 +45,8 @@ Pipeline.build
           label = "hard fork test",
           key = "hard-fork-test",
           target = Size.Small,
-          docker = None Docker.Type
+          docker = None Docker.Type,
+          timeout_in_minutes = Some 420
         }
     ]
   }
