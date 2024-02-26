@@ -4289,21 +4289,25 @@ module Queries = struct
         (Ledger.Any_ledger.M.merkle_root staking_ledger)
         staking_epoch.ledger.hash ) ;
     let%bind next_epoch_ledger =
-      if
-        Consensus.Hooks.epoch_is_not_finalized
-          ~epoch:(Data.Consensus_state.curr_epoch consensus_state)
-          ~constants:consensus_constants ~consensus_state
-      then
-        match Mina_lib.next_epoch_ledger mina with
-        | None ->
-            Deferred.Result.fail "Next epoch ledger is not initialized."
-        | Some `Notfinalized ->
-            failwith "next_epoch_ledger returned a disallowed value"
-        | Some (`Finalized (Genesis_epoch_ledger l)) ->
-            return (Ledger.Any_ledger.cast (module Ledger) l)
-        | Some (`Finalized (Ledger_db l)) ->
-            return (Ledger.Any_ledger.cast (module Ledger.Db) l)
-      else failwith "TODO"
+      match Mina_lib.next_epoch_ledger mina with
+      | None ->
+          Deferred.Result.fail "Next epoch ledger is not initialized."
+      | Some `Notfinalized ->
+          (* The next epoch ledger isn't finalized: we manually grab the snarked
+             ledger for this block instead.
+          *)
+          let state_hash =
+            Transition_frontier.Breadcrumb.state_hash breadcrumb
+          in
+          let%map ledger =
+            Mina_lib.get_snarked_ledger_full mina (Some state_hash)
+            |> Deferred.Result.map_error ~f:Error.to_string_hum
+          in
+          Ledger.Any_ledger.cast (module Ledger) ledger
+      | Some (`Finalized (Genesis_epoch_ledger l)) ->
+          return (Ledger.Any_ledger.cast (module Ledger) l)
+      | Some (`Finalized (Ledger_db l)) ->
+          return (Ledger.Any_ledger.cast (module Ledger.Db) l)
     in
     assert (
       Mina_base.Ledger_hash.equal
