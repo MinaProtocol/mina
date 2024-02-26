@@ -4289,24 +4289,21 @@ module Queries = struct
         (Ledger.Any_ledger.M.merkle_root staking_ledger)
         staking_epoch.ledger.hash ) ;
     let%bind next_epoch_ledger =
-      match
-        (* We always want to return the next epoch ledger here, in case we
-           need to hard-fork from a block where it is unfinalized. The
-           safety concern doesn't apply here, because we are only using
-           this to build a snapshot, and never applying it back to the
-           running network.
-        *)
-        Mina_lib.next_epoch_ledger
-          ~unsafe_always_return_ledger_as_if_finalized:true mina
-      with
-      | None ->
-          Deferred.Result.fail "Next epoch ledger is not initialized."
-      | Some `Notfinalized ->
-          failwith "next_epoch_ledger returned a disallowed value"
-      | Some (`Finalized (Genesis_epoch_ledger l)) ->
-          return (Ledger.Any_ledger.cast (module Ledger) l)
-      | Some (`Finalized (Ledger_db l)) ->
-          return (Ledger.Any_ledger.cast (module Ledger.Db) l)
+      if
+        Consensus.Hooks.epoch_is_not_finalized
+          ~epoch:(Data.Consensus_state.curr_epoch consensus_state)
+          ~constants:consensus_constants ~consensus_state
+      then
+        match Mina_lib.next_epoch_ledger mina with
+        | None ->
+            Deferred.Result.fail "Next epoch ledger is not initialized."
+        | Some `Notfinalized ->
+            failwith "next_epoch_ledger returned a disallowed value"
+        | Some (`Finalized (Genesis_epoch_ledger l)) ->
+            return (Ledger.Any_ledger.cast (module Ledger) l)
+        | Some (`Finalized (Ledger_db l)) ->
+            return (Ledger.Any_ledger.cast (module Ledger.Db) l)
+      else failwith "TODO"
     in
     assert (
       Mina_base.Ledger_hash.equal
