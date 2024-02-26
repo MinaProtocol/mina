@@ -42,6 +42,7 @@ let zkapp_command =
   List.hd_exn zkapp_commands
 
 let zkapp_proof =
+  let%map.Async.Deferred zkapp_command = zkapp_command in
   List.fold_until
     (Mina_base.Zkapp_command.all_account_updates_list zkapp_command)
     ~init:None
@@ -65,6 +66,7 @@ let verification_key =
     Transaction_snark.For_tests.create_trivial_snapp
       ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
   in
+  let%map.Async.Deferred vk = vk in
   With_hash.data vk
 
 let applied = Mina_base.Transaction_status.Applied
@@ -202,6 +204,7 @@ let scan_state_base_node_payment =
   mk_scan_state_base_node varying
 
 let scan_state_base_node_zkapp =
+  let%map.Async.Deferred zkapp_command = zkapp_command in
   let varying : Mina_transaction_logic.Transaction_applied.Varying.t =
     let zkapp_command_applied :
         Mina_transaction_logic.Transaction_applied.Zkapp_command_applied.t =
