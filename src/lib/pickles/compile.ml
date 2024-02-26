@@ -17,8 +17,6 @@ open Backend
 
 exception Return_digest of Md5.t
 
-let profile_constraints = false
-
 let verify_promise = Verify.verify
 
 open Kimchi_backend
@@ -336,59 +334,6 @@ struct
       * (Kimchi_bindings.Protocol.VerifierIndex.Fp.t * Dirty.t) Promise.t Lazy.t
   end
 
-  let _log_step main _typ name index =
-    let module Constraints = Snarky_log.Constraints (Impls.Step.Internal_Basic) in
-    let log =
-      let weight =
-        let sys = Backend.Tick.R1CS_constraint_system.create () in
-        fun ({ annotation; basic } : Impls.Step.Constraint.t) ->
-          let prev =
-            Kimchi_pasta_constraint_system.Vesta_constraint_system.next_row sys
-          in
-          Backend.Tick.R1CS_constraint_system.add_constraint sys
-            ?label:annotation basic ;
-          let next =
-            Kimchi_pasta_constraint_system.Vesta_constraint_system.next_row sys
-          in
-          next - prev
-      in
-      Constraints.log ~weight (fun () -> Impls.Step.make_checked main)
-    in
-    if profile_constraints then
-      Snarky_log.to_file (sprintf "step-snark-%s-%d.json" name index) log
-
-  let _log_wrap main typ name id =
-    let module Constraints = Snarky_log.Constraints (Impls.Wrap.Internal_Basic) in
-    let log =
-      let sys = Backend.Tock.R1CS_constraint_system.create () in
-      let weight ({ annotation; basic } : Impls.Wrap.Constraint.t) =
-        let prev =
-          Kimchi_pasta_constraint_system.Pallas_constraint_system.next_row sys
-        in
-        Backend.Tock.R1CS_constraint_system.add_constraint sys ?label:annotation
-          basic ;
-        let next =
-          Kimchi_pasta_constraint_system.Pallas_constraint_system.next_row sys
-        in
-        next - prev
-      in
-      let log =
-        Constraints.log ~weight
-          Impls.Wrap.(
-            fun () ->
-              make_checked (fun () : unit ->
-                  let x = with_label __LOC__ (fun () -> exists typ) in
-                  main x () ))
-      in
-      log
-    in
-    if profile_constraints then
-      Snarky_log.to_file
-        (sprintf
-           !"wrap-%s-%{sexp:Type_equal.Id.Uid.t}.json"
-           name (Type_equal.Id.uid id) )
-        log
-
   let compile :
       type var value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
          self:(var, value, max_proofs_verified, branches) Tag.t
@@ -610,7 +555,6 @@ struct
                 ~wrap_rounds:Tock.Rounds.n
 
             let f (T b : _ Branch_data.t) =
-              (* let () = if true then log_step main typ name b.index in *)
               let open Impls.Step in
               (* HACK: TODO docs *)
               if return_early_digest_exception then failwith "TODO: Delete me" ;
@@ -718,7 +662,6 @@ struct
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
       let open Impls.Wrap in
-      (*let () = if true then log_wrap main typ name self.id in*)
       let self_id = Type_equal.Id.uid self.id in
       let disk_key_prover =
         lazy
