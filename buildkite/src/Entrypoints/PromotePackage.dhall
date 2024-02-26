@@ -43,7 +43,7 @@ let promote_artifacts =
           , name = docker
           , version = version
           , new_tag = tag
-          , step_key = "add-tag-${tag}-to-${Artifact.lowerName docker}-docker"
+          , step_key = "add-tag-to-${Artifact.lowerName docker}-docker"
         })
       dockers
   in
