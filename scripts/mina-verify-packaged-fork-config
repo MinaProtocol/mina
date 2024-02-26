@@ -96,7 +96,7 @@ function extract_ledgers() {
     config_file=$1
     ledger_dir=$2
     json_prefix=$3
-    "$MINA_EXE" daemon --libp2p-keypair "$workdir/keys/p2p" --config-file "$config_file" --seed --genesis-ledger-dir "ledger_dir" &
+    "$MINA_EXE" daemon --libp2p-keypair "$workdir/keys/p2p" --config-file "$config_file" --seed --genesis-ledger-dir "$ledger_dir" &
     
     while ! "$MINA_EXE" ledger export staged-ledger  | jq >"$json_prefix-staged.json"; do
         sleep 1m
