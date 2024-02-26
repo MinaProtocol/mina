@@ -36,8 +36,9 @@ let account : Mina_base.Account.t =
 let zkapp_command =
   let num_updates = 16 in
   let _ledger, zkapp_commands =
-    Snark_profiler_lib.create_ledger_and_zkapps ~min_num_updates:num_updates
-      ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        Snark_profiler_lib.create_ledger_and_zkapps ~min_num_updates:num_updates
+          ~num_proof_updates:num_updates ~max_num_updates:num_updates () )
   in
   List.hd_exn zkapp_commands
 
