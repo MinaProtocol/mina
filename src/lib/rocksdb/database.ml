@@ -1,7 +1,5 @@
 (* rocksdb.ml -- expose RocksDB operations for Mina *)
 
-open Core
-
 type t = { uuid : Uuid.Stable.V1.t; db : (Rocks.t[@sexp.opaque]) }
 [@@deriving sexp]
 
@@ -180,6 +178,7 @@ let%test_unit "checkpoint read" =
       | `Duplicate_key _ ->
           Deferred.unit
       | `Ok db_hashtbl -> (
+          let open Core in
           let cp_hashtbl = Hashtbl.copy db_hashtbl in
           let db_dir = Filename.temp_dir "test_db" "" in
           let cp_dir =
