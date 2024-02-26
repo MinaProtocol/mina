@@ -123,6 +123,8 @@ module Network_config = struct
         ; slots_per_epoch
         ; slots_per_sub_window
         ; txpool_max_size
+        ; slot_tx_end
+        ; slot_chain_end
         } =
       test_config
     in
@@ -215,7 +217,12 @@ module Network_config = struct
     in
     let runtime_config =
       { Runtime_config.daemon =
-          Some { txpool_max_size = Some txpool_max_size; peer_list_url = None }
+          Some
+            { txpool_max_size = Some txpool_max_size
+            ; peer_list_url = None
+            ; slot_tx_end
+            ; slot_chain_end
+            }
       ; genesis =
           Some
             { k = Some k
@@ -718,7 +725,7 @@ module Network_manager = struct
     in
     let nodes_to_string =
       Fn.compose (String.concat ~sep:", ")
-        (List.map ~f:Kubernetes_network.Node.id)
+        (List.map ~f:Kubernetes_network.Node.infra_id)
     in
     [%log info] "Network deployed" ;
     [%log info] "testnet namespace: %s" t.namespace ;

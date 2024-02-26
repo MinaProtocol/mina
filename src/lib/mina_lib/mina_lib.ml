@@ -407,16 +407,17 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
                              "Offline for too long; restarting libp2p_helper" ;
                            Mina_networking.restart_helper net ;
                            next_helper_restart := None ;
-                           match !offline_shutdown with
-                           | None ->
-                               offline_shutdown :=
-                                 Some
-                                   (Async.Clock.Event.run_after
-                                      offline_shutdown_delay
-                                      (fun () -> raise Offline_shutdown)
-                                      () )
-                           | Some _ ->
-                               () )
+                           if not is_seed then
+                             match !offline_shutdown with
+                             | None ->
+                                 offline_shutdown :=
+                                   Some
+                                     (Async.Clock.Event.run_after
+                                        offline_shutdown_delay
+                                        (fun () -> raise Offline_shutdown)
+                                        () )
+                             | Some _ ->
+                                 () )
                          () )
               | Some _ ->
                   () ) ;
@@ -922,7 +923,7 @@ let staking_ledger t =
   Consensus.Hooks.get_epoch_ledger ~constants:consensus_constants
     ~consensus_state ~local_state
 
-let next_epoch_ledger t =
+let next_epoch_ledger ?(unsafe_always_return_ledger_as_if_finalized = false) t =
   let open Option.Let_syntax in
   let%map frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
@@ -940,6 +941,7 @@ let next_epoch_ledger t =
   if
     Mina_numbers.Length.(
       equal root_epoch best_tip_epoch || equal best_tip_epoch zero)
+    || unsafe_always_return_ledger_as_if_finalized
   then
     (*root is in the same epoch as the best tip and so the next epoch ledger in the local state will be updated by Proof_of_stake.frontier_root_transition. Next epoch ledger in genesis epoch is the genesis ledger*)
     `Finalized
@@ -1562,11 +1564,16 @@ let create ?wallets (config : Config.t) =
                 | Some net ->
                     Mina_networking.peers net )
           in
+          let slot_tx_end =
+            Runtime_config.slot_tx_end_or_default
+              config.Config.precomputed_values.runtime_config
+          in
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
+              ~slot_tx_end
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
@@ -2083,3 +2090,35 @@ let get_filtered_log_entries
     !in_memory_reverse_structured_log_messages_for_integration_test
   in
   (get_from_idx curr_idx messages [], is_started)
+
+let get_transition_frontier (t : t) =
+  transition_frontier t |> Pipe_lib.Broadcast_pipe.Reader.peek
+  |> Result.of_option ~error:"Could not obtain transition frontier"
+
+let best_chain_block_by_height (t : t) height =
+  let open Result.Let_syntax in
+  let%bind transition_frontier = get_transition_frontier t in
+  Transition_frontier.best_tip_path transition_frontier
+  |> List.find ~f:(fun bc ->
+         let validated_transition =
+           Transition_frontier.Breadcrumb.validated_transition bc
+         in
+         let block_height =
+           Mina_block.(
+             blockchain_length @@ With_hash.data
+             @@ Validated.forget validated_transition)
+         in
+         Unsigned.UInt32.equal block_height height )
+  |> Result.of_option
+       ~error:
+         (sprintf "Could not find block in transition frontier with height %s"
+            (Unsigned.UInt32.to_string height) )
+
+let best_chain_block_by_state_hash (t : t) hash =
+  let open Result.Let_syntax in
+  let%bind transition_frontier = get_transition_frontier t in
+  Transition_frontier.find transition_frontier hash
+  |> Result.of_option
+       ~error:
+         (sprintf "Block with state hash %s not found in transition frontier"
+            (State_hash.to_base58_check hash) )
