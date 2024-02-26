@@ -4257,24 +4257,32 @@ module Queries = struct
 
   let get_epoch_ledgers ~mina breadcrumb =
     let open Deferred.Result.Let_syntax in
-    let consensus =
+    let mina_config = Mina_lib.config mina in
+    let frontier_consensus_local_state = mina_config.consensus_local_state in
+    let consensus_constants =
+      mina_config.precomputed_values.consensus_constants
+    in
+    let consensus_state =
       breadcrumb |> Transition_frontier.Breadcrumb.protocol_state
       |> Mina_state.Protocol_state.consensus_state
     in
     let staking_epoch =
-      Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data consensus
+      Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
+        consensus_state
     in
     let next_epoch =
-      Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data consensus
+      Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
+        consensus_state
     in
-    let%bind staking_ledger =
-      match Mina_lib.staking_ledger mina with
-      | None ->
-          Deferred.Result.fail "Staking ledger is not initialized."
-      | Some (Genesis_epoch_ledger l) ->
-          return (Ledger.Any_ledger.cast (module Ledger) l)
-      | Some (Ledger_db l) ->
-          return (Ledger.Any_ledger.cast (module Ledger.Db) l)
+    let staking_ledger =
+      match
+        Consensus.Hooks.get_epoch_ledger ~constants:consensus_constants
+          ~consensus_state ~local_state:frontier_consensus_local_state
+      with
+      | Genesis_epoch_ledger l ->
+          Ledger.Any_ledger.cast (module Ledger) l
+      | Ledger_db l ->
+          Ledger.Any_ledger.cast (module Ledger.Db) l
     in
     assert (
       Mina_base.Ledger_hash.equal
