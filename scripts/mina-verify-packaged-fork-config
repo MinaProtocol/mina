@@ -23,7 +23,7 @@ Inputs:
 - SECONDS_PER_SLOT (default: 180)
 
 Ensures:
-- The accounts listed in config.json are the ones in the PACKAGED_CONFIG_JSON
+- The accounts listed in config.json are the ones in the PACKAGED_DAEMON_CONFIG
 - The genesis ledger directory tarfile contents match reference copies created
   fresh from config.json. This takes a long time (>20min) due to rehashing.
 
@@ -86,7 +86,7 @@ sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth"
 
 FORK_CONFIG_JSON="$1" \
 LEDGER_HASHES_JSON="$workdir/hashes.json" \
-GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$PACKAGED_CONFIG_JSON") \
+GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$PACKAGED_DAEMON_CONFIG") \
 "$CREATE_RUNTIME_CONFIG" > "$workdir/config-substituted.json"
 
 echo "exporting ledgers from running node ... (this may take a while)"
@@ -108,7 +108,7 @@ function extract_ledgers() {
     "$MINA_EXE" client stop
 }
 
-extract_ledgers "$PACKAGED_CONFIG_JSON" "$GENESIS_LEDGER_DIR" "$workdir/packaged"
+extract_ledgers "$PACKAGED_DAEMON_CONFIG" "$GENESIS_LEDGER_DIR" "$workdir/packaged"
 mv -t "$workdir/ledgers-backup" /var/lib/coda/*.tar.gz
 extract_ledgers "$workdir/config-substituted.json" "$workdir/ledgers" "$workdir/reference"
 mv -t /var/lib/coda "$workdir/ledgers-backup"/*
@@ -116,13 +116,13 @@ mv -t /var/lib/coda "$workdir/ledgers-backup"/*
 echo "Performing final comparisons..."
 error=0
 
-result=$(jq --slurpfile a "$workdir/config-substituted.json" --slurpfile b "$PACKAGED_CONFIG_JSON" -n '
+result=$(jq --slurpfile a "$workdir/config-substituted.json" --slurpfile b "$PACKAGED_DAEMON_CONFIG" -n '
   ($a[0].epoch_data.staking.hash == $b[0].epoch_data.staking.hash and
    $a[0].epoch_data.next.hash == $b[0].epoch_data.next.hash and
    $a[0].ledger.hash == $b[0].ledger.hash)')
 
 if [ "$result" != "true" ]; then
-    echo "Packaged config hashes in $PACKAGED_CONFIG_JSON not expected compared to $workdir/config-substituted.json"
+    echo "Packaged config hashes in $PACKAGED_DAEMON_CONFIG not expected compared to $workdir/config-substituted.json"
     error=1
 fi
 
