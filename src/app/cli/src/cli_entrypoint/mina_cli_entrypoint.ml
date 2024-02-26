@@ -1918,6 +1918,117 @@ let internal_commands logger =
   ; ("dump-type-shapes", dump_type_shapes)
   ; ("replay-blocks", replay_blocks logger)
   ; ("audit-type-shapes", audit_type_shapes)
+  ; ( "test-genesis-block-generation"
+    , Command.async ~summary:"Generate a genesis proof"
+        (let open Command.Let_syntax in
+        let%map_open config_file =
+          flag "--config-file" ~aliases:[ "config-file" ]
+            ~doc:
+              "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
+               default: <config_dir>/daemon.json). Pass multiple times to \
+               override fields from earlier config files"
+            (required string)
+        and conf_dir = Cli_lib.Flag.conf_dir
+        and genesis_dir =
+          flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
+            ~doc:
+              "DIR Directory that contains the genesis ledger and the genesis \
+               blockchain proof (default: <config-dir>)"
+            (optional string)
+        in
+        fun () ->
+          let open Deferred.Let_syntax in
+          Parallel.init_master () ;
+          let logger = Logger.create () in
+          let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
+          let genesis_dir =
+            Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
+          in
+          let proof_level = Genesis_constants.Proof_level.Full in
+          let%bind config =
+            match%bind Genesis_ledger_helper.load_config_json config_file with
+            | Ok config_json -> (
+                let%map config_json =
+                  Genesis_ledger_helper.upgrade_old_config ~logger config_file
+                    config_json
+                in
+                match Runtime_config.of_yojson config_json with
+                | Ok loaded_config ->
+                    Runtime_config.combine Runtime_config.default loaded_config
+                | Error err ->
+                    [%log fatal]
+                      "Could not parse configuration from $config_file: $error"
+                      ~metadata:
+                        [ ("config_file", `String config_file)
+                        ; ("config_json", config_json)
+                        ; ("error", `String err)
+                        ] ;
+                    failwithf "Could not parse configuration file: %s" err () )
+            | Error err ->
+                Mina_user_error.raisef ~where:"reading configuration file"
+                  "The configuration file %s could not be read:\n%s" config_file
+                  (Error.to_string_hum err)
+          in
+          let%bind precomputed_values =
+            match%map
+              Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
+                ~proof_level:(Some proof_level) config
+            with
+            | Ok (precomputed_values, _) ->
+                precomputed_values
+            | Error err ->
+                let ( json_config
+                    , `Accounts_omitted
+                        ( `Genesis genesis_accounts_omitted
+                        , `Staking staking_accounts_omitted
+                        , `Next next_accounts_omitted ) ) =
+                  Runtime_config.to_yojson_without_accounts config
+                in
+                let append_accounts_omitted s =
+                  Option.value_map
+                    ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
+                    ~default:Fn.id
+                in
+                let metadata =
+                  append_accounts_omitted "genesis" genesis_accounts_omitted
+                  @@ append_accounts_omitted "staking" staking_accounts_omitted
+                  @@ append_accounts_omitted "next" next_accounts_omitted []
+                  @ [ ("config", json_config)
+                    ; ( "name"
+                      , `String
+                          (Option.value ~default:"not provided"
+                             (let%bind.Option ledger = config.ledger in
+                              Option.first_some ledger.name ledger.hash ) ) )
+                    ; ("error", Error_json.error_to_yojson err)
+                    ]
+                in
+                [%log info]
+                  "Initializing with runtime configuration. Ledger source: \
+                   $name"
+                  ~metadata ;
+                Error.raise err
+          in
+          let pids = Child_processes.Termination.create_pid_table () in
+          let%bind prover =
+            (* We create a prover process (unnecessarily) here, to have a more
+               realistic test.
+            *)
+            Prover.create ~logger ~pids ~conf_dir ~proof_level
+              ~constraint_constants:precomputed_values.constraint_constants ()
+          in
+          match%bind
+            Prover.create_genesis_block prover
+              (Genesis_proof.to_inputs precomputed_values)
+          with
+          | Ok block ->
+              Format.eprintf "Generated block@.%s@."
+                ( Yojson.Safe.to_string
+                @@ Blockchain_snark.Blockchain.to_yojson block ) ;
+              exit 0
+          | Error err ->
+              Format.eprintf "Failed to generate block@.%s@."
+                (Yojson.Safe.to_string @@ Error_json.error_to_yojson err) ;
+              exit 1) )
   ]
 
 let mina_commands logger =
