@@ -2,6 +2,7 @@
  (name rocksdb)
  (public_name rocksdb)
  (library_flags -linkall)
+ (flags -open Core_kernel)
  (libraries
    ;; opam libraries
   async
