@@ -2800,7 +2800,7 @@ module Hooks = struct
         , Data.Local_state.Snapshot.ledger
             !local_state.Local_state.Data.next_epoch_snapshot )
     else
-      (* Next epoch, the caller will need to manually compute the snarked
+      (* Next epoch: the caller will need to manually compute the snarked
          ledger for the parent block at the epoch boundary.
       *)
       let num_parents =
