@@ -40,7 +40,7 @@ let to_int : t -> int = function N0 -> 0 | N1 -> 1 | N2 -> 2
 
 type proofs_verified = t
 
-let of_nat (type n) (n : n Pickles_types.Nat.t) : t =
+let of_nat_exn (type n) (n : n Pickles_types.Nat.t) : t =
   let open Pickles_types.Nat in
   match n with
   | Z ->
@@ -50,9 +50,11 @@ let of_nat (type n) (n : n Pickles_types.Nat.t) : t =
   | S (S Z) ->
       N2
   | S _ ->
-      failwithf "Proofs_verified.of_nat: got %d" (to_int n) ()
+      raise
+        (Invalid_argument
+           (Printf.sprintf "Proofs_verified.of_nat: got %d" (to_int n)) )
 
-let of_int (n : int) : t =
+let of_int_exn (n : int) : t =
   match n with
   | 0 ->
       N0
@@ -61,7 +63,8 @@ let of_int (n : int) : t =
   | 2 ->
       N2
   | _ ->
-      failwithf "Proofs_verified.of_int: got %d" n ()
+      raise
+        (Invalid_argument (Printf.sprintf "Proofs_verified.of_int: got %d" n))
 
 type 'f boolean = 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
 
