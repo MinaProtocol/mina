@@ -2290,63 +2290,62 @@ module Queries = struct
       ~resolve:(fun { ctx = mina; _ } () state_hash_opt block_height_opt ->
         let open Deferred.Result.Let_syntax in
         let runtime_config = Mina_lib.runtime_config mina in
-        let%bind breadcrumb =
+        let%bind best_tip =
+          match Mina_lib.best_tip mina with
+          | `Bootstrapping ->
+              Deferred.Result.fail "Daemon is bootstrapping"
+          | `Active b ->
+              Deferred.Result.return b
+        in
+        let%bind target_breadcrumb =
           match (state_hash_opt, block_height_opt) with
           | None, None -> (
-              match Mina_lib.best_tip mina with
-              | `Bootstrapping ->
-                  Deferred.Result.fail "Daemon is bootstrapping"
-              | `Active breadcrumb -> (
-                  let target_height =
-                    match runtime_config.daemon with
-                    | Some daemon ->
-                        daemon.slot_tx_end
-                    | None ->
-                        None
+              let target_height =
+                match runtime_config.daemon with
+                | Some daemon ->
+                    daemon.slot_tx_end
+                | None ->
+                    None
+              in
+              match target_height with
+              | None ->
+                  return best_tip
+              | Some txn_stop_slot ->
+                  (* NB: Here we use the correct notion of the stop slot: we
+                     want to stop at an offset from genesis. This is
+                     inconsistent with the uses across the rest of the code
+                     -- the stop slot is being used as since hard-fork
+                     instead, which is the incorrect version -- but I refuse
+                     to propagate that error to here.
+                  *)
+                  let stop_slot =
+                    Mina_numbers.Global_slot_since_genesis.of_int txn_stop_slot
                   in
-                  match target_height with
-                  | None ->
-                      return breadcrumb
-                  | Some txn_stop_slot ->
-                      (* NB: Here we use the correct notion of the stop slot: we
-                         want to stop at an offset from genesis. This is
-                         inconsistent with the uses across the rest of the code
-                         -- the stop slot is being used as since hard-fork
-                         instead, which is the incorrect version -- but I refuse
-                         to propagate that error to here.
-                      *)
-                      let stop_slot =
-                        Mina_numbers.Global_slot_since_genesis.of_int
-                          txn_stop_slot
+                  let rec find_block_older_than_stop_slot breadcrumb =
+                    let protocol_state =
+                      Transition_frontier.Breadcrumb.protocol_state breadcrumb
+                    in
+                    let global_slot =
+                      Mina_state.Protocol_state.consensus_state protocol_state
+                      |> Consensus.Data.Consensus_state
+                         .global_slot_since_genesis
+                    in
+                    if
+                      Mina_numbers.Global_slot_since_genesis.( < ) global_slot
+                        stop_slot
+                    then return breadcrumb
+                    else
+                      let parent_hash =
+                        Transition_frontier.Breadcrumb.parent_hash breadcrumb
                       in
-                      let rec find_block_older_than_stop_slot breadcrumb =
-                        let protocol_state =
-                          Transition_frontier.Breadcrumb.protocol_state
-                            breadcrumb
-                        in
-                        let global_slot =
-                          Mina_state.Protocol_state.consensus_state
-                            protocol_state
-                          |> Consensus.Data.Consensus_state
-                             .global_slot_since_genesis
-                        in
-                        if
-                          Mina_numbers.Global_slot_since_genesis.( < )
-                            global_slot stop_slot
-                        then return breadcrumb
-                        else
-                          let parent_hash =
-                            Transition_frontier.Breadcrumb.parent_hash
-                              breadcrumb
-                          in
-                          let%bind breadcrumb =
-                            Deferred.return
-                            @@ Mina_lib.best_chain_block_by_state_hash mina
-                                 parent_hash
-                          in
-                          find_block_older_than_stop_slot breadcrumb
+                      let%bind breadcrumb =
+                        Deferred.return
+                        @@ Mina_lib.best_chain_block_by_state_hash mina
+                             parent_hash
                       in
-                      find_block_older_than_stop_slot breadcrumb ) )
+                      find_block_older_than_stop_slot breadcrumb
+                  in
+                  find_block_older_than_stop_slot best_tip )
           | Some state_hash_base58, None ->
               let open Result.Monad_infix in
               State_hash.of_base58_check state_hash_base58
@@ -2360,81 +2359,116 @@ module Queries = struct
           | Some _, Some _ ->
               Deferred.Result.fail "Cannot specify both state hash and height"
         in
-        let block = Transition_frontier.Breadcrumb.block breadcrumb in
-        let blockchain_length = Mina_block.blockchain_length block in
-        let global_slot =
-          Mina_block.consensus_state block
-          |> Consensus.Data.Consensus_state.curr_global_slot
+        let target_block =
+          Transition_frontier.Breadcrumb.block target_breadcrumb
         in
-        let staged_ledger =
-          Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+        let target_height = Mina_block.blockchain_length target_block in
+        let target_staged_ledger =
+          Transition_frontier.Breadcrumb.staged_ledger target_breadcrumb
           |> Staged_ledger.ledger
         in
-        let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
-        let protocol_state =
-          Transition_frontier.Breadcrumb.protocol_state breadcrumb
+        let target_state_hash =
+          Transition_frontier.Breadcrumb.state_hash target_breadcrumb
         in
-        let consensus =
-          Mina_state.Protocol_state.consensus_state protocol_state
+        let target_consensus_state = Mina_block.consensus_state target_block in
+        let target_slot =
+          Consensus.Data.Consensus_state.curr_global_slot target_consensus_state
         in
-        let staking_epoch =
+        let best_tip_consensus_state =
+          Transition_frontier.Breadcrumb.protocol_state best_tip
+          |> Mina_state.Protocol_state.consensus_state
+        in
+        let target_staking_epoch =
           Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
-            consensus
+            target_consensus_state
         in
-        let next_epoch =
+        let target_next_epoch =
           Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
-            consensus
+            target_consensus_state
         in
-        let staking_epoch_seed =
+        let target_staking_epoch_seed =
           Mina_base.Epoch_seed.to_base58_check
-            staking_epoch.Mina_base.Epoch_data.Poly.seed
+            target_staking_epoch.Mina_base.Epoch_data.Poly.seed
         in
-        let next_epoch_seed =
+        let target_next_epoch_seed =
           Mina_base.Epoch_seed.to_base58_check
-            next_epoch.Mina_base.Epoch_data.Poly.seed
+            target_next_epoch.Mina_base.Epoch_data.Poly.seed
         in
-        let%bind staking_ledger =
-          match Mina_lib.staking_ledger mina with
-          | None ->
-              Deferred.Result.fail "Staking ledger is not initialized."
-          | Some (Genesis_epoch_ledger l) ->
-              return (Ledger.Any_ledger.cast (module Ledger) l)
-          | Some (Ledger_db l) ->
-              return (Ledger.Any_ledger.cast (module Ledger.Db) l)
+        let mina_config = Mina_lib.config mina in
+        let local_state = mina_config.consensus_local_state in
+        let constants = mina_config.precomputed_values.consensus_constants in
+        let cast_ledger :
+               Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
+            -> Ledger.Any_ledger.witness = function
+          | Genesis_epoch_ledger l ->
+              Ledger.Any_ledger.cast (module Ledger) l
+          | Ledger_db l ->
+              Ledger.Any_ledger.cast (module Ledger.Db) l
+        in
+        let cur_epoch_ledger =
+          Consensus.Data.Local_state.staking_epoch_ledger local_state
+          |> cast_ledger
+        in
+        let next_epoch_ledger =
+          Consensus.Data.Local_state.next_epoch_ledger local_state
+          |> cast_ledger
+        in
+        let best_tip_finalized =
+          Consensus.Hooks.epoch_ledgers_finalized ~constants
+            best_tip_consensus_state
+        in
+        let epoch =
+          Consensus.Proof_of_stake.Exported.Global_slot.(
+            Fn.compose epoch (of_slot_number ~constants))
+        in
+        let same_epoch =
+          Unsigned.UInt32.equal (epoch target_slot)
+          @@ epoch
+          @@ Consensus.Data.Consensus_state.curr_global_slot
+               best_tip_consensus_state
+        in
+        let staking_ledger =
+          if same_epoch && not best_tip_finalized then
+            (* Neither target nor best tip are finalized (both in the same epoch) =>
+               `next_epoch_ledger` refers to staking ledger corresponding to staking ledger of
+               the current epoch (because root is in the previous epoch) *)
+            next_epoch_ledger
+          else (
+            (* There are two cases:
+
+               - Target and best tip are in different epochs =>
+                 best_tip is not finalized
+                 (because fork_config can't process targets deeper than root transition) =>
+                 `cur_epoch_ledger` corresponds to a root from the previous epoch =>
+                 it equals to staking ledger for the target transition
+               - Best tip is finalized =>
+               `cur_epoch_ledger` corresponds to the current epoch
+               (because root is in the same epoch as target) *)
+            assert (
+              Mina_base.Ledger_hash.equal
+                (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
+                target_next_epoch.ledger.hash ) ;
+            cur_epoch_ledger )
         in
         assert (
           Mina_base.Ledger_hash.equal
             (Ledger.Any_ledger.M.merkle_root staking_ledger)
-            staking_epoch.ledger.hash ) ;
-        let%bind next_epoch_ledger =
-          match
-            (* We always want to return the next epoch ledger here, in case we
-               need to hard-fork from a block where it is unfinalized. The
-               safety concern doesn't apply here, because we are only using
-               this to build a snapshot, and never applying it back to the
-               running network.
-            *)
-            Mina_lib.next_epoch_ledger
-              ~unsafe_always_return_ledger_as_if_finalized:true mina
-          with
-          | None ->
-              Deferred.Result.fail "Next epoch ledger is not initialized."
-          | Some `Notfinalized ->
-              failwith "next_epoch_ledger returned a disallowed value"
-          | Some (`Finalized (Genesis_epoch_ledger l)) ->
-              return (Ledger.Any_ledger.cast (module Ledger) l)
-          | Some (`Finalized (Ledger_db l)) ->
-              return (Ledger.Any_ledger.cast (module Ledger.Db) l)
-        in
-        assert (
-          Mina_base.Ledger_hash.equal
-            (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
-            next_epoch.ledger.hash ) ;
+            target_staking_epoch.ledger.hash ) ;
         let%bind new_config =
-          Runtime_config.make_fork_config ~staged_ledger ~global_slot
-            ~state_hash ~staking_ledger ~staking_epoch_seed
-            ~next_epoch_ledger:(Some next_epoch_ledger) ~next_epoch_seed
-            ~blockchain_length runtime_config
+          (* For next epoch ledger we always return the next epoch ledger
+             corresponding to the root transition, in case we need to hard-fork
+             from a block where it is unfinalized.
+
+             The safety concern doesn't apply here, because we are only using
+             this to build a snapshot, and never applying it back to the
+             running network.
+          *)
+          Runtime_config.make_fork_config ~staged_ledger:target_staged_ledger
+            ~global_slot:target_slot ~state_hash:target_state_hash
+            ~staking_ledger ~staking_epoch_seed:target_staking_epoch_seed
+            ~next_epoch_ledger:(Some next_epoch_ledger)
+            ~next_epoch_seed:target_next_epoch_seed
+            ~blockchain_length:target_height runtime_config
         in
         let%map () =
           let open Async.Deferred.Infix in

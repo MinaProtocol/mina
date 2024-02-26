@@ -1083,7 +1083,7 @@ let staking_ledger t =
   Consensus.Hooks.get_epoch_ledger ~constants:consensus_constants
     ~consensus_state ~local_state
 
-let next_epoch_ledger ?(unsafe_always_return_ledger_as_if_finalized = false) t =
+let next_epoch_ledger t =
   let open Option.Let_syntax in
   let%map frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
@@ -1101,7 +1101,6 @@ let next_epoch_ledger ?(unsafe_always_return_ledger_as_if_finalized = false) t =
   if
     Mina_numbers.Length.(
       equal root_epoch best_tip_epoch || equal best_tip_epoch zero)
-    || unsafe_always_return_ledger_as_if_finalized
   then
     (*root is in the same epoch as the best tip and so the next epoch ledger in the local state will be updated by Proof_of_stake.frontier_root_transition. Next epoch ledger in genesis epoch is the genesis ledger*)
     `Finalized

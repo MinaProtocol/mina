@@ -726,6 +726,9 @@ module type S = sig
            Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
       -> bool
 
+    val epoch_ledgers_finalized :
+      constants:Constants.t -> Consensus_state.Value.t -> bool
+
     val get_epoch_ledger :
          constants:Constants.t
       -> consensus_state:Consensus_state.Value.t

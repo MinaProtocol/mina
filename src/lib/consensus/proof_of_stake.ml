@@ -2641,6 +2641,15 @@ module Make_str (A : Wire_types.Concrete) = struct
       | `Last ->
           "last"
 
+    let epoch_ledgers_finalized ~(constants : Constants.t)
+        ({ next_epoch_data = { epoch_length; _ }
+         ; curr_global_slot_since_hard_fork = slot
+         ; _
+         } :
+          Consensus_state.Value.t ) =
+      let open Length in
+      Global_slot.epoch slot = zero || epoch_length > constants.k
+
     (* Select the correct epoch snapshot to use from local state for an epoch.
      * The rule for selecting the correct epoch snapshot is predicated off of
      * whether or not the first transition in the epoch in question has been
@@ -2653,25 +2662,16 @@ module Make_str (A : Wire_types.Concrete) = struct
      * (i.e. it does not check that the epoch snapshot's ledger hash is the same
      * as the ledger hash specified by the epoch data).
      *)
-    let select_epoch_snapshot ~(constants : Constants.t)
-        ~(consensus_state : Consensus_state.Value.t) ~local_state ~epoch =
-      let open Local_state in
-      let open Epoch_data.Poly in
+    let select_epoch_snapshot ~constants ~consensus_state ~local_state ~epoch =
       (* are we in the next epoch after the consensus state? *)
       let in_next_epoch =
         Epoch.equal epoch
           (Epoch.succ (Consensus_state.curr_epoch consensus_state))
       in
-      (* has the first transition in the epoch (other than the genesis epoch) reached finalization? *)
-      let epoch_is_not_finalized =
-        let is_genesis_epoch = Length.equal epoch Length.zero in
-        let epoch_is_finalized =
-          Length.(consensus_state.next_epoch_data.epoch_length > constants.k)
-        in
-        (not epoch_is_finalized) && not is_genesis_epoch
-      in
-      if in_next_epoch || epoch_is_not_finalized then
-        (`Curr, !local_state.Data.next_epoch_snapshot)
+      if
+        in_next_epoch
+        || not (epoch_ledgers_finalized ~constants consensus_state)
+      then (`Curr, !local_state.Local_state.Data.next_epoch_snapshot)
       else (`Last, !local_state.staking_epoch_snapshot)
 
     let get_epoch_ledger ~constants ~(consensus_state : Consensus_state.Value.t)
@@ -2681,7 +2681,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~epoch:(Data.Consensus_state.curr_epoch consensus_state)
           ~local_state
       in
-      Data.Local_state.Snapshot.ledger snapshot
+      Local_state.Snapshot.ledger snapshot
 
     type required_snapshot =
       { snapshot_id : Local_state.snapshot_identifier
