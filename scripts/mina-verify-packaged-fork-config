@@ -82,7 +82,7 @@ echo "generating genesis ledgers ... (this may take a while)"
 
 cp "$1" "$workdir/config.json"
 sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "1"}/' "$workdir/config.json"
-"$MINA_GENESIS_EXE" --config-file "$1"  --genesis-dir "$workdir/ledgers"  --hash-output-file "$workdir/hashes.json"
+"$MINA_GENESIS_EXE" --config-file "$workdir/config.json"  --genesis-dir "$workdir/ledgers"  --hash-output-file "$workdir/hashes.json"
 
 FORK_CONFIG_JSON="$1" \
 LEDGER_HASHES_JSON="$workdir/hashes.json" \
