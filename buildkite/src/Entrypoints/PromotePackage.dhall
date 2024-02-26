@@ -1,14 +1,14 @@
-let B = ../../External/Buildkite.dhall
-let Prelude = ../../External/Prelude.dhall
+let B = ../External/Buildkite.dhall
+let Prelude = ../External/Prelude.dhall
 let List/map = Prelude.List.map
 
-let PromotePackage = ../../Command/PromotePackage.dhall
-let Package =  ../../Constants/DebianPackage.dhall
-let Artifact =  ../../Constants/Artifacts.dhall
-let DebianChannel = ../../Constants/DebianChannel.dhall
-let DebianVersions = ../../Constants/DebianVersions.dhall
-let Pipeline = ../../Pipeline/Dsl.dhall
-let PipelineMode = ../../Pipeline/Mode.dhall
+let PromotePackage = ../Command/PromotePackage.dhall
+let Package =  ../Constants/DebianPackage.dhall
+let Artifact =  ../Constants/Artifacts.dhall
+let DebianChannel = ../Constants/DebianChannel.dhall
+let DebianVersions = ../Constants/DebianVersions.dhall
+let Pipeline = ../Pipeline/Dsl.dhall
+let PipelineMode = ../Pipeline/Mode.dhall
 
 let promote_artifacts = 
   \(debians: List Package.Type) ->
