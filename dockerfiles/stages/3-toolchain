@@ -48,7 +48,6 @@ RUN apt-get update --yes \
     perl \
     pkg-config \
     python3-sexpdata \
-    rocksdb-tools \
     rubygems \
     wget \
     zlib1g-dev \

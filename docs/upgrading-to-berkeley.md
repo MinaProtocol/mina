@@ -34,7 +34,7 @@ jq --slurpfile hashes ~/.mina-config/genesis_hashes.json 'del(.ledger) | del(.ep
 
 Finally, edit the `daemon.json` to also include the correct genesis timestamp. You will need to consult the release documentation for this value.
 
-As an optional check, you can use ldb to compare the generated key-value databases to those archived on the web. The `ldb` tool is part of rocksdb, packaged as:
+As an optional check, you can use `ldb` to compare the generated key-value databases to those archived on the web. The `ldb` tool is part of rocksdb, packaged as:
 
 - Nix: `rocksdb.tools` (eg run this inside `nix-shell -p rocksdb.tools`)
 - Debian/Ubuntu/Fedora: `rocksdb-tools`

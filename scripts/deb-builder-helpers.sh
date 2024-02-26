@@ -23,7 +23,7 @@ source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
 cd "${SCRIPTPATH}/../_build"
 
 # Set dependencies based on debian release
-SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata"
+SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
 
 TEST_EXECUTIVE_DEPS=", mina-logproc, python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, terraform, helm"
 
