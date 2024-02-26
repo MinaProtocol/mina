@@ -40,6 +40,19 @@ val create_checkpoint : t -> string -> t
 
 val get_uuid : t -> uuid
 
+val foldi :
+     t
+  -> init:'a
+  -> f:(int -> 'a -> key:Bigstring.t -> data:Bigstring.t -> 'a)
+  -> 'a
+
+val fold_until :
+     t
+  -> init:'a
+  -> f:('a -> key:Bigstring.t -> data:Bigstring.t -> ('a, 'b) Continue_or_stop.t)
+  -> finish:('a -> 'b)
+  -> 'b
+
 module Batch : sig
   type t = Rocks.WriteBatch.t
 

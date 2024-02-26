@@ -93,19 +93,20 @@ module GADT = struct
       let bin_data = Key.binable_data_type key in
       bin_data.reader.read serialized_value ~pos_ref:(ref 0)
 
-    module Some_key = Intf.Key.Some_key (Key)
+    (* This one's re-exported as Key at the end. The name is to prevent from
+       hiding the Key module parameter *)
+    module K = Intf.Key.Some (Key)
 
     let get_batch t ~keys =
-      let open Some_key in
-      let skeys = List.map keys ~f:(fun (Some_key k) -> bin_key_dump k) in
+      let skeys = List.map keys ~f:(fun (K.Some_key k) -> bin_key_dump k) in
       let serialized_value_opts = Database.get_batch ~keys:skeys t in
-      let f (Some_key k) =
+      let f (K.Some_key k) =
         Option.map ~f:(fun serialized_value ->
             let bin_data = Key.binable_data_type k in
             let value =
               bin_data.reader.read serialized_value ~pos_ref:(ref 0)
             in
-            Some_key_value (k, value) )
+            K.Some_key_value (k, value) )
       in
       List.map2_exn keys serialized_value_opts ~f
 
@@ -114,5 +115,7 @@ module GADT = struct
 
       let with_batch = Database.Batch.with_batch
     end
+
+    module Key = K
   end
 end
