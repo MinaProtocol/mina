@@ -34,6 +34,33 @@ jq --slurpfile hashes ~/.mina-config/genesis_hashes.json 'del(.ledger) | del(.ep
 
 Finally, edit the `daemon.json` to also include the correct genesis timestamp. You will need to consult the release documentation for this value.
 
+As an optional check, you can use ldb to compare the generated key-value databases to those archived on the web. The `ldb` tool is part of rocksdb, packaged as:
+
+- Nix: `rocksdb.tools` (eg run this inside `nix-shell -p rocksdb.tools`)
+- Debian/Ubuntu/Fedora: `rocksdb-tools`
+- homebrew: `rocksdb`
+- Arch Linux: `rocksdb-ldb` (AUR)
+
+```sh
+workdir=$(mktemp -d)
+ldb_cmd=$(command -v rocksdb-ldb || command -v rocksdb_ldb || command -v ldb)
+error=0
+for file in ~/.mina-config/genesis/*.tar.gz; do
+    tarname=${$(basename "$file")%.tar.gz}
+    tardir="$workdir/verify-ledgers/$tarname"
+    mkdir -p "$tardir/{web,generated}"
+    tar -xzf "$file" -C "$tardir/generated"
+    curl "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net/$tarname.tar.gz" | tar -xz -C "$tardir/web"
+    $ldb_cmd --hex --db="$tardir/web" scan > $workdir/web.scan
+    $ldb_cmd --hex --db="$tardir/generated" scan > $workdir/generated.scan
+
+    if ! cmp $workdir/generated.scan $workdir/web.scan; then
+        echo "Error: kvdb contents mismatch for $tarname"
+        error=1
+    fi
+done
+```
+
 ## Verifying packaged configuration
 
 A script is installed (from `./scripts/mina-verify-packaged-fork-config`) that automates this process. If you want to verify that an installed Mina package was generated from the same configuration as the one exported earlier, it is as easy as:
