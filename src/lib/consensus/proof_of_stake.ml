@@ -2784,6 +2784,32 @@ module Hooks = struct
     in
     Data.Local_state.Snapshot.ledger snapshot
 
+  let get_epoch_ledgers_for_finalized_frontier_block
+      ~(root_consensus_state : Consensus_state.Value.t)
+      ~(target_consensus_state : Consensus_state.Value.t) ~local_state =
+    let root_epoch = Data.Consensus_state.curr_epoch root_consensus_state in
+    let target_epoch = Data.Consensus_state.curr_epoch target_consensus_state in
+    if Epoch.equal root_epoch target_epoch then
+      (* If we assume that the target state is finalized, then so is the root.
+         Hence, the next epoch snapshot is also finalized, and we can return
+         both ledgers.
+      *)
+      `Both
+        ( Data.Local_state.Snapshot.ledger
+            !local_state.Local_state.Data.staking_epoch_snapshot
+        , Data.Local_state.Snapshot.ledger
+            !local_state.Local_state.Data.next_epoch_snapshot )
+    else
+      (* Next epoch, the caller will need to manually compute the snarked
+         ledger for the parent block at the epoch boundary.
+      *)
+      let num_parents =
+        Length.to_int target_consensus_state.next_epoch_data.epoch_length - 1
+      in
+      `Snarked_ledger
+        ( Data.Local_state.Snapshot.ledger !local_state.next_epoch_snapshot
+        , num_parents )
+
   type required_snapshot =
     { snapshot_id : Local_state.snapshot_identifier
     ; expected_root : Mina_base.Frozen_ledger_hash.t
