@@ -331,8 +331,8 @@ module Data = struct
 
       (* Invariant: Snapshot's delegators are taken from accounts in block_production_pubkeys *)
       type t =
-        { mutable staking_epoch_snapshot : Snapshot.t
-        ; mutable next_epoch_snapshot : Snapshot.t
+        { mutable frontier_root_staking_epoch_snapshot : Snapshot.t
+        ; mutable frontier_root_next_epoch_snapshot : Snapshot.t
         ; last_checked_slot_and_epoch :
             (Epoch.t * Slot.t) Public_key.Compressed.Table.t
         ; mutable last_epoch_delegatee_table :
@@ -346,9 +346,9 @@ module Data = struct
       let to_yojson t =
         `Assoc
           [ ( "staking_epoch_snapshot"
-            , [%to_yojson: Snapshot.t] t.staking_epoch_snapshot )
+            , [%to_yojson: Snapshot.t] t.frontier_root_staking_epoch_snapshot )
           ; ( "next_epoch_snapshot"
-            , [%to_yojson: Snapshot.t] t.next_epoch_snapshot )
+            , [%to_yojson: Snapshot.t] t.frontier_root_next_epoch_snapshot )
           ; ( "last_checked_slot_and_epoch"
             , `Assoc
                 ( Public_key.Compressed.Table.to_alist
@@ -369,7 +369,7 @@ module Data = struct
       !t.epoch_ledger_location ^ Uuid.to_string !t.epoch_ledger_uuids.next
 
     let current_epoch_delegatee_table ~(local_state : t) =
-      !local_state.staking_epoch_snapshot.delegatee_table
+      !local_state.frontier_root_staking_epoch_snapshot.delegatee_table
 
     let last_epoch_delegatee_table ~(local_state : t) =
       !local_state.last_epoch_delegatee_table
@@ -509,13 +509,13 @@ module Data = struct
           ~genesis_epoch_ledger:genesis_epoch_ledger_next ~ledger_depth
       in
       ref
-        { Data.staking_epoch_snapshot =
+        { Data.frontier_root_staking_epoch_snapshot =
             { Snapshot.ledger = staking_epoch_ledger
             ; delegatee_table =
                 Snapshot.Ledger_snapshot.compute_delegatee_table
                   block_producer_pubkeys staking_epoch_ledger
             }
-        ; next_epoch_snapshot =
+        ; frontier_root_next_epoch_snapshot =
             { Snapshot.ledger = next_epoch_ledger
             ; delegatee_table =
                 Snapshot.Ledger_snapshot.compute_delegatee_table
@@ -541,9 +541,10 @@ module Data = struct
         }
       in
       t :=
-        { Data.staking_epoch_snapshot = s old.staking_epoch_snapshot
-        ; next_epoch_snapshot =
-            s old.next_epoch_snapshot
+        { Data.frontier_root_staking_epoch_snapshot =
+            s old.frontier_root_staking_epoch_snapshot
+        ; frontier_root_next_epoch_snapshot =
+            s old.frontier_root_next_epoch_snapshot
             (* assume these keys are different and therefore we haven't checked any
                * slots or epochs *)
         ; last_checked_slot_and_epoch =
@@ -566,16 +567,16 @@ module Data = struct
     let get_snapshot (t : t) id =
       match id with
       | Staking_epoch_snapshot ->
-          !t.staking_epoch_snapshot
+          !t.frontier_root_staking_epoch_snapshot
       | Next_epoch_snapshot ->
-          !t.next_epoch_snapshot
+          !t.frontier_root_next_epoch_snapshot
 
     let set_snapshot (t : t) id v =
       match id with
       | Staking_epoch_snapshot ->
-          !t.staking_epoch_snapshot <- v
+          !t.frontier_root_staking_epoch_snapshot <- v
       | Next_epoch_snapshot ->
-          !t.next_epoch_snapshot <- v
+          !t.frontier_root_next_epoch_snapshot <- v
 
     let reset_snapshot (t : t) id ~sparse_ledger ~ledger_depth =
       let open Mina_base in
@@ -590,29 +591,29 @@ module Data = struct
       match id with
       | Staking_epoch_snapshot ->
           let location = staking_epoch_ledger_location t in
-          Snapshot.Ledger_snapshot.remove !t.staking_epoch_snapshot.ledger
-            ~location ;
+          Snapshot.Ledger_snapshot.remove
+            !t.frontier_root_staking_epoch_snapshot.ledger ~location ;
           let ledger =
             Ledger.Db.create ~directory_name:location ~depth:ledger_depth ()
           in
           let%map (_ : Ledger.Db.t) =
             Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger
           in
-          !t.staking_epoch_snapshot <-
+          !t.frontier_root_staking_epoch_snapshot <-
             { delegatee_table
             ; ledger = Snapshot.Ledger_snapshot.Ledger_db ledger
             }
       | Next_epoch_snapshot ->
           let location = next_epoch_ledger_location t in
-          Snapshot.Ledger_snapshot.remove !t.next_epoch_snapshot.ledger
-            ~location ;
+          Snapshot.Ledger_snapshot.remove
+            !t.frontier_root_next_epoch_snapshot.ledger ~location ;
           let ledger =
             Ledger.Db.create ~directory_name:location ~depth:ledger_depth ()
           in
           let%map (_ : Ledger.Db.t) =
             Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger
           in
-          !t.next_epoch_snapshot <-
+          !t.frontier_root_next_epoch_snapshot <-
             { delegatee_table
             ; ledger = Snapshot.Ledger_snapshot.Ledger_db ledger
             }
@@ -2614,8 +2615,8 @@ module Hooks = struct
               then Error "refusing to serve genesis ledger"
               else
                 let candidate_snapshots =
-                  [ !local_state.Data.staking_epoch_snapshot
-                  ; !local_state.Data.next_epoch_snapshot
+                  [ !local_state.Data.frontier_root_staking_epoch_snapshot
+                  ; !local_state.Data.frontier_root_next_epoch_snapshot
                   ]
                 in
                 let res =
@@ -2772,8 +2773,8 @@ module Hooks = struct
       (not epoch_is_finalized) && not is_genesis_epoch
     in
     if in_next_epoch || epoch_is_not_finalized then
-      (`Curr, !local_state.Data.next_epoch_snapshot)
-    else (`Last, !local_state.staking_epoch_snapshot)
+      (`Curr, !local_state.Data.frontier_root_next_epoch_snapshot)
+    else (`Last, !local_state.frontier_root_staking_epoch_snapshot)
 
   let get_epoch_ledger ~constants ~(consensus_state : Consensus_state.Value.t)
       ~local_state =
@@ -2861,15 +2862,15 @@ module Hooks = struct
              Ledger_hash.equal
                (Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
                (Local_state.Snapshot.Ledger_snapshot.merkle_root
-                  !local_state.next_epoch_snapshot.ledger ))
+                  !local_state.frontier_root_next_epoch_snapshot.ledger ))
       then (
         Local_state.Snapshot.Ledger_snapshot.remove
-          !local_state.staking_epoch_snapshot.ledger
+          !local_state.frontier_root_staking_epoch_snapshot.ledger
           ~location:(staking_epoch_ledger_location local_state) ;
-        match !local_state.next_epoch_snapshot.ledger with
+        match !local_state.frontier_root_next_epoch_snapshot.ledger with
         | Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger _ ->
             set_snapshot local_state Staking_epoch_snapshot
-              !local_state.next_epoch_snapshot ;
+              !local_state.frontier_root_next_epoch_snapshot ;
             Deferred.Or_error.ok_unit
         | Ledger_db next_epoch_ledger ->
             let ledger =
@@ -2880,7 +2881,7 @@ module Hooks = struct
             set_snapshot local_state Staking_epoch_snapshot
               { ledger = Ledger_snapshot.Ledger_db ledger
               ; delegatee_table =
-                  !local_state.next_epoch_snapshot.delegatee_table
+                  !local_state.frontier_root_next_epoch_snapshot.delegatee_table
               } ;
             Deferred.Or_error.ok_unit )
       else
@@ -3260,11 +3261,12 @@ module Hooks = struct
            (Consensus_state.curr_epoch next) )
     then (
       !local_state.last_epoch_delegatee_table <-
-        Some !local_state.staking_epoch_snapshot.delegatee_table ;
+        Some !local_state.frontier_root_staking_epoch_snapshot.delegatee_table ;
       Local_state.Snapshot.Ledger_snapshot.remove
-        !local_state.staking_epoch_snapshot.ledger
+        !local_state.frontier_root_staking_epoch_snapshot.ledger
         ~location:(Local_state.staking_epoch_ledger_location local_state) ;
-      !local_state.staking_epoch_snapshot <- !local_state.next_epoch_snapshot ;
+      !local_state.frontier_root_staking_epoch_snapshot <-
+        !local_state.frontier_root_next_epoch_snapshot ;
       (*If snarked ledger hash is still the genesis ledger hash then the epoch ledger should continue to be `next_data.ledger`. This is because the epoch ledgers at genesis can be different from the genesis ledger*)
       if
         not
@@ -3283,7 +3285,7 @@ module Hooks = struct
         Yojson.Safe.to_file
           (!local_state.epoch_ledger_location ^ ".json")
           (Local_state.epoch_ledger_uuids_to_yojson epoch_ledger_uuids) ;
-        !local_state.next_epoch_snapshot <-
+        !local_state.frontier_root_next_epoch_snapshot <-
           { ledger =
               Local_state.Snapshot.Ledger_snapshot.Ledger_db
                 (Mina_base.Ledger.Db.create_checkpoint snarked_ledger
