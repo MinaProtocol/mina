@@ -549,7 +549,7 @@ let get_ledger t state_hash_opt =
       Deferred.return
       @@ Or_error.error_string "state hash not found in transition frontier"
 
-let get_snarked_ledger t state_hash_opt =
+let get_snarked_ledger_full t state_hash_opt =
   let open Deferred.Or_error.Let_syntax in
   let%bind state_hash =
     Option.value_map state_hash_opt ~f:Deferred.Or_error.return
@@ -636,10 +636,8 @@ let get_snarked_ledger t state_hash_opt =
         |> Mina_state.Blockchain_state.snarked_ledger_hash
       in
       let merkle_root = Ledger.merkle_root ledger in
-      if Frozen_ledger_hash.equal snarked_ledger_hash merkle_root then (
-        let%map.Deferred res = Ledger.to_list ledger in
-        ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ ledger ;
-        Ok res )
+      if Frozen_ledger_hash.equal snarked_ledger_hash merkle_root then
+        return ledger
       else
         Deferred.Or_error.errorf
           "Expected snarked ledger hash %s but got %s for state hash %s"
@@ -649,6 +647,13 @@ let get_snarked_ledger t state_hash_opt =
   | None ->
       Deferred.Or_error.error_string
         "get_snarked_ledger: state hash not found in transition frontier"
+
+let get_snarked_ledger t state_hash_opt =
+  let open Deferred.Or_error.Let_syntax in
+  let%bind ledger = get_snarked_ledger_full t state_hash_opt in
+  let%map.Deferred res = Ledger.to_list ledger in
+  ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ ledger ;
+  Ok res
 
 let get_account t aid =
   let open Participating_state.Let_syntax in
