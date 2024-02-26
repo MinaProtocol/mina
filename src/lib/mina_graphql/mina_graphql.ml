@@ -2436,6 +2436,8 @@ module Queries = struct
               Mina_lib.get_snarked_ledger_full mina (Some target_state_hash)
               |> Deferred.Result.map_error ~f:Error.to_string_hum
             in
+            (* The next epoch ledger isn't finalized: we manually grab the snarked
+               ledger for the targer block instead. *)
             ( local_next_epoch_ledger
             , Ledger.Any_ledger.cast (module Ledger) ledger )
           else (
@@ -2461,8 +2463,6 @@ module Queries = struct
             (Ledger.Any_ledger.M.merkle_root staking_ledger)
             target_staking_epoch.ledger.hash ) ;
         let%bind new_config =
-          (* The next epoch ledger isn't finalized: we manually grab the snarked
-               ledger for this block instead. *)
           Runtime_config.make_fork_config ~staged_ledger:target_staged_ledger
             ~global_slot:target_slot ~state_hash:target_state_hash
             ~staking_ledger ~staking_epoch_seed:target_staking_epoch_seed
