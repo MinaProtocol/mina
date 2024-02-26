@@ -187,13 +187,14 @@ end
 let transaction_combinations = Transaction_key.Table.create ()
 
 let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
-    ~max_num_updates () :
-    (Mina_ledger.Ledger.t * Zkapp_command.t list) Async.Deferred.t =
+    ~max_num_updates () : Mina_ledger.Ledger.t * Zkapp_command.t list =
   let `VK verification_key, `Prover prover =
     Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
   in
   let zkapp_prover_and_vk = (prover, verification_key) in
-  let%map.Async.Deferred verification_key = verification_key in
+  let verification_key =
+    Async.Thread_safe.block_on_async_exn (fun () -> verification_key)
+  in
   let num_keypairs = max_num_updates + 10 in
   let keypairs = List.init num_keypairs ~f:(fun _ -> Keypair.create ()) in
   let num_keypairs_in_ledger = max_num_updates + 1 in

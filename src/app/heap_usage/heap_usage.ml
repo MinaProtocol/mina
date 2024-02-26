@@ -14,11 +14,6 @@ let print_heap_usage name v =
 
 let main () =
   let open Values in
-  let%bind.Deferred zkapp_command = zkapp_command in
-  let%bind.Deferred zkapp_proof = zkapp_proof in
-  let%bind.Deferred verification_key = verification_key in
-  let%bind.Deferred scan_state_base_node_zkapp = scan_state_base_node_zkapp in
-
   print_heap_usage "Account.t (w/ zkapp)" account ;
   print_heap_usage "Zkapp_command.t" zkapp_command ;
   print_heap_usage "Pickles.Side_loaded.Proof.t" zkapp_proof ;

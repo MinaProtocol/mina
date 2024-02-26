@@ -4228,15 +4228,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       let `VK vk_a, `Prover prover_a =
         create_trivial_snapp ~unique_id:0 ~constraint_constants ()
       in
+      let vk_a = Async.Thread_safe.block_on_async_exn (fun () -> vk_a) in
       let `VK vk_b, `Prover prover_b =
         create_trivial_snapp ~unique_id:1 ~constraint_constants ()
       in
-      let vk_a, vk_b =
-        Async.Thread_safe.block_on_async_exn (fun () ->
-            let%bind vk_a = vk_a in
-            let%map vk_b = vk_b in
-            (vk_a, vk_b) )
-      in
+      let vk_b = Async.Thread_safe.block_on_async_exn (fun () -> vk_b) in
       assert (
         not
           ([%equal:
