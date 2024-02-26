@@ -2405,11 +2405,11 @@ module Queries = struct
           | Ledger_db l ->
               Ledger.Any_ledger.cast (module Ledger.Db) l
         in
-        let cur_epoch_ledger =
+        let local_cur_epoch_ledger =
           Consensus.Data.Local_state.staking_epoch_ledger local_state
           |> cast_ledger
         in
-        let next_epoch_ledger =
+        let local_next_epoch_ledger =
           Consensus.Data.Local_state.next_epoch_ledger local_state
           |> cast_ledger
         in
@@ -2427,12 +2427,17 @@ module Queries = struct
           @@ Consensus.Data.Consensus_state.curr_global_slot
                best_tip_consensus_state
         in
-        let staking_ledger =
+        let%bind staking_ledger, next_epoch_ledger =
           if same_epoch && not best_tip_finalized then
             (* Neither target nor best tip are finalized (both in the same epoch) =>
                `next_epoch_ledger` refers to staking ledger corresponding to staking ledger of
                the current epoch (because root is in the previous epoch) *)
-            next_epoch_ledger
+            let%map ledger =
+              Mina_lib.get_snarked_ledger_full mina (Some target_state_hash)
+              |> Deferred.Result.map_error ~f:Error.to_string_hum
+            in
+            ( local_next_epoch_ledger
+            , Ledger.Any_ledger.cast (module Ledger) ledger )
           else (
             (* There are two cases:
 
@@ -2446,23 +2451,18 @@ module Queries = struct
                (because root is in the same epoch as target) *)
             assert (
               Mina_base.Ledger_hash.equal
-                (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
+                (Ledger.Any_ledger.M.merkle_root local_next_epoch_ledger)
                 target_next_epoch.ledger.hash ) ;
-            cur_epoch_ledger )
+            Deferred.Result.return
+              (local_cur_epoch_ledger, local_next_epoch_ledger) )
         in
         assert (
           Mina_base.Ledger_hash.equal
             (Ledger.Any_ledger.M.merkle_root staking_ledger)
             target_staking_epoch.ledger.hash ) ;
         let%bind new_config =
-          (* For next epoch ledger we always return the next epoch ledger
-             corresponding to the root transition, in case we need to hard-fork
-             from a block where it is unfinalized.
-
-             The safety concern doesn't apply here, because we are only using
-             this to build a snapshot, and never applying it back to the
-             running network.
-          *)
+          (* The next epoch ledger isn't finalized: we manually grab the snarked
+               ledger for this block instead. *)
           Runtime_config.make_fork_config ~staged_ledger:target_staged_ledger
             ~global_slot:target_slot ~state_hash:target_state_hash
             ~staking_ledger ~staking_epoch_seed:target_staking_epoch_seed
