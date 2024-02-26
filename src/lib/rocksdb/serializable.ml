@@ -50,45 +50,8 @@ end
 (** Database Interface for storing heterogeneous key-value pairs. Similar to
     Janestreet's Core.Univ_map *)
 module GADT = struct
-  module type Database_intf = sig
-    type t
-
-    type 'a g
-
-    val set : t -> key:'a g -> data:'a -> unit
-
-    val set_raw : t -> key:'a g -> data:Bigstring.t -> unit
-
-    val remove : t -> key:'a g -> unit
-  end
-
-  module type S = sig
-    include Database_intf
-
-    module Some_key : Key_intf.Some_key_intf with type 'a unwrapped_t := 'a g
-
-    module T : sig
-      type nonrec t = t
-    end
-
-    val create : string -> t
-
-    val close : t -> unit
-
-    val get : t -> key:'a g -> 'a option
-
-    val get_raw : t -> key:'a g -> Bigstring.t option
-
-    val get_batch : t -> keys:Some_key.t list -> Some_key.with_value option list
-
-    module Batch : sig
-      include Database_intf with type 'a g := 'a g
-
-      val with_batch : T.t -> f:(t -> 'a) -> 'a
-    end
-  end
-
-  module Make (Key : Key_intf.S) : S with type 'a g := 'a Key.t = struct
+  module Make (Key : Intf.Key.S) : Intf.Database.S with type 'a g := 'a Key.t =
+  struct
     let bin_key_dump (key : 'a Key.t) =
       Bin_prot.Utils.bin_dump (Key.binable_key_type key).writer key
 
@@ -130,7 +93,7 @@ module GADT = struct
       let bin_data = Key.binable_data_type key in
       bin_data.reader.read serialized_value ~pos_ref:(ref 0)
 
-    module Some_key = Key_intf.Some_key (Key)
+    module Some_key = Intf.Key.Some_key (Key)
 
     let get_batch t ~keys =
       let open Some_key in
