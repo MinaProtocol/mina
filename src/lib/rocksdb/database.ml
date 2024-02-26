@@ -55,8 +55,6 @@ module Batch = struct
     Rocks.write t.db batch ; result
 end
 
-let copy _t = failwith "Database.copy: not implemented"
-
 let remove t ~(key : Bigstring.t) : unit =
   Rocks.delete ?pos:None ?len:None ?opts:None t.db key
 
