@@ -64,6 +64,93 @@ let plugin_flag = Command.Param.return []
 
 [%%endif]
 
+let load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level config_files =
+  let%bind config_jsons =
+    let config_files_paths =
+      List.map config_files ~f:(fun (config_file, _) -> `String config_file)
+    in
+    [%log info] "Reading configuration files $config_files"
+      ~metadata:[ ("config_files", `List config_files_paths) ] ;
+    Deferred.List.filter_map config_files
+      ~f:(fun (config_file, handle_missing) ->
+        match%bind Genesis_ledger_helper.load_config_json config_file with
+        | Ok config_json ->
+            let%map config_json =
+              Genesis_ledger_helper.upgrade_old_config ~logger config_file
+                config_json
+            in
+            Some (config_file, config_json)
+        | Error err -> (
+            match handle_missing with
+            | `Must_exist ->
+                Mina_user_error.raisef ~where:"reading configuration file"
+                  "The configuration file %s could not be read:\n%s" config_file
+                  (Error.to_string_hum err)
+            | `May_be_missing ->
+                [%log warn] "Could not read configuration from $config_file"
+                  ~metadata:
+                    [ ("config_file", `String config_file)
+                    ; ("error", Error_json.error_to_yojson err)
+                    ] ;
+                return None ) )
+  in
+  let config =
+    List.fold ~init:Runtime_config.default config_jsons
+      ~f:(fun config (config_file, config_json) ->
+        match Runtime_config.of_yojson config_json with
+        | Ok loaded_config ->
+            Runtime_config.combine config loaded_config
+        | Error err ->
+            [%log fatal]
+              "Could not parse configuration from $config_file: $error"
+              ~metadata:
+                [ ("config_file", `String config_file)
+                ; ("config_json", config_json)
+                ; ("error", `String err)
+                ] ;
+            failwithf "Could not parse configuration file: %s" err () )
+  in
+  let genesis_dir = Option.value ~default:(conf_dir ^/ "genesis") genesis_dir in
+  let%bind precomputed_values =
+    match%map
+      Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
+        ~proof_level config
+    with
+    | Ok (precomputed_values, _) ->
+        precomputed_values
+    | Error err ->
+        let ( json_config
+            , `Accounts_omitted
+                ( `Genesis genesis_accounts_omitted
+                , `Staking staking_accounts_omitted
+                , `Next next_accounts_omitted ) ) =
+          Runtime_config.to_yojson_without_accounts config
+        in
+        let append_accounts_omitted s =
+          Option.value_map
+            ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
+            ~default:Fn.id
+        in
+        let metadata =
+          append_accounts_omitted "genesis" genesis_accounts_omitted
+          @@ append_accounts_omitted "staking" staking_accounts_omitted
+          @@ append_accounts_omitted "next" next_accounts_omitted []
+          @ [ ("config", json_config)
+            ; ( "name"
+              , `String
+                  (Option.value ~default:"not provided"
+                     (let%bind.Option ledger = config.ledger in
+                      Option.first_some ledger.name ledger.hash ) ) )
+            ; ("error", Error_json.error_to_yojson err)
+            ]
+        in
+        [%log info]
+          "Initializing with runtime configuration. Ledger source: $name"
+          ~metadata ;
+        Error.raise err
+  in
+  return (precomputed_values, config_jsons, config)
+
 let setup_daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -692,97 +779,9 @@ let setup_daemon logger =
             @ List.map config_files ~f:(fun config_file ->
                   (config_file, `Must_exist) )
           in
-          let%bind config_jsons =
-            let config_files_paths =
-              List.map config_files ~f:(fun (config_file, _) ->
-                  `String config_file )
-            in
-            [%log info] "Reading configuration files $config_files"
-              ~metadata:[ ("config_files", `List config_files_paths) ] ;
-            Deferred.List.filter_map config_files
-              ~f:(fun (config_file, handle_missing) ->
-                match%bind
-                  Genesis_ledger_helper.load_config_json config_file
-                with
-                | Ok config_json ->
-                    let%map config_json =
-                      Genesis_ledger_helper.upgrade_old_config ~logger
-                        config_file config_json
-                    in
-                    Some (config_file, config_json)
-                | Error err -> (
-                    match handle_missing with
-                    | `Must_exist ->
-                        Mina_user_error.raisef
-                          ~where:"reading configuration file"
-                          "The configuration file %s could not be read:\n%s"
-                          config_file (Error.to_string_hum err)
-                    | `May_be_missing ->
-                        [%log warn]
-                          "Could not read configuration from $config_file"
-                          ~metadata:
-                            [ ("config_file", `String config_file)
-                            ; ("error", Error_json.error_to_yojson err)
-                            ] ;
-                        return None ) )
-          in
-          let config =
-            List.fold ~init:Runtime_config.default config_jsons
-              ~f:(fun config (config_file, config_json) ->
-                match Runtime_config.of_yojson config_json with
-                | Ok loaded_config ->
-                    Runtime_config.combine config loaded_config
-                | Error err ->
-                    [%log fatal]
-                      "Could not parse configuration from $config_file: $error"
-                      ~metadata:
-                        [ ("config_file", `String config_file)
-                        ; ("config_json", config_json)
-                        ; ("error", `String err)
-                        ] ;
-                    failwithf "Could not parse configuration file: %s" err () )
-          in
-          let genesis_dir =
-            Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
-          in
-          let%bind precomputed_values =
-            match%map
-              Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
-                ~proof_level config
-            with
-            | Ok (precomputed_values, _) ->
-                precomputed_values
-            | Error err ->
-                let ( json_config
-                    , `Accounts_omitted
-                        ( `Genesis genesis_accounts_omitted
-                        , `Staking staking_accounts_omitted
-                        , `Next next_accounts_omitted ) ) =
-                  Runtime_config.to_yojson_without_accounts config
-                in
-                let append_accounts_omitted s =
-                  Option.value_map
-                    ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
-                    ~default:Fn.id
-                in
-                let metadata =
-                  append_accounts_omitted "genesis" genesis_accounts_omitted
-                  @@ append_accounts_omitted "staking" staking_accounts_omitted
-                  @@ append_accounts_omitted "next" next_accounts_omitted []
-                  @ [ ("config", json_config)
-                    ; ( "name"
-                      , `String
-                          (Option.value ~default:"not provided"
-                             (let%bind.Option ledger = config.ledger in
-                              Option.first_some ledger.name ledger.hash ) ) )
-                    ; ("error", Error_json.error_to_yojson err)
-                    ]
-                in
-                [%log info]
-                  "Initializing with runtime configuration. Ledger source: \
-                   $name"
-                  ~metadata ;
-                Error.raise err
+          let%bind precomputed_values, config_jsons, config =
+            load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level
+              config_files
           in
           let rev_daemon_configs =
             List.rev_filter_map config_jsons
