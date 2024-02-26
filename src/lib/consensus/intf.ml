@@ -729,6 +729,9 @@ module type S = sig
       -> logger:Logger.t
       -> bool
 
+    val epoch_ledgers_finalized :
+      constants:Constants.t -> Consensus_state.Value.t -> bool
+
     val get_epoch_ledger :
          constants:Constants.t
       -> consensus_state:Consensus_state.Value.t
