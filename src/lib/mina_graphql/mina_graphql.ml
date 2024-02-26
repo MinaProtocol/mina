@@ -4255,6 +4255,57 @@ module Queries = struct
         Mina_lib.runtime_config mina
         |> Runtime_config.to_yojson |> Yojson.Safe.to_basic )
 
+  let get_epoch_ledgers ~mina breadcrumb =
+    let open Deferred.Result.Let_syntax in
+    let consensus =
+      breadcrumb |> Transition_frontier.Breadcrumb.protocol_state
+      |> Mina_state.Protocol_state.consensus_state
+    in
+    let staking_epoch =
+      Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data consensus
+    in
+    let next_epoch =
+      Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data consensus
+    in
+    let%bind staking_ledger =
+      match Mina_lib.staking_ledger mina with
+      | None ->
+          Deferred.Result.fail "Staking ledger is not initialized."
+      | Some (Genesis_epoch_ledger l) ->
+          return (Ledger.Any_ledger.cast (module Ledger) l)
+      | Some (Ledger_db l) ->
+          return (Ledger.Any_ledger.cast (module Ledger.Db) l)
+    in
+    assert (
+      Mina_base.Ledger_hash.equal
+        (Ledger.Any_ledger.M.merkle_root staking_ledger)
+        staking_epoch.ledger.hash ) ;
+    let%bind next_epoch_ledger =
+      match
+        (* We always want to return the next epoch ledger here, in case we
+           need to hard-fork from a block where it is unfinalized. The
+           safety concern doesn't apply here, because we are only using
+           this to build a snapshot, and never applying it back to the
+           running network.
+        *)
+        Mina_lib.next_epoch_ledger
+          ~unsafe_always_return_ledger_as_if_finalized:true mina
+      with
+      | None ->
+          Deferred.Result.fail "Next epoch ledger is not initialized."
+      | Some `Notfinalized ->
+          failwith "next_epoch_ledger returned a disallowed value"
+      | Some (`Finalized (Genesis_epoch_ledger l)) ->
+          return (Ledger.Any_ledger.cast (module Ledger) l)
+      | Some (`Finalized (Ledger_db l)) ->
+          return (Ledger.Any_ledger.cast (module Ledger.Db) l)
+    in
+    assert (
+      Mina_base.Ledger_hash.equal
+        (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
+        next_epoch.ledger.hash ) ;
+    return (staking_ledger, next_epoch_ledger)
+
   let fork_config =
     io_field "fork_config"
       ~doc:
@@ -4373,43 +4424,9 @@ module Queries = struct
           Mina_base.Epoch_seed.to_base58_check
             next_epoch.Mina_base.Epoch_data.Poly.seed
         in
-        let%bind staking_ledger =
-          match Mina_lib.staking_ledger mina with
-          | None ->
-              Deferred.Result.fail "Staking ledger is not initialized."
-          | Some (Genesis_epoch_ledger l) ->
-              return (Ledger.Any_ledger.cast (module Ledger) l)
-          | Some (Ledger_db l) ->
-              return (Ledger.Any_ledger.cast (module Ledger.Db) l)
+        let%bind staking_ledger, next_epoch_ledger =
+          get_epoch_ledgers ~mina breadcrumb
         in
-        assert (
-          Mina_base.Ledger_hash.equal
-            (Ledger.Any_ledger.M.merkle_root staking_ledger)
-            staking_epoch.ledger.hash ) ;
-        let%bind next_epoch_ledger =
-          match
-            (* We always want to return the next epoch ledger here, in case we
-               need to hard-fork from a block where it is unfinalized. The
-               safety concern doesn't apply here, because we are only using
-               this to build a snapshot, and never applying it back to the
-               running network.
-            *)
-            Mina_lib.next_epoch_ledger
-              ~unsafe_always_return_ledger_as_if_finalized:true mina
-          with
-          | None ->
-              Deferred.Result.fail "Next epoch ledger is not initialized."
-          | Some `Notfinalized ->
-              failwith "next_epoch_ledger returned a disallowed value"
-          | Some (`Finalized (Genesis_epoch_ledger l)) ->
-              return (Ledger.Any_ledger.cast (module Ledger) l)
-          | Some (`Finalized (Ledger_db l)) ->
-              return (Ledger.Any_ledger.cast (module Ledger.Db) l)
-        in
-        assert (
-          Mina_base.Ledger_hash.equal
-            (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
-            next_epoch.ledger.hash ) ;
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger ~global_slot
             ~state_hash ~staking_ledger ~staking_epoch_seed
