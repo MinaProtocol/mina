@@ -26,6 +26,7 @@ module Network_config = struct
     ; archive_node_configs : Docker_node_config.Archive_node_config.t list
     ; mina_archive_schema_aux_files : string list
     ; log_precomputed_blocks : bool
+    ; start_filtered_logs : string list
     }
   [@@deriving to_yojson]
 
@@ -56,6 +57,7 @@ module Network_config = struct
         ; snark_worker_fee
         ; num_archive_nodes
         ; log_precomputed_blocks
+        ; start_filtered_logs
         ; proof_config
         ; Test_config.k
         ; delta
@@ -525,6 +527,7 @@ module Network_config = struct
         ; mina_archive_image = images.archive_node
         ; runtime_config = Runtime_config.to_yojson runtime_config
         ; log_precomputed_blocks
+        ; start_filtered_logs
         ; block_producer_configs
         ; seed_configs
         ; mina_archive_schema_aux_files

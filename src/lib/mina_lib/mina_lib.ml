@@ -1406,6 +1406,32 @@ module type Itn_settable = sig
   val set_itn_logger_data : t -> daemon_port:int -> unit Deferred.Or_error.t
 end
 
+let start_filtered_log
+    in_memory_reverse_structured_log_messages_for_integration_test
+    (structured_log_ids : string list) =
+  let handle str =
+    let idx, old_messages, started =
+      !in_memory_reverse_structured_log_messages_for_integration_test
+    in
+    in_memory_reverse_structured_log_messages_for_integration_test :=
+      (idx + 1, str :: old_messages, started)
+  in
+  let _, _, started =
+    !in_memory_reverse_structured_log_messages_for_integration_test
+  in
+  if started then Or_error.error_string "Already initialized"
+  else (
+    in_memory_reverse_structured_log_messages_for_integration_test :=
+      (0, [], true) ;
+    let event_set =
+      Structured_log_events.Set.of_list
+      @@ List.map ~f:Structured_log_events.id_of_string structured_log_ids
+    in
+    Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
+      ~processor:(Logger.Processor.raw_structured_log_events event_set)
+      ~transport:(Logger.Transport.raw handle) ;
+    Ok () )
+
 let create ?wallets (config : Config.t) =
   let module Context = (val context config) in
   let catchup_mode = if config.super_catchup then `Super else `Normal in
@@ -1429,6 +1455,15 @@ let create ?wallets (config : Config.t) =
         else Deferred.unit
       in
       O1trace.thread "mina_lib" (fun () ->
+          let in_memory_reverse_structured_log_messages_for_integration_test =
+            ref (0, [], false)
+          in
+          if not (List.is_empty config.start_filtered_logs) then
+            (* Start the filtered logs, if requested. *)
+            Or_error.ok_exn
+            @@ start_filtered_log
+                 in_memory_reverse_structured_log_messages_for_integration_test
+                 config.start_filtered_logs ;
           let%bind prover =
             Monitor.try_with ~here:[%here]
               ~rest:
@@ -2221,8 +2256,7 @@ let create ?wallets (config : Config.t) =
             ; sync_status
             ; precomputed_block_writer
             ; block_production_status = ref `Free
-            ; in_memory_reverse_structured_log_messages_for_integration_test =
-                ref (0, [], false)
+            ; in_memory_reverse_structured_log_messages_for_integration_test
             ; vrf_evaluation_state =
                 Block_producer.Vrf_evaluation_state.create ()
             } ) )
@@ -2235,28 +2269,9 @@ let runtime_config { config = { precomputed_values; _ }; _ } =
 let start_filtered_log
     ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)
     (structured_log_ids : string list) =
-  let handle str =
-    let idx, old_messages, started =
-      !in_memory_reverse_structured_log_messages_for_integration_test
-    in
-    in_memory_reverse_structured_log_messages_for_integration_test :=
-      (idx + 1, str :: old_messages, started)
-  in
-  let _, _, started =
-    !in_memory_reverse_structured_log_messages_for_integration_test
-  in
-  if started then Or_error.error_string "Already initialized"
-  else (
-    in_memory_reverse_structured_log_messages_for_integration_test :=
-      (0, [], true) ;
-    let event_set =
-      Structured_log_events.Set.of_list
-      @@ List.map ~f:Structured_log_events.id_of_string structured_log_ids
-    in
-    Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
-      ~processor:(Logger.Processor.raw_structured_log_events event_set)
-      ~transport:(Logger.Transport.raw handle) ;
-    Ok () )
+  start_filtered_log
+    in_memory_reverse_structured_log_messages_for_integration_test
+    structured_log_ids
 
 let get_filtered_log_entries
     ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)
