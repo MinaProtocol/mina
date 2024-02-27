@@ -68,6 +68,7 @@ type t =
   ; snark_worker_fee : string
   ; num_archive_nodes : int
   ; log_precomputed_blocks : bool
+  ; start_filtered_logs : string list
         (* ; num_plain_nodes : int  *)
         (* blockchain constants *)
   ; proof_config : Runtime_config.Proof_keys.t
@@ -105,6 +106,7 @@ let default =
   ; snark_worker_fee = "0.025"
   ; num_archive_nodes = 0
   ; log_precomputed_blocks = false (* ; num_plain_nodes = 0 *)
+  ; start_filtered_logs = []
   ; proof_config = proof_config_default
   ; k = 20
   ; slots_per_epoch = 3 * 8 * 20
