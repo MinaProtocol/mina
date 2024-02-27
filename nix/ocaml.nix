@@ -147,7 +147,7 @@ let
         MINA_COMMIT_DATE = "<unknown>";
         MINA_BRANCH = "<unknown>";
 
-        DUNE_PROFILE = "devnet";
+        DUNE_PROFILE = "dev";
 
         NIX_LDFLAGS =
           optionalString (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64)
@@ -258,6 +258,22 @@ let
 
       # Same as above, but wrapped with version info.
       mina = wrapMina self.mina-dev { };
+
+      # Mina with additional instrumentation info.
+      with-instrumentation-dev = self.mina-dev.overrideAttrs (oa: {
+        pname = "with-instrumentation";
+        outputs = [ "out" ];
+
+        buildPhase = ''
+          dune build  --display=short --profile=testnet_postake_medium_curves --instrument-with bisect_ppx src/app/cli/src/mina.exe
+        '';
+        installPhase = ''
+          mkdir -p $out/bin
+          mv _build/default/src/app/cli/src/mina.exe $out/bin/mina
+        '';
+      });
+
+      with-instrumentation = wrapMina self.with-instrumentation-dev { };
 
       mainnet-pkg = self.mina-dev.overrideAttrs (s: {
         version = "mainnet";
