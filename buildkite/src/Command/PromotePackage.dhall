@@ -11,6 +11,7 @@ let PipelineTag = ../Pipeline/Tag.dhall
 let Pipeline = ../Pipeline/Dsl.dhall
 let JobSpec = ../Pipeline/JobSpec.dhall
 let DebianChannel = ../Constants/DebianChannel.dhall
+let Profiles = ../Constants/Profiles.dhall
 let Artifact = ../Constants/Artifacts.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
 let Command = ./Base.dhall
@@ -30,6 +31,7 @@ let PromoteDebianSpec = {
     codename: DebianVersions.DebVersion,
     from_channel: DebianChannel.Type,
     to_channel: DebianChannel.Type,
+    profile: Profiles.Type,
     step_key: Text,
     `if`: Optional B/If
   },
@@ -41,6 +43,7 @@ let PromoteDebianSpec = {
     codename = DebianVersions.DebVersion.Bullseye,
     from_channel = DebianChannel.Type.Unstable,
     to_channel = DebianChannel.Type.Nightly,
+    profile = Profiles.Type.Standard,
     step_key = "promote-debian-package",
     `if` = None B/If
   }
@@ -51,6 +54,7 @@ let PromoteDockerSpec = {
     deps: List Command.TaggedKey.Type,
     name: Artifact.Type,
     version: Text,
+    profile: Profiles.Type,
     new_tag: Text,
     step_key: Text,
     `if`: Optional B/If
@@ -61,6 +65,7 @@ let PromoteDockerSpec = {
     version = "",
     new_tag = "",
     step_key = "promote-docker",
+    profile = Profiles.Type.Standard,
     `if` = None B/If
   }
 }
@@ -72,7 +77,7 @@ let promoteDebianStep = \(spec : PromoteDebianSpec.Type) ->
         commands = DebianVersions.toolchainRunner DebianVersions.DebVersion.Bullseye [
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY"
-        ] "./buildkite/scripts/promote-deb.sh --package ${Package.debianName spec.package} --version ${spec.version} --architecture ${spec.architecture} --codename ${DebianVersions.lowerName spec.codename} --from-component ${DebianChannel.lowerName spec.from_channel} --to-component ${DebianChannel.lowerName spec.to_channel}",
+        ] "./buildkite/scripts/promote-deb.sh --package ${Package.debianName spec.package}${Profiles.toLabelSegment spec.profile} --version ${spec.version} --architecture ${spec.architecture} --codename ${DebianVersions.lowerName spec.codename} --from-component ${DebianChannel.lowerName spec.from_channel} --to-component ${DebianChannel.lowerName spec.to_channel}",
         label = "Debian: ${spec.step_key}",
         key = spec.step_key,
         target = Size.XLarge,
@@ -84,7 +89,7 @@ let promoteDockerStep = \(spec : PromoteDockerSpec.Type) ->
     Command.build
       Command.Config::{
         commands = [ 
-          Cmd.run "./buildkite/scripts/promote-docker.sh --name ${Artifact.dockerName spec.name} --version ${spec.version} --tag ${spec.new_tag}"
+          Cmd.run "./buildkite/scripts/promote-docker.sh --name ${Artifact.dockerName spec.name}${Profiles.toLabelSegment spec.profile} --version ${spec.version} --tag ${spec.new_tag}"
         ],
         label = "Docker: ${spec.step_key}",
         key = spec.step_key,

@@ -2,11 +2,11 @@ let Prelude = ../External/Prelude.dhall
 let Text/concatSep = Prelude.Text.concatSep
 let Profiles = ./Profiles.dhall
 
-let Artifact : Type  = < Daemon | Archive | ArchiveMigration | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
+let Artifact : Type  = < Daemon | Archive | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
 
-let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.ArchiveMigration , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
+let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
 
-let Main = [ Artifact.Daemon , Artifact.Archive , Artifact.ArchiveMigration , Artifact.Rosetta ]
+let Main = [ Artifact.Daemon , Artifact.Archive , Artifact.Rosetta ]
 
 let All = AllButTests # [ Artifact.FunctionalTestSuite ]
 
@@ -14,7 +14,6 @@ let capitalName = \(artifact : Artifact) ->
   merge {
     Daemon = "Daemon"
     , Archive = "Archive"
-    , ArchiveMigration = "ArchiveMigration"
     , TestExecutive = "TestExecutive"
     , BatchTxn = "BatchTxn"
     , Rosetta = "Rosetta"
@@ -26,7 +25,6 @@ let lowerName = \(artifact : Artifact) ->
   merge {
     Daemon = "daemon"
     , Archive = "archive"
-    , ArchiveMigration = "archive_migration"
     , TestExecutive = "test_executive"
     , BatchTxn = "batch_txn"
     , Rosetta = "rosetta"
@@ -38,7 +36,6 @@ let dockerName = \(artifact : Artifact) ->
   merge {
     Daemon = "mina-daemon"
     , Archive = "mina-archive"
-    , ArchiveMigration = "mina-archive-berkeley-archive-migration"
     , TestExecutive = "mina-test-executive"
     , BatchTxn = "mina-batch-txn"
     , Rosetta = "mina-rosetta" 
@@ -51,7 +48,6 @@ let toDebianName = \(artifact : Artifact) ->
   merge {
     Daemon = "daemon"
     , Archive = "archive"
-    , ArchiveMigration = "berkeley_migration"
     , TestExecutive = "test_executive"
     , BatchTxn = "batch_txn"
     , Rosetta = "" 

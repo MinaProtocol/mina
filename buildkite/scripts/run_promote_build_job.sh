@@ -27,10 +27,11 @@ function usage() {
   if [[ -n "$1" ]]; then
     echo -e "${RED}☞  $1${CLEAR}\n";
   fi
-  echo "  DEBIANS             The comma delimitered debian names. For example: 'mina-berkeley,mina-archive' "
-  echo "  DOCKERS             The comma delimitered docker names. For example: 'mina-berkeley,mina-archive' "
+  echo "  DEBIANS             The comma delimitered debian names. For example: 'Daemon,Archive' "
+  echo "  DOCKERS             The comma delimitered docker names. For example: 'Daemon,Archive' "
   echo "  CODENAME            The Debian codename (Bullseye, Buster etc.)"
   echo "  VERSION             The Docker version"
+  echo "  PROFILE             The Docker and Debian profile (Standard, Lightnet, BerkeleyMigration)"
   echo "  FROM_CHANNEL        The Docker name (mina-berkeley, mina-archive etc.)"
   echo "  TO_CHANNEL          The Docker version"
   echo "  TAG                 The Additional tag for docker"
@@ -46,6 +47,7 @@ DHALL_DEBIANS="([] : List (./buildkite/src/Constants/DebianPackage.dhall).Type)"
 
 if [[ -n "$DEBIANS" ]]; then 
     if [[ -z "$CODENAME" ]]; then usage "Codename is not set!"; fi;
+    if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
     if [[ -z "$FROM_CHANNEL" ]]; then usage "'From channel' arg is not set!"; fi;
     if [[ -z "$TO_CHANNEL" ]]; then usage "'To channel' arg is not set!"; fi;
     if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
@@ -64,7 +66,7 @@ DHALL_DOCKERS="([] : List (./buildkite/src/Constants/Artifacts.dhall).Type)"
 if [[ -n "$DOCKERS" ]]; then 
     if [[ -z "$TAG" ]]; then usage "Tag is not set!"; fi;
     if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
- 
+    if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
   
   arr_of_dockers=(${DOCKERS//,/ })
   DHALL_DOCKERS=""
@@ -74,4 +76,4 @@ if [[ -n "$DOCKERS" ]]; then
   DHALL_DOCKERS="[${DHALL_DOCKERS:1}]"
 fi
 
-echo '(./buildkite/src/Entrypoints/PromotePackage.dhall).promote_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${VERSION}"'" "amd64" (./buildkite/src/Constants/DebianVersions.dhall).DebVersion.'"${CODENAME}"' (./buildkite/src/Constants/DebianChannel.dhall).Type.'"${FROM_CHANNEL}"' (./buildkite/src/Constants/DebianChannel.dhall).Type.'"${TO_CHANNEL}"' "'"${TAG}"'" ' | dhall-to-yaml --quoted 
+echo '(./buildkite/src/Entrypoints/PromotePackage.dhall).promote_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${VERSION}"'" "amd64" (./buildkite/src/Constants/Profiles.dhall).Type.'"${PROFILE}"' (./buildkite/src/Constants/DebianVersions.dhall).DebVersion.'"${CODENAME}"' (./buildkite/src/Constants/DebianChannel.dhall).Type.'"${FROM_CHANNEL}"' (./buildkite/src/Constants/DebianChannel.dhall).Type.'"${TO_CHANNEL}"' "'"${TAG}"'" ' | dhall-to-yaml --quoted 

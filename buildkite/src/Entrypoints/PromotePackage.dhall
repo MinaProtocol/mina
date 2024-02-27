@@ -4,6 +4,7 @@ let List/map = Prelude.List.map
 
 let PromotePackage = ../Command/PromotePackage.dhall
 let Package =  ../Constants/DebianPackage.dhall
+let Profile =  ../Constants/Profiles.dhall
 let Artifact =  ../Constants/Artifacts.dhall
 let DebianChannel = ../Constants/DebianChannel.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
@@ -15,6 +16,7 @@ let promote_artifacts =
   \(dockers: List Artifact.Type) ->
   \(version: Text ) ->
   \(architecture: Text ) ->
+  \(profile: Profile.Type) ->
   \(codename: DebianVersions.DebVersion ) ->
   \(from_channel: DebianChannel.Type ) ->
   \(to_channel: DebianChannel.Type ) ->
@@ -25,6 +27,7 @@ let promote_artifacts =
       Package.Type
       PromotePackage.PromoteDebianSpec.Type
       (\(debian: Package.Type) -> PromotePackage.PromoteDebianSpec::{
+            profile = profile
             , package = debian
             , version = version
             , architecture = architecture
@@ -40,6 +43,7 @@ let promote_artifacts =
       Artifact.Type
       PromotePackage.PromoteDockerSpec.Type
         (\(docker: Artifact.Type) -> PromotePackage.PromoteDockerSpec::{
+          profile = profile
           , name = docker
           , version = version
           , new_tag = tag
