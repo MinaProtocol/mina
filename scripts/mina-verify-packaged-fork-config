@@ -47,9 +47,9 @@ source_build_fallback() {
     fi
 }
 
-MINA_EXE=${MINA_EXE:-$(source_build_fallback $(command -v mina) ./_build/default/src/app/cli/src/mina.exe)}
-MINA_GENESIS_EXE=${MINA_GENESIS_EXE:-$(source_build_fallback $(command -v mina-create-genesis) ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe)}
-CREATE_RUNTIME_CONFIG=${CREATE_RUNTIME_CONFIG:-$(source_build_fallback $(command -v mina-hf-create-runtime-config) ./scripts/hardfork/create_runtime_config.sh)}
+MINA_EXE=${MINA_EXE:-$(source_build_fallback "$(command -v mina)" ./_build/default/src/app/cli/src/mina.exe)}
+MINA_GENESIS_EXE=${MINA_GENESIS_EXE:-$(source_build_fallback "$(command -v mina-create-genesis)" ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe)}
+CREATE_RUNTIME_CONFIG=${CREATE_RUNTIME_CONFIG:-$(source_build_fallback "$(command -v mina-hf-create-runtime-config)" ./scripts/hardfork/create_runtime_config.sh)}
 
 installed_config=$(echo /var/lib/coda/config_*.json)
 PACKAGED_DAEMON_CONFIG=${PACKAGED_DAEMON_CONFIG:-$installed_config}
@@ -100,7 +100,7 @@ function extract_ledgers() {
     
     while ! "$MINA_EXE" ledger export staged-ledger  | jq >"$json_prefix-staged.json"; do
         sleep 1m
-        if ! grep -qFx $(cat ~/.mina-config/.mina-lock) <(jobs -rp); then
+        if ! grep -qFx "$(cat ~/.mina-config/.mina-lock)" <(jobs -rp); then
             echo "daemon died before exporting ledgers" >&2
             exit 1
         fi
@@ -146,16 +146,16 @@ for file in "$workdir"/ledgers/*.tar.gz; do
     tarname=$(basename "$file")
     tarname=${tarname%.tar.gz}
     tardir="$workdir/ledgers/$tarname"
-    mkdir -p "$tardir"/{packaged,generated}
+    mkdir -p "$tardir"/{packaged,generated,web}
     tar -xzf "$file" -C "$tardir/generated"
     tar -xzf "$GENESIS_LEDGER_DIR/$tarname.tar.gz" -C "$tardir/packaged"
     curl "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net/$tarname.tar.gz" | tar -xz -C "$tardir/web"
 
-    $ldb_cmd --hex --db="$tardir/packaged" scan > $workdir/packaged.scan
-    $ldb_cmd --hex --db="$tardir/web" scan > $workdir/web.scan
-    $ldb_cmd --hex --db="$tardir/generated" scan > $workdir/generated.scan
+    $ldb_cmd --hex --db="$tardir/packaged" scan > "$workdir/packaged.scan"
+    $ldb_cmd --hex --db="$tardir/web" scan > "$workdir/web.scan"
+    $ldb_cmd --hex --db="$tardir/generated" scan > "$workdir/generated.scan"
 
-    if ! cmp $workdir/generated.scan $workdir/packaged.scan || ! cmp $workdir/packaged.scan $workdir/web.scan; then
+    if ! cmp "$workdir/generated.scan" "$workdir/packaged.scan" || ! cmp "$workdir/packaged.scan" "$workdir/web.scan"; then
         echo "Error: kvdb contents mismatch for $tarname" >&2
         error=1
     fi
