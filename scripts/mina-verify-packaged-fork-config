@@ -99,11 +99,11 @@ function extract_ledgers() {
     "$MINA_EXE" daemon --libp2p-keypair "$workdir/keys/p2p" --config-file "$config_file" --seed --genesis-ledger-dir "$ledger_dir" &
     
     while ! "$MINA_EXE" ledger export staged-ledger  | jq >"$json_prefix-staged.json"; do
+        sleep 1m
         if ! grep -qFx $(cat ~/.mina-config/.mina-lock) <(jobs -rp); then
             echo "daemon died before exporting ledgers" >&2
             exit 1
         fi
-        sleep 1m
     done
     
     "$MINA_EXE" ledger export staking-epoch-ledger | jq > "$json_prefix-staking.json"
