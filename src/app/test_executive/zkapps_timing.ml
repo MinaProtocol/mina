@@ -15,7 +15,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let previous_global_slot = 10000
+  let global_slot_since_genesis = 10000
 
   let config =
     let open Test_config in
@@ -37,10 +37,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { proof_config_default with
           fork =
             Some
-              { previous_state_hash =
+              { state_hash =
                   "3NKtK83Ms5KgiYnyDqAWDbVLRizxP4dmJEk3GBGYEMPQtQpXRpaD"
-              ; previous_length = 30000
-              ; previous_global_slot
+              ; blockchain_length = 30000
+              ; global_slot_since_genesis
               }
         }
     }
@@ -99,7 +99,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  ( { initial_minimum_balance = Currency.Balance.of_mina_int_exn 5
                    ; cliff_time =
                        Mina_numbers.Global_slot_since_genesis.of_int
-                         (10000 + previous_global_slot)
+                         (10000 + global_slot_since_genesis)
                    ; cliff_amount = Currency.Amount.of_nanomina_int_exn 10_000
                    ; vesting_period = Mina_numbers.Global_slot_span.of_int 2
                    ; vesting_increment =
@@ -197,7 +197,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                        Currency.Balance.of_mina_int_exn 100
                    ; cliff_time =
                        Mina_numbers.Global_slot_since_genesis.of_int
-                         previous_global_slot
+                         global_slot_since_genesis
                    ; cliff_amount = Currency.Amount.of_mina_int_exn 0
                    ; vesting_period = Mina_numbers.Global_slot_span.of_int 1
                    ; vesting_increment = Currency.Amount.of_mina_int_exn 1
@@ -244,7 +244,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  ( { initial_minimum_balance = Currency.Balance.of_mina_int_exn 5
                    ; cliff_time =
                        Mina_numbers.Global_slot_since_genesis.of_int
-                         (10000 + previous_global_slot)
+                         (10000 + global_slot_since_genesis)
                    ; cliff_amount = Currency.Amount.of_nanomina_int_exn 10_000
                    ; vesting_period = Mina_numbers.Global_slot_span.zero
                    ; vesting_increment =
@@ -338,7 +338,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               { initial_minimum_balance = Currency.Balance.of_mina_int_exn 9
               ; cliff_time =
                   Mina_numbers.Global_slot_since_genesis.of_int
-                    (4000 + previous_global_slot)
+                    (4000 + global_slot_since_genesis)
               ; cliff_amount = Currency.Amount.of_nanomina_int_exn 100_000
               ; vesting_period = Mina_numbers.Global_slot_span.of_int 8
               ; vesting_increment = Currency.Amount.of_nanomina_int_exn 2_000
@@ -731,7 +731,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
-           ~start_slot_since_genesis:previous_global_slot
+           ~start_slot_since_genesis:global_slot_since_genesis
            (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
        check_replayer_logs ~logger logs )

@@ -16,7 +16,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let previous_global_slot = 42185
+  let global_slot_since_genesis = 42185
 
   let config =
     let open Test_config in
@@ -49,10 +49,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Some Runtime_config.Proof_keys.Transaction_capacity.small
         ; fork =
             Some
-              { previous_state_hash =
+              { state_hash =
                   "3NKtK83Ms5KgiYnyDqAWDbVLRizxP4dmJEk3GBGYEMPQtQpXRpaD"
-              ; previous_length = 30000
-              ; previous_global_slot
+              ; blockchain_length = 30000
+              ; global_slot_since_genesis
               }
         }
     }
@@ -909,7 +909,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "Running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
-           ~start_slot_since_genesis:previous_global_slot
+           ~start_slot_since_genesis:global_slot_since_genesis
            (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
        check_replayer_logs ~logger logs )

@@ -57,10 +57,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Some Runtime_config.Proof_keys.Transaction_capacity.small
         ; fork =
             Some
-              { previous_state_hash =
+              { state_hash =
                   "3NKtK83Ms5KgiYnyDqAWDbVLRizxP4dmJEk3GBGYEMPQtQpXRpaD"
-              ; previous_length = 30000
-              ; previous_global_slot = 42185
+              ; blockchain_length = 30000
+              ; global_slot_since_genesis = 42185
               }
         }
     }
