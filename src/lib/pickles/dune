@@ -5,7 +5,7 @@
  (modules_without_implementation
    full_signature
    type)
- (flags -warn-error -22+34+33+27)
+ (flags -warn-error +34+33+27)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

@@ -1,4 +1,3 @@
-open Core_kernel
 open Mina_base_import
 open Snark_params
 open Snarky_backendless

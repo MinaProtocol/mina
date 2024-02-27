@@ -490,16 +490,17 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
                                "Offline for too long; restarting libp2p_helper" ;
                              Mina_networking.restart_helper net ;
                              next_helper_restart := None ;
-                             match !offline_shutdown with
-                             | None ->
-                                 offline_shutdown :=
-                                   Some
-                                     (Async.Clock.Event.run_after
-                                        offline_shutdown_delay
-                                        (fun () -> raise Offline_shutdown)
-                                        () )
-                             | Some _ ->
-                                 () )
+                             if not is_seed then
+                               match !offline_shutdown with
+                               | None ->
+                                   offline_shutdown :=
+                                     Some
+                                       (Async.Clock.Event.run_after
+                                          offline_shutdown_delay
+                                          (fun () -> raise Offline_shutdown)
+                                          () )
+                               | Some _ ->
+                                   () )
                            () )
                 | Some _ ->
                     () ) ;
@@ -1082,7 +1083,7 @@ let staking_ledger t =
   Consensus.Hooks.get_epoch_ledger ~constants:consensus_constants
     ~consensus_state ~local_state
 
-let next_epoch_ledger t =
+let next_epoch_ledger ?(unsafe_always_return_ledger_as_if_finalized = false) t =
   let open Option.Let_syntax in
   let%map frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
@@ -1100,6 +1101,7 @@ let next_epoch_ledger t =
   if
     Mina_numbers.Length.(
       equal root_epoch best_tip_epoch || equal best_tip_epoch zero)
+    || unsafe_always_return_ledger_as_if_finalized
   then
     (*root is in the same epoch as the best tip and so the next epoch ledger in the local state will be updated by Proof_of_stake.frontier_root_transition. Next epoch ledger in genesis epoch is the genesis ledger*)
     `Finalized
@@ -1799,12 +1801,17 @@ let create ?wallets (config : Config.t) =
                 | Some net ->
                     Mina_networking.peers net )
           in
+          let slot_tx_end =
+            Runtime_config.slot_tx_end_or_default
+              config.Config.precomputed_values.runtime_config
+          in
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
+              ~slot_tx_end
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =

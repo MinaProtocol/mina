@@ -32,7 +32,7 @@ let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
 
-let dependsOn = DebianVersions.dependsOn DebianVersions.DebVersion.Bullseye Profiles.Type.Standard
+let dependsOn = DebianVersions.dependsOn DebianVersions.DebVersion.Bullseye Profiles.Type.Lightnet
 
 
 let buildTestCmd : Size -> Command.Type = \(cmd_target : Size) ->

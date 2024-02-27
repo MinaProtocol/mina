@@ -86,7 +86,7 @@ automation/services/watchdog/check_libp2p/check_libp2p
 _opam
 
 target
-release
+./release
 .vscode
 
 ### IntelliJ IDEA ###
