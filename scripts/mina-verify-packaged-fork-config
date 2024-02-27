@@ -146,7 +146,7 @@ for file in "$workdir"/ledgers/*.tar.gz; do
     tarname=$(basename "$file")
     tarname=${tarname%.tar.gz}
     tardir="$workdir/ledgers/$tarname"
-    mkdir -p "$tardir/{packaged,generated}"
+    mkdir -p "$tardir"/{packaged,generated}
     tar -xzf "$file" -C "$tardir/generated"
     tar -xzf "$GENESIS_LEDGER_DIR/$tarname.tar.gz" -C "$tardir/packaged"
     curl "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net/$tarname.tar.gz" | tar -xz -C "$tardir/web"
