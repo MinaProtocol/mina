@@ -2805,7 +2805,7 @@ module Hooks = struct
          ledger for the parent block at the epoch boundary.
       *)
       let num_parents =
-        Length.to_int target_consensus_state.next_epoch_data.epoch_length - 1
+        Length.to_int target_consensus_state.next_epoch_data.epoch_length
       in
       `Snarked_ledger
         ( Data.Local_state.Snapshot.ledger !local_state.next_epoch_snapshot
