@@ -4,18 +4,18 @@ open Core_kernel
 open Async
 open Yojson.Basic.Util
 
+
+
 module Check = struct
-  type t = Ok | Error of string list | Skipped of string
+  type t = Ok | Error of string list
 
   let ok = Ok
-
-  let skipped reason = Skipped reason
 
   let err error = Error [ error ]
 
   let errors errors = Error errors
 
-  let combine checks =
+  let _combine checks =
     List.fold checks ~init:ok ~f:(fun acc item ->
         match (acc, item) with
         | Error e1, Error e2 ->
@@ -24,8 +24,6 @@ module Check = struct
             errors e
         | _, Error e ->
             errors e
-        | Skipped reason1, Skipped reason2 ->
-            Skipped (String.concat ~sep:" and " [ reason1; reason2 ])
         | _, _ ->
             Ok )
 end
@@ -37,8 +35,8 @@ let exit_code = ref 0
 module Test = struct
   type t = { check : Check.t; name : string }
 
-  let of_check check ~name ~idx =
-    { check; name = sprintf "[%d/%d] %s check " idx test_count name }
+  let of_check check ~name ~idx ~prefix =
+    { check; name = sprintf "[%d/%d] %s) %s " idx test_count prefix name }
 
   let print_errors error_messages =
     if List.length error_messages > 10 then (
@@ -59,10 +57,46 @@ module Test = struct
         exit_code := !exit_code + 1 ;
         Async.printf "%s ... ❌ \n" t.name ;
         print_errors error_messages
-    | Skipped reason ->
-        Async.printf "%s skipping check due to '%s' ... ⚠️ \n" t.name reason
 end
 
+let migrated_db_is_connected query_migrated_db =
+  let open Deferred.Let_syntax in
+  let%bind block_height =
+    query_migrated_db ~f:(fun db ->
+        Sql.Berkeley.block_height db )
+  in
+  let%bind canonical_blocks_count_till_height =
+    query_migrated_db ~f:(fun db ->
+        Sql.Berkeley.canonical_blocks_count_till_height db block_height )
+  in
+  if Int.equal canonical_blocks_count_till_height block_height then
+    Deferred.return Check.ok
+  else
+    Deferred.return
+      (Check.err
+         (sprintf "Expected to have the same amount of blocks as blockchain height. However got %d vs %d"
+         canonical_blocks_count_till_height block_height ) )
+
+let no_pending_and_orphaned_blocks_in_migrated_db query_migrated_db =
+  let open Deferred.Let_syntax in
+  let%bind block_height =
+    query_migrated_db ~f:(fun db ->
+        Sql.Berkeley.block_height db )
+  in
+  let%bind blocks_count =
+    query_migrated_db ~f:(fun db ->
+        Sql.Berkeley.blocks_count db )
+  in
+  if Int.equal blocks_count block_height then
+    Deferred.return Check.ok
+  else
+    Deferred.return
+      (Check.err
+         (sprintf "Expected to have the same amount of canonical blocks as blockchain height. However got %d vs %d"
+         blocks_count block_height ) )
+
+
+(*
 let get_migration_end_slot_for_state_hash ~query_mainnet_db state_hash =
   let open Deferred.Let_syntax in
   let%bind maybe_slot =
@@ -74,22 +108,6 @@ let get_migration_end_slot_for_state_hash ~query_mainnet_db state_hash =
        ~message:
          (Printf.sprintf "Cannot find slot for state hash: %s" state_hash) )
 
-let assert_migrated_db_contains_only_canonical_blocks query_migrated_db height =
-  let%bind canonical_blocks_count =
-    query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.get_all_canonical_blocks_till_height db height )
-  in
-  let%bind all_blocks_till_height =
-    query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.get_all_blocks_till_height db height )
-  in
-  if Int.equal all_blocks_till_height canonical_blocks_count then
-    Deferred.return Check.ok
-  else
-    Deferred.return
-      (Check.err
-         (sprintf "Expected to have only %d canonical block while having %d"
-            canonical_blocks_count all_blocks_till_height ) )
 
 let assert_migrated_db_has_account_accessed query_migrated_db =
   let%bind account_accessed_count =
@@ -440,15 +458,52 @@ let compare_migrated_replayer_output ~migrated_replayer_output ~fork_config_file
     (Check.combine
        [ download_check; update_perms_check; copy_files; run_check ] )
 
+*)
 
 let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri ()= 
-  Deferred.Or_error.ok_unit
+  printf
+  "Running verifications for incremental migration between '%s' and '%s' schemas. It may take a couple \
+  of minutes... \n"
+  mainnet_archive_uri migrated_archive_uri ;
+
+  let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
+  let migrated_archive_uri = Uri.of_string migrated_archive_uri in
+  let mainnet_pool =
+  Caqti_async.connect_pool ~max_size:128 mainnet_archive_uri
+  in
+  let migrated_pool =
+  Caqti_async.connect_pool ~max_size:128 migrated_archive_uri
+  in
+
+  match (mainnet_pool, migrated_pool) with
+  | Error _e, _ | _, Error _e ->
+      failwithf "Connection failed to orignal and migrated schema" ()
+  | Ok mainnet_pool, Ok migrated_pool ->
+  
+    let _query_mainnet_db = Mina_caqti.query mainnet_pool in
+    let query_migrated_db = Mina_caqti.query migrated_pool in
+
+    let%bind check =
+    migrated_db_is_connected query_migrated_db
+    in
+    Test.of_check check ~name:"Migrated blocks are connected"
+      ~idx:1 ~prefix:"D3.1"
+    |> Test.eval ;
+
+    let%bind check =
+    no_pending_and_orphaned_blocks_in_migrated_db query_migrated_db
+    in
+    Test.of_check check ~name:"No orphaned nor pending blocks in migrated db"
+      ~idx:2 ~prefix:"D3.2"
+    |> Test.eval ;
+
+    Deferred.Or_error.ok_unit
 
   
-let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri ~migrated_replayer_output
-~fork_config_file () =
+let post_fork_validations ~_mainnet_archive_uri ~_migrated_archive_uri ~_migrated_replayer_output
+~_fork_config_file () =
   Deferred.Or_error.ok_unit
-
+(*
 let main ~mainnet_archive_uri ~migrated_archive_uri ~migrated_replayer_output
     ~fork_config_file () =
   let fork_config =
@@ -496,10 +551,9 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~migrated_replayer_output
          !exit_code )
   else Deferred.Or_error.ok_unit
 
-
+*)
 
 let incremental_migration_command =
-  let open Command.Param in
     Command.async_or_error
         ~summary:"Verify migrated mainnet archive with original one"
         (let open Command.Let_syntax in
@@ -516,7 +570,6 @@ let incremental_migration_command =
         )
   
 let post_fork_migration_command = 
-  let open Command.Param in
   Command.async_or_error
       ~summary:"Verifye migrated mainnet archive with original one"
       (let open Command.Let_syntax in
@@ -540,8 +593,8 @@ let post_fork_migration_command =
            ~doc:"String Path to fork config file"
        in
 
-       post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
-         ~migrated_replayer_output ~fork_config_file )
+       post_fork_validations ~_mainnet_archive_uri:mainnet_archive_uri ~_migrated_archive_uri:migrated_archive_uri
+         ~_migrated_replayer_output:migrated_replayer_output ~_fork_config_file:fork_config_file )
 
 let commands =
   [ ( "incremental", incremental_migration_command )

@@ -1,19 +1,5 @@
 open Caqti_async
 
-module Common = struct
-  let block_state_hashes_query =
-    Caqti_request.collect Caqti_type.int
-      Caqti_type.(tup2 string string)
-      {sql| 
-            SELECT state_hash,parent_hash FROM blocks 
-            WHERE chain_status <> 'orphaned'
-            AND global_slot_since_genesis < ?
-          |sql}
-
-  let block_state_hashes (module Conn : CONNECTION) end_global_slot =
-    Conn.collect_list block_state_hashes_query end_global_slot
-end
-
 module Mainnet = struct
   let latest_state_hash_before_slot_query =
     Caqti_request.find_opt Caqti_type.int Caqti_type.string
@@ -175,58 +161,18 @@ module Mainnet = struct
 end
 
 module Berkeley = struct
-  let find_internal_command_id_by_hash_query =
-    Caqti_request.find_opt Caqti_type.string Caqti_type.int
-      {sql| select id 
-            from internal_commands 
-            where hash = ?    
+  
+  let height_query =
+    Caqti_request.find Caqti_type.unit
+      Caqti_type.int
+      {sql| 
+            SELECT height from blocks order by height desc limit 1;
           |sql}
 
-  let find_internal_command_id_by_hash (module Conn : CONNECTION) hash =
-    Conn.find_opt find_internal_command_id_by_hash_query hash
+  let block_height (module Conn : CONNECTION)  =
+    Conn.find height_query ()
 
-  let find_user_command_id_by_hash_query =
-    Caqti_request.find_opt Caqti_type.string Caqti_type.int
-      {sql| select id 
-            from user_commands 
-            where hash = ?
-          |sql}
-
-  let find_user_command_id_by_hash (module Conn : CONNECTION) hash =
-    Conn.find_opt find_user_command_id_by_hash_query hash
-
-  let find_block_by_state_hash_query =
-    Caqti_request.find_opt Caqti_type.string Caqti_type.int
-      {sql| select id 
-            from blocks 
-            where state_hash = ?
-          |sql}
-
-  let find_block_by_state_hash (module Conn : CONNECTION) hash =
-    Conn.find_opt find_block_by_state_hash_query hash
-
-  let find_block_by_parent_hash_query =
-    Caqti_request.find_opt Caqti_type.string Caqti_type.int
-      {sql| select id 
-            from blocks 
-            where parent_hash = ?
-            limit 1
-          |sql}
-
-  let find_block_by_parent_hash (module Conn : CONNECTION) hash =
-    Conn.find_opt find_block_by_parent_hash_query hash
-
-  let find_block_by_ledger_hash_query =
-    Caqti_request.find_opt Caqti_type.string Caqti_type.int
-      {sql| select id 
-            from blocks 
-            where ledger_hash = ?
-          |sql}
-
-  let find_block_by_ledger_hash (module Conn : CONNECTION) hash =
-    Conn.find_opt find_block_by_ledger_hash_query hash
-
-  let get_all_canonical_blocks_till_height_query =
+  let canonical_blocks_count_till_height_query =
     Caqti_request.find Caqti_type.int Caqti_type.int
       {sql|
         WITH RECURSIVE chain AS 
@@ -241,17 +187,17 @@ module Berkeley = struct
         ) SELECT count(*) FROM chain where chain_status = 'canonical';
       |sql}
 
-  let get_all_canonical_blocks_till_height (module Conn : CONNECTION) height =
-    Conn.find get_all_canonical_blocks_till_height_query height
+  let canonical_blocks_count_till_height (module Conn : CONNECTION) height =
+    Conn.find canonical_blocks_count_till_height_query height 
 
-  let get_all_blocks_till_height_query =
-    Caqti_request.find Caqti_type.int Caqti_type.int
+  let blocks_count_query =
+    Caqti_request.find Caqti_type.unit Caqti_type.int
       {sql|
-          SELECT count(*) FROM blocks WHERE height <= ?;
+          SELECT count(*) FROM blocks ;
         |sql}
 
-  let get_all_blocks_till_height (module Conn : CONNECTION) height =
-    Conn.find get_all_blocks_till_height_query height
+  let blocks_count (module Conn : CONNECTION)  =
+    Conn.find blocks_count_query ()
 
   let get_account_accessed_count_query =
     Caqti_request.find Caqti_type.unit Caqti_type.int
