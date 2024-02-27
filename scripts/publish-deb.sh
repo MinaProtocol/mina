@@ -63,6 +63,7 @@ DEB="${deb_split[0]}"
 # md5 and sizes before finishing script
 function verify_o1test_repo_is_synced {
   sudo apt-get update
+  echo "${DEBS3_SHOW} ${DEB} ${DEB_VERSION} $ARCH -c $DEB_CODENAME -m $DEB_RELEASE"
   ${DEBS3_SHOW} ${DEB} ${DEB_VERSION} $ARCH -c $DEB_CODENAME -m $DEB_RELEASE
   return $?
 }
