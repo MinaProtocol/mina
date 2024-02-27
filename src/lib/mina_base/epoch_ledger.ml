@@ -1,15 +1,17 @@
 open Core_kernel
 open Currency
 open Snark_params.Tick
-open Bitstring_lib
 
 module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
       type ('ledger_hash, 'amount) t =
+            ( 'ledger_hash
+            , 'amount )
+            Mina_wire_types.Mina_base.Epoch_ledger.Poly.V1.t =
         { hash : 'ledger_hash; total_currency : 'amount }
-      [@@deriving sexp, equal, compare, hash, yojson, hlist]
+      [@@deriving annot, sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
 end
@@ -28,26 +30,21 @@ module Value = struct
 end
 
 let to_input ({ hash; total_currency } : Value.t) =
-  let open Snark_params.Tick in
-  { Random_oracle.Input.field_elements = [| (hash :> Field.t) |]
-  ; bitstrings = [| Amount.to_bits total_currency |]
-  }
+  Random_oracle_input.Chunked.(
+    append (field (hash :> Field.t)) (Amount.to_input total_currency))
 
 type var = (Frozen_ledger_hash0.var, Amount.var) Poly.t
 
-let data_spec = Data_spec.[ Frozen_ledger_hash0.typ; Amount.typ ]
-
 let typ : (var, Value.t) Typ.t =
-  Typ.of_hlistable data_spec ~var_to_hlist:Poly.to_hlist
-    ~var_of_hlist:Poly.of_hlist ~value_to_hlist:Poly.to_hlist
-    ~value_of_hlist:Poly.of_hlist
+  Typ.of_hlistable
+    [ Frozen_ledger_hash0.typ; Amount.typ ]
+    ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
+    ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
 let var_to_input ({ Poly.hash; total_currency } : var) =
-  { Random_oracle.Input.field_elements =
-      [| Frozen_ledger_hash0.var_to_hash_packed hash |]
-  ; bitstrings =
-      [| Bitstring.Lsb_first.to_list (Amount.var_to_bits total_currency) |]
-  }
+  let total_currency = Amount.var_to_input total_currency in
+  Random_oracle_input.Chunked.(
+    append (field (Frozen_ledger_hash0.var_to_hash_packed hash)) total_currency)
 
 let if_ cond ~(then_ : (Frozen_ledger_hash0.var, Amount.var) Poly.t)
     ~(else_ : (Frozen_ledger_hash0.var, Amount.var) Poly.t) =

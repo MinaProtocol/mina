@@ -32,15 +32,10 @@ let cache =
   ]
 
 let env_path =
-  (* TODO: remove deprecated variable, eventually *)
-  let mina_keys_path = "MINA_KEYS_PATH" in
-  let coda_keys_path = "CODA_KEYS_PATH" in
-  match (Sys.getenv mina_keys_path, Sys.getenv coda_keys_path) with
-  | Some path, _ ->
+  match Sys.getenv "MINA_KEYS_PATH" with
+  | Some path ->
       path
-  | None, Some path ->
-      path
-  | None, None ->
+  | None ->
       manual_install_path
 
 let possible_paths base =
@@ -53,6 +48,7 @@ let possible_paths base =
     ] ~f:(fun d -> d ^/ base)
 
 let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
+  let%bind () = Unix.mkdir ~p:() (Filename.dirname s3_install_path) in
   Deferred.map ~f:Result.join
   @@ Monitor.try_with ~here:[%here] (fun () ->
          let each_uri (uri_string, file_path) =
@@ -81,7 +77,5 @@ let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
                ] ;
            Result.return ()
          in
-         Deferred.List.map ~f:each_uri
-           (List.zip_exn s3_bucket_prefix s3_install_path)
-         |> Deferred.map ~f:Result.all_unit )
+         each_uri (s3_bucket_prefix, s3_install_path) )
   |> Deferred.Result.map_error ~f:Error.of_exn

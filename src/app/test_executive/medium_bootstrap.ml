@@ -22,10 +22,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       k = 2
     ; requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
-        ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
-        ; { account_name = "node-c-key"; balance = "0"; timing = Untimed }
-        ]
+        (let open Test_account in
+        [ create ~account_name:"node-a-key" ~balance:"1000" ()
+        ; create ~account_name:"node-b-key" ~balance:"1000" ()
+        ; create ~account_name:"node-c-key" ~balance:"0" ()
+        ])
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -49,9 +50,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
-      wait_for t
-        (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data all_mina_nodes) )
+      section_hard "Wait for nodes to initialize"
+        (wait_for t
+           (Wait_condition.nodes_to_initialize
+              (Core.String.Map.data all_mina_nodes) ) )
     in
     let node_a =
       Core.String.Map.find_exn (Network.block_producers network) "node-a"
@@ -63,11 +65,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Core.String.Map.find_exn (Network.block_producers network) "node-c"
     in
     let%bind () =
-      section "blocks are produced"
+      section_hard "blocks are produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 1))
     in
     let%bind () =
-      section "restart node after 2k+1, ie 5, blocks"
+      section_hard "restart node after 2k+1, ie 5, blocks"
         (let%bind () = Node.stop node_c in
          [%log info] "%s stopped, will now wait for blocks to be produced"
            (Node.id node_c) ;
@@ -80,7 +82,40 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          wait_for t
            (Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]) )
     in
-    section "network is fully connected after one node was restarted"
+    let%bind () =
+      section_hard "network is fully connected after one node was restarted"
+        (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
+         let%bind final_connectivity_data =
+           fetch_connectivity_data ~logger (Core.String.Map.data all_mina_nodes)
+         in
+         assert_peers_completely_connected final_connectivity_data )
+    in
+    let%bind () =
+      section_hard "blocks are produced"
+        (wait_for t (Wait_condition.blocks_to_be_produced 1))
+    in
+    let%bind () =
+      section_hard "restart node with the same state after 1 block"
+        (let%bind () = Node.stop node_c in
+         [%log info] "%s stopped, will now wait for blocks to be produced"
+           (Node.id node_c) ;
+         let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 1) in
+         let%bind () = Node.start ~fresh_state:false node_c in
+         [%log info]
+           "%s started again on same data, will now wait for this node to \
+            initialize"
+           (Node.id node_c) ;
+         let%bind () =
+           wait_for t
+             (Wait_condition.transition_frontier_loaded_from_persistence
+                ~fresh_data:false ~sync_needed:false )
+         in
+         let%bind () = wait_for t (Wait_condition.node_to_initialize node_c) in
+         wait_for t
+           (Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]) )
+    in
+
+    section_hard "network is fully connected after one node was restarted"
       (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
        let%bind final_connectivity_data =
          fetch_connectivity_data ~logger (Core.String.Map.data all_mina_nodes)
