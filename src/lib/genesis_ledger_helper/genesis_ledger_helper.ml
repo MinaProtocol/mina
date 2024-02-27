@@ -6,9 +6,6 @@ include Genesis_ledger_helper_lib
 
 type exn += Genesis_state_initialization_error
 
-let s3_bucket_prefix =
-  "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net"
-
 module Tar = struct
   let create ~root ~directory ~file () =
     match%map
@@ -59,30 +56,33 @@ let file_exists ?follow_symlinks filename =
   | _ ->
       false
 
-let assert_filehash_equal ~file ~hash ~logger =
+let sha3_hash ledger_file =
   let st = ref (Digestif.SHA3_256.init ()) in
-  match%bind
-    Reader.with_file file ~f:(fun rdr ->
+  match%map
+    Reader.with_file ledger_file ~f:(fun rdr ->
         Reader.read_one_chunk_at_a_time rdr ~handle_chunk:(fun buf ~pos ~len ->
             st := Digestif.SHA3_256.feed_bigstring !st buf ~off:pos ~len ;
             Deferred.return `Continue ) )
   with
   | `Eof ->
-      let computed_hash = Digestif.SHA3_256.(get !st |> to_hex) in
-      if not (String.equal computed_hash hash) then (
-        let%map () = Unix.rename ~src:file ~dst:(file ^ ".incorrect-hash") in
-        [%log error]
-          "Verification failure: downloaded $file and expected SHA3-256 = \
-           $hash but it had $computed_hash"
-          ~metadata:
-            [ ("path", `String file)
-            ; ("expected_hash", `String hash)
-            ; ("computed_hash", `String computed_hash)
-            ] ;
-        failwith "Tarball hash mismatch" )
-      else Deferred.unit
+      Digestif.SHA3_256.(get !st |> to_hex)
   | _ ->
       failwith "impossible: `Stop not used"
+
+let assert_filehash_equal ~file ~hash ~logger =
+  let%bind computed_hash = sha3_hash file in
+  if String.equal computed_hash hash then Deferred.unit
+  else
+    let%map () = Unix.rename ~src:file ~dst:(file ^ ".incorrect-hash") in
+    [%log error]
+      "Verification failure: downloaded $file and expected SHA3-256 = $hash \
+       but it had $computed_hash"
+      ~metadata:
+        [ ("path", `String file)
+        ; ("expected_hash", `String hash)
+        ; ("computed_hash", `String computed_hash)
+        ] ;
+    failwith "Tarball hash mismatch"
 
 module Ledger = struct
   let hash_filename hash ~ledger_name_prefix =
@@ -149,7 +149,7 @@ module Ledger = struct
     let load_from_s3 filename =
       match config.s3_data_hash with
       | Some s3_hash -> (
-          let s3_path = s3_bucket_prefix ^/ filename in
+          let s3_path = Cache_dir.s3_keys_bucket_prefix ^/ filename in
           let local_path = Cache_dir.s3_install_path ^/ filename in
           match%bind Cache_dir.load_from_s3 s3_path local_path ~logger with
           | Ok () ->
@@ -168,9 +168,9 @@ module Ledger = struct
                   ] ;
               return None )
       | None ->
-          [%log error]
+          [%log warn]
             "Need S3 hash specified in runtime config to verify download for \
-             $ledger (root hash $root_hash), refusing unsafe download"
+             $ledger (root hash $root_hash), not attempting"
             ~metadata:
               [ ( "root_hash"
                 , `String (Option.value ~default:"not specified" config.hash) )
@@ -410,11 +410,6 @@ module Ledger = struct
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
       ?(ledger_name_prefix = "genesis_ledger") (config : Runtime_config.Ledger.t)
       =
-    [%log trace] "Load requested for $name $config"
-      ~metadata:
-        [ ("name", `String ledger_name_prefix)
-        ; ("config", Runtime_config.Ledger.to_yojson config)
-        ] ;
     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
         let padded_accounts_opt =
           padded_accounts_from_runtime_config_opt ~logger ~proof_level
@@ -532,7 +527,7 @@ module Ledger = struct
                         ; ("named_tar_path", `String link_name)
                         ] ;
                     Ok (packed, config, link_name)
-                | Ok tar_path, None ->
+                | Ok tar_path, _ ->
                     return (Ok (packed, config, tar_path))
                 | Error err, _ ->
                     let root_hash =
