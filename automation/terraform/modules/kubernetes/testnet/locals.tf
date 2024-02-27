@@ -27,6 +27,7 @@ locals {
       // TODO: Change this to a better name
       seedPeers          = var.additional_peers
       logLevel           = var.log_level
+      startFilteredLogs    = var.start_filtered_logs
       logSnarkWorkGossip = var.log_snark_work_gossip
       logTxnPoolGossip = var.log_txn_pool_gossip
       ports = {
