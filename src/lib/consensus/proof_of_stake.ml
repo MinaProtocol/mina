@@ -2065,10 +2065,10 @@ module Make_str (A : Wire_types.Concrete) = struct
           match constraint_constants.fork with
           | None ->
               (Length.zero, Mina_numbers.Global_slot_since_genesis.zero)
-          | Some { previous_length; genesis_slot; _ } ->
+          | Some { blockchain_length; global_slot_since_genesis; _ } ->
               (*Note: global_slot_since_genesis at fork point is the same as global_slot_since_genesis in the new genesis. This value is used to check transaction validity and existence of locked tokens.
                 For reviewers, should this be incremented by 1 because it's technically a new block? we don't really know how many slots passed since the fork point*)
-              (previous_length, genesis_slot)
+              (blockchain_length, global_slot_since_genesis)
         in
         let default_epoch_data =
           Genesis_epoch_data.Data.
@@ -2682,6 +2682,35 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~local_state
       in
       Data.Local_state.Snapshot.ledger snapshot
+
+    let get_epoch_ledgers_for_finalized_frontier_block
+        ~(root_consensus_state : Consensus_state.Value.t)
+        ~(target_consensus_state : Consensus_state.Value.t) ~local_state =
+      let root_epoch = Data.Consensus_state.curr_epoch root_consensus_state in
+      let target_epoch =
+        Data.Consensus_state.curr_epoch target_consensus_state
+      in
+      if Epoch.equal root_epoch target_epoch then
+        (* If we assume that the target state is finalized, then so is the
+           frontier's root state that it builds upon.
+           Hence, the next epoch snapshot is also finalized, and we can return
+           both ledgers.
+        *)
+        `Both
+          ( Data.Local_state.Snapshot.ledger
+              !local_state.Local_state.Data.staking_epoch_snapshot
+          , Data.Local_state.Snapshot.ledger
+              !local_state.Local_state.Data.next_epoch_snapshot )
+      else
+        (* Next epoch: the caller will need to manually compute the snarked
+           ledger for the parent block at the epoch boundary.
+        *)
+        let num_parents =
+          Length.to_int target_consensus_state.next_epoch_data.epoch_length
+        in
+        `Snarked_ledger
+          ( Data.Local_state.Snapshot.ledger !local_state.next_epoch_snapshot
+          , num_parents )
 
     type required_snapshot =
       { snapshot_id : Local_state.snapshot_identifier
@@ -3606,12 +3635,12 @@ module Make_str (A : Wire_types.Concrete) = struct
         | Some fork ->
             assert (
               Mina_numbers.Global_slot_since_genesis.(
-                equal fork.genesis_slot
+                equal fork.global_slot_since_genesis
                   previous_consensus_state.global_slot_since_genesis) ) ;
             assert (
               Mina_numbers.Length.(
                 equal
-                  (succ fork.previous_length)
+                  (succ fork.blockchain_length)
                   previous_consensus_state.blockchain_length) ) ) ;
         let global_slot =
           Core_kernel.Time.now () |> Time.of_time
@@ -3687,12 +3716,12 @@ module Make_str (A : Wire_types.Concrete) = struct
             assert (
               Mina_numbers.Global_slot_since_genesis.(
                 equal
-                  (add fork.genesis_slot slot_diff)
+                  (add fork.global_slot_since_genesis slot_diff)
                   next_consensus_state.global_slot_since_genesis) ) ;
             assert (
               Mina_numbers.Length.(
                 equal
-                  (succ (succ fork.previous_length))
+                  (succ (succ fork.blockchain_length))
                   next_consensus_state.blockchain_length) ) ) ;
         (* build pieces needed to apply "update_var" *)
         let checked_computation =
@@ -3788,14 +3817,15 @@ module Make_str (A : Wire_types.Concrete) = struct
         let constraint_constants_with_fork =
           let fork_constants =
             Some
-              { Genesis_constants.Fork_constants.previous_state_hash =
+              { Genesis_constants.Fork_constants.state_hash =
                   Result.ok_or_failwith
                     (State_hash.of_yojson
                        (`String
                          "3NL3bc213VQEFx6XTLbc3HxHqHH9ANbhHxRxSnBcRzXcKgeFA6TY"
                          ) )
-              ; previous_length = Mina_numbers.Length.of_int 100
-              ; genesis_slot = Mina_numbers.Global_slot_since_genesis.of_int 200
+              ; blockchain_length = Mina_numbers.Length.of_int 100
+              ; global_slot_since_genesis =
+                  Mina_numbers.Global_slot_since_genesis.of_int 200
               }
           in
           { constraint_constants with fork = fork_constants }

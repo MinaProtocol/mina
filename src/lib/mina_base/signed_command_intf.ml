@@ -236,11 +236,15 @@ module type Full = sig
 
     module V2 : sig
       type t =
-        ( Payload.Stable.V2.t
-        , Public_key.Stable.V1.t
-        , Signature.Stable.V1.t )
+        ( Payload.Stable.Latest.t
+        , Public_key.Stable.Latest.t
+        , Signature.Stable.Latest.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, hash, yojson, version]
+      [@@deriving sexp, hash, version]
+
+      val to_yojson : t -> Yojson.Safe.t
+
+      val of_yojson : Yojson.Safe.t -> (t, string) result
 
       include Comparable.S with type t := t
 
@@ -266,5 +270,5 @@ module type Full = sig
     end
   end]
 
-  include S with type t = Stable.V2.t and type t_v1 = Stable.V1.t
+  include S with type t = Stable.V2.t and type t_v1 := Stable.V1.t
 end

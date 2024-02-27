@@ -1,4 +1,4 @@
-# A set defining OCaml parts&dependencies of Mina
+# A set defining OCaml parts&dependencies of Minaocamlnix
 { inputs, ... }@args:
 let
   opam-nix = inputs.opam-nix.lib.${pkgs.system};
@@ -207,7 +207,8 @@ let
             src/app/replayer/replayer.exe \
             src/app/swap_bad_balances/swap_bad_balances.exe \
             src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
-          dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
+          # TODO figure out purpose of the line below
+          # dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
           # Building documentation fails, because not everything in the source tree compiles. Ignore the errors.
           dune build @doc || true
         '';
@@ -225,13 +226,15 @@ let
 
         installPhase = ''
           mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
-          mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
+          # TODO uncomment when genesis is generated above
+          # mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
           pushd _build/default
           cp src/app/cli/src/mina.exe $out/bin/mina
           cp src/app/logproc/logproc.exe $out/bin/logproc
           cp src/app/rosetta/rosetta.exe $out/bin/rosetta
           cp src/app/batch_txn_tool/batch_txn_tool.exe $batch_txn_tool/bin/batch_txn_tool
           cp src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe $genesis/bin/runtime_genesis_ledger
+          cp src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe $out/bin/runtime_genesis_ledger
           cp src/app/cli/src/mina_mainnet_signatures.exe $mainnet/bin/mina_mainnet_signatures
           cp src/app/rosetta/rosetta_mainnet_signatures.exe $mainnet/bin/rosetta_mainnet_signatures
           cp src/app/cli/src/mina_testnet_signatures.exe $testnet/bin/mina_testnet_signatures
@@ -255,6 +258,24 @@ let
 
       # Same as above, but wrapped with version info.
       mina = wrapMina self.mina-dev { };
+
+      mainnet-pkg = self.mina-dev.overrideAttrs (s: {
+        version = "mainnet";
+        DUNE_PROFILE = "mainnet";
+        # For compatibility with Docker build
+        MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
+      });
+
+      mainnet = wrapMina self.mainnet-pkg { };
+
+      devnet-pkg = self.mina-dev.overrideAttrs (s: {
+        version = "devnet";
+        DUNE_PROFILE = "devnet";
+        # For compatibility with Docker build
+        MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
+      });
+
+      devnet = wrapMina self.devnet-pkg { };
 
       # Unit tests
       mina_tests = runMinaCheck {
