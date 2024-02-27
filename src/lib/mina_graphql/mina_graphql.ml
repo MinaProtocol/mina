@@ -2272,6 +2272,90 @@ module Queries = struct
         Mina_lib.runtime_config mina
         |> Runtime_config.to_yojson |> Yojson.Safe.to_basic )
 
+  let get_epoch_ledgers ~mina breadcrumb =
+    let open Deferred.Result.Let_syntax in
+    let mina_config = Mina_lib.config mina in
+    let frontier_consensus_local_state = mina_config.consensus_local_state in
+    let consensus_state =
+      breadcrumb |> Transition_frontier.Breadcrumb.protocol_state
+      |> Mina_state.Protocol_state.consensus_state
+    in
+    let staking_epoch =
+      Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
+        consensus_state
+    in
+    let next_epoch =
+      Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
+        consensus_state
+    in
+    let cast_ledger = function
+      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
+          l ->
+          Ledger.Any_ledger.cast (module Ledger) l
+      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_db l ->
+          Ledger.Any_ledger.cast (module Ledger.Db) l
+    in
+    let root_consensus_state =
+      let frontier =
+        Option.value_exn @@ Pipe_lib.Broadcast_pipe.Reader.peek
+        @@ Mina_lib.transition_frontier mina
+      in
+      let frontier_root = Transition_frontier.root frontier in
+      frontier_root |> Transition_frontier.Breadcrumb.protocol_state
+      |> Mina_state.Protocol_state.consensus_state
+    in
+    let%map staking_ledger, next_epoch_ledger =
+      match
+        (* We pretend that the block is finalized, so that we can query it in
+           advance, for redundancy.
+        *)
+        Consensus.Hooks.get_epoch_ledgers_for_finalized_frontier_block
+          ~root_consensus_state ~target_consensus_state:consensus_state
+          ~local_state:frontier_consensus_local_state
+      with
+      | `Both (staking_ledger, next_epoch_ledger) ->
+          return (cast_ledger staking_ledger, cast_ledger next_epoch_ledger)
+      | `Snarked_ledger (staking_ledger, num_parents) ->
+          (* The epoch transition was at a block between the given block and
+             the root. We find it by walking back by `num_parents` blocks.
+          *)
+          let%bind epoch_transition_state_hash =
+            let open Result.Let_syntax in
+            let rec ancestor breadcrumb i =
+              if i = 0 then return breadcrumb
+              else
+                let parent_hash =
+                  Transition_frontier.Breadcrumb.parent_hash breadcrumb
+                in
+                let%bind breadcrumb =
+                  Mina_lib.best_chain_block_by_state_hash mina parent_hash
+                in
+                ancestor breadcrumb (i - 1)
+            in
+            ancestor breadcrumb num_parents
+            >>| Transition_frontier.Breadcrumb.state_hash |> Deferred.return
+          in
+          (* When this block reaches the root of the frontier, its snarked
+             ledger will become the next epoch ledger; we simulate that here.
+          *)
+          let%map next_epoch_ledger =
+            Mina_lib.get_snarked_ledger_full mina
+              (Some epoch_transition_state_hash)
+            |> Deferred.Result.map_error ~f:Error.to_string_hum
+          in
+          ( cast_ledger staking_ledger
+          , Ledger.Any_ledger.cast (module Ledger) next_epoch_ledger )
+    in
+    assert (
+      Mina_base.Ledger_hash.equal
+        (Ledger.Any_ledger.M.merkle_root staking_ledger)
+        staking_epoch.ledger.hash ) ;
+    assert (
+      Mina_base.Ledger_hash.equal
+        (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
+        next_epoch.ledger.hash ) ;
+    (staking_ledger, next_epoch_ledger)
+
   let fork_config =
     io_field "fork_config"
       ~doc:
@@ -2393,43 +2477,9 @@ module Queries = struct
           Mina_base.Epoch_seed.to_base58_check
             next_epoch.Mina_base.Epoch_data.Poly.seed
         in
-        let%bind staking_ledger =
-          match Mina_lib.staking_ledger mina with
-          | None ->
-              Deferred.Result.fail "Staking ledger is not initialized."
-          | Some (Genesis_epoch_ledger l) ->
-              return (Ledger.Any_ledger.cast (module Ledger) l)
-          | Some (Ledger_db l) ->
-              return (Ledger.Any_ledger.cast (module Ledger.Db) l)
+        let%bind staking_ledger, next_epoch_ledger =
+          get_epoch_ledgers ~mina breadcrumb
         in
-        assert (
-          Mina_base.Ledger_hash.equal
-            (Ledger.Any_ledger.M.merkle_root staking_ledger)
-            staking_epoch.ledger.hash ) ;
-        let%bind next_epoch_ledger =
-          match
-            (* We always want to return the next epoch ledger here, in case we
-               need to hard-fork from a block where it is unfinalized. The
-               safety concern doesn't apply here, because we are only using
-               this to build a snapshot, and never applying it back to the
-               running network.
-            *)
-            Mina_lib.next_epoch_ledger
-              ~unsafe_always_return_ledger_as_if_finalized:true mina
-          with
-          | None ->
-              Deferred.Result.fail "Next epoch ledger is not initialized."
-          | Some `Notfinalized ->
-              failwith "next_epoch_ledger returned a disallowed value"
-          | Some (`Finalized (Genesis_epoch_ledger l)) ->
-              return (Ledger.Any_ledger.cast (module Ledger) l)
-          | Some (`Finalized (Ledger_db l)) ->
-              return (Ledger.Any_ledger.cast (module Ledger.Db) l)
-        in
-        assert (
-          Mina_base.Ledger_hash.equal
-            (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
-            next_epoch.ledger.hash ) ;
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger ~global_slot
             ~state_hash ~staking_ledger ~staking_epoch_seed
