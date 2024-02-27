@@ -143,7 +143,8 @@ done
 
 ldb_cmd=$(command -v rocksdb-ldb || command -v rocksdb_ldb || command -v ldb)
 for file in "$workdir"/ledgers/*.tar.gz; do
-    tarname=${$(basename "$file")%.tar.gz}
+    tarname=$(basename "$file")
+    tarname=${tarname%.tar.gz}
     tardir="$workdir/ledgers/$tarname"
     mkdir -p "$tardir/{packaged,generated}"
     tar -xzf "$file" -C "$tardir/generated"
