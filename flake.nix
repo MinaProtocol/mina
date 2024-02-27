@@ -7,6 +7,7 @@
     extra-trusted-public-keys = [
       "nix-cache.minaprotocol.org:fdcuDzmnM0Kbf7yU4yywBuUEJWClySc1WIF6t6Mm8h4="
       "nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c="
+      "mina-nix-cache-1:djtioLfv2oxuK2lqPUgmZbf8bY8sK/BnYZCU2iU5Q10="
     ];
   };
 
@@ -287,7 +288,7 @@
         # Main user-facing binaries.
         packages = rec {
           inherit (ocamlPackages)
-            mina mina_tests mina-ocaml-format test_executive;
+            mina devnet mainnet mina_tests mina-ocaml-format test_executive;
           inherit (pkgs)
             libp2p_helper kimchi_bindings_stubs snarky_js leaderboard
             validation trace-tool zkapp-cli;

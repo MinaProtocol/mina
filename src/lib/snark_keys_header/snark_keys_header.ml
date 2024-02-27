@@ -87,9 +87,9 @@ module Constraint_constants = struct
   module Fork_config = struct
     (** Fork data *)
     type t =
-      { previous_state_hash : string
-      ; previous_length : int
-      ; genesis_slot : int
+      { state_hash : string
+      ; blockchain_length : int
+      ; global_slot_since_genesis : int
       }
     [@@deriving yojson, sexp, ord, equal]
 

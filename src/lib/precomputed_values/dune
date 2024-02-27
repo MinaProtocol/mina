@@ -1,6 +1,5 @@
 (library
  (name precomputed_values)
- (flags -warn-error -22)
  (public_name precomputed_values)
  (libraries
    ;; opam libraries
