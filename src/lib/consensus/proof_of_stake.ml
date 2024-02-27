@@ -2790,7 +2790,8 @@ module Hooks = struct
     let root_epoch = Data.Consensus_state.curr_epoch root_consensus_state in
     let target_epoch = Data.Consensus_state.curr_epoch target_consensus_state in
     if Epoch.equal root_epoch target_epoch then
-      (* If we assume that the target state is finalized, then so is the root.
+      (* If we assume that the target state is finalized, then so is the
+         frontier's root state that it builds upon.
          Hence, the next epoch snapshot is also finalized, and we can return
          both ledgers.
       *)
