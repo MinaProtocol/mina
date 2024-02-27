@@ -47,7 +47,7 @@ let module = \(environment : List Text) ->
       "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
     let sharedDir : Text = "/var/buildkite/shared"
     in
-    { line = "docker run -it --rm --entrypoint /bin/bash --init --volume ${sharedDir}:/shared --volume ${outerDir}:/workdir --workdir /workdir${envVars}${if docker.privileged then " --privileged" else ""} ${docker.image} -c '${inner.line}'"
+    { line = "docker run -it --rm --entrypoint /bin/sh --init --volume ${sharedDir}:/shared --volume ${outerDir}:/workdir --workdir /workdir${envVars}${if docker.privileged then " --privileged" else ""} ${docker.image} -c '${inner.line}'"
     , readable = Optional/map Text Text (\(readable : Text) -> "Docker@${docker.image} ( ${readable} )") inner.readable
     }
 
@@ -108,7 +108,7 @@ let tests =
 
   let dockerExample = assert :
   { line =
-"docker run -it --rm --entrypoint /bin/bash --init --volume /var/buildkite/shared:/shared --volume \\\$BUILDKITE_BUILD_CHECKOUT_PATH:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag -c 'echo hello'"
+"docker run -it --rm --entrypoint /bin/sh --init --volume /var/buildkite/shared:/shared --volume \\\$BUILDKITE_BUILD_CHECKOUT_PATH:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag -c 'echo hello'"
   , readable =
     Some "Docker@foo/bar:tag ( echo hello )"
   }
@@ -122,7 +122,7 @@ let tests =
 
   let cacheExample = assert :
 ''
-  ./buildkite/scripts/cache-through.sh data.tar "docker run -it --rm --entrypoint /bin/bash --init --volume /var/buildkite/shared:/shared --volume \$BUILDKITE_BUILD_CHECKOUT_PATH:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag -c 'echo hello > /tmp/data/foo.txt && tar cvf data.tar /tmp/data'"''
+  ./buildkite/scripts/cache-through.sh data.tar "docker run -it --rm --entrypoint /bin/sh --init --volume /var/buildkite/shared:/shared --volume \$BUILDKITE_BUILD_CHECKOUT_PATH:/workdir --workdir /workdir --env ENV1 --env ENV2 --env TEST foo/bar:tag -c 'echo hello > /tmp/data/foo.txt && tar cvf data.tar /tmp/data'"''
   ===
   M.format (
     M.cacheThrough
