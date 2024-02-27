@@ -4299,7 +4299,7 @@ module Queries = struct
       | `Both (staking_ledger, next_epoch_ledger) ->
           return (cast_ledger staking_ledger, cast_ledger next_epoch_ledger)
       | `Snarked_ledger (staking_ledger, num_parents) ->
-          (* The epoch transition was at a block between the current block and
+          (* The epoch transition was at a block between the given block and
              the root. We find it by walking back by `num_parents` blocks.
           *)
           let%bind epoch_transition_state_hash =
