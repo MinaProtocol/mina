@@ -16,7 +16,7 @@ fi
 
 for deb in $DEBS
 do
-  source "scripts/publish-deb" \
+  source scripts/publish-deb.sh \
   --name $deb \
   --release $MINA_DEB_RELEASE \
   --version $MINA_DEB_VERSION \
