@@ -220,6 +220,91 @@ let wrap_main
                        | Some x ->
                            Opt.just (Array.map ~f:Inner_curve.constant x) ) ) ) )
         in
+        let () =
+          (* Check consistency between index and feature flags. *)
+          let { Plonk_verification_key_evals.Step.sigma_comm = _
+              ; coefficients_comm = _
+              ; generic_comm = _
+              ; psm_comm = _
+              ; complete_add_comm = _
+              ; mul_comm = _
+              ; emul_comm = _
+              ; endomul_scalar_comm = _
+              ; xor_comm
+              ; range_check0_comm
+              ; range_check1_comm
+              ; foreign_field_add_comm
+              ; foreign_field_mul_comm
+              ; rot_comm
+              ; lookup_table_comm =
+                  [ lookup_table_comm0
+                  ; lookup_table_comm1
+                  ; lookup_table_comm2
+                  ; lookup_table_comm3
+                  ]
+              ; lookup_table_ids =
+                  _ (* Unconstrained, doesn't affect the flags. *)
+              ; runtime_tables_selector
+              ; lookup_selector_lookup
+              ; lookup_selector_xor
+              ; lookup_selector_range_check
+              ; lookup_selector_ffmul
+              } =
+            step_plonk_index
+          in
+          let { Plonk_types.Features.Full.range_check0
+              ; range_check1
+              ; foreign_field_add
+              ; foreign_field_mul
+              ; xor
+              ; rot
+              ; lookup
+              ; runtime_tables
+              ; uses_lookups
+              ; table_width_at_least_1
+              ; table_width_at_least_2
+              ; table_width_3
+              ; lookups_per_row_3
+              ; lookups_per_row_4
+              ; lookup_pattern_xor
+              ; lookup_pattern_range_check
+              } =
+            Plonk_checks.expand_feature_flags
+              ( module struct
+                type t = Boolean.var
+
+                include Boolean
+              end )
+              plonk.feature_flags
+          in
+          let commitment_flag = function
+            | Opt.Just _ ->
+                Boolean.true_
+            | Opt.Maybe (b, _) ->
+                b
+            | Opt.Nothing ->
+                Boolean.false_
+          in
+          let assert_consistent comm flag =
+            Boolean.Assert.( = ) (commitment_flag comm) (Lazy.force flag)
+          in
+          assert_consistent xor_comm xor ;
+          assert_consistent range_check0_comm range_check0 ;
+          assert_consistent range_check1_comm range_check1 ;
+          assert_consistent foreign_field_add_comm foreign_field_add ;
+          assert_consistent foreign_field_mul_comm foreign_field_mul ;
+          assert_consistent rot_comm rot ;
+          assert_consistent lookup_table_comm0 table_width_at_least_1 ;
+          assert_consistent lookup_table_comm1 table_width_at_least_2 ;
+          assert_consistent lookup_table_comm2 table_width_3 ;
+          assert_consistent lookup_table_comm3 (lazy Boolean.false_) ;
+          assert_consistent runtime_tables_selector runtime_tables ;
+          assert_consistent lookup_selector_lookup lookup ;
+          assert_consistent lookup_selector_xor lookup_pattern_xor ;
+          assert_consistent lookup_selector_range_check
+            lookup_pattern_range_check ;
+          assert_consistent lookup_selector_ffmul foreign_field_mul
+        in
         let prev_step_accs =
           with_label __LOC__ (fun () ->
               exists (Vector.typ Inner_curve.typ Max_proofs_verified.n)
