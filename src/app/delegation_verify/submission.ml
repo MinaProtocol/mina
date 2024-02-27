@@ -209,9 +209,9 @@ module Cassandra = struct
     in
     let partition =
       if List.length partition_keys = 1 then
-        sprintf "submitted_at_date = '%s'" (List.hd_exn partition_keys)
+        sprintf "submitted_at_date = '%s' and shard in (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59)" (List.hd_exn partition_keys)
       else
-        sprintf "submitted_at_date IN (%s)"
+        sprintf "submitted_at_date IN (%s) and shard in (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59)"
           (String.concat ~sep:"," @@ List.map ~f:(sprintf "'%s'") partition_keys)
     in
     let%bind raw =
@@ -288,15 +288,20 @@ module Cassandra = struct
         String.chop_prefix_exn b.raw_block ~prefix:"0x"
         |> Hex.Safe.of_hex |> Option.value_exn |> return
 
+  (* shard is minute from submission.submitted_at: "2024-02-27 07:31:45.0+0000" => "31" *)
+  let calculate_shard timestamp_str = 
+    String.sub ~pos:14 ~len:2 timestamp_str
+
   let output { conf; _ } (submission : submission) = function
     | Ok payload ->
         Output.display payload ;
         Cassandra.update ~conf ~table:"submissions"
           ~where:
             (sprintf
-               "submitted_at_date = '%s' and submitted_at = '%s' and submitter \
+               "submitted_at_date = '%s' and shard = %s and submitted_at = '%s' and submitter \
                 = '%s'"
                (List.hd_exn @@ String.split ~on:' ' submission.submitted_at)
+               (calculate_shard submission.submitted_at)
                submission.submitted_at
                (Public_key.Compressed.to_base58_check submission.submitter) )
           Output.(valid_payload_to_cassandra_updates payload)
@@ -305,9 +310,10 @@ module Cassandra = struct
         Cassandra.update ~conf ~table:"submissions"
           ~where:
             (sprintf
-               "submitted_at_date = '%s' and submitted_at = '%s' and submitter \
+               "submitted_at_date = '%s' and shard = %s and submitted_at = '%s' and submitter \
                 = '%s'"
                (List.hd_exn @@ String.split ~on:' ' submission.submitted_at)
+               (calculate_shard submission.submitted_at)
                submission.submitted_at
                (Public_key.Compressed.to_base58_check submission.submitter) )
           [ ("validation_error", sprintf "'%s'" (Error.to_string_hum e))
