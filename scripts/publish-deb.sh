@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eox pipefail
+set -eo pipefail
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
@@ -58,12 +58,12 @@ DEBS3_SHOW="deb-s3 show $BUCKET_ARG $S3_REGION_ARG"
 
 deb_split=(${DEB_NAME//_/ })
 DEB="${deb_split[0]}"
+DEB=$(basename $DEB)
 
 # In order to prevent anyone to use freshly pushed packages prematurely we need to be sure those packages has correct
 # md5 and sizes before finishing script
 function verify_o1test_repo_is_synced {
   sudo apt-get update
-  echo "${DEBS3_SHOW} ${DEB} ${DEB_VERSION} $ARCH -c $DEB_CODENAME -m $DEB_RELEASE"
   ${DEBS3_SHOW} ${DEB} ${DEB_VERSION} $ARCH -c $DEB_CODENAME -m $DEB_RELEASE
   return $?
 }
