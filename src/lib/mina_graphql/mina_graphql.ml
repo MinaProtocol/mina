@@ -2542,6 +2542,21 @@ module Queries = struct
         ^ Option.value ~default:Mina_compile_config.network_id configured_name
         )
 
+  let signature_kind =
+    field "signatureKind"
+      ~doc:"The signature kind that this daemon instance is using"
+      ~typ:(non_null string)
+      ~args:Arg.[]
+      ~resolve:(fun _ () ->
+        match Mina_signature_kind.t with
+        | Mainnet ->
+            "mainnet"
+        | Testnet ->
+            "testnet"
+        | Other_network s ->
+            (* Prefix string to disambiguate *)
+            "other network: " ^ s )
+
   let commands =
     [ sync_status
     ; daemon_status
@@ -2578,6 +2593,7 @@ module Queries = struct
     ; thread_graph
     ; blockchain_verification_key
     ; network_id
+    ; signature_kind
     ]
 
   module Itn = struct
