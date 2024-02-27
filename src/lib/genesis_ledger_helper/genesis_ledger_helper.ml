@@ -6,9 +6,6 @@ include Genesis_ledger_helper_lib
 
 type exn += Genesis_state_initialization_error
 
-let s3_bucket_prefix =
-  "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net"
-
 module Tar = struct
   let create ~root ~directory ~file () =
     match%map
@@ -153,7 +150,7 @@ module Ledger = struct
     let load_from_s3 filename =
       match config.s3_data_hash with
       | Some s3_hash -> (
-          let s3_path = s3_bucket_prefix ^/ filename in
+          let s3_path = Cache_dir.s3_keys_bucket_prefix ^/ filename in
           let local_path = Cache_dir.s3_install_path ^/ filename in
           match%bind Cache_dir.load_from_s3 s3_path local_path ~logger with
           | Ok () ->
