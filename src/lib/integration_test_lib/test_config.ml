@@ -95,6 +95,19 @@ let proof_config_default : Runtime_config.Proof_keys.t =
   ; fork = None
   }
 
+let log_filter_of_event_type ev_existential =
+  let open Event_type in
+  let (Event_type ev_type) = ev_existential in
+  let (module Ty) = event_type_module ev_type in
+  match Ty.parse with
+  | From_error_log _ ->
+      [] (* TODO: Do we need this? *)
+  | From_daemon_log (struct_id, _) ->
+      [ Structured_log_events.string_of_id struct_id ]
+  | From_puppeteer_log _ ->
+      []
+(* TODO: Do we need this? *)
+
 let default =
   { requires_graphql =
       true
@@ -106,7 +119,8 @@ let default =
   ; snark_worker_fee = "0.025"
   ; num_archive_nodes = 0
   ; log_precomputed_blocks = false (* ; num_plain_nodes = 0 *)
-  ; start_filtered_logs = []
+  ; start_filtered_logs =
+      List.bind ~f:log_filter_of_event_type Event_type.all_event_types
   ; proof_config = proof_config_default
   ; k = 20
   ; slots_per_epoch = 3 * 8 * 20
