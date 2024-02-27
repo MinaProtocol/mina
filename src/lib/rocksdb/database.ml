@@ -1,7 +1,5 @@
 (* rocksdb.ml -- expose RocksDB operations for Mina *)
 
-open Core
-
 type t = { uuid : Uuid.Stable.V1.t; db : (Rocks.t[@sexp.opaque]) }
 [@@deriving sexp]
 
@@ -33,7 +31,7 @@ let set t ~(key : Bigstring.t) ~(data : Bigstring.t) : unit =
   Rocks.put ?key_pos:None ?key_len:None ?value_pos:None ?value_len:None
     ?opts:None t.db key data
 
-let set_batch t ?(remove_keys = [])
+let[@warning "-16"] set_batch t ?(remove_keys : Bigstring.t list = [])
     ~(key_data_pairs : (Bigstring.t * Bigstring.t) list) : unit =
   let batch = Rocks.WriteBatch.create () in
   (* write to batch *)
@@ -56,8 +54,6 @@ module Batch = struct
     let result = f batch in
     Rocks.write t.db batch ; result
 end
-
-let copy _t = failwith "Database.copy: not implemented"
 
 let remove t ~(key : Bigstring.t) : unit =
   Rocks.delete ?pos:None ?len:None ?opts:None t.db key
@@ -128,7 +124,7 @@ let%test_unit "get_batch" =
       File_system.with_temp_dir "/tmp/mina-rocksdb-test" ~f:(fun db_dir ->
           let db = create db_dir in
           let[@warning "-8"] [ key1; key2; key3 ] =
-            List.map ~f:Bigstring.of_string [ "a"; "b"; "c" ]
+            List.map ~f:(fun s -> Bigstring.of_string s) [ "a"; "b"; "c" ]
           in
           let data = Bigstring.of_string "test" in
           set db ~key:key1 ~data ;
@@ -180,6 +176,7 @@ let%test_unit "checkpoint read" =
       | `Duplicate_key _ ->
           Deferred.unit
       | `Ok db_hashtbl -> (
+          let open Core in
           let cp_hashtbl = Hashtbl.copy db_hashtbl in
           let db_dir = Filename.temp_dir "test_db" "" in
           let cp_dir =
