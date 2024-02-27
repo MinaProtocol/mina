@@ -60,8 +60,8 @@ resource "helm_release" "block_producers" {
 # Plain nodes
 
 resource "helm_release" "plain_nodes" {
-  provider = helm.testnet_deploy
-  count    = length(local.plain_node_vars)
+  provider   = helm.testnet_deploy
+  count      = length(local.plain_node_vars)
   name       = "${var.testnet_name}-plain-node-${count.index + 1}"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/plain-node" : "plain-node"
@@ -116,8 +116,8 @@ resource "helm_release" "archive_node" {
 # Watchdog
 
 resource "helm_release" "watchdog" {
-  provider   = helm.testnet_deploy
-  count      = var.deploy_watchdog ? 1 : 0
+  provider = helm.testnet_deploy
+  count    = var.deploy_watchdog ? 1 : 0
 
   name       = "${var.testnet_name}-watchdog"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
@@ -135,7 +135,8 @@ resource "helm_release" "watchdog" {
 # zkApps Dashboard
 
 resource "helm_release" "zkapps-dashboard" {
-  provider   = helm.testnet_deploy
+  provider = helm.testnet_deploy
+  count    = 0
 
   name       = "zkapps-dashboard"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
@@ -161,8 +162,8 @@ resource "helm_release" "zkapps-dashboard" {
 # itn orchestrator
 
 resource "helm_release" "itn-orchestrator" {
-  provider   = helm.testnet_deploy
-  count      = var.expose_itn_graphql ? 1 : 0
+  provider = helm.testnet_deploy
+  count    = var.expose_itn_graphql ? 1 : 0
 
   name       = "${var.testnet_name}-itn-orchestrator"
   repository = var.use_local_charts ? "" : local.mina_helm_repo

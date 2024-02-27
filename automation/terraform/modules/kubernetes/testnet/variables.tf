@@ -209,8 +209,11 @@ variable "seed_configs" {
       libp2p_secret_pw    = string
       external_ip         = string,
       enableArchive       = bool,
-      archiveAddress      = string
+      archiveAddress      = string,
       persist_working_dir = bool,
+      nodeSelector = object({
+        preemptible = bool
+      })
     })
   )
   default = []
@@ -226,6 +229,16 @@ variable "log_level" {
 variable "block_producer_key_pass" {
   type    = string
   default = "naughty blue worm"
+}
+
+variable "block_producer_node_selector" {
+  type = object({
+    preemptible = bool
+  })
+  default = {
+    preemptible = false
+  }
+  description = "Helm value that determines if affinities to spots are required during scheduling"
 }
 
 variable "block_producer_configs" {
@@ -265,6 +278,9 @@ variable "snark_coordinators" {
       snark_worker_public_key      = string
       snark_coordinators_host_port = number
       persist_working_dir          = bool
+      nodeSelector = object({
+        preemptible = bool
+      })
   }))
   default = []
 }
@@ -369,6 +385,9 @@ variable "archive_configs" {
       persistenceAccessModes  = list(string)
       spotAllowed             = string
       persist_working_dir     = bool
+      nodeSelector = object({
+        preemptible = bool
+      })
     })
   )
   default = []

@@ -1,0 +1,22 @@
+apiVersion: v2
+name: snark-worker
+description: A Helm chart for Mina Protocol's SNARK worker nodes
+type: application
+version: 1.0.9
+appVersion: 1.16.0
+annotations:
+  artifacthub.io/changes: |
+    - Support spot instances
+dependencies:
+  - name: common-utilities
+    version: "*"
+    repository: "https://coda-charts.storage.googleapis.com"
+icon: https://storage.googleapis.com/coda-charts/Mina_Icon_Secondary_RGB_Black.png
+keywords:
+- snarks
+- zero-knowledge
+- mina
+- testnet
+home: https://minaprotocol.com/
+sources:
+- https://github.com/MinaProtocol/mina/tree/develop/helm/snark-worker

@@ -1,0 +1,23 @@
+apiVersion: v2
+name: block-producer
+description: A Helm chart for Mina Protocol's block producing network nodes
+type: application
+version: 1.0.10
+appVersion: 1.16.0
+annotations:
+  artifacthub.io/changes: |
+    - Support spot instances
+dependencies:
+  - name: common-utilities
+    version: "*"
+    repository: "https://coda-charts.storage.googleapis.com"
+icon: https://storage.googleapis.com/coda-charts/Mina_Icon_Secondary_RGB_Black.png
+keywords:
+- block-producer
+- stake
+- delegate
+- mina
+- testnet
+home: https://minaprotocol.com/
+sources:
+- https://github.com/MinaProtocol/mina/tree/compatible/helm/block-producer
