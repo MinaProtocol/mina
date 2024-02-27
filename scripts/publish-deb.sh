@@ -4,6 +4,8 @@ set -eox pipefail
 CLEAR='\033[0m'
 RED='\033[0;31m'
 
+ARCH=amd64
+
 while [[ "$#" -gt 0 ]]; do case $1 in
   -n|--name) DEB_NAME="$2"; shift;;
   -r|--release) DEB_RELEASE="$2"; shift;;
