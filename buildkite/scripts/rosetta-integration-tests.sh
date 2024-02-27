@@ -66,23 +66,28 @@ mina libp2p generate-keypair -privkey-path $MINA_LIBP2P_KEYPAIR_PATH
 # Configuration
 echo "=========================== GENERATING GENESIS LEDGER FOR ${MINA_NETWORK} ==========================="
 mkdir -p $MINA_KEYS_PATH
-mina advanced generate-keypair --privkey-path $MINA_KEYS_PATH/block-producer.key
-mina advanced generate-keypair --privkey-path $MINA_KEYS_PATH/snark-producer.key
-mina advanced generate-keypair --privkey-path $MINA_KEYS_PATH/zkapp-fee-payer.key
-mina advanced generate-keypair --privkey-path $MINA_KEYS_PATH/zkapp-sender.key
-mina advanced generate-keypair --privkey-path $MINA_KEYS_PATH/zkapp-account.key
-chmod -R 0700 $MINA_KEYS_PATH
-BLOCK_PRODUCER_PK=$(cat $MINA_KEYS_PATH/block-producer.key.pub)
-SNARK_PRODUCER_PK=$(cat $MINA_KEYS_PATH/snark-producer.key.pub)
+BLOCK_PRODUCER_KEY=$MINA_KEYS_PATH/block-producer.key
+SNARK_PRODUCER_KEY=$MINA_KEYS_PATH/snark-producer.key
 ZKAPP_FEE_PAYER_KEY=$MINA_KEYS_PATH/zkapp-fee-payer.key
-ZKAPP_FEE_PAYER_PUB_KEY=$(cat ${ZKAPP_FEE_PAYER_KEY}.pub)
 ZKAPP_SENDER_KEY=$MINA_KEYS_PATH/zkapp-sender.key
-ZKAPP_SENDER_PUB_KEY=$(cat ${ZKAPP_SENDER_KEY}.pub)
 ZKAPP_ACCOUNT_KEY=$MINA_KEYS_PATH/zkapp-account.key
+TIME_VESTING_ACCOUNT_1_KEY=$MINA_KEYS_PATH/time-vesting-account-1.key
+TIME_VESTING_ACCOUNT_2_KEY=$MINA_KEYS_PATH/time-vesting-account-2.key
+keys=($BLOCK_PRODUCER_KEY $SNARK_PRODUCER_KEY $ZKAPP_FEE_PAYER_KEY $ZKAPP_SENDER_KEY $ZKAPP_ACCOUNT_KEY $TIME_VESTING_ACCOUNT_1_KEY $TIME_VESTING_ACCOUNT_2_KEY)
+for key in ${keys[*]}; do
+  mina advanced generate-keypair --privkey-path $key
+done
+chmod -R 0700 $MINA_KEYS_PATH
+BLOCK_PRODUCER_PUB_KEY=$(cat ${BLOCK_PRODUCER_KEY}.pub)
+SNARK_PRODUCER_PK=$(cat ${SNARK_PRODUCER_KEY}.pub)
+ZKAPP_FEE_PAYER_PUB_KEY=$(cat ${ZKAPP_FEE_PAYER_KEY}.pub)
+ZKAPP_SENDER_PUB_KEY=$(cat ${ZKAPP_SENDER_KEY}.pub)
 ZKAPP_ACCOUNT_PUB_KEY=$(cat ${ZKAPP_ACCOUNT_KEY}.pub)
+TIME_VESTING_ACCOUNT_1_PUB_KEY=$(cat ${TIME_VESTING_ACCOUNT_1_KEY}.pub)
+TIME_VESTING_ACCOUNT_2_PUB_KEY=$(cat ${TIME_VESTING_ACCOUNT_2_KEY}.pub)
 
 mkdir -p $MINA_CONFIG_DIR/wallets/store
-cp $MINA_KEYS_PATH/block-producer.key $MINA_CONFIG_DIR/wallets/store/$BLOCK_PRODUCER_PK
+cp ${BLOCK_PRODUCER_KEY} $MINA_CONFIG_DIR/wallets/store/$BLOCK_PRODUCER_PUB_KEY
 CURRENT_TIME=$(date +"%Y-%m-%dT%H:%M:%S%z")
 cat <<EOF >"$MINA_CONFIG_FILE"
 {
@@ -91,24 +96,40 @@ cat <<EOF >"$MINA_CONFIG_FILE"
   "ledger": {
     "name": "${MINA_NETWORK}",
     "accounts": [
-      { "pk": "${BLOCK_PRODUCER_PK}", "balance": "1000000", "delegate": null, "sk": null },
-      { "pk": "${SNARK_PRODUCER_PK}", "balance": "2000000", "delegate": "${BLOCK_PRODUCER_PK}", "sk": null },
+      { "pk": "${BLOCK_PRODUCER_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
+      { "pk": "${SNARK_PRODUCER_PK}", "balance": "2000000", "delegate": "${BLOCK_PRODUCER_PUB_KEY}", "sk": null },
       { "pk": "${ZKAPP_FEE_PAYER_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
       { "pk": "${ZKAPP_SENDER_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
-      { "pk": "${ZKAPP_ACCOUNT_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null }
+      { "pk": "${ZKAPP_ACCOUNT_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
+      { "pk": "${ZKAPP_ACCOUNT_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
+      { "pk": "${TIME_VESTING_ACCOUNT_1_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null, "timing": { "initial_minimum_balance": "1000000", "cliff_time": "10", "cliff_amount": "1000000", "vesting_period": "1", "vesting_increment": "0" } },
+      { "pk": "${TIME_VESTING_ACCOUNT_2_PUB_KEY}", "balance": "2000000", "delegate": null, "sk": null, "timing": { "initial_minimum_balance": "1000000", "cliff_time": "5", "cliff_amount": "1000000", "vesting_period": "1", "vesting_increment": "200000" } }
     ]
   }
 }
 EOF
 
-# Substitute placeholders in rosetta-cli configuration
 ROSETTA_CONFIGURATION_OUTPUT_DIR=/tmp/rosetta-cli-config
 mkdir -p "$ROSETTA_CONFIGURATION_OUTPUT_DIR"
+
+# Create interesting accounts file
+ROSETTA_CLI_INTERESTING_ACCOUNTS_FILENAME=interesting_accounts.json
+ROSETTA_CLI_INTERESTING_ACCOUNTS_FILEPATH="${ROSETTA_CONFIGURATION_OUTPUT_DIR}/${ROSETTA_CLI_INTERESTING_ACCOUNTS_FILENAME}"
+cat <<EOF >"$ROSETTA_CLI_INTERESTING_ACCOUNTS_FILEPATH"
+[
+  { "account_identifier": { "address": "${TIME_VESTING_ACCOUNT_1_PUB_KEY}" }, "currency": { "symbol": "MINA", "decimals": 9 } },
+  { "account_identifier": { "address": "${TIME_VESTING_ACCOUNT_2_PUB_KEY}" }, "currency": { "symbol": "MINA", "decimals": 9 } }
+]
+EOF
+jq -r --arg file ${ROSETTA_CLI_INTERESTING_ACCOUNTS_FILENAME} '.data_directory = $file' "${ROSETTA_CONFIGURATION_INPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}" >"${ROSETTA_CONFIGURATION_INPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}.tmp"
+mv "${ROSETTA_CONFIGURATION_INPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}.tmp" "${ROSETTA_CONFIGURATION_INPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}"
+
+# Substitute placeholders in rosetta-cli configuration
 ROSETTA_CONFIGURATION_FILE="${ROSETTA_CONFIGURATION_OUTPUT_DIR}/${ROSETTA_CLI_MAIN_CONFIG_FILE}"
-BLOCK_PRODUCER_PRIVKEY=$(mina-ocaml-signer hex-of-private-key-file --private-key-path "$MINA_KEYS_PATH/block-producer.key")
+BLOCK_PRODUCER_PRIVKEY=$(mina-ocaml-signer hex-of-private-key-file --private-key-path "${BLOCK_PRODUCER_KEY}")
 for config_file in $ROSETTA_CLI_CONFIG_FILES; do
   sed -e "s/PLACEHOLDER_PREFUNDED_PRIVKEY/${BLOCK_PRODUCER_PRIVKEY}/" \
-    -e "s/PLACEHOLDER_PREFUNDED_ADDRESS/${BLOCK_PRODUCER_PK}/" \
+    -e "s/PLACEHOLDER_PREFUNDED_ADDRESS/${BLOCK_PRODUCER_PUB_KEY}/" \
     -e "s/PLACEHOLDER_ROSETTA_OFFLINE_PORT/${MINA_ROSETTA_OFFLINE_PORT}/" \
     -e "s/PLACEHOLDER_ROSETTA_ONLINE_PORT/${MINA_ROSETTA_ONLINE_PORT}/" \
     -e "s/PLACEHOLDER_NETWORK_NAME/${MINA_NETWORK}/" \
@@ -117,8 +138,8 @@ done
 
 # Import Genesis Accounts
 echo "==================== IMPORTING GENESIS ACCOUNTS ======================"
-mina accounts import --privkey-path $MINA_KEYS_PATH/block-producer.key --config-directory $MINA_CONFIG_DIR
-mina accounts import --privkey-path $MINA_KEYS_PATH/snark-producer.key --config-directory $MINA_CONFIG_DIR
+mina accounts import --privkey-path ${BLOCK_PRODUCER_KEY} --config-directory $MINA_CONFIG_DIR
+mina accounts import --privkey-path ${SNARK_PRODUCER_KEY} --config-directory $MINA_CONFIG_DIR
 
 # Postgres
 echo "========================= INITIALIZING POSTGRESQL ==========================="
@@ -155,7 +176,7 @@ echo "========================= STARTING DAEMON connected to ${MINA_NETWORK} ===
 mina daemon \
   --archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} \
   --background \
-  --block-producer-pubkey "$BLOCK_PRODUCER_PK" \
+  --block-producer-pubkey "$BLOCK_PRODUCER_PUB_KEY" \
   --config-directory ${MINA_CONFIG_DIR} \
   --config-file ${MINA_CONFIG_FILE} \
   --libp2p-keypair ${MINA_LIBP2P_KEYPAIR_PATH} \
@@ -193,16 +214,15 @@ send_zkapp_txn "${ZKAPP_TXN_QUERY}"
 
 # Unlock Genesis Accounts
 echo "==================== UNLOCKING GENESIS ACCOUNTS ======================"
-mina accounts unlock --public-key $BLOCK_PRODUCER_PK
+mina accounts unlock --public-key $BLOCK_PRODUCER_PUB_KEY
 mina accounts unlock --public-key $SNARK_PRODUCER_PK
-
 
 # Start sending value transfer transactions
 send_value_transfer_txns() {
-  mina client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -nonce 0 -receiver $BLOCK_PRODUCER_PK -sender $BLOCK_PRODUCER_PK
+  mina client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -nonce 0 -receiver $BLOCK_PRODUCER_PUB_KEY -sender $BLOCK_PRODUCER_PUB_KEY
   while true; do
     sleep $TRANSACTION_FREQUENCY
-    mina client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -receiver $BLOCK_PRODUCER_PK -sender $BLOCK_PRODUCER_PK
+    mina client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -receiver $BLOCK_PRODUCER_PUB_KEY -sender $BLOCK_PRODUCER_PUB_KEY
   done
 }
 send_value_transfer_txns &
@@ -246,6 +266,18 @@ if [[ "$MODE" == "full" ]]; then
 
   echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
   rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE}
+
+  # wait until block height 11 is reached before starting check:data
+  # so it gives enough time to vest the time-vesting accounts
+  current_block_height=$(mina client status --json | jq -r '.blockchain_length')
+  while [[ ${current_block_height} -lt 11 ]]; do
+    current_block_height=$(mina client status --json | jq -r '.blockchain_length')
+    echo "Waiting for block height 11 to be reached..."
+    echo "Current block height is: ${current_block_height}"
+    sleep 30
+  done
+
+  echo "========================= ROSETTA CLI: CHECK:DATA ==========================="
 
   echo "========================= ROSETTA CLI: CHECK:DATA ==========================="
   rosetta-cli check:data --configuration-file ${ROSETTA_CONFIGURATION_FILE}

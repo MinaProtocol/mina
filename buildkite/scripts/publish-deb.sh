@@ -66,13 +66,15 @@ function verify_size_and_md5 {
 
 }
 
-case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
-  rampup|berkeley|release/2.0.0|develop)
-    TESTNET_NAME="berkeley"
-  ;;
-  *)
-    TESTNET_NAME="mainnet"
-esac
+if [ -z ${TESTNET_NAME+x} ]; then
+  case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
+    rampup|berkeley|release/2.0.0|develop)
+      TESTNET_NAME="berkeley"
+    ;;
+    *)
+      TESTNET_NAME="mainnet"
+  esac
+fi
 
 # In order to prevent anyone to use freshly pushed packages prematurely we need to be sure those packages has correct
 # md5 and sizes before finishing script
