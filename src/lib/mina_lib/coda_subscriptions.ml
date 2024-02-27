@@ -14,6 +14,11 @@ module Optional_public_key = struct
   include Hashable.Make (T)
 end
 
+module Precomputed_block_writer = struct
+  type t = { file : string option; dir : string option; log : bool }
+  [@@deriving fields]
+end
+
 type t =
   { subscribed_payment_users :
       Signed_command.t reader_and_writer Public_key.Compressed.Table.t
@@ -98,16 +103,56 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
               Pipe.write_without_pushback writer { With_hash.data; hash } ) )
       ~if_not_found:ignore
   in
+  let dump_precomputed_blocks =
+    is_some (!precomputed_block_writer : Precomputed_block_writer.t).dir
+  in
+  let network =
+    match Core.Sys.getenv "NETWORK_NAME" with
+    | Some network ->
+        if upload_blocks_to_gcloud || dump_precomputed_blocks then
+          [%log info] "NETWORK_NAME environment variable set to %s" network ;
+        network
+    | _ ->
+        if upload_blocks_to_gcloud || dump_precomputed_blocks then
+          [%log warn]
+            "NETWORK_NAME environment variable not set. Default to 'mainnet'" ;
+        "mainnet"
+  in
   let gcloud_keyfile =
     match Core.Sys.getenv "GCLOUD_KEYFILE" with
     | Some keyfile ->
+        if upload_blocks_to_gcloud then
+          [%log info] "GCLOUD_KEYFILE environment variable set to %s" keyfile ;
         Some keyfile
     | _ ->
-        [%log warn]
-          "GCLOUD_KEYFILE environment variable not set. Must be set to use \
-           upload_blocks_to_gcloud" ;
+        if upload_blocks_to_gcloud then
+          [%log warn]
+            "GCLOUD_KEYFILE environment variable not set. Must be set to use \
+             upload_blocks_to_gcloud" ;
         None
   in
+  let gcloud_bucket =
+    match Core.Sys.getenv "GCLOUD_BLOCK_UPLOAD_BUCKET" with
+    | Some bucket ->
+        if upload_blocks_to_gcloud then
+          [%log info]
+            "GCLOUD_BLOCK_UPLOAD_BUCKET environment variable set to %s" bucket ;
+        Some bucket
+    | _ ->
+        if upload_blocks_to_gcloud then
+          [%log warn]
+            "GCLOUD_BLOCK_UPLOAD_BUCKET environment variable not set. Must be \
+             set to use upload_blocks_to_gcloud" ;
+        None
+  in
+  Option.iter !precomputed_block_writer.file ~f:(fun path ->
+      [%log info]
+        ~metadata:[ ("path", `String path) ]
+        "Precomputed blocks will be logged to the same file $path" ) ;
+  Option.iter !precomputed_block_writer.dir ~f:(fun path ->
+      [%log info]
+        ~metadata:[ ("path", `String path) ]
+        "Precomputed blocks will be logged to individual files in $path" ) ;
   Option.iter gcloud_keyfile ~f:(fun path ->
       ignore
         ( Core.Sys.command
@@ -121,7 +166,9 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
             Mina_block.Validated.forget new_block
             |> State_hash.With_state_hashes.state_hash
           in
-          (let path, log = !precomputed_block_writer in
+          (let Precomputed_block_writer.{ file; dir; log } =
+             !precomputed_block_writer
+           in
            let precomputed_block =
              lazy
                (let scheduled_time = Block_time.now time_controller in
@@ -132,31 +179,11 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                 in
                 Precomputed.to_yojson precomputed_block )
            in
-           if upload_blocks_to_gcloud then (
-             [%log info] "log" ;
+           (* Upload precomputed blocks to gcloud *)
+           ( if upload_blocks_to_gcloud then
              let json = Yojson.Safe.to_string (Lazy.force precomputed_block) in
-             let network =
-               match Core.Sys.getenv "NETWORK_NAME" with
-               | Some network ->
-                   Some network
-               | _ ->
-                   [%log warn]
-                     "NETWORK_NAME environment variable not set. Must be set \
-                      to use upload_blocks_to_gcloud" ;
-                   None
-             in
-             let bucket =
-               match Core.Sys.getenv "GCLOUD_BLOCK_UPLOAD_BUCKET" with
-               | Some bucket ->
-                   Some bucket
-               | _ ->
-                   [%log warn]
-                     "GCLOUD_BLOCK_UPLOAD_BUCKET environment variable not set. \
-                      Must be set to use upload_blocks_to_gcloud" ;
-                   None
-             in
-             match (gcloud_keyfile, network, bucket) with
-             | Some _, Some network, Some bucket ->
+             match (gcloud_keyfile, gcloud_bucket) with
+             | Some _, Some bucket ->
                  let hash_string = State_hash.to_base58_check hash in
                  let height =
                    Mina_block.Validated.forget new_block
@@ -166,6 +193,13 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                  let name =
                    sprintf "%s-%s-%s.json" network height hash_string
                  in
+                 [%log info]
+                   ~metadata:
+                     [ ("hash", `String hash_string)
+                     ; ("height", `String height)
+                     ; ("bucket", `String bucket)
+                     ]
+                   "Uploading precomputed block with $hash to gcloud $bucket" ;
                  (* TODO: Use a pipe to queue this if these are building up *)
                  don't_wait_for
                    ( Mina_metrics.(
@@ -217,16 +251,38 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                    )
              | _ ->
                  () ) ;
-           Option.iter path ~f:(fun (`Path path) ->
+           (* Write precomputed blocks locally *)
+           Option.iter file ~f:(fun path ->
+               let json =
+                 Yojson.Safe.to_string (Lazy.force precomputed_block)
+               in
+               (* original functionality, appends to single file *)
                Out_channel.with_file ~append:true path ~f:(fun out_channel ->
-                   Out_channel.output_lines out_channel
-                     [ Yojson.Safe.to_string (Lazy.force precomputed_block) ] ) ) ;
+                   Out_channel.output_lines out_channel [ json ] ) ) ;
+           Option.iter dir ~f:(fun path ->
+               (* write precomputed blocks to individual files in the directory *)
+               let json =
+                 Yojson.Safe.to_string (Lazy.force precomputed_block)
+               in
+               let hash_string = State_hash.to_base58_check hash in
+               let height =
+                 Mina_block.Validated.forget new_block
+                 |> With_hash.data |> Mina_block.blockchain_length
+                 |> Mina_numbers.Length.to_string
+               in
+               let name = sprintf "%s-%s-%s.json" network height hash_string in
+               let fpath = Core.Filename.(parts path @ [ name ] |> of_parts) in
+               Out_channel.with_file ~append:false fpath ~f:(fun out_channel ->
+                   Out_channel.output_lines out_channel [ json ] ) ;
+               [%log info]
+                 ~metadata:[ ("block", `String name); ("path", `String path) ]
+                 "Logged precomputed $block to $path" ) ;
            [%log info] "Saw block with state hash $state_hash"
              ~metadata:
                (let state_hash_data =
                   [ ("state_hash", `String (State_hash.to_base58_check hash)) ]
                 in
-                if is_some log then
+                if log then
                   state_hash_data
                   @ [ ("precomputed_block", Lazy.force precomputed_block) ]
                 else state_hash_data ) ) ;
