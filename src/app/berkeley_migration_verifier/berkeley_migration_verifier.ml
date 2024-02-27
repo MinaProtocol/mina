@@ -440,6 +440,15 @@ let compare_migrated_replayer_output ~migrated_replayer_output ~fork_config_file
     (Check.combine
        [ download_check; update_perms_check; copy_files; run_check ] )
 
+
+let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri ()= 
+  Deferred.Or_error.ok_unit
+
+  
+let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri ~migrated_replayer_output
+~fork_config_file () =
+  Deferred.Or_error.ok_unit
+
 let main ~mainnet_archive_uri ~migrated_archive_uri ~migrated_replayer_output
     ~fork_config_file () =
   let fork_config =
@@ -487,30 +496,59 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~migrated_replayer_output
          !exit_code )
   else Deferred.Or_error.ok_unit
 
-let () =
-  Async_command.(
-    run
-      (let open Let_syntax in
-      Async_command.async_or_error
-        ~summary:"Verifye migrated mainnet archive with original one"
-        (let%map mainnet_archive_uri =
-           Param.flag "--mainnet-archive-uri"
-             ~doc:"URI URI for connecting to the mainnet archive database"
-             Param.(required string)
-         and migrated_archive_uri =
-           Param.flag "--migrated-archive-uri"
-             ~doc:"URI URI for connecting to the migrated archive database"
-             Param.(required string)
-         and migrated_replayer_output =
-           Param.flag "--migrated-replayer-output"
-             ~aliases:[ "-migrated-replayer-output" ]
-             Param.(required string)
-             ~doc:"Path Path to migrated replayer output"
-         and fork_config_file =
-           Param.flag "--fork-config-file" ~aliases:[ "-fork-config-file" ]
-             Param.(required string)
-             ~doc:"String Path to fork config file"
-         in
 
-         main ~mainnet_archive_uri ~migrated_archive_uri
-           ~migrated_replayer_output ~fork_config_file )))
+
+let incremental_migration_command =
+  let open Command.Param in
+    Command.async_or_error
+        ~summary:"Verify migrated mainnet archive with original one"
+        (let open Command.Let_syntax in
+        let%map mainnet_archive_uri =
+        Command. Param.flag "--mainnet-archive-uri"
+             ~doc:"URI URI for connecting to the mainnet archive database"
+             Command.  Param.(required string)
+         and migrated_archive_uri =
+          Command. Param.flag "--migrated-archive-uri"
+             ~doc:"URI URI for connecting to the migrated archive database"
+             Command. Param.(required string)
+         in
+         pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
+        )
+  
+let post_fork_migration_command = 
+  let open Command.Param in
+  Command.async_or_error
+      ~summary:"Verifye migrated mainnet archive with original one"
+      (let open Command.Let_syntax in
+      
+      let%map mainnet_archive_uri =
+      Command.Param.flag "--mainnet-archive-uri"
+           ~doc:"URI URI for connecting to the mainnet archive database"
+           Command.Param.(required string)
+       and migrated_archive_uri =
+        Command.Param.flag "--migrated-archive-uri"
+           ~doc:"URI URI for connecting to the migrated archive database"
+           Command.Param.(required string)
+       and migrated_replayer_output =
+        Command.Param.flag "--migrated-replayer-output"
+           ~aliases:[ "-migrated-replayer-output" ]
+           Command.Param.(required string)
+           ~doc:"Path Path to migrated replayer output"
+       and fork_config_file =
+        Command. Param.flag "--fork-config-file" ~aliases:[ "-fork-config-file" ]
+        Command.Param.(required string)
+           ~doc:"String Path to fork config file"
+       in
+
+       post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
+         ~migrated_replayer_output ~fork_config_file )
+
+let commands =
+  [ ( "incremental", incremental_migration_command )
+    ; ( "post-fork", post_fork_migration_command )
+  ]
+
+let () =
+  Async_command.run
+    (Async_command.group ~summary:"Berkeley migration verifier"
+       ~preserve_subcommand_order:() commands )
