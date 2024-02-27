@@ -14,12 +14,8 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     exit 0
 fi
 
-for deb in $DEBS
-do
-  source scripts/publish-deb.sh \
-  --name $deb \
+source scripts/publish-deb.sh \
+  --names $DEBS \
   --release $MINA_DEB_RELEASE \
   --version $MINA_DEB_VERSION \
   --codename $MINA_DEB_CODENAME  
-done
-
