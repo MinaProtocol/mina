@@ -8,9 +8,9 @@ type t = { uuid : uuid; db : (Rocks.t[@sexp.opaque]) } [@@deriving sexp]
 
 type db := t
 
-(** [create filename] creates a database contained in [filename]. 
+(** [create dirname] creates a database contained in [dirname]. 
 
-    @param filename will be created if it does not exist
+    @param dirname will be created if it does not exist
  *)
 val create : string -> t
 
