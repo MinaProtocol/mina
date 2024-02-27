@@ -37,7 +37,7 @@ fi
 source_build_fallback() {
     if [ ! -e "$1" ]; then
         if [ ! -e "$2" ]; then
-            echo "Error: not find useable $1 or $2" >&2
+            echo "Error: did not find useable $1 or $2" >&2
             exit 1
         else
             echo "$2"
