@@ -11,7 +11,7 @@ in
 
 Pipeline.build 
     (ArtifactPipelines.pipeline 
-        [ Artifact.Daemon , Artifact.Archive , Artifact.ArchiveMigration ,Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
+        [ Artifacts.Type.Daemon , Artifacts.Type.Archive , Artifacts.Type.ArchiveMigration ,Artifacts.Type.BatchTxn , Artifacts.Type.TestExecutive , Artifacts.Type.Rosetta , Artifacts.Type.ZkappTestTransaction ]
         DebianVersions.DebVersion.Buster 
         Profiles.Type.Standard 
         PipelineMode.Type.PullRequest

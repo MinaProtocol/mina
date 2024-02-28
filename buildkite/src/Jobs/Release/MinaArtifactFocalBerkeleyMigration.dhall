@@ -11,7 +11,7 @@ in
 
 Pipeline.build 
     (ArtifactPipelines.pipeline 
-        [ Artifacts.Type.BerkeleyMigration ]
+        [ Artifacts.Type.ArchiveMigration ]
         DebianVersions.DebVersion.Focal 
         Profiles.Type.BerkeleyMigration
         PipelineMode.Type.PullRequest
