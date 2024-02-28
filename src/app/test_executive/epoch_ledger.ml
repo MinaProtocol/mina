@@ -16,8 +16,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   type dsl = Dsl.t
 
   let fork_config : Runtime_config.Fork_config.t =
-    { state_hash =
-        "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
+    { state_hash = "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
     ; blockchain_length = 300000
     ; global_slot_since_genesis = 500000
     }
