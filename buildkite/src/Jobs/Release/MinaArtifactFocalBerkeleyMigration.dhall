@@ -11,8 +11,8 @@ in
 
 Pipeline.build 
     (ArtifactPipelines.pipeline 
-        [ Artifact.Daemon , Artifact.Archive , Artifact.ArchiveMigration ,Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
-        DebianVersions.DebVersion.Buster 
-        Profiles.Type.Standard 
+        [ Artifacts.Type.BerkeleyMigration ]
+        DebianVersions.DebVersion.Focal 
+        Profiles.Type.BerkeleyMigration
         PipelineMode.Type.PullRequest
     )

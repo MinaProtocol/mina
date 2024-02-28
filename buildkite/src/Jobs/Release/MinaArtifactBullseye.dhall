@@ -11,7 +11,8 @@ in
 
 Pipeline.build 
     (ArtifactPipelines.pipeline 
-        Artifacts.All
+        [ Artifact.Daemon , Artifact.Archive, Artifact.BatchTxn , Artifact.TestExecutive ,
+          Artifact.Rosetta , Artifact.ZkappTestTransaction, Artifact.FunctionalTestSuite ]
         DebianVersions.DebVersion.Bullseye 
         Profiles.Type.Standard 
         PipelineMode.Type.PullRequest

@@ -2,16 +2,15 @@ let Prelude = ../External/Prelude.dhall
 let Text/concatSep = Prelude.Text.concatSep
 let Profiles = ./Profiles.dhall
 
-let Artifact : Type  = < Daemon | Archive | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
+let Artifact : Type  = < Daemon | Archive | ArchiveMigration | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
 
-let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
-
-let All = AllButTests # [ Artifact.FunctionalTestSuite ]
+let All = [ Artifact.Daemon , Artifact.Archive , Artifact.ArchiveMigration ,Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction, Artifact.FunctionalTestSuite ]
 
 let capitalName = \(artifact : Artifact) ->
   merge {
     Daemon = "Daemon"
     , Archive = "Archive"
+    , ArchiveMigration = "ArchiveMigration"
     , TestExecutive = "TestExecutive"
     , BatchTxn = "BatchTxn"
     , Rosetta = "Rosetta"
@@ -23,6 +22,7 @@ let lowerName = \(artifact : Artifact) ->
   merge {
     Daemon = "daemon"
     , Archive = "archive"
+    , ArchiveMigration = "archive_migration"
     , TestExecutive = "test_executive"
     , BatchTxn = "batch_txn"
     , Rosetta = "rosetta"
@@ -36,6 +36,7 @@ let toDebianName = \(artifact : Artifact) ->
   merge {
     Daemon = "daemon"
     , Archive = "archive"
+    , ArchiveMigration  = "archive_migration"
     , TestExecutive = "test_executive"
     , BatchTxn = "batch_txn"
     , Rosetta = "" 
@@ -59,6 +60,5 @@ in
   , lowerName = lowerName
   , toDebianName = toDebianName
   , toDebianNames = toDebianNames
-  , All = All 
-  , AllButTests = AllButTests 
+  , All = All
 }
