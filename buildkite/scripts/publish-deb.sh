@@ -1,12 +1,8 @@
 #!/bin/bash
 set -eo pipefail
 
-DEBS='_build/mina-*.deb'
-
-set +x
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 source "${SCRIPTPATH}/export-git-env-vars.sh"
-set -x
 
 # check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
@@ -15,7 +11,7 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
 fi
 
 source scripts/publish-deb.sh \
-  --names $DEBS \
+  --names '_build/mina-*.deb' \
   --release $MINA_DEB_RELEASE \
   --version $MINA_DEB_VERSION \
   --codename $MINA_DEB_CODENAME  
