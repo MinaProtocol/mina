@@ -30,9 +30,9 @@ function usage() {
 }
 
 if [[ -z "$DEB_NAMES" ]]; then usage "Debian(s) to upload are not set!"; fi;
-if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
-if [[ -z "$CODENAME" ]]; then usage "Codename is not set!"; fi;
-if [[ -z "$RELEASE" ]]; then usage "Release is not set!"; fi;
+if [[ -z "$DEB_VERSION" ]]; then usage "Version is not set!"; fi;
+if [[ -z "$DEB_CODENAME" ]]; then usage "Codename is not set!"; fi;
+if [[ -z "$DEB_RELEASE" ]]; then usage "Release is not set!"; fi;
 
 
 BUCKET_ARG='--bucket packages.o1test.net'
