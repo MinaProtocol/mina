@@ -48,29 +48,31 @@ else
   export GITTAG=$(find_most_recent_numeric_tag HEAD)
 
   # Determine deb repo to use
-  case $GITBRANCH in
-      berkeley|rampup|compatible|master|release*) # whitelist of branches that can be tagged
-          case "${THIS_COMMIT_TAG}" in
-            *alpha*) # any tag including the string `alpha`
-              RELEASE=alpha ;;
-            *beta*) # any tag including the string `beta`
-              RELEASE=beta ;;
-            *berkeley*) # any tag including the string `berkeley`
-              RELEASE=berkeley ;;
-            *rampup*) # any tag including the string `rampup`
-              RELEASE=rampup ;;
-            ?*) # Any other non-empty tag. ? matches a single character and * matches 0 or more characters.
-              RELEASE=stable ;;
-            "") # No tag
-              RELEASE=unstable ;;
-            *) # The above set of cases should be exhaustive, if they're not then still set RELEASE=unstable
-              RELEASE=unstable
-              echo "git tag --points-at HEAD may have failed, falling back to unstable. Value: \"$(git tag --points-at HEAD)\""
-              ;;
-          esac ;;
-      *)
-          RELEASE=unstable ;;
-  esac
+  if [ -z ${RELEASE+x} ]; then
+    case $GITBRANCH in
+        berkeley|rampup|compatible|master|release*) # whitelist of branches that can be tagged
+            case "${THIS_COMMIT_TAG}" in
+              *alpha*) # any tag including the string `alpha`
+                RELEASE=alpha ;;
+              *beta*) # any tag including the string `beta`
+                RELEASE=beta ;;
+              *berkeley*) # any tag including the string `berkeley`
+                RELEASE=berkeley ;;
+              *rampup*) # any tag including the string `rampup`
+                RELEASE=rampup ;;
+              ?*) # Any other non-empty tag. ? matches a single character and * matches 0 or more characters.
+                RELEASE=stable ;;
+              "") # No tag
+                RELEASE=unstable ;;
+              *) # The above set of cases should be exhaustive, if they're not then still set RELEASE=unstable
+                RELEASE=unstable
+                echo "git tag --points-at HEAD may have failed, falling back to unstable. Value: \"$(git tag --points-at HEAD)\""
+                ;;
+            esac ;;
+        *)
+            RELEASE=unstable ;;
+    esac
+  fi
 fi
 
 if [[ -n "${THIS_COMMIT_TAG}" ]]; then # If the commit is tagged
