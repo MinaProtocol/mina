@@ -219,7 +219,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             service="mina-archive-migration",
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_profile="${Profiles.lowerName profile}",
-            step_key="archive-migration-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
+            step_key="archive-migration-${DebianVersions.lowerName debVersion}-docker-image"
           },
           
         Rosetta = 
