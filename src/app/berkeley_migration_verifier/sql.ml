@@ -363,22 +363,20 @@ module Berkeley = struct
   let dump_user_command_info_to_csv_query ~output_file ~height =
     (* Workaround for replacing output file as caqti has an issue with using ? in place of FILE argument*)
     let sql =
-      "\n\
-      \    COPY\n\
-      \    ( WITH user_command_ids AS \n\
-      \      ( SELECT user_command_id FROM blocks_user_commands \n\
-      \        INNER JOIN blocks ON blocks.id = block_id \n\
-      \        WHERE chain_status = 'canonical' \n\
-      \        AND height <= HEIGHT ORDER BY height, sequence_no \n\
-      \      ) \n\
-      \      SELECT receiver_keys.value, fee_payer_keys.value, nonce, amount, \
-       fee, valid_until, memo, hash FROM user_commands \n\
-      \      INNER JOIN user_command_ids ON user_command_id = id\n\
-      \      INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
-       receiver_keys.id\n\
-      \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
-       fee_payer_keys.id \n\
-      \    ) TO 'OUTPUT' DELIMITER ',' CSV HEADER\n\
+      "
+      COPY
+    ( WITH user_command_ids AS
+      ( SELECT height, sequence_no, user_command_id FROM blocks_user_commands
+        INNER JOIN blocks ON blocks.id = block_id
+        WHERE chain_status = 'canonical'
+        AND height <= HEIGHT
+      )
+      SELECT receiver_keys.value, fee_payer_keys.value, nonce, amount, fee, valid_until, memo, hash FROM user_commands
+      INNER JOIN user_command_ids ON user_command_id = id
+      INNER JOIN public_keys AS receiver_keys  ON receiver_id  = receiver_keys.id
+      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = fee_payer_keys.id ORDER BY height, sequence_no
+    ) TO 'OUTPUT' DELIMITER ',' CSV HEADER
+    
       \  "
       |> Str.global_replace (Str.regexp_string "OUTPUT") output_file
       |> Str.global_replace (Str.regexp_string "HEIGHT") (Int.to_string height)
@@ -400,14 +398,14 @@ module Berkeley = struct
        secondary_sequence_no FROM blocks_internal_commands \n\
       \        INNER JOIN blocks ON blocks.id = block_id \n\
       \        WHERE chain_status = 'canonical'\n\
-      \        AND height <= HEIGHT\n\
+      \        AND height <= HEIGHT \n\
       \      ) \n\
       \      SELECT receiver_keys.value, fee, sequence_no, \
        secondary_sequence_no, hash FROM internal_commands \n\
       \      INNER JOIN internal_command_ids ON internal_command_id = id\n\
       \      INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
        receiver_keys.id\n\
-      \      ORDER BY height, sequence_no, secondary_sequence_no, command_type \n\
+      \      ORDER BY height, sequence_no \n\
       \    ) TO 'OUTPUT' DELIMITER ',' CSV HEADER\n\
       \  "
       |> Str.global_replace (Str.regexp_string "OUTPUT") output_file

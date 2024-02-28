@@ -99,7 +99,9 @@ let diff_files left right =
   with
   | Ok output ->
       if String.is_empty output then return Check.ok
-      else return (Check.err (sprintf "Discrepancies found:"))
+      else return (Check.err (sprintf "Discrepancies found between files %s and %s. To reproduce please run `diff %s %s`"
+        left right left right
+      ))
   | Error error ->
       return
         (Check.err
