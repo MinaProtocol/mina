@@ -1,6 +1,88 @@
 open Caqti_async
 
 module Mainnet = struct
+  let dump_state_and_ledger_hashes_to_csv_query ~output_file ~height =
+    (* Workaround for replacing output file as caqti has an issue with using ? in place of FILE argument*)
+    let sql =
+      " \n\
+      \      COPY \n\
+      \    ( SELECT state_hash, ledger_hash FROM blocks \n\
+      \      WHERE chain_status = 'canonical'\n\
+      \      AND height <= HEIGHT ORDER BY height\n\
+      \    ) TO 'OUTPUT' DELIMITER ',' CSV HEADER   \n\
+      \    "
+      |> Str.global_replace (Str.regexp_string "OUTPUT") output_file
+      |> Str.global_replace (Str.regexp_string "HEIGHT") (Int.to_string height)
+    in
+
+    Caqti_request.exec Caqti_type.unit sql
+
+  let dump_state_and_ledger_hashes_to_csv (module Conn : CONNECTION) output_file
+      height =
+    Conn.exec
+      (dump_state_and_ledger_hashes_to_csv_query ~output_file ~height)
+      ()
+
+  let dump_user_command_info_to_csv_query ~output_file ~height =
+    (* Workaround for replacing output file as caqti has an issue with using ? in place of FILE argument*)
+    let sql =
+      "\n\
+      \    COPY\n\
+      \    ( WITH user_command_ids AS \n\
+      \      ( SELECT user_command_id FROM blocks_user_commands \n\
+      \        INNER JOIN blocks ON blocks.id = block_id \n\
+      \        WHERE chain_status = 'canonical' \n\
+      \        AND height <= HEIGHT ORDER BY height, sequence_no \n\
+      \      ) \n\
+      \      SELECT receiver_keys.value, fee_payer_keys.value, nonce, amount, \
+       fee, valid_until, memo, hash FROM user_commands \n\
+      \      INNER JOIN user_command_ids ON user_command_id = id\n\
+      \      INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
+       receiver_keys.id\n\
+      \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
+       fee_payer_keys.id \n\
+      \    ) TO 'OUTPUT' DELIMITER ',' CSV HEADER\n\
+      \  "
+      |> Str.global_replace (Str.regexp_string "OUTPUT") output_file
+      |> Str.global_replace (Str.regexp_string "HEIGHT") (Int.to_string height)
+    in
+
+    Caqti_request.exec Caqti_type.unit sql
+
+  let dump_user_command_info_to_csv (module Conn : CONNECTION) output_file
+      height =
+    Conn.exec (dump_user_command_info_to_csv_query ~output_file ~height) ()
+
+  let dump_internal_command_info_to_csv_query ~output_file ~height =
+    (* Workaround for replacing output file as caqti has an issue with using ? in place of FILE argument*)
+    let sql =
+      "\n\
+      \      COPY\n\
+      \      ( WITH internal_command_ids AS \n\
+      \        ( SELECT internal_command_id, height, sequence_no, \
+       secondary_sequence_no FROM blocks_internal_commands \n\
+      \          INNER JOIN blocks ON blocks.id = block_id \n\
+      \          WHERE chain_status = 'canonical'\n\
+      \          AND height <= HEIGHT\n\
+      \        ) \n\
+      \        SELECT receiver_keys.value, fee, sequence_no, \
+       secondary_sequence_no, hash FROM internal_commands \n\
+      \        INNER JOIN internal_command_ids ON internal_command_id = id\n\
+      \        INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
+       receiver_keys.id\n\
+      \        ORDER BY height, sequence_no, secondary_sequence_no, type \n\
+      \      ) TO 'OUTPUT' DELIMITER ',' CSV HEADER\n\
+      \    "
+      |> Str.global_replace (Str.regexp_string "OUTPUT") output_file
+      |> Str.global_replace (Str.regexp_string "HEIGHT") (Int.to_string height)
+    in
+
+    Caqti_request.exec Caqti_type.unit sql
+
+  let dump_internal_command_info_to_csv (module Conn : CONNECTION) output_file
+      height =
+    Conn.exec (dump_internal_command_info_to_csv_query ~output_file ~height) ()
+
   let latest_state_hash_before_slot_query =
     Caqti_request.find_opt Caqti_type.int Caqti_type.string
       {sql| 
@@ -161,16 +243,13 @@ module Mainnet = struct
 end
 
 module Berkeley = struct
-  
   let height_query =
-    Caqti_request.find Caqti_type.unit
-      Caqti_type.int
+    Caqti_request.find Caqti_type.unit Caqti_type.int
       {sql| 
             SELECT height from blocks order by height desc limit 1;
           |sql}
 
-  let block_height (module Conn : CONNECTION)  =
-    Conn.find height_query ()
+  let block_height (module Conn : CONNECTION) = Conn.find height_query ()
 
   let canonical_blocks_count_till_height_query =
     Caqti_request.find Caqti_type.int Caqti_type.int
@@ -188,7 +267,7 @@ module Berkeley = struct
       |sql}
 
   let canonical_blocks_count_till_height (module Conn : CONNECTION) height =
-    Conn.find canonical_blocks_count_till_height_query height 
+    Conn.find canonical_blocks_count_till_height_query height
 
   let blocks_count_query =
     Caqti_request.find Caqti_type.unit Caqti_type.int
@@ -196,8 +275,150 @@ module Berkeley = struct
           SELECT count(*) FROM blocks ;
         |sql}
 
-  let blocks_count (module Conn : CONNECTION)  =
-    Conn.find blocks_count_query ()
+  let blocks_count (module Conn : CONNECTION) = Conn.find blocks_count_query ()
+
+  let dump_internal_accounts_to_csv_query ~output_file =
+    (* Workaround for replacing output file as caqti has an issue with using ? in place of FILE argument*)
+    let sql =
+      Str.global_replace
+        (Str.regexp_string "OUTPUT")
+        output_file
+        "COPY\n\
+        \      (\n\
+        \        ( \n\
+        \          WITH user_command_ids AS\n\
+        \          ( SELECT user_command_id, block_id FROM blocks_user_commands\n\
+        \            INNER JOIN blocks ON id = block_id\n\
+        \            WHERE chain_status = 'canonical'\n\
+        \          )\n\
+        \          SELECT account_identifiers.id, block_id FROM user_command_ids\n\
+        \          INNER JOIN user_commands ON id = user_command_id\n\
+        \          INNER JOIN account_identifiers ON public_key_id = receiver_id\n\
+        \                                        OR public_key_id = fee_payer_id\n\
+        \        )\n\
+        \          UNION\n\
+        \        (\n\
+        \          WITH internal_command_ids AS\n\
+        \          ( SELECT internal_command_id, block_id FROM \
+         blocks_internal_commands\n\
+        \            INNER JOIN blocks ON id = block_id\n\
+        \            WHERE chain_status = 'canonical'\n\
+        \          ) \n\
+        \          SELECT account_identifiers.id, block_id FROM \
+         internal_command_ids\n\
+        \          INNER JOIN internal_commands ON id = internal_command_id\n\
+        \          INNER JOIN account_identifiers ON public_key_id = receiver_id\n\
+        \        ) ORDER BY block_id, id\n\
+        \      ) TO 'OUTPUT' DELIMITER ',' CSV HEADER\n\
+        \    "
+    in
+
+    Caqti_request.exec Caqti_type.unit sql
+
+  let dump_internal_accounts_to_csv (module Conn : CONNECTION) output_file =
+    Conn.exec (dump_internal_accounts_to_csv_query ~output_file) ()
+
+  let dump_account_accessed_to_csv_query ~output_file =
+    (* Workaround for replacing output file as caqti has an issue with using ? in place of FILE argument*)
+    let sql =
+      Str.global_replace
+        (Str.regexp_string "OUTPUT")
+        output_file
+        " \n\
+        \          COPY\n\
+        \          ( SELECT account_identifier_id AS id, block_id \n\
+        \            FROM accounts_accessed \n\
+        \            ORDER BY block_id, id \n\
+        \          ) TO 'OUTPUT' DELIMITER ',' CSV HEADER\n\
+        \        "
+    in
+
+    Caqti_request.exec Caqti_type.unit sql
+
+  let dump_accounts_accessed_to_csv (module Conn : CONNECTION) output_file =
+    Conn.exec (dump_account_accessed_to_csv_query ~output_file) ()
+
+  let dump_state_and_ledger_hashes_to_csv_query ~output_file ~height =
+    (* Workaround for replacing output file as caqti has an issue with using ? in place of FILE argument*)
+    let sql =
+      " \n\
+      \    COPY \n\
+      \  ( SELECT state_hash, ledger_hash FROM blocks \n\
+      \    WHERE chain_status = 'canonical'\n\
+      \    AND height <= HEIGHT ORDER BY height\n\
+      \  ) TO 'OUTPUT' DELIMITER ',' CSV HEADER   \n\
+      \  "
+      |> Str.global_replace (Str.regexp_string "OUTPUT") output_file
+      |> Str.global_replace (Str.regexp_string "HEIGHT") (Int.to_string height)
+    in
+
+    Caqti_request.exec Caqti_type.unit sql
+
+  let dump_state_and_ledger_hashes_to_csv (module Conn : CONNECTION) output_file
+      height =
+    Conn.exec
+      (dump_state_and_ledger_hashes_to_csv_query ~output_file ~height)
+      ()
+
+  let dump_user_command_info_to_csv_query ~output_file ~height =
+    (* Workaround for replacing output file as caqti has an issue with using ? in place of FILE argument*)
+    let sql =
+      "\n\
+      \    COPY\n\
+      \    ( WITH user_command_ids AS \n\
+      \      ( SELECT user_command_id FROM blocks_user_commands \n\
+      \        INNER JOIN blocks ON blocks.id = block_id \n\
+      \        WHERE chain_status = 'canonical' \n\
+      \        AND height <= HEIGHT ORDER BY height, sequence_no \n\
+      \      ) \n\
+      \      SELECT receiver_keys.value, fee_payer_keys.value, nonce, amount, \
+       fee, valid_until, memo, hash FROM user_commands \n\
+      \      INNER JOIN user_command_ids ON user_command_id = id\n\
+      \      INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
+       receiver_keys.id\n\
+      \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
+       fee_payer_keys.id \n\
+      \    ) TO 'OUTPUT' DELIMITER ',' CSV HEADER\n\
+      \  "
+      |> Str.global_replace (Str.regexp_string "OUTPUT") output_file
+      |> Str.global_replace (Str.regexp_string "HEIGHT") (Int.to_string height)
+    in
+
+    Caqti_request.exec Caqti_type.unit sql
+
+  let dump_user_command_info_to_csv (module Conn : CONNECTION) output_file
+      height =
+    Conn.exec (dump_user_command_info_to_csv_query ~output_file ~height) ()
+
+  let dump_internal_command_info_to_csv_query ~output_file ~height =
+    (* Workaround for replacing output file as caqti has an issue with using ? in place of FILE argument*)
+    let sql =
+      "\n\
+      \    COPY\n\
+      \    ( WITH internal_command_ids AS \n\
+      \      ( SELECT internal_command_id, height, sequence_no, \
+       secondary_sequence_no FROM blocks_internal_commands \n\
+      \        INNER JOIN blocks ON blocks.id = block_id \n\
+      \        WHERE chain_status = 'canonical'\n\
+      \        AND height <= HEIGHT\n\
+      \      ) \n\
+      \      SELECT receiver_keys.value, fee, sequence_no, \
+       secondary_sequence_no, hash FROM internal_commands \n\
+      \      INNER JOIN internal_command_ids ON internal_command_id = id\n\
+      \      INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
+       receiver_keys.id\n\
+      \      ORDER BY height, sequence_no, secondary_sequence_no, command_type \n\
+      \    ) TO 'OUTPUT' DELIMITER ',' CSV HEADER\n\
+      \  "
+      |> Str.global_replace (Str.regexp_string "OUTPUT") output_file
+      |> Str.global_replace (Str.regexp_string "HEIGHT") (Int.to_string height)
+    in
+
+    Caqti_request.exec Caqti_type.unit sql
+
+  let dump_internal_command_info_to_csv (module Conn : CONNECTION) output_file
+      height =
+    Conn.exec (dump_user_command_info_to_csv_query ~output_file ~height) ()
 
   let get_account_accessed_count_query =
     Caqti_request.find Caqti_type.unit Caqti_type.int
