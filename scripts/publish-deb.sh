@@ -62,7 +62,7 @@ set +x
 
 function verify_o1test_repo_has_package {
   sudo apt-get update
-  ${DEBS3_SHOW} ${DEB} ${DEB_VERSION} $ARCH -c $DEB_CODENAME -m $DEB_RELEASE
+  ${DEBS3_SHOW} ${1} ${DEB_VERSION} $ARCH -c $DEB_CODENAME -m $DEB_RELEASE
   return $?
 }
 
@@ -77,7 +77,7 @@ do
   deb="${deb_split[0]}"
   deb=$(basename $deb)
   
-  for i in {1..10}; do verify_o1test_repo_has_package && break || sleep 60; done
+  for i in {1..10}; do (verify_o1test_repo_has_package $deb) && break || sleep 60; done
 
 done
 
