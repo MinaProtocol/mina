@@ -9,17 +9,17 @@ FORKING_FROM_CONFIG_JSON=${FORKING_FROM_CONFIG_JSON:=genesis_ledgers/mainnet.jso
 # If not given, the genesis timestamp is set to 10 mins into the future
 GENESIS_TIMESTAMP=${GENESIS_TIMESTAMP:=$(date -u +"%Y-%m-%dT%H:%M:%SZ" -d "10 mins")}
 
-echo "*** $FORKING_FROM_CONFIG_JSON:" >&2
-cat "$FORKING_FROM_CONFIG_JSON" >&2
-jq < "$FORKING_FROM_CONFIG_JSON" >/dev/null
+# echo "*** $FORKING_FROM_CONFIG_JSON:" >&2
+# cat "$FORKING_FROM_CONFIG_JSON" >&2
+# jq < "$FORKING_FROM_CONFIG_JSON" >/dev/null
 
 echo "*** $LEDGER_HASHES_JSON:" >&2
 cat "$LEDGER_HASHES_JSON" >&2
-jq < "$LEDGER_HASHES_JSON" >/dev/null
+jq '.' < "$LEDGER_HASHES_JSON" >/dev/null
 
-echo "*** $FORK_CONFIG_JSON:" >&2
-cat "$FORK_CONFIG_JSON" >&2
-jq < "$FORK_CONFIG_JSON" >/dev/null
+# echo "*** $FORK_CONFIG_JSON:" >&2
+# cat "$FORK_CONFIG_JSON" >&2
+# jq < "$FORK_CONFIG_JSON" >/dev/null
 
 # Pull the original genesis timestamp from the pre-fork config file
 ORIGINAL_GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$FORKING_FROM_CONFIG_JSON")
