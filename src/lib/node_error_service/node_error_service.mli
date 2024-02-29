@@ -11,7 +11,7 @@ type node_state =
   ; block_height_at_best_tip : int option
   ; sync_status : Sync_status.t
   ; hardware_info : string list option
-  ; uptime_of_node : string
+  ; uptime_of_node : float
   }
 
 val set_config :
