@@ -39,4 +39,4 @@ function rebuild_deb() {
 
 rebuild_deb
 
-source scripts/publish-deb.sh --name "${DEB}_${NEW_VERSION}.deb" --version ${NEW_VERSION} --codename ${CODENAME} --release ${NEW_RELEASE}
+source scripts/publish-deb.sh --names "${DEB}_${NEW_VERSION}.deb" --version ${NEW_VERSION} --codename ${CODENAME} --release ${NEW_RELEASE}
