@@ -52,6 +52,9 @@ mkdir hardfork_ledgers
 _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --config-file config.json --genesis-dir hardfork_ledgers/ --hash-output-file hardfork_ledger_hashes.json | tee runtime_genesis_ledger.log | _build/default/src/app/logproc/logproc.exe
 
 echo "--- Create hardfork config"
+# Pull from lfs, in case the genesis ledger is checked in there.
+sudo apt-get update && sudo apt-get install -y git-lfs
+git lfs pull
 FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hardfork_ledger_hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
 
 existing_files=$(aws s3 ls s3://snark-keys.o1test.net/ | awk '{print $4}')
@@ -75,6 +78,7 @@ mkdir -p /tmp/artifacts
 cp _build/mina*.deb /tmp/artifacts/.
 
 echo "--- Upload debs to amazon s3 repo"
+[ -n ${RELEASE+x} ] && export MINA_DEB_RELEASE="${RELEASE}"
 make publish_debs
 
 echo "--- Git diff after build is complete:"
