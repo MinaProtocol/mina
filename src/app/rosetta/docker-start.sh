@@ -4,8 +4,7 @@ set -eou pipefail
 
 POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g')
 
-function cleanup
-{
+function cleanup {
   echo "========================= CLEANING UP ==========================="
   echo "Stopping mina daemon and waiting 3 seconds"
   mina client stop-daemon && sleep 3
@@ -31,7 +30,7 @@ export MINA_LIBP2P_PASS=${MINA_LIBP2P_PASS:=''}
 export MINA_NETWORK=${MINA_NETWORK:=mainnet}
 export MINA_SUFFIX=${MINA_SUFFIX:=}
 export MINA_GENESIS_LEDGER_URL=${MINA_GENESIS_LEDGER_URL:=}
-export MINA_CONFIG_FILE=/genesis_ledgers/${MINA_NETWORK}.json
+export MINA_CONFIG_FILE="${MINA_CONFIG_FILE:=/etc/mina/rosetta/genesis_ledgers/${MINA_NETWORK}.json}"
 export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=/data/.mina-config}"
 export MINA_CLIENT_TRUSTLIST=${MINA_CLIENT_TRUSTLIST:=}
 export PEER_LIST_URL=${PEER_LIST_URL:=https://storage.googleapis.com/seed-lists/mainnet_seeds.txt}
@@ -55,10 +54,10 @@ DUMP_TIME=${DUMP_TIME:=0000}
 
 # Genesis Ledger
 if [ -n "$MINA_GENESIS_LEDGER_URL" ]; then
-    curl -o "$MINA_CONFIG_FILE" "$MINA_GENESIS_LEDGER_URL"
-    echo "Downloaded content from $MINA_GENESIS_LEDGER_URL to $MINA_CONFIG_FILE"
+  curl -o "$MINA_CONFIG_FILE" "$MINA_GENESIS_LEDGER_URL"
+  echo "Downloaded content from $MINA_GENESIS_LEDGER_URL to $MINA_CONFIG_FILE"
 else
-   echo "Variable MINA_GENESIS_LEDGER_URL is empty, will use $MINA_CONFIG_FILE as Genesis Ledger"
+  echo "Variable MINA_GENESIS_LEDGER_URL is empty, will use $MINA_CONFIG_FILE as Genesis Ledger"
 fi
 
 # Postgres
@@ -67,16 +66,15 @@ echo "========================= INITIALIZING POSTGRESQL ========================
 
 # Mina Rosetta
 echo "=========================== STARTING ROSETTA API ONLINE AND OFFLINE INSTANCES ==========================="
-ports=( $MINA_ROSETTA_ONLINE_PORT $MINA_ROSETTA_OFFLINE_PORT )
-for port in ${ports[*]}
-do
-    mina-rosetta${MINA_SUFFIX} \
+ports=($MINA_ROSETTA_ONLINE_PORT $MINA_ROSETTA_OFFLINE_PORT)
+for port in ${ports[*]}; do
+  mina-rosetta${MINA_SUFFIX} \
     --archive-uri "${PG_CONN}" \
     --graphql-uri http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \
     --log-json \
     --log-level ${LOG_LEVEL} \
     --port ${port} &
-    sleep 5
+  sleep 5
 done
 
 # Archive
@@ -111,7 +109,6 @@ sleep 30
 
 echo "========================= POPULATING MISSING BLOCKS ==========================="
 ./download-missing-blocks.sh ${MINA_NETWORK} ${POSTGRES_DBNAME} ${POSTGRES_USERNAME} &
-
 
 if ! kill -0 "${MINA_DAEMON_PID}"; then
   echo "[FATAL] Mina daemon failed to start, exiting docker-start.sh"
