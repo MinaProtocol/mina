@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+set -e
+set -o pipefail
+
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 SLOT_TX_END="${SLOT_TX_END:-30}"
@@ -7,7 +10,7 @@ SLOT_CHAIN_END="${SLOT_CHAIN_END:-$((SLOT_TX_END+8))}"
 
 # Slot from which to start calling bestchain query
 # to find last non-empty block
-BEST_CHAIN_QUERY_FROM="${BEST_CHAIN_QUERY_FROM:-$((SLOT_TX_END-5))}"
+BEST_CHAIN_QUERY_FROM="${BEST_CHAIN_QUERY_FROM:-25}"
 
 # Slot duration in seconds to be used for both version
 MAIN_SLOT="${MAIN_SLOT:-90}"
@@ -22,10 +25,11 @@ source "$SCRIPT_DIR"/test-helper.sh
 
 # Executable built off mainnet branch
 MAIN_MINA_EXE="$1"
+MAIN_RUNTIME_GENESIS_LEDGER_EXE="$2"
 
 # Executables built off fork branch (e.g. berkeley)
-FORK_MINA_EXE="$2"
-FORK_RUNTIME_GENESIS_LEDGER_EXE="$3"
+FORK_MINA_EXE="$3"
+FORK_RUNTIME_GENESIS_LEDGER_EXE="$4"
 
 stop_nodes(){
   "$1" client stop-daemon --daemon-port 10301
@@ -54,6 +58,14 @@ if [[ $((2*blockHeight)) -lt $BEST_CHAIN_QUERY_FROM ]]; then
   exit 3
 fi
 
+first_epoch_ne_str="$(blocks 10303 2>/dev/null | latest_nonempty_block)"
+IFS=, read -ra first_epoch_ne <<< "$first_epoch_ne_str"
+
+genesis_epoch_staking_hash="${first_epoch_ne[$((3+IX_CUR_EPOCH_HASH))]}"
+genesis_epoch_next_hash="${first_epoch_ne[$((3+IX_NEXT_EPOCH_HASH))]}"
+
+echo "Genesis epoch staking/next hashes: $genesis_epoch_staking_hash, $genesis_epoch_next_hash"
+
 last_ne_str="$(for i in $(seq $BEST_CHAIN_QUERY_FROM $SLOT_CHAIN_END); do
   blocks $((10303+10*(i%2))) 2>/dev/null || true
   sleep "${MAIN_SLOT}s"
@@ -61,7 +73,16 @@ done | latest_nonempty_block)"
 
 IFS=, read -ra latest_ne <<< "$last_ne_str"
 
+# Maximum slot observed for a block
 max_slot=${latest_ne[0]}
+
+# List of epochs for which last snarked ledger hashes were captured
+IFS=: read -ra epochs <<< "${latest_ne[1]}"
+# List of last snarked ledger hashes captured
+IFS=: read -ra last_snarked_hash_pe <<< "${latest_ne[2]}"
+
+latest_ne=( "${latest_ne[@]:3}" )
+
 echo "Last occupied slot of pre-fork chain: $max_slot"
 if [[ $max_slot -ge $SLOT_CHAIN_END ]]; then
   echo "Assertion failed: block with slot $max_slot created after slot chain end" >&2
@@ -69,9 +90,9 @@ if [[ $max_slot -ge $SLOT_CHAIN_END ]]; then
   exit 3
 fi
 
-latest_shash="${latest_ne[1]}"
-latest_height=${latest_ne[2]}
-latest_slot=${latest_ne[3]}
+latest_shash="${latest_ne[$IX_STATE_HASH]}"
+latest_height=${latest_ne[$IX_HEIGHT]}
+latest_slot=${latest_ne[$IX_SLOT]}
 
 echo "Latest non-empty block: $latest_shash, height: $latest_height, slot: $latest_slot"
 if [[ $latest_slot -ge $SLOT_TX_END ]]; then
@@ -80,7 +101,7 @@ if [[ $latest_slot -ge $SLOT_TX_END ]]; then
   exit 3
 fi
 
-expected_fork_data="{\"blockchain_length\":$latest_height,\"global_slot_since_genesis\":$latest_slot,\"state_hash\":\"$latest_shash\"}"
+expected_fork_data="{\"fork\":{\"blockchain_length\":$latest_height,\"global_slot_since_genesis\":$latest_slot,\"state_hash\":\"$latest_shash\"},\"next_seed\":\"${latest_ne[$IX_NEXT_EPOCH_SEED]}\",\"staking_seed\":\"${latest_ne[$IX_CUR_EPOCH_SEED]}\"}"
 
 # 4. Check that no new blocks are created
 sleep 1m
@@ -105,9 +126,51 @@ done
 # 7. Runtime config is converted with a script to have only ledger hashes in the config
 stop_nodes "$MAIN_MINA_EXE"
 
-fork_data="$(jq -cS '.proof.fork' localnet/fork_config.json)"
+fork_data="$(jq -cS '{fork:.proof.fork,next_seed:.epoch_data.next.seed,staking_seed:.epoch_data.staking.seed}' localnet/fork_config.json)"
 if [[ "$fork_data" != "$expected_fork_data" ]]; then
   echo "Assertion failed: unexpected fork data" >&2
+  exit 3
+fi
+
+"$MAIN_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/prefork_hf_ledgers --hash-output-file localnet/prefork_hf_ledger_hashes.json
+
+# Finds staking ledger hash corresponding to an epoch given as $1 parameter
+function find_staking_hash(){
+  e=$1
+  if [[ $e == 0 ]]; then
+    echo $genesis_epoch_staking_hash
+  elif [[ $e == 1 ]]; then
+    echo $genesis_epoch_next_hash
+  else
+    ix=0
+    e_=$((e-2))
+    for el in "${epochs[@]}"; do
+      [[ "$el" == $e_ ]] && break
+      ix=$((ix+1))
+    done
+    if [[ $ix == ${#epochs[@]} ]]; then
+      echo "Assertion failed: last snarked ledger for epoch $e_ wasn't captured"
+      exit 3
+    fi
+    echo ${last_snarked_hash_pe[$ix]}
+  fi
+}
+
+slot_tx_end_epoch=$((SLOT_TX_END/48))
+
+expected_staking_hash=$(find_staking_hash $slot_tx_end_epoch)
+expected_next_hash=$(find_staking_hash $((slot_tx_end_epoch+1)))
+
+expected_prefork_hashes="{\"epoch_data\":{\"next\":{\"hash\":\"$expected_next_hash\"},\"staking\":{\"hash\":\"$expected_staking_hash\"}},\"ledger\":{\"hash\":\"${latest_ne[$IX_STAGED_HASH]}\"}}"
+
+# SHA3 hashes are not checked, because this is irrelevant to
+# checking that correct ledgers are used
+prefork_hashes_select='{epoch_data:{staking:{hash:.epoch_data.staking.hash},next:{hash:.epoch_data.next.hash}},ledger:{hash:.ledger.hash}}'
+
+prefork_hashes="$(jq -cS "$prefork_hashes_select" localnet/prefork_hf_ledger_hashes.json)"
+if [[ "$prefork_hashes" != "$expected_prefork_hashes" ]]; then
+  echo "Assertion failed: unexpected ledgers in fork_config" >&2
+  echo "Expected: $expected_prefork_hashes" >&2
   exit 3
 fi
 
@@ -135,6 +198,8 @@ fi
 
 wait "$MAIN_NETWORK_PID"
 
+echo "Config for the fork is correct, starting a new network"
+
 # 8. Node is shutdown and restarted with mina-fork and the config from previous step 
 "$SCRIPT_DIR"/run-localnet.sh -m "$FORK_MINA_EXE" -d "$FORK_DELAY" -i "$FORK_SLOT" \
   -s "$FORK_SLOT" -c localnet/config.json --genesis-ledger-dir localnet/hf_ledgers &
@@ -155,8 +220,6 @@ if [[ $earliest_height != $((latest_height+1)) ]]; then
   exit 3
 fi
 
-# TODO shouldn't comparison be against expected_genesis_slot+1 ?
-# This would normally be equality, but sometimes VRF might be such that first slot isn't occupied
 if [[ $earliest_slot -lt $expected_genesis_slot ]]; then
   echo "Assertion failed: unexpected slot $earliest_slot at the beginning of the fork" >&2
   stop_nodes "$FORK_MINA_EXE"
