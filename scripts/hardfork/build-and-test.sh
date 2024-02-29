@@ -77,9 +77,9 @@ if [[ ! -L compatible-devnet ]]; then
   fi
   git submodule sync --recursive
   git submodule update --init --recursive
-  git apply "$SCRIPT_DIR"/localnet-patches/compatible-1.patch
+  git apply "$SCRIPT_DIR"/localnet-patches/compatible-{1,2}.patch
   nix "${NIX_OPTS[@]}" build "$compatible_build?submodules=1#devnet" --out-link "$INIT_DIR/compatible-devnet"
-  git apply -R "$SCRIPT_DIR"/localnet-patches/compatible-1.patch
+  git apply -R "$SCRIPT_DIR"/localnet-patches/compatible-{1,2}.patch
   if [[ $# == 0 ]]; then
     cd -
     rm -Rf "$compatible_build"
@@ -112,4 +112,4 @@ export SLOT_TX_END
 
 echo "Running HF test with SLOT_TX_END=$SLOT_TX_END"
 
-"$SCRIPT_DIR"/test.sh compatible-devnet/bin/mina fork-devnet/bin/{mina,runtime_genesis_ledger} && echo "HF test completed successfully"
+"$SCRIPT_DIR"/test.sh compatible-devnet/bin/{mina,runtime_genesis_ledger} fork-devnet/bin/{mina,runtime_genesis_ledger} && echo "HF test completed successfully"
