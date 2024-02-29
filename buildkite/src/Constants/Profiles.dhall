@@ -20,7 +20,7 @@ let duneProfile = \(profile : Profile) ->
   merge {
     Standard = "devnet"
     , Lightnet = "lightnet"
-    , BerkeleyMigration = "berkeley_archive_migration"
+    , BerkeleyMigration = "berkeley_archive_migration_devnet"
   } profile
 
 let toSuffixUppercase = \(profile : Profile) ->
