@@ -104,6 +104,7 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
                   debVersion
                   [ "NETWORK_NAME=\$NETWORK_NAME"
                   , "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL"
+                  , "RELEASE=\$RELEASE"
                   , "AWS_ACCESS_KEY_ID"
                   , "AWS_SECRET_ACCESS_KEY"
                   , "MINA_BRANCH=\$BUILDKITE_BRANCH"

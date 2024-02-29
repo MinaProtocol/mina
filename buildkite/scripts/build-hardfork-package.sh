@@ -78,6 +78,7 @@ mkdir -p /tmp/artifacts
 cp _build/mina*.deb /tmp/artifacts/.
 
 echo "--- Upload debs to amazon s3 repo"
+[ -n ${RELEASE+x} ] && export MINA_DEB_RELEASE="${RELEASE}"
 make publish_debs
 
 echo "--- Git diff after build is complete:"
