@@ -12,7 +12,7 @@ let test_bit x i = B.(shift_right x i land one = one)
 (** returns all the values that can fit in [~size_in_bits] bits and that are
  * either congruent with -2^[~size_in_bits] mod [~modulus] 
  * or congruent with -2^[~size_in_bits] - 1 mod [~modulus] 
- *)
+*)
 let forbidden_shifted_values ~modulus:r ~size_in_bits =
   let two_to_n = B.(pow (of_int 2) (of_int size_in_bits)) in
   (* this function doesn't make sense if the modulus is smaller *)
@@ -95,14 +95,14 @@ module Step = struct
       Typ.transport
         (Typ.tuple2 Field.typ Boolean.typ)
         ~there:(fun x ->
-          match Tock.Field.to_bits x with
-          | [] ->
+            match Tock.Field.to_bits x with
+            | [] ->
               assert false
-          | low :: high ->
+            | low :: high ->
               (Field.Constant.project high, low) )
         ~back:(fun (high, low) ->
-          let high = Field.Constant.unpack high in
-          Tock.Field.of_bits (low :: high) )
+            let high = Field.Constant.unpack high in
+            Tock.Field.of_bits (low :: high) )
 
     let check t =
       let open Internal_Basic in
@@ -137,8 +137,8 @@ module Step = struct
         (T
            ( Shifted_value.Type2.typ Other_field.typ_unchecked
            , (fun (Shifted_value.Type2.Shifted_value x as t) ->
-               Impl.run_checked (Other_field.check x) ;
-               t )
+                Impl.run_checked (Other_field.check x) ;
+                t )
            , Fn.id ) )
         spec
     in
@@ -224,7 +224,7 @@ module Wrap = struct
 
   let input
       ~feature_flags:
-        ({ Plonk_types.Features.Full.uses_lookups; _ } as feature_flags) () =
+      ({ Plonk_types.Features.Full.uses_lookups; _ } as feature_flags) () =
     let feature_flags = Plonk_types.Features.of_full feature_flags in
     let lookup =
       { Types.Wrap.Lookup_parameters.use = uses_lookups
@@ -251,8 +251,8 @@ module Wrap = struct
         (T
            ( Shifted_value.Type1.typ fp
            , (fun (Shifted_value x as t) ->
-               Impl.run_checked (Other_field.check x) ;
-               t )
+                Impl.run_checked (Other_field.check x) ;
+                t )
            , Fn.id ) )
         (In_circuit.spec (module Impl) lookup feature_flags)
     in

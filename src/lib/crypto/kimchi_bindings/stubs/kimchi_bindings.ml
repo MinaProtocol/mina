@@ -745,7 +745,10 @@ module Protocol = struct
            Index.Bn254Fp.t
         -> FieldVectors.Bn254Fp.t array
         -> Bn254_bindings.Bn254Fp.t Kimchi_types.runtime_table array
-        -> string = "caml_bn254_fp_plonk_proof_create"
+        -> ( Bn254_bindings.Bn254Fq.t Kimchi_types.or_infinity
+           , Bn254_bindings.Bn254Fp.t )
+           Kimchi_types.kzg_proof_with_public
+        = "caml_bn254_fp_plonk_proof_create"
     end
   end
 end

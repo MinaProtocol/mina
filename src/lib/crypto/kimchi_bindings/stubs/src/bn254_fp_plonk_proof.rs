@@ -1,5 +1,6 @@
 use crate::{
-    arkworks::CamlBn254Fp, bn254_fp_plonk_index::CamlBn254FpPlonkIndexPtr,
+    arkworks::{CamlBn254Fp, CamlGBn254},
+    bn254_fp_plonk_index::CamlBn254FpPlonkIndexPtr,
     field_vector::bn254_fp::CamlBn254FpVector,
 };
 use ark_bn254::Parameters;
@@ -8,6 +9,7 @@ use groupmap::GroupMap;
 use kimchi::circuits::polynomial::COLUMNS;
 use kimchi::keccak_sponge::Keccak256FqSponge;
 use kimchi::proof::ProverProof;
+use kimchi::prover::caml::CamlKzgProofWithPublic;
 use kimchi::{
     circuits::lookup::runtime_tables::{caml::CamlRuntimeTable, RuntimeTable},
     keccak_sponge::Keccak256FrSponge,
@@ -27,7 +29,7 @@ pub fn caml_bn254_fp_plonk_proof_create(
     index: CamlBn254FpPlonkIndexPtr<'static>,
     witness: Vec<CamlBn254FpVector>,
     runtime_tables: Vec<CamlRuntimeTable<CamlBn254Fp>>,
-) -> Result<String, ocaml::Error> {
+) -> Result<CamlKzgProofWithPublic<CamlGBn254, CamlBn254Fp>, ocaml::Error> {
     {
         let ptr: &mut SRS<Bn254> =
             unsafe { &mut *((&index.as_ref().0.srs.full_srs as *const SRS<Bn254>) as *mut _) };
@@ -41,6 +43,9 @@ pub fn caml_bn254_fp_plonk_proof_create(
     let index: &ProverIndex<Bn254, PairingProof<Bn<Parameters>>> = &index.as_ref().0;
     let runtime_tables: Vec<RuntimeTable<Fp>> =
         runtime_tables.into_iter().map(Into::into).collect();
+
+    // public input
+    let public_input = witness[0][0..index.cs.public].to_vec();
 
     // NB: This method is designed only to be used by tests. However, since creating a new reference will cause `drop` to be called on it once we are done with it. Since `drop` calls `caml_shutdown` internally, we *really, really* do not want to do this, but we have no other way to get at the active runtime.
     // TODO: There's actually a way to get a handle to the runtime as a function argument. Switch
@@ -60,8 +65,6 @@ pub fn caml_bn254_fp_plonk_proof_create(
         )
         .map_err(|e| ocaml::Error::Error(e.into()))?;
 
-        let serialized_proof = serde_json::to_string(&proof)
-            .map_err(|_| ocaml::Error::Message("Could not serialize proof"))?;
-        Ok(serialized_proof)
+        Ok((proof, public_input).into())
     })
 }

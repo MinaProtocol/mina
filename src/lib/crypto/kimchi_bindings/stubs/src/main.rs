@@ -36,8 +36,11 @@ use wires_15_stubs::{
     projective::{bn254::*, pallas::*, vesta::*},
     srs::{fp::*, fq::*},
     CamlCircuitGate,
+    CamlKzgProofWithPublic,
+    CamlKzgProverProof,
     CamlLookupCommitments,
     CamlOpeningProof,
+    CamlPairingProof,
     CamlPolyComm,
     CamlProofEvaluations,
     CamlProofWithPublic,
@@ -124,6 +127,7 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_type!(w, env, CamlPolyComm::<T1> => "poly_comm");
     decl_type!(w, env, CamlRecursionChallenge::<T1, T2> => "recursion_challenge");
     decl_type!(w, env, CamlOpeningProof::<T1, T2> => "opening_proof");
+    decl_type!(w, env, CamlPairingProof::<T1, T2> => "pairing_proof");
     decl_type!(w, env, CamlLookupCommitments::<T1> => "lookup_commitments");
 
     decl_type!(w, env, CamlRuntimeTableCfg::<T1> => "runtime_table_cfg");
@@ -131,7 +135,9 @@ fn generate_types_bindings(mut w: impl std::io::Write, env: &mut Env) {
     decl_type!(w, env, CamlRuntimeTable::<T1> => "runtime_table");
     decl_type!(w, env, CamlProverCommitments::<T1> => "prover_commitments");
     decl_type!(w, env, CamlProverProof<T1, T2> => "prover_proof");
+    decl_type!(w, env, CamlKzgProverProof<T1, T2> => "kzg_prover_proof");
     decl_type!(w, env, CamlProofWithPublic<T1, T2> => "proof_with_public");
+    decl_type!(w, env, CamlKzgProofWithPublic<T1, T2> => "kzg_proof_with_public");
 
     decl_type!(w, env, CamlWire => "wire");
     decl_type!(w, env, GateType => "gate_type");

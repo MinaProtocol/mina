@@ -879,7 +879,7 @@ module Make
        t
     -> (int -> Fp.t)
     -> Fp.t array array * Fp.t Kimchi_types.runtime_table array
-
+  
   val finalize : t -> unit
 
   val finalize_and_get_gates :
@@ -1050,7 +1050,7 @@ end = struct
           rt.data.(i) <- vv ) ;
     (* Return the witness. *)
     (res, runtime_tables)
-
+  
   let union_find sys v =
     Hashtbl.find_or_add sys.union_finds v ~default:(fun () ->
         Union_find.create v )
