@@ -1,6 +1,6 @@
-let Package : Type  = < Daemon | DaemonLightnet | Archive | ArchiveMigration | TestExecutive | BatchTxn | LogProc | ZkappTestTransaction | FunctionalTestSuite >
+let Package : Type  = < Daemon | DaemonDevnet | DaemonLightnet | Archive | ArchiveMigration | TestExecutive | BatchTxn | LogProc | ZkappTestTransaction | FunctionalTestSuite >
 
-let MainPackages = [ Package.Daemon , Package.Archive , Package.ArchiveMigration , Package.LogProc ]
+let MainPackages = [ Package.Daemon , Package.DaemonDevnet , Package.Archive , Package.ArchiveMigration , Package.LogProc ]
 
 let AuxiliaryPackages = [ Package.DaemonLightnet , Package.TestExecutive , Package.BatchTxn , Package.ZkappTestTransaction , Package.FunctionalTestSuite ]
 
@@ -8,6 +8,7 @@ let AuxiliaryPackages = [ Package.DaemonLightnet , Package.TestExecutive , Packa
 let capitalName = \(package : Package) ->
   merge {
     Daemon = "Daemon"
+    , DaemonDevnet = "DaemonDevnet"
     , DaemonLightnet = "DaemonLightnet"
     , Archive = "Archive"
     , ArchiveMigration = "ArchiveMigration"
@@ -21,6 +22,7 @@ let capitalName = \(package : Package) ->
 let lowerName = \(package : Package) ->
   merge {
     Daemon = "daemon"
+    , DaemonDevnet = "daemon_devnet"
     , DaemonLightnet = "daemon_lightnet"
     , Archive = "archive"
     , ArchiveMigration = "archive_migration"
@@ -34,6 +36,7 @@ let lowerName = \(package : Package) ->
 let debianName = \(package : Package) ->
   merge {
     Daemon = "mina-berkeley"
+    , DaemonDevnet = "mina-devnet"
     , DaemonLightnet = "mina-berkeley-lightnet"
     , Archive = "mina-archive"
     , ArchiveMigration = "mina-archive-migration"
