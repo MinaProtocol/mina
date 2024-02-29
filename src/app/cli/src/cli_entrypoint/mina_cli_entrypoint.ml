@@ -532,6 +532,10 @@ let setup_daemon logger =
   and node_error_url =
     flag "--node-error-url" ~aliases:[ "node-error-url" ] (optional string)
       ~doc:"URL of the node error collection service"
+  and simplified_node_stats =
+    flag "--simplified-node-stats"
+      ~aliases:[ "simplified-node-stats" ]
+      no_arg ~doc:"whether to report simplified node stats (default: false)"
   and contact_info =
     flag "--contact-info" ~aliases:[ "contact-info" ] (optional string)
       ~doc:
@@ -1388,7 +1392,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ?precomputed_blocks_path ~log_precomputed_blocks
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
                  ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
-                 ~node_status_url ~graphql_control_port:itn_graphql_port () )
+                 ~node_status_url ~graphql_control_port:itn_graphql_port
+                 ~simplified_node_stats () )
           in
           { mina
           ; client_trustlist
