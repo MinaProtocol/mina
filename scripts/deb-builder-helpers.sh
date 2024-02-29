@@ -340,7 +340,7 @@ build_archive_deb () {
 ##################################### ARCHIVE PACKAGE ##########################################
 build_archive_migration_deb () {
 
-  ARCHIVE_MIGRATION_DEB=mina${DEB_SUFFIX}
+  ARCHIVE_MIGRATION_DEB=mina-archive-migration${DEB_SUFFIX}
 
   echo "------------------------------------------------------------"
   echo "--- Building archive migration deb"
