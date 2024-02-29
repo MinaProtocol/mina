@@ -15,6 +15,7 @@ let promote_artifacts =
   \(debians: List Package.Type) ->
   \(dockers: List Artifact.Type) ->
   \(version: Text ) ->
+  \(new_version: Text ) ->
   \(architecture: Text ) ->
   \(profile: Profile.Type) ->
   \(codename: DebianVersions.DebVersion ) ->
@@ -30,6 +31,7 @@ let promote_artifacts =
             profile = profile
             , package = debian
             , version = version
+            , new_version = new_version
             , architecture = architecture
             , codename = codename
             , from_channel = from_channel
@@ -46,7 +48,7 @@ let promote_artifacts =
           profile = profile
           , name = docker
           , version = version
-          , new_tag = tag
+          , new_tag = new_version
           , step_key = "add-tag-to-${Artifact.lowerName docker}-docker"
         })
       dockers

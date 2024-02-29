@@ -27,6 +27,7 @@ let PromoteDebianSpec = {
     deps: List Command.TaggedKey.Type,
     package: Package.Type,
     version: Text,
+    new_version: Text,
     architecture: Text,
     codename: DebianVersions.DebVersion,
     from_channel: DebianChannel.Type,
@@ -39,6 +40,7 @@ let PromoteDebianSpec = {
     deps = [] : List Command.TaggedKey.Type,
     package = Package.Type.LogProc,
     version = "",
+    new_version = "",
     architecture = "amd64",
     codename = DebianVersions.DebVersion.Bullseye,
     from_channel = DebianChannel.Type.Unstable,
@@ -77,7 +79,7 @@ let promoteDebianStep = \(spec : PromoteDebianSpec.Type) ->
         commands = DebianVersions.toolchainRunner DebianVersions.DebVersion.Bullseye [
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY"
-        ] "./buildkite/scripts/promote-deb.sh --package ${Package.debianName spec.package}${Profiles.toLabelSegment spec.profile} --version ${spec.version} --architecture ${spec.architecture} --codename ${DebianVersions.lowerName spec.codename} --from-component ${DebianChannel.lowerName spec.from_channel} --to-component ${DebianChannel.lowerName spec.to_channel}",
+        ] "./buildkite/scripts/promote-deb.sh --package ${Package.debianName spec.package}${Profiles.toLabelSegment spec.profile} --version ${spec.version} --new-version ${spec.new_version} --architecture ${spec.architecture} --codename ${DebianVersions.lowerName spec.codename} --from-component ${DebianChannel.lowerName spec.from_channel} --to-component ${DebianChannel.lowerName spec.to_channel}",
         label = "Debian: ${spec.step_key}",
         key = spec.step_key,
         target = Size.XLarge,

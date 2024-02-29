@@ -30,11 +30,11 @@ function usage() {
   echo "  DEBIANS             The comma delimitered debian names. For example: 'Daemon,Archive' "
   echo "  DOCKERS             The comma delimitered docker names. For example: 'Daemon,Archive' "
   echo "  CODENAME            The Debian codename (Bullseye, Buster etc.)"
-  echo "  VERSION             The Docker version"
+  echo "  VERSION             The Docker or Debian version"
+  echo "  NEW_VERSION         The new Debian version or new Docker tag"
   echo "  PROFILE             The Docker and Debian profile (Standard, Lightnet, BerkeleyMigration)"
   echo "  FROM_CHANNEL        The Docker name (mina-berkeley, mina-archive etc.)"
   echo "  TO_CHANNEL          The Docker version"
-  echo "  TAG                 The Additional tag for docker"
   echo "  PUBLISH             The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io"
   echo ""
   exit 1
@@ -51,6 +51,8 @@ if [[ -n "$DEBIANS" ]]; then
     if [[ -z "$FROM_CHANNEL" ]]; then usage "'From channel' arg is not set!"; fi;
     if [[ -z "$TO_CHANNEL" ]]; then usage "'To channel' arg is not set!"; fi;
     if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
+    if [[ -z "$NEW_VERSION" ]]; then NEW_VERSION=$VERSION; fi;
+    
 
   arr_of_debians=(${DEBIANS//,/ })
   DHALL_DEBIANS=""
@@ -64,7 +66,7 @@ fi
 DHALL_DOCKERS="([] : List (./buildkite/src/Constants/Artifacts.dhall).Type)"
 
 if [[ -n "$DOCKERS" ]]; then 
-    if [[ -z "$TAG" ]]; then usage "Tag is not set!"; fi;
+    if [[ -z "$NEW_VERSION" ]]; then usage "New Tag is not set!"; fi;
     if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
     if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
   
