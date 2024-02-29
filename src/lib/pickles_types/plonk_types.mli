@@ -233,6 +233,17 @@ module Evals : sig
     val map : ('f, 'bool) t -> f:('f -> 'g) -> ('g, 'bool) t
 
     val to_list : ('a, 'b) t -> ('a, 'b) Opt.t list
+
+    (** {4 Generic helpers} *)
+
+    val validate_feature_flags :
+         true_:'boolean
+      -> false_:'boolean
+      -> or_:('boolean -> 'boolean -> 'boolean)
+      -> assert_equal:('boolean -> 'boolean -> unit)
+      -> feature_flags:'boolean Features.t
+      -> (_, 'boolean) t
+      -> unit
   end
 
   type 'a t =
