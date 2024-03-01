@@ -195,24 +195,45 @@ module Cassandra = struct
 
   let submitter ({ submitter; _ } : submission) = submitter
 
+  let shard t =
+      let parts = Time.to_ofday t ~zone:Time.Zone.utc |> Time.Ofday.to_parts in
+      parts.min * 10 + parts.sec / 6
+
+  let shards_range start_time end_time =
+    if Time.Span.(Time.diff end_time start_time > of_hr 1.0) then
+      List.range ~stop:`inclusive 0 599
+    else
+      let first_shard = shard start_time in
+      let last_shard = shard end_time in
+      if first_shard > last_shard then
+        (List.range ~stop:`inclusive first_shard 599)
+        @ (List.range ~stop:`inclusive 0 last_shard)
+      else
+      List.range ~stop:`inclusive first_shard last_shard
+
+  let comma_sep ~to_str l =
+    List.map ~f:to_str l |> String.concat ~sep:", "
+
   let load_submissions { conf; period_start; period_end } =
     let open Deferred.Or_error.Let_syntax in
-    let start_day =
-      Time.of_string period_start |> Time.to_date ~zone:Time.Zone.utc
-    in
-    let end_day =
-      Time.of_string period_end |> Time.to_date ~zone:Time.Zone.utc
-    in
+    let start_time = Time.of_string period_start in
+    let end_time = Time.of_string period_end in
+    let start_day = Time.to_date ~zone:Time.Zone.utc start_time in
+    let end_day = Time.to_date ~zone:Time.Zone.utc end_time in
     let partition_keys =
       Date.dates_between ~min:start_day ~max:end_day
       |> List.map ~f:(fun d -> Date.format d "%Y-%m-%d")
     in
+    let shards = shards_range start_time end_time in
     let partition =
       if List.length partition_keys = 1 then
-        sprintf "submitted_at_date = '%s' and shard in (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59)" (List.hd_exn partition_keys)
+        sprintf "submitted_at_date = '%s' and shard in (%s)"
+          (List.hd_exn partition_keys)
+          (comma_sep ~to_str:Int.to_string shards)
       else
-        sprintf "submitted_at_date IN (%s) and shard in (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59)"
-          (String.concat ~sep:"," @@ List.map ~f:(sprintf "'%s'") partition_keys)
+        sprintf "submitted_at_date IN (%s) and shard in (%s)"
+          (comma_sep ~to_str:(sprintf "'%s'") partition_keys)
+          (comma_sep ~to_str:Int.to_string shards)
     in
     let%bind raw =
       Cassandra.select ~conf ~parse:raw_of_yojson
@@ -239,7 +260,7 @@ module Cassandra = struct
         let snark_work =
           Option.map sub.snark_work ~f:(fun s ->
               String.chop_prefix_exn s ~prefix:"0x"
-              |> Hex.Safe.of_hex |> Option.value_exn |> Base64.encode_string )
+               |> Hex.Safe.of_hex |> Option.value_exn |> Base64.encode_string )
         in
         let%map s = of_raw { sub with snark_work } in
         s :: l )
