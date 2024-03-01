@@ -122,10 +122,10 @@ let Config =
   }
 
 let targetToAgent = \(target : Size) ->
-  merge { XLarge = toMap { size = "generic" },
-          Large = toMap { size = "generic" },
-          Medium = toMap { size = "generic" },
-          Small = toMap { size = "generic" },
+  merge { XLarge = toMap { size = "generic-lfs" },
+          Large = toMap { size = "generic-lfs" },
+          Medium = toMap { size = "generic-lfs" },
+          Small = toMap { size = "generic-lfs" },
           Integration = toMap { size = "integration" },
           QA = toMap { size = "qa" }
         }
