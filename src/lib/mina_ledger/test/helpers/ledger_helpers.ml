@@ -16,12 +16,18 @@ let bin_log n =
   in
   find 0
 
-let ledger_of_accounts ?depth accounts =
+type ledger_depth = Fixed_depth of int | Inferred_depth
+
+let ledger_of_accounts ?(depth = Inferred_depth) accounts =
   let open Result.Let_syntax in
   let open Test_account in
   let module R = Monad_lib.Make_ext2 (Result) in
   let depth =
-    match depth with None -> bin_log @@ List.length accounts | Some d -> d
+    match depth with
+    | Inferred_depth ->
+        bin_log @@ List.length accounts
+    | Fixed_depth d ->
+        d
   in
   let ledger = Ledger.empty ~depth () in
   let%map () =

@@ -135,7 +135,7 @@ let coinbase_order_of_created_accounts_is_correct ~with_fee_transfer () =
   in
   let accounts = [] (* All accounts are new *) in
   let ledger =
-    match Ledger_helpers.ledger_of_accounts ~depth:2 accounts with
+    match Ledger_helpers.ledger_of_accounts ~depth:(Fixed_depth 2) accounts with
     | Ok l ->
         l
     | Error _ ->
