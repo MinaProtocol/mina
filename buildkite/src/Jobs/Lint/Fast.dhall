@@ -29,7 +29,11 @@ let commands =
 in  Pipeline.build
       Pipeline.Config::{
         spec = JobSpec::{
-        , dirtyWhen = [ S.strictlyStart (S.contains "src/") ]
+        , dirtyWhen =
+          [ S.strictlyStart (S.contains "src/")
+          , S.exactly_noext "CODEOWNERS"
+          , S.contains "rfcs/"
+          ]
         , path = "Lint"
         , name = "Fast"
         , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint ]
