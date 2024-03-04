@@ -366,19 +366,19 @@ end = struct
 
     val remove : 'a t -> Addr.t -> unit
   end = struct
-    type 'a t = 'a Addr.Table.t
+    type 'a t = { table : 'a Addr.Table.t }
 
-    let create () = Addr.Table.create ()
+    let create () = { table = Addr.Table.create () }
 
-    let clear = Addr.Table.clear
+    let clear { table } = Addr.Table.clear table
 
-    let add_exn = Addr.Table.add_exn
+    let add_exn { table } ~key ~data = Addr.Table.add_exn table ~key ~data
 
-    let find = Addr.Table.find
+    let find { table } addr = Addr.Table.find table addr
 
-    let find_exn = Addr.Table.find_exn
+    let find_exn { table } addr = Addr.Table.find_exn table addr
 
-    let remove = Addr.Table.remove
+    let remove { table } addr = Addr.Table.remove table addr
   end
 
   type 'a t =
