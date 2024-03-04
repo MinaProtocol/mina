@@ -57,7 +57,8 @@ module Ledger_inner = struct
 
         let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
-        let empty_account = Ledger_hash.of_digest Account.empty_digest
+        let empty_account =
+          Ledger_hash.of_digest (Lazy.force Account.empty_digest)
       end
     end]
   end
@@ -105,7 +106,7 @@ module Ledger_inner = struct
   end
 
   module Db :
-    Merkle_ledger.Database_intf.S
+    Merkle_ledger.Intf.Ledger.DATABASE
       with module Location = Location_at_depth
       with module Addr = Location_at_depth.Addr
       with type root_hash := Ledger_hash.t
@@ -121,7 +122,7 @@ module Ledger_inner = struct
   module Null = Null_ledger.Make (Inputs)
 
   module Any_ledger :
-    Merkle_ledger.Any_ledger.S
+    Merkle_ledger.Intf.Ledger.ANY
       with module Location = Location_at_depth
       with type account := Account.t
        and type key := Public_key.Compressed.t
