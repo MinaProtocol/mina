@@ -292,7 +292,7 @@ module Ledger = struct
     Mina_ledger.Ledger.commit ledger ;
     let dirname = Option.value_exn (Mina_ledger.Ledger.get_directory ledger) in
     let root_hash =
-      State_hash.to_base58_check @@ Mina_ledger.Ledger.merkle_root ledger
+      Ledger_hash.to_base58_check @@ Mina_ledger.Ledger.merkle_root ledger
     in
     let%bind () = Unix.mkdir ~p:() genesis_dir in
     let tar_path = genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix in
@@ -405,7 +405,7 @@ module Ledger = struct
             match%map
               load_from_tar ~genesis_dir ~logger ~constraint_constants
                 ~expected_merkle_root:
-                  (Option.map config.hash ~f:State_hash.of_base58_check_exn)
+                  (Option.map config.hash ~f:Ledger_hash.of_base58_check_exn)
                 ?accounts:padded_accounts_opt ~ledger_name_prefix tar_path
             with
             | Ok ledger ->
@@ -468,7 +468,7 @@ module Ledger = struct
                   { config with
                     hash =
                       Some
-                        ( State_hash.to_base58_check
+                        ( Ledger_hash.to_base58_check
                         @@ Mina_ledger.Ledger.merkle_root ledger )
                   }
                 in
@@ -511,7 +511,7 @@ module Ledger = struct
                     return (Ok (packed, config, tar_path))
                 | Error err, _ ->
                     let root_hash =
-                      State_hash.to_base58_check
+                      Ledger_hash.to_base58_check
                       @@ Mina_ledger.Ledger.merkle_root ledger
                     in
                     let tar_path =

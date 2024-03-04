@@ -5,7 +5,7 @@ ARG deb_version
 ARG deb_release=unstable
 ARG network=mainnet
 
-ARG psql_version=13
+ARG psql_version=15
 # Golang version number used to detemine tarball name
 ARG GO_VERSION=1.19.11
 
@@ -54,6 +54,7 @@ RUN apt-get update --quiet --yes \
     tzdata \
     jq \
     sudo \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Install Postgresql
@@ -81,7 +82,8 @@ RUN export GOBIN="$(pwd)/bin" \
     && /usr/lib/go/bin/go install
 
 # --- Generate en_US.UTF-8 locale to allow use of O(1) Labs DB dumps
-RUN locale-gen en_US.UTF-8
+RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
+    && locale-gen
 
 # --- Set up sample/demo wallets and configuration
 RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
