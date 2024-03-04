@@ -366,19 +366,46 @@ end = struct
 
     val remove : 'a t -> Addr.t -> unit
   end = struct
-    type 'a t = { table : 'a Addr.Table.t }
+    type 'a t =
+      { table : 'a Addr.Table.t
+      ; added : int Int.Table.t
+      ; removed : int Int.Table.t
+      }
 
-    let create () = { table = Addr.Table.create () }
+    let create () =
+      { table = Addr.Table.create ()
+      ; added = Int.Table.create ()
+      ; removed = Int.Table.create ()
+      }
 
-    let clear { table } = Addr.Table.clear table
+    let clear { table; added; removed } =
+      Addr.Table.clear table ; Int.Table.clear added ; Int.Table.clear removed
 
-    let add_exn { table } ~key ~data = Addr.Table.add_exn table ~key ~data
+    let add_exn { table; added; removed = _ } ~key ~data =
+      Addr.Table.add_exn table ~key ~data ;
+      Int.Table.update added (Addr.depth key) ~f:(function
+        | None ->
+            1
+        | Some x ->
+            x + 1 )
 
-    let find { table } addr = Addr.Table.find table addr
+    let find { table; added = _; removed = _ } addr = Addr.Table.find table addr
 
-    let find_exn { table } addr = Addr.Table.find_exn table addr
+    let find_exn { table; added = _; removed = _ } addr =
+      Addr.Table.find_exn table addr
 
-    let remove { table } addr = Addr.Table.remove table addr
+    let remove { table; added; removed } addr =
+      Addr.Table.remove table addr ;
+      Int.Table.update added (Addr.depth addr) ~f:(function
+        | None ->
+            0
+        | Some x ->
+            x - 1 ) ;
+      Int.Table.update removed (Addr.depth addr) ~f:(function
+        | None ->
+            1
+        | Some x ->
+            x + 1 )
   end
 
   type 'a t =
