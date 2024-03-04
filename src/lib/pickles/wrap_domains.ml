@@ -55,19 +55,7 @@ struct
 
   let f full_signature num_choices choices_length ~feature_flags
       ~max_proofs_verified =
-    let res =
-      Common.wrap_domains
-        ~proofs_verified:(Nat.to_int (Nat.Add.n max_proofs_verified))
-    in
-    (*let%map.Promise () =
-        if debug then
-          let%map.Promise res' =
-            f_debug full_signature num_choices choices_length ~feature_flags
-              ~max_proofs_verified
-          in
-          [%test_eq: Domains.t] res res'
-        else Promise.return ()
-      in*)
-    res
+    Common.wrap_domains
+      ~proofs_verified:(Nat.to_int (Nat.Add.n max_proofs_verified))
 end
 [@@warning "-60"]

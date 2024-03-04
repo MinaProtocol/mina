@@ -157,7 +157,7 @@ let create
                 match tag.kind with
                 | Compiled ->
                     let compiled = Types_map.lookup_compiled tag.id in
-                    let%map.Promise wrap_key = Lazy.force @@ compiled.wrap_key
+                    let%map.Promise wrap_key = Lazy.force compiled.wrap_key
                     and step_domains =
                       let%map.Promise () =
                         (* Wait for promises to resolve. *)

@@ -94,7 +94,7 @@ end) : sig
     - ['auxiliary_value] is the out-of-circuit type of the [main] function's
       auxiliary data, to be returned to the prover but not exposed in the
       public input.
-*)
+  *)
   type ( 'prev_vars
        , 'prev_values
        , 'widths

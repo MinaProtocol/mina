@@ -97,7 +97,6 @@ module Step = struct
     let pk =
       lazy
         (let%map.Promise k_p = Lazy.force k_p in
-         let _, _, _, sys = k_p in
          match
            Common.time "step keypair read" (fun () ->
                Key_cache.Sync.read cache s_p k_p )
@@ -105,9 +104,10 @@ module Step = struct
          | Ok (pk, dirty) ->
              Common.time "step keypair create" (fun () -> (pk, dirty))
          | Error _e ->
+             let _, _, _, sys = k_p in
              let r =
                Common.time "stepkeygen" (fun () ->
-                   sys |> Keypair.generate ~prev_challenges )
+                   Keypair.generate ~prev_challenges sys )
              in
              Timer.clock __LOC__ ;
              ignore
@@ -234,7 +234,6 @@ module Wrap = struct
     let pk =
       lazy
         (let%map.Promise k = Lazy.force k_p in
-         let _, _, sys = k in
          match
            Common.time "wrap key read" (fun () ->
                Key_cache.Sync.read cache s_p k )
@@ -242,9 +241,10 @@ module Wrap = struct
          | Ok (pk, d) ->
              (pk, d)
          | Error _e ->
+             let _, _, sys = k in
              let r =
                Common.time "wrapkeygen" (fun () ->
-                   sys |> Keypair.generate ~prev_challenges )
+                   Keypair.generate ~prev_challenges sys )
              in
              ignore
                ( Key_cache.Sync.write cache s_p k (Keypair.pk r)

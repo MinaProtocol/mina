@@ -448,6 +448,27 @@ let dummy_constraints () =
         (Kimchi_backend_common.Scalar_challenge.create x)
       : Field.t * Field.t )
 
+let exists_deferred ?request:req ?compute typ =
+  let open Snark_params.Tick.Run in
+  let open Async_kernel in
+  (* Set up a full Ivar, in case we are generating the constraint system. *)
+  let deferred = ref (Ivar.create_full ()) in
+  (* Request or compute the [Deferred.t] value. *)
+  let requested = exists ?request:req ?compute (Typ.Internal.ref ()) in
+  as_prover (fun () ->
+      (* If we are generating the witness, create a new Ivar.. *)
+      deferred := Ivar.create () ;
+      (* ..and fill it when the value we want to read resolves. *)
+      Deferred.upon (As_prover.Ref.get requested) (fun _ ->
+          Ivar.fill !deferred () ) ) ;
+  (* Await the [Deferred.t] if we're generating the witness, otherwise we
+     immediately bind over the filled Ivar and continue.
+  *)
+  Deferred.map (Ivar.read !deferred) ~f:(fun () ->
+      (* Retrieve the value by peeking in the known-resolved deferred. *)
+      exists typ ~compute:(fun () ->
+          Option.value_exn @@ Deferred.peek @@ As_prover.Ref.get requested ) )
+
 type return_type =
   { account_update : Account_update.Body.t
   ; account_update_digest : Zkapp_command.Digest.Account_update.t
@@ -600,7 +621,7 @@ let compile :
           ; main =
               (fun { Pickles.Inductive_rule.public_input = () } ->
                 let%map.Deferred vk_hash =
-                  Mina_base_util.exists_deferred Field.typ ~compute:(fun () ->
+                  exists_deferred Field.typ ~compute:(fun () ->
                       Lazy.force @@ Option.value_exn !vk_hash )
                 in
                 let { Pickles.Inductive_rule.previous_proof_statements
