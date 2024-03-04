@@ -1,0 +1,4 @@
+testnetName: "mina-testnet"
+name: "itn-orchestrator"
+
+image: gcr.io/o1labs-192920/itn-orchestrator
