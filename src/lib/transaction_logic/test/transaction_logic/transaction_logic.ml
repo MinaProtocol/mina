@@ -115,3 +115,44 @@ let simple_payment_signer_different_from_fee_payer () =
           "Cannot pay fees from a public key that did not sign the transaction"
         (Transaction_logic.apply_transactions ~constraint_constants ~global_slot
            ~txn_state_view ledger [ txn ] ) )
+
+let coinbase_order_of_created_accounts_is_correct ~with_fee_transfer () =
+  let amount = Amount.of_mina_int_exn 720 in
+  let make_nondeterministic_pk () =
+    Private_key.create () |> Public_key.of_private_key_exn
+    |> Public_key.compress
+  in
+  let receiver = make_nondeterministic_pk () in
+  let fee_transfer =
+    if with_fee_transfer then
+      let receiver_pk = make_nondeterministic_pk () in
+      let fee = Fee.of_mina_int_exn 10 in
+      Some (Coinbase_fee_transfer.create ~receiver_pk ~fee)
+    else None
+  in
+  let coinbase_txn =
+    Or_error.ok_exn @@ Coinbase.create ~amount ~receiver ~fee_transfer
+  in
+  let accounts = [] (* All accounts are new *) in
+  let ledger =
+    match Ledger_helpers.ledger_of_accounts ~depth:2 accounts with
+    | Ok l ->
+        l
+    | Error _ ->
+        assert false
+  in
+  let txn_global_slot = Global_slot_since_genesis.of_int 5 in
+  [%test_pred: Transaction_applied.Coinbase_applied.t Or_error.t] Or_error.is_ok
+    (Transaction_logic.apply_coinbase ~constraint_constants ~txn_global_slot
+       ledger coinbase_txn ) ;
+  let int_loc_of_account pk =
+    Ledger.location_of_account ledger pk
+    |> Option.value_exn |> Mina_ledger.Ledger.Location.to_path_exn
+    |> Mina_ledger.Ledger.Addr.to_int
+  in
+  let coinbase_accounts_referenced =
+    Coinbase.accounts_referenced coinbase_txn
+  in
+  List.iteri coinbase_accounts_referenced ~f:(fun idx pk ->
+      let actual_idx = int_loc_of_account pk in
+      [%test_eq: int] actual_idx idx )

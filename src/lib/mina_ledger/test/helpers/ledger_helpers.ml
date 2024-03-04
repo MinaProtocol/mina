@@ -16,11 +16,13 @@ let bin_log n =
   in
   find 0
 
-let ledger_of_accounts accounts =
+let ledger_of_accounts ?depth accounts =
   let open Result.Let_syntax in
   let open Test_account in
   let module R = Monad_lib.Make_ext2 (Result) in
-  let depth = bin_log @@ List.length accounts in
+  let depth =
+    match depth with None -> bin_log @@ List.length accounts | Some d -> d
+  in
   let ledger = Ledger.empty ~depth () in
   let%map () =
     R.iter_m accounts ~f:(fun a ->
