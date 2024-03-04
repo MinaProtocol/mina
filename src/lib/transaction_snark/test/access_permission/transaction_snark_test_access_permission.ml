@@ -34,8 +34,8 @@ let%test_module "Access permission tests" =
     module P = (val p_module)
 
     let vk =
-      let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
-      Async.Thread_safe.block_on_async_exn (fun () -> vk)
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Pickles.Side_loaded.Verification_key.of_compiled tag )
 
     let vk_hash = Mina_base.Verification_key_wire.digest_vk vk
 

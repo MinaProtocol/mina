@@ -264,8 +264,10 @@ let%test_module "multisig_account" =
                       }
                     ] )
               in
-              let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
-              let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk) in
+              let vk =
+                Async.Thread_safe.block_on_async_exn (fun () ->
+                    Pickles.Side_loaded.Verification_key.of_compiled tag )
+              in
               let { Mina_transaction_logic.For_tests.Transaction_spec.fee
                   ; sender = sender, sender_nonce
                   ; receiver = multisig_account_pk

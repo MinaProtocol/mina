@@ -1296,11 +1296,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let step_vks =
             lazy
-              (let%map.Promise step_vk = Lazy.force (snd step_keypair) in
-               Vector.map
-                 [ (fst step_keypair, step_vk) ]
-                 ~f:(fun (_, vk) -> Tick.Keypair.vk_commitments (fst vk)) )
+              (let _, lazy_step_vk = step_keypair in
+               let%map.Promise step_vk, _ = Lazy.force lazy_step_vk in
+               Vector.singleton @@ Tick.Keypair.vk_commitments step_vk )
           in
+
           let wrap_main _ =
             let module SC' = SC in
             let open Impls.Wrap in
