@@ -226,6 +226,24 @@ module Json_layout = struct
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
 
+        let to_yojson t =
+          `Assoc
+            [ ("edit_state", Auth_required.to_yojson t.edit_state)
+            ; ("send", Auth_required.to_yojson t.send)
+            ; ("receive", Auth_required.to_yojson t.receive)
+            ; ("access", Auth_required.to_yojson t.access)
+            ; ("set_delegate", Auth_required.to_yojson t.set_delegate)
+            ; ("set_permissions", Auth_required.to_yojson t.set_permissions)
+            ; ( "set_verification_key"
+              , Verification_key_perm.to_yojson t.set_verification_key )
+            ; ("set_zkapp_uri", Auth_required.to_yojson t.set_zkapp_uri)
+            ; ("edit_action_state", Auth_required.to_yojson t.edit_action_state)
+            ; ("set_token_symbol", Auth_required.to_yojson t.set_token_symbol)
+            ; ("increment_nonce", Auth_required.to_yojson t.increment_nonce)
+            ; ("set_voting_for", Auth_required.to_yojson t.set_voting_for)
+            ; ("set_timing", Auth_required.to_yojson t.set_timing)
+            ]
+
         let of_permissions (perm : Mina_base.Permissions.t) =
           { edit_state = Auth_required.of_account_perm perm.edit_action_state
           ; send = Auth_required.of_account_perm perm.send
