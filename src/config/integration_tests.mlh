@@ -5,3 +5,7 @@
 (* This profile is only used for the test executive binary, so we don't need
    snark keys, a valid genesis proof, etc. *)
 [%%import "/src/config/proof_level/none.mlh"]
+[%%undef zkapp_cmd_limit]
+
+[%%undef slot_tx_end]
+[%%undef slot_chain_end]

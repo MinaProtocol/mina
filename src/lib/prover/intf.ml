@@ -17,10 +17,13 @@ module type S = sig
 
   val create :
        logger:Logger.t
+    -> ?enable_internal_tracing:bool
+    -> ?internal_trace_filename:string
     -> pids:Child_processes.Termination.t
     -> conf_dir:string
     -> proof_level:Genesis_constants.Proof_level.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> unit
     -> t Deferred.t
 
   val initialized : t -> [ `Initialized ] Deferred.Or_error.t
@@ -46,4 +49,11 @@ module type S = sig
 
   val create_genesis_block :
     t -> Genesis_proof.Inputs.t -> Blockchain.t Deferred.Or_error.t
+
+  val toggle_internal_tracing : t -> bool -> unit Deferred.Or_error.t
+
+  (* in ITN logger, sets the client port of daemon to send RPC requests to
+     sets the process kind for the Itn logger to "prover"
+  *)
+  val set_itn_logger_data : t -> daemon_port:int -> unit Deferred.Or_error.t
 end

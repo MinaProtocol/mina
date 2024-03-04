@@ -1,0 +1,29 @@
+(library
+ (name mina_ledger_test_helpers)
+ (libraries
+  ;; opam libraries
+  base
+  base.caml
+  core_kernel
+  core
+  integers
+  sexplib0
+  yojson
+  ;; local libraries
+  currency
+  kimchi_backend_common
+  kimchi_backend.pasta
+  kimchi_backend.pasta.basic
+  mina_base
+  mina_base_test_helpers
+  mina_ledger
+  mina_numbers
+  monad_lib
+  pickles
+  pickles.backend
+  pickles_types
+  signature_lib)
+ (preprocess
+  (pps ppx_base ppx_let ppx_assert ppx_version))
+ (instrumentation
+  (backend bisect_ppx)))

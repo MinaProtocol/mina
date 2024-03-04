@@ -2,10 +2,11 @@
  (name codable)
  (public_name codable)
  (library_flags (-linkall))
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    core_kernel
+   base64
    ppx_deriving_yojson.runtime
    yojson
    result
