@@ -343,7 +343,6 @@ struct
       -> ?disk_keys:
            (Cache.Step.Key.Verification.t, branches) Vector.t
            * Cache.Wrap.Key.Verification.t
-      -> ?return_early_digest_exception:bool
       -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
       -> ?override_wrap_main:
            (max_proofs_verified, branches, prev_varss) wrap_main_generic
@@ -380,10 +379,9 @@ struct
    fun ~self ~cache
        ~storables:
          { step_storable; step_vk_storable; wrap_storable; wrap_vk_storable }
-       ~proof_cache ?disk_keys ?(return_early_digest_exception = false)
-       ?override_wrap_domain ?override_wrap_main ~branches:(module Branches)
-       ~max_proofs_verified ~name ~constraint_constants ~public_input
-       ~auxiliary_typ ~choices () ->
+       ~proof_cache ?disk_keys ?override_wrap_domain ?override_wrap_main
+       ~branches:(module Branches) ~max_proofs_verified ~name
+       ~constraint_constants ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
@@ -556,9 +554,6 @@ struct
 
             let f (T b : _ Branch_data.t) =
               let open Impls.Step in
-              (* HACK: TODO docs *)
-              if return_early_digest_exception then failwith "TODO: Delete me" ;
-
               let k_p =
                 lazy
                   (let (T (typ, _conv, conv_inv)) = etyp in
@@ -982,7 +977,6 @@ let compile_with_wrap_main_override_promise :
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, branches) Vector.t
          * Cache.Wrap.Key.Verification.t
-    -> ?return_early_digest_exception:bool
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> ?override_wrap_main:
          (max_proofs_verified, branches, prev_varss) wrap_main_generic
@@ -1032,9 +1026,9 @@ let compile_with_wrap_main_override_promise :
     and the underlying Make(_).compile function which builds the circuits.
  *)
  fun ?self ?(cache = []) ?(storables = Storables.default) ?proof_cache
-     ?disk_keys ?(return_early_digest_exception = false) ?override_wrap_domain
-     ?override_wrap_main ~public_input ~auxiliary_typ ~branches
-     ~max_proofs_verified ~name ~constraint_constants ~choices () ->
+     ?disk_keys ?override_wrap_domain ?override_wrap_main ~public_input
+     ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
+     ~choices () ->
   let self =
     match self with
     | None ->
@@ -1100,10 +1094,9 @@ let compile_with_wrap_main_override_promise :
         r :: conv_irs rs
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
-    M.compile ~return_early_digest_exception ~self ~proof_cache ~cache
-      ~storables ?disk_keys ?override_wrap_domain ?override_wrap_main ~branches
-      ~max_proofs_verified ~name ~public_input ~auxiliary_typ
-      ~constraint_constants
+    M.compile ~self ~proof_cache ~cache ~storables ?disk_keys
+      ?override_wrap_domain ?override_wrap_main ~branches ~max_proofs_verified
+      ~name ~public_input ~auxiliary_typ ~constraint_constants
       ~choices:(fun ~self -> conv_irs (choices ~self))
       ()
   in
