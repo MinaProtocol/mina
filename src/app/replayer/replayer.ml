@@ -681,6 +681,13 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
             return packed_ledger
       in
       let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
+      [%log info]
+        ~metadata:
+          [ ( "ledger_hash"
+            , `String (Ledger_hash.to_base58_check @@ Ledger.merkle_root ledger)
+            )
+          ]
+        "Ledger_hash of input file" ;
       let epoch_ledgers_state_hash_opt =
         Option.map input.target_epoch_ledgers_state_hash
           ~f:State_hash.to_base58_check
