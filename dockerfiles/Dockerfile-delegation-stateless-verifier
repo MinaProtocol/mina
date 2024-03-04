@@ -40,7 +40,7 @@ RUN mkdir ${HOME}/app
 
 RUN eval $(opam config env) \
   && dune build --profile=${DUNE_PROFILE} \
-    src/app/delegation_verify/delegation_verify.exe \
+  src/app/delegation_verify/delegation_verify.exe \
   && cp _build/default/src/app/delegation_verify/delegation_verify.exe ./delegation-verify \
   && rm -rf _build
 
@@ -62,7 +62,7 @@ COPY --from=builder /bin/authenticate.sh /bin/authenticate.sh
 # awscli and cqlsh-expansion are used by the delegation verification tool
 RUN apt-get update && apt-get install -y python3 python3-pip jq libjemalloc2 wget dnsutils gawk
 RUN pip3 install awscli
-RUN pip3 install cqlsh-expansion
+RUN pip3 install cqlsh
 RUN pip3 install pytz
 
 # Install libssl1.1.1b (not in apt)
@@ -88,8 +88,6 @@ RUN rm libffi7_3.3-4_amd64.deb
 # Make symlinks
 RUN ln -s /usr/local/bin/aws /bin/aws
 RUN ln -s /usr/local/bin/cqlsh /bin/cqlsh
-RUN ln -s /usr/local/bin/cqlsh-expansion /bin/cqlsh-expansion
-RUN /usr/local/bin/cqlsh-expansion.init
 
 # make binary and script executable
 RUN chmod +x /bin/authenticate.sh /bin/delegation-verify
