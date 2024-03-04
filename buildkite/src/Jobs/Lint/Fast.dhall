@@ -33,6 +33,7 @@ in  Pipeline.build
             S.strictly (S.contains "Makefile"),
             S.strictlyStart (S.contains "src/"),
             S.strictlyStart (S.contains "rfcs/"),
+            S.exactly_noext "CODEOWNERS",
             S.exactly "scripts/check-snarky-submodule" "sh"
           ]
         , path = "Lint"
