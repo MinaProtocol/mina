@@ -1212,6 +1212,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             ~next_epoch_ledger
         in
         let log_ledger_hash_after_last_slot () =
+          (* See PR #9782. *)
           let global_slots_to_avoid =
             [ 146033L
             ; 146078L
