@@ -275,7 +275,7 @@ $ opam install alcotest cmdliner=1.0.3 fmt=0.8.6
 Then, run the following command to update the `ocaml.export` file:
 
 ```console
-$ opam switch export opam.export
+$ opam switch export --full opam.export
 ```
 
 ## Steps for adding a new OCaml pinned dependency
