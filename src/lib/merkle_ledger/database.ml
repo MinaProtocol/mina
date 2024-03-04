@@ -1,33 +1,10 @@
-open Core
-
-module type Inputs_intf = sig
-  include Base_inputs_intf.S
-
-  module Location : Location_intf.S
-
-  module Location_binable : Hashable.S_binable with type t := Location.t
-
-  module Kvdb : Intf.Key_value_database with type config := string
-
-  module Storage_locations : Intf.Storage_locations
-end
-
-module Make (Inputs : Inputs_intf) :
-  Database_intf.S
-    with module Location = Inputs.Location
-     and module Addr = Inputs.Location.Addr
-     and type key := Inputs.Key.t
-     and type token_id := Inputs.Token_id.t
-     and type token_id_set := Inputs.Token_id.Set.t
-     and type account := Inputs.Account.t
-     and type root_hash := Inputs.Hash.t
-     and type hash := Inputs.Hash.t
-     and type account_id := Inputs.Account_id.t
-     and type account_id_set := Inputs.Account_id.Set.t = struct
+module Make (Inputs : Intf.Inputs.DATABASE) = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   open Inputs
 
   module Db_error = struct
+    [@@@warning "-4"] (* due to deriving sexp below *)
+
     type t = Account_location_not_found | Out_of_leaves | Malformed_database
     [@@deriving sexp]
   end
@@ -67,6 +44,8 @@ module Make (Inputs : Inputs_intf) :
   let depth t = t.depth
 
   let create ?directory_name ~depth () =
+    let open Core in
+    (* for ^/ and Unix below *)
     assert (depth < 0xfe) ;
     let uuid = Uuid_unix.create () in
     let directory =
@@ -290,25 +269,13 @@ module Make (Inputs : Inputs_intf) :
       Result.map location_result ~f:(fun location ->
           set mdb key location ; location )
 
-    let last_location_address mdb =
-      match
-        last_location_key () |> get_raw mdb |> Result.of_option ~error:()
-        |> Result.bind ~f:(Location.parse ~ledger_depth:mdb.depth)
-      with
-      | Error () ->
-          None
-      | Ok parsed_location ->
-          Some (Location.to_path_exn parsed_location)
-
     let last_location mdb =
-      match
-        last_location_key () |> get_raw mdb |> Result.of_option ~error:()
-        |> Result.bind ~f:(Location.parse ~ledger_depth:mdb.depth)
-      with
-      | Error () ->
-          None
-      | Ok parsed_location ->
-          Some parsed_location
+      last_location_key () |> get_raw mdb
+      |> Option.bind ~f:(fun data ->
+             Location.parse ~ledger_depth:mdb.depth data |> Result.ok )
+
+    let last_location_address mdb =
+      Option.map (last_location mdb) ~f:Location.to_path_exn
   end
 
   let get_at_index_exn mdb index =
@@ -590,7 +557,7 @@ module Make (Inputs : Inputs_intf) :
 
   let get_or_create_account mdb account_id account =
     match Account_location.get mdb account_id with
-    | Error Account_location_not_found -> (
+    | Error Db_error.Account_location_not_found -> (
         match Account_location.allocate mdb account_id with
         | Ok location ->
             set mdb location account ;
@@ -599,7 +566,7 @@ module Make (Inputs : Inputs_intf) :
         | Error err ->
             Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
         )
-    | Error err ->
+    | Error ((Db_error.Malformed_database | Db_error.Out_of_leaves) as err) ->
         Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
     | Ok location ->
         Ok (`Existed, location)
