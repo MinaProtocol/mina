@@ -72,7 +72,7 @@ You can build Mina using Docker. Using Docker works in any dev environment. See 
 1. Install [rustup](https://rustup.rs/).
 2. Create your switch with deps `opam switch import --switch mina opam.export`
 
-    M1- and M-2 operating systems experience issues because Homebrew does not link include files automatically.
+    M1- and M2- operating systems experience issues because Homebrew does not link include files automatically.
   
     If you get an error about failing to find `gmp.h`, update your `~/.zshrc` or `~/.bashrc` with:
 
