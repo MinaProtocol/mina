@@ -1,6 +1,25 @@
-{ lib, dockerTools, buildEnv, ocamlPackages_mina, runCommand, dumb-init
-, coreutils, bashInteractive, python3, libp2p_helper, procps, postgresql, curl
-, jq, stdenv, rsync, bash, gnutar, gzip, currentTime, flockenzeit }:
+{ lib
+, dockerTools
+, buildEnv
+, ocamlPackages_mina
+, runCommand
+, dumb-init
+, coreutils
+, bashInteractive
+, python3
+, libp2p_helper
+, procps
+, postgresql
+, curl
+, jq
+, stdenv
+, rsync
+, bash
+, gnutar
+, gzip
+, currentTime
+, flockenzeit
+}:
 let
   created = flockenzeit.lib.ISO-8601 currentTime;
 
@@ -71,7 +90,8 @@ let
     };
   };
 
-in {
+in
+{
   mina-image-slim = dockerTools.streamLayeredImage {
     name = "mina";
     inherit created;
