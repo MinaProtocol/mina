@@ -20,11 +20,4 @@ echo "--- Upload debs to amazon s3 repo"
 ./buildkite/scripts/publish-deb.sh
 
 echo "--- Git diff after build is complete:"
-diff_output=$(git diff -- .)
-diff_length=${#diff_output}
-
-if [ $diff_length -ne 0 ]; then
-    echo "Warning: There are uncommitted changes." >&2
-else
-    echo "No changes detected."
-fi
+#git diff --exit-code -- .
