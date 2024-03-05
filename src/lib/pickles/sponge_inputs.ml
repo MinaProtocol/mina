@@ -44,14 +44,14 @@ struct
             ~compute:
               As_prover.(fun () -> round_table (Array.map init ~f:read_var))
         in
-        t.(0) <- init ;
+        t.(0) <- Array.copy init ;
         (let open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint in
         with_label __LOC__ (fun () ->
             Impl.assert_
               { basic = T (Poseidon { state = t })
               ; annotation = Some "plonk-poseidon"
               } )) ;
-        t.(Int.(Array.length t - 1)) )
+        Array.copy t.(Int.(Array.length t - 1)) )
 
   let add_assign ~state i x =
     state.(i) <- Util.seal (module Impl) Field.(state.(i) + x)
