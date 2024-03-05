@@ -148,6 +148,10 @@ module type S = sig
   val merkle_path_at_addr : 'a t -> addr -> merkle_path Or_error.t
 
   val get_account_at_addr : 'a t -> addr -> account Or_error.t
+
+  val waiting_parents : 'a t -> int Int.Table.t * int Int.Table.t
+
+  val waiting_content : 'a t -> int Int.Table.t * int Int.Table.t
 end
 
 (*
@@ -357,6 +361,8 @@ end = struct
     val find_exn : 'a t -> Addr.t -> 'a
 
     val remove : 'a t -> Addr.t -> unit
+
+    val added_and_removed : 'a t -> int Int.Table.t * int Int.Table.t
   end = struct
     type 'a t =
       { table : 'a Addr.Table.t
@@ -398,6 +404,8 @@ end = struct
             1
         | Some x ->
             x + 1 )
+
+    let added_and_removed { added; removed; table = _ } = (added, removed)
   end
 
   type 'a t =
@@ -419,6 +427,12 @@ end = struct
     ; mutable validity_listener :
         [ `Ok | `Target_changed of Root_hash.t option * Root_hash.t ] Ivar.t
     }
+
+  let waiting_parents { waiting_parents; _ } =
+    Waiting.added_and_removed waiting_parents
+
+  let waiting_content { waiting_content; _ } =
+    Waiting.added_and_removed waiting_content
 
   let t_of_sexp _ = failwith "t_of_sexp: not implemented"
 

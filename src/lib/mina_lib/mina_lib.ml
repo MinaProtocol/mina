@@ -110,8 +110,17 @@ type t =
       [ `Producing | `Producing_in_ms of float | `Free ] ref
   ; in_memory_reverse_structured_log_messages_for_integration_test :
       (int * string list * bool) ref
+  ; bootstrap_stats_fetcher :
+      (   unit
+       -> (int Int.Table.t * int Int.Table.t)
+          * (int Int.Table.t * int Int.Table.t) )
+      option
+      ref
   }
 [@@deriving fields]
+
+let bootstrap_stats t =
+  match !(t.bootstrap_stats_fetcher) with None -> None | Some f -> Some (f ())
 
 let time_controller t = t.config.time_controller
 
@@ -1320,6 +1329,7 @@ let create ?wallets (config : Config.t) =
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       O1trace.thread "mina_lib" (fun () ->
+          let bootstrap_stats_fetcher = ref None in
           let%bind prover =
             Monitor.try_with ~here:[%here]
               ~rest:
@@ -1805,6 +1815,7 @@ let create ?wallets (config : Config.t) =
               ~catchup_mode ~network_transition_reader:block_reader
               ~producer_transition_reader ~most_recent_valid_block
               ~precomputed_values:config.precomputed_values ~notify_online
+              ~bootstrap_stats_fetcher
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -2063,6 +2074,7 @@ let create ?wallets (config : Config.t) =
             ; block_production_status = ref `Free
             ; in_memory_reverse_structured_log_messages_for_integration_test =
                 ref (0, [], false)
+            ; bootstrap_stats_fetcher
             } ) )
 
 let net { components = { net; _ }; _ } = net

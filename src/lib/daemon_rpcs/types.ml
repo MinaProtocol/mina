@@ -193,6 +193,16 @@ module Status = struct
     [@@deriving to_yojson, bin_io_unversioned, fields]
   end
 
+  module Bootstrap_status = struct
+    type t =
+      { waiting_parents : (int * int) list
+      ; completed_parents : (int * int) list
+      ; waiting_content : (int * int) list
+      ; completed_content : (int * int) list
+      }
+    [@@deriving to_yojson, bin_io_unversioned, fields]
+  end
+
   module Make_entries (FieldT : sig
     type 'a t
 
@@ -400,6 +410,25 @@ module Status = struct
       in
       option_entry "Catchup status" ~f:render
 
+    let bootstrap_status_one xs =
+      List.map xs ~f:(fun (i, j) ->
+          (sprintf "\t ledger depth %i" i, Int.to_string j) )
+      |> digest_entries ~title:""
+
+    let bootstrap_status =
+      let render conf =
+        let fmt_field field =
+          let name = Field.name field in
+          (name, bootstrap_status_one (Field.get field conf))
+        in
+        Bootstrap_status.Fields.to_list ~waiting_parents:fmt_field
+          ~completed_parents:fmt_field ~waiting_content:fmt_field
+          ~completed_content:fmt_field
+        |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
+        |> digest_entries ~title:""
+      in
+      option_entry "Bootstrap snarked ledger status" ~f:render
+
     let metrics =
       let render conf =
         let fmt_field name op field = [ (name, op (Field.get field conf)) ] in
@@ -448,6 +477,7 @@ module Status = struct
     ; catchup_status :
         (Transition_frontier.Full_catchup_tree.Node.State.Enum.t * int) list
         option
+    ; bootstrap_status : Bootstrap_status.t option
     ; block_production_keys : string list
     ; coinbase_receiver : string option
     ; histograms : Histograms.t option
@@ -477,7 +507,8 @@ module Status = struct
       ~coinbase_receiver ~histograms ~consensus_time_best_tip
       ~global_slot_since_genesis_best_tip ~consensus_time_now
       ~consensus_mechanism ~consensus_configuration ~next_block_production
-      ~snark_work_fee ~addrs_and_ports ~catchup_status ~metrics
+      ~snark_work_fee ~addrs_and_ports ~catchup_status ~bootstrap_status
+      ~metrics
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =

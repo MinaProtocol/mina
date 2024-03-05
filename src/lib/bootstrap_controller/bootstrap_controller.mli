@@ -1,3 +1,4 @@
+open Core_kernel
 open Async_kernel
 open Pipe_lib
 open Network_peer
@@ -21,6 +22,12 @@ val run :
   -> initial_root_transition:Mina_block.Validated.t
   -> precomputed_values:Precomputed_values.t
   -> catchup_mode:[ `Normal | `Super ]
+  -> bootstrap_stats_fetcher:
+       (   unit
+        -> (int Int.Table.t * int Int.Table.t)
+           * (int Int.Table.t * int Int.Table.t) )
+       option
+       ref
   -> ( Transition_frontier.t
      * Mina_block.initial_valid_block Envelope.Incoming.t list )
      Deferred.t

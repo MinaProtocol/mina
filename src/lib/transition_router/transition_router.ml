@@ -100,7 +100,8 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
     ~transition_reader_ref ~transition_writer_ref ~consensus_local_state
     ~frontier_w ~initial_root_transition ~persistent_root ~persistent_frontier
-    ~best_seen_transition ~precomputed_values ~catchup_mode =
+    ~best_seen_transition ~precomputed_values ~catchup_mode
+    ~bootstrap_stats_fetcher =
   [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
   let bootstrap_controller_reader, bootstrap_controller_writer =
@@ -131,8 +132,8 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
     (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
        ~consensus_local_state ~transition_reader:!transition_reader_ref
        ~persistent_frontier ~persistent_root ~initial_root_transition
-       ~best_seen_transition ~precomputed_values ~catchup_mode )
-    (fun (new_frontier, collected_transitions) ->
+       ~best_seen_transition ~precomputed_values ~catchup_mode
+       ~bootstrap_stats_fetcher ) (fun (new_frontier, collected_transitions) ->
       Strict_pipe.Writer.kill !transition_writer_ref ;
       start_transition_frontier_controller ~logger ~trust_system ~verifier
         ~network ~time_controller ~producer_transition_reader_ref
@@ -307,7 +308,8 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
     ~producer_transition_writer_ref ~clear_reader ~verified_transition_writer
     ~transition_reader_ref ~transition_writer_ref
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
-    ~consensus_local_state ~precomputed_values ~catchup_mode ~notify_online =
+    ~consensus_local_state ~precomputed_values ~catchup_mode ~notify_online
+    ~bootstrap_stats_fetcher =
   let%bind () =
     if is_demo_mode then return ()
     else wait_for_high_connectivity ~logger ~network ~is_seed
@@ -335,7 +337,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
         ~clear_reader ~transition_reader_ref ~consensus_local_state
         ~transition_writer_ref ~frontier_w ~persistent_root ~persistent_frontier
         ~initial_root_transition ~catchup_mode ~best_seen_transition:best_tip
-        ~precomputed_values
+        ~precomputed_values ~bootstrap_stats_fetcher
   | best_tip, Some frontier -> (
       match best_tip with
       | Some best_tip
@@ -364,6 +366,7 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
             ~transition_writer_ref ~frontier_w ~persistent_root
             ~persistent_frontier ~initial_root_transition ~catchup_mode
             ~best_seen_transition:(Some best_tip) ~precomputed_values
+            ~bootstrap_stats_fetcher
       | _ ->
           if Option.is_some best_tip then
             [%log info]
@@ -468,7 +471,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     ~producer_transition_reader
     ~most_recent_valid_block:
       (most_recent_valid_block_reader, most_recent_valid_block_writer)
-    ~precomputed_values ~catchup_mode ~notify_online =
+    ~precomputed_values ~catchup_mode ~notify_online ~bootstrap_stats_fetcher =
   let initialization_finish_signal = Ivar.create () in
   let clear_reader, clear_writer =
     Strict_pipe.create ~name:"clear" Synchronous
@@ -545,6 +548,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
           ~verified_transition_writer ~transition_reader_ref
           ~transition_writer_ref ~most_recent_valid_block_writer
           ~consensus_local_state ~precomputed_values ~notify_online
+          ~bootstrap_stats_fetcher
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
       let valid_transition_reader1, valid_transition_reader2 =
@@ -610,7 +614,8 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                           ~consensus_local_state ~frontier_w ~persistent_root
                           ~persistent_frontier ~initial_root_transition
                           ~best_seen_transition:(Some enveloped_transition)
-                          ~precomputed_values ~catchup_mode )
+                          ~precomputed_values ~catchup_mode
+                          ~bootstrap_stats_fetcher )
                       else Deferred.unit
                   | None ->
                       Deferred.unit
