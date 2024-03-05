@@ -1,8 +1,8 @@
 (* berkeley_migration_verifier.ml -- verify integrity of migrated archive db from original Mina mainnet schema *)
 
-open Core_kernel
 open Async
 open Yojson.Basic.Util
+open Core
 
 module Check = struct
   type t = Ok | Error of string list
@@ -11,29 +11,15 @@ module Check = struct
 
   let err error = Error [ error ]
 
-  let errors errors = Error errors
-
-  let _combine checks =
-    List.fold checks ~init:ok ~f:(fun acc item ->
-        match (acc, item) with
-        | Error e1, Error e2 ->
-            errors (e1 @ e2)
-        | Error e, _ ->
-            errors e
-        | _, Error e ->
-            errors e
-        | _, _ ->
-            Ok )
+  let errors errors = if List.is_empty errors then Ok else Error errors
 end
-
-let test_count = 12
 
 let exit_code = ref 0
 
 module Test = struct
   type t = { check : Check.t; name : string }
 
-  let of_check check ~name ~idx ~prefix =
+  let of_check check ~name ~idx ~prefix test_count =
     { check; name = sprintf "[%d/%d] %s) %s " idx test_count prefix name }
 
   let print_errors error_messages =
@@ -57,7 +43,7 @@ module Test = struct
         print_errors error_messages
 end
 
-let migrated_db_is_connected query_migrated_db ~height=
+let migrated_db_is_connected query_migrated_db ~height =
   let open Deferred.Let_syntax in
   let%bind canonical_blocks_count_till_height =
     query_migrated_db ~f:(fun db ->
@@ -93,518 +79,241 @@ let diff_files left right =
   with
   | Ok output ->
       if String.is_empty output then return Check.ok
-      else return (Check.err (sprintf "Discrepancies found between files %s and %s. To reproduce please run `diff %s %s`"
-        left right left right
-      ))
+      else
+        return
+          (Check.err
+             (sprintf
+                "Discrepancies found between files %s and %s. To reproduce \
+                 please run `diff %s %s`"
+                left right left right ) )
   | Error error ->
       return
         (Check.err
            (sprintf "Internal error when comparing files, due to %s"
               (Error.to_string_hum error) ) )
 
-let all_accounts_referred_in_commands_are_recorded migrated_pool  =
+let all_accounts_referred_in_commands_are_recorded migrated_pool ~work_dir =
   let query_migrated_db = Mina_caqti.query migrated_pool in
+  let user_and_internal_cmds =
+    Filename.concat work_dir "user_and_internal_cmds.csv"
+  in
+  let account_accessed = Filename.concat work_dir "account_accessed.csv" in
 
   let open Deferred.Let_syntax in
   let%bind () =
     query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_user_and_internal_command_info_to_csv db "/tmp/accesssed1.csv")
+        Sql.Berkeley.dump_user_and_internal_command_info_to_csv db
+          user_and_internal_cmds )
   in
 
   let%bind () =
     query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_accounts_accessed_to_csv db "/tmp/accesssed2.csv")
+        Sql.Berkeley.dump_accounts_accessed_to_csv db account_accessed )
   in
 
-  diff_files "/tmp/accesssed1.csv" "/tmp/accesssed2.csv"
+  diff_files user_and_internal_cmds account_accessed
 
-let compare_hashes_till_height migrated_pool mainnet_pool ~height=
+let compare_hashes_till_height migrated_pool mainnet_pool ~height ~work_dir =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
+  let state_hashes_berk = Filename.concat work_dir "state_hashes_berk.csv" in
+  let state_hashes_main = Filename.concat work_dir "state_hashes_main.csv" in
 
   let open Deferred.Let_syntax in
-
   let%bind () =
     query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_block_hashes_till_height db
-          "/tmp/state_hashes1.csv" height )
+        Sql.Berkeley.dump_block_hashes_till_height db state_hashes_berk height )
   in
 
   let%bind () =
     query_mainnet_db ~f:(fun db ->
-        Sql.Mainnet.dump_block_hashes_till_height db
-          "/tmp/state_hashes2.csv" height )
+        Sql.Mainnet.dump_block_hashes_till_height db state_hashes_main height )
   in
 
-  diff_files "/tmp/state_hashes1.csv" "/tmp/state_hashes2.csv"
+  diff_files state_hashes_berk state_hashes_main
 
-let compare_hashes migrated_pool mainnet_pool =
+let compare_hashes migrated_pool mainnet_pool ~work_dir =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
+  let state_hashes_berk = Filename.concat work_dir "state_hashes_berk.csv" in
+  let state_hashes_main = Filename.concat work_dir "state_hashes_main.csv" in
 
   let open Deferred.Let_syntax in
-
   let%bind () =
     query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_block_hashes db
-          "/tmp/state_hashes1.csv" )
+        Sql.Berkeley.dump_block_hashes db state_hashes_berk )
   in
 
   let%bind () =
     query_mainnet_db ~f:(fun db ->
-        Sql.Mainnet.dump_block_hashes db
-          "/tmp/state_hashes2.csv" )
+        Sql.Mainnet.dump_block_hashes db state_hashes_main )
   in
 
-  diff_files "/tmp/state_hashes1.csv" "/tmp/state_hashes2.csv"
+  diff_files state_hashes_berk state_hashes_main
 
-
-let compare_user_commands_till_height migrated_pool mainnet_pool ~height=
+let compare_user_commands_till_height migrated_pool mainnet_pool ~height
+    ~work_dir =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
+  let user_commands_berk = Filename.concat work_dir "user_commands_berk.csv" in
+  let user_commands_main = Filename.concat work_dir "user_commands_main.csv" in
 
   let open Deferred.Let_syntax in
-  
   let%bind () =
     query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_user_commands_till_height db
-          "/tmp/user_commands_info1.csv" height )
+        Sql.Berkeley.dump_user_commands_till_height db user_commands_berk height )
   in
 
   let%bind () =
     query_mainnet_db ~f:(fun db ->
-        Sql.Mainnet.dump_user_commands_till_height db
-          "/tmp/user_commands_info2.csv" height )
+        Sql.Mainnet.dump_user_commands_till_height db user_commands_main height )
   in
 
-  diff_files "/tmp/user_commands_info1.csv" "/tmp/user_commands_info2.csv"
+  diff_files user_commands_berk user_commands_main
 
-let compare_internal_commands_till_height migrated_pool mainnet_pool ~height =
+let compare_internal_commands_till_height migrated_pool mainnet_pool ~height
+    ~work_dir =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
+  let internal_commands_berk =
+    Filename.concat work_dir "internal_commands_berk.csv"
+  in
+  let internal_commands_main =
+    Filename.concat work_dir "internal_commands_main.csv"
+  in
 
   let open Deferred.Let_syntax in
-
   let%bind () =
     query_migrated_db ~f:(fun db ->
         Sql.Berkeley.dump_internal_commands_till_height db
-          "/tmp/internal_commands_info1.csv" height )
+          internal_commands_berk height )
   in
 
   let%bind () =
     query_mainnet_db ~f:(fun db ->
-        Sql.Mainnet.dump_internal_commands_till_height db
-          "/tmp/internal_commands_info2.csv" height )
+        Sql.Mainnet.dump_internal_commands_till_height db internal_commands_main
+          height )
   in
 
-  diff_files "/tmp/internal_commands_info1.csv"
-    "/tmp/internal_commands_info2.csv"
+  diff_files internal_commands_berk internal_commands_main
 
-
-let compare_user_commands migrated_pool mainnet_pool =
+let compare_user_commands migrated_pool mainnet_pool ~work_dir =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
+  let user_commands_berk = Filename.concat work_dir "user_commands_berk.csv" in
+  let user_commands_main = Filename.concat work_dir "user_commands_main.csv" in
 
   let open Deferred.Let_syntax in
-  
   let%bind () =
     query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_user_commands db
-          "/tmp/user_commands_info1.csv" )
+        Sql.Berkeley.dump_user_commands db user_commands_berk )
   in
 
   let%bind () =
     query_mainnet_db ~f:(fun db ->
-        Sql.Mainnet.dump_user_commands db
-          "/tmp/user_commands_info2.csv" )
+        Sql.Mainnet.dump_user_commands db user_commands_main )
   in
 
-  diff_files "/tmp/user_commands_info1.csv" "/tmp/user_commands_info2.csv"
+  diff_files user_commands_berk user_commands_main
 
-let compare_internal_commands migrated_pool mainnet_pool =
+let compare_internal_commands migrated_pool mainnet_pool ~work_dir =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
+  let internal_commands_berk =
+    Filename.concat work_dir "internal_commands_berk.csv"
+  in
+  let internal_commands_main =
+    Filename.concat work_dir "internal_commands_main.csv"
+  in
 
   let open Deferred.Let_syntax in
-
   let%bind () =
     query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_internal_commands db
-          "/tmp/internal_commands_info1.csv" )
+        Sql.Berkeley.dump_internal_commands db internal_commands_berk )
   in
 
   let%bind () =
     query_mainnet_db ~f:(fun db ->
-        Sql.Mainnet.dump_internal_commands db
-          "/tmp/internal_commands_info2.csv" )
+        Sql.Mainnet.dump_internal_commands db internal_commands_main )
   in
 
-  diff_files "/tmp/internal_commands_info1.csv"
-    "/tmp/internal_commands_info2.csv"
+  diff_files internal_commands_berk internal_commands_main
 
-(*
-   let get_migration_end_slot_for_state_hash ~query_mainnet_db state_hash =
-     let open Deferred.Let_syntax in
-     let%bind maybe_slot =
-       query_mainnet_db ~f:(fun db ->
-           Sql.Mainnet.global_slot_since_genesis_at_state_hash db state_hash )
-     in
-     Deferred.return
-       (Option.value_exn maybe_slot
-          ~message:
-            (Printf.sprintf "Cannot find slot for state hash: %s" state_hash) )
+module CommonAccountElement = struct
+  type t =
+    { pk : string
+    ; balance : string
+    ; delegate : string
+    ; receipt_chain_hash : string
+    ; voting_for : string
+    ; nonce : string
+    }
 
+  let of_yojson_node json_item =
+    { pk = member "pk" json_item |> to_string
+    ; balance = member "balance" json_item |> to_string
+    ; delegate = member "delegate" json_item |> to_string
+    ; receipt_chain_hash = member "receipt_chain_hash" json_item |> to_string
+    ; voting_for = member "voting_for" json_item |> to_string
+    ; nonce =
+        member "nonce" json_item |> to_string_option
+        |> Option.value ~default:"0"
+    }
 
-   let assert_migrated_db_has_account_accessed query_migrated_db =
-     let%bind account_accessed_count =
-       query_migrated_db ~f:(fun db -> Sql.Berkeley.count_account_accessed db)
-     in
-     if Int.( > ) account_accessed_count 0 then Deferred.return Check.ok
-     else
-       Deferred.return
-         (Check.err
-            (sprintf
-               "Expected to have at least one entry in account accessed table" ) )
+  let to_string t =
+    sprintf
+      "{\n\
+      \      pk: %s \n\
+      \      ; balance: %s\n\
+      \      ; delegate: %s\n\
+      \      ; receipt_chain_hash: %s\n\
+      \      ; voting_for: %s\n\
+      \      ; nonce: %s\n\
+      \    }" t.pk t.balance t.delegate t.receipt_chain_hash t.voting_for
+      t.nonce
 
-   let assert_all_user_and_interal_commands_account_ids_appear_in_accounts_accessed
-       query_migrated_db =
-     let%bind account_accessed_in_commands_count =
-       query_migrated_db ~f:(fun db ->
-           Sql.Berkeley.get_account_id_accessed_in_commands db )
-     in
-     let%bind account_accessed =
-       query_migrated_db ~f:(fun db -> Sql.Berkeley.count_account_accessed db)
-     in
-     if Int.equal account_accessed account_accessed_in_commands_count then
-       Deferred.return Check.ok
-     else
-       Deferred.return
-         (Check.err
-            (sprintf
-               "Unmigrated accounts in user or internal commands found. Expected: \
-                '%d' unique accounts based on commands tables but got '%d'"
-               account_accessed account_accessed_in_commands_count ) )
+  let equal_ignore_receipt_chain_hash t1 t2 =
+    String.equal t1.pk t2.pk
+    && String.equal t1.balance t2.balance
+    && String.equal t1.delegate t2.delegate
+    && String.equal t1.voting_for t2.voting_for
+    && String.equal t1.receipt_chain_hash t2.receipt_chain_hash
+    && String.equal t1.nonce t2.nonce
+end
 
-   let compare_db_content ~mainnet_archive_uri ~migrated_archive_uri
-       ~fork_state_hash () =
-     printf
-       "Running verifications between '%s' and '%s' schemas. It may take a couple \
-        of minutes... \n"
-       mainnet_archive_uri migrated_archive_uri ;
-
-     let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
-     let migrated_archive_uri = Uri.of_string migrated_archive_uri in
-     let mainnet_pool =
-       Caqti_async.connect_pool ~max_size:128 mainnet_archive_uri
-     in
-     let migrated_pool =
-       Caqti_async.connect_pool ~max_size:128 migrated_archive_uri
-     in
-
-     match (mainnet_pool, migrated_pool) with
-     | Error _e, _ | _, Error _e ->
-         failwithf "Connection failed to orignal and migrated schema" ()
-     | Ok mainnet_pool, Ok migrated_pool ->
-         Test.of_check Check.ok ~name:"Connection to orignal and migrated schema"
-           ~idx:1
-         |> Test.eval ;
-
-         let query_mainnet_db = Mina_caqti.query mainnet_pool in
-         let query_migrated_db = Mina_caqti.query migrated_pool in
-
-         let%bind end_global_slot =
-           get_migration_end_slot_for_state_hash ~query_mainnet_db fork_state_hash
-         in
-
-         let%bind fork_block_height =
-           query_migrated_db ~f:(fun db ->
-               Sql.Mainnet.blockchain_length_for_state_hash db fork_state_hash )
-         in
-         let fork_block_height =
-           match fork_block_height with
-           | Some height ->
-               height
-           | None ->
-               failwith
-                 "Migrated data is corrupted cannot get fork block height ❌. \
-                  Exiting \n"
-         in
-         let compare_hashes ~fetch_data_sql ~find_element_sql ~name =
-           let%bind expected_hashes = query_mainnet_db ~f:fetch_data_sql in
-           let%bind checks =
-             Deferred.List.map expected_hashes ~f:(fun hash ->
-                 let%bind element_id = find_element_sql hash in
-                 if element_id |> Option.is_none then
-                   return
-                     (Check.err
-                        (sprintf "Cannot find %s hash ('%s') in migrated database"
-                           name hash ) )
-                 else return Check.ok )
-           in
-
-           Deferred.return (Check.combine checks)
-         in
-
-         let%bind check =
-           compare_hashes
-             ~fetch_data_sql:(fun db ->
-               Sql.Mainnet.user_commands_hashes db end_global_slot )
-             ~find_element_sql:(fun hash ->
-               query_migrated_db ~f:(fun db ->
-                   Sql.Berkeley.find_user_command_id_by_hash db hash ) )
-             ~name:"user_commands"
-         in
-         Test.of_check check ~name:"No missing user commands" ~idx:2 |> Test.eval ;
-
-         let%bind check =
-           compare_hashes
-             ~fetch_data_sql:(fun db ->
-               Sql.Mainnet.internal_commands_hashes db end_global_slot )
-             ~find_element_sql:(fun hash ->
-               query_migrated_db ~f:(fun db ->
-                   Sql.Berkeley.find_internal_command_id_by_hash db hash ) )
-             ~name:"internal_commands"
-         in
-         Test.of_check check ~name:"No missing internal commands" ~idx:3
-         |> Test.eval ;
-
-         let%bind check =
-           assert_migrated_db_contains_only_canonical_blocks query_migrated_db
-             fork_block_height
-         in
-         Test.of_check check ~name:"Only canonical blocks in migrated archive"
-           ~idx:4
-         |> Test.eval ;
-
-         let%bind check =
-           assert_migrated_db_has_account_accessed query_migrated_db
-         in
-         Test.of_check check ~name:"Account accessed sanity" ~idx:5 |> Test.eval ;
-
-         let%bind check =
-           compare_hashes
-             ~fetch_data_sql:(fun db ->
-               Sql.Mainnet.block_hashes_only_canonical db end_global_slot )
-             ~find_element_sql:(fun hash ->
-               query_migrated_db ~f:(fun db ->
-                   Sql.Berkeley.find_block_by_state_hash db hash ) )
-             ~name:"block_state_hashes"
-         in
-         Test.of_check check ~name:"No missing Blocks by state hashes" ~idx:6
-         |> Test.eval ;
-
-         let%bind check =
-           assert_all_user_and_interal_commands_account_ids_appear_in_accounts_accessed
-             query_migrated_db
-         in
-         Test.of_check check
-           ~name:
-             "All user and internal commands accounts appears in account accessed \
-              table"
-           ~idx:7
-         |> Test.eval ;
-
-         let%bind check =
-           compare_hashes
-             ~fetch_data_sql:(fun db ->
-               Sql.Mainnet.block_parent_hashes_no_orphaned db end_global_slot )
-             ~find_element_sql:(fun hash ->
-               query_migrated_db ~f:(fun db ->
-                   Sql.Berkeley.find_block_by_parent_hash db hash ) )
-             ~name:"orphaned block"
-         in
-         Test.of_check check ~name:"No orphaned blocks in migrated schema" ~idx:8
-         |> Test.eval ;
-
-         let%bind check =
-           compare_hashes
-             ~fetch_data_sql:(fun db ->
-               Sql.Mainnet.ledger_hashes_no_orphaned db end_global_slot )
-             ~find_element_sql:(fun hash ->
-               query_migrated_db ~f:(fun db ->
-                   Sql.Berkeley.find_block_by_ledger_hash db hash ) )
-             ~name:"ledger_hashes"
-         in
-
-         Test.of_check check ~name:"No orphaned ledger hashes in migrated schema"
-           ~idx:9
-         |> Test.eval ;
-
-         let%bind expected_hashes =
-           query_mainnet_db ~f:(fun db ->
-               Sql.Common.block_state_hashes db end_global_slot )
-         in
-         let%bind actual_hashes =
-           query_migrated_db ~f:(fun db ->
-               Sql.Common.block_state_hashes db end_global_slot )
-         in
-
-         List.map expected_hashes ~f:(fun (expected_child, expected_parent) ->
-             if
-               List.exists actual_hashes ~f:(fun (actual_child, actual_parent) ->
-                   String.equal expected_child actual_child
-                   && String.equal expected_parent actual_parent )
-             then Check.ok
-             else
-               Check.err
-                 (sprintf
-                    "Relation between blocks is skewed. Cannot find original \
-                     subchain '%s' -> '%s' in migrated database"
-                    expected_child expected_parent ) )
-         |> Check.combine
-         |> Test.of_check ~name:"Block relation parent -> child preserved" ~idx:10
-         |> Test.eval ;
-         Deferred.unit
-
-   let get_forked_blockchain uri fork_point =
-     match Caqti_async.connect_pool ~max_size:128 uri with
-     | Error _ ->
-         failwithf "Failed to create Caqti pools for Postgresql to %s"
-           (Uri.to_string uri) ()
-     | Ok pool ->
-         let query_db = Mina_caqti.query pool in
-         query_db ~f:(fun db ->
-             Sql.Berkeley.Block_info.forked_blockchain db fork_point )
-
-   let check_forked_chain ~migrated_archive_uri ~fork_state_hash =
-     let%bind forked_blockchain =
-       get_forked_blockchain (Uri.of_string migrated_archive_uri) fork_state_hash
-     in
-
-     match forked_blockchain with
-     | [] ->
-         Deferred.return (Check.skipped "Forked state hash does not exist")
-     | [ _fork_point ] ->
-         Deferred.return (Check.skipped "Forked blockchain is empty")
-     | fork_point :: fork_chain ->
-         Deferred.return
-           ( List.mapi fork_chain ~f:(fun idx block ->
-                 let idx_64 = Int64.of_int idx in
-                 let protocol_version_check =
-                   if Int.( <> ) block.protocol_version_id 2 then
-                     Check.err
-                       (sprintf
-                          "block with id (%d) has unexpected protocol version"
-                          block.id )
-                   else Check.ok
-                 in
-                 let global_slot_since_hardfork_check =
-                   if Int64.( = ) block.global_slot_since_hard_fork idx_64 then
-                     Check.err
-                       (sprintf
-                          "block with id (%d) has unexpected \
-                           global_slot_since_hard_fork"
-                          block.id )
-                   else Check.ok
-                 in
-                 let global_slot_since_genesis_check =
-                   if
-                     Int64.( > ) block.global_slot_since_genesis
-                       (Int64.( + ) fork_point.global_slot_since_genesis
-                          (Int64.( + ) idx_64 Int64.one) )
-                   then
-                     Check.err
-                       (sprintf
-                          "block with id (%d) has unexpected \
-                           global_slot_since_genesis"
-                          block.id )
-                   else Check.ok
-                 in
-                 let block_height_check =
-                   if Int.( > ) block.height (fork_point.height + idx + 1) then
-                     Check.err
-                       (sprintf
-                          "block with id (%d) has unexpected \
-                           global_slot_since_genesis"
-                          block.id )
-                   else Check.ok
-                 in
-
-                 Check.combine
-                   [ protocol_version_check
-                   ; global_slot_since_genesis_check
-                   ; global_slot_since_hardfork_check
-                   ; block_height_check
-                   ] )
-           |> Check.combine )
-
-   let compare_migrated_replayer_output ~migrated_replayer_output ~fork_config_file
-       =
-     let compare_script_download_uri =
-       "https://raw.githubusercontent.com/MinaProtocol/mina/berkeley/scripts/compare-replayer-and-fork-config.sh"
-     in
-     let%bind tmpd = Async.Unix.mkdtemp "berkeley_migration_verifier_output" in
-     let compare_script_name = "compare_fork_and_replayer_script.sh" in
-     let compare_script = Filename.concat tmpd compare_script_name in
-
-     let%bind result =
-       Process.run ~prog:"wget"
-         ~args:[ compare_script_download_uri; "-O"; compare_script ]
-         ()
-     in
-     let download_check =
-       match result with
-       | Error exn ->
-           Check.err
-             (sprintf "Internal error: Cannot download compare script, due to '%s'"
-                (Error.to_string_hum exn) )
-       | Ok _ ->
-           Check.ok
-     in
-     let%bind result =
-       Process.run ~prog:"chmod" ~args:[ "755"; compare_script ] ()
-     in
-     let update_perms_check =
-       match result with
-       | Error exn ->
-           Check.err
-             (sprintf "Internal error: Cannot download compare script, due to '%s'"
-                (Error.to_string_hum exn) )
-       | Ok _ ->
-           Check.ok
-     in
-     let%bind result =
-       Process.run ~prog:"cp"
-         ~args:[ migrated_replayer_output; fork_config_file; tmpd ]
-         ()
-     in
-     let copy_files =
-       match result with
-       | Error exn ->
-           Check.err
-             (sprintf
-                "Internal error: Cannot copy files to temp directory, due to '%s'"
-                (Error.to_string_hum exn) )
-       | Ok _ ->
-           Check.ok
-     in
-     let%bind result =
-       Process.run
-         ~prog:(String.concat ~sep:"/" [ "."; compare_script_name ])
-         ~args:[ migrated_replayer_output; fork_config_file ]
-         ~working_dir:tmpd ~accept_nonzero_exit:[ 1 ] ()
-     in
-     let run_check =
-       match result with
-       | Ok output ->
-           if String.is_empty output then Check.ok
-           else (
-             Out_channel.write_all (Filename.concat tmpd "diff.out") ~data:output ;
-             Check.err
-               (sprintf
-                  "Discrepances found between fork config and replayer files. \
-                   Please refer to '%s' folder for more details"
-                  tmpd ) )
-       | Error exn ->
-           Check.err
-             (sprintf "Exception while comparing files: %s..."
-                (Error.to_string_hum exn) )
-     in
-     Deferred.return
-       (Check.combine
-          [ download_check; update_perms_check; copy_files; run_check ] )
-*)
-
+let compare_replayer_and_fork_config ~migrated_replayer_output ~fork_config_file
+    =
+  let replayer_accounts =
+    Yojson.Basic.from_file migrated_replayer_output
+    |> member "genesis_ledger" |> member "accounts" |> to_list
+    |> List.map ~f:CommonAccountElement.of_yojson_node
+  in
+  let forked_accounts =
+    Yojson.Basic.from_file fork_config_file
+    |> member "ledger" |> member "accounts" |> to_list
+    |> List.map ~f:CommonAccountElement.of_yojson_node
+  in
+  match List.zip forked_accounts replayer_accounts with
+  | Unequal_lengths ->
+      Check.err
+        (sprintf "unequal length [%d](%s) vs [%d](%s)"
+           (List.length forked_accounts)
+           fork_config_file
+           (List.length replayer_accounts)
+           migrated_replayer_output )
+  | Ok list ->
+      List.filter_map list ~f:(fun elements ->
+          let left, right = elements in
+          if
+            not
+              (CommonAccountElement.equal_ignore_receipt_chain_hash left right)
+          then
+            Some
+              (sprintf "%s vs %s"
+                 (CommonAccountElement.to_string left)
+                 (CommonAccountElement.to_string right) )
+          else None )
+      |> Check.errors
 
 let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
   printf
@@ -625,103 +334,84 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
   | Error _e, _ | _, Error _e ->
       failwithf "Connection failed to orignal and migrated schema" ()
   | Ok mainnet_pool, Ok migrated_pool ->
-    let query_migrated_db = Mina_caqti.query migrated_pool in
-    
-    let%bind height =
-      query_migrated_db ~f:(fun db -> Sql.Berkeley.block_height db)
-    in
-       
+      let query_migrated_db = Mina_caqti.query migrated_pool in
+
+      let%bind height =
+        query_migrated_db ~f:(fun db -> Sql.Berkeley.block_height db)
+      in
+
+      let test_count = 7 in
+      let work_dir = Filename.temp_dir_name in
       let%bind check = migrated_db_is_connected query_migrated_db ~height in
       Test.of_check check ~name:"Migrated blocks are connected" ~idx:1
-        ~prefix:"D3.1"
+        ~prefix:"D3.1" test_count
       |> Test.eval ;
-    
+
       let%bind check =
         no_pending_and_orphaned_blocks_in_migrated_db query_migrated_db ~height
       in
       Test.of_check check ~name:"No orphaned nor pending blocks in migrated db"
-        ~idx:2 ~prefix:"D3.2"
+        ~idx:2 ~prefix:"D3.2" test_count
       |> Test.eval ;
-    
+
       let%bind check =
-        all_accounts_referred_in_commands_are_recorded migrated_pool
+        all_accounts_referred_in_commands_are_recorded migrated_pool ~work_dir
       in
       Test.of_check check
         ~name:
           "All accounts referred in internal commands or transactions are \
            recorded in the accounts_accessed table."
-        ~idx:3 ~prefix:"D3.3"
+        ~idx:3 ~prefix:"D3.3" test_count
       |> Test.eval ;
-    
-      let%bind check = compare_hashes_till_height migrated_pool mainnet_pool ~height in
+
+      let%bind check =
+        compare_hashes_till_height migrated_pool mainnet_pool ~height ~work_dir
+      in
       Test.of_check check
-        ~name:
-          "All block hashes (state_hash, ledger_hashes) are equal"
-        ~idx:4 ~prefix:"D3.4"
-      |> Test.eval;
-    
-      let%bind check = compare_user_commands_till_height migrated_pool mainnet_pool ~height in
+        ~name:"All block hashes (state_hash, ledger_hashes) are equal" ~idx:4
+        ~prefix:"D3.4" test_count
+      |> Test.eval ;
+
+      let%bind check =
+        compare_user_commands_till_height migrated_pool mainnet_pool ~height
+          ~work_dir
+      in
       Test.of_check check ~name:"Verify user commands" ~idx:5 ~prefix:"D3.5"
-      |> Test.eval;
-    
-      let%bind check = compare_internal_commands_till_height migrated_pool mainnet_pool ~height in
+        test_count
+      |> Test.eval ;
+
+      let%bind check =
+        compare_internal_commands_till_height migrated_pool mainnet_pool ~height
+          ~work_dir
+      in
       Test.of_check check ~name:"Verify internal commands" ~idx:6 ~prefix:"D3.6"
-      |> Test.eval;
-    
-        
-    if Int.(=) !exit_code 0 then 
-      Deferred.Or_error.ok_unit
-    else
-      Deferred.Or_error.errorf "Some tests failed. Please refer to above output for details"
+        test_count
+      |> Test.eval ;
 
+      if Int.( = ) !exit_code 0 then Deferred.Or_error.ok_unit
+      else
+        Deferred.Or_error.errorf
+          "Some tests failed. Please refer to above output for details"
 
-let fork_config_exn ~fork_config_file = 
-        let fork_config =
-          match
-            Yojson.Safe.from_file fork_config_file |> Runtime_config.of_yojson
-          with
-          | Ok fork_config ->
-              fork_config
-          | Error err ->
-              failwithf "Cannot parse fork config '%s' due to : '%s'" fork_config_file
-                err ()
-        in
-        match fork_config.proof with
-          | Some proof -> (
-              match proof.fork with
-              | Some fork ->
-                  fork
-              | None ->
-                  failwithf
-                    "Cannot parse fork config: Missing fork element under proof  in \
-                     fork config '%s' "
-                    fork_config_file () )
-          | None ->
-              failwithf
-                "Cannot parse fork config: missing proof element in fork config '%s' "
-                fork_config_file ()
+let fork_config_exn ~fork_config_file =
+  Yojson.Basic.from_file fork_config_file |> member "proof" |> member "fork"
 
-let fork_block_state_hash_exn ~fork_config_file = 
-    let fork_config = fork_config_exn ~fork_config_file in
-    fork_config.state_hash
+let fork_block_state_hash_exn ~fork_config_file =
+  fork_config_exn ~fork_config_file |> member "state_hash" |> to_string
 
-let fork_block_height_exn ~fork_config_file = 
-    let fork_config = fork_config_exn ~fork_config_file in
-    fork_config.blockchain_length
+let fork_block_height_exn ~fork_config_file =
+  fork_config_exn ~fork_config_file |> member "blockchain_length" |> to_int
 
 let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
     ~migrated_replayer_output ~fork_config_file () =
-
-    printf
+  Async.printf
     "Running verifications for incremental migration between '%s' and '%s' \
      schemas. It may take a couple of minutes... \n"
     mainnet_archive_uri migrated_archive_uri ;
 
-    printf "%s" migrated_replayer_output;
-  
   let fork_height = fork_block_height_exn ~fork_config_file in
   let fork_state_hash = fork_block_state_hash_exn ~fork_config_file in
-  
+
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
   let mainnet_pool =
@@ -738,105 +428,74 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
       let query_mainnet_db = Mina_caqti.query mainnet_pool in
       let query_migrated_db = Mina_caqti.query migrated_pool in
 
-      let%bind check = migrated_db_is_connected query_migrated_db ~height:fork_height in
+      let test_count = 7 in
+      let work_dir = Filename.temp_dir_name in
+      let%bind check =
+        migrated_db_is_connected query_migrated_db ~height:fork_height
+      in
       Test.of_check check ~name:"Migrated blocks are connected" ~idx:1
-        ~prefix:"A10.1"
+        ~prefix:"A10.1" test_count
       |> Test.eval ;
 
-
       let%bind check =
-        no_pending_and_orphaned_blocks_in_migrated_db query_migrated_db ~height:fork_height
+        no_pending_and_orphaned_blocks_in_migrated_db query_migrated_db
+          ~height:fork_height
       in
       Test.of_check check ~name:"No orphaned nor pending blocks in migrated db"
-        ~idx:2 ~prefix:"A10.2"
+        ~idx:2 ~prefix:"A10.2" test_count
       |> Test.eval ;
 
       let%bind check =
-      all_accounts_referred_in_commands_are_recorded migrated_pool
-    in
-    Test.of_check check
-      ~name:
-        "All accounts referred in internal commands or transactions are \
-         recorded in the accounts_accessed table."
-      ~idx:3 ~prefix:"A10.3"
-    |> Test.eval ;
+        all_accounts_referred_in_commands_are_recorded migrated_pool ~work_dir
+      in
+      Test.of_check check
+        ~name:
+          "All accounts referred in internal commands or transactions are \
+           recorded in the accounts_accessed table."
+        ~idx:3 ~prefix:"A10.3" test_count
+      |> Test.eval ;
 
-    let%bind _ =
-    query_mainnet_db ~f:(fun db ->
-        Sql.Mainnet.mark_chain_till_fork_block_as_canonical db fork_state_hash )
-    in
+      let%bind _ =
+        query_mainnet_db ~f:(fun db ->
+            Sql.Mainnet.mark_chain_till_fork_block_as_canonical db
+              fork_state_hash )
+      in
 
-    let%bind check = compare_hashes migrated_pool mainnet_pool in
-    Test.of_check check
-      ~name:
-        "All block hashes (state_hash, ledger_hashes) are equal"
-      ~idx:4 ~prefix:"A10.4"
-    |> Test.eval;
+      let%bind check = compare_hashes migrated_pool mainnet_pool ~work_dir in
+      Test.of_check check
+        ~name:"All block hashes (state_hash, ledger_hashes) are equal" ~idx:4
+        ~prefix:"A10.4" test_count
+      |> Test.eval ;
 
-        
-    let%bind check = compare_user_commands migrated_pool mainnet_pool in
-    Test.of_check check ~name:"Verify user commands" ~idx:5 ~prefix:"A10.5"
-    |> Test.eval;
-  
-    let%bind check = compare_internal_commands migrated_pool mainnet_pool in
-    Test.of_check check ~name:"Verify internal commands" ~idx:6 ~prefix:"A10.6"
-    |> Test.eval;
-      if Int.(=) !exit_code 0 then 
-        Deferred.Or_error.ok_unit
+      let%bind check =
+        compare_user_commands migrated_pool mainnet_pool ~work_dir
+      in
+      Test.of_check check ~name:"Verify user commands" ~idx:5 ~prefix:"A10.5"
+        test_count
+      |> Test.eval ;
+
+      let%bind check =
+        compare_internal_commands migrated_pool mainnet_pool ~work_dir
+      in
+      Test.of_check check ~name:"Verify internal commands" ~idx:6
+        ~prefix:"A10.6" test_count
+      |> Test.eval ;
+
+      let check =
+        compare_replayer_and_fork_config ~migrated_replayer_output
+          ~fork_config_file
+      in
+      Test.of_check check ~name:"Verify fork config vs migrated replayer output"
+        ~idx:7 ~prefix:"A10.7" test_count
+      |> Test.eval ;
+
+      if Int.( = ) !exit_code 0 then Deferred.Or_error.ok_unit
       else
-        Deferred.Or_error.errorf "Some tests failed. Please refer to above output for details"
-(*
-let main ~mainnet_archive_uri ~migrated_archive_uri ~migrated_replayer_output
-    ~fork_config_file () =
-  let fork_config =
-    match
-      Yojson.Safe.from_file fork_config_file |> Runtime_config.of_yojson
-    with
-    | Ok fork_config ->
-        fork_config
-    | Error err ->
-        failwithf "Cannot parse fork config '%s' due to : '%s'" fork_config_file
-          err ()
-  in
-  let fork_state_hash =
-    match fork_config.proof with
-    | Some proof -> (
-        match proof.fork with
-        | Some fork ->
-            fork.state_hash
-        | None ->
-            failwithf
-              "Cannot parse fork config: Missing fork element under proof  in \
-               fork config '%s' "
-              fork_config_file () )
-    | None ->
-        failwithf
-          "Cannot parse fork config: missing proof element in fork config '%s' "
-          fork_config_file ()
-  in
-  let%bind _ =
-    compare_db_content ~mainnet_archive_uri ~migrated_archive_uri
-      ~fork_state_hash ()
-  in
-  let%bind forked_chain_check =
-    check_forked_chain ~migrated_archive_uri ~fork_state_hash
-  in
-  Test.of_check forked_chain_check ~name:"Forked chain" ~idx:11 |> Test.eval ;
-  let%bind fork_comparision =
-    compare_migrated_replayer_output ~migrated_replayer_output ~fork_config_file
-  in
-  Test.of_check fork_comparision ~name:"Fork config" ~idx:12 |> Test.eval ;
-  if Int.equal !exit_code 1 then
-    Deferred.Or_error.error_string
-      (sprintf
-         "\n ❌ %d checks failed. Please refer to output above for more details"
-         !exit_code )
-  else Deferred.Or_error.ok_unit
-
-*)
+        Deferred.Or_error.errorf
+          "Some tests failed. Please refer to above output for details"
 
 let incremental_migration_command =
-  Command.async_or_error
+  Async.Command.async_or_error
     ~summary:"Verify migrated mainnet archive with original one"
     (let open Command.Let_syntax in
     let%map mainnet_archive_uri =
@@ -851,7 +510,7 @@ let incremental_migration_command =
     pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri)
 
 let post_fork_migration_command =
-  Command.async_or_error
+  Async.Command.async_or_error
     ~summary:"Verify migrated mainnet archive with original one"
     (let open Command.Let_syntax in
     let%map mainnet_archive_uri =
@@ -873,13 +532,11 @@ let post_fork_migration_command =
         ~doc:"String Path to fork config file"
     in
 
-    post_fork_validations ~mainnet_archive_uri
-      ~migrated_archive_uri
-      ~migrated_replayer_output
-      ~fork_config_file)
+    post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
+      ~migrated_replayer_output ~fork_config_file)
 
 let commands =
-  [ ("incremental", incremental_migration_command)
+  [ ("pre-fork", incremental_migration_command)
   ; ("post-fork", post_fork_migration_command)
   ]
 
