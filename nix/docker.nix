@@ -78,6 +78,7 @@ let
       procps
       curl
       jq
+      git-lfs
     ] ++ packages;
     extraCommands = ''
       mkdir root tmp
