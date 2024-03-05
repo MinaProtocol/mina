@@ -352,9 +352,15 @@ module type Transition_router_intf = sig
           -> Transaction_snark_work.Checked.t option )
     -> catchup_mode:[ `Normal | `Super ]
     -> notify_online:(unit -> unit Deferred.t)
+    -> bootstrap_stats_fetcher:
+         (   unit
+          -> (int Int.Table.t * int Int.Table.t)
+             * (int Int.Table.t * int Int.Table.t) )
+         option
+         ref
     -> unit
     -> ( [ `Transition of Mina_block.Validated.t ]
-       * [ `Source of [ `Gossip | `Catchup | `Internal ] ]
+       * [> `Source of [> `Gossip | `Catchup | `Internal ] ]
        * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
        Strict_pipe.Reader.t
        * unit Ivar.t
