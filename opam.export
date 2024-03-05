@@ -415,9 +415,7 @@ package "graphql_ppx" {
   dev-repo: "git+https://github.com/o1-labs/graphql_ppx.git"
   url {
     src:
-      "https://github.com/o1-labs/graphql_ppx/archive/f3ba4f7622240a2299f622b0c1d910f734579c25.tar.gz"
-    checksum:
-      "sha256=8aff33988218c99a95a91fb04ef703a3b8cde0676b7a90ee72478959829867d8"
+      "git+https://github.com/tweag/check_opam_switch.git#d0aa49884e0f9fd4bbb2cd1a32b798a12"
   }
 }
 package "rpc_parallel" {
