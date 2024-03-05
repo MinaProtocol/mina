@@ -91,7 +91,7 @@ let compute_block_trace_metadata transition_with_validation =
 let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
     ~trust_system ~parent
     ~transition:(transition_with_validation : Mina_block.almost_valid_block)
-    ~sender ~transition_receipt_time () =
+    ~get_completed_work ~sender ~transition_receipt_time () =
   let state_hash =
     ( With_hash.hash
     @@ Mina_block.Validation.block_with_hash transition_with_validation )
@@ -106,7 +106,7 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
       let open Deferred.Let_syntax in
       match%bind
         Validation.validate_staged_ledger_diff ?skip_staged_ledger_verification
-          ~logger ~precomputed_values ~verifier
+          ~get_completed_work ~logger ~precomputed_values ~verifier
           ~parent_staged_ledger:(staged_ledger parent)
           ~parent_protocol_state:
             ( parent.validated_transition |> Mina_block.Validated.header
@@ -189,6 +189,7 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
                       | Insufficient_work _
                       | Mismatched_statuses _
                       | Invalid_public_key _
+                      | ZkApps_exceed_limit _
                       | Unexpected _ ->
                           make_actions Gossiped_invalid_transition
                     in
@@ -329,13 +330,14 @@ module For_tests = struct
       ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys () :
       (t -> t Deferred.t) Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
-    let gen_slot_advancement = Int.gen_incl 1 10 in
+    let%bind slot_advancement = Int.gen_incl 1 10 in
     let%bind make_next_consensus_state =
-      Consensus_state_hooks.For_tests.gen_consensus_state ~gen_slot_advancement
+      Consensus_state_hooks.For_tests.gen_consensus_state ~slot_advancement
         ~constraint_constants:
           precomputed_values.Precomputed_values.constraint_constants
         ~constants:precomputed_values.consensus_constants
     in
+    let zkapp_cmd_limit = None in
     let%map supercharge_coinbase = Quickcheck.Generator.bool in
     fun parent_breadcrumb ->
       let open Deferred.Let_syntax in
@@ -361,7 +363,7 @@ module For_tests = struct
                 One_or_two.map stmts ~f:(fun statement ->
                     Ledger_proof.create ~statement
                       ~sok_digest:Sok_message.Digest.default
-                      ~proof:Proof.transaction_dummy )
+                      ~proof:(Lazy.force Proof.transaction_dummy) )
             ; prover
             }
       in
@@ -378,13 +380,18 @@ module For_tests = struct
         , ( prev_state_hashes.state_hash
           , Option.value_exn prev_state_hashes.state_body_hash ) )
       in
+      let current_global_slot =
+        Mina_numbers.Global_slot_since_genesis.add
+          current_state_view.global_slot_since_genesis
+          (Mina_numbers.Global_slot_span.of_int slot_advancement)
+      in
       let coinbase_receiver = largest_account_public_key in
       let staged_ledger_diff, _invalid_txns =
         Staged_ledger.create_diff parent_staged_ledger ~logger
-          ~global_slot:current_state_view.global_slot_since_genesis
+          ~global_slot:current_global_slot
           ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver ~current_state_view ~supercharge_coinbase
-          ~transactions_by_fee:transactions ~get_completed_work
+          ~transactions_by_fee:transactions ~get_completed_work ~zkapp_cmd_limit
         |> Result.map_error ~f:Staged_ledger.Pre_diff_info.Error.to_error
         |> Or_error.ok_exn
       in
@@ -397,10 +404,12 @@ module For_tests = struct
                , `Pending_coinbase_update _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
-            ~global_slot:current_state_view.global_slot_since_genesis
-            ~coinbase_receiver ~logger staged_ledger_diff
+            ~global_slot:current_global_slot ~coinbase_receiver ~logger
+            staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
             ~current_state_view ~state_and_body_hash ~supercharge_coinbase
+            ~zkapp_cmd_limit_hardcap:
+              precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
         with
         | Ok r ->
             return r
@@ -437,8 +446,7 @@ module For_tests = struct
       let consensus_state =
         make_next_consensus_state
           ~snarked_ledger_hash:
-            (Blockchain_state.snarked_ledger_hash
-               (Protocol_state.blockchain_state previous_protocol_state) )
+            (Blockchain_state.snarked_ledger_hash next_blockchain_state)
           ~previous_protocol_state:
             With_hash.
               { data = previous_protocol_state; hash = previous_state_hashes }
@@ -455,11 +463,10 @@ module For_tests = struct
           ~blockchain_state:next_blockchain_state ~consensus_state
           ~constants:(Protocol_state.constants previous_protocol_state)
       in
-      Protocol_version.(set_current zero) ;
       let next_block =
         let header =
           Mina_block.Header.create ~protocol_state
-            ~protocol_state_proof:Proof.blockchain_dummy
+            ~protocol_state_proof:(Lazy.force Proof.blockchain_dummy)
             ~delta_block_chain_proof:(previous_state_hashes.state_hash, [])
             ()
         in
@@ -478,7 +485,7 @@ module For_tests = struct
       let transition_receipt_time = Some (Time.now ()) in
       match%map
         build ~logger ~precomputed_values ~trust_system ~verifier
-          ~parent:parent_breadcrumb
+          ~get_completed_work:(Fn.const None) ~parent:parent_breadcrumb
           ~transition:
             ( next_block |> Mina_block.Validated.remember
             |> Validation.reset_staged_ledger_diff_validation )

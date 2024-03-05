@@ -49,34 +49,32 @@ end)
 
     open Mina_net2.Validation_callback
 
-    let error err =
-      Fn.compose Deferred.return (function
-        | Local f ->
-            f (Error err)
-        | External cb ->
-            fire_if_not_already_fired cb `Reject )
+    let error err = function
+      | Local f ->
+          f (Error err)
+      | External cb ->
+          fire_if_not_already_fired cb `Reject
 
-    let reject accepted rejected =
-      Fn.compose Deferred.return (function
-        | Local f ->
-            f (Ok (`Not_broadcasted, accepted, rejected))
-        | External cb ->
-            fire_if_not_already_fired cb `Reject )
+    let reject accepted rejected = function
+      | Local f ->
+          f (Ok (`Not_broadcasted, accepted, rejected))
+      | External cb ->
+          fire_if_not_already_fired cb `Reject
 
-    let drop accepted rejected =
-      Fn.compose Deferred.return (function
-        | Local f ->
-            f (Ok (`Not_broadcasted, accepted, rejected))
-        | External cb ->
-            fire_if_not_already_fired cb `Ignore )
+    let drop accepted rejected = function
+      | Local f ->
+          f (Ok (`Not_broadcasted, accepted, rejected))
+      | External cb ->
+          fire_if_not_already_fired cb `Ignore
 
     let forward broadcast_pipe accepted rejected = function
       | Local f ->
           f (Ok (`Broadcasted, accepted, rejected)) ;
-          Linear_pipe.write broadcast_pipe accepted
+          Linear_pipe.write broadcast_pipe
+            { With_nonce.message = accepted; nonce = 0 }
+          |> don't_wait_for
       | External cb ->
-          fire_if_not_already_fired cb `Accept ;
-          Deferred.unit
+          fire_if_not_already_fired cb `Accept
   end
 
   module Remote_sink =
@@ -104,8 +102,8 @@ end)
   type t =
     { resource_pool : Resource_pool.t
     ; logger : Logger.t
-    ; write_broadcasts : Resource_pool.Diff.t Linear_pipe.Writer.t
-    ; read_broadcasts : Resource_pool.Diff.t Linear_pipe.Reader.t
+    ; write_broadcasts : Resource_pool.Diff.t With_nonce.t Linear_pipe.Writer.t
+    ; read_broadcasts : Resource_pool.Diff.t With_nonce.t Linear_pipe.Reader.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     }
 
@@ -118,36 +116,42 @@ end)
       ~capacity:
         (Resource_pool.Diff.max_per_15_seconds, `Per (Time.Span.of_sec 15.0))
 
-  let apply_and_broadcast t
+  let apply_and_broadcast ({ logger; _ } as t)
       (diff : Resource_pool.Diff.verified Envelope.Incoming.t) cb =
+    let env = Envelope.Incoming.map ~f:Resource_pool.Diff.t_of_verified diff in
     let rebroadcast (diff', rejected) =
       let open Broadcast_callback in
       if Resource_pool.Diff.is_empty diff' then (
-        [%log' trace t.logger]
+        [%log trace]
           "Refusing to rebroadcast $diff. Pool diff apply feedback: empty diff"
           ~metadata:
             [ ( "diff"
-              , Resource_pool.Diff.verified_to_yojson
-                @@ Envelope.Incoming.data diff )
+              , `String Resource_pool.Diff.(summary @@ t_of_verified diff.data)
+              )
             ] ;
         drop diff' rejected cb )
       else (
-        [%log' debug t.logger] "Rebroadcasting diff %s"
-          (Resource_pool.Diff.summary diff') ;
+        [%log debug] "Rebroadcasting diff %s" (Resource_pool.Diff.summary diff') ;
         forward t.write_broadcasts diff' rejected cb )
     in
     O1trace.sync_thread apply_and_broadcast_thread_label (fun () ->
-        match%bind Resource_pool.Diff.unsafe_apply t.resource_pool diff with
+        match Resource_pool.Diff.unsafe_apply t.resource_pool diff with
         | Ok (`Accept, accepted, rejected) ->
+            Resource_pool.Diff.log_internal ~logger "accepted" env ;
             rebroadcast (accepted, rejected)
         | Ok (`Reject, accepted, rejected) ->
+            Resource_pool.Diff.log_internal ~logger "rejected"
+              ~reason:"not_applied" env ;
             Broadcast_callback.reject accepted rejected cb
         | Error (`Locally_generated res) ->
+            Resource_pool.Diff.log_internal ~logger "rejected"
+              ~reason:"locally_generated" env ;
             rebroadcast res
         | Error (`Other e) ->
             [%log' debug t.logger]
               "Refusing to rebroadcast. Pool diff apply feedback: $error"
               ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+            Resource_pool.Diff.log_internal ~logger "rejected" env ;
             Broadcast_callback.error e cb )
 
   let log_rate_limiter_occasionally t rl =
@@ -191,7 +195,7 @@ end)
     (*priority: Transition frontier diffs > local diffs > incoming diffs*)
     Deferred.don't_wait_for
       (O1trace.thread Resource_pool.label (fun () ->
-           Strict_pipe.Reader.Merge.iter
+           Strict_pipe.Reader.Merge.iter_sync
              [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
                    Transition_frontier_extension diff )
              ; remote_r
@@ -200,10 +204,10 @@ end)
              ~f:(fun diff_source ->
                match diff_source with
                | Diff ((verified_diff, cb) : Remote_sink.unwrapped_t) ->
-                   O1trace.thread processing_diffs_thread_label (fun () ->
+                   O1trace.sync_thread processing_diffs_thread_label (fun () ->
                        apply_and_broadcast network_pool verified_diff cb )
                | Transition_frontier_extension diff ->
-                   O1trace.thread
+                   O1trace.sync_thread
                      processing_transition_frontier_diffs_thread_label
                      (fun () ->
                        Resource_pool.handle_transition_frontier_diff diff
@@ -247,9 +251,10 @@ end)
                      ~f:(fun d -> `String (Resource_pool.Diff.summary d))
                      rebroadcastable ) )
             ] ;
+      let nonce = Time_ns.to_int_ns_since_epoch (Time_ns.now ()) in
       let%bind () =
-        Deferred.List.iter rebroadcastable
-          ~f:(Linear_pipe.write t.write_broadcasts)
+        Deferred.List.iter rebroadcastable ~f:(fun message ->
+            Linear_pipe.write t.write_broadcasts With_nonce.{ message; nonce } )
       in
       let%bind () = Async.after rebroadcast_interval in
       go ()

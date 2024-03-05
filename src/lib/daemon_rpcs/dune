@@ -2,7 +2,7 @@
  (name daemon_rpcs)
  (public_name daemon_rpcs)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    base.caml
@@ -20,6 +20,7 @@
    ;; local libraries
    network_peer
    genesis_constants
+   bounded_types
    currency
    mina_net2
    transition_frontier

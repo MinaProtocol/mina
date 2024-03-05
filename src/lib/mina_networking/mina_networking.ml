@@ -17,10 +17,13 @@ type Structured_log_events.t +=
 
 type Structured_log_events.t +=
   | Gossip_transaction_pool_diff of
-      { txns : Transaction_pool.Resource_pool.Diff.t }
+      { fee_payer_summaries : User_command.fee_payer_summary_t list }
   [@@deriving
     register_event
-      { msg = "Broadcasting transaction pool diff over gossip net" }]
+      { msg =
+          "Broadcasting transaction pool diff $fee_payer_summaries over gossip \
+           net"
+      }]
 
 type Structured_log_events.t +=
   | Gossip_snark_pool_diff of { work : Snark_pool.Resource_pool.Diff.compact }
@@ -198,7 +201,11 @@ module Rpcs = struct
       module T = struct
         type query = Ledger_hash.t * Sync_ledger.Query.t
 
-        type response = Sync_ledger.Answer.t Core.Or_error.t
+        type response =
+          (( Sync_ledger.Answer.t
+           , Bounded_types.Wrapped_error.Stable.V1.t )
+           Result.t
+          [@version_asserted] )
       end
 
       module Caller = T
@@ -226,12 +233,16 @@ module Rpcs = struct
       include Master
     end)
 
-    module V2 = struct
+    module V3 = struct
       module T = struct
         type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
         [@@deriving sexp]
 
-        type response = Sync_ledger.Answer.Stable.V2.t Core.Or_error.Stable.V1.t
+        type response =
+          (( Sync_ledger.Answer.Stable.V2.t
+           , Bounded_types.Wrapped_error.Stable.V1.t )
+           Result.t
+          [@version_asserted] )
         [@@deriving sexp]
 
         let query_of_caller_model = Fn.id
@@ -669,15 +680,7 @@ module Rpcs = struct
       module Stable = struct
         module V2 = struct
           type t =
-            { node_ip_addr : Core.Unix.Inet_addr.Stable.V1.t
-                  [@to_yojson
-                    fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
-                  [@of_yojson
-                    function
-                    | `String s ->
-                        Ok (Unix.Inet_addr.of_string s)
-                    | _ ->
-                        Error "expected string"]
+            { node_ip_addr : Network_peer.Peer.Inet_addr.Stable.V1.t
             ; node_peer_id : Network_peer.Peer.Id.Stable.V1.t
                   [@to_yojson fun peer_id -> `String peer_id]
                   [@of_yojson
@@ -692,8 +695,8 @@ module Rpcs = struct
                 * Trust_system.Peer_status.Stable.V1.t )
                 list
             ; k_block_hashes_and_timestamps :
-                (State_hash.Stable.V1.t * string) list
-            ; git_commit : string
+                (State_hash.Stable.V1.t * Bounded_types.String.Stable.V1.t) list
+            ; git_commit : Bounded_types.String.Stable.V1.t
             ; uptime_minutes : int
             ; block_height_opt : int option [@default None]
             }
@@ -704,15 +707,7 @@ module Rpcs = struct
 
         module V1 = struct
           type t =
-            { node_ip_addr : Core.Unix.Inet_addr.Stable.V1.t
-                  [@to_yojson
-                    fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
-                  [@of_yojson
-                    function
-                    | `String s ->
-                        Ok (Unix.Inet_addr.of_string s)
-                    | _ ->
-                        Error "expected string"]
+            { node_ip_addr : Network_peer.Peer.Inet_addr.Stable.V1.t
             ; node_peer_id : Network_peer.Peer.Id.Stable.V1.t
                   [@to_yojson fun peer_id -> `String peer_id]
                   [@of_yojson
@@ -727,8 +722,8 @@ module Rpcs = struct
                 * Trust_system.Peer_status.Stable.V1.t )
                 list
             ; k_block_hashes_and_timestamps :
-                (State_hash.Stable.V1.t * string) list
-            ; git_commit : string
+                (State_hash.Stable.V1.t * Bounded_types.String.Stable.V1.t) list
+            ; git_commit : Bounded_types.String.Stable.V1.t
             ; uptime_minutes : int
             }
           [@@deriving to_yojson, of_yojson]
@@ -757,7 +752,8 @@ module Rpcs = struct
       module T = struct
         type query = unit [@@deriving sexp, to_yojson]
 
-        type response = Node_status.t Or_error.t
+        type response =
+          (Node_status.t, Bounded_types.Wrapped_error.Stable.V1.t) result
       end
 
       module Caller = T
@@ -795,7 +791,11 @@ module Rpcs = struct
       module T = struct
         type query = unit [@@deriving sexp]
 
-        type response = Node_status.Stable.V2.t Core_kernel.Or_error.Stable.V1.t
+        type response =
+          (( Node_status.Stable.V2.t
+           , Bounded_types.Wrapped_error.Stable.V1.t )
+           Result.t
+          [@version_asserted] )
 
         let query_of_caller_model = Fn.id
 
@@ -822,7 +822,11 @@ module Rpcs = struct
       module T = struct
         type query = unit [@@deriving sexp]
 
-        type response = Node_status.Stable.V1.t Core_kernel.Or_error.Stable.V1.t
+        type response =
+          (( Node_status.Stable.V1.t
+           , Bounded_types.Wrapped_error.Stable.V1.t )
+           Core_kernel.Result.t
+          [@version_asserted] )
 
         let query_of_caller_model = Fn.id
 
@@ -1145,7 +1149,7 @@ let create (config : Config.t) ~sinks
                          (Header.current_protocol_version
                             (Mina_block.header external_transition) ) ) )
                 ; ( "daemon_current_protocol_version"
-                  , `String Protocol_version.(to_string @@ get_current ()) )
+                  , `String Protocol_version.(to_string current) )
                 ] ) )
         in
         Trust_system.record_envelope_sender config.trust_system config.logger
@@ -1468,35 +1472,28 @@ include struct
 end
 
 (* TODO: Have better pushback behavior *)
-let log_gossip logger ~log_msg msg =
-  [%str_log' trace logger]
-    ~metadata:[ ("message", Gossip_net.Message.msg_to_yojson msg) ]
-    log_msg
-
 let broadcast_state t state =
-  let msg = With_hash.data state in
-  log_gossip t.logger (Gossip_net.Message.New_state msg)
-    ~log_msg:
-      (Gossip_new_state
-         { state_hash = State_hash.With_state_hashes.state_hash state } ) ;
+  [%str_log' trace t.logger]
+    (Gossip_new_state
+       { state_hash = State_hash.With_state_hashes.state_hash state } ) ;
   Mina_metrics.(Gauge.inc_one Network.new_state_broadcasted) ;
-  Gossip_net.Any.broadcast_state t.gossip_net msg
+  Gossip_net.Any.broadcast_state t.gossip_net (With_hash.data state)
 
-let broadcast_transaction_pool_diff t diff =
-  log_gossip t.logger (Gossip_net.Message.Transaction_pool_diff diff)
-    ~log_msg:(Gossip_transaction_pool_diff { txns = diff }) ;
+let broadcast_transaction_pool_diff ?nonce t diff =
+  [%str_log' trace t.logger]
+    (Gossip_transaction_pool_diff
+       { fee_payer_summaries = List.map ~f:User_command.fee_payer_summary diff }
+    ) ;
   Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_broadcasted) ;
-  Gossip_net.Any.broadcast_transaction_pool_diff t.gossip_net diff
+  Gossip_net.Any.broadcast_transaction_pool_diff ?nonce t.gossip_net diff
 
-let broadcast_snark_pool_diff t diff =
+let broadcast_snark_pool_diff ?nonce t diff =
   Mina_metrics.(Gauge.inc_one Network.snark_pool_diff_broadcasted) ;
-  log_gossip t.logger (Gossip_net.Message.Snark_pool_diff diff)
-    ~log_msg:
-      (Gossip_snark_pool_diff
-         { work =
-             Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
-         } ) ;
-  Gossip_net.Any.broadcast_snark_pool_diff t.gossip_net diff
+  [%str_log' trace t.logger]
+    (Gossip_snark_pool_diff
+       { work = Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
+       } ) ;
+  Gossip_net.Any.broadcast_snark_pool_diff ?nonce t.gossip_net diff
 
 let find_map xs ~f =
   let open Async in

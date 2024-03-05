@@ -288,6 +288,36 @@ module type Full = sig
       -> Deploy_snapp_spec.t
       -> Zkapp_command.t
 
+    module Single_account_update_spec : sig
+      type t =
+        { fee : Currency.Fee.t
+        ; fee_payer : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+        ; zkapp_account_keypair : Signature_lib.Keypair.t
+        ; memo : Signed_command_memo.t
+        ; update : Account_update.Update.t
+        ; actions : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; events : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; call_data : Tick.Field.t
+        }
+    end
+
+    val single_account_update :
+         ?zkapp_prover_and_vk:
+           ( unit
+           , unit
+           , unit
+           , Zkapp_statement.t
+           , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
+             Async.Deferred.t )
+           Pickles.Prover.t
+           * ( Pickles.Side_loaded.Verification_key.t
+             , Snark_params.Tick.Field.t )
+             With_hash.t
+      -> chain:Mina_signature_kind.t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
+      -> Single_account_update_spec.t
+      -> Zkapp_command.t Async.Deferred.t
+
     module Update_states_spec : sig
       type t =
         { fee : Currency.Fee.t
@@ -302,8 +332,8 @@ module type Full = sig
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
         ; current_auth : Permissions.Auth_required.t
-        ; actions : Tick.Field.t array list
-        ; events : Tick.Field.t array list
+        ; actions : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; events : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
         }
@@ -350,7 +380,8 @@ module type Full = sig
       -> unit
 
     val create_trivial_snapp :
-         constraint_constants:Genesis_constants.Constraint_constants.t
+         ?unique_id:int
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> unit
       -> [> `VK of (Side_loaded_verification_key.t, Tick.Field.t) With_hash.t ]
          * [> `Prover of
@@ -376,8 +407,8 @@ module type Full = sig
         ; new_zkapp_account : bool
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
-        ; actions : Tick.Field.t array list
-        ; events : Tick.Field.t array list
+        ; actions : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; events : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
         }
@@ -385,5 +416,7 @@ module type Full = sig
     end
 
     val multiple_transfers : Multiple_transfers_spec.t -> Zkapp_command.t
+
+    val set_proof_cache : Pickles.Proof_cache.t -> unit
   end
 end

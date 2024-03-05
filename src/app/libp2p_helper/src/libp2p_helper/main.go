@@ -177,13 +177,13 @@ func main() {
 	for {
 		rawMsg, err := decoder.Decode()
 		if err != nil {
-			helperLog.Errorf("Error decoding raw message: %w", err)
+			helperLog.Errorf("Error decoding raw message: %s", err)
 			os.Exit(2)
 			return
 		}
 		msg, err := ipc.ReadRootLibp2pHelperInterface_Message(rawMsg)
 		if err != nil {
-			helperLog.Errorf("Error decoding capnp message: %w", err)
+			helperLog.Errorf("Error decoding capnp message: %s", err)
 			os.Exit(3)
 			return
 		}

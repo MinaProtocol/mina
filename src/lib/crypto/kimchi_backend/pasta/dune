@@ -1,5 +1,5 @@
 (library
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (name kimchi_pasta)
  (public_name kimchi_backend.pasta)
  (flags -warn-error -27)
@@ -21,6 +21,7 @@
   promise
   kimchi_bindings
   kimchi_pasta_basic
+  bounded_types
   kimchi_pasta_constraint_system
   kimchi_types
   pasta_bindings

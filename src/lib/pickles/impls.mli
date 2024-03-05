@@ -31,6 +31,8 @@ module Step : sig
 
     module Constant = Backend.Tock.Field
 
+    val forbidden_shifted_values : (Impl.field * bool) list lazy_t
+
     val typ_unchecked : (t, Constant.t) Typ.t
 
     val typ : (t, Constant.t, Internal_Basic.field) Snarky_backendless.Typ.t
@@ -39,23 +41,9 @@ module Step : sig
   val input :
        proofs_verified:'a Pickles_types.Nat.t
     -> wrap_rounds:'b Pickles_types.Nat.t
-    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
     -> ( ( ( ( Impl.Field.t
              , Impl.Field.t Composition_types.Scalar_challenge.t
              , Other_field.t Pickles_types.Shifted_value.Type2.t
-             , ( Other_field.t Pickles_types.Shifted_value.Type2.t
-               , Impl.field Snarky_backendless.Cvar.t
-                 Snarky_backendless.Snark_intf.Boolean0.t )
-               Pickles_types.Plonk_types.Opt.t
-             , ( Impl.Field.t Composition_types.Scalar_challenge.t
-                 Pickles_types.Hlist0.Id.t
-                 Composition_types.Step.Proof_state.Deferred_values.Plonk
-                 .In_circuit
-                 .Lookup
-                 .t
-               , Impl.field Snarky_backendless.Cvar.t
-                 Snarky_backendless.Snark_intf.Boolean0.t )
-               Pickles_types.Plonk_types.Opt.t
              , ( Impl.field Snarky_backendless.Cvar.t
                  Kimchi_backend_common.Scalar_challenge.t
                  Composition_types.Bulletproof_challenge.t
@@ -75,13 +63,6 @@ module Step : sig
        , ( ( ( Challenge.Constant.t
              , Challenge.Constant.t Composition_types.Scalar_challenge.t
              , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
-             , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t option
-             , Challenge.Constant.t Composition_types.Scalar_challenge.t
-               Composition_types.Step.Proof_state.Deferred_values.Plonk
-               .In_circuit
-               .Lookup
-               .t
-               option
              , ( Limb_vector.Challenge.Constant.t
                  Kimchi_backend_common.Scalar_challenge.t
                  Composition_types.Bulletproof_challenge.t
@@ -140,6 +121,8 @@ module Wrap : sig
 
     module Constant = Backend.Tick.Field
 
+    val forbidden_shifted_values : Impl.field list lazy_t
+
     val typ_unchecked : (Impl.Field.t, Backend.Tick.Field.t) Impl.Typ.t
 
     val typ :
@@ -150,21 +133,19 @@ module Wrap : sig
   end
 
   val input :
-       unit
+       feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
+    -> unit
     -> ( ( Impl.Field.t
          , Impl.Field.t Composition_types.Scalar_challenge.t
          , Impl.Field.t Pickles_types.Shifted_value.Type1.t
          , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
            , Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
-           Pickles_types.Plonk_types.Opt.t
+           Pickles_types.Opt.t
          , ( Impl.Field.t Composition_types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , Impl.field Snarky_backendless.Cvar.t
              Snarky_backendless.Snark_intf.Boolean0.t )
-           Pickles_types.Plonk_types.Opt.t
+           Pickles_types.Opt.t
          , Impl.Boolean.var
          , Impl.field Snarky_backendless.Cvar.t
          , Impl.field Snarky_backendless.Cvar.t
@@ -182,9 +163,6 @@ module Wrap : sig
          , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
          , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t option
          , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
-           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-           .Lookup
-           .t
            option
          , bool
          , ( Limb_vector.Constant.Hex64.t

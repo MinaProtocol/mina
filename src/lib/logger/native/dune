@@ -2,7 +2,7 @@
  (name logger_native)
  (public_name logger.native)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    result
@@ -17,6 +17,7 @@
    interpolator_lib
    mina_compile_config
    ppx_version.runtime
+   bounded_types
  )
  (preprocess
   (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson))

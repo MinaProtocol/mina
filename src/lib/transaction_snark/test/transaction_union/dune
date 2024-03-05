@@ -12,6 +12,7 @@
    yojson
    ;; local libraries
    mina_base.import
+   bounded_types
    pickles
    pickles.backend
    kimchi_backend.pasta
@@ -42,7 +43,7 @@
    mina_wire_types
    )
   (library_flags -linkall)
-  (inline_tests)
+  (inline_tests (flags -verbose -show-counts))
   (preprocess
     (pps ppx_snarky ppx_version ppx_jane))
   (instrumentation (backend bisect_ppx)))

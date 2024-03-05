@@ -49,7 +49,7 @@ CREATE TABLE account_identifiers
 */
 CREATE TABLE timing_info
 ( id                      serial    PRIMARY KEY
-, account_identifier_id   int       NOT NULL UNIQUE REFERENCES account_identifiers(id)
+, account_identifier_id   int       NOT NULL REFERENCES account_identifiers(id)
 , initial_minimum_balance text      NOT NULL
 , cliff_time              bigint    NOT NULL
 , cliff_amount            text      NOT NULL
@@ -132,10 +132,10 @@ CREATE TABLE epoch_data
 
 CREATE TABLE protocol_versions
 ( id               serial PRIMARY KEY
-, major            int    NOT NULL
-, minor            int    NOT NULL
+, transaction      int    NOT NULL
+, network          int    NOT NULL
 , patch            int    NOT NULL
-, UNIQUE (major,minor,patch)
+, UNIQUE (transaction,network,patch)
 );
 
 CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned', 'pending');

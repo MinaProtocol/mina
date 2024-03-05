@@ -36,19 +36,6 @@ include (
 
 let bits = V.bits
 
-let input_size ~of_int ~add ~mul w =
-  (* This should be an affine function in [a]. *)
-  let size a =
-    let (T (Typ typ, _conv, _conv_inv)) =
-      Impls.Step.input ~proofs_verified:a ~wrap_rounds:Backend.Tock.Rounds.n
-        ~feature_flags:Plonk_types.Features.none
-    in
-    typ.size_in_field_elements
-  in
-  let f0 = size Nat.N0.n in
-  let slope = size Nat.N1.n - f0 in
-  add (of_int f0) (mul (of_int slope) w)
-
 module Width : sig
   [%%versioned:
   module Stable : sig
@@ -198,7 +185,9 @@ module Stable = struct
         in
         let log2_size = Import.Domain.log2_size d in
         let public =
-          let (T (input, _conv, _conv_inv)) = Impls.Wrap.input () in
+          let (T (input, _conv, _conv_inv)) =
+            Impls.Wrap.input ~feature_flags:Plonk_types.Features.Full.maybe ()
+          in
           let (Typ typ) = input in
           typ.size_in_field_elements
         in
@@ -231,9 +220,16 @@ module Stable = struct
                    ; emul_comm = g c.emul_comm
                    ; complete_add_comm = g c.complete_add_comm
                    ; endomul_scalar_comm = g c.endomul_scalar_comm
+                   ; xor_comm = None
+                   ; range_check0_comm = None
+                   ; range_check1_comm = None
+                   ; foreign_field_add_comm = None
+                   ; foreign_field_mul_comm = None
+                   ; rot_comm = None
                    } )
               ; shifts = Common.tock_shifts ~log2_size
               ; lookup_index = None
+              ; zk_rows = 3
               } )
         in
         { Poly.max_proofs_verified
@@ -346,20 +342,6 @@ module Checked = struct
             wrap_index
         ]
 end
-
-let%test_unit "input_size" =
-  List.iter
-    (List.range 0 (Nat.to_int Width.Max.n) ~stop:`inclusive ~start:`inclusive)
-    ~f:(fun n ->
-      [%test_eq: int]
-        (input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) n)
-        (let (T a) = Nat.of_int n in
-         let (T (Typ typ, _conv, _conv_inv)) =
-           Impls.Step.input ~proofs_verified:a
-             ~wrap_rounds:Backend.Tock.Rounds.n
-             ~feature_flags:Plonk_types.Features.none
-         in
-         typ.size_in_field_elements ) )
 
 let typ : (Checked.t, t) Impls.Step.Typ.t =
   let open Step_main_inputs in

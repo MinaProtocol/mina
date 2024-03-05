@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# set -x
+#set -x
 
 # Exit script when commands fail
 set -e
@@ -34,6 +34,7 @@ ZKAPP_TRANSACTIONS=false
 RESET=false
 UPDATE_GENESIS_TIMESTAMP=false
 PROOF_LEVEL="full"
+LOG_PRECOMPUTED_BLOCKS=false
 
 SNARK_WORKER_FEE=0.001
 TRANSACTION_FREQUENCY=10 # in seconds
@@ -116,6 +117,8 @@ help() {
   echo "                                         |   Default: ${TRANSACTION_FREQUENCY}"
   echo "-sf  |--snark-worker-fee <#>             | SNARK Worker fee"
   echo "                                         |   Default: ${SNARK_WORKER_FEE}"
+  echo "-lp  |--log-precomputed-blocks     		 | Log precomputed blocks"
+  echo "                                  		 |   Default: ${LOG_PRECOMPUTED_BLOCKS}"
   echo "-pl  |--proof-level <proof-level>        | Proof level (currently consumed by SNARK Workers only)"
   echo "                                         |   Default: ${PROOF_LEVEL}"
   echo "-r   |--reset                            | Whether to reset the Mina Local Network storage file-system (presence of argument)"
@@ -170,6 +173,8 @@ exec-daemon() {
     -log-json \
     -log-level ${LOG_LEVEL} \
     -file-log-level ${FILE_LOG_LEVEL} \
+    -precomputed-blocks-file ${FOLDER}/precomputed_blocks.log \
+    -log-precomputed-blocks ${LOG_PRECOMPUTED_BLOCKS} \
     $@
 }
 
@@ -232,15 +237,15 @@ reset-genesis-ledger() {
 
 recreate-schema() {
   echo "Recreating database '${PG_DB}'..."
-  
+
   psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT} -c "DROP DATABASE IF EXISTS ${PG_DB};"
-  
+
   psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT} -c "CREATE DATABASE ${PG_DB};"
-  
-  # We need to change our working directory as script has relation to others subscripts 
+
+  # We need to change our working directory as script has relation to others subscripts
   # and calling them from local folder
-  cd ./src/app/archive 
-  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT} ${PG_DB} < create_schema.sql
+  cd ./src/app/archive
+  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT}/${PG_DB} < create_schema.sql
   cd ../../../
 
   echo "Schema '${PG_DB}' created successfully."
@@ -337,6 +342,7 @@ while [[ "$#" -gt 0 ]]; do
     SNARK_WORKER_FEE="${2}"
     shift
     ;;
+  -lp | --log-precomputed-blocks) LOG_PRECOMPUTED_BLOCKS=true ;;
   -pl | --proof-level)
     PROOF_LEVEL="${2}"
     shift

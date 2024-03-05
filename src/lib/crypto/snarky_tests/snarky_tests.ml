@@ -36,7 +36,7 @@ let check_json ~input_typ ~return_typ ~circuit filename () =
 (* monadic API tests *)
 
 (** Both the monadic and imperative API will produce the same circuit hash. *)
-let expected = "5357346d161dcccaa547c7999b8148db"
+let expected = "ec45af854f3d3e14367bb8394c2ed0d7"
 
 module MonadicAPI = struct
   module Impl = Snarky_backendless.Snark.Make (struct
@@ -611,8 +611,7 @@ module Protocol_circuits = struct
     ()
 
   let blockchain () : unit =
-    let expected = "234ab6add22368c3dba20bff6df78e01" in
-
+    let expected = "36786c300e37c2a2f1341ad6374aa113" in
     let digest =
       Blockchain_snark.Blockchain_snark_state.constraint_system_digests
     in
@@ -627,9 +626,8 @@ module Protocol_circuits = struct
     ()
 
   let transaction () : unit =
-    let expected1 = "198acebc60e3d2fc163c4c12baa71948" in
-    let expected2 = "9aaecfee3b4bcc5ec9101cbb41136a0f" in
-
+    let expected1 = "b8879f677f622a1d86648030701f43e1" in
+    let expected2 = "c17f6cef52fc6c73d389c0128e41a924" in
     let digest =
       Transaction_snark.constraint_system_digests ~constraint_constants ()
     in
@@ -645,10 +643,10 @@ module Protocol_circuits = struct
     let digest2 = Core.Md5.to_hex hash2 in
 
     let check = String.(digest1 = expected1) in
-    print_hash check expected1 digest1 ;
+    print_hash (not check) expected1 digest1 ;
     assert check ;
     let check = String.(digest2 = expected2) in
-    print_hash check expected2 digest2 ;
+    print_hash (not check) expected2 digest2 ;
     assert check ;
     ()
 

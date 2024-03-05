@@ -6,6 +6,21 @@ variable "deploy_graphql_ingress" {
   type = bool
 }
 
+variable "expose_itn_graphql" {
+  type    = bool
+  default = false
+}
+
+variable "itn_keys" {
+  type    = string
+  default = ""
+}
+
+variable "itn_orchestrator_image" {
+  type    = string
+  default = "gcr.io/o1labs-192920/itn_orchestrator_image:latest"
+}
+
 variable "aws_route53_zone_id" {
   type = string
 }
@@ -78,6 +93,11 @@ variable "log_precomputed_blocks" {
   type = bool
 }
 
+variable "start_filtered_logs" {
+  type    = list(string)
+  default = []
+}
+
 variable "worker_cpu_request" {
   type    = number
   default = 0
@@ -96,6 +116,10 @@ variable "cpu_request" {
 variable "mem_request" {
   type    = string
   default = "0Mi"
+}
+
+variable "pod_priority" {
+  type    = number
 }
 
 variable "archive_configs" {

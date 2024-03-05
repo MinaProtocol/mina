@@ -1,7 +1,6 @@
 (library
  (name frontier_base)
  (public_name transition_frontier_base)
- (flags -w -22)
  (libraries
    ;;opam libraries
    async_unix

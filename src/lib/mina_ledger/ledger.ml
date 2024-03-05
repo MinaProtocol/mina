@@ -22,6 +22,7 @@ module Ledger_inner = struct
       | Hash of Location_at_depth.Addr.t
     [@@deriving hash, sexp, compare]
 
+    include Comparable.Make_binable (Arg)
     include Hashable.Make_binable (Arg) [@@deriving sexp, compare, hash, yojson]
   end
 
@@ -56,7 +57,8 @@ module Ledger_inner = struct
 
         let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
-        let empty_account = Ledger_hash.of_digest Account.empty_digest
+        let empty_account =
+          Ledger_hash.of_digest (Lazy.force Account.empty_digest)
       end
     end]
   end
@@ -104,7 +106,7 @@ module Ledger_inner = struct
   end
 
   module Db :
-    Merkle_ledger.Database_intf.S
+    Merkle_ledger.Intf.Ledger.DATABASE
       with module Location = Location_at_depth
       with module Addr = Location_at_depth.Addr
       with type root_hash := Ledger_hash.t
@@ -120,7 +122,7 @@ module Ledger_inner = struct
   module Null = Null_ledger.Make (Inputs)
 
   module Any_ledger :
-    Merkle_ledger.Any_ledger.S
+    Merkle_ledger.Intf.Ledger.ANY
       with module Location = Location_at_depth
       with type account := Account.t
        and type key := Public_key.Compressed.t
@@ -163,6 +165,7 @@ module Ledger_inner = struct
        and type root_hash := Hash.t
        and type unattached_mask := Mask.t
        and type attached_mask := Mask.Attached.t
+       and type accumulated_t := Mask.accumulated_t
        and type t := Any_ledger.M.t =
   Merkle_mask.Maskable_merkle_tree.Make (struct
     include Inputs
@@ -269,7 +272,12 @@ module Ledger_inner = struct
 
   let packed t = Any_ledger.cast (module Mask.Attached) t
 
-  let register_mask t mask = Maskable.register_mask (packed t) mask
+  let register_mask t mask =
+    let accumulated = Mask.Attached.to_accumulated t in
+    Maskable.register_mask ~accumulated (packed t) mask
+
+  let unsafe_preload_accounts_from_parent =
+    Maskable.unsafe_preload_accounts_from_parent
 
   let unregister_mask_exn ~loc mask = Maskable.unregister_mask_exn ~loc mask
 
@@ -279,6 +287,8 @@ module Ledger_inner = struct
   type unattached_mask = Mask.t
 
   type attached_mask = Mask.Attached.t
+
+  type accumulated_t = Mask.accumulated_t
 
   (* inside MaskedLedger, the functor argument has assigned to location, account, and path
      but the module signature for the functor result wants them, so we declare them here *)

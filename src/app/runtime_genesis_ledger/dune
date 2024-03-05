@@ -10,14 +10,21 @@
    core
    result
    async.async_command
+   yojson
+   async_unix
    ;;local libraries
    genesis_constants
    mina_runtime_config
    mina_ledger
    genesis_ledger_helper
+   bounded_types
    logger
    cache_dir
+   precomputed_values
+   coda_genesis_ledger
+   consensus
+   mina_base
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_let ppx_optcomp ppx_deriving_yojson)))
+ (preprocess (pps ppx_mina ppx_version ppx_let ppx_optcomp ppx_deriving_yojson)))

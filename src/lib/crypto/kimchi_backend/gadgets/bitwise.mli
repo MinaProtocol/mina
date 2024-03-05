@@ -2,16 +2,46 @@
 type rot_mode = Left | Right
 
 (** 64-bit rotation of rot_bits to the `mode` side
- *  - word of maximum 64 bits to be rotated
- * - rot_bits: number of bits to be rotated
- * - mode: Left or Right
+ * @param check64  whether to check the input word is at most 64 bits (default is false)
+ * @param word  word of maximum 64 bits to be rotated
+ * @param bits  number of bits to be rotated
+ * @param mode  Left or Right
  * Returns rotated word
  *)
 val rot64 :
      (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+  -> ?check64:bool (* false *)
   -> 'f Snarky_backendless.Cvar.t
   -> int
   -> rot_mode
+  -> 'f Snarky_backendless.Cvar.t
+
+(** 64-bit bitwise logical shift left of bits to the `mode` side
+ * Inputs
+ *  @param check64  whether to check the input word is at most 64 bits (default is false)
+ *  @param word  word of maximum 64 bits to be shifted
+ *  @param bits  number of bits to be shifted
+ * Output: left shifted word (with bits 0s at the least significant positions)
+ *)
+val lsl64 :
+     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+  -> ?check64:bool (* false *)
+  -> 'f Snarky_backendless.Cvar.t
+  -> int
+  -> 'f Snarky_backendless.Cvar.t
+
+(** 64-bit bitwise logical shift of bits to the right side
+ * Inputs
+ *  @param check64   whether to check the input word is at most 64 bits (default is false)
+ *  @param word  word of maximum 64 bits to be shifted
+ *  @param bits  number of bits to be shifted
+ * Output: right shifted word (with bits 0s at the most significant positions)
+ *)
+val lsr64 :
+     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+  -> ?check64:bool (* false *)
+  -> 'f Snarky_backendless.Cvar.t
+  -> int
   -> 'f Snarky_backendless.Cvar.t
 
 (** Boolean Xor of length bits 

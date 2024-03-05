@@ -13,55 +13,8 @@
  * Props to @nholland for showing me this trick.
  * *)
 
-open Core_kernel
-
-module type S = sig
-  type key
-
-  type token_id
-
-  type token_id_set
-
-  type account_id
-
-  type account_id_set
-
-  type account
-
-  type hash
-
-  module Location : Location_intf.S
-
-  (** The type of the witness for a base ledger exposed here so that it can
-   * be easily accessed from outside this module *)
-  type witness [@@deriving sexp_of]
-
-  module type Base_intf =
-    Base_ledger_intf.S
-      with module Addr = Location.Addr
-      with module Location = Location
-      with type key := key
-       and type token_id := token_id
-       and type token_id_set := token_id_set
-       and type account_id := account_id
-       and type account_id_set := account_id_set
-       and type hash := hash
-       and type root_hash := hash
-       and type account := account
-
-  val cast : (module Base_intf with type t = 'a) -> 'a -> witness
-
-  module M : Base_intf with type t = witness
-end
-
-module type Inputs_intf = sig
-  include Base_inputs_intf.S
-
-  module Location : Location_intf.S
-end
-
-module Make_base (Inputs : Inputs_intf) :
-  S
+module Make_base (Inputs : Intf.Inputs.Intf) :
+  Intf.Ledger.ANY
     with module Location = Inputs.Location
     with type key := Inputs.Key.t
      and type token_id := Inputs.Token_id.t
@@ -74,7 +27,7 @@ module Make_base (Inputs : Inputs_intf) :
   module Location = Location
 
   module type Base_intf =
-    Base_ledger_intf.S
+    Intf.Ledger.S
       with module Addr = Location.Addr
       with module Location = Location
       with type key := Inputs.Key.t
@@ -113,14 +66,19 @@ module Make_base (Inputs : Inputs_intf) :
 
     module Addr = Location.Addr
 
-    let remove_accounts_exn (T ((module Base), t)) = Base.remove_accounts_exn t
-
     let merkle_path_at_index_exn (T ((module Base), t)) =
       Base.merkle_path_at_index_exn t
 
     let merkle_path (T ((module Base), t)) = Base.merkle_path t
 
+    let merkle_path_batch (T ((module Base), t)) = Base.merkle_path_batch t
+
+    let wide_merkle_path_batch (T ((module Base), t)) =
+      Base.wide_merkle_path_batch t
+
     let merkle_root (T ((module Base), t)) = Base.merkle_root t
+
+    let get_hash_batch_exn (T ((module Base), t)) = Base.get_hash_batch_exn t
 
     let index_of_account_exn (T ((module Base), t)) =
       Base.index_of_account_exn t
@@ -176,8 +134,6 @@ module Make_base (Inputs : Inputs_intf) :
     let to_list (T ((module Base), t)) = Base.to_list t
 
     let to_list_sequential (T ((module Base), t)) = Base.to_list_sequential t
-
-    let make_space_for (T ((module Base), t)) = Base.make_space_for t
 
     let get_all_accounts_rooted_at_exn (T ((module Base), t)) =
       Base.get_all_accounts_rooted_at_exn t

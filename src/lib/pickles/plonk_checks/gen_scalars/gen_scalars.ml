@@ -91,8 +91,9 @@ module Env = struct
     ; pow : 'a * int -> 'a
     ; square : 'a -> 'a
     ; zk_polynomial : 'a
-    ; omega_to_minus_3 : 'a
+    ; omega_to_minus_zk_rows : 'a
     ; zeta_to_n_minus_1 : 'a
+    ; zeta_to_srs_length : 'a Lazy.t
     ; var : Column.t * curr_or_next -> 'a
     ; field : string -> 'a
     ; cell : 'a -> 'a
@@ -101,11 +102,11 @@ module Env = struct
     ; endo_coefficient : 'a
     ; mds : int * int -> 'a
     ; srs_length_log2 : int
-    ; vanishes_on_last_4_rows : 'a
+    ; vanishes_on_zero_knowledge_and_previous_rows : 'a
     ; joint_combiner : 'a
     ; beta : 'a
     ; gamma : 'a
-    ; unnormalized_lagrange_basis : int -> 'a
+    ; unnormalized_lagrange_basis : bool * int -> 'a
     ; if_feature : Kimchi_types.feature_flag * (unit -> 'a) * (unit -> 'a) -> 'a
     }
 end
@@ -122,21 +123,22 @@ module Tick : S = struct
       ({ add = ( + )
        ; sub = ( - )
        ; mul = ( * )
-       ; square = _
+       ; square
        ; mds
-       ; endo_coefficient = _
+       ; endo_coefficient
        ; pow
        ; var
        ; field
        ; cell
        ; alpha_pow
-       ; double = _
+       ; double
        ; zk_polynomial = _
-       ; omega_to_minus_3 = _
+       ; omega_to_minus_zk_rows = _
        ; zeta_to_n_minus_1 = _
+       ; zeta_to_srs_length = _
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
-       ; joint_combiner = _
+       ; vanishes_on_zero_knowledge_and_previous_rows
+       ; joint_combiner
        ; beta
        ; gamma
        ; unnormalized_lagrange_basis
@@ -156,31 +158,7 @@ let () =
   output_string
     {ocaml|
 
-  let index_terms (type a)
-      ({ add = ( + )
-       ; sub = ( - )
-       ; mul = ( * )
-       ; square
-       ; pow
-       ; var
-       ; field
-       ; cell
-       ; alpha_pow
-       ; double
-       ; zk_polynomial = _
-       ; omega_to_minus_3 = _
-       ; zeta_to_n_minus_1 = _
-       ; mds = _
-       ; endo_coefficient
-       ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
-       ; joint_combiner
-       ; beta
-       ; gamma
-       ; unnormalized_lagrange_basis = _
-       ; if_feature
-       } :
-        a Env.t) =
+  let index_terms (type a) (_ : a Env.t) =
     Column.Table.of_alist_exn
     [
 |ocaml}
@@ -209,25 +187,26 @@ module Tock : S = struct
       ({ add = ( + )
        ; sub = ( - )
        ; mul = ( * )
-       ; square = _
+       ; square
        ; mds
-       ; endo_coefficient = _
+       ; endo_coefficient
        ; pow
        ; var
        ; field
        ; cell
        ; alpha_pow
-       ; double = _
+       ; double
        ; zk_polynomial = _
-       ; omega_to_minus_3 = _
+       ; omega_to_minus_zk_rows = _
        ; zeta_to_n_minus_1 = _
+       ; zeta_to_srs_length = _
        ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
+       ; vanishes_on_zero_knowledge_and_previous_rows = _
        ; joint_combiner = _
-       ; beta
-       ; gamma
-       ; unnormalized_lagrange_basis
-       ; if_feature
+       ; beta = _
+       ; gamma = _
+       ; unnormalized_lagrange_basis = _
+       ; if_feature = _
        } :
         a Env.t) =
 |ocaml}
@@ -243,31 +222,7 @@ let () =
   output_string
     {ocaml|
 
-  let index_terms (type a)
-      ({ add = ( + )
-       ; sub = ( - )
-       ; mul = ( * )
-       ; square
-       ; pow
-       ; var
-       ; field
-       ; cell
-       ; alpha_pow
-       ; double
-       ; zk_polynomial = _
-       ; omega_to_minus_3 = _
-       ; zeta_to_n_minus_1 = _
-       ; mds = _
-       ; endo_coefficient
-       ; srs_length_log2 = _
-       ; vanishes_on_last_4_rows
-       ; joint_combiner
-       ; beta
-       ; gamma
-       ; unnormalized_lagrange_basis = _
-       ; if_feature
-       } :
-        a Env.t) =
+  let index_terms (type a) (_ : a Env.t) =
     Column.Table.of_alist_exn
     [
 |ocaml}

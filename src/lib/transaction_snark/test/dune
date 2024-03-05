@@ -14,6 +14,8 @@
    yojson
    integers
    ;; local libraries
+   bounded_types
+   logger
    random_oracle_input
    pickles.backend
    mina_base.import
@@ -21,6 +23,7 @@
    kimchi_backend
    with_hash
    pickles
+   pickles_base
    consensus
    transaction_snark
    snark_params
@@ -53,7 +56,7 @@
    zkapps_examples
    )
   (library_flags -linkall)
-  (inline_tests)
+  (inline_tests (flags -verbose -show-counts))
   (preprocess
-    (pps ppx_snarky ppx_version ppx_jane ppx_sexp_conv))
+    (pps ppx_mina ppx_snarky ppx_version ppx_jane ppx_sexp_conv))
   (instrumentation (backend bisect_ppx)))

@@ -9,6 +9,7 @@ module Make
        ?handler:
          (   Snarky_backendless.Request.request
           -> Snarky_backendless.Request.response )
+    -> proof_cache:Proof_cache.t option
     -> ( A.t
        , A_value.t
        , 'ret_var
@@ -30,9 +31,9 @@ module Make
     -> prevs_length:('prev_vars, 'prevs_length) Pickles_types.Hlist.Length.t
     -> self:('a, 'b, 'c, 'd) Tag.t
     -> step_domains:(Import.Domains.t, 'self_branches) Pickles_types.Vector.t
-    -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
     -> self_dlog_plonk_index:
-         Backend.Tick.Inner_curve.Affine.t
+         Backend.Tick.Inner_curve.Affine.t array
          Pickles_types.Plonk_verification_key_evals.t
     -> public_input:
          ( 'var

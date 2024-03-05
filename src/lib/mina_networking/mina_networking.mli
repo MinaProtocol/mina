@@ -10,7 +10,7 @@ exception No_initial_peers
 type Structured_log_events.t +=
   | Gossip_new_state of { state_hash : State_hash.t }
   | Gossip_transaction_pool_diff of
-      { txns : Transaction_pool.Resource_pool.Diff.t }
+      { fee_payer_summaries : User_command.fee_payer_summary_t list }
   | Gossip_snark_pool_diff of { work : Snark_pool.Resource_pool.Diff.compact }
   [@@deriving register_event]
 
@@ -85,7 +85,7 @@ module Rpcs : sig
       module Stable : sig
         module V2 : sig
           type t =
-            { node_ip_addr : Core.Unix.Inet_addr.Stable.V1.t
+            { node_ip_addr : Network_peer.Peer.Inet_addr.Stable.V1.t
             ; node_peer_id : Peer.Id.Stable.V1.t
             ; sync_status : Sync_status.Stable.V1.t
             ; peers : Network_peer.Peer.Stable.V1.t list
@@ -242,10 +242,10 @@ val broadcast_state :
   t -> Mina_block.t State_hash.With_state_hashes.t -> unit Deferred.t
 
 val broadcast_snark_pool_diff :
-  t -> Snark_pool.Resource_pool.Diff.t -> unit Deferred.t
+  ?nonce:int -> t -> Snark_pool.Resource_pool.Diff.t -> unit Deferred.t
 
 val broadcast_transaction_pool_diff :
-  t -> Transaction_pool.Resource_pool.Diff.t -> unit Deferred.t
+  ?nonce:int -> t -> Transaction_pool.Resource_pool.Diff.t -> unit Deferred.t
 
 val glue_sync_ledger :
      t

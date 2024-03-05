@@ -31,66 +31,6 @@ let make_conf_dir_item_io ~conf_dir ~filename =
   in
   (read_item, write_item)
 
-let get_current_protocol_version ~compile_time_current_protocol_version
-    ~conf_dir ~logger =
-  let read_protocol_version, write_protocol_version =
-    make_conf_dir_item_io ~conf_dir ~filename:"current_protocol_version"
-  in
-  function
-  | None -> (
-      try
-        (* not provided on command line, try to read from config dir *)
-        let protocol_version = read_protocol_version () in
-        [%log info]
-          "Setting current protocol version to $protocol_version from config"
-          ~metadata:[ ("protocol_version", `String protocol_version) ] ;
-        Protocol_version.of_string_exn protocol_version
-      with Sys_error _ ->
-        (* not on command-line, not in config dir, use compile-time value *)
-        [%log info]
-          "Setting current protocol version to $protocol_version from \
-           compile-time config"
-          ~metadata:
-            [ ("protocol_version", `String compile_time_current_protocol_version)
-            ] ;
-        Protocol_version.of_string_exn compile_time_current_protocol_version )
-  | Some protocol_version -> (
-      try
-        (* it's an error if the command line value disagrees with the value in the config *)
-        let config_protocol_version = read_protocol_version () in
-        if String.equal config_protocol_version protocol_version then (
-          [%log info]
-            "Using current protocol version $protocol_version from command \
-             line, which matches the one in the config"
-            ~metadata:[ ("protocol_version", `String protocol_version) ] ;
-          Protocol_version.of_string_exn config_protocol_version )
-        else (
-          [%log fatal]
-            "Current protocol version $protocol_version from the command line \
-             disagrees with $config_protocol_version from the Coda config"
-            ~metadata:
-              [ ("protocol_version", `String protocol_version)
-              ; ("config_protocol_version", `String config_protocol_version)
-              ] ;
-          failwith
-            "Current protocol version from command line disagrees with \
-             protocol version in Coda config; please delete your Coda config \
-             if you wish to use a new protocol version" )
-      with Sys_error _ -> (
-        (* use value provided on command line, write to config dir *)
-        match Protocol_version.of_string_opt protocol_version with
-        | None ->
-            [%log fatal] "Protocol version provided on command line is invalid"
-              ~metadata:[ ("protocol_version", `String protocol_version) ] ;
-            failwith "Protocol version from command line is invalid"
-        | Some pv ->
-            write_protocol_version protocol_version ;
-            [%log info]
-              "Using current protocol_version $protocol_version from command \
-               line, writing to config"
-              ~metadata:[ ("protocol_version", `String protocol_version) ] ;
-            pv ) )
-
 let get_proposed_protocol_version_opt ~conf_dir ~logger =
   let read_protocol_version, write_protocol_version =
     make_conf_dir_item_io ~conf_dir ~filename:"proposed_protocol_version"
@@ -811,6 +751,14 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                   *** Shutting down ***\n" ;
                handle_crash Mina_lib.Offline_shutdown ~time_controller ~conf_dir
                  ~child_pids ~top_logger coda_ref
+           | Mina_lib.Bootstrap_stuck_shutdown ->
+               Core.print_string
+                 "\n\
+                  [FATAL] *** Mina daemon has been stuck in bootstrap for too \
+                  long ***\n\
+                  *** Shutting down ***\n" ;
+               handle_crash Mina_lib.Bootstrap_stuck_shutdown ~time_controller
+                 ~conf_dir ~child_pids ~top_logger coda_ref
            | _exn ->
                let error = Error.of_exn ~backtrace:`Get exn in
                let%bind () =

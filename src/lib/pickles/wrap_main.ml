@@ -36,15 +36,12 @@ module Old_bulletproof_chals = struct
         -> t
 end
 
-let pack_statement max_proofs_verified ~lookup ~feature_flags t =
+let pack_statement max_proofs_verified t =
   let open Types.Step in
   Spec.pack
     (module Impl)
-    (Statement.spec
-       (module Impl)
-       max_proofs_verified Backend.Tock.Rounds.n lookup feature_flags )
-    (Statement.to_data t ~option_map:Plonk_types.Opt.map
-       ~to_opt:Plonk_types.Opt.to_option_unsafe )
+    (Statement.spec max_proofs_verified Backend.Tock.Rounds.n)
+    (Statement.to_data t)
 
 let shifts ~log2_size = Common.tock_shifts ~log2_size
 
@@ -83,22 +80,19 @@ let split_field (x : Field.t) : Field.t * Boolean.var =
   Field.(Assert.equal ((of_int 2 * y) + (is_odd :> t)) x) ;
   res
 
-let lookup_config_for_pack =
-  { Types.Wrap.Lookup_parameters.zero = Common.Lookup_parameters.tock_zero
-  ; use = Plonk_types.Opt.Flag.No
-  }
-
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
     (type max_proofs_verified branches prev_varss max_local_max_proofs_verifieds)
-    ~feature_flags
+    ~num_chunks ~feature_flags
     (full_signature :
       ( max_proofs_verified
       , branches
       , max_local_max_proofs_verifieds )
       Full_signature.t ) (pi_branches : (prev_varss, branches) Hlist.Length.t)
     (step_keys :
-      ( Wrap_main_inputs.Inner_curve.Constant.t Wrap_verifier.index'
+      ( ( Wrap_main_inputs.Inner_curve.Constant.t array
+        , Wrap_main_inputs.Inner_curve.Constant.t array option )
+        Wrap_verifier.index'
       , branches )
       Vector.t
       Lazy.t ) (step_widths : (int, branches) Vector.t)
@@ -148,7 +142,7 @@ let wrap_main
            ; sponge_digest_before_evaluations
            ; messages_for_next_wrap_proof = messages_for_next_wrap_proof_digest
            }
-       ; messages_for_next_step_proof = _
+       ; messages_for_next_step_proof
        } :
         ( _
         , _
@@ -207,7 +201,6 @@ let wrap_main
               let typ =
                 typ
                   (module Impl)
-                  Common.Lookup_parameters.tock_zero
                   ~assert_16_bits:(Wrap_verifier.assert_n_bits ~n:16)
                   (Vector.init Max_proofs_verified.n ~f:(fun _ ->
                        Plonk_types.Features.none ) )
@@ -219,7 +212,13 @@ let wrap_main
           with_label __LOC__ (fun () ->
               Wrap_verifier.choose_key which_branch
                 (Vector.map (Lazy.force step_keys)
-                   ~f:(Plonk_verification_key_evals.map ~f:Inner_curve.constant) ) )
+                   ~f:
+                     (Plonk_verification_key_evals.Step.map
+                        ~f:(Array.map ~f:Inner_curve.constant) ~f_opt:(function
+                       | None ->
+                           Opt.nothing
+                       | Some x ->
+                           Opt.just (Array.map ~f:Inner_curve.constant x) ) ) ) )
         in
         let prev_step_accs =
           with_label __LOC__ (fun () ->
@@ -263,7 +262,9 @@ let wrap_main
               let evals =
                 let ty =
                   let ty =
-                    Plonk_types.All_evals.typ (module Impl) feature_flags
+                    Plonk_types.All_evals.typ
+                      (module Impl)
+                      ~num_chunks:1 feature_flags
                   in
                   Vector.typ ty Max_proofs_verified.n
                 in
@@ -304,32 +305,6 @@ let wrap_main
                        ; wrap_domain
                        ]
                      ->
-                    let deferred_values =
-                      (* strengthen the values to constants when we know they're true or false.
-                         This lets us skip some later computations.
-                      *)
-                      { deferred_values with
-                        plonk =
-                          { deferred_values.plonk with
-                            feature_flags =
-                              Plonk_types.Features.map2
-                                deferred_values.plonk.feature_flags
-                                Plonk_types.Features.none
-                                ~f:(fun actual_flag flag ->
-                                  match flag with
-                                  | No ->
-                                      Boolean.Assert.( = ) actual_flag
-                                        Boolean.false_ ;
-                                      Boolean.false_
-                                  | Yes ->
-                                      Boolean.Assert.( = ) actual_flag
-                                        Boolean.true_ ;
-                                      Boolean.true_
-                                  | Maybe ->
-                                      actual_flag )
-                          }
-                      }
-                    in
                     let sponge =
                       let s = Sponge.create sponge_params in
                       Sponge.absorb s sponge_digest_before_evaluations ;
@@ -376,6 +351,8 @@ let wrap_main
                   ; old_bulletproof_challenges = chals
                   } )
           in
+          Field.Assert.equal messages_for_next_step_proof
+            prev_proof_state.messages_for_next_step_proof ;
           { Types.Step.Statement.messages_for_next_wrap_proof =
               prev_messages_for_next_wrap_proof
           ; proof_state = prev_proof_state
@@ -418,7 +395,7 @@ let wrap_main
                      Inner_curve.typ ~bool:Boolean.typ feature_flags
                      ~dummy:Inner_curve.Params.one
                      ~commitment_lengths:
-                       (Commitment_lengths.create ~of_int:Fn.id) )
+                       (Commitment_lengths.default ~num_chunks) )
                   ~request:(fun () -> Req.Messages) )
           in
           let sponge = Wrap_verifier.Opt.create sponge_params in
@@ -430,8 +407,7 @@ let wrap_main
                   ~verification_key:step_plonk_index ~srs ~xi ~sponge
                   ~public_input:
                     (Array.map
-                       (pack_statement Max_proofs_verified.n ~feature_flags
-                          ~lookup:lookup_config_for_pack prev_statement )
+                       (pack_statement Max_proofs_verified.n prev_statement)
                        ~f:(function
                       | `Field (Shifted_value x) ->
                           `Field (split_field x)

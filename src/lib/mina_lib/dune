@@ -2,7 +2,7 @@
  (name mina_lib)
  (public_name mina_lib)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    integers
@@ -21,6 +21,7 @@
    result
    bin_prot.shape
    ;; local libraries
+   bounded_types
    transition_chain_prover
    best_tip_prover
    proof_carrying_data

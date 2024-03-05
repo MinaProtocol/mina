@@ -10,14 +10,14 @@ import (
 )
 
 type AllocateSlotsParams struct {
-	Groups []int
+	Groups []int `json:"groups"`
 
-	SlotsWon []SlotsWonOutput
+	SlotsWon []SlotsWonOutput `json:"slotsWon"`
 
 	// Minimum number of slots to split equally among groups
-	MinSlots int
+	MinSlots int `json:"minSlots"`
 	// Maximum number of slots to split equally among groups
-	MaxSlots int
+	MaxSlots int `json:"maxSlots"`
 }
 
 type slotEntry struct {
@@ -297,5 +297,7 @@ func (AllocateSlotsAction) Run(config Config, rawParams json.RawMessage, output 
 		output("lastSlot", lastSlot, false, false)
 	})
 }
+
+func (AllocateSlotsAction) Name() string { return "allocate-slots" }
 
 var _ Action = AllocateSlotsAction{}

@@ -71,6 +71,8 @@ let lift_sync f =
            [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
          Ivar.fill ivar (f ()) ) )
 
+let zkapp_cmd_limit = ref Mina_compile_config.zkapp_cmd_limit
+
 module Singleton_scheduler : sig
   type t
 
@@ -160,218 +162,258 @@ let report_transaction_inclusion_failures ~logger failed_txns =
       let leftover_bytes = available_bytes - base_error_size - 2 in
       wrap_error (`List (generate_errors failed_txns leftover_bytes)) )
 
-let generate_next_state ~constraint_constants ~previous_protocol_state
-    ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
-    ~(block_data : Consensus.Data.Block_data.t) ~winner_pk ~scheduled_time
-    ~log_block_creation ~block_reward_threshold =
+let generate_next_state ~zkapp_cmd_limit ~constraint_constants
+    ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
+    ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
+    ~winner_pk ~scheduled_time ~log_block_creation ~block_reward_threshold
+    ~zkapp_cmd_limit_hardcap ~slot_tx_end ~slot_chain_end =
   let open Interruptible.Let_syntax in
-  let previous_protocol_state_body_hash =
-    Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
+  let global_slot_since_hard_fork =
+    Consensus.Data.Block_data.global_slot block_data
   in
-  let previous_protocol_state_hash =
-    (Protocol_state.hashes_with_body
-       ~body_hash:previous_protocol_state_body_hash previous_protocol_state )
-      .state_hash
-  in
-  let previous_state_view =
-    Protocol_state.body previous_protocol_state
-    |> Mina_state.Protocol_state.Body.view
-  in
-  let global_slot =
-    Consensus.Data.Block_data.global_slot_since_genesis block_data
-  in
-  let supercharge_coinbase =
-    let epoch_ledger = Consensus.Data.Block_data.epoch_ledger block_data in
-    Staged_ledger.can_apply_supercharged_coinbase_exn ~winner:winner_pk
-      ~epoch_ledger ~global_slot
-  in
-  let%bind res =
-    Interruptible.uninterruptible
-      (let open Deferred.Let_syntax in
-      let coinbase_receiver =
-        Consensus.Data.Block_data.coinbase_receiver block_data
-      in
-      let diff =
-        O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
-            [%log internal] "Create_staged_ledger_diff" ;
-            (* TODO: handle transaction inclusion failures here *)
-            let diff_result =
-              Staged_ledger.create_diff ~constraint_constants ~global_slot
-                staged_ledger ~coinbase_receiver ~logger
-                ~current_state_view:previous_state_view
-                ~transactions_by_fee:transactions ~get_completed_work
-                ~log_block_creation ~supercharge_coinbase
-              |> Result.map ~f:(fun (diff, failed_txns) ->
-                     if not (List.is_empty failed_txns) then
-                       don't_wait_for
-                         (report_transaction_inclusion_failures ~logger
-                            failed_txns ) ;
-                     diff )
-              |> Result.map_error ~f:(fun err ->
-                     Staged_ledger.Staged_ledger_error.Pre_diff err )
-            in
-            [%log internal] "Create_staged_ledger_diff_done" ;
-            match (diff_result, block_reward_threshold) with
-            | Ok diff, Some threshold ->
-                let net_return =
-                  Option.value ~default:Currency.Amount.zero
-                    (Staged_ledger_diff.net_return ~constraint_constants
-                       ~supercharge_coinbase
-                       (Staged_ledger_diff.forget diff) )
-                in
-                if Currency.Amount.(net_return >= threshold) then diff_result
-                else (
-                  [%log info]
-                    "Block reward $reward is less than the min-block-reward \
-                     $threshold, creating empty block"
-                    ~metadata:
-                      [ ("threshold", Currency.Amount.to_yojson threshold)
-                      ; ("reward", Currency.Amount.to_yojson net_return)
-                      ] ;
-                  Ok
-                    Staged_ledger_diff.With_valid_signatures_and_proofs
-                    .empty_diff )
-            | _ ->
-                diff_result )
-      in
-      [%log internal] "Apply_staged_ledger_diff" ;
-      match%map
-        let%bind.Deferred.Result diff = return diff in
-        Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
-          ~global_slot diff ~logger ~current_state_view:previous_state_view
-          ~state_and_body_hash:
-            (previous_protocol_state_hash, previous_protocol_state_body_hash)
-          ~coinbase_receiver ~supercharge_coinbase
-      with
-      | Ok
-          ( `Hash_after_applying next_staged_ledger_hash
-          , `Ledger_proof ledger_proof_opt
-          , `Staged_ledger transitioned_staged_ledger
-          , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) )
-        ->
-          (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
-          ignore
-          @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
-               (Staged_ledger.ledger transitioned_staged_ledger) ;
-          Some
-            ( (match diff with Ok diff -> diff | Error _ -> assert false)
-            , next_staged_ledger_hash
-            , ledger_proof_opt
-            , is_new_stack
-            , pending_coinbase_update )
-      | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
-          [%log error] "Failed to apply the diff: $error"
-            ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-          None
-      | Error e ->
-          ( match diff with
-          | Ok diff ->
-              [%log error]
-                ~metadata:
-                  [ ( "error"
-                    , `String (Staged_ledger.Staged_ledger_error.to_string e) )
-                  ; ( "diff"
-                    , Staged_ledger_diff.With_valid_signatures_and_proofs
-                      .to_yojson diff )
-                  ]
-                "Error applying the diff $diff: $error"
-          | Error e ->
-              [%log error] "Error building the diff: $error"
-                ~metadata:
-                  [ ( "error"
-                    , `String (Staged_ledger.Staged_ledger_error.to_string e) )
-                  ] ) ;
-          None)
-  in
-  [%log internal] "Apply_staged_ledger_diff_done" ;
-  match res with
-  | None ->
+  match slot_chain_end with
+  | Some slot_chain_end
+    when Mina_numbers.Global_slot_since_hard_fork.(
+           global_slot_since_hard_fork >= slot_chain_end) ->
+      [%log info] "Reached slot_chain_end $slot_chain_end, not producing blocks"
+        ~metadata:
+          [ ( "slot_chain_end"
+            , Mina_numbers.Global_slot_since_hard_fork.to_yojson slot_chain_end
+            )
+          ] ;
       Interruptible.return None
-  | Some
-      ( diff
-      , next_staged_ledger_hash
-      , ledger_proof_opt
-      , is_new_stack
-      , pending_coinbase_update ) ->
-      let%bind protocol_state, consensus_transition_data =
-        lift_sync (fun () ->
-            let previous_ledger_hash =
-              previous_protocol_state |> Protocol_state.blockchain_state
-              |> Blockchain_state.snarked_ledger_hash
-            in
-            let ledger_proof_statement =
-              match ledger_proof_opt with
-              | Some (proof, _) ->
-                  Ledger_proof.statement proof
-              | None ->
-                  let state =
-                    previous_protocol_state |> Protocol_state.blockchain_state
-                  in
-                  Blockchain_state.ledger_proof_statement state
-            in
-            let genesis_ledger_hash =
-              previous_protocol_state |> Protocol_state.blockchain_state
-              |> Blockchain_state.genesis_ledger_hash
-            in
-            let supply_increase =
-              Option.value_map ledger_proof_opt
-                ~f:(fun (proof, _) ->
-                  (Ledger_proof.statement proof).supply_increase )
-                ~default:Currency.Amount.Signed.zero
-            in
-            let body_reference =
-              Staged_ledger_diff.Body.compute_reference
-                (Body.create @@ Staged_ledger_diff.forget diff)
-            in
-            let blockchain_state =
-              (* We use the time of the beginning of the slot because if things
-                 are slower than expected, we may have entered the next slot and
-                 putting the **current** timestamp rather than the expected one
-                 will screw things up.
-
-                 [generate_transition] will log an error if the [current_time]
-                 has a different slot from the [scheduled_time]
-              *)
-              Blockchain_state.create_value ~timestamp:scheduled_time
-                ~genesis_ledger_hash ~staged_ledger_hash:next_staged_ledger_hash
-                ~body_reference ~ledger_proof_statement
-            in
-            let current_time =
-              Block_time.now time_controller
-              |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
-            in
-            O1trace.sync_thread "generate_consensus_transition" (fun () ->
-                Consensus_state_hooks.generate_transition
-                  ~previous_protocol_state ~blockchain_state ~current_time
-                  ~block_data ~supercharge_coinbase
-                  ~snarked_ledger_hash:previous_ledger_hash ~genesis_ledger_hash
-                  ~supply_increase ~logger ~constraint_constants ) )
+  | None | Some _ -> (
+      let previous_protocol_state_body_hash =
+        Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
       in
-      lift_sync (fun () ->
-          let snark_transition =
-            O1trace.sync_thread "generate_snark_transition" (fun () ->
-                Snark_transition.create_value
-                  ~blockchain_state:
-                    (Protocol_state.blockchain_state protocol_state)
-                  ~consensus_transition:consensus_transition_data
-                  ~pending_coinbase_update () )
+      let previous_protocol_state_hash =
+        (Protocol_state.hashes_with_body
+           ~body_hash:previous_protocol_state_body_hash previous_protocol_state )
+          .state_hash
+      in
+      let previous_state_view =
+        Protocol_state.body previous_protocol_state
+        |> Mina_state.Protocol_state.Body.view
+      in
+      let global_slot =
+        Consensus.Data.Block_data.global_slot_since_genesis block_data
+      in
+      let supercharge_coinbase =
+        let epoch_ledger = Consensus.Data.Block_data.epoch_ledger block_data in
+        Staged_ledger.can_apply_supercharged_coinbase_exn ~winner:winner_pk
+          ~epoch_ledger ~global_slot
+      in
+      let%bind res =
+        Interruptible.uninterruptible
+          (let open Deferred.Let_syntax in
+          let coinbase_receiver =
+            Consensus.Data.Block_data.coinbase_receiver block_data
           in
-          let internal_transition =
-            O1trace.sync_thread "generate_internal_transition" (fun () ->
-                Internal_transition.create ~snark_transition
-                  ~prover_state:
-                    (Consensus.Data.Block_data.prover_state block_data)
-                  ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
-                  ~ledger_proof:
-                    (Option.map ledger_proof_opt ~f:(fun (proof, _) -> proof)) )
+          let diff =
+            match slot_tx_end with
+            | Some slot_tx_end
+              when Mina_numbers.Global_slot_since_hard_fork.(
+                     global_slot_since_hard_fork >= slot_tx_end) ->
+                [%log info]
+                  "Reached slot_tx_end $slot_tx_end, producing empty block"
+                  ~metadata:
+                    [ ( "slot_tx_end"
+                      , Mina_numbers.Global_slot_since_hard_fork.to_yojson
+                          slot_tx_end )
+                    ] ;
+                Result.return
+                  Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff
+            | Some _ | None ->
+                O1trace.sync_thread "create_staged_ledger_diff" (fun () ->
+                    [%log internal] "Create_staged_ledger_diff" ;
+                    (* TODO: handle transaction inclusion failures here *)
+                    let diff_result =
+                      Staged_ledger.create_diff ~constraint_constants
+                        ~global_slot staged_ledger ~coinbase_receiver ~logger
+                        ~current_state_view:previous_state_view
+                        ~transactions_by_fee:transactions ~get_completed_work
+                        ~log_block_creation ~supercharge_coinbase
+                        ~zkapp_cmd_limit
+                      |> Result.map ~f:(fun (diff, failed_txns) ->
+                             if not (List.is_empty failed_txns) then
+                               don't_wait_for
+                                 (report_transaction_inclusion_failures ~logger
+                                    failed_txns ) ;
+                             diff )
+                      |> Result.map_error ~f:(fun err ->
+                             Staged_ledger.Staged_ledger_error.Pre_diff err )
+                    in
+                    [%log internal] "Create_staged_ledger_diff_done" ;
+                    match (diff_result, block_reward_threshold) with
+                    | Ok diff, Some threshold ->
+                        let net_return =
+                          Option.value ~default:Currency.Amount.zero
+                            (Staged_ledger_diff.net_return ~constraint_constants
+                               ~supercharge_coinbase
+                               (Staged_ledger_diff.forget diff) )
+                        in
+                        if Currency.Amount.(net_return >= threshold) then
+                          diff_result
+                        else (
+                          [%log info]
+                            "Block reward $reward is less than the \
+                             min-block-reward $threshold, creating empty block"
+                            ~metadata:
+                              [ ( "threshold"
+                                , Currency.Amount.to_yojson threshold )
+                              ; ("reward", Currency.Amount.to_yojson net_return)
+                              ] ;
+                          Ok
+                            Staged_ledger_diff.With_valid_signatures_and_proofs
+                            .empty_diff )
+                    | _ ->
+                        diff_result )
           in
-          let witness =
-            { Pending_coinbase_witness.pending_coinbases =
-                Staged_ledger.pending_coinbase_collection staged_ledger
-            ; is_new_stack
-            }
+          [%log internal] "Apply_staged_ledger_diff" ;
+          match%map
+            let%bind.Deferred.Result diff = return diff in
+            Staged_ledger.apply_diff_unchecked staged_ledger
+              ~constraint_constants ~global_slot diff ~logger
+              ~current_state_view:previous_state_view
+              ~state_and_body_hash:
+                (previous_protocol_state_hash, previous_protocol_state_body_hash)
+              ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
+          with
+          | Ok
+              ( `Hash_after_applying next_staged_ledger_hash
+              , `Ledger_proof ledger_proof_opt
+              , `Staged_ledger transitioned_staged_ledger
+              , `Pending_coinbase_update (is_new_stack, pending_coinbase_update)
+              ) ->
+              (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
+              ignore
+              @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
+                   (Staged_ledger.ledger transitioned_staged_ledger) ;
+              Some
+                ( (match diff with Ok diff -> diff | Error _ -> assert false)
+                , next_staged_ledger_hash
+                , ledger_proof_opt
+                , is_new_stack
+                , pending_coinbase_update )
+          | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
+              [%log error] "Failed to apply the diff: $error"
+                ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+              None
+          | Error e ->
+              ( match diff with
+              | Ok diff ->
+                  [%log error]
+                    ~metadata:
+                      [ ( "error"
+                        , `String
+                            (Staged_ledger.Staged_ledger_error.to_string e) )
+                      ; ( "diff"
+                        , Staged_ledger_diff.With_valid_signatures_and_proofs
+                          .to_yojson diff )
+                      ]
+                    "Error applying the diff $diff: $error"
+              | Error e ->
+                  [%log error] "Error building the diff: $error"
+                    ~metadata:
+                      [ ( "error"
+                        , `String
+                            (Staged_ledger.Staged_ledger_error.to_string e) )
+                      ] ) ;
+              None)
+      in
+      [%log internal] "Apply_staged_ledger_diff_done" ;
+      match res with
+      | None ->
+          Interruptible.return None
+      | Some
+          ( diff
+          , next_staged_ledger_hash
+          , ledger_proof_opt
+          , is_new_stack
+          , pending_coinbase_update ) ->
+          let%bind protocol_state, consensus_transition_data =
+            lift_sync (fun () ->
+                let previous_ledger_hash =
+                  previous_protocol_state |> Protocol_state.blockchain_state
+                  |> Blockchain_state.snarked_ledger_hash
+                in
+                let ledger_proof_statement =
+                  match ledger_proof_opt with
+                  | Some (proof, _) ->
+                      Ledger_proof.statement proof
+                  | None ->
+                      let state =
+                        previous_protocol_state
+                        |> Protocol_state.blockchain_state
+                      in
+                      Blockchain_state.ledger_proof_statement state
+                in
+                let genesis_ledger_hash =
+                  previous_protocol_state |> Protocol_state.blockchain_state
+                  |> Blockchain_state.genesis_ledger_hash
+                in
+                let supply_increase =
+                  Option.value_map ledger_proof_opt
+                    ~f:(fun (proof, _) ->
+                      (Ledger_proof.statement proof).supply_increase )
+                    ~default:Currency.Amount.Signed.zero
+                in
+                let body_reference =
+                  Staged_ledger_diff.Body.compute_reference
+                    (Body.create @@ Staged_ledger_diff.forget diff)
+                in
+                let blockchain_state =
+                  (* We use the time of the beginning of the slot because if things
+                     are slower than expected, we may have entered the next slot and
+                     putting the **current** timestamp rather than the expected one
+                     will screw things up.
+
+                     [generate_transition] will log an error if the [current_time]
+                     has a different slot from the [scheduled_time]
+                  *)
+                  Blockchain_state.create_value ~timestamp:scheduled_time
+                    ~genesis_ledger_hash
+                    ~staged_ledger_hash:next_staged_ledger_hash ~body_reference
+                    ~ledger_proof_statement
+                in
+                let current_time =
+                  Block_time.now time_controller
+                  |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
+                in
+                O1trace.sync_thread "generate_consensus_transition" (fun () ->
+                    Consensus_state_hooks.generate_transition
+                      ~previous_protocol_state ~blockchain_state ~current_time
+                      ~block_data ~supercharge_coinbase
+                      ~snarked_ledger_hash:previous_ledger_hash
+                      ~genesis_ledger_hash ~supply_increase ~logger
+                      ~constraint_constants ) )
           in
-          Some (protocol_state, internal_transition, witness) )
+          lift_sync (fun () ->
+              let snark_transition =
+                O1trace.sync_thread "generate_snark_transition" (fun () ->
+                    Snark_transition.create_value
+                      ~blockchain_state:
+                        (Protocol_state.blockchain_state protocol_state)
+                      ~consensus_transition:consensus_transition_data
+                      ~pending_coinbase_update () )
+              in
+              let internal_transition =
+                O1trace.sync_thread "generate_internal_transition" (fun () ->
+                    Internal_transition.create ~snark_transition
+                      ~prover_state:
+                        (Consensus.Data.Block_data.prover_state block_data)
+                      ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
+                      ~ledger_proof:
+                        (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
+                             proof ) ) )
+              in
+              let witness =
+                { Pending_coinbase_witness.pending_coinbases =
+                    Staged_ledger.pending_coinbase_collection staged_ledger
+                ; is_new_stack
+                }
+              in
+              Some (protocol_state, internal_transition, witness) ) )
 
 module Precomputed = struct
   type t = Precomputed.t =
@@ -417,7 +459,7 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
       (`Prover_error
         ( err
         , ( previous_protocol_state_proof
-          , internal_transition
+          , _internal_transition
           , pending_coinbase_witness ) ) ) ->
       let msg : (_, unit, string, unit) format4 =
         "Prover failed to prove freshly generated transition: $error"
@@ -427,8 +469,9 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
         ; ("prev_state", Protocol_state.value_to_yojson previous_protocol_state)
         ; ("prev_state_proof", Proof.to_yojson previous_protocol_state_proof)
         ; ("next_state", Protocol_state.value_to_yojson protocol_state)
-        ; ( "internal_transition"
-          , Internal_transition.to_yojson internal_transition )
+          (* Commented out because for large blocks it's an oversized log *)
+          (* ; ( "internal_transition"
+             , Internal_transition.to_yojson internal_transition ) *)
         ; ( "pending_coinbase_witness"
           , Pending_coinbase_witness.to_yojson pending_coinbase_witness )
         ; time_metadata
@@ -610,8 +653,11 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
     ~time_controller ~consensus_local_state ~coinbase_receiver ~frontier_reader
     ~transition_writer ~set_next_producer_timing ~log_block_creation
-    ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state =
+    ~block_reward_threshold ~block_produced_bvar ~vrf_evaluation_state ~net
+    ~zkapp_cmd_limit_hardcap =
   let open Context in
+  let constraint_constants = precomputed_values.constraint_constants in
+  let consensus_constants = precomputed_values.consensus_constants in
   O1trace.sync_thread "produce_blocks" (fun () ->
       let genesis_breadcrumb =
         let started = ref false in
@@ -650,6 +696,13 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
       in
       let log_bootstrap_mode () =
         [%log info] "Pausing block production while bootstrapping"
+      in
+      let slot_tx_end =
+        Runtime_config.slot_tx_end_or_default precomputed_values.runtime_config
+      in
+      let slot_chain_end =
+        Runtime_config.slot_chain_end_or_default
+          precomputed_values.runtime_config
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
       let produce ivar (scheduled_time, block_data, winner_pubkey) =
@@ -696,8 +749,14 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
             in
             let start = Block_time.now time_controller in
             [%log info]
-              ~metadata:[ ("breadcrumb", Breadcrumb.to_yojson crumb) ]
-              "Producing new block with parent $breadcrumb%!" ;
+              ~metadata:
+                [ ( "parent_hash"
+                  , Breadcrumb.parent_hash crumb |> State_hash.to_yojson )
+                ; ( "protocol_state"
+                  , Breadcrumb.protocol_state crumb
+                    |> Protocol_state.value_to_yojson )
+                ]
+              "Producing new block with parent $parent_hash%!" ;
             let previous_transition = Breadcrumb.block_with_hash crumb in
             let previous_protocol_state =
               Header.protocol_state
@@ -716,10 +775,11 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     let proof = Blockchain_snark.Blockchain.proof block in
                     Interruptible.lift (Deferred.return proof)
                       (Deferred.never ())
-                | Error _ ->
+                | Error err ->
                     [%log error]
                       "Aborting block production: cannot generate a genesis \
-                       proof" ;
+                       proof"
+                      ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
                     Interruptible.lift (Deferred.never ()) (Deferred.return ())
                 )
               else
@@ -744,6 +804,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~log_block_creation
                 ~winner_pk:winner_pubkey ~block_reward_threshold
+                ~zkapp_cmd_limit:!zkapp_cmd_limit ~zkapp_cmd_limit_hardcap
+                ~slot_tx_end ~slot_chain_end
             in
             [%log internal] "Generate_next_state_done" ;
             match next_state_opt with
@@ -880,7 +942,8 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                       time ~logger ~time_controller
                         "Build breadcrumb on produced block" (fun () ->
                           Breadcrumb.build ~logger ~precomputed_values ~verifier
-                            ~trust_system ~parent:crumb ~transition
+                            ~get_completed_work:(Fn.const None) ~trust_system
+                            ~parent:crumb ~transition
                             ~sender:None (* Consider skipping `All here *)
                             ~skip_staged_ledger_verification:`Proofs
                             ~transition_receipt_time () )
@@ -896,12 +959,18 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                              | `Prover_error _ ) as err ->
                                err )
                     in
+                    let txs =
+                      Mina_block.transactions ~constraint_constants
+                        (Breadcrumb.block breadcrumb)
+                      |> List.map ~f:Transaction.yojson_summary_with_status
+                    in
                     [%log internal] "@block_metadata"
                       ~metadata:
                         [ ( "blockchain_length"
                           , Mina_numbers.Length.to_yojson
                             @@ Mina_block.blockchain_length
                             @@ Breadcrumb.block breadcrumb )
+                        ; ("transactions", `List txs)
                         ] ;
                     [%str_log info]
                       ~metadata:
@@ -959,7 +1028,9 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                         [%log info] ~metadata
                           "Generated transition $state_hash was accepted into \
                            transition frontier" ;
-                        return ()
+                        Deferred.map ~f:Result.return
+                          (Mina_networking.broadcast_state net
+                             (Breadcrumb.block_with_hash breadcrumb) )
                     | `Timed_out ->
                         (* FIXME #3167: this should be fatal, and more
                            importantly, shouldn't happen.
@@ -1000,240 +1071,263 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
       let production_supervisor = Singleton_supervisor.create ~task:produce in
       let scheduler = Singleton_scheduler.create time_controller in
       let rec check_next_block_timing slot i () =
-        O1trace.sync_thread "check_next_block_timing" (fun () ->
-            (* Begin checking for the ability to produce a block *)
-            match Broadcast_pipe.Reader.peek frontier_reader with
-            | None ->
-                log_bootstrap_mode () ;
-                don't_wait_for
-                  (let%map () =
-                     Broadcast_pipe.Reader.iter_until frontier_reader
-                       ~f:(Fn.compose Deferred.return Option.is_some)
-                   in
-                   check_next_block_timing slot i () )
-            | Some transition_frontier ->
-                let consensus_state =
-                  Transition_frontier.best_tip transition_frontier
-                  |> Breadcrumb.consensus_state
-                in
-                let now = Block_time.now time_controller in
-                let epoch_data_for_vrf, ledger_snapshot =
-                  O1trace.sync_thread "get_epoch_data_for_vrf" (fun () ->
-                      Consensus.Hooks.get_epoch_data_for_vrf
-                        ~constants:consensus_constants (time_to_ms now)
-                        consensus_state ~local_state:consensus_local_state
-                        ~logger )
-                in
-                let i' = Mina_numbers.Length.succ epoch_data_for_vrf.epoch in
-                let new_global_slot = epoch_data_for_vrf.global_slot in
-                let generate_genesis_proof_if_needed () =
-                  match Broadcast_pipe.Reader.peek frontier_reader with
-                  | Some transition_frontier ->
-                      let consensus_state =
-                        Transition_frontier.best_tip transition_frontier
-                        |> Breadcrumb.consensus_state
-                      in
-                      if
-                        Consensus.Data.Consensus_state.is_genesis_state
-                          consensus_state
-                      then genesis_breadcrumb () |> Deferred.ignore_m
-                      else Deferred.return ()
-                  | None ->
-                      Deferred.return ()
-                in
-                (* TODO: Re-enable this assertion when it doesn't fail dev demos
-                 *       (see #5354)
-                 * assert (
+        (* Begin checking for the ability to produce a block *)
+        match Broadcast_pipe.Reader.peek frontier_reader with
+        | None ->
+            log_bootstrap_mode () ;
+            don't_wait_for
+              (let%map () =
+                 Broadcast_pipe.Reader.iter_until frontier_reader
+                   ~f:(Fn.compose Deferred.return Option.is_some)
+               in
+               check_next_block_timing slot i () )
+        | Some transition_frontier ->
+            let consensus_state =
+              Transition_frontier.best_tip transition_frontier
+              |> Breadcrumb.consensus_state
+            in
+            let now = Block_time.now time_controller in
+            let epoch_data_for_vrf, ledger_snapshot =
+              O1trace.sync_thread "get_epoch_data_for_vrf" (fun () ->
+                  Consensus.Hooks.get_epoch_data_for_vrf
+                    ~constants:consensus_constants (time_to_ms now)
+                    consensus_state ~local_state:consensus_local_state ~logger )
+            in
+            let i' = Mina_numbers.Length.succ epoch_data_for_vrf.epoch in
+            let new_global_slot = epoch_data_for_vrf.global_slot in
+            let log_if_slot_diff_is_less_than =
+              let current_global_slot =
+                Consensus.Data.Consensus_time.(
+                  to_global_slot
+                    (of_time_exn ~constants:consensus_constants
+                       (Block_time.now time_controller) ))
+              in
+              fun ~diff_limit ~every ~message -> function
+                | None ->
+                    ()
+                | Some slot ->
+                    let slot_diff =
+                      let open Mina_numbers in
+                      Option.map ~f:Global_slot_span.to_int
+                      @@ Global_slot_since_hard_fork.diff slot
+                           current_global_slot
+                    in
+                    Option.iter slot_diff ~f:(fun slot_diff' ->
+                        if slot_diff' <= diff_limit && slot_diff' mod every = 0
+                        then
+                          [%log info] message
+                            ~metadata:[ ("slot_diff", `Int slot_diff') ] )
+            in
+            log_if_slot_diff_is_less_than ~diff_limit:480 ~every:60
+              ~message:
+                "Block producer will stop producing blocks after $slot_diff \
+                 slots"
+              slot_chain_end ;
+            log_if_slot_diff_is_less_than ~diff_limit:480 ~every:60
+              ~message:
+                "Block producer will begin producing only empty blocks after \
+                 $slot_diff slots"
+              slot_tx_end ;
+
+            let generate_genesis_proof_if_needed () =
+              match Broadcast_pipe.Reader.peek frontier_reader with
+              | Some transition_frontier ->
+                  let consensus_state =
+                    Transition_frontier.best_tip transition_frontier
+                    |> Breadcrumb.consensus_state
+                  in
+                  if
+                    Consensus.Data.Consensus_state.is_genesis_state
+                      consensus_state
+                  then genesis_breadcrumb () |> Deferred.ignore_m
+                  else Deferred.return ()
+              | None ->
+                  Deferred.return ()
+            in
+            (* TODO: Re-enable this assertion when it doesn't fail dev demos
+             *       (see #5354)
+             * assert (
                    Consensus.Hooks.required_local_state_sync
                     ~constants:consensus_constants ~consensus_state
                     ~local_state:consensus_local_state
                    = None ) ; *)
-                don't_wait_for
-                  (let%bind () =
-                     if Mina_numbers.Length.(i' > i) then
-                       Vrf_evaluation_state.update_epoch_data ~vrf_evaluator
-                         ~epoch_data_for_vrf ~logger vrf_evaluation_state
-                     else Deferred.unit
-                   in
-                   let%bind () =
-                     (*Poll once every slot if the evaluation for the epoch is not completed or the evaluation is completed*)
-                     if
-                       Mina_numbers.Global_slot_since_hard_fork.(
-                         new_global_slot > slot)
-                       && not
-                            (Vrf_evaluation_state.finished vrf_evaluation_state)
-                     then
+            don't_wait_for
+              (let%bind () =
+                 if Mina_numbers.Length.(i' > i) then
+                   Vrf_evaluation_state.update_epoch_data ~vrf_evaluator
+                     ~epoch_data_for_vrf ~logger vrf_evaluation_state
+                 else Deferred.unit
+               in
+               let%bind () =
+                 (*Poll once every slot if the evaluation for the epoch is not completed or the evaluation is completed*)
+                 if
+                   Mina_numbers.Global_slot_since_hard_fork.(
+                     new_global_slot > slot)
+                   && not (Vrf_evaluation_state.finished vrf_evaluation_state)
+                 then
+                   Vrf_evaluation_state.poll ~vrf_evaluator ~logger
+                     vrf_evaluation_state
+                 else Deferred.unit
+               in
+               match Core.Queue.dequeue vrf_evaluation_state.queue with
+               | None -> (
+                   (*Keep trying until we get some slots*)
+                   let poll () =
+                     let%bind () =
+                       Async.after
+                         (Time.Span.of_ms
+                            ( Mina_compile_config.vrf_poll_interval_ms
+                            |> Int.to_float ) )
+                     in
+                     let%map () =
                        Vrf_evaluation_state.poll ~vrf_evaluator ~logger
                          vrf_evaluation_state
-                     else Deferred.unit
+                     in
+                     Singleton_scheduler.schedule scheduler
+                       (Block_time.now time_controller)
+                       ~f:(check_next_block_timing new_global_slot i')
                    in
-                   match Core.Queue.dequeue vrf_evaluation_state.queue with
-                   | None -> (
-                       (*Keep trying until we get some slots*)
-                       let poll () =
-                         let%bind () =
-                           Async.after
-                             (Time.Span.of_ms
-                                ( Mina_compile_config.vrf_poll_interval_ms
-                                |> Int.to_float ) )
-                         in
-                         let%map () =
-                           Vrf_evaluation_state.poll ~vrf_evaluator ~logger
-                             vrf_evaluation_state
-                         in
-                         Singleton_scheduler.schedule scheduler
-                           (Block_time.now time_controller)
+                   match
+                     Vrf_evaluation_state.evaluator_status vrf_evaluation_state
+                   with
+                   | Completed ->
+                       let epoch_end_time =
+                         Consensus.Hooks.epoch_end_time
+                           ~constants:consensus_constants
+                           epoch_data_for_vrf.epoch
+                       in
+                       set_next_producer_timing (`Check_again epoch_end_time)
+                         consensus_state ;
+                       [%log info] "No more slots won in this epoch" ;
+                       return
+                         (Singleton_scheduler.schedule scheduler epoch_end_time
+                            ~f:(check_next_block_timing new_global_slot i') )
+                   | At last_slot ->
+                       set_next_producer_timing (`Evaluating_vrf last_slot)
+                         consensus_state ;
+                       poll ()
+                   | Start ->
+                       set_next_producer_timing
+                         (`Evaluating_vrf new_global_slot) consensus_state ;
+                       poll () )
+               | Some slot_won -> (
+                   let winning_global_slot = slot_won.global_slot in
+                   let slot, epoch =
+                     let t =
+                       Consensus.Data.Consensus_time.of_global_slot
+                         winning_global_slot ~constants:consensus_constants
+                     in
+                     Consensus.Data.Consensus_time.(slot t, epoch t)
+                   in
+                   [%log info] "Block producer won slot $slot in epoch $epoch"
+                     ~metadata:
+                       [ ( "slot"
+                         , Mina_numbers.Global_slot_since_genesis.(
+                             to_yojson @@ of_uint32 slot) )
+                       ; ("epoch", Mina_numbers.Length.to_yojson epoch)
+                       ] ;
+                   let now = Block_time.now time_controller in
+                   let curr_global_slot =
+                     Consensus.Data.Consensus_time.(
+                       of_time_exn ~constants:consensus_constants now
+                       |> to_global_slot)
+                   in
+                   let winner_pk = fst slot_won.delegator in
+                   let data =
+                     Consensus.Hooks.get_block_data ~slot_won ~ledger_snapshot
+                       ~coinbase_receiver:!coinbase_receiver
+                   in
+                   if
+                     Mina_numbers.Global_slot_since_hard_fork.(
+                       curr_global_slot = winning_global_slot)
+                   then (
+                     (*produce now*)
+                     [%log info] "Producing a block now" ;
+                     set_next_producer_timing
+                       (`Produce_now (data, winner_pk))
+                       consensus_state ;
+                     Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
+                     let%map () = generate_genesis_proof_if_needed () in
+                     ignore
+                       ( Interruptible.finally
+                           (Singleton_supervisor.dispatch production_supervisor
+                              (now, data, winner_pk) )
                            ~f:(check_next_block_timing new_global_slot i')
-                       in
-                       match
-                         Vrf_evaluation_state.evaluator_status
-                           vrf_evaluation_state
-                       with
-                       | Completed ->
-                           let epoch_end_time =
-                             Consensus.Hooks.epoch_end_time
-                               ~constants:consensus_constants
-                               epoch_data_for_vrf.epoch
-                           in
-                           set_next_producer_timing
-                             (`Check_again epoch_end_time) consensus_state ;
-                           [%log info] "No more slots won in this epoch" ;
-                           return
-                             (Singleton_scheduler.schedule scheduler
-                                epoch_end_time
-                                ~f:(check_next_block_timing new_global_slot i') )
-                       | At last_slot ->
-                           set_next_producer_timing (`Evaluating_vrf last_slot)
-                             consensus_state ;
-                           poll ()
-                       | Start ->
-                           set_next_producer_timing
-                             (`Evaluating_vrf new_global_slot) consensus_state ;
-                           poll () )
-                   | Some slot_won -> (
-                       let winning_global_slot = slot_won.global_slot in
-                       let slot, epoch =
-                         let t =
-                           Consensus.Data.Consensus_time.of_global_slot
-                             winning_global_slot ~constants:consensus_constants
+                         : (_, _) Interruptible.t ) )
+                   else
+                     match
+                       Mina_numbers.Global_slot_since_hard_fork.diff
+                         winning_global_slot curr_global_slot
+                     with
+                     | None ->
+                         [%log warn]
+                           "Skipping block production for global slot \
+                            $slot_won because it has passed. Current global \
+                            slot is $curr_slot"
+                           ~metadata:
+                             [ ( "slot_won"
+                               , Mina_numbers.Global_slot_since_hard_fork
+                                 .to_yojson winning_global_slot )
+                             ; ( "curr_slot"
+                               , Mina_numbers.Global_slot_since_hard_fork
+                                 .to_yojson curr_global_slot )
+                             ] ;
+                         return (check_next_block_timing new_global_slot i' ())
+                     | Some slot_diff ->
+                         [%log info] "Producing a block in $slots slots"
+                           ~metadata:
+                             [ ( "slots"
+                               , Mina_numbers.Global_slot_span.to_yojson
+                                   slot_diff )
+                             ] ;
+                         let time =
+                           Consensus.Data.Consensus_time.(
+                             start_time ~constants:consensus_constants
+                               (of_global_slot ~constants:consensus_constants
+                                  winning_global_slot ))
+                           |> Block_time.to_span_since_epoch
+                           |> Block_time.Span.to_ms
                          in
-                         Consensus.Data.Consensus_time.(slot t, epoch t)
-                       in
-                       [%log info]
-                         "Block producer won slot $slot in epoch $epoch"
-                         ~metadata:
-                           [ ( "slot"
-                             , Mina_numbers.Global_slot_since_genesis.(
-                                 to_yojson @@ of_uint32 slot) )
-                           ; ("epoch", Mina_numbers.Length.to_yojson epoch)
-                           ] ;
-                       let now = Block_time.now time_controller in
-                       let curr_global_slot =
-                         Consensus.Data.Consensus_time.(
-                           of_time_exn ~constants:consensus_constants now
-                           |> to_global_slot)
-                       in
-                       let winner_pk = fst slot_won.delegator in
-                       let data =
-                         Consensus.Hooks.get_block_data ~slot_won
-                           ~ledger_snapshot
-                           ~coinbase_receiver:!coinbase_receiver
-                       in
-                       if
-                         Mina_numbers.Global_slot_since_hard_fork.(
-                           curr_global_slot = winning_global_slot)
-                       then (
-                         (*produce now*)
-                         [%log info] "Producing a block now" ;
                          set_next_producer_timing
-                           (`Produce_now (data, winner_pk))
+                           (`Produce (time, data, winner_pk))
                            consensus_state ;
                          Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
-                         let%map () = generate_genesis_proof_if_needed () in
-                         ignore
-                           ( Interruptible.finally
-                               (Singleton_supervisor.dispatch
-                                  production_supervisor (now, data, winner_pk) )
-                               ~f:(check_next_block_timing new_global_slot i')
-                             : (_, _) Interruptible.t ) )
-                       else
-                         match
-                           Mina_numbers.Global_slot_since_hard_fork.diff
-                             winning_global_slot curr_global_slot
-                         with
-                         | None ->
-                             [%log warn]
-                               "Skipping block production for global slot \
-                                $slot_won because it has passed. Current \
-                                global slot is $curr_slot"
-                               ~metadata:
-                                 [ ( "slot_won"
-                                   , Mina_numbers.Global_slot_since_hard_fork
-                                     .to_yojson winning_global_slot )
-                                 ; ( "curr_slot"
-                                   , Mina_numbers.Global_slot_since_hard_fork
-                                     .to_yojson curr_global_slot )
-                                 ] ;
-                             return
-                               (check_next_block_timing new_global_slot i' ())
-                         | Some slot_diff ->
-                             [%log info] "Producing a block in $slots slots"
-                               ~metadata:
-                                 [ ( "slots"
-                                   , Mina_numbers.Global_slot_span.to_yojson
-                                       slot_diff )
-                                 ] ;
-                             let time =
-                               Consensus.Data.Consensus_time.(
-                                 start_time ~constants:consensus_constants
-                                   (of_global_slot
-                                      ~constants:consensus_constants
-                                      winning_global_slot ))
-                               |> Block_time.to_span_since_epoch
-                               |> Block_time.Span.to_ms
-                             in
-                             set_next_producer_timing
-                               (`Produce (time, data, winner_pk))
-                               consensus_state ;
-                             Mina_metrics.(
-                               Counter.inc_one Block_producer.slots_won) ;
-                             let scheduled_time = time_of_ms time in
-                             don't_wait_for
-                               ((* Attempt to generate a genesis proof in the slot
-                                   immediately before we'll actually need it, so that
-                                   it isn't limiting our block production time in the
-                                   won slot.
-                                   This also allows non-genesis blocks to be received
-                                   in the meantime and alleviate the need to produce
-                                   one at all, if this won't have block height 1.
-                                *)
-                                let scheduled_genesis_time =
-                                  time_of_ms
-                                    Int64.(
-                                      time
-                                      - of_int
-                                          constraint_constants
-                                            .block_window_duration_ms)
-                                in
-                                let span_till_time =
-                                  Block_time.diff scheduled_genesis_time
-                                    (Block_time.now time_controller)
-                                  |> Block_time.Span.to_time_span
-                                in
-                                let%bind () = after span_till_time in
-                                generate_genesis_proof_if_needed () ) ;
-                             Singleton_scheduler.schedule scheduler
-                               scheduled_time ~f:(fun () ->
-                                 ignore
-                                   ( Interruptible.finally
-                                       (Singleton_supervisor.dispatch
-                                          production_supervisor
-                                          (scheduled_time, data, winner_pk) )
-                                       ~f:
-                                         (check_next_block_timing
-                                            new_global_slot i' )
-                                     : (_, _) Interruptible.t ) ) ;
-                             Deferred.return () ) ) )
+                         let scheduled_time = time_of_ms time in
+                         don't_wait_for
+                           ((* Attempt to generate a genesis proof in the slot
+                               immediately before we'll actually need it, so that
+                               it isn't limiting our block production time in the
+                               won slot.
+                               This also allows non-genesis blocks to be received
+                               in the meantime and alleviate the need to produce
+                               one at all, if this won't have block height 1.
+                            *)
+                            let scheduled_genesis_time =
+                              time_of_ms
+                                Int64.(
+                                  time
+                                  - of_int
+                                      constraint_constants
+                                        .block_window_duration_ms)
+                            in
+                            let span_till_time =
+                              Block_time.diff scheduled_genesis_time
+                                (Block_time.now time_controller)
+                              |> Block_time.Span.to_time_span
+                            in
+                            let%bind () = after span_till_time in
+                            generate_genesis_proof_if_needed () ) ;
+                         Singleton_scheduler.schedule scheduler scheduled_time
+                           ~f:(fun () ->
+                             ignore
+                               ( Interruptible.finally
+                                   (Singleton_supervisor.dispatch
+                                      production_supervisor
+                                      (scheduled_time, data, winner_pk) )
+                                   ~f:
+                                     (check_next_block_timing new_global_slot i')
+                                 : (_, _) Interruptible.t ) ) ;
+                         Deferred.return () ) )
       in
       let start () =
         check_next_block_timing Mina_numbers.Global_slot_since_hard_fork.zero
@@ -1383,7 +1477,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
             time ~logger ~time_controller
               "Build breadcrumb on produced block (precomputed)" (fun () ->
                 Breadcrumb.build ~logger ~precomputed_values ~verifier
-                  ~trust_system ~parent:crumb ~transition ~sender:None
+                  ~get_completed_work:(Fn.const None) ~trust_system
+                  ~parent:crumb ~transition ~sender:None
                   ~skip_staged_ledger_verification:`Proofs
                   ~transition_receipt_time ()
                 |> Deferred.Result.map_error ~f:(function

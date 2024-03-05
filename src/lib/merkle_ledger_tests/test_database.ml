@@ -7,7 +7,7 @@ let%test_module "test functor on in memory databases" =
     module Database = Merkle_ledger.Database
 
     module type DB =
-      Merkle_ledger.Database_intf.S
+      Intf.Ledger.DATABASE
         with type key := Key.t
          and type token_id := Token_id.t
          and type token_id_set := Token_id.Set.t
@@ -429,28 +429,6 @@ let%test_module "test functor on in memory databases" =
               assert (
                 Stdlib.List.compare_lengths accounts retrieved_accounts = 0 ) ;
               assert (List.equal Account.equal accounts retrieved_accounts) )
-
-      let%test_unit "removing accounts restores Merkle root" =
-        Test.with_instance (fun mdb ->
-            let num_accounts = 5 in
-            let account_ids = Account_id.gen_accounts num_accounts in
-            let balances =
-              Quickcheck.random_value
-                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-            in
-            let accounts =
-              List.map2_exn account_ids balances ~f:Account.create
-            in
-            let merkle_root0 = MT.merkle_root mdb in
-            List.iter accounts ~f:(fun account ->
-                ignore @@ create_new_account_exn mdb account ) ;
-            let merkle_root1 = MT.merkle_root mdb in
-            (* adding accounts should change the Merkle root *)
-            assert (not (Hash.equal merkle_root0 merkle_root1)) ;
-            MT.remove_accounts_exn mdb account_ids ;
-            (* should see original Merkle root after removing the accounts *)
-            let merkle_root2 = MT.merkle_root mdb in
-            assert (Hash.equal merkle_root2 merkle_root0) )
 
       let%test_unit "fold over account balances" =
         Test.with_instance (fun mdb ->

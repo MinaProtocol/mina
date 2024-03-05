@@ -110,11 +110,7 @@ struct
     { uuid = Uuid_unix.create (); table = Bigstring_frozen.Table.create () }
 
   let create_checkpoint t _ =
-    { uuid = Uuid_unix.create ()
-    ; table =
-        Bigstring_frozen.Table.of_alist_exn
-        @@ Bigstring_frozen.Table.to_alist t.table
-    }
+    { uuid = Uuid_unix.create (); table = Bigstring_frozen.Table.copy t.table }
 
   let close _ = ()
 
@@ -132,6 +128,17 @@ struct
   let remove t ~key = Bigstring_frozen.Table.remove t.table key
 
   let make_checkpoint _ _ = ()
+
+  let foldi t ~init ~f =
+    let i = ref (-1) in
+    let f ~key ~data accum = incr i ; f !i accum ~key ~data in
+    Bigstring_frozen.Table.fold t.table ~init ~f
+
+  (* Relying on {!val:to_alist} is probably enough for testing purposes. *)
+  let fold_until t ~init ~f ~finish =
+    let f accum (key, data) = f accum ~key ~data in
+    let alist = to_alist t in
+    List.fold_until alist ~init ~f ~finish
 end
 
 module Storage_locations : Intf.Storage_locations = struct

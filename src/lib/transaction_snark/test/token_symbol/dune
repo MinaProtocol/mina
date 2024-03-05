@@ -9,6 +9,8 @@
    base
    core_kernel
    yojson
+   ppx_deriving_yojson.runtime
+   result
    ;; local libraries
    mina_base.import
    pickles
@@ -18,6 +20,7 @@
    mina_base
    mina_transaction_logic
    currency
+   bounded_types
    mina_state
    signature_lib
    genesis_constants
@@ -28,7 +31,7 @@
    transaction_snark_tests
    )
   (library_flags -linkall)
-  (inline_tests)
+  (inline_tests (flags -verbose -show-counts) (deps proof_cache.json))
   (preprocess
     (pps ppx_snarky ppx_version ppx_jane))
   (instrumentation (backend bisect_ppx)))

@@ -328,6 +328,8 @@ module type S = sig
     val transaction : t -> Transaction.t With_status.t
 
     val transaction_status : t -> Transaction_status.t
+
+    val new_accounts : t -> Account_id.t list
   end
 
   module Global_state : sig
@@ -543,6 +545,24 @@ module type S = sig
     -> bool Or_error.t
 
   module For_tests : sig
+    module Stack (Elt : sig
+      type t
+    end) : sig
+      type t = Elt.t list
+
+      val if_ : bool -> then_:t -> else_:t -> t
+
+      val empty : unit -> t
+
+      val is_empty : t -> bool
+
+      val pop_exn : t -> Elt.t * t
+
+      val pop : t -> (Elt.t * t) option
+
+      val push : Elt.t -> onto:t -> t
+    end
+
     val validate_timing_with_min_balance :
          account:Account.t
       -> txn_amount:Amount.t
@@ -1294,6 +1314,20 @@ module Make (L : Ledger_intf.S) :
           else Control.Tag.None_given
         in
         Permissions.Auth_required.check perm tag
+
+      let verification_key_perm_fallback_to_signature_with_older_version =
+        Permissions.Auth_required
+        .verification_key_perm_fallback_to_signature_with_older_version
+    end
+
+    module Txn_version = struct
+      type t = Mina_numbers.Txn_version.t
+
+      let if_ = value_if
+
+      let equal_to_current = Mina_numbers.Txn_version.equal_to_current
+
+      let older_than_current = Mina_numbers.Txn_version.older_than_current
     end
 
     module Global_slot_since_genesis = struct
@@ -1378,7 +1412,7 @@ module Make (L : Ledger_intf.S) :
     end
 
     module Zkapp_uri = struct
-      type t = string
+      type t = Bounded_types.String.t
 
       let if_ = value_if
     end
@@ -1407,8 +1441,11 @@ module Make (L : Ledger_intf.S) :
         let set_permissions : t -> Controller.t =
          fun a -> a.permissions.set_permissions
 
-        let set_verification_key : t -> Controller.t =
-         fun a -> a.permissions.set_verification_key
+        let set_verification_key_auth : t -> Controller.t =
+         fun a -> fst a.permissions.set_verification_key
+
+        let set_verification_key_txn_version : t -> Txn_version.t =
+         fun a -> snd a.permissions.set_verification_key
 
         let set_zkapp_uri : t -> Controller.t =
          fun a -> a.permissions.set_zkapp_uri
@@ -1865,23 +1902,14 @@ module Make (L : Ledger_intf.S) :
             global_state.protocol_state
           |> fun or_err -> match or_err with Ok () -> true | Error _ -> false )
       | Check_account_precondition
-          (account_update, account, new_account, local_state) -> (
-          match account_update.body.preconditions.account with
-          | Accept ->
-              local_state
-          | Nonce n ->
-              let nonce_matches = Account.Nonce.equal account.nonce n in
-              Inputs.Local_state.add_check local_state
-                Account_nonce_precondition_unsatisfied nonce_matches
-          | Full precondition_account ->
-              let local_state = ref local_state in
-              let check failure b =
-                local_state :=
-                  Inputs.Local_state.add_check !local_state failure b
-              in
-              Zkapp_precondition.Account.check ~new_account ~check
-                precondition_account account ;
-              !local_state )
+          (account_update, account, new_account, local_state) ->
+          let local_state = ref local_state in
+          let check failure b =
+            local_state := Inputs.Local_state.add_check !local_state failure b
+          in
+          Zkapp_precondition.Account.check ~new_account ~check
+            account_update.body.preconditions.account account ;
+          !local_state
       | Init_account { account_update = _; account = a } ->
           a
   end
@@ -2512,6 +2540,8 @@ module Make (L : Ledger_intf.S) :
     >>= Mina_stdlib.Result.List.map ~f:(apply_transaction_second_pass ledger)
 
   module For_tests = struct
+    module Stack = Inputs.Stack
+
     let validate_timing_with_min_balance = validate_timing_with_min_balance
 
     let validate_timing = validate_timing
@@ -2568,7 +2598,7 @@ module For_tests = struct
             ; receive = None
             ; set_delegate = Either
             ; set_permissions = Either
-            ; set_verification_key = Either
+            ; set_verification_key = (Either, Mina_numbers.Txn_version.current)
             ; set_zkapp_uri = Either
             ; edit_action_state = Either
             ; set_token_symbol = Either
@@ -2757,7 +2787,7 @@ module For_tests = struct
                 ; preconditions =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
-                    ; account = Accept
+                    ; account = Zkapp_precondition.Account.accept
                     ; valid_while = Ignore
                     }
                 ; may_use_token = No
@@ -2769,7 +2799,7 @@ module For_tests = struct
                 }
             ; authorization =
                 ( if use_full_commitment then Signature Signature.dummy
-                else Proof Mina_base.Proof.transaction_dummy )
+                else Proof (Lazy.force Mina_base.Proof.transaction_dummy) )
             }
           ; { body =
                 { public_key = receiver
@@ -2784,7 +2814,7 @@ module For_tests = struct
                 ; preconditions =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept
-                    ; account = Accept
+                    ; account = Zkapp_precondition.Account.accept
                     ; valid_while = Ignore
                     }
                 ; may_use_token = No

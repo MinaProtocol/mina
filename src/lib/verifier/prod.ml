@@ -8,6 +8,26 @@ open Blockchain_snark
 
 type invalid = Common.invalid [@@deriving bin_io_unversioned, to_yojson]
 
+module With_id_tag = struct
+  type 'a t = int * 'a [@@deriving bin_io_unversioned]
+
+  let tag_list = List.mapi ~f:(fun id command -> (id, command))
+
+  (* This function associates each tagged inputs with its corresponding result based
+     on the ID, and returns a list of tuples (input, result). *)
+  let reassociate_tagged_results tagged_inputs tagged_results =
+    let result_map = Int.Map.of_alist_exn tagged_results in
+    List.map tagged_inputs ~f:(fun (id, input) ->
+        let result =
+          match Int.Map.find result_map id with
+          | Some res ->
+              res
+          | None ->
+              failwith "Verification result missing for command"
+        in
+        (input, result) )
+end
+
 let invalid_to_error = Common.invalid_to_error
 
 type ledger_proof = Ledger_proof.Prod.t
@@ -18,14 +38,15 @@ module Worker_state = struct
       (Protocol_state.Value.t * Proof.t) list -> unit Or_error.t Deferred.t
 
     val verify_commands :
-         Mina_base.User_command.Verifiable.t With_status.t list
-      -> [ `Valid of Mina_base.User_command.Valid.t
+         Mina_base.User_command.Verifiable.t With_status.t With_id_tag.t list
+      -> [ `Valid
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
            * Mina_base.Zkapp_statement.t
            * Pickles.Side_loaded.Proof.t )
            list
          | invalid ]
+         With_id_tag.t
          list
          Deferred.t
 
@@ -53,7 +74,6 @@ module Worker_state = struct
   type t = (module S)
 
   let create { logger; proof_level; constraint_constants; _ } : t Deferred.t =
-    Memory_stats.log_memory_stats logger ~process:"verifier" ;
     match proof_level with
     | Full ->
         Pickles.Side_loaded.srs_precomputation () ;
@@ -74,44 +94,55 @@ module Worker_state = struct
              end)
 
              let verify_commands
-                 (cs : User_command.Verifiable.t With_status.t list) :
-                 _ list Deferred.t =
-               let cs = List.map cs ~f:Common.check in
+                 (cs :
+                   User_command.Verifiable.t With_status.t With_id_tag.t list )
+                 : _ list Deferred.t =
+               let results =
+                 List.map cs ~f:(fun (id, c) -> (id, Common.check c))
+               in
                let to_verify =
-                 List.concat_map cs ~f:(function
-                   | `Valid _ ->
-                       []
-                   | `Valid_assuming (_, xs) ->
-                       xs
-                   | `Invalid_keys _
-                   | `Invalid_signature _
-                   | `Invalid_proof _
-                   | `Missing_verification_key _
-                   | `Unexpected_verification_key _
-                   | `Mismatched_authorization_kind _ ->
-                       [] )
+                 results |> List.map ~f:snd
+                 |> List.concat_map ~f:(function
+                      | `Valid _ ->
+                          []
+                      | `Valid_assuming (_, xs) ->
+                          xs
+                      | `Invalid_keys _
+                      | `Invalid_signature _
+                      | `Invalid_proof _
+                      | `Missing_verification_key _
+                      | `Unexpected_verification_key _
+                      | `Mismatched_authorization_kind _ ->
+                          [] )
                in
                let%map all_verified =
                  Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ to_verify
                in
-               List.map cs ~f:(function
-                 | `Valid c ->
-                     `Valid c
-                 | `Valid_assuming (c, xs) ->
-                     if Or_error.is_ok all_verified then `Valid c
-                     else `Valid_assuming xs
-                 | `Invalid_keys keys ->
-                     `Invalid_keys keys
-                 | `Invalid_signature keys ->
-                     `Invalid_signature keys
-                 | `Invalid_proof err ->
-                     `Invalid_proof err
-                 | `Missing_verification_key keys ->
-                     `Missing_verification_key keys
-                 | `Unexpected_verification_key keys ->
-                     `Unexpected_verification_key keys
-                 | `Mismatched_authorization_kind keys ->
-                     `Mismatched_authorization_kind keys )
+               List.map results ~f:(fun (id, result) ->
+                   let result =
+                     match result with
+                     | `Valid _ ->
+                         (* The command is dropped here to avoid decoding it later in the caller
+                            which would create a duplicate. Results are paired back to their inputs
+                            using the input [id]*)
+                         `Valid
+                     | `Valid_assuming (_, xs) ->
+                         if Or_error.is_ok all_verified then `Valid
+                         else `Valid_assuming xs
+                     | `Invalid_keys keys ->
+                         `Invalid_keys keys
+                     | `Invalid_signature keys ->
+                         `Invalid_signature keys
+                     | `Invalid_proof err ->
+                         `Invalid_proof err
+                     | `Missing_verification_key keys ->
+                         `Missing_verification_key keys
+                     | `Unexpected_verification_key keys ->
+                         `Unexpected_verification_key keys
+                     | `Mismatched_authorization_kind keys ->
+                         `Mismatched_authorization_kind keys
+                   in
+                   (id, result) )
 
              let verify_commands cs =
                Internal_tracing.Context_logger.with_logger (Some logger)
@@ -171,25 +202,28 @@ module Worker_state = struct
     | Check | None ->
         Deferred.return
         @@ ( module struct
-             let verify_commands cs =
-               List.map cs ~f:(fun c ->
-                   match Common.check c with
-                   | `Valid c ->
-                       `Valid c
-                   | `Valid_assuming (c, _) ->
-                       `Valid c
-                   | `Invalid_keys keys ->
-                       `Invalid_keys keys
-                   | `Invalid_signature keys ->
-                       `Invalid_signature keys
-                   | `Invalid_proof err ->
-                       `Invalid_proof err
-                   | `Missing_verification_key keys ->
-                       `Missing_verification_key keys
-                   | `Unexpected_verification_key keys ->
-                       `Unexpected_verification_key keys
-                   | `Mismatched_authorization_kind keys ->
-                       `Mismatched_authorization_kind keys )
+             let verify_commands tagged_commands =
+               List.map tagged_commands ~f:(fun (id, c) ->
+                   let result =
+                     match Common.check c with
+                     | `Valid _ ->
+                         `Valid
+                     | `Valid_assuming (_, _) ->
+                         `Valid
+                     | `Invalid_keys keys ->
+                         `Invalid_keys keys
+                     | `Invalid_signature keys ->
+                         `Invalid_signature keys
+                     | `Invalid_proof err ->
+                         `Invalid_proof err
+                     | `Missing_verification_key keys ->
+                         `Missing_verification_key keys
+                     | `Unexpected_verification_key keys ->
+                         `Unexpected_verification_key keys
+                     | `Mismatched_authorization_kind keys ->
+                         `Mismatched_authorization_kind keys
+                   in
+                   (id, result) )
                |> Deferred.return
 
              let verify_blockchain_snarks _ = Deferred.return (Ok ())
@@ -232,14 +266,15 @@ module Worker = struct
           ('w, (Transaction_snark.t * Sok_message.t) list, unit Or_error.t) F.t
       ; verify_commands :
           ( 'w
-          , User_command.Verifiable.t With_status.t list
-          , [ `Valid of User_command.Valid.t
+          , User_command.Verifiable.t With_status.t With_id_tag.t list
+          , [ `Valid
             | `Valid_assuming of
               ( Pickles.Side_loaded.Verification_key.t
               * Mina_base.Zkapp_statement.t
               * Pickles.Side_loaded.Proof.t )
               list
             | invalid ]
+            With_id_tag.t
             list )
           F.t
       ; get_blockchain_verification_key :
@@ -315,15 +350,17 @@ module Worker = struct
               ( [%bin_type_class:
                   User_command.Verifiable.Stable.Latest.t
                   With_status.Stable.Latest.t
+                  With_id_tag.t
                   list]
               , [%bin_type_class:
-                  [ `Valid of User_command.Valid.Stable.Latest.t
+                  [ `Valid
                   | `Valid_assuming of
                     ( Pickles.Side_loaded.Verification_key.Stable.Latest.t
                     * Mina_base.Zkapp_statement.Stable.Latest.t
                     * Pickles.Side_loaded.Proof.Stable.Latest.t )
                     list
                   | invalid ]
+                  With_id_tag.t
                   list]
               , verify_commands )
         ; get_blockchain_verification_key =
@@ -422,7 +459,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
          [rest] handler for the 'rest' of the errors after the value is
          determined, which logs the errors and then swallows them.
       *)
-      Monitor.try_with ~name:"Verifier RPC worker" ~here:[%here] ~run:`Now
+      Monitor.try_with ~here:[%here] ~name:"Verifier RPC worker" ~run:`Now
         ~rest:
           (`Call
             (fun exn ->
@@ -658,13 +695,41 @@ let verify_transaction_snarks =
   wrap_verify_snarks_with_trace ~checkpoint_before:"Verify_transaction_snarks"
     ~checkpoint_after:"Verify_transaction_snarks_done" verify_transaction_snarks
 
+(* Reinjects the original user commands into the validation results.
+   This avoids duplicating proof data by not sending it back from the subprocess. *)
+let reinject_valid_user_command_into_valid_result (command, result) =
+  match result with
+  | #invalid as invalid ->
+      invalid
+  | `Valid_assuming x ->
+      `Valid_assuming x
+  | `Valid ->
+      (* Since we have stripped the transaction from the result, we reconstruct it here.
+         The use of [to_valid_unsafe] is justified because a [`Valid] result for this
+         command means that it has indeed been validated. *)
+      let (`If_this_is_used_it_should_have_a_comment_justifying_it command_valid)
+          =
+        User_command.to_valid_unsafe
+          (User_command.of_verifiable (With_status.data command))
+      in
+      `Valid command_valid
+
+let finalize_verification_results tagged_commands tagged_results =
+  With_id_tag.reassociate_tagged_results tagged_commands tagged_results
+  |> List.map ~f:reinject_valid_user_command_into_valid_result
+
 let verify_commands { worker; logger } ts =
   O1trace.thread "dispatch_user_command_verification" (fun () ->
       with_retry ~logger (fun () ->
           let%bind { connection; _ } = Ivar.read !worker in
+          let tagged_commands = With_id_tag.tag_list ts in
           Worker.Connection.run connection ~f:Worker.functions.verify_commands
-            ~arg:ts
-          |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ) )
+            ~arg:tagged_commands
+          |> Deferred.Or_error.map ~f:(fun tagged_results ->
+                 let results =
+                   finalize_verification_results tagged_commands tagged_results
+                 in
+                 `Continue results ) ) )
 
 let verify_commands t ts =
   let logger = t.logger in

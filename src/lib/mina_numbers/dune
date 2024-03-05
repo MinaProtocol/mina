@@ -1,7 +1,7 @@
 (library
  (name mina_numbers)
  (public_name mina_numbers)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (library_flags -linkall)
  (libraries
    ;; opam libraries
@@ -16,11 +16,11 @@
    base.base_internalhash_types
    ppx_inline_test.config
    ;; local libraries
+   protocol_version
    mina_wire_types
    bignum_bigint
    pickles
    codable
-   ppx_dhall_type
    snarky.backendless
    fold_lib
    tuple_lib

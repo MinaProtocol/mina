@@ -65,7 +65,7 @@ module Diff_versioned = struct
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
-      module V2 = struct
+      module V3 = struct
         type t =
           | Insufficient_replace_fee
           | Duplicate
@@ -78,6 +78,7 @@ module Diff_versioned = struct
           | Overloaded
           | Fee_payer_account_not_found
           | Fee_payer_not_permitted_to_send
+          | After_slot_tx_end
         [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
@@ -99,6 +100,7 @@ module Diff_versioned = struct
       | Overloaded
       | Fee_payer_account_not_found
       | Fee_payer_not_permitted_to_send
+      | After_slot_tx_end
     [@@deriving sexp, yojson]
 
     let to_string_name = function
@@ -124,6 +126,8 @@ module Diff_versioned = struct
           "fee_payer_account_not_found"
       | Fee_payer_not_permitted_to_send ->
           "fee_payer_not_permitted_to_send"
+      | After_slot_tx_end ->
+          "after_slot_tx_end"
 
     let to_string_hum = function
       | Insufficient_replace_fee ->
@@ -152,6 +156,9 @@ module Diff_versioned = struct
           "Fee payer account was not found in the best tip ledger"
       | Fee_payer_not_permitted_to_send ->
           "Fee payer account permissions don't allow sending funds"
+      | After_slot_tx_end ->
+          "This transaction was submitted after the slot defined to stop \
+           accepting transactions"
   end
 
   module Rejected = struct
@@ -160,7 +167,7 @@ module Diff_versioned = struct
       [@@@no_toplevel_latest_type]
 
       module V3 = struct
-        type t = (User_command.Stable.V2.t * Diff_error.Stable.V2.t) list
+        type t = (User_command.Stable.V2.t * Diff_error.Stable.V3.t) list
         [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
@@ -175,7 +182,12 @@ module Diff_versioned = struct
   type verified = Transaction_hash.User_command_with_valid_signature.t list
   [@@deriving sexp, to_yojson]
 
-  let summary t = Printf.sprintf "Transaction diff of length %d" (List.length t)
+  let summary t =
+    Printf.sprintf
+      !"Transaction_pool_diff of length %d with fee payer summary %s"
+      (List.length t)
+      ( String.concat ~sep:","
+      @@ List.map ~f:User_command.fee_payer_summary_string t )
 
   let is_empty t = List.is_empty t
 end
@@ -276,8 +288,20 @@ struct
               *)
         ; verifier : (Verifier.t[@sexp.opaque])
         ; genesis_constants : Genesis_constants.t
+        ; slot_tx_end : Mina_numbers.Global_slot_since_hard_fork.t option
         }
-      [@@deriving sexp_of, make]
+      [@@deriving sexp_of]
+
+      (* remove next line if there's a way to force [@@deriving make] write a
+         named parameter instead of an optional parameter *)
+      let make ~trust_system ~pool_max_size ~verifier ~genesis_constants
+          ~slot_tx_end =
+        { trust_system
+        ; pool_max_size
+        ; verifier
+        ; genesis_constants
+        ; slot_tx_end
+        }
     end
 
     let make_config = Config.make
@@ -328,41 +352,82 @@ struct
     end
 
     module Vk_refcount_table = struct
-      type t = (int * Verification_key_wire.t) Zkapp_basic.F_map.Table.t
+      type t =
+        { verification_keys :
+            (int * Verification_key_wire.t) Zkapp_basic.F_map.Table.t
+        ; account_id_to_vks : int Zkapp_basic.F_map.Map.t Account_id.Table.t
+        ; vk_to_account_ids : int Account_id.Map.t Zkapp_basic.F_map.Table.t
+        }
 
-      let create () = Zkapp_basic.F_map.Table.create ()
+      let create () =
+        { verification_keys = Zkapp_basic.F_map.Table.create ()
+        ; account_id_to_vks = Account_id.Table.create ()
+        ; vk_to_account_ids = Zkapp_basic.F_map.Table.create ()
+        }
 
-      let find t key = Zkapp_basic.F_map.Table.find t key
+      let find_vk (t : t) = Hashtbl.find t.verification_keys
 
-      let inc ~key ~value t =
-        Zkapp_basic.F_map.Table.update t key ~f:(function
+      let find_vks_by_account_id (t : t) account_id =
+        match Hashtbl.find t.account_id_to_vks account_id with
+        | None ->
+            []
+        | Some vks ->
+            Map.keys vks
+            |> List.map ~f:(find_vk t)
+            |> Option.all
+            |> Option.value_exn ~message:"malformed Vk_refcount_table.t"
+            |> List.map ~f:snd
+
+      let inc (t : t) ~account_id ~(vk : Verification_key_wire.t) =
+        let inc_map ~default_map key map =
+          Map.update (Option.value map ~default:default_map) key ~f:(function
+            | None ->
+                1
+            | Some count ->
+                count + 1 )
+        in
+        Hashtbl.update t.verification_keys vk.hash ~f:(function
           | None ->
-              (1, value)
-          | Some (x, value) ->
-              (x + 1, value) ) ;
+              (1, vk)
+          | Some (count, vk) ->
+              (count + 1, vk) ) ;
+        Hashtbl.update t.account_id_to_vks account_id
+          ~f:(inc_map ~default_map:Zkapp_basic.F_map.Map.empty vk.hash) ;
+        Hashtbl.update t.vk_to_account_ids vk.hash
+          ~f:(inc_map ~default_map:Account_id.Map.empty account_id) ;
         Mina_metrics.(
           Gauge.set Transaction_pool.vk_refcount_table_size
-            (Float.of_int (Zkapp_basic.F_map.Table.length t)))
+            (Float.of_int (Zkapp_basic.F_map.Table.length t.verification_keys)))
 
-      let dec ~key ~value:_ t =
-        Zkapp_basic.F_map.Table.change t key ~f:(function
-          | None ->
-              None
-          | Some (x, value) ->
-              if x = 1 then None else Some (x - 1, value) ) ;
+      let dec (t : t) ~account_id ~vk_hash =
+        let open Option.Let_syntax in
+        let dec count = if count = 1 then None else Some (count - 1) in
+        let dec_map key map =
+          let map' = Map.change map key ~f:(Option.bind ~f:dec) in
+          if Map.is_empty map' then None else Some map'
+        in
+        Hashtbl.change t.verification_keys vk_hash
+          ~f:
+            (Option.bind ~f:(fun (count, value) ->
+                 let%map count' = dec count in
+                 (count', value) ) ) ;
+        Hashtbl.change t.account_id_to_vks account_id
+          ~f:(Option.bind ~f:(dec_map vk_hash)) ;
+        Hashtbl.change t.vk_to_account_ids vk_hash
+          ~f:(Option.bind ~f:(dec_map account_id)) ;
         Mina_metrics.(
           Gauge.set Transaction_pool.vk_refcount_table_size
-            (Float.of_int (Zkapp_basic.F_map.Table.length t)))
+            (Float.of_int (Zkapp_basic.F_map.Table.length t.verification_keys)))
 
-      let lift_common t table_modify cmd =
+      let lift_common (t : t) table_modify cmd =
         User_command.extract_vks cmd
-        |> List.iter ~f:(fun vk -> table_modify ~key:vk.hash ~value:vk t)
+        |> List.iter ~f:(fun (account_id, vk) -> table_modify t ~account_id ~vk)
 
-      let lift t table_modify (cmd : User_command.Valid.t With_status.t) =
+      let lift (t : t) table_modify (cmd : User_command.Valid.t With_status.t) =
         With_status.data cmd |> User_command.forget_check
         |> lift_common t table_modify
 
-      let lift_hashed t table_modify cmd =
+      let lift_hashed (t : t) table_modify cmd =
         Transaction_hash.User_command_with_valid_signature.forget_check cmd
         |> With_hash.data |> lift_common t table_modify
     end
@@ -433,7 +498,7 @@ struct
           else true
 
     let diff_error_of_indexed_pool_error :
-        Indexed_pool.Command_error.t -> Diff_versioned.Diff_error.t = function
+        Command_error.t -> Diff_versioned.Diff_error.t = function
       | Invalid_nonce _ ->
           Invalid_nonce
       | Insufficient_funds _ ->
@@ -448,9 +513,11 @@ struct
           Unwanted_fee_token
       | Expired _ ->
           Expired
+      | After_slot_tx_end ->
+          After_slot_tx_end
 
     let indexed_pool_error_metadata = function
-      | Indexed_pool.Command_error.Invalid_nonce (`Between (low, hi), nonce) ->
+      | Command_error.Invalid_nonce (`Between (low, hi), nonce) ->
           let nonce_json = Account.Nonce.to_yojson in
           [ ( "between"
             , `Assoc [ ("low", nonce_json low); ("hi", nonce_json hi) ] )
@@ -477,10 +544,12 @@ struct
           , `Global_slot_since_genesis global_slot_since_genesis ) ->
           [ ( "valid_until"
             , Mina_numbers.Global_slot_since_genesis.to_yojson valid_until )
-          ; ( "current_global_slot"
+          ; ( "current_global_slot_since_genesis"
             , Mina_numbers.Global_slot_since_genesis.to_yojson
                 global_slot_since_genesis )
           ]
+      | After_slot_tx_end ->
+          []
 
     let indexed_pool_error_log_info e =
       ( Diff_versioned.Diff_error.to_string_name
@@ -508,6 +577,10 @@ struct
          Don't forget to modify the refcount table as well as remove from the
          index pool.
       *)
+      let vk_table_inc = Vk_refcount_table.inc in
+      let vk_table_dec t ~account_id ~(vk : Verification_key_wire.t) =
+        Vk_refcount_table.dec t ~account_id ~vk_hash:vk.hash
+      in
       let vk_table_lift = Vk_refcount_table.lift t.verification_key_table in
       let vk_table_lift_hashed =
         Vk_refcount_table.lift_hashed t.verification_key_table
@@ -527,18 +600,21 @@ struct
               ]
             @ metadata )
       in
-      List.iter new_commands ~f:(vk_table_lift Vk_refcount_table.inc) ;
-      List.iter removed_commands ~f:(vk_table_lift Vk_refcount_table.dec) ;
+      List.iter new_commands ~f:(vk_table_lift vk_table_inc) ;
+      List.iter removed_commands ~f:(vk_table_lift vk_table_dec) ;
+      let compact_json =
+        Fn.compose User_command.fee_payer_summary_json User_command.forget_check
+      in
       [%log' trace t.logger]
         ~metadata:
           [ ( "removed"
             , `List
                 (List.map removed_commands
-                   ~f:(With_status.to_yojson User_command.Valid.to_yojson) ) )
+                   ~f:(With_status.to_yojson compact_json) ) )
           ; ( "added"
             , `List
-                (List.map new_commands
-                   ~f:(With_status.to_yojson User_command.Valid.to_yojson) ) )
+                (List.map new_commands ~f:(With_status.to_yojson compact_json))
+            )
           ]
         "Diff: removed: $removed added: $added from best tip" ;
       let pool', dropped_backtrack =
@@ -574,8 +650,7 @@ struct
             in
             (pool', Sequence.append dropped_so_far dropped_seq) )
       in
-      Sequence.iter dropped_backtrack
-        ~f:(vk_table_lift_hashed Vk_refcount_table.dec) ;
+      Sequence.iter dropped_backtrack ~f:(vk_table_lift_hashed vk_table_dec) ;
       (* Track what locally generated commands were removed from the pool
          during backtracking due to the max size constraint. *)
       let locally_generated_dropped =
@@ -640,7 +715,7 @@ struct
                  (Transaction_hash.User_command_with_valid_signature.hash cmd) )
       in
       List.iter committed_commands ~f:(fun cmd ->
-          vk_table_lift_hashed Vk_refcount_table.dec cmd ;
+          vk_table_lift_hashed vk_table_dec cmd ;
           Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
           |> Option.iter ~f:(fun data ->
                  Hashtbl.add_exn t.locally_generated_committed ~key:cmd ~data ) ) ;
@@ -675,7 +750,7 @@ struct
              be in locally_generated_committed. If it wasn't, try re-adding to
              the pool. *)
           let remove_cmd () =
-            vk_table_lift_hashed Vk_refcount_table.dec cmd ;
+            vk_table_lift_hashed vk_table_dec cmd ;
             assert (
               Option.is_some
               @@ Hashtbl.find_and_remove t.locally_generated_uncommitted cmd )
@@ -751,22 +826,21 @@ struct
                 , Transaction_hash.User_command_with_valid_signature.to_yojson
                     cmd )
               ] ;
-          vk_table_lift_hashed Vk_refcount_table.dec cmd ;
+          vk_table_lift_hashed vk_table_dec cmd ;
           ignore
             ( Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
               : (Time.t * [ `Batch of int ]) option ) ) ;
       Mina_metrics.(
         Gauge.set Transaction_pool.pool_size
           (Float.of_int (Indexed_pool.size pool))) ;
-      t.pool <- pool ;
-      Deferred.unit
+      t.pool <- pool
 
     let create ~constraint_constants ~consensus_constants ~time_controller
         ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
       let t =
         { pool =
             Indexed_pool.empty ~constraint_constants ~consensus_constants
-              ~time_controller
+              ~time_controller ~slot_tx_end:config.Config.slot_tx_end
         ; locally_generated_uncommitted =
             Hashtbl.create
               ( module Transaction_hash.User_command_with_valid_signature.Stable
@@ -920,6 +994,8 @@ struct
           (*apply*)
           | Fee_payer_account_not_found
           | Fee_payer_not_permitted_to_send
+          (*Indexed_pool*)
+          | After_slot_tx_end
         [@@deriving sexp, yojson, compare]
 
         let to_string_hum = Diff_versioned.Diff_error.to_string_hum
@@ -932,7 +1008,8 @@ struct
           | Duplicate
           | Overloaded
           | Fee_payer_account_not_found
-          | Fee_payer_not_permitted_to_send ->
+          | Fee_payer_not_permitted_to_send
+          | After_slot_tx_end ->
               false
           | Overflow | Bad_token | Unwanted_fee_token ->
               true
@@ -963,7 +1040,11 @@ struct
       let max_per_15_seconds = max_per_15_seconds
 
       let summary t =
-        Printf.sprintf "Transaction diff of length %d" (List.length t)
+        Printf.sprintf
+          !"Transaction_pool_diff of length %d with fee payer summary %s"
+          (List.length t)
+          ( String.concat ~sep:","
+          @@ List.map ~f:User_command.fee_payer_summary_string t )
 
       let is_empty t = List.is_empty t
 
@@ -992,8 +1073,8 @@ struct
       let of_indexed_pool_error e =
         (diff_error_of_indexed_pool_error e, indexed_pool_error_metadata e)
 
-      let report_command_error ~logger ~is_sender_local tx
-          (e : Indexed_pool.Command_error.t) =
+      let report_command_error ~logger ~is_sender_local tx (e : Command_error.t)
+          =
         let diff_err, error_extra = of_indexed_pool_error e in
         if is_sender_local then
           [%str_log error]
@@ -1021,23 +1102,23 @@ struct
 
       (** DO NOT mutate any transaction pool state in this function, you may only mutate in the synchronous `apply` function. *)
       let verify (t : pool) (diff : t Envelope.Incoming.t) :
-          verified Envelope.Incoming.t Deferred.Or_error.t =
-        let open Deferred.Or_error.Let_syntax in
-        let ok_if_true cond ~error =
-          Deferred.return
-            (Result.ok_if_true cond ~error:(Error.of_string error))
-        in
+          ( verified Envelope.Incoming.t
+          , Intf.Verification_error.t )
+          Deferred.Result.t =
+        let open Deferred.Result.Let_syntax in
         let is_sender_local =
           Envelope.Sender.(equal Local) (Envelope.Incoming.sender diff)
         in
+        let open Intf.Verification_error in
         let%bind () =
           (* TODO: we should probably remove this -- the libp2p gossip cache should cover this already (#11704) *)
           let (`Already_mem already_mem) =
             Lru_cache.add t.recently_seen (Lru_cache.T.hash diff.data)
           in
-          ok_if_true
-            (not (already_mem && not is_sender_local))
-            ~error:"Recently seen"
+          Deferred.return
+          @@ Result.ok_if_true
+               ((not already_mem) || is_sender_local)
+               ~error:Recently_seen
         in
         let%bind () =
           let well_formedness_errors =
@@ -1071,51 +1152,67 @@ struct
               ~compare:User_command.Well_formedness_error.compare
           with
           | [] ->
-              Deferred.Or_error.return ()
+              return ()
           | errs ->
               let err_str =
                 List.map errs ~f:User_command.Well_formedness_error.to_string
                 |> String.concat ~sep:","
               in
-              Deferred.Or_error.fail
-              @@ Error.createf
-                   "Some commands have one or more well-formedness errors: %s "
-                   err_str
+              Deferred.Result.fail
+              @@ Invalid
+                   (Error.createf
+                      "Some commands have one or more well-formedness errors: \
+                       %s "
+                      err_str )
         in
-        (* TODO: batch `to_verifiable` (#11705) *)
         let%bind ledger =
           match t.best_tip_ledger with
           | Some ledger ->
               return ledger
           | None ->
-              Deferred.Or_error.error_string
-                "We don't have a transition frontier at the moment, so we're \
-                 unable to verify any transactions."
+              Deferred.Result.fail
+              @@ Failure
+                   (Error.of_string
+                      "We don't have a transition frontier at the moment, so \
+                       we're unable to verify any transactions." )
         in
 
         let%bind diff' =
           O1trace.sync_thread "convert_transactions_to_verifiable" (fun () ->
               Envelope.Incoming.map diff ~f:(fun diff ->
-                  List.map diff ~f:(fun cmd ->
-                      { With_status.status = Applied; data = cmd } )
-                  |> User_command.Any.to_all_verifiable
-                       ~find_vk:(fun vk_hash account_id ->
-                         match
-                           Vk_refcount_table.find t.verification_key_table
-                             vk_hash
-                         with
-                         | Some (_, vk) ->
-                             Ok vk
-                         | None ->
-                             Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
-                               ~get:Base_ledger.get
-                               ~location_of_account:
-                                 Base_ledger.location_of_account vk_hash
-                               account_id ) ) )
+                  User_command.Unapplied_sequence.to_all_verifiable diff
+                    ~load_vk_cache:(fun account_ids ->
+                      let account_ids = Set.to_list account_ids in
+                      let ledger_vks =
+                        Zkapp_command.Verifiable.load_vks_from_ledger
+                          ~location_of_account_batch:
+                            (Base_ledger.location_of_account_batch ledger)
+                          ~get_batch:(Base_ledger.get_batch ledger)
+                          account_ids
+                      in
+                      let ledger_vks =
+                        Map.map ledger_vks ~f:(fun vk ->
+                            Zkapp_basic.F_map.Map.singleton vk.hash vk )
+                      in
+                      let mempool_vks =
+                        List.map account_ids ~f:(fun account_id ->
+                            let vks =
+                              Vk_refcount_table.find_vks_by_account_id
+                                t.verification_key_table account_id
+                            in
+                            let vks =
+                              vks
+                              |> List.map ~f:(fun vk -> (vk.hash, vk))
+                              |> Zkapp_basic.F_map.Map.of_alist_exn
+                            in
+                            (account_id, vks) )
+                        |> Account_id.Map.of_alist_exn
+                      in
+                      Map.merge_skewed ledger_vks mempool_vks
+                        ~combine:(fun ~key:_ ->
+                          Map.merge_skewed ~combine:(fun ~key:_ _ x -> x) ) ) ) )
           |> Envelope.Incoming.lift_error
-          |> Result.map
-               ~f:(Envelope.Incoming.map ~f:(List.map ~f:With_status.data))
-          |> Result.map_error ~f:(Error.tag ~tag:"Verification_failed")
+          |> Result.map_error ~f:(fun e -> Invalid e)
           |> Deferred.return
         in
         match%bind.Deferred
@@ -1131,7 +1228,7 @@ struct
                 [ ( "transaction_pool_diff"
                   , Diff_versioned.to_yojson (Envelope.Incoming.data diff) )
                 ] ;
-            Deferred.return (Error (Error.tag e ~tag:"Internal_error"))
+            Deferred.Result.fail (Failure e)
         | Ok (Error invalid) ->
             let err = Verifier.invalid_to_error invalid in
             [%log' error t.logger]
@@ -1145,20 +1242,19 @@ struct
                     ( "rejecting command because had invalid signature or proof"
                     , [] ) )
             in
-            Error (Error.tag err ~tag:"Verification_failed")
+            Error (Invalid err)
         | Ok (Ok commands) ->
             (* TODO: avoid duplicate hashing (#11706) *)
             O1trace.sync_thread "hashing_transactions_after_verification"
               (fun () ->
-                Deferred.return
-                  (Ok
-                     { diff with
-                       data =
-                         List.map commands
-                           ~f:
-                             Transaction_hash.User_command_with_valid_signature
-                             .create
-                     } ) )
+                return
+                  { diff with
+                    data =
+                      List.map commands
+                        ~f:
+                          Transaction_hash.User_command_with_valid_signature
+                          .create
+                  } )
 
       let register_locally_generated t txn =
         Hashtbl.update t.locally_generated_uncommitted txn ~f:(function
@@ -1283,7 +1379,10 @@ struct
         let () =
           let lift = Vk_refcount_table.lift_hashed t.verification_key_table in
           List.iter added_cmds ~f:(lift Vk_refcount_table.inc) ;
-          List.iter all_dropped_cmds ~f:(lift Vk_refcount_table.dec)
+          List.iter all_dropped_cmds
+            ~f:
+              (lift (fun t ~account_id ~vk ->
+                   Vk_refcount_table.dec t ~account_id ~vk_hash:vk.hash ) )
         in
         let dropped_for_add_hashes =
           List.map dropped_for_add
@@ -1366,7 +1465,7 @@ struct
         in
         (decision, accepted, rejected)
 
-      let unsafe_apply' (t : pool) (diff : verified Envelope.Incoming.t) :
+      let unsafe_apply (t : pool) (diff : verified Envelope.Incoming.t) :
           ([ `Accept | `Reject ] * t * rejected, _) Result.t =
         match apply t diff with
         | Ok (decision, accepted, rejected) ->
@@ -1387,24 +1486,61 @@ struct
         | Error e ->
             Error (`Other e)
 
-      let unsafe_apply t diff = Deferred.return (unsafe_apply' t diff)
-
       type Structured_log_events.t +=
-        | Transactions_received of { txns : t; sender : Envelope.Sender.t }
+        | Transactions_received of
+            { fee_payer_summaries : User_command.fee_payer_summary_t list
+            ; sender : Envelope.Sender.t
+            }
         [@@deriving
           register_event
-            { msg = "Received transaction-pool diff $txns from $sender" }]
+            { msg =
+                "Received transaction-pool $fee_payer_summaries from $sender"
+            }]
 
-      let update_metrics envelope valid_cb gossip_heard_logger_option =
+      let update_metrics ~logger ~log_gossip_heard envelope valid_cb =
         Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
         Mina_metrics.(Gauge.inc_one Network.transaction_pool_diff_received) ;
         let diff = Envelope.Incoming.data envelope in
-        Option.iter gossip_heard_logger_option ~f:(fun logger ->
-            [%str_log debug]
-              (Transactions_received
-                 { txns = diff; sender = Envelope.Incoming.sender envelope } ) ) ;
-        Mina_net2.Validation_callback.set_message_type valid_cb `Transaction ;
-        Mina_metrics.(Counter.inc_one Network.Transaction.received)
+        if log_gossip_heard then (
+          let fee_payer_summaries =
+            List.map ~f:User_command.fee_payer_summary diff
+          in
+          [%str_log debug]
+            (Transactions_received
+               { fee_payer_summaries
+               ; sender = Envelope.Incoming.sender envelope
+               } ) ;
+          Mina_net2.Validation_callback.set_message_type valid_cb `Transaction ;
+          Mina_metrics.(Counter.inc_one Network.Transaction.received) )
+
+      let log_internal ?reason ~logger msg
+          { Envelope.Incoming.data = diff; sender; _ } =
+        let metadata =
+          [ ( "diff"
+            , `List
+                (List.map diff
+                   ~f:Mina_transaction.Transaction.yojson_summary_of_command )
+            )
+          ]
+        in
+        let metadata =
+          match sender with
+          | Remote addr ->
+              ("sender", `String (Core.Unix.Inet_addr.to_string @@ Peer.ip addr))
+              :: metadata
+          | Local ->
+              metadata
+        in
+        let metadata =
+          Option.value_map reason
+            ~f:(fun r -> List.cons ("reason", `String r))
+            ~default:ident metadata
+        in
+        if not (is_empty diff) then
+          [%log internal] "%s" ("Transaction_diff_" ^ msg) ~metadata
+
+      let t_of_verified =
+        List.map ~f:Transaction_hash.User_command_with_valid_signature.command
     end
 
     let get_rebroadcastable (t : t) ~has_timed_out =
@@ -1587,13 +1723,22 @@ let%test_module _ =
 
       type t = best_tip_diff Broadcast_pipe.Reader.t * Breadcrumb.t ref
 
-      let create : unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
+      let create ?permissions :
+          unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
        fun () ->
         let zkappify_account (account : Account.t) : Account.t =
           let zkapp =
             Some { Zkapp_account.default with verification_key = Some vk }
           in
-          { account with zkapp }
+          { account with
+            zkapp
+          ; permissions =
+              ( match permissions with
+              | Some p ->
+                  p
+              | None ->
+                  Permissions.user_default )
+          }
         in
         let pipe_r, pipe_w =
           Broadcast_pipe.create
@@ -1687,21 +1832,22 @@ let%test_module _ =
                   Zkapp_command_builder.replace_authorizations ~keymap ~prover
                     (Zkapp_command.Valid.forget zkapp_command_dummy_auths)
                 in
-                { With_status.data = User_command.Zkapp_command cmd
-                ; status = Applied
-                }
+                User_command.Zkapp_command cmd
             | Signed_command _ ->
                 failwith "Expected Zkapp_command valid user command" )
       in
       match
-        User_command.Any.to_all_verifiable zkapp_commands_fixed
-          ~find_vk:
-            (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
-               ~get:Mina_ledger.Ledger.get
-               ~location_of_account:Mina_ledger.Ledger.location_of_account )
+        User_command.Unapplied_sequence.to_all_verifiable zkapp_commands_fixed
+          ~load_vk_cache:(fun account_ids ->
+            Set.to_list account_ids
+            |> Zkapp_command.Verifiable.load_vks_from_ledger
+                 ~get_batch:(Mina_ledger.Ledger.get_batch ledger)
+                 ~location_of_account_batch:
+                   (Mina_ledger.Ledger.location_of_account_batch ledger)
+            |> Map.map ~f:(fun vk ->
+                   Zkapp_basic.F_map.Map.singleton vk.hash vk ) )
         |> Or_error.bind ~f:(fun xs ->
-               List.map xs ~f:(fun cmd ->
-                   User_command.check_verifiable cmd.data )
+               List.map xs ~f:User_command.check_verifiable
                |> Or_error.combine_errors )
       with
       | Ok cmds ->
@@ -1760,7 +1906,7 @@ let%test_module _ =
       assert (List.is_sorted txns ~compare)
 
     let assert_pool_txs test txs =
-      Indexed_pool.For_tests.assert_invariants test.txn_pool.pool ;
+      Indexed_pool.For_tests.assert_pool_consistency test.txn_pool.pool ;
       assert_locally_generated test.txn_pool ;
       assert_fee_wu_ordering test.txn_pool ;
       assert_user_command_sets_equal
@@ -1773,8 +1919,10 @@ let%test_module _ =
                 User_command.forget_check )
            txs )
 
-    let setup_test () =
-      let frontier, best_tip_diff_w = Mock_transition_frontier.create () in
+    let setup_test ?(verifier = verifier) ?permissions ?slot_tx_end () =
+      let frontier, best_tip_diff_w =
+        Mock_transition_frontier.create ?permissions ()
+      in
       let _, best_tip_ref = frontier in
       let frontier_pipe_r, frontier_pipe_w =
         Broadcast_pipe.create @@ Some frontier
@@ -1782,7 +1930,7 @@ let%test_module _ =
       let trust_system = Trust_system.null () in
       let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
-          ~genesis_constants:Genesis_constants.compiled
+          ~genesis_constants:Genesis_constants.compiled ~slot_tx_end
       in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
@@ -1824,6 +1972,36 @@ let%test_module _ =
                 { receiver_pk = get_pk receiver_idx
                 ; amount = Currency.Amount.of_nanomina_int_exn amount
                 } ) )
+
+    let mk_single_account_update ~chain ~fee_payer_idx ~zkapp_account_idx ~fee
+        ~nonce ~ledger =
+      let fee = Currency.Fee.of_nanomina_int_exn fee in
+      let fee_payer_kp = test_keys.(fee_payer_idx) in
+      let nonce = Account.Nonce.of_int nonce in
+      let spec : Transaction_snark.For_tests.Single_account_update_spec.t =
+        Transaction_snark.For_tests.Single_account_update_spec.
+          { fee_payer = (fee_payer_kp, nonce)
+          ; fee
+          ; memo = Signed_command_memo.create_from_string_exn "invalid proof"
+          ; zkapp_account_keypair = test_keys.(zkapp_account_idx)
+          ; update = { Account_update.Update.noop with zkapp_uri = Set "abcd" }
+          ; call_data = Snark_params.Tick.Field.zero
+          ; events = []
+          ; actions = []
+          }
+      in
+      let%map zkapp_command =
+        Transaction_snark.For_tests.single_account_update ~chain
+          ~constraint_constants spec
+      in
+      Or_error.ok_exn
+        (Zkapp_command.Verifiable.create ~failed:false
+           ~find_vk:
+             (Zkapp_command.Verifiable.load_vk_from_ledger
+                ~get:(Mina_ledger.Ledger.get ledger)
+                ~location_of_account:
+                  (Mina_ledger.Ledger.location_of_account ledger) )
+           zkapp_command )
 
     let mk_transfer_zkapp_command ?valid_period ?fee_payer_idx ~sender_idx
         ~receiver_idx ~fee ~nonce ~amount () =
@@ -1870,10 +2048,12 @@ let%test_module _ =
               { Account_update.Preconditions.network =
                   protocol_state_precondition
               ; account =
-                  Account_update.Account_precondition.Nonce
-                    ( if Option.is_none fee_payer then
-                      Account.Nonce.succ sender_nonce
-                    else sender_nonce )
+                  (let nonce =
+                     if Option.is_none fee_payer then
+                       Account.Nonce.succ sender_nonce
+                     else sender_nonce
+                   in
+                   Zkapp_precondition.Account.nonce nonce )
               ; valid_while = Ignore
               }
         }
@@ -1883,11 +2063,11 @@ let%test_module _ =
       in
       let zkapp_command =
         Or_error.ok_exn
-          (Zkapp_command.Valid.to_valid ~status:Applied
+          (Zkapp_command.Valid.to_valid ~failed:false
              ~find_vk:
-               (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger:()
-                  ~get:(fun _ _ -> failwith "Not expecting proof zkapp_command")
-                  ~location_of_account:(fun _ _ ->
+               (Zkapp_command.Verifiable.load_vk_from_ledger
+                  ~get:(fun _ -> failwith "Not expecting proof zkapp_command")
+                  ~location_of_account:(fun _ ->
                     failwith "Not expecting proof zkapp_command" ) )
              zkapp_command )
       in
@@ -1950,21 +2130,13 @@ let%test_module _ =
                             preconditions =
                               { p.body.preconditions with
                                 account =
-                                  ( match p.body.preconditions.account with
-                                  | Account_update.Account_precondition.Full
-                                      { nonce =
-                                          Zkapp_basic.Or_ignore.Check n as c
-                                      ; _
-                                      }
+                                  ( match p.body.preconditions.account.nonce with
+                                  | Zkapp_basic.Or_ignore.Check n as c
                                     when Zkapp_precondition.Numeric.(
                                            is_constant Tc.nonce c) ->
-                                      Account_update.Account_precondition.Nonce
-                                        n.lower
-                                  | Account_update.Account_precondition.Full _
-                                    ->
-                                      Account_update.Account_precondition.Accept
-                                  | pre ->
-                                      pre )
+                                      Zkapp_precondition.Account.nonce n.lower
+                                  | _ ->
+                                      Zkapp_precondition.Account.accept )
                               }
                           }
                       } )
@@ -1975,12 +2147,13 @@ let%test_module _ =
             in
             let valid_zkapp_command =
               Or_error.ok_exn
-                (Zkapp_command.Valid.to_valid ~status:Applied
+                (Zkapp_command.Valid.to_valid ~failed:false
                    ~find_vk:
-                     (Zkapp_command.Verifiable.find_vk_via_ledger
-                        ~ledger:best_tip_ledger ~get:Mina_ledger.Ledger.get
+                     (Zkapp_command.Verifiable.load_vk_from_ledger
+                        ~get:(Mina_ledger.Ledger.get best_tip_ledger)
                         ~location_of_account:
-                          Mina_ledger.Ledger.location_of_account )
+                          (Mina_ledger.Ledger.location_of_account
+                             best_tip_ledger ) )
                    zkapp_command_valid_vk_hashes )
             in
             User_command.Zkapp_command valid_zkapp_command
@@ -2024,14 +2197,15 @@ let%test_module _ =
                ~libp2p_port:8302 )
       in
       let tm0 = Time.now () in
-      let%bind verified =
+      let%map verified =
         Test.Resource_pool.Diff.verify test.txn_pool
           (Envelope.Incoming.wrap
              ~data:(List.map ~f:User_command.forget_check cs)
              ~sender )
-        >>| Or_error.ok_exn
+        >>| Fn.compose Or_error.ok_exn
+              (Result.map_error ~f:Intf.Verification_error.to_error)
       in
-      let%map result =
+      let result =
         Test.Resource_pool.Diff.unsafe_apply test.txn_pool verified
       in
       let tm1 = Time.now () in
@@ -2715,11 +2889,12 @@ let%test_module _ =
       in
       let zkapp_command =
         Or_error.ok_exn
-          (Zkapp_command.Valid.to_valid ~status:Applied
+          (Zkapp_command.Valid.to_valid ~failed:false
              ~find_vk:
-               (Zkapp_command.Verifiable.find_vk_via_ledger
-                  ~ledger:best_tip_ledger ~get:Mina_ledger.Ledger.get
-                  ~location_of_account:Mina_ledger.Ledger.location_of_account )
+               (Zkapp_command.Verifiable.load_vk_from_ledger
+                  ~get:(Mina_ledger.Ledger.get best_tip_ledger)
+                  ~location_of_account:
+                    (Mina_ledger.Ledger.location_of_account best_tip_ledger) )
              zkapp_command )
       in
       let zkapp_command = User_command.Zkapp_command zkapp_command in
@@ -2738,7 +2913,7 @@ let%test_module _ =
           ~default:
             Account_update.Preconditions.
               { network = Zkapp_precondition.Protocol_state.accept
-              ; account = Account_update.Account_precondition.Accept
+              ; account = Zkapp_precondition.Account.accept
               ; valid_while = Ignore
               }
       in
@@ -2913,4 +3088,82 @@ let%test_module _ =
             run_test_cases send_command
           in
           return () )
+
+    let%test "account update with a different network id that uses proof \
+              authorization would be rejected" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind verifier_full =
+            Verifier.create ~logger ~proof_level:Full ~constraint_constants
+              ~conf_dir:None
+              ~pids:(Child_processes.Termination.create_pid_table ())
+              ()
+          in
+          let%bind test =
+            setup_test ~verifier:verifier_full
+              ~permissions:
+                { Permissions.user_default with set_zkapp_uri = Proof }
+              ()
+          in
+          let%bind zkapp_command =
+            mk_single_account_update
+              ~chain:Mina_signature_kind.(Other_network "invalid")
+              ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0 ~zkapp_account_idx:1
+              ~ledger:(Option.value_exn test.txn_pool.best_tip_ledger)
+          in
+          match%map
+            Test.Resource_pool.Diff.verify test.txn_pool
+              (Envelope.Incoming.wrap
+                 ~data:
+                   [ User_command.forget_check
+                     @@ Zkapp_command
+                          (Zkapp_command.Valid.of_verifiable zkapp_command)
+                   ]
+                 ~sender:Envelope.Sender.Local )
+          with
+          | Error (Intf.Verification_error.Invalid e) ->
+              String.is_substring (Error.to_string_hum e) ~substring:"proof"
+          | _ ->
+              false )
+
+    let%test_unit "transactions added before slot_tx_end are accepted" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let curr_slot =
+            Mina_numbers.(
+              Global_slot_since_hard_fork.of_uint32
+              @@ Global_slot_since_genesis.to_uint32 @@ current_global_slot ())
+          in
+          let slot_tx_end =
+            Mina_numbers.Global_slot_since_hard_fork.(succ @@ succ curr_slot)
+          in
+          let%bind t = setup_test ~slot_tx_end () in
+          assert_pool_txs t [] ;
+          add_commands t independent_cmds >>| assert_pool_apply independent_cmds )
+
+    let%test_unit "transactions added at slot_tx_end are rejected" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let curr_slot =
+            Mina_numbers.(
+              Global_slot_since_hard_fork.of_uint32
+              @@ Global_slot_since_genesis.to_uint32 @@ current_global_slot ())
+          in
+          let%bind t = setup_test ~slot_tx_end:curr_slot () in
+          assert_pool_txs t [] ;
+          add_commands t independent_cmds >>| assert_pool_apply [] )
+
+    let%test_unit "transactions added after slot_tx_end are rejected" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let curr_slot =
+            Mina_numbers.(
+              Global_slot_since_hard_fork.of_uint32
+              @@ Global_slot_since_genesis.to_uint32 @@ current_global_slot ())
+          in
+          let slot_tx_end =
+            Option.value_exn
+            @@ Mina_numbers.(
+                 Global_slot_since_hard_fork.(
+                   sub curr_slot @@ Global_slot_span.of_int 1))
+          in
+          let%bind t = setup_test ~slot_tx_end () in
+          assert_pool_txs t [] ;
+          add_commands t independent_cmds >>| assert_pool_apply [] )
   end )

@@ -4,10 +4,10 @@ set -eo pipefail
 
 case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
     compatible|release/*)
-      echo "Not pulling against compatible or not in release branch. Therefore, not running the connect test"
-      exit 0
       ;;
     *) 
+      echo "Not pulling against compatible or not in release branch. Therefore, not running the connect test"
+      exit 0
       ;;
 esac
 
@@ -37,10 +37,10 @@ mina daemon \
 & # -background
 
 
-# Attempt to connect to the GraphQL client every 10s for up to 4 minutes
+# Attempt to connect to the GraphQL client every 30s for up to 12 minutes
 num_status_retries=24
 for ((i=1;i<=$num_status_retries;i++)); do
-  sleep 10s
+  sleep 30s
   set +e
   mina client status
   status_exit_code=$?

@@ -15,8 +15,6 @@ open Poly_types
 open Hlist
 open Backend
 
-exception Return_digest of Md5.t
-
 let profile_constraints = false
 
 let verify_promise = Verify.verify
@@ -24,6 +22,9 @@ let verify_promise = Verify.verify
 open Kimchi_backend
 module Proof_ = P.Base
 module Proof = P
+
+type chunking_data = Verify.Instance.chunking_data =
+  { num_chunks : int; domain_size : int; zk_rows : int }
 
 let pad_messages_for_next_wrap_proof
     (type local_max_proofs_verifieds max_local_max_proofs_verifieds
@@ -117,7 +118,9 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
          , 'max_local_max_proofs_verifieds )
          Full_signature.t
       -> ('prev_varss, 'branches) Hlist.Length.t
-      -> ( Wrap_main_inputs.Inner_curve.Constant.t Wrap_verifier.index'
+      -> ( ( Wrap_main_inputs.Inner_curve.Constant.t array
+           , Wrap_main_inputs.Inner_curve.Constant.t array option )
+           Wrap_verifier.index'
          , 'branches )
          Vector.t
          Lazy.t
@@ -130,14 +133,10 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
                  , Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
                  , ( Wrap_verifier.Other_field.Packed.t Shifted_value.Type1.t
                    , Impls.Wrap.Boolean.var )
-                   Plonk_types.Opt.t
+                   Opt.t
                  , ( Impls.Wrap.Impl.Field.t Composition_types.Scalar_challenge.t
-                     Composition_types.Wrap.Proof_state.Deferred_values.Plonk
-                     .In_circuit
-                     .Lookup
-                     .t
                    , Impls.Wrap.Boolean.var )
-                   Pickles_types__Plonk_types.Opt.t
+                   Pickles_types__Opt.t
                  , Impls.Wrap.Boolean.var )
                  Composition_types.Wrap.Proof_state.Deferred_values.Plonk
                  .In_circuit
@@ -167,9 +166,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , bool )
            Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , bool )
            Import.Types.Opt.t
          , bool
@@ -199,9 +195,6 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
            , bool )
            Import.Types.Opt.t
          , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-             Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-             .Lookup
-             .t
            , bool )
            Import.Types.Opt.t
          , bool
@@ -234,6 +227,22 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
               statement to be accepted.
           *)
   }
+
+module Storables = struct
+  type t =
+    { step_storable : Cache.Step.storable
+    ; step_vk_storable : Cache.Step.vk_storable
+    ; wrap_storable : Cache.Wrap.storable
+    ; wrap_vk_storable : Cache.Wrap.vk_storable
+    }
+
+  let default =
+    { step_storable = Cache.Step.storable
+    ; step_vk_storable = Cache.Step.vk_storable
+    ; wrap_storable = Cache.Wrap.storable
+    ; wrap_vk_storable = Cache.Wrap.vk_storable
+    }
+end
 
 module Make
     (Arg_var : Statement_var_intf)
@@ -285,7 +294,7 @@ struct
 
   module Lazy_keys = struct
     type t =
-      (Impls.Step.Keypair.t * Dirty.t) Lazy.t
+      (Impls.Step.Proving_key.t * Dirty.t) Lazy.t
       * (Kimchi_bindings.Protocol.VerifierIndex.Fp.t * Dirty.t) Lazy.t
 
     (* TODO Think this is right.. *)
@@ -348,18 +357,21 @@ struct
       type var value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
          self:(var, value, max_proofs_verified, branches) Tag.t
       -> cache:Key_cache.Spec.t list
+      -> storables:Storables.t
+      -> proof_cache:Proof_cache.t option
       -> ?disk_keys:
            (Cache.Step.Key.Verification.t, branches) Vector.t
            * Cache.Wrap.Key.Verification.t
-      -> ?return_early_digest_exception:bool
       -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
       -> ?override_wrap_main:
            (max_proofs_verified, branches, prev_varss) wrap_main_generic
+      -> ?num_chunks:int
       -> branches:(module Nat.Intf with type n = branches)
       -> max_proofs_verified:
            (module Nat.Add.Intf with type n = max_proofs_verified)
       -> name:string
-      -> constraint_constants:Snark_keys_header.Constraint_constants.t
+      -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
+      -> ?commits:Snark_keys_header.Commits.With_date.t
       -> public_input:
            ( var
            , value
@@ -385,20 +397,44 @@ struct
          * _
          * _
          * _ =
-   fun ~self ~cache ?disk_keys ?(return_early_digest_exception = false)
-       ?override_wrap_domain ?override_wrap_main ~branches:(module Branches)
-       ~max_proofs_verified ~name ~constraint_constants ~public_input
-       ~auxiliary_typ ~choices () ->
+   fun ~self ~cache
+       ~storables:
+         { step_storable; step_vk_storable; wrap_storable; wrap_vk_storable }
+       ~proof_cache ?disk_keys ?override_wrap_domain ?override_wrap_main
+       ?(num_chunks = 1) ~branches:(module Branches) ~max_proofs_verified ~name
+       ?constraint_constants ?commits ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
+      let constraint_constants : Snark_keys_header.Constraint_constants.t =
+        match constraint_constants with
+        | Some constraint_constants ->
+            constraint_constants
+        | None ->
+            { sub_windows_per_window = 0
+            ; ledger_depth = 0
+            ; work_delay = 0
+            ; block_window_duration_ms = 0
+            ; transaction_capacity = Log_2 0
+            ; pending_coinbase_depth = 0
+            ; coinbase_amount = Unsigned.UInt64.of_int 0
+            ; supercharged_coinbase_factor = 0
+            ; account_creation_fee = Unsigned.UInt64.of_int 0
+            ; fork = None
+            }
+      in
+      let (commits, commit_date) : Snark_keys_header.Commits.t * string =
+        match commits with
+        | Some { commits; commit_date } ->
+            (commits, commit_date)
+        | None ->
+            ( { mina = "[NOT SPECIFIED]"; marlin = "[NOT SPECIFIED]" }
+            , "[UNKNOWN]" )
+      in
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
       ; constraint_constants
-      ; commits =
-          { mina = Mina_version.commit_id
-          ; marlin = Mina_version.marlin_commit_id
-          }
+      ; commits
       ; length = (* This is a dummy, it gets filled in on read/write. *) 0
-      ; commit_date = Mina_version.commit_date
+      ; commit_date
       ; constraint_system_hash
       ; identifying_hash =
           (* TODO: Proper identifying hash. *)
@@ -425,25 +461,26 @@ struct
     let feature_flags =
       let rec go :
           type a b c d.
-             (a, b, c, d) H4.T(IR).t
-          -> Plonk_types.Opt.Flag.t Plonk_types.Features.t =
+          (a, b, c, d) H4.T(IR).t -> Opt.Flag.t Plonk_types.Features.Full.t =
        fun rules ->
         match rules with
         | [] ->
-            Plonk_types.Features.none
+            Plonk_types.Features.Full.none
         | [ r ] ->
             Plonk_types.Features.map r.feature_flags ~f:(function
               | true ->
-                  Plonk_types.Opt.Flag.Yes
+                  Opt.Flag.Yes
               | false ->
-                  Plonk_types.Opt.Flag.No )
+                  Opt.Flag.No )
+            |> Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| )
         | r :: rules ->
             let feature_flags = go rules in
-            Plonk_types.Features.map2 r.feature_flags feature_flags
-              ~f:(fun enabled flag ->
+            Plonk_types.Features.Full.map2
+              (Plonk_types.Features.to_full ~or_:( || ) r.feature_flags)
+              feature_flags ~f:(fun enabled flag ->
                 match (enabled, flag) with
                 | true, Yes ->
-                    Plonk_types.Opt.Flag.Yes
+                    Opt.Flag.Yes
                 | false, No ->
                     No
                 | _, Maybe | true, No | false, Yes ->
@@ -460,7 +497,7 @@ struct
               (Auxiliary_value)
           in
           M.f full_signature prev_varss_n prev_varss_length ~max_proofs_verified
-            ~feature_flags
+            ~feature_flags ~num_chunks
       | Some override ->
           Common.wrap_domains
             ~proofs_verified:(Pickles_base.Proofs_verified.to_int override)
@@ -510,7 +547,7 @@ struct
               Timer.clock __LOC__ ;
               let res =
                 Common.time "make step data" (fun () ->
-                    Step_branch_data.create ~index:!i ~feature_flags
+                    Step_branch_data.create ~index:!i ~feature_flags ~num_chunks
                       ~actual_feature_flags:rule.feature_flags
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~public_input ~auxiliary_typ
@@ -546,7 +583,7 @@ struct
           (struct
             let etyp =
               Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-                ~wrap_rounds:Tock.Rounds.n ~feature_flags
+                ~wrap_rounds:Tock.Rounds.n
 
             let f (T b : _ Branch_data.t) =
               let (T (typ, _conv, conv_inv)) = etyp in
@@ -556,13 +593,6 @@ struct
               in
               let () = if true then log_step main typ name b.index in
               let open Impls.Step in
-              (* HACK: TODO docs *)
-              if return_early_digest_exception then
-                raise
-                  (Return_digest
-                     ( constraint_system ~input_typ:Typ.unit ~return_typ:typ main
-                     |> R1CS_constraint_system.digest ) ) ;
-
               let k_p =
                 lazy
                   (let cs =
@@ -601,7 +631,7 @@ struct
                 Common.time "step read or generate" (fun () ->
                     Cache.Step.read_or_generate
                       ~prev_challenges:(Nat.to_int (fst b.proofs_verified))
-                      cache k_p k_v
+                      cache ~s_p:step_storable k_p ~s_v:step_vk_storable k_v
                       (Snarky_backendless.Typ.unit ())
                       typ main )
               in
@@ -617,14 +647,14 @@ struct
       let module V = H4.To_vector (Lazy_keys) in
       lazy
         (Vector.map (V.f prev_varss_length step_keypairs) ~f:(fun (_, vk) ->
-             Tick.Keypair.vk_commitments (fst (Lazy.force vk)) ) )
+             Tick.Keypair.full_vk_commitments (fst (Lazy.force vk)) ) )
     in
     Timer.clock __LOC__ ;
     let wrap_requests, wrap_main =
       match override_wrap_main with
       | None ->
           let srs = Tick.Keypair.load_urs () in
-          Wrap_main.wrap_main ~feature_flags ~srs full_signature
+          Wrap_main.wrap_main ~num_chunks ~feature_flags ~srs full_signature
             prev_varss_length step_vks proofs_verifieds step_domains
             max_proofs_verified
       | Some { wrap_main; tweak_statement = _ } ->
@@ -642,7 +672,7 @@ struct
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
       let open Impls.Wrap in
-      let (T (typ, conv, _conv_inv)) = input () in
+      let (T (typ, conv, _conv_inv)) = input ~feature_flags () in
       let main x () : unit = wrap_main (conv x) in
       let () = if true then log_wrap main typ name self.id in
       let self_id = Type_equal.Id.uid self.id in
@@ -677,13 +707,27 @@ struct
       let r =
         Common.time "wrap read or generate " (fun () ->
             Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
-              ~prev_challenges:2 cache disk_key_prover disk_key_verifier typ
+              ~prev_challenges:2 cache ~s_p:wrap_storable disk_key_prover
+              ~s_v:wrap_vk_storable disk_key_verifier typ
               (Snarky_backendless.Typ.unit ())
               main )
       in
       (r, disk_key_verifier)
     in
     Timer.clock __LOC__ ;
+    let wrap_vk =
+      Lazy.map wrap_vk ~f:(fun ((wrap_vk, _) as res) ->
+          let computed_domain_size = wrap_vk.index.domain.log_size_of_group in
+          let (Pow_2_roots_of_unity proposed_domain_size) = wrap_domains.h in
+          if computed_domain_size <> proposed_domain_size then
+            failwithf
+              "This circuit was compiled for proofs using the wrap domain of \
+               size %d, but the actual wrap domain size for the circuit has \
+               size %d. You should pass the ~override_wrap_domain argument to \
+               set the correct domain size."
+              proposed_domain_size computed_domain_size () ;
+          res )
+    in
     accum_dirty (Lazy.map wrap_pk ~f:snd) ;
     accum_dirty (Lazy.map wrap_vk ~f:snd) ;
     let wrap_vk = Lazy.map wrap_vk ~f:fst in
@@ -720,9 +764,13 @@ struct
         let step handler next_state =
           let wrap_vk = Lazy.force wrap_vk in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
-            ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
+            ~self ~step_domains
+            ~self_dlog_plonk_index:
+              ((* TODO *) Plonk_verification_key_evals.map
+                 ~f:(fun x -> [| x |])
+                 wrap_vk.commitments )
             ~public_input ~auxiliary_typ ~feature_flags
-            (Impls.Step.Keypair.pk (fst (Lazy.force step_pk)))
+            (fst (Lazy.force step_pk))
             wrap_vk.index
         in
         let step_vk = fst (Lazy.force step_vk) in
@@ -732,7 +780,7 @@ struct
                            , return_value
                            , auxiliary_value
                            , actual_wrap_domains ) =
-            step handler ~maxes:(module Maxes) next_state
+            step ~proof_cache handler ~maxes:(module Maxes) next_state
           in
           let proof =
             { proof with
@@ -761,12 +809,16 @@ struct
                   *)
                   Some tweak_statement
             in
-            Wrap.wrap ~max_proofs_verified:Max_proofs_verified.n ~feature_flags
-              ~actual_feature_flags:b.feature_flags full_signature.maxes
-              wrap_requests ?tweak_statement
-              ~dlog_plonk_index:wrap_vk.commitments wrap_main ~typ ~step_vk
-              ~step_plonk_indices:(Lazy.force step_vks) ~actual_wrap_domains
-              (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
+            Wrap.wrap ~proof_cache ~max_proofs_verified:Max_proofs_verified.n
+              ~feature_flags ~actual_feature_flags:b.feature_flags
+              full_signature.maxes wrap_requests ?tweak_statement
+              ~dlog_plonk_index:
+                ((* TODO *) Plonk_verification_key_evals.map
+                   ~f:(fun x -> [| x |])
+                   wrap_vk.commitments )
+              wrap_main ~typ ~step_vk ~step_plonk_indices:(Lazy.force step_vks)
+              ~actual_wrap_domains
+              (fst (Lazy.force wrap_pk))
               proof
           in
           ( return_value
@@ -812,11 +864,22 @@ struct
       ; proofs_verifieds
       ; max_proofs_verified
       ; public_input = typ
-      ; wrap_key = Lazy.map wrap_vk ~f:Verification_key.commitments
+      ; wrap_key =
+          Lazy.map wrap_vk ~f:(fun x ->
+              Plonk_verification_key_evals.map (Verification_key.commitments x)
+                ~f:(fun x -> [| x |]) )
       ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
       ; wrap_domains
       ; step_domains
       ; feature_flags
+      ; num_chunks
+      ; zk_rows =
+          ( match num_chunks with
+          | 1 ->
+              3
+          | num_chunks ->
+              let permuts = 7 in
+              ((2 * (permuts + 1) * num_chunks) - 1 + permuts) / permuts )
       }
     in
     Timer.clock __LOC__ ;
@@ -840,9 +903,12 @@ module Side_loaded = struct
           ~log_2_domain_size:(Lazy.force d.wrap_vk).domain.log_size_of_group
       in
       { wrap_vk = Some (Lazy.force d.wrap_vk)
-      ; wrap_index = Lazy.force d.wrap_key
+      ; wrap_index =
+          Plonk_verification_key_evals.map (Lazy.force d.wrap_key) ~f:(fun x ->
+              x.(0) )
       ; max_proofs_verified =
-          Pickles_base.Proofs_verified.of_nat (Nat.Add.n d.max_proofs_verified)
+          Pickles_base.Proofs_verified.of_nat_exn
+            (Nat.Add.n d.max_proofs_verified)
       ; actual_wrap_domain_size
       }
 
@@ -858,7 +924,10 @@ module Side_loaded = struct
       { max_proofs_verified
       ; public_input = typ
       ; branches = Verification_key.Max_branches.n
-      ; feature_flags
+      ; feature_flags =
+          Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
+      ; num_chunks = 1
+      ; zk_rows = 3
       }
 
   module Proof = struct
@@ -901,7 +970,7 @@ module Side_loaded = struct
                   { constraints = 0 }
               }
             in
-            Verify.Instance.T (max_proofs_verified, m, vk, x, p) )
+            Verify.Instance.T (max_proofs_verified, m, None, vk, x, p) )
         |> Verify.verify_heterogenous )
 
   let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred
@@ -917,13 +986,15 @@ let compile_with_wrap_main_override_promise :
     type var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
        ?self:(var, value, max_proofs_verified, branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
+    -> ?storables:Storables.t
+    -> ?proof_cache:Proof_cache.t
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, branches) Vector.t
          * Cache.Wrap.Key.Verification.t
-    -> ?return_early_digest_exception:bool
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> ?override_wrap_main:
          (max_proofs_verified, branches, prev_varss) wrap_main_generic
+    -> ?num_chunks:int
     -> public_input:
          ( var
          , value
@@ -937,7 +1008,8 @@ let compile_with_wrap_main_override_promise :
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = max_proofs_verified)
     -> name:string
-    -> constraint_constants:Snark_keys_header.Constraint_constants.t
+    -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
+    -> ?commits:Snark_keys_header.Commits.With_date.t
     -> choices:
          (   self:(var, value, max_proofs_verified, branches) Tag.t
           -> ( prev_varss
@@ -969,9 +1041,10 @@ let compile_with_wrap_main_override_promise :
  (* This function is an adapter between the user-facing Pickles.compile API
     and the underlying Make(_).compile function which builds the circuits.
  *)
- fun ?self ?(cache = []) ?disk_keys ?(return_early_digest_exception = false)
-     ?override_wrap_domain ?override_wrap_main ~public_input ~auxiliary_typ
-     ~branches ~max_proofs_verified ~name ~constraint_constants ~choices () ->
+ fun ?self ?(cache = []) ?(storables = Storables.default) ?proof_cache
+     ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks
+     ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
+     ?constraint_constants ?commits ~choices () ->
   let self =
     match self with
     | None ->
@@ -1037,9 +1110,10 @@ let compile_with_wrap_main_override_promise :
         r :: conv_irs rs
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
-    M.compile ~return_early_digest_exception ~self ~cache ?disk_keys
-      ?override_wrap_domain ?override_wrap_main ~branches ~max_proofs_verified
-      ~name ~public_input ~auxiliary_typ ~constraint_constants
+    M.compile ~self ~proof_cache ~cache ~storables ?disk_keys
+      ?override_wrap_domain ?override_wrap_main ?num_chunks ~branches
+      ~max_proofs_verified ~name ~public_input ~auxiliary_typ
+      ?constraint_constants ?commits
       ~choices:(fun ~self -> conv_irs (choices ~self))
       ()
   in
@@ -1061,6 +1135,26 @@ let compile_with_wrap_main_override_promise :
       let (Typ typ) = typ in
       fun x -> fst (typ.value_to_fields x)
   end in
+  let chunking_data =
+    match num_chunks with
+    | None ->
+        None
+    | Some num_chunks ->
+        let compiled = Types_map.lookup_compiled self.id in
+        let { h = Pow_2_roots_of_unity domain_size } =
+          compiled.step_domains
+          |> Vector.reduce_exn
+               ~f:(fun
+                    { h = Pow_2_roots_of_unity d1 }
+                    { h = Pow_2_roots_of_unity d2 }
+                  -> { h = Pow_2_roots_of_unity (Int.max d1 d2) } )
+        in
+        Some
+          { Verify.Instance.num_chunks
+          ; domain_size
+          ; zk_rows = compiled.zk_rows
+          }
+  in
   let module P = struct
     type statement = value
 
@@ -1080,7 +1174,7 @@ let compile_with_wrap_main_override_promise :
     let verification_key = wrap_vk
 
     let verify_promise ts =
-      verify_promise
+      verify_promise ?chunking_data
         ( module struct
           include Max_proofs_verified
         end )
@@ -1151,9 +1245,6 @@ module Make_adversarial_test (M : sig
          , bool )
          Import.Types.Opt.t
        , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-           .Lookup
-           .t
          , bool )
          Import.Types.Opt.t
        , bool
@@ -1183,9 +1274,6 @@ module Make_adversarial_test (M : sig
          , bool )
          Import.Types.Opt.t
        , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
-           Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-           .Lookup
-           .t
          , bool )
          Import.Types.Opt.t
        , bool
@@ -1215,19 +1303,6 @@ module Make_adversarial_test (M : sig
 end) =
 struct
   open Impls.Step
-
-  let constraint_constants : Snark_keys_header.Constraint_constants.t =
-    { sub_windows_per_window = 0
-    ; ledger_depth = 0
-    ; work_delay = 0
-    ; block_window_duration_ms = 0
-    ; transaction_capacity = Log_2 0
-    ; pending_coinbase_depth = 0
-    ; coinbase_amount = Unsigned.UInt64.of_int 0
-    ; supercharged_coinbase_factor = 0
-    ; account_creation_fee = Unsigned.UInt64.of_int 0
-    ; fork = None
-    }
 
   let rule self : _ Inductive_rule.t =
     { identifier = "main"
@@ -1265,19 +1340,6 @@ struct
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"
-      ~constraint_constants:
-        (* Dummy values *)
-        { sub_windows_per_window = 0
-        ; ledger_depth = 0
-        ; work_delay = 0
-        ; block_window_duration_ms = 0
-        ; transaction_capacity = Log_2 0
-        ; pending_coinbase_depth = 0
-        ; coinbase_amount = Unsigned.UInt64.of_int 0
-        ; supercharged_coinbase_factor = 0
-        ; account_creation_fee = Unsigned.UInt64.of_int 0
-        ; fork = None
-        }
       ~choices:(fun ~self -> [ rule self ])
 
   module Proof = (val p)
@@ -1316,7 +1378,7 @@ struct
             ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
             ~branches:(module Nat.N1)
             ~max_proofs_verified:(module Nat.N2)
-            ~name:"recurse-on-bad" ~constraint_constants
+            ~name:"recurse-on-bad"
             ~choices:(fun ~self:_ ->
               [ { identifier = "main"
                 ; feature_flags = Plonk_types.Features.none_bool

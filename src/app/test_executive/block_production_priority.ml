@@ -24,20 +24,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { Test_Account.account_name = "receiver-key"
-          ; balance = "9999999"
-          ; timing = Untimed
-          }
-        ; { account_name = "empty-bp-key"; balance = "0"; timing = Untimed }
-        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
+        (let open Test_account in
+        [ create ~account_name:"receiver-key" ~balance:"9999999" ()
+        ; create ~account_name:"empty-bp-key" ~balance:"0" ()
+        ; create ~account_name:"snark-node-key" ~balance:"0" ()
         ]
         @ List.init num_extra_keys ~f:(fun i ->
               let i_str = Int.to_string i in
-              { Test_Account.account_name =
-                  String.concat [ "sender-account"; i_str ]
-              ; balance = "10000"
-              ; timing = Untimed
-              } )
+              create
+                ~account_name:(String.concat [ "sender-account"; i_str ])
+                ~balance:"10000" () ))
     ; block_producers =
         [ { node_name = "receiver"; account_name = "receiver-key" }
         ; { node_name = "empty_node-1"; account_name = "empty-bp-key" }
@@ -114,10 +110,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
     in
-    let all_nodes = Network.all_nodes network in
+    let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
       wait_for t
-        (Wait_condition.nodes_to_initialize (Core.String.Map.data all_nodes))
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data all_mina_nodes) )
     in
     let%bind () =
       section_hard "wait for 3 blocks to be produced (warm-up)"
@@ -208,15 +205,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~f:Malleable_error.or_hard_error
     in
     let%bind () =
-      section "check metrics of tx receiver node"
-        (let%bind { block_production_delay = rcv_delay; _ } =
+      section
+        "ensure \\not\\exists more than \\epsilon block production delays of \
+         greater 60s from start slot where we should have produced"
+        (let%bind { block_production_delay =
+                      block_production_delay_histogram_buckets_60s_min
+                  ; _
+                  } =
            get_metrics receiver
          in
-         let rcv_delay_rest =
-           List.fold ~init:0 ~f:( + ) @@ List.drop rcv_delay 1
+         let blocks_delayed_over_60s =
+           List.fold ~init:0 ~f:( + )
+           @@ List.drop block_production_delay_histogram_buckets_60s_min 1
          in
          (* First two slots might be delayed because of test's bootstrap, so we have 2 as a threshold *)
-         ok_if_true "block production was delayed" (rcv_delay_rest <= 2) )
+         ok_if_true "block production was delayed" (blocks_delayed_over_60s <= 2)
+        )
     in
     let%bind () =
       section "retrieve metrics of tx sender nodes"

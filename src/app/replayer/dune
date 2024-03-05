@@ -9,6 +9,8 @@
    result
    async.async_command
    async
+   base.caml
+   bin_prot.shape
    caqti-async
    core_kernel
    archive_lib
@@ -38,6 +40,7 @@
    mina_state
    mina_ledger
    mina_base
+   bounded_types
    mina_base.import
    mina_transaction
    mina_transaction_logic
@@ -56,6 +59,7 @@
    unsigned_extended
    random_oracle
    codable
+   ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

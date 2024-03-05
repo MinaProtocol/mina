@@ -224,7 +224,7 @@ let%snarkydef_ step ~(logger : Logger.t)
     in
     let%bind previous_state_hash =
       match constraint_constants.fork with
-      | Some { previous_state_hash = fork_prev; _ } ->
+      | Some { state_hash = fork_prev; _ } ->
           State_hash.if_ is_base_case
             ~then_:(State_hash.var_of_t fork_prev)
             ~else_:t.previous_state_hash
@@ -238,7 +238,7 @@ let%snarkydef_ step ~(logger : Logger.t)
     in
     (t, is_base_case)
   in
-  let%bind txn_snark_should_verify, success =
+  let%bind txn_snark_must_verify, success =
     let%bind new_pending_coinbase_hash, deleted_stack, no_coinbases_popped =
       let coinbase_receiver =
         Consensus.Data.Consensus_state.coinbase_receiver_var consensus_state
@@ -348,14 +348,14 @@ let%snarkydef_ step ~(logger : Logger.t)
     in
     (transaction_snark_should_verifiy, result)
   in
-  let txn_snark_should_verify =
+  let txn_snark_must_verify =
     match proof_level with
     | Check | None ->
         Boolean.false_
     | Full ->
-        txn_snark_should_verify
+        txn_snark_must_verify
   in
-  let prev_should_verify =
+  let prev_must_verify =
     match proof_level with
     | Check | None ->
         Boolean.false_
@@ -374,11 +374,11 @@ let%snarkydef_ step ~(logger : Logger.t)
   ( { Pickles.Inductive_rule.Previous_proof_statement.public_input =
         previous_blockchain_proof_input
     ; proof = previous_blockchain_proof
-    ; proof_must_verify = prev_should_verify
+    ; proof_must_verify = prev_must_verify
     }
   , { Pickles.Inductive_rule.Previous_proof_statement.public_input = txn_snark
     ; proof = txn_snark_proof
-    ; proof_must_verify = txn_snark_should_verify
+    ; proof_must_verify = txn_snark_must_verify
     } )
 
 module Statement = struct
@@ -479,6 +479,7 @@ end) : S = struct
 
   let tag, cache_handle, p, Pickles.Provers.[ step ] =
     Pickles.compile () ~cache:Cache_dir.cache ~public_input:(Input typ)
+      ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
@@ -486,6 +487,13 @@ end) : S = struct
       ~constraint_constants:
         (Genesis_constants.Constraint_constants.to_snark_keys_header
            constraint_constants )
+      ~commits:
+        { commits =
+            { mina = Mina_version.commit_id
+            ; marlin = Mina_version.marlin_commit_id
+            }
+        ; commit_date = Mina_version.commit_date
+        }
       ~choices:(fun ~self ->
         [ rule ~proof_level ~constraint_constants T.tag self ] )
 

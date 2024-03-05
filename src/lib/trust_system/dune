@@ -25,8 +25,9 @@
    run_in_thread
    test_util
    ppx_version.runtime
+   bounded_types
  )
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (preprocess
   (pps
     ppx_assert

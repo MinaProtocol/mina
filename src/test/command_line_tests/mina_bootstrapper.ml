@@ -12,7 +12,7 @@ module MinaBootstrapper = struct
     }
 
   let create config =
-    { config; client_delay = 40.; retry_delay = 30.; retry_attempts = 5 }
+    { config; client_delay = 40.; retry_delay = 60.; retry_attempts = 10 }
 
   let get_args t working_dir =
     [ "daemon"
@@ -27,8 +27,6 @@ module MinaBootstrapper = struct
     ; t.config.dirs.conf
     ; "-genesis-ledger-dir"
     ; t.config.dirs.genesis
-    ; "-current-protocol-version"
-    ; "0.0.0"
     ; "-external-ip"
     ; "0.0.0.0"
     ; "-libp2p-keypair"

@@ -19,7 +19,8 @@
    child_processes
    network_peer
    file_system
+   bounded_types
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_mina ppx_version))
- (inline_tests))
+ (inline_tests (flags -verbose -show-counts)))

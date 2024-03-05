@@ -104,7 +104,7 @@ let validate_transaction =
     (* TODO upgrade to yojson 2.0.0 when possible to use seq_from_channel
      * instead of the deprecated stream interface *)
     let jsons = Yojson.Safe.stream_from_channel In_channel.stdin in
-    ( match[@alert "--deprecated"]
+    ( match[@alert "-deprecated"]
         Or_error.try_with (fun () ->
             Caml.Stream.iter
               (fun transaction_json ->
@@ -139,7 +139,7 @@ let validate_transaction =
       Format.printf "Some transactions failed to verify@." ;
       exit 1 )
     else
-      let[@alert "--deprecated"] first = Caml.Stream.peek jsons in
+      let[@alert "-deprecated"] first = Caml.Stream.peek jsons in
       match first with
       | None ->
           Format.printf "Could not parse any transactions@." ;
@@ -271,7 +271,7 @@ module Vrf = struct
             let lexbuf = Lexing.from_channel In_channel.stdin in
             let lexer = Yojson.init_lexer () in
             Deferred.repeat_until_finished () (fun () ->
-                Deferred.Or_error.try_with (fun () ->
+                Deferred.Or_error.try_with ~here:[%here] (fun () ->
                     try
                       let message_json =
                         Yojson.Safe.from_lexbuf ~stream:true lexer lexbuf
@@ -326,7 +326,7 @@ module Vrf = struct
       let lexer = Yojson.init_lexer () in
       let%bind () =
         Deferred.repeat_until_finished () (fun () ->
-            Deferred.Or_error.try_with (fun () ->
+            Deferred.Or_error.try_with ~here:[%here] (fun () ->
                 try
                   let evaluation_json =
                     Yojson.Safe.from_lexbuf ~stream:true lexer lexbuf

@@ -67,14 +67,16 @@ endif
 ocaml_checks: ocaml_version ocaml_word_size check_opam_switch
 
 libp2p_helper:
+ifeq (, $(MINA_LIBP2P_HELPER_PATH))
 	make -C src/app/libp2p_helper
+endif
 
 genesis_ledger: ocaml_checks
 	$(info Building runtime_genesis_ledger)
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir $(GENESIS_DIR)
 	$(info Genesis ledger and genesis proof generated)
 
-# checks that every OCaml packages in the project build without issues
+# Checks that every OCaml packages in the project build without issues
 check: ocaml_checks libp2p_helper
 	dune build @src/check
 
@@ -113,18 +115,6 @@ build_intgtest: ocaml_checks
 	dune build --profile=$(DUNE_PROFILE) src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 	$(info Build complete)
 
-snarkyjs: ocaml_checks
-	$(info Starting Build)
-	((ulimit -s 65532) || true) && (ulimit -n 10240 || true) \
-	&& bash ./src/lib/snarkyjs/src/bindings/scripts/build-snarkyjs-node.sh
-	$(info Build complete)
-
-snarkyjs_no_types: ocaml_checks
-	$(info Starting Build)
-	((ulimit -s 65532) || true) && (ulimit -n 10240 || true) \
-	&& bash ./src/lib/snarkyjs/src/bindings/scripts/build-snarkyjs-node-artifacts.sh
-	$(info Build complete)
-
 rosetta_lib_encodings: ocaml_checks
 	$(info Starting Build)
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/lib/rosetta_lib/test/test_encodings.exe --profile=mainnet
@@ -135,14 +125,9 @@ rosetta_lib_encodings_nonconsensus: ocaml_checks
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/nonconsensus/rosetta_lib/test/test_encodings.exe --profile=nonconsensus_mainnet
 	$(info Build complete)
 
-dhall_types: ocaml_checks
-	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/dhall_types/dump_dhall_types.exe --profile=dev
-	$(info Build complete)
-
 replayer: ocaml_checks
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/replayer/replayer.exe --profile=testnet_postake_medium_curves
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/replayer/replayer.exe --profile=devnet
 	$(info Build complete)
 
 delegation_compliance: ocaml_checks
@@ -218,6 +203,9 @@ check-format: ocaml_checks
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
 
+check-proof-systems-submodule:
+	./scripts/check-proof-systems-submodule.sh
+
 #######################################
 ## Environment setup
 
@@ -242,9 +230,6 @@ deb_optimized:
 	@mkdir -p /tmp/artifacts
 	@cp _build/mina*.deb /tmp/artifacts/.
 
-test_executive_deb:
-	./scripts/rebuild_test_executive_deb.sh
-
 build_pv_keys: ocaml_checks
 	$(info Building keys)
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
@@ -254,9 +239,6 @@ build_or_download_pv_keys: ocaml_checks
 	$(info Building keys)
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
 	$(info Keys built)
-
-publish_deb:
-	@./scripts/publish-deb.sh
 
 publish_debs:
 	@./buildkite/scripts/publish-deb.sh
@@ -322,8 +304,10 @@ endif
 %.conv.tex.png: %.conv.tex
 	cd $(dir $@) && pdflatex -halt-on-error -shell-escape $(notdir $<)
 
+# TODO: this, but smarter so we don't have to add every library
 doc_diagram_sources=$(addprefix docs/res/,*.dot *.tex *.conv.tex)
 doc_diagram_sources+=$(addprefix rfcs/res/,*.dot *.tex *.conv.tex)
+doc_diagram_sources+=$(addprefix src/lib/transition_frontier/res/,*.dot *.tex *.conv.tex)
 doc_diagrams: $(addsuffix .png,$(wildcard $(doc_diagram_sources)))
 
 ########################################

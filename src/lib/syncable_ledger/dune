@@ -32,7 +32,7 @@
 (library
  (name test)
  (modules test)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    result
@@ -61,6 +61,7 @@
    data_hash_lib
    mina_base.import
    signature_lib
+   bounded_types
    )
  (preprocess
   (pps ppx_version ppx_jane ppx_compare ppx_deriving_yojson))

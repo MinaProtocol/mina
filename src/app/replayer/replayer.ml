@@ -6,6 +6,8 @@ open Mina_base
 module Ledger = Mina_ledger.Ledger
 module Processor = Archive_lib.Processor
 module Load_data = Archive_lib.Load_data
+module Account_comparables = Comparable.Make_binable (Account.Stable.Latest)
+module Account_set = Account_comparables.Set
 
 (* identify a target block B containing staking and next epoch ledgers
    to be used in a hard fork, by giving its state hash
@@ -29,6 +31,8 @@ type input =
   { target_epoch_ledgers_state_hash : State_hash.t option [@default None]
   ; start_slot_since_genesis : int64 [@default 0L]
   ; genesis_ledger : Runtime_config.Ledger.t
+  ; first_pass_ledger_hashes : Ledger_hash.t list [@default []]
+  ; last_snarked_ledger_hash : Ledger_hash.t option [@default None]
   }
 [@@deriving yojson]
 
@@ -61,6 +65,44 @@ let create_ledger_as_list ledger =
   let%map accounts = Ledger.to_list ledger in
   List.map accounts ~f:(fun acc ->
       Genesis_ledger_helper.Accounts.Single.of_account acc None )
+
+module First_pass_ledger_hashes = struct
+  (* ledger hashes after 1st pass, indexed by order of occurrence *)
+
+  module T = struct
+    type t = Ledger_hash.Stable.Latest.t * int
+    [@@deriving bin_io_unversioned, compare, sexp, hash]
+  end
+
+  include T
+  include Hashable.Make_binable (T)
+
+  let hash_set = Hash_set.create ()
+
+  let add =
+    let count = ref 0 in
+    fun ~migration_mode ledger_hash ->
+      if migration_mode then ()
+      else (
+        Base.Hash_set.add hash_set (ledger_hash, !count) ;
+        incr count )
+
+  let find ledger_hash =
+    Base.Hash_set.find hash_set ~f:(fun (hash, _n) ->
+        Ledger_hash.equal hash ledger_hash )
+
+  (* once we find a snarked ledger hash corresponding to a ledger hash, don't need to store earlier ones *)
+  let flush_older_than ndx =
+    let elts = Base.Hash_set.to_list hash_set in
+    List.iter elts ~f:(fun ((_hash, n) as elt) ->
+        if n < ndx then Base.Hash_set.remove hash_set elt )
+
+  let get_last_snarked_hash, set_last_snarked_hash =
+    let last_snarked_hash = ref Ledger_hash.empty_hash in
+    let getter () = !last_snarked_hash in
+    let setter hash = last_snarked_hash := hash in
+    (getter, setter)
+end
 
 let create_output ~target_epoch_ledgers_state_hash ~target_fork_state_hash
     ~ledger ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger ~next_seed
@@ -101,49 +143,39 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
     { base = Accounts accounts
     ; num_accounts = None
     ; balances = []
-    ; hash = None
+    ; hash = Some (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
+    ; s3_data_hash = None
     ; name = None
     ; add_genesis_winner = Some true
     }
   in
+  let first_pass_ledger_hashes =
+    let elts = Base.Hash_set.to_list First_pass_ledger_hashes.hash_set in
+    List.sort elts ~compare:(fun (_h1, n1) (_h2, n2) -> Int.compare n1 n2)
+    |> List.map ~f:(fun (h, _n) -> h)
+  in
+  let last_snarked_ledger_hash =
+    Some (First_pass_ledger_hashes.get_last_snarked_hash ())
+  in
   { target_epoch_ledgers_state_hash = None
   ; start_slot_since_genesis
   ; genesis_ledger
+  ; first_pass_ledger_hashes
+  ; last_snarked_ledger_hash
   }
 
-(* map from global slots (since genesis) to state hash, ledger hash pairs *)
-let global_slot_hashes_tbl : (Int64.t, State_hash.t * Ledger_hash.t) Hashtbl.t =
+(* map from global slots (since genesis) to state hash, ledger hash, snarked ledger hash triples *)
+let global_slot_hashes_tbl :
+    (Int64.t, State_hash.t * Ledger_hash.t * Frozen_ledger_hash.t) Hashtbl.t =
   Int64.Table.create ()
 
-(* the starting slot may not have a block, so there may not be an entry in the table
-    of hashes
-   look at the predecessor slots until we find an entry
-   this search should only happen on the start slot, all other slots
-    come from commands in blocks, for which we have an entry in the table
-*)
-let get_slot_hashes ~logger slot =
-  let rec go curr_slot =
-    if Int64.is_negative curr_slot then (
-      [%log fatal]
-        "Could not find state and ledger hashes for slot %Ld, despite trying \
-         all predecessor slots"
-        slot ;
-      Core.exit 1 ) ;
-    match Hashtbl.find global_slot_hashes_tbl curr_slot with
-    | None ->
-        [%log info]
-          "State and ledger hashes not available at slot since genesis %Ld, \
-           will try predecessor slot"
-          curr_slot ;
-        go (Int64.pred curr_slot)
-    | Some hashes ->
-        hashes
-  in
-  go slot
+let get_slot_hashes slot = Hashtbl.find global_slot_hashes_tbl slot
 
-let process_block_infos_of_state_hash ~logger pool state_hash ~f =
+let process_block_infos_of_state_hash ~logger pool ~state_hash ~start_slot ~f =
   match%bind
-    Caqti_async.Pool.use (fun db -> Sql.Block_info.run db state_hash) pool
+    Caqti_async.Pool.use
+      (fun db -> Sql.Block_info.run db ~state_hash ~start_slot)
+      pool
   with
   | Ok block_infos ->
       f block_infos
@@ -515,7 +547,7 @@ let zkapp_command_to_transaction ~logger ~pool (cmd : Sql.Zkapp_command.t) :
         let (authorization : Control.t) =
           match body.authorization_kind with
           | Proof _ ->
-              Proof Proof.transaction_dummy
+              Proof (Lazy.force Proof.transaction_dummy)
           | Signature ->
               Signature Signature.dummy
           | None_given ->
@@ -560,35 +592,55 @@ let try_slot ~logger pool slot =
       Core_kernel.exit 1 ) ;
     match%bind find_canonical_chain ~logger pool slot with
     | None ->
-        go ~slot:(slot - 1) ~tries_left:(tries_left - 1)
+        go ~slot:(Int64.pred slot) ~tries_left:(tries_left - 1)
     | Some state_hash ->
         [%log info]
-          "Found possible canonical chain to target state hash %s at slot %d"
+          "Found possible canonical chain to target state hash %s at slot %Ld"
           state_hash slot ;
         return state_hash
   in
   go ~slot ~tries_left:num_tries
 
-let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis =
-  (* start replaying at the slot after the one we've just finished with *)
-  let start_slot_since_genesis = Int64.succ last_global_slot_since_genesis in
-  let%bind replayer_checkpoint =
-    let%map input =
-      create_replayer_checkpoint ~ledger ~start_slot_since_genesis
+let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
+    ~max_canonical_slot ~checkpoint_output_folder_opt ~checkpoint_file_prefix
+    ~migration_mode =
+  if
+    migration_mode
+    || Int64.( <= ) last_global_slot_since_genesis max_canonical_slot
+  then (
+    (* start replaying at the slot after the one we've just finished with *)
+    let start_slot_since_genesis = Int64.succ last_global_slot_since_genesis in
+    let%map replayer_checkpoint =
+      let%map input =
+        create_replayer_checkpoint ~ledger ~start_slot_since_genesis
+      in
+      input_to_yojson input |> Yojson.Safe.pretty_to_string
     in
-    input_to_yojson input |> Yojson.Safe.pretty_to_string
-  in
-  let checkpoint_file =
-    sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
-  in
-  [%log info] "Writing checkpoint file"
-    ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
-  return
-  @@ Out_channel.with_file checkpoint_file ~f:(fun oc ->
-         Out_channel.output_string oc replayer_checkpoint )
+    let checkpoint_file =
+      let checkpoint_filename =
+        sprintf "%s-checkpoint-%Ld.json" checkpoint_file_prefix
+          start_slot_since_genesis
+      in
+      match checkpoint_output_folder_opt with
+      | Some parent ->
+          Filename.concat parent checkpoint_filename
+      | None ->
+          checkpoint_filename
+    in
+    [%log info] "Writing checkpoint file"
+      ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
+    Out_channel.with_file checkpoint_file ~f:(fun oc ->
+        Out_channel.output_string oc replayer_checkpoint ) )
+  else (
+    [%log info] "Not writing checkpoint file at slot %Ld, because not canonical"
+      last_global_slot_since_genesis
+      ~metadata:
+        [ ("max_canonical_slot", `String (Int64.to_string max_canonical_slot)) ] ;
+    Deferred.unit )
 
-let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
-    ~checkpoint_interval () =
+let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
+    ~continue_on_error ~checkpoint_interval ~checkpoint_output_folder_opt
+    ~checkpoint_file_prefix ~genesis_dir_opt () =
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -613,22 +665,20 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
          except that we don't consider loading from a tar file
       *)
       let query_db = Mina_caqti.query pool in
-      let%bind padded_accounts =
-        match
-          Genesis_ledger_helper.Ledger.padded_accounts_from_runtime_config_opt
-            ~logger ~proof_level input.genesis_ledger
-            ~ledger_name_prefix:"genesis_ledger"
+      let%bind packed_ledger =
+        match%bind
+          Genesis_ledger_helper.Ledger.load ~proof_level
+            ~genesis_dir:
+              (Option.value ~default:Cache_dir.autogen_path genesis_dir_opt)
+            ~logger ~constraint_constants input.genesis_ledger
         with
-        | None ->
+        | Error e ->
             [%log fatal]
-              "Could not load accounts from input runtime genesis ledger" ;
+              "Could not load accounts from input runtime genesis ledger %s"
+              (Error.to_string_hum e) ;
             exit 1
-        | Some accounts ->
-            return accounts
-      in
-      let packed_ledger =
-        Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-          ~depth:constraint_constants.ledger_depth padded_accounts
+        | Ok (packed_ledger, _, _) ->
+            return packed_ledger
       in
       let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
       let epoch_ledgers_state_hash_opt =
@@ -637,50 +687,77 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       in
       let%bind target_state_hash =
         match epoch_ledgers_state_hash_opt with
-        | Some epoch_ledgers_state_hash ->
-            [%log info] "Retrieving fork block state_hash" ;
-            query_db ~f:(fun db ->
-                Sql.Parent_block.get_parent_state_hash db
-                  epoch_ledgers_state_hash )
+        | Some hash ->
+            return hash
         | None ->
             [%log info]
               "Searching for block with greatest height on canonical chain" ;
             let%bind max_slot =
               query_db ~f:(fun db -> Sql.Block.get_max_slot db ())
             in
-            [%log info] "Maximum global slot since genesis in blocks is %d"
+            [%log info] "Maximum global slot since genesis in blocks is %Ld"
               max_slot ;
             try_slot ~logger pool max_slot
       in
-      [%log info] "Loading block information using target state hash" ;
-      let%bind block_ids =
-        process_block_infos_of_state_hash ~logger pool target_state_hash
-          ~f:(fun block_infos ->
+      if not @@ List.is_empty input.first_pass_ledger_hashes then (
+        [%log info] "Populating set of first-pass ledger hashes" ;
+        List.iter input.first_pass_ledger_hashes
+          ~f:(First_pass_ledger_hashes.add ~migration_mode) ) ;
+      Option.iter input.last_snarked_ledger_hash ~f:(fun h ->
+          [%log info] "Setting last snarked ledger hash" ;
+          First_pass_ledger_hashes.set_last_snarked_hash h ) ;
+      [%log info]
+        "Loading block information using target state hash and start slot" ;
+      let%bind block_ids, oldest_block_id =
+        process_block_infos_of_state_hash ~logger pool
+          ~state_hash:target_state_hash
+          ~start_slot:input.start_slot_since_genesis ~f:(fun block_infos ->
+            let ({ id = oldest_block_id; _ } : Sql.Block_info.t) =
+              Option.value_exn
+                (List.min_elt block_infos ~compare:(fun bi1 bi2 ->
+                     Int64.compare bi1.global_slot_since_genesis
+                       bi2.global_slot_since_genesis ) )
+            in
             let ids = List.map block_infos ~f:(fun { id; _ } -> id) in
             (* build mapping from global slots to state and ledger hashes *)
-            List.iter block_infos
-              ~f:(fun { global_slot_since_genesis; state_hash; ledger_hash; _ }
-                 ->
-                Hashtbl.add_exn global_slot_hashes_tbl
-                  ~key:global_slot_since_genesis
-                  ~data:
-                    ( State_hash.of_base58_check_exn state_hash
-                    , Ledger_hash.of_base58_check_exn ledger_hash ) ) ;
-            return (Int.Set.of_list ids) )
+            let%bind () =
+              Deferred.List.iter block_infos
+                ~f:(fun
+                     { global_slot_since_genesis
+                     ; state_hash
+                     ; ledger_hash
+                     ; snarked_ledger_hash_id
+                     ; _
+                     }
+                   ->
+                  let%map snarked_hash =
+                    query_db ~f:(fun db ->
+                        Sql.Snarked_ledger_hashes.run db snarked_ledger_hash_id )
+                  in
+
+                  Hashtbl.add_exn global_slot_hashes_tbl
+                    ~key:global_slot_since_genesis
+                    ~data:
+                      ( State_hash.of_base58_check_exn state_hash
+                      , Ledger_hash.of_base58_check_exn ledger_hash
+                      , Frozen_ledger_hash.of_base58_check_exn snarked_hash ) )
+            in
+            return (Int.Set.of_list ids, oldest_block_id) )
       in
-      (* check that genesis block is in chain to target hash
-         assumption: genesis block occupies global slot 0
-      *)
-      if Int64.Table.mem global_slot_hashes_tbl Int64.zero then
-        [%log info]
-          "Block chain leading to target state hash includes genesis block, \
-           length = %d"
-          (Int.Set.length block_ids)
-      else (
-        [%log fatal]
-          "Block chain leading to target state hash does not include genesis \
-           block" ;
-        Core_kernel.exit 1 ) ;
+      if Int64.equal input.start_slot_since_genesis 0L then
+        (* check that genesis block is in chain to target hash                                                                                                                                                                                          assumption: genesis block occupies global slot 0
+
+           if nonzero start slot, can't assume there's a block at that slot *)
+        if Int64.Table.mem global_slot_hashes_tbl Int64.zero then
+          [%log info]
+            "Block chain leading to target state hash includes genesis block, \
+             length = %d"
+            (Int.Set.length block_ids)
+        else (
+          [%log fatal]
+            "Block chain leading to target state hash does not include genesis \
+             block" ;
+          Core_kernel.exit 1 ) ;
       (* some mutable state, less painful than passing epoch ledgers throughout *)
       let staking_epoch_ledger = ref ledger in
       let next_epoch_ledger = ref ledger in
@@ -689,7 +766,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         let least_slot =
           Option.value_exn @@ List.min_elt slots ~compare:Int64.compare
         in
-        let state_hash, _ledger_hash =
+        let state_hash, _ledger_hash, _snarked_hash =
           Int64.Table.find_exn global_slot_hashes_tbl least_slot
         in
         let%bind { staking_epoch_data_id; next_epoch_data_id; _ } =
@@ -748,7 +825,10 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             let open Deferred.Let_syntax in
             match%map
               Caqti_async.Pool.use
-                (fun db -> Sql.Internal_command.run db id)
+                (fun db ->
+                  Sql.Internal_command.run db
+                    ~start_slot:input.start_slot_since_genesis
+                    ~internal_cmd_id:id )
                 pool
             with
             | Ok [] ->
@@ -867,28 +947,44 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
           (Option.map checkpoint_interval_i64 ~f:(fun interval ->
                Int64.(input.start_slot_since_genesis + interval) ) )
       in
+      let%bind max_canonical_slot =
+        query_db ~f:(fun db -> Sql.Block.get_max_canonical_slot db ())
+      in
+      let%bind genesis_snarked_ledger_hash =
+        let%map hash_str =
+          query_db ~f:(fun db ->
+              Sql.Block.genesis_snarked_ledger db input.start_slot_since_genesis )
+        in
+        Frozen_ledger_hash.of_base58_check_exn hash_str
+      in
       let incr_checkpoint_target () =
         Option.iter !checkpoint_target ~f:(fun target ->
             match checkpoint_interval_i64 with
             | Some interval ->
-                [%log info] "Checkpoint target was %Ld, setting to %Ld" target
-                  Int64.(target + interval) ;
-                checkpoint_target := Some Int64.(target + interval)
+                let new_target = Int64.(target + interval) in
+                if Int64.( <= ) new_target max_canonical_slot then (
+                  [%log info] "Checkpoint target was %Ld, setting to %Ld" target
+                    new_target ;
+                  checkpoint_target := Some new_target )
+                else (
+                  (* set target so it can't be reached *)
+                  [%log info]
+                    "Checkpoint target was %Ld, new target would be at \
+                     noncanonical slot, set target to unreachable value"
+                    target ;
+                  checkpoint_target := Some Int64.max_value )
             | None ->
                 failwith "Expected a checkpoint interval" )
       in
+      let found_snarked_ledger_hash = ref false in
       (* apply commands in global slot, sequence order *)
       let rec apply_commands ~last_global_slot_since_genesis ~last_block_id
           ~(block_txns : Mina_transaction.Transaction.t list)
           (internal_cmds : Sql.Internal_command.t list)
           (user_cmds : Sql.User_command.t list)
           (zkapp_cmds : Sql.Zkapp_command.t list) =
-        let state_hash, expected_ledger_hash =
-          get_slot_hashes ~logger last_global_slot_since_genesis
-        in
-        let check_ledger_hash_at_slot () =
-          if Ledger_hash.equal (Ledger.merkle_root ledger) expected_ledger_hash
-          then
+        let check_ledger_hash_at_slot state_hash ledger_hash =
+          if Ledger_hash.equal (Ledger.merkle_root ledger) ledger_hash then
             [%log info]
               "Applied all commands at global slot since genesis %Ld, got \
                expected ledger hash"
@@ -906,8 +1002,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                hash differs from expected ledger hash"
               ~metadata:
                 [ ("ledger_hash", json_ledger_hash_of_ledger ledger)
-                ; ( "expected_ledger_hash"
-                  , Ledger_hash.to_yojson expected_ledger_hash )
+                ; ("expected_ledger_hash", Ledger_hash.to_yojson ledger_hash)
                 ; ("state_hash", State_hash.to_yojson state_hash)
                 ; ( "global_slot_since_genesis"
                   , `String (Int64.to_string last_global_slot_since_genesis) )
@@ -915,7 +1010,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
               last_global_slot_since_genesis ;
             if continue_on_error then incr error_count else Core_kernel.exit 1 )
         in
-        let check_account_accessed () =
+        let check_account_accessed state_hash =
           [%log info] "Checking accounts accessed in block just processed"
             ~metadata:
               [ ("state_hash", State_hash.to_yojson state_hash)
@@ -956,22 +1051,23 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                 if continue_on_error then incr error_count
                 else Core_kernel.exit 1 ) ) ;
           [%log info]
-            "Verifying balances and nonces for accounts accessed in block with \
-             global slot since genesis %Ld"
+            "Verifying accounts accessed in block with global slot since \
+             genesis %Ld"
             last_global_slot_since_genesis ;
           let%map accounts_accessed =
             Deferred.List.map accounts_accessed_db
               ~f:(Archive_lib.Load_data.get_account_accessed ~pool)
           in
-          List.iter accounts_accessed
-            ~f:(fun (index, { public_key; token_id; balance; nonce; _ }) ->
-              let account_id = Account_id.create public_key token_id in
+          List.iter accounts_accessed ~f:(fun (index, account) ->
+              let account_id =
+                Account_id.create account.public_key account.token_id
+              in
               let index_in_ledger =
                 Ledger.index_of_account_exn ledger account_id
               in
               if index <> index_in_ledger then (
                 [%log error]
-                  "Index in ledger does not match index in account accessed"
+                  "Account index in ledger does not match index in database"
                   ~metadata:
                     [ ("index_in_ledger", `Int index_in_ledger)
                     ; ("index_in_account_accessed", `Int index)
@@ -996,185 +1092,312 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                           "Account not in ledger, even though there's a \
                            location for it"
                   in
-                  let balance_in_ledger = account_in_ledger.balance in
-                  if not (Currency.Balance.equal balance balance_in_ledger) then (
+                  if not @@ Account.equal account account_in_ledger then (
                     [%log error]
-                      "Balance in ledger does not match balance in account \
-                       accessed"
+                      "Account in ledger does not match account in database"
                       ~metadata:
                         [ ("account_id", Account_id.to_yojson account_id)
-                        ; ( "balance_in_ledger"
-                          , Currency.Balance.to_yojson balance_in_ledger )
-                        ; ( "balance_in_account_accessed"
-                          , Currency.Balance.to_yojson balance )
-                        ] ;
-                    if continue_on_error then incr error_count
-                    else Core_kernel.exit 1 ) ;
-                  let nonce_in_ledger = account_in_ledger.nonce in
-                  if
-                    not (Mina_numbers.Account_nonce.equal nonce nonce_in_ledger)
-                  then (
-                    [%log error]
-                      "Nonce in ledger does not match nonce in account accessed"
-                      ~metadata:
-                        [ ("account_id", Account_id.to_yojson account_id)
-                        ; ( "nonce_in_ledger"
-                          , Mina_numbers.Account_nonce.to_yojson nonce_in_ledger
-                          )
-                        ; ( "nonce_in_account_accessed"
-                          , Mina_numbers.Account_nonce.to_yojson nonce )
+                        ; ( "account_in_ledger"
+                          , Account.to_yojson account_in_ledger )
+                        ; ("account_in_database", Account.to_yojson account)
                         ] ;
                     if continue_on_error then incr error_count
                     else Core_kernel.exit 1 ) )
         in
         let log_state_hash_on_next_slot curr_global_slot_since_genesis =
-          let state_hash, _ledger_hash =
-            get_slot_hashes ~logger curr_global_slot_since_genesis
-          in
-          [%log info]
-            ~metadata:
-              [ ("state_hash", `String (State_hash.to_base58_check state_hash))
-              ]
-            "Starting processing of commands in block with state_hash \
-             $state_hash at global slot since genesis %Ld"
-            curr_global_slot_since_genesis
+          match get_slot_hashes curr_global_slot_since_genesis with
+          | None ->
+              [%log fatal]
+                "Missing state hash information for current global slot" ;
+              Core.exit 1
+          | Some (state_hash, _ledger_hash, _snarked_hash) ->
+              [%log info]
+                ~metadata:
+                  [ ( "state_hash"
+                    , `String (State_hash.to_base58_check state_hash) )
+                  ]
+                "Starting processing of commands in block with state_hash \
+                 $state_hash at global slot since genesis %Ld"
+                curr_global_slot_since_genesis
         in
-        let run_transactions_on_slot_change block_txns =
-          let state_hash, _ledger_hash =
-            get_slot_hashes ~logger last_global_slot_since_genesis
-          in
-          let rec count_txns ~signed_count ~zkapp_count ~fee_transfer_count
-              ~coinbase_count = function
-            | [] ->
+        let run_transactions_on_slot_change ?(last_block = false) block_txns ()
+            =
+          match get_slot_hashes last_global_slot_since_genesis with
+          | None ->
+              if
+                Int64.equal last_global_slot_since_genesis
+                  input.start_slot_since_genesis
+              then (
                 [%log info]
-                  "Replaying transactions in block with state hash $state_hash"
+                  "No ledger hash information at start slot, not checking \
+                   against ledger, not running transactions" ;
+                Deferred.unit )
+              else (
+                [%log fatal]
+                  "Missing ledger hash information for last global slot, which \
+                   is not the start slot" ;
+                Core.exit 1 )
+          | Some (state_hash, ledger_hash, snarked_hash) ->
+              let write_checkpoint_file ~checkpoint_output_folder_opt
+                  ~checkpoint_file_prefix ~migration_mode () =
+                let write_checkpoint () =
+                  write_replayer_checkpoint ~logger ~ledger
+                    ~last_global_slot_since_genesis ~max_canonical_slot
+                    ~checkpoint_output_folder_opt ~checkpoint_file_prefix
+                    ~migration_mode
+                in
+                if last_block then write_checkpoint ()
+                else
+                  match !checkpoint_target with
+                  | None ->
+                      Deferred.unit
+                  | Some target ->
+                      if Int64.(last_global_slot_since_genesis >= target) then (
+                        incr_checkpoint_target () ; write_checkpoint () )
+                      else Deferred.unit
+              in
+              let rec count_txns ~signed_count ~zkapp_count ~fee_transfer_count
+                  ~coinbase_count = function
+                | [] ->
+                    [%log info]
+                      "Replaying transactions in block with state hash \
+                       $state_hash"
+                      ~metadata:
+                        [ ("state_hash", State_hash.to_yojson state_hash)
+                        ; ( "global_slot_since_genesis"
+                          , `String
+                              (Int64.to_string last_global_slot_since_genesis)
+                          )
+                        ; ("block_id", `Int last_block_id)
+                        ; ("no_signed_commands", `Int signed_count)
+                        ; ("no_zkapp_commands", `Int zkapp_count)
+                        ; ("no_fee_transfers", `Int fee_transfer_count)
+                        ; ("no_coinbases", `Int coinbase_count)
+                        ]
+                | txn :: txns -> (
+                    match txn with
+                    | Mina_transaction.Transaction.Command cmd -> (
+                        match cmd with
+                        | User_command.Signed_command _ ->
+                            count_txns ~signed_count:(signed_count + 1)
+                              ~zkapp_count ~fee_transfer_count ~coinbase_count
+                              txns
+                        | Zkapp_command _ ->
+                            count_txns ~signed_count
+                              ~zkapp_count:(zkapp_count + 1) ~fee_transfer_count
+                              ~coinbase_count txns )
+                    | Fee_transfer _ ->
+                        count_txns ~signed_count ~zkapp_count
+                          ~fee_transfer_count:(fee_transfer_count + 1)
+                          ~coinbase_count txns
+                    | Coinbase _ ->
+                        count_txns ~signed_count ~zkapp_count
+                          ~fee_transfer_count
+                          ~coinbase_count:(coinbase_count + 1) txns )
+              in
+              let run_transactions () =
+                count_txns ~signed_count:0 ~zkapp_count:0 ~fee_transfer_count:0
+                  ~coinbase_count:0 block_txns ;
+                let%bind txn_state_view =
+                  get_parent_state_view ~pool last_block_id
+                in
+                let parent_global_slot =
+                  Zkapp_precondition.Protocol_state.Poly
+                  .global_slot_since_genesis txn_state_view
+                in
+                let apply_transaction_phases txns =
+                  let%bind phase_1s =
+                    Deferred.List.mapi txns ~f:(fun n txn ->
+                        match
+                          Ledger.apply_transaction_first_pass
+                            ~constraint_constants
+                            ~global_slot:
+                              ( if migration_mode then parent_global_slot
+                              else
+                                Mina_numbers.Global_slot_since_genesis.of_uint32
+                                  (Unsigned.UInt32.of_int64
+                                     last_global_slot_since_genesis ) )
+                            ~txn_state_view ledger txn
+                        with
+                        | Ok partially_applied ->
+                            (* the current ledger may become a snarked ledger *)
+                            First_pass_ledger_hashes.add ~migration_mode
+                              (Ledger.merkle_root ledger) ;
+                            let%bind () =
+                              update_staking_epoch_data ~logger pool
+                                ~last_block_id ~ledger ~staking_epoch_ledger
+                                ~staking_seed
+                            in
+                            let%map () =
+                              update_next_epoch_data ~logger pool ~last_block_id
+                                ~ledger ~next_epoch_ledger ~next_seed
+                            in
+                            partially_applied
+                        | Error err ->
+                            [%log error]
+                              "Error during Phase 1 application of transaction \
+                               %d (0-based) in block with state hash \
+                               $state_hash"
+                              n
+                              ~metadata:
+                                [ ("state_hash", State_hash.to_yojson state_hash)
+                                ; ( "transaction"
+                                  , Mina_transaction.Transaction.to_yojson txn
+                                  )
+                                ; ("error", `String (Error.to_string_hum err))
+                                ] ;
+                            Error.raise err )
+                  in
+                  Deferred.List.map phase_1s ~f:(fun partial ->
+                      match
+                        Ledger.apply_transaction_second_pass ledger partial
+                      with
+                      | Ok applied ->
+                          let%bind () =
+                            update_staking_epoch_data ~logger pool
+                              ~last_block_id ~ledger ~staking_epoch_ledger
+                              ~staking_seed
+                          and () =
+                            update_next_epoch_data ~logger pool ~last_block_id
+                              ~ledger ~next_epoch_ledger ~next_seed
+                          in
+                          return applied
+                      | Error err ->
+                          (* must be a zkApp *)
+                          ( match partial with
+                          | Ledger.Transaction_partially_applied.Zkapp_command
+                              zk_partial ->
+                              let cmd = zk_partial.command in
+                              [%log error]
+                                "Error during Phase 2 application of \
+                                 partially-applied zkApp in block with state \
+                                 hash $state_hash"
+                                ~metadata:
+                                  [ ( "state_hash"
+                                    , State_hash.to_yojson state_hash )
+                                  ; ( "zkapp_command"
+                                    , Zkapp_command.to_yojson cmd )
+                                  ; ("error", `String (Error.to_string_hum err))
+                                  ]
+                          | _ ->
+                              failwith
+                                "Unexpected phase 2 failure of non-zkApp \
+                                 command" ) ;
+                          Error.raise err )
+                in
+                apply_transaction_phases (List.rev block_txns)
+              in
+              ( if migration_mode then
+                [%log info]
+                  "We are doing migration, so the snarked_ledger_hash in \
+                   global_slot_hashes_tbl is irrelevant"
+              else if
+              Frozen_ledger_hash.equal snarked_hash
+                (First_pass_ledger_hashes.get_last_snarked_hash ())
+            then
+                [%log info]
+                  "Snarked ledger hash same as in the preceding block, not \
+                   checking it again"
+              else if
+              Frozen_ledger_hash.equal snarked_hash genesis_snarked_ledger_hash
+            then
+                [%log info] "Snarked ledger hash is genesis snarked ledger hash"
+              else
+                match First_pass_ledger_hashes.find snarked_hash with
+                | None ->
+                    if not !found_snarked_ledger_hash then (
+                      [%log info]
+                        "Current snarked ledger hash not among first-pass \
+                         ledger hashes, but we haven't yet found one. The \
+                         transaction that created this ledger hash might have \
+                         been in an older replayer run that created a \
+                         checkpoint file without saved first-pass ledger \
+                         hashes" ;
+                      First_pass_ledger_hashes.set_last_snarked_hash
+                        snarked_hash )
+                    else
+                      [%log error]
+                        "Current snarked ledger hash does not appear among \
+                         first-pass ledger hashes" ;
+                    if continue_on_error then incr error_count
+                    else Core_kernel.exit 1
+                | Some (_hash, n) ->
+                    [%log info]
+                      "Found snarked ledger hash among first-pass ledger hashes" ;
+                    found_snarked_ledger_hash := true ;
+                    First_pass_ledger_hashes.set_last_snarked_hash snarked_hash ;
+                    First_pass_ledger_hashes.flush_older_than n ) ;
+              if List.is_empty block_txns then (
+                [%log info]
+                  "No transactions to run for block with state hash $state_hash"
                   ~metadata:
                     [ ("state_hash", State_hash.to_yojson state_hash)
                     ; ( "global_slot_since_genesis"
                       , `String (Int64.to_string last_global_slot_since_genesis)
                       )
                     ; ("block_id", `Int last_block_id)
-                    ; ("no_signed_commands", `Int signed_count)
-                    ; ("no_zkapp_commands", `Int zkapp_count)
-                    ; ("no_fee_transfers", `Int fee_transfer_count)
-                    ; ("no_coinbases", `Int coinbase_count)
-                    ]
-            | txn :: txns -> (
-                match txn with
-                | Mina_transaction.Transaction.Command cmd -> (
-                    match cmd with
-                    | User_command.Signed_command _ ->
-                        count_txns ~signed_count:(signed_count + 1) ~zkapp_count
-                          ~fee_transfer_count ~coinbase_count txns
-                    | Zkapp_command _ ->
-                        count_txns ~signed_count ~zkapp_count:(zkapp_count + 1)
-                          ~fee_transfer_count ~coinbase_count txns )
-                | Fee_transfer _ ->
-                    count_txns ~signed_count ~zkapp_count
-                      ~fee_transfer_count:(fee_transfer_count + 1)
-                      ~coinbase_count txns
-                | Coinbase _ ->
-                    count_txns ~signed_count ~zkapp_count ~fee_transfer_count
-                      ~coinbase_count:(coinbase_count + 1) txns )
-          in
-          let run_transactions () =
-            count_txns ~signed_count:0 ~zkapp_count:0 ~fee_transfer_count:0
-              ~coinbase_count:0 block_txns ;
-            let%bind txn_state_view =
-              get_parent_state_view ~pool last_block_id
-            in
-            let apply_transaction_phases txns =
-              let%bind phase_1s =
-                Deferred.List.mapi txns ~f:(fun n txn ->
-                    match
-                      Ledger.apply_transaction_first_pass ~constraint_constants
-                        ~global_slot:
-                          (Mina_numbers.Global_slot_since_genesis.of_uint32
-                             (Unsigned.UInt32.of_int64
-                                last_global_slot_since_genesis ) )
-                        ~txn_state_view ledger txn
-                    with
-                    | Ok partially_applied ->
-                        let%bind () =
-                          update_staking_epoch_data ~logger pool ~last_block_id
-                            ~ledger ~staking_epoch_ledger ~staking_seed
+                    ] ;
+                Deferred.unit )
+              else
+                let%bind transactions_applied = run_transactions () in
+                let%bind () =
+                  if migration_mode then
+                    let accounts_created =
+                      List.concat_map transactions_applied
+                        ~f:Ledger.Transaction_applied.new_accounts
+                    in
+                    let accounts_accessed =
+                      List.concat_map transactions_applied
+                        ~f:(fun txn_applied ->
+                          let txn =
+                            Ledger.Transaction_applied.transaction txn_applied
+                            |> With_status.data
+                          in
+                          let status =
+                            Ledger.Transaction_applied.transaction_status
+                              txn_applied
+                          in
+                          Mina_transaction.Transaction.account_access_statuses
+                            txn status )
+                      |> List.filter_map ~f:(fun (account_id, status) ->
+                             match status with
+                             | `Accessed ->
+                                 Some account_id
+                             | `Not_accessed ->
+                                 None )
+                      |> List.dedup_and_sort ~compare:Account_id.compare
+                    in
+                    let%bind () =
+                      Deferred.List.iter accounts_created ~f:(fun acct_id ->
+                          query_db ~f:(fun db ->
+                              Processor.Accounts_created.add_if_doesn't_exist db
+                                last_block_id acct_id
+                                constraint_constants.account_creation_fee )
+                          |> Deferred.ignore_m )
+                    in
+
+                    Deferred.List.iter accounts_accessed ~f:(fun acct_id ->
+                        let index =
+                          Ledger.index_of_account_exn ledger acct_id
                         in
-                        let%map () =
-                          update_next_epoch_data ~logger pool ~last_block_id
-                            ~ledger ~next_epoch_ledger ~next_seed
-                        in
-                        partially_applied
-                    | Error err ->
-                        [%log error]
-                          "Error during Phase 1 application of transaction %d \
-                           (0-based) in block with state hash $state_hash"
-                          n
-                          ~metadata:
-                            [ ("state_hash", State_hash.to_yojson state_hash)
-                            ; ( "transaction"
-                              , Mina_transaction.Transaction.to_yojson txn )
-                            ; ("error", `String (Error.to_string_hum err))
-                            ] ;
-                        Error.raise err )
-              in
-              Deferred.List.iter phase_1s ~f:(fun partial ->
-                  match Ledger.apply_transaction_second_pass ledger partial with
-                  | Ok _applied ->
-                      let%bind () =
-                        update_staking_epoch_data ~logger pool ~last_block_id
-                          ~ledger ~staking_epoch_ledger ~staking_seed
-                      in
-                      update_next_epoch_data ~logger pool ~last_block_id ~ledger
-                        ~next_epoch_ledger ~next_seed
-                  | Error err ->
-                      (* must be a zkApp *)
-                      ( match partial with
-                      | Ledger.Transaction_partially_applied.Zkapp_command
-                          zk_partial ->
-                          let cmd = zk_partial.command in
-                          [%log error]
-                            "Error during Phase 2 application of \
-                             partially-applied zkApp in block with state hash \
-                             $state_hash"
-                            ~metadata:
-                              [ ("state_hash", State_hash.to_yojson state_hash)
-                              ; ("zkapp_command", Zkapp_command.to_yojson cmd)
-                              ; ("error", `String (Error.to_string_hum err))
-                              ]
-                      | _ ->
-                          failwith
-                            "Unexpected phase 2 failure of non-zkApp command" ) ;
-                      Error.raise err )
-            in
-            apply_transaction_phases (List.rev block_txns)
-          in
-          if List.is_empty block_txns then (
-            [%log info]
-              "No transactions to run for block with state hash $state_hash"
-              ~metadata:
-                [ ("state_hash", State_hash.to_yojson state_hash)
-                ; ( "global_slot_since_genesis"
-                  , `String (Int64.to_string last_global_slot_since_genesis) )
-                ; ("block_id", `Int last_block_id)
-                ] ;
-            Deferred.unit )
-          else
-            let%bind () = run_transactions () in
-            check_ledger_hash_at_slot () ;
-            let%map () = check_account_accessed () in
-            log_state_hash_on_next_slot last_global_slot_since_genesis
+                        let acct = Ledger.get_at_index_exn ledger index in
+                        query_db ~f:(fun db ->
+                            Processor.Accounts_accessed.add_if_doesn't_exist db
+                              last_block_id ~logger (index, acct) )
+                        |> Deferred.ignore_m )
+                  else (
+                    check_ledger_hash_at_slot state_hash ledger_hash ;
+                    Deferred.unit )
+                in
+                (* don't check ledger hash, because depth changed from mainnet *)
+                let%bind () = check_account_accessed state_hash in
+                log_state_hash_on_next_slot last_global_slot_since_genesis ;
+                write_checkpoint_file ~checkpoint_output_folder_opt
+                  ~checkpoint_file_prefix ~migration_mode ()
         in
         (* a sequence is a command type, slot, sequence number triple *)
         let get_internal_cmd_sequence (ic : Sql.Internal_command.t) =
           (`Internal_command, ic.global_slot_since_genesis, ic.sequence_no)
-        in
-        let _write_checkpoint_file () =
-          Option.iter !checkpoint_target ~f:(fun target ->
-              if Int64.(last_global_slot_since_genesis >= target) then (
-                incr_checkpoint_target () ;
-                Async.don't_wait_for
-                  (write_replayer_checkpoint ~logger ~ledger
-                     ~last_global_slot_since_genesis ) ) )
         in
         let get_user_cmd_sequence (uc : Sql.User_command.t) =
           (`User_command, uc.global_slot_since_genesis, uc.sequence_no)
@@ -1195,7 +1418,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
             Int64.( > ) cmd_global_slot_since_genesis
               last_global_slot_since_genesis
           then
-            let%map () = run_transactions_on_slot_change block_txns in
+            let%map () = run_transactions_on_slot_change block_txns () in
             []
           else return block_txns
         in
@@ -1203,15 +1426,10 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         | [], [], [] ->
             (* all done *)
             let%bind _ =
-              check_for_complete_block
-                ~cmd_global_slot_since_genesis:Int64.max_value
+              run_transactions_on_slot_change ~last_block:true block_txns ()
             in
             Deferred.return
-              ( last_global_slot_since_genesis
-              , staking_epoch_ledger
-              , staking_seed
-              , next_epoch_ledger
-              , next_seed )
+              (staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed)
         | ic :: ics, [], [] ->
             (* only internal commands *)
             let%bind block_txns0 =
@@ -1379,16 +1597,6 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                   ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
                   ~last_block_id:zkc.block_id internal_cmds user_cmds zkcs )
       in
-      let%bind unparented_ids =
-        query_db ~f:(fun db -> Sql.Block.get_unparented db ())
-      in
-      let genesis_block_id =
-        match List.filter unparented_ids ~f:(Int.Set.mem block_ids) with
-        | [ id ] ->
-            id
-        | _ ->
-            failwith "Expected only the genesis block to have an unparented id"
-      in
       let%bind start_slot_since_genesis =
         let%map slot_opt =
           query_db ~f:(fun db ->
@@ -1418,36 +1626,17 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       [%log info] "At start global slot %Ld, ledger hash"
         start_slot_since_genesis
         ~metadata:[ ("ledger_hash", json_ledger_hash_of_ledger ledger) ] ;
-      let%bind ( last_global_slot_since_genesis
-               , staking_epoch_ledger
-               , staking_seed
-               , next_epoch_ledger
-               , next_seed ) =
+      let%bind staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed
+          =
         apply_commands ~block_txns:[]
           ~last_global_slot_since_genesis:start_slot_since_genesis
-          ~last_block_id:genesis_block_id sorted_internal_cmds sorted_user_cmds
+          ~last_block_id:oldest_block_id sorted_internal_cmds sorted_user_cmds
           sorted_zkapp_cmds
       in
       match input.target_epoch_ledgers_state_hash with
       | None ->
-          (* start replaying at the slot after the one we've just finished with *)
-          let start_slot_since_genesis =
-            Int64.succ last_global_slot_since_genesis
-          in
-          let%bind replayer_checkpoint =
-            let%map input =
-              create_replayer_checkpoint ~ledger ~start_slot_since_genesis
-            in
-            input_to_yojson input |> Yojson.Safe.pretty_to_string
-          in
-          let checkpoint_file =
-            sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
-          in
-          [%log info] "Writing checkpoint file"
-            ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
-          return
-          @@ Out_channel.with_file checkpoint_file ~f:(fun oc ->
-                 Out_channel.output_string oc replayer_checkpoint )
+          [%log info] "No target epoch ledger hash supplied, not writing output" ;
+          Deferred.unit
       | Some target_epoch_ledgers_state_hash -> (
           match output_file_opt with
           | None ->
@@ -1484,12 +1673,20 @@ let () =
       Command.async ~summary:"Replay transactions from Mina archive database"
         (let%map input_file =
            Param.flag "--input-file"
-             ~doc:"file File containing the genesis ledger"
+             ~doc:"file File containing the starting ledger"
              Param.(required string)
          and output_file_opt =
            Param.flag "--output-file"
              ~doc:"file File containing the resulting ledger"
              Param.(optional string)
+         and migration_mode =
+           Param.flag "--migration-mode"
+             ~doc:
+               "If this flag is turned on then migration mode would be \
+                started, which means ledger hash check would be disabled and \
+                this app would populates the `accounts_accessed` and \
+                `accounts_created` tables"
+             Param.no_arg
          and archive_uri =
            Param.flag "--archive-uri"
              ~doc:
@@ -1503,6 +1700,19 @@ let () =
            Param.flag "--checkpoint-interval"
              ~doc:"NN Write checkpoint file every NN slots"
              Param.(optional int)
+         and checkpoint_output_folder_opt =
+           Param.flag "--checkpoint-output-folder"
+             ~doc:"file Folder containing the resulting checkpoints"
+             Param.(optional string)
+         and genesis_dir_opt =
+           Param.flag "--genesis-ledger-dir"
+             ~doc:"DIR Directory that contains the genesis ledger"
+             Param.(optional string)
+         and checkpoint_file_prefix =
+           Param.flag "--checkpoint-file-prefix"
+             ~doc:"string Checkpoint file prefix (default: 'replayer')"
+             Param.(optional_with_default "replayer" string)
          in
-         main ~input_file ~output_file_opt ~archive_uri ~checkpoint_interval
-           ~continue_on_error )))
+         main ~input_file ~output_file_opt ~migration_mode ~archive_uri
+           ~checkpoint_interval ~continue_on_error ~checkpoint_output_folder_opt
+           ~checkpoint_file_prefix ~genesis_dir_opt )))

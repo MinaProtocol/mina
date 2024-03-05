@@ -13,7 +13,8 @@
    ;; local libraries
    network_peer
    ppx_version.runtime
+   bounded_types
  )
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_let ppx_deriving_yojson)))

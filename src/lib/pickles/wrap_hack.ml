@@ -29,7 +29,7 @@ let pad_vector (type a) ~dummy (v : (a, _) Vector.t) =
 
 (* Specialized padding function. *)
 let pad_challenges (chalss : (_ Vector.t, _) Vector.t) =
-  pad_vector ~dummy:Dummy.Ipa.Wrap.challenges_computed chalss
+  pad_vector ~dummy:(Lazy.force Dummy.Ipa.Wrap.challenges_computed) chalss
 
 (* Specialized padding function. *)
 let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
@@ -37,7 +37,8 @@ let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
     ~dummy:
       { Tock.Proof.Challenge_polynomial.commitment =
           Lazy.force Dummy.Ipa.Wrap.sg
-      ; challenges = Vector.to_array Dummy.Ipa.Wrap.challenges_computed
+      ; challenges =
+          Vector.to_array (Lazy.force Dummy.Ipa.Wrap.challenges_computed)
       }
   |> Vector.to_list
 
@@ -83,7 +84,7 @@ module Checked = struct
     pad_vector
       ~dummy:
         (Vector.map ~f:Impls.Wrap.Field.constant
-           Dummy.Ipa.Wrap.challenges_computed )
+           (Lazy.force Dummy.Ipa.Wrap.challenges_computed) )
       chalss
 
   let pad_commitments (commitments : _ Vector.t) =
@@ -102,9 +103,10 @@ module Checked = struct
       let full_state s = (S.state s, s.sponge_state) in
       let sponge = S.create Tock_field_sponge.params in
       let s0 = full_state sponge in
-      Vector.iter ~f:(S.absorb sponge) Dummy.Ipa.Wrap.challenges_computed ;
+      let chals = Lazy.force Dummy.Ipa.Wrap.challenges_computed in
+      Vector.iter ~f:(S.absorb sponge) chals ;
       let s1 = full_state sponge in
-      Vector.iter ~f:(S.absorb sponge) Dummy.Ipa.Wrap.challenges_computed ;
+      Vector.iter ~f:(S.absorb sponge) chals ;
       let s2 = full_state sponge in
       [| s0; s1; s2 |] )
 
@@ -139,34 +141,4 @@ module Checked = struct
       (Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof
        .to_field_elements ~g1:Inner_curve.to_field_elements t ) ;
     Sponge.squeeze_field sponge
-
-  (* Check that the pre-absorbing technique works. I.e., that it's consistent with
-     the actual definition of hash_messages_for_next_wrap_proof. *)
-  let%test_unit "hash_messages_for_next_wrap_proof correct" =
-    let open Impls.Wrap in
-    let test (type n) (n : n Nat.t) =
-      let messages_for_next_wrap_proof :
-          _ Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t =
-        let g = Wrap_main_inputs.Inner_curve.Constant.random () in
-        { Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof
-          .challenge_polynomial_commitment = g
-        ; old_bulletproof_challenges =
-            Vector.init n ~f:(fun _ ->
-                Vector.init Tock.Rounds.n ~f:(fun _ -> Tock.Field.random ()) )
-        }
-      in
-      Internal_Basic.Test.test_equal ~sexp_of_t:Field.Constant.sexp_of_t
-        ~equal:Field.Constant.equal
-        (Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.typ
-           Wrap_main_inputs.Inner_curve.typ
-           (Vector.typ Field.typ Backend.Tock.Rounds.n)
-           ~length:n )
-        Field.typ
-        (fun t -> make_checked (fun () -> hash_messages_for_next_wrap_proof n t))
-        (fun t ->
-          hash_constant_messages_for_next_wrap_proof n t
-          |> Digest.Constant.to_bits |> Impls.Wrap.Field.Constant.project )
-        messages_for_next_wrap_proof
-    in
-    test Nat.N0.n ; test Nat.N1.n ; test Nat.N2.n
 end

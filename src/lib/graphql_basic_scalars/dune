@@ -1,7 +1,7 @@
 (library
  (name graphql_basic_scalars)
  (public_name graphql_basic_scalars)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    async
@@ -18,6 +18,8 @@
    ppx_inline_test.config
    ;; local libraries
    graphql_wrapper
+   base_quickcheck
+   quickcheck_lib
    unix
  )
  (instrumentation (backend bisect_ppx))

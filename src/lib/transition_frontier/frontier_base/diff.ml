@@ -1,6 +1,5 @@
 open Core_kernel
 open Mina_base
-open Mina_block
 
 type full = Full
 
@@ -109,9 +108,14 @@ module Node_list = struct
 end
 
 module Root_transition = struct
+  type 'repr root_transition_scan_state =
+    | Lite : lite root_transition_scan_state
+    | Full : Staged_ledger.Scan_state.t -> full root_transition_scan_state
+
   type 'repr t =
     { new_root : Root_data.Limited.t
     ; garbage : 'repr Node_list.t
+    ; old_root_scan_state : 'repr root_transition_scan_state
     ; just_emitted_a_proof : bool
     }
 
@@ -156,14 +160,23 @@ module Root_transition = struct
         module T_nonbinable = struct
           type nonrec t = t
 
-          let to_binable ({ new_root; garbage; just_emitted_a_proof } : t) :
-              Binable_arg.Stable.V4.t =
+          let to_binable
+              ({ new_root
+               ; garbage
+               ; just_emitted_a_proof
+               ; old_root_scan_state = Lite
+               } :
+                t ) : Binable_arg.Stable.V4.t =
             { new_root; garbage; just_emitted_a_proof }
 
           let of_binable
               ({ new_root; garbage; just_emitted_a_proof } :
                 Binable_arg.Stable.V4.t ) : t =
-            { new_root; garbage; just_emitted_a_proof }
+            { new_root
+            ; garbage
+            ; old_root_scan_state = Lite
+            ; just_emitted_a_proof
+            }
         end
 
         include Binable.Of_binable (Binable_arg.Stable.V4) (T_nonbinable)
@@ -212,7 +225,8 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
         State_hash.to_yojson (Breadcrumb.state_hash breadcrumb)
     | New_node (Lite transition) ->
         State_hash.to_yojson (Mina_block.Validated.state_hash transition)
-    | Root_transitioned { new_root; garbage; just_emitted_a_proof } ->
+    | Root_transitioned
+        { new_root; garbage; just_emitted_a_proof; old_root_scan_state = _ } ->
         let garbage_hashes =
           match garbage with
           | Node_list.Full nodes ->
@@ -238,10 +252,15 @@ let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
       let external_transition = Breadcrumb.validated_transition breadcrumb in
       New_node (Lite external_transition)
   | Root_transitioned
-      { new_root; garbage = Full garbage_nodes; just_emitted_a_proof } ->
+      { new_root
+      ; garbage = Full garbage_nodes
+      ; old_root_scan_state = Full _
+      ; just_emitted_a_proof
+      } ->
       Root_transitioned
         { new_root
         ; garbage = Lite (Node_list.to_lite garbage_nodes)
+        ; old_root_scan_state = Lite
         ; just_emitted_a_proof
         }
   | Best_tip_changed b ->

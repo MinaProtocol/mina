@@ -69,7 +69,7 @@ module type Inputs_intf = sig
   end
 
   module MT :
-    Merkle_ledger.Syncable_intf.S
+    Merkle_ledger.Intf.SYNCABLE
       with type hash := Hash.t
        and type root_hash := Root_hash.t
        and type addr := Addr.t
@@ -525,7 +525,6 @@ end = struct
     (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
     let actual = complete_with_empties content_hash height (MT.depth t.tree) in
     if Hash.equal actual rh then (
-      MT.make_space_for t.tree n ;
       Addr.Table.clear t.waiting_parents ;
       (* We should use this information to set the empty account slots empty and
          start syncing at the content root. See #1972. *)

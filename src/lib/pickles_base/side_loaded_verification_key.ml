@@ -108,8 +108,6 @@ end
 module Max_branches = struct
   include Nat.N8
   module Log2 = Nat.N3
-
-  let%test "check max_branches" = Nat.to_int n = 1 lsl Nat.to_int Log2.n
 end
 
 (* TODO: remove since it looks very much like the Domains module in the same directory *)

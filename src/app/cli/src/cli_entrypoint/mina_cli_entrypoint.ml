@@ -22,8 +22,11 @@ type mina_initialization =
   ; itn_graphql_port : int option
   }
 
+(* keep this code in sync with Client.chain_id_inputs, Mina_commands.chain_id_inputs, and
+   Daemon_rpcs.Chain_id_inputs
+*)
 let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
-    ~protocol_major_version =
+    ~protocol_transaction_version ~protocol_network_version =
   (* if this changes, also change Mina_commands.chain_id_inputs *)
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
   let genesis_constants_hash = Genesis_constants.hash genesis_constants in
@@ -31,19 +34,21 @@ let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
     List.map constraint_system_digests ~f:(fun (_, digest) -> Md5.to_hex digest)
     |> String.concat ~sep:""
   in
-  let protocol_version_digest =
-    Int.to_string protocol_major_version |> Md5.digest_string |> Md5.to_hex
+  let version_digest v = Int.to_string v |> Md5.digest_string |> Md5.to_hex in
+  let protocol_transaction_version_digest =
+    version_digest protocol_transaction_version
+  in
+  let protocol_network_version_digest =
+    version_digest protocol_network_version
   in
   let b2 =
     Blake2.digest_string
       ( genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash
-      ^ protocol_version_digest )
+      ^ protocol_transaction_version_digest ^ protocol_network_version_digest )
   in
   Blake2.to_hex b2
 
 [%%inject "daemon_expiry", daemon_expiry]
-
-[%%inject "compile_time_current_protocol_version", current_protocol_version]
 
 [%%if plugins]
 
@@ -59,6 +64,93 @@ let plugin_flag = Command.Param.return []
 
 [%%endif]
 
+let load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level config_files =
+  let%bind config_jsons =
+    let config_files_paths =
+      List.map config_files ~f:(fun (config_file, _) -> `String config_file)
+    in
+    [%log info] "Reading configuration files $config_files"
+      ~metadata:[ ("config_files", `List config_files_paths) ] ;
+    Deferred.List.filter_map config_files
+      ~f:(fun (config_file, handle_missing) ->
+        match%bind Genesis_ledger_helper.load_config_json config_file with
+        | Ok config_json ->
+            let%map config_json =
+              Genesis_ledger_helper.upgrade_old_config ~logger config_file
+                config_json
+            in
+            Some (config_file, config_json)
+        | Error err -> (
+            match handle_missing with
+            | `Must_exist ->
+                Mina_user_error.raisef ~where:"reading configuration file"
+                  "The configuration file %s could not be read:\n%s" config_file
+                  (Error.to_string_hum err)
+            | `May_be_missing ->
+                [%log warn] "Could not read configuration from $config_file"
+                  ~metadata:
+                    [ ("config_file", `String config_file)
+                    ; ("error", Error_json.error_to_yojson err)
+                    ] ;
+                return None ) )
+  in
+  let config =
+    List.fold ~init:Runtime_config.default config_jsons
+      ~f:(fun config (config_file, config_json) ->
+        match Runtime_config.of_yojson config_json with
+        | Ok loaded_config ->
+            Runtime_config.combine config loaded_config
+        | Error err ->
+            [%log fatal]
+              "Could not parse configuration from $config_file: $error"
+              ~metadata:
+                [ ("config_file", `String config_file)
+                ; ("config_json", config_json)
+                ; ("error", `String err)
+                ] ;
+            failwithf "Could not parse configuration file: %s" err () )
+  in
+  let genesis_dir = Option.value ~default:(conf_dir ^/ "genesis") genesis_dir in
+  let%bind precomputed_values =
+    match%map
+      Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
+        ~proof_level config
+    with
+    | Ok (precomputed_values, _) ->
+        precomputed_values
+    | Error err ->
+        let ( json_config
+            , `Accounts_omitted
+                ( `Genesis genesis_accounts_omitted
+                , `Staking staking_accounts_omitted
+                , `Next next_accounts_omitted ) ) =
+          Runtime_config.to_yojson_without_accounts config
+        in
+        let append_accounts_omitted s =
+          Option.value_map
+            ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
+            ~default:Fn.id
+        in
+        let metadata =
+          append_accounts_omitted "genesis" genesis_accounts_omitted
+          @@ append_accounts_omitted "staking" staking_accounts_omitted
+          @@ append_accounts_omitted "next" next_accounts_omitted []
+          @ [ ("config", json_config)
+            ; ( "name"
+              , `String
+                  (Option.value ~default:"not provided"
+                     (let%bind.Option ledger = config.ledger in
+                      Option.first_some ledger.name ledger.hash ) ) )
+            ; ("error", Error_json.error_to_yojson err)
+            ]
+        in
+        [%log info]
+          "Initializing with runtime configuration. Ledger source: $name"
+          ~metadata ;
+        Error.raise err
+  in
+  return (precomputed_values, config_jsons, config)
+
 let setup_daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -68,9 +160,12 @@ let setup_daemon logger =
     flag "--block-producer-key" ~aliases:[ "block-producer-key" ]
       ~doc:
         (sprintf
-           "KEYFILE Private key file for the block producer. You cannot \
+           "DEPRECATED: Use environment variable `MINA_BP_PRIVKEY` instead. \
+            Private key file for the block producer. Providing this flag or \
+            the environment variable will enable block production. You cannot \
             provide both `block-producer-key` and `block-producer-pubkey`. \
-            (default: don't produce blocks). %s"
+            (default: use environment variable `MINA_BP_PRIVKEY`, if provided, \
+            or else don't produce any blocks) %s"
            receiver_key_warning )
       (optional string)
   and block_production_pubkey =
@@ -80,8 +175,8 @@ let setup_daemon logger =
         (sprintf
            "PUBLICKEY Public key for the associated private key that is being \
             tracked by this daemon. You cannot provide both \
-            `block-producer-key` and `block-producer-pubkey`. (default: don't \
-            produce blocks). %s"
+            `block-producer-key` (or `MINA_BP_PRIVKEY`) and \
+            `block-producer-pubkey`. (default: don't produce blocks) %s"
            receiver_key_warning )
       (optional public_key_compressed)
   and block_production_password =
@@ -364,13 +459,6 @@ let setup_daemon logger =
     flag "--peer-list-url" ~aliases:[ "peer-list-url" ]
       ~doc:"URL URL of seed peer list file. Will be polled periodically."
       (optional string)
-  and curr_protocol_version =
-    flag "--current-protocol-version"
-      ~aliases:[ "current-protocol-version" ]
-      (optional string)
-      ~doc:
-        "NN.NN.NN Current protocol version, only blocks with the same version \
-         accepted"
   and proposed_protocol_version =
     flag "--proposed-protocol-version"
       ~aliases:[ "proposed-protocol-version" ]
@@ -409,6 +497,11 @@ let setup_daemon logger =
       ~aliases:[ "log-precomputed-blocks" ]
       (optional_with_default false bool)
       ~doc:"true|false Include precomputed blocks in the log (default: false)"
+  and start_filtered_logs =
+    flag "--start-filtered-logs" (listed string)
+      ~doc:
+        "LOG-FILTER Include filtered logs for the given filter. May be passed \
+         multiple times"
   and block_reward_threshold =
     flag "--minimum-block-reward" ~aliases:[ "minimum-block-reward" ]
       ~doc:
@@ -447,6 +540,10 @@ let setup_daemon logger =
   and node_error_url =
     flag "--node-error-url" ~aliases:[ "node-error-url" ] (optional string)
       ~doc:"URL of the node error collection service"
+  and simplified_node_stats =
+    flag "--simplified-node-stats"
+      ~aliases:[ "simplified-node-stats" ]
+      no_arg ~doc:"whether to report simplified node stats (default: false)"
   and contact_info =
     flag "--contact-info" ~aliases:[ "contact-info" ] (optional string)
       ~doc:
@@ -477,6 +574,13 @@ let setup_daemon logger =
          for the associated private key that is being tracked by this daemon. \
          You cannot provide both `uptime-submitter-key` and \
          `uptime-submitter-pubkey`."
+  and uptime_send_node_commit =
+    flag "--uptime-send-node-commit-sha"
+      ~aliases:[ "uptime-send-node-commit-sha" ]
+      ~doc:
+        "true|false Whether to send the commit SHA used to build the node to \
+         the uptime service. (default: false)"
+      no_arg
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -504,7 +608,7 @@ let setup_daemon logger =
             Daemon.daemonize ~allow_threads_to_have_been_created:true
               ~redirect_stdout:`Dev_null ?cd:working_dir
               ~redirect_stderr:`Dev_null () )
-          else ignore (Option.map working_dir ~f:Caml.Sys.chdir)
+          else Option.iter working_dir ~f:Caml.Sys.chdir
         in
         Stdout_log.setup log_json log_level ;
         (* 512MB logrotate max size = 1GB max filesystem usage *)
@@ -534,7 +638,7 @@ let setup_daemon logger =
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-oversized-logs.log"
-               ~max_size:logrotate_max_size ~num_rotate:file_log_rotations ) ;
+               ~max_size:logrotate_max_size ~num_rotate:20 ) ;
         (* Consumer for `[%log internal]` logging used for internal tracing *)
         Itn_logger.set_message_postprocessor
           Internal_tracing.For_itn_logger.post_process_message ;
@@ -641,7 +745,6 @@ let setup_daemon logger =
                   ] ;
               make_version ()
         in
-        Memory_stats.log_memory_stats logger ~process:"daemon" ;
         Parallel.init_master () ;
         let monitor = Async.Monitor.create ~name:"coda" () in
         let time_controller =
@@ -688,74 +791,9 @@ let setup_daemon logger =
             @ List.map config_files ~f:(fun config_file ->
                   (config_file, `Must_exist) )
           in
-          let%bind config_jsons =
-            let config_files_paths =
-              List.map config_files ~f:(fun (config_file, _) ->
-                  `String config_file )
-            in
-            [%log info] "Reading configuration files $config_files"
-              ~metadata:[ ("config_files", `List config_files_paths) ] ;
-            Deferred.List.filter_map config_files
-              ~f:(fun (config_file, handle_missing) ->
-                match%bind
-                  Genesis_ledger_helper.load_config_json config_file
-                with
-                | Ok config_json ->
-                    let%map config_json =
-                      Genesis_ledger_helper.upgrade_old_config ~logger
-                        config_file config_json
-                    in
-                    Some (config_file, config_json)
-                | Error err -> (
-                    match handle_missing with
-                    | `Must_exist ->
-                        Mina_user_error.raisef
-                          ~where:"reading configuration file"
-                          "The configuration file %s could not be read:\n%s"
-                          config_file (Error.to_string_hum err)
-                    | `May_be_missing ->
-                        [%log warn]
-                          "Could not read configuration from $config_file"
-                          ~metadata:
-                            [ ("config_file", `String config_file)
-                            ; ("error", Error_json.error_to_yojson err)
-                            ] ;
-                        return None ) )
-          in
-          let config =
-            List.fold ~init:Runtime_config.default config_jsons
-              ~f:(fun config (config_file, config_json) ->
-                match Runtime_config.of_yojson config_json with
-                | Ok loaded_config ->
-                    Runtime_config.combine config loaded_config
-                | Error err ->
-                    [%log fatal]
-                      "Could not parse configuration from $config_file: $error"
-                      ~metadata:
-                        [ ("config_file", `String config_file)
-                        ; ("config_json", config_json)
-                        ; ("error", `String err)
-                        ] ;
-                    failwithf "Could not parse configuration file: %s" err () )
-          in
-          let genesis_dir =
-            Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
-          in
-          let%bind precomputed_values =
-            match%map
-              Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
-                ~proof_level config
-            with
-            | Ok (precomputed_values, _) ->
-                precomputed_values
-            | Error err ->
-                [%log fatal]
-                  "Failed initializing with configuration $config: $error"
-                  ~metadata:
-                    [ ("config", Runtime_config.to_yojson config)
-                    ; ("error", Error_json.error_to_yojson err)
-                    ] ;
-                Error.raise err
+          let%bind precomputed_values, config_jsons, config =
+            load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level
+              config_files
           in
           let rev_daemon_configs =
             List.rev_filter_map config_jsons
@@ -944,21 +982,39 @@ let setup_daemon logger =
                   Unix.putenv ~key:Secrets.Keypair.env ~data:password )
             block_production_password ;
           let%bind block_production_keypair =
-            match (block_production_key, block_production_pubkey) with
-            | Some _, Some _ ->
+            match
+              ( block_production_key
+              , block_production_pubkey
+              , Sys.getenv "MINA_BP_PRIVKEY" )
+            with
+            | Some _, Some _, _ ->
                 Mina_user_error.raise
                   "You cannot provide both `block-producer-key` and \
                    `block_production_pubkey`"
-            | None, None ->
+            | None, Some _, Some _ ->
+                Mina_user_error.raise
+                  "You cannot provide both `MINA_BP_PRIVKEY` and \
+                   `block_production_pubkey`"
+            | None, None, None ->
                 Deferred.return None
-            | Some sk_file, _ ->
+            | None, None, Some base58_privkey ->
+                let kp =
+                  Private_key.of_base58_check_exn base58_privkey
+                  |> Keypair.of_private_key_exn
+                in
+                Deferred.return (Some kp)
+            (* CLI argument takes precedence over env variable *)
+            | Some sk_file, None, (Some _ | None) ->
+                [%log warn]
+                  "`block-producer-key` is deprecated. Please set \
+                   `MINA_BP_PRIVKEY` environment variable instead." ;
                 let%map kp =
                   Secrets.Keypair.Terminal_stdin.read_exn
                     ~should_prompt_user:false ~which:"block producer keypair"
                     sk_file
                 in
                 Some kp
-            | _, Some tracked_pubkey ->
+            | None, Some tracked_pubkey, None ->
                 let%map kp =
                   Secrets.Wallets.get_tracked_keypair ~logger
                     ~which:"block producer keypair"
@@ -1011,7 +1067,12 @@ let setup_daemon logger =
                 | Sexp.List sexps ->
                     `List (List.map ~f:Error_json.sexp_record_to_yojson sexps)
                 | Sexp.Atom _ ->
-                    failwith "Expeted a sexp list" )
+                    failwith "Expected a sexp list" )
+          in
+          let o1trace context =
+            Execution_context.find_local context O1trace.local_storage_id
+            |> Option.value ~default:[]
+            |> List.map ~f:(fun x -> `String x)
           in
           Stream.iter
             (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
@@ -1019,12 +1080,18 @@ let setup_daemon logger =
             ~f:(fun (span, context) ->
               let secs = Time_ns.Span.to_sec span in
               let monitor_infos = get_monitor_infos context.monitor in
+              let o1trace = o1trace context in
+              [%log internal] "Long_async_cycle"
+                ~metadata:
+                  [ ("duration", `Float secs); ("trace", `List o1trace) ] ;
               [%log debug]
                 ~metadata:
                   [ ("long_async_cycle", `Float secs)
                   ; ("monitors", `List monitor_infos)
+                  ; ("o1trace", `List o1trace)
                   ]
-                "Long async cycle, $long_async_cycle seconds, $monitors" ;
+                "Long async cycle, $long_async_cycle seconds, $monitors, \
+                 $o1trace" ;
               Mina_metrics.(
                 Runtime.Long_async_histogram.observe Runtime.long_async_cycle
                   secs) ) ;
@@ -1032,10 +1099,15 @@ let setup_daemon logger =
             ~f:(fun (context, span) ->
               let secs = Time_ns.Span.to_sec span in
               let monitor_infos = get_monitor_infos context.monitor in
+              let o1trace = o1trace context in
+              [%log internal] "Long_async_job"
+                ~metadata:
+                  [ ("duration", `Float secs); ("trace", `List o1trace) ] ;
               [%log debug]
                 ~metadata:
                   [ ("long_async_job", `Float secs)
                   ; ("monitors", `List monitor_infos)
+                  ; ("o1trace", `List o1trace)
                   ; ( "most_recent_2_backtrace"
                     , `String
                         (String.concat ~sep:"␤"
@@ -1044,7 +1116,7 @@ let setup_daemon logger =
                                  (Execution_context.backtrace_history context)
                                  2 ) ) ) )
                   ]
-                "Long async job, $long_async_job seconds" ;
+                "Long async job, $long_async_job seconds, $monitors, $o1trace" ;
               Mina_metrics.(
                 Runtime.Long_job_histogram.observe Runtime.long_async_job secs) ) ;
           let trace_database_initialization typ location =
@@ -1054,7 +1126,7 @@ let setup_daemon logger =
           in
           let trust_dir = conf_dir ^/ "trust" in
           let%bind () = Async.Unix.mkdir ~p:() trust_dir in
-          let trust_system = Trust_system.create trust_dir in
+          let%bind trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
           let genesis_state_hash =
             (Precomputed_values.genesis_state_hashes precomputed_values)
@@ -1186,18 +1258,21 @@ let setup_daemon logger =
 
 Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let chain_id =
-            let protocol_major_version =
-              Protocol_version.of_string_exn
-                compile_time_current_protocol_version
-              |> Protocol_version.major
+            let protocol_transaction_version =
+              Protocol_version.(transaction current)
+            in
+            let protocol_network_version =
+              Protocol_version.(transaction current)
             in
             chain_id ~genesis_state_hash
               ~genesis_constants:precomputed_values.genesis_constants
               ~constraint_system_digests:
                 (Lazy.force precomputed_values.constraint_system_digests)
-              ~protocol_major_version
+              ~protocol_transaction_version ~protocol_network_version
           in
           [%log info] "Daemon will use chain id %s" chain_id ;
+          [%log info] "Daemon running protocol version %s"
+            Protocol_version.(to_string current) ;
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
               { timeout = Time.Span.of_sec 3.
@@ -1248,11 +1323,6 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let coinbase_receiver : Consensus.Coinbase_receiver.t =
             Option.value_map coinbase_receiver_flag ~default:`Producer
               ~f:(fun pk -> `Other pk)
-          in
-          let current_protocol_version =
-            Mina_run.get_current_protocol_version
-              ~compile_time_current_protocol_version ~conf_dir ~logger
-              curr_protocol_version
           in
           let proposed_protocol_version_opt =
             Mina_run.get_proposed_protocol_version_opt ~conf_dir ~logger
@@ -1325,9 +1395,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                  ~chain_id ~is_seed ~super_catchup:(not no_super_catchup)
                  ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
-                 ~gossip_net_params
-                 ~initial_protocol_version:current_protocol_version
-                 ~proposed_protocol_version_opt
+                 ~gossip_net_params ~proposed_protocol_version_opt
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method )
@@ -1348,9 +1416,11 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~work_reassignment_wait ~archive_process_location
                  ~log_block_creation ~precomputed_values ~start_time
                  ?precomputed_blocks_path ~log_precomputed_blocks
-                 ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~stop_time ~node_status_url
-                 ~graphql_control_port:itn_graphql_port () )
+                 ~start_filtered_logs ~upload_blocks_to_gcloud
+                 ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
+                 ~uptime_send_node_commit ~stop_time ~node_status_url
+                 ~graphql_control_port:itn_graphql_port ~simplified_node_stats
+                 () )
           in
           { mina
           ; client_trustlist
@@ -1514,6 +1584,100 @@ let dump_type_shapes =
              Core_kernel.printf "%s, %s, %s, %s\n" path digest shape_summary
                ty_decl ) ) )
 
+let primitive_ok = function
+  | "array" | "bytes" | "string" | "bigstring" ->
+      false
+  | "int" | "int32" | "int64" | "nativeint" | "char" | "bool" | "float" ->
+      true
+  | "unit" | "option" | "list" ->
+      true
+  | "kimchi_backend_bigint_32_V1" ->
+      true
+  | "Bounded_types.String.t"
+  | "Bounded_types.String.Tagged.t"
+  | "Bounded_types.Array.t" ->
+      true
+  | "8fabab0a-4992-11e6-8cca-9ba2c4686d9e" ->
+      true (* hashtbl *)
+  | "ac8a9ff4-4994-11e6-9a1b-9fb4e933bd9d" ->
+      true (* Make_iterable_binable *)
+  | s ->
+      failwithf "unknown primitive %s" s ()
+
+let audit_type_shapes : Command.t =
+  let rec shape_ok (shape : Sexp.t) : bool =
+    match shape with
+    | List [ Atom "Exp"; exp ] ->
+        exp_ok exp
+    | List [] ->
+        true
+    | _ ->
+        failwithf "bad shape: %s" (Sexp.to_string shape) ()
+  and exp_ok (exp : Sexp.t) : bool =
+    match exp with
+    | List [ Atom "Base"; Atom tyname; List exps ] ->
+        primitive_ok tyname && List.for_all exps ~f:shape_ok
+    | List [ Atom "Record"; List fields ] ->
+        List.for_all fields ~f:(fun field ->
+            match field with
+            | List [ Atom _; sh ] ->
+                shape_ok sh
+            | _ ->
+                failwithf "unhandled rec field: %s" (Sexp.to_string_hum field)
+                  () )
+    | List [ Atom "Tuple"; List exps ] ->
+        List.for_all exps ~f:shape_ok
+    | List [ Atom "Variant"; List ctors ] ->
+        List.for_all ctors ~f:(fun ctor ->
+            match ctor with
+            | List [ Atom _ctr; List exps ] ->
+                List.for_all exps ~f:shape_ok
+            | _ ->
+                failwithf "unhandled variant: %s" (Sexp.to_string_hum ctor) () )
+    | List [ Atom "Poly_variant"; List [ List [ Atom "sorted"; List ctors ] ] ]
+      ->
+        List.for_all ctors ~f:(fun ctor ->
+            match ctor with
+            | List [ Atom _ctr ] ->
+                true
+            | List [ Atom _ctr; List fields ] ->
+                List.for_all fields ~f:shape_ok
+            | _ ->
+                failwithf "unhandled poly variant: %s" (Sexp.to_string_hum ctor)
+                  () )
+    | List [ Atom "Application"; sh; List args ] ->
+        shape_ok sh && List.for_all args ~f:shape_ok
+    | List [ Atom "Rec_app"; Atom _; List args ] ->
+        List.for_all args ~f:shape_ok
+    | List [ Atom "Var"; Atom _ ] ->
+        true
+    | List (Atom ctr :: _) ->
+        failwithf "unhandled ctor (%s) in exp_ok: %s" ctr
+          (Sexp.to_string_hum exp) ()
+    | List [] | List _ | Atom _ ->
+        failwithf "bad format: %s" (Sexp.to_string_hum exp) ()
+  in
+  let handle_shape (path : string) (shape : Bin_prot.Shape.t) (ty_decl : string)
+      (good : int ref) (bad : int ref) =
+    let open Bin_prot.Shape in
+    let path, file = String.lsplit2_exn ~on:':' path in
+    let canonical = eval shape in
+    let shape_sexp = Canonical.to_string_hum canonical |> Sexp.of_string in
+    if not @@ shape_ok shape_sexp then (
+      incr bad ;
+      Core.eprintf "%s has a bad shape in %s (%s):\n%s\n" path file ty_decl
+        (Canonical.to_string_hum canonical) )
+    else incr good
+  in
+  Command.basic ~summary:"Audit shapes of versioned types"
+    (Command.Param.return (fun () ->
+         let bad, good = (ref 0, ref 0) in
+         Ppx_version_runtime.Shapes.iteri
+           ~f:(fun ~key:path ~data:(shape, ty_decl) ->
+             handle_shape path shape ty_decl good bad ) ;
+         Core.printf "good shapes:\n\t%d\nbad shapes:\n\t%d\n%!" !good !bad ;
+         if !bad > 0 then Core.exit 1 ) )
+
 [%%if force_updates]
 
 let rec ensure_testnet_id_still_good logger =
@@ -1635,6 +1799,52 @@ let internal_commands logger =
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
                  failwith "early EOF while reading sexp" ) ) )
+  ; ( "run-snark-worker-single"
+    , Command.async
+        ~summary:"Run snark-worker on a sexp provided on a single line of stdin"
+        (let open Command.Let_syntax in
+        let%map_open filename =
+          flag "--file" (required string)
+            ~doc:"File containing the s-expression of the snark work to execute"
+        in
+        fun () ->
+          let open Deferred.Let_syntax in
+          let logger = Logger.create () in
+          Parallel.init_master () ;
+          match%bind
+            Reader.with_file filename ~f:(fun reader ->
+                [%log info] "Created reader for %s" filename ;
+                Reader.read_sexp reader )
+          with
+          | `Ok sexp -> (
+              let%bind worker_state =
+                Snark_worker.Prod.Inputs.Worker_state.create
+                  ~proof_level:Genesis_constants.Proof_level.compiled
+                  ~constraint_constants:
+                    Genesis_constants.Constraint_constants.compiled ()
+              in
+              let sok_message =
+                { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
+                ; prover = Quickcheck.random_value Public_key.Compressed.gen
+                }
+              in
+              let spec =
+                [%of_sexp:
+                  ( Transaction_witness.t
+                  , Ledger_proof.t )
+                  Snark_work_lib.Work.Single.Spec.t] sexp
+              in
+              match%map
+                Snark_worker.Prod.Inputs.perform_single worker_state
+                  ~message:sok_message spec
+              with
+              | Ok _ ->
+                  [%log info] "Successfully worked"
+              | Error err ->
+                  [%log error] "Work didn't work: $err"
+                    ~metadata:[ ("err", Error_json.error_to_yojson err) ] )
+          | `Eof ->
+              failwith "early EOF while reading sexp") )
   ; ( "run-verifier"
     , Command.async
         ~summary:"Run verifier on a proof provided on a single line of stdin"
@@ -1784,6 +1994,60 @@ let internal_commands logger =
           Deferred.return ()) )
   ; ("dump-type-shapes", dump_type_shapes)
   ; ("replay-blocks", replay_blocks logger)
+  ; ("audit-type-shapes", audit_type_shapes)
+  ; ( "test-genesis-block-generation"
+    , Command.async ~summary:"Generate a genesis proof"
+        (let open Command.Let_syntax in
+        let%map_open config_files =
+          flag "--config-file" ~aliases:[ "config-file" ]
+            ~doc:
+              "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
+               default: <config_dir>/daemon.json). Pass multiple times to \
+               override fields from earlier config files"
+            (listed string)
+        and conf_dir = Cli_lib.Flag.conf_dir
+        and genesis_dir =
+          flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
+            ~doc:
+              "DIR Directory that contains the genesis ledger and the genesis \
+               blockchain proof (default: <config-dir>)"
+            (optional string)
+        in
+        fun () ->
+          let open Deferred.Let_syntax in
+          Parallel.init_master () ;
+          let logger = Logger.create () in
+          let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
+          let proof_level = Genesis_constants.Proof_level.Full in
+          let config_files =
+            List.map config_files ~f:(fun config_file ->
+                (config_file, `Must_exist) )
+          in
+          let%bind precomputed_values, _config_jsons, _config =
+            load_config_files ~logger ~conf_dir ~genesis_dir
+              ~proof_level:(Some proof_level) config_files
+          in
+          let pids = Child_processes.Termination.create_pid_table () in
+          let%bind prover =
+            (* We create a prover process (unnecessarily) here, to have a more
+               realistic test.
+            *)
+            Prover.create ~logger ~pids ~conf_dir ~proof_level
+              ~constraint_constants:precomputed_values.constraint_constants ()
+          in
+          match%bind
+            Prover.create_genesis_block prover
+              (Genesis_proof.to_inputs precomputed_values)
+          with
+          | Ok block ->
+              Format.eprintf "Generated block@.%s@."
+                ( Yojson.Safe.to_string
+                @@ Blockchain_snark.Blockchain.to_yojson block ) ;
+              exit 0
+          | Error err ->
+              Format.eprintf "Failed to generate block@.%s@."
+                (Yojson.Safe.to_string @@ Error_json.error_to_yojson err) ;
+              exit 1) )
   ]
 
 let mina_commands logger =

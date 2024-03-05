@@ -27,6 +27,7 @@ locals {
       // TODO: Change this to a better name
       seedPeers          = var.additional_peers
       logLevel           = var.log_level
+      startFilteredLogs    = var.start_filtered_logs
       logSnarkWorkGossip = var.log_snark_work_gossip
       logTxnPoolGossip = var.log_txn_pool_gossip
       ports = {
@@ -35,11 +36,16 @@ locals {
         metrics = "8081"
         p2p     = var.seed_external_port
       }
-      # seedPeersURL         = var.seed_peers_url
+      itn = {
+        port    = "3086"
+        keys    = var.itn_keys
+      }
       uploadBlocksToGCloud = var.upload_blocks_to_gcloud
       exposeGraphql        = var.expose_graphql
+      exposeItnGraphql     = var.expose_itn_graphql
     }
     
+    priorityClass = var.priority_class
     persist_working_dir = var.enable_working_dir_persitence
 
     seedConfigs = [
@@ -70,10 +76,12 @@ locals {
     logLevel             = var.log_level
     logSnarkWorkGossip   = var.log_snark_work_gossip
     logPrecomputedBlocks = var.log_precomputed_blocks
+    startFilteredLogs    = var.start_filtered_logs
     logTxnPoolGossip = var.log_txn_pool_gossip
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     # seedPeersURL         = var.seed_peers_url
     exposeGraphql        = var.expose_graphql
+    exposeItnGraphql     = var.expose_itn_graphql
     cpuRequest = var.cpu_request
     memRequest= var.mem_request
   }
@@ -123,6 +131,7 @@ locals {
         archiveAddress       = config.archiveAddress
       }
     ]
+    priorityClass = var.priority_class
     persist_working_dir = var.enable_working_dir_persitence
   }
 
@@ -158,6 +167,7 @@ locals {
         }
       }
     }
+    priorityClass = var.priority_class
     persist_working_dir = var.enable_working_dir_persitence
   }]
 
@@ -181,6 +191,7 @@ locals {
 
       workerCpuRequest    = var.worker_cpu_request
       workerMemRequest    = var.worker_mem_request
+      priorityClass = var.priority_class
       persist_working_dir = var.enable_working_dir_persitence
     }
   ]
@@ -191,6 +202,7 @@ locals {
       mina        = local.daemon
       healthcheck = local.healthcheck_vars
       name = node.name
+      priorityClass = var.priority_class
       persist_working_dir = var.enable_working_dir_persitence
     }
   ]
@@ -210,5 +222,10 @@ locals {
     makeReportDiscordWebhookUrl = var.make_report_discord_webhook_url
     makeReportAccounts          = var.make_report_accounts
     seedPeersURL                = var.additional_peers
+  }
+
+  itn_orchestrator_vars = {
+    testnetName = var.testnet_name
+    image       = var.itn_orchestrator_image
   }
 }

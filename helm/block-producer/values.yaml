@@ -6,6 +6,7 @@ mina:
   logLevel: "Debug"
   logSnarkWorkGossip: false
   logPrecomputedBlocks: false
+  startFilteredLogs: []
   logTxnPoolGossip: false
   image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet
   useCustomEntrypoint: false
@@ -20,6 +21,12 @@ mina:
     metrics: "10001"
     p2p: "10909"
   exposeGraphql: false
+  exposeItnGraphql: false
+  itn:
+    port: "3086"
+    keys: ""
+
+  
   cpuRequest: 6
   memRequest: "12.0Gi"
 
@@ -110,5 +117,5 @@ nodeSelector:
 
 storage:
   accessMode: "ReadWriteOnce"
-  size: "4Gi"
+  size: "30Gi"
   storageClass: "standard"

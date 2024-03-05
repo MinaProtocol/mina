@@ -34,7 +34,8 @@ end) =
 struct
   type t = Event.t list [@@deriving compare, sexp]
 
-  let empty_hash = Random_oracle.(salt Inputs.salt_phrase |> digest)
+  let empty_hash =
+    Hash_prefix_create.salt Inputs.salt_phrase |> Random_oracle.digest
 
   let push_hash acc hash =
     Random_oracle.hash ~init:Inputs.hash_prefix [| acc; hash |]
@@ -126,7 +127,7 @@ module Actions = struct
 
   let empty_state_element =
     let salt_phrase = "MinaZkappActionStateEmptyElt" in
-    Random_oracle.(salt salt_phrase |> digest)
+    Hash_prefix_create.salt salt_phrase |> Random_oracle.digest
 
   let push_events (acc : Field.t) (events : t) : Field.t =
     push_hash acc (hash events)
@@ -145,7 +146,8 @@ module Zkapp_uri = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = string [@@deriving sexp, equal, compare, hash, yojson]
+        type t = Bounded_types.String.Stable.V1.t
+        [@@deriving sexp, equal, compare, hash, yojson]
 
         let to_latest = Fn.id
 
@@ -170,9 +172,9 @@ module Zkapp_uri = struct
 
       include
         Binable.Of_binable_without_uuid
-          (Core_kernel.String.Stable.V1)
+          (Bounded_types.String.Stable.V1)
           (struct
-            type t = string
+            type t = Bounded_types.String.Stable.V1.t
 
             let to_binable = Fn.id
 
@@ -344,8 +346,8 @@ let typ : (Checked.t, t) Typ.t =
   let open Poly in
   Typ.of_hlistable
     [ Zkapp_state.typ Field.typ
-    ; Flagged_option.option_typ
-        ~default:{ With_hash.data = None; hash = dummy_vk_hash () }
+    ; Flagged_option.lazy_option_typ
+        ~default:(lazy { With_hash.data = None; hash = dummy_vk_hash () })
         (Data_as_hash.typ ~hash:With_hash.hash)
       |> Typ.transport
            ~there:(Option.map ~f:(With_hash.map ~f:Option.some))
@@ -447,7 +449,6 @@ let gen : t Quickcheck.Generator.t =
   in
   let%bind zkapp_version = Mina_numbers.Zkapp_version.gen in
   let%bind seq_state = Generator.list_with_length 5 Field.gen in
-  let%bind last_sequence_slot = Mina_numbers.Global_slot_since_genesis.gen in
   let%map zkapp_uri = gen_uri in
   let five = Pickles_types.Nat.(S (S (S (S (S Z))))) in
   { app_state

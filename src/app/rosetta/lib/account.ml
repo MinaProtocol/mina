@@ -24,6 +24,35 @@ module Get_balance =
     }
 |}]
 
+module Node_runtime_config =
+[%graphql
+{|
+ query runtime_config {
+   runtimeConfig
+ }
+|}]
+
+let genesis_ledger_balance ~graphql_uri public_key : (Unsigned.UInt64.t, Errors.t) Deferred.Result.t =
+  let open Deferred.Result.Let_syntax in
+  let%bind gql_response = Graphql.query (Node_runtime_config.make ()) graphql_uri in
+  let%map config =
+    (gql_response.Node_runtime_config.runtimeConfig :> Yojson.Safe.t)
+    |> Runtime_config.of_yojson
+    |> Result.map_error ~f:(fun e -> Errors.create @@ `Graphql_mina_query e)
+    |> Deferred.return
+  in
+  let balance =
+    let open Option.Let_syntax in
+    let%bind ledger = config.ledger in
+    match ledger.base with
+      | Runtime_config.Ledger.Accounts accounts ->
+         let open Runtime_config.Accounts.Single in
+         let%map account = List.find accounts ~f:(fun a -> String.equal a.pk public_key) in
+         MinaCurrency.Balance.to_uint64 account.balance
+      | _ -> None
+  in
+  Option.value balance ~default:Unsigned.UInt64.zero
+
 module Balance_info = struct
   type t = {liquid_balance: int64; total_balance: int64}
            [@@deriving yojson]
@@ -37,8 +66,8 @@ module Sql = struct
 
     let query_pending =
       Caqti_request.find_opt
-        Caqti_type.(tup2 string int64)
-        Caqti_type.(tup4 int64 int64 int64 int64)
+        Caqti_type.(tup3 string int64 string)
+        Caqti_type.(tup2 (tup4 int64 int64 int64 int64) int)
         {sql|
   WITH RECURSIVE pending_chain AS (
 
@@ -60,7 +89,7 @@ module Sql = struct
 
               )
 
-              SELECT DISTINCT full_chain.height,full_chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce
+              SELECT DISTINCT full_chain.height,full_chain.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce,timing_id
 
               FROM (SELECT
                     id, state_hash, parent_id, height, global_slot_since_genesis, timestamp, chain_status
@@ -76,9 +105,11 @@ module Sql = struct
               INNER JOIN accounts_accessed aa ON full_chain.id = aa.block_id
               INNER JOIN account_identifiers ai on ai.id = aa.account_identifier_id
               INNER JOIN public_keys pks ON ai.public_key_id = pks.id
+              INNER JOIN tokens t ON ai.token_id = t.id
 
               WHERE pks.value = $1
               AND full_chain.height <= $2
+              AND t.value = $3
 
               ORDER BY full_chain.height DESC
               LIMIT 1
@@ -86,19 +117,21 @@ module Sql = struct
 
     let query_canonical =
       Caqti_request.find_opt
-        Caqti_type.(tup2 string int64)
-        Caqti_type.(tup4 int64 int64 int64 int64)
+        Caqti_type.(tup3 string int64 string)
+        Caqti_type.(tup2 (tup4 int64 int64 int64 int64) int)
         {sql|
-                SELECT b.height,b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce
+                SELECT b.height,b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce,timing_id
 
                 FROM blocks b
                 INNER JOIN accounts_accessed ac ON ac.block_id = b.id
                 INNER JOIN account_identifiers ai on ai.id = ac.account_identifier_id
                 INNER JOIN public_keys pks ON ai.public_key_id = pks.id
+                INNER JOIN tokens t ON ai.token_id = t.id
 
                 WHERE pks.value = $1
                 AND b.height <= $2
                 AND b.chain_status = 'canonical'
+                AND t.value = $3
 
                 ORDER BY (b.height) DESC
                 LIMIT 1
@@ -108,9 +141,10 @@ module Sql = struct
         address =
       let open Deferred.Result.Let_syntax in
       let%bind has_canonical_height = Sql.Block.run_has_canonical_height (module Conn) ~height:requested_block_height in
+      let token_id = Mina_base.Token_id.(to_string default) in
       Conn.find_opt
         (if has_canonical_height then query_canonical else query_pending)
-        (address, requested_block_height)
+        (address, requested_block_height, token_id)
   end
 
   let compute_incremental_balance
@@ -140,63 +174,57 @@ module Sql = struct
   let find_current_balance
         (module Conn : Caqti_async.CONNECTION)
         ~requested_block_global_slot_since_genesis
-        ~last_relevant_command_info
-        address =
+        ~last_relevant_command_info ?timing_id () =
     let open Deferred.Result.Let_syntax in
     let open Unsigned in
     let (_, last_relevant_command_global_slot_since_genesis, last_relevant_command_balance, nonce) =
       last_relevant_command_info
     in
-    let pk = Signature_lib.Public_key.Compressed.of_base58_check_exn address in
-    let account_id = Mina_base.Account_id.create pk Mina_base.Token_id.default in
-    match%bind Archive_lib.Processor.Account_identifiers.find_opt (module Conn) account_id |>
-           Errors.Lift.sql ~context:"Finding account identifier" with
-    | None -> Deferred.Result.fail (Errors.create @@ `Account_not_found address)
-    | Some account_identifier_id ->
-       let%bind timing_info_opt =
-         Archive_lib.Processor.Timing_info.find_by_account_identifier_id_opt
-           (module Conn)
-           account_identifier_id
-         |> Errors.Lift.sql ~context:"Finding timing info"
-       in
-       let end_slot =
-         Mina_numbers.Global_slot_since_genesis.of_uint32
-           (Unsigned.UInt32.of_int64 requested_block_global_slot_since_genesis)
-       in
-       let%bind (liquid_balance, nonce) =
-         match timing_info_opt with
-         | None ->
-            (* This account has no special vesting, so just use its last
-               known balance from the command.*)
-            Deferred.Result.return (last_relevant_command_balance, UInt64.of_int64 nonce)
-         | Some timing_info ->
-            (* This block was in the genesis ledger and has been
-               involved in at least one user or internal command. We need *
-               to compute the change in its balance between the most recent
-               command and the start block (if it has vesting * it may have
-               changed). *)
-            let incremental_balance_between_slots =
-              compute_incremental_balance timing_info
-                ~start_slot:
-                  (Mina_numbers.Global_slot_since_genesis.of_int
-                   (Int.of_int64_exn
-                      last_relevant_command_global_slot_since_genesis))
-                ~end_slot
-            in
-            Deferred.Result.return
-              ( UInt64.Infix.(
-                  UInt64.of_int64 last_relevant_command_balance
-                  + incremental_balance_between_slots)
-                |> UInt64.to_int64, UInt64.of_int64 nonce )
-       in
-       let total_balance = last_relevant_command_balance in
-       let balance_info : Balance_info.t = {liquid_balance; total_balance} in
-       Deferred.Result.return (balance_info, nonce)
+    let%bind timing_info_opt =
+      match timing_id with
+      | Some timing_id ->
+         Archive_lib.Processor.Timing_info.load_opt (module Conn) timing_id
+           |> Errors.Lift.sql ~context:"Finding timing info"
+      | None -> return None
+    in
+    let end_slot =
+      Mina_numbers.Global_slot_since_genesis.of_uint32
+        (Unsigned.UInt32.of_int64 requested_block_global_slot_since_genesis)
+    in
+    let%bind (liquid_balance, nonce) =
+      match timing_info_opt with
+      | None ->
+         (* This account has no special vesting, so just use its last
+            known balance from the command.*)
+         Deferred.Result.return (last_relevant_command_balance, UInt64.of_int64 nonce)
+      | Some timing_info ->
+         (* This block was in the genesis ledger and has been
+            involved in at least one user or internal command. We need
+            to compute the change in its balance between the most recent
+            command and the start block (if it has vesting it may have
+            changed). *)
+         let incremental_balance_between_slots =
+           compute_incremental_balance timing_info
+             ~start_slot:
+               (Mina_numbers.Global_slot_since_genesis.of_int
+                (Int.of_int64_exn
+                  last_relevant_command_global_slot_since_genesis))
+             ~end_slot
+           in
+           Deferred.Result.return
+             ( UInt64.Infix.(
+                 UInt64.of_int64 last_relevant_command_balance
+                 + incremental_balance_between_slots)
+               |> UInt64.to_int64, UInt64.of_int64 nonce )
+    in
+    let total_balance = last_relevant_command_balance in
+    let balance_info : Balance_info.t = {liquid_balance; total_balance} in
+    Deferred.Result.return (balance_info, nonce)
 
   (* TODO: either address will have to include a token id, or we pass the
      token id separately, make it optional and use the default token if omitted
   *)
-  let run (module Conn : Caqti_async.CONNECTION) block_query address =
+  let run ~graphql_uri (module Conn : Caqti_async.CONNECTION) block_query address =
     let open Deferred.Result.Let_syntax in
     (* First find the block referenced by the block identifier. Then
        find the latest block no later than it that has a user or
@@ -235,14 +263,24 @@ module Sql = struct
     let%bind (balance_info, nonce) =
       match last_relevant_command_info_opt with
       | None ->
-         let balance_info : Balance_info.t = { liquid_balance = 0L; total_balance = 0L } in
-         Deferred.Result.return (balance_info, Unsigned.UInt64.zero)
-      | Some last_relevant_command_info ->
+         (* No relevant command info means there were no transactions involving
+            the account yet, so it must retain its original balance. *)
+         let%bind total_balance = genesis_ledger_balance ~graphql_uri address in
+         let last_relevant_command_info =
+           (0L, 1L, Unsigned.UInt64.to_int64 total_balance, 0L)
+         in
          find_current_balance
            (module Conn)
            ~requested_block_global_slot_since_genesis
            ~last_relevant_command_info
-           address
+           ()
+      | Some (last_relevant_command_info, timing_id) ->
+         find_current_balance
+           (module Conn)
+           ~requested_block_global_slot_since_genesis
+           ~last_relevant_command_info
+           ~timing_id
+           ()
     in
     Deferred.Result.return (requested_block_identifier, balance_info, nonce)
 end
@@ -282,7 +320,7 @@ module Balance = struct
       ; db_block_identifier_and_balance_info=
           (fun ~block_query ~address ->
             let (module Conn : Caqti_async.CONNECTION) = db in
-            Sql.run (module Conn) block_query address )
+            Sql.run ~graphql_uri (module Conn) block_query address )
       ; validate_network_choice= Network.Validate_choice.Real.validate }
 
     let dummy_block_identifier =
@@ -313,8 +351,7 @@ module Balance = struct
                      end)
                end )
       ; db_block_identifier_and_balance_info=
-          (fun ~block_query ~address ->
-            ignore ((block_query, address) : Block_query.t * string) ;
+          (fun ~block_query:_ ~address:_ ->
             let balance_info : Balance_info.t =
               {liquid_balance= 0L; total_balance= 0L}
             in

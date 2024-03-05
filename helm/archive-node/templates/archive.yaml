@@ -24,6 +24,9 @@ spec:
         prometheus.io/path: '/metrics'
     spec:
       {{- if .Values.archive.enableLocalDaemon }}
+      {{- if $.Values.priorityClass }}
+      priorityClassName: {{ $.Values.priorityClass }}
+      {{- end }}
       initContainers:
       - name: libp2p-perms
         image: {{ $.Values.mina.image | quote }}
@@ -116,6 +119,12 @@ spec:
           protocol: TCP
           containerPort: {{ .Values.mina.ports.p2p }}
           hostPort: {{ .Values.mina.ports.p2p }}
+        {{- if $.Values.mina.exposeItnGraphql }}
+        - name: http-itn-graphql
+          protocol: TCP
+          port: {{ $.Values.mina.itn.port }}
+          targetPort: {{ $.Values.mina.itn.port }}
+        {{- end }}  
 {{$name := include "archive-node.fullname" . }}
 {{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.daemon.allChecks" $data | indent 8 }}
@@ -210,4 +219,10 @@ spec:
     protocol: TCP
     port: 80
     targetPort: {{ $.Values.mina.ports.graphql }}
+  {{- if $.Values.mina.exposeItnGraphql }}
+  - name: http-itn-graphql
+    protocol: TCP
+    port: {{ $.Values.mina.itn.port }}
+    targetPort: {{ $.Values.mina.itn.port }}
+  {{- end }}  
 {{- end }}

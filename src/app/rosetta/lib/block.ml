@@ -1,33 +1,3 @@
-module Scalars = Graphql_lib.Scalars
-
-module Get_coinbase_and_genesis =
-[%graphql
-{|
-  query {
-    genesisBlock {
-      creatorAccount {
-        publicKey @ppxCustom(module: "Scalars.String_json")
-      }
-      winnerAccount {
-        publicKey @ppxCustom(module: "Scalars.String_json")
-      }
-      protocolState {
-        blockchainState {
-          date @ppxCustom(module: "Scalars.String_json")
-        }
-        consensusState {
-          blockHeight
-        }
-      }
-      stateHash @ppxCustom(module: "Scalars.String_json")
-    }
-    daemonStatus {
-      chainId
-    }
-    initialPeers
-  }
-|}]
-
 (* Avoid shadowing graphql_ppx functions *)
 open Core_kernel
 open Async
@@ -56,16 +26,6 @@ module Block_query = struct
       of_partial_identifier
         (Option.value identifier
            ~default:{ Partial_block_identifier.index = None; hash = None } )
-
-    let is_genesis ~hash ~block_height = function
-      | Some (`This (`Height index)) ->
-          Int64.equal index block_height
-      | Some (`That (`Hash hash')) ->
-          String.equal hash hash'
-      | Some (`Those (`Height index, `Hash hash')) ->
-          Int64.equal index block_height && String.equal hash hash'
-      | None ->
-          false
   end
 
   let to_string : t -> string = function
@@ -324,7 +284,7 @@ module Zkapp_command_info = struct
               M.return
                 { Operation.operation_identifier
                 ; related_operations
-                ; status=Some (Operation_statuses.name `Success)
+                ; status = Some (Operation_statuses.name `Success)
                 ; account =
                     Some
                       (account_id t.fee_payer
@@ -332,8 +292,9 @@ module Zkapp_command_info = struct
                 ; _type = Operation_types.name `Zkapp_fee_payer_dec
                 ; amount =
                     Some
-                      (Amount_of.(negated @@ token (`Token_id Amount_of.Token_id.default)
-                         t.fee ))
+                      Amount_of.(
+                        negated
+                        @@ token (`Token_id Amount_of.Token_id.default) t.fee)
                 ; coin_change = None
                 ; metadata = None
                 }
@@ -342,12 +303,12 @@ module Zkapp_command_info = struct
               let amount =
                 match String.chop_prefix ~prefix:"-" upd.balance_change with
                 | Some amount ->
-                  Some
+                    Some
                       Amount_of.(
                         negated @@ token upd.token
                         @@ Unsigned_extended.UInt64.of_string amount)
                 | None ->
-                  Some
+                    Some
                       Amount_of.(
                         token upd.token
                         @@ Unsigned_extended.UInt64.of_string upd.balance_change)
@@ -435,6 +396,14 @@ module Sql = struct
 
     let typ = Caqti_type.(tup3 int Archive_lib.Processor.Block.typ Extras.typ)
 
+    let block_fields ?prefix () =
+      let names = Archive_lib.Processor.Block.Fields.names in
+      let fields =
+        Option.value_map prefix ~default:names ~f:(fun prefix ->
+            List.map ~f:(fun n -> prefix ^ n) names )
+      in
+      String.concat ~sep:"," fields
+
     let query_count_canonical_at_height =
       Caqti_request.find Caqti_type.int64 Caqti_type.int64
         {sql| SELECT COUNT(*) FROM blocks
@@ -443,20 +412,31 @@ module Sql = struct
         |sql}
 
     let query_height_canonical =
+      let c_fields = block_fields ~prefix:"c." () in
       Caqti_request.find_opt Caqti_type.int64 typ
         (* The archive database will only reconcile the canonical columns for
          * blocks older than k + epsilon
          *)
-        {|
-SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_winner_id, c.snarked_ledger_hash_id, c.staking_epoch_data_id, c.next_epoch_data_id, c.min_window_density, c.total_currency, c.ledger_hash, c.height, c.global_slot_since_hard_fork, c.global_slot_since_genesis, c.timestamp, c.chain_status, pk.value as creator, bw.value as winner FROM blocks c
-  INNER JOIN public_keys pk
-  ON pk.id = c.creator_id
-  INNER JOIN public_keys bw
-  ON bw.id = c.block_winner_id
-  WHERE c.height = ? AND c.chain_status = 'canonical'
-      |}
+        (sprintf
+           {|
+         SELECT c.id,
+                %s,
+                pk.value as creator,
+                bw.value as winner
+         FROM blocks c
+         INNER JOIN public_keys pk
+           ON pk.id = c.creator_id
+         INNER JOIN public_keys bw
+           ON bw.id = c.block_winner_id
+         WHERE c.height = ?
+           AND c.chain_status = 'canonical'
+        |}
+           c_fields )
 
     let query_height_pending =
+      let fields = block_fields () in
+      let b_fields = block_fields ~prefix:"b." () in
+      let c_fields = block_fields ~prefix:"c." () in
       Caqti_request.find_opt Caqti_type.int64 typ
         (* According to the clarification of the Rosetta spec here
          * https://community.rosetta-api.org/t/querying-block-by-just-its-index/84/3 ,
@@ -470,64 +450,113 @@ SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_win
          * + epsilon)
          * requests since recursive queries stress PostgreSQL.
          *)
-        {|
-WITH RECURSIVE chain AS (
-  (SELECT id, state_hash, parent_id, parent_hash, creator_id, block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, min_window_density, total_currency, ledger_hash, height, global_slot_since_hard_fork, global_slot_since_genesis, timestamp, chain_status FROM blocks b WHERE height = (select MAX(height) from blocks)
-  ORDER BY timestamp ASC, state_hash ASC
-  LIMIT 1)
+        (sprintf
+           {|
+         WITH RECURSIVE chain AS (
+           (SELECT id, %s
+           FROM blocks
+           WHERE height = (select MAX(height) from blocks)
+           ORDER BY timestamp ASC, state_hash ASC
+           LIMIT 1)
 
-  UNION ALL
+         UNION ALL
 
-  SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.min_window_density, b.total_currency, b.ledger_hash, b.height, b.global_slot_since_hard_fork, b.global_slot_since_genesis, b.timestamp, b.chain_status FROM blocks b
-  INNER JOIN chain
-  ON b.id = chain.parent_id AND chain.id <> chain.parent_id AND chain.chain_status <> 'canonical'
-) SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_winner_id, c.snarked_ledger_hash_id, c.staking_epoch_data_id, c.next_epoch_data_id, c.min_window_density, c.total_currency, c.ledger_hash, c.height, c.global_slot_since_hard_fork, c.global_slot_since_genesis, c.timestamp, c.chain_status, pk.value as creator, bw.value as winner FROM chain c
-  INNER JOIN public_keys pk
-  ON pk.id = c.creator_id
-  INNER JOIN public_keys bw
-  ON bw.id = c.block_winner_id
-  WHERE c.height = ?
-      |}
+           SELECT b.id, %s
+           FROM blocks b
+           INNER JOIN chain
+             ON b.id = chain.parent_id
+             AND chain.id <> chain.parent_id
+             AND chain.chain_status <> 'canonical')
+
+         SELECT c.id,
+                %s,
+                pk.value as creator,
+                bw.value as winner
+         FROM chain c
+         INNER JOIN public_keys pk
+           ON pk.id = c.creator_id
+         INNER JOIN public_keys bw
+           ON bw.id = c.block_winner_id
+         WHERE c.height = ?
+       |}
+           fields b_fields c_fields )
 
     let query_hash =
+      let b_fields = block_fields ~prefix:"b." () in
       Caqti_request.find_opt Caqti_type.string typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.min_window_density, b.total_currency, b.ledger_hash, b.height, b.global_slot_since_hard_fork, b.global_slot_since_genesis, b.timestamp, b.chain_status, pk.value as creator, bw.value as winner FROM blocks b
-        INNER JOIN public_keys pk
-        ON pk.id = b.creator_id
-        INNER JOIN public_keys bw
-        ON bw.id = b.block_winner_id
-        WHERE b.state_hash = ? |}
+        (sprintf
+           {|
+         SELECT b.id,
+                %s,
+                pk.value as creator,
+                bw.value as winner
+         FROM blocks b
+         INNER JOIN public_keys pk
+         ON pk.id = b.creator_id
+         INNER JOIN public_keys bw
+         ON bw.id = b.block_winner_id
+         WHERE b.state_hash = ?
+        |}
+           b_fields )
 
     let query_both =
+      let b_fields = block_fields ~prefix:"b." () in
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.min_window_density, b.total_currency, b.ledger_hash, b.height, b.global_slot_since_hard_fork, b.global_slot_since_genesis, b.timestamp, b.chain_status, pk.value as creator, bw.value as winner FROM blocks b
-        INNER JOIN public_keys pk
-        ON pk.id = b.creator_id
-        INNER JOIN public_keys bw
-        ON bw.id = b.block_winner_id
-        WHERE b.state_hash = ? AND b.height = ? |}
+        (sprintf
+           {|
+         SELECT b.id,
+                %s,
+                pk.value as creator,
+                bw.value as winner
+         FROM blocks b
+         INNER JOIN public_keys pk
+           ON pk.id = b.creator_id
+         INNER JOIN public_keys bw
+           ON bw.id = b.block_winner_id
+         WHERE b.state_hash = ?
+           AND b.height = ?
+        |}
+           b_fields )
 
     let query_by_id =
+      let b_fields = block_fields ~prefix:"b." () in
       Caqti_request.find_opt Caqti_type.int typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.min_window_density, b.total_currency, b.ledger_hash, b.height, b.global_slot_since_hard_fork, b.global_slot_since_genesis, b.timestamp, b.chain_status, pk.value as creator, bw.value as winner FROM blocks b
-        INNER JOIN public_keys pk
-        ON pk.id = b.creator_id
-        INNER JOIN public_keys bw
-        ON bw.id = b.block_winner_id
-        WHERE b.id = ? |}
+        (sprintf
+           {|
+         SELECT b.id,
+                %s,
+                pk.value as creator,
+                bw.value as winner
+         FROM blocks b
+         INNER JOIN public_keys pk
+           ON pk.id = b.creator_id
+         INNER JOIN public_keys bw
+           ON bw.id = b.block_winner_id
+         WHERE b.id = ?
+        |}
+           b_fields )
 
     let query_best =
+      let b_fields = block_fields ~prefix:"b." () in
       Caqti_request.find_opt Caqti_type.unit typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.min_window_density, b.total_currency, b.ledger_hash, b.height, b.global_slot_since_hard_fork, b.global_slot_since_genesis, b.timestamp, b.chain_status, pk.value as creator, bw.value as winner FROM blocks b
-           INNER JOIN public_keys pk
+        (sprintf
+           {|
+         SELECT b.id,
+                %s,
+                pk.value as creator,
+                bw.value as winner
+         FROM blocks b
+         INNER JOIN public_keys pk
            ON pk.id = b.creator_id
-           INNER JOIN public_keys bw
+         INNER JOIN public_keys bw
            ON bw.id = b.block_winner_id
-           WHERE b.height = (select MAX(b.height) from blocks b)
-           ORDER BY timestamp ASC, state_hash ASC
-           LIMIT 1 |}
+         WHERE b.height = (select MAX(b.height) from blocks b)
+         ORDER BY timestamp ASC, state_hash ASC
+         LIMIT 1
+        |}
+           b_fields )
 
     let run_by_id (module Conn : Caqti_async.CONNECTION) id =
       Conn.find_opt query_by_id id
@@ -611,38 +640,67 @@ WITH RECURSIVE chain AS (
           Extras.typ)
 
     let query =
-      Caqti_request.collect Caqti_type.int typ
-        {| SELECT u.id, u.command_type, u.fee_payer_id, u.source_id, u.receiver_id, u.nonce, u.amount, u.fee,
-        u.valid_until, u.memo, u.hash,
-        pk_payer.value as fee_payer, pk_source.value as source, pk_receiver.value as receiver,
-        buc.status,
-        buc.failure_reason,
-        ac.creation_fee
-        FROM user_commands u
-        INNER JOIN blocks_user_commands buc ON buc.user_command_id = u.id
-        INNER JOIN account_identifiers ai_payer on ai_payer.id = u.fee_payer_id
-        INNER JOIN public_keys pk_payer ON pk_payer.id = ai_payer.public_key_id
-        INNER JOIN account_identifiers ai_source on ai_source.id = u.source_id
-        INNER JOIN public_keys pk_source ON pk_source.id = ai_source.public_key_id
-        INNER JOIN account_identifiers ai_receiver on ai_receiver.id = u.receiver_id
-        INNER JOIN public_keys pk_receiver ON pk_receiver.id = ai_receiver.public_key_id
+      let fields =
+        String.concat ~sep:","
+        @@ List.map
+             ~f:(fun n -> "u." ^ n)
+             Archive_lib.Processor.User_command.Signed_command.Fields.names
+      in
+      Caqti_request.collect
+        Caqti_type.(tup2 int string)
+        typ
+        (sprintf
+           {|
+         SELECT u.id,
+                %s,
+                pk_payer.value as fee_payer,
+                pk_source.value as source,
+                pk_receiver.value as receiver,
+                buc.status,
+                buc.failure_reason,
+                ac.creation_fee
+         FROM user_commands u
+         INNER JOIN blocks_user_commands buc
+           ON buc.user_command_id = u.id
+         INNER JOIN public_keys pk_payer
+           ON pk_payer.id = u.fee_payer_id
+         INNER JOIN public_keys pk_source
+           ON pk_source.id = u.source_id
+         INNER JOIN public_keys pk_receiver
+           ON pk_receiver.id = u.receiver_id
+         INNER JOIN account_identifiers ai_receiver
+           ON ai_receiver.public_key_id = pk_receiver.id
         /* Account creation fees are attributed to the first successful command in the
            block that mentions the account with the following LEFT JOIN */
-        LEFT JOIN accounts_created ac
-            ON buc.block_id = ac.block_id
-                   AND u.receiver_id = ac.account_identifier_id
-                   AND buc.status = 'applied'
-                   AND buc.sequence_no =
-                       (SELECT MIN(buc2.sequence_no)
-                        FROM blocks_user_commands buc2
-                            INNER JOIN user_commands uc2 on buc2.user_command_id = uc2.id
-                                   AND uc2.receiver_id = ac.account_identifier_id
-                                   AND buc2.block_id = buc.block_id)
-        WHERE buc.block_id = ?
-      |}
+         LEFT JOIN accounts_created ac
+           ON buc.block_id = ac.block_id
+           AND ai_receiver.id = ac.account_identifier_id
+           AND buc.status = 'applied'
+           AND buc.sequence_no =
+             (SELECT LEAST(
+                (SELECT min(bic2.sequence_no)
+                 FROM blocks_internal_commands bic2
+                 INNER JOIN internal_commands ic2
+                    ON bic2.internal_command_id = ic2.id
+                 WHERE ic2.receiver_id = u.receiver_id
+                    AND bic2.block_id = buc.block_id
+                    AND bic2.status = 'applied'),
+                 (SELECT min(buc2.sequence_no)
+                  FROM blocks_user_commands buc2
+                  INNER JOIN user_commands uc2
+                    ON buc2.user_command_id = uc2.id
+                  WHERE uc2.receiver_id = u.receiver_id
+                    AND buc2.block_id = buc.block_id
+                    AND buc2.status = 'applied')))
+         INNER JOIN tokens t
+           ON t.id = ai_receiver.token_id
+         WHERE buc.block_id = ?
+           AND t.value = ?
+        |}
+           fields )
 
     let run (module Conn : Caqti_async.CONNECTION) id =
-      Conn.collect_list query id
+      Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
   end
 
   module Internal_commands = struct
@@ -663,20 +721,59 @@ WITH RECURSIVE chain AS (
         tup3 int Archive_lib.Processor.Internal_command.typ Extras.typ)
 
     let query =
-      Caqti_request.collect Caqti_type.int typ
-        {| SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no) i.id, i.command_type, i.receiver_id, i.fee, i.hash,
-            ac.creation_fee, pk.value as receiver,
-            bic.sequence_no, bic.secondary_sequence_no
-        FROM internal_commands i
-        INNER JOIN blocks_internal_commands bic ON bic.internal_command_id = i.id
-        INNER JOIN account_identifiers ai on ai.id = i.receiver_id
-        LEFT JOIN accounts_created ac on ac.account_identifier_id = ai.id
-        INNER JOIN public_keys pk ON pk.id = ai.public_key_id
-        WHERE bic.block_id = ?
+      let fields =
+        String.concat ~sep:","
+        @@ List.map
+             ~f:(fun n -> "i." ^ n)
+             Archive_lib.Processor.Internal_command.Fields.names
+      in
+      Caqti_request.collect
+        Caqti_type.(tup2 int string)
+        typ
+        (sprintf
+           {|
+         SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no)
+           i.id,
+           %s,
+           ac.creation_fee,
+           pk.value as receiver,
+           bic.sequence_no,
+           bic.secondary_sequence_no
+         FROM internal_commands i
+         INNER JOIN blocks_internal_commands bic
+           ON bic.internal_command_id = i.id
+         INNER JOIN public_keys pk
+           ON pk.id = i.receiver_id
+         INNER JOIN account_identifiers ai
+           ON ai.public_key_id = receiver_id
+         LEFT JOIN accounts_created ac
+           ON ac.account_identifier_id = ai.id
+           AND ac.block_id = bic.block_id
+           AND bic.sequence_no =
+               (SELECT LEAST(
+                   (SELECT min(bic2.sequence_no)
+                    FROM blocks_internal_commands bic2
+                    INNER JOIN internal_commands ic2
+                       ON bic2.internal_command_id = ic2.id
+                    WHERE ic2.receiver_id = i.receiver_id
+                       AND bic2.block_id = bic.block_id
+                       AND bic2.status = 'applied'),
+                    (SELECT min(buc2.sequence_no)
+                     FROM blocks_user_commands buc2
+                     INNER JOIN user_commands uc2
+                       ON buc2.user_command_id = uc2.id
+                     WHERE uc2.receiver_id = i.receiver_id
+                       AND buc2.block_id = bic.block_id
+                       AND buc2.status = 'applied')))
+         INNER JOIN tokens t
+           ON t.id = ai.token_id
+         WHERE bic.block_id = ?
+          AND t.value = ?
       |}
+           fields )
 
     let run (module Conn : Caqti_async.CONNECTION) id =
-      Conn.collect_list query id
+      Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
   end
 
   module Zkapp_commands = struct
@@ -722,18 +819,26 @@ WITH RECURSIVE chain AS (
     let query =
       Caqti_request.collect Caqti_type.int typ
         {| 
-  SELECT zc.id, zc.memo, zc.hash,
-    pk_fee_payer.value as fee_payer, zfpb.fee, zfpb.valid_until, zfpb.nonce,
-    bzc.sequence_no, bzc.status,
-    array(SELECT unnest(zauf.failures)
-          FROM zkapp_account_update_failures zauf
-          WHERE zauf.id = ANY (bzc.failure_reasons_ids))
-FROM blocks_zkapp_commands bzc
- INNER JOIN zkapp_commands zc on zc.id = bzc.zkapp_command_id
- INNER JOIN zkapp_fee_payer_body zfpb on zc.zkapp_fee_payer_body_id = zfpb.id
- INNER JOIN account_identifiers ai_fee_payer on ai_fee_payer.id = zfpb.account_identifier_id
- INNER JOIN public_keys pk_fee_payer on ai_fee_payer.public_key_id = pk_fee_payer.id
-WHERE bzc.block_id = ?
+         SELECT zc.id,
+                zc.memo,
+                zc.hash,
+                pk_fee_payer.value as fee_payer,
+                zfpb.fee,
+                zfpb.valid_until,
+                zfpb.nonce,
+                bzc.sequence_no,
+                bzc.status,
+                array(SELECT unnest(zauf.failures)
+                      FROM zkapp_account_update_failures zauf
+                      WHERE zauf.id = ANY (bzc.failure_reasons_ids))
+         FROM blocks_zkapp_commands bzc
+         INNER JOIN zkapp_commands zc
+           ON zc.id = bzc.zkapp_command_id
+         INNER JOIN zkapp_fee_payer_body zfpb
+           ON zc.zkapp_fee_payer_body_id = zfpb.id
+         INNER JOIN public_keys pk_fee_payer
+           ON zfpb.public_key_id = pk_fee_payer.id
+         WHERE bzc.block_id = ?
       |}
 
     let run (module Conn : Caqti_async.CONNECTION) id =
@@ -756,25 +861,42 @@ WHERE bzc.block_id = ?
         tup2 Archive_lib.Processor.Zkapp_account_update_body.typ Extras.typ)
 
     let query =
-      Caqti_request.collect Caqti_type.int typ
-        {|
-SELECT zaub.account_identifier_id, zaub.id,
-    zaub.balance_change, zaub.increment_nonce, zaub.events_id,
-    zaub.actions_id, zaub.call_data_id, zaub.call_depth,
-    zaub.zkapp_network_precondition_id, zaub.zkapp_account_precondition_id,
-    zaub.use_full_commitment, zaub.may_use_token, zaub.authorization_kind,
-    pk.value as account, bzc.status
-FROM zkapp_commands zc
- INNER JOIN blocks_zkapp_commands bzc on bzc.zkapp_command_id = zc.id
- INNER JOIN zkapp_account_update zau on zau.id = ANY(zc.zkapp_account_updates_ids)
- INNER JOIN zkapp_account_update_body zaub on zaub.id = zau.body_id
- INNER JOIN account_identifiers ai on ai.id = zaub.account_identifier_id
- INNER JOIN public_keys pk on ai.public_key_id = pk.id
-WHERE zc.id = ?
+      let fields =
+        String.concat ~sep:","
+        @@ List.map
+             ~f:(fun n -> "zaub." ^ n)
+             Archive_lib.Processor.Zkapp_account_update_body.Fields.names
+      in
+      Caqti_request.collect
+        Caqti_type.(tup3 int string int)
+        typ
+        (sprintf
+           {|
+         SELECT %s,
+                pk.value as account,
+                bzc.status
+         FROM zkapp_commands zc
+         INNER JOIN blocks_zkapp_commands bzc
+           ON bzc.zkapp_command_id = zc.id
+         INNER JOIN zkapp_account_update zau
+           ON zau.id = ANY(zc.zkapp_account_updates_ids)
+         INNER JOIN zkapp_account_update_body zaub
+           ON zaub.id = zau.body_id
+         INNER JOIN account_identifiers ai
+           ON ai.id = zaub.account_identifier_id
+         INNER JOIN public_keys pk
+           ON ai.public_key_id = pk.id
+         INNER JOIN tokens t
+           ON t.id = ai.token_id
+         WHERE zc.id = ?
+           AND t.value = ?
+           AND bzc.block_id = ?
     |}
+           fields )
 
-    let run (module Conn : Caqti_async.CONNECTION) id =
-      Conn.collect_list query id
+    let run (module Conn : Caqti_async.CONNECTION) command_id block_id =
+      Conn.collect_list query
+        (command_id, Mina_base.Token_id.(to_string default), block_id)
   end
 
   let run (module Conn : Caqti_async.CONNECTION) input =
@@ -801,17 +923,11 @@ WHERE zc.id = ?
       | Some (block_id, raw_block, block_extras) ->
           M.return (block_id, raw_block, block_extras)
     in
-    let%bind parent_id =
-      Option.value_map raw_block.parent_id
-        ~default:
-          (M.fail
-             ( Errors.create
-             @@ `Block_missing
-                  (sprintf "parent block of: %s" (Block_query.to_string input))
-             ) )
-        ~f:M.return
-    in
-    let%bind raw_parent_block, _parent_block_extras =
+    let%bind raw_parent_block =
+    (* if parent_id is null, this means this is the chain genesis block and
+       the block is its own parent *)
+    Option.value_map raw_block.parent_id ~default:(M.return raw_block)
+    ~f:(fun parent_id ->
       match%bind
         Block.run_by_id (module Conn) parent_id
         |> Errors.Lift.sql ~context:"Finding parent block"
@@ -820,8 +936,8 @@ WHERE zc.id = ?
           M.fail
             ( Errors.create ~context:"Parent block"
             @@ `Block_missing (sprintf "parent_id = %d" parent_id) )
-      | Some (_, raw_parent_block, parent_block_extras) ->
-          M.return (raw_parent_block, parent_block_extras)
+      | Some (_, raw_parent_block, _) ->
+          M.return (raw_parent_block))
     in
     let%bind raw_user_commands =
       User_commands.run (module Conn) block_id
@@ -934,7 +1050,7 @@ WHERE zc.id = ?
           (* TODO: check if this holds *)
           let token = Mina_base.Token_id.(to_string default) in
           let%bind raw_zkapp_account_update =
-            Zkapp_account_update.run (module Conn) cmd_id
+            Zkapp_account_update.run (module Conn) cmd_id block_id
             |> Errors.Lift.sql
                  ~context:"Finding zkapp account updates within command"
           in
@@ -1000,8 +1116,7 @@ module Specific = struct
     (* All side-effects go in the env so we can mock them out later *)
     module T (M : Monad_fail.S) = struct
       type 'gql t =
-        { gql : unit -> ('gql, Errors.t) M.t
-        ; logger : Logger.t
+        { logger : Logger.t
         ; db_block : Block_query.t -> (Block_info.t, Errors.t) M.t
         ; validate_network_choice :
                network_identifier:Network_identifier.t
@@ -1019,15 +1134,9 @@ module Specific = struct
     let real :
            logger:Logger.t
         -> db:(module Caqti_async.CONNECTION)
-        -> graphql_uri:Uri.t
         -> 'gql Real.t =
-     fun ~logger ~db ~graphql_uri ->
-      { gql =
-          ( Memoize.build
-          @@ fun ~graphql_uri () ->
-          Graphql.query (Get_coinbase_and_genesis.make ()) graphql_uri )
-            ~graphql_uri
-      ; logger
+     fun ~logger ~db ->
+      { logger
       ; db_block =
           (fun query ->
             let (module Conn : Caqti_async.CONNECTION) = db in
@@ -1037,17 +1146,7 @@ module Specific = struct
 
     let mock : logger:Logger.t -> 'gql Mock.t =
      fun ~logger ->
-      { gql =
-          (fun () ->
-            Result.return
-            @@ object
-                 method genesisBlock =
-                   object
-                     method stateHash = "STATE_HASH_GENESIS"
-                   end
-               end )
-          (* TODO: Add variants to cover every branch *)
-      ; logger
+      { logger
       ; db_block = (fun _query -> Result.return @@ Block_info.dummy)
       ; validate_network_choice = Network.Validate_choice.Mock.succeed
       }
@@ -1067,38 +1166,12 @@ module Specific = struct
       let open M.Let_syntax in
       let logger = env.logger in
       let%bind query = Query.of_partial_identifier req.block_identifier in
-      let%bind res = env.gql () in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~graphql_uri
       in
-      let genesisBlock = res.Get_coinbase_and_genesis.genesisBlock in
-      let block_height =
-        genesisBlock.protocolState.consensusState.blockHeight
-        |> Unsigned.UInt32.to_int64
-      in
       let%bind block_info =
-        if Query.is_genesis ~block_height ~hash:genesisBlock.stateHash query
-        then
-          let genesis_block_identifier =
-            { Block_identifier.index = block_height
-            ; hash = genesisBlock.stateHash
-            }
-          in
-          M.return
-            { Block_info.block_identifier =
-                genesis_block_identifier
-                (* parent_block_identifier for genesis block should be the same as block identifier as described https://www.rosetta-api.org/docs/common_mistakes.html.correct-example *)
-            ; parent_block_identifier = genesis_block_identifier
-            ; creator = `Pk genesisBlock.creatorAccount.publicKey
-            ; winner = `Pk genesisBlock.winnerAccount.publicKey
-            ; timestamp =
-                Int64.of_string genesisBlock.protocolState.blockchainState.date
-            ; internal_info = []
-            ; user_commands = []
-            ; zkapp_commands = []
-            }
-        else env.db_block query
+         env.db_block query
       in
       let coinbase_receiver =
         List.find block_info.internal_info ~f:(fun info ->
@@ -1221,7 +1294,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
           in
           let%map res =
             Specific.Real.handle ~graphql_uri
-              ~env:(Specific.Env.real ~logger ~db ~graphql_uri)
+              ~env:(Specific.Env.real ~logger ~db)
               req
             |> Errors.Lift.wrap
           in

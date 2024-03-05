@@ -238,7 +238,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
       ; send = Either
       ; set_delegate = Either
       ; set_permissions = Either
-      ; set_verification_key = Either
+      ; set_verification_key = (Either, Mina_numbers.Txn_version.current)
       ; set_zkapp_uri = Either
       ; edit_action_state = Either
       ; set_token_symbol = Either
@@ -685,12 +685,12 @@ let profile_zkapps ~verifier ledger zkapp_commands =
         let%bind res =
           Verifier.verify_commands verifier
             [ { With_status.data =
-                  User_command.to_verifiable ~status:Applied
+                  User_command.to_verifiable ~failed:false
                     ~find_vk:
-                      (Zkapp_command.Verifiable.find_vk_via_ledger ~ledger
-                         ~get:Mina_ledger.Ledger.get
+                      (Zkapp_command.Verifiable.load_vk_from_ledger
+                         ~get:(Mina_ledger.Ledger.get ledger)
                          ~location_of_account:
-                           Mina_ledger.Ledger.location_of_account )
+                           (Mina_ledger.Ledger.location_of_account ledger) )
                     (Zkapp_command zkapp_command)
                   |> Or_error.ok_exn
               ; status = Applied
@@ -718,10 +718,11 @@ let profile_zkapps ~verifier ledger zkapp_commands =
         let tm_zkapp0 = Core.Unix.gettimeofday () in
         (*verify*)
         let%map () =
+          let mask = Mina_ledger.Ledger.copy ledger in
           match%map
-            Async_kernel.Monitor.try_with (fun () ->
+            Async_kernel.Monitor.try_with ~here:[%here] (fun () ->
                 Transaction_snark_tests.Util.check_zkapp_command_with_merges_exn
-                  ~ignore_outside_snark:true ledger [ zkapp_command ] )
+                  ~ignore_outside_snark:true mask [ zkapp_command ] )
           with
           | Ok () ->
               ()

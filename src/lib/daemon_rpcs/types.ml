@@ -7,7 +7,8 @@ module Git_sha = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = string [@@deriving sexp, to_yojson, equal]
+      type t = Bounded_types.String.Stable.V1.t
+      [@@deriving sexp, to_yojson, equal]
 
       let to_latest = Fn.id
     end
@@ -191,6 +192,10 @@ module Status = struct
       ; transaction_pool_diff_broadcasted : int
       ; transactions_added_to_pool : int
       ; transaction_pool_size : int
+      ; snark_pool_diff_received : int
+      ; snark_pool_diff_broadcasted : int
+      ; pending_snark_work : int
+      ; snark_pool_size : int
       }
     [@@deriving to_yojson, bin_io_unversioned, fields]
   end
@@ -423,9 +428,19 @@ module Status = struct
         let transaction_pool_size =
           fmt_field "transaction_pool_size" string_of_int
         in
+        let snark_pool_diff_received =
+          fmt_field "snark_pool_diff_received" string_of_int
+        in
+        let snark_pool_diff_broadcasted =
+          fmt_field "snark_pool_diff_broadcasted" string_of_int
+        in
+        let pending_snark_work = fmt_field "pending_snark_work" string_of_int in
+        let snark_pool_size = fmt_field "snark_pool_size" string_of_int in
         Metrics.Fields.to_list ~block_production_delay
           ~transaction_pool_diff_received ~transaction_pool_diff_broadcasted
           ~transactions_added_to_pool ~transaction_pool_size
+          ~snark_pool_diff_received ~snark_pool_diff_broadcasted
+          ~pending_snark_work ~snark_pool_size
         |> List.concat
         |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
         |> digest_entries ~title:""

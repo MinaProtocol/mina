@@ -1,5 +1,5 @@
 (library
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (name kimchi_backend_common)
  (public_name kimchi_backend.common)
  (flags -warn-error -27)
@@ -25,6 +25,7 @@
   base.caml
   ppx_inline_test.config
   bignum.bigint
+  zarith
   base.base_internalhash_types
   ;; local libraries
   tuple_lib
@@ -41,7 +42,8 @@
   promise
   logger
   internal_tracing.context_logger
-  ppx_version.runtime))
+  ppx_version.runtime
+  bounded_types))
 
 (rule
  (targets version.ml)

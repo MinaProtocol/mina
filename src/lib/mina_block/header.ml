@@ -24,8 +24,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; delta_block_chain_proof :
             (* TODO: abstract *)
             State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
-        ; current_protocol_version : Protocol_version.Stable.V1.t
-        ; proposed_protocol_version_opt : Protocol_version.Stable.V1.t option
+        ; current_protocol_version : Protocol_version.Stable.V2.t
+        ; proposed_protocol_version_opt : Protocol_version.Stable.V2.t option
         }
       [@@deriving fields, sexp, to_yojson]
 
@@ -62,13 +62,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let cur_ver_fun =
             Option.(bind current_protocol_version ~f:(Fn.compose return const))
           in
-          let cur_ver_fallback () =
-            try Protocol_version.get_current ()
-            with _ ->
-              failwith
-                "Cannot create block header before setting current protocol \
-                 version"
-          in
+          let cur_ver_fallback () = Protocol_version.current in
           { protocol_state
           ; protocol_state_proof
           ; delta_block_chain_proof

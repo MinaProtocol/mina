@@ -2,7 +2,7 @@
  (name snark_worker)
  (public_name snark_worker)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    async_rpc_kernel
@@ -22,6 +22,7 @@
    async_unix
    bin_prot.shape
    ;; local libraries
+   bounded_types
    one_or_two
    mina_metrics
    logger
