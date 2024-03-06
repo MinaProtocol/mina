@@ -1248,10 +1248,8 @@ let start t =
             ~start_time:t.config.start_time
             ~slot_duration:
               (Block_time.Span.to_time_span
-                 t.config.precomputed_values.consensus_constants
-                   .slot_duration_ms )
-    | None ->
-        ()
+               t.config.precomputed_values.consensus_constants.slot_duration_ms )
+          ~block_producer_public_key_base58
   in
   Uptime_service.start ~logger:t.config.logger ~uptime_url:t.config.uptime_url
     ~snark_worker_opt:t.processes.uptime_snark_worker_opt
