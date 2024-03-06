@@ -667,7 +667,7 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
 
   (* underlying Merkle tree *)
   module Base_db :
-    Merkle_ledger.Database_intf.S
+    Merkle_ledger.Intf.Ledger.DATABASE
       with module Location = Location
        and module Addr = Location.Addr
        and type account := Account.t
