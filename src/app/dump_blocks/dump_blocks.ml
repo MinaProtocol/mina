@@ -2,12 +2,13 @@ open Core
 open Frontier_base
 open Full_frontier.For_tests
 
-type encoding = Sexp | Json | Binary
-
-type 'a content =
-  | Block : Mina_block.t content
-  | Precomputed : Mina_block.Precomputed.t content
-
+(* NOTE: This type is initially instantiated as Encoding.t io, where
+   Encoding.t is a simple placeholder for encoding format. Then this
+   placeholder is replaced with a module holding actual encoding
+   functions encapsulated in a value of type 'a codec (see below).
+   Choice of the actual codec module depends on more than one CLI
+   argument, which is why it must be delayed until all the CLI
+   arguments are parsed. This choice is made by mk_io function below. *)
 type 'a io =
   { encoding : 'a
   ; filename : string
@@ -17,8 +18,8 @@ type 'a codec = (module Encoding.S with type t = 'a)
 
 type conf = Conf : 'a codec io option * 'a codec io list -> conf
 
-let mk_io : type a. (a content * encoding io) -> a codec io = function
-  | (Precomputed, { encoding = Sexp; filename }) ->
+let mk_io : type a. (a Encoding.content * Encoding.t io) -> a codec io = function
+  | (Encoding.Precomputed, { encoding = Sexp; filename }) ->
      { encoding = (module Encoding.Sexp_precomputed)
      ; filename
      }
@@ -47,7 +48,7 @@ let encoded_block =
       | [ encoding; filename ] ->
           { encoding=
               ( match String.lowercase encoding with
-              | "sexp" -> Sexp
+              | "sexp" -> Encoding.Sexp
               | "json" -> Json
               | "bin" | "binary" -> Binary
               | _ -> failwith "invalid encoding" )
@@ -102,8 +103,8 @@ let f (type a) (outputs : a codec io list) make_breadcrumb =
       clean_up_persistent_root ~frontier )
 
 let default_outputs =
-  [ { encoding= Sexp; filename= "-" }
-  ; { encoding= Json; filename= "-" }
+  [ { encoding= Encoding.Sexp; filename= "-" }
+  ; { encoding= Encoding.Json; filename= "-" }
   ]
 
 let command =
@@ -132,10 +133,10 @@ let command =
      let conf =
        if full then
          Conf ( Option.map input ~f:(fun i -> mk_io (Block, i))
-              , List.map ~f:mk_io (List.map ~f:(fun x -> (Block, x)) outs))
+              , List.map ~f:mk_io (List.map ~f:(fun x -> (Encoding.Block, x)) outs))
        else
          Conf ( Option.map input ~f:(fun i -> mk_io (Precomputed, i))
-              , List.map ~f:mk_io (List.map ~f:(fun x -> (Precomputed, x)) outs))
+              , List.map ~f:mk_io (List.map ~f:(fun x -> (Encoding.Precomputed, x)) outs))
      in
      fun () ->
      match conf with

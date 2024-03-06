@@ -1,5 +1,11 @@
 open Core
 
+type t = Sexp | Json | Binary
+
+type 'a content =
+  | Block : Mina_block.t content
+  | Precomputed : Mina_block.Precomputed.t content
+
 module type S = sig
   type t
 
