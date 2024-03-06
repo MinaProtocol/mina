@@ -5,6 +5,7 @@ module Partial_reason = struct
   type t =
     | Length_mismatch
     | Fee_payer_and_source_mismatch
+    | Fee_not_negative
     | Amount_not_some
     | Account_not_some
     | Invalid_metadata
@@ -329,8 +330,7 @@ end = struct
         sprintf
           "The minimum fee on transactions is %s . Please increase your fee to \
            at least this amount."
-          (Currency.Fee.to_formatted_string
-             Mina_compile_config.minimum_user_command_fee )
+          (Currency.Fee.to_mina_string Currency.Fee.minimum_user_command_fee)
     | `Transaction_submit_invalid_signature ->
         "An invalid signature is attached to this transaction"
     | `Transaction_submit_insufficient_balance ->

@@ -4,7 +4,7 @@ ifeq ($(GO),)
 GO = go
 endif
 
-GO_CAPNP_VERSION = v3@v3.0.0-alpha.1
+GO_CAPNP_VERSION = v3@v3.0.0-alpha.5
 
 ifeq ($(GO_CAPNP_STD),)
 GO_CAPNP_STD = $(shell $(GO) env GOPATH)/pkg/mod/capnproto.org/go/capnp/${GO_CAPNP_VERSION}/std

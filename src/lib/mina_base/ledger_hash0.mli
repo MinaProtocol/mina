@@ -1,7 +1,7 @@
 (* This module exists to break the dependency cycle
 
-   Snapp_account
+   Zkapp_account
    -> Ledger_hash
    -> Account
-   -> Snapp_account *)
+   -> Zkapp_account *)
 include Ledger_hash_intf0.S
