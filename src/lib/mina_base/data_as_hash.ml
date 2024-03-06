@@ -20,6 +20,14 @@ let optional_typ ~hash ~non_preimage ~dummy_value =
       | None -> (non_preimage, dummy_value) | Some s -> (hash s, s) )
     ~back:(fun (_, s) -> Some s)
 
+let lazy_optional_typ ~hash ~non_preimage ~dummy_value =
+  Typ.transport
+    Typ.(Field.typ * Internal.ref ())
+    ~there:(function
+      | None -> (Lazy.force non_preimage, dummy_value) | Some s -> (hash s, s)
+      )
+    ~back:(fun (_, s) -> Some s)
+
 let to_input (x, _) = Random_oracle_input.Chunked.field x
 
 let if_ b ~then_ ~else_ =

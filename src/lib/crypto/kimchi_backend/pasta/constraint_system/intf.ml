@@ -27,11 +27,13 @@ module type With_accessors = sig
 end
 
 module type Full = sig
-  include With_accessors
-
   type fp
 
   type gates
+
+  include
+    With_accessors
+      with type t = (fp, gates) Kimchi_backend_common.Plonk_constraint_system.t
 
   val add_constraint :
        ?label:string
@@ -39,11 +41,29 @@ module type Full = sig
     -> (fp Snarky_backendless.Cvar.t, fp) Snarky_backendless.Constraint.basic
     -> unit
 
-  val compute_witness : t -> (int -> fp) -> fp array array
+  val compute_witness :
+    t -> (int -> fp) -> fp array array * fp Kimchi_types.runtime_table array
 
   val finalize : t -> unit
 
-  val finalize_and_get_gates : t -> gates
+  val finalize_and_get_gates :
+       t
+    -> gates
+       * fp Kimchi_types.lookup_table array
+       * fp Kimchi_types.runtime_table_cfg array
+
+  (** Return the size of all the fixed lookup tables concatenated, without the
+      built-in XOR and RangeCheck tables *)
+  val get_concatenated_fixed_lookup_table_size : t -> int
+
+  (** Return the size of all the runtime lookup tables concatenated *)
+  val get_concatenated_runtime_lookup_table_size : t -> int
+
+  (** Finalize the fixed lookup tables. The function can not be called twice *)
+  val finalize_fixed_lookup_tables : t -> unit
+
+  (** Finalize the runtime lookup table configurations. The function can not be called twice. *)
+  val finalize_runtime_lookup_tables : t -> unit
 
   val digest : t -> Md5.t
 
