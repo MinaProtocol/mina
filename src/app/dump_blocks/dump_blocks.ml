@@ -4,14 +4,34 @@ open Full_frontier.For_tests
 
 type encoding = Sexp | Json
 
-let encoding_to_string = function
-  | Sexp -> "sexp"
-  | Json -> "json"
+type 'a content =
+  | Block : Mina_block.t content
+  | Precomputed : Mina_block.Precomputed.t content
 
-type block =
-  { encoding : encoding
+type 'a io =
+  { encoding : 'a
   ; filename : string
   }
+
+type 'a codec = (module Encoding.S with type t = 'a)
+
+type conf = Conf : 'a codec io option * 'a codec io list -> conf
+
+let mk_io : type a. (a content * encoding io) -> a codec io = function
+  | (Precomputed, { encoding = Sexp; filename }) ->
+     { encoding = (module Encoding.Sexp_precomputed)
+     ; filename
+     }
+  | (Precomputed, { encoding = Json; filename }) ->
+     { encoding = (module Encoding.Json_precomputed)
+     ; filename
+     }
+  | (Block, { encoding = Sexp; filename }) ->
+     { encoding = (module Encoding.Sexp_block)
+     ; filename
+     }
+  | (Block, { encoding = Json; filename }) ->
+     failwith "Json encoding for full blocks not supported."
 
 let encoded_block =
   Command.Arg_type.create (fun s ->
@@ -37,21 +57,18 @@ let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
 let constraint_constants = precomputed_values.constraint_constants
 
-let output_block precomputed { encoding; filename } =
+let output_block : type a. a -> a codec io -> unit
+  = fun content { encoding; filename } ->
+  let module Enc : Encoding.S with type t = a = (val encoding) in
   let channel =
     match filename with
     | "-" -> Out_channel.stdout
     | s -> Out_channel.create s
   in
-  let contents =
-    match encoding with
-    | Sexp -> Sexp.to_string (Mina_block.Precomputed.sexp_of_t precomputed)
-    | Json -> Yojson.Safe.to_string (Mina_block.Precomputed.to_yojson precomputed)
-  in
   eprintf !"Randomly generated block, %s: %s\n"
-    (encoding_to_string encoding)
+    Enc.name
     (match filename with "-" -> "" | s -> s) ;
-  fprintf channel "%s\n" contents ;
+  fprintf channel "%s\n" (Enc.to_string content);
   match filename with
     | "-" -> ()
     | s -> Out_channel.close channel
@@ -63,27 +80,16 @@ let output_block precomputed { encoding; filename } =
    * include all types of transactions
    * etc.
 *)
-let f outputs make_breadcrumb =
+let f (type a) (outputs : a codec io list) make_breadcrumb =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let frontier = create_frontier () in
       let root = Full_frontier.root frontier in
       let open Async_kernel.Deferred.Let_syntax in
       let%map breadcrumb = make_breadcrumb root in
-      let block = Breadcrumb.block breadcrumb in
-      let staged_ledger =
-        Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-      in
-      let scheduled_time =
-        Mina_block.(Header.protocol_state @@ header block)
-        |> Mina_state.Protocol_state.blockchain_state
-        |> Mina_state.Blockchain_state.timestamp
-      in
-      let precomputed =
-        Mina_block.Precomputed.of_block ~logger ~constraint_constants
-          ~staged_ledger ~scheduled_time
-          (Breadcrumb.block_with_hash breadcrumb)
-      in
-      List.iter outputs ~f:(output_block precomputed);
+      List.iter outputs ~f:(fun output ->
+          let module Enc = (val output.encoding) in
+          let content = Enc.of_breadcrumb breadcrumb in
+          output_block content output;);
       clean_up_persistent_root ~frontier )
 
 let default_outputs =
@@ -104,35 +110,41 @@ let command =
          "-i"
          (optional encoded_block)
          ~doc:"input <format>:<path>; formats are: sexp / json / bin; a dash (-) dentoes stdin"
+     and full =
+       flag
+         "--full"
+         no_arg
+         ~doc:"use full blocks, not just precomputed values"
      in
      let outs = match outputs with
        | [] -> default_outputs
        | _ -> outputs
      in
+     let conf =
+       if full then
+         Conf ( Option.map input ~f:(fun i -> mk_io (Block, i))
+              , List.map ~f:mk_io (List.map ~f:(fun x -> (Block, x)) outs))
+       else
+         Conf ( Option.map input ~f:(fun i -> mk_io (Precomputed, i))
+              , List.map ~f:mk_io (List.map ~f:(fun x -> (Precomputed, x)) outs))
+     in
      fun () ->
-     match input with
-     | None ->
+     match conf with
+     | Conf (None, outs) ->
         let verifier = verifier () in
         Core_kernel.Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:1 ~f:(f outs)
-     | Some { encoding; filename } ->
+     | Conf (Some { encoding; filename }, outs)->
+        let module Enc = (val encoding) in
         let input =
           match filename with
           | "-" -> In_channel.stdin
           | s -> In_channel.create s
         in
-        let contents = In_channel.input_all input in
-        let precomputed =
-          match encoding with
-          | Sexp -> 
-             Sexp.of_string contents
-             |> Mina_block.Precomputed.t_of_sexp
-          | Json ->
-             Yojson.Safe.from_string contents
-             |> Mina_block.Precomputed.of_yojson
-             |> Result.map_error ~f:(fun s -> Failure s)
-             |> Result.ok_exn
+        let contents =
+          In_channel.input_all input
+          |> Enc.of_string
         in
-        List.iter outputs ~f:(output_block precomputed))
+        List.iter outs ~f:(output_block contents))
 
 let () = Command_unix.run command
 
