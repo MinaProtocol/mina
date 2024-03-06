@@ -67,6 +67,7 @@ installed: [
   "bisect_ppx.2.8.1"
   "bitstring.4.1.0"
   "camlp4.4.14+1"
+  "camlp-streams.5.0.1"
   "camomile.1.0.2"
   "capnp.3.4.0"
   "caqti.1.5.0"

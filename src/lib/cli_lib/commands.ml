@@ -1,4 +1,8 @@
 open Signature_lib
+
+(* Alias ocamlp-streams before it's hidden by open
+   Core_kernel *)
+module Streams = Stream
 open Core_kernel
 open Async
 
@@ -106,7 +110,7 @@ let validate_transaction =
     let jsons = Yojson.Safe.stream_from_channel In_channel.stdin in
     ( match[@alert "-deprecated"]
         Or_error.try_with (fun () ->
-            Caml.Stream.iter
+            Streams.iter
               (fun transaction_json ->
                 match
                   Rosetta_lib.Transaction.to_mina_signed transaction_json
