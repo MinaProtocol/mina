@@ -4,7 +4,12 @@ let Profiles = ./Profiles.dhall
 
 let Artifact : Type  = < Daemon | Archive | ArchiveMigration | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
 
-let All = [ Artifact.Daemon , Artifact.Archive , Artifact.ArchiveMigration ,Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction, Artifact.FunctionalTestSuite ]
+
+let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.ArchiveMigration , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
+
+let Main = [ Artifact.Daemon , Artifact.Archive , Artifact.Rosetta ]
+
+let All = AllButTests # [ Artifact.FunctionalTestSuite ]
 
 let capitalName = \(artifact : Artifact) ->
   merge {
@@ -30,6 +35,16 @@ let lowerName = \(artifact : Artifact) ->
     , FunctionalTestSuite = "functional_test_suite"
   } artifact
 
+let dockerName = \(artifact : Artifact) ->
+  merge {
+    Daemon = "mina-daemon"
+    , Archive = "mina-archive"
+    , TestExecutive = "mina-test-executive"
+    , BatchTxn = "mina-batch-txn"
+    , Rosetta = "mina-rosetta" 
+    , ZkappTestTransaction = "mina-zkapp-test-transaction"
+    , FunctionalTestSuite = "mina-test-suite"
+  } artifact
 
 
 let toDebianName = \(artifact : Artifact) ->
@@ -60,5 +75,8 @@ in
   , lowerName = lowerName
   , toDebianName = toDebianName
   , toDebianNames = toDebianNames
-  , All = All
+  , dockerName = dockerName
+  , All = All 
+  , AllButTests = AllButTests 
+  , Main = Main
 }
