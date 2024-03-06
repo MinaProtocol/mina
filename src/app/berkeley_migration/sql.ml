@@ -313,5 +313,13 @@ module Berkeley = struct
                  ORDER BY height DESC
                  LIMIT 1
            |sql} )
+
+    let genesis_block_id (module Conn : CONNECTION) =
+      Conn.find
+        (Caqti_request.find Caqti_type.unit Caqti_type.int
+           {sql| SELECT id
+                 FROM blocks
+                 WHERE height = 1
+         |sql} )
   end
 end

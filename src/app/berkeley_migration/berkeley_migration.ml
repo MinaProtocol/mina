@@ -431,6 +431,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
         Yojson.Safe.from_file runtime_config_file
         |> Runtime_config.of_yojson |> Result.ok_or_failwith
       in
+      let runtime_config_ledger = Option.value_exn runtime_config.ledger in
       [%log info] "Getting precomputed values from runtime config" ;
       let proof_level = Genesis_constants.Proof_level.compiled in
       let%bind precomputed_values =
@@ -540,6 +541,77 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
       [%log info] "Deleting all precomputed blocks" ;
       let%bind () = Precomputed_block.delete_fetched ~network in
       [%log info] "Done migrating mainnet blocks!" ;
+      [%log info] "Populating original genesis ledger balances" ;
+      let%bind padded_accounts =
+        match
+          Genesis_ledger_helper.Ledger.padded_accounts_from_runtime_config_opt
+            ~logger ~proof_level runtime_config_ledger
+            ~ledger_name_prefix:"genesis_ledger"
+        with
+        | None ->
+            [%log fatal] "Could not load accounts from runtime config ledger" ;
+            exit 1
+        | Some accounts ->
+            return accounts
+      in
+      let constraint_constants =
+        Genesis_constants.Constraint_constants.compiled
+      in
+      let packed_ledger =
+        Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
+          ~depth:constraint_constants.ledger_depth padded_accounts
+      in
+      let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
+      let%bind account_ids =
+        let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
+        Mina_base.Account_id.Set.to_list account_id_set
+      in
+      let%bind genesis_block_id =
+        query_migrated_db ~f:(fun db ->
+            Sql.Berkeley.Block.genesis_block_id db () )
+      in
+      let%bind () =
+        Deferred.List.iter account_ids ~f:(fun acct_id ->
+            match Mina_ledger.Ledger.location_of_account ledger acct_id with
+            | None ->
+                [%log error] "Could not get location for account"
+                  ~metadata:
+                    [ ("account_id", Mina_base.Account_id.to_yojson acct_id) ] ;
+                failwith "Could not get location for genesis account"
+            | Some loc ->
+                let index =
+                  Mina_ledger.Ledger.index_of_account_exn ledger acct_id
+                in
+                let acct =
+                  match Mina_ledger.Ledger.get ledger loc with
+                  | None ->
+                      [%log error] "Could not get account, given a location"
+                        ~metadata:
+                          [ ( "account_id"
+                            , Mina_base.Account_id.to_yojson acct_id )
+                          ] ;
+                      failwith "Could not get genesis account, given a location"
+                  | Some acct ->
+                      acct
+                in
+                query_migrated_db ~f:(fun db ->
+                    match%map
+                      Archive_lib.Processor.Accounts_accessed
+                      .add_if_doesn't_exist ~logger db genesis_block_id
+                        (index, acct)
+                    with
+                    | Ok _ ->
+                        Ok ()
+                    | Error err ->
+                        [%log error] "Could not add genesis account"
+                          ~metadata:
+                            [ ( "account_id"
+                              , Mina_base.Account_id.to_yojson acct_id )
+                            ; ("error", `String (Caqti_error.show err))
+                            ] ;
+                        failwith "Could not add add genesis account" ) )
+      in
+      [%log info] "Done populating original genesis ledger balances!" ;
       Deferred.unit
 
 let () =
