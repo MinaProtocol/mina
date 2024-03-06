@@ -176,6 +176,9 @@ val transition_frontier :
 
 val get_ledger : t -> State_hash.t option -> Account.t list Deferred.Or_error.t
 
+val get_snarked_ledger_full :
+  t -> State_hash.t option -> Ledger.t Deferred.Or_error.t
+
 val get_snarked_ledger :
   t -> State_hash.t option -> Account.t list Deferred.Or_error.t
 

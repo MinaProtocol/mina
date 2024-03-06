@@ -47,6 +47,7 @@ type t =
   ; constraint_constants : Genesis_constants.Constraint_constants.t
   ; consensus_constants : Consensus.Constants.t
   ; time_controller : Block_time.Controller.t
+  ; slot_tx_end : Mina_numbers.Global_slot.t option
   }
 [@@deriving sexp_of, equal, compare]
 
@@ -72,6 +73,7 @@ module Command_error = struct
         * [ `Current_global_slot of Mina_numbers.Global_slot.t ]
     | Unwanted_fee_token of Token_id.t
     | Invalid_transaction
+    | After_slot_tx_end
   [@@deriving sexp_of, to_yojson]
 end
 
@@ -298,7 +300,8 @@ module For_tests = struct
     [%test_eq: int] (Map.length all_by_hash) size
 end
 
-let empty ~constraint_constants ~consensus_constants ~time_controller : t =
+let empty ~constraint_constants ~consensus_constants ~time_controller
+    ~slot_tx_end : t =
   { applicable_by_fee = Currency.Fee.Map.empty
   ; all_by_sender = Account_id.Map.empty
   ; all_by_fee = Currency.Fee.Map.empty
@@ -308,6 +311,7 @@ let empty ~constraint_constants ~consensus_constants ~time_controller : t =
   ; constraint_constants
   ; consensus_constants
   ; time_controller
+  ; slot_tx_end
   }
 
 let size : t -> int = fun t -> t.size
@@ -346,8 +350,8 @@ let current_global_slot t =
       |> to_global_slot)
   in
   match t.constraint_constants.fork with
-  | Some { previous_global_slot; _ } ->
-      Mina_numbers.Global_slot.(add previous_global_slot current_slot)
+  | Some { global_slot_since_genesis; _ } ->
+      Mina_numbers.Global_slot.(add global_slot_since_genesis current_slot)
   | None ->
       current_slot
 
@@ -725,10 +729,25 @@ let rec add_from_gossip_exn :
          * Transaction_hash.User_command_with_valid_signature.t Sequence.t
        , Command_error.t )
        Result.t =
- fun ({ constraint_constants; consensus_constants; time_controller; _ } as t)
-     ~verify cmd0 current_nonce balance ->
+ fun ( { constraint_constants
+       ; consensus_constants
+       ; time_controller
+       ; slot_tx_end
+       ; _
+       } as t ) ~verify cmd0 current_nonce balance ->
   let open Command_error in
   let open Result.Let_syntax in
+  let current_global_slot =
+    Consensus.Data.Consensus_time.(
+      to_global_slot
+        (of_time_exn ~constants:consensus_constants
+           (Block_time.now time_controller) ))
+  in
+  let%bind () =
+    Result.ok_if_true ~error:After_slot_tx_end
+    @@ Option.value_map slot_tx_end ~default:true ~f:(fun slot_tx_end' ->
+           Global_slot.(current_global_slot < slot_tx_end') )
+  in
   let unchecked_cmd =
     match cmd0 with
     | `Unchecked x ->
@@ -804,6 +823,7 @@ let rec add_from_gossip_exn :
         ; constraint_constants
         ; consensus_constants
         ; time_controller
+        ; slot_tx_end
         }
       , Sequence.empty )
   | Some (queued_cmds, reserved_currency) ->
@@ -966,9 +986,24 @@ let add_from_backtrack :
        t
     -> Transaction_hash.User_command_with_valid_signature.t
     -> (t, Command_error.t) Result.t =
- fun ({ constraint_constants; consensus_constants; time_controller; _ } as t)
-     cmd ->
+ fun ( { constraint_constants
+       ; consensus_constants
+       ; time_controller
+       ; slot_tx_end
+       ; _
+       } as t ) cmd ->
   let open Result.Let_syntax in
+  let current_global_slot =
+    Consensus.Data.Consensus_time.(
+      to_global_slot
+        (of_time_exn ~constants:consensus_constants
+           (Block_time.now time_controller) ))
+  in
+  let%bind () =
+    Result.ok_if_true ~error:Command_error.After_slot_tx_end
+    @@ Option.value_map slot_tx_end ~default:true ~f:(fun slot_tx_end' ->
+           Global_slot.(current_global_slot < slot_tx_end') )
+  in
   let unchecked =
     Transaction_hash.User_command_with_valid_signature.command cmd
   in
@@ -1004,6 +1039,7 @@ let add_from_backtrack :
       ; constraint_constants
       ; consensus_constants
       ; time_controller
+      ; slot_tx_end
       }
   | Some (queue, currency_reserved) ->
       let first_queued = F_sequence.head_exn queue in
@@ -1047,6 +1083,7 @@ let add_from_backtrack :
       ; constraint_constants
       ; consensus_constants
       ; time_controller
+      ; slot_tx_end
       }
 
 (* Only show stdout for failed inline tests. *)
@@ -1075,8 +1112,11 @@ let%test_module _ =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let slot_tx_end = None
+
     let empty =
       empty ~constraint_constants ~consensus_constants ~time_controller
+        ~slot_tx_end
 
     let%test_unit "empty invariants" = assert_invariants empty
 
@@ -1217,7 +1257,11 @@ let%test_module _ =
                       !"Expired user command. Current global slot is \
                         %{sexp:Mina_numbers.Global_slot.t} but user command is \
                         only valid until %{sexp:Mina_numbers.Global_slot.t}"
-                      current_global_slot valid_until () )
+                      current_global_slot valid_until ()
+                | Error After_slot_tx_end ->
+                    failwith
+                      "Transaction was submitted after the slot defined to \
+                       stop accepting transactions" )
           in
           go cmds )
 

@@ -26,9 +26,9 @@ end
 
 module Fork_constants = struct
   type t =
-    { previous_state_hash : Pickles.Backend.Tick.Field.Stable.Latest.t
-    ; previous_length : Mina_numbers.Length.Stable.Latest.t
-    ; previous_global_slot : Mina_numbers.Global_slot.Stable.Latest.t
+    { state_hash : Pickles.Backend.Tick.Field.Stable.Latest.t
+    ; blockchain_length : Mina_numbers.Length.Stable.Latest.t
+    ; global_slot_since_genesis : Mina_numbers.Global_slot.Stable.Latest.t
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 end
@@ -67,13 +67,12 @@ module Constraint_constants = struct
     ; account_creation_fee = Currency.Fee.to_uint64 t.account_creation_fee
     ; fork =
         ( match t.fork with
-        | Some { previous_length; previous_state_hash; previous_global_slot } ->
+        | Some { blockchain_length; state_hash; global_slot_since_genesis } ->
             Some
-              { previous_length = Unsigned.UInt32.to_int previous_length
-              ; previous_state_hash =
-                  Pickles.Backend.Tick.Field.to_string previous_state_hash
-              ; previous_global_slot =
-                  Unsigned.UInt32.to_int previous_global_slot
+              { blockchain_length = Unsigned.UInt32.to_int blockchain_length
+              ; state_hash = Pickles.Backend.Tick.Field.to_string state_hash
+              ; global_slot_since_genesis =
+                  Unsigned.UInt32.to_int global_slot_since_genesis
               }
         | None ->
             None )
@@ -152,27 +151,28 @@ module Constraint_constants = struct
         Core_kernel.Int.ceil_log2
           (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
 
-      [%%ifndef fork_previous_length]
+      [%%ifndef fork_blockchain_length]
 
       let fork = None
 
       [%%else]
 
-      [%%inject "fork_previous_length", fork_previous_length]
+      [%%inject "fork_blockchain_length", fork_blockchain_length]
 
       [%%inject "fork_previous_state_hash", fork_previous_state_hash]
 
-      [%%inject "fork_previous_global_slot", fork_previous_global_slot]
+      [%%inject
+      "fork_global_slot_since_genesis", fork_global_slot_since_genesis]
 
       let fork =
         Some
-          { Fork_constants.previous_length =
-              Mina_numbers.Length.of_int fork_previous_length
-          ; previous_state_hash =
+          { Fork_constants.blockchain_length =
+              Mina_numbers.Length.of_int fork_blockchain_length
+          ; state_hash =
               Data_hash_lib.State_hash.of_base58_check_exn
                 fork_previous_state_hash
-          ; previous_global_slot =
-              Mina_numbers.Global_slot.of_int fork_previous_global_slot
+          ; global_slot_since_genesis =
+              Mina_numbers.Global_slot.of_int fork_global_slot_since_genesis
           }
 
       [%%endif]
