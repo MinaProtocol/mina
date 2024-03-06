@@ -6,6 +6,8 @@ type 'a content =
   | Block : Mina_block.t content
   | Precomputed : Mina_block.Precomputed.t content
 
+let append_newline s = s ^ "\n"
+
 module type S = sig
   type t
 
@@ -26,6 +28,7 @@ module Sexp_block : S  with type t = Mina_block.t = struct
   let to_string b =
     Mina_block.sexp_of_t b
     |> Sexp.to_string
+    |> append_newline
 
   let of_string s =
     Sexp.of_string s
@@ -81,6 +84,7 @@ module Sexp_precomputed : S with type t = Mina_block.Precomputed.t = struct
   let to_string b =
     Mina_block.Precomputed.sexp_of_t b
     |> Sexp.to_string
+    |> append_newline
 
   let of_string s =
     Sexp.of_string s
@@ -97,6 +101,7 @@ module Json_precomputed : S  with type t = Mina_block.Precomputed.t = struct
   let to_string b =
     Mina_block.Precomputed.to_yojson b
     |> Yojson.Safe.to_string
+    |> append_newline
 
   let of_string s =
     Yojson.Safe.from_string s

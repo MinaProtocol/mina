@@ -75,10 +75,7 @@ let output_block : type a. a -> a codec io -> unit
     | "-" -> Out_channel.stdout
     | s -> Out_channel.create s
   in
-  eprintf !"Randomly generated block, %s: %s\n"
-    Enc.name
-    (match filename with "-" -> "" | s -> s) ;
-  fprintf channel "%s\n" (Enc.to_string content);
+  fprintf channel "%s" (Enc.to_string content);
   match filename with
     | "-" -> ()
     | s -> Out_channel.close channel
@@ -99,6 +96,9 @@ let f (type a) (outputs : a codec io list) make_breadcrumb =
       List.iter outputs ~f:(fun output ->
           let module Enc = (val output.encoding) in
           let content = Enc.of_breadcrumb breadcrumb in
+          eprintf !"Randomly generated block, %s: %s\n"
+            Enc.name
+            (match output.filename with "-" -> "" | s -> s) ;
           output_block content output;);
       clean_up_persistent_root ~frontier )
 
