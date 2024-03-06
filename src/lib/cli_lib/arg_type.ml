@@ -145,3 +145,14 @@ let work_selection_method_to_module :
       (module Work_selector.Selection_methods.Sequence)
   | Random ->
       (module Work_selector.Selection_methods.Random)
+
+let node_status_type : [ `Full | `Simple | `None ] Command.Arg_type.t =
+  Command.Arg_type.map Command.Param.string ~f:(function
+    | "full" ->
+        `Full
+    | "simple" ->
+        `Simple
+    | "none" ->
+        `None
+    | s ->
+        failwithf "unrecognised node stats type %s" s () )
