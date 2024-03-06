@@ -307,6 +307,31 @@ let cache_fee_transfer_via_coinbase pool (internal_cmd : Sql.Internal_command.t)
   | _ ->
       Deferred.unit
 
+let create_or_append_repair_script ~logger ~output_repair_script_opt
+    ~(balance_info : Archive_lib.Processor.Balance.t) nonce =
+  match output_repair_script_opt with
+  | None ->
+      ()
+  | Some output_repair_script_opt ->
+      [%log debug] "Persisting nonce repair to repair script" ;
+
+      let sql =
+        sprintf
+          "UPDATE balances SET nonce = %Ld\n\
+          \      WHERE balance = %Ld\n\
+          \      AND block_height = %Ld\n\
+          \      AND block_sequence_no = %d\n\
+          \      AND block_secondary_sequence_no = %d;" nonce
+          balance_info.balance balance_info.block_height
+          balance_info.block_sequence_no
+          balance_info.block_secondary_sequence_no
+      in
+
+      Out_channel.with_file ~append:true output_repair_script_opt
+        ~f:(fun outc ->
+          Out_channel.output_string outc sql ;
+          Out_channel.newline outc )
+
 (* balance_block_data come from a loaded internal or user command, which
     includes data from the blocks table and
     - for internal commands, the tables internal_commands and blocks_internals_commands
@@ -314,8 +339,8 @@ let cache_fee_transfer_via_coinbase pool (internal_cmd : Sql.Internal_command.t)
    we compare those against the same-named values in the balances row
 *)
 let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
-    ~balance_block_data ~set_nonces ~repair_nonces ~continue_on_error :
-    unit Deferred.t =
+    ~balance_block_data ~set_nonces ~repair_nonces ~continue_on_error
+    ~output_repair_script_opt : unit Deferred.t =
   let%bind pk = pk_of_pk_id pool pk_id in
   let%bind balance_info = balance_info_of_id pool ~id:balance_id in
   let token = token_int64 |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64 in
@@ -405,6 +430,10 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
         let nonce =
           Account.Nonce.to_uint32 ledger_nonce |> Unsigned.UInt32.to_int64
         in
+
+        create_or_append_repair_script ~logger ~output_repair_script_opt
+          ~balance_info nonce ;
+
         query_db pool
           ~f:(fun db -> Sql.Balances.insert_nonce db ~id:balance_id ~nonce)
           ~item:"chain from state hash" )
@@ -432,6 +461,10 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
           let correct_nonce =
             ledger_nonce |> Account.Nonce.to_uint32 |> Unsigned.UInt32.to_int64
           in
+
+          create_or_append_repair_script ~logger ~output_repair_script_opt
+            ~balance_info correct_nonce ;
+
           query_db pool
             ~f:(fun db ->
               Sql.Balances.insert_nonce db ~id:balance_id ~nonce:correct_nonce
@@ -443,6 +476,7 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
               [ ("who", `String who)
               ; ("ledger_nonce", Account.Nonce.to_yojson ledger_nonce)
               ; ("database_nonce", Account.Nonce.to_yojson db_nonce)
+              ; ("balance_id", `Int balance_id)
               ] ;
           return
           @@ if continue_on_error then incr error_count else Core_kernel.exit 1
@@ -576,7 +610,7 @@ let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
         if continue_on_error then incr error_count else Core_kernel.exit 1
 
 let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
-    ~set_nonces ~repair_nonces ~continue_on_error =
+    ~set_nonces ~repair_nonces ~continue_on_error ~output_repair_script_opt =
   [%log info]
     "Applying internal command (%s) with global slot since genesis %Ld, \
      sequence number %d, and secondary sequence number %d"
@@ -619,7 +653,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       | Ok _undo ->
           verify_balance ~logger ~pool ~ledger ~who:"fee transfer receiver"
             ~balance_id ~pk_id ~token_int64 ~balance_block_data ~set_nonces
-            ~repair_nonces ~continue_on_error
+            ~repair_nonces ~continue_on_error ~output_repair_script_opt
       | Error err ->
           fail_on_error err )
   | "coinbase" -> (
@@ -657,7 +691,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       | Ok _undo ->
           verify_balance ~logger ~pool ~ledger ~who:"coinbase receiver"
             ~balance_id ~pk_id ~token_int64 ~balance_block_data ~set_nonces
-            ~repair_nonces ~continue_on_error
+            ~repair_nonces ~continue_on_error ~output_repair_script_opt
       | Error err ->
           fail_on_error err )
   | "fee_transfer_via_coinbase" ->
@@ -669,7 +703,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
         verify_balance ~logger ~pool ~ledger
           ~who:"fee_transfer_via_coinbase receiver" ~balance_id ~pk_id
           ~token_int64 ~balance_block_data ~set_nonces ~repair_nonces
-          ~continue_on_error
+          ~continue_on_error ~output_repair_script_opt
       in
       (* the actual application is in the "coinbase" case *)
       Deferred.unit
@@ -677,7 +711,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       failwithf "Unknown internal command \"%s\"" cmd.type_ ()
 
 let apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces ~repair_nonces
-    ~continue_on_error (cmd1 : Sql.Internal_command.t)
+    ~output_repair_script_opt ~continue_on_error (cmd1 : Sql.Internal_command.t)
     (cmd2 : Sql.Internal_command.t) =
   [%log info] "Applying combined fee transfers with sequence number %d"
     cmd1.sequence_no ;
@@ -714,13 +748,13 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces ~repair_nonces
         verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (1)"
           ~balance_id:cmd1.receiver_balance ~pk_id:cmd1.receiver_id
           ~token_int64:cmd1.token ~balance_block_data ~set_nonces ~repair_nonces
-          ~continue_on_error
+          ~continue_on_error ~output_repair_script_opt
       in
       let balance_block_data = internal_command_to_balance_block_data cmd2 in
       verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (2)"
         ~balance_id:cmd2.receiver_balance ~pk_id:cmd2.receiver_id
         ~token_int64:cmd2.token ~balance_block_data ~set_nonces ~repair_nonces
-        ~continue_on_error
+        ~continue_on_error ~output_repair_script_opt
   | Error err ->
       Error.tag_arg err "Error applying combined fee transfer"
         ("sequence number", cmd1.sequence_no)
@@ -786,7 +820,7 @@ let body_of_sql_user_cmd pool
       failwithf "Invalid user command type: %s" type_ ()
 
 let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
-    ~set_nonces ~repair_nonces ~continue_on_error =
+    ~set_nonces ~repair_nonces ~continue_on_error ~output_repair_script_opt =
   [%log info]
     "Applying user command (%s) with nonce %Ld, global slot since genesis %Ld, \
      and sequence number %d"
@@ -849,7 +883,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
         | Some balance_id ->
             verify_balance ~logger ~pool ~ledger ~who:"source" ~balance_id
               ~pk_id:cmd.source_id ~token_int64 ~balance_block_data ~set_nonces
-              ~repair_nonces ~continue_on_error
+              ~repair_nonces ~continue_on_error ~output_repair_script_opt
         | None ->
             return ()
       in
@@ -859,13 +893,14 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
             verify_balance ~logger ~pool ~ledger ~who:"receiver" ~balance_id
               ~pk_id:cmd.receiver_id ~token_int64 ~balance_block_data
               ~set_nonces ~repair_nonces ~continue_on_error
+              ~output_repair_script_opt
         | None ->
             return ()
       in
       verify_balance ~logger ~pool ~ledger ~who:"fee payer"
         ~balance_id:cmd.fee_payer_balance ~pk_id:cmd.fee_payer_id
         ~token_int64:cmd.fee_token ~balance_block_data ~set_nonces
-        ~repair_nonces ~continue_on_error
+        ~repair_nonces ~continue_on_error ~output_repair_script_opt
   | Error err ->
       Error.tag_arg err "User command failed on replay"
         ( ("global slot_since_genesis", cmd.global_slot_since_genesis)
@@ -942,7 +977,7 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
     Deferred.unit )
 
 let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
-    ~checkpoint_interval ~continue_on_error () =
+    ~checkpoint_interval ~continue_on_error ~output_repair_script_opt () =
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -1306,6 +1341,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               let%bind () =
                 apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces
                   ~repair_nonces ~continue_on_error ic ic2
+                  ~output_repair_script_opt
               in
               apply_commands ics2 user_cmds
                 ~last_global_slot_since_genesis:ic.global_slot_since_genesis
@@ -1317,7 +1353,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               in
               let%bind () =
                 run_internal_command ~logger ~pool ~ledger ~set_nonces
-                  ~repair_nonces ~continue_on_error ic
+                  ~repair_nonces ~continue_on_error ic ~output_repair_script_opt
               in
               apply_commands ics user_cmds
                 ~last_global_slot_since_genesis:ic.global_slot_since_genesis
@@ -1344,7 +1380,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             in
             let%bind () =
               run_user_command ~logger ~pool ~ledger ~set_nonces ~repair_nonces
-                ~continue_on_error uc
+                ~continue_on_error uc ~output_repair_script_opt
             in
             apply_commands [] ucs
               ~last_global_slot_since_genesis:uc.global_slot_since_genesis
@@ -1356,7 +1392,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             in
             let%bind () =
               run_user_command ~logger ~pool ~ledger ~set_nonces ~repair_nonces
-                ~continue_on_error uc
+                ~continue_on_error uc ~output_repair_script_opt
             in
             apply_commands internal_cmds ucs
               ~last_global_slot_since_genesis:uc.global_slot_since_genesis
@@ -1466,6 +1502,13 @@ let () =
          and repair_nonces =
            Param.flag "--repair-nonces"
              ~doc:"Repair incorrect nonces in archive database" Param.no_arg
+         and output_repair_script_opt =
+           Param.flag "--dump-repair-script"
+             ~doc:
+               "file Output sql script which will contain all updates to \
+                nonces made during replayer run. Works only when using \
+                --repair-nonces or --set-nonces args"
+             Param.(optional string)
          and continue_on_error =
            Param.flag "--continue-on-error"
              ~doc:"Continue processing after errors" Param.no_arg
@@ -1475,4 +1518,5 @@ let () =
              Param.(optional int)
          in
          main ~input_file ~output_file_opt ~archive_uri ~set_nonces
-           ~repair_nonces ~checkpoint_interval ~continue_on_error )))
+           ~repair_nonces ~checkpoint_interval ~continue_on_error
+           ~output_repair_script_opt )))
