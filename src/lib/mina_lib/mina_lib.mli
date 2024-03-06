@@ -176,6 +176,9 @@ val transition_frontier :
 
 val get_ledger : t -> State_hash.t option -> Account.t list Deferred.Or_error.t
 
+val get_snarked_ledger_full :
+  t -> State_hash.t option -> Ledger.t Deferred.Or_error.t
+
 val get_snarked_ledger :
   t -> State_hash.t option -> Account.t list Deferred.Or_error.t
 
@@ -200,3 +203,9 @@ val runtime_config : t -> Runtime_config.t
 val start_filtered_log : t -> string list -> unit Or_error.t
 
 val get_filtered_log_entries : t -> int -> string list * bool
+
+val best_chain_block_by_height :
+  t -> Unsigned.UInt32.t -> (Transition_frontier.Breadcrumb.t, string) Result.t
+
+val best_chain_block_by_state_hash :
+  t -> State_hash.t -> (Transition_frontier.Breadcrumb.t, string) Result.t

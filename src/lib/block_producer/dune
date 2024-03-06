@@ -51,6 +51,7 @@
    unsigned_extended
    genesis_constants
    data_hash_lib
+   runtime_config
  )
  (preprocess
   (pps ppx_coda ppx_version ppx_jane ppx_register_event))

@@ -10066,8 +10066,26 @@
             {
               "name": "fork_config",
               "description":
-                "The runtime configuration for a blockchain fork intended to be a continuation of the current one.",
-              "args": [],
+                "The runtime configuration for a blockchain fork intended to be a continuation of the current one. By default, this returns the newest block that appeared before the transaction stop slot provided in the configuration, or the best tip if no such block exists.",
+              "args": [
+                {
+                  "name": "height",
+                  "description":
+                    "The height of the desired block in the best chain",
+                  "type": { "kind": "SCALAR", "name": "Int", "ofType": null },
+                  "defaultValue": null
+                },
+                {
+                  "name": "stateHash",
+                  "description": "The state hash of the desired block",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                }
+              ],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
