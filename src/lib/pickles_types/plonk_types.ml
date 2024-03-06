@@ -879,11 +879,11 @@ module Evals = struct
         ; foreign_field_mul_lookup_selector
         } =
       let opt_flag = function
-        | Opt.Some _ ->
+        | Opt.Just _ ->
             true_
         | Opt.Maybe (b, _) ->
             b
-        | Opt.None ->
+        | Opt.Nothing ->
             false_
       in
       let enable_if x flag = assert_equal (opt_flag x) flag in
