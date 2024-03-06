@@ -2,7 +2,7 @@ open Core
 open Frontier_base
 open Full_frontier.For_tests
 
-type encoding = Sexp | Json
+type encoding = Sexp | Json | Binary
 
 type 'a content =
   | Block : Mina_block.t content
@@ -26,12 +26,20 @@ let mk_io : type a. (a content * encoding io) -> a codec io = function
      { encoding = (module Encoding.Json_precomputed)
      ; filename
      }
+  | (Precomputed, { encoding = Binary; filename }) ->
+     { encoding = (module Encoding.Binary_precomputed)
+     ; filename
+     }
   | (Block, { encoding = Sexp; filename }) ->
      { encoding = (module Encoding.Sexp_block)
      ; filename
      }
   | (Block, { encoding = Json; filename }) ->
      failwith "Json encoding for full blocks not supported."
+  | (Block, { encoding = Binary; filename }) ->
+     { encoding = (module Encoding.Binary_block)
+     ; filename
+     }
 
 let encoded_block =
   Command.Arg_type.create (fun s ->
@@ -41,6 +49,7 @@ let encoded_block =
               ( match String.lowercase encoding with
               | "sexp" -> Sexp
               | "json" -> Json
+              | "bin" | "binary" -> Binary
               | _ -> failwith "invalid encoding" )
           ; filename
           }

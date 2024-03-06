@@ -26,6 +26,19 @@ module Sexp_block : S  with type t = Mina_block.t = struct
     |> Mina_block.t_of_sexp
 end
 
+
+module Binary_block : S with type t = Mina_block.t = struct
+  type t = Mina_block.t
+
+  let name = "binary"
+
+  let of_breadcrumb = Frontier_base.Breadcrumb.block
+
+  let to_string = Binable.to_string (module Mina_block.Stable.Latest)
+
+  let of_string = Binable.of_string (module Mina_block.Stable.Latest)
+end
+
 let () =
   let open Core_kernel in
   Backtrace.elide := false ;
@@ -68,7 +81,7 @@ module Sexp_precomputed : S with type t = Mina_block.Precomputed.t = struct
     |> Mina_block.Precomputed.t_of_sexp
 end
 
-module Json_precomputed : S  with type t = Mina_block.Precomputed.t= struct
+module Json_precomputed : S  with type t = Mina_block.Precomputed.t = struct
   type t = Mina_block.Precomputed.t
 
   let name = "json"
@@ -83,4 +96,18 @@ module Json_precomputed : S  with type t = Mina_block.Precomputed.t= struct
     Yojson.Safe.from_string s
     |> Mina_block.Precomputed.of_yojson
     |> Result.ok_or_failwith
+end
+
+module Binary_precomputed : S with type t = Mina_block.Precomputed.t = struct
+  type t = Mina_block.Precomputed.t
+
+  let name = "binary"
+
+  let of_breadcrumb = precomputed_of_breadcrumb
+
+  let to_string =
+    Binable.to_string (module Mina_block.Precomputed.Stable.Latest)
+
+  let of_string =
+    Binable.of_string (module Mina_block.Precomputed.Stable.Latest)
 end
