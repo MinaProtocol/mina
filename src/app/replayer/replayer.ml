@@ -977,6 +977,20 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                 failwith "Expected a checkpoint interval" )
       in
       let found_snarked_ledger_hash = ref false in
+      (* See PR #9782. *)
+      let global_slots_to_avoid =
+        [ 146033L
+        ; 146078L
+        ; 146102L
+        ; 146164L
+        ; 146328L
+        ; 146399L
+        ; 146438L
+        ; 146489L
+        ; 146631L
+        ; 146752L
+        ]
+      in
       (* apply commands in global slot, sequence order *)
       let rec apply_commands ~last_global_slot_since_genesis ~last_block_id
           ~(block_txns : Mina_transaction.Transaction.t list)
@@ -996,6 +1010,16 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                 ; ("block_id", `Int last_block_id)
                 ]
               last_global_slot_since_genesis
+          else if
+            List.mem global_slots_to_avoid last_global_slot_since_genesis
+              ~equal:Int64.equal
+          then
+            [%log info]
+              ~metadata:
+                [ ("state_hash", `String (State_hash.to_base58_check state_hash))
+                ]
+              "This block has an inconsistent ledger hash due to a known \
+               historical issue."
           else (
             [%log error]
               "Applied all commands at global slot since genesis %Ld, ledger \
