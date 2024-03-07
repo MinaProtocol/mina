@@ -8,11 +8,32 @@ type 'a content =
 
 let append_newline s = s ^ "\n"
 
+let block_of_breadcrumb ?with_parent_statehash breadcrumb =
+  let open Mina_block in
+  let block = Frontier_base.Breadcrumb.block breadcrumb in
+  match with_parent_statehash with
+    | None ->
+       block
+    | Some hash ->
+       let previous_state_hash = Mina_base.State_hash.of_base58_check_exn hash in
+       let h = header block in
+       let state = Header.protocol_state h in
+       let header =
+         Header.create
+           ~protocol_state:{ state with previous_state_hash }
+           ~protocol_state_proof:(Header.protocol_state_proof h)
+           ~delta_block_chain_proof:(Header.delta_block_chain_proof h)
+           ?proposed_protocol_version_opt:(Header.proposed_protocol_version_opt h)
+           ~current_protocol_version:(Header.current_protocol_version h)
+           ()
+       in
+       Mina_block.create ~header ~body:(body block)
+
 module type S = sig
   type t
 
   val name : string
-  val of_breadcrumb : Frontier_base.Breadcrumb.t -> t
+  val of_breadcrumb : ?with_parent_statehash:string -> Frontier_base.Breadcrumb.t -> t
 
   val to_string : t -> string
   val of_string : string -> t
@@ -23,7 +44,8 @@ module Sexp_block : S  with type t = Mina_block.t = struct
 
   let name = "sexp"
 
-  let of_breadcrumb = Frontier_base.Breadcrumb.block
+  let of_breadcrumb = block_of_breadcrumb
+
 
   let to_string b =
     Mina_block.sexp_of_t b
@@ -41,7 +63,7 @@ module Binary_block : S with type t = Mina_block.t = struct
 
   let name = "binary"
 
-  let of_breadcrumb = Frontier_base.Breadcrumb.block
+  let of_breadcrumb = block_of_breadcrumb
 
   let to_string = Binable.to_string (module Mina_block.Stable.Latest)
 
@@ -59,9 +81,9 @@ let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
 let constraint_constants = precomputed_values.constraint_constants
 
-let precomputed_of_breadcrumb breadcrumb =
+let precomputed_of_breadcrumb ?with_parent_statehash breadcrumb =
   let open Frontier_base in
-  let block = Breadcrumb.block breadcrumb in
+  let block = block_of_breadcrumb ?with_parent_statehash breadcrumb in
   let staged_ledger =
     Transition_frontier.Breadcrumb.staged_ledger breadcrumb
   in

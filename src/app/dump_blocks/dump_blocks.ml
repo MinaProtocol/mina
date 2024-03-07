@@ -87,7 +87,7 @@ let output_block : type a. a -> a codec io -> unit
    * include all types of transactions
    * etc.
 *)
-let f (type a) (outputs : a codec io list) make_breadcrumb =
+let f (type a) ?parent (outputs : a codec io list) make_breadcrumb =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let frontier = create_frontier () in
       let root = Full_frontier.root frontier in
@@ -95,7 +95,11 @@ let f (type a) (outputs : a codec io list) make_breadcrumb =
       let%map breadcrumb = make_breadcrumb root in
       List.iter outputs ~f:(fun output ->
           let module Enc = (val output.encoding) in
-          let content = Enc.of_breadcrumb breadcrumb in
+          let content =
+            Enc.of_breadcrumb
+              ?with_parent_statehash:parent
+              breadcrumb
+          in
           eprintf !"Randomly generated block, %s: %s\n"
             Enc.name
             (match output.filename with "-" -> "" | s -> s) ;
@@ -125,6 +129,12 @@ let command =
          "--full"
          no_arg
          ~doc:"use full blocks, not just precomputed values"
+     and parent =
+       flag
+         "--parent"
+         (optional string)
+         ~aliases:[ "--parent-statehash" ]
+         ~doc:"statehash of the parent block"
      in
      let outs = match outputs with
        | [] -> default_outputs
@@ -142,7 +152,7 @@ let command =
      match conf with
      | Conf (None, outs) ->
         let verifier = verifier () in
-        Core_kernel.Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:1 ~f:(f outs)
+        Core_kernel.Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:1 ~f:(f ?parent outs)
      | Conf (Some { encoding; filename }, outs)->
         let module Enc = (val encoding) in
         let input =
