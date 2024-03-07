@@ -531,7 +531,7 @@ groups:
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
-      severity: critical
+      severity: warning
     annotations:
       summary: "{{ $labels.testnet }} min density is critically low"
       description: "Critically low min density of {{ $value }} on network {{ $labels.testnet }}."
