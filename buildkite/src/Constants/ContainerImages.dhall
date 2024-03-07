@@ -8,7 +8,6 @@
   minaToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:49891eb46089f937f054afa464ce9868529981b92b30740cce32ef60957a1098",
   minaToolchainBookworm = "gcr.io/o1labs-192920/mina-toolchain@sha256:49891eb46089f937f054afa464ce9868529981b92b30740cce32ef60957a1098",
   minaToolchain = "gcr.io/o1labs-192920/mina-toolchain@sha256:49891eb46089f937f054afa464ce9868529981b92b30740cce32ef60957a1098",
-  delegationBackendToolchain = "gcr.io/o1labs-192920/delegation-backend-production@sha256:12ffd0a9016819c720687f440c7a46b8815f8d3ad06d306d342ee5f8dd4375f5",
   elixirToolchain = "elixir:1.10-alpine",
   nodeToolchain = "node:14.13.1-stretch-slim",
   ubuntu2004 = "ubuntu:20.04",
