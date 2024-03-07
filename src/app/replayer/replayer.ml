@@ -1212,6 +1212,21 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             ~next_epoch_ledger
         in
         let log_ledger_hash_after_last_slot () =
+          (* See PR #9782. *)
+          let global_slots_to_avoid =
+            [ 146033L
+            ; 146078L
+            ; 146102L
+            ; 146164L
+            ; 146328L
+            ; 146399L
+            ; 146438L
+            ; 146489L
+            ; 146631L
+            ; 146752L
+            ]
+          in
+
           match get_slot_hashes last_global_slot_since_genesis with
           | None ->
               if
@@ -1226,7 +1241,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                   "Missing ledger hash information for last global slot, which \
                    is not the start slot" ;
                 Core.exit 1 )
-          | Some (_state_hash, expected_ledger_hash) ->
+          | Some (state_hash, expected_ledger_hash) ->
               if
                 Ledger_hash.equal
                   (Ledger.merkle_root ledger)
@@ -1238,6 +1253,17 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                   ~metadata:
                     [ ("ledger_hash", json_ledger_hash_of_ledger ledger) ]
                   last_global_slot_since_genesis
+              else if
+                List.mem global_slots_to_avoid last_global_slot_since_genesis
+                  ~equal:Int64.equal
+              then
+                [%log info]
+                  ~metadata:
+                    [ ( "state_hash"
+                      , `String (State_hash.to_base58_check state_hash) )
+                    ]
+                  "This block has an inconsistent ledger hash due to a known \
+                   historical issue."
               else (
                 [%log error]
                   "Applied all commands at global slot since genesis %Ld, \
