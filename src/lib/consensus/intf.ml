@@ -735,6 +735,16 @@ module type S = sig
       -> local_state:Local_state.t
       -> Data.Local_state.Snapshot.Ledger_snapshot.t
 
+    val get_epoch_ledgers_for_finalized_frontier_block :
+         root_consensus_state:Consensus_state.Value.t
+      -> target_consensus_state:Consensus_state.Value.t
+      -> local_state:Local_state.t
+      -> [ `Both of
+           Data.Local_state.Snapshot.Ledger_snapshot.t
+           * Data.Local_state.Snapshot.Ledger_snapshot.t
+         | `Snarked_ledger of Data.Local_state.Snapshot.Ledger_snapshot.t * int
+         ]
+
     val epoch_end_time :
       constants:Constants.t -> Mina_numbers.Length.t -> Block_time.t
 

@@ -7,6 +7,7 @@
     extra-trusted-public-keys = [
       "nix-cache.minaprotocol.org:fdcuDzmnM0Kbf7yU4yywBuUEJWClySc1WIF6t6Mm8h4="
       "nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c="
+      "mina-nix-cache-1:djtioLfv2oxuK2lqPUgmZbf8bY8sK/BnYZCU2iU5Q10="
     ];
   };
 
@@ -262,7 +263,7 @@
 
         packages = {
           inherit (ocamlPackages)
-            mina mina_tests mina-ocaml-format mina_client_sdk test_executive;
+            mina devnet mainnet mina_tests mina-ocaml-format mina_client_sdk test_executive;
           inherit (pkgs) libp2p_helper marlin_plonk_bindings_stubs;
         };
 

@@ -218,6 +218,20 @@ let
 
       mina = wrapMina self.mina-dev { };
 
+      mainnet-pkg = self.mina-dev.overrideAttrs (s: {
+        version = "mainnet";
+        DUNE_PROFILE = "mainnet";
+      });
+
+      mainnet = wrapMina self.mainnet-pkg { };
+
+      devnet-pkg = self.mina-dev.overrideAttrs (s: {
+        version = "devnet";
+        DUNE_PROFILE = "devnet";
+      });
+
+      devnet = wrapMina self.devnet-pkg { };
+
       mina_tests = runMinaCheck {
         name = "tests";
         extraArgs = {
