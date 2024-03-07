@@ -3,4 +3,4 @@
  (public_name rfc3339_time)
  (instrumentation (backend bisect_ppx))
  (libraries core_kernel core ptime)
- (preprocess (pps ppx_coda ppx_version)))
+ (preprocess (pps ppx_mina ppx_version)))

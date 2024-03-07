@@ -1,0 +1,65 @@
+name: 🪲 Failing test
+description: Did you find a failing test in our CI? Report your findings here.
+labels: "type: failing_test"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # Welcome 👋
+
+        Thanks for taking the time to fill out this issue.
+        Please fill out each section below. This info allows Mina maintainers to triage and fix the failing test(s) as quickly as possible.
+
+        Useful links:
+
+        - Documentation: https://docs.minaprotocol.com/
+        - Contributing: check `CONTRIBUTING.md`
+  - type: checkboxes
+    attributes:
+      label: Preliminary Checks
+      description: Please make sure that you verify each checkbox and follow the instructions for them.
+      options:
+        - label: "This issue is not a duplicate. Before opening a new issue, please search existing issues: https://github.com/MinaProtocol/mina/issues"
+          required: true
+        - label: "This issue is not a question, feature request, RFC, or anything other than a bug report. Please post those things in GitHub Discussions: https://github.com/MinaProtocol/mina/discussions"
+          required: true
+  - type: textarea
+    validations:
+      required: true
+    attributes:
+      label: Summary
+      description: |
+        List which test(s) are failing, and describe how you expect them to behave.
+  - type: textarea
+    validations:
+      required: true
+    attributes:
+      label: Steps to replicate this Issue
+      description: How can the problem be replicated? Are there any additional steps required?
+      value: |
+        1.
+        2.
+        3.
+        ...
+  - type: textarea
+    attributes:
+      label: Console output
+      render: shell
+      description: Paste the output of the test(s) here.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Platform
+      description: Which platform do you use? Are there any special flags you are using?
+      placeholder: |
+        Platform: Ubuntu 21.04
+        FLAGS: --XPTO=1
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Build link(s)
+      description: Provide the CI's URL where the build is failing
+    validations:
+      required: false
