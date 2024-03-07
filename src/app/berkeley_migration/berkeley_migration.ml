@@ -566,16 +566,50 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
       in
       let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
       [%log info] "Created genesis ledger" ;
-      let%bind account_ids =
-        let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
-        Mina_base.Account_id.Set.to_list account_id_set
-      in
       let%bind genesis_block_id =
         query_migrated_db ~f:(fun db ->
             Sql.Berkeley.Block.genesis_block_id db () )
       in
+      let%bind account_ids =
+        let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
+        Mina_base.Account_id.Set.to_list account_id_set
+      in
+      [%log info] "Found %d accounts in genesis ledger"
+        (List.length account_ids) ;
+      let%bind account_ids_to_migrate_unsorted =
+        match%bind
+          query_migrated_db ~f:(fun db ->
+              Sql.Berkeley.Accounts_accessed.greatest_account_identifier_id db
+                genesis_block_id )
+        with
+        | None ->
+            return account_ids
+        | Some greatest_migrated_account_identifier_id ->
+            let%map last_migrated_account_id =
+              let%map { public_key; token } =
+                query_migrated_db ~f:(fun db ->
+                    Sql.Berkeley.Account_identifiers.load db
+                      greatest_migrated_account_identifier_id )
+              in
+              Mina_base.Account_id.create
+                (Signature_lib.Public_key.Compressed.of_base58_check_exn
+                   public_key )
+                (Mina_base.Token_id.of_string token)
+            in
+            [%log info]
+              "Already migrated accounts through %d, resuming migration"
+              greatest_migrated_account_identifier_id ;
+            List.filter
+              ~f:(fun id -> Mina_base.Account_id.(id > last_migrated_account_id))
+              account_ids
+      in
+      let account_ids_to_migrate =
+        List.sort account_ids_to_migrate_unsorted
+          ~compare:Mina_base.Account_id.compare
+      in
+      [%log info] "Migrating %d accounts" (List.length account_ids_to_migrate) ;
       let%bind () =
-        Deferred.List.iter account_ids ~f:(fun acct_id ->
+        Deferred.List.iter account_ids_to_migrate ~f:(fun acct_id ->
             match Mina_ledger.Ledger.location_of_account ledger acct_id with
             | None ->
                 [%log error] "Could not get location for account"
