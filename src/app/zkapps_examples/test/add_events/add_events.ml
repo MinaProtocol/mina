@@ -36,7 +36,9 @@ let%test_module "Add events test" =
 
     module P = (val p_module)
 
-    let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
+    let vk =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Pickles.Side_loaded.Verification_key.of_compiled tag )
 
     module Deploy_account_update = struct
       let account_update_body : Account_update.Body.t =

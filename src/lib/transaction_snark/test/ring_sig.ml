@@ -133,6 +133,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
               ~choices:(fun ~self:_ -> [ ring_sig_rule ring_member_pks ])
           in
           let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
+          let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk) in
           ( if debug_mode then
             Binable.to_string (module Side_loaded_verification_key.Stable.V2) vk
             |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet

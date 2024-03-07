@@ -14,6 +14,8 @@ fi
 mkdir -p "${XDG_CONFIG_HOME-${HOME}/.config}/nix"
 echo 'experimental-features = nix-command flakes' > "${XDG_CONFIG_HOME-${HOME}/.config}/nix/nix.conf"
 
+nix-env -i git-lfs
+
 git config --global --add safe.directory /workdir
 
 git fetch origin $1:$1

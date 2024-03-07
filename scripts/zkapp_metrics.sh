@@ -12,5 +12,5 @@ echo "Running heap usage app"
 echo "Building zkapp limits app"
 make zkapp_limits
 
-echo "Running heap usage app"
+echo "Running zkapp limits app"
 ./_build/default/src/app/zkapp_limits/zkapp_limits.exe

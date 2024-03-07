@@ -326,8 +326,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; authorization_kind = Signature
         }
       in
-      Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-        zkapp_command_spec
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+            zkapp_command_spec )
     in
 
     let%bind zkapp_command_update_vk_proof, zkapp_command_update_vk_impossible =

@@ -3335,9 +3335,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       val verify : (t * Sok_message.t) list -> unit Or_error.t Async.Deferred.t
 
-      val id : Pickles.Verification_key.Id.t Lazy.t
+      val id : Pickles.Verification_key.Id.t Async.Deferred.t Lazy.t
 
-      val verification_key : Pickles.Verification_key.t Lazy.t
+      val verification_key : Pickles.Verification_key.t Async.Deferred.t Lazy.t
 
       val verify_against_digest : t -> unit Or_error.t Async.Deferred.t
 
@@ -4193,9 +4193,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         let%map (), (), proof = trivial_prover ?handler stmt in
         ((), (), Pickles.Side_loaded.Proof.of_proof proof)
       in
-      let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
-      ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
-      , `Prover trivial_prover )
+      let vk =
+        let%map.Async.Deferred vk =
+          Pickles.Side_loaded.Verification_key.of_compiled tag
+        in
+        With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk
+      in
+      (`VK vk, `Prover trivial_prover)
 
     let%test_unit "creating trivial zkapps with different nonces makes unique \
                    verification keypairs" =
@@ -4224,9 +4228,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       let `VK vk_a, `Prover prover_a =
         create_trivial_snapp ~unique_id:0 ~constraint_constants ()
       in
+      let vk_a = Async.Thread_safe.block_on_async_exn (fun () -> vk_a) in
       let `VK vk_b, `Prover prover_b =
         create_trivial_snapp ~unique_id:1 ~constraint_constants ()
       in
+      let vk_b = Async.Thread_safe.block_on_async_exn (fun () -> vk_b) in
       assert (
         not
           ([%equal:
@@ -4582,6 +4588,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let `VK vk, `Prover _trivial_prover =
         create_trivial_snapp ~constraint_constants ()
       in
+      let%map.Async.Deferred vk = vk in
       (* only allow timing on a single new snapp account
          balance changes for other new snapp accounts are just the account creation fee
       *)
@@ -4712,6 +4719,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         | None ->
             create_trivial_snapp ~constraint_constants ()
       in
+      let%bind.Async.Deferred vk = vk in
       let ( `Zkapp_command { Zkapp_command.fee_payer; memo; _ }
           , `Sender_account_update _
           , `Proof_zkapp_command _
@@ -4865,6 +4873,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             in
             (prover, vk)
       in
+      let%bind.Async.Deferred vk = vk in
       let ( `Zkapp_command ({ Zkapp_command.fee_payer; memo; _ } as p)
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
@@ -5055,6 +5064,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let `VK vk, `Prover trivial_prover =
         create_trivial_snapp ~constraint_constants ()
       in
+      let%bind.Async.Deferred vk = vk in
       let _v =
         let id =
           Public_key.compress sender.public_key

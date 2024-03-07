@@ -2384,6 +2384,8 @@ let%test_module "staged ledger tests" =
     let `VK vk, `Prover zkapp_prover =
       Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
 
+    let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
@@ -4500,8 +4502,8 @@ let%test_module "staged ledger tests" =
             in
             let%map zkapp_command =
               Transaction_snark.For_tests.update_states
-                ~zkapp_prover_and_vk:(zkapp_prover, vk) ~constraint_constants
-                spec
+                ~zkapp_prover_and_vk:(zkapp_prover, Async.Deferred.return vk)
+                ~constraint_constants spec
             in
             let valid_zkapp_command =
               Zkapp_command.Valid.to_valid ~failed:false
@@ -4812,43 +4814,46 @@ let%test_module "staged ledger tests" =
             [ (* command from A that sets a new verification key *)
               { status = Applied
               ; data =
-                  mk_basic_zkapp_command ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
-                    ~fee_payer_pk:a.public_key
-                    ~fee_payer_nonce:(Unsigned.UInt32.of_int 0)
-                    [ mk_basic_node ~account:a ~authorization:Signature
-                        ~update:
-                          { Account_update.Update.noop with
-                            verification_key = Zkapp_basic.Set_or_keep.Set vk_a
-                          }
-                        ()
-                    ]
+                  (let%bind.Async.Deferred vk_a = vk_a in
+                   mk_basic_zkapp_command ~keymap
+                     ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                     ~fee_payer_pk:a.public_key
+                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 0)
+                     [ mk_basic_node ~account:a ~authorization:Signature
+                         ~update:
+                           { Account_update.Update.noop with
+                             verification_key = Zkapp_basic.Set_or_keep.Set vk_a
+                           }
+                         ()
+                     ] )
               }
             ; (* command from B that sets a different verification key *)
               { status = Applied
               ; data =
-                  mk_basic_zkapp_command ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
-                    ~fee_payer_pk:a.public_key
-                    ~fee_payer_nonce:(Unsigned.UInt32.of_int 1)
-                    [ mk_basic_node ~account:b ~authorization:Signature
-                        ~update:
-                          { Account_update.Update.noop with
-                            verification_key = Zkapp_basic.Set_or_keep.Set vk_b
-                          }
-                        ()
-                    ]
+                  (let%bind.Async.Deferred vk_b = vk_b in
+                   mk_basic_zkapp_command ~keymap
+                     ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                     ~fee_payer_pk:a.public_key
+                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 1)
+                     [ mk_basic_node ~account:b ~authorization:Signature
+                         ~update:
+                           { Account_update.Update.noop with
+                             verification_key = Zkapp_basic.Set_or_keep.Set vk_b
+                           }
+                         ()
+                     ] )
               }
             ; (* proven command from A that is valid against the previously set verification key *)
               { status = Applied
               ; data =
-                  mk_basic_zkapp_command ~prover:prover_a ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
-                    ~fee_payer_pk:a.public_key
-                    ~fee_payer_nonce:(Unsigned.UInt32.of_int 2)
-                    [ mk_basic_node ~account:a ~authorization:(Proof vk_a.hash)
-                        ()
-                    ]
+                  (let%bind.Async.Deferred vk_a = vk_a in
+                   mk_basic_zkapp_command ~prover:prover_a ~keymap
+                     ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                     ~fee_payer_pk:a.public_key
+                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 2)
+                     [ mk_basic_node ~account:a ~authorization:(Proof vk_a.hash)
+                         ()
+                     ] )
               }
             ] )
 
@@ -4872,50 +4877,53 @@ let%test_module "staged ledger tests" =
             [ (* successful command from A that sets verification key *)
               { status = Applied
               ; data =
-                  mk_basic_zkapp_command ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
-                    ~fee_payer_pk:a.public_key
-                    ~fee_payer_nonce:(Unsigned.UInt32.of_int 0)
-                    [ mk_basic_node ~account:a ~authorization:Signature
-                        ~update:
-                          { Account_update.Update.noop with
-                            verification_key = Zkapp_basic.Set_or_keep.Set vk_a
-                          }
-                        ()
-                    ]
+                  (let%bind.Async.Deferred vk_a = vk_a in
+                   mk_basic_zkapp_command ~keymap
+                     ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                     ~fee_payer_pk:a.public_key
+                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 0)
+                     [ mk_basic_node ~account:a ~authorization:Signature
+                         ~update:
+                           { Account_update.Update.noop with
+                             verification_key = Zkapp_basic.Set_or_keep.Set vk_a
+                           }
+                         ()
+                     ] )
               }
               (* failing command from A that sets another verification key *)
             ; { status =
                   Failed [ []; [ Account_nonce_precondition_unsatisfied ] ]
               ; data =
-                  mk_basic_zkapp_command ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
-                    ~fee_payer_pk:a.public_key
-                    ~fee_payer_nonce:(Unsigned.UInt32.of_int 1)
-                    [ mk_basic_node ~account:a ~authorization:Signature
-                        ~preconditions:
-                          { Account_update.Preconditions.accept with
-                            account =
-                              Zkapp_precondition.Account.nonce
-                                (Account.Nonce.of_int 0)
-                          }
-                        ~update:
-                          { Account_update.Update.noop with
-                            verification_key = Zkapp_basic.Set_or_keep.Set vk_b
-                          }
-                        ()
-                    ]
+                  (let%bind.Async.Deferred vk_b = vk_b in
+                   mk_basic_zkapp_command ~keymap
+                     ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                     ~fee_payer_pk:a.public_key
+                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 1)
+                     [ mk_basic_node ~account:a ~authorization:Signature
+                         ~preconditions:
+                           { Account_update.Preconditions.accept with
+                             account =
+                               Zkapp_precondition.Account.nonce
+                                 (Account.Nonce.of_int 0)
+                           }
+                         ~update:
+                           { Account_update.Update.noop with
+                             verification_key = Zkapp_basic.Set_or_keep.Set vk_b
+                           }
+                         ()
+                     ] )
               }
             ; (* proven command from A that is valid against the first verification key only *)
               { status = Applied
               ; data =
-                  mk_basic_zkapp_command ~prover:prover_a ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
-                    ~fee_payer_pk:a.public_key
-                    ~fee_payer_nonce:(Unsigned.UInt32.of_int 2)
-                    [ mk_basic_node ~account:a ~authorization:(Proof vk_a.hash)
-                        ()
-                    ]
+                  (let%bind.Async.Deferred vk_a = vk_a in
+                   mk_basic_zkapp_command ~prover:prover_a ~keymap
+                     ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                     ~fee_payer_pk:a.public_key
+                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 2)
+                     [ mk_basic_node ~account:a ~authorization:(Proof vk_a.hash)
+                         ()
+                     ] )
               }
             ] )
 
@@ -4981,7 +4989,9 @@ let%test_module "staged ledger tests" =
                     l
                   in
                   let%bind zkapp_command =
-                    let zkapp_prover_and_vk = (zkapp_prover, vk) in
+                    let zkapp_prover_and_vk =
+                      (zkapp_prover, Async.Deferred.return vk)
+                    in
                     Transaction_snark.For_tests.update_states
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
@@ -5106,7 +5116,9 @@ let%test_module "staged ledger tests" =
                     Signature_lib.Public_key.compress
                       zkapp_account_keypair.public_key
                   in
-                  let zkapp_prover_and_vk = (zkapp_prover, vk) in
+                  let zkapp_prover_and_vk =
+                    (zkapp_prover, Async.Deferred.return vk)
+                  in
                   let%bind zkapp_command =
                     single_account_update
                       ~chain:Mina_signature_kind.(Other_network "invalid")

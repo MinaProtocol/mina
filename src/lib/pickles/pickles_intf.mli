@@ -66,9 +66,13 @@ module type S = sig
 
     type t
 
-    val verification_key : Verification_key.t Lazy.t
+    val verification_key_promise : Verification_key.t Promise.t Lazy.t
 
-    val id : Verification_key.Id.t Lazy.t
+    val verification_key : Verification_key.t Deferred.t Lazy.t
+
+    val id_promise : Verification_key.Id.t Promise.t Lazy.t
+
+    val id : Verification_key.Id.t Deferred.t Lazy.t
 
     val verify : (statement * t) list -> unit Or_error.t Deferred.t
 
@@ -183,7 +187,10 @@ module type S = sig
       *)
       }
 
-    (** This type models an "inductive rule". It includes
+    module Make (M : sig
+      type _ t
+    end) : sig
+      (** This type models an "inductive rule". It includes
         - the list of previous statements which this one assumes
         - the snarky main function
 
@@ -219,24 +226,35 @@ module type S = sig
           auxiliary data, to be returned to the prover but not exposed in the
           public input.
     *)
-    type ( 'prev_vars
-         , 'prev_values
-         , 'widths
-         , 'heights
-         , 'a_var
-         , 'a_value
-         , 'ret_var
-         , 'ret_value
-         , 'auxiliary_var
-         , 'auxiliary_value )
-         t =
-      { identifier : string
-      ; prevs : ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
-      ; main :
-             'a_var main_input
-          -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return
-      ; feature_flags : bool Pickles_types.Plonk_types.Features.t
-      }
+      type ( 'prev_vars
+           , 'prev_values
+           , 'widths
+           , 'heights
+           , 'a_var
+           , 'a_value
+           , 'ret_var
+           , 'ret_value
+           , 'auxiliary_var
+           , 'auxiliary_value )
+           t =
+        { identifier : string
+        ; prevs : ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
+        ; main :
+               'a_var main_input
+            -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return M.t
+        ; feature_flags : bool Pickles_types.Plonk_types.Features.t
+        }
+    end
+
+    module Promise : sig
+      include module type of Make (Promise)
+    end
+
+    module Deferred : sig
+      include module type of Make (Deferred)
+    end
+
+    include module type of Make (Id)
   end
 
   val verify_promise :
@@ -273,7 +291,7 @@ module type S = sig
   module Cache_handle : sig
     type t
 
-    val generate_or_load : t -> Dirty.t
+    val generate_or_load : t -> Dirty.t Promise.t
   end
 
   module Storables : sig
@@ -307,7 +325,9 @@ module type S = sig
 
       val typ : (Checked.t, t) Impls.Step.Typ.t
 
-      val of_compiled : _ Tag.t -> t
+      val of_compiled_promise : _ Tag.t -> t Promise.t
+
+      val of_compiled : _ Tag.t -> t Deferred.t
 
       module Max_branches : Nat.Add.Intf
 
@@ -376,7 +396,6 @@ module type S = sig
     -> ?disk_keys:
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
-    -> ?return_early_digest_exception:bool
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> public_input:
          ( 'var
@@ -404,7 +423,7 @@ module type S = sig
              , 'ret_value
              , 'auxiliary_var
              , 'auxiliary_value )
-             H4_6.T(Inductive_rule).t )
+             H4_6.T(Inductive_rule.Promise).t )
     -> unit
     -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
        * Cache_handle.t
@@ -460,6 +479,61 @@ module type S = sig
              , 'auxiliary_var
              , 'auxiliary_value )
              H4_6.T(Inductive_rule).t )
+    -> unit
+    -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
+       * Cache_handle.t
+       * (module Proof_intf
+            with type t = ('max_proofs_verified, 'max_proofs_verified) Proof.t
+             and type statement = 'value )
+       * ( 'prev_valuess
+         , 'widthss
+         , 'heightss
+         , 'a_value
+         , ( 'ret_value
+           * 'auxiliary_value
+           * ('max_proofs_verified, 'max_proofs_verified) Proof.t )
+           Deferred.t )
+         H3_2.T(Prover).t
+
+  (** This compiles a series of inductive rules defining a set into a proof
+      system for proving membership in that set, with a prover corresponding
+      to each inductive rule. *)
+  val compile_async :
+       ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
+    -> ?cache:Key_cache.Spec.t list
+    -> ?storables:Storables.t
+    -> ?proof_cache:Proof_cache.t
+    -> ?disk_keys:
+         (Cache.Step.Key.Verification.t, 'branches) Vector.t
+         * Cache.Wrap.Key.Verification.t
+    -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+    -> public_input:
+         ( 'var
+         , 'value
+         , 'a_var
+         , 'a_value
+         , 'ret_var
+         , 'ret_value )
+         Inductive_rule.public_input
+    -> auxiliary_typ:('auxiliary_var, 'auxiliary_value) Impls.Step.Typ.t
+    -> branches:(module Nat.Intf with type n = 'branches)
+    -> max_proofs_verified:
+         (module Nat.Add.Intf with type n = 'max_proofs_verified)
+    -> name:string
+    -> constraint_constants:Snark_keys_header.Constraint_constants.t
+    -> choices:
+         (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
+          -> ( 'prev_varss
+             , 'prev_valuess
+             , 'widthss
+             , 'heightss
+             , 'a_var
+             , 'a_value
+             , 'ret_var
+             , 'ret_value
+             , 'auxiliary_var
+             , 'auxiliary_value )
+             H4_6.T(Inductive_rule.Deferred).t )
     -> unit
     -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
        * Cache_handle.t
