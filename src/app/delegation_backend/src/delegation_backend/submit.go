@@ -34,22 +34,30 @@ func writeErrorResponse(app *App, w *http.ResponseWriter, msg string) {
 
 func (ctx *AwsContext) S3Save(objs ObjectsToSave) {
 	for path, bs := range objs {
-		_, err := ctx.Client.HeadObject(ctx.Context, &s3.HeadObjectInput{
-			Bucket: ctx.BucketName,
-			Key:    aws.String(ctx.Prefix + "/" + path),
-		})
-		if err == nil {
-			ctx.Log.Warnf("object already exists: %s", path)
+		fullKey := aws.String(ctx.Prefix + "/" + path)
+		if strings.HasPrefix(path, "blocks/") {
+			_, err := ctx.Client.HeadObject(ctx.Context, &s3.HeadObjectInput{
+				Bucket: ctx.BucketName,
+				Key:    fullKey,
+			})
+			if err == nil {
+				//block already exists, skipping
+				continue
+			}
+			if !strings.Contains(err.Error(), "NotFound") {
+				ctx.Log.Warnf("S3Save: Error when checking if block exists, but will continue with block save: %s, error: %v", path, err)
+			}
 		}
 
-		_, err = ctx.Client.PutObject(ctx.Context, &s3.PutObjectInput{
+		ctx.Log.Debugf("S3Save: saving %s", path)
+		_, err := ctx.Client.PutObject(ctx.Context, &s3.PutObjectInput{
 			Bucket:     ctx.BucketName,
-			Key:        aws.String(ctx.Prefix + "/" + path),
+			Key:        fullKey,
 			Body:       bytes.NewReader(bs),
 			ContentMD5: nil,
 		})
 		if err != nil {
-			ctx.Log.Warnf("Error while saving metadata: %v", err)
+			ctx.Log.Warnf("S3Save: Error while saving metadata: %v", err)
 		}
 	}
 }
@@ -175,7 +183,7 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	metaBytes, err1 := req.MakeMetaToBeSaved(remoteAddr)
 	if err1 != nil {
-		h.app.Log.Errorf("Error while marshaling JSON for metaToBeSaved: %v", err)
+		h.app.Log.Errorf("Error while marshaling JSON for metaToBeSaved: %v", err1)
 		w.WriteHeader(500)
 		writeErrorResponse(h.app, &w, "Unexpected server error")
 		return

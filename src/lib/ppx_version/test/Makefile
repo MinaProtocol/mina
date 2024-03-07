@@ -11,14 +11,13 @@ endif
 
 .PHONY: positive-tests negative-tests
 
-# all : positive-tests negative-tests
-all : negative-tests
+all : positive-tests negative-tests
 
 positive-tests :
 # version syntax
 	@ echo -n "Version syntax, should succeed..."
-	dune build good_version_syntax.cma ${REDIRECT}
-	echo "OK"
+	@ dune build good_version_syntax.cma ${REDIRECT}
+	@ echo "OK"
 # versioning
 	@ echo -n "Versioned types, should succeed..."
 	@ dune build versioned_good.cma ${REDIRECT}

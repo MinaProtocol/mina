@@ -93,6 +93,11 @@ variable "log_precomputed_blocks" {
   type = bool
 }
 
+variable "start_filtered_logs" {
+  type    = list(string)
+  default = []
+}
+
 variable "worker_cpu_request" {
   type    = number
   default = 0
