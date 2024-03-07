@@ -3,14 +3,14 @@ open Core_kernel
 [@@@warning "-4"] (* sexp-related fragile pattern-matching warning *)
 
 [%%versioned
-module Stable = struct
-  module V1 = struct
-    type t = Mina_wire_types.Pickles_base.Proofs_verified.V1.t = N0 | N1 | N2
-    [@@deriving sexp, compare, yojson, hash, equal]
+  module Stable = struct
+    module V1 = struct
+      type t = Mina_wire_types.Pickles_base.Proofs_verified.V1.t = N0 | N1 | N2
+      [@@deriving sexp, compare, yojson, hash, equal]
 
-    let to_latest = Fn.id
-  end
-end]
+      let to_latest = Fn.id
+    end
+  end]
 
 [@@@warning "+4"]
 
@@ -44,24 +44,24 @@ let of_nat (type n) (n : n Pickles_types.Nat.t) : t =
   let open Pickles_types.Nat in
   match n with
   | Z ->
-      N0
+    N0
   | S Z ->
-      N1
+    N1
   | S (S Z) ->
-      N2
+    N2
   | S _ ->
-      failwithf "Proofs_verified.of_nat: got %d" (to_int n) ()
+    failwithf "Proofs_verified.of_nat: got %d" (to_int n) ()
 
 let of_int (n : int) : t =
   match n with
   | 0 ->
-      N0
+    N0
   | 1 ->
-      N1
+    N1
   | 2 ->
-      N2
+    N2
   | _ ->
-      failwithf "Proofs_verified.of_int: got %d" n ()
+    failwithf "Proofs_verified.of_int: got %d" n ()
 
 type 'f boolean = 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
 
@@ -74,25 +74,25 @@ module Prefix_mask = struct
 
   let[@warning "-40-42"] there : proofs_verified -> bool vec2 = function
     | N0 ->
-        [ false; false ]
+      [ false; false ]
     | N1 ->
-        [ false; true ]
+      [ false; true ]
     | N2 ->
-        [ true; true ]
+      [ true; true ]
 
   let[@warning "-40-42"] back : bool vec2 -> proofs_verified = function
     | [ false; false ] ->
-        N0
+      N0
     | [ false; true ] ->
-        N1
+      N1
     | [ true; true ] ->
-        N2
+      N2
     | [ true; false ] ->
-        invalid_arg "Prefix_mask.back: invalid mask [false; true]"
+      invalid_arg "Prefix_mask.back: invalid mask [false; true]"
 
   let typ (type f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) :
-      (f Checked.t, proofs_verified) Impl.Typ.t =
+    (f Checked.t, proofs_verified) Impl.Typ.t =
     let open Impl in
     Typ.transport
       (Pickles_types.Vector.typ Boolean.typ Pickles_types.Nat.N2.n)
@@ -114,29 +114,29 @@ module One_hot = struct
 
   let back : int -> proofs_verified = function
     | 0 ->
-        N0
+      N0
     | 1 ->
-        N1
+      N1
     | 2 ->
-        N2
+      N2
     | _ ->
-        failwith "Invalid mask"
+      failwith "Invalid mask"
 
   let to_input ~zero ~one (t : t) =
     let one_hot =
       match t with
       | N0 ->
-          [| one; zero; zero |]
+        [| one; zero; zero |]
       | N1 ->
-          [| zero; one; zero |]
+        [| zero; one; zero |]
       | N2 ->
-          [| zero; zero; one |]
+        [| zero; zero; one |]
     in
     Random_oracle_input.Chunked.packeds (Array.map one_hot ~f:(fun b -> (b, 1)))
 
   let typ (type f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) :
-      (f Checked.t, proofs_verified) Impl.Typ.t =
+    (f Checked.t, proofs_verified) Impl.Typ.t =
     let module M = One_hot_vector.Make (Impl) in
     let open Impl in
     Typ.transport (M.typ Pickles_types.Nat.N3.n) ~there ~back

@@ -27,15 +27,18 @@ pub mod gate_vector;
 pub mod projective;
 
 /// SRS
+pub mod pairing_srs;
 pub mod srs;
 
 /// Indexes
+pub mod bn254_fp_plonk_index;
 pub mod pasta_fp_plonk_index;
 pub mod pasta_fq_plonk_index;
 
 /// Verifier indexes/keys
 pub mod plonk_verifier_index;
 
+pub mod bn254_fp_plonk_verifier_index;
 pub mod pasta_fp_plonk_verifier_index;
 pub mod pasta_fq_plonk_verifier_index;
 
@@ -43,6 +46,7 @@ pub mod pasta_fq_plonk_verifier_index;
 pub mod oracles;
 
 /// Proofs
+pub mod bn254_fp_plonk_proof;
 pub mod pasta_fp_plonk_proof;
 pub mod pasta_fq_plonk_proof;
 
@@ -62,8 +66,9 @@ pub use {
     },
     kimchi::proof::caml::CamlProofEvaluations,
     kimchi::prover::caml::{
-        CamlLookupCommitments, CamlProofWithPublic, CamlProverCommitments, CamlProverProof,
+        CamlKzgProofWithPublic, CamlKzgProverProof, CamlLookupCommitments, CamlProofWithPublic,
+        CamlProverCommitments, CamlProverProof,
     },
     mina_poseidon::sponge::caml::CamlScalarChallenge,
-    poly_commitment::commitment::caml::{CamlOpeningProof, CamlPolyComm},
+    poly_commitment::commitment::caml::{CamlOpeningProof, CamlPairingProof, CamlPolyComm},
 };

@@ -55,16 +55,16 @@ module Row = struct
 
   (** Either a public input row,
       or a non-public input row that starts at index 0.
-    *)
+  *)
   type t = Public_input of int | After_public_input of int
   [@@deriving hash, sexp, compare]
 
   let to_absolute ~public_input_size = function
     | Public_input i ->
-        i
+      i
     | After_public_input i ->
-        (* the first i rows are public-input rows *)
-        i + public_input_size
+      (* the first i rows are public-input rows *)
+      i + public_input_size
 end
 
 (* TODO: rename module Position to Permutation/Wiring? *)
@@ -84,7 +84,7 @@ module Position = struct
       append enough column wires to get an entire row.
       The wire appended will simply point to themselves,
       so as to not take part in the permutation argument.
-    *)
+  *)
   let append_cols (row : 'row) (cols : _ t array) : _ t array =
     let padding_offset = Array.length cols in
     assert (padding_offset <= Constants.permutation_cols) ;
@@ -95,12 +95,12 @@ module Position = struct
     Array.append cols padding
 
   (** Converts an array of [Constants.columns] to [Constants.permutation_cols].
-    This is useful to truncate arrays of cells to the ones that only matter for the permutation argument.
-    *)
+      This is useful to truncate arrays of cells to the ones that only matter for the permutation argument.
+  *)
   let cols_to_perms cols = Array.slice cols 0 Constants.permutation_cols
 
   (** Converts a [Position.t] into the Rust-compatible type [Kimchi_types.wire].
-    *)
+  *)
   let to_rust_wire { row; col } : Kimchi_types.wire = { row; col }
 end
 
@@ -152,7 +152,7 @@ module Plonk_constraint = struct
   module T = struct
     type ('v, 'f) t =
       | Basic of { l : 'f * 'v; r : 'f * 'v; o : 'f * 'v; m : 'f; c : 'f }
-          (** the Poseidon state is an array of states (and states are arrays of size 3). *)
+      (** the Poseidon state is an array of states (and states are arrays of size 3). *)
       | Poseidon of { state : 'v array array }
       | EC_add_complete of
           { p1 : 'v * 'v
@@ -188,7 +188,7 @@ module Plonk_constraint = struct
           ; v0c7 : 'v (* LSBs *)
           ; (* Coefficients *)
             compact : 'f
-                (* Limbs mode coefficient: 0 (standard 3-limb) or 1 (compact 2-limb) *)
+            (* Limbs mode coefficient: 0 (standard 3-limb) or 1 (compact 2-limb) *)
           }
       | RangeCheck1 of
           { (* Current row *)
@@ -317,46 +317,46 @@ module Plonk_constraint = struct
       let fp (x, y) = (f x, f y) in
       match t with
       | Basic { l; r; o; m; c } ->
-          let p (x, y) = (x, f y) in
-          Basic { l = p l; r = p r; o = p o; m; c }
+        let p (x, y) = (x, f y) in
+        Basic { l = p l; r = p r; o = p o; m; c }
       | Poseidon { state } ->
-          Poseidon { state = Array.map ~f:(fun x -> Array.map ~f x) state }
+        Poseidon { state = Array.map ~f:(fun x -> Array.map ~f x) state }
       | EC_add_complete { p1; p2; p3; inf; same_x; slope; inf_z; x21_inv } ->
-          EC_add_complete
-            { p1 = fp p1
-            ; p2 = fp p2
-            ; p3 = fp p3
-            ; inf = f inf
-            ; same_x = f same_x
-            ; slope = f slope
-            ; inf_z = f inf_z
-            ; x21_inv = f x21_inv
-            }
+        EC_add_complete
+          { p1 = fp p1
+          ; p2 = fp p2
+          ; p3 = fp p3
+          ; inf = f inf
+          ; same_x = f same_x
+          ; slope = f slope
+          ; inf_z = f inf_z
+          ; x21_inv = f x21_inv
+          }
       | EC_scale { state } ->
-          EC_scale
-            { state = Array.map ~f:(fun x -> Scale_round.map ~f x) state }
+        EC_scale
+          { state = Array.map ~f:(fun x -> Scale_round.map ~f x) state }
       | EC_endoscale { state; xs; ys; n_acc } ->
-          EC_endoscale
-            { state = Array.map ~f:(fun x -> Endoscale_round.map ~f x) state
-            ; xs = f xs
-            ; ys = f ys
-            ; n_acc = f n_acc
-            }
+        EC_endoscale
+          { state = Array.map ~f:(fun x -> Endoscale_round.map ~f x) state
+          ; xs = f xs
+          ; ys = f ys
+          ; n_acc = f n_acc
+          }
       | EC_endoscalar { state } ->
-          EC_endoscalar
-            { state =
-                Array.map ~f:(fun x -> Endoscale_scalar_round.map ~f x) state
-            }
+        EC_endoscalar
+          { state =
+              Array.map ~f:(fun x -> Endoscale_scalar_round.map ~f x) state
+          }
       | Lookup { w0; w1; w2; w3; w4; w5; w6 } ->
-          Lookup
-            { w0 = f w0
-            ; w1 = f w1
-            ; w2 = f w2
-            ; w3 = f w3
-            ; w4 = f w4
-            ; w5 = f w5
-            ; w6 = f w6
-            }
+        Lookup
+          { w0 = f w0
+          ; w1 = f w1
+          ; w2 = f w2
+          ; w3 = f w3
+          ; w4 = f w4
+          ; w5 = f w5
+          ; w6 = f w6
+          }
       | RangeCheck0
           { v0
           ; v0p0
@@ -375,24 +375,24 @@ module Plonk_constraint = struct
           ; v0c7
           ; compact
           } ->
-          RangeCheck0
-            { v0 = f v0
-            ; v0p0 = f v0p0
-            ; v0p1 = f v0p1
-            ; v0p2 = f v0p2
-            ; v0p3 = f v0p3
-            ; v0p4 = f v0p4
-            ; v0p5 = f v0p5
-            ; v0c0 = f v0c0
-            ; v0c1 = f v0c1
-            ; v0c2 = f v0c2
-            ; v0c3 = f v0c3
-            ; v0c4 = f v0c4
-            ; v0c5 = f v0c5
-            ; v0c6 = f v0c6
-            ; v0c7 = f v0c7
-            ; compact
-            }
+        RangeCheck0
+          { v0 = f v0
+          ; v0p0 = f v0p0
+          ; v0p1 = f v0p1
+          ; v0p2 = f v0p2
+          ; v0p3 = f v0p3
+          ; v0p4 = f v0p4
+          ; v0p5 = f v0p5
+          ; v0c0 = f v0c0
+          ; v0c1 = f v0c1
+          ; v0c2 = f v0c2
+          ; v0c3 = f v0c3
+          ; v0c4 = f v0c4
+          ; v0c5 = f v0c5
+          ; v0c6 = f v0c6
+          ; v0c7 = f v0c7
+          ; compact
+          }
       | RangeCheck1
           { (* Current row *) v2
           ; v12
@@ -425,38 +425,38 @@ module Plonk_constraint = struct
           ; v2c18
           ; v2c19
           } ->
-          RangeCheck1
-            { (* Current row *) v2 = f v2
-            ; v12 = f v12
-            ; v2c0 = f v2c0
-            ; v2p0 = f v2p0
-            ; v2p1 = f v2p1
-            ; v2p2 = f v2p2
-            ; v2p3 = f v2p3
-            ; v2c1 = f v2c1
-            ; v2c2 = f v2c2
-            ; v2c3 = f v2c3
-            ; v2c4 = f v2c4
-            ; v2c5 = f v2c5
-            ; v2c6 = f v2c6
-            ; v2c7 = f v2c7
-            ; v2c8 = f v2c8
-            ; (* Next row *) v2c9 = f v2c9
-            ; v2c10 = f v2c10
-            ; v2c11 = f v2c11
-            ; v0p0 = f v0p0
-            ; v0p1 = f v0p1
-            ; v1p0 = f v1p0
-            ; v1p1 = f v1p1
-            ; v2c12 = f v2c12
-            ; v2c13 = f v2c13
-            ; v2c14 = f v2c14
-            ; v2c15 = f v2c15
-            ; v2c16 = f v2c16
-            ; v2c17 = f v2c17
-            ; v2c18 = f v2c18
-            ; v2c19 = f v2c19
-            }
+        RangeCheck1
+          { (* Current row *) v2 = f v2
+          ; v12 = f v12
+          ; v2c0 = f v2c0
+          ; v2p0 = f v2p0
+          ; v2p1 = f v2p1
+          ; v2p2 = f v2p2
+          ; v2p3 = f v2p3
+          ; v2c1 = f v2c1
+          ; v2c2 = f v2c2
+          ; v2c3 = f v2c3
+          ; v2c4 = f v2c4
+          ; v2c5 = f v2c5
+          ; v2c6 = f v2c6
+          ; v2c7 = f v2c7
+          ; v2c8 = f v2c8
+          ; (* Next row *) v2c9 = f v2c9
+          ; v2c10 = f v2c10
+          ; v2c11 = f v2c11
+          ; v0p0 = f v0p0
+          ; v0p1 = f v0p1
+          ; v1p0 = f v1p0
+          ; v1p1 = f v1p1
+          ; v2c12 = f v2c12
+          ; v2c13 = f v2c13
+          ; v2c14 = f v2c14
+          ; v2c15 = f v2c15
+          ; v2c16 = f v2c16
+          ; v2c17 = f v2c17
+          ; v2c18 = f v2c18
+          ; v2c19 = f v2c19
+          }
       | Xor
           { in1
           ; in2
@@ -474,23 +474,23 @@ module Plonk_constraint = struct
           ; out_2
           ; out_3
           } ->
-          Xor
-            { in1 = f in1
-            ; in2 = f in2
-            ; out = f out
-            ; in1_0 = f in1_0
-            ; in1_1 = f in1_1
-            ; in1_2 = f in1_2
-            ; in1_3 = f in1_3
-            ; in2_0 = f in2_0
-            ; in2_1 = f in2_1
-            ; in2_2 = f in2_2
-            ; in2_3 = f in2_3
-            ; out_0 = f out_0
-            ; out_1 = f out_1
-            ; out_2 = f out_2
-            ; out_3 = f out_3
-            }
+        Xor
+          { in1 = f in1
+          ; in2 = f in2
+          ; out = f out
+          ; in1_0 = f in1_0
+          ; in1_1 = f in1_1
+          ; in1_2 = f in1_2
+          ; in1_3 = f in1_3
+          ; in2_0 = f in2_0
+          ; in2_1 = f in2_1
+          ; in2_2 = f in2_2
+          ; in2_3 = f in2_3
+          ; out_0 = f out_0
+          ; out_1 = f out_1
+          ; out_2 = f out_2
+          ; out_3 = f out_3
+          }
       | ForeignFieldAdd
           { left_input_lo
           ; left_input_mi
@@ -505,20 +505,20 @@ module Plonk_constraint = struct
           ; foreign_field_modulus2
           ; sign
           } ->
-          ForeignFieldAdd
-            { left_input_lo = f left_input_lo
-            ; left_input_mi = f left_input_mi
-            ; left_input_hi = f left_input_hi
-            ; right_input_lo = f right_input_lo
-            ; right_input_mi = f right_input_mi
-            ; right_input_hi = f right_input_hi
-            ; field_overflow = f field_overflow
-            ; carry = f carry
-            ; (* Coefficients *) foreign_field_modulus0
-            ; foreign_field_modulus1
-            ; foreign_field_modulus2
-            ; sign
-            }
+        ForeignFieldAdd
+          { left_input_lo = f left_input_lo
+          ; left_input_mi = f left_input_mi
+          ; left_input_hi = f left_input_hi
+          ; right_input_lo = f right_input_lo
+          ; right_input_mi = f right_input_mi
+          ; right_input_hi = f right_input_hi
+          ; field_overflow = f field_overflow
+          ; carry = f carry
+          ; (* Coefficients *) foreign_field_modulus0
+          ; foreign_field_modulus1
+          ; foreign_field_modulus2
+          ; sign
+          }
       | ForeignFieldMul
           { left_input0
           ; left_input1
@@ -552,39 +552,39 @@ module Plonk_constraint = struct
           ; neg_foreign_field_modulus1
           ; neg_foreign_field_modulus2
           } ->
-          ForeignFieldMul
-            { left_input0 = f left_input0
-            ; left_input1 = f left_input1
-            ; left_input2 = f left_input2
-            ; right_input0 = f right_input0
-            ; right_input1 = f right_input1
-            ; right_input2 = f right_input2
-            ; remainder01 = f remainder01
-            ; remainder2 = f remainder2
-            ; quotient0 = f quotient0
-            ; quotient1 = f quotient1
-            ; quotient2 = f quotient2
-            ; quotient_hi_bound = f quotient_hi_bound
-            ; product1_lo = f product1_lo
-            ; product1_hi_0 = f product1_hi_0
-            ; product1_hi_1 = f product1_hi_1
-            ; carry0 = f carry0
-            ; carry1_0 = f carry1_0
-            ; carry1_12 = f carry1_12
-            ; carry1_24 = f carry1_24
-            ; carry1_36 = f carry1_36
-            ; carry1_48 = f carry1_48
-            ; carry1_60 = f carry1_60
-            ; carry1_72 = f carry1_72
-            ; carry1_84 = f carry1_84
-            ; carry1_86 = f carry1_86
-            ; carry1_88 = f carry1_88
-            ; carry1_90 = f carry1_90
-            ; (* Coefficients *) foreign_field_modulus2
-            ; neg_foreign_field_modulus0
-            ; neg_foreign_field_modulus1
-            ; neg_foreign_field_modulus2
-            }
+        ForeignFieldMul
+          { left_input0 = f left_input0
+          ; left_input1 = f left_input1
+          ; left_input2 = f left_input2
+          ; right_input0 = f right_input0
+          ; right_input1 = f right_input1
+          ; right_input2 = f right_input2
+          ; remainder01 = f remainder01
+          ; remainder2 = f remainder2
+          ; quotient0 = f quotient0
+          ; quotient1 = f quotient1
+          ; quotient2 = f quotient2
+          ; quotient_hi_bound = f quotient_hi_bound
+          ; product1_lo = f product1_lo
+          ; product1_hi_0 = f product1_hi_0
+          ; product1_hi_1 = f product1_hi_1
+          ; carry0 = f carry0
+          ; carry1_0 = f carry1_0
+          ; carry1_12 = f carry1_12
+          ; carry1_24 = f carry1_24
+          ; carry1_36 = f carry1_36
+          ; carry1_48 = f carry1_48
+          ; carry1_60 = f carry1_60
+          ; carry1_72 = f carry1_72
+          ; carry1_84 = f carry1_84
+          ; carry1_86 = f carry1_86
+          ; carry1_88 = f carry1_88
+          ; carry1_90 = f carry1_90
+          ; (* Coefficients *) foreign_field_modulus2
+          ; neg_foreign_field_modulus0
+          ; neg_foreign_field_modulus1
+          ; neg_foreign_field_modulus2
+          }
       | Rot64
           { (* Current row *) word
           ; rotated
@@ -603,32 +603,32 @@ module Plonk_constraint = struct
           ; bound_crumb7
           ; (* Coefficients *) two_to_rot
           } ->
-          Rot64
-            { word = f word
-            ; rotated = f rotated
-            ; excess = f excess
-            ; bound_limb0 = f bound_limb0
-            ; bound_limb1 = f bound_limb1
-            ; bound_limb2 = f bound_limb2
-            ; bound_limb3 = f bound_limb3
-            ; bound_crumb0 = f bound_crumb0
-            ; bound_crumb1 = f bound_crumb1
-            ; bound_crumb2 = f bound_crumb2
-            ; bound_crumb3 = f bound_crumb3
-            ; bound_crumb4 = f bound_crumb4
-            ; bound_crumb5 = f bound_crumb5
-            ; bound_crumb6 = f bound_crumb6
-            ; bound_crumb7 = f bound_crumb7
-            ; (* Coefficients *) two_to_rot
-            }
+        Rot64
+          { word = f word
+          ; rotated = f rotated
+          ; excess = f excess
+          ; bound_limb0 = f bound_limb0
+          ; bound_limb1 = f bound_limb1
+          ; bound_limb2 = f bound_limb2
+          ; bound_limb3 = f bound_limb3
+          ; bound_crumb0 = f bound_crumb0
+          ; bound_crumb1 = f bound_crumb1
+          ; bound_crumb2 = f bound_crumb2
+          ; bound_crumb3 = f bound_crumb3
+          ; bound_crumb4 = f bound_crumb4
+          ; bound_crumb5 = f bound_crumb5
+          ; bound_crumb6 = f bound_crumb6
+          ; bound_crumb7 = f bound_crumb7
+          ; (* Coefficients *) two_to_rot
+          }
       | AddFixedLookupTable { id; data } ->
-          (* TODO: see a possible better API -
-             https://github.com/MinaProtocol/mina/issues/13984 *)
-          AddFixedLookupTable { id; data }
+        (* TODO: see a possible better API -
+           https://github.com/MinaProtocol/mina/issues/13984 *)
+        AddFixedLookupTable { id; data }
       | AddRuntimeTableCfg { id; first_column } ->
-          AddRuntimeTableCfg { id; first_column }
+        AddRuntimeTableCfg { id; first_column }
       | Raw { kind; values; coeffs } ->
-          Raw { kind; values = Array.map ~f values; coeffs }
+        Raw { kind; values = Array.map ~f values; coeffs }
 
     (** [eval (module F) get_variable gate] checks that [gate]'s polynomial is
         satisfied by the assignments given by [get_variable].
@@ -640,27 +640,27 @@ module Plonk_constraint = struct
       match t with
       (* cl * vl + cr * vr + co * vo + m * vl*vr + c = 0 *)
       | Basic { l = cl, vl; r = cr, vr; o = co, vo; m; c } ->
-          let vl = eval_one vl in
-          let vr = eval_one vr in
-          let vo = eval_one vo in
-          let open F in
-          let res =
-            List.reduce_exn ~f:add
-              [ mul cl vl; mul cr vr; mul co vo; mul m (mul vl vr); c ]
-          in
-          if not (equal zero res) then (
-            eprintf
-              !"%{sexp:t} * %{sexp:t}\n\
-                + %{sexp:t} * %{sexp:t}\n\
-                + %{sexp:t} * %{sexp:t}\n\
-                + %{sexp:t} * %{sexp:t}\n\
-                + %{sexp:t}\n\
-                = %{sexp:t}%!"
-              cl vl cr vr co vo m (mul vl vr) c res ;
-            false )
-          else true
+        let vl = eval_one vl in
+        let vr = eval_one vr in
+        let vo = eval_one vo in
+        let open F in
+        let res =
+          List.reduce_exn ~f:add
+            [ mul cl vl; mul cr vr; mul co vo; mul m (mul vl vr); c ]
+        in
+        if not (equal zero res) then (
+          eprintf
+            !"%{sexp:t} * %{sexp:t}\n\
+              + %{sexp:t} * %{sexp:t}\n\
+              + %{sexp:t} * %{sexp:t}\n\
+              + %{sexp:t} * %{sexp:t}\n\
+              + %{sexp:t}\n\
+              = %{sexp:t}%!"
+            cl vl cr vr co vo m (mul vl vr) c res ;
+          false )
+        else true
       | _ ->
-          true
+        true
   end
 
   include T
@@ -684,11 +684,11 @@ module V = struct
     *)
     type t =
       | External of int
-          (** An external variable (generated by snarky, via [exists]). *)
+      (** An external variable (generated by snarky, via [exists]). *)
       | Internal of Internal_var.t
-          (** An internal variable is generated to hold an intermediate value
-              (e.g., in reducing linear combinations to single PLONK positions).
-          *)
+      (** An internal variable is generated to hold an intermediate value
+          (e.g., in reducing linear combinations to single PLONK positions).
+      *)
     [@@deriving compare, hash, sexp]
   end
 
@@ -699,13 +699,13 @@ end
 
 (** Keeps track of a circuit (which is a list of gates)
     while it is being written.
-  *)
+*)
 type ('f, 'rust_gates) circuit =
   | Unfinalized_rev of (unit, 'f) Gate_spec.t list
-      (** A circuit still being written. *)
+  (** A circuit still being written. *)
   | Compiled of Core_kernel.Md5.t * 'rust_gates
-      (** Once finalized, a circuit is represented as a digest
-    and a list of gates that corresponds to the circuit.
+  (** Once finalized, a circuit is represented as a digest
+      and a list of gates that corresponds to the circuit.
   *)
 
 type 'f fixed_lookup_tables =
@@ -729,12 +729,12 @@ type ('f, 'rust_gates) t =
        The finalized tag contains the digest of the circuit.
     *)
     mutable gates : ('f, 'rust_gates) circuit
-        (* Witnesses values corresponding to each runtime lookups *)
+  (* Witnesses values corresponding to each runtime lookups *)
   ; mutable runtime_lookups_rev : (V.t * (V.t * V.t)) list
-        (* The user-provided lookup tables associated with this circuit. *)
+  (* The user-provided lookup tables associated with this circuit. *)
   ; mutable fixed_lookup_tables : 'f fixed_lookup_tables
-        (* The user-provided runtime table configurations associated with this
-            circuit. *)
+  (* The user-provided runtime table configurations associated with this
+      circuit. *)
   ; mutable runtime_tables_cfg : 'f runtime_tables_cfg
   ; (* The row to use the next time we add a constraint. *)
     mutable next_row : int
@@ -751,16 +751,16 @@ type ('f, 'rust_gates) t =
        use a fresh generic constraint each time to create a constant.
     *)
     cached_constants : ('f, V.t) Core_kernel.Hashtbl.t
-        (* The [equivalence_classes] field keeps track of the positions which must be
-             enforced to be equivalent due to the fact that they correspond to the same V.t value.
-             I.e., positions that are different usages of the same [V.t].
+  (* The [equivalence_classes] field keeps track of the positions which must be
+       enforced to be equivalent due to the fact that they correspond to the same V.t value.
+       I.e., positions that are different usages of the same [V.t].
 
-             We use a union-find data structure to track equalities that a constraint system wants
-             enforced *between* [V.t] values. Then, at the end, for all [V.t]s that have been unioned
-             together, we combine their equivalence classes in the [equivalence_classes] table into
-             a single equivalence class, so that the permutation argument enforces these desired equalities
-             as well.
-        *)
+       We use a union-find data structure to track equalities that a constraint system wants
+       enforced *between* [V.t] values. Then, at the end, for all [V.t]s that have been unioned
+       together, we combine their equivalence classes in the [equivalence_classes] table into
+       a single equivalence class, so that the permutation argument enforces these desired equalities
+       as well.
+  *)
   ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
   }
 
@@ -776,44 +776,44 @@ let set_prev_challenges sys challenges =
 let get_concatenated_fixed_lookup_table_size sys =
   match sys.fixed_lookup_tables with
   | Unfinalized_fixed_lookup_tables_rev _ ->
-      failwith
-        "Cannot get the fixed lookup tables before finalizing the constraint \
-         system"
+    failwith
+      "Cannot get the fixed lookup tables before finalizing the constraint \
+       system"
   | Compiled_fixed_lookup_tables flts ->
-      let get_table_size (flt : _ Kimchi_types.lookup_table) =
-        if Array.length flt.data = 0 then 0
-        else Array.length (Array.get flt.data 0)
-      in
-      Array.fold_left (fun acc flt -> acc + get_table_size flt) 0 flts
+    let get_table_size (flt : _ Kimchi_types.lookup_table) =
+      if Array.length flt.data = 0 then 0
+      else Array.length (Array.get flt.data 0)
+    in
+    Array.fold_left (fun acc flt -> acc + get_table_size flt) 0 flts
 
 let get_concatenated_runtime_lookup_table_size sys =
   match sys.runtime_tables_cfg with
   | Unfinalized_runtime_tables_cfg_rev _ ->
-      failwith
-        "Cannot get the runtime table configurations before finalizing the \
-         constraint system"
+    failwith
+      "Cannot get the runtime table configurations before finalizing the \
+       constraint system"
   | Compiled_runtime_tables_cfg rt_cfgs ->
-      Array.fold_left
-        (fun acc (rt_cfg : _ Kimchi_types.runtime_table_cfg) ->
-          acc + Array.length rt_cfg.first_column )
-        0 rt_cfgs
+    Array.fold_left
+      (fun acc (rt_cfg : _ Kimchi_types.runtime_table_cfg) ->
+         acc + Array.length rt_cfg.first_column )
+      0 rt_cfgs
 
 let finalize_fixed_lookup_tables sys =
   match sys.fixed_lookup_tables with
   | Unfinalized_fixed_lookup_tables_rev fixed_lt_rev ->
-      sys.fixed_lookup_tables <-
-        Compiled_fixed_lookup_tables
-          (Core_kernel.Array.of_list_rev fixed_lt_rev)
+    sys.fixed_lookup_tables <-
+      Compiled_fixed_lookup_tables
+        (Core_kernel.Array.of_list_rev fixed_lt_rev)
   | Compiled_fixed_lookup_tables _ ->
-      failwith "Fixed lookup tables have already been finalized"
+    failwith "Fixed lookup tables have already been finalized"
 
 let finalize_runtime_lookup_tables sys =
   match sys.runtime_tables_cfg with
   | Unfinalized_runtime_tables_cfg_rev rt_cfgs_rev ->
-      sys.runtime_tables_cfg <-
-        Compiled_runtime_tables_cfg (Core_kernel.Array.of_list_rev rt_cfgs_rev)
+    sys.runtime_tables_cfg <-
+      Compiled_runtime_tables_cfg (Core_kernel.Array.of_list_rev rt_cfgs_rev)
   | Compiled_runtime_tables_cfg _ ->
-      failwith "Runtime table configurations have already been finalized"
+    failwith "Runtime table configurations have already been finalized"
 
 (* TODO: shouldn't that Make create something bounded by a signature? As we know what a back end should be? Check where this is used *)
 
@@ -828,8 +828,8 @@ module Make
     *)
     (Gates : Gate_vector_intf with type field := Fp.t)
     (Params : sig
-      val params : Fp.t Params.t
-    end) : sig
+       val params : Fp.t Params.t
+     end) : sig
   open Core_kernel
 
   type nonrec t = (Fp.t, Gates.t) t
@@ -866,22 +866,22 @@ module Make
   val finalize_runtime_lookup_tables : t -> unit
 
   val add_constraint :
-       ?label:string
+    ?label:string
     -> t
     -> ( Fp.t Snarky_backendless.Cvar.t
        , Fp.t )
-       Snarky_backendless.Constraint.basic
+      Snarky_backendless.Constraint.basic
     -> unit
 
   val compute_witness :
-       t
+    t
     -> (int -> Fp.t)
     -> Fp.t array array * Fp.t Kimchi_types.runtime_table array
 
   val finalize : t -> unit
 
   val finalize_and_get_gates :
-       t
+    t
     -> Gates.t
        * Fp.t Kimchi_types.lookup_table array
        * Fp.t Kimchi_types.runtime_table_cfg array
@@ -913,7 +913,7 @@ end = struct
       For example, if one of the equivalence class is [pos1, pos3, pos7],
       the function will return a hashtable that maps pos1 to pos3,
       pos3 to pos7, and pos7 to pos1.
-    *)
+  *)
   let equivalence_classes_to_hashtbl sys =
     let module Relative_position = struct
       module T = struct
@@ -927,9 +927,9 @@ end = struct
     Hashtbl.iteri sys.equivalence_classes ~f:(fun ~key ~data ->
         let u = Hashtbl.find_exn sys.union_finds key in
         Hashtbl.update equivalence_classes (Union_find.get u) ~f:(function
-          | None ->
+            | None ->
               Relative_position.Hash_set.of_list data
-          | Some ps ->
+            | Some ps ->
               List.iter ~f:(Hash_set.add ps) data ;
               ps ) ) ;
     let res = Relative_position.Table.create () in
@@ -944,9 +944,9 @@ end = struct
 
   (** Compute the witness, given the constraint system `sys`
       and a function that converts the indexed secret inputs to their concrete values.
-   *)
+  *)
   let compute_witness (sys : t) (external_values : int -> Fp.t) :
-      Fp.t array array * Fp.t Kimchi_types.runtime_table array =
+    Fp.t array array * Fp.t Kimchi_types.runtime_table array =
     let internal_values : Fp.t Internal_var.Table.t =
       Internal_var.Table.create ()
     in
@@ -963,9 +963,9 @@ end = struct
     let find t k =
       match Hashtbl.find t k with
       | None ->
-          failwithf !"Could not find %{sexp:Internal_var.t}\n%!" k ()
+        failwithf !"Could not find %{sexp:Internal_var.t}\n%!" k ()
       | Some x ->
-          x
+        x
     in
     (* Compute an internal variable associated value. *)
     let compute ((lc, c) : (Fp.t * V.t) list * Fp.t option) =
@@ -973,9 +973,9 @@ end = struct
           let x =
             match x with
             | External x ->
-                external_values x
+              external_values x
             | Internal x ->
-                find internal_values x
+              find internal_values x
           in
           Fp.(acc + (s * x)) )
     in
@@ -985,39 +985,39 @@ end = struct
         Array.iteri cols ~f:(fun col_idx var ->
             match var with
             | None ->
-                ()
+              ()
             | Some (External var) ->
-                res.(col_idx).(row_idx) <- external_values var
+              res.(col_idx).(row_idx) <- external_values var
             | Some (Internal var) ->
-                let lc = find sys.internal_vars var in
-                let value = compute lc in
-                res.(col_idx).(row_idx) <- value ;
-                Hashtbl.set internal_values ~key:var ~data:value ) ) ;
+              let lc = find sys.internal_vars var in
+              let value = compute lc in
+              res.(col_idx).(row_idx) <- value ;
+              Hashtbl.set internal_values ~key:var ~data:value ) ) ;
 
     let map_runtime_tables = MapRuntimeTable.Table.create () in
     let runtime_tables : Fp.t Kimchi_types.runtime_table array =
       match sys.runtime_tables_cfg with
       | Unfinalized_runtime_tables_cfg_rev _ ->
-          failwith
-            "Attempted to generate a witness for an unfinalized constraint \
-             system"
+        failwith
+          "Attempted to generate a witness for an unfinalized constraint \
+           system"
       | Compiled_runtime_tables_cfg cfgs ->
-          Array.mapi cfgs ~f:(fun rt_idx { Kimchi_types.id; first_column } ->
-              let data =
-                Array.mapi first_column ~f:(fun i v ->
-                    ignore
-                    (* `add` leaves the value unchanged if the index has been
-                       already used. Therefore, it keeps the first value.
-                       This handles the case that the first column has
-                       duplicated index values.
-                    *)
-                    @@ MapRuntimeTable.Table.add map_runtime_tables ~key:(id, v)
-                         ~data:(i, rt_idx) ;
-                    (* default padding value for lookup *)
-                    Fp.zero )
-              in
-              let rt : Fp.t Kimchi_types.runtime_table = { id; data } in
-              rt )
+        Array.mapi cfgs ~f:(fun rt_idx { Kimchi_types.id; first_column } ->
+            let data =
+              Array.mapi first_column ~f:(fun i v ->
+                  ignore
+                  (* `add` leaves the value unchanged if the index has been
+                     already used. Therefore, it keeps the first value.
+                     This handles the case that the first column has
+                     duplicated index values.
+                  *)
+                  @@ MapRuntimeTable.Table.add map_runtime_tables ~key:(id, v)
+                    ~data:(i, rt_idx) ;
+                  (* default padding value for lookup *)
+                  Fp.zero )
+            in
+            let rt : Fp.t Kimchi_types.runtime_table = { id; data } in
+            rt )
     in
 
     (* Fill in the used entries of the runtime lookup tables. *)
@@ -1131,28 +1131,28 @@ end = struct
   let add_row sys (vars : V.t option array) kind coeffs =
     match sys.gates with
     | Compiled _ ->
-        failwith "add_row called on finalized constraint system"
+      failwith "add_row called on finalized constraint system"
     | Unfinalized_rev gates ->
-        (* As we're adding a row, we're adding new cells.
-           If these cells (the first 7) contain variables,
-           make sure that they are wired
-        *)
-        let num_vars = min Constants.permutation_cols (Array.length vars) in
-        let vars_for_perm = Array.slice vars 0 num_vars in
-        Array.iteri vars_for_perm ~f:(fun col x ->
-            Option.iter x ~f:(fun x -> wire sys x sys.next_row col) ) ;
-        (* Add to gates. *)
-        let open Position in
-        sys.gates <- Unfinalized_rev ({ kind; wired_to = [||]; coeffs } :: gates) ;
-        (* Increment row. *)
-        sys.next_row <- sys.next_row + 1 ;
-        (* Add to row. *)
-        sys.rows_rev <- vars :: sys.rows_rev
+      (* As we're adding a row, we're adding new cells.
+         If these cells (the first 7) contain variables,
+         make sure that they are wired
+      *)
+      let num_vars = min Constants.permutation_cols (Array.length vars) in
+      let vars_for_perm = Array.slice vars 0 num_vars in
+      Array.iteri vars_for_perm ~f:(fun col x ->
+          Option.iter x ~f:(fun x -> wire sys x sys.next_row col) ) ;
+      (* Add to gates. *)
+      let open Position in
+      sys.gates <- Unfinalized_rev ({ kind; wired_to = [||]; coeffs } :: gates) ;
+      (* Increment row. *)
+      sys.next_row <- sys.next_row + 1 ;
+      (* Add to row. *)
+      sys.rows_rev <- vars :: sys.rows_rev
 
   (** Adds zero-knowledgeness to the gates/rows,
       and convert into Rust type [Gates.t].
       This can only be called once.
-    *)
+  *)
   let rec finalize_and_get_gates sys =
     match sys with
     | { gates = Compiled (_, gates)
@@ -1160,97 +1160,97 @@ end = struct
       ; runtime_tables_cfg = Compiled_runtime_tables_cfg runtime_tables_cfg
       ; _
       } ->
-        (gates, fixed_lookup_tables, runtime_tables_cfg)
+      (gates, fixed_lookup_tables, runtime_tables_cfg)
     (* Finalizing lookup tables and runtime table cfgs first *)
     | { fixed_lookup_tables = Unfinalized_fixed_lookup_tables_rev _; _ } ->
-        finalize_fixed_lookup_tables sys ;
-        finalize_and_get_gates sys
+      finalize_fixed_lookup_tables sys ;
+      finalize_and_get_gates sys
     | { runtime_tables_cfg = Unfinalized_runtime_tables_cfg_rev _; _ } ->
-        finalize_runtime_lookup_tables sys ;
-        finalize_and_get_gates sys
+      finalize_runtime_lookup_tables sys ;
+      finalize_and_get_gates sys
     | { pending_generic_gate = Some (l, r, o, coeffs); _ } ->
-        (* Finalize any pending generic constraint first. *)
-        add_row sys [| l; r; o |] Generic coeffs ;
-        sys.pending_generic_gate <- None ;
-        finalize_and_get_gates sys
+      (* Finalize any pending generic constraint first. *)
+      add_row sys [| l; r; o |] Generic coeffs ;
+      sys.pending_generic_gate <- None ;
+      finalize_and_get_gates sys
     | { gates = Unfinalized_rev gates_rev
       ; fixed_lookup_tables = Compiled_fixed_lookup_tables fixed_lookup_tables
       ; runtime_tables_cfg = Compiled_runtime_tables_cfg runtime_tables_cfg
       ; _
       } ->
-        let rust_gates = Gates.create () in
+      let rust_gates = Gates.create () in
 
-        (* Create rows for public input. *)
-        let public_input_size =
-          Set_once.get_exn sys.public_input_size [%here]
-        in
-        let pub_selectors = [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero |] in
-        let pub_input_gate_specs_rev = ref [] in
-        for row = 0 to public_input_size - 1 do
-          let public_var = V.External row in
-          wire' sys public_var (Row.Public_input row) 0 ;
-          pub_input_gate_specs_rev :=
-            { Gate_spec.kind = Generic
-            ; wired_to = [||]
-            ; coeffs = pub_selectors
-            }
-            :: !pub_input_gate_specs_rev
-        done ;
-
-        (* Construct permutation hashmap. *)
-        let pos_map = equivalence_classes_to_hashtbl sys in
-        let permutation (pos : Row.t Position.t) : Row.t Position.t =
-          Option.value (Hashtbl.find pos_map pos) ~default:pos
-        in
-
-        let update_gate_with_permutation_info (row : Row.t)
-            (gate : (unit, _) Gate_spec.t) : (Row.t, _) Gate_spec.t =
-          { gate with
-            wired_to =
-              Array.init Constants.permutation_cols ~f:(fun col ->
-                  permutation { row; col } )
+      (* Create rows for public input. *)
+      let public_input_size =
+        Set_once.get_exn sys.public_input_size [%here]
+      in
+      let pub_selectors = [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.zero |] in
+      let pub_input_gate_specs_rev = ref [] in
+      for row = 0 to public_input_size - 1 do
+        let public_var = V.External row in
+        wire' sys public_var (Row.Public_input row) 0 ;
+        pub_input_gate_specs_rev :=
+          { Gate_spec.kind = Generic
+          ; wired_to = [||]
+          ; coeffs = pub_selectors
           }
-        in
+          :: !pub_input_gate_specs_rev
+      done ;
 
-        (* Process public gates. *)
-        let public_gates = List.rev !pub_input_gate_specs_rev in
-        let public_gates =
-          List.mapi public_gates ~f:(fun absolute_row gate ->
-              update_gate_with_permutation_info (Row.Public_input absolute_row)
-                gate )
-        in
+      (* Construct permutation hashmap. *)
+      let pos_map = equivalence_classes_to_hashtbl sys in
+      let permutation (pos : Row.t Position.t) : Row.t Position.t =
+        Option.value (Hashtbl.find pos_map pos) ~default:pos
+      in
 
-        (* construct all the other gates (except zero-knowledge rows) *)
-        let gates = List.rev gates_rev in
-        let gates =
-          List.mapi gates ~f:(fun relative_row gate ->
-              update_gate_with_permutation_info
-                (Row.After_public_input relative_row) gate )
-        in
+      let update_gate_with_permutation_info (row : Row.t)
+          (gate : (unit, _) Gate_spec.t) : (Row.t, _) Gate_spec.t =
+        { gate with
+          wired_to =
+            Array.init Constants.permutation_cols ~f:(fun col ->
+                permutation { row; col } )
+        }
+      in
 
-        (* concatenate and convert to absolute rows *)
-        let to_absolute_row =
-          Gate_spec.map_rows ~f:(Row.to_absolute ~public_input_size)
-        in
+      (* Process public gates. *)
+      let public_gates = List.rev !pub_input_gate_specs_rev in
+      let public_gates =
+        List.mapi public_gates ~f:(fun absolute_row gate ->
+            update_gate_with_permutation_info (Row.Public_input absolute_row)
+              gate )
+      in
 
-        (* convert all the gates into our Gates.t Rust vector type *)
-        let add_gates gates =
-          List.iter gates ~f:(fun g ->
-              let g = to_absolute_row g in
-              Gates.add rust_gates (Gate_spec.to_rust_gate g) )
-        in
-        add_gates public_gates ;
-        add_gates gates ;
+      (* construct all the other gates (except zero-knowledge rows) *)
+      let gates = List.rev gates_rev in
+      let gates =
+        List.mapi gates ~f:(fun relative_row gate ->
+            update_gate_with_permutation_info
+              (Row.After_public_input relative_row) gate )
+      in
 
-        (* compute the circuit's digest *)
-        let digest = Gates.digest public_input_size rust_gates in
-        let md5_digest = Md5.digest_bytes digest in
+      (* concatenate and convert to absolute rows *)
+      let to_absolute_row =
+        Gate_spec.map_rows ~f:(Row.to_absolute ~public_input_size)
+      in
 
-        (* drop the gates, we don't need them anymore *)
-        sys.gates <- Compiled (md5_digest, rust_gates) ;
+      (* convert all the gates into our Gates.t Rust vector type *)
+      let add_gates gates =
+        List.iter gates ~f:(fun g ->
+            let g = to_absolute_row g in
+            Gates.add rust_gates (Gate_spec.to_rust_gate g) )
+      in
+      add_gates public_gates ;
+      add_gates gates ;
 
-        (* return the gates *)
-        (rust_gates, fixed_lookup_tables, runtime_tables_cfg)
+      (* compute the circuit's digest *)
+      let digest = Gates.digest public_input_size rust_gates in
+      let md5_digest = Md5.digest_bytes digest in
+
+      (* drop the gates, we don't need them anymore *)
+      sys.gates <- Compiled (md5_digest, rust_gates) ;
+
+      (* return the gates *)
+      (rust_gates, fixed_lookup_tables, runtime_tables_cfg)
 
   (** Calls [finalize_and_get_gates] and ignores the result. *)
   let finalize t =
@@ -1275,9 +1275,9 @@ end = struct
   let rec digest (sys : t) =
     match sys.gates with
     | Unfinalized_rev _ ->
-        finalize sys ; digest sys
+      finalize sys ; digest sys
     | Compiled (digest, _) ->
-        digest
+      digest
 
   (** Regroup terms that share the same variable.
       For example, (3, i2) ; (2, i2) can be simplified to (5, i2).
@@ -1296,7 +1296,7 @@ end = struct
 
   (** Converts a [Cvar.t] to a `(terms, terms_length, has_constant)`.
       if `has_constant` is set, then terms start with a constant term in the form of (c, 0).
-    *)
+  *)
   let canonicalize x =
     let c, terms =
       Fp.(
@@ -1319,17 +1319,17 @@ end = struct
   (** Adds a generic constraint to the constraint system.
       As there are two generic gates per row, we queue
       every other generic gate.
-      *)
+  *)
   let add_generic_constraint ?l ?r ?o coeffs sys : unit =
     match sys.pending_generic_gate with
     (* if the queue of generic gate is empty, queue this *)
     | None ->
-        sys.pending_generic_gate <- Some (l, r, o, coeffs)
+      sys.pending_generic_gate <- Some (l, r, o, coeffs)
     (* otherwise empty the queue and create the row  *)
     | Some (l2, r2, o2, coeffs2) ->
-        let coeffs = Array.append coeffs coeffs2 in
-        add_row sys [| l; r; o; l2; r2; o2 |] Generic coeffs ;
-        sys.pending_generic_gate <- None
+      let coeffs = Array.append coeffs coeffs2 in
+      add_row sys [| l; r; o; l2; r2; o2 |] Generic coeffs ;
+      sys.pending_generic_gate <- None
 
   (** Converts a number of scaled additions \sum s_i * x_i
       to as many constraints as needed,
@@ -1350,25 +1350,25 @@ end = struct
     (* just adding constrained variables without values *)
     let rec go = function
       | [] ->
-          assert false
+        assert false
       | [ (s, x) ] ->
-          (s, V.External x)
+        (s, V.External x)
       | (ls, lx) :: t ->
-          let lx = V.External lx in
-          (* TODO: this should be rewritten to be tail-optimized *)
-          let rs, rx = go t in
-          let s1x1_plus_s2x2 = create_internal sys [ (ls, lx); (rs, rx) ] in
-          add_generic_constraint ~l:lx ~r:rx ~o:s1x1_plus_s2x2
-            [| ls; rs; Fp.(negate one); Fp.zero; Fp.zero |]
-            sys ;
-          (Fp.one, s1x1_plus_s2x2)
+        let lx = V.External lx in
+        (* TODO: this should be rewritten to be tail-optimized *)
+        let rs, rx = go t in
+        let s1x1_plus_s2x2 = create_internal sys [ (ls, lx); (rs, rx) ] in
+        add_generic_constraint ~l:lx ~r:rx ~o:s1x1_plus_s2x2
+          [| ls; rs; Fp.(negate one); Fp.zero; Fp.zero |]
+          sys ;
+        (Fp.one, s1x1_plus_s2x2)
     in
     go terms
 
   (** Converts a linear combination of variables into a set of constraints.
       It returns the output variable as (1, `Var res),
       unless the output is a constant, in which case it returns (c, `Constant).
-    *)
+  *)
   let reduce_lincom sys (x : Fp.t Snarky_backendless.Cvar.t) =
     let constant, terms =
       Fp.(
@@ -1383,162 +1383,162 @@ end = struct
     in
     match (constant, Map.is_empty terms) with
     | Some c, true ->
-        (c, `Constant)
+      (c, `Constant)
     | None, true ->
-        (Fp.zero, `Constant)
+      (Fp.zero, `Constant)
     | _ -> (
         match terms_list with
         | [] ->
-            assert false
+          assert false
         | [ (ls, lx) ] -> (
             match constant with
             | None ->
-                (ls, `Var (V.External lx))
+              (ls, `Var (V.External lx))
             | Some c ->
-                (* res = ls * lx + c *)
-                let res =
-                  create_internal ~constant:c sys [ (ls, External lx) ]
-                in
-                add_generic_constraint ~l:(External lx) ~o:res
-                  [| ls; Fp.zero; Fp.(negate one); Fp.zero; c |]
-                  (* Could be here *)
-                  sys ;
-                (Fp.one, `Var res) )
+              (* res = ls * lx + c *)
+              let res =
+                create_internal ~constant:c sys [ (ls, External lx) ]
+              in
+              add_generic_constraint ~l:(External lx) ~o:res
+                [| ls; Fp.zero; Fp.(negate one); Fp.zero; c |]
+                (* Could be here *)
+                sys ;
+              (Fp.one, `Var res) )
         | (ls, lx) :: tl ->
-            (* reduce the terms, then add the constant *)
-            let rs, rx = completely_reduce sys tl in
-            let res =
-              create_internal ?constant sys [ (ls, External lx); (rs, rx) ]
-            in
-            (* res = ls * lx + rs * rx + c *)
-            add_generic_constraint ~l:(External lx) ~r:rx ~o:res
-              [| ls
-               ; rs
-               ; Fp.(negate one)
-               ; Fp.zero
-               ; (match constant with Some x -> x | None -> Fp.zero)
-              |]
-              (* Could be here *)
-              sys ;
-            (Fp.one, `Var res) )
+          (* reduce the terms, then add the constant *)
+          let rs, rx = completely_reduce sys tl in
+          let res =
+            create_internal ?constant sys [ (ls, External lx); (rs, rx) ]
+          in
+          (* res = ls * lx + rs * rx + c *)
+          add_generic_constraint ~l:(External lx) ~r:rx ~o:res
+            [| ls
+             ; rs
+             ; Fp.(negate one)
+             ; Fp.zero
+             ; (match constant with Some x -> x | None -> Fp.zero)
+            |]
+            (* Could be here *)
+            sys ;
+          (Fp.one, `Var res) )
 
   (** Adds a constraint to the constraint system. *)
   let add_constraint ?label:_ sys
       (constr :
-        ( Fp.t Snarky_backendless.Cvar.t
-        , Fp.t )
-        Snarky_backendless.Constraint.basic ) =
+         ( Fp.t Snarky_backendless.Cvar.t
+         , Fp.t )
+           Snarky_backendless.Constraint.basic ) =
     let red = reduce_lincom sys in
     (* reduce any [Cvar.t] to a single internal variable *)
     let reduce_to_v (x : Fp.t Snarky_backendless.Cvar.t) : V.t =
       match red x with
       | s, `Var x ->
-          if Fp.equal s Fp.one then x
-          else
-            let sx = create_internal sys [ (s, x) ] in
-            (* s * x - sx = 0 *)
-            add_generic_constraint ~l:x ~o:sx
-              [| s; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero |]
-              sys ;
-            sx
+        if Fp.equal s Fp.one then x
+        else
+          let sx = create_internal sys [ (s, x) ] in
+          (* s * x - sx = 0 *)
+          add_generic_constraint ~l:x ~o:sx
+            [| s; Fp.zero; Fp.(negate one); Fp.zero; Fp.zero |]
+            sys ;
+          sx
       | s, `Constant -> (
           match Hashtbl.find sys.cached_constants s with
           | Some x ->
-              x
+            x
           | None ->
-              let x = create_internal sys ~constant:s [] in
-              add_generic_constraint ~l:x
-                [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.negate s |]
-                sys ;
-              Hashtbl.set sys.cached_constants ~key:s ~data:x ;
-              x )
+            let x = create_internal sys ~constant:s [] in
+            add_generic_constraint ~l:x
+              [| Fp.one; Fp.zero; Fp.zero; Fp.zero; Fp.negate s |]
+              sys ;
+            Hashtbl.set sys.cached_constants ~key:s ~data:x ;
+            x )
     in
     match constr with
     | Snarky_backendless.Constraint.Square (v1, v2) -> (
         match (red v1, red v2) with
         | (sl, `Var xl), (so, `Var xo) ->
-            (* (sl * xl)^2 = so * xo
-               sl^2 * xl * xl - so * xo = 0
-            *)
-            add_generic_constraint ~l:xl ~r:xl ~o:xo
-              [| Fp.zero; Fp.zero; Fp.negate so; Fp.(sl * sl); Fp.zero |]
-              sys
+          (* (sl * xl)^2 = so * xo
+             sl^2 * xl * xl - so * xo = 0
+          *)
+          add_generic_constraint ~l:xl ~r:xl ~o:xo
+            [| Fp.zero; Fp.zero; Fp.negate so; Fp.(sl * sl); Fp.zero |]
+            sys
         | (sl, `Var xl), (so, `Constant) ->
-            (* TODO: it's hard to read the array of selector values, name them! *)
-            add_generic_constraint ~l:xl ~r:xl
-              [| Fp.zero; Fp.zero; Fp.zero; Fp.(sl * sl); Fp.negate so |]
-              sys
+          (* TODO: it's hard to read the array of selector values, name them! *)
+          add_generic_constraint ~l:xl ~r:xl
+            [| Fp.zero; Fp.zero; Fp.zero; Fp.(sl * sl); Fp.negate so |]
+            sys
         | (sl, `Constant), (so, `Var xo) ->
-            (* sl^2 = so * xo *)
-            add_generic_constraint ~o:xo
-              [| Fp.zero; Fp.zero; so; Fp.zero; Fp.negate (Fp.square sl) |]
-              sys
+          (* sl^2 = so * xo *)
+          add_generic_constraint ~o:xo
+            [| Fp.zero; Fp.zero; so; Fp.zero; Fp.negate (Fp.square sl) |]
+            sys
         | (sl, `Constant), (so, `Constant) ->
-            assert (Fp.(equal (square sl) so)) )
+          assert (Fp.(equal (square sl) so)) )
     | Snarky_backendless.Constraint.R1CS (v1, v2, v3) -> (
         match (red v1, red v2, red v3) with
         | (s1, `Var x1), (s2, `Var x2), (s3, `Var x3) ->
-            (* s1 x1 * s2 x2 = s3 x3
-               - s1 s2 (x1 x2) + s3 x3 = 0
-            *)
-            add_generic_constraint ~l:x1 ~r:x2 ~o:x3
-              [| Fp.zero; Fp.zero; s3; Fp.(negate s1 * s2); Fp.zero |]
-              sys
+          (* s1 x1 * s2 x2 = s3 x3
+             - s1 s2 (x1 x2) + s3 x3 = 0
+          *)
+          add_generic_constraint ~l:x1 ~r:x2 ~o:x3
+            [| Fp.zero; Fp.zero; s3; Fp.(negate s1 * s2); Fp.zero |]
+            sys
         | (s1, `Var x1), (s2, `Var x2), (s3, `Constant) ->
-            add_generic_constraint ~l:x1 ~r:x2
-              [| Fp.zero; Fp.zero; Fp.zero; Fp.(s1 * s2); Fp.negate s3 |]
-              sys
+          add_generic_constraint ~l:x1 ~r:x2
+            [| Fp.zero; Fp.zero; Fp.zero; Fp.(s1 * s2); Fp.negate s3 |]
+            sys
         | (s1, `Var x1), (s2, `Constant), (s3, `Var x3) ->
-            (* s1 x1 * s2 = s3 x3
-            *)
-            add_generic_constraint ~l:x1 ~o:x3
-              [| Fp.(s1 * s2); Fp.zero; Fp.negate s3; Fp.zero; Fp.zero |]
-              sys
+          (* s1 x1 * s2 = s3 x3
+          *)
+          add_generic_constraint ~l:x1 ~o:x3
+            [| Fp.(s1 * s2); Fp.zero; Fp.negate s3; Fp.zero; Fp.zero |]
+            sys
         | (s1, `Constant), (s2, `Var x2), (s3, `Var x3) ->
-            add_generic_constraint ~r:x2 ~o:x3
-              [| Fp.zero; Fp.(s1 * s2); Fp.negate s3; Fp.zero; Fp.zero |]
-              sys
+          add_generic_constraint ~r:x2 ~o:x3
+            [| Fp.zero; Fp.(s1 * s2); Fp.negate s3; Fp.zero; Fp.zero |]
+            sys
         | (s1, `Var x1), (s2, `Constant), (s3, `Constant) ->
-            add_generic_constraint ~l:x1
-              [| Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.zero; Fp.negate s3 |]
-              sys
+          add_generic_constraint ~l:x1
+            [| Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.zero; Fp.negate s3 |]
+            sys
         | (s1, `Constant), (s2, `Var x2), (s3, `Constant) ->
-            add_generic_constraint ~r:x2
-              [| Fp.zero; Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.negate s3 |]
-              sys
+          add_generic_constraint ~r:x2
+            [| Fp.zero; Fp.(s1 * s2); Fp.zero; Fp.zero; Fp.negate s3 |]
+            sys
         | (s1, `Constant), (s2, `Constant), (s3, `Var x3) ->
-            add_generic_constraint ~o:x3
-              [| Fp.zero; Fp.zero; s3; Fp.zero; Fp.(negate s1 * s2) |]
-              sys
+          add_generic_constraint ~o:x3
+            [| Fp.zero; Fp.zero; s3; Fp.zero; Fp.(negate s1 * s2) |]
+            sys
         | (s1, `Constant), (s2, `Constant), (s3, `Constant) ->
-            assert (Fp.(equal s3 Fp.(s1 * s2))) )
+          assert (Fp.(equal s3 Fp.(s1 * s2))) )
     | Snarky_backendless.Constraint.Boolean v -> (
         let s, x = red v in
         match x with
         | `Var x ->
-            (* -x + x * x = 0  *)
-            add_generic_constraint ~l:x ~r:x
-              [| Fp.(negate one); Fp.zero; Fp.zero; Fp.one; Fp.zero |]
-              sys
+          (* -x + x * x = 0  *)
+          add_generic_constraint ~l:x ~r:x
+            [| Fp.(negate one); Fp.zero; Fp.zero; Fp.one; Fp.zero |]
+            sys
         | `Constant ->
-            assert (Fp.(equal s (s * s))) )
+          assert (Fp.(equal s (s * s))) )
     | Snarky_backendless.Constraint.Equal (v1, v2) -> (
         let (s1, x1), (s2, x2) = (red v1, red v2) in
         match (x1, x2) with
         | `Var x1, `Var x2 ->
-            if Fp.equal s1 s2 then (
-              if not (Fp.equal s1 Fp.zero) then
-                Union_find.union (union_find sys x1) (union_find sys x2) )
-            else if (* s1 x1 - s2 x2 = 0
-          *)
-                    not (Fp.equal s1 s2) then
-              add_generic_constraint ~l:x1 ~r:x2
-                [| s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero |]
-                sys
-            else
-              add_generic_constraint ~l:x1 ~r:x2
-                [| s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero |]
-                sys
+          if Fp.equal s1 s2 then (
+            if not (Fp.equal s1 Fp.zero) then
+              Union_find.union (union_find sys x1) (union_find sys x2) )
+          else if (* s1 x1 - s2 x2 = 0
+                  *)
+            not (Fp.equal s1 s2) then
+            add_generic_constraint ~l:x1 ~r:x2
+              [| s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero |]
+              sys
+          else
+            add_generic_constraint ~l:x1 ~r:x2
+              [| s1; Fp.(negate s2); Fp.zero; Fp.zero; Fp.zero |]
+              sys
         | `Var x1, `Constant -> (
             (* s1 * x1 = s2
                x1 = s2 / s1
@@ -1546,12 +1546,12 @@ end = struct
             let ratio = Fp.(s2 / s1) in
             match Hashtbl.find sys.cached_constants ratio with
             | Some x2 ->
-                Union_find.union (union_find sys x1) (union_find sys x2)
+              Union_find.union (union_find sys x1) (union_find sys x2)
             | None ->
-                add_generic_constraint ~l:x1
-                  [| s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2 |]
-                  sys ;
-                Hashtbl.set sys.cached_constants ~key:ratio ~data:x1 )
+              add_generic_constraint ~l:x1
+                [| s1; Fp.zero; Fp.zero; Fp.zero; Fp.negate s2 |]
+                sys ;
+              Hashtbl.set sys.cached_constants ~key:ratio ~data:x1 )
         | `Constant, `Var x2 -> (
             (* s1 = s2 * x2
                x2 = s1 / s2
@@ -1559,277 +1559,135 @@ end = struct
             let ratio = Fp.(s1 / s2) in
             match Hashtbl.find sys.cached_constants ratio with
             | Some x1 ->
-                Union_find.union (union_find sys x1) (union_find sys x2)
+              Union_find.union (union_find sys x1) (union_find sys x2)
             | None ->
-                add_generic_constraint ~r:x2
-                  [| Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1 |]
-                  sys ;
-                Hashtbl.set sys.cached_constants ~key:ratio ~data:x2 )
+              add_generic_constraint ~r:x2
+                [| Fp.zero; s2; Fp.zero; Fp.zero; Fp.negate s1 |]
+                sys ;
+              Hashtbl.set sys.cached_constants ~key:ratio ~data:x2 )
         | `Constant, `Constant ->
-            assert (Fp.(equal s1 s2)) )
+          assert (Fp.(equal s1 s2)) )
     | Plonk_constraint.T (Basic { l; r; o; m; c }) ->
-        (* 0
-           = l.s * l.x
-           + r.s * r.x
-           + o.s * o.x
-           + m * (l.x * r.x)
-           + c
-           =
-             l.s * l.s' * l.x'
-           + r.s * r.s' * r.x'
-           + o.s * o.s' * o.x'
-           + m * (l.s' * l.x' * r.s' * r.x')
-           + c
-           =
-             (l.s * l.s') * l.x'
-           + (r.s * r.s') * r.x'
-           + (o.s * o.s') * o.x'
-           + (m * l.s' * r.s') * l.x' r.x'
-           + c
-        *)
-        (* TODO: This is sub-optimal *)
-        let c = ref c in
-        let red_pr (s, x) =
-          match red x with
-          | s', `Constant ->
-              c := Fp.add !c Fp.(s * s') ;
-              (* No need to have a real term. *)
-              (s', None)
-          | s', `Var x ->
-              (s', Some (Fp.(s * s'), x))
-        in
-        (* l.s * l.x
-           + r.s * r.x
-           + o.s * o.x
-           + m * (l.x * r.x)
-           + c
-           =
-             l.s * l.s' * l.x'
-           + r.s * r.x
-           + o.s * o.x
-           + m * (l.x * r.x)
-           + c
-           =
-        *)
-        let l_s', l = red_pr l in
-        let r_s', r = red_pr r in
-        let _, o = red_pr o in
-        let var = Option.map ~f:snd in
-        let coeff = Option.value_map ~default:Fp.zero ~f:fst in
-        let m =
-          match (l, r) with
-          | Some _, Some _ ->
-              Fp.(l_s' * r_s' * m)
-          | _ ->
-              (* TODO: Figure this out later. *)
-              failwith "Must use non-constant cvar in plonk constraints"
-        in
-        add_generic_constraint ?l:(var l) ?r:(var r) ?o:(var o)
-          [| coeff l; coeff r; coeff o; m; !c |]
-          sys
+      (* 0
+         = l.s * l.x
+         + r.s * r.x
+         + o.s * o.x
+         + m * (l.x * r.x)
+         + c
+         =
+           l.s * l.s' * l.x'
+         + r.s * r.s' * r.x'
+         + o.s * o.s' * o.x'
+         + m * (l.s' * l.x' * r.s' * r.x')
+         + c
+         =
+           (l.s * l.s') * l.x'
+         + (r.s * r.s') * r.x'
+         + (o.s * o.s') * o.x'
+         + (m * l.s' * r.s') * l.x' r.x'
+         + c
+      *)
+      (* TODO: This is sub-optimal *)
+      let c = ref c in
+      let red_pr (s, x) =
+        match red x with
+        | s', `Constant ->
+          c := Fp.add !c Fp.(s * s') ;
+          (* No need to have a real term. *)
+          (s', None)
+        | s', `Var x ->
+          (s', Some (Fp.(s * s'), x))
+      in
+      (* l.s * l.x
+         + r.s * r.x
+         + o.s * o.x
+         + m * (l.x * r.x)
+         + c
+         =
+           l.s * l.s' * l.x'
+         + r.s * r.x
+         + o.s * o.x
+         + m * (l.x * r.x)
+         + c
+         =
+      *)
+      let l_s', l = red_pr l in
+      let r_s', r = red_pr r in
+      let _, o = red_pr o in
+      let var = Option.map ~f:snd in
+      let coeff = Option.value_map ~default:Fp.zero ~f:fst in
+      let m =
+        match (l, r) with
+        | Some _, Some _ ->
+          Fp.(l_s' * r_s' * m)
+        | _ ->
+          (* TODO: Figure this out later. *)
+          failwith "Must use non-constant cvar in plonk constraints"
+      in
+      add_generic_constraint ?l:(var l) ?r:(var r) ?o:(var o)
+        [| coeff l; coeff r; coeff o; m; !c |]
+        sys
     (* | w0 | w1 | w2 | w3 | w4 | w5
        state = [ x , x  , x ], [ y, y, y ], ... ]
                  i=0, perm^   i=1, perm^
     *)
     | Plonk_constraint.T (Poseidon { state }) ->
-        (* reduce the state *)
-        let reduce_state sys (s : Fp.t Snarky_backendless.Cvar.t array array) :
-            V.t array array =
-          Array.map ~f:(Array.map ~f:reduce_to_v) s
-        in
-        let state = reduce_state sys state in
-        (* add_round_state adds a row that contains 5 rounds of permutation *)
-        let add_round_state ~round (s1, s2, s3, s4, s5) =
-          let vars =
-            [| Some s1.(0)
-             ; Some s1.(1)
-             ; Some s1.(2)
-             ; Some s5.(0) (* the last state is in 2nd position *)
-             ; Some s5.(1)
-             ; Some s5.(2)
-             ; Some s2.(0)
-             ; Some s2.(1)
-             ; Some s2.(2)
-             ; Some s3.(0)
-             ; Some s3.(1)
-             ; Some s3.(2)
-             ; Some s4.(0)
-             ; Some s4.(1)
-             ; Some s4.(2)
-            |]
-          in
-          let coeffs =
-            [| Params.params.round_constants.(round).(0)
-             ; Params.params.round_constants.(round).(1)
-             ; Params.params.round_constants.(round).(2)
-             ; Params.params.round_constants.(round + 1).(0)
-             ; Params.params.round_constants.(round + 1).(1)
-             ; Params.params.round_constants.(round + 1).(2)
-             ; Params.params.round_constants.(round + 2).(0)
-             ; Params.params.round_constants.(round + 2).(1)
-             ; Params.params.round_constants.(round + 2).(2)
-             ; Params.params.round_constants.(round + 3).(0)
-             ; Params.params.round_constants.(round + 3).(1)
-             ; Params.params.round_constants.(round + 3).(2)
-             ; Params.params.round_constants.(round + 4).(0)
-             ; Params.params.round_constants.(round + 4).(1)
-             ; Params.params.round_constants.(round + 4).(2)
-            |]
-          in
-          add_row sys vars Poseidon coeffs
-        in
-        (* add_last_row adds the last row containing the output *)
-        let add_last_row state =
-          let vars =
-            [| Some state.(0)
-             ; Some state.(1)
-             ; Some state.(2)
-             ; None
-             ; None
-             ; None
-             ; None
-             ; None
-             ; None
-             ; None
-             ; None
-             ; None
-             ; None
-             ; None
-             ; None
-            |]
-          in
-          add_row sys vars Zero [||]
-        in
-        (* go through the states row by row (a row contains 5 states) *)
-        let rec process_5_states_at_a_time ~round = function
-          | [ s1; s2; s3; s4; s5; last ] ->
-              add_round_state ~round (s1, s2, s3, s4, s5) ;
-              add_last_row last
-          | s1 :: s2 :: s3 :: s4 :: s5 :: tl ->
-              add_round_state ~round (s1, s2, s3, s4, s5) ;
-              process_5_states_at_a_time ~round:(round + 5) tl
-          | _ ->
-              failwith "incorrect number of states given"
-        in
-        process_5_states_at_a_time ~round:0 (Array.to_list state)
-    | Plonk_constraint.T
-        (EC_add_complete { p1; p2; p3; inf; same_x; slope; inf_z; x21_inv }) ->
-        let reduce_curve_point (x, y) = (reduce_to_v x, reduce_to_v y) in
-
-        (*
-        //! 0   1   2   3   4   5   6   7      8   9      10      11   12   13   14
-        //! x1  y1  x2  y2  x3  y3  inf same_x s   inf_z  x21_inv
-        *)
-        let x1, y1 = reduce_curve_point p1 in
-        let x2, y2 = reduce_curve_point p2 in
-        let x3, y3 = reduce_curve_point p3 in
+      (* reduce the state *)
+      let reduce_state sys (s : Fp.t Snarky_backendless.Cvar.t array array) :
+        V.t array array =
+        Array.map ~f:(Array.map ~f:reduce_to_v) s
+      in
+      let state = reduce_state sys state in
+      (* add_round_state adds a row that contains 5 rounds of permutation *)
+      let add_round_state ~round (s1, s2, s3, s4, s5) =
         let vars =
-          [| Some x1
-           ; Some y1
-           ; Some x2
-           ; Some y2
-           ; Some x3
-           ; Some y3
-           ; Some (reduce_to_v inf)
-           ; Some (reduce_to_v same_x)
-           ; Some (reduce_to_v slope)
-           ; Some (reduce_to_v inf_z)
-           ; Some (reduce_to_v x21_inv)
-           ; None
-           ; None
-           ; None
-           ; None
+          [| Some s1.(0)
+           ; Some s1.(1)
+           ; Some s1.(2)
+           ; Some s5.(0) (* the last state is in 2nd position *)
+           ; Some s5.(1)
+           ; Some s5.(2)
+           ; Some s2.(0)
+           ; Some s2.(1)
+           ; Some s2.(2)
+           ; Some s3.(0)
+           ; Some s3.(1)
+           ; Some s3.(2)
+           ; Some s4.(0)
+           ; Some s4.(1)
+           ; Some s4.(2)
           |]
         in
-        add_row sys vars CompleteAdd [||]
-    | Plonk_constraint.T (EC_scale { state }) ->
-        let i = ref 0 in
-        (*
- 0   1   2   3   4   5   6   7   8   9   10  11  12  13  14
- xT  yT  x0  y0  n   n'      x1  y1  x2  y2  x3  y3  x4  y4
- x5  y5  b0  b1  b2  b3  b4  s0  s1  s2  s3  s4
-        *)
-        let add_ecscale_round
-            Scale_round.{ accs; bits; ss; base = xt, yt; n_prev; n_next } =
-          let curr_row =
-            [| Some xt
-             ; Some yt
-             ; Some (fst accs.(0))
-             ; Some (snd accs.(0))
-             ; Some n_prev
-             ; Some n_next
-             ; None
-             ; Some (fst accs.(1))
-             ; Some (snd accs.(1))
-             ; Some (fst accs.(2))
-             ; Some (snd accs.(2))
-             ; Some (fst accs.(3))
-             ; Some (snd accs.(3))
-             ; Some (fst accs.(4))
-             ; Some (snd accs.(4))
-            |]
-          in
-          let next_row =
-            [| Some (fst accs.(5))
-             ; Some (snd accs.(5))
-             ; Some bits.(0)
-             ; Some bits.(1)
-             ; Some bits.(2)
-             ; Some bits.(3)
-             ; Some bits.(4)
-             ; Some ss.(0)
-             ; Some ss.(1)
-             ; Some ss.(2)
-             ; Some ss.(3)
-             ; Some ss.(4)
-             ; None
-             ; None
-             ; None
-            |]
-          in
-          add_row sys curr_row VarBaseMul [||] ;
-          add_row sys next_row Zero [||]
+        let coeffs =
+          [| Params.params.round_constants.(round).(0)
+           ; Params.params.round_constants.(round).(1)
+           ; Params.params.round_constants.(round).(2)
+           ; Params.params.round_constants.(round + 1).(0)
+           ; Params.params.round_constants.(round + 1).(1)
+           ; Params.params.round_constants.(round + 1).(2)
+           ; Params.params.round_constants.(round + 2).(0)
+           ; Params.params.round_constants.(round + 2).(1)
+           ; Params.params.round_constants.(round + 2).(2)
+           ; Params.params.round_constants.(round + 3).(0)
+           ; Params.params.round_constants.(round + 3).(1)
+           ; Params.params.round_constants.(round + 3).(2)
+           ; Params.params.round_constants.(round + 4).(0)
+           ; Params.params.round_constants.(round + 4).(1)
+           ; Params.params.round_constants.(round + 4).(2)
+          |]
         in
-
-        Array.iter
-          ~f:(fun round -> add_ecscale_round round ; incr i)
-          (Array.map state ~f:(Scale_round.map ~f:reduce_to_v)) ;
-        ()
-    | Plonk_constraint.T (EC_endoscale { state; xs; ys; n_acc }) ->
-        (* Reduce state. *)
-        let state = Array.map state ~f:(Endoscale_round.map ~f:reduce_to_v) in
-        (* Add round function. *)
-        let add_endoscale_round (round : V.t Endoscale_round.t) =
-          let row =
-            [| Some round.xt
-             ; Some round.yt
-             ; None
-             ; None
-             ; Some round.xp
-             ; Some round.yp
-             ; Some round.n_acc
-             ; Some round.xr
-             ; Some round.yr
-             ; Some round.s1
-             ; Some round.s3
-             ; Some round.b1
-             ; Some round.b2
-             ; Some round.b3
-             ; Some round.b4
-            |]
-          in
-          add_row sys row Kimchi_types.EndoMul [||]
-        in
-        Array.iter state ~f:add_endoscale_round ;
-        (* Last row. *)
+        add_row sys vars Poseidon coeffs
+      in
+      (* add_last_row adds the last row containing the output *)
+      let add_last_row state =
         let vars =
-          [| None
+          [| Some state.(0)
+           ; Some state.(1)
+           ; Some state.(2)
            ; None
            ; None
            ; None
-           ; Some (reduce_to_v xs)
-           ; Some (reduce_to_v ys)
-           ; Some (reduce_to_v n_acc)
+           ; None
            ; None
            ; None
            ; None
@@ -1841,259 +1699,401 @@ end = struct
           |]
         in
         add_row sys vars Zero [||]
+      in
+      (* go through the states row by row (a row contains 5 states) *)
+      let rec process_5_states_at_a_time ~round = function
+        | [ s1; s2; s3; s4; s5; last ] ->
+          add_round_state ~round (s1, s2, s3, s4, s5) ;
+          add_last_row last
+        | s1 :: s2 :: s3 :: s4 :: s5 :: tl ->
+          add_round_state ~round (s1, s2, s3, s4, s5) ;
+          process_5_states_at_a_time ~round:(round + 5) tl
+        | _ ->
+          failwith "incorrect number of states given"
+      in
+      process_5_states_at_a_time ~round:0 (Array.to_list state)
     | Plonk_constraint.T
-        (EC_endoscalar { state : 'v Endoscale_scalar_round.t array }) ->
-        (* Add round function. *)
-        let add_endoscale_scalar_round (round : V.t Endoscale_scalar_round.t) =
-          let row =
-            [| Some round.n0
-             ; Some round.n8
-             ; Some round.a0
-             ; Some round.b0
-             ; Some round.a8
-             ; Some round.b8
-             ; Some round.x0
-             ; Some round.x1
-             ; Some round.x2
-             ; Some round.x3
-             ; Some round.x4
-             ; Some round.x5
-             ; Some round.x6
-             ; Some round.x7
-             ; None
-            |]
-          in
-          add_row sys row Kimchi_types.EndoMulScalar [||]
-        in
-        Array.iter state
-          ~f:
-            (Fn.compose add_endoscale_scalar_round
-               (Endoscale_scalar_round.map ~f:reduce_to_v) )
-    | Plonk_constraint.T (Lookup { w0; w1; w2; w3; w4; w5; w6 }) ->
-        (* table ID *)
-        let red_w0 = reduce_to_v w0 in
-        (* idx1 *)
-        let red_w1 = reduce_to_v w1 in
-        (* v1 *)
-        let red_w2 = reduce_to_v w2 in
-        (* idx2 *)
-        let red_w3 = reduce_to_v w3 in
-        (* v2 *)
-        let red_w4 = reduce_to_v w4 in
-        (* idx3 *)
-        let red_w5 = reduce_to_v w5 in
-        (* v3 *)
-        let red_w6 = reduce_to_v w6 in
-        let vars =
-          [| Some red_w0
-           ; Some red_w1
-           ; Some red_w2
-           ; Some red_w3
-           ; Some red_w4
-           ; Some red_w5
-           ; Some red_w6
+        (EC_add_complete { p1; p2; p3; inf; same_x; slope; inf_z; x21_inv }) ->
+      let reduce_curve_point (x, y) = (reduce_to_v x, reduce_to_v y) in
+
+        (*
+        //! 0   1   2   3   4   5   6   7      8   9      10      11   12   13   14
+        //! x1  y1  x2  y2  x3  y3  inf same_x s   inf_z  x21_inv
+        *)
+      let x1, y1 = reduce_curve_point p1 in
+      let x2, y2 = reduce_curve_point p2 in
+      let x3, y3 = reduce_curve_point p3 in
+      let vars =
+        [| Some x1
+         ; Some y1
+         ; Some x2
+         ; Some y2
+         ; Some x3
+         ; Some y3
+         ; Some (reduce_to_v inf)
+         ; Some (reduce_to_v same_x)
+         ; Some (reduce_to_v slope)
+         ; Some (reduce_to_v inf_z)
+         ; Some (reduce_to_v x21_inv)
+         ; None
+         ; None
+         ; None
+         ; None
+        |]
+      in
+      add_row sys vars CompleteAdd [||]
+    | Plonk_constraint.T (EC_scale { state }) ->
+      let i = ref 0 in
+        (*
+ 0   1   2   3   4   5   6   7   8   9   10  11  12  13  14
+ xT  yT  x0  y0  n   n'      x1  y1  x2  y2  x3  y3  x4  y4
+ x5  y5  b0  b1  b2  b3  b4  s0  s1  s2  s3  s4
+        *)
+      let add_ecscale_round
+          Scale_round.{ accs; bits; ss; base = xt, yt; n_prev; n_next } =
+        let curr_row =
+          [| Some xt
+           ; Some yt
+           ; Some (fst accs.(0))
+           ; Some (snd accs.(0))
+           ; Some n_prev
+           ; Some n_next
+           ; None
+           ; Some (fst accs.(1))
+           ; Some (snd accs.(1))
+           ; Some (fst accs.(2))
+           ; Some (snd accs.(2))
+           ; Some (fst accs.(3))
+           ; Some (snd accs.(3))
+           ; Some (fst accs.(4))
+           ; Some (snd accs.(4))
           |]
         in
-        let lookup1 = (red_w0, (red_w1, red_w2)) in
-        let lookup2 = (red_w0, (red_w3, red_w4)) in
-        let lookup3 = (red_w0, (red_w5, red_w6)) in
-        (* We populate with the first lookup. In the case the user uses the same
-           index multiple times, the last value will be used *)
-        sys.runtime_lookups_rev <-
-          lookup3 :: lookup2 :: lookup1 :: sys.runtime_lookups_rev ;
-        add_row sys vars Lookup [||]
+        let next_row =
+          [| Some (fst accs.(5))
+           ; Some (snd accs.(5))
+           ; Some bits.(0)
+           ; Some bits.(1)
+           ; Some bits.(2)
+           ; Some bits.(3)
+           ; Some bits.(4)
+           ; Some ss.(0)
+           ; Some ss.(1)
+           ; Some ss.(2)
+           ; Some ss.(3)
+           ; Some ss.(4)
+           ; None
+           ; None
+           ; None
+          |]
+        in
+        add_row sys curr_row VarBaseMul [||] ;
+        add_row sys next_row Zero [||]
+      in
+
+      Array.iter
+        ~f:(fun round -> add_ecscale_round round ; incr i)
+        (Array.map state ~f:(Scale_round.map ~f:reduce_to_v)) ;
+      ()
+    | Plonk_constraint.T (EC_endoscale { state; xs; ys; n_acc }) ->
+      (* Reduce state. *)
+      let state = Array.map state ~f:(Endoscale_round.map ~f:reduce_to_v) in
+      (* Add round function. *)
+      let add_endoscale_round (round : V.t Endoscale_round.t) =
+        let row =
+          [| Some round.xt
+           ; Some round.yt
+           ; None
+           ; None
+           ; Some round.xp
+           ; Some round.yp
+           ; Some round.n_acc
+           ; Some round.xr
+           ; Some round.yr
+           ; Some round.s1
+           ; Some round.s3
+           ; Some round.b1
+           ; Some round.b2
+           ; Some round.b3
+           ; Some round.b4
+          |]
+        in
+        add_row sys row Kimchi_types.EndoMul [||]
+      in
+      Array.iter state ~f:add_endoscale_round ;
+      (* Last row. *)
+      let vars =
+        [| None
+         ; None
+         ; None
+         ; None
+         ; Some (reduce_to_v xs)
+         ; Some (reduce_to_v ys)
+         ; Some (reduce_to_v n_acc)
+         ; None
+         ; None
+         ; None
+         ; None
+         ; None
+         ; None
+         ; None
+         ; None
+        |]
+      in
+      add_row sys vars Zero [||]
+    | Plonk_constraint.T
+        (EC_endoscalar { state : 'v Endoscale_scalar_round.t array }) ->
+      (* Add round function. *)
+      let add_endoscale_scalar_round (round : V.t Endoscale_scalar_round.t) =
+        let row =
+          [| Some round.n0
+           ; Some round.n8
+           ; Some round.a0
+           ; Some round.b0
+           ; Some round.a8
+           ; Some round.b8
+           ; Some round.x0
+           ; Some round.x1
+           ; Some round.x2
+           ; Some round.x3
+           ; Some round.x4
+           ; Some round.x5
+           ; Some round.x6
+           ; Some round.x7
+           ; None
+          |]
+        in
+        add_row sys row Kimchi_types.EndoMulScalar [||]
+      in
+      Array.iter state
+        ~f:
+          (Fn.compose add_endoscale_scalar_round
+             (Endoscale_scalar_round.map ~f:reduce_to_v) )
+    | Plonk_constraint.T (Lookup { w0; w1; w2; w3; w4; w5; w6 }) ->
+      (* table ID *)
+      let red_w0 = reduce_to_v w0 in
+      (* idx1 *)
+      let red_w1 = reduce_to_v w1 in
+      (* v1 *)
+      let red_w2 = reduce_to_v w2 in
+      (* idx2 *)
+      let red_w3 = reduce_to_v w3 in
+      (* v2 *)
+      let red_w4 = reduce_to_v w4 in
+      (* idx3 *)
+      let red_w5 = reduce_to_v w5 in
+      (* v3 *)
+      let red_w6 = reduce_to_v w6 in
+      let vars =
+        [| Some red_w0
+         ; Some red_w1
+         ; Some red_w2
+         ; Some red_w3
+         ; Some red_w4
+         ; Some red_w5
+         ; Some red_w6
+        |]
+      in
+      let lookup1 = (red_w0, (red_w1, red_w2)) in
+      let lookup2 = (red_w0, (red_w3, red_w4)) in
+      let lookup3 = (red_w0, (red_w5, red_w6)) in
+      (* We populate with the first lookup. In the case the user uses the same
+         index multiple times, the last value will be used *)
+      sys.runtime_lookups_rev <-
+        lookup3 :: lookup2 :: lookup1 :: sys.runtime_lookups_rev ;
+      add_row sys vars Lookup [||]
     | Plonk_constraint.T
         (RangeCheck0
-          { v0
-          ; v0p0
-          ; v0p1
-          ; v0p2
-          ; v0p3
-          ; v0p4
-          ; v0p5
-          ; v0c0
-          ; v0c1
-          ; v0c2
-          ; v0c3
-          ; v0c4
-          ; v0c5
-          ; v0c6
-          ; v0c7
-          ; compact
-          } ) ->
+           { v0
+           ; v0p0
+           ; v0p1
+           ; v0p2
+           ; v0p3
+           ; v0p4
+           ; v0p5
+           ; v0c0
+           ; v0c1
+           ; v0c2
+           ; v0c3
+           ; v0c4
+           ; v0c5
+           ; v0c6
+           ; v0c7
+           ; compact
+           } ) ->
         (*
         //! 0   1   2   3   4   5   6   7   8   9  10  11  12  13  14
         //! v vp0 vp1 vp2 vp3 vp4 vp5 vc0 vc1 vc2 vc3 vc4 vc5 vc6 vc7
         *)
-        let vars =
-          [| Some (reduce_to_v v0)
-           ; Some (reduce_to_v v0p0) (* MSBs *)
-           ; Some (reduce_to_v v0p1)
-           ; Some (reduce_to_v v0p2)
-           ; Some (reduce_to_v v0p3)
-           ; Some (reduce_to_v v0p4)
-           ; Some (reduce_to_v v0p5)
-           ; Some (reduce_to_v v0c0)
-           ; Some (reduce_to_v v0c1)
-           ; Some (reduce_to_v v0c2)
-           ; Some (reduce_to_v v0c3)
-           ; Some (reduce_to_v v0c4)
-           ; Some (reduce_to_v v0c5)
-           ; Some (reduce_to_v v0c6)
-           ; Some (reduce_to_v v0c7) (* LSBs *)
-          |]
-        in
-        let coeff = if Fp.equal compact Fp.one then Fp.one else Fp.zero in
-        add_row sys vars RangeCheck0 [| coeff |]
+      let vars =
+        [| Some (reduce_to_v v0)
+         ; Some (reduce_to_v v0p0) (* MSBs *)
+         ; Some (reduce_to_v v0p1)
+         ; Some (reduce_to_v v0p2)
+         ; Some (reduce_to_v v0p3)
+         ; Some (reduce_to_v v0p4)
+         ; Some (reduce_to_v v0p5)
+         ; Some (reduce_to_v v0c0)
+         ; Some (reduce_to_v v0c1)
+         ; Some (reduce_to_v v0c2)
+         ; Some (reduce_to_v v0c3)
+         ; Some (reduce_to_v v0c4)
+         ; Some (reduce_to_v v0c5)
+         ; Some (reduce_to_v v0c6)
+         ; Some (reduce_to_v v0c7) (* LSBs *)
+        |]
+      in
+      let coeff = if Fp.equal compact Fp.one then Fp.one else Fp.zero in
+      add_row sys vars RangeCheck0 [| coeff |]
     | Plonk_constraint.T
         (RangeCheck1
-          { (* Current row *) v2
-          ; v12
-          ; v2c0
-          ; v2p0
-          ; v2p1
-          ; v2p2
-          ; v2p3
-          ; v2c1
-          ; v2c2
-          ; v2c3
-          ; v2c4
-          ; v2c5
-          ; v2c6
-          ; v2c7
-          ; v2c8
-          ; (* Next row *) v2c9
-          ; v2c10
-          ; v2c11
-          ; v0p0
-          ; v0p1
-          ; v1p0
-          ; v1p1
-          ; v2c12
-          ; v2c13
-          ; v2c14
-          ; v2c15
-          ; v2c16
-          ; v2c17
-          ; v2c18
-          ; v2c19
-          } ) ->
+           { (* Current row *) v2
+           ; v12
+           ; v2c0
+           ; v2p0
+           ; v2p1
+           ; v2p2
+           ; v2p3
+           ; v2c1
+           ; v2c2
+           ; v2c3
+           ; v2c4
+           ; v2c5
+           ; v2c6
+           ; v2c7
+           ; v2c8
+           ; (* Next row *) v2c9
+           ; v2c10
+           ; v2c11
+           ; v0p0
+           ; v0p1
+           ; v1p0
+           ; v1p1
+           ; v2c12
+           ; v2c13
+           ; v2c14
+           ; v2c15
+           ; v2c16
+           ; v2c17
+           ; v2c18
+           ; v2c19
+           } ) ->
         (*
         //!       0      1      2     3    4    5    6     7     8     9    10    11    12   13     14
         //! Curr: v2   v12   v2c0  v2p0 v2p1 v2p2 v2p3  v2c1  v2c2  v2c3  v2c4  v2c5  v2c6 v2c7   v2c8
         //! Next: v2c9 v2c10 v2c11 v0p0 v0p1 v1p0 v1p1 v2c12 v2c13 v2c14 v2c15 v2c16 v2c17 v2c18 v2c19
         *)
-        let vars_curr =
-          [| (* Current row *) Some (reduce_to_v v2)
-           ; Some (reduce_to_v v12)
-           ; Some (reduce_to_v v2c0) (* MSBs *)
-           ; Some (reduce_to_v v2p0)
-           ; Some (reduce_to_v v2p1)
-           ; Some (reduce_to_v v2p2)
-           ; Some (reduce_to_v v2p3)
-           ; Some (reduce_to_v v2c1)
-           ; Some (reduce_to_v v2c2)
-           ; Some (reduce_to_v v2c3)
-           ; Some (reduce_to_v v2c4)
-           ; Some (reduce_to_v v2c5)
-           ; Some (reduce_to_v v2c6)
-           ; Some (reduce_to_v v2c7)
-           ; Some (reduce_to_v v2c8) (* LSBs *)
-          |]
-        in
-        let vars_next =
-          [| (* Next row *) Some (reduce_to_v v2c9)
-           ; Some (reduce_to_v v2c10)
-           ; Some (reduce_to_v v2c11)
-           ; Some (reduce_to_v v0p0)
-           ; Some (reduce_to_v v0p1)
-           ; Some (reduce_to_v v1p0)
-           ; Some (reduce_to_v v1p1)
-           ; Some (reduce_to_v v2c12)
-           ; Some (reduce_to_v v2c13)
-           ; Some (reduce_to_v v2c14)
-           ; Some (reduce_to_v v2c15)
-           ; Some (reduce_to_v v2c16)
-           ; Some (reduce_to_v v2c17)
-           ; Some (reduce_to_v v2c18)
-           ; Some (reduce_to_v v2c19)
-          |]
-        in
-        add_row sys vars_curr RangeCheck1 [||] ;
-        add_row sys vars_next Zero [||]
+      let vars_curr =
+        [| (* Current row *) Some (reduce_to_v v2)
+         ; Some (reduce_to_v v12)
+         ; Some (reduce_to_v v2c0) (* MSBs *)
+         ; Some (reduce_to_v v2p0)
+         ; Some (reduce_to_v v2p1)
+         ; Some (reduce_to_v v2p2)
+         ; Some (reduce_to_v v2p3)
+         ; Some (reduce_to_v v2c1)
+         ; Some (reduce_to_v v2c2)
+         ; Some (reduce_to_v v2c3)
+         ; Some (reduce_to_v v2c4)
+         ; Some (reduce_to_v v2c5)
+         ; Some (reduce_to_v v2c6)
+         ; Some (reduce_to_v v2c7)
+         ; Some (reduce_to_v v2c8) (* LSBs *)
+        |]
+      in
+      let vars_next =
+        [| (* Next row *) Some (reduce_to_v v2c9)
+         ; Some (reduce_to_v v2c10)
+         ; Some (reduce_to_v v2c11)
+         ; Some (reduce_to_v v0p0)
+         ; Some (reduce_to_v v0p1)
+         ; Some (reduce_to_v v1p0)
+         ; Some (reduce_to_v v1p1)
+         ; Some (reduce_to_v v2c12)
+         ; Some (reduce_to_v v2c13)
+         ; Some (reduce_to_v v2c14)
+         ; Some (reduce_to_v v2c15)
+         ; Some (reduce_to_v v2c16)
+         ; Some (reduce_to_v v2c17)
+         ; Some (reduce_to_v v2c18)
+         ; Some (reduce_to_v v2c19)
+        |]
+      in
+      add_row sys vars_curr RangeCheck1 [||] ;
+      add_row sys vars_next Zero [||]
     | Plonk_constraint.T
         (Xor
-          { in1
-          ; in2
-          ; out
-          ; in1_0
-          ; in1_1
-          ; in1_2
-          ; in1_3
-          ; in2_0
-          ; in2_1
-          ; in2_2
-          ; in2_3
-          ; out_0
-          ; out_1
-          ; out_2
-          ; out_3
-          } ) ->
-        (* | Column |          Curr    | Next (gadget responsibility) |
-           | ------ | ---------------- | ---------------------------- |
-           |      0 | copy     `in1`   | copy     `in1'`              |
-           |      1 | copy     `in2`   | copy     `in2'`              |
-           |      2 | copy     `out`   | copy     `out'`              |
-           |      3 | plookup0 `in1_0` |                              |
-           |      4 | plookup1 `in1_1` |                              |
-           |      5 | plookup2 `in1_2` |                              |
-           |      6 | plookup3 `in1_3` |                              |
-           |      7 | plookup0 `in2_0` |                              |
-           |      8 | plookup1 `in2_1` |                              |
-           |      9 | plookup2 `in2_2` |                              |
-           |     10 | plookup3 `in2_3` |                              |
-           |     11 | plookup0 `out_0` |                              |
-           |     12 | plookup1 `out_1` |                              |
-           |     13 | plookup2 `out_2` |                              |
-           |     14 | plookup3 `out_3` |                              |
-        *)
-        let curr_row =
-          [| Some (reduce_to_v in1)
-           ; Some (reduce_to_v in2)
-           ; Some (reduce_to_v out)
-           ; Some (reduce_to_v in1_0)
-           ; Some (reduce_to_v in1_1)
-           ; Some (reduce_to_v in1_2)
-           ; Some (reduce_to_v in1_3)
-           ; Some (reduce_to_v in2_0)
-           ; Some (reduce_to_v in2_1)
-           ; Some (reduce_to_v in2_2)
-           ; Some (reduce_to_v in2_3)
-           ; Some (reduce_to_v out_0)
-           ; Some (reduce_to_v out_1)
-           ; Some (reduce_to_v out_2)
-           ; Some (reduce_to_v out_3)
-          |]
-        in
-        (* The raw gate after a Xor16 gate is a Const to check that all values are zero.
-           For that, the first coefficient is 1 and the rest will be zero.
-           This will be included in the gadget for a chain of Xors, not here.*)
-        add_row sys curr_row Xor16 [||]
+           { in1
+           ; in2
+           ; out
+           ; in1_0
+           ; in1_1
+           ; in1_2
+           ; in1_3
+           ; in2_0
+           ; in2_1
+           ; in2_2
+           ; in2_3
+           ; out_0
+           ; out_1
+           ; out_2
+           ; out_3
+           } ) ->
+      (* | Column |          Curr    | Next (gadget responsibility) |
+         | ------ | ---------------- | ---------------------------- |
+         |      0 | copy     `in1`   | copy     `in1'`              |
+         |      1 | copy     `in2`   | copy     `in2'`              |
+         |      2 | copy     `out`   | copy     `out'`              |
+         |      3 | plookup0 `in1_0` |                              |
+         |      4 | plookup1 `in1_1` |                              |
+         |      5 | plookup2 `in1_2` |                              |
+         |      6 | plookup3 `in1_3` |                              |
+         |      7 | plookup0 `in2_0` |                              |
+         |      8 | plookup1 `in2_1` |                              |
+         |      9 | plookup2 `in2_2` |                              |
+         |     10 | plookup3 `in2_3` |                              |
+         |     11 | plookup0 `out_0` |                              |
+         |     12 | plookup1 `out_1` |                              |
+         |     13 | plookup2 `out_2` |                              |
+         |     14 | plookup3 `out_3` |                              |
+      *)
+      let curr_row =
+        [| Some (reduce_to_v in1)
+         ; Some (reduce_to_v in2)
+         ; Some (reduce_to_v out)
+         ; Some (reduce_to_v in1_0)
+         ; Some (reduce_to_v in1_1)
+         ; Some (reduce_to_v in1_2)
+         ; Some (reduce_to_v in1_3)
+         ; Some (reduce_to_v in2_0)
+         ; Some (reduce_to_v in2_1)
+         ; Some (reduce_to_v in2_2)
+         ; Some (reduce_to_v in2_3)
+         ; Some (reduce_to_v out_0)
+         ; Some (reduce_to_v out_1)
+         ; Some (reduce_to_v out_2)
+         ; Some (reduce_to_v out_3)
+        |]
+      in
+      (* The raw gate after a Xor16 gate is a Const to check that all values are zero.
+         For that, the first coefficient is 1 and the rest will be zero.
+         This will be included in the gadget for a chain of Xors, not here.*)
+      add_row sys curr_row Xor16 [||]
     | Plonk_constraint.T
         (ForeignFieldAdd
-          { left_input_lo
-          ; left_input_mi
-          ; left_input_hi
-          ; right_input_lo
-          ; right_input_mi
-          ; right_input_hi
-          ; field_overflow
-          ; carry
-          ; (* Coefficients *) foreign_field_modulus0
-          ; foreign_field_modulus1
-          ; foreign_field_modulus2
-          ; sign
-          } ) ->
+           { left_input_lo
+           ; left_input_mi
+           ; left_input_hi
+           ; right_input_lo
+           ; right_input_mi
+           ; right_input_hi
+           ; field_overflow
+           ; carry
+           ; (* Coefficients *) foreign_field_modulus0
+           ; foreign_field_modulus1
+           ; foreign_field_modulus2
+           ; sign
+           } ) ->
         (*
         //! | Gate   | `ForeignFieldAdd`        | Circuit/gadget responsibility  |
         //! | ------ | ------------------------ | ------------------------------ |
@@ -2115,64 +2115,64 @@ end = struct
         //! |     13 |                          |                                |
         //! |     14 |                          |                                |
         *)
-        let vars =
-          [| (* Current row *) Some (reduce_to_v left_input_lo)
-           ; Some (reduce_to_v left_input_mi)
-           ; Some (reduce_to_v left_input_hi)
-           ; Some (reduce_to_v right_input_lo)
-           ; Some (reduce_to_v right_input_mi)
-           ; Some (reduce_to_v right_input_hi)
-           ; Some (reduce_to_v field_overflow)
-           ; Some (reduce_to_v carry)
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-           ; None
-          |]
-        in
-        add_row sys vars ForeignFieldAdd
-          [| foreign_field_modulus0
-           ; foreign_field_modulus1
-           ; foreign_field_modulus2
-           ; sign
-          |]
+      let vars =
+        [| (* Current row *) Some (reduce_to_v left_input_lo)
+         ; Some (reduce_to_v left_input_mi)
+         ; Some (reduce_to_v left_input_hi)
+         ; Some (reduce_to_v right_input_lo)
+         ; Some (reduce_to_v right_input_mi)
+         ; Some (reduce_to_v right_input_hi)
+         ; Some (reduce_to_v field_overflow)
+         ; Some (reduce_to_v carry)
+         ; None
+         ; None
+         ; None
+         ; None
+         ; None
+         ; None
+         ; None
+        |]
+      in
+      add_row sys vars ForeignFieldAdd
+        [| foreign_field_modulus0
+         ; foreign_field_modulus1
+         ; foreign_field_modulus2
+         ; sign
+        |]
     | Plonk_constraint.T
         (ForeignFieldMul
-          { left_input0
-          ; left_input1
-          ; left_input2
-          ; right_input0
-          ; right_input1
-          ; right_input2
-          ; remainder01
-          ; remainder2
-          ; quotient0
-          ; quotient1
-          ; quotient2
-          ; quotient_hi_bound
-          ; product1_lo
-          ; product1_hi_0
-          ; product1_hi_1
-          ; carry0
-          ; carry1_0
-          ; carry1_12
-          ; carry1_24
-          ; carry1_36
-          ; carry1_48
-          ; carry1_60
-          ; carry1_72
-          ; carry1_84
-          ; carry1_86
-          ; carry1_88
-          ; carry1_90
-          ; (* Coefficients *) foreign_field_modulus2
-          ; neg_foreign_field_modulus0
-          ; neg_foreign_field_modulus1
-          ; neg_foreign_field_modulus2
-          } ) ->
+           { left_input0
+           ; left_input1
+           ; left_input2
+           ; right_input0
+           ; right_input1
+           ; right_input2
+           ; remainder01
+           ; remainder2
+           ; quotient0
+           ; quotient1
+           ; quotient2
+           ; quotient_hi_bound
+           ; product1_lo
+           ; product1_hi_0
+           ; product1_hi_1
+           ; carry0
+           ; carry1_0
+           ; carry1_12
+           ; carry1_24
+           ; carry1_36
+           ; carry1_48
+           ; carry1_60
+           ; carry1_72
+           ; carry1_84
+           ; carry1_86
+           ; carry1_88
+           ; carry1_90
+           ; (* Coefficients *) foreign_field_modulus2
+           ; neg_foreign_field_modulus0
+           ; neg_foreign_field_modulus1
+           ; neg_foreign_field_modulus2
+           } ) ->
         (*
           | col | `ForeignFieldMul`       | `Zero`                     |
           | --- | ----------------------- | -------------------------- |
@@ -2192,70 +2192,70 @@ end = struct
           |  13 | `carry1_88`             |                            |
           |  14 | `carry1_90`             |                            |
         *)
-        (* Current row *)
-        let vars_curr =
-          [| Some (reduce_to_v left_input0)
-           ; Some (reduce_to_v left_input1)
-           ; Some (reduce_to_v left_input2)
-           ; Some (reduce_to_v right_input0)
-           ; Some (reduce_to_v right_input1)
-           ; Some (reduce_to_v right_input2)
-           ; Some (reduce_to_v product1_lo)
-           ; Some (reduce_to_v carry1_0)
-           ; Some (reduce_to_v carry1_12)
-           ; Some (reduce_to_v carry1_24)
-           ; Some (reduce_to_v carry1_36)
-           ; Some (reduce_to_v carry1_84)
-           ; Some (reduce_to_v carry1_86)
-           ; Some (reduce_to_v carry1_88)
-           ; Some (reduce_to_v carry1_90)
-          |]
-        in
-        (* Next row *)
-        let vars_next =
-          [| Some (reduce_to_v remainder01)
-           ; Some (reduce_to_v remainder2)
-           ; Some (reduce_to_v quotient0)
-           ; Some (reduce_to_v quotient1)
-           ; Some (reduce_to_v quotient2)
-           ; Some (reduce_to_v quotient_hi_bound)
-           ; Some (reduce_to_v product1_hi_0)
-           ; Some (reduce_to_v product1_hi_1)
-           ; Some (reduce_to_v carry1_48)
-           ; Some (reduce_to_v carry1_60)
-           ; Some (reduce_to_v carry1_72)
-           ; Some (reduce_to_v carry0)
-           ; None
-           ; None
-           ; None
-          |]
-        in
-        add_row sys vars_curr ForeignFieldMul
-          [| foreign_field_modulus2
-           ; neg_foreign_field_modulus0
-           ; neg_foreign_field_modulus1
-           ; neg_foreign_field_modulus2
-          |] ;
-        add_row sys vars_next Zero [||]
+      (* Current row *)
+      let vars_curr =
+        [| Some (reduce_to_v left_input0)
+         ; Some (reduce_to_v left_input1)
+         ; Some (reduce_to_v left_input2)
+         ; Some (reduce_to_v right_input0)
+         ; Some (reduce_to_v right_input1)
+         ; Some (reduce_to_v right_input2)
+         ; Some (reduce_to_v product1_lo)
+         ; Some (reduce_to_v carry1_0)
+         ; Some (reduce_to_v carry1_12)
+         ; Some (reduce_to_v carry1_24)
+         ; Some (reduce_to_v carry1_36)
+         ; Some (reduce_to_v carry1_84)
+         ; Some (reduce_to_v carry1_86)
+         ; Some (reduce_to_v carry1_88)
+         ; Some (reduce_to_v carry1_90)
+        |]
+      in
+      (* Next row *)
+      let vars_next =
+        [| Some (reduce_to_v remainder01)
+         ; Some (reduce_to_v remainder2)
+         ; Some (reduce_to_v quotient0)
+         ; Some (reduce_to_v quotient1)
+         ; Some (reduce_to_v quotient2)
+         ; Some (reduce_to_v quotient_hi_bound)
+         ; Some (reduce_to_v product1_hi_0)
+         ; Some (reduce_to_v product1_hi_1)
+         ; Some (reduce_to_v carry1_48)
+         ; Some (reduce_to_v carry1_60)
+         ; Some (reduce_to_v carry1_72)
+         ; Some (reduce_to_v carry0)
+         ; None
+         ; None
+         ; None
+        |]
+      in
+      add_row sys vars_curr ForeignFieldMul
+        [| foreign_field_modulus2
+         ; neg_foreign_field_modulus0
+         ; neg_foreign_field_modulus1
+         ; neg_foreign_field_modulus2
+        |] ;
+      add_row sys vars_next Zero [||]
     | Plonk_constraint.T
         (Rot64
-          { word
-          ; rotated
-          ; excess
-          ; bound_limb0
-          ; bound_limb1
-          ; bound_limb2
-          ; bound_limb3
-          ; bound_crumb0
-          ; bound_crumb1
-          ; bound_crumb2
-          ; bound_crumb3
-          ; bound_crumb4
-          ; bound_crumb5
-          ; bound_crumb6
-          ; bound_crumb7
-          ; (* Coefficients *) two_to_rot
-          } ) ->
+           { word
+           ; rotated
+           ; excess
+           ; bound_limb0
+           ; bound_limb1
+           ; bound_limb2
+           ; bound_limb3
+           ; bound_crumb0
+           ; bound_crumb1
+           ; bound_crumb2
+           ; bound_crumb3
+           ; bound_crumb4
+           ; bound_crumb5
+           ; bound_crumb6
+           ; bound_crumb7
+           ; (* Coefficients *) two_to_rot
+           } ) ->
         (*
         //! | Gate   | `Rot64`             | `RangeCheck0` gadgets (designer's duty)                   |
         //! | ------ | ------------------- | --------------------------------------------------------- |
@@ -2277,58 +2277,58 @@ end = struct
         //! |     13 |      `bound_crumb6` | `shifted_crumb6` | `excess_crumb6` |       `word_crumb6`  |
         //! |     14 |      `bound_crumb7` | `shifted_crumb7` | `excess_crumb7` |       `word_crumb7`  |
         *)
-        let vars_curr =
-          [| (* Current row *) Some (reduce_to_v word)
-           ; Some (reduce_to_v rotated)
-           ; Some (reduce_to_v excess)
-           ; Some (reduce_to_v bound_limb0)
-           ; Some (reduce_to_v bound_limb1)
-           ; Some (reduce_to_v bound_limb2)
-           ; Some (reduce_to_v bound_limb3)
-           ; Some (reduce_to_v bound_crumb0)
-           ; Some (reduce_to_v bound_crumb1)
-           ; Some (reduce_to_v bound_crumb2)
-           ; Some (reduce_to_v bound_crumb3)
-           ; Some (reduce_to_v bound_crumb4)
-           ; Some (reduce_to_v bound_crumb5)
-           ; Some (reduce_to_v bound_crumb6)
-           ; Some (reduce_to_v bound_crumb7)
-          |]
-        in
-        add_row sys vars_curr Rot64 [| two_to_rot |]
+      let vars_curr =
+        [| (* Current row *) Some (reduce_to_v word)
+         ; Some (reduce_to_v rotated)
+         ; Some (reduce_to_v excess)
+         ; Some (reduce_to_v bound_limb0)
+         ; Some (reduce_to_v bound_limb1)
+         ; Some (reduce_to_v bound_limb2)
+         ; Some (reduce_to_v bound_limb3)
+         ; Some (reduce_to_v bound_crumb0)
+         ; Some (reduce_to_v bound_crumb1)
+         ; Some (reduce_to_v bound_crumb2)
+         ; Some (reduce_to_v bound_crumb3)
+         ; Some (reduce_to_v bound_crumb4)
+         ; Some (reduce_to_v bound_crumb5)
+         ; Some (reduce_to_v bound_crumb6)
+         ; Some (reduce_to_v bound_crumb7)
+        |]
+      in
+      add_row sys vars_curr Rot64 [| two_to_rot |]
     | Plonk_constraint.T (AddFixedLookupTable { id; data }) -> (
         match sys.fixed_lookup_tables with
         | Unfinalized_fixed_lookup_tables_rev fixed_lookup_tables ->
-            let lt : Fp.t Kimchi_types.lookup_table list =
-              { id; data } :: fixed_lookup_tables
-            in
-            sys.fixed_lookup_tables <- Unfinalized_fixed_lookup_tables_rev lt
+          let lt : Fp.t Kimchi_types.lookup_table list =
+            { id; data } :: fixed_lookup_tables
+          in
+          sys.fixed_lookup_tables <- Unfinalized_fixed_lookup_tables_rev lt
         | Compiled_fixed_lookup_tables _ ->
-            failwith
-              "Trying to add a fixed lookup tables when it has been already \
-               finalized" )
+          failwith
+            "Trying to add a fixed lookup tables when it has been already \
+             finalized" )
     | Plonk_constraint.T (AddRuntimeTableCfg { id; first_column }) -> (
         match sys.runtime_tables_cfg with
         | Unfinalized_runtime_tables_cfg_rev runtime_tables_cfg ->
-            let rt_cfg : Fp.t Kimchi_types.runtime_table_cfg list =
-              { id; first_column } :: runtime_tables_cfg
-            in
-            sys.runtime_tables_cfg <- Unfinalized_runtime_tables_cfg_rev rt_cfg
+          let rt_cfg : Fp.t Kimchi_types.runtime_table_cfg list =
+            { id; first_column } :: runtime_tables_cfg
+          in
+          sys.runtime_tables_cfg <- Unfinalized_runtime_tables_cfg_rev rt_cfg
         | Compiled_runtime_tables_cfg _ ->
-            failwith
-              "Trying to add a runtime table configuration  it has been \
-               already finalized" )
+          failwith
+            "Trying to add a runtime table configuration  it has been \
+             already finalized" )
     | Plonk_constraint.T (Raw { kind; values; coeffs }) ->
-        let values =
-          Array.init 15 ~f:(fun i ->
-              (* Insert [None] if the index is beyond the end of the [values]
-                 array.
-              *)
-              Option.try_with (fun () -> reduce_to_v values.(i)) )
-        in
-        add_row sys values kind coeffs
+      let values =
+        Array.init 15 ~f:(fun i ->
+            (* Insert [None] if the index is beyond the end of the [values]
+               array.
+            *)
+            Option.try_with (fun () -> reduce_to_v values.(i)) )
+      in
+      add_row sys values kind coeffs
     | constr ->
-        failwithf "Unhandled constraint %s"
-          Obj.(Extension_constructor.name (Extension_constructor.of_val constr))
-          ()
+      failwithf "Unhandled constraint %s"
+        Obj.(Extension_constructor.name (Extension_constructor.of_val constr))
+        ()
 end

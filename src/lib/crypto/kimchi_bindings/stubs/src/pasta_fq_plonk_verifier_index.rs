@@ -142,7 +142,8 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas, OpeningProof<
             shift,
             permutation_vanishing_polynomial_m: {
                 let res = once_cell::sync::OnceCell::new();
-                res.set(permutation_vanishing_polynomial(domain, 3)).unwrap();
+                res.set(permutation_vanishing_polynomial(domain, 3))
+                    .unwrap();
                 res
             },
             w: {

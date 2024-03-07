@@ -156,27 +156,62 @@ module External_checks : sig
   module Cvar = Snarky_backendless.Cvar
 
   type 'field t =
-    { mutable multi_ranges : 'field Cvar.t standard_limbs list
+    { mutable bounds : ('field Cvar.t standard_limbs * bool) list
+    ; mutable canonicals : 'field Cvar.t standard_limbs list
+    ; mutable multi_ranges : 'field Cvar.t standard_limbs list
     ; mutable compact_multi_ranges : 'field Cvar.t compact_limbs list
-    ; mutable bounds : 'field Cvar.t standard_limbs list
+    ; mutable limb_ranges : 'field Cvar.t list
     }
 
+  (** Create a new context *)
   val create : (module Snark_intf.Run with type field = 'field) -> 'field t
 
+  (** Track a bound check *)
+  val append_bound_check :
+    'field t -> ?do_multi_range_check:bool -> 'field Element.Standard.t -> unit
+
+  (** Track a canonical check *)
+  val append_canonical_check : 'field t -> 'field Element.Standard.t -> unit
+
+  (** Track a multi-range-check *)
   val append_multi_range_check :
     'field t -> 'field Cvar.t standard_limbs -> unit
 
+  (** Track a compact-multi-range-check *)
   val append_compact_multi_range_check :
     'field t -> 'field Cvar.t compact_limbs -> unit
 
-  val append_bound_check : 'field t -> 'field Cvar.t standard_limbs -> unit
+  (** Tracks a limb-range-check *)
+  val append_limb_check : 'field t -> 'field Cvar.t -> unit
 end
 
 (* Type of operation *)
 type op_mode = Add | Sub
 
-(** Gadget to check the supplied value is a valid foreign field element for the
- *  supplied foreign field modulus
+(** Bound check the supplied value
+ *    Inputs:
+ *      external_checks       := Context to track required external checks
+ *      x                     := Value to check
+ *      do_multi_range_check  := Whether to multi-range-check x
+ *      foreign_field_modulus := Foreign field modulus
+ *
+ *    Outputs:
+ *      Inserts generic gate to constrain computation of high bound x'2 = x2 + 2^88 - f2 - 1
+ *      Adds x to external_checks.multi_ranges
+ *      Adds x'2 to external_checks.limb_ranges
+ *      Returns computed high bound
+ *)
+val check_bound :
+     (module Snark_intf.Run with type field = 'f)
+  -> 'f External_checks.t (* external_checks context *)
+  -> 'f Element.Standard.t (* value *)
+  -> bool (* do_multi_range_check *)
+  -> 'f standard_limbs (* foreign_field_modulus *)
+  -> 'f Snarky_backendless.Cvar.t
+(* bound *)
+
+(** Gadget to check the supplied value is a canonical foreign field element for the
+ * supplied foreign field modulus
  *
  *    This gadget checks in the circuit that a value is less than the foreign field modulus.
  *    Part of this involves computing a bound value that is both added to external_checks
@@ -184,19 +219,16 @@ type op_mode = Add | Sub
  *
  *    Inputs:
  *      external_checks       := Context to track required external checks
- *      value                 := the value to check
- *      foreign_field_modulus := the modulus of the foreign field
+ *      value                 := Value to check
+ *      foreign_field_modulus := Foreign field modulus
  *
  *    Outputs:
- *      Inserts the gates (described below) into the circuit
- *      Adds bound value to be multi-range-checked to external_checks
+ *      Inserts ForeignFieldAdd gate
+ *      Inserts Zero gate containing result
+ *      Adds bound to be multi-range-checked to external_checks
  *      Returns bound value
- *
- *    Effects to the circuit:
- *      - 1 FFAdd gate
- *      - 1 Zero gate
  *)
-val valid_element :
+val check_canonical :
      (module Snark_intf.Run with type field = 'f)
   -> 'f External_checks.t (* external_checks context *)
   -> 'f Element.Standard.t (* value *)
@@ -214,22 +246,21 @@ val constrain_external_checks :
 (** Gadget for a chain of foreign field sums (additions or subtractions)
  *
  *    Inputs:
+ *      external_checks       := Context to track required external checks
  *      inputs                := All the inputs to the chain of sums
- *      operations            := List of operation modes Add or Sub indicating whether th
+ *      operations            := List of operation modes Add or Sub indicating whether the
  *                               corresponding addition is a subtraction
- *      foreign_field_modulus := The modulus of the foreign field (all the same)
+ *      foreign_field_modulus := Foreign field modulus
  *
  *    Outputs:
- *      Inserts the gates (described below) into the circuit
+ *      Inserts ForeignFieldAdd gate into the circuit
  *      Returns the final result of the chain of sums
  *
- *    For n+1 inputs, the gadget creates n foreign field addition gates, followed by a final
- *    foreign field addition gate for the bound check (i.e. valid_element check). For this, a
- *    an additional multi range check must also be performed.
- *    By default, the range check takes place right after the final Raw row.
+ *    For n+1 inputs, the gadget creates n foreign field addition gates.
  *)
 val sum_chain :
      (module Snark_intf.Run with type field = 'f)
+  -> 'f External_checks.t (* external_checks *)
   -> 'f Element.Standard.t list (* inputs *)
   -> op_mode list (* operations *)
   -> 'f standard_limbs (* foreign_field_modulus *)
@@ -239,29 +270,18 @@ val sum_chain :
 (** Gadget for a single foreign field addition
  *
  *    Inputs:
- *      full                  := flag for whether to perform a full addition with valid_element check
- *                               on the result (default true) or just a single FFAdd row (false)
- *      left_input            := 3 limbs foreign field element
- *      right_input           := 3 limbs foreign field element
- *      foreign_field_modulus := The modulus of the foreign field
+ *      external_checks       := Context to track required external checks
+ *      left_input            := Foreign field element
+ *      right_input           := Foreign field element
+ *      foreign_field_modulus := Foreign field modulus
  *
  *    Outputs:
- *      Inserts the gates (described below) into the circuit
- *      Returns the result of the addition as a 3 limbs element
- *
- * In default mode:
- *     It adds a FFAdd gate,
- *     followed by a Zero gate,
- *     a FFAdd gate for the bound check,
- *     a Zero gate after this bound check,
- *     and a Multi Range Check gadget.
- *
- * In false mode:
- *     It adds a FFAdd gate.
+ *      Inserts ForeignFieldAdd gate into the circuit
+ *      Returns the result
  *)
 val add :
      (module Snark_intf.Run with type field = 'f)
-  -> ?full:bool (* full *)
+  -> 'f External_checks.t (* external_checks *)
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
@@ -271,40 +291,30 @@ val add :
 (** Gadget for a single foreign field subtraction
  *
  *    Inputs:
- *      full                  := flag for whether to perform a full subtraction with valid_element check
- *                               on the result (default true) or just a single FFAdd row (false)
- *      left_input            := 3 limbs foreign field element
- *      right_input           := 3 limbs foreign field element
- *      foreign_field_modulus := The modulus of the foreign field
+ *      external_checks       := Context to track required external checks
+ *      left_input            := Foreign field element
+ *      right_input           := Foreign field element
+ *      foreign_field_modulus := Foreign field modulus
  *
  *    Outputs:
- *      Inserts the gates (described below) into the circuit
- *      Returns the result of the addition as a 3 limbs element
- *
- * In default mode:
- *     It adds a FFAdd gate,
- *     followed by a Zero gate,
- *     a FFAdd gate for the bound check,
- *     a Zero gate after this bound check,
- *     and a Multi Range Check gadget.
- *
- * In false mode:
- *     It adds a FFAdd gate.
+ *      Inserts ForeignFieldAdd gate into the circuit
+ *      Returns ther result
  *)
 val sub :
      (module Snark_intf.Run with type field = 'f)
-  -> ?full:bool (* full *)
+  -> 'f External_checks.t (* external_checks *)
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
   -> 'f Element.Standard.t
 (* result *)
 
-(* Gadget for creating an addition or subtraction result row (Zero gate with result) *)
+(** Gadget for creating an addition or subtraction result row (Zero gate with result) *)
 val result_row :
      (module Snark_intf.Run with type field = 'f)
   -> ?label:string
   -> 'f Element.Standard.t
+  -> 'f Element.Standard.t option
   -> unit
 
 (** Gadget for foreign field multiplication
@@ -313,7 +323,7 @@ val result_row :
  *
  *     left_input * right_input = quotient * foreign_field_modulus + remainder
  *
- *   where remainder is the product.
+ *   where remainder is the product in the foreign field (might not be canonical)
  *
  *   Inputs:
  *     external_checks       := Context to track required external checks
@@ -324,23 +334,25 @@ val result_row :
  *   Outputs:
  *     Inserts the ForeignFieldMul gate, followed by Zero gate into the circuit
  *     Appends required values to external_checks
- *     Returns the product
+ *     Returns the product (remainder term) of the multiplication
  *)
 val mul :
      (module Snark_intf.Run with type field = 'f)
   -> 'f External_checks.t (* external_checks *)
-  -> ?bound_check_result:bool
   -> 'f Element.Standard.t (* left_input *)
   -> 'f Element.Standard.t (* right_input *)
   -> 'f standard_limbs (* foreign_field_modulus *)
   -> 'f Element.Standard.t
-(* product *)
+(* remainder *)
 
-(** Gadget to constrain conversion of bytes list (output of Keccak gadget)
-   into foreign field element with standard limbs (input of ECDSA gadget).
-   Include the endianness of the bytes list. *)
+(** Gadget to constrain conversion of bytes list (e.g. output of Keccak gadget)
+ *  into a foreign field element (e.g. input of ECDSA gadget).
+ *
+ *  Parameters: endianness of the bytes list
+ *)
 val bytes_to_standard_element :
      (module Snark_intf.Run with type field = 'f)
+  -> 'f External_checks.t (* external_checks *)
   -> endian:Keccak.endianness
   -> 'f Snarky_backendless.Cvar.t list
   -> 'f standard_limbs

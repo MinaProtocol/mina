@@ -32,6 +32,40 @@ module FieldVectors = struct
 
     external set : t -> int -> elt -> unit = "caml_fq_vector_set"
   end
+
+  module Bn254Fp = struct
+    type nonrec t
+
+    type nonrec elt = Bn254_bindings.Bn254Fp.t
+
+    external create : unit -> t = "caml_bn254_fp_vector_create"
+
+    external length : t -> int = "caml_bn254_fp_vector_length"
+
+    external emplace_back : t -> elt -> unit
+      = "caml_bn254_fp_vector_emplace_back"
+
+    external get : t -> int -> elt = "caml_bn254_fp_vector_get"
+
+    external set : t -> int -> elt -> unit = "caml_bn254_fp_vector_set"
+  end
+
+  module Bn254Fq = struct
+    type nonrec t
+
+    type nonrec elt = Bn254_bindings.Bn254Fq.t
+
+    external create : unit -> t = "caml_bn254_fq_vector_create"
+
+    external length : t -> int = "caml_bn254_fq_vector_length"
+
+    external emplace_back : t -> elt -> unit
+      = "caml_bn254_fq_vector_emplace_back"
+
+    external get : t -> int -> elt = "caml_bn254_fq_vector_get"
+
+    external set : t -> int -> elt -> unit = "caml_bn254_fq_vector_set"
+  end
 end
 
 module Protocol = struct
@@ -81,6 +115,29 @@ module Protocol = struct
 
         external to_json : int -> t -> string
           = "caml_pasta_fq_plonk_circuit_serialize"
+      end
+
+      module Bn254Fp = struct
+        type nonrec t
+
+        type nonrec elt = Bn254_bindings.Bn254Fp.t Kimchi_types.circuit_gate
+
+        external create : unit -> t = "caml_bn254_fp_plonk_gate_vector_create"
+
+        external add : t -> elt -> unit = "caml_bn254_fp_plonk_gate_vector_add"
+
+        external get : t -> int -> elt = "caml_bn254_fp_plonk_gate_vector_get"
+
+        external len : t -> int = "caml_bn254_fp_plonk_gate_vector_len"
+
+        external wrap : t -> Kimchi_types.wire -> Kimchi_types.wire -> unit
+          = "caml_bn254_fp_plonk_gate_vector_wrap"
+
+        external digest : int -> t -> bytes
+          = "caml_bn254_fp_plonk_gate_vector_digest"
+
+        external to_json : int -> t -> string
+          = "caml_bn254_fp_plonk_circuit_serialize"
       end
     end
   end
@@ -188,6 +245,63 @@ module Protocol = struct
       external urs_h : t -> Pasta_bindings.Fp.t Kimchi_types.or_infinity
         = "caml_fq_srs_h"
     end
+
+    module Bn254Fp = struct
+      type nonrec t
+
+      module Poly_comm = struct
+        type nonrec t =
+          Bn254_bindings.Bn254Fp.t Kimchi_types.or_infinity
+          Kimchi_types.poly_comm
+      end
+
+      external create : int -> t = "caml_bn254_fp_srs_create"
+
+      external write : bool option -> t -> string -> unit
+        = "caml_bn254_fp_srs_write"
+
+      external read : int option -> string -> t option
+        = "caml_bn254_fp_srs_read"
+
+      external lagrange_commitment :
+           t
+        -> int
+        -> int
+        -> Bn254_bindings.Bn254Fq.t Kimchi_types.or_infinity
+           Kimchi_types.poly_comm = "caml_bn254_fp_srs_lagrange_commitment"
+
+      external add_lagrange_basis : t -> int -> unit
+        = "caml_bn254_fp_srs_add_lagrange_basis"
+
+      external commit_evaluations :
+           t
+        -> int
+        -> Bn254_bindings.Bn254Fp.t array
+        -> Bn254_bindings.Bn254Fq.t Kimchi_types.or_infinity
+           Kimchi_types.poly_comm = "caml_bn254_fp_srs_commit_evaluations"
+
+      external b_poly_commitment :
+           t
+        -> Bn254_bindings.Bn254Fp.t array
+        -> Bn254_bindings.Bn254Fq.t Kimchi_types.or_infinity
+           Kimchi_types.poly_comm = "caml_bn254_fp_srs_b_poly_commitment"
+
+      external batch_accumulator_check :
+           t
+        -> Bn254_bindings.Bn254Fq.t Kimchi_types.or_infinity array
+        -> Bn254_bindings.Bn254Fp.t array
+        -> bool = "caml_bn254_fp_srs_batch_accumulator_check"
+
+      external batch_accumulator_generate :
+           t
+        -> int
+        -> Bn254_bindings.Bn254Fp.t array
+        -> Bn254_bindings.Bn254Fq.t Kimchi_types.or_infinity array
+        = "caml_bn254_fp_srs_batch_accumulator_generate"
+
+      external urs_h : t -> Bn254_bindings.Bn254Fq.t Kimchi_types.or_infinity
+        = "caml_bn254_fp_srs_h"
+    end
   end
 
   module Index = struct
@@ -258,6 +372,40 @@ module Protocol = struct
       external write : bool option -> t -> string -> unit
         = "caml_pasta_fq_plonk_index_write"
     end
+
+    module Bn254Fp = struct
+      type nonrec t
+
+      external create :
+           Gates.Vector.Bn254Fp.t
+        -> int
+        -> Bn254_bindings.Bn254Fp.t Kimchi_types.lookup_table array
+        -> Bn254_bindings.Bn254Fp.t Kimchi_types.runtime_table_cfg array
+        -> int
+        -> SRS.Bn254Fp.t
+        -> t
+        = "caml_bn254_fp_plonk_index_create_bytecode" "caml_bn254_fp_plonk_index_create"
+
+      external max_degree : t -> int = "caml_bn254_fp_plonk_index_max_degree"
+
+      external public_inputs : t -> int
+        = "caml_bn254_fp_plonk_index_public_inputs"
+
+      external domain_d1_size : t -> int
+        = "caml_bn254_fp_plonk_index_domain_d1_size"
+
+      external domain_d4_size : t -> int
+        = "caml_bn254_fp_plonk_index_domain_d4_size"
+
+      external domain_d8_size : t -> int
+        = "caml_bn254_fp_plonk_index_domain_d8_size"
+
+      external read : int option -> SRS.Bn254Fp.t -> string -> t
+        = "caml_bn254_fp_plonk_index_read"
+
+      external write : bool option -> t -> string -> unit
+        = "caml_bn254_fp_plonk_index_write"
+    end
   end
 
   module VerifierIndex = struct
@@ -311,6 +459,32 @@ module Protocol = struct
 
       external deep_copy : t -> t
         = "caml_pasta_fq_plonk_verifier_index_deep_copy"
+    end
+
+    module Bn254Fp = struct
+      type nonrec t =
+        ( Bn254_bindings.Bn254Fp.t
+        , SRS.Bn254Fp.t
+        , Bn254_bindings.Bn254Fq.t Kimchi_types.or_infinity
+          Kimchi_types.poly_comm )
+        Kimchi_types.VerifierIndex.verifier_index
+
+      external create : Index.Bn254Fp.t -> t
+        = "caml_bn254_fp_plonk_verifier_index_create"
+
+      external read : int option -> SRS.Bn254Fp.t -> string -> t
+        = "caml_bn254_fp_plonk_verifier_index_read"
+
+      external write : bool option -> t -> string -> unit
+        = "caml_bn254_fp_plonk_verifier_index_write"
+
+      external shifts : int -> Bn254_bindings.Bn254Fp.t array
+        = "caml_bn254_fp_plonk_verifier_index_shifts"
+
+      external dummy : unit -> t = "caml_bn254_fp_plonk_verifier_index_dummy"
+
+      external deep_copy : t -> t
+        = "caml_bn254_fp_plonk_verifier_index_deep_copy"
     end
   end
 
@@ -564,6 +738,17 @@ module Protocol = struct
            , Pasta_bindings.Fq.t )
            Kimchi_types.proof_with_public
         = "caml_pasta_fq_plonk_proof_deep_copy"
+    end
+
+    module Bn254Fp = struct
+      external create :
+           Index.Bn254Fp.t
+        -> FieldVectors.Bn254Fp.t array
+        -> Bn254_bindings.Bn254Fp.t Kimchi_types.runtime_table array
+        -> ( Bn254_bindings.Bn254Fq.t Kimchi_types.or_infinity
+           , Bn254_bindings.Bn254Fp.t )
+           Kimchi_types.kzg_proof_with_public
+        = "caml_bn254_fp_plonk_proof_create"
     end
   end
 end

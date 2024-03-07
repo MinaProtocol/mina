@@ -30,7 +30,8 @@
   (<> %{env:RUST_TARGET_FEATURE_OPTIMISATIONS=y} n))
  (targets rustflags.sexp)
  (action
-  (with-stdout-to rustflags.sexp
+  (with-stdout-to
+   rustflags.sexp
    (echo "-C target-feature=+bmi2,+adx"))))
 
 (rule
@@ -38,7 +39,8 @@
   (= %{env:RUST_TARGET_FEATURE_OPTIMISATIONS=y} n))
  (targets rustflags.sexp)
  (action
-  (with-stdout-to rustflags.sexp
+  (with-stdout-to
+   rustflags.sexp
    (echo "-C target-feature=-bmi2,-adx"))))
 
 ;;
@@ -97,7 +99,8 @@
  (instrumentation
   (backend bisect_ppx))
  (libraries bounded_types)
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_inline_test)))
 
@@ -108,7 +111,20 @@
  (libraries kimchi_types pasta_bindings.backend bounded_types)
  (instrumentation
   (backend bisect_ppx))
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
+ (preprocess
+  (pps ppx_version ppx_inline_test)))
+
+(library
+ (public_name bn254_bindings)
+ (name bn254_bindings)
+ (modules bn254_bindings)
+ (libraries pasta_bindings kimchi_types)
+ (instrumentation
+  (backend bisect_ppx))
+ (inline_tests
+  (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_inline_test)))
 
@@ -116,10 +132,11 @@
  (public_name kimchi_bindings)
  (name kimchi_bindings)
  (modules kimchi_bindings)
- (libraries pasta_bindings kimchi_types bounded_types)
+ (libraries bn254_bindings pasta_bindings kimchi_types bounded_types)
  (instrumentation
   (backend bisect_ppx))
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_inline_test)))
 
@@ -132,7 +149,8 @@
  (libraries bounded_types)
  (instrumentation
   (backend bisect_ppx))
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
  (preprocess
   (pps ppx_version ppx_inline_test))
  (implements pasta_bindings.backend))
@@ -144,7 +162,11 @@
 ;; note: to build Mina, nix will set `MARLIN_PLONK_STUBS` and ignore this rule
 
 (rule
- (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
+ (targets
+  kimchi_types.ml
+  pasta_bindings.ml
+  bn254_bindings.ml
+  kimchi_bindings.ml)
  (enabled_if
   (= %{env:MARLIN_PLONK_STUBS=n} n))
  (mode promote)

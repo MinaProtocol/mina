@@ -20,6 +20,7 @@
   kimchi_backend.common
   promise
   kimchi_bindings
+  kimchi_bn254_basic
   kimchi_pasta_basic
   bounded_types
   kimchi_pasta_constraint_system

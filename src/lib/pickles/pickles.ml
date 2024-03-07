@@ -6,9 +6,9 @@ module Wire_types = Mina_wire_types.Pickles
 module Make_sig (A : Wire_types.Types.S) = struct
   module type S =
     Pickles_intf.S
-      with type Side_loaded.Verification_key.Stable.V2.t =
-        A.Side_loaded.Verification_key.V2.t
-       and type ('a, 'b) Proof.t = ('a, 'b) A.Proof.t
+    with type Side_loaded.Verification_key.Stable.V2.t =
+           A.Side_loaded.Verification_key.V2.t
+     and type ('a, 'b) Proof.t = ('a, 'b) A.Proof.t
 end
 
 module Make_str (_ : Wire_types.Concrete) = struct
@@ -35,6 +35,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Sponge_inputs = Sponge_inputs
   module Util = Util
   module Tick_field_sponge = Tick_field_sponge
+  module Bn254_field_sponge = Bn254_field_sponge
   module Impls = Impls
   module Inductive_rule = Inductive_rule
   module Tag = Tag
@@ -42,6 +43,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Dirty = Dirty
   module Cache_handle = Cache_handle
   module Step_main_inputs = Step_main_inputs
+  module Bn254_main_inputs = Bn254_main_inputs
   module Step_verifier = Step_verifier
   module Proof_cache = Proof_cache
   module Cache = Cache
@@ -281,12 +283,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 { commitments = vk.wrap_index
                 ; index =
                     ( match vk.wrap_vk with
-                    | None ->
+                      | None ->
                         return
                           (Promise.return
                              (Or_error.errorf
                                 "Pickles.verify: wrap_vk not found" ) )
-                    | Some x ->
+                      | Some x ->
                         x )
                 ; data =
                     (* This isn't used in verify_heterogeneous, so we can leave this dummy *)
@@ -326,15 +328,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ~max_proofs_verified ~name ~constraint_constants ~choices ()
     in
     let rec adjust_provers :
-        type a1 a2 a3 s1 s2_inner.
-           (a1, a2, a3, s1, s2_inner Promise.t) H3_2.T(Prover).t
-        -> (a1, a2, a3, s1, s2_inner Deferred.t) H3_2.T(Prover).t = function
+      type a1 a2 a3 s1 s2_inner.
+      (a1, a2, a3, s1, s2_inner Promise.t) H3_2.T(Prover).t
+      -> (a1, a2, a3, s1, s2_inner Deferred.t) H3_2.T(Prover).t = function
       | [] ->
-          []
+        []
       | prover :: tl ->
-          (fun ?handler public_input ->
-            Promise.to_deferred (prover ?handler public_input) )
-          :: adjust_provers tl
+        (fun ?handler public_input ->
+           Promise.to_deferred (prover ?handler public_input) )
+        :: adjust_provers tl
     in
     (self, cache_handle, proof_module, adjust_provers provers)
 
@@ -402,19 +404,19 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; fork = None
                   }
                 ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; prevs = []
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; main =
-                        (fun { public_input = self } ->
-                          dummy_constraints () ;
-                          Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
-                    }
-                  ] ) )
+                    [ { identifier = "main"
+                      ; prevs = []
+                      ; feature_flags = Plonk_types.Features.none_bool
+                      ; main =
+                          (fun { public_input = self } ->
+                             dummy_constraints () ;
+                             Field.Assert.equal self Field.zero ;
+                             { previous_proof_statements = []
+                             ; public_output = ()
+                             ; auxiliary_output = ()
+                             } )
+                      }
+                    ] ) )
 
         module Proof = (val p)
 
@@ -453,18 +455,18 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; fork = None
                   }
                 ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; prevs = []
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; main =
-                        (fun _ ->
-                          dummy_constraints () ;
-                          { previous_proof_statements = []
-                          ; public_output = Field.zero
-                          ; auxiliary_output = ()
-                          } )
-                    }
-                  ] ) )
+                    [ { identifier = "main"
+                      ; prevs = []
+                      ; feature_flags = Plonk_types.Features.none_bool
+                      ; main =
+                          (fun _ ->
+                             dummy_constraints () ;
+                             { previous_proof_statements = []
+                             ; public_output = Field.zero
+                             ; auxiliary_output = ()
+                             } )
+                      }
+                    ] ) )
 
         module Proof = (val p)
 
@@ -493,11 +495,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (Snarky_backendless.Request.With { request; respond }) =
           match request with
           | Prev_input ->
-              respond (Provide prev_input)
+            respond (Provide prev_input)
           | Proof ->
-              respond (Provide proof)
+            respond (Provide proof)
           | _ ->
-              respond Unhandled
+            respond Unhandled
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
@@ -520,33 +522,33 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; fork = None
                   }
                 ~choices:(fun ~self ->
-                  [ { identifier = "main"
-                    ; prevs = [ self ]
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; main =
-                        (fun { public_input = self } ->
-                          let prev =
-                            exists Field.typ ~request:(fun () -> Prev_input)
-                          in
-                          let proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
-                                Proof )
-                          in
-                          let is_base_case = Field.equal Field.zero self in
-                          let proof_must_verify = Boolean.not is_base_case in
-                          let self_correct = Field.(equal (one + prev) self) in
-                          Boolean.Assert.any [ self_correct; is_base_case ] ;
-                          { previous_proof_statements =
-                              [ { public_input = prev
-                                ; proof
-                                ; proof_must_verify
-                                }
-                              ]
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
-                    }
-                  ] ) )
+                    [ { identifier = "main"
+                      ; prevs = [ self ]
+                      ; feature_flags = Plonk_types.Features.none_bool
+                      ; main =
+                          (fun { public_input = self } ->
+                             let prev =
+                               exists Field.typ ~request:(fun () -> Prev_input)
+                             in
+                             let proof =
+                               exists (Typ.Internal.ref ()) ~request:(fun () ->
+                                   Proof )
+                             in
+                             let is_base_case = Field.equal Field.zero self in
+                             let proof_must_verify = Boolean.not is_base_case in
+                             let self_correct = Field.(equal (one + prev) self) in
+                             Boolean.Assert.any [ self_correct; is_base_case ] ;
+                             { previous_proof_statements =
+                                 [ { public_input = prev
+                                   ; proof
+                                   ; proof_must_verify
+                                   }
+                                 ]
+                             ; public_output = ()
+                             ; auxiliary_output = ()
+                             } )
+                      }
+                    ] ) )
 
         module Proof = (val p)
 
@@ -591,20 +593,20 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         let handler
             ((no_recursion_input, no_recursion_proof) :
-              Field.Constant.t * _ Proof.t )
+               Field.Constant.t * _ Proof.t )
             ((recursion_input, recursion_proof) : Field.Constant.t * _ Proof.t)
             (Snarky_backendless.Request.With { request; respond }) =
           match request with
           | No_recursion_input ->
-              respond (Provide no_recursion_input)
+            respond (Provide no_recursion_input)
           | No_recursion_proof ->
-              respond (Provide no_recursion_proof)
+            respond (Provide no_recursion_proof)
           | Recursive_input ->
-              respond (Provide recursion_input)
+            respond (Provide recursion_input)
           | Recursive_proof ->
-              respond (Provide recursion_proof)
+            respond (Provide recursion_proof)
           | _ ->
-              respond Unhandled
+            respond Unhandled
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
@@ -628,46 +630,46 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; fork = None
                   }
                 ~choices:(fun ~self ->
-                  [ { identifier = "main"
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; prevs = [ No_recursion.tag; self ]
-                    ; main =
-                        (fun { public_input = self } ->
-                          let no_recursive_input =
-                            exists Field.typ ~request:(fun () ->
-                                No_recursion_input )
-                          in
-                          let no_recursive_proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
-                                No_recursion_proof )
-                          in
-                          let prev =
-                            exists Field.typ ~request:(fun () ->
-                                Recursive_input )
-                          in
-                          let prev_proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
-                                Recursive_proof )
-                          in
-                          let is_base_case = Field.equal Field.zero self in
-                          let proof_must_verify = Boolean.not is_base_case in
-                          let self_correct = Field.(equal (one + prev) self) in
-                          Boolean.Assert.any [ self_correct; is_base_case ] ;
-                          { previous_proof_statements =
-                              [ { public_input = no_recursive_input
-                                ; proof = no_recursive_proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ; { public_input = prev
-                                ; proof = prev_proof
-                                ; proof_must_verify
-                                }
-                              ]
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
-                    }
-                  ] ) )
+                    [ { identifier = "main"
+                      ; feature_flags = Plonk_types.Features.none_bool
+                      ; prevs = [ No_recursion.tag; self ]
+                      ; main =
+                          (fun { public_input = self } ->
+                             let no_recursive_input =
+                               exists Field.typ ~request:(fun () ->
+                                   No_recursion_input )
+                             in
+                             let no_recursive_proof =
+                               exists (Typ.Internal.ref ()) ~request:(fun () ->
+                                   No_recursion_proof )
+                             in
+                             let prev =
+                               exists Field.typ ~request:(fun () ->
+                                   Recursive_input )
+                             in
+                             let prev_proof =
+                               exists (Typ.Internal.ref ()) ~request:(fun () ->
+                                   Recursive_proof )
+                             in
+                             let is_base_case = Field.equal Field.zero self in
+                             let proof_must_verify = Boolean.not is_base_case in
+                             let self_correct = Field.(equal (one + prev) self) in
+                             Boolean.Assert.any [ self_correct; is_base_case ] ;
+                             { previous_proof_statements =
+                                 [ { public_input = no_recursive_input
+                                   ; proof = no_recursive_proof
+                                   ; proof_must_verify = Boolean.true_
+                                   }
+                                 ; { public_input = prev
+                                   ; proof = prev_proof
+                                   ; proof_must_verify
+                                   }
+                                 ]
+                             ; public_output = ()
+                             ; auxiliary_output = ()
+                             } )
+                      }
+                    ] ) )
 
         module Proof = (val p)
 
@@ -721,22 +723,22 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         let handler (is_base_case : bool)
             ((no_recursion_input, no_recursion_proof) :
-              Field.Constant.t * _ Proof.t )
+               Field.Constant.t * _ Proof.t )
             ((recursion_input, recursion_proof) : Field.Constant.t * _ Proof.t)
             (Snarky_backendless.Request.With { request; respond }) =
           match request with
           | Is_base_case ->
-              respond (Provide is_base_case)
+            respond (Provide is_base_case)
           | No_recursion_input ->
-              respond (Provide no_recursion_input)
+            respond (Provide no_recursion_input)
           | No_recursion_proof ->
-              respond (Provide no_recursion_proof)
+            respond (Provide no_recursion_proof)
           | Recursive_input ->
-              respond (Provide recursion_input)
+            respond (Provide recursion_input)
           | Recursive_proof ->
-              respond (Provide recursion_proof)
+            respond (Provide recursion_proof)
           | _ ->
-              respond Unhandled
+            respond Unhandled
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
@@ -760,50 +762,50 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; fork = None
                   }
                 ~choices:(fun ~self ->
-                  [ { identifier = "main"
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; prevs = [ No_recursion_return.tag; self ]
-                    ; main =
-                        (fun { public_input = () } ->
-                          let no_recursive_input =
-                            exists Field.typ ~request:(fun () ->
-                                No_recursion_input )
-                          in
-                          let no_recursive_proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
-                                No_recursion_proof )
-                          in
-                          let prev =
-                            exists Field.typ ~request:(fun () ->
-                                Recursive_input )
-                          in
-                          let prev_proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
-                                Recursive_proof )
-                          in
-                          let is_base_case =
-                            exists Boolean.typ ~request:(fun () -> Is_base_case)
-                          in
-                          let proof_must_verify = Boolean.not is_base_case in
-                          let self =
-                            Field.(
-                              if_ is_base_case ~then_:zero ~else_:(one + prev))
-                          in
-                          { previous_proof_statements =
-                              [ { public_input = no_recursive_input
-                                ; proof = no_recursive_proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ; { public_input = prev
-                                ; proof = prev_proof
-                                ; proof_must_verify
-                                }
-                              ]
-                          ; public_output = self
-                          ; auxiliary_output = ()
-                          } )
-                    }
-                  ] ) )
+                    [ { identifier = "main"
+                      ; feature_flags = Plonk_types.Features.none_bool
+                      ; prevs = [ No_recursion_return.tag; self ]
+                      ; main =
+                          (fun { public_input = () } ->
+                             let no_recursive_input =
+                               exists Field.typ ~request:(fun () ->
+                                   No_recursion_input )
+                             in
+                             let no_recursive_proof =
+                               exists (Typ.Internal.ref ()) ~request:(fun () ->
+                                   No_recursion_proof )
+                             in
+                             let prev =
+                               exists Field.typ ~request:(fun () ->
+                                   Recursive_input )
+                             in
+                             let prev_proof =
+                               exists (Typ.Internal.ref ()) ~request:(fun () ->
+                                   Recursive_proof )
+                             in
+                             let is_base_case =
+                               exists Boolean.typ ~request:(fun () -> Is_base_case)
+                             in
+                             let proof_must_verify = Boolean.not is_base_case in
+                             let self =
+                               Field.(
+                                 if_ is_base_case ~then_:zero ~else_:(one + prev))
+                             in
+                             { previous_proof_statements =
+                                 [ { public_input = no_recursive_input
+                                   ; proof = no_recursive_proof
+                                   ; proof_must_verify = Boolean.true_
+                                   }
+                                 ; { public_input = prev
+                                   ; proof = prev_proof
+                                   ; proof_must_verify
+                                   }
+                                 ]
+                             ; public_output = self
+                             ; auxiliary_output = ()
+                             } )
+                      }
+                    ] ) )
 
         module Proof = (val p)
 
@@ -872,18 +874,18 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; fork = None
                   }
                 ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; prevs = []
-                    ; main =
-                        (fun { public_input = x } ->
-                          dummy_constraints () ;
-                          { previous_proof_statements = []
-                          ; public_output = Field.(add one) x
-                          ; auxiliary_output = ()
-                          } )
-                    }
-                  ] ) )
+                    [ { identifier = "main"
+                      ; feature_flags = Plonk_types.Features.none_bool
+                      ; prevs = []
+                      ; main =
+                          (fun { public_input = x } ->
+                             dummy_constraints () ;
+                             { previous_proof_statements = []
+                             ; public_output = Field.(add one) x
+                             ; auxiliary_output = ()
+                             } )
+                      }
+                    ] ) )
 
         module Proof = (val p)
 
@@ -925,29 +927,29 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; fork = None
                   }
                 ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; prevs = []
-                    ; main =
-                        (fun { public_input = input } ->
-                          dummy_constraints () ;
-                          let sponge =
-                            Step_main_inputs.Sponge.create
-                              Step_main_inputs.sponge_params
-                          in
-                          let blinding_value =
-                            exists Field.typ ~compute:Field.Constant.random
-                          in
-                          Step_main_inputs.Sponge.absorb sponge (`Field input) ;
-                          Step_main_inputs.Sponge.absorb sponge
-                            (`Field blinding_value) ;
-                          let result = Step_main_inputs.Sponge.squeeze sponge in
-                          { previous_proof_statements = []
-                          ; public_output = result
-                          ; auxiliary_output = blinding_value
-                          } )
-                    }
-                  ] ) )
+                    [ { identifier = "main"
+                      ; feature_flags = Plonk_types.Features.none_bool
+                      ; prevs = []
+                      ; main =
+                          (fun { public_input = input } ->
+                             dummy_constraints () ;
+                             let sponge =
+                               Step_main_inputs.Sponge.create
+                                 Step_main_inputs.sponge_params
+                             in
+                             let blinding_value =
+                               exists Field.typ ~compute:Field.Constant.random
+                             in
+                             Step_main_inputs.Sponge.absorb sponge (`Field input) ;
+                             Step_main_inputs.Sponge.absorb sponge
+                               (`Field blinding_value) ;
+                             let result = Step_main_inputs.Sponge.squeeze sponge in
+                             { previous_proof_statements = []
+                             ; public_output = result
+                             ; auxiliary_output = blinding_value
+                             } )
+                      }
+                    ] ) )
 
         module Proof = (val p)
 
@@ -1016,23 +1018,23 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ; prevs = [ tag; tag ]
         ; main =
             (fun { public_input = () } ->
-              let dummy_proof =
-                As_prover.Ref.create (fun () ->
-                    Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15 )
-              in
-              { previous_proof_statements =
-                  [ { public_input = ()
-                    ; proof = dummy_proof
-                    ; proof_must_verify = Boolean.false_
-                    }
-                  ; { public_input = ()
-                    ; proof = dummy_proof
-                    ; proof_must_verify = Boolean.false_
-                    }
-                  ]
-              ; public_output = ()
-              ; auxiliary_output = ()
-              } )
+               let dummy_proof =
+                 As_prover.Ref.create (fun () ->
+                     Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15 )
+               in
+               { previous_proof_statements =
+                   [ { public_input = ()
+                     ; proof = dummy_proof
+                     ; proof_must_verify = Boolean.false_
+                     }
+                   ; { public_input = ()
+                     ; proof = dummy_proof
+                     ; proof_must_verify = Boolean.false_
+                     }
+                   ]
+               ; public_output = ()
+               ; auxiliary_output = ()
+               } )
         ; feature_flags = Plonk_types.Features.none_bool
         }
 
@@ -1063,9 +1065,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     end)
 
                 let f :
-                    type a b c d.
-                    (a, b, c, d) IR.t -> Local_max_proofs_verifieds.t =
-                 fun rule ->
+                  type a b c d.
+                  (a, b, c, d) IR.t -> Local_max_proofs_verifieds.t =
+                  fun rule ->
                   let (T (_, l)) = HT.length rule.prevs in
                   Vector.extend_front_exn
                     (V.f l (M.f rule.prevs))
@@ -1085,11 +1087,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
         end
 
         let compile :
-            (   unit
-             -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t Promise.t
-            )
-            * _
-            * _ =
+          (   unit
+              -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t Promise.t
+          )
+          * _
+          * _ =
           let self = tag in
           let snark_keys_header kind constraint_system_hash =
             { Snark_keys_header.header_version =
@@ -1143,7 +1145,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               , 'vals
               , 'n
               , 'm )
-              Step_branch_data.t
+                Step_branch_data.t
           end in
           let proofs_verifieds = Vector.singleton 2 in
           let (T inner_step_data as step_data) =
@@ -1276,532 +1278,532 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let module S = Step.Make (A) (A_value) (Max_proofs_verified) in
           let prover =
             let f :
-                   ( unit * (unit * unit)
-                   , unit * (unit * unit)
-                   , Nat.N2.n * (Nat.N2.n * unit)
-                   , Nat.N1.n * (Nat.N1.n * unit) )
-                   Branch_data.t
-                -> Lazy_keys.t
-                -> unit
-                -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t
-                   Promise.t =
-             fun (T b as branch_data) (step_pk, step_vk) () ->
-              let (_ : (Max_proofs_verified.n, Maxes.ns) Requests.Wrap.t) =
-                Requests.Wrap.create ()
-              in
-              let _, prev_vars_length = b.proofs_verified in
-              let step =
-                let wrap_vk = Lazy.force wrap_vk in
-                S.f branch_data () ~feature_flags ~prevs_length:prev_vars_length
-                  ~self ~public_input:(Input typ)
-                  ~auxiliary_typ:Impls.Step.Typ.unit ~step_domains
-                  ~self_dlog_plonk_index:
-                    ((* TODO *) Plonk_verification_key_evals.map
-                       ~f:(fun x -> [| x |])
-                       wrap_vk.commitments )
-                  (fst (Lazy.force step_pk))
-                  wrap_vk.index
-              in
-              let pairing_vk = fst (Lazy.force step_vk) in
-              let wrap =
-                let wrap_vk = Lazy.force wrap_vk in
-                let%bind.Promise proof, (), (), _ =
-                  step ~proof_cache:None ~maxes:(module Maxes)
+              ( unit * (unit * unit)
+              , unit * (unit * unit)
+              , Nat.N2.n * (Nat.N2.n * unit)
+              , Nat.N1.n * (Nat.N1.n * unit) )
+                Branch_data.t
+              -> Lazy_keys.t
+              -> unit
+              -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t
+                Promise.t =
+              fun (T b as branch_data) (step_pk, step_vk) () ->
+                let (_ : (Max_proofs_verified.n, Maxes.ns) Requests.Wrap.t) =
+                  Requests.Wrap.create ()
                 in
-                let proof =
-                  { proof with
-                    statement =
-                      { proof.statement with
-                        messages_for_next_wrap_proof =
-                          Compile.pad_messages_for_next_wrap_proof
-                            (module Maxes)
-                            proof.statement.messages_for_next_wrap_proof
-                      }
-                  }
+                let _, prev_vars_length = b.proofs_verified in
+                let step =
+                  let wrap_vk = Lazy.force wrap_vk in
+                  S.f branch_data () ~feature_flags ~prevs_length:prev_vars_length
+                    ~self ~public_input:(Input typ)
+                    ~auxiliary_typ:Impls.Step.Typ.unit ~step_domains
+                    ~self_dlog_plonk_index:
+                      ((* TODO *) Plonk_verification_key_evals.map
+                                   ~f:(fun x -> [| x |])
+                                   wrap_vk.commitments )
+                    (fst (Lazy.force step_pk))
+                    wrap_vk.index
                 in
-                let%map.Promise proof =
-                  (* The prover for wrapping a proof *)
-                  let wrap (type actual_branching)
-                      ~(max_proofs_verified : Max_proofs_verified.n Nat.t)
-                      (module Max_local_max_proofs_verifieds : Hlist.Maxes.S
-                        with type ns = Maxes.ns
-                         and type length = Max_proofs_verified.n )
-                      ~dlog_plonk_index wrap_main to_field_elements ~pairing_vk
-                      ~step_domains:_ ~wrap_domains:_ ~pairing_plonk_indices:_
-                      pk
-                      ({ statement = prev_statement
-                       ; prev_evals = _
-                       ; proof
-                       ; index = _which_index
-                       } :
-                        ( _
-                        , _
-                        , (_, actual_branching) Vector.t
-                        , (_, actual_branching) Vector.t
-                        , Maxes.ns
-                          H1.T
-                            (P.Base.Messages_for_next_proof_over_same_field.Wrap)
-                          .t
-                        , ( ( Tock.Field.t
-                            , Tock.Field.t array )
-                            Plonk_types.All_evals.t
-                          , Max_proofs_verified.n )
-                          Vector.t )
-                        P.Base.Step.t ) =
-                    let prev_messages_for_next_wrap_proof =
-                      let module M =
-                        H1.Map
-                          (P.Base.Messages_for_next_proof_over_same_field.Wrap)
-                          (P.Base.Messages_for_next_proof_over_same_field.Wrap
-                           .Prepared)
-                          (struct
-                            let f =
-                              P.Base.Messages_for_next_proof_over_same_field
-                              .Wrap
-                              .prepare
-                          end)
-                      in
-                      M.f prev_statement.messages_for_next_wrap_proof
-                    in
-                    let prev_statement_with_hashes : _ Types.Step.Statement.t =
-                      { proof_state =
-                          { prev_statement.proof_state with
-                            messages_for_next_step_proof =
-                              (* TODO: Careful here... the length of
-                                 old_buletproof_challenges inside the messages_for_next_wrap_proof
-                                 might not be correct *)
-                              Common.hash_messages_for_next_step_proof
-                                ~app_state:to_field_elements
-                                (P.Base.Messages_for_next_proof_over_same_field
-                                 .Step
-                                 .prepare ~dlog_plonk_index
-                                   prev_statement.proof_state
-                                     .messages_for_next_step_proof )
-                          }
-                      ; messages_for_next_wrap_proof =
-                          (let module M =
-                             H1.Map
-                               (P.Base.Messages_for_next_proof_over_same_field
-                                .Wrap
-                                .Prepared)
-                               (E01 (Digest.Constant))
-                               (struct
-                                 let f (type n)
-                                     (m :
-                                       n
-                                       P.Base
-                                       .Messages_for_next_proof_over_same_field
-                                       .Wrap
-                                       .Prepared
-                                       .t ) =
-                                   let T =
-                                     Nat.eq_exn max_proofs_verified
-                                       (Vector.length
-                                          m.old_bulletproof_challenges )
-                                   in
-                                   Wrap_hack.hash_messages_for_next_wrap_proof
-                                     max_proofs_verified m
-                               end)
-                           in
-                          let module V = H1.To_vector (Digest.Constant) in
-                          V.f Max_local_max_proofs_verifieds.length
-                            (M.f prev_messages_for_next_wrap_proof) )
-                      }
-                    in
-                    let module O = Tick.Oracles in
-                    let public_input =
-                      tick_public_input_of_statement ~max_proofs_verified
-                        prev_statement_with_hashes
-                    in
-                    let prev_challenges =
-                      Vector.map ~f:Ipa.Step.compute_challenges
-                        prev_statement.proof_state.messages_for_next_step_proof
-                          .old_bulletproof_challenges
-                    in
-                    let actual_proofs_verified =
-                      Vector.length prev_challenges
-                    in
-                    let lte =
-                      Nat.lte_exn actual_proofs_verified
-                        (Length.to_nat Max_local_max_proofs_verifieds.length)
-                    in
-                    let o =
-                      let sgs =
+                let pairing_vk = fst (Lazy.force step_vk) in
+                let wrap =
+                  let wrap_vk = Lazy.force wrap_vk in
+                  let%bind.Promise proof, (), (), _ =
+                    step ~proof_cache:None ~maxes:(module Maxes)
+                  in
+                  let proof =
+                    { proof with
+                      statement =
+                        { proof.statement with
+                          messages_for_next_wrap_proof =
+                            Compile.pad_messages_for_next_wrap_proof
+                              (module Maxes)
+                              proof.statement.messages_for_next_wrap_proof
+                        }
+                    }
+                  in
+                  let%map.Promise proof =
+                    (* The prover for wrapping a proof *)
+                    let wrap (type actual_branching)
+                        ~(max_proofs_verified : Max_proofs_verified.n Nat.t)
+                        (module Max_local_max_proofs_verifieds : Hlist.Maxes.S
+                          with type ns = Maxes.ns
+                           and type length = Max_proofs_verified.n )
+                        ~dlog_plonk_index wrap_main to_field_elements ~pairing_vk
+                        ~step_domains:_ ~wrap_domains:_ ~pairing_plonk_indices:_
+                        pk
+                        ({ statement = prev_statement
+                         ; prev_evals = _
+                         ; proof
+                         ; index = _which_index
+                         } :
+                           ( _
+                           , _
+                           , (_, actual_branching) Vector.t
+                           , (_, actual_branching) Vector.t
+                           , Maxes.ns
+                               H1.T
+                               (P.Base.Messages_for_next_proof_over_same_field.Wrap)
+                               .t
+                           , ( ( Tock.Field.t
+                               , Tock.Field.t array )
+                                 Plonk_types.All_evals.t
+                             , Max_proofs_verified.n )
+                               Vector.t )
+                             P.Base.Step.t ) =
+                      let prev_messages_for_next_wrap_proof =
                         let module M =
                           H1.Map
+                            (P.Base.Messages_for_next_proof_over_same_field.Wrap)
                             (P.Base.Messages_for_next_proof_over_same_field.Wrap
                              .Prepared)
-                            (E01 (Tick.Curve.Affine))
                             (struct
-                              let f :
-                                  type n.
-                                     n
-                                     P.Base
-                                     .Messages_for_next_proof_over_same_field
-                                     .Wrap
-                                     .Prepared
-                                     .t
-                                  -> _ =
-                               fun t -> t.challenge_polynomial_commitment
+                              let f =
+                                P.Base.Messages_for_next_proof_over_same_field
+                                .Wrap
+                                .prepare
                             end)
                         in
-                        let module V = H1.To_vector (Tick.Curve.Affine) in
-                        V.f Max_local_max_proofs_verifieds.length
-                          (M.f prev_messages_for_next_wrap_proof)
+                        M.f prev_statement.messages_for_next_wrap_proof
                       in
-                      O.create pairing_vk
-                        Vector.(
-                          map2 (Vector.trim_front sgs lte) prev_challenges
-                            ~f:(fun commitment cs ->
-                              { Tick.Proof.Challenge_polynomial.commitment
-                              ; challenges = Vector.to_array cs
-                              } )
-                          |> to_list)
-                        public_input proof
-                    in
-                    let x_hat = O.(p_eval_1 o, p_eval_2 o) in
-                    let step_vk, _ = Lazy.force step_vk in
-                    let next_statement : _ Types.Wrap.Statement.In_circuit.t =
-                      let scalar_chal f =
-                        Scalar_challenge.map ~f:Challenge.Constant.of_tick_field
-                          (f o)
-                      in
-                      let sponge_digest_before_evaluations =
-                        O.digest_before_evaluations o
-                      in
-                      let plonk0 =
-                        { Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal
-                          .alpha = scalar_chal O.alpha
-                        ; beta = O.beta o
-                        ; gamma = O.gamma o
-                        ; zeta = scalar_chal O.zeta
-                        ; joint_combiner =
-                            Option.map (O.joint_combiner_chal o)
-                              ~f:
-                                (Scalar_challenge.map
-                                   ~f:Challenge.Constant.of_tick_field )
-                        ; feature_flags = Plonk_types.Features.none_bool
+                      let prev_statement_with_hashes : _ Types.Step.Statement.t =
+                        { proof_state =
+                            { prev_statement.proof_state with
+                              messages_for_next_step_proof =
+                                (* TODO: Careful here... the length of
+                                   old_buletproof_challenges inside the messages_for_next_wrap_proof
+                                   might not be correct *)
+                                Common.hash_messages_for_next_step_proof
+                                  ~app_state:to_field_elements
+                                  (P.Base.Messages_for_next_proof_over_same_field
+                                   .Step
+                                   .prepare ~dlog_plonk_index
+                                     prev_statement.proof_state
+                                     .messages_for_next_step_proof )
+                            }
+                        ; messages_for_next_wrap_proof =
+                            (let module M =
+                               H1.Map
+                                 (P.Base.Messages_for_next_proof_over_same_field
+                                  .Wrap
+                                  .Prepared)
+                                 (E01 (Digest.Constant))
+                                 (struct
+                                   let f (type n)
+                                       (m :
+                                          n
+                                            P.Base
+                                            .Messages_for_next_proof_over_same_field
+                                            .Wrap
+                                            .Prepared
+                                            .t ) =
+                                     let T =
+                                       Nat.eq_exn max_proofs_verified
+                                         (Vector.length
+                                            m.old_bulletproof_challenges )
+                                     in
+                                     Wrap_hack.hash_messages_for_next_wrap_proof
+                                       max_proofs_verified m
+                                 end)
+                             in
+                             let module V = H1.To_vector (Digest.Constant) in
+                             V.f Max_local_max_proofs_verifieds.length
+                               (M.f prev_messages_for_next_wrap_proof) )
                         }
                       in
-                      let r = scalar_chal O.u in
-                      let xi = scalar_chal O.v in
-                      let to_field =
-                        SC.to_field_constant
-                          (module Tick.Field)
-                          ~endo:Endo.Wrap_inner_curve.scalar
+                      let module O = Tick.Oracles in
+                      let public_input =
+                        tick_public_input_of_statement ~max_proofs_verified
+                          prev_statement_with_hashes
                       in
-                      let module As_field = struct
-                        let r = to_field r
-
-                        let xi = to_field xi
-
-                        let zeta = to_field plonk0.zeta
-
-                        let alpha = to_field plonk0.alpha
-
-                        let joint_combiner =
-                          Option.map ~f:to_field plonk0.joint_combiner
-                      end in
-                      let domain =
-                        Domain.Pow_2_roots_of_unity
-                          step_vk.domain.log_size_of_group
+                      let prev_challenges =
+                        Vector.map ~f:Ipa.Step.compute_challenges
+                          prev_statement.proof_state.messages_for_next_step_proof
+                          .old_bulletproof_challenges
                       in
-                      let w = step_vk.domain.group_gen in
-                      (* Debug *)
-                      [%test_eq: Tick.Field.t] w
-                        (Tick.Field.domain_generator
-                           ~log2_size:(Domain.log2_size domain) ) ;
-                      let zetaw = Tick.Field.mul As_field.zeta w in
-                      let tick_plonk_minimal =
-                        { plonk0 with
-                          zeta = As_field.zeta
-                        ; alpha = As_field.alpha
-                        ; joint_combiner = As_field.joint_combiner
-                        }
+                      let actual_proofs_verified =
+                        Vector.length prev_challenges
                       in
-                      let tick_combined_evals =
-                        Plonk_checks.evals_of_split_evals
-                          (module Tick.Field)
-                          proof.openings.evals
-                          ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta:As_field.zeta
-                          ~zetaw
+                      let lte =
+                        Nat.lte_exn actual_proofs_verified
+                          (Length.to_nat Max_local_max_proofs_verifieds.length)
                       in
-                      let tick_domain =
-                        Plonk_checks.domain
-                          (module Tick.Field)
-                          domain ~shifts:Common.tick_shifts
-                          ~domain_generator:Backend.Tick.Field.domain_generator
-                      in
-                      let tick_combined_evals =
-                        Plonk_types.Evals.to_in_circuit tick_combined_evals
-                      in
-                      let tick_env =
-                        let module Env_bool = struct
-                          type t = bool
-
-                          let true_ = true
-
-                          let false_ = false
-
-                          let ( &&& ) = ( && )
-
-                          let ( ||| ) = ( || )
-
-                          let any = List.exists ~f:Fn.id
-                        end in
-                        let module Env_field = struct
-                          include Tick.Field
-
-                          type bool = Env_bool.t
-
-                          let if_ (b : bool) ~then_ ~else_ =
-                            if b then then_ () else else_ ()
-                        end in
-                        Plonk_checks.scalars_env
-                          (module Env_bool)
-                          (module Env_field)
-                          ~endo:Endo.Step_inner_curve.base
-                          ~mds:Tick_field_sponge.params.mds
-                          ~srs_length_log2:Common.Max_degree.step_log2
-                          ~field_of_hex:(fun s ->
-                            Kimchi_pasta.Pasta.Bigint256.of_hex_string s
-                            |> Kimchi_pasta.Pasta.Fp.of_bigint )
-                          ~domain:tick_domain tick_plonk_minimal
-                          tick_combined_evals
-                      in
-                      let combined_inner_product =
-                        let open As_field in
-                        Wrap.combined_inner_product
-                        (* Note: We do not pad here. *)
-                          ~actual_proofs_verified:
-                            (Nat.Add.create actual_proofs_verified)
-                          { evals = proof.openings.evals; public_input = x_hat }
-                          ~r ~xi ~zeta ~zetaw
-                          ~old_bulletproof_challenges:prev_challenges
-                          ~env:tick_env ~domain:tick_domain
-                          ~ft_eval1:proof.openings.ft_eval1
-                          ~plonk:tick_plonk_minimal
-                      in
-                      let chal = Challenge.Constant.of_tick_field in
-                      let sg_new, new_bulletproof_challenges, b =
-                        let prechals =
-                          Array.map (O.opening_prechallenges o) ~f:(fun x ->
-                              let x =
-                                Scalar_challenge.map
-                                  ~f:Challenge.Constant.of_tick_field x
-                              in
-                              x )
+                      let o =
+                        let sgs =
+                          let module M =
+                            H1.Map
+                              (P.Base.Messages_for_next_proof_over_same_field.Wrap
+                               .Prepared)
+                              (E01 (Tick.Curve.Affine))
+                              (struct
+                                let f :
+                                  type n.
+                                  n
+                                    P.Base
+                                    .Messages_for_next_proof_over_same_field
+                                    .Wrap
+                                    .Prepared
+                                    .t
+                                  -> _ =
+                                  fun t -> t.challenge_polynomial_commitment
+                              end)
+                          in
+                          let module V = H1.To_vector (Tick.Curve.Affine) in
+                          V.f Max_local_max_proofs_verifieds.length
+                            (M.f prev_messages_for_next_wrap_proof)
                         in
-                        let chals =
-                          Array.map prechals ~f:(fun x ->
-                              Ipa.Step.compute_challenge x )
-                        in
-                        let challenge_polynomial =
-                          unstage (Wrap.challenge_polynomial chals)
-                        in
-                        let open As_field in
-                        let b =
-                          let open Tick.Field in
-                          challenge_polynomial zeta
-                          + (r * challenge_polynomial zetaw)
-                        in
-                        let overwritten_prechals =
-                          Array.map prechals
-                            ~f:
-                              (Scalar_challenge.map ~f:(fun _ ->
-                                   Challenge.Constant.of_tick_field
-                                     (Impls.Step.Field.Constant.of_int 100) ) )
-                        in
-                        let chals =
-                          Array.map overwritten_prechals ~f:(fun x ->
-                              Ipa.Step.compute_challenge x )
-                        in
-                        let sg_new =
-                          let urs = Backend.Tick.Keypair.load_urs () in
-                          Kimchi_bindings.Protocol.SRS.Fp
-                          .batch_accumulator_generate urs 1 chals
-                        in
-                        let[@warning "-4"] sg_new =
-                          match sg_new with
-                          | [| Kimchi_types.Finite x |] ->
-                              x
-                          | _ ->
-                              assert false
-                        in
-                        let overwritten_prechals =
-                          Array.map overwritten_prechals
-                            ~f:Bulletproof_challenge.unpack
-                        in
-
-                        (sg_new, overwritten_prechals, b)
+                        O.create pairing_vk
+                          Vector.(
+                            map2 (Vector.trim_front sgs lte) prev_challenges
+                              ~f:(fun commitment cs ->
+                                  { Tick.Proof.Challenge_polynomial.commitment
+                                  ; challenges = Vector.to_array cs
+                                  } )
+                            |> to_list)
+                          public_input proof
                       in
-                      let plonk =
-                        let module Field = struct
-                          include Tick.Field
-                        end in
-                        Wrap.Type1.derive_plonk
-                          (module Field)
-                          ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
-                          tick_combined_evals
-                      in
-                      let shift_value =
-                        Shifted_value.Type1.of_field
-                          (module Tick.Field)
-                          ~shift:Shifts.tick1
-                      in
-                      let branch_data : Composition_types.Branch_data.t =
-                        { proofs_verified =
-                            ( match actual_proofs_verified with
-                            | Z ->
-                                Composition_types.Branch_data.Proofs_verified.N0
-                            | S Z ->
-                                N1
-                            | S (S Z) ->
-                                N2
-                            | S _ ->
-                                assert false )
-                        ; domain_log2 =
-                            Composition_types.Branch_data.Domain_log2.of_int_exn
-                              step_vk.domain.log_size_of_group
-                        }
-                      in
-                      let messages_for_next_wrap_proof :
-                          _
-                          P.Base.Messages_for_next_proof_over_same_field.Wrap.t
-                          =
-                        { challenge_polynomial_commitment = sg_new
-                        ; old_bulletproof_challenges =
-                            Vector.map
-                              prev_statement.proof_state.unfinalized_proofs
-                              ~f:(fun t ->
-                                t.deferred_values.bulletproof_challenges )
-                        }
-                      in
-                      { proof_state =
-                          { deferred_values =
-                              { xi
-                              ; b = shift_value b
-                              ; bulletproof_challenges =
-                                  Vector.of_array_and_length_exn
-                                    new_bulletproof_challenges Tick.Rounds.n
-                              ; combined_inner_product =
-                                  shift_value combined_inner_product
-                              ; branch_data
-                              ; plonk =
-                                  { plonk with
-                                    zeta = plonk0.zeta
-                                  ; alpha = plonk0.alpha
-                                  ; beta = chal plonk0.beta
-                                  ; gamma = chal plonk0.gamma
-                                  ; joint_combiner = Opt.nothing
-                                  }
-                              }
-                          ; sponge_digest_before_evaluations =
-                              Digest.Constant.of_tick_field
-                                sponge_digest_before_evaluations
-                          ; messages_for_next_wrap_proof
+                      let x_hat = O.(p_eval_1 o, p_eval_2 o) in
+                      let step_vk, _ = Lazy.force step_vk in
+                      let next_statement : _ Types.Wrap.Statement.In_circuit.t =
+                        let scalar_chal f =
+                          Scalar_challenge.map ~f:Challenge.Constant.of_tick_field
+                            (f o)
+                        in
+                        let sponge_digest_before_evaluations =
+                          O.digest_before_evaluations o
+                        in
+                        let plonk0 =
+                          { Types.Wrap.Proof_state.Deferred_values.Plonk.Minimal
+                            .alpha = scalar_chal O.alpha
+                          ; beta = O.beta o
+                          ; gamma = O.gamma o
+                          ; zeta = scalar_chal O.zeta
+                          ; joint_combiner =
+                              Option.map (O.joint_combiner_chal o)
+                                ~f:
+                                  (Scalar_challenge.map
+                                     ~f:Challenge.Constant.of_tick_field )
+                          ; feature_flags = Plonk_types.Features.none_bool
                           }
-                      ; messages_for_next_step_proof =
-                          prev_statement.proof_state
-                            .messages_for_next_step_proof
-                      }
-                    in
-                    let messages_for_next_wrap_proof_prepared =
-                      P.Base.Messages_for_next_proof_over_same_field.Wrap
-                      .prepare
-                        next_statement.proof_state.messages_for_next_wrap_proof
-                    in
-                    let%map.Promise next_proof =
-                      let (T (input, conv, _conv_inv)) =
-                        Impls.Wrap.input ~feature_flags ()
-                      in
-                      Common.time "wrap proof" (fun () ->
-                          Impls.Wrap.generate_witness_conv
-                            ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs
-                                    ; public_inputs
-                                    } () ->
-                              Backend.Tock.Proof.create_async
-                                ~primary:public_inputs
-                                ~auxiliary:auxiliary_inputs pk
-                                ~message:
-                                  ( Vector.map2
-                                      (Vector.extend_front_exn
-                                         prev_statement.proof_state
-                                           .messages_for_next_step_proof
-                                           .challenge_polynomial_commitments
-                                         max_proofs_verified
-                                         (Lazy.force Dummy.Ipa.Wrap.sg) )
-                                      messages_for_next_wrap_proof_prepared
-                                        .old_bulletproof_challenges
-                                      ~f:(fun sg chals ->
-                                        { Tock.Proof.Challenge_polynomial
-                                          .commitment = sg
-                                        ; challenges = Vector.to_array chals
-                                        } )
-                                  |> Wrap_hack.pad_accumulator ) )
-                            ~input_typ:input
-                            ~return_typ:(Snarky_backendless.Typ.unit ())
-                            (fun x () : unit -> wrap_main (conv x))
-                            { messages_for_next_step_proof =
-                                prev_statement_with_hashes.proof_state
-                                  .messages_for_next_step_proof
-                            ; proof_state =
-                                { next_statement.proof_state with
-                                  messages_for_next_wrap_proof =
-                                    Wrap_hack.hash_messages_for_next_wrap_proof
-                                      max_proofs_verified
-                                      messages_for_next_wrap_proof_prepared
-                                ; deferred_values =
-                                    { next_statement.proof_state.deferred_values with
-                                      plonk =
-                                        { next_statement.proof_state
-                                            .deferred_values
-                                            .plonk
-                                          with
-                                          joint_combiner = None
-                                        }
+                        in
+                        let r = scalar_chal O.u in
+                        let xi = scalar_chal O.v in
+                        let to_field =
+                          SC.to_field_constant
+                            (module Tick.Field)
+                            ~endo:Endo.Wrap_inner_curve.scalar
+                        in
+                        let module As_field = struct
+                          let r = to_field r
+
+                          let xi = to_field xi
+
+                          let zeta = to_field plonk0.zeta
+
+                          let alpha = to_field plonk0.alpha
+
+                          let joint_combiner =
+                            Option.map ~f:to_field plonk0.joint_combiner
+                        end in
+                        let domain =
+                          Domain.Pow_2_roots_of_unity
+                            step_vk.domain.log_size_of_group
+                        in
+                        let w = step_vk.domain.group_gen in
+                        (* Debug *)
+                        [%test_eq: Tick.Field.t] w
+                          (Tick.Field.domain_generator
+                             ~log2_size:(Domain.log2_size domain) ) ;
+                        let zetaw = Tick.Field.mul As_field.zeta w in
+                        let tick_plonk_minimal =
+                          { plonk0 with
+                            zeta = As_field.zeta
+                          ; alpha = As_field.alpha
+                          ; joint_combiner = As_field.joint_combiner
+                          }
+                        in
+                        let tick_combined_evals =
+                          Plonk_checks.evals_of_split_evals
+                            (module Tick.Field)
+                            proof.openings.evals
+                            ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta:As_field.zeta
+                            ~zetaw
+                        in
+                        let tick_domain =
+                          Plonk_checks.domain
+                            (module Tick.Field)
+                            domain ~shifts:Common.tick_shifts
+                            ~domain_generator:Backend.Tick.Field.domain_generator
+                        in
+                        let tick_combined_evals =
+                          Plonk_types.Evals.to_in_circuit tick_combined_evals
+                        in
+                        let tick_env =
+                          let module Env_bool = struct
+                            type t = bool
+
+                            let true_ = true
+
+                            let false_ = false
+
+                            let ( &&& ) = ( && )
+
+                            let ( ||| ) = ( || )
+
+                            let any = List.exists ~f:Fn.id
+                          end in
+                          let module Env_field = struct
+                            include Tick.Field
+
+                            type bool = Env_bool.t
+
+                            let if_ (b : bool) ~then_ ~else_ =
+                              if b then then_ () else else_ ()
+                          end in
+                          Plonk_checks.scalars_env
+                            (module Env_bool)
+                            (module Env_field)
+                            ~endo:Endo.Step_inner_curve.base
+                            ~mds:Tick_field_sponge.params.mds
+                            ~srs_length_log2:Common.Max_degree.step_log2
+                            ~field_of_hex:(fun s ->
+                                Kimchi_pasta.Pasta.Bigint256.of_hex_string s
+                                |> Kimchi_pasta.Pasta.Fp.of_bigint )
+                            ~domain:tick_domain tick_plonk_minimal
+                            tick_combined_evals
+                        in
+                        let combined_inner_product =
+                          let open As_field in
+                          Wrap.combined_inner_product
+                            (* Note: We do not pad here. *)
+                            ~actual_proofs_verified:
+                              (Nat.Add.create actual_proofs_verified)
+                            { evals = proof.openings.evals; public_input = x_hat }
+                            ~r ~xi ~zeta ~zetaw
+                            ~old_bulletproof_challenges:prev_challenges
+                            ~env:tick_env ~domain:tick_domain
+                            ~ft_eval1:proof.openings.ft_eval1
+                            ~plonk:tick_plonk_minimal
+                        in
+                        let chal = Challenge.Constant.of_tick_field in
+                        let sg_new, new_bulletproof_challenges, b =
+                          let prechals =
+                            Array.map (O.opening_prechallenges o) ~f:(fun x ->
+                                let x =
+                                  Scalar_challenge.map
+                                    ~f:Challenge.Constant.of_tick_field x
+                                in
+                                x )
+                          in
+                          let chals =
+                            Array.map prechals ~f:(fun x ->
+                                Ipa.Step.compute_challenge x )
+                          in
+                          let challenge_polynomial =
+                            unstage (Wrap.challenge_polynomial chals)
+                          in
+                          let open As_field in
+                          let b =
+                            let open Tick.Field in
+                            challenge_polynomial zeta
+                            + (r * challenge_polynomial zetaw)
+                          in
+                          let overwritten_prechals =
+                            Array.map prechals
+                              ~f:
+                                (Scalar_challenge.map ~f:(fun _ ->
+                                     Challenge.Constant.of_tick_field
+                                       (Impls.Step.Field.Constant.of_int 100) ) )
+                          in
+                          let chals =
+                            Array.map overwritten_prechals ~f:(fun x ->
+                                Ipa.Step.compute_challenge x )
+                          in
+                          let sg_new =
+                            let urs = Backend.Tick.Keypair.load_urs () in
+                            Kimchi_bindings.Protocol.SRS.Fp
+                            .batch_accumulator_generate urs 1 chals
+                          in
+                          let[@warning "-4"] sg_new =
+                            match sg_new with
+                            | [| Kimchi_types.Finite x |] ->
+                              x
+                            | _ ->
+                              assert false
+                          in
+                          let overwritten_prechals =
+                            Array.map overwritten_prechals
+                              ~f:Bulletproof_challenge.unpack
+                          in
+
+                          (sg_new, overwritten_prechals, b)
+                        in
+                        let plonk =
+                          let module Field = struct
+                            include Tick.Field
+                          end in
+                          Wrap.Type1.derive_plonk
+                            (module Field)
+                            ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal
+                            tick_combined_evals
+                        in
+                        let shift_value =
+                          Shifted_value.Type1.of_field
+                            (module Tick.Field)
+                            ~shift:Shifts.tick1
+                        in
+                        let branch_data : Composition_types.Branch_data.t =
+                          { proofs_verified =
+                              ( match actual_proofs_verified with
+                                | Z ->
+                                  Composition_types.Branch_data.Proofs_verified.N0
+                                | S Z ->
+                                  N1
+                                | S (S Z) ->
+                                  N2
+                                | S _ ->
+                                  assert false )
+                          ; domain_log2 =
+                              Composition_types.Branch_data.Domain_log2.of_int_exn
+                                step_vk.domain.log_size_of_group
+                          }
+                        in
+                        let messages_for_next_wrap_proof :
+                          _
+                            P.Base.Messages_for_next_proof_over_same_field.Wrap.t
+                          =
+                          { challenge_polynomial_commitment = sg_new
+                          ; old_bulletproof_challenges =
+                              Vector.map
+                                prev_statement.proof_state.unfinalized_proofs
+                                ~f:(fun t ->
+                                    t.deferred_values.bulletproof_challenges )
+                          }
+                        in
+                        { proof_state =
+                            { deferred_values =
+                                { xi
+                                ; b = shift_value b
+                                ; bulletproof_challenges =
+                                    Vector.of_array_and_length_exn
+                                      new_bulletproof_challenges Tick.Rounds.n
+                                ; combined_inner_product =
+                                    shift_value combined_inner_product
+                                ; branch_data
+                                ; plonk =
+                                    { plonk with
+                                      zeta = plonk0.zeta
+                                    ; alpha = plonk0.alpha
+                                    ; beta = chal plonk0.beta
+                                    ; gamma = chal plonk0.gamma
+                                    ; joint_combiner = Opt.nothing
                                     }
                                 }
-                            } )
+                            ; sponge_digest_before_evaluations =
+                                Digest.Constant.of_tick_field
+                                  sponge_digest_before_evaluations
+                            ; messages_for_next_wrap_proof
+                            }
+                        ; messages_for_next_step_proof =
+                            prev_statement.proof_state
+                            .messages_for_next_step_proof
+                        }
+                      in
+                      let messages_for_next_wrap_proof_prepared =
+                        P.Base.Messages_for_next_proof_over_same_field.Wrap
+                        .prepare
+                          next_statement.proof_state.messages_for_next_wrap_proof
+                      in
+                      let%map.Promise next_proof =
+                        let (T (input, conv, _conv_inv)) =
+                          Impls.Wrap.input ~feature_flags ()
+                        in
+                        Common.time "wrap proof" (fun () ->
+                            Impls.Wrap.generate_witness_conv
+                              ~f:(fun { Impls.Wrap.Proof_inputs.auxiliary_inputs
+                                      ; public_inputs
+                                      } () ->
+                                   Backend.Tock.Proof.create_async
+                                     ~primary:public_inputs
+                                     ~auxiliary:auxiliary_inputs pk
+                                     ~message:
+                                       ( Vector.map2
+                                           (Vector.extend_front_exn
+                                              prev_statement.proof_state
+                                              .messages_for_next_step_proof
+                                              .challenge_polynomial_commitments
+                                              max_proofs_verified
+                                              (Lazy.force Dummy.Ipa.Wrap.sg) )
+                                           messages_for_next_wrap_proof_prepared
+                                           .old_bulletproof_challenges
+                                           ~f:(fun sg chals ->
+                                               { Tock.Proof.Challenge_polynomial
+                                                 .commitment = sg
+                                               ; challenges = Vector.to_array chals
+                                               } )
+                                         |> Wrap_hack.pad_accumulator ) )
+                              ~input_typ:input
+                              ~return_typ:(Snarky_backendless.Typ.unit ())
+                              (fun x () : unit -> wrap_main (conv x))
+                              { messages_for_next_step_proof =
+                                  prev_statement_with_hashes.proof_state
+                                  .messages_for_next_step_proof
+                              ; proof_state =
+                                  { next_statement.proof_state with
+                                    messages_for_next_wrap_proof =
+                                      Wrap_hack.hash_messages_for_next_wrap_proof
+                                        max_proofs_verified
+                                        messages_for_next_wrap_proof_prepared
+                                  ; deferred_values =
+                                      { next_statement.proof_state.deferred_values with
+                                        plonk =
+                                          { next_statement.proof_state
+                                            .deferred_values
+                                            .plonk
+                                            with
+                                              joint_combiner = None
+                                          }
+                                      }
+                                  }
+                              } )
+                      in
+                      ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof.proof
+                        ; statement =
+                            Types.Wrap.Statement.to_minimal
+                              ~to_option:Opt.to_option next_statement
+                        ; prev_evals =
+                            { Plonk_types.All_evals.evals =
+                                { public_input = x_hat
+                                ; evals = proof.openings.evals
+                                }
+                            ; ft_eval1 = proof.openings.ft_eval1
+                            }
+                        }
+                        : _ P.Base.Wrap.t )
                     in
-                    ( { proof = Wrap_wire_proof.of_kimchi_proof next_proof.proof
-                      ; statement =
-                          Types.Wrap.Statement.to_minimal
-                            ~to_option:Opt.to_option next_statement
-                      ; prev_evals =
-                          { Plonk_types.All_evals.evals =
-                              { public_input = x_hat
-                              ; evals = proof.openings.evals
-                              }
-                          ; ft_eval1 = proof.openings.ft_eval1
-                          }
-                      }
-                      : _ P.Base.Wrap.t )
+                    wrap ~max_proofs_verified:Max_proofs_verified.n
+                      full_signature.maxes
+                      ~dlog_plonk_index:
+                        ((* TODO *) Plonk_verification_key_evals.map
+                                     ~f:(fun x -> [| x |])
+                                     wrap_vk.commitments )
+                      wrap_main A_value.to_field_elements ~pairing_vk
+                      ~step_domains:b.domains
+                      ~pairing_plonk_indices:(Lazy.force step_vks) ~wrap_domains
+                      (fst (Lazy.force wrap_pk))
+                      proof
                   in
-                  wrap ~max_proofs_verified:Max_proofs_verified.n
-                    full_signature.maxes
-                    ~dlog_plonk_index:
-                      ((* TODO *) Plonk_verification_key_evals.map
-                         ~f:(fun x -> [| x |])
-                         wrap_vk.commitments )
-                    wrap_main A_value.to_field_elements ~pairing_vk
-                    ~step_domains:b.domains
-                    ~pairing_plonk_indices:(Lazy.force step_vks) ~wrap_domains
-                    (fst (Lazy.force wrap_pk))
-                    proof
+                  Proof.T
+                    { proof with
+                      statement =
+                        { proof.statement with
+                          messages_for_next_step_proof =
+                            { proof.statement.messages_for_next_step_proof with
+                              app_state = ()
+                            }
+                        }
+                    }
                 in
-                Proof.T
-                  { proof with
-                    statement =
-                      { proof.statement with
-                        messages_for_next_step_proof =
-                          { proof.statement.messages_for_next_step_proof with
-                            app_state = ()
-                          }
-                      }
-                  }
-              in
-              wrap
+                wrap
             in
             f step_data step_keypair
           in
@@ -1854,7 +1856,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let%test "should not be able to verify invalid proof" =
         Or_error.is_error
         @@ Promise.block_on_async_exn (fun () ->
-               Proof.verify [ proof_with_stmt ] )
+            Proof.verify [ proof_with_stmt ] )
 
       module Recurse_on_bad_proof = struct
         open Impls.Step
@@ -1869,9 +1871,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (Snarky_backendless.Request.With { request; respond }) =
           match request with
           | Proof ->
-              respond (Provide proof)
+            respond (Provide proof)
           | _ ->
-              respond Unhandled
+            respond Unhandled
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
@@ -1881,30 +1883,30 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"recurse-on-bad" ~constraint_constants
                 ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; prevs = [ tag; tag ]
-                    ; main =
-                        (fun { public_input = () } ->
-                          let proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
-                                Proof )
-                          in
-                          { previous_proof_statements =
-                              [ { public_input = ()
-                                ; proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ; { public_input = ()
-                                ; proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ]
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
-                    }
-                  ] ) )
+                    [ { identifier = "main"
+                      ; feature_flags = Plonk_types.Features.none_bool
+                      ; prevs = [ tag; tag ]
+                      ; main =
+                          (fun { public_input = () } ->
+                             let proof =
+                               exists (Typ.Internal.ref ()) ~request:(fun () ->
+                                   Proof )
+                             in
+                             { previous_proof_statements =
+                                 [ { public_input = ()
+                                   ; proof
+                                   ; proof_must_verify = Boolean.true_
+                                   }
+                                 ; { public_input = ()
+                                   ; proof
+                                   ; proof_must_verify = Boolean.true_
+                                   }
+                                 ]
+                             ; public_output = ()
+                             ; auxiliary_output = ()
+                             } )
+                      }
+                    ] ) )
 
         module Proof = (val p)
       end
@@ -1920,7 +1922,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.is_error
           @@ Promise.block_on_async_exn (fun () ->
-                 Recurse_on_bad_proof.Proof.verify_promise [ ((), proof) ] )
+              Recurse_on_bad_proof.Proof.verify_promise [ ((), proof) ] )
         with _ -> true
     end )
 
@@ -1934,38 +1936,38 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let%test_module "test domain size too large" =
         ( module Compile.Make_adversarial_test (struct
-          let tweak_statement (stmt : _ Import.Types.Wrap.Statement.In_circuit.t)
-              =
-            (* Modify the statement to use an invalid domain size. *)
-            { stmt with
-              proof_state =
-                { stmt.proof_state with
-                  deferred_values =
-                    { stmt.proof_state.deferred_values with
-                      branch_data =
-                        { stmt.proof_state.deferred_values.branch_data with
-                          Branch_data.domain_log2 =
-                            Branch_data.Domain_log2.of_int_exn
-                              (Nat.to_int Kimchi_pasta.Basic.Rounds.Step.n + 1)
+              let tweak_statement (stmt : _ Import.Types.Wrap.Statement.In_circuit.t)
+                =
+                (* Modify the statement to use an invalid domain size. *)
+                { stmt with
+                  proof_state =
+                    { stmt.proof_state with
+                      deferred_values =
+                        { stmt.proof_state.deferred_values with
+                          branch_data =
+                            { stmt.proof_state.deferred_values.branch_data with
+                              Branch_data.domain_log2 =
+                                Branch_data.Domain_log2.of_int_exn
+                                  (Nat.to_int Kimchi_pasta.Basic.Rounds.Step.n + 1)
+                            }
                         }
                     }
                 }
-            }
 
-          let check_verifier_error err =
-            (* Convert to JSON to make it easy to parse. *)
-            err |> Error_json.error_to_yojson
-            |> Yojson.Safe.Util.member "multiple"
-            |> Yojson.Safe.Util.to_list
-            |> List.find_exn ~f:(fun json ->
-                   let error =
-                     json
-                     |> Yojson.Safe.Util.member "string"
-                     |> Yojson.Safe.Util.to_string
-                   in
-                   String.equal error "domain size is small enough" )
-            |> fun _ -> ()
-        end) )
+              let check_verifier_error err =
+                (* Convert to JSON to make it easy to parse. *)
+                err |> Error_json.error_to_yojson
+                |> Yojson.Safe.Util.member "multiple"
+                |> Yojson.Safe.Util.to_list
+                |> List.find_exn ~f:(fun json ->
+                    let error =
+                      json
+                      |> Yojson.Safe.Util.member "string"
+                      |> Yojson.Safe.Util.to_string
+                    in
+                    String.equal error "domain size is small enough" )
+                |> fun _ -> ()
+            end) )
     end )
 
   let%test_module "domain too small" =
@@ -2021,19 +2023,19 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; fork = None
                   }
                 ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; prevs = []
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; main =
-                        (fun { public_input = self } ->
-                          dummy_constraints () ;
-                          Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
-                    }
-                  ] ) )
+                    [ { identifier = "main"
+                      ; prevs = []
+                      ; feature_flags = Plonk_types.Features.none_bool
+                      ; main =
+                          (fun { public_input = self } ->
+                             dummy_constraints () ;
+                             Field.Assert.equal self Field.zero ;
+                             { previous_proof_statements = []
+                             ; public_output = ()
+                             ; auxiliary_output = ()
+                             } )
+                      }
+                    ] ) )
 
         module Proof = (val p)
 
@@ -2072,19 +2074,19 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; fork = None
                   }
                 ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; prevs = []
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; main =
-                        (fun { public_input = self } ->
-                          dummy_constraints () ;
-                          Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
-                    }
-                  ] ) )
+                    [ { identifier = "main"
+                      ; prevs = []
+                      ; feature_flags = Plonk_types.Features.none_bool
+                      ; main =
+                          (fun { public_input = self } ->
+                             dummy_constraints () ;
+                             Field.Assert.equal self Field.zero ;
+                             { previous_proof_statements = []
+                             ; public_output = ()
+                             ; auxiliary_output = ()
+                             } )
+                      }
+                    ] ) )
 
         module Proof = (val p)
 
@@ -2124,19 +2126,19 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; fork = None
                   }
                 ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; prevs = []
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; main =
-                        (fun { public_input = self } ->
-                          dummy_constraints () ;
-                          Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
-                    }
-                  ] ) )
+                    [ { identifier = "main"
+                      ; prevs = []
+                      ; feature_flags = Plonk_types.Features.none_bool
+                      ; main =
+                          (fun { public_input = self } ->
+                             dummy_constraints () ;
+                             Field.Assert.equal self Field.zero ;
+                             { previous_proof_statements = []
+                             ; public_output = ()
+                             ; auxiliary_output = ()
+                             } )
+                      }
+                    ] ) )
 
         module Proof = (val p)
 
@@ -2167,13 +2169,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (Snarky_backendless.Request.With { request; respond }) =
           match request with
           | Prev_input ->
-              respond (Provide prev_input)
+            respond (Provide prev_input)
           | Proof ->
-              respond (Provide proof)
+            respond (Provide proof)
           | Verifier_index ->
-              respond (Provide verifier_index)
+            respond (Provide verifier_index)
           | _ ->
-              respond Unhandled
+            respond Unhandled
 
         let side_loaded_tag =
           Side_loaded.create ~name:"foo"
@@ -2201,44 +2203,44 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; fork = None
                   }
                 ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; prevs = [ side_loaded_tag ]
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; main =
-                        (fun { public_input = self } ->
-                          let prev =
-                            exists Field.typ ~request:(fun () -> Prev_input)
-                          in
-                          let proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
-                                Proof )
-                          in
-                          let vk =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
-                                Verifier_index )
-                          in
-                          as_prover (fun () ->
-                              let vk = As_prover.Ref.get vk in
-                              Side_loaded.in_prover side_loaded_tag vk ) ;
-                          let vk =
-                            exists Side_loaded_verification_key.typ
-                              ~compute:(fun () -> As_prover.Ref.get vk)
-                          in
-                          Side_loaded.in_circuit side_loaded_tag vk ;
-                          let is_base_case = Field.equal Field.zero self in
-                          let self_correct = Field.(equal (one + prev) self) in
-                          Boolean.Assert.any [ self_correct; is_base_case ] ;
-                          { previous_proof_statements =
-                              [ { public_input = prev
-                                ; proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ]
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
-                    }
-                  ] ) )
+                    [ { identifier = "main"
+                      ; prevs = [ side_loaded_tag ]
+                      ; feature_flags = Plonk_types.Features.none_bool
+                      ; main =
+                          (fun { public_input = self } ->
+                             let prev =
+                               exists Field.typ ~request:(fun () -> Prev_input)
+                             in
+                             let proof =
+                               exists (Typ.Internal.ref ()) ~request:(fun () ->
+                                   Proof )
+                             in
+                             let vk =
+                               exists (Typ.Internal.ref ()) ~request:(fun () ->
+                                   Verifier_index )
+                             in
+                             as_prover (fun () ->
+                                 let vk = As_prover.Ref.get vk in
+                                 Side_loaded.in_prover side_loaded_tag vk ) ;
+                             let vk =
+                               exists Side_loaded_verification_key.typ
+                                 ~compute:(fun () -> As_prover.Ref.get vk)
+                             in
+                             Side_loaded.in_circuit side_loaded_tag vk ;
+                             let is_base_case = Field.equal Field.zero self in
+                             let self_correct = Field.(equal (one + prev) self) in
+                             Boolean.Assert.any [ self_correct; is_base_case ] ;
+                             { previous_proof_statements =
+                                 [ { public_input = prev
+                                   ; proof
+                                   ; proof_must_verify = Boolean.true_
+                                   }
+                                 ]
+                             ; public_output = ()
+                             ; auxiliary_output = ()
+                             } )
+                      }
+                    ] ) )
 
         module Proof = (val p)
 
@@ -2369,19 +2371,19 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; fork = None
                   }
                 ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; prevs = []
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; main =
-                        (fun { public_input = self } ->
-                          dummy_constraints () ;
-                          Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
-                    }
-                  ] ) )
+                    [ { identifier = "main"
+                      ; prevs = []
+                      ; feature_flags = Plonk_types.Features.none_bool
+                      ; main =
+                          (fun { public_input = self } ->
+                             dummy_constraints () ;
+                             Field.Assert.equal self Field.zero ;
+                             { previous_proof_statements = []
+                             ; public_output = ()
+                             ; auxiliary_output = ()
+                             } )
+                      }
+                    ] ) )
 
         module Proof = (val p)
 
@@ -2420,19 +2422,19 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; fork = None
                   }
                 ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; prevs = []
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; main =
-                        (fun { public_input = self } ->
-                          dummy_constraints () ;
-                          Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
-                    }
-                  ] ) )
+                    [ { identifier = "main"
+                      ; prevs = []
+                      ; feature_flags = Plonk_types.Features.none_bool
+                      ; main =
+                          (fun { public_input = self } ->
+                             dummy_constraints () ;
+                             Field.Assert.equal self Field.zero ;
+                             { previous_proof_statements = []
+                             ; public_output = ()
+                             ; auxiliary_output = ()
+                             } )
+                      }
+                    ] ) )
 
         module Proof = (val p)
 
@@ -2472,19 +2474,19 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; fork = None
                   }
                 ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; prevs = []
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; main =
-                        (fun { public_input = self } ->
-                          dummy_constraints () ;
-                          Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
-                    }
-                  ] ) )
+                    [ { identifier = "main"
+                      ; prevs = []
+                      ; feature_flags = Plonk_types.Features.none_bool
+                      ; main =
+                          (fun { public_input = self } ->
+                             dummy_constraints () ;
+                             Field.Assert.equal self Field.zero ;
+                             { previous_proof_statements = []
+                             ; public_output = ()
+                             ; auxiliary_output = ()
+                             } )
+                      }
+                    ] ) )
 
         module Proof = (val p)
 
@@ -2515,13 +2517,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (Snarky_backendless.Request.With { request; respond }) =
           match request with
           | Prev_input ->
-              respond (Provide prev_input)
+            respond (Provide prev_input)
           | Proof ->
-              respond (Provide proof)
+            respond (Provide proof)
           | Verifier_index ->
-              respond (Provide verifier_index)
+            respond (Provide verifier_index)
           | _ ->
-              respond Unhandled
+            respond Unhandled
 
         let maybe_features =
           Plonk_types.Features.(map none ~f:(fun _ -> Opt.Flag.Maybe))
@@ -2552,44 +2554,44 @@ module Make_str (_ : Wire_types.Concrete) = struct
                   ; fork = None
                   }
                 ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; prevs = [ side_loaded_tag ]
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; main =
-                        (fun { public_input = self } ->
-                          let prev =
-                            exists Field.typ ~request:(fun () -> Prev_input)
-                          in
-                          let proof =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
-                                Proof )
-                          in
-                          let vk =
-                            exists (Typ.Internal.ref ()) ~request:(fun () ->
-                                Verifier_index )
-                          in
-                          as_prover (fun () ->
-                              let vk = As_prover.Ref.get vk in
-                              Side_loaded.in_prover side_loaded_tag vk ) ;
-                          let vk =
-                            exists Side_loaded_verification_key.typ
-                              ~compute:(fun () -> As_prover.Ref.get vk)
-                          in
-                          Side_loaded.in_circuit side_loaded_tag vk ;
-                          let is_base_case = Field.equal Field.zero self in
-                          let self_correct = Field.(equal (one + prev) self) in
-                          Boolean.Assert.any [ self_correct; is_base_case ] ;
-                          { previous_proof_statements =
-                              [ { public_input = prev
-                                ; proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ]
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
-                    }
-                  ] ) )
+                    [ { identifier = "main"
+                      ; prevs = [ side_loaded_tag ]
+                      ; feature_flags = Plonk_types.Features.none_bool
+                      ; main =
+                          (fun { public_input = self } ->
+                             let prev =
+                               exists Field.typ ~request:(fun () -> Prev_input)
+                             in
+                             let proof =
+                               exists (Typ.Internal.ref ()) ~request:(fun () ->
+                                   Proof )
+                             in
+                             let vk =
+                               exists (Typ.Internal.ref ()) ~request:(fun () ->
+                                   Verifier_index )
+                             in
+                             as_prover (fun () ->
+                                 let vk = As_prover.Ref.get vk in
+                                 Side_loaded.in_prover side_loaded_tag vk ) ;
+                             let vk =
+                               exists Side_loaded_verification_key.typ
+                                 ~compute:(fun () -> As_prover.Ref.get vk)
+                             in
+                             Side_loaded.in_circuit side_loaded_tag vk ;
+                             let is_base_case = Field.equal Field.zero self in
+                             let self_correct = Field.(equal (one + prev) self) in
+                             Boolean.Assert.any [ self_correct; is_base_case ] ;
+                             { previous_proof_statements =
+                                 [ { public_input = prev
+                                   ; proof
+                                   ; proof_must_verify = Boolean.true_
+                                   }
+                                 ]
+                             ; public_output = ()
+                             ; auxiliary_output = ()
+                             } )
+                      }
+                    ] ) )
 
         module Proof = (val p)
 

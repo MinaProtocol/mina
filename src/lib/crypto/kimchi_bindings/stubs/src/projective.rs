@@ -148,3 +148,19 @@ pub mod vesta {
         ProjectiveVesta
     );
 }
+
+pub mod bn254 {
+    use super::*;
+    use crate::arkworks::{CamlBn254Fp, CamlBn254Fq, CamlGBn254, CamlGroupProjectiveBn254};
+    use mina_curves::bn254::{Bn254 as GAffine, Fq, ProjectiveBn254};
+
+    impl_projective!(
+        bn254,
+        CamlGroupProjectiveBn254,
+        CamlGBn254,
+        CamlBn254Fp,
+        Fq,
+        CamlBn254Fq,
+        ProjectiveBn254
+    );
+}

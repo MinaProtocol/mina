@@ -3,11 +3,11 @@ open Core_kernel
 let padded_array_typ ~length ~dummy elt =
   Snarky_backendless.Typ.array ~length elt
   |> Snarky_backendless.Typ.transport
-       ~there:(fun a ->
-         let n = Array.length a in
-         if n > length then failwithf "Expected %d <= %d" n length () ;
-         Array.append a (Array.create ~len:(length - n) dummy) )
-       ~back:Fn.id
+    ~there:(fun a ->
+        let n = Array.length a in
+        if n > length then failwithf "Expected %d <= %d" n length () ;
+        Array.append a (Array.create ~len:(length - n) dummy) )
+    ~back:Fn.id
 
 let hash_fold_array f s x = hash_fold_list f s (Array.to_list x)
 
@@ -48,43 +48,43 @@ module Features = struct
         (feature : Kimchi_types.feature_flag) =
       match feature with
       | RangeCheck0 ->
-          Some feature_flags.range_check0
+        Some feature_flags.range_check0
       | RangeCheck1 ->
-          Some feature_flags.range_check1
+        Some feature_flags.range_check1
       | ForeignFieldAdd ->
-          Some feature_flags.foreign_field_add
+        Some feature_flags.foreign_field_add
       | ForeignFieldMul ->
-          Some feature_flags.foreign_field_mul
+        Some feature_flags.foreign_field_mul
       | Xor ->
-          Some feature_flags.xor
+        Some feature_flags.xor
       | Rot ->
-          Some feature_flags.rot
+        Some feature_flags.rot
       | LookupTables ->
-          Some feature_flags.uses_lookups
+        Some feature_flags.uses_lookups
       | RuntimeLookupTables ->
-          Some feature_flags.runtime_tables
+        Some feature_flags.runtime_tables
       | TableWidth 3 ->
-          Some feature_flags.table_width_3
+        Some feature_flags.table_width_3
       | TableWidth 2 ->
-          Some feature_flags.table_width_at_least_2
+        Some feature_flags.table_width_at_least_2
       | TableWidth i when i <= 1 ->
-          Some feature_flags.table_width_at_least_1
+        Some feature_flags.table_width_at_least_1
       | TableWidth _ ->
-          None
+        None
       | LookupsPerRow 4 ->
-          Some feature_flags.lookups_per_row_4
+        Some feature_flags.lookups_per_row_4
       | LookupsPerRow i when i <= 3 ->
-          Some feature_flags.lookups_per_row_3
+        Some feature_flags.lookups_per_row_3
       | LookupsPerRow _ ->
-          None
+        None
       | LookupPattern Lookup ->
-          Some feature_flags.lookup
+        Some feature_flags.lookup
       | LookupPattern Xor ->
-          Some feature_flags.lookup_pattern_xor
+        Some feature_flags.lookup_pattern_xor
       | LookupPattern RangeCheck ->
-          Some feature_flags.lookup_pattern_range_check
+        Some feature_flags.lookup_pattern_range_check
       | LookupPattern ForeignFieldMul ->
-          Some feature_flags.foreign_field_mul
+        Some feature_flags.foreign_field_mul
 
     let map
         { range_check0
@@ -203,21 +203,21 @@ module Features = struct
   end
 
   [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type 'bool t =
-        { range_check0 : 'bool
-        ; range_check1 : 'bool
-        ; foreign_field_add : 'bool
-        ; foreign_field_mul : 'bool
-        ; xor : 'bool
-        ; rot : 'bool
-        ; lookup : 'bool
-        ; runtime_tables : 'bool
-        }
-      [@@deriving sexp, compare, yojson, hash, equal, hlist]
-    end
-  end]
+    module Stable = struct
+      module V1 = struct
+        type 'bool t =
+          { range_check0 : 'bool
+          ; range_check1 : 'bool
+          ; foreign_field_add : 'bool
+          ; foreign_field_mul : 'bool
+          ; xor : 'bool
+          ; rot : 'bool
+          ; lookup : 'bool
+          ; runtime_tables : 'bool
+          }
+        [@@deriving sexp, compare, yojson, hash, equal, hlist]
+      end
+    end]
 
   let of_full
       ({ range_check0
@@ -237,7 +237,7 @@ module Features = struct
        ; lookup_pattern_xor = _
        ; lookup_pattern_range_check = _
        } :
-        'bool Full.t ) =
+         'bool Full.t ) =
     { range_check0
     ; range_check1
     ; foreign_field_add
@@ -343,7 +343,7 @@ module Features = struct
        ; lookup
        ; runtime_tables
        ] :
-        _ Hlist.HlistId.t ) =
+         _ Hlist.HlistId.t ) =
     { range_check0
     ; range_check1
     ; foreign_field_add
@@ -356,15 +356,15 @@ module Features = struct
 
   let typ bool
       ~feature_flags:
-        { range_check0
-        ; range_check1
-        ; foreign_field_add
-        ; foreign_field_mul
-        ; xor
-        ; rot
-        ; lookup
-        ; runtime_tables
-        } =
+      { range_check0
+      ; range_check1
+      ; foreign_field_add
+      ; foreign_field_mul
+      ; xor
+      ; rot
+      ; lookup
+      ; runtime_tables
+      } =
     (* TODO: This should come from snarky. *)
     let constant (type var value)
         (typ : (var, value, _) Snarky_backendless.Typ.t) (x : value) : var =
@@ -383,15 +383,15 @@ module Features = struct
     in
     let bool_typ_of_flag = function
       | Opt.Flag.Yes ->
-          constant_typ
-            ~there:(function true -> () | false -> assert false)
-            true
+        constant_typ
+          ~there:(function true -> () | false -> assert false)
+          true
       | Opt.Flag.No ->
-          constant_typ
-            ~there:(function false -> () | true -> assert false)
-            false
+        constant_typ
+          ~there:(function false -> () | true -> assert false)
+          false
       | Opt.Flag.Maybe ->
-          bool
+        bool
     in
     Snarky_backendless.Typ.of_hlistable
       [ bool_typ_of_flag range_check0
@@ -473,38 +473,38 @@ end
 
 module Evals = struct
   [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type 'a t =
-        { w : 'a Columns_vec.Stable.V1.t
-        ; coefficients : 'a Columns_vec.Stable.V1.t
-        ; z : 'a
-        ; s : 'a Permuts_minus_1_vec.Stable.V1.t
-        ; generic_selector : 'a
-        ; poseidon_selector : 'a
-        ; complete_add_selector : 'a
-        ; mul_selector : 'a
-        ; emul_selector : 'a
-        ; endomul_scalar_selector : 'a
-        ; range_check0_selector : 'a option
-        ; range_check1_selector : 'a option
-        ; foreign_field_add_selector : 'a option
-        ; foreign_field_mul_selector : 'a option
-        ; xor_selector : 'a option
-        ; rot_selector : 'a option
-        ; lookup_aggregation : 'a option
-        ; lookup_table : 'a option
-        ; lookup_sorted : 'a option Lookup_sorted_vec.Stable.V1.t
-        ; runtime_lookup_table : 'a option
-        ; runtime_lookup_table_selector : 'a option
-        ; xor_lookup_selector : 'a option
-        ; lookup_gate_lookup_selector : 'a option
-        ; range_check_lookup_selector : 'a option
-        ; foreign_field_mul_lookup_selector : 'a option
-        }
-      [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
-    end
-  end]
+    module Stable = struct
+      module V2 = struct
+        type 'a t =
+          { w : 'a Columns_vec.Stable.V1.t
+          ; coefficients : 'a Columns_vec.Stable.V1.t
+          ; z : 'a
+          ; s : 'a Permuts_minus_1_vec.Stable.V1.t
+          ; generic_selector : 'a
+          ; poseidon_selector : 'a
+          ; complete_add_selector : 'a
+          ; mul_selector : 'a
+          ; emul_selector : 'a
+          ; endomul_scalar_selector : 'a
+          ; range_check0_selector : 'a option
+          ; range_check1_selector : 'a option
+          ; foreign_field_add_selector : 'a option
+          ; foreign_field_mul_selector : 'a option
+          ; xor_selector : 'a option
+          ; rot_selector : 'a option
+          ; lookup_aggregation : 'a option
+          ; lookup_table : 'a option
+          ; lookup_sorted : 'a option Lookup_sorted_vec.Stable.V1.t
+          ; runtime_lookup_table : 'a option
+          ; runtime_lookup_table_selector : 'a option
+          ; xor_lookup_selector : 'a option
+          ; lookup_gate_lookup_selector : 'a option
+          ; range_check_lookup_selector : 'a option
+          ; foreign_field_mul_lookup_selector : 'a option
+          }
+        [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
+      end
+    end]
 
   let validate_feature_flags ~feature_flags:(f : bool Features.t)
       { w = _
@@ -554,13 +554,13 @@ module Evals = struct
                (* NB: lookups_per_row + 1 in sorted, due to the lookup table. *)
                match i with
                | 0 | 1 | 2 ->
-                   lookups_per_row_2
+                 lookups_per_row_2
                | 3 ->
-                   lookups_per_row_3
+                 lookups_per_row_3
                | 4 ->
-                   lookups_per_row_4
+                 lookups_per_row_4
                | _ ->
-                   assert false
+                 assert false
              in
              acc && enable_if x flag )
        ; enable_if runtime_lookup_table f.runtime_tables
@@ -694,7 +694,7 @@ module Evals = struct
          ; range_check_lookup_selector
          ; foreign_field_mul_lookup_selector
          } :
-          (a, bool) t ) ~(f : a -> b) : (b, bool) t =
+           (a, bool) t ) ~(f : a -> b) : (b, bool) t =
       { w = Vector.map w ~f
       ; coefficients = Vector.map coefficients ~f
       ; z = f z
@@ -760,9 +760,9 @@ module Evals = struct
             ; emul_selector
             ; endomul_scalar_selector
             ]
-          @ Vector.to_list w
-          @ Vector.to_list coefficients
-          @ Vector.to_list s )
+            @ Vector.to_list w
+            @ Vector.to_list coefficients
+            @ Vector.to_list s )
       in
       let optional_gates =
         [ range_check0_selector
@@ -876,7 +876,7 @@ module Evals = struct
        ; range_check_lookup_selector
        ; foreign_field_mul_lookup_selector
        } :
-        a t ) : (a, bool) In_circuit.t =
+         a t ) : (a, bool) In_circuit.t =
     { w
     ; coefficients
     ; z
@@ -933,7 +933,7 @@ module Evals = struct
        ; range_check_lookup_selector
        ; foreign_field_mul_lookup_selector
        } :
-        a t ) ~(f : a -> b) : b t =
+         a t ) ~(f : a -> b) : b t =
     { w = Vector.map w ~f
     ; coefficients = Vector.map coefficients ~f
     ; z = f z
@@ -1089,24 +1089,24 @@ module Evals = struct
     always_present @ optional_gates
     @ List.filter_map ~f:Fn.id (Vector.to_list lookup_sorted)
     @ List.filter_map ~f:Fn.id
-        [ lookup_aggregation
-        ; lookup_table
-        ; runtime_lookup_table
-        ; runtime_lookup_table_selector
-        ; xor_lookup_selector
-        ; lookup_gate_lookup_selector
-        ; range_check_lookup_selector
-        ; foreign_field_mul_lookup_selector
-        ]
+      [ lookup_aggregation
+      ; lookup_table
+      ; runtime_lookup_table
+      ; runtime_lookup_table_selector
+      ; xor_lookup_selector
+      ; lookup_gate_lookup_selector
+      ; range_check_lookup_selector
+      ; foreign_field_mul_lookup_selector
+      ]
 
   let typ (type f a_var a)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
       ~dummy e
       ({ uses_lookups; lookups_per_row_3; lookups_per_row_4; _ } as
        feature_flags :
-        _ Features.Full.t ) :
-      ((a_var, Impl.Boolean.var) In_circuit.t, a t, f) Snarky_backendless.Typ.t
-      =
+         _ Features.Full.t ) :
+    ((a_var, Impl.Boolean.var) In_circuit.t, a t, f) Snarky_backendless.Typ.t
+    =
     let open Impl in
     let opt flag = Opt.typ Impl.Boolean.typ flag e ~dummy in
     let lookup_sorted =
@@ -1154,13 +1154,13 @@ end
 module All_evals = struct
   module With_public_input = struct
     [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ('f, 'f_multi) t =
-          { public_input : 'f; evals : 'f_multi Evals.Stable.V2.t }
-        [@@deriving sexp, compare, yojson, hash, equal, hlist]
-      end
-    end]
+      module Stable = struct
+        module V1 = struct
+          type ('f, 'f_multi) t =
+            { public_input : 'f; evals : 'f_multi Evals.Stable.V2.t }
+          [@@deriving sexp, compare, yojson, hash, equal, hlist]
+        end
+      end]
 
     module In_circuit = struct
       type ('f, 'f_multi, 'bool) t =
@@ -1169,13 +1169,13 @@ module All_evals = struct
 
       let factor (type f f_multi bool)
           ({ public_input = p1, p2; evals } : (f * f, f_multi * f_multi, bool) t)
-          : (f, f_multi, bool) t Tuple_lib.Double.t =
+        : (f, f_multi, bool) t Tuple_lib.Double.t =
         ( { evals = Evals.In_circuit.map ~f:fst evals; public_input = p1 }
         , { evals = Evals.In_circuit.map ~f:snd evals; public_input = p2 } )
     end
 
     let map (type a1 a2 b1 b2) (t : (a1, a2) t) ~(f1 : a1 -> b1) ~(f2 : a2 -> b2)
-        : (b1, b2) t =
+      : (b1, b2) t =
       { public_input = f1 t.public_input; evals = Evals.map ~f:f2 t.evals }
 
     let typ impl feature_flags f f_multi ~dummy =
@@ -1189,15 +1189,15 @@ module All_evals = struct
   [@@@warning "-4"]
 
   [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type ('f, 'f_multi) t =
-        { evals : ('f * 'f, 'f_multi * 'f_multi) With_public_input.Stable.V1.t
-        ; ft_eval1 : 'f
-        }
-      [@@deriving sexp, compare, yojson, hash, equal, hlist]
-    end
-  end]
+    module Stable = struct
+      module V1 = struct
+        type ('f, 'f_multi) t =
+          { evals : ('f * 'f, 'f_multi * 'f_multi) With_public_input.Stable.V1.t
+          ; ft_eval1 : 'f
+          }
+        [@@deriving sexp, compare, yojson, hash, equal, hlist]
+      end
+    end]
 
   module In_circuit = struct
     type ('f, 'f_multi, 'bool) t =
@@ -1209,7 +1209,7 @@ module All_evals = struct
   end
 
   let map (type a1 a2 b1 b2) (t : (a1, a2) t) ~(f1 : a1 -> b1) ~(f2 : a2 -> b2)
-      : (b1, b2) t =
+    : (b1, b2) t =
     { evals =
         With_public_input.map t.evals
           ~f1:(Tuple_lib.Double.map ~f:f1)
@@ -1238,18 +1238,18 @@ module Openings = struct
 
   module Bulletproof = struct
     [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ('g, 'fq) t =
-          { lr : ('g * 'g) Bounded_types.ArrayN16.Stable.V1.t
-          ; z_1 : 'fq
-          ; z_2 : 'fq
-          ; delta : 'g
-          ; challenge_polynomial_commitment : 'g
-          }
-        [@@deriving sexp, compare, yojson, hash, equal, hlist]
-      end
-    end]
+      module Stable = struct
+        module V1 = struct
+          type ('g, 'fq) t =
+            { lr : ('g * 'g) Bounded_types.ArrayN16.Stable.V1.t
+            ; z_1 : 'fq
+            ; z_2 : 'fq
+            ; delta : 'g
+            ; challenge_polynomial_commitment : 'g
+            }
+          [@@deriving sexp, compare, yojson, hash, equal, hlist]
+        end
+      end]
 
     let typ fq g ~length =
       let open Snarky_backendless.Typ in
@@ -1260,30 +1260,30 @@ module Openings = struct
   end
 
   [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type ('g, 'fq, 'fqv) t =
-        { proof : ('g, 'fq) Bulletproof.Stable.V1.t
-        ; evals : ('fqv * 'fqv) Evals.Stable.V2.t
-        ; ft_eval1 : 'fq
-        }
-      [@@deriving sexp, compare, yojson, hash, equal, hlist]
-    end
-  end]
+    module Stable = struct
+      module V2 = struct
+        type ('g, 'fq, 'fqv) t =
+          { proof : ('g, 'fq) Bulletproof.Stable.V1.t
+          ; evals : ('fqv * 'fqv) Evals.Stable.V2.t
+          ; ft_eval1 : 'fq
+          }
+        [@@deriving sexp, compare, yojson, hash, equal, hlist]
+      end
+    end]
 end
 
 module Poly_comm = struct
   module With_degree_bound = struct
     [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type 'g_opt t =
-          { unshifted : 'g_opt Bounded_types.ArrayN16.Stable.V1.t
-          ; shifted : 'g_opt
-          }
-        [@@deriving sexp, compare, yojson, hlist, hash, equal]
-      end
-    end]
+      module Stable = struct
+        module V1 = struct
+          type 'g_opt t =
+            { unshifted : 'g_opt Bounded_types.ArrayN16.Stable.V1.t
+            ; shifted : 'g_opt
+            }
+          [@@deriving sexp, compare, yojson, hlist, hash, equal]
+        end
+      end]
 
     let padded_array_typ0 = padded_array_typ
 
@@ -1291,14 +1291,14 @@ module Poly_comm = struct
         (g : (g_var, g, f) Snarky_backendless.Typ.t) ~length
         ~dummy_group_element
         ~(bool : (bool_var, bool, f) Snarky_backendless.Typ.t) :
-        ((bool_var * g_var) t, g Or_infinity.t t, f) Snarky_backendless.Typ.t =
+      ((bool_var * g_var) t, g Or_infinity.t t, f) Snarky_backendless.Typ.t =
       let open Snarky_backendless.Typ in
       let g_inf =
         transport (tuple2 bool g)
           ~there:(function
-            | Or_infinity.Infinity ->
+              | Or_infinity.Infinity ->
                 (false, dummy_group_element)
-            | Finite x ->
+              | Finite x ->
                 (true, x) )
           ~back:(fun (b, x) -> if b then Infinity else Finite x)
       in
@@ -1309,12 +1309,12 @@ module Poly_comm = struct
 
   module Without_degree_bound = struct
     [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type 'g t = 'g Bounded_types.ArrayN16.Stable.V1.t
-        [@@deriving sexp, compare, yojson, hash, equal]
-      end
-    end]
+      module Stable = struct
+        module V1 = struct
+          type 'g t = 'g Bounded_types.ArrayN16.Stable.V1.t
+          [@@deriving sexp, compare, yojson, hash, equal]
+        end
+      end]
   end
 end
 
@@ -1328,18 +1328,18 @@ module Messages = struct
 
   module Lookup = struct
     [%%versioned
-    module Stable = struct
-      [@@@no_toplevel_latest_type]
+      module Stable = struct
+        [@@@no_toplevel_latest_type]
 
-      module V1 = struct
-        type 'g t =
-          { sorted : 'g Bounded_types.ArrayN16.Stable.V1.t
-          ; aggreg : 'g
-          ; runtime : 'g option
-          }
-        [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
-      end
-    end]
+        module V1 = struct
+          type 'g t =
+            { sorted : 'g Bounded_types.ArrayN16.Stable.V1.t
+            ; aggreg : 'g
+            ; runtime : 'g option
+            }
+          [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
+        end
+      end]
 
     type 'g t =
       { sorted : 'g Lookup_sorted_minus_1_vec.t
@@ -1384,19 +1384,19 @@ module Messages = struct
   end
 
   [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
 
-    module V2 = struct
-      type 'g t =
-        { w_comm : 'g Without_degree_bound.Stable.V1.t Columns_vec.Stable.V1.t
-        ; z_comm : 'g Without_degree_bound.Stable.V1.t
-        ; t_comm : 'g Without_degree_bound.Stable.V1.t
-        ; lookup : 'g Without_degree_bound.Stable.V1.t Lookup.Stable.V1.t option
-        }
-      [@@deriving sexp, compare, yojson, fields, hash, equal, hlist]
-    end
-  end]
+      module V2 = struct
+        type 'g t =
+          { w_comm : 'g Without_degree_bound.Stable.V1.t Columns_vec.Stable.V1.t
+          ; z_comm : 'g Without_degree_bound.Stable.V1.t
+          ; t_comm : 'g Without_degree_bound.Stable.V1.t
+          ; lookup : 'g Without_degree_bound.Stable.V1.t Lookup.Stable.V1.t option
+          }
+        [@@deriving sexp, compare, yojson, fields, hash, equal, hlist]
+      end
+    end]
 
   type 'g t =
     { w_comm : 'g Without_degree_bound.t Columns_vec.t
@@ -1420,9 +1420,9 @@ module Messages = struct
   let typ (type n f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f) g
       ({ runtime_tables; uses_lookups; lookups_per_row_4; _ } :
-        Opt.Flag.t Features.Full.t ) ~dummy
+         Opt.Flag.t Features.Full.t ) ~dummy
       ~(commitment_lengths : (((int, n) Vector.t as 'v), int, int) Poly.t) ~bool
-      =
+    =
     let open Snarky_backendless.Typ in
     let { Poly.w = w_lens; z; t } = commitment_lengths in
     let array ~length elt = padded_array_typ ~dummy ~length elt in
@@ -1445,17 +1445,17 @@ end
 
 module Proof = struct
   [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
 
-    module V2 = struct
-      type ('g, 'fq, 'fqv) t =
-        { messages : 'g Messages.Stable.V2.t
-        ; openings : ('g, 'fq, 'fqv) Openings.Stable.V2.t
-        }
-      [@@deriving sexp, compare, yojson, hash, equal]
-    end
-  end]
+      module V2 = struct
+        type ('g, 'fq, 'fqv) t =
+          { messages : 'g Messages.Stable.V2.t
+          ; openings : ('g, 'fq, 'fqv) Openings.Stable.V2.t
+          }
+        [@@deriving sexp, compare, yojson, hash, equal]
+      end
+    end]
 
   type ('g, 'fq, 'fqv) t =
     { messages : 'g Messages.t; openings : ('g, 'fq, 'fqv) Openings.t }
@@ -1466,10 +1466,10 @@ module Shifts = struct
   open Core_kernel
 
   [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type 'field t = 'field Bounded_types.ArrayN16.Stable.V1.t
-      [@@deriving sexp, compare, yojson, equal]
-    end
-  end]
+    module Stable = struct
+      module V2 = struct
+        type 'field t = 'field Bounded_types.ArrayN16.Stable.V1.t
+        [@@deriving sexp, compare, yojson, equal]
+      end
+    end]
 end

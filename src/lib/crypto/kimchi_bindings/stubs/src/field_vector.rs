@@ -135,3 +135,19 @@ pub mod fq {
 
     impl_vector_old!(CamlFqVector, CamlFq, Fq);
 }
+
+pub mod bn254_fp {
+    use super::*;
+    use crate::arkworks::CamlBn254Fp;
+    use mina_curves::bn254::Fp;
+
+    impl_vector_old!(CamlBn254FpVector, CamlBn254Fp, Fp);
+}
+
+pub mod bn254_fq {
+    use super::*;
+    use crate::arkworks::CamlBn254Fq;
+    use mina_curves::bn254::Fq;
+
+    impl_vector_old!(CamlBn254FqVector, CamlBn254Fq, Fq);
+}

@@ -143,7 +143,8 @@ impl From<CamlPastaFpPlonkVerifierIndex> for VerifierIndex<Vesta, OpeningProof<V
             shift,
             permutation_vanishing_polynomial_m: {
                 let res = once_cell::sync::OnceCell::new();
-                res.set(permutation_vanishing_polynomial(domain, 3)).unwrap();
+                res.set(permutation_vanishing_polynomial(domain, 3))
+                    .unwrap();
                 res
             },
             w: {

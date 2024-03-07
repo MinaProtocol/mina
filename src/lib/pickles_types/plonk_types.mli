@@ -39,24 +39,24 @@ module Features : sig
   end
 
   [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type 'bool t =
-        { range_check0 : 'bool
-        ; range_check1 : 'bool
-        ; foreign_field_add : 'bool
-        ; foreign_field_mul : 'bool
-        ; xor : 'bool
-        ; rot : 'bool
-        ; lookup : 'bool
-        ; runtime_tables : 'bool
-        }
-      [@@deriving sexp, compare, yojson, hash, equal, hlist]
-    end
-  end]
+    module Stable : sig
+      module V1 : sig
+        type 'bool t =
+          { range_check0 : 'bool
+          ; range_check1 : 'bool
+          ; foreign_field_add : 'bool
+          ; foreign_field_mul : 'bool
+          ; xor : 'bool
+          ; rot : 'bool
+          ; lookup : 'bool
+          ; runtime_tables : 'bool
+          }
+        [@@deriving sexp, compare, yojson, hash, equal, hlist]
+      end
+    end]
 
   val to_full :
-       or_:('bool -> 'bool -> 'bool)
+    or_:('bool -> 'bool -> 'bool)
     -> ?any:('bool list -> 'bool)
     -> 'bool t
     -> 'bool Full.t
@@ -72,18 +72,18 @@ module Features : sig
   (** [to_data flags] takes the record defined above and deconstructs it in a
       list, in the field order *)
   val to_data :
-       'a t
+    'a t
     -> ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
-       Hlist.HlistId.t
+      Hlist.HlistId.t
 
   (** [of_data flags_list] constructs a record from the flags list *)
   val of_data :
-       ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
-       Hlist.HlistId.t
+    ('a * ('a * ('a * ('a * ('a * ('a * ('a * ('a * unit))))))))
+      Hlist.HlistId.t
     -> 'a t
 
   val typ :
-       ('var, bool, 'f) Snarky_backendless.Typ.t
+    ('var, bool, 'f) Snarky_backendless.Typ.t
     -> feature_flags:options
     -> ('var t, bool t, 'f) Snarky_backendless.Typ.t
 
@@ -132,8 +132,8 @@ module Messages : sig
   end
 
   (** The types of lookup tables. This should stay in line with the {{
-  https://o1-labs.github.io/proof-systems/rfcs/extended-lookup-tables.html} RFC4
-  - Extended lookup tables } in the kimchi book *)
+      https://o1-labs.github.io/proof-systems/rfcs/extended-lookup-tables.html} RFC4
+      - Extended lookup tables } in the kimchi book *)
   module Lookup : sig
     module Stable : sig
       module V1 : sig
@@ -194,13 +194,13 @@ module Messages : sig
       ; lookup :
           ( ('g Poly_comm.Without_degree_bound.t, 'bool) Lookup.In_circuit.t
           , 'bool )
-          Opt.t
+            Opt.t
       }
     [@@deriving fields]
   end
 
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+    (module Snarky_backendless.Snark_intf.Run with type field = 'f)
     -> ('a, 'b, 'f) Snarky_backendless.Typ.t
     -> Opt.Flag.t Features.Full.t
     -> dummy:'b
@@ -208,10 +208,10 @@ module Messages : sig
     -> bool:('c, bool, 'f) Snarky_backendless.Typ.t
     -> ( ( 'a
          , 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
-         In_circuit.t
+           In_circuit.t
        , 'b t
        , 'f )
-       Snarky_backendless.Typ.t
+      Snarky_backendless.Typ.t
 end
 
 module Evals : sig
@@ -305,30 +305,30 @@ end
 module Openings : sig
   module Bulletproof : sig
     [%%versioned:
-    module Stable : sig
-      module V1 : sig
-        type ('g, 'fq) t =
-          { lr : ('g * 'g) array
-          ; z_1 : 'fq
-          ; z_2 : 'fq
-          ; delta : 'g
-          ; challenge_polynomial_commitment : 'g
-          }
-        [@@deriving compare, sexp, yojson, hash, equal]
-      end
-    end]
+      module Stable : sig
+        module V1 : sig
+          type ('g, 'fq) t =
+            { lr : ('g * 'g) array
+            ; z_1 : 'fq
+            ; z_2 : 'fq
+            ; delta : 'g
+            ; challenge_polynomial_commitment : 'g
+            }
+          [@@deriving compare, sexp, yojson, hash, equal]
+        end
+      end]
 
     val typ :
-         ( 'a
-         , 'b
-         , 'c
-         , (unit, 'c) Snarky_backendless.Checked_runner.Simple.t )
-         Snarky_backendless.Types.Typ.typ
+      ( 'a
+      , 'b
+      , 'c
+      , (unit, 'c) Snarky_backendless.Checked_runner.Simple.t )
+        Snarky_backendless.Types.Typ.typ
       -> ( 'd
          , 'e
          , 'c
          , (unit, 'c) Snarky_backendless.Checked_runner.Simple.t )
-         Snarky_backendless.Types.Typ.typ
+        Snarky_backendless.Types.Typ.typ
       -> length:int
       -> (('d, 'a) t, ('e, 'b) t, 'c) Snarky_backendless.Typ.t
   end
@@ -376,7 +376,7 @@ module All_evals : sig
         { public_input : 'f; evals : ('f_multi, 'bool) Evals.In_circuit.t }
 
       val factor :
-           ('f * 'f, 'f_multi * 'f_multi, 'bool) t
+        ('f * 'f, 'f_multi * 'f_multi, 'bool) t
         -> ('f, 'f_multi, 'bool) t Tuple_lib.Double.t
     end
   end
@@ -409,16 +409,16 @@ module All_evals : sig
   val map : ('a, 'b) t -> f1:('a -> 'c) -> f2:('b -> 'd) -> ('c, 'd) t
 
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+    (module Snarky_backendless.Snark_intf.Run with type field = 'f)
     -> Opt.Flag.t Features.Full.t
     -> ( ( 'f Snarky_backendless.Cvar.t
          , 'f Snarky_backendless.Cvar.t array
          , 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t )
-         In_circuit.t
+           In_circuit.t
        , ('f, 'f array) t
        , 'f
        , (unit, 'f) Snarky_backendless.Checked_runner.Simple.t )
-       Snarky_backendless.Types.Typ.typ
+      Snarky_backendless.Types.Typ.typ
 end
 
 (** Shifts, related to the permutation argument in Plonk *)

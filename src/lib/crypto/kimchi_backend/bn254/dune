@@ -1,0 +1,34 @@
+(library
+ (inline_tests
+  (flags -verbose -show-counts))
+ (name kimchi_bn254)
+ (public_name kimchi_backend.bn254)
+ (flags -warn-error -27)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
+ (libraries
+  ;; opam libraries
+  ppx_inline_test.config
+  sexplib0
+  core_kernel
+  bin_prot.shape
+  base.caml
+  ;; local libraries
+  sponge
+  snarky.backendless
+  pickles_types
+  kimchi_backend.common
+  promise
+  kimchi_bindings
+  kimchi_bn254_basic
+  kimchi_bn254_constraint_system
+  kimchi_backend.pasta
+  kimchi_backend.pasta.basic
+  kimchi_backend.pasta.constraint_system
+  kimchi_types
+  pasta_bindings
+  bn254_bindings
+  snarkette
+  ppx_version.runtime))
