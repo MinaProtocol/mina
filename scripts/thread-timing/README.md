@@ -33,6 +33,6 @@ To import a chart to Grafana:
 1. Add a new panel to the dashboard you want to import to.
 2. On the dashboard view, when you open the dropdown for the panel (by clicking on the panel title), select "Inspect > Panel JSON".
 3. In the righthand view that pops up, take note of the value set in the `id` field (we will need it in a second). Select and delete all of the JSON data for the panel.
-4. Paste in the JSON output from the the script you ran to generate the chart.
+4. Paste in the JSON output from the script you ran to generate the chart.
 5. Now the annoying part: look for the `id` field of the JSON object you just pasted. Update the `id` field to match `id` of the JSON object you deleted in step 3. Failing to do this can screw up your dashboard in weird ways because Grafana ends up overwriting other charts with the same id in a weird and buggy way. I hope to find a slightly better workflow for importing charts in the future that circumvents this weird chart id behavior that Grafana has.
 6. Click "Apply".

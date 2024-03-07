@@ -948,7 +948,7 @@ let scalar_mul (type f) (module Circuit : Snark_intf.Run with type field = f)
    *     we employ a randomized strategy that avoids adding the identity element
    *     or the same point to itself.  The strategy works as follows.
    *
-   *     Since the prover knows the the points that it will add and double during
+   *     Since the prover knows the points that it will add and double during
    *     scaling, the prover could select an initial accumulator point I such that
    *     the double-and-add algorithm never adds the identity element, same point
    *     or negated point to itself whilst scaling.
