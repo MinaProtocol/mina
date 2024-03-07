@@ -543,7 +543,8 @@ let setup_daemon logger =
   and simplified_node_stats =
     flag "--simplified-node-stats"
       ~aliases:[ "simplified-node-stats" ]
-      no_arg ~doc:"whether to report simplified node stats (default: false)"
+      (optional_with_default true bool)
+      ~doc:"whether to report simplified node stats (default: true)"
   and contact_info =
     flag "--contact-info" ~aliases:[ "contact-info" ] (optional string)
       ~doc:
