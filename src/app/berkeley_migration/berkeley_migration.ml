@@ -542,6 +542,8 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
       let%bind () = Precomputed_block.delete_fetched ~network in
       [%log info] "Done migrating mainnet blocks!" ;
       [%log info] "Populating original genesis ledger balances" ;
+      (* inlined from Archive_lib.Processor.add_genesis_accounts to avoid
+         recomputing precomputed_values *)
       let%bind padded_accounts =
         match
           Genesis_ledger_helper.Ledger.padded_accounts_from_runtime_config_opt
@@ -557,11 +559,13 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
       let constraint_constants =
         Genesis_constants.Constraint_constants.compiled
       in
+      [%log info] "Creating genesis ledger" ;
       let packed_ledger =
         Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
           ~depth:constraint_constants.ledger_depth padded_accounts
       in
       let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
+      [%log info] "Created genesis ledger" ;
       let%bind account_ids =
         let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
         Mina_base.Account_id.Set.to_list account_id_set
