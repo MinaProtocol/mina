@@ -20,4 +20,5 @@ echo "--- Upload debs to amazon s3 repo"
 ./buildkite/scripts/publish-deb.sh
 
 echo "--- Git diff after build is complete:"
+git lfs install
 git diff --exit-code -- .
