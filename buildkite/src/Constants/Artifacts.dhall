@@ -40,6 +40,7 @@ let dockerName = \(artifact : Artifact) ->
     Daemon = "mina-daemon"
     , Archive = "mina-archive"
     , TestExecutive = "mina-test-executive"
+    , ArchiveMigration = "mina-archive-migration"
     , BatchTxn = "mina-batch-txn"
     , Rosetta = "mina-rosetta" 
     , ZkappTestTransaction = "mina-zkapp-test-transaction"
