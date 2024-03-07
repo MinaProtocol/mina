@@ -78,5 +78,4 @@ echo "--- Upload debs to amazon s3 repo"
 make publish_debs
 
 echo "--- Git diff after build is complete:"
-git lfs install
 git diff --exit-code -- .
