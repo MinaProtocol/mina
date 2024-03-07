@@ -367,7 +367,6 @@ module Ledger = struct
                        $ledger_filename"
                       ~metadata:
                         [ ("ledger", `String ledger_name_prefix)
-                        ; ("config", Runtime_config.Ledger.to_yojson config)
                         ; ("ledger_name", `String ledger_name)
                         ; ("ledger_filename", `String ledger_filename)
                         ] ;
@@ -819,10 +818,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
         `Null
   in
   [%log info] "Initializing with runtime configuration. Ledger name: $name"
-    ~metadata:
-      [ ("name", ledger_name_json)
-      ; ("config", Runtime_config.to_yojson config)
-      ] ;
+    ~metadata:[ ("name", ledger_name_json) ] ;
   let open Deferred.Or_error.Let_syntax in
   let genesis_constants = Genesis_constants.compiled in
   let proof_level =
