@@ -4,6 +4,9 @@ CLEAR='\033[0m'
 RED='\033[0;31m'
 
 set -u
+set -e
+set -E
+set -o pipefail
 
 DEFAULT_MINA_NETWORK=devnet
 DEFAULT_PG_CONN=postgres://postgres@127.0.0.1:5432/archive_balances_migrated
