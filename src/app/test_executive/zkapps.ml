@@ -21,18 +21,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node-a-key"
-          ; balance = "8000000000"
-          ; timing = Untimed
-          }
-        ; { account_name = "node-b-key"
-          ; balance = "1000000000"
-          ; timing = Untimed
-          }
-        ; { account_name = "fish1"; balance = "3000"; timing = Untimed }
-        ; { account_name = "fish2"; balance = "3000"; timing = Untimed }
-        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
-        ]
+        (let open Test_account in
+        [ create ~account_name:"node-a-key" ~balance:"8000000000" ()
+        ; create ~account_name:"node-b-key" ~balance:"1000000000" ()
+        ; create ~account_name:"fish1" ~balance:"3000" ()
+        ; create ~account_name:"fish2" ~balance:"3000" ()
+        ; create ~account_name:"snark-node-key" ~balance:"0" ()
+        ])
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -184,8 +179,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       return
-      @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-           zkapp_command_spec
+      @@ Async.Thread_safe.block_on_async_exn (fun () ->
+             Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+               zkapp_command_spec )
     in
     let%bind.Deferred zkapp_command_update_permissions, permissions_updated =
       (* construct a Zkapp_command.t, similar to zkapp_test_transaction update-permissions *)
@@ -200,7 +196,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           edit_state = Permissions.Auth_required.Proof
         ; edit_action_state = Proof
         ; set_delegate = Proof
-        ; set_verification_key = Proof
+        ; set_verification_key = (Proof, Mina_numbers.Txn_version.current)
         ; set_permissions = Proof
         ; set_zkapp_uri = Proof
         ; set_token_symbol = Proof

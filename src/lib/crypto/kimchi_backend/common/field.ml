@@ -37,6 +37,8 @@ module type Input_intf = sig
 
   val is_square : t -> bool
 
+  val compare : t -> t -> int
+
   val equal : t -> t -> bool
 
   val print : t -> unit
@@ -177,24 +179,22 @@ module Make (F : Input_intf) :
             let of_sexpable = of_bigint
           end)
 
-      let to_bignum_bigint n =
-        let rec go i two_to_the_i acc =
-          if Int.equal i size_in_bits then acc
+      let to_bignum_bigint =
+        let zero = of_int 0 in
+        let one = of_int 1 in
+        fun n ->
+          if equal n zero then Bignum_bigint.zero
+          else if equal n one then Bignum_bigint.one
           else
-            let acc' =
-              if Bigint.test_bit n i then Bignum_bigint.(acc + two_to_the_i)
-              else acc
-            in
-            go (i + 1) Bignum_bigint.(two_to_the_i + two_to_the_i) acc'
-        in
-        go 0 Bignum_bigint.one Bignum_bigint.zero
+            Bytes.unsafe_to_string
+              ~no_mutation_while_string_reachable:(to_bytes n)
+            |> Z.of_bits |> Bignum_bigint.of_zarith_bigint
 
-      let hash_fold_t s x =
-        Bignum_bigint.hash_fold_t s (to_bignum_bigint (to_bigint x))
+      let hash_fold_t s x = Bignum_bigint.hash_fold_t s (to_bignum_bigint x)
 
       let hash = Hash.of_fold hash_fold_t
 
-      let compare t1 t2 = Bigint.compare (to_bigint t1) (to_bigint t2)
+      let compare = compare
 
       let equal = equal
 

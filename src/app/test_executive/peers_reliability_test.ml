@@ -21,10 +21,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node-a-key"; balance = "700000"; timing = Untimed }
-        ; { account_name = "node-b-key"; balance = "700000"; timing = Untimed }
-        ; { account_name = "node-c-key"; balance = "800000"; timing = Untimed }
-        ]
+        (let open Test_account in
+        [ create ~account_name:"node-a-key" ~balance:"700000" ()
+        ; create ~account_name:"node-b-key" ~balance:"700000" ()
+        ; create ~account_name:"node-c-key" ~balance:"800000" ()
+        ])
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -138,9 +139,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              }
            in
            return
-           @@ Transaction_snark.For_tests.deploy_snapp
-                ~constraint_constants:(Network.constraint_constants network)
-                parties_spec
+           @@ Async.Thread_safe.block_on_async_exn (fun () ->
+                  Transaction_snark.For_tests.deploy_snapp
+                    ~constraint_constants:(Network.constraint_constants network)
+                    parties_spec )
          in
          let%bind () =
            send_zkapp ~logger

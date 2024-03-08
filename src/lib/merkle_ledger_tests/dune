@@ -19,6 +19,7 @@
    async
    core_kernel
    ;; local libraries
+   bounded_types
    merkle_ledger
    merkle_mask
    mina_base

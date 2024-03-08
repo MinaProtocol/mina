@@ -6,6 +6,12 @@ open Mina_base
 
 let%test_module "zkApp deploy tests" =
   ( module struct
+    let proof_cache =
+      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+      @@ Yojson.Safe.from_file "proof_cache.json"
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let memo = Signed_command_memo.create_from_string_exn "zkApp deploy tests"
 
     let constraint_constants = U.constraint_constants
@@ -33,8 +39,9 @@ let%test_module "zkApp deploy tests" =
                     }
                   in
                   let zkapp_command =
-                    Transaction_snark.For_tests.deploy_snapp test_spec
-                      ~constraint_constants
+                    Async.Thread_safe.block_on_async_exn (fun () ->
+                        Transaction_snark.For_tests.deploy_snapp test_spec
+                          ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -71,8 +78,9 @@ let%test_module "zkApp deploy tests" =
                     }
                   in
                   let zkapp_command =
-                    Transaction_snark.For_tests.deploy_snapp test_spec
-                      ~constraint_constants
+                    Async.Thread_safe.block_on_async_exn (fun () ->
+                        Transaction_snark.For_tests.deploy_snapp test_spec
+                          ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -103,8 +111,9 @@ let%test_module "zkApp deploy tests" =
                     }
                   in
                   let zkapp_command =
-                    Transaction_snark.For_tests.deploy_snapp test_spec
-                      ~constraint_constants
+                    Async.Thread_safe.block_on_async_exn (fun () ->
+                        Transaction_snark.For_tests.deploy_snapp test_spec
+                          ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -136,8 +145,9 @@ let%test_module "zkApp deploy tests" =
                     }
                   in
                   let zkapp_command =
-                    Transaction_snark.For_tests.deploy_snapp test_spec
-                      ~constraint_constants
+                    Async.Thread_safe.block_on_async_exn (fun () ->
+                        Transaction_snark.For_tests.deploy_snapp test_spec
+                          ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -169,8 +179,9 @@ let%test_module "zkApp deploy tests" =
                     }
                   in
                   let zkapp_command =
-                    Transaction_snark.For_tests.deploy_snapp test_spec
-                      ~constraint_constants
+                    Async.Thread_safe.block_on_async_exn (fun () ->
+                        Transaction_snark.For_tests.deploy_snapp test_spec
+                          ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -178,4 +189,11 @@ let%test_module "zkApp deploy tests" =
                   U.check_zkapp_command_with_merges_exn ledger
                     ~expected_failure:(Invalid_fee_excess, Pass_2)
                     [ zkapp_command ] ) ) )
+
+    let () =
+      match Sys.getenv "PROOF_CACHE_OUT" with
+      | Some path ->
+          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
+      | None ->
+          ()
   end )

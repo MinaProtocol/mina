@@ -79,13 +79,13 @@ final: prev: {
   # Tool for testing implementation of the rosetta api
   rosetta-cli = final.buildGoModule rec {
     pname = "rosetta-cli";
-    version = "0.10.0";
+    version = "0.10.3-pallas";
     src = final.fetchFromGitHub {
-      owner = "coinbase";
+      owner = "MinaProtocol";
       repo = "rosetta-cli";
-      rev = "085f95c85c99f607a82fb1814594d95dc9fefb55";
-      sha256 = "I3fNRiMwuk5FWiECu31Z5A23djUR0GHugy1OqNruzj8=";
+      rev = "9a8ba09359482898580bb35c3aa86896364b14ce";
+      sha256 = "sha256-3Lk5pa6fAeHGCmDjhaUjUoASxN6ozTD9e2+0wDH7hGs=";
     };
-    vendorSha256 = "sha256-ooFpB17Yu9aILx3kl2o6WVbbX110YeSdcC0RIaBUwzM=";
+    vendorSha256 = "sha256-lCBAsCNtorEu0WRZRLEMEaNyjtVIdJSAZg3icrpHIsQ=";
   };
 }

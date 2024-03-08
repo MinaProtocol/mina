@@ -56,6 +56,7 @@ module Maskable :
      and type root_hash := Ledger_hash.t
      and type unattached_mask := Mask.t
      and type attached_mask := Mask.Attached.t
+     and type accumulated_t := Mask.accumulated_t
      and type t := Any_ledger.M.t
 
 include
@@ -73,12 +74,16 @@ include
      and type t = Mask.Attached.t
      and type attached_mask = Mask.Attached.t
      and type unattached_mask = Mask.t
+     and type accumulated_t = Mask.accumulated_t
 
 (* We override the type of unregister_mask_exn that comes from
    Merkle_mask.Maskable_merkle_tree_intf.S because at this level callers aren't
    doing reparenting and shouldn't be able to turn off the check parameter.
 *)
 val unregister_mask_exn : loc:string -> Mask.Attached.t -> Mask.t
+
+val unsafe_preload_accounts_from_parent :
+  Mask.Attached.t -> Account_id.t list -> unit
 
 (* The maskable ledger is t = Mask.Attached.t because register/unregister
  * work off of this type *)

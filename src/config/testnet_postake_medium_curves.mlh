@@ -46,3 +46,6 @@
 (* 2*block_window_duration *)
 [%%define compaction_interval 360000]
 [%%define vrf_poll_interval 5000]
+[%%undef zkapp_cmd_limit]
+[%%undef slot_tx_end]
+[%%undef slot_chain_end]

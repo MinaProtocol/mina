@@ -8,6 +8,8 @@ let logger = Logger.create ()
 
 let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
 
+let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
+
 let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
   let fee_payer_keypairs =
     Array.init num_of_fee_payers ~f:(fun _ -> Keypair.create ())
@@ -115,7 +117,7 @@ let generate_zkapp_commands_and_apply_them_consecutively_5_times ~successful
       match%map
         try_with (fun () ->
             with_timeout (Time.Span.of_int_sec individual_test_timeout)
-            @@ U.check_zkapp_command_with_merges_exn ~global_slot ledger
+            @@ U.check_zkapp_command_with_merges_exn ~logger ~global_slot ledger
                  [ zkapp_command ] )
       with
       | Ok (`Result ()) ->
@@ -165,7 +167,7 @@ let generate_zkapp_commands_and_apply_them_freshly ~successful
     match%map
       try_with (fun () ->
           with_timeout (Time.Span.of_int_sec individual_test_timeout)
-          @@ U.check_zkapp_command_with_merges_exn ~global_slot ledger
+          @@ U.check_zkapp_command_with_merges_exn ~logger ~global_slot ledger
                [ zkapp_command ] )
     with
     | Ok (`Result ()) ->
@@ -213,7 +215,7 @@ let mk_invalid_test ~successful ~max_account_updates ~type_of_failure
     match%map
       try_with (fun () ->
           with_timeout (Time.Span.of_int_sec individual_test_timeout)
-          @@ U.check_zkapp_command_with_merges_exn
+          @@ U.check_zkapp_command_with_merges_exn ~logger
                ~expected_failure:expected_failure_status ledger
                [ zkapp_command ] ~global_slot )
     with
@@ -266,7 +268,7 @@ let test_timed_account ~successful ~max_account_updates ~individual_test_timeout
     match%map
       try_with (fun () ->
           with_timeout (Time.Span.of_int_sec individual_test_timeout)
-          @@ U.check_zkapp_command_with_merges_exn
+          @@ U.check_zkapp_command_with_merges_exn ~logger
                ~expected_failure:
                  ( Transaction_status.Failure.Source_minimum_balance_violation
                  , Pass_1 )
@@ -323,7 +325,9 @@ let () =
          let successful = ref true in
          let rec loop random =
            generate_zkapp_commands_and_apply_them_consecutively_5_times
-             ~successful ~max_account_updates ~individual_test_timeout random
+             ~successful ~max_account_updates
+             ~individual_test_timeout:(individual_test_timeout * 2)
+             random
            >>= generate_zkapp_commands_and_apply_them_freshly ~successful
                  ~max_account_updates ~individual_test_timeout
            >>= mk_invalid_test ~successful ~max_account_updates
@@ -335,7 +339,7 @@ let () =
                  ~type_of_failure:(Update_not_permitted `App_state)
                  ~expected_failure_status:
                    (Update_not_permitted_app_state, Pass_2)
-                 ~individual_test_timeout
+                 ~individual_test_timeout:(individual_test_timeout * 2)
            >>= mk_invalid_test ~successful ~max_account_updates
                  ~type_of_failure:(Update_not_permitted `Verification_key)
                  ~expected_failure_status:

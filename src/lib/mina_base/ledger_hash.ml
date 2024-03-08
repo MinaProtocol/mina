@@ -45,7 +45,7 @@ let empty_hash = of_hash Outside_hash_image.t
 let%bench "Ledger_hash.merge ~height:1 empty_hash empty_hash" =
   merge ~height:1 empty_hash empty_hash
 
-let of_digest = Fn.compose Fn.id of_hash
+let of_digest = of_hash
 
 type path = Random_oracle.Digest.t list
 

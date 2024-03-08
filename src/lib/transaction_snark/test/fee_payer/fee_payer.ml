@@ -9,6 +9,12 @@ open Mina_transaction
 
 let%test_module "Fee payer tests" =
   ( module struct
+    let proof_cache =
+      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+      @@ Yojson.Safe.from_file "proof_cache.json"
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let memo = Signed_command_memo.create_from_string_exn "Fee payer tests"
@@ -158,8 +164,9 @@ let%test_module "Fee payer tests" =
                 }
               in
               let zkapp_command =
-                Transaction_snark.For_tests.deploy_snapp test_spec
-                  ~constraint_constants
+                Async.Thread_safe.block_on_async_exn (fun () ->
+                    Transaction_snark.For_tests.deploy_snapp test_spec
+                      ~constraint_constants )
               in
               let txn_state_view =
                 Mina_state.Protocol_state.Body.view U.genesis_state_body
@@ -316,4 +323,11 @@ let%test_module "Fee payer tests" =
                     List.is_empty
                       (Zkapp_command.account_updates_list zkapp_command) ) ;
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
+
+    let () =
+      match Sys.getenv "PROOF_CACHE_OUT" with
+      | Some path ->
+          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
+      | None ->
+          ()
   end )

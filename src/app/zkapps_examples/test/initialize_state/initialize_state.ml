@@ -40,7 +40,9 @@ let%test_module "Initialize state test" =
 
     module P = (val p_module)
 
-    let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
+    let vk =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Pickles.Side_loaded.Verification_key.of_compiled tag )
 
     module Deploy_account_update = struct
       let account_update_body : Account_update.Body.t =
@@ -65,7 +67,8 @@ let%test_module "Initialize state test" =
                   ; access = None
                   ; set_delegate = Proof
                   ; set_permissions = Proof
-                  ; set_verification_key = Proof
+                  ; set_verification_key =
+                      (Proof, Mina_numbers.Txn_version.current)
                   ; set_zkapp_uri = Proof
                   ; edit_action_state = Proof
                   ; set_token_symbol = Proof
@@ -78,7 +81,7 @@ let%test_module "Initialize state test" =
         ; preconditions =
             { Account_update.Preconditions.network =
                 Zkapp_precondition.Protocol_state.accept
-            ; account = Accept
+            ; account = Zkapp_precondition.Account.accept
             ; valid_while = Ignore
             }
         ; authorization_kind = Signature

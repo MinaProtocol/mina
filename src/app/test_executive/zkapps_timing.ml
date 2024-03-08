@@ -20,19 +20,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node-a-key"
-          ; balance = "8000000000"
-          ; timing = Untimed
-          }
-        ; { account_name = "node-b-key"
-          ; balance = "1000000000"
-          ; timing = Untimed
-          }
-        ; { account_name = "node-c-key"
-          ; balance = "1000000000"
-          ; timing = Untimed
-          }
-        ]
+        (let open Test_account in
+        [ create ~account_name:"node-a-key" ~balance:"8000000000" ()
+        ; create ~account_name:"node-b-key" ~balance:"1000000000" ()
+        ; create ~account_name:"node-c-key" ~balance:"1000000000" ()
+        ])
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -113,8 +105,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Token_id.default
       in
 
-      ( Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-          zkapp_command_spec
+      ( Async.Thread_safe.block_on_async_exn (fun () ->
+            Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+              zkapp_command_spec )
       , timing_account_id
       , zkapp_command_spec.snapp_update
       , zkapp_keypair )
@@ -158,8 +151,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       return
-      @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-           zkapp_command_spec
+      @@ Async.Thread_safe.block_on_async_exn (fun () ->
+             Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+               zkapp_command_spec )
     in
     (* Create a timed account that with initial liquid balance being 0, and vesting 1 mina at each slot.
        This account would be used to test the edge case of vesting. See `zkapp_command_transfer_from_third_timed_account`
@@ -208,8 +202,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
           Token_id.default
       in
-      ( Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-          zkapp_command_spec
+      ( Async.Thread_safe.block_on_async_exn (fun () ->
+            Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+              zkapp_command_spec )
       , timing_account_id
       , zkapp_keypair )
     in
@@ -250,8 +245,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; authorization_kind = Signature
         }
       in
-      Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-        zkapp_command_spec
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+            zkapp_command_spec )
     in
     let%bind zkapp_command_transfer_from_timed_account =
       let open Mina_base in

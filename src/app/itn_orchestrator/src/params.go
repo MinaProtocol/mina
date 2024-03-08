@@ -1,6 +1,7 @@
 package itn_orchestrator
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -113,8 +114,13 @@ func ResolveParam(config ResolutionConfig, step int, raw json.RawMessage) (json.
 	}
 }
 
+var nullJson = json.RawMessage([]byte("null"))
+
 func ResolveParams(config ResolutionConfig, step int, raw RawParams) (json.RawMessage, error) {
 	for k, v := range raw {
+		if bytes.Equal(v, nullJson) {
+			continue
+		}
 		v_, err := ResolveParam(config, step, v)
 		if err != nil {
 			return nil, err
