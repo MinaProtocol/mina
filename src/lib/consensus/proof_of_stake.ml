@@ -1913,6 +1913,29 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; Public_key.Compressed.Checked.to_input coinbase_receiver
           ]
 
+      let create ~blockchain_length ~epoch_count ~min_window_density
+          ~sub_window_densities ~last_vrf_output ~total_currency
+          ~curr_global_slot_since_hard_fork ~global_slot_since_genesis
+          ~staking_epoch_data ~next_epoch_data
+          ~has_ancestor_in_same_checkpoint_window ~block_stake_winner
+          ~block_creator ~coinbase_receiver ~supercharge_coinbase : Value.t =
+        { blockchain_length
+        ; epoch_count
+        ; min_window_density
+        ; sub_window_densities
+        ; last_vrf_output
+        ; total_currency
+        ; curr_global_slot_since_hard_fork
+        ; global_slot_since_genesis
+        ; staking_epoch_data
+        ; next_epoch_data
+        ; has_ancestor_in_same_checkpoint_window
+        ; block_stake_winner
+        ; block_creator
+        ; coinbase_receiver
+        ; supercharge_coinbase
+        }
+
       let global_slot { Poly.curr_global_slot_since_hard_fork; _ } =
         curr_global_slot_since_hard_fork
 

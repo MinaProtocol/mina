@@ -498,6 +498,24 @@ module type S = sig
            constraint_constants:Genesis_constants.Constraint_constants.t
         -> (var, Value.t) Snark_params.Tick.Typ.t
 
+      val create :
+           blockchain_length:Length.t
+        -> epoch_count:Length.t
+        -> min_window_density:Length.t
+        -> sub_window_densities:Length.t list
+        -> last_vrf_output:string
+        -> total_currency:Amount.t
+        -> curr_global_slot_since_hard_fork:Consensus_time.t
+        -> global_slot_since_genesis:Global_slot_since_genesis.t
+        -> staking_epoch_data:Epoch_data.Value.t
+        -> next_epoch_data:Epoch_data.Value.t
+        -> has_ancestor_in_same_checkpoint_window:bool
+        -> block_stake_winner:Public_key.Compressed.t
+        -> block_creator:Public_key.Compressed.t
+        -> coinbase_receiver:Public_key.Compressed.t
+        -> supercharge_coinbase:bool
+        -> Value.t
+
       val negative_one :
            genesis_ledger:Mina_ledger.Ledger.t Lazy.t
         -> genesis_epoch_data:Genesis_epoch_data.t

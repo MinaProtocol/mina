@@ -12,6 +12,7 @@
 (package (name bindings_js))
 (package (name blake2))
 (package (name blockchain_snark))
+(package (name block_converter))
 (package (name block_producer))
 (package (name block_storage))
 (package (name block_time))
