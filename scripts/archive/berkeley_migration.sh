@@ -555,7 +555,7 @@ function final(){
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
 				echo "";
-				initial_help;
+				final_help;
                 exit 0;
             ;;
         esac
