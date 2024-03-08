@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 
 # bash strict mode
@@ -23,6 +23,14 @@ declare -r PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 ################################################################################
 # functions
 ################################################################################
+function check_required() {
+    if ! command -v "$1" >/dev/null 2>&1; then echo "Missing required program '$1' in PATH"; exit 1; fi
+}
+check_required mina-berkeley-migration
+check_required mina-migration-replayer
+check_required jq
+check_required gsutil
+
 function main_help(){
 	echo Script for archive migration from mainnet to berkeley
 	echo ""
@@ -44,16 +52,13 @@ function version(){
     exit 0
 }
 
-
-
 function initial_help(){
 	echo Initial migration based on genesis ledger and empty migration database
 	echo ""
     echo "     $CLI_NAME initial [-options]"
     echo ""
     echo "Parameters:"
-
-	printf "%-23s %s\n" ;
+    echo ""
     printf "  %-25s %s\n" "-h | --help" "show help";
     printf "  %-25s %s\n" "-g | --genesis-ledger" "[file] path to genesis ledger file";
     printf "  %-25s %s\n" "-s | --source-db" "[connection_str] connection string to database to be migrated";
@@ -256,8 +261,7 @@ function incremental_help(){
     echo "     $CLI_NAME incremental [-options]"
     echo ""
     echo "Parameters:"
-
-	printf "%-23s %s\n" ;
+    echo ""
     printf "  %-25s %s\n" "-h | --help" "show help";
     printf "  %-25s %s\n" "-r | --replayer-checkpoint" "[file] path to genesis ledger file";
     printf "  %-25s %s\n" "-s | --source-db" "[connection_str] connection string to database to be migrated";
@@ -413,9 +417,6 @@ function incremental(){
         $__checkpoint_interval \
         $__replayer_checkpoint
 
-    check_incremental_migration_progress
-    check_output_replayer_for_incremental
-    check_logs
 }
 
 function run_incremental_migration() {
@@ -472,8 +473,7 @@ function final_help(){
     echo "     $CLI_NAME final [-options]"
     echo ""
     echo "Parameters:"
-
-	printf "%-23s %s\n" ;
+    echo ""
     printf "  %-25s %s\n" "-h | --help" "show help";
     printf "  %-25s %s\n" "-r | --replayer-checkpoint" "[file] path to genesis ledger file";
     printf "  %-25s %s\n" "-r | --fork-state-hash" "[hash] fork state hash";
