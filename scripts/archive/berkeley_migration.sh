@@ -299,7 +299,7 @@ function check_new_replayer_checkpoints_for_incremental() {
     local __count_checkpoints=$(ls -t "${__checkpoint_prefix}"-checkpoint*.json 2> /dev/null | wc -l)
   
     if [ "$__count_checkpoints" -eq "1" ]; then
-	  echo "There are no new checkpoints apart from the on downloaded before migration"
+	  echo "There are no new checkpoints apart from the one downloaded before migration"
       echo "It means that no transactions are archived before this and last incremental migration."
       echo "Please ensure that source database has at least one more canoncial block that migrated one"
 	  exit 1
