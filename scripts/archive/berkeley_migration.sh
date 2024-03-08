@@ -485,7 +485,7 @@ function final_help(){
     echo ""
     echo "Example:"
     echo ""
-    echo "  " $CLI_NAME final --replayer-checkpoint migration-replayer-checkpoint-1233.json --fork-state-hash 3NLnD1Yp4MS9LtMXikD1YyySZNVgCXA82b5eQVpmYZ5kyTo4Xsr7 --genesis_ledger "genesis_ledgers/mainnet.json" --source-db "postgres://postgres:pass@localhost:5432/archive_balances_migrated" --target-db "postgres://postgres:pass@localhost:5432/migrated" --blocks-batch-size 10 --blocks-bucket "mina_network_block_data" --network "mainnet" 
+    echo "  " $CLI_NAME final --replayer-checkpoint migration-replayer-checkpoint-1233.json --fork-state-hash 3NLnD1Yp4MS9LtMXikD1YyySZNVgCXA82b5eQVpmYZ5kyTo4Xsr7 --genesis-ledger "genesis_ledgers/mainnet.json" --source-db "postgres://postgres:pass@localhost:5432/archive_balances_migrated" --target-db "postgres://postgres:pass@localhost:5432/migrated" --blocks-batch-size 10 --blocks-bucket "mina_network_block_data" --network "mainnet" 
     echo ""
     echo "Notes:"
     echo "  1. After run migrated data will be filled with migrated blocks till last block in source db"
