@@ -9,7 +9,7 @@ local __default_mina_network=devnet
 local __default_pg_conn=postgres://postgres@127.0.0.1:5432/archive_balances_migrated
 local __default_archive_blocks_app=mina-archive-blocks
 local __default_missing_blocks_auditor=mina-missing-blocks-auditor
-local __default_block_bucket="https://storage.googleapis.com/mina_network_block_data}"
+local __default_block_bucket="https://storage.googleapis.com/mina_network_block_data"
 CLI_NAME=./download-missing-blocks.sh
 
 
