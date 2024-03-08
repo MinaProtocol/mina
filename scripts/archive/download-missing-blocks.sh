@@ -5,19 +5,19 @@ RED='\033[0;31m'
 
 set -u
 
-local __default_mina_network=devnet
-local __default_pg_conn=postgres://postgres@127.0.0.1:5432/archive_balances_migrated
-local __default_archive_blocks_app=mina-archive-blocks
-local __default_missing_blocks_auditor=mina-missing-blocks-auditor
-local __default_block_bucket="https://storage.googleapis.com/mina_network_block_data"
+DEFAULT_MINA_NETWORK=devnet
+DEFAULT_PG_CONN=postgres://postgres@127.0.0.1:5432/archive_balances_migrated
+DEFAULT_ARCHIVE_BLOCKS=mina-archive-blocks
+DEFAULT_MISSING_BLOCKS_AUDITOR=mina-missing-blocks-auditor
+DEFAULT_BLOCK_BUCKET="https://storage.googleapis.com/mina_network_block_data"
 CLI_NAME=./download-missing-blocks.sh
 
 
-MINA_NETWORK=${1:-$__default_mina_network}
-PG_CONN=${2:-$__default_pg_conn}
-ARCHIVE_BLOCKS_APP=${3:-$__default_archive_blocks_app}
-MISSING_BLOCKS_AUDITOR=${4:-$__default_missing_blocks_auditor}
-BLOCKS_BUCKET=${5:-$__default_block_bucket}
+MINA_NETWORK=${1:-$DEFAULT_MINA_NETWORK}
+PG_CONN=${2:-$DEFAULT_PG_CONN}
+ARCHIVE_BLOCKS_APP=${3:-$DEFAULT_ARCHIVE_BLOCKS}
+MISSING_BLOCKS_AUDITOR=${4:-$DEFAULT_MISSING_BLOCKS_AUDITOR}
+BLOCKS_BUCKET=${5:-$DEFAULT_BLOCK_BUCKET}
 
 function help(){
   echo Downloading missing blocks for archive database
@@ -27,16 +27,14 @@ function help(){
   echo "Parameters:"
   echo ""
   printf "  %-25s %s\n" "-h | --help" "show help";
-  printf "  %-25s %s\n" "-n | --network" "[str] name of network (for downloading precomputed blocks). NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json. Default: $__default_mina_network ";
-  printf "  %-25s %s\n" "-a | --archive-uri" "[connection_str] connection string to database to be patched. Default: $__default_pg_conn ";
-  printf "  %-25s %s\n" "-b | --archive-blocks path" "[fie] archive blocks app for archiving blocks path . Default: $__default_archive_blocks_app ";
-  printf "  %-25s %s\n" "-m | --missing-blocks-auditor" "[file] missing auditor app path. Default: $__default_missing_blocks_auditor ";
-  printf "  %-25s %s\n" "-m | --missing-blocks-auditor" "[file] missing auditor app path. Default: $__default_missing_blocks_auditor ";
-  printf "  %-25s %s\n" "-c | --blocks-bucket" "[string] name of precomputed blocks bucket. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json. Default: $__default_block_bucket";  
+  printf "  %-25s %s\n" "-n | --network" "[str] name of network (for downloading precomputed blocks). NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json. Default: $DEFAULT_MINA_NETWORK ";
+  printf "  %-25s %s\n" "-a | --archive-uri" "[connection_str] connection string to database to be patched. Default: $DEFAULT_PG_CONN ";
+  printf "  %-25s %s\n" "-b | --archive-blocks path" "[fie] archive blocks app for archiving blocks path . Default: $DEFAULT_ARCHIVE_BLOCKS ";
+  printf "  %-25s %s\n" "-m | --missing-blocks-auditor" "[file] missing auditor app path. Default: $DEFAULT_MISSING_BLOCKS_AUDITOR ";
+  printf "  %-25s %s\n" "-c | --blocks-bucket" "[string] name of precomputed blocks bucket. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json. Default: $DEFAULT_BLOCK_BUCKET";  
   echo "Example:"
   echo ""
   echo "  " $CLI_NAME --network devnet --archive-uri postgres://postgres:pass@localhost:5432/archive_balances_migrated
-  echo ""
   echo ""
   exit 0
 }
