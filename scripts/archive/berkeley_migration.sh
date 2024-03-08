@@ -53,7 +53,7 @@ function version(){
 }
 
 function initial_help(){
-	echo Initial migration based on genesis ledger and empty migration database
+	echo Initial migration based on genesis ledger and empty migration target database
 	echo ""
     echo "     $CLI_NAME initial [-options]"
     echo ""
