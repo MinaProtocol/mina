@@ -27,6 +27,7 @@ function check_required() {
     if ! command -v "$1" >/dev/null 2>&1; then echo "Missing required program '$1' in PATH"; exit 1; fi
 }
 check_required mina-berkeley-migration
+check_required mina-berkeley-migration-verifier
 check_required mina-migration-replayer
 check_required jq
 check_required gsutil
@@ -250,6 +251,10 @@ function run_initial_migration() {
 
     check_incremental_migration_progress "$__replayer_checkpoint" "$__migrated_archive_uri" 
     check_output_replayer_for_initial "migration"
+
+    mina-berkeley-migration-verifier pre-fork \
+        --mainnet-archive-uri "$__mainnet_archive_uri" \
+        --migrated-archive-uri "$__migrated_archive_uri"
 }
 
 
@@ -459,6 +464,10 @@ function run_incremental_migration() {
     set -e # exit immediately on errors
 
     check_new_replayer_checkpoints_for_incremental "migration"
+
+    mina-berkeley-migration-verifier pre-fork \
+        --mainnet-archive-uri "$__mainnet_archive_uri" \
+        --migrated-archive-uri "$__migrated_archive_uri"
 }
 
 function final_help(){
@@ -473,16 +482,17 @@ function final_help(){
     echo ""
     printf "  %-25s %s\n" "-h | --help" "show help";
     printf "  %-25s %s\n" "-r | --replayer-checkpoint" "[file] path to genesis ledger file";
-    printf "  %-25s %s\n" "-r | --fork-state-hash" "[hash] fork state hash";
+    printf "  %-25s %s\n" "-f | --fork-state-hash" "[hash] fork state hash";
     printf "  %-25s %s\n" "-s | --source-db" "[connection_str] connection string to database to be migrated";
     printf "  %-25s %s\n" "-t | --target-db" "[connection_str] connection string to database which will hold migrated data";
     printf "  %-25s %s\n" "-b | --blocks-bucket" "[string] name of precomputed blocks bucket. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
     printf "  %-25s %s\n" "-bs | --blocks-batch-size" "[int] number of precomputed blocks to be fetch at once from Gcloud. Bigger number like 1000 can help speed up migration process";
     printf "  %-25s %s\n" "-n | --network" "[string] network name when determining precomputed blocks. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
+    printf "  %-25s %s\n" "-fc | --fork-config" "[file] Fork-state config file is dump file in form of json containing fork block and ledger file. It should be provied by MF or O(1)Labs team after fork block is announced";
     echo ""
     echo "Example:"
     echo ""
-    echo "  " $CLI_NAME final --replayer-checkpoint migration-replayer-checkpoint-1233.json --fork-state-hash 3NLnD1Yp4MS9LtMXikD1YyySZNVgCXA82b5eQVpmYZ5kyTo4Xsr7 --genesis-ledger "genesis_ledgers/mainnet.json" --source-db "postgres://postgres:pass@localhost:5432/archive_balances_migrated" --target-db "postgres://postgres:pass@localhost:5432/migrated" --blocks-batch-size 10 --blocks-bucket "mina_network_block_data" --network "mainnet" 
+    echo "  " $CLI_NAME final --replayer-checkpoint migration-replayer-checkpoint-1233.json --fork-state-hash 3NLnD1Yp4MS9LtMXikD1YyySZNVgCXA82b5eQVpmYZ5kyTo4Xsr7 --genesis-ledger "genesis_ledgers/mainnet.json" --source-db "postgres://postgres:pass@localhost:5432/archive_balances_migrated" --target-db "postgres://postgres:pass@localhost:5432/migrated" --blocks-batch-size 10 --blocks-bucket "mina_network_block_data" --network "mainnet" --fork-config fork_config.json 
     echo ""
     echo "Notes:"
     echo "  1. After run migrated data will be filled with migrated blocks till last block in source db"
@@ -506,6 +516,7 @@ function final(){
     local __network='' 
     local __checkpoint_interval=1000
     local __fork_state_hash=''
+    local __fork_config=''
     
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
@@ -519,6 +530,10 @@ function final(){
             ;;
             -f | --fork-state-hash )
                 __fork_state_hash=${2:?$error_message}
+                shift 2;
+            ;;
+            -fc | --fork-config )
+                __fork_config=${2:?$error_message}
                 shift 2;
             ;;
             -r | --replayer-checkpoint )
@@ -586,6 +601,12 @@ function final(){
         echo "which is required to run final migration"
         exit 1
     fi
+    if [ -z "$__fork_config" ]; then
+        echo ""
+        echo "Fork config file is not defined. Please refer to mina or o(1) Labs team announcements regarding fork block state hash"
+        echo "which is required to run final migration"
+        exit 1
+    fi
 
     if [ -z "$__blocks_bucket" ]; then
         echo ""
@@ -606,7 +627,8 @@ function final(){
         "$__network" \
         "$__fork_state_hash" \
         "$__checkpoint_interval" \
-        "$__replayer_checkpoint"
+        "$__replayer_checkpoint" \
+        "$__fork_config"
 }
 
 function run_final_migration() {
@@ -618,7 +640,8 @@ function run_final_migration() {
     local __network=$6
     local __fork_state_hash=$7
     local __checkpoint_interval=$8  
-    local __replayer_checkpoint=$9
+    local __replayer_checkpoint=$9  
+    local __fork_config=$10
     
     
     local __date=$(date '+%Y-%m-%d_%H%M')
@@ -654,6 +677,16 @@ function run_final_migration() {
 
     check_incremental_migration_progress "$__replayer_checkpoint" "$__migrated_archive_uri" 
     check_new_replayer_checkpoints_for_incremental "migration"
+
+    # sort by https://stackoverflow.com/questions/60311787/how-to-sort-by-numbers-that-are-part-of-a-filename-in-bash
+    local migrated_replayer_output=$(find . -maxdepth 1 -name "migration-replayer-checkpoint*.json"  | sort -Vrt - -k4,4 | head -n 1)
+
+    mina-berkeley-migration-verifier post-fork \
+        --mainnet-archive-uri "$__mainnet_archive_uri" \
+        --migrated-archive-uri "$__migrated_archive_uri" \
+        --fork-config-file "$__fork_config_file" \
+        --migrated-replayer-output "$migrated_replayer_output"
+
 }
 
 function main(){
