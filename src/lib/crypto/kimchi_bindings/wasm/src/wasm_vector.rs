@@ -164,3 +164,11 @@ pub mod fq {
 
     impl_vec_vec_fp!(Fq, WasmPastaFq);
 }
+
+pub mod bn254_fp {
+    use super::*;
+    use crate::arkworks::WasmBn254Fp;
+    use mina_curves::bn254::Fp as Bn254Fp;
+
+    impl_vec_vec_fp!(Bn254Fp, WasmBn254Fp);
+}

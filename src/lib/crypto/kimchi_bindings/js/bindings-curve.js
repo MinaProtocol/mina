@@ -116,3 +116,61 @@ var caml_vesta_of_affine_coordinates = tsBindings.caml_vesta_of_affine_coordinat
 // Provides: caml_vesta_affine_deep_copy
 // Requires: tsBindings
 var caml_vesta_affine_deep_copy = tsBindings.caml_vesta_affine_deep_copy;
+
+// bn254
+
+// Provides: caml_bn254_one
+// Requires: tsBindings
+var caml_bn254_one = tsBindings.caml_bn254_one;
+
+// Provides: caml_bn254_add
+// Requires: tsBindings
+var caml_bn254_add = tsBindings.caml_bn254_add;
+
+// Provides: caml_bn254_sub
+// Requires: tsBindings
+var caml_bn254_sub = tsBindings.caml_bn254_sub;
+
+// Provides: caml_bn254_negate
+// Requires: tsBindings
+var caml_bn254_negate = tsBindings.caml_bn254_negate;
+
+// Provides: caml_bn254_double
+// Requires: tsBindings
+var caml_bn254_double = tsBindings.caml_bn254_double;
+
+// Provides: caml_bn254_scale
+// Requires: tsBindings
+var caml_bn254_scale = tsBindings.caml_bn254_scale;
+
+// Provides: caml_bn254_random
+// Requires: tsBindings
+var caml_bn254_random = tsBindings.caml_bn254_random;
+
+// Provides: caml_bn254_rng
+// Requires: tsBindings
+var caml_bn254_rng = tsBindings.caml_bn254_rng;
+
+// Provides: caml_bn254_endo_base
+// Requires: tsBindings
+var caml_bn254_endo_base = tsBindings.caml_bn254_endo_base;
+
+// Provides: caml_bn254_endo_scalar
+// Requires: tsBindings
+var caml_bn254_endo_scalar = tsBindings.caml_bn254_endo_scalar;
+
+// Provides: caml_bn254_to_affine
+// Requires: tsBindings
+var caml_bn254_to_affine = tsBindings.caml_bn254_to_affine;
+
+// Provides: caml_bn254_of_affine
+// Requires: tsBindings
+var caml_bn254_of_affine = tsBindings.caml_bn254_of_affine;
+
+// Provides: caml_bn254_of_affine_coordinates
+// Requires: tsBindings
+var caml_bn254_of_affine_coordinates = tsBindings.caml_bn254_of_affine_coordinates;
+
+// Provides: caml_bn254_affine_deep_copy
+// Requires: tsBindings
+var caml_bn254_affine_deep_copy = tsBindings.caml_bn254_affine_deep_copy;

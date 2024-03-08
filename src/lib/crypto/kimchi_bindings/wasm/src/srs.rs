@@ -383,3 +383,24 @@ pub mod fq {
         bases.into_iter().map(Into::into).collect()
     }
 }
+
+//
+// Bn254Fp
+//
+
+pub mod bn254_fp {
+    use super::*;
+    use crate::arkworks::{WasmBn254Fp, WasmGBn254};
+    use crate::poly_comm::bn254::WasmBn254FpPolyComm as WasmPolyComm;
+    use mina_curves::bn254::{Bn254, Fp};
+
+    impl_srs!(
+        caml_bn254_fp_srs,
+        WasmBn254Fp,
+        WasmGBn254,
+        Fp,
+        Bn254,
+        WasmPolyComm,
+        Bn254Fp
+    );
+}

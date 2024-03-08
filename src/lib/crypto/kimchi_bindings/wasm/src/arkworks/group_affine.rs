@@ -1,5 +1,10 @@
+use crate::arkworks::bn254_fq::WasmBn254Fq;
 use crate::arkworks::pasta_fp::WasmPastaFp;
 use crate::arkworks::pasta_fq::WasmPastaFq;
+use mina_curves::bn254::{
+    curve::G_GENERATOR_X as GeneratorBn254X, curve::G_GENERATOR_Y as GeneratorBn254Y,
+    Bn254 as AffineBn254,
+};
 use mina_curves::pasta::{
     curves::{
         pallas::G_GENERATOR_X as GeneratorPallasX, pallas::G_GENERATOR_Y as GeneratorPallasY,
@@ -26,6 +31,14 @@ pub struct WasmGPallas {
 pub struct WasmGVesta {
     pub x: WasmPastaFq,
     pub y: WasmPastaFq,
+    pub infinity: bool,
+}
+
+#[wasm_bindgen]
+#[derive(Clone, Copy, Debug)]
+pub struct WasmGBn254 {
+    pub x: WasmBn254Fq,
+    pub y: WasmBn254Fq,
     pub infinity: bool,
 }
 
@@ -97,6 +110,40 @@ impl From<&WasmGPallas> for AffinePallas {
     }
 }
 
+// Conversions from/to AffineBn254
+
+impl From<AffineBn254> for WasmGBn254 {
+    fn from(point: AffineBn254) -> Self {
+        WasmGBn254 {
+            x: point.x.into(),
+            y: point.y.into(),
+            infinity: point.infinity,
+        }
+    }
+}
+
+impl From<&AffineBn254> for WasmGBn254 {
+    fn from(point: &AffineBn254) -> Self {
+        WasmGBn254 {
+            x: point.x.into(),
+            y: point.y.into(),
+            infinity: point.infinity,
+        }
+    }
+}
+
+impl From<WasmGBn254> for AffineBn254 {
+    fn from(point: WasmGBn254) -> Self {
+        AffineBn254::new(point.x.into(), point.y.into(), point.infinity)
+    }
+}
+
+impl From<&WasmGBn254> for AffineBn254 {
+    fn from(point: &WasmGBn254) -> Self {
+        AffineBn254::new(point.x.into(), point.y.into(), point.infinity)
+    }
+}
+
 #[wasm_bindgen]
 pub fn caml_pallas_affine_one() -> WasmGPallas {
     WasmGPallas {
@@ -111,6 +158,15 @@ pub fn caml_vesta_affine_one() -> WasmGVesta {
     WasmGVesta {
         x: WasmPastaFq::from(GeneratorVestaX),
         y: WasmPastaFq::from(GeneratorVestaY),
+        infinity: false,
+    }
+}
+
+#[wasm_bindgen]
+pub fn caml_bn254_affine_one() -> WasmGBn254 {
+    WasmGBn254 {
+        x: WasmBn254Fq::from(GeneratorBn254X),
+        y: WasmBn254Fq::from(GeneratorBn254Y),
         infinity: false,
     }
 }

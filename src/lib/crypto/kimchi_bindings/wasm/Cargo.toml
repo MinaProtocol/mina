@@ -42,7 +42,7 @@ groupmap = { path = "../../proof-systems/groupmap" }
 mina-curves = { path = "../../proof-systems/curves" }
 o1-utils = { path = "../../proof-systems/utils" }
 mina-poseidon = { path = "../../proof-systems/poseidon" }
-kimchi = { path = "../../proof-systems/kimchi", features = ["wasm_types"] }
+kimchi = { path = "../../proof-systems/kimchi", features = ["wasm_types", "bn254"] }
 
 array-init = "2.0.0"
 base64 = "0.13.0"

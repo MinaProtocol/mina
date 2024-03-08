@@ -273,6 +273,100 @@ var caml_fq_srs_h = function (t) {
 // Requires: tsSrs
 var caml_fq_srs_add_lagrange_basis = tsSrs.fq.addLagrangeBasis;
 
+
+// Provides: caml_bn254_fp_srs_create
+// Requires: plonk_wasm, free_on_finalize
+var caml_bn254_fp_srs_create = function (i) {
+  return free_on_finalize(plonk_wasm.caml_bn254_fp_srs_create(i));
+};
+
+// Provides: caml_bn254_fp_srs_write
+// Requires: plonk_wasm, caml_jsstring_of_string
+var caml_bn254_fp_srs_write = function (append, t, path) {
+  if (append === 0) {
+    append = undefined;
+  } else {
+    append = append[1];
+  }
+  return plonk_wasm.caml_bn254_fp_srs_write(append, t, caml_jsstring_of_string(path));
+};
+
+// Provides: caml_bn254_fp_srs_read
+// Requires: plonk_wasm, caml_jsstring_of_string
+var caml_bn254_fp_srs_read = function (offset, path) {
+  if (offset === 0) {
+    offset = undefined;
+  } else {
+    offset = offset[1];
+  }
+  var res = plonk_wasm.caml_bn254_fp_srs_read(offset, caml_jsstring_of_string(path));
+  if (res) {
+    return [0, res]; // Some(res)
+  } else {
+    return 0; // None
+  }
+};
+
+// Provides: caml_bn254_fp_srs_lagrange_commitment
+// Requires: plonk_wasm, tsRustConversion
+var caml_bn254_fp_srs_lagrange_commitment = function (t, domain_size, i) {
+  var res = plonk_wasm.caml_bn254_fp_srs_lagrange_commitment(t, domain_size, i);
+  return tsRustConversion.bn254Fp.polyCommFromRust(res);
+};
+
+// Provides: caml_bn254_fp_srs_commit_evaluations
+// Requires: plonk_wasm, tsRustConversion
+var caml_bn254_fp_srs_commit_evaluations = function (t, domain_size, fps) {
+  var res = plonk_wasm.caml_bn254_fp_srs_commit_evaluations(
+    t,
+    domain_size,
+    tsRustConversion.bn254Fp.vectorToRust(fps)
+  );
+  return tsRustConversion.bn254Fp.polyCommFromRust(res);
+};
+
+// Provides: caml_bn254_fp_srs_b_poly_commitment
+// Requires: plonk_wasm, tsRustConversion
+var caml_bn254_fp_srs_b_poly_commitment = function (srs, chals) {
+  var res = plonk_wasm.caml_bn254_fp_srs_b_poly_commitment(
+    srs,
+    tsRustConversion.fieldsToRustFlat(chals)
+  );
+  return tsRustConversion.bn254Fp.polyCommFromRust(res);
+};
+
+// Provides: caml_bn254_fp_srs_batch_accumulator_check
+// Requires: plonk_wasm, tsRustConversion
+var caml_bn254_fp_srs_batch_accumulator_check = function (srs, comms, chals) {
+  var rust_comms = tsRustConversion.bn254Fp.pointsToRust(comms);
+  var rust_chals = tsRustConversion.bn254Fp.vectorToRust(chals);
+  var ok = plonk_wasm.caml_bn254_fp_srs_batch_accumulator_check(
+    srs,
+    rust_comms,
+    rust_chals
+  );
+  return ok;
+};
+
+// Provides: caml_bn254_fp_srs_batch_accumulator_generate
+// Requires: plonk_wasm, tsRustConversion
+var caml_bn254_fp_srs_batch_accumulator_generate = function (srs, n_comms, chals) {
+  var rust_chals = tsRustConversion.bn254Fp.vectorToRust(chals);
+  var rust_comms = plonk_wasm.caml_bn254_fp_srs_batch_accumulator_generate(
+    srs,
+    n_comms,
+    rust_chals
+  );
+  return tsRustConversion.bn254Fp.pointsFromRust(rust_comms);
+};
+
+// Provides: caml_bn254_fp_srs_h
+// Requires: plonk_wasm, tsRustConversion
+var caml_bn254_fp_srs_h = function (t) {
+  return tsRustConversion.bn254Fp.pointFromRust(plonk_wasm.caml_bn254_fp_srs_h(t));
+};
+
+
 // gate vector
 
 // Provides: caml_pasta_fp_plonk_gate_vector_create
@@ -403,6 +497,82 @@ var caml_pasta_fq_plonk_circuit_serialize = function (
 ) {
   return caml_string_of_jsstring(
     plonk_wasm.caml_pasta_fq_plonk_circuit_serialize(
+      public_input_size,
+      gate_vector
+    )
+  );
+};
+
+
+// gate vector - bn254 fp
+
+// Provides: caml_bn254_fp_plonk_gate_vector_create
+// Requires: plonk_wasm, free_on_finalize
+var caml_bn254_fp_plonk_gate_vector_create = function () {
+  // TODO: rename to `plonk_wasm.caml_bn254_fp_plonk_gate_vector_create`
+  return free_on_finalize(plonk_wasm.caml_pasta_bn254_fp_plonk_gate_vector_create());
+};
+
+// Provides: caml_bn254_fp_plonk_gate_vector_add
+// Requires: plonk_wasm, tsRustConversion
+var caml_bn254_fp_plonk_gate_vector_add = function (v, x) {
+  // TODO: rename to `plonk_wasm.caml_bn254_fp_plonk_gate_vector_add`
+  return plonk_wasm.caml_pasta_bn254_fp_plonk_gate_vector_add(
+    v,
+    tsRustConversion.bn254Fp.gateToRust(x)
+  );
+};
+
+// Provides: caml_bn254_fp_plonk_gate_vector_get
+// Requires: plonk_wasm, tsRustConversion
+var caml_bn254_fp_plonk_gate_vector_get = function (v, i) {
+  return tsRustConversion.fp.gateFromRust(
+    // TODO: rename to `plonk_wasm.caml_bn254_fp_plonk_gate_vector_get`
+    plonk_wasm.caml_pasta_bn254_fp_plonk_gate_vector_get(v, i)
+  );
+};
+
+// Provides: caml_bn254_fp_plonk_gate_vector_len
+// Requires: plonk_wasm
+var caml_bn254_fp_plonk_gate_vector_len = function (v) {
+  // TODO: rename to `plonk_wasm.caml_bn254_fp_plonk_gate_vector_len`
+  return plonk_wasm.caml_pasta_bn254_fp_plonk_gate_vector_len(v);
+};
+
+// Provides: caml_bn254_fp_plonk_gate_vector_wrap
+// Requires: plonk_wasm, tsRustConversion
+var caml_bn254_fp_plonk_gate_vector_wrap = function (v, x, y) {
+  // TODO: rename to `plonk_wasm.caml_bn254_fp_plonk_gate_vector_wrap`
+  return plonk_wasm.caml_pasta_bn254_fp_plonk_gate_vector_wrap(
+    v,
+    tsRustConversion.bn254Fp.wireToRust(x),
+    tsRustConversion.bn254Fp.wireToRust(y)
+  );
+};
+
+// Provides: caml_bn254_fp_plonk_gate_vector_digest
+// Requires: plonk_wasm, caml_bytes_of_uint8array
+var caml_bn254_fp_plonk_gate_vector_digest = function (
+  public_input_size,
+  gate_vector
+) {
+  // TODO: rename to `plonk_wasm.caml_bn254_fp_plonk_gate_vector_digest`
+  var uint8array = plonk_wasm.caml_pasta_bn254_fp_plonk_gate_vector_digest(
+    public_input_size,
+    gate_vector
+  );
+  return caml_bytes_of_uint8array(uint8array);
+};
+
+// Provides: caml_bn254_fp_plonk_circuit_serialize
+// Requires: plonk_wasm, caml_string_of_jsstring
+var caml_bn254_fp_plonk_circuit_serialize = function (
+  public_input_size,
+  gate_vector
+) {
+  // TODO: rename to `plonk_wasm.caml_bn254_fp_plonk_circuit_serialize`
+  return caml_string_of_jsstring(
+    plonk_wasm.caml_pasta_bn254_fp_plonk_circuit_serialize(
       public_input_size,
       gate_vector
     )
@@ -614,6 +784,53 @@ var caml_pasta_fq_plonk_index_write = function (append, t, path) {
   );
 };
 
+// Provides: caml_bn254_fp_plonk_index_create_bytecode
+// Requires: caml_bn254_fp_plonk_index_create
+var caml_bn254_fp_plonk_index_create_bytecode = function (
+  gates,
+  public_inputs,
+  caml_lookup_tables,
+  caml_runtime_table_cfgs,
+  prev_challenges,
+  urs
+) {
+  return caml_bn254_fp_plonk_index_create(
+    gates,
+    public_inputs,
+    caml_lookup_tables,
+    caml_runtime_table_cfgs,
+    prev_challenges,
+    urs
+  );
+};
+
+// Provides: caml_bn254_fp_plonk_index_create
+// Requires: plonk_wasm, free_on_finalize, tsRustConversion
+var caml_bn254_fp_plonk_index_create = function (
+  gates,
+  public_inputs,
+  caml_lookup_tables,
+  caml_runtime_table_cfgs,
+  prev_challenges,
+  urs
+) {
+  var wasm_lookup_tables =
+    tsRustConversion.bn254Fp.lookupTablesToRust(caml_lookup_tables);
+  var wasm_runtime_table_cfgs = tsRustConversion.bn254Fp.runtimeTableCfgsToRust(
+    caml_runtime_table_cfgs
+  );
+
+  var t = plonk_wasm.caml_bn254_fp_plonk_index_create(
+    gates,
+    public_inputs,
+    wasm_lookup_tables,
+    wasm_runtime_table_cfgs,
+    prev_challenges,
+    urs
+  );
+  return free_on_finalize(t);
+};
+
 // verifier index
 
 // Provides: caml_opt_of_rust
@@ -766,6 +983,70 @@ var caml_pasta_fq_plonk_verifier_index_deep_copy = function (x) {
   );
 };
 
+// Provides: caml_bn254_fp_plonk_verifier_index_create
+// Requires: plonk_wasm, tsRustConversion
+var caml_bn254_fp_plonk_verifier_index_create = function (x) {
+  var vk = plonk_wasm.caml_bn254_fp_plonk_verifier_index_create(x);
+  return tsRustConversion.bn254Fp.verifierIndexFromRust(vk);
+};
+
+// Provides: caml_bn254_fp_plonk_verifier_index_read
+// Requires: plonk_wasm, caml_jsstring_of_string, tsRustConversion
+var caml_bn254_fp_plonk_verifier_index_read = function (offset, urs, path) {
+  if (offset === 0) {
+    offset = undefined;
+  } else {
+    offset = offset[1];
+  }
+  return tsRustConversion.bn254Fp.verifierIndexFromRust(
+    plonk_wasm.caml_bn254_fp_plonk_verifier_index_read(
+      offset,
+      urs,
+      caml_jsstring_of_string(path)
+    )
+  );
+};
+
+// Provides: caml_bn254_fp_plonk_verifier_index_write
+// Requires: plonk_wasm, caml_jsstring_of_string, tsRustConversion
+var caml_bn254_fp_plonk_verifier_index_write = function (append, t, path) {
+  if (append === 0) {
+    append = undefined;
+  } else {
+    append = append[1];
+  }
+  return plonk_wasm.caml_bn254_fp_plonk_verifier_index_write(
+    append,
+    tsRustConversion.bn254Fp.verifierIndexToRust(t),
+    caml_jsstring_of_string(path)
+  );
+};
+
+// Provides: caml_bn254_fp_plonk_verifier_index_shifts
+// Requires: plonk_wasm, tsRustConversion
+var caml_bn254_fp_plonk_verifier_index_shifts = function (log2_size) {
+  return tsRustConversion.bn254Fp.shiftsFromRust(
+    plonk_wasm.caml_bn254_fp_plonk_verifier_index_shifts(log2_size)
+  );
+};
+
+// Provides: caml_bn254_fp_plonk_verifier_index_dummy
+// Requires: plonk_wasm, tsRustConversion
+var caml_bn254_fp_plonk_verifier_index_dummy = function () {
+  var res = plonk_wasm.caml_bn254_fp_plonk_verifier_index_dummy();
+  return tsRustConversion.bn254Fp.verifierIndexFromRust(res);
+};
+
+// Provides: caml_bn254_fp_plonk_verifier_index_deep_copy
+// Requires: plonk_wasm, tsRustConversion
+var caml_bn254_fp_plonk_verifier_index_deep_copy = function (x) {
+  return tsRustConversion.bn254Fp.verifierIndexFromRust(
+    plonk_wasm.caml_bn254_fp_plonk_verifier_index_deep_copy(
+      tsRustConversion.bn254Fp.verifierIndexToRust(x)
+    )
+  );
+};
+
 // proof
 
 // Provides: caml_pasta_fp_plonk_proof_create
@@ -904,6 +1185,32 @@ var caml_pasta_fq_plonk_proof_deep_copy = function (proof) {
   );
 };
 
+// Provides: caml_bn254_fp_plonk_proof_create
+// Requires: plonk_wasm, tsRustConversion
+var caml_bn254_fp_plonk_proof_create = function (
+  index,
+  witness_cols,
+  caml_runtime_tables
+) {
+  var w = new plonk_wasm.WasmVecVecBn254Fp(witness_cols.length - 1);
+  for (var i = 1; i < witness_cols.length; i++) {
+    w.push(tsRustConversion.bn254Fp.vectorToRust(witness_cols[i]));
+  }
+  witness_cols = w;
+  var prev_challenges = tsRustConversion.bn254Fp.vectorToRust([]);
+  var wasm_runtime_tables =
+    tsRustConversion.bn254Fp.runtimeTablesToRust(caml_runtime_tables);
+  var prev_sgs = tsRustConversion.bn254Fp.pointsToRust([]);
+  var proof = plonk_wasm.caml_bn254_fp_plonk_proof_create(
+    index,
+    witness_cols,
+    wasm_runtime_tables,
+    prev_challenges,
+    prev_sgs
+  );
+  return tsRustConversion.bn254Fp.proofFromRust(proof);
+};
+
 // oracles
 
 // Provides: fp_oracles_create
@@ -1019,6 +1326,10 @@ function caml_pasta_fp_plonk_proof_example_with_lookup() {
 // Provides: prover_to_json
 // Requires: plonk_wasm
 var prover_to_json = plonk_wasm.prover_to_json;
+
+// Provides: prover_to_json_bn254
+// Requires: plonk_wasm
+var prover_to_json_bn254 = plonk_wasm.prover_to_json_bn254;
 
 // Provides: integers_uint64_of_uint32
 // Requires: UInt64, caml_int64_of_int32

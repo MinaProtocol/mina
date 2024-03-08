@@ -103,3 +103,11 @@ pub mod vesta {
 
     impl_poly_comm!(WasmGVesta, GAffine, Fp);
 }
+
+pub mod bn254 {
+    use super::*;
+    use crate::arkworks::group_affine::WasmGBn254;
+    use mina_curves::bn254::Bn254 as GAffine;
+
+    impl_poly_comm!(WasmGBn254, GAffine, Bn254Fp);
+}

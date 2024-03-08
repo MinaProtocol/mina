@@ -1,6 +1,7 @@
 // use kimchi::circuits::expr::{Linearization, PolishToken, Variable, Column};
 // use kimchi::circuits::gate::{GateType, CurrOrNext};
 use crate::wasm_flat_vector::WasmFlatVector;
+use crate::wasm_vector::bn254_fp::WasmVecVecBn254Fp;
 use crate::wasm_vector::fp::WasmVecVecFp;
 use crate::wasm_vector::fq::WasmVecVecFq;
 use crate::wasm_vector::WasmVector;
@@ -911,5 +912,30 @@ pub mod fq {
         WasmPastaFqPlonkIndex,
         WasmPlonkVerifierIndex,
         Fq
+    );
+}
+
+pub mod bn254_fp {
+    use super::*;
+    use crate::arkworks::{WasmBn254Fp, WasmGBn254};
+    use crate::bn254_fp_plonk_index::WasmBn254FpPlonkIndex;
+    use crate::plonk_verifier_index::bn254_fp::WasmBn254FpPlonkVerifierIndex as WasmPlonkVerifierIndex;
+    use crate::poly_comm::bn254::WasmBn254FpPolyComm as WasmPolyComm;
+    use mina_curves::bn254::{Bn254 as GAffine, Bn254Parameters, Fp, Fq};
+
+    impl_proof!(
+        caml_bn254_fp_plonk_proof,
+        WasmGBn254,
+        GAffine,
+        WasmBn254Fp,
+        Fp,
+        WasmPolyComm,
+        WasmSrs,
+        GAffineOther,
+        mina_poseidon::bn128,
+        mina_poseidon::bn128,
+        WasmBn254FpPlonkIndex,
+        WasmPlonkVerifierIndex,
+        Bn254Fp
     );
 }

@@ -49,6 +49,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ark-bn254"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea691771ebbb28aea556c044e2e5c5227398d840cee0c34d4d20fa8eb2689e8c"
+dependencies = [
+ "ark-ec",
+ "ark-ff",
+ "ark-std",
+]
+
+[[package]]
 name = "ark-ec"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -573,6 +584,7 @@ dependencies = [
 name = "kimchi"
 version = "0.1.0"
 dependencies = [
+ "ark-bn254",
  "ark-ec",
  "ark-ff",
  "ark-poly",
@@ -603,6 +615,7 @@ dependencies = [
  "thiserror",
  "turshi",
  "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -652,6 +665,7 @@ dependencies = [
 name = "mina-curves"
 version = "0.1.0"
 dependencies = [
+ "ark-bn254",
  "ark-ec",
  "ark-ff",
 ]
