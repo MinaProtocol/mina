@@ -253,7 +253,12 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~consensus_local_state ~transition_reader ~best_seen_transition
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
-    =
+    ~(bootstrap_stats_fetcher :
+       (   unit
+        -> (int Int.Table.t * int Int.Table.t)
+           * (int Int.Table.t * int Int.Table.t) )
+       option
+       ref ) =
   let open Context in
   O1trace.thread "bootstrap" (fun () ->
       let genesis_constants =
@@ -315,6 +320,11 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
             (let root_sync_ledger =
                Sync_ledger.Db.create temp_snarked_ledger ~logger ~trust_system
              in
+             bootstrap_stats_fetcher :=
+               Some
+                 (fun () ->
+                   ( Sync_ledger.Db.waiting_parents root_sync_ledger
+                   , Sync_ledger.Db.waiting_content root_sync_ledger ) ) ;
              don't_wait_for
                (sync_ledger t
                   ~preferred:
@@ -332,6 +342,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                 * a db ledger. *)
              let%map _, data = Sync_ledger.Db.valid_tree root_sync_ledger in
              Sync_ledger.Db.destroy root_sync_ledger ;
+             bootstrap_stats_fetcher := None ;
              data )
         in
         Mina_metrics.(
@@ -869,7 +880,8 @@ let%test_module "Bootstrap_controller tests" =
            ~best_seen_transition:None
            ~consensus_local_state:my_net.state.consensus_local_state
            ~transition_reader ~persistent_root ~persistent_frontier
-           ~catchup_mode:`Normal ~initial_root_transition )
+           ~catchup_mode:`Normal ~initial_root_transition
+           ~bootstrap_stats_fetcher:(ref None) )
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions :

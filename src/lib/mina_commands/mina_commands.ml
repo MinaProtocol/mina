@@ -452,6 +452,25 @@ let get_status ~flag t =
     | _ ->
         None
   in
+  let bootstrap_status =
+    match Mina_lib.bootstrap_stats t with
+    | None ->
+        None
+    | Some
+        ( (waiting_parents, completed_parents)
+        , (waiting_content, completed_content) ) ->
+        let dump_and_sort tbl =
+          Int.Table.to_alist tbl
+          |> List.sort ~compare:(fun (idx_a, _) (idx_b, _) -> idx_a - idx_b)
+        in
+        Some
+          { Daemon_rpcs.Types.Status.Bootstrap_status.waiting_parents =
+              dump_and_sort waiting_parents
+          ; completed_parents = dump_and_sort completed_parents
+          ; waiting_content = dump_and_sort waiting_content
+          ; completed_content = dump_and_sort completed_content
+          }
+  in
   let metrics =
     let open Mina_metrics.Block_producer in
     Mina_metrics.
@@ -478,6 +497,7 @@ let get_status ~flag t =
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
   ; catchup_status
+  ; bootstrap_status
   ; blockchain_length
   ; highest_block_length_received =
       (*if this function is not called until after catchup max_block_height will be 1 and most_recent_valid_transition pipe might have the genesis block as the latest transition in which case return the best tip length*)
