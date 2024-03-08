@@ -13,6 +13,7 @@ if [ $# -eq 0 ]
     echo "No arguments supplied. Building all known debian packages"
     build_keypair_deb
     build_archive_deb
+    build_archive_migration_deb
     build_batch_txn_deb
     build_daemon_deb
     build_test_executive_deb
