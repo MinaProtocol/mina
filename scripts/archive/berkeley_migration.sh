@@ -244,9 +244,11 @@ function run_initial_migration() {
         --checkpoint-interval 1000 \
         --checkpoint-file-prefix "migration" | tee "$__replayer_log"
 
+    check_logs "$__berkely_migration_log" "$__replayer_log"
+
     set -e # exit immediately on errors
 
-    check_logs "$__berkely_migration_log" "$__replayer_log"
+    check_incremental_migration_progress "$__replayer_checkpoint" "$__migrated_archive_uri" 
     check_output_replayer_for_initial "migration"
 }
 
@@ -456,7 +458,6 @@ function run_incremental_migration() {
 
     set -e # exit immediately on errors
 
-    check_incremental_migration_progress "$__replayer_checkpoint" "$__migrated_archive_uri" 
     check_new_replayer_checkpoints_for_incremental "migration"
 }
 
@@ -647,10 +648,10 @@ function run_final_migration() {
         --input-file "$__replayer_checkpoint" \
         --checkpoint-interval "$__checkpoint_interval" \
         --checkpoint-file-prefix "migration" | tee "$__replayer_log"
-    
-    set -e # exit immediately on errors
-    
+
     check_logs "$__berkely_migration_log" "$__replayer_log"
+    set -e # exit immediately on errors
+
     check_incremental_migration_progress "$__replayer_checkpoint" "$__migrated_archive_uri" 
     check_new_replayer_checkpoints_for_incremental "migration"
 }
@@ -910,9 +911,10 @@ function run_initial_migration() {
         --checkpoint-interval 1000 \
         --checkpoint-file-prefix "migration" | tee $__replayer_log
 
+    check_logs $__berkely_migration_log $__replayer_log
+
     set -e # exit immediately on errors
 
-    check_logs $__berkely_migration_log $__replayer_log
     check_output_replayer_for_initial "migration"
 }
 
@@ -1306,7 +1308,7 @@ function run_final_migration() {
         --blocks-bucket $__blocks_bucket \
         --fork-state-hash $__fork_state_hash \
         --network $__network | tee $__berkely_migration_log
-    
+
     set +e # skip error because we will do validations and we are better than replayer i reporting
 
     mina-migration-replayer \
@@ -1315,10 +1317,10 @@ function run_final_migration() {
         --input-file $__replayer_checkpoint \
         --checkpoint-interval $__checkpoint_interval \
         --checkpoint-file-prefix "migration" | tee $__replayer_log
-    
-    set -e # exit immediately on errors
-    
+
     check_logs $__berkely_migration_log $__replayer_log
+    set -e # exit immediately on errors
+
     check_incremental_migration_progress $__replayer_checkpoint $__migrated_archive_uri 
     check_new_replayer_checkpoints_for_incremental "migration"
 }
