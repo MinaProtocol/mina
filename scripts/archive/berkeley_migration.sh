@@ -53,7 +53,7 @@ function version(){
 }
 
 function initial_help(){
-	echo Initial migration based on genesis ledger and empty migration database
+	echo Initial migration based on genesis ledger and empty migration target database
 	echo ""
     echo "     $CLI_NAME initial [-options]"
     echo ""
@@ -303,7 +303,7 @@ function check_new_replayer_checkpoints_for_incremental() {
     local __count_checkpoints=$(ls -t "${__checkpoint_prefix}"-checkpoint*.json 2> /dev/null | wc -l)
   
     if [ "$__count_checkpoints" -eq "1" ]; then
-	  echo "There are no new checkpoints apart from the on downloaded before migration"
+	  echo "There are no new checkpoints apart from the one downloaded before migration"
       echo "It means that no transactions are archived before this and last incremental migration."
       echo "Please ensure that source database has at least one more canoncial block that migrated one"
 	  exit 1
@@ -366,7 +366,7 @@ function incremental(){
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
 				echo "";
-				initial_help;
+				incremental_help;
                 exit 0;
             ;;
         esac
@@ -485,7 +485,7 @@ function final_help(){
     echo ""
     echo "Example:"
     echo ""
-    echo "  " $CLI_NAME final --replayer-checkpoint migration-replayer-checkpoint-1233.json --fork-state-hash 3NLnD1Yp4MS9LtMXikD1YyySZNVgCXA82b5eQVpmYZ5kyTo4Xsr7 --genesis_ledger "genesis_ledgers/mainnet.json" --source-db "postgres://postgres:pass@localhost:5432/archive_balances_migrated" --target-db "postgres://postgres:pass@localhost:5432/migrated" --blocks-batch-size 10 --blocks-bucket "mina_network_block_data" --network "mainnet" 
+    echo "  " $CLI_NAME final --replayer-checkpoint migration-replayer-checkpoint-1233.json --fork-state-hash 3NLnD1Yp4MS9LtMXikD1YyySZNVgCXA82b5eQVpmYZ5kyTo4Xsr7 --genesis-ledger "genesis_ledgers/mainnet.json" --source-db "postgres://postgres:pass@localhost:5432/archive_balances_migrated" --target-db "postgres://postgres:pass@localhost:5432/migrated" --blocks-batch-size 10 --blocks-bucket "mina_network_block_data" --network "mainnet" 
     echo ""
     echo "Notes:"
     echo "  1. After run migrated data will be filled with migrated blocks till last block in source db"
@@ -555,7 +555,7 @@ function final(){
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
 				echo "";
-				initial_help;
+				final_help;
                 exit 0;
             ;;
         esac
@@ -573,7 +573,12 @@ function final(){
         echo "to existing and initially migrated database. If you don't have such schema please refer to help in 'initial' subcommand" 
 		exit 1
 	fi
-
+    if [ -z $__replayer_checkpoint ]; then
+		echo ""
+        echo "Replayer checkpoint not defined. Please provide path to latest replayer checkpoint file"
+		echo "which should be generated on previous incremental run or inital"
+		exit 1
+	fi
     if [ -z $__genesis_ledger ]; then
 		echo ""
         echo "Genesis ledger not defined"
@@ -661,7 +666,11 @@ function main(){
     fi
 
     case ${1} in
-        help | version | initial | incremental | final )
+        help )
+            main_help 0;
+            exit 0;
+        ;;
+        version | initial | incremental | final )
             $1 "${@:2}";
         ;;
         * )
