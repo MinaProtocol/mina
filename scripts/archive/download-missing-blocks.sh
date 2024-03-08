@@ -20,13 +20,13 @@ MISSING_BLOCKS_AUDITOR=${4:-$__default_missing_blocks_auditor}
 BLOCKS_BUCKET=${5:-$__default_block_bucket}
 
 function help(){
-	echo Downloading missing blocks for archive database
-	echo ""
+  echo Downloading missing blocks for archive database
+  echo ""
   echo "     $CLI_NAME [-n|--network network] [-a|--archive-uri uri] [-b|--archive-blocks path] [-m|--missing-blocks-auditor path] [-c|--bucket uri]"
   echo ""
   echo "Parameters:"
   echo ""
-	printf "  %-25s %s\n" "-h | --help" "show help";
+  printf "  %-25s %s\n" "-h | --help" "show help";
   printf "  %-25s %s\n" "-n | --network" "[str] name of network (for downloading precomputed blocks). NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json. Default: $__default_mina_network ";
   printf "  %-25s %s\n" "-a | --archive-uri" "[connection_str] connection string to database to be patched. Default: $__default_pg_conn ";
   printf "  %-25s %s\n" "-b | --archive-blocks path" "[fie] archive blocks app for archiving blocks path . Default: $__default_archive_blocks_app ";
@@ -45,20 +45,20 @@ function help(){
 while [ ${#} -gt 0 ]; do
   error_message="Error: a value is needed for '$1'";
   case $1 in
-			-h | --help ) 
-				help;
-  		;;
+      -h | --help ) 
+        help;
+      ;;
       -n | --network )
         MINA_NETWORK=${2:?$error_message}
-			  shift 2;
+        shift 2;
       ;;
       -a | --archive-uri )
         PG_CONN=${2:?$error_message}
-			  shift 2;
+        shift 2;
       ;;
       -b | --archive-blocks )
         ARCHIVE_BLOCKS_APP=${2:?$error_message}
-				shift 2;
+        shift 2;
       ;;
       -m | --missing-blocks-auditor )
         MISSING_BLOCKS_AUDITOR=${2:?$error_message}
@@ -70,8 +70,8 @@ while [ ${#} -gt 0 ]; do
       ;;
       * )
         echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
-	  		echo "";
-				initial_help;
+        echo "";
+        help;
         exit 0;
       ;;
   esac
