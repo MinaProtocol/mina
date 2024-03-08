@@ -366,7 +366,7 @@ function incremental(){
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
 				echo "";
-				initial_help;
+				incremental_help;
                 exit 0;
             ;;
         esac
