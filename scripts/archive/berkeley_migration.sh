@@ -573,7 +573,12 @@ function final(){
         echo "to existing and initially migrated database. If you don't have such schema please refer to help in 'initial' subcommand" 
 		exit 1
 	fi
-
+    if [ -z $__replayer_checkpoint ]; then
+		echo ""
+        echo "Replayer checkpoint not defined. Please provide path to latest replayer checkpoint file"
+		echo "which should be generated on previous incremental run or inital"
+		exit 1
+	fi
     if [ -z $__genesis_ledger ]; then
 		echo ""
         echo "Genesis ledger not defined"
