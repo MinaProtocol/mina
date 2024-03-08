@@ -666,7 +666,11 @@ function main(){
     fi
 
     case ${1} in
-        help | version | initial | incremental | final )
+        help )
+            main_help 0;
+            exit 0;
+        ;;
+        version | initial | incremental | final )
             $1 "${@:2}";
         ;;
         * )
