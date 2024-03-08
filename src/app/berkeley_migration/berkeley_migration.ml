@@ -431,7 +431,6 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
         Yojson.Safe.from_file runtime_config_file
         |> Runtime_config.of_yojson |> Result.ok_or_failwith
       in
-      let runtime_config_ledger = Option.value_exn runtime_config.ledger in
       [%log info] "Getting precomputed values from runtime config" ;
       let proof_level = Genesis_constants.Proof_level.compiled in
       let%bind precomputed_values =
@@ -543,28 +542,11 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
       [%log info] "Done migrating mainnet blocks!" ;
       [%log info] "Populating original genesis ledger balances" ;
       (* inlined from Archive_lib.Processor.add_genesis_accounts to avoid
-         recomputing precomputed_values *)
-      let%bind padded_accounts =
-        match
-          Genesis_ledger_helper.Ledger.padded_accounts_from_runtime_config_opt
-            ~logger ~proof_level runtime_config_ledger
-            ~ledger_name_prefix:"genesis_ledger"
-        with
-        | None ->
-            [%log fatal] "Could not load accounts from runtime config ledger" ;
-            exit 1
-        | Some accounts ->
-            return accounts
-      in
-      let constraint_constants =
-        Genesis_constants.Constraint_constants.compiled
-      in
+         recomputing values from runtime config *)
       [%log info] "Creating genesis ledger" ;
-      let packed_ledger =
-        Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-          ~depth:constraint_constants.ledger_depth padded_accounts
+      let ledger =
+        Lazy.force @@ Precomputed_values.genesis_ledger precomputed_values
       in
-      let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
       [%log info] "Created genesis ledger" ;
       let%bind genesis_block_id =
         query_migrated_db ~f:(fun db ->
