@@ -30,4 +30,4 @@ time dune runtest "src/app/print_blockchain_snark_vk" --profile="${profile}" -j1
 export ERROR_ON_PROOF=true
 
 echo "--- Run unit tests"
-time dune runtest "${path}" --profile="${profile}" -j16 || (./scripts/link-coredumps.sh)
+time dune runtest "${path}" --profile="${profile}" -j16 || (./scripts/link-coredumps.sh && false)
