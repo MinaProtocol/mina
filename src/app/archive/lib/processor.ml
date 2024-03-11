@@ -179,6 +179,7 @@ module Token = struct
           owner_public_key_id = Some owner_public_key_id
         ; owner_token_id = Some owner_token_id
         } ;
+
     Conn.find
       (Caqti_request.find
          Caqti_type.(tup3 int int int)
@@ -255,8 +256,6 @@ module Voting_for = struct
 
   let table_name = "voting_for"
 
-  let id_to_t = Hashtbl.create (module Int)
-
   let t_to_id = Hashtbl.create (module String)
 
   let loaded = ref false
@@ -272,7 +271,6 @@ module Voting_for = struct
           ()
       in
       List.iter (unwrap all_voting_for) ~f:(fun (id, value) ->
-          Hashtbl.add_exn id_to_t ~key:id ~data:value ;
           Hashtbl.add_exn t_to_id ~key:value ~data:id ) ;
       loaded := true
 
@@ -290,7 +288,6 @@ module Voting_for = struct
             (module Conn)
             voting_for
         in
-        Hashtbl.add_exn id_to_t ~key:new_id ~data:voting_for ;
         Hashtbl.add_exn t_to_id ~key:voting_for ~data:new_id ;
         new_id
 
@@ -328,11 +325,12 @@ module Token_symbols = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION) token_symbol =
     let%bind () = load_local_copy (module Conn) in
+    let open Deferred.Result.Let_syntax in
     match Hashtbl.find value_to_id token_symbol with
     | Some id ->
-        Deferred.Result.return id
+        return id
     | None ->
-        let%map.Deferred.Result new_id =
+        let%map new_id =
           Mina_caqti.insert_assuming_new ~select:("id", Caqti_type.int)
             ~table_name
             ~cols:([ "value" ], typ)
@@ -709,8 +707,12 @@ module Zkapp_verification_keys = struct
 end
 
 module Protocol_versions = struct
-  type t = { transaction : int; network : int; patch : int }
-  [@@deriving hlist, fields]
+  module T = struct
+    type t = { transaction : int; network : int; patch : int }
+    [@@deriving hlist, fields, compare, sexp, hash]
+  end
+
+  include T
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -718,13 +720,41 @@ module Protocol_versions = struct
 
   let table_name = "protocol_versions"
 
+  let t_to_id = Hashtbl.create (module T)
+
+  let loaded = ref false
+
+  let load_local_copy (module Conn : CONNECTION) =
+    if !loaded then Deferred.unit
+    else
+      let%map all_versions =
+        Conn.collect_list
+          (Caqti_request.collect Caqti_type.unit
+             Caqti_type.(tup4 int int int int)
+             {sql| SELECT id, transaction, network, patch FROM protocol_versions |sql} )
+          ()
+      in
+      List.iter (unwrap all_versions)
+        ~f:(fun (id, transaction, network, patch) ->
+          Hashtbl.add_exn t_to_id ~key:{ transaction; network; patch } ~data:id ) ;
+      loaded := true
+
   let add_if_doesn't_exist (module Conn : CONNECTION) ~transaction ~network
       ~patch =
     let t = { transaction; network; patch } in
-    Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
-      (module Conn)
-      t
+    let%bind () = load_local_copy (module Conn) in
+    match Hashtbl.find t_to_id t with
+    | Some id ->
+        return (Ok id)
+    | None ->
+        let%map.Deferred.Result new_id =
+          Mina_caqti.insert_assuming_new ~select:("id", Caqti_type.int)
+            ~table_name ~cols:(Fields.names, typ)
+            (module Conn)
+            t
+        in
+        Hashtbl.add_exn t_to_id ~key:t ~data:new_id ;
+        new_id
 
   let find (module Conn : CONNECTION) ~transaction ~network ~patch =
     Conn.find
@@ -735,11 +765,14 @@ module Protocol_versions = struct
       (transaction, network, patch)
 
   let find_txn_version (module Conn : CONNECTION) ~transaction =
-    Conn.collect_list
-      (Caqti_request.collect Caqti_type.int Caqti_type.int
-         {sql| SELECT id FROM protocol_versions WHERE transaction = ?
-        |sql} )
-      transaction
+    let%map () = load_local_copy (module Conn) in
+    let matching_ids =
+      Hashtbl.fold ~init:[]
+        ~f:(fun ~key ~data acc ->
+          if key.transaction = transaction then data :: acc else acc )
+        t_to_id
+    in
+    Ok matching_ids
 
   let load (module Conn : CONNECTION) id =
     Conn.find
@@ -1358,21 +1391,57 @@ module Zkapp_global_slot_bounds = struct
 end
 
 module Timing_info = struct
-  type t =
-    { account_identifier_id : int
-    ; initial_minimum_balance : string
-    ; cliff_time : int64
-    ; cliff_amount : string
-    ; vesting_period : int64
-    ; vesting_increment : string
-    }
-  [@@deriving hlist, fields]
+  module T = struct
+    type t =
+      { account_identifier_id : int
+      ; initial_minimum_balance : string
+      ; cliff_time : int64
+      ; cliff_amount : string
+      ; vesting_period : int64
+      ; vesting_increment : string
+      }
+    [@@deriving hlist, fields, compare, sexp, hash]
+  end
+
+  include T
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ int; string; int64; string; int64; string ]
 
   let table_name = "timing_info"
+
+  let t_to_id = Hashtbl.create (module T)
+
+  let loaded = ref false
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+      id
+
+  let load_opt (module Conn : CONNECTION) id =
+    Conn.find_opt
+      (Caqti_request.find_opt Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+      id
+
+  let load_local_copy (module Conn : CONNECTION) =
+    if !loaded then Deferred.unit
+    else
+      let%bind all_ids =
+        Conn.collect_list
+          (Caqti_request.collect Caqti_type.unit Caqti_type.int
+             {sql| SELECT id FROM timing_info |sql} )
+          ()
+      in
+      let%map () =
+        Deferred.List.iter (unwrap all_ids) ~f:(fun id ->
+            let%map row = load (module Conn) id in
+            Hashtbl.add_exn t_to_id ~key:(unwrap row) ~data:id )
+      in
+      loaded := true
 
   let find (module Conn : CONNECTION) (acc : Account.t) =
     let open Deferred.Result.Let_syntax in
@@ -1434,18 +1503,7 @@ module Timing_info = struct
           ; vesting_increment = zero
           }
     in
-    match%bind
-      Conn.find_opt
-        (Caqti_request.find_opt typ Caqti_type.int
-           {sql| SELECT id FROM timing_info
-                 WHERE account_identifier_id = ?
-                 AND initial_minimum_balance = ?
-                 AND cliff_time = ?
-                 AND cliff_amount = ?
-                 AND vesting_period = ?
-                 AND vesting_increment = ? |sql} )
-        values
-    with
+    match Hashtbl.find t_to_id values with
     | Some id ->
         return id
     | None ->
@@ -1458,18 +1516,6 @@ module Timing_info = struct
                    RETURNING id
              |sql} )
           values
-
-  let load (module Conn : CONNECTION) id =
-    Conn.find
-      (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
-      id
-
-  let load_opt (module Conn : CONNECTION) id =
-    Conn.find_opt
-      (Caqti_request.find_opt Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
-      id
 end
 
 module Snarked_ledger_hash = struct
@@ -2857,6 +2903,27 @@ module Accounts_accessed = struct
 
   let table_name = "accounts_accessed"
 
+  let exists_index =
+    Hash_set.create
+      ( module struct
+        type t = int * int [@@deriving compare, sexp, hash]
+      end )
+
+  let loaded = ref false
+
+  let load_local_copy (module Conn : CONNECTION) =
+    if !loaded then Deferred.unit
+    else
+      let%map all_ids =
+        Conn.collect_list
+          (Caqti_request.collect Caqti_type.unit
+             Caqti_type.(tup2 int int)
+             {sql| SELECT block_id,account_identifier_id FROM accounts_accessed |sql} )
+          ()
+      in
+      List.iter (unwrap all_ids) ~f:(fun key -> Hash_set.add exists_index key) ;
+      loaded := true
+
   let find_opt (module Conn : CONNECTION) ~block_id ~account_identifier_id =
     let comma_cols = String.concat Fields.names ~sep:"," in
     Conn.find_opt
@@ -2874,68 +2941,69 @@ module Accounts_accessed = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~logger block_id
       (ledger_index, (account : Account.t)) =
+    let%bind () = load_local_copy (module Conn) in
     let open Deferred.Result.Let_syntax in
     let account_id = Account_id.create account.public_key account.token_id in
     let%bind account_identifier_id =
       Account_identifiers.add_if_doesn't_exist (module Conn) account_id
     in
-    match%bind find_opt (module Conn) ~block_id ~account_identifier_id with
-    | Some result ->
-        return (result.block_id, result.account_identifier_id)
-    | None ->
-        let%bind token_symbol_id =
-          Token_symbols.add_if_doesn't_exist (module Conn) account.token_symbol
-        in
-        let balance = Currency.Balance.to_string account.balance in
-        let nonce =
-          account.nonce |> Account.Nonce.to_uint32 |> Unsigned.UInt32.to_int64
-        in
-        let receipt_chain_hash =
-          account.receipt_chain_hash |> Receipt.Chain_hash.to_base58_check
-        in
-        let%bind delegate_id =
-          Mina_caqti.add_if_some
-            (Public_key.add_if_doesn't_exist (module Conn))
-            account.delegate
-        in
-        let%bind voting_for_id =
-          Voting_for.add_if_doesn't_exist (module Conn) account.voting_for
-        in
-        let%bind timing_id =
-          Timing_info.add_if_doesn't_exist
-            (module Conn)
-            account_identifier_id account.timing
-        in
-        let%bind permissions_id =
-          Zkapp_permissions.add_if_doesn't_exist
-            (module Conn)
-            ~logger account.permissions
-        in
-        let%bind zkapp_id =
-          Mina_caqti.add_if_some
-            (Zkapp_account.add_if_doesn't_exist (module Conn))
-            account.zkapp
-        in
-        let account_accessed : t =
-          { ledger_index
-          ; block_id
-          ; account_identifier_id
-          ; token_symbol_id
-          ; balance
-          ; nonce
-          ; receipt_chain_hash
-          ; delegate_id
-          ; voting_for_id
-          ; timing_id
-          ; permissions_id
-          ; zkapp_id
-          }
-        in
-        Mina_caqti.select_insert_into_cols
-          ~select:("block_id,account_identifier_id", Caqti_type.(tup2 int int))
-          ~table_name ~cols:(Fields.names, typ)
+    if Hash_set.mem exists_index (block_id, account_identifier_id) then
+      return (block_id, account_identifier_id)
+    else
+      let%bind token_symbol_id =
+        Token_symbols.add_if_doesn't_exist (module Conn) account.token_symbol
+      in
+      let balance = Currency.Balance.to_string account.balance in
+      let nonce =
+        account.nonce |> Account.Nonce.to_uint32 |> Unsigned.UInt32.to_int64
+      in
+      let receipt_chain_hash =
+        account.receipt_chain_hash |> Receipt.Chain_hash.to_base58_check
+      in
+      let%bind delegate_id =
+        Mina_caqti.add_if_some
+          (Public_key.add_if_doesn't_exist (module Conn))
+          account.delegate
+      in
+      let%bind voting_for_id =
+        Voting_for.add_if_doesn't_exist (module Conn) account.voting_for
+      in
+      let%bind timing_id =
+        Timing_info.add_if_doesn't_exist
           (module Conn)
-          account_accessed
+          account_identifier_id account.timing
+      in
+      let%bind permissions_id =
+        Zkapp_permissions.add_if_doesn't_exist
+          (module Conn)
+          ~logger account.permissions
+      in
+      let%bind zkapp_id =
+        Mina_caqti.add_if_some
+          (Zkapp_account.add_if_doesn't_exist (module Conn))
+          account.zkapp
+      in
+      let account_accessed : t =
+        { ledger_index
+        ; block_id
+        ; account_identifier_id
+        ; token_symbol_id
+        ; balance
+        ; nonce
+        ; receipt_chain_hash
+        ; delegate_id
+        ; voting_for_id
+        ; timing_id
+        ; permissions_id
+        ; zkapp_id
+        }
+      in
+      Hash_set.add exists_index (block_id, account_identifier_id) ;
+      Mina_caqti.insert_assuming_new
+        ~select:("block_id,account_identifier_id", Caqti_type.(tup2 int int))
+        ~table_name ~cols:(Fields.names, typ)
+        (module Conn)
+        account_accessed
 
   let add_accounts_if_don't_exist (module Conn : CONNECTION) ~logger block_id
       (accounts : (int * Account.t) list) =
