@@ -19,6 +19,7 @@ declare -r CLI_VERSION='1.0.0';
 declare -r CLI_NAME='berkeley_migration.sh';
 declare -r PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 
+CHECKPOINT_PREFIX=migration
 
 ################################################################################
 # functions
@@ -243,15 +244,14 @@ function run_initial_migration() {
         --archive-uri "$__migrated_archive_uri" \
         --input-file "$__config_file" \
         --checkpoint-interval 1000 \
-        --checkpoint-file-prefix "migration" | tee "$__replayer_log"
+        --checkpoint-file-prefix "$CHECKPOINT_PREFIX" | tee "$__replayer_log"
 
     check_logs "$__berkely_migration_log" "$__replayer_log"
 
     set -e # exit immediately on errors
 
-    check_incremental_migration_progress "$__replayer_checkpoint" "$__migrated_archive_uri" 
-    check_output_replayer_for_initial "migration"
-
+    check_output_replayer_for_initial "$CHECKPOINT_PREFIX"
+    
     mina-berkeley-migration-verifier pre-fork \
         --mainnet-archive-uri "$__mainnet_archive_uri" \
         --migrated-archive-uri "$__migrated_archive_uri"
@@ -457,13 +457,13 @@ function run_incremental_migration() {
         --archive-uri "$__migrated_archive_uri" \
         --input-file "$__replayer_checkpoint" \
         --checkpoint-interval "$__checkpoint_interval" \
-        --checkpoint-file-prefix "migration" | tee "$__replayer_log"  
+        --checkpoint-file-prefix "$CHECKPOINT_PREFIX" | tee "$__replayer_log"  
 
     check_logs "$__berkely_migration_log" "$__replayer_log"
 
     set -e # exit immediately on errors
 
-    check_new_replayer_checkpoints_for_incremental "migration"
+    check_new_replayer_checkpoints_for_incremental "$CHECKPOINT_PREFIX"
 
     mina-berkeley-migration-verifier pre-fork \
         --mainnet-archive-uri "$__mainnet_archive_uri" \
@@ -641,7 +641,7 @@ function run_final_migration() {
     local __fork_state_hash=$7
     local __checkpoint_interval=$8  
     local __replayer_checkpoint=$9  
-    local __fork_config=$10
+    local __fork_config=${10}
     
     
     local __date=$(date '+%Y-%m-%d_%H%M')
@@ -670,21 +670,21 @@ function run_final_migration() {
         --archive-uri "$__migrated_archive_uri" \
         --input-file "$__replayer_checkpoint" \
         --checkpoint-interval "$__checkpoint_interval" \
-        --checkpoint-file-prefix "migration" | tee "$__replayer_log"
+        --checkpoint-file-prefix "$CHECKPOINT_PREFIX" | tee "$__replayer_log"
 
     check_logs "$__berkely_migration_log" "$__replayer_log"
     set -e # exit immediately on errors
 
     check_incremental_migration_progress "$__replayer_checkpoint" "$__migrated_archive_uri" 
-    check_new_replayer_checkpoints_for_incremental "migration"
+    check_new_replayer_checkpoints_for_incremental "$CHECKPOINT_PREFIX"
 
     # sort by https://stackoverflow.com/questions/60311787/how-to-sort-by-numbers-that-are-part-of-a-filename-in-bash
-    local migrated_replayer_output=$(find . -maxdepth 1 -name "migration-replayer-checkpoint*.json"  | sort -Vrt - -k4,4 | head -n 1)
+    local migrated_replayer_output=$(find . -maxdepth 1 -name "$CHECKPOINT_PREFIX-checkpoint*.json"  | sort -Vrt - -k3,3 | head -n 1)
 
     mina-berkeley-migration-verifier post-fork \
         --mainnet-archive-uri "$__mainnet_archive_uri" \
         --migrated-archive-uri "$__migrated_archive_uri" \
-        --fork-config-file "$__fork_config_file" \
+        --fork-config-file "$__fork_config" \
         --migrated-replayer-output "$migrated_replayer_output"
 
 }
