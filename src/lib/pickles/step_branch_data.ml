@@ -86,8 +86,7 @@ let create
        , ret_var
        , ret_value )
        Inductive_rule.public_input ) ~auxiliary_typ _var_to_field_elements
-    _value_to_field_elements ~(chain_to : unit Promise.t)
-    (rule : _ Inductive_rule.Promise.t) =
+    _value_to_field_elements (rule : _ Inductive_rule.Promise.t) =
   Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
   let (T (self_width, proofs_verified)) = HT.length rule.prevs in
@@ -210,7 +209,6 @@ let create
         ~wrap_rounds:Backend.Tock.Rounds.n
       (* TODO *)
     in
-    let%bind.Promise () = chain_to in
     Fix_domains.domains ~feature_flags:actual_feature_flags
       (module Impls.Step)
       (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
