@@ -92,6 +92,8 @@ module Step : sig
      this is needed because snarky relies on mutable global state for the current circuit being run.
   *)
   val run_async_circuit : (unit -> 'a Promise.t) -> 'a Promise.t
+
+  module Async_promise : module type of Async' (Promise)
 end
 
 module Wrap : sig

@@ -160,6 +160,8 @@ module Step = struct
       let%map res = f () in
       !unlock () ; res
     with exn -> !unlock () ; raise exn
+
+  module Async_promise = Async' (Promise)
 end
 
 module Wrap = struct

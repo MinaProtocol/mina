@@ -83,6 +83,7 @@ struct
       Promise.t =
     let logger = Internal_tracing_context_logger.get () in
     [%log internal] "Pickles_step_proof" ;
+    print_endline "Pickles_step_proof" ;
     let _ = auxiliary_typ in
     (* unused *)
     let _, prev_vars_length = branch_data.proofs_verified in
@@ -534,6 +535,7 @@ struct
       , witness
       , `Actual_wrap_domain dlog_vk.domain.log_size_of_group )
     in
+    print_endline "step-prover before getting prevs" ;
     let%bind.Promise prevs =
       let rec go :
           type vars values ns ms.
@@ -548,6 +550,7 @@ struct
       in
       go branch_data.rule.prevs
     in
+    print_endline "step-prover after getting prevs" ;
     let challenge_polynomial_commitments = ref None in
     let unfinalized_proofs = ref None in
     let statements_with_hashes = ref None in
@@ -625,7 +628,8 @@ struct
       x_hats := Some x_hats' ;
       witnesses := Some witnesses' ;
       prev_proofs := Some prev_proofs' ;
-      actual_wrap_domains := Some actual_wrap_domains'
+      actual_wrap_domains := Some actual_wrap_domains' ;
+      Promise.return ()
     in
     let unfinalized_proofs = lazy (Option.value_exn !unfinalized_proofs) in
     let unfinalized_proofs_extended =
@@ -737,9 +741,9 @@ struct
       match request with
       | Req.Compute_prev_proof_parts prev_proof_requests ->
           [%log internal] "Step_compute_prev_proof_parts" ;
-          compute_prev_proof_parts prev_proof_requests ;
+          let p = compute_prev_proof_parts prev_proof_requests in
           [%log internal] "Step_compute_prev_proof_parts_done" ;
-          k ()
+          k p
       | Req.Proof_with_datas ->
           k (Option.value_exn !witnesses)
       | Req.Wrap_index ->
@@ -807,21 +811,26 @@ struct
       let%bind.Promise main = branch_data.main ~step_domains in
       let%bind.Promise step_domains = step_domains in
       let { Domains.h } = Vector.nth_exn step_domains branch_data.index in
+      print_endline "step-prover before circuit" ;
       ksprintf Common.time "step-prover %d (%d)" branch_data.index
         (Domain.size h) (fun () ->
           [%log internal] "Step_generate_witness_conv" ;
-          let builder =
-            Impls.Step.generate_witness_manual ~handlers:[ handler ]
-              ~input_typ:Impls.Step.Typ.unit ~return_typ:input ()
+          let%bind.Promise ( { Impls.Step.Proof_inputs.auxiliary_inputs
+                             ; public_inputs
+                             }
+                           , next_statement_hashed ) =
+            Impls.Step.run_async_circuit (fun () ->
+                let builder =
+                  Impls.Step.generate_witness_manual ~handlers:[ handler ]
+                    ~input_typ:Impls.Step.Typ.unit ~return_typ:input ()
+                in
+                let%map.Promise res =
+                  builder.run_circuit (fun () () ->
+                      Promise.map ~f:conv_inv (main ()) )
+                in
+                builder.finish_computation res )
           in
-          let%bind.Promise res =
-            builder.run_circuit (fun () () ->
-                Promise.map ~f:conv_inv (main ()) )
-          in
-          let ( { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
-              , next_statement_hashed ) =
-            builder.finish_computation res
-          in
+          print_endline "step-prover after circuit" ;
           [%log internal] "Backend_tick_proof_create_async" ;
           let create_proof () =
             Backend.Tick.Proof.create_async ~primary:public_inputs
@@ -850,6 +859,7 @@ struct
                       ( { proof; public_evals = None }
                         : Tick.Proof.with_public_evals ) )
           in
+          print_endline "step-prover after proof" ;
           [%log internal] "Backend_tick_proof_create_async_done" ;
           (proof, next_statement_hashed) )
     in
