@@ -11,7 +11,7 @@ module Mainnet = struct
         "  SELECT state_hash, ledger_hash FROM blocks\n\
         \            WHERE chain_status = 'canonical'\n\
         \          "
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_block_hashes_till_height_query ~output_file ~height =
     dump_sql_to_csv output_file
@@ -22,7 +22,7 @@ module Mainnet = struct
            \            WHERE chain_status = 'canonical'\n\
            \            AND height <= %d ORDER BY height\n\
            \      " height )
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
       height =
@@ -36,7 +36,7 @@ module Mainnet = struct
         \            WHERE chain_status = 'canonical'\n\
         \            ORDER BY height\n\
         \      "
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_block_hashes (module Conn : CONNECTION) output_file =
     Conn.exec (dump_block_hashes_query ~output_file) ()
@@ -60,7 +60,7 @@ module Mainnet = struct
            \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
             fee_payer_keys.id ORDER BY height, sequence_no\n\
            \      " height )
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_user_commands_till_height (module Conn : CONNECTION) output_file
       height =
@@ -85,7 +85,7 @@ module Mainnet = struct
            \        ORDER BY height, sequence_no, secondary_sequence_no, type \n\
            \   \n\
            \          " height )
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_internal_commands_till_height (module Conn : CONNECTION) output_file
       height =
@@ -108,7 +108,7 @@ module Mainnet = struct
         \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
          fee_payer_keys.id ORDER BY height, sequence_no\n\
         \      "
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_user_commands (module Conn : CONNECTION) output_file =
     Conn.exec (dump_user_commands_query ~output_file) ()
@@ -131,13 +131,13 @@ module Mainnet = struct
            \        ORDER BY height, sequence_no, secondary_sequence_no, type \n\
            \   \n\
            \          " )
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_internal_commands (module Conn : CONNECTION) output_file =
     Conn.exec (dump_internal_commands_query ~output_file) ()
 
   let mark_chain_till_fork_block_as_canonical_query =
-    Caqti_request.exec Caqti_type.string
+    Mina_caqti.exec_req Caqti_type.string
       {sql|
       UPDATE blocks
     Set chain_status = 'canonical'
@@ -166,7 +166,7 @@ end
 
 module Berkeley = struct
   let height_query =
-    Caqti_request.find Caqti_type.unit Caqti_type.int
+    Mina_caqti.find Caqti_type.unit Caqti_type.int
       {sql| 
             SELECT height from blocks order by height desc limit 1;
           |sql}
@@ -174,7 +174,7 @@ module Berkeley = struct
   let block_height (module Conn : CONNECTION) = Conn.find height_query ()
 
   let canonical_blocks_count_till_height_query =
-    Caqti_request.find Caqti_type.int Caqti_type.int
+    Mina_caqti.find Caqti_type.int Caqti_type.int
       {sql|
         WITH RECURSIVE chain AS 
         (  
@@ -192,7 +192,7 @@ module Berkeley = struct
     Conn.find canonical_blocks_count_till_height_query height
 
   let blocks_count_query =
-    Caqti_request.find Caqti_type.unit Caqti_type.int
+    Mina_caqti.find Caqti_type.unit Caqti_type.int
       {sql|
           SELECT count(*) FROM blocks ;
         |sql}
@@ -218,7 +218,7 @@ module Berkeley = struct
            \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
             fee_payer_keys.id ORDER BY height, sequence_no\n\
            \     " height )
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_user_commands_till_height (module Conn : CONNECTION) output_file
       height =
@@ -243,7 +243,7 @@ module Berkeley = struct
            \        ORDER BY height, sequence_no, secondary_sequence_no, \
             command_type \n\
            \      " height )
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_internal_commands_till_height (module Conn : CONNECTION) output_file
       height =
@@ -266,7 +266,7 @@ module Berkeley = struct
         \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
          fee_payer_keys.id ORDER BY height, sequence_no\n\
         \     "
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_user_commands (module Conn : CONNECTION) output_file =
     Conn.exec (dump_user_commands_query ~output_file) ()
@@ -288,7 +288,7 @@ module Berkeley = struct
         \        ORDER BY height, sequence_no, secondary_sequence_no, \
          command_type \n\
         \      "
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_internal_commands (module Conn : CONNECTION) output_file =
     Conn.exec (dump_internal_commands_query ~output_file) ()
@@ -299,7 +299,7 @@ module Berkeley = struct
         "SELECT account_identifier_id AS id, block_id \n\
         \            FROM accounts_accessed \n\
         \            ORDER BY block_id, id \n"
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_accounts_accessed_to_csv (module Conn : CONNECTION) output_file =
     Conn.exec (dump_account_accessed_to_csv_query ~output_file) ()
@@ -313,7 +313,7 @@ module Berkeley = struct
            \    AND height <= %d ORDER BY height\n\
            \ \n\
            \     " height )
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
       height =
@@ -327,7 +327,7 @@ module Berkeley = struct
         \      WHERE chain_status = 'canonical'\n\
         \      ORDER BY height\n\
         \      "
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_block_hashes (module Conn : CONNECTION) output_file =
     Conn.exec (dump_block_hashes_query ~output_file) ()
@@ -359,21 +359,21 @@ module Berkeley = struct
         \    INNER JOIN internal_commands ON id = internal_command_id\n\
         \    INNER JOIN account_identifiers ON public_key_id = receiver_id\n\
         \  ) ORDER BY block_id, id"
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_user_and_internal_command_info_to_csv (module Conn : CONNECTION)
       output_file =
     Conn.exec (dump_user_and_internal_command_info_to_csv_query ~output_file) ()
 
   let get_account_accessed_count_query =
-    Caqti_request.find Caqti_type.unit Caqti_type.int
+    Mina_caqti.find Caqti_type.unit Caqti_type.int
       {sql| SELECT count(*) FROM accounts_accessed; |sql}
 
   let count_account_accessed (module Conn : CONNECTION) =
     Conn.find get_account_accessed_count_query ()
 
   let get_account_id_accessed_in_commands_query =
-    Caqti_request.find Caqti_type.unit Caqti_type.int
+    Mina_caqti.find Caqti_type.unit Caqti_type.int
       {sql| 
         select count(distinct ids.account_identifier_id) FROM 
 
