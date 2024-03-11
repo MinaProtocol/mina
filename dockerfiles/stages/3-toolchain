@@ -35,6 +35,7 @@ RUN apt-get update --yes \
     apt-transport-https \
     apt-utils \
     awscli \
+    ca-certificates \
     cmake \
     fakeroot \
     gnupg2 \
@@ -70,7 +71,7 @@ RUN apt-get update --yes \
 RUN test "$deb_codename" = "bullseye" \
       && apt-get update --yes \
       && apt-get install --yes --no-install-recommends \
-          python3-sexpdata \
+          python3-sexpdata python3-pip \
       && pip install readchar \
       || exit 0
 
@@ -96,10 +97,11 @@ RUN curl -fsSL https://apt.releases.hashicorp.com/gpg | \
     sudo apt-get install -y terraform
 
 # --- Google Cloud tools
-RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
-    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
-    && apt-get update --yes \
-    && apt-get install --yes google-cloud-sdk kubectl \
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | \
+    tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | \
+    gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
+    && apt-get update -y && apt-get install google-cloud-sdk kubectl -y \
     && rm -rf /var/lib/apt/lists/*
 
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
