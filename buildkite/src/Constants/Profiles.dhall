@@ -1,12 +1,13 @@
 let Prelude = ../External/Prelude.dhall
 
-let Profile : Type = < Standard | Lightnet | BerkeleyMigration >
+let Profile : Type = < Standard | Lightnet | BerkeleyMigration | Hardfork >
 
 let capitalName = \(profile : Profile) ->
   merge {
     Standard = "Standard"
     , Lightnet = "Lightnet"
     , BerkeleyMigration = "BerkeleyMigration"
+    , Hardfork = "Hardfork"
   } profile
 
 let lowerName = \(profile : Profile) ->
@@ -14,6 +15,7 @@ let lowerName = \(profile : Profile) ->
     Standard = "standard"
     , Lightnet = "lightnet"
     , BerkeleyMigration = "berkeley-archive-migration"
+    , Hardfork = "hardfork"
   } profile
 
 let duneProfile = \(profile : Profile) ->
@@ -21,6 +23,7 @@ let duneProfile = \(profile : Profile) ->
     Standard = "devnet"
     , Lightnet = "lightnet"
     , BerkeleyMigration = "berkeley_archive_migration"
+    , Hardfork = "hardfork"
   } profile
 
 let toSuffixUppercase = \(profile : Profile) ->
@@ -28,6 +31,7 @@ let toSuffixUppercase = \(profile : Profile) ->
     Standard = ""
     , Lightnet = "Lightnet"
     , BerkeleyMigration = "BerkeleyMigration"  
+    , Hardfork = "Hardfork"
   } profile
 
 let toSuffixLowercase = \(profile : Profile) ->
@@ -35,6 +39,7 @@ let toSuffixLowercase = \(profile : Profile) ->
     Standard = ""
     , Lightnet = "lightnet"
     , BerkeleyMigration = "berkeley-archive-migration" 
+    , Hardfork = "hardfork"
   } profile
 
 let toLabelSegment = \(profile : Profile) ->
@@ -42,6 +47,7 @@ let toLabelSegment = \(profile : Profile) ->
     Standard = ""
     , Lightnet = "-lightnet"
     , BerkeleyMigration = "-berkeley-archive-migration" 
+    , Hardfork = "-hardfork"
   } profile
 
 
