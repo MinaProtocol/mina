@@ -278,6 +278,15 @@ let insert_into_cols ~(returning : string) ~(table_name : string)
     (String.concat ~sep:", " cols)
     values returning
 
+let insert_assuming_new ~(select : string * 'select Caqti_type.t)
+    ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
+    (module Conn : CONNECTION) (value : 'cols) =
+  Conn.find
+    ( Caqti_request.find (snd cols) (snd select)
+    @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
+         ~cols:(fst cols) () )
+    value
+
 let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
     ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
     (module Conn : CONNECTION) (value : 'cols) =
@@ -291,11 +300,7 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
   | Some id ->
       return id
   | None ->
-      Conn.find
-        ( Caqti_request.find (snd cols) (snd select)
-        @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
-             ~cols:(fst cols) () )
-        value
+      insert_assuming_new ~select ~table_name ?tannot ~cols (module Conn) value
 
 let sep_by_comma ?(parenthesis = false) xs =
   List.map xs ~f:(if parenthesis then sprintf "('%s')" else sprintf "'%s'")
