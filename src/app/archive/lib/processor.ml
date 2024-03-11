@@ -57,7 +57,6 @@ module Public_key = struct
              {sql| SELECT id, value FROM public_keys |sql} )
           ()
       in
-      (match all_keys with Error e -> failwith (Caqti_error.show e) | _ -> ()) ;
       List.iter (unwrap all_keys) ~f:(fun (id, keytext) ->
           let key = Public_key.Compressed.of_base58_check_exn keytext in
           Hashtbl.add_exn id_to_key ~key:id ~data:key ;
