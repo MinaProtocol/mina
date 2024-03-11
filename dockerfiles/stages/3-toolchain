@@ -53,6 +53,16 @@ RUN apt-get update --yes \
     zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
 
+# -- Debian Bullseye python dependencies (largely installed above from apt)
+# Ocaml lints tool `scripts/require-ppxs.py` requires python3 sexpdata
+# but debian stretch does not have this package, so only install in bullseye
+RUN test "$deb_codename" = "bullseye" \
+      && apt-get update --yes \
+      && apt-get install --yes --no-install-recommends \
+          python3-sexpdata python3-pip \
+      && pip install readchar \
+      || exit 0
+
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
 RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
