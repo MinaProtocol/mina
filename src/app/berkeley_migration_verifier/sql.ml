@@ -166,7 +166,7 @@ end
 
 module Berkeley = struct
   let height_query =
-    Mina_caqti.find Caqti_type.unit Caqti_type.int
+    Mina_caqti.find_req Caqti_type.unit Caqti_type.int
       {sql| 
             SELECT height from blocks order by height desc limit 1;
           |sql}
@@ -174,7 +174,7 @@ module Berkeley = struct
   let block_height (module Conn : CONNECTION) = Conn.find height_query ()
 
   let canonical_blocks_count_till_height_query =
-    Mina_caqti.find Caqti_type.int Caqti_type.int
+    Mina_caqti.find_req Caqti_type.int Caqti_type.int
       {sql|
         WITH RECURSIVE chain AS 
         (  
@@ -192,7 +192,7 @@ module Berkeley = struct
     Conn.find canonical_blocks_count_till_height_query height
 
   let blocks_count_query =
-    Mina_caqti.find Caqti_type.unit Caqti_type.int
+    Mina_caqti.find_req Caqti_type.unit Caqti_type.int
       {sql|
           SELECT count(*) FROM blocks ;
         |sql}
@@ -366,14 +366,14 @@ module Berkeley = struct
     Conn.exec (dump_user_and_internal_command_info_to_csv_query ~output_file) ()
 
   let get_account_accessed_count_query =
-    Mina_caqti.find Caqti_type.unit Caqti_type.int
+    Mina_caqti.find_req Caqti_type.unit Caqti_type.int
       {sql| SELECT count(*) FROM accounts_accessed; |sql}
 
   let count_account_accessed (module Conn : CONNECTION) =
     Conn.find get_account_accessed_count_query ()
 
   let get_account_id_accessed_in_commands_query =
-    Mina_caqti.find Caqti_type.unit Caqti_type.int
+    Mina_caqti.find_req Caqti_type.unit Caqti_type.int
       {sql| 
         select count(distinct ids.account_identifier_id) FROM 
 
