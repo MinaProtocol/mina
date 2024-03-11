@@ -144,6 +144,22 @@ module Step = struct
     in
     let typ = Typ.transport typ ~there:to_data ~back:of_data in
     Spec.ETyp.T (typ, (fun x -> of_data (f x)), fun x -> f_inv (to_data x))
+
+  let lock = ref (Promise.return ())
+
+  let run_async_circuit (f : unit -> 'a Promise.t) : 'a Promise.t =
+    let open Promise.Let_syntax in
+    (* acquire the lock *)
+    let existing_lock = !lock in
+    let unlock = ref (fun () -> ()) in
+    lock := Promise.create (fun resolve -> unlock := resolve) ;
+    (* await the existing lock *)
+    let%bind () = existing_lock in
+    (* run the function and release the lock *)
+    try
+      let%map res = f () in
+      !unlock () ; res
+    with exn -> !unlock () ; raise exn
 end
 
 module Wrap = struct

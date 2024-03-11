@@ -87,6 +87,11 @@ module Step : sig
          Import.Types.Step.Statement.t
        , Impl.field )
        Import.Spec.ETyp.t
+
+  (* safe wrapper to run async circuits in to ensure two of them don't run at the same time / in an overlapping way.
+     this is needed because snarky relies on mutable global state for the current circuit being run.
+  *)
+  val run_async_circuit : (unit -> 'a Promise.t) -> 'a Promise.t
 end
 
 module Wrap : sig
