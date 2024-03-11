@@ -3,8 +3,7 @@ open Import
 open Backend
 
 val expand_deferred :
-     zk_rows:int
-  -> evals:
+     evals:
        (Pasta_bindings.Fp.t, Pasta_bindings.Fp.t array) Plonk_types.All_evals.t
   -> old_bulletproof_challenges:
        ( Challenge.Constant.t Kimchi_types.scalar_challenge

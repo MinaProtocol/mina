@@ -16,6 +16,7 @@
    ;; local libraries
    mina_base
    snark_worker
+   bounded_types
    snark_work_lib
    transaction_witness
    transaction_snark

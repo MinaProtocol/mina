@@ -250,7 +250,9 @@ module Graphql = struct
                       setPermissions
                       setZkappUri
                       setTokenSymbol
-                      setVerificationKey
+                      setVerificationKey { auth
+                                           txnVersion
+                                         }
                       setVotingFor
                       setTiming
                     }
@@ -272,6 +274,29 @@ module Graphql = struct
       }
     }
   |}]
+
+  module Best_chain_for_slot_end_test =
+  [%graphql
+  {|
+      query ($max_length: Int) @encoders(module: "Encoders") {
+        bestChain(maxLength: $max_length) {
+          stateHash @ppxCustom(module: "Graphql_lib.Scalars.String_json")
+          commandTransactionCount
+          protocolState {
+            consensusState {
+              slot @ppxCustom(module: "Scalars.GlobalSlotSinceHardFork")
+              slotSinceGenesis @ppxCustom(module: "Scalars.GlobalSlotSinceGenesis")
+            }
+          }
+          transactions {
+            coinbase
+          }
+          snarkJobs {
+            workIds
+          }
+        }
+      }
+    |}]
 end
 
 (** this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
@@ -282,10 +307,11 @@ let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
     [ ("query", `String query_name)
     ; ("uri", `String (Uri.to_string node_uri))
     ; ("init_delay", `Float initial_delay_sec)
+    ; ("query_obj", `String query_obj#query)
     ]
   in
   [%log info]
-    "Attempting to send GraphQL request \"$query\" to \"$uri\" after \
+    "Attempting to send GraphQL request \"$query_obj\" to \"$uri\" after \
      $init_delay sec"
     ~metadata ;
   let rec retry n =
@@ -487,7 +513,9 @@ let permissions_of_account_permissions account_permissions :
   ; set_zkapp_uri = to_auth_required account_permissions.setZkappUri
   ; set_token_symbol = to_auth_required account_permissions.setTokenSymbol
   ; set_verification_key =
-      to_auth_required account_permissions.setVerificationKey
+      ( to_auth_required account_permissions.setVerificationKey.auth
+      , Mina_numbers.Txn_version.of_string
+          account_permissions.setVerificationKey.txnVersion )
   ; set_voting_for = to_auth_required account_permissions.setVotingFor
   ; set_timing = to_auth_required account_permissions.setTiming
   }
@@ -1115,3 +1143,40 @@ let get_filtered_log_entries ~last_log_index_seen node_uri =
   else
     Deferred.Or_error.error_string
       "Node is not currently capturing structured log messages"
+
+type best_chain_block_for_slot_end_test =
+  { state_hash : string
+  ; command_transaction_count : int
+  ; coinbase : Currency.Amount.t
+  ; snark_work_count : int
+  ; slot : Mina_numbers.Global_slot_since_hard_fork.t
+  ; slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+  }
+
+let get_best_chain_for_slot_end_test ?max_length ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  let query_obj =
+    Graphql.Best_chain_for_slot_end_test.(make @@ makeVariables ?max_length ())
+  in
+  let%bind result =
+    exec_graphql_request ~logger ~retry_delay_sec:10.0 ~node_uri
+      ~query_name:"GetBlockSlot" query_obj
+  in
+  match result.bestChain with
+  | None | Some [||] ->
+      Deferred.Or_error.error_string "failed to get best chains"
+  | Some chain ->
+      return
+      @@ List.map (Array.to_list chain) ~f:(fun block ->
+             { state_hash = block.stateHash
+             ; command_transaction_count = block.commandTransactionCount
+             ; coinbase = block.transactions.coinbase
+             ; snark_work_count = block.snarkJobs |> Array.length
+             ; slot = block.protocolState.consensusState.slot
+             ; slot_since_genesis =
+                 block.protocolState.consensusState.slotSinceGenesis
+             } )
+
+let must_get_best_chain_for_slot_end_test ?max_length ~logger node_uri =
+  get_best_chain_for_slot_end_test ?max_length ~logger node_uri
+  |> Deferred.bind ~f:Malleable_error.or_hard_error

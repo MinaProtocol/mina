@@ -22,6 +22,7 @@
   promise
   kimchi_bindings
   kimchi_types
+  bounded_types
   pasta_bindings
   bn254_bindings
   snarkette

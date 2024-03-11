@@ -15,4 +15,6 @@ module Tock : sig
   module Inner_curve = Kimchi_backend.Pasta.Pasta.Vesta
 end
 
-module Bn254 = Kimchi_backend.Bn254.Bn254_based_plonk
+module Bn254 : sig
+  include module type of Kimchi_backend.Bn254.Bn254_based_plonk
+end

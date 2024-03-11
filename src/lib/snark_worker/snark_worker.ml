@@ -87,7 +87,7 @@ module Worker = struct
       module V2 = struct
         module T = struct
           type query =
-            Core_kernel.Error.Stable.V2.t
+            Bounded_types.Wrapped_error.Stable.V1.t
             * ( Transaction_witness.Stable.V2.t
               , Inputs.Ledger_proof.Stable.V2.t )
               Snark_work_lib.Work.Single.Spec.Stable.V2.t

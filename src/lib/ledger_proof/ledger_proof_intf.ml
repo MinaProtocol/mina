@@ -42,4 +42,6 @@ module type S = sig
   val sok_digest : t -> Sok_message.Digest.t
 
   val underlying_proof : t -> Proof.t
+
+  val snarked_ledger_hash : t -> Frozen_ledger_hash.t
 end

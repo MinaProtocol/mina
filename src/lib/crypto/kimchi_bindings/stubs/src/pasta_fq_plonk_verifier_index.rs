@@ -58,7 +58,6 @@ impl From<VerifierIndex<Pallas, OpeningProof<Pallas>>> for CamlPastaFqPlonkVerif
             },
             shifts: vi.shift.to_vec().iter().map(Into::into).collect(),
             lookup_index: vi.lookup_index.map(Into::into),
-            zk_rows: vi.zk_rows as isize,
         }
     }
 }
@@ -110,8 +109,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas, OpeningProof<
         };
 
         // TODO dummy_lookup_value ?
-        let (linearization, powers_of_alpha) =
-            expr_linearization(Some(&feature_flags), true);
+        let (linearization, powers_of_alpha) = expr_linearization(Some(&feature_flags), true, 3);
 
         VerifierIndex::<Pallas, OpeningProof<Pallas>> {
             domain,
@@ -121,7 +119,7 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas, OpeningProof<
             powers_of_alpha,
             srs: { Arc::clone(&index.srs.0) },
 
-            zk_rows: index.zk_rows as u64,
+            zk_rows: 3,
 
             sigma_comm,
             coefficients_comm,
@@ -144,16 +142,13 @@ impl From<CamlPastaFqPlonkVerifierIndex> for VerifierIndex<Pallas, OpeningProof<
             shift,
             permutation_vanishing_polynomial_m: {
                 let res = once_cell::sync::OnceCell::new();
-                res.set(permutation_vanishing_polynomial(
-                    domain,
-                    index.zk_rows as u64,
-                ))
-                .unwrap();
+                res.set(permutation_vanishing_polynomial(domain, 3))
+                    .unwrap();
                 res
             },
             w: {
                 let res = once_cell::sync::OnceCell::new();
-                res.set(zk_w(domain, index.zk_rows as u64)).unwrap();
+                res.set(zk_w(domain, 3)).unwrap();
                 res
             },
             endo: endo_q,
@@ -278,7 +273,6 @@ pub fn caml_pasta_fq_plonk_verifier_index_dummy() -> CamlPastaFqPlonkVerifierInd
         },
         shifts: (0..PERMUTS - 1).map(|_| Fq::one().into()).collect(),
         lookup_index: None,
-        zk_rows: 3,
     }
 }
 

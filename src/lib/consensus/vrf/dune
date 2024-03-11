@@ -20,6 +20,7 @@
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    genesis_constants
+   bounded_types
    crypto_params
    random_oracle
    blake2
@@ -47,6 +48,7 @@
    kimchi_bindings
    kimchi_types
    pasta_bindings
+   ppx_deriving_yojson.runtime
    ppx_version.runtime
  )
  (inline_tests (flags -verbose -show-counts))

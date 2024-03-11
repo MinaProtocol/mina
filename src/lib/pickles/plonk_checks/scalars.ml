@@ -26,8 +26,6 @@ module Gate_type = struct
       | ForeignFieldMul
       | Xor16
       | Rot64
-      | KeccakRound
-      | KeccakSponge
     [@@deriving hash, eq, compare, sexp]
   end
 
@@ -81,9 +79,8 @@ module Env = struct
     ; pow : 'a * int -> 'a
     ; square : 'a -> 'a
     ; zk_polynomial : 'a
-    ; omega_to_minus_zk_rows : 'a
+    ; omega_to_minus_3 : 'a
     ; zeta_to_n_minus_1 : 'a
-    ; zeta_to_srs_length : 'a Lazy.t
     ; var : Column.t * curr_or_next -> 'a
     ; field : string -> 'a
     ; cell : 'a -> 'a
@@ -96,7 +93,7 @@ module Env = struct
     ; joint_combiner : 'a
     ; beta : 'a
     ; gamma : 'a
-    ; unnormalized_lagrange_basis : bool * int -> 'a
+    ; unnormalized_lagrange_basis : int -> 'a
     ; if_feature : Kimchi_types.feature_flag * (unit -> 'a) * (unit -> 'a) -> 'a
     }
 end
@@ -123,9 +120,8 @@ module Tick : S = struct
        ; alpha_pow
        ; double
        ; zk_polynomial = _
-       ; omega_to_minus_zk_rows = _
+       ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
-       ; zeta_to_srs_length = _
        ; srs_length_log2 = _
        ; vanishes_on_zero_knowledge_and_previous_rows
        ; joint_combiner
@@ -3336,13 +3332,13 @@ module Tick : S = struct
                       + cell (var (LookupTable, Curr))
                       + (beta * cell (var (LookupTable, Next))) ) ) ) )
             + alpha_pow 25
-              * ( unnormalized_lagrange_basis (false, 0)
+              * ( unnormalized_lagrange_basis 0
                 * ( cell (var (LookupAggreg, Curr))
                   - field
                       "0x0000000000000000000000000000000000000000000000000000000000000001"
                   ) )
             + alpha_pow 26
-              * ( unnormalized_lagrange_basis (true, -1)
+              * ( unnormalized_lagrange_basis (-4)
                 * ( cell (var (LookupAggreg, Curr))
                   - field
                       "0x0000000000000000000000000000000000000000000000000000000000000001"
@@ -3351,7 +3347,7 @@ module Tick : S = struct
               * if_feature
                   ( LookupsPerRow 1
                   , (fun () ->
-                      unnormalized_lagrange_basis (true, -1)
+                      unnormalized_lagrange_basis (-4)
                       * ( cell (var (LookupSorted 0, Curr))
                         - cell (var (LookupSorted 1, Curr)) ) )
                   , fun () ->
@@ -3362,7 +3358,7 @@ module Tick : S = struct
               * if_feature
                   ( LookupsPerRow 2
                   , (fun () ->
-                      unnormalized_lagrange_basis (false, 0)
+                      unnormalized_lagrange_basis 0
                       * ( cell (var (LookupSorted 1, Curr))
                         - cell (var (LookupSorted 2, Curr)) ) )
                   , fun () ->
@@ -3373,7 +3369,7 @@ module Tick : S = struct
               * if_feature
                   ( LookupsPerRow 3
                   , (fun () ->
-                      unnormalized_lagrange_basis (true, -1)
+                      unnormalized_lagrange_basis (-4)
                       * ( cell (var (LookupSorted 2, Curr))
                         - cell (var (LookupSorted 3, Curr)) ) )
                   , fun () ->
@@ -3384,7 +3380,7 @@ module Tick : S = struct
               * if_feature
                   ( LookupsPerRow 4
                   , (fun () ->
-                      unnormalized_lagrange_basis (false, 0)
+                      unnormalized_lagrange_basis 0
                       * ( cell (var (LookupSorted 3, Curr))
                         - cell (var (LookupSorted 4, Curr)) ) )
                   , fun () ->
@@ -3424,9 +3420,8 @@ module Tock : S = struct
        ; alpha_pow
        ; double
        ; zk_polynomial = _
-       ; omega_to_minus_zk_rows = _
+       ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
-       ; zeta_to_srs_length = _
        ; srs_length_log2 = _
        ; vanishes_on_zero_knowledge_and_previous_rows = _
        ; joint_combiner = _

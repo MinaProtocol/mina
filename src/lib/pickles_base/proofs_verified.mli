@@ -13,13 +13,13 @@ end
 type t = Stable.V1.t = N0 | N1 | N2
 [@@deriving sexp, compare, yojson, hash, equal]
 
-(** [of_nat_exn t_n] converts the type level natural [t_n] to the data type natural.
+(** [of_nat t_n] converts the type level natural [t_n] to the data type natural.
     Raise an exception if [t_n] represents a value above or equal to 3 *)
-val of_nat_exn : 'n Pickles_types.Nat.t -> t
+val of_nat : 'n Pickles_types.Nat.t -> t
 
-(** [of_int_exn n] converts the runtime natural [n] to the data type natural. Raise
+(** [of_int n] converts the runtime natural [n] to the data type natural. Raise
     an exception if the value [n] is above or equal to 3 *)
-val of_int_exn : int -> t
+val of_int : int -> t
 
 (** [to_int v] converts the value [v] to the corresponding integer, i.e [N0 ->
     0], [N1 -> 1] and [N2 -> 2] *)
@@ -36,7 +36,7 @@ module One_hot : sig
   val to_input : zero:'a -> one:'a -> t -> 'a Random_oracle_input.Chunked.t
 
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+    (module Snarky_backendless.Snark_intf.Run with type field = 'f)
     -> ('f Checked.t, t, 'f) Snarky_backendless.Typ.t
 end
 
@@ -55,10 +55,10 @@ module Prefix_mask : sig
   val back : bool vec2 -> t
 
   val typ :
-       (module Snarky_backendless.Snark_intf.Run with type field = 'f)
+    (module Snarky_backendless.Snark_intf.Run with type field = 'f)
     -> ( 'f Checked.t
        , t
        , 'f
        , (unit, 'f) Snarky_backendless.Checked_runner.Simple.t )
-       Snarky_backendless__.Types.Typ.t
+      Snarky_backendless__.Types.Typ.t
 end

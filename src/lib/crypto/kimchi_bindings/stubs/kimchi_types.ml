@@ -178,8 +178,6 @@ type nonrec gate_type =
   | ForeignFieldMul
   | Xor16
   | Rot64
-  | KeccakRound
-  | KeccakSponge
 
 type nonrec lookup_pattern = Xor | Lookup | RangeCheck | ForeignFieldMul
 
@@ -272,6 +270,5 @@ module VerifierIndex = struct
     ; evals : 'poly_comm verification_evals
     ; shifts : 'fr array
     ; lookup_index : 'poly_comm Lookup.t option
-    ; zk_rows : int
     }
 end

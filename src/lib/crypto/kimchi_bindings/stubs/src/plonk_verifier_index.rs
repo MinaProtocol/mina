@@ -194,5 +194,4 @@ pub struct CamlPlonkVerifierIndex<Fr, SRS, PolyComm> {
     pub evals: CamlPlonkVerificationEvals<PolyComm>,
     pub shifts: Vec<Fr>,
     pub lookup_index: Option<CamlLookupVerifierIndex<PolyComm>>,
-    pub zk_rows: ocaml::Int,
 }

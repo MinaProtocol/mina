@@ -38,8 +38,6 @@ module Gate_type = struct
       | ForeignFieldMul
       | Xor16
       | Rot64
-      | KeccakRound
-      | KeccakSponge
     [@@deriving hash, eq, compare, sexp]
   end
 
@@ -93,9 +91,8 @@ module Env = struct
     ; pow : 'a * int -> 'a
     ; square : 'a -> 'a
     ; zk_polynomial : 'a
-    ; omega_to_minus_zk_rows : 'a
+    ; omega_to_minus_3 : 'a
     ; zeta_to_n_minus_1 : 'a
-    ; zeta_to_srs_length : 'a Lazy.t
     ; var : Column.t * curr_or_next -> 'a
     ; field : string -> 'a
     ; cell : 'a -> 'a
@@ -108,7 +105,7 @@ module Env = struct
     ; joint_combiner : 'a
     ; beta : 'a
     ; gamma : 'a
-    ; unnormalized_lagrange_basis : bool * int -> 'a
+    ; unnormalized_lagrange_basis : int -> 'a
     ; if_feature : Kimchi_types.feature_flag * (unit -> 'a) * (unit -> 'a) -> 'a
     }
 end
@@ -135,9 +132,8 @@ module Tick : S = struct
        ; alpha_pow
        ; double
        ; zk_polynomial = _
-       ; omega_to_minus_zk_rows = _
+       ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
-       ; zeta_to_srs_length = _
        ; srs_length_log2 = _
        ; vanishes_on_zero_knowledge_and_previous_rows
        ; joint_combiner
@@ -199,9 +195,8 @@ module Tock : S = struct
        ; alpha_pow
        ; double
        ; zk_polynomial = _
-       ; omega_to_minus_zk_rows = _
+       ; omega_to_minus_3 = _
        ; zeta_to_n_minus_1 = _
-       ; zeta_to_srs_length = _
        ; srs_length_log2 = _
        ; vanishes_on_zero_knowledge_and_previous_rows = _
        ; joint_combiner = _

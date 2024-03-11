@@ -17,6 +17,7 @@
 [%%define slots_per_epoch 720]
 [%%define slots_per_sub_window 7]
 [%%define sub_windows_per_window 11]
+[%%define grace_period_slots 200]
 
 [%%define record_async_backtraces false]
 [%%define time_offsets true]
@@ -46,3 +47,6 @@
 (* 2*block_window_duration *)
 [%%define compaction_interval 360000]
 [%%define vrf_poll_interval 5000]
+[%%undef zkapp_cmd_limit]
+[%%undef slot_tx_end]
+[%%undef slot_chain_end]

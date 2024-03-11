@@ -5,6 +5,8 @@ open Async_kernel
 open Pickles_types
 open Hlist
 
+exception Return_digest of Md5.t
+
 val pad_messages_for_next_wrap_proof :
      (module Pickles_types.Hlist.Maxes.S
         with type length = 'max_proofs_verified
@@ -42,12 +44,8 @@ module type Proof_intf = sig
   val verify_promise : (statement * t) list -> unit Or_error.t Promise.t
 end
 
-type chunking_data = Verify.Instance.chunking_data =
-  { num_chunks : int; domain_size : int; zk_rows : int }
-
 val verify_promise :
-     ?chunking_data:chunking_data
-  -> (module Nat.Intf with type n = 'n)
+     (module Nat.Intf with type n = 'n)
   -> (module Statement_value_intf with type t = 'a)
   -> Verification_key.t
   -> ('a * ('n, 'n) Proof.t) list
@@ -266,20 +264,32 @@ type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =
           *)
   }
 
+module Storables : sig
+  type t =
+    { step_storable : Cache.Step.storable
+    ; step_vk_storable : Cache.Step.vk_storable
+    ; wrap_storable : Cache.Wrap.storable
+    ; wrap_vk_storable : Cache.Wrap.vk_storable
+    }
+
+  val default : t
+end
+
 (** This compiles a series of inductive rules defining a set into a proof
       system for proving membership in that set, with a prover corresponding
       to each inductive rule. *)
 val compile_with_wrap_main_override_promise :
      ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
   -> ?cache:Key_cache.Spec.t list
+  -> ?storables:Storables.t
   -> ?proof_cache:Proof_cache.t
   -> ?disk_keys:
        (Cache.Step.Key.Verification.t, 'branches) Vector.t
        * Cache.Wrap.Key.Verification.t
+  -> ?return_early_digest_exception:bool
   -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
   -> ?override_wrap_main:
        ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic
-  -> ?num_chunks:int
   -> public_input:
        ( 'var
        , 'value

@@ -84,7 +84,6 @@ module Verifier_index_json = struct
     ; evals : 'polyComm verification_evals
     ; shifts : 'fr array
     ; lookup_index : 'polyComm Lookup.t option
-    ; zk_rows : int
     }
   [@@deriving yojson]
 
@@ -101,6 +100,11 @@ module Verifier_index_json = struct
     verifier_index_to_yojson fp
       (fun _ -> `Null)
       (polycomm_to_yojson (or_infinity_to_yojson fq))
+
+  let of_yojson fp fq =
+    verifier_index_of_yojson fp
+      (fun _ -> Ok (Backend.Tock.Keypair.load_urs ()))
+      (polycomm_of_yojson (or_infinity_of_yojson fq))
 end
 
 module Data = struct
@@ -140,10 +144,13 @@ module Stable = struct
           (Impls.Wrap.Verification_key.t
           [@to_yojson
             Verifier_index_json.to_yojson Backend.Tock.Field.to_yojson
-              Backend.Tick.Field.to_yojson] )
+              Backend.Tick.Field.to_yojson]
+          [@of_yojson
+            Verifier_index_json.of_yojson Backend.Tock.Field.of_yojson
+              Backend.Tick.Field.of_yojson] )
       ; data : Data.t
       }
-    [@@deriving fields, to_yojson]
+    [@@deriving fields, to_yojson, of_yojson]
 
     let to_latest = Fn.id
 
@@ -189,7 +196,6 @@ module Stable = struct
              } )
         ; shifts = Common.tock_shifts ~log2_size
         ; lookup_index = None
-        ; zk_rows = 3
         }
       in
       { commitments = c; data = d; index = t }
@@ -209,6 +215,8 @@ module Stable = struct
 end]
 
 let to_yojson = Stable.Latest.to_yojson
+
+let of_yojson = Stable.Latest.of_yojson
 
 let dummy_commitments g =
   let open Plonk_types in

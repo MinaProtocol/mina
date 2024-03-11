@@ -98,6 +98,7 @@
  (modules kimchi_types)
  (instrumentation
   (backend bisect_ppx))
+ (libraries bounded_types)
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess
@@ -107,7 +108,7 @@
  (public_name pasta_bindings)
  (name pasta_bindings)
  (modules pasta_bindings)
- (libraries kimchi_types pasta_bindings.backend)
+ (libraries kimchi_types pasta_bindings.backend bounded_types)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests
@@ -131,7 +132,7 @@
  (public_name kimchi_bindings)
  (name kimchi_bindings)
  (modules kimchi_bindings)
- (libraries bn254_bindings pasta_bindings kimchi_types)
+ (libraries bn254_bindings pasta_bindings kimchi_types bounded_types)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests
@@ -145,6 +146,7 @@
  (modules pasta_bindings_backend)
  (foreign_archives wires_15_stubs)
  (c_library_flags :standard "-lpthread")
+ (libraries bounded_types)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests

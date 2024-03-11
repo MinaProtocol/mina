@@ -8,4 +8,6 @@ module Tock = struct
   module Inner_curve = Kimchi_backend.Pasta.Pasta.Vesta
 end
 
-module Bn254 = Kimchi_backend.Bn254.Bn254_based_plonk
+module Bn254 = struct
+  include Kimchi_backend.Bn254.Bn254_based_plonk
+end

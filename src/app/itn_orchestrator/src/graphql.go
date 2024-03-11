@@ -102,27 +102,35 @@ func (client *SequentialAuthenticator) Do(req *http.Request) (*http.Response, er
 
 var _ graphql.Doer = (*SequentialAuthenticator)(nil)
 
-func GetGqlClient(config Config, addr NodeAddress) (graphql.Client, *int, error) {
-	authenticator := NewAuthenticator(config.Sk, http.DefaultClient)
-	if entry, has := config.NodeData[addr]; has {
-		return entry.Client, entry.LastStatusCode, nil
-	}
+func NewGqlClient(config Config, addr NodeAddress) (*NodeEntry, error) {
 	url := "http://" + string(addr) + "/graphql"
+	authenticator := NewAuthenticator(config.Sk, http.DefaultClient)
 	authClient := graphql.NewClient(url, authenticator)
 	resp, err := auth(config.Ctx, authClient)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to authorize client %s: %v", addr, err)
+		return nil, fmt.Errorf("failed to authorize client %s: %v", addr, err)
 	}
 	seqAuthenticator := NewSequentialAuthenticator(resp.Auth.ServerUuid, resp.Auth.SignerSequenceNumber, authenticator)
 	client := graphql.NewClient(url, seqAuthenticator)
-	config.NodeData[addr] = NodeEntry{
+	return &NodeEntry{
 		Client:          client,
 		Libp2pPort:      resp.Auth.Libp2pPort,
 		PeerId:          resp.Auth.PeerId,
 		IsBlockProducer: resp.Auth.IsBlockProducer,
 		LastStatusCode:  &authenticator.doer.LastStatusCode,
+	}, nil
+}
+
+func GetGqlClient(config Config, addr NodeAddress) (graphql.Client, *int, error) {
+	if entry, has := config.NodeData[addr]; has {
+		return entry.Client, entry.LastStatusCode, nil
 	}
-	return client, &authenticator.doer.LastStatusCode, nil
+	entry, err := NewGqlClient(config, addr)
+	if err != nil {
+		return nil, nil, err
+	}
+	config.NodeData[addr] = *entry
+	return entry.Client, entry.LastStatusCode, nil
 }
 
 func wrapGqlRequest(config Config, nodeAddress NodeAddress, perform func(client graphql.Client) (any, error)) (any, error) {
@@ -209,4 +217,14 @@ func StopDaemonGql(config Config, nodeAddress NodeAddress, clean bool, delaySec 
 		return "", fmt.Errorf("error stoping daemon on %s (delay %d): %v", nodeAddress, delaySec, err)
 	}
 	return resp.(*stopDaemonResponse).StopDaemon, nil
+}
+
+func SetZkappSoftLimitGql(config Config, nodeAddress NodeAddress, limit *int) (*int, error) {
+	resp, err := wrapGqlRequest(config, nodeAddress, func(client graphql.Client) (any, error) {
+		return setZkappSoftLimit(config.Ctx, client, limit)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error setting zkapp soft limit on %s: %v", nodeAddress, err)
+	}
+	return resp.(*setZkappSoftLimitResponse).ZkAppCommandLimit, nil
 }

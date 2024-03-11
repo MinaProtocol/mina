@@ -137,7 +137,8 @@ let%test_module "Archive node unit tests" =
           match%map
             let open Deferred.Result.Let_syntax in
             let%bind user_command_id =
-              Processor.User_command.add_if_doesn't_exist conn user_command
+              Processor.User_command.add_if_doesn't_exist conn ~logger
+                user_command
             in
             let%map result =
               Processor.User_command.find conn ~transaction_hash
@@ -189,7 +190,8 @@ let%test_module "Archive node unit tests" =
               match%map
                 let open Deferred.Result.Let_syntax in
                 let%bind user_command_id =
-                  Processor.User_command.add_if_doesn't_exist conn user_command
+                  Processor.User_command.add_if_doesn't_exist conn ~logger
+                    user_command
                 in
                 let%map result =
                   Processor.User_command.find conn ~transaction_hash
@@ -231,6 +233,7 @@ let%test_module "Archive node unit tests" =
             in
             let%map result =
               Processor.Internal_command.find_opt conn ~transaction_hash
+                ~v1_transaction_hash:false
                 ~command_type:(Processor.Fee_transfer.Kind.to_string kind)
             in
             [%test_result: int] ~expect:fee_transfer_id
@@ -255,6 +258,7 @@ let%test_module "Archive node unit tests" =
             in
             let%map result =
               Processor.Internal_command.find_opt conn ~transaction_hash
+                ~v1_transaction_hash:false
                 ~command_type:Processor.Coinbase.coinbase_command_type
             in
             [%test_result: int] ~expect:coinbase_id (Option.value_exn result)
