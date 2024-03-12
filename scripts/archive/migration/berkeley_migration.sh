@@ -215,7 +215,7 @@ function run_initial_migration() {
     local __blocks_bucket=$5
     local __network=$6
     
-    local __date=$(date '+%Y-%m-%d_%H%M')
+    local __date=$(date '+%Y-%m-%d_%H_%M_%S')
     local __berkely_migration_log="berkeley_migration_$__date.log"
     local __replayer_log="replayer_$__date.log"
     local __config_file="initial_replayer_config_$__date.json"
