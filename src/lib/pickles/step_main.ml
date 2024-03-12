@@ -300,8 +300,8 @@ let step_main :
         in
         (* Compute proof parts outside of the prover before requesting values.
         *)
-        let%map.Promise _r =
-          Async_promise.request (fun () ->
+        let%map.Promise () =
+          Async_promise.unit_request (fun () ->
               let previous_proof_statements =
                 let rec go :
                     type prev_vars prev_values ns1 ns2.

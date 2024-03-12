@@ -161,7 +161,7 @@ module Step = struct
       !unlock () ; res
     with exn -> !unlock () ; raise exn
 
-  module Async_promise = Async' (Promise)
+  module Async_promise = Async_generic (Promise)
 end
 
 module Wrap = struct

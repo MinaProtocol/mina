@@ -93,7 +93,7 @@ module Step : sig
   *)
   val run_async_circuit : (unit -> 'a Promise.t) -> 'a Promise.t
 
-  module Async_promise : module type of Async' (Promise)
+  module Async_promise : module type of Async_generic (Promise)
 end
 
 module Wrap : sig
