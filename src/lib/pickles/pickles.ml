@@ -1227,7 +1227,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
               ~branches:Branches.n ~self ~public_input:(Input typ)
               ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
-              rule ~wrap_domains ~proofs_verifieds
+              rule ~wrap_domains ~proofs_verifieds ~chain_to:(Promise.return ())
             (* TODO? *)
           in
           let step_domains = Vector.singleton inner_step_data.domains in

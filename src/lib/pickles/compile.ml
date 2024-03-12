@@ -477,10 +477,11 @@ struct
       Timer.clock __LOC__ ;
       let rec f :
           type a b c d.
-          (a, b, c, d) H4.T(IR).t -> (a, b, c, d) H4.T(Branch_data).t = function
-        | [] ->
+             (a, b, c, d) H4.T(IR).t * unit Promise.t
+          -> (a, b, c, d) H4.T(Branch_data).t = function
+        | [], _ ->
             []
-        | rule :: rules ->
+        | rule :: rules, chain_to ->
             let first =
               Timer.clock __LOC__ ;
               let res =
@@ -490,13 +491,15 @@ struct
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~public_input ~auxiliary_typ
                       Arg_var.to_field_elements Arg_value.to_field_elements rule
-                      ~wrap_domains ~proofs_verifieds )
+                      ~wrap_domains ~proofs_verifieds ~chain_to )
               in
               Timer.clock __LOC__ ; incr i ; res
             in
-            first :: f rules
+            let (T b) = first in
+            let chain_to = Promise.map b.domains ~f:(fun _ -> ()) in
+            first :: f (rules, chain_to)
       in
-      f choices
+      f (choices, Promise.return ())
     in
     Timer.clock __LOC__ ;
     let step_domains =

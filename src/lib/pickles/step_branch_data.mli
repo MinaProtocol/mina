@@ -103,6 +103,7 @@ val create :
   -> auxiliary_typ:('a, 'b) Impls.Step.Typ.t
   -> 'c
   -> 'd
+  -> chain_to:unit Promise.t
   -> ( 'e
      , 'f
      , 'g
