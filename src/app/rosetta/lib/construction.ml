@@ -17,13 +17,8 @@ module Get_options_metadata =
       }
 
       account(publicKey: $sender, token: $token_id) {
-        balance {
-          blockHeight @ppxCustom(module: "Scalars.UInt32")
-          stateHash
+        inferredNonce
         }
-        nonce
-      }
-      initialPeers
      }
 |}]
 
@@ -322,7 +317,9 @@ module Metadata = struct
         | Some account ->
             M.return account
       in
-      let nonce = Option.value ~default:Unsigned.UInt32.zero account.nonce
+      (* this metadata is for building a transaction, so let's return the
+         inferred nonce of the account *)
+      let nonce = Option.value ~default:Unsigned.UInt32.zero account.inferredNonce
       in
       (* suggested fee *)
       (* Take the median of all the fees in blocks and add a bit extra using
