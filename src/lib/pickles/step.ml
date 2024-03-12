@@ -810,20 +810,17 @@ struct
       ksprintf Common.time "step-prover %d (%d)" branch_data.index
         (Domain.size h) (fun () ->
           [%log internal] "Step_generate_witness_conv" ;
-          let%bind.Promise ( { Impls.Step.Proof_inputs.auxiliary_inputs
-                             ; public_inputs
-                             }
-                           , next_statement_hashed ) =
-            Impls.Step.run_async_circuit (fun () ->
-                let builder =
-                  Impls.Step.generate_witness_manual ~handlers:[ handler ]
-                    ~input_typ:Impls.Step.Typ.unit ~return_typ:input ()
-                in
-                let%map.Promise res =
-                  builder.run_circuit (fun () () ->
-                      Promise.map ~f:conv_inv (main ()) )
-                in
-                builder.finish_computation res )
+          let builder =
+            Impls.Step.generate_witness_manual ~handlers:[ handler ]
+              ~input_typ:Impls.Step.Typ.unit ~return_typ:input ()
+          in
+          let%bind.Promise res =
+            builder.run_circuit (fun () () ->
+                Promise.map ~f:conv_inv (main ()) )
+          in
+          let ( { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
+              , next_statement_hashed ) =
+            builder.finish_computation res
           in
           [%log internal] "Backend_tick_proof_create_async" ;
           let create_proof () =
