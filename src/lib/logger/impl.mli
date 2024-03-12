@@ -69,6 +69,8 @@ module Processor : sig
   val raw : ?log_level:Level.t -> unit -> t
 
   val pretty : log_level:Level.t -> config:Logproc_lib.Interpolator.config -> t
+
+  val raw_structured_log_events : Structured_log_events.Set.t -> t
 end
 
 (** A Transport is a module which represent a destination
@@ -94,6 +96,9 @@ module Transport : sig
       -> num_rotate:int
       -> t
   end
+
+  (** A transport that calls the given function on each log line *)
+  val raw : (string -> unit) -> t
 end
 
 (** The Consumer_registry is a global registry where consumers

@@ -1,4 +1,4 @@
-ARG image=debian:stretch-slim
+ARG image=debian:bullseye-slim
 FROM ${image}
 
 # Run with `docker build --build-arg deb_version=<version>`

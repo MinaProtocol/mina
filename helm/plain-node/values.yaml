@@ -30,3 +30,8 @@ healthcheck:
 
 nodeSelector:
   preemptible: false
+
+storage:
+  accessMode: "ReadWriteOnce"
+  size: "4Gi"
+  storageClass: "standard"

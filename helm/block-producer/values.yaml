@@ -109,3 +109,8 @@ healthcheck:
 
 nodeSelector:
   preemptible: true
+
+storage:
+  accessMode: "ReadWriteOnce"
+  size: "4Gi"
+  storageClass: "standard"

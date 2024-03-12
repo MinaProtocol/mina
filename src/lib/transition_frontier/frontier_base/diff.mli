@@ -59,9 +59,14 @@ end
  *  by transitioning the root.
  *)
 module Root_transition : sig
+  type 'repr root_transition_scan_state =
+    | Lite : lite root_transition_scan_state
+    | Full : Staged_ledger.Scan_state.t -> full root_transition_scan_state
+
   type 'repr t =
     { new_root: Root_data.Limited.Stable.V2.t
     ; garbage: 'repr Node_list.t
+    ; old_root_scan_state: 'repr root_transition_scan_state
     ; just_emitted_a_proof: bool }
 
   type 'repr root_transition = 'repr t

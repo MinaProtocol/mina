@@ -27,12 +27,14 @@ module Statement = struct
 
       type _unused = unit constraint t = Arg.Stable.V1.t
 
+      include Comparable.Make_binable (Arg.Stable.V1)
       include Hashable.Make_binable (Arg.Stable.V1)
     end
   end]
 
   type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson, equal]
 
+  include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make (Stable.Latest)
 
   let gen = One_or_two.gen Transaction_snark.Statement.gen
