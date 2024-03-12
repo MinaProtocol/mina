@@ -13,6 +13,19 @@ ARG DHALL_VERSION=1.41.1
 ARG DHALL_JSON_VERSION=1.7.10
 ARG DHALL_BASH_VERSION=1.0.40
 
+# location of repo used for pins and external package commits
+ARG MINA_DIR=mina
+
+# location of external packages
+ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
+
+# don't keep sources, to force reinstall of pinned packages from Mina sources
+# and to keep Docker image reasonable size
+ENV OPAMKEEPBUILDDIR=false
+ENV OPAMREUSEBUILDDIR=false
+
+ENV DEBIAN_FRONTEND=noninteractive
+
 USER root
 
 # OS package dependencies
@@ -48,9 +61,7 @@ RUN apt-get update --yes \
     postgresql-contrib \
     perl \
     pkg-config \
-    python3-sexpdata \
     rubygems \
-    wget \
     zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
 
@@ -71,8 +82,9 @@ RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_V
     && rm -f deb-s3-${DEBS3_VERSION}.gem
 
 # --- Docker Daemon
-RUN curl -sL https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz \
-    | tar --extract --gzip --strip-components 1 --directory=/usr/bin --file=-
+RUN curl -L -o /tmp/docker-${DOCKER_VERSION}.tgz https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz \
+    && tar -xz -C /tmp -f /tmp/docker-${DOCKER_VERSION}.tgz \
+    && mv /tmp/docker/* /usr/bin
 
 # --- Terraform tools
 RUN curl -fsSL https://apt.releases.hashicorp.com/gpg | \
@@ -101,11 +113,11 @@ RUN curl https://baltocdn.com/helm/signing.asc | apt-key add - \
     && apt-get install --yes --no-install-recommends helm \
     && rm -rf /var/lib/apt/lists/*
 
-# --- yarn + nodejs, pinned version
+# Get yarn + nodejs
 RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - \
-    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - \
-    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
-    && apt update --yes \
+    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
+    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list \
+    && apt update \
     && apt install --yes --no-install-recommends nodejs yarn \
     && rm -rf /var/lib/apt/lists/*
 
