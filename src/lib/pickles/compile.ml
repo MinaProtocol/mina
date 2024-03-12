@@ -248,6 +248,25 @@ module Storables = struct
     }
 end
 
+let create_lock () =
+  let lock = ref (Promise.return ()) in
+
+  let open Promise.Let_syntax in
+  let run_in_sequence (f : unit -> 'a Promise.t) : 'a Promise.t =
+    (* acquire the lock *)
+    let existing_lock = !lock in
+    let unlock = ref (fun () -> ()) in
+    lock := Promise.create (fun resolve -> unlock := resolve) ;
+    (* await the existing lock *)
+    let%bind () = existing_lock in
+    (* run the function and release the lock *)
+    try
+      let%map res = f () in
+      !unlock () ; res
+    with exn -> !unlock () ; raise exn
+  in
+  run_in_sequence
+
 (* turn a vector of promises into a promise of a vector *)
 let promise_all (type a n) (vec : (a Promise.t, n) Vector.t) :
     (a, n) Vector.t Promise.t =
@@ -517,6 +536,7 @@ struct
     in
 
     let all_step_domains = promise_all step_domains in
+    let run_in_sequence = create_lock () in
 
     let cache_handle = ref (Lazy.return (Promise.return `Cache_hit)) in
     let accum_dirty t = cache_handle := Cache_handle.(!cache_handle + t) in
@@ -540,7 +560,7 @@ struct
                    let%bind.Promise main =
                      b.main ~step_domains:all_step_domains
                    in
-                   Impls.Step.run_async_circuit (fun () ->
+                   run_in_sequence (fun () ->
                        let main () () =
                          let%map.Promise res = main () in
                          Impls.Step.with_label "conv_inv" (fun () ->

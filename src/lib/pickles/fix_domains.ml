@@ -77,12 +77,9 @@ let domains (type field gates) ?feature_flags
         Pow_2_roots_of_unity Int.(max lookup_table_length_log2 (ceil_log2 rows))
     }
   in
-  let%map.Promise constraint_system =
-    Impls.Step.run_async_circuit (fun () ->
-        let constraint_builder =
-          Impl.constraint_system_manual ~input_typ:typ ~return_typ
-        in
-        let%map.Promise res = constraint_builder.run_circuit main in
-        constraint_builder.finish_computation res )
+  let constraint_builder =
+    Impl.constraint_system_manual ~input_typ:typ ~return_typ
   in
+  let%map.Promise res = constraint_builder.run_circuit main in
+  let constraint_system = constraint_builder.finish_computation res in
   domains2 constraint_system
