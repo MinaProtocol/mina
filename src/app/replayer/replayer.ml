@@ -1245,10 +1245,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             ; "3NLPbRNQi6JFbh7DW9ibPgRhUnExwGaMpiuGJdEQ6Na47kWcP3PW"
             ; "3NK4EUku6d9fmU3P1t7NnoxsN4sg699JSskJZ4nJs1mWSHs1CL4v"
             ; "3NLDE8xKUvKMiSpLSd9uvnQaRiXYW6MWw7UXpFD2wbq4WeKRAnKM"
-            ; "3NLZYyohgxGFE3hw6o6tfvXnZLoG6gyzr67WNGPFfpugHtoXaFGq"
-            ]
-            @ (*mainnet*)
-            [ "3NKCedb2xxrgiaBFKVpxAJ9Kp7Tu1JG4qCUppJmt3c1RULQYQtrZ"
+            ; "3NLZYyohgxGFE3hw6o6tfvXnZLoG6gyzr67WNGPFfpugHtoXaFGq" (*mainnet*)
+            ; "3NKCedb2xxrgiaBFKVpxAJ9Kp7Tu1JG4qCUppJmt3c1RULQYQtrZ"
             ; "3NKjb8G3Sc4Z5hLckDy2Wg8soZmdghenyAYDuHVF5uNV36Td9DZt"
             ; "3NKKrhT3QX5tUS18kyGkYnjfNCCppgjy9zcZrmtMeNynEce47zpj"
             ; "3NKzdd7UjWLygUvgKfJwd3MVj3PD1GnXDHHGoTLyXinVvSoFRyX5"
