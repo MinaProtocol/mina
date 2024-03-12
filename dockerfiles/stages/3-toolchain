@@ -13,6 +13,19 @@ ARG DHALL_VERSION=1.41.1
 ARG DHALL_JSON_VERSION=1.7.10
 ARG DHALL_BASH_VERSION=1.0.40
 
+# location of repo used for pins and external package commits
+ARG MINA_DIR=mina
+
+# location of external packages
+ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
+
+# don't keep sources, to force reinstall of pinned packages from Mina sources
+# and to keep Docker image reasonable size
+ENV OPAMKEEPBUILDDIR=false
+ENV OPAMREUSEBUILDDIR=false
+
+ENV DEBIAN_FRONTEND=noninteractive
+
 USER root
 
 # OS package dependencies
