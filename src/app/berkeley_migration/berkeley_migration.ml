@@ -554,44 +554,40 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
       in
       let%bind account_ids =
         let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
-        Mina_base.Account_id.Set.to_list account_id_set
+        List.map ~f:(fun account_id ->
+            let index =
+              Mina_ledger.Ledger.index_of_account_exn ledger account_id
+            in
+            (account_id, index) )
+        @@ Mina_base.Account_id.Set.to_list account_id_set
       in
       [%log info] "Found %d accounts in genesis ledger"
         (List.length account_ids) ;
       let%bind account_ids_to_migrate_unsorted =
-        match%bind
+        match%map
           query_migrated_db ~f:(fun db ->
-              Sql.Berkeley.Accounts_accessed.greatest_account_identifier_id db
+              Sql.Berkeley.Accounts_accessed.greatest_ledger_index db
                 genesis_block_id )
         with
         | None ->
-            return account_ids
-        | Some greatest_migrated_account_identifier_id ->
-            let%map last_migrated_account_id =
-              let%map { public_key; token } =
-                query_migrated_db ~f:(fun db ->
-                    Sql.Berkeley.Account_identifiers.load db
-                      greatest_migrated_account_identifier_id )
-              in
-              Mina_base.Account_id.create
-                (Signature_lib.Public_key.Compressed.of_base58_check_exn
-                   public_key )
-                (Mina_base.Token_id.of_string token)
-            in
+            account_ids
+        | Some greatest_migrated_ledger_index ->
             [%log info]
-              "Already migrated accounts through %d, resuming migration"
-              greatest_migrated_account_identifier_id ;
+              "Already migrated accounts through ledger index %d, resuming \
+               migration"
+              greatest_migrated_ledger_index ;
             List.filter
-              ~f:(fun id -> Mina_base.Account_id.(id > last_migrated_account_id))
+              ~f:(fun (_id, index) -> index > greatest_migrated_ledger_index)
               account_ids
       in
       let account_ids_to_migrate =
         List.sort account_ids_to_migrate_unsorted
-          ~compare:Mina_base.Account_id.compare
+          ~compare:(fun (_id_1, index_1) (_id_2, index_2) ->
+            compare index_1 index_2 )
       in
       [%log info] "Migrating %d accounts" (List.length account_ids_to_migrate) ;
       let%bind () =
-        Deferred.List.iter account_ids_to_migrate ~f:(fun acct_id ->
+        Deferred.List.iter account_ids_to_migrate ~f:(fun (acct_id, index) ->
             match Mina_ledger.Ledger.location_of_account ledger acct_id with
             | None ->
                 [%log error] "Could not get location for account"
@@ -599,9 +595,6 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                     [ ("account_id", Mina_base.Account_id.to_yojson acct_id) ] ;
                 failwith "Could not get location for genesis account"
             | Some loc ->
-                let index =
-                  Mina_ledger.Ledger.index_of_account_exn ledger acct_id
-                in
                 let acct =
                   match Mina_ledger.Ledger.get ledger loc with
                   | None ->

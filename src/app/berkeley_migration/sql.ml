@@ -345,13 +345,13 @@ module Berkeley = struct
   end
 
   module Accounts_accessed = struct
-    let greatest_account_identifier_id (module Conn : CONNECTION) =
+    let greatest_ledger_index (module Conn : CONNECTION) =
       Conn.find_opt
         (Caqti_request.find_opt Caqti_type.int Caqti_type.int
-           {sql| SELECT account_identifier_id
+           {sql| SELECT ledger_index
                  FROM accounts_accessed
                  WHERE block_id = $1
-                 ORDER BY account_identifier_id DESC
+                 ORDER BY ledger_index DESC
                  LIMIT 1
            |sql} )
   end
