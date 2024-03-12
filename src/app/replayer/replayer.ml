@@ -1543,8 +1543,13 @@ let () =
              ~doc:"NN Write checkpoint file every NN slots"
              Param.(optional int)
          in
-         if Option.is_some output_repair_script_opt && not (repair_nonces || set_nonces) then
-             (eprintf "--dump-repair-script requires --repair-nonces or --set-nonces" ; exit 1)
-         main ~input_file ~output_file_opt ~archive_uri ~set_nonces
-           ~repair_nonces ~checkpoint_interval ~continue_on_error
-           ~output_repair_script_opt )))
+         if
+           Option.is_some output_repair_script_opt
+           && not (repair_nonces || set_nonces)
+         then
+           ( eprintf
+               "--dump-repair-script requires --repair-nonces or --set-nonces" ;
+             exit 1 )
+             main ~input_file ~output_file_opt ~archive_uri ~set_nonces
+             ~repair_nonces ~checkpoint_interval ~continue_on_error
+             ~output_repair_script_opt )))
