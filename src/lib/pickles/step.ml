@@ -534,20 +534,6 @@ struct
       , witness
       , `Actual_wrap_domain dlog_vk.domain.log_size_of_group )
     in
-    let%bind.Promise prevs =
-      let rec go :
-          type vars values ns ms.
-             (vars, values, ns, ms) H4.T(Tag).t
-          -> (vars, values, ns, ms) H4.T(Types_map.Basic).t Promise.t = function
-        | [] ->
-            Promise.return ([] : _ H4.T(Types_map.Basic).t)
-        | tag :: tags ->
-            let%bind.Promise data = Types_map.lookup_basic tag in
-            let%map.Promise rest = go tags in
-            (data :: rest : _ H4.T(Types_map.Basic).t)
-      in
-      go branch_data.rule.prevs
-    in
     let challenge_polynomial_commitments = ref None in
     let unfinalized_proofs = ref None in
     let statements_with_hashes = ref None in
@@ -558,6 +544,22 @@ struct
     let auxiliary_value = ref None in
     let actual_wrap_domains = ref None in
     let compute_prev_proof_parts prev_proof_requests =
+      [%log internal] "Step_compute_prev_proof_parts" ;
+      let%map.Promise prevs =
+        let rec go :
+            type vars values ns ms.
+               (vars, values, ns, ms) H4.T(Tag).t
+            -> (vars, values, ns, ms) H4.T(Types_map.Basic).t Promise.t =
+          function
+          | [] ->
+              Promise.return ([] : _ H4.T(Types_map.Basic).t)
+          | tag :: tags ->
+              let%bind.Promise data = Types_map.lookup_basic tag in
+              let%map.Promise rest = go tags in
+              (data :: rest : _ H4.T(Types_map.Basic).t)
+        in
+        go branch_data.rule.prevs
+      in
       let ( challenge_polynomial_commitments'
           , unfinalized_proofs'
           , statements_with_hashes'
@@ -625,7 +627,8 @@ struct
       x_hats := Some x_hats' ;
       witnesses := Some witnesses' ;
       prev_proofs := Some prev_proofs' ;
-      actual_wrap_domains := Some actual_wrap_domains'
+      actual_wrap_domains := Some actual_wrap_domains' ;
+      [%log internal] "Step_compute_prev_proof_parts_done"
     in
     let unfinalized_proofs = lazy (Option.value_exn !unfinalized_proofs) in
     let unfinalized_proofs_extended =
@@ -736,10 +739,7 @@ struct
       let k x = respond (Provide x) in
       match request with
       | Req.Compute_prev_proof_parts prev_proof_requests ->
-          [%log internal] "Step_compute_prev_proof_parts" ;
-          compute_prev_proof_parts prev_proof_requests ;
-          [%log internal] "Step_compute_prev_proof_parts_done" ;
-          k ()
+          k (compute_prev_proof_parts prev_proof_requests)
       | Req.Proof_with_datas ->
           k (Option.value_exn !witnesses)
       | Req.Wrap_index ->

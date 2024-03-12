@@ -27,7 +27,7 @@ module Step : sig
           ( prev_values
           , local_signature )
           Hlist.H2.T(Inductive_rule.Previous_proof_statement.Constant).t
-          -> unit Snarky_backendless.Request.t
+          -> unit Promise.t Snarky_backendless.Request.t
       | Proof_with_datas :
           ( prev_values
           , local_signature
