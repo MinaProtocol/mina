@@ -218,9 +218,9 @@ module Status = struct
     let oldest_block_ref = ref None
 
     let real :
-        db:(module Caqti_async.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t =
+        db:(module Mina_caqti.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t =
      fun ~db ~graphql_uri ->
-      let (module Db : Caqti_async.CONNECTION) = db in
+      let (module Db : Mina_caqti.CONNECTION) = db in
       { gql = Get_status_t.query ~graphql_uri
       ; db_oldest_block =
           (fun () ->

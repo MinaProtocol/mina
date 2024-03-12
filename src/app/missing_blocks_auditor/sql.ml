@@ -11,7 +11,7 @@ module Unparented_blocks = struct
            WHERE parent_id IS NULL
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) () = Conn.collect_list query ()
+  let run (module Conn : Mina_caqti.CONNECTION) () = Conn.collect_list query ()
 end
 
 module Missing_blocks_gap = struct
@@ -21,7 +21,7 @@ module Missing_blocks_gap = struct
             WHERE height < $1
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) height = Conn.find query height
+  let run (module Conn : Mina_caqti.CONNECTION) height = Conn.find query height
 end
 
 module Chain_status = struct
@@ -31,7 +31,7 @@ module Chain_status = struct
             WHERE chain_status = 'canonical'
       |sql}
 
-  let run_highest_canonical (module Conn : Caqti_async.CONNECTION) () =
+  let run_highest_canonical (module Conn : Mina_caqti.CONNECTION) () =
     Conn.find query_highest_canonical ()
 
   let query_count_pending_below =
@@ -41,7 +41,7 @@ module Chain_status = struct
             AND height <= ?
       |sql}
 
-  let run_count_pending_below (module Conn : Caqti_async.CONNECTION) height =
+  let run_count_pending_below (module Conn : Mina_caqti.CONNECTION) height =
     Conn.find query_count_pending_below height
 
   let query_canonical_chain =
@@ -69,6 +69,6 @@ module Chain_status = struct
               ORDER BY id ASC
       |sql}
 
-  let run_canonical_chain (module Conn : Caqti_async.CONNECTION) height =
+  let run_canonical_chain (module Conn : Mina_caqti.CONNECTION) height =
     Conn.collect_list query_canonical_chain height
 end

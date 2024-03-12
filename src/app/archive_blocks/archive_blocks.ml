@@ -20,7 +20,7 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
   if Bool.equal precomputed extensional then
     failwith "Must provide exactly one of -precomputed and -extensional" ;
   let logger = Logger.create () in
-  match Caqti_async.connect_pool archive_uri with
+  match Mina_caqti.connect_pool archive_uri with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]

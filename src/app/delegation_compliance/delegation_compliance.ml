@@ -113,7 +113,7 @@ let global_slot_hashes_tbl : (Int64.t, State_hash.t * Ledger_hash.t) Hashtbl.t =
 let pk_tbl : (int, Account.key) Hashtbl.t = Int.Table.create ()
 
 let query_db pool ~f ~item =
-  match%bind Caqti_async.Pool.use f pool with
+  match%bind Mina_caqti.Pool.use f pool with
   | Ok v ->
       return v
   | Error msg ->
@@ -141,7 +141,7 @@ let pk_of_pk_id pool pk_id : Account.key Deferred.t =
   | None -> (
       (* not in cache, consult database *)
       match%map
-        Caqti_async.Pool.use (fun db -> Sql.Public_key.run db pk_id) pool
+        Mina_caqti.Pool.use (fun db -> Sql.Public_key.run db pk_id) pool
       with
       | Ok (Some pk) -> (
           match Signature_lib.Public_key.Compressed.of_base58_check pk with
@@ -162,7 +162,7 @@ let pk_of_pk_id pool pk_id : Account.key Deferred.t =
 let pk_id_of_pk pool pk : int Deferred.t =
   let open Deferred.Let_syntax in
   match%map
-    Caqti_async.Pool.use (fun db -> Sql.Public_key.run_for_id db pk) pool
+    Mina_caqti.Pool.use (fun db -> Sql.Public_key.run_for_id db pk) pool
   with
   | Ok (Some id) ->
       id
@@ -343,7 +343,7 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
         csv_datas
   in
   let archive_uri = Uri.of_string archive_uri in
-  match Caqti_async.connect_pool ~max_size:128 archive_uri with
+  match Mina_caqti.connect_pool ~max_size:128 archive_uri with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]
@@ -603,7 +603,7 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
                 ] ;
             let%bind coinbase_receiver_ids =
               match%map
-                Caqti_async.Pool.use
+                Mina_caqti.Pool.use
                   (fun db ->
                     Sql.Coinbase_receivers_for_block_creator.run db
                       ~block_creator_id:delegatee_id )

@@ -43,11 +43,11 @@ module Subchain = struct
            "b.id = chain.parent_id AND (chain.state_hash <> $2 OR b.state_hash \
             = $2)" )
 
-  let start_from_unparented (module Conn : Caqti_async.CONNECTION)
+  let start_from_unparented (module Conn : Mina_caqti.CONNECTION)
       ~end_state_hash =
     Conn.collect_list query_unparented end_state_hash
 
-  let start_from_specified (module Conn : Caqti_async.CONNECTION)
+  let start_from_specified (module Conn : Mina_caqti.CONNECTION)
       ~start_state_hash ~end_state_hash =
     Conn.collect_list query_from_start (end_state_hash, start_state_hash)
 
@@ -59,7 +59,7 @@ module Subchain = struct
     Caqti_request.collect Caqti_type.unit Archive_lib.Processor.Block.typ
       (sprintf "SELECT %s FROM blocks" comma_fields)
 
-  let all_blocks (module Conn : Caqti_async.CONNECTION) =
+  let all_blocks (module Conn : Mina_caqti.CONNECTION) =
     Conn.collect_list query_all ()
 end
 
@@ -74,7 +74,7 @@ module Blocks_and_user_commands = struct
             WHERE block_id = ?
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+  let run (module Conn : Mina_caqti.CONNECTION) ~block_id =
     Conn.collect_list query block_id
 end
 
@@ -105,7 +105,7 @@ module Block_user_command_tokens = struct
             WHERE block_id = ?
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+  let run (module Conn : Mina_caqti.CONNECTION) ~block_id =
     Conn.collect_list query block_id
 end
 
@@ -130,7 +130,7 @@ module Blocks_and_internal_commands = struct
             WHERE block_id = ?
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+  let run (module Conn : Mina_caqti.CONNECTION) ~block_id =
     Conn.collect_list query block_id
 end
 
@@ -161,7 +161,7 @@ module Block_internal_command_tokens = struct
             WHERE block_id = ?
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+  let run (module Conn : Mina_caqti.CONNECTION) ~block_id =
     Conn.collect_list query block_id
 end
 
@@ -174,7 +174,7 @@ module Blocks_and_zkapp_commands = struct
             WHERE block_id = ?
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+  let run (module Conn : Mina_caqti.CONNECTION) ~block_id =
     Conn.collect_list query block_id
 end
 
@@ -208,6 +208,6 @@ module Block_zkapp_command_tokens = struct
             WHERE block_id = ?
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+  let run (module Conn : Mina_caqti.CONNECTION) ~block_id =
     Conn.collect_list query block_id
 end

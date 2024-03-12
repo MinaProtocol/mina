@@ -1,7 +1,7 @@
 (* sql.ml -- for reading the mainnet and berkeley databases (no writing!) *)
 
 open Core
-open Caqti_async
+open Mina_caqti
 
 module Mainnet = struct
   module Public_key = struct
