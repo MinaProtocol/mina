@@ -107,4 +107,9 @@ EOF
   nix --experimental-features nix-command copy --to "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" --stdin </tmp/nix-paths
 fi
 
+SLOT_TX_END=${SLOT_TX_END:-$((RANDOM%120+30))}
+export SLOT_TX_END
+
+echo "Running HF test with SLOT_TX_END=$SLOT_TX_END"
+
 "$SCRIPT_DIR"/test.sh compatible-devnet/bin/mina fork-devnet/bin/{mina,runtime_genesis_ledger} && echo "HF test completed successfully"
