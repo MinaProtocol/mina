@@ -96,7 +96,7 @@ module Make_verifier (Source : Submission.Data_source) = struct
     let%bind () = Known_blocks.is_valid block_hash in
     let%map () =
       if validate then
-        match Source.snark_work submission with
+        match%bind Deferred.return @@ Source.snark_work submission with
         | None ->
             Deferred.Result.return ()
         | Some

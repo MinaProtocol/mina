@@ -19,7 +19,7 @@ module type Data_source = sig
 
   val block_hash : submission -> string
 
-  val snark_work : submission -> Uptime_service.Proof_data.t option
+  val snark_work : submission -> Uptime_service.Proof_data.t option Or_error.t
 
   val submitter : submission -> Public_key.Compressed.t
 
@@ -44,13 +44,6 @@ module Filesystem = struct
   type t = { block_dir : string; submission_paths : string list }
 
   type submission =
-    { submitted_at : string
-    ; snark_work : Uptime_service.Proof_data.t option
-    ; submitter : Public_key.Compressed.t
-    ; block_hash : string
-    }
-
-  type raw =
     { created_at : string
     ; peer_id : string
     ; snark_work : string option [@default None]
@@ -61,32 +54,21 @@ module Filesystem = struct
     }
   [@@deriving yojson]
 
-  let of_raw meta =
-    let open Result.Let_syntax in
-    let%bind.Result submitter =
-      Public_key.Compressed.of_base58_check meta.submitter
-    in
-    let%map snark_work =
-      match meta.snark_work with
-      | None ->
-          Ok None
-      | Some s ->
-          let%map snark_work = decode_snark_work s in
-          Some snark_work
-    in
-    { submitter
-    ; snark_work
-    ; block_hash = meta.block_hash
-    ; submitted_at = meta.created_at
-    }
-
-  let submitted_at ({ submitted_at; _ } : submission) = submitted_at
+  let submitted_at ({ created_at; _ } : submission) = created_at
 
   let block_hash ({ block_hash; _ } : submission) = block_hash
 
-  let snark_work ({ snark_work; _ } : submission) = snark_work
+  let snark_work ({ snark_work; _ } : submission) =
+    match snark_work with
+    | None ->
+        Ok None
+    | Some s ->
+        let open Result.Let_syntax in
+        let%map snark_work = decode_snark_work s in
+        Some snark_work
 
-  let submitter ({ submitter; _ } : submission) = submitter
+  let submitter ({ submitter; _ } : submission) =
+    Public_key.Compressed.of_base58_check_exn submitter
 
   let load_submissions { submission_paths; _ } =
     Deferred.create (fun ivar ->
@@ -97,14 +79,15 @@ module Filesystem = struct
               try Ok (In_channel.read_all filename)
               with _ -> Error (Error.of_string "Fail to load metadata")
             in
-            let%bind meta =
-              match Yojson.Safe.from_string contents |> raw_of_yojson with
+            let%map t =
+              match
+                Yojson.Safe.from_string contents |> submission_of_yojson
+              with
               | Ppx_deriving_yojson_runtime.Result.Ok a ->
                   Ok a
               | Ppx_deriving_yojson_runtime.Result.Error e ->
                   Error (Error.of_string e)
             in
-            let%map t = of_raw meta in
             t :: acc )
         |> Ivar.fill ivar )
 
@@ -133,16 +116,6 @@ module Cassandra = struct
 
   type submission =
     { created_at : string
-    ; snark_work : Uptime_service.Proof_data.t option
-    ; submitter : Public_key.Compressed.t
-    ; block_hash : string
-    ; submitted_at : string
-    ; submitted_at_date : string
-    ; raw_block : string option [@default None]
-    }
-
-  type raw =
-    { created_at : string
     ; peer_id : string
     ; snark_work : string option [@default None]
     ; remote_addr : string
@@ -155,39 +128,25 @@ module Cassandra = struct
     }
   [@@deriving yojson]
 
-  let of_raw meta =
-    let open Result.Let_syntax in
-    let%bind.Result submitter =
-      Public_key.Compressed.of_base58_check meta.submitter
-    in
-    let%map snark_work =
-      match meta.snark_work with
-      | None ->
-          Ok None
-      | Some s ->
-          let%map snark_work = decode_snark_work s in
-          Some snark_work
-    in
-    ( { submitter
-      ; snark_work
-      ; block_hash = meta.block_hash
-      ; created_at = meta.created_at
-      ; submitted_at_date = meta.submitted_at_date
-      ; submitted_at = meta.submitted_at
-      ; raw_block = meta.raw_block
-      }
-      : submission )
-
   let submitted_at ({ submitted_at; _ } : submission) = submitted_at
 
   let block_hash ({ block_hash; _ } : submission) = block_hash
 
-  let snark_work ({ snark_work; _ } : submission) = snark_work
+  let snark_work ({ snark_work; _ } : submission) =
+    match snark_work with
+    | None ->
+        Ok None
+    | Some s ->
+        let base64 =
+          String.chop_prefix_exn s ~prefix:"0x"
+          |> Hex.Safe.of_hex |> Option.value_exn |> Base64.encode_string
+        in
+        Result.map (decode_snark_work base64) ~f:Option.some
 
-  let submitter ({ submitter; _ } : submission) = submitter
+  let submitter ({ submitter; _ } : submission) =
+    Public_key.Compressed.of_base58_check_exn submitter
 
   let load_submissions { conf; period_start; period_end } =
-    let open Deferred.Or_error.Let_syntax in
     let start_day =
       Time.of_string period_start |> Time.to_date ~zone:Time.Zone.utc
     in
@@ -205,36 +164,23 @@ module Cassandra = struct
         sprintf "submitted_at_date IN (%s)"
           (String.concat ~sep:"," @@ List.map ~f:(sprintf "'%s'") partition_keys)
     in
-    let%bind raw =
-      Cassandra.select ~conf ~parse:raw_of_yojson
-        ~fields:
-          [ "created_at"
-          ; "submitted_at_date"
-          ; "submitted_at"
-          ; "peer_id"
-          ; "snark_work"
-          ; "remote_addr"
-          ; "submitter"
-          ; "block_hash"
-          ; "graphql_control_port"
-          ; "raw_block"
-          ]
-        ~where:
-          (sprintf "%s AND submitted_at >= '%s' AND submitted_at < '%s'"
-             partition period_start period_end )
-        "submissions"
-    in
-    List.fold_right raw ~init:(Ok []) ~f:(fun sub acc ->
-        let open Result.Let_syntax in
-        let%bind l = acc in
-        let snark_work =
-          Option.map sub.snark_work ~f:(fun s ->
-              String.chop_prefix_exn s ~prefix:"0x"
-              |> Hex.Safe.of_hex |> Option.value_exn |> Base64.encode_string )
-        in
-        let%map s = of_raw { sub with snark_work } in
-        s :: l )
-    |> Deferred.return
+    Cassandra.select ~conf ~parse:submission_of_yojson
+      ~fields:
+        [ "created_at"
+        ; "submitted_at_date"
+        ; "submitted_at"
+        ; "peer_id"
+        ; "snark_work"
+        ; "remote_addr"
+        ; "submitter"
+        ; "block_hash"
+        ; "graphql_control_port"
+        ; "raw_block"
+        ]
+      ~where:
+        (sprintf "%s AND submitted_at >= '%s' AND submitted_at < '%s'" partition
+           period_start period_end )
+      "submissions"
 
   let load_from_s3 ~block_hash =
     let aws_cli = Option.value ~default:"/bin/aws" @@ Sys.getenv "AWS_CLI" in
@@ -270,8 +216,7 @@ module Cassandra = struct
                "submitted_at_date = '%s' and submitted_at = '%s' and submitter \
                 = '%s'"
                (List.hd_exn @@ String.split ~on:' ' submission.submitted_at)
-               submission.submitted_at
-               (Public_key.Compressed.to_base58_check submission.submitter) )
+               submission.submitted_at submission.submitter )
           Output.(valid_payload_to_cassandra_updates payload)
     | Error e ->
         Output.display_error @@ Error.to_string_hum e ;
@@ -281,8 +226,7 @@ module Cassandra = struct
                "submitted_at_date = '%s' and submitted_at = '%s' and submitter \
                 = '%s'"
                (List.hd_exn @@ String.split ~on:' ' submission.submitted_at)
-               submission.submitted_at
-               (Public_key.Compressed.to_base58_check submission.submitter) )
+               submission.submitted_at submission.submitter )
           [ ("validation_error", sprintf "'%s'" (Error.to_string_hum e))
           ; ("raw_block", "NULL")
           ; ("snark_work", "NULL")
@@ -304,9 +248,20 @@ module Stdin = struct
 
   let block_hash json = Yojson.Safe.Util.(member "block_hash" json |> to_string)
 
-  let snark_work json = Yojson.Safe.Util.(member "snark_work" json |> to_string)
+  let snark_work json =
+    match
+      Yojson.Safe.Util.(member "snark_work" json |> to_option to_string)
+    with
+    | None ->
+        Ok None
+    | Some s ->
+        let open Result.Let_syntax in
+        let%map prf = decode_snark_work s in
+        Some prf
 
-  let submitter json = Yojson.Safe.Util.(member "submitter" json |> to_string)
+  let submitter json =
+    Yojson.Safe.Util.(member "submitter" json |> to_string)
+    |> Public_key.Compressed.of_base58_check_exn
 
   let load_block submission () =
     Yojson.Safe.Util.(member "raw_block" submission |> to_string)
@@ -344,9 +299,10 @@ module Stdin = struct
             ; ("height", `Null)
             ; ("slot", `Null)
             ; ("verified", `Bool true)
-            ; ("validation_error", `String e)
+            ; ("validation_error", `String (Error.to_string_hum e))
             ]
     in
     Yojson.Safe.Util.combine submission results
     |> Yojson.Safe.pretty_to_channel Out_channel.stdout
+    |> Deferred.Or_error.return
 end
