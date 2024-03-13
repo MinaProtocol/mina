@@ -211,9 +211,37 @@ let cassandra_command =
             Output.display_error @@ Error.to_string_hum e ;
             exit 1)
 
+let stdin_command =
+  Command.async
+    ~summary:"Verify submissions and blocks read from standard input"
+    Command.Let_syntax.(
+      let%map_open config_file = config_flag and no_checks = no_checks_flag in
+      fun () ->
+        let open Deferred.Let_syntax in
+        let logger = Logger.create () in
+        let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
+          instantiate_verify_functions ~logger config_file
+        in
+        let module V = Make_verifier (struct
+          include Submission.Stdin
+
+          let verify_blockchain_snarks = verify_blockchain_snarks
+
+          let verify_transaction_snarks = verify_transaction_snarks
+        end) in
+        match%bind V.process ~validate:(not no_checks) () with
+        | Ok () ->
+            Deferred.unit
+        | Error e ->
+            Output.display_error @@ Error.to_string_hum e ;
+            exit 1)
+
 let command =
   Command.group
     ~summary:"A tool for verifying JSON payload submitted by the uptime service"
-    [ ("fs", filesystem_command); ("cassandra", cassandra_command) ]
+    [ ("fs", filesystem_command)
+    ; ("cassandra", cassandra_command)
+    ; ("stdin", stdin_command)
+    ]
 
 let () = Async.Command.run command
