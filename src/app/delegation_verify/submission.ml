@@ -15,8 +15,6 @@ module type Data_source = sig
 
   type submission
 
-  val is_cassandra : t -> bool
-
   val submitted_at : submission -> string
 
   val block_hash : submission -> string
@@ -27,9 +25,7 @@ module type Data_source = sig
 
   val load_submissions : t -> submission list Deferred.Or_error.t
 
-  val load_block : block_hash:string -> t -> string Deferred.Or_error.t
-
-  val load_block_from_submission : submission -> string Deferred.Or_error.t
+  val load_block : submission -> t -> string Deferred.Or_error.t
 
   val verify_blockchain_snarks :
        (Mina_wire_types.Mina_state_protocol_state.Value.V2.t * Mina_base.Proof.t)
@@ -112,19 +108,14 @@ module Filesystem = struct
             t :: acc )
         |> Ivar.fill ivar )
 
-  let load_block ~block_hash { block_dir; _ } =
+  let load_block (submission : submission) { block_dir; _ } =
     Deferred.create (fun ivar ->
-        let block_path = Printf.sprintf "%s/%s.dat" block_dir block_hash in
+        let block_path =
+          Printf.sprintf "%s/%s.dat" block_dir submission.block_hash
+        in
         ( try Ok (In_channel.read_all block_path)
           with _ -> Error (Error.of_string "Fail to load block") )
         |> Ivar.fill ivar )
-
-  (* Dummy impl, not to be used in the context of Filesystem module.
-     It is only intended to fulfill the interface requirements of the
-     Data_source module signature for the Filesystem module *)
-  let load_block_from_submission submission =
-    let _ = submission in
-    Deferred.Or_error.return "dummy block data"
 
   let output _ (_submission : submission) = function
     | Ok payload ->
@@ -260,7 +251,7 @@ module Cassandra = struct
     Deferred.Or_error.bind (return s3_path) ~f:(fun s3_path ->
         Process.run ~prog:aws_cli ~args:[ "s3"; "cp"; s3_path; "-" ] () )
 
-  let load_block_from_submission (submission : submission) =
+  let load_block (submission : submission) _ =
     let open Deferred.Or_error.Let_syntax in
     match submission.raw_block with
     | None ->
@@ -268,24 +259,6 @@ module Cassandra = struct
         load_from_s3 ~block_hash:submission.block_hash
     | Some b ->
         String.chop_prefix_exn b ~prefix:"0x"
-        |> Hex.Safe.of_hex |> Option.value_exn |> return
-
-  (* The 'blocks' table is no longer actively used in the Cassandra schema.
-     However, 'load_block' is retained for reference purposes and in case of
-     schema rollbacks or data migration needs. *)
-  let load_block ~block_hash { conf; _ } =
-    let open Deferred.Or_error.Let_syntax in
-    let%bind block_data =
-      Cassandra.select ~conf ~parse:block_data_of_yojson ~fields:[ "raw_block" ]
-        ~where:(sprintf "block_hash = '%s'" block_hash)
-        "blocks"
-    in
-    match List.hd block_data with
-    | None ->
-        (* If not found in Cassandra, try loading from S3 *)
-        load_from_s3 ~block_hash
-    | Some b ->
-        String.chop_prefix_exn b.raw_block ~prefix:"0x"
         |> Hex.Safe.of_hex |> Option.value_exn |> return
 
   let output { conf; _ } (submission : submission) = function
