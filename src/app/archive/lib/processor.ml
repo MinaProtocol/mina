@@ -49,12 +49,12 @@ let load_copy' ~default ~local_copies ~typ ~query ~load_elt
       Deferred.return copy
   | None ->
       let t_to_id = ensure_local_copies (module Conn) ~default local_copies in
-      let%bind all_versions =
+      let%bind all_rows =
         Conn.collect_list (Caqti_request.collect Caqti_type.unit typ query) ()
       in
       let%map () =
-        Deferred.List.iter (unwrap all_versions) ~f:(fun typ ->
-            load_elt (module Conn : Mina_caqti.CONNECTION) t_to_id typ )
+        Deferred.List.iter (unwrap all_rows) ~f:(fun row ->
+            load_elt t_to_id row )
       in
       t_to_id
 
@@ -83,7 +83,7 @@ module Public_key = struct
       ~local_copies
       ~typ:Caqti_type.(tup2 int string)
       ~query:{sql| SELECT id, value FROM public_keys |sql}
-      ~load_elt:(fun _conn { id_to_key; key_to_id } (id, keytext) ->
+      ~load_elt:(fun { id_to_key; key_to_id } (id, keytext) ->
         let key = Public_key.Compressed.of_base58_check_exn keytext in
         add_bidi id_to_key key_to_id ~key:id ~data:key ;
         Deferred.unit )
@@ -158,7 +158,7 @@ module Token = struct
       ~typ:Caqti_type.(tup4 int string (option int) (option int))
       ~query:
         {sql| SELECT id, value, owner_public_key_id, owner_token_id FROM tokens |sql}
-      ~load_elt:(fun _conn { id_to_t; value_to_id }
+      ~load_elt:(fun { id_to_t; value_to_id }
                      (id, value, owner_public_key_id, owner_token_id) ->
         let t = { value; owner_public_key_id; owner_token_id } in
         add_bidi_mapped id_to_t value_to_id ~key:id ~data:t ~value ;
@@ -292,7 +292,7 @@ module Voting_for = struct
       ~local_copies
       ~typ:Caqti_type.(tup2 int string)
       ~query:{sql| SELECT id, value FROM voting_for |sql}
-      ~load_elt:(fun _conn t_to_id (id, value) ->
+      ~load_elt:(fun t_to_id (id, value) ->
         Hashtbl.add_exn t_to_id ~key:value ~data:id ;
         Deferred.unit )
 
@@ -337,7 +337,7 @@ module Token_symbols = struct
       ~local_copies
       ~typ:Caqti_type.(tup2 int string)
       ~query:{sql| SELECT id, value FROM token_symbols |sql}
-      ~load_elt:(fun _conn t_to_id (id, value) ->
+      ~load_elt:(fun t_to_id (id, value) ->
         Hashtbl.add_exn t_to_id ~key:value ~data:id ;
         Deferred.unit )
 
@@ -390,7 +390,7 @@ module Account_identifiers = struct
       ~typ:Caqti_type.(tup3 int int int)
       ~query:
         {sql| SELECT id,public_key_id,token_id FROM account_identifiers |sql}
-      ~load_elt:(fun _conn t_to_id (id, public_key_id, token_id) ->
+      ~load_elt:(fun t_to_id (id, public_key_id, token_id) ->
         Hashtbl.add_exn t_to_id ~key:(public_key_id, token_id) ~data:id ;
         Deferred.unit )
 
@@ -748,7 +748,7 @@ module Protocol_versions = struct
       ~typ:Caqti_type.(tup4 int int int int)
       ~query:
         {sql| SELECT id, transaction, network, patch FROM protocol_versions |sql}
-      ~load_elt:(fun _conn t_to_id (id, transaction, network, patch) ->
+      ~load_elt:(fun t_to_id (id, transaction, network, patch) ->
         Hashtbl.add_exn t_to_id ~key:{ transaction; network; patch } ~data:id ;
         Deferred.unit )
 
@@ -879,11 +879,14 @@ module Zkapp_permissions = struct
   let load_copy =
     load_copy'
       ~default:(fun () -> Hashtbl.create (module T))
-      ~local_copies ~typ:Caqti_type.int
-      ~query:{sql| SELECT id FROM zkapp_permissions |sql}
-      ~load_elt:(fun conn t_to_id id ->
-        let%map row = load conn id in
-        Hashtbl.add_exn t_to_id ~key:(unwrap row) ~data:id )
+      ~local_copies
+      ~typ:Caqti_type.(tup2 int typ)
+      ~query:
+        (sprintf {sql| SELECT id, (%s) FROM zkapp_permissions |sql}
+           (String.concat ~sep:"," Fields.names) )
+      ~load_elt:(fun t_to_id (id, t) ->
+        Hashtbl.add_exn t_to_id ~key:t ~data:id ;
+        Deferred.unit )
 
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
       (perms : Permissions.t) ~logger =
@@ -1438,11 +1441,14 @@ module Timing_info = struct
   let load_copy =
     load_copy'
       ~default:(fun () -> Hashtbl.create (module T))
-      ~local_copies ~typ:Caqti_type.int
-      ~query:{sql| SELECT id FROM timing_info |sql}
-      ~load_elt:(fun conn t_to_id id ->
-        let%map row = load conn id in
-        Hashtbl.add_exn t_to_id ~key:(unwrap row) ~data:id )
+      ~local_copies
+      ~typ:Caqti_type.(tup2 int typ)
+      ~query:
+        (sprintf {sql| SELECT id, (%s) FROM timing_info |sql}
+           (String.concat ~sep:"," Fields.names) )
+      ~load_elt:(fun t_to_id (id, t) ->
+        Hashtbl.add_exn t_to_id ~key:t ~data:id ;
+        Deferred.unit )
 
   let find (module Conn : Mina_caqti.CONNECTION) (acc : Account.t) =
     let open Deferred.Result.Let_syntax in
@@ -2925,7 +2931,7 @@ module Accounts_accessed = struct
       ~typ:Caqti_type.(tup2 int int)
       ~query:
         {sql| SELECT block_id,account_identifier_id FROM accounts_accessed |sql}
-      ~load_elt:(fun _conn exists_index key ->
+      ~load_elt:(fun exists_index key ->
         Hash_set.add exists_index key ;
         Deferred.unit )
 
