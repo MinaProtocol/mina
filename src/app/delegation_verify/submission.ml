@@ -278,31 +278,28 @@ module Stdin = struct
     let results =
       match output with
       | Ok (payload : Output.t) ->
-          `Assoc
-            [ ( "state_hash"
-              , `String
-                  (Mina_base.State_hash.to_base58_check payload.state_hash) )
-            ; ( "parent"
-              , `String (Mina_base.State_hash.to_base58_check payload.parent) )
-            ; ("height", `Int (Unsigned.UInt32.to_int payload.height))
-            ; ( "slot"
-              , `Int
-                  (Mina_numbers.Global_slot_since_genesis.to_int payload.slot)
-              )
-            ; ("verified", `Bool true)
-            ; ("validation_error", `Null)
-            ]
+          [ ( "state_hash"
+            , `String (Mina_base.State_hash.to_base58_check payload.state_hash)
+            )
+          ; ( "parent"
+            , `String (Mina_base.State_hash.to_base58_check payload.parent) )
+          ; ("height", `Int (Unsigned.UInt32.to_int payload.height))
+          ; ( "slot"
+            , `Int (Mina_numbers.Global_slot_since_genesis.to_int payload.slot)
+            )
+          ; ("verified", `Bool true)
+          ; ("validation_error", `Null)
+          ]
       | Error e ->
-          `Assoc
-            [ ("state_hash", `Null)
-            ; ("parent", `Null)
-            ; ("height", `Null)
-            ; ("slot", `Null)
-            ; ("verified", `Bool true)
-            ; ("validation_error", `String (Error.to_string_hum e))
-            ]
+          [ ("state_hash", `Null)
+          ; ("parent", `Null)
+          ; ("height", `Null)
+          ; ("slot", `Null)
+          ; ("verified", `Bool true)
+          ; ("validation_error", `String (Error.to_string_hum e))
+          ]
     in
-    Yojson.Safe.Util.combine submission results
+    Json.json_update results submission
     |> Yojson.Safe.pretty_to_channel Out_channel.stdout
     |> Deferred.Or_error.return
 end
