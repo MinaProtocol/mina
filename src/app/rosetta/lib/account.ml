@@ -15,11 +15,11 @@ module Get_balance =
       account(publicKey: $public_key, token: $token_id) {
         balance {
           blockHeight @ppxCustom(module: "Scalars.UInt32")
-          stateHash
+          stateHash @ppxCustom(module: "Scalars.String_json")
           liquid @ppxCustom(module: "Scalars.UInt64")
           total @ppxCustom(module: "Scalars.UInt64")
         }
-        nonce
+        nonce @ppxCustom(module: "Scalars.String_json")
       }
     }
 |}]
@@ -330,26 +330,23 @@ module Balance = struct
       { gql=
           (fun ?token_id:_ ~address:_ () ->
             (* TODO: Add variants to cover every branch *)
-            Result.return
-            @@ object
-                 method account =
-                   Some
-                     (object
-                        method balance =
-                          object
-                            method blockHeight = Unsigned.UInt32.of_int 3
+            Result.return @@
+            { Get_balance.account =
+                   Some {
+                      balance = {
+                          blockHeight = Unsigned.UInt32.of_int 3;
 
-                            method stateHash = Some "STATE_HASH_TIP"
+                            stateHash = Some "STATE_HASH_TIP";
 
-                            method liquid =
-                              Some (Unsigned.UInt64.of_int 66_000)
+                            liquid =
+                              Some (Unsigned.UInt64.of_int 66_000);
 
-                            method total = Unsigned.UInt64.of_int 66_000
-                          end
+                            total = Unsigned.UInt64.of_int 66_000
+                     };
+                     nonce = Some "2";
+                     };
 
-                        method nonce = Some "2"
-                     end)
-               end )
+      } )
       ; db_block_identifier_and_balance_info=
           (fun ~block_query:_ ~address:_ ->
             let balance_info : Balance_info.t =
@@ -400,20 +397,43 @@ module Balance = struct
         in
         {amount with metadata= Some metadata}
       in
-      let%bind block_query =
+     let%bind block_query =
         Query.of_partial_identifier' req.block_identifier
       in
-      let%map block_identifier, {liquid_balance; total_balance}, nonce =
-        env.db_block_identifier_and_balance_info ~block_query ~address
+      let%map block_identifier, liquid_balance, total_balance, nonce, created_via_historical_lookup =
+        match block_query with
+        | Some _ ->
+          let%map block_identifier, {liquid_balance; total_balance}, nonce =
+            env.db_block_identifier_and_balance_info ~block_query ~address in
+          block_identifier, Unsigned.UInt64.of_int64 liquid_balance, Unsigned.UInt64.of_int64 total_balance, Unsigned.UInt64.to_string nonce, true
+        | None ->
+          let%bind gql_response = env.gql ?token_id ~address () in
+          let%bind account =
+            Option.value_map gql_response.Get_balance.account ~f:M.return
+              ~default:(M.fail (Errors.create (`Account_not_found address))) in
+            match account with
+            | {
+              balance={
+                blockHeight;
+                stateHash= Some state_hash;
+                liquid= Some liquid;
+                total;
+              };
+              nonce= Some nonce;
+              } ->
+                let block_identifier = Block_identifier.create (Unsigned.UInt32.to_int64 blockHeight) state_hash in
+                M.return (block_identifier, liquid, total, nonce, false)
+              | _ -> M.fail (Errors.create (`Exception "Error getting balance from GraphQL (node still bootstrapping?)"))
+          
       in
       { Account_balance_response.block_identifier
       ; balances=
           [ make_balance_amount
-              ~liquid_balance:(Unsigned.UInt64.of_int64 liquid_balance)
-              ~total_balance:(Unsigned.UInt64.of_int64 total_balance) ]
-      ; metadata=Some (`Assoc [ ("created_via_historical_lookup", `Bool true )
+              ~liquid_balance
+              ~total_balance ]
+      ; metadata=Some (`Assoc [ ("created_via_historical_lookup", `Bool created_via_historical_lookup )
                               ; ("nonce",
-                                  `String (Unsigned.UInt64.to_string nonce)) ]) }
+                                  `String nonce) ]) }
 
   end
 
@@ -433,6 +453,34 @@ module Balance = struct
           ~actual:
             (Result.return
                { Account_balance_response.block_identifier=
+                   { Block_identifier.index= Int64.of_int 3
+                   ; Block_identifier.hash= "STATE_HASH_TIP" }
+               ; balances=
+                   [ { Amount.value= "66000"
+                     ; currency=
+                         {Currency.symbol= "MINA"; decimals= 9l; metadata= None}
+                     ; metadata=
+                         Some
+                           (`Assoc
+                             [ ("locked_balance", `Intlit "0")
+                             ; ("liquid_balance", `Intlit "66000")
+                             ; ("total_balance", `Intlit "66000") ]) } ]
+               ; metadata= Some (`Assoc [ ("created_via_historical_lookup", `Bool false )
+                                        ; ("nonce", `String "2") ]) })
+    
+    let%test_unit "account exists historical lookup" =
+        Test.assert_ ~f:Account_balance_response.to_yojson
+          ~expected:
+            (Mock.handle ~graphql_uri:(Uri.of_string "http://minaprotocol.com") ~env:Env.mock
+               (Account_balance_request.{
+                  block_identifier= Some (Partial_block_identifier.{ index= Some 4L; hash = None});
+                  network_identifier=(Network_identifier.create "x" "y");
+                  account_identifier=(Account_identifier.create "x");
+                  currencies=[]
+                }))
+          ~actual:
+            (Result.return
+               { Account_balance_response.block_identifier=
                    { Block_identifier.index= Int64.of_int 4
                    ; Block_identifier.hash= "STATE_HASH_BLOCK" }
                ; balances=
@@ -447,7 +495,8 @@ module Balance = struct
                              ; ("total_balance", `Intlit "0") ]) } ]
                ; metadata= Some (`Assoc [ ("created_via_historical_lookup", `Bool true )
                                         ; ("nonce", `String "0") ]) })
-    end )
+    
+                                      end )
 end
 
 let router ~graphql_uri ~logger ~with_db (route : string list) body =
