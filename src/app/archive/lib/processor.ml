@@ -42,7 +42,7 @@ let unwrap t = Result.map_error ~f:Caqti_error.show t |> Result.ok_or_failwith
 let ensure_local_copies (module Conn : Mina_caqti.CONNECTION) ~default tbl =
   Hashtbl.find_or_add ~default tbl (Uri.to_string Conn.source)
 
-let load_local_copy' ~default ~local_copies ~typ ~query ~load_elt
+let load_copy' ~default ~local_copies ~typ ~query ~load_elt
     (module Conn : Mina_caqti.CONNECTION) =
   match Hashtbl.find local_copies (Uri.to_string Conn.source) with
   | Some copy ->
@@ -74,8 +74,8 @@ module Public_key = struct
 
   let local_copies = Hashtbl.create (module String)
 
-  let load_local_copy =
-    load_local_copy'
+  let load_copy =
+    load_copy'
       ~default:(fun () ->
         { id_to_key = Hashtbl.create (module Int)
         ; key_to_id = Hashtbl.create (module Public_key.Compressed)
@@ -89,23 +89,23 @@ module Public_key = struct
         Deferred.unit )
 
   let find (module Conn : Mina_caqti.CONNECTION) (t : Public_key.Compressed.t) =
-    let%map local = load_local_copy (module Conn) in
+    let%map local = load_copy (module Conn) in
     Ok (Hashtbl.find_exn local.key_to_id t)
 
   let find_opt (module Conn : Mina_caqti.CONNECTION)
       (t : Public_key.Compressed.t) =
-    let%map local = load_local_copy (module Conn) in
+    let%map local = load_copy (module Conn) in
     Ok (Hashtbl.find local.key_to_id t)
 
   let find_by_id (module Conn : Mina_caqti.CONNECTION) id =
-    let%map local = load_local_copy (module Conn) in
+    let%map local = load_copy (module Conn) in
     Ok
       ( Hashtbl.find_exn local.id_to_key id
       |> Public_key.Compressed.to_base58_check )
 
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
       (t : Public_key.Compressed.t) =
-    let%bind local = load_local_copy (module Conn) in
+    let%bind local = load_copy (module Conn) in
     let open Deferred.Result.Let_syntax in
     match%bind find_opt (module Conn) t with
     | Some id ->
@@ -148,8 +148,8 @@ module Token = struct
 
   let local_copies = Hashtbl.create (module String)
 
-  let load_local_copy =
-    load_local_copy'
+  let load_copy =
+    load_copy'
       ~default:(fun () ->
         { id_to_t = Hashtbl.create (module Int)
         ; value_to_id = Hashtbl.create (module String)
@@ -171,19 +171,19 @@ module Token = struct
   let table_name = "tokens"
 
   let find_by_id (module Conn : Mina_caqti.CONNECTION) id =
-    let%map local = load_local_copy (module Conn) in
+    let%map local = load_copy (module Conn) in
     Ok (Hashtbl.find_exn local.id_to_t id)
 
   let find (module Conn : Mina_caqti.CONNECTION) token_id =
-    let%map local = load_local_copy (module Conn) in
+    let%map local = load_copy (module Conn) in
     Ok (Hashtbl.find_exn local.value_to_id (Token_id.to_string token_id))
 
   let find_opt (module Conn : Mina_caqti.CONNECTION) token_id =
-    let%map local = load_local_copy (module Conn) in
+    let%map local = load_copy (module Conn) in
     Ok (Hashtbl.find local.value_to_id (Token_id.to_string token_id))
 
   let find_no_owner_opt (module Conn : Mina_caqti.CONNECTION) token_id =
-    let%map local = load_local_copy (module Conn) in
+    let%map local = load_copy (module Conn) in
     let value = Token_id.to_string token_id in
     Ok
       ( match Hashtbl.find local.value_to_id value with
@@ -198,7 +198,7 @@ module Token = struct
 
   let set_owner (module Conn : Mina_caqti.CONNECTION) ~id ~owner_public_key_id
       ~owner_token_id =
-    let%bind local = load_local_copy (module Conn) in
+    let%bind local = load_copy (module Conn) in
     Hashtbl.set local.id_to_t ~key:id
       ~data:
         { (Hashtbl.find_exn local.id_to_t id) with
@@ -218,7 +218,7 @@ module Token = struct
       (id, owner_public_key_id, owner_token_id)
 
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION) token_id =
-    let%bind local = load_local_copy (module Conn) in
+    let%bind local = load_copy (module Conn) in
     let open Deferred.Result.Let_syntax in
     let value = Token_id.to_string token_id in
     match Token_owners.find_owner token_id with
@@ -286,8 +286,8 @@ module Voting_for = struct
 
   let local_copies = Hashtbl.create (module String)
 
-  let load_local_copy =
-    load_local_copy'
+  let load_copy =
+    load_copy'
       ~default:(fun () -> Hashtbl.create (module String))
       ~local_copies
       ~typ:Caqti_type.(tup2 int string)
@@ -297,7 +297,7 @@ module Voting_for = struct
         Deferred.unit )
 
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION) voting_for =
-    let%bind t_to_id = load_local_copy (module Conn) in
+    let%bind t_to_id = load_copy (module Conn) in
     let voting_for = State_hash.to_base58_check voting_for in
     match Hashtbl.find t_to_id voting_for with
     | Some id ->
@@ -331,8 +331,8 @@ module Token_symbols = struct
 
   let local_copies = Hashtbl.create (module String)
 
-  let load_local_copy =
-    load_local_copy'
+  let load_copy =
+    load_copy'
       ~default:(fun () -> Hashtbl.create (module String))
       ~local_copies
       ~typ:Caqti_type.(tup2 int string)
@@ -342,7 +342,7 @@ module Token_symbols = struct
         Deferred.unit )
 
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION) token_symbol =
-    let%bind t_to_id = load_local_copy (module Conn) in
+    let%bind t_to_id = load_copy (module Conn) in
     let open Deferred.Result.Let_syntax in
     match Hashtbl.find t_to_id token_symbol with
     | Some id ->
@@ -379,8 +379,8 @@ module Account_identifiers = struct
 
   let loaded = ref false
 
-  let load_local_copy =
-    load_local_copy'
+  let load_copy =
+    load_copy'
       ~default:(fun () ->
         Hashtbl.create
           ( module struct
@@ -395,7 +395,7 @@ module Account_identifiers = struct
         Deferred.unit )
 
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION) account_id =
-    let%bind t_to_id = load_local_copy (module Conn) in
+    let%bind t_to_id = load_copy (module Conn) in
     let open Deferred.Result.Let_syntax in
     let pk = Account_id.public_key account_id in
     (* this token_id is Token_id.t *)
@@ -418,7 +418,7 @@ module Account_identifiers = struct
         Deferred.Result.return id
 
   let find_opt (module Conn : Mina_caqti.CONNECTION) account_id =
-    let%bind t_to_id = load_local_copy (module Conn) in
+    let%bind t_to_id = load_copy (module Conn) in
     let open Deferred.Result.Let_syntax in
     let pk = Account_id.public_key account_id in
     match%bind Public_key.find_opt (module Conn) pk with
@@ -433,7 +433,7 @@ module Account_identifiers = struct
             return (Hashtbl.find t_to_id (pk_id, tok_id)) )
 
   let find (module Conn : Mina_caqti.CONNECTION) account_id =
-    let%bind t_to_id = load_local_copy (module Conn) in
+    let%bind t_to_id = load_copy (module Conn) in
     let open Deferred.Result.Let_syntax in
     let pk = Account_id.public_key account_id in
     let%bind public_key_id = Public_key.find (module Conn) pk in
@@ -741,8 +741,8 @@ module Protocol_versions = struct
 
   let local_copies = Hashtbl.create (module String)
 
-  let load_local_copy =
-    load_local_copy'
+  let load_copy =
+    load_copy'
       ~default:(fun () -> Hashtbl.create (module T))
       ~local_copies
       ~typ:Caqti_type.(tup4 int int int int)
@@ -755,7 +755,7 @@ module Protocol_versions = struct
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION) ~transaction
       ~network ~patch =
     let t = { transaction; network; patch } in
-    let%bind t_to_id = load_local_copy (module Conn) in
+    let%bind t_to_id = load_copy (module Conn) in
     match Hashtbl.find t_to_id t with
     | Some id ->
         return (Ok id)
@@ -778,7 +778,7 @@ module Protocol_versions = struct
       (transaction, network, patch)
 
   let find_txn_version (module Conn : Mina_caqti.CONNECTION) ~transaction =
-    let%map t_to_id = load_local_copy (module Conn) in
+    let%map t_to_id = load_copy (module Conn) in
     let matching_ids =
       Hashtbl.fold ~init:[]
         ~f:(fun ~key ~data acc ->
@@ -876,8 +876,8 @@ module Zkapp_permissions = struct
 
   let local_copies = Hashtbl.create (module String)
 
-  let load_local_copy =
-    load_local_copy'
+  let load_copy =
+    load_copy'
       ~default:(fun () -> Hashtbl.create (module T))
       ~local_copies ~typ:Caqti_type.int
       ~query:{sql| SELECT id FROM zkapp_permissions |sql}
@@ -922,7 +922,7 @@ module Zkapp_permissions = struct
       ; set_timing = perms.set_timing
       }
     in
-    let%bind t_to_id = load_local_copy (module Conn) in
+    let%bind t_to_id = load_copy (module Conn) in
 
     let open Deferred.Result.Let_syntax in
     match Hashtbl.find t_to_id value with
@@ -1435,8 +1435,8 @@ module Timing_info = struct
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 
-  let load_local_copy =
-    load_local_copy'
+  let load_copy =
+    load_copy'
       ~default:(fun () -> Hashtbl.create (module T))
       ~local_copies ~typ:Caqti_type.int
       ~query:{sql| SELECT id FROM timing_info |sql}
@@ -1474,7 +1474,7 @@ module Timing_info = struct
 
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
       account_identifier_id (timing : Account_timing.t) =
-    let%bind t_to_id = load_local_copy (module Conn) in
+    let%bind t_to_id = load_copy (module Conn) in
     let open Deferred.Result.Let_syntax in
     let slot_to_int64 x =
       Mina_numbers.Global_slot_since_genesis.to_uint32 x
@@ -2914,8 +2914,8 @@ module Accounts_accessed = struct
 
   let local_copies = Hashtbl.create (module String)
 
-  let load_local_copy =
-    load_local_copy'
+  let load_copy =
+    load_copy'
       ~default:(fun () ->
         Hash_set.create
           ( module struct
@@ -2947,7 +2947,7 @@ module Accounts_accessed = struct
 
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION) ~logger
       block_id (ledger_index, (account : Account.t)) =
-    let%bind exists_index = load_local_copy (module Conn) in
+    let%bind exists_index = load_copy (module Conn) in
     let open Deferred.Result.Let_syntax in
     let account_id = Account_id.create account.public_key account.token_id in
     let%bind account_identifier_id =
