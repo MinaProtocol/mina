@@ -124,7 +124,13 @@ let main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
   let copy_uri = make_archive_copy_uri archive_uri in
   [%log info] "Connecting to original database" ;
   let%bind () =
-    match Caqti_async.connect_pool ~max_size:128 archive_uri with
+    match
+      Caqti_async.connect_pool
+        ~pool_config:
+          Caqti_pool_config.(
+            merge_left (default_from_env ()) (create ~max_size:128 ()))
+        archive_uri
+    with
     | Error e ->
         [%log fatal]
           ~metadata:[ ("error", `String (Caqti_error.show e)) ]
@@ -159,7 +165,13 @@ let main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
         ()
   in
   [%log info] "Connecting to copied database" ;
-  match Caqti_async.connect_pool ~max_size:128 copy_uri with
+  match
+    Caqti_async.connect_pool
+      ~pool_config:
+        Caqti_pool_config.(
+          merge_left (default_from_env ()) (create ~max_size:128 ()))
+      copy_uri
+  with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]

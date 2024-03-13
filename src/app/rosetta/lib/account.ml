@@ -65,9 +65,9 @@ module Sql = struct
       Int.pow 2 Genesis_constants.Constraint_constants.compiled.transaction_capacity_log_2
 
     let query_pending =
-      Caqti_request.find_opt
-        Caqti_type.(tup3 string int64 string)
-        Caqti_type.(tup2 (tup4 int64 int64 int64 int64) int)
+      Mina_caqti.find_opt_req
+        Caqti_type.(t3 string int64 string)
+        Caqti_type.(t2 (t4 int64 int64 int64 int64) int)
         {sql|
   WITH RECURSIVE pending_chain AS (
 
@@ -116,9 +116,9 @@ module Sql = struct
 |sql}
 
     let query_canonical =
-      Caqti_request.find_opt
-        Caqti_type.(tup3 string int64 string)
-        Caqti_type.(tup2 (tup4 int64 int64 int64 int64) int)
+      Mina_caqti.find_opt_req
+        Caqti_type.(t3 string int64 string)
+        Caqti_type.(t2 (t4 int64 int64 int64 int64) int)
         {sql|
                 SELECT b.height,b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce,timing_id
 

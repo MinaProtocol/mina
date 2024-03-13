@@ -391,10 +391,10 @@ module Sql = struct
 
       let winner (_, winner) = `Pk winner
 
-      let typ = Caqti_type.(tup2 string string)
+      let typ = Caqti_type.(t2 string string)
     end
 
-    let typ = Caqti_type.(tup3 int Archive_lib.Processor.Block.typ Extras.typ)
+    let typ = Caqti_type.(t3 int Archive_lib.Processor.Block.typ Extras.typ)
 
     let block_fields ?prefix () =
       let names = Archive_lib.Processor.Block.Fields.names in
@@ -405,7 +405,7 @@ module Sql = struct
       String.concat ~sep:"," fields
 
     let query_count_canonical_at_height =
-      Caqti_request.find Caqti_type.int64 Caqti_type.int64
+      Mina_caqti.find_req Caqti_type.int64 Caqti_type.int64
         {sql| SELECT COUNT(*) FROM blocks
               WHERE height = ?
               AND chain_status = 'canonical'
@@ -413,7 +413,7 @@ module Sql = struct
 
     let query_height_canonical =
       let c_fields = block_fields ~prefix:"c." () in
-      Caqti_request.find_opt Caqti_type.int64 typ
+      Mina_caqti.find_opt_req Caqti_type.int64 typ
         (* The archive database will only reconcile the canonical columns for
          * blocks older than k + epsilon
          *)
@@ -437,7 +437,7 @@ module Sql = struct
       let fields = block_fields () in
       let b_fields = block_fields ~prefix:"b." () in
       let c_fields = block_fields ~prefix:"c." () in
-      Caqti_request.find_opt Caqti_type.int64 typ
+      Mina_caqti.find_opt_req Caqti_type.int64 typ
         (* According to the clarification of the Rosetta spec here
          * https://community.rosetta-api.org/t/querying-block-by-just-its-index/84/3 ,
          * it is important to select only the block on the canonical chain for a
@@ -483,7 +483,7 @@ module Sql = struct
 
     let query_hash =
       let b_fields = block_fields ~prefix:"b." () in
-      Caqti_request.find_opt Caqti_type.string typ
+      Mina_caqti.find_opt_req Caqti_type.string typ
         (sprintf
            {|
          SELECT b.id,
@@ -501,8 +501,8 @@ module Sql = struct
 
     let query_both =
       let b_fields = block_fields ~prefix:"b." () in
-      Caqti_request.find_opt
-        Caqti_type.(tup2 string int64)
+      Mina_caqti.find_opt_req
+        Caqti_type.(t2 string int64)
         typ
         (sprintf
            {|
@@ -522,7 +522,7 @@ module Sql = struct
 
     let query_by_id =
       let b_fields = block_fields ~prefix:"b." () in
-      Caqti_request.find_opt Caqti_type.int typ
+      Mina_caqti.find_opt_req Caqti_type.int typ
         (sprintf
            {|
          SELECT b.id,
@@ -540,7 +540,7 @@ module Sql = struct
 
     let query_best =
       let b_fields = block_fields ~prefix:"b." () in
-      Caqti_request.find_opt Caqti_type.unit typ
+      Mina_caqti.find_opt_req Caqti_type.unit typ
         (sprintf
            {|
          SELECT b.id,
@@ -579,7 +579,7 @@ module Sql = struct
           else
             let%bind max_height =
               Conn.find
-                (Caqti_request.find Caqti_type.unit Caqti_type.int64
+                (Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
                    {sql| SELECT MAX(height) FROM blocks |sql} )
                 ()
             in
@@ -636,7 +636,7 @@ module Sql = struct
 
     let typ =
       Caqti_type.(
-        tup3 int Archive_lib.Processor.User_command.Signed_command.typ
+        t3 int Archive_lib.Processor.User_command.Signed_command.typ
           Extras.typ)
 
     let query =
@@ -646,8 +646,8 @@ module Sql = struct
              ~f:(fun n -> "u." ^ n)
              Archive_lib.Processor.User_command.Signed_command.Fields.names
       in
-      Caqti_request.collect
-        Caqti_type.(tup2 int string)
+      Mina_caqti.collect_req
+        Caqti_type.(t2 int string)
         typ
         (sprintf
            {|
@@ -713,12 +713,12 @@ module Sql = struct
 
       let secondary_sequence_no (_, _, _, secondary_seq_no) = secondary_seq_no
 
-      let typ = Caqti_type.(tup4 (option int64) string int int)
+      let typ = Caqti_type.(t4 (option int64) string int int)
     end
 
     let typ =
       Caqti_type.(
-        tup3 int Archive_lib.Processor.Internal_command.typ Extras.typ)
+        t3 int Archive_lib.Processor.Internal_command.typ Extras.typ)
 
     let query =
       let fields =
@@ -727,8 +727,8 @@ module Sql = struct
              ~f:(fun n -> "i." ^ n)
              Archive_lib.Processor.Internal_command.Fields.names
       in
-      Caqti_request.collect
-        Caqti_type.(tup2 int string)
+      Mina_caqti.collect_req
+        Caqti_type.(t2 int string)
         typ
         (sprintf
            {|
@@ -814,10 +814,10 @@ module Sql = struct
             ]
     end
 
-    let typ = Caqti_type.(tup2 int Extras.typ)
+    let typ = Caqti_type.(t2 int Extras.typ)
 
     let query =
-      Caqti_request.collect Caqti_type.int typ
+      Mina_caqti.collect_req Caqti_type.int typ
         {| 
          SELECT zc.id,
                 zc.memo,
@@ -858,7 +858,7 @@ module Sql = struct
 
     let typ =
       Caqti_type.(
-        tup2 Archive_lib.Processor.Zkapp_account_update_body.typ Extras.typ)
+        t2 Archive_lib.Processor.Zkapp_account_update_body.typ Extras.typ)
 
     let query =
       let fields =
@@ -867,8 +867,8 @@ module Sql = struct
              ~f:(fun n -> "zaub." ^ n)
              Archive_lib.Processor.Zkapp_account_update_body.Fields.names
       in
-      Caqti_request.collect
-        Caqti_type.(tup3 int string int)
+      Mina_caqti.collect_req
+        Caqti_type.(t3 int string int)
         typ
         (sprintf
            {|

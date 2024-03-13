@@ -14,7 +14,7 @@ let default_missing_blocks_width = 2000
 
 module Max_block_height = struct
   let query =
-    Caqti_request.find Caqti_type.unit Caqti_type.int
+    Caqti_request.Infix.(Caqti_type.unit ->! Caqti_type.int)
       "SELECT GREATEST(0, MAX(height)) FROM blocks"
 
   let update (module Conn : Caqti_async.CONNECTION) metric_server =
@@ -30,7 +30,7 @@ end
 module Missing_blocks = struct
   (*A block is missing if there is no entry for a specific height. However, if there is an entry then it doesn't necessarily mean that it is part of the main chain. Unparented_blocks will show value > 1 in that case. Look for the last 2000 blocks*)
   let query missing_blocks_width =
-    Caqti_request.find Caqti_type.unit Caqti_type.int
+    Caqti_request.Infix.(Caqti_type.unit ->! Caqti_type.int)
       (Core_kernel.sprintf
          {sql| 
         SELECT COUNT( * )
@@ -55,7 +55,7 @@ module Unparented_blocks = struct
   (* parent_hashes represent ends of chains leading to an orphan block *)
 
   let query =
-    Caqti_request.find Caqti_type.unit Caqti_type.int
+    Caqti_request.Infix.(Caqti_type.unit ->! Caqti_type.int)
       {sql|
            SELECT COUNT( * ) FROM blocks
            WHERE parent_id IS NULL
