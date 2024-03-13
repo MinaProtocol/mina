@@ -289,3 +289,64 @@ module Cassandra = struct
           ; ("verified", "true")
           ]
 end
+
+module Stdin = struct
+  type t = unit
+
+  (* The input contains irrelevant data, which we accept and return back unchanged
+     for convenience. Therefore rather than parse it into a structure, we just
+     extract relevant data, attach our output to the input and return it back to
+     the caller. This also makes us resilient to immaterial changes to the input. *)
+  type submission = Yojson.Safe.t
+
+  let submitted_at json =
+    Yojson.Safe.Util.(member "submitted_at" json |> to_string)
+
+  let block_hash json = Yojson.Safe.Util.(member "block_hash" json |> to_string)
+
+  let snark_work json = Yojson.Safe.Util.(member "snark_work" json |> to_string)
+
+  let submitter json = Yojson.Safe.Util.(member "submitter" json |> to_string)
+
+  let load_block submission () =
+    Yojson.Safe.Util.(member "raw_block" submission |> to_string)
+    |> Base64.decode_exn |> Deferred.Or_error.return
+
+  let load_submissions () =
+    Yojson.Safe.from_channel In_channel.stdin
+    |> Yojson.Safe.Util.to_list |> Deferred.Or_error.return
+
+  (* It is requested that we return the whole input we got back with some extra data
+     attached. So here we extract the data from the payload and combine it with the
+     submission JSON. *)
+  let output () submission output =
+    let results =
+      match output with
+      | Ok (payload : Output.t) ->
+          `Assoc
+            [ ( "state_hash"
+              , `String
+                  (Mina_base.State_hash.to_base58_check payload.state_hash) )
+            ; ( "parent"
+              , `String (Mina_base.State_hash.to_base58_check payload.parent) )
+            ; ("height", `Int (Unsigned.UInt32.to_int payload.height))
+            ; ( "slot"
+              , `Int
+                  (Mina_numbers.Global_slot_since_genesis.to_int payload.slot)
+              )
+            ; ("verified", `Bool true)
+            ; ("validation_error", `Null)
+            ]
+      | Error e ->
+          `Assoc
+            [ ("state_hash", `Null)
+            ; ("parent", `Null)
+            ; ("height", `Null)
+            ; ("slot", `Null)
+            ; ("verified", `Bool true)
+            ; ("validation_error", `String e)
+            ]
+    in
+    Yojson.Safe.Util.combine submission results
+    |> Yojson.Safe.pretty_to_channel Out_channel.stdout
+end
