@@ -108,11 +108,10 @@ module Sql = struct
                 LIMIT 1
 |sql}
 
-    let run (module Conn : Caqti_async.CONNECTION) requested_block_height
-        address =
+    let run (module Conn : Caqti_async.CONNECTION) ~requested_block_height
+        ~address ~token_id =
       let open Deferred.Result.Let_syntax in
       let%bind has_canonical_height = Sql.Block.run_has_canonical_height (module Conn) ~height:requested_block_height in
-      let token_id = Mina_base.Token_id.(to_string default) in
       Conn.find_opt
         (if has_canonical_height then query_canonical else query_pending)
         (address, requested_block_height, token_id)
@@ -192,10 +191,8 @@ module Sql = struct
     let balance_info : Balance_info.t = {liquid_balance; total_balance} in
     Deferred.Result.return (balance_info, nonce)
 
-  (* TODO: either address will have to include a token id, or we pass the
-     token id separately, make it optional and use the default token if omitted
-  *)
-  let run ~graphql_uri (module Conn : Caqti_async.CONNECTION) block_query address =
+  let run ~graphql_uri (module Conn : Caqti_async.CONNECTION) ~block_query
+      ~address ~token_id =
     let open Deferred.Result.Let_syntax in
     (* First find the block referenced by the block identifier. Then
        find the latest block no later than it that has a user or
@@ -222,7 +219,7 @@ module Sql = struct
     let%bind last_relevant_command_info_opt =
       Balance_from_last_relevant_command.run
         (module Conn)
-        requested_block_height address
+        ~requested_block_height ~address ~token_id
       |> Errors.Lift.sql
            ~context:
            "Finding balance at last relevant internal or user command."
@@ -258,6 +255,7 @@ module Balance = struct
         ; db_block_identifier_and_balance_info:
                block_query:Block_query.t
             -> address:string
+            -> token_id:string
             -> (Block_identifier.t * Balance_info.t * Unsigned.UInt64.t, Errors.t) M.t
         ; validate_network_choice: network_identifier:Network_identifier.t -> graphql_uri:Uri.t -> (unit, Errors.t) M.t }
     end
@@ -281,9 +279,9 @@ module Balance = struct
                  ())
               graphql_uri )
       ; db_block_identifier_and_balance_info=
-          (fun ~block_query ~address ->
+          (fun ~block_query ~address ~token_id ->
             let (module Conn : Caqti_async.CONNECTION) = db in
-            Sql.run ~graphql_uri (module Conn) block_query address )
+            Sql.run ~graphql_uri (module Conn) ~block_query ~address ~token_id )
       ; validate_network_choice= Network.Validate_choice.Real.validate }
 
     let dummy_block_identifier =
@@ -311,7 +309,7 @@ module Balance = struct
 
       } )
       ; db_block_identifier_and_balance_info=
-          (fun ~block_query:_ ~address:_ ->
+          (fun ~block_query:_ ~address:_ ~token_id:_ ->
             let balance_info : Balance_info.t =
               {liquid_balance= 0L; total_balance= 0L}
             in
@@ -367,7 +365,9 @@ module Balance = struct
         match block_query with
         | Some _ ->
           let%map block_identifier, {liquid_balance; total_balance}, nonce =
-            env.db_block_identifier_and_balance_info ~block_query ~address in
+            env.db_block_identifier_and_balance_info ~block_query ~address
+              ~token_id:(Option.value token_id
+                            ~default:Mina_base.Token_id.(to_string default)) in
           block_identifier, Unsigned.UInt64.of_int64 liquid_balance, Unsigned.UInt64.of_int64 total_balance, Unsigned.UInt64.to_string nonce, true
         | None ->
           let%bind gql_response = env.gql ?token_id ~address () in
