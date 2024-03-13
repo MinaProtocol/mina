@@ -389,7 +389,7 @@ module Account_identifiers = struct
       ~local_copies
       ~typ:Caqti_type.(tup3 int int int)
       ~query:
-        {sql| SELECT block_id,account_identifier_id FROM accounts_accessed |sql}
+        {sql| SELECT id,public_key_id,token_id FROM account_identifiers |sql}
       ~load_elt:(fun _conn t_to_id (id, public_key_id, token_id) ->
         Hashtbl.add_exn t_to_id ~key:(public_key_id, token_id) ~data:id ;
         Deferred.unit )
