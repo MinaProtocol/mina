@@ -777,7 +777,7 @@ module Protocol_versions = struct
          (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()) )
       (transaction, network, patch)
 
-  let find_txn_version (module Conn : Mina_caqti.CONNECTION) ~transaction =
+  let find_by_txn_version (module Conn : Mina_caqti.CONNECTION) ~transaction =
     let%map t_to_id = load_copy (module Conn) in
     let matching_ids =
       Hashtbl.fold ~init:[]
@@ -894,7 +894,7 @@ module Zkapp_permissions = struct
       Mina_numbers.Txn_version.to_int @@ snd perms.set_verification_key
     in
     let%bind versions =
-      Protocol_versions.find_txn_version (module Conn) ~transaction:txn_version
+      Protocol_versions.find_by_txn_version (module Conn) ~transaction:txn_version
     in
     ( match versions with
     | Ok [] ->
