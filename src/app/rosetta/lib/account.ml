@@ -24,35 +24,6 @@ module Get_balance =
     }
 |}]
 
-module Node_runtime_config =
-[%graphql
-{|
- query runtime_config {
-   runtimeConfig
- }
-|}]
-
-let genesis_ledger_balance ~graphql_uri public_key : (Unsigned.UInt64.t, Errors.t) Deferred.Result.t =
-  let open Deferred.Result.Let_syntax in
-  let%bind gql_response = Graphql.query (Node_runtime_config.make ()) graphql_uri in
-  let%map config =
-    (gql_response.Node_runtime_config.runtimeConfig :> Yojson.Safe.t)
-    |> Runtime_config.of_yojson
-    |> Result.map_error ~f:(fun e -> Errors.create @@ `Graphql_mina_query e)
-    |> Deferred.return
-  in
-  let balance =
-    let open Option.Let_syntax in
-    let%bind ledger = config.ledger in
-    match ledger.base with
-      | Runtime_config.Ledger.Accounts accounts ->
-         let open Runtime_config.Accounts.Single in
-         let%map account = List.find accounts ~f:(fun a -> String.equal a.pk public_key) in
-         MinaCurrency.Balance.to_uint64 account.balance
-      | _ -> None
-  in
-  Option.value balance ~default:Unsigned.UInt64.zero
-
 module Balance_info = struct
   type t = {liquid_balance: int64; total_balance: int64}
            [@@deriving yojson]
@@ -263,17 +234,9 @@ module Sql = struct
     let%bind (balance_info, nonce) =
       match last_relevant_command_info_opt with
       | None ->
-         (* No relevant command info means there were no transactions involving
-            the account yet, so it must retain its original balance. *)
-         let%bind total_balance = genesis_ledger_balance ~graphql_uri address in
-         let last_relevant_command_info =
-           (0L, 1L, Unsigned.UInt64.to_int64 total_balance, 0L)
-         in
-         find_current_balance
-           (module Conn)
-           ~requested_block_global_slot_since_genesis
-           ~last_relevant_command_info
-           ()
+         (* account doesn' exist yet at the request block, return zero balance *)
+          let nonce = Unsigned.UInt64.of_int 0 in
+         Deferred.Result.return ({Balance_info.liquid_balance=0L; total_balance=0L}, nonce)
       | Some (last_relevant_command_info, timing_id) ->
          find_current_balance
            (module Conn)
