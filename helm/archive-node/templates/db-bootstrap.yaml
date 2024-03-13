@@ -48,7 +48,7 @@ spec:
         args:
         - 'sleep 30
         && cd /tmp
-        && {{ range .Values.archive.remoteSchemaAuxFiles }} wget -O {{.}} && {{ end }}
+        && {{ range .Values.archive.remoteSchemaAuxFiles }} wget {{.}} && {{ end }}
         psql
         --username {{ .Values.postgresql.auth.username }}
         --host {{ tpl .Values.archive.postgresHost . }}
