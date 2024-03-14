@@ -161,6 +161,7 @@ copy_common_daemon_configs() {
   # --- Copy artifacts
   cp ../src/app/rosetta/*.conf "${BUILDDIR}/etc/mina/rosetta"
   cp ../src/app/rosetta/*.sh "${BUILDDIR}/etc/mina/rosetta"
+  cp ../scripts/archive/download-missing-blocks.sh "${BUILDDIR}/etc/mina/rosetta"
 
   cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
@@ -331,6 +332,11 @@ build_archive_deb () {
   cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
   cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
   
+  cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
+  
+  mkdir -p "${BUILDDIR}/etc/mina/archive"
+  cp ../scripts/archive/download-missing-blocks.sh "${BUILDDIR}/etc/mina/archive"
+  
   cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-replayer"
   cp ./default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILDDIR}/usr/local/bin/mina-swap-bad-balances"
@@ -352,6 +358,7 @@ build_archive_migration_deb () {
  Compatible with Mina Daemon'
 
   cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
+  cp ./default/src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-verifier"
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-migration-replayer"
 
   build_deb "$ARCHIVE_MIGRATION_DEB"
