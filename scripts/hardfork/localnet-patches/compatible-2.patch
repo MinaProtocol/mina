@@ -1,12 +1,48 @@
-From e8f7671b3e1b685d62c5f378fa23c5a0bbaf5dcf Mon Sep 17 00:00:00 2001
+From adbd5d42493835788b5519b1ec2ad527dbdfaf5c Mon Sep 17 00:00:00 2001
 From: georgeee <george.agapov@gmail.com>
 Date: Thu, 29 Feb 2024 12:37:58 +0100
 Subject: [PATCH] Port runtime_genesis_ledger from Berkeley (without SHA3 hash)
 
 ---
+ nix/ocaml.nix                                 |  11 +-
  src/app/runtime_genesis_ledger/dune           |  12 +-
  .../runtime_genesis_ledger.ml                 | 174 ++++++++++++++----
+ 3 files changed, 150 insertions(+), 47 deletions(-)
 
+diff --git a/nix/ocaml.nix b/nix/ocaml.nix
+index ebdd36800d..76a71a6a86 100644
+--- a/nix/ocaml.nix
++++ b/nix/ocaml.nix
+@@ -174,17 +174,14 @@ let
+         buildPhase = ''
+           dune build --display=short \
+             src/app/logproc/logproc.exe \
+-            src/app/cli/src/mina.exe \
+-            src/app/batch_txn_tool/batch_txn_tool.exe \
+-            src/app/cli/src/mina_testnet_signatures.exe \
+-            src/app/cli/src/mina_mainnet_signatures.exe \
+-            src/app/rosetta/rosetta.exe \
++            src/app/cli/
+             src/app/rosetta/rosetta_testnet_signatures.exe \
+             src/app/rosetta/rosetta_mainnet_signatures.exe \
+             src/app/generate_keypair/generate_keypair.exe \
++            src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+             src/lib/mina_base/sample_keypairs.json \
+             -j$NIX_BUILD_CORES
+-          dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
++          # dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
+           dune build @doc || true
+         '';
+ 
+@@ -193,7 +190,7 @@ let
+ 
+         installPhase = ''
+           mkdir -p $out/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
+-          mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
++          # mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
+           pushd _build/default
+           cp src/app/cli/src/mina.exe $out/bin/mina
+           cp src/app/logproc/logproc.exe $out/bin/logproc
 diff --git a/src/app/runtime_genesis_ledger/dune b/src/app/runtime_genesis_ledger/dune
 index 2dd27537d5..c989d10cfe 100644
 --- a/src/app/runtime_genesis_ledger/dune
