@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
-set -o pipefail
+set -eo pipefail
 
 export MINA_LIBP2P_PASS=
 export MINA_PRIVKEY_PASS=

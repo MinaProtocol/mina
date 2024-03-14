@@ -17,7 +17,7 @@
 # switches the branch with git) and nix builds put to `compatible-devnet`
 # and `fork-devnet` symlinks (located in $PWD).
 
-set -eo pipefail
+set -exo pipefail
 
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
 
