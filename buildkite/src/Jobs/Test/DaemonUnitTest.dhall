@@ -37,6 +37,7 @@ Pipeline.build
         S.strictlyStart (S.contains "src/nonconsensus"),
         S.strictly (S.contains "Makefile"),
         S.exactly "buildkite/src/Jobs/Test/DaemonUnitTest" "dhall",
+        S.exactly "buildkite/src/Constants/ContainerImages" "dhall",
         S.exactly "scripts/link-coredumps" "sh",
         S.exactly "buildkite/scripts/unit-test" "sh"
       ]
