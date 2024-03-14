@@ -98,7 +98,7 @@ if [[ $latest_slot -ge $SLOT_TX_END ]]; then
   exit 3
 fi
 
-expected_fork_data="{\"blockchain_length\":$latest_height,\"global_slot_since_genesis\":$latest_slot,\"state_hash\":\"$latest_shash\"}"
+expected_fork_data="{\"fork\":{\"blockchain_length\":$latest_height,\"global_slot_since_genesis\":$latest_slot,\"state_hash\":\"$latest_shash\"},\"next_seed\":\"${latest_ne[$IX_NEXT_EPOCH_SEED]}\",\"staking_seed\":\"${latest_ne[$IX_CUR_EPOCH_SEED]}\"}"
 
 # 4. Check that no new blocks are created
 sleep 1m
@@ -123,32 +123,52 @@ done
 # 7. Runtime config is converted with a script to have only ledger hashes in the config
 stop_nodes "$MAIN_MINA_EXE"
 
-fork_data="$(jq -cS '.proof.fork' localnet/fork_config.json)"
+fork_data="$(jq -cS '{fork:.proof.fork,next_seed:.epoch_data.next.seed,staking_seed:.epoch_data.staking.seed}' localnet/fork_config.json)"
 if [[ "$fork_data" != "$expected_fork_data" ]]; then
   echo "Assertion failed: unexpected fork data" >&2
   exit 3
 fi
 
-# TODO run compatible's runtime_genesis_ledger (using exe "$MAIN_RUNTIME_GENESIS_LEDGER_EXE", similar how it's
-# done below but with different 
-"$MAIN_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/hf_ledgers --hash-output-file localnet/hf_ledger_hashes.json
+"$MAIN_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/prefork_hf_ledgers --hash-output-file localnet/prefork_hf_ledger_hashes.json
 
-# TODO compare resulting (throwaway) hashes file to what is expected:
-# From slot_tx_end calculate the epoch `e`.
-# Compare ${last_snarked_hash_pe[${epochs[$e-2]}]} to staking ledger hash of hashes
-# and ${last_snarked_hash_pe[${epochs[$e-2]}]} to the next ledger
-# (if e < 2, use $genesis_epoch_staking_hash
-# and $genesis_epoch_next_hash to avoid a negative index calling on a bash array)
-#
-# Sha3 hashes are not to be considered
-#
-# Compare genesis ledger hash of hashes to ${latest_ne[$IX_STAGED_HASH]}
-# Compare seeds of fork config to ${latest_ne[$IX_CUR_EPOCH_SEED]}
-# and ${latest_ne[$IX_CUR_EPOCH_SEED]} respectively
-#
-# For comparing against fork config it's easiest to modify $expected_fork_data and related comparison above
-# And use similar technique for hashes file check
-# Exit 3 if either check fails
+# Finds staking ledger hash corresponding to an epoch given as $1 parameter
+function find_staking_hash(){
+  e=$1
+  if [[ $e == 0 ]]; then
+    echo $genesis_epoch_staking_hash
+  elif [[ $e == 1 ]]; then
+    echo $genesis_epoch_next_hash
+  else
+    ix=0
+    e_=$((e-2))
+    for el in "${epochs[@]}"; do
+      [[ "$el" == $e_ ]] && break
+      ix=$((ix+1))
+    done
+    if [[ $ix == ${#epochs[@]} ]]; then
+      echo "Assertion failed: last snarked ledger for epoch $e_ wasn't captured"
+      exit 3
+    fi
+    echo ${last_snarked_hash_pe[$ix]}
+  fi
+}
+
+slot_tx_end_epoch=$((SLOT_TX_END/48))
+
+expected_staking_hash=$(find_staking_hash $slot_tx_end_epoch)
+expected_next_hash=$(find_staking_hash $((slot_tx_end_epoch+1)))
+
+expected_prefork_hashes="{\"epoch_data\":{\"next\":{\"hash\":\"$expected_next_hash\"},\"staking\":{\"hash\":\"$expected_staking_hash\"}},\"ledger\":{\"hash\":\"${latest_ne[$IX_STAGED_HASH]}\"}}"
+
+# SHA3 hashes are not checked, because this is irrelevant to
+# checking that correct ledgers are used
+prefork_hashes_select='{epoch_data:{staking:{hash:.epoch_data.staking.hash},next:{hash:.epoch_data.next.hash}},ledger:{hash:.ledger.hash}}'
+
+prefork_hashes="$(jq -cS "$prefork_hashes_select" localnet/prefork_hf_ledger_hashes.json)"
+if [[ "$prefork_hashes" != "$expected_prefork_hashes" ]]; then
+  echo "Assertion failed: unexpected ledgers in fork_config" >&2
+  exit 3
+fi
 
 sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "1"}/' localnet/fork_config.json
 
