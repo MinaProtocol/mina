@@ -279,9 +279,8 @@ module Balance = struct
     (* But for tests, we want things to go fast *)
     module Mock = T (Result)
 
-    let real :
-        db:(module Caqti_async.CONNECTION) -> graphql_uri:Uri.t -> 'gql Real.t =
-     fun ~db ~graphql_uri ->
+    let real : with_db:_ -> graphql_uri:Uri.t -> 'gql Real.t =
+     fun ~with_db ~graphql_uri ->
       { gql =
           (fun ?token_id ~address () ->
             Graphql.query
@@ -298,9 +297,13 @@ module Balance = struct
               graphql_uri )
       ; db_block_identifier_and_balance_info =
           (fun ~block_query ~address ~token_id ->
-            let (module Conn : Caqti_async.CONNECTION) = db in
-            Sql.run ~graphql_uri (module Conn) ~block_query ~address ~token_id
-            )
+            with_db (fun ~db ->
+                let (module Conn : Caqti_async.CONNECTION) = db in
+                Sql.run ~graphql_uri
+                  (module Conn)
+                  ~block_query ~address ~token_id
+                |> Errors.Lift.wrap )
+            |> Errors.Lift.unwrap )
       ; validate_network_choice = Network.Validate_choice.Real.validate
       }
 
@@ -534,44 +537,41 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
   [%log info] "Account query" ~metadata:[ ("query", body) ] ;
   match route with
   | [ "balance" ] ->
-      with_db (fun ~db ->
-          let body =
-            (* workaround: rosetta-cli with view:balance does not seem to have a way to submit the
-               currencies list, so supply it here
-            *)
-            match body with
-            | `Assoc items -> (
-                match
-                  List.Assoc.find items "currencies" ~equal:String.equal
-                with
-                | Some _ ->
-                    body
-                | None ->
-                    `Assoc
-                      ( items
-                      @ [ ( "currencies"
-                          , `List
-                              [ `Assoc
-                                  [ ("symbol", `String "MINA")
-                                  ; ("decimals", `Int 9)
-                                  ]
-                              ] )
-                        ] ) )
-            | _ ->
-                (* will fail on JSON parse below *)
+      let body =
+        (* workaround: rosetta-cli with view:balance does not seem to have a way to submit the
+           currencies list, so supply it here
+        *)
+        match body with
+        | `Assoc items -> (
+            match List.Assoc.find items "currencies" ~equal:String.equal with
+            | Some _ ->
                 body
-          in
-          let%bind req =
-            Errors.Lift.parse ~context:"Request"
-            @@ Account_balance_request.of_yojson body
-            |> Errors.Lift.wrap
-          in
-          let%map res =
-            Balance.Real.handle ~graphql_uri
-              ~env:(Balance.Env.real ~db ~graphql_uri)
-              req
-            |> Errors.Lift.wrap
-          in
-          Account_balance_response.to_yojson res )
+            | None ->
+                `Assoc
+                  ( items
+                  @ [ ( "currencies"
+                      , `List
+                          [ `Assoc
+                              [ ("symbol", `String "MINA")
+                              ; ("decimals", `Int 9)
+                              ]
+                          ] )
+                    ] ) )
+        | _ ->
+            (* will fail on JSON parse below *)
+            body
+      in
+      let%bind req =
+        Errors.Lift.parse ~context:"Request"
+        @@ Account_balance_request.of_yojson body
+        |> Errors.Lift.wrap
+      in
+      let%map res =
+        Balance.Real.handle ~graphql_uri
+          ~env:(Balance.Env.real ~with_db ~graphql_uri)
+          req
+        |> Errors.Lift.wrap
+      in
+      Account_balance_response.to_yojson res
   | _ ->
       Deferred.Result.fail `Page_not_found

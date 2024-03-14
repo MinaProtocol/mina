@@ -1,4 +1,3 @@
-(* Avoid shadowing graphql_ppx functions *)
 open Core_kernel
 open Async
 open Rosetta_lib

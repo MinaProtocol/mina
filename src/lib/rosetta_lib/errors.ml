@@ -72,6 +72,9 @@ module T : sig
 
     val wrap :
       ('a, t) Deferred.Result.t -> ('a, [> `App of t ]) Deferred.Result.t
+
+    val unwrap :
+      ('a, [< `App of t ]) Deferred.Result.t -> ('a, t) Deferred.Result.t
   end
 end = struct
   type t = { extra_context : string option; kind : Variant.t }
@@ -401,6 +404,8 @@ end = struct
         res
 
     let wrap t = Deferred.Result.map_error ~f:(fun e -> `App e) t
+
+    let unwrap t = Deferred.Result.map_error ~f:(function `App e -> e) t
   end
 end
 

@@ -1076,12 +1076,8 @@ module Submit = struct
   module Mock = Impl (Result)
 end
 
-let router ~get_graphql_uri_or_error
-    ~(with_db :
-          (   db:(module Caqti_async.CONNECTION)
-           -> (Yojson.Safe.t, [> `App of Errors.t ]) Deferred.Result.t )
-       -> ('a, [> `Page_not_found ]) Deferred.Result.t ) ~logger
-    (route : string list) body =
+let router ~get_graphql_uri_or_error ~with_db ~logger (route : string list) body
+    =
   [%log debug] "Handling /construction/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
   let open Deferred.Result.Let_syntax in
