@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
 FORK_CONFIG_JSON=${FORK_CONFIG_JSON:=fork_config.json}
 LEDGER_HASHES_JSON=${LEDGER_HASHES_JSON:=ledger_hashes.json}
