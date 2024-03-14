@@ -4,32 +4,9 @@ Date: Thu, 29 Feb 2024 12:37:58 +0100
 Subject: [PATCH] Port runtime_genesis_ledger from Berkeley (without SHA3 hash)
 
 ---
- nix/ocaml.nix                                 |   3 +-
  src/app/runtime_genesis_ledger/dune           |  12 +-
  .../runtime_genesis_ledger.ml                 | 174 ++++++++++++++----
- 3 files changed, 148 insertions(+), 41 deletions(-)
 
-diff --git a/nix/ocaml.nix b/nix/ocaml.nix
-index ebdd36800d..7dfa1345ce 100644
---- a/nix/ocaml.nix
-+++ b/nix/ocaml.nix
-@@ -184,7 +184,7 @@ let
-             src/app/generate_keypair/generate_keypair.exe \
-             src/lib/mina_base/sample_keypairs.json \
-             -j$NIX_BUILD_CORES
--          dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
-+          # dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
-           dune build @doc || true
-         '';
- 
-@@ -199,6 +199,7 @@ let
-           cp src/app/logproc/logproc.exe $out/bin/logproc
-           cp src/app/rosetta/rosetta.exe $out/bin/rosetta
-           cp src/app/batch_txn_tool/batch_txn_tool.exe $batch_txn_tool/bin/batch_txn_tool
-+          cp src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe $out/bin/runtime_genesis_ledger
-           cp src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe $genesis/bin/runtime_genesis_ledger
-           cp src/app/cli/src/mina_mainnet_signatures.exe $mainnet/bin/mina_mainnet_signatures
-           cp src/app/rosetta/rosetta_mainnet_signatures.exe $mainnet/bin/rosetta_mainnet_signatures
 diff --git a/src/app/runtime_genesis_ledger/dune b/src/app/runtime_genesis_ledger/dune
 index 2dd27537d5..c989d10cfe 100644
 --- a/src/app/runtime_genesis_ledger/dune
