@@ -300,6 +300,7 @@ module Stdin = struct
           ]
     in
     Json.json_update results submission
-    |> Yojson.Safe.pretty_to_channel Out_channel.stdout
-    |> Deferred.Or_error.return
+    |> Yojson.Safe.to_channel Out_channel.stdout ;
+    Out_channel.newline stdout ;
+    Deferred.Or_error.return ()
 end
