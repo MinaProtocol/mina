@@ -633,25 +633,16 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
       [%log info] "Will migrate %d mainnet blocks"
         (List.length mainnet_blocks_unmigrated) ;
       (* blocks in height order *)
-      (* TODO: this is actually already done by the sql query, so we can skip this here *)
+      (* TODO: this ordering is actually already done by the sql query, so we can skip this here *)
       let mainnet_blocks_to_migrate =
         List.sort mainnet_blocks_unmigrated ~compare:(fun block1 block2 ->
             Int64.compare block1.height block2.height )
       in
-      [%log info] "Determining precomputed block requirements" ;
-      let%bind existing_precomputed_block_ids = Precomputed_block.list_directory ~network in
-      [%log info] "Found %d precomputed blocks" (Set.length existing_precomputed_block_ids) ;
       let required_precomputed_block_ids =
         List.map mainnet_blocks_to_migrate ~f:(fun {height; state_hash; _} -> (height, state_hash))
         |> List.filter ~f:(fun (height, _) -> Int64.(height > 1L))
-        |> Precomputed_block.Id.Set.of_list
       in
-      let missing_precomputed_block_ids =
-        Set.diff required_precomputed_block_ids existing_precomputed_block_ids
-      in
-      [%log info] "Will download %d precomputed blocks (this may take a while)" (Set.length missing_precomputed_block_ids) ;
-      let%bind precomputed_blocks = Precomputed_block.concrete_fetch_batch ~logger ~bucket:mina_network_blocks_bucket ~network missing_precomputed_block_ids in
-      [%log info] "Finished downloading precomputed blocks" ;
+      let%bind precomputed_blocks = Precomputed_block.concrete_fetch_batch ~logger ~bucket:mina_network_blocks_bucket ~network required_precomputed_block_ids in
       [%log info] "Migrating mainnet blocks" ;
       let%bind () =
         List.chunks_of ~length:batch_size mainnet_blocks_to_migrate
