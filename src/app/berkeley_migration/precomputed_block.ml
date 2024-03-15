@@ -15,6 +15,9 @@ module Id = struct
 
   include T
   include Comparable.Make (T)
+
+  let filename ~network (height, state_hash) =
+    sprintf "%s-%Ld-%s.json" network height state_hash
 end
 
 let yojson_debug name of_yojson x =
@@ -148,25 +151,28 @@ let list_directory ~network =
   |> Id.Set.of_list
 
 let concrete_fetch_batch ~logger ~bucket ~network targets =
-  let num_targets = Set.length targets in
-  let block_filenames =
-    List.map (Set.to_list targets) ~f:(fun (height, state_hash) ->
-      (state_hash, sprintf "%s-%Ld-%s.json" network height state_hash))
+  [%log info] "Determining precomputed block requirements" ;
+  let%bind missing_targets =
+    let%map existing = list_directory ~network in
+    [%log info] "Found %d precomputed blocks" (Set.length existing) ;
+    Set.diff (Id.Set.of_list targets) existing
   in
-  let block_uris =
-    List.map block_filenames ~f:(fun (_state_hash, filename) ->
-      sprintf "gs://%s/%s" bucket filename)
+  let num_missing_targets = Set.length missing_targets in
+  [%log info] "Will download %d precomputed blocks (this may take a while)" num_missing_targets ;
+  let block_uris_to_download =
+    List.map (Set.to_list missing_targets) ~f:(fun target ->
+      sprintf "gs://%s/%s" bucket (Id.filename ~network target))
   in
-  let gsutil_input = String.concat ~sep:"\n" block_uris in
+  let gsutil_input = String.concat ~sep:"\n" block_uris_to_download in
   let gsutil_process = Process.run ~prog:"gsutil" ~args:([ "-m"; "cp"; "-I"; "." ]) ~stdin:gsutil_input () in
   don't_wait_for (
     let rec progress_loop () =
-      let%bind available_blocks = list_directory ~network in
-      let downloaded_targets = Set.length (Set.inter targets available_blocks) in
+      let%bind existing = list_directory ~network in
+      let downloaded_targets = Set.length (Set.inter missing_targets existing) in
       [%log info] "%d/%d files downloaded (%%%f)"
         downloaded_targets
-        num_targets
-        Float.(100.0 * of_int downloaded_targets / of_int num_targets) ;
+        num_missing_targets
+        Float.(100.0 * of_int downloaded_targets / of_int num_missing_targets) ;
       let%bind () = after (Time.Span.of_sec 10.0) in
       if Deferred.is_determined gsutil_process then
         Deferred.unit
@@ -176,8 +182,10 @@ let concrete_fetch_batch ~logger ~bucket ~network targets =
     progress_loop () ) ;
   match%bind gsutil_process with
   | Ok _ ->
-      Deferred.List.fold block_filenames ~init:Mina_base.State_hash.Map.empty ~f:(fun acc (state_hash, filename) ->
-        let%map contents = Reader.file_contents filename in
+      [%log info] "Finished downloading precomputed blocks" ;
+      Deferred.List.fold targets ~init:Mina_base.State_hash.Map.empty ~f:(fun acc target ->
+        let _, state_hash = target in
+        let%map contents = Reader.file_contents (Id.filename ~network target) in
         let block =
           Yojson.Safe.from_string contents
           |> custom_of_yojson
