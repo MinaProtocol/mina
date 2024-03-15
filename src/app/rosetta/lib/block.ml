@@ -1,4 +1,3 @@
-(* Avoid shadowing graphql_ppx functions *)
 open Core_kernel
 open Async
 open Rosetta_lib
@@ -924,20 +923,20 @@ module Sql = struct
           M.return (block_id, raw_block, block_extras)
     in
     let%bind raw_parent_block =
-    (* if parent_id is null, this means this is the chain genesis block and
-       the block is its own parent *)
-    Option.value_map raw_block.parent_id ~default:(M.return raw_block)
-    ~f:(fun parent_id ->
-      match%bind
-        Block.run_by_id (module Conn) parent_id
-        |> Errors.Lift.sql ~context:"Finding parent block"
-      with
-      | None ->
-          M.fail
-            ( Errors.create ~context:"Parent block"
-            @@ `Block_missing (sprintf "parent_id = %d" parent_id) )
-      | Some (_, raw_parent_block, _) ->
-          M.return (raw_parent_block))
+      (* if parent_id is null, this means this is the chain genesis block and
+         the block is its own parent *)
+      Option.value_map raw_block.parent_id ~default:(M.return raw_block)
+        ~f:(fun parent_id ->
+          match%bind
+            Block.run_by_id (module Conn) parent_id
+            |> Errors.Lift.sql ~context:"Finding parent block"
+          with
+          | None ->
+              M.fail
+                ( Errors.create ~context:"Parent block"
+                @@ `Block_missing (sprintf "parent_id = %d" parent_id) )
+          | Some (_, raw_parent_block, _) ->
+              M.return raw_parent_block )
     in
     let%bind raw_user_commands =
       User_commands.run (module Conn) block_id
@@ -1132,9 +1131,7 @@ module Specific = struct
     module Mock = T (Result)
 
     let real :
-           logger:Logger.t
-        -> db:(module Caqti_async.CONNECTION)
-        -> 'gql Real.t =
+        logger:Logger.t -> db:(module Caqti_async.CONNECTION) -> 'gql Real.t =
      fun ~logger ~db ->
       { logger
       ; db_block =
@@ -1170,9 +1167,7 @@ module Specific = struct
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~graphql_uri
       in
-      let%bind block_info =
-         env.db_block query
-      in
+      let%bind block_info = env.db_block query in
       let coinbase_receiver =
         List.find block_info.internal_info ~f:(fun info ->
             Internal_command_info.Kind.equal info.Internal_command_info.kind
