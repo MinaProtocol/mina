@@ -161,17 +161,17 @@ let concrete_fetch_batch ~logger ~bucket ~network targets =
   let gsutil_process = Process.run ~prog:"gsutil" ~args:([ "-m"; "cp"; "-I"; "." ]) ~stdin:gsutil_input () in
   don't_wait_for (
     let rec progress_loop () =
+      let%bind available_blocks = list_directory ~network in
+      let downloaded_targets = Set.length (Set.inter targets available_blocks) in
+      [%log info] "%d/%d files downloaded (%%%f)"
+        downloaded_targets
+        num_targets
+        Float.(100.0 * of_int downloaded_targets / of_int num_targets) ;
       let%bind () = after (Time.Span.of_sec 10.0) in
       if Deferred.is_determined gsutil_process then
         Deferred.unit
-      else (
-        let%bind available_blocks = list_directory ~network in
-        let downloaded_targets = Set.length (Set.inter targets available_blocks) in
-        [%log info] "%d/%d files downloaded (%%%f)"
-          downloaded_targets
-          num_targets
-          Float.(of_int downloaded_targets / of_int num_targets) ;
-        progress_loop ())
+      else
+        progress_loop ()
     in
     progress_loop () ) ;
   match%bind gsutil_process with
