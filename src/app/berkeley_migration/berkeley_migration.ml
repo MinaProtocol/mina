@@ -642,7 +642,9 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
       let%bind existing_precomputed_block_ids = Precomputed_block.list_directory ~network in
       [%log info] "Found %d precomputed blocks" (Set.length existing_precomputed_block_ids) ;
       let required_precomputed_block_ids =
-        Precomputed_block.Id.Set.of_list @@ List.map mainnet_blocks_to_migrate ~f:(fun {height; state_hash; _} -> (height, state_hash))
+        List.map mainnet_blocks_to_migrate ~f:(fun {height; state_hash; _} -> (height, state_hash))
+        |> List.filter ~f:(fun (height, _) -> Int64.(height > 1L))
+        |> Precomputed_block.Id.Set.of_list
       in
       let missing_precomputed_block_ids =
         Set.diff required_precomputed_block_ids existing_precomputed_block_ids
@@ -687,10 +689,12 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                     failwithf
                       "Could not archive extensional block batch: %s" (Caqti_error.show err) () ) )
       in
+      (*
       (* if the migration was successfully, cleanup the precomputed blocks we downloaded *)
       [%log info] "Deleting all precomputed blocks" ;
       let%bind () = Precomputed_block.delete_fetched ~network in
       [%log info] "Done migrating mainnet blocks!" ;
+      *)
       Deferred.unit
 
 let () =
