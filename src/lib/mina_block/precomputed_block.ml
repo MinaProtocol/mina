@@ -93,6 +93,21 @@ module Stable = struct
 
     let to_latest = Fn.id
   end
+
+  (*
+  module V1 = struct
+    type t = T.t =
+      { scheduled_time : Block_time.Stable.V1.t
+      ; protocol_state : Protocol_state.Value.Stable.V1.t
+      ; protocol_state_proof : Mina_base.Proof.Stable.V1.t
+      ; staged_ledger_diff : Staged_ledger_diff.Stable.V1.t
+      ; delta_transition_chain_proof :
+          Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
+      }
+
+    let to_latest = Fn.id
+  end
+  *)
 end]
 
 (* functions for the versioned json, not the unversioned ones provided by `T` *)

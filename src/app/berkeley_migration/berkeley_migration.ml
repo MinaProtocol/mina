@@ -1,7 +1,10 @@
+(* TODO: cleanup partial writes to blocks table introduced by bulk approach *)
+
 (* berkeley_migration.ml -- migrate archive db from original Mina mainnet to berkeley schema *)
 
 open Core_kernel
 open Async
+open Caqti_async
 
 (* before running this program for the first time, import the berkeley schema to the
    migrated database name
@@ -184,7 +187,158 @@ let mainnet_protocol_version =
   *)
   Protocol_version.create ~transaction:1 ~network:0 ~patch:0
 
-let mainnet_block_to_extensional ~logger ~mainnet_pool ~network
+let compare_user_cmd_seq (a : Archive_lib.Extensional.User_command.t) (b : Archive_lib.Extensional.User_command.t) : int =
+  Int.compare a.sequence_no b.sequence_no
+
+let compare_internal_cmd_seq (a : Archive_lib.Extensional.Internal_command.t) (b : Archive_lib.Extensional.Internal_command.t) : int =
+  Tuple2.compare ~cmp1:Int.compare ~cmp2:Int.compare (a.sequence_no, a.secondary_sequence_no) (b.sequence_no, b.secondary_sequence_no)
+
+let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
+    ~(genesis_block : Mina_block.t) (blocks : Sql.Mainnet.Block.t list)
+    : Archive_lib.Extensional.Block.t list Deferred.t =
+  let module Blockchain_state = Mina_state.Blockchain_state in
+  let module Consensus_state = Consensus.Data.Consensus_state in
+
+  let query_mainnet_db ~f = Mina_caqti.query ~f mainnet_pool in
+
+  (*
+  [%log info] "Deleting all precomputed blocks" ;
+  let%bind () = Precomputed_block.delete_fetched ~network in
+  *)
+
+  (*
+  [%log info] "Fetching batch of precomputed blocks" ;
+  let%bind precomputed_blocks =
+    List.filter blocks ~f:(fun block -> Int64.(block.height > 1L))
+    |> List.map ~f:(fun block -> (block.height, block.state_hash))
+    |> Precomputed_block.concrete_fetch_batch ~network ~bucket
+  in
+  [%log info] "Done fetching batch of precomputed blocks" ;
+  *)
+
+  [%log info] "Fetching transaction sequence from prior database" ;
+  let%bind block_user_cmds =
+    query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
+      Conn.collect_list
+        (Caqti_request.collect Caqti_type.unit (Caqti_type.tup2 Sql.Mainnet.User_command.typ Sql.Mainnet.Block_user_command.typ)
+          (sprintf "SELECT %s, %s FROM %s AS c JOIN %s AS j ON c.id = j.user_command_id AND j.block_id IN (%s)"
+            (String.concat ~sep:"," Sql.Mainnet.User_command.field_names)
+            (String.concat ~sep:"," Sql.Mainnet.Block_user_command.Fields.names)
+            Sql.Mainnet.User_command.table_name
+            Sql.Mainnet.Block_user_command.table_name
+            (String.concat ~sep:"," @@ List.map blocks ~f:(fun block -> Int.to_string block.id))))
+        ())
+  in
+  let%bind block_internal_cmds =
+    query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
+      Conn.collect_list
+        (Caqti_request.collect Caqti_type.unit (Caqti_type.tup2 Sql.Mainnet.Internal_command.typ Sql.Mainnet.Block_internal_command.typ)
+          (sprintf "SELECT %s, %s FROM %s AS c JOIN %s AS j ON c.id = j.internal_command_id AND j.block_id IN (%s)"
+            (String.concat ~sep:"," Sql.Mainnet.Internal_command.field_names)
+            (String.concat ~sep:"," Sql.Mainnet.Block_internal_command.Fields.names)
+            Sql.Mainnet.Internal_command.table_name
+            Sql.Mainnet.Block_internal_command.table_name
+            (String.concat ~sep:"," @@ List.map blocks ~f:(fun block -> Int.to_string block.id))))
+        ())
+  in
+  let required_public_key_ids =
+    let user_cmd_reqs = List.bind block_user_cmds ~f:(fun (cmd, _join) -> [cmd.fee_payer_id; cmd.source_id; cmd.receiver_id]) in
+    let internal_cmd_reqs = List.map block_internal_cmds ~f:(fun (cmd, _join) -> cmd.receiver_id) in
+    Staged.unstage (List.stable_dedup_staged ~compare:Int.compare) (user_cmd_reqs @ internal_cmd_reqs)
+  in
+  let%bind public_keys =
+    query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
+      Conn.collect_list
+        (Caqti_request.collect Caqti_type.unit Caqti_type.(tup2 int Sql.Mainnet.Public_key.typ)
+          (sprintf "SELECT id, value FROM %s WHERE id IN (%s)"
+            Sql.Mainnet.Public_key.table_name
+            (String.concat ~sep:"," @@ List.map required_public_key_ids ~f:Int.to_string)
+          ))
+        ())
+    >>| Int.Map.of_alist_exn
+  in
+  let user_cmds =
+    List.fold_left block_user_cmds ~init:Int.Map.empty ~f:(fun acc (cmd, join) ->
+        let ext_cmd : Archive_lib.Extensional.User_command.t =
+          { sequence_no = join.sequence_no
+          ; command_type = cmd.typ
+          ; fee_payer = Map.find_exn public_keys cmd.fee_payer_id
+          ; source = Map.find_exn public_keys cmd.source_id
+          ; receiver = Map.find_exn public_keys cmd.receiver_id
+          ; nonce = Mina_numbers.Account_nonce.of_int cmd.nonce
+          ; amount = Option.map cmd.amount ~f:(fun amount -> Unsigned.UInt64.of_int64 amount |> Currency.Amount.of_uint64)
+          ; fee = cmd.fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
+          ; valid_until =
+              Option.map cmd.valid_until ~f:(fun valid_until ->
+                  Unsigned.UInt32.of_int64 valid_until
+                  |> Mina_numbers.Global_slot_since_genesis.of_uint32 )
+          ; memo = Mina_base.Signed_command_memo.of_base58_check_exn cmd.memo
+          ; hash = Mina_transaction.Transaction_hash.of_base58_check_exn_v1 cmd.hash
+          ; status = join.status
+          ; failure_reason = Option.map join.failure_reason ~f:mainnet_transaction_failure_of_string
+          }
+        in
+        Map.add_multi acc ~key:join.block_id ~data:ext_cmd)
+  in
+  let internal_cmds =
+    List.fold_left block_internal_cmds ~init:Int.Map.empty ~f:(fun acc (cmd, join) ->
+      let ext_cmd : Archive_lib.Extensional.Internal_command.t =
+        { sequence_no = join.sequence_no
+        ; secondary_sequence_no = join.secondary_sequence_no
+        ; command_type = cmd.typ
+        ; receiver = Map.find_exn public_keys cmd.receiver_id
+        ; fee = cmd.fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
+        ; hash = Mina_transaction.Transaction_hash.of_base58_check_exn_v1 cmd.hash
+        ; status = "applied"
+        ; failure_reason = None
+        }
+      in
+      Map.add_multi acc ~key:join.block_id ~data:ext_cmd)
+  in
+  [%log info] "Done fetching transaction sequence from prior database" ;
+
+  return (List.map blocks ~f:(fun block ->
+    let state_hash = Mina_base.State_hash.of_base58_check_exn block.state_hash in
+    let is_genesis_block = Int64.equal block.height Int64.one in
+    let precomputed =
+      if is_genesis_block then
+        Precomputed_block.of_block_header (Mina_block.header genesis_block)
+      else
+        Map.find_exn precomputed_blocks state_hash
+    in
+    (* NB: command indices do not contain entries for blocks that have no commands associated with them in the database *)
+    let user_cmds = List.sort ~compare:compare_user_cmd_seq @@ Option.value ~default:[] @@ Map.find user_cmds block.id in
+    let internal_cmds = List.sort ~compare:compare_internal_cmd_seq @@ Option.value ~default:[] @@ Map.find internal_cmds block.id in
+    let consensus_state = precomputed.protocol_state.body.consensus_state in
+    { Archive_lib.Extensional.Block.state_hash
+    ; parent_hash = Mina_base.State_hash.of_base58_check_exn block.parent_hash
+    ; creator = (* Map.find_exn public_keys block.creator_id *) consensus_state.block_creator
+    ; block_winner = (* Map.find_exn public_keys block.block_winner_id *) consensus_state.block_stake_winner
+    ; last_vrf_output = consensus_state.last_vrf_output
+    ; snarked_ledger_hash = (* Map.find_exn snarked_ledger_hashes block.snarked_ledger_hash_id *) precomputed.protocol_state.body.blockchain_state.snarked_ledger_hash
+    ; staking_epoch_data = consensus_state.staking_epoch_data
+    ; next_epoch_data = consensus_state.next_epoch_data
+    ; min_window_density = consensus_state.min_window_density
+    ; total_currency = consensus_state.total_currency
+    ; sub_window_densities = consensus_state.sub_window_densities
+    ; ledger_hash = Mina_base.Frozen_ledger_hash.of_base58_check_exn block.ledger_hash
+    ; height = Unsigned.UInt32.of_int64 block.height
+    ; global_slot_since_hard_fork = Mina_numbers.Global_slot_since_hard_fork.of_uint32 @@ Unsigned.UInt32.of_int64 block.global_slot_since_hard_fork
+    ; global_slot_since_genesis = Mina_numbers.Global_slot_since_genesis.of_uint32 @@ Unsigned.UInt32.of_int64 block.global_slot_since_genesis
+    ; timestamp = Block_time.of_int64 block.timestamp
+    ; user_cmds
+    ; internal_cmds
+    ; zkapp_cmds = []
+    ; protocol_version = mainnet_protocol_version
+    ; proposed_protocol_version = None
+    ; chain_status = Archive_lib.Chain_status.of_string block.chain_status
+    (* TODO: ignoring these fields as they are unread when adding to the db, so they aren't needed to make the replayer happy, but we will need to add this back *)
+    ; accounts_accessed = []
+    ; accounts_created = []
+    ; tokens_used = []
+    }))
+
+let _mainnet_block_to_extensional ~logger ~mainnet_pool ~network
     ~(genesis_block : Mina_block.t) (block : Sql.Mainnet.Block.t) ~bucket
     ~batch_size =
   let query_mainnet_db ~f = Mina_caqti.query ~f mainnet_pool in
@@ -198,6 +352,7 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool ~network
        Mina_state.Protocol_state.Body.consensus_state body )
   in
   let%bind () =
+    (* TODO: only download the state hashes we need... *)
     (* we may try to be fetching more blocks than exist
        gsutil seems to get the ones that do exist, in that exist
     *)
@@ -243,6 +398,7 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool ~network
   let parent_hash =
     Mina_base.State_hash.of_base58_check_exn block.parent_hash
   in
+  [%log info] "Fetching block data from mainnet db..." ;
   let%bind creator = pk_of_id block.creator_id in
   let%bind block_winner = pk_of_id block.block_winner_id in
   let%bind last_vrf_output =
@@ -406,7 +562,7 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool ~network
       : Archive_lib.Extensional.Block.t )
 
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
-    ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network () =
+    ~fork_state_hash:_ ~mina_network_blocks_bucket ~batch_size ~network () =
   let logger = Logger.create () in
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
@@ -445,9 +601,11 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
               (Error.to_string_hum err) ()
       in
       [%log info] "Got precomputed values from runtime config" ;
-      let With_hash.{ data = genesis_block; _ }, _validation =
+      let With_hash.{ data = genesis_block; hash = genesis_state_hashes }, _validation =
         Mina_block.genesis ~precomputed_values
       in
+      (* TODO: skip this step, but still fill in the canonical sub chain *)
+      (*
       let%bind mainnet_block_ids =
         match fork_state_hash with
         | None ->
@@ -480,13 +638,14 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
             query_mainnet_db ~f:(fun db ->
                 Sql.Mainnet.Block.canonical_blocks db () )
       in
-
       [%log info] "Found %d mainnet blocks" (List.length mainnet_block_ids) ;
+      *)
+      [%log info] "Querying mainnet canonical blocks" ;
       let%bind mainnet_blocks_unsorted =
-        Deferred.List.map mainnet_block_ids ~f:(fun id ->
-            query_mainnet_db ~f:(fun db -> Sql.Mainnet.Block.load db ~id) )
+        query_mainnet_db ~f:(fun db -> Sql.Mainnet.Block.full_canonical_blocks db ())
       in
       (* remove blocks we've already migrated *)
+      [%log info] "Determining already migrated bocks" ;
       let%bind greatest_migrated_height =
         let%bind count =
           query_migrated_db ~f:(fun db -> Sql.Berkeley.Block.count db ())
@@ -510,33 +669,61 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
       [%log info] "Will migrate %d mainnet blocks"
         (List.length mainnet_blocks_unmigrated) ;
       (* blocks in height order *)
+      (* TODO: this is actually already done by the sql query, so we can skip this here *)
       let mainnet_blocks_to_migrate =
         List.sort mainnet_blocks_unmigrated ~compare:(fun block1 block2 ->
             Int64.compare block1.height block2.height )
       in
+      [%log info] "Determining precomputed block requirements" ;
+      let%bind existing_precomputed_block_ids = Precomputed_block.list_directory ~network in
+      [%log info] "Found %d precomputed blocks" (Set.length existing_precomputed_block_ids) ;
+      let required_precomputed_block_ids =
+        Precomputed_block.Id.Set.of_list @@ List.map mainnet_blocks_to_migrate ~f:(fun {height; state_hash; _} -> (height, state_hash))
+      in
+      let missing_precomputed_block_ids =
+        Set.diff required_precomputed_block_ids existing_precomputed_block_ids
+      in
+      [%log info] "Will download %d precomputed blocks (this may take a while)" (Set.length missing_precomputed_block_ids) ;
+      let%bind precomputed_blocks = Precomputed_block.concrete_fetch_batch ~logger ~bucket:mina_network_blocks_bucket ~network missing_precomputed_block_ids in
+      [%log info] "Finished downloading precomputed blocks" ;
       [%log info] "Migrating mainnet blocks" ;
       let%bind () =
-        Deferred.List.iter mainnet_blocks_to_migrate ~f:(fun block ->
+        List.chunks_of ~length:batch_size mainnet_blocks_to_migrate
+        |> Deferred.List.iter ~f:(fun (blocks : Sql.Mainnet.Block.t list) ->
+            (* TODO: state hash list in metadata *)
             [%log info]
-              "Migrating mainnet block at height %Ld with state hash %s"
-              block.height block.state_hash ;
-            let%bind extensional_block =
-              mainnet_block_to_extensional ~logger ~mainnet_pool ~genesis_block
-                block ~bucket:mina_network_blocks_bucket ~batch_size ~network
+              "Migrating %d blocks starting at height %Ld (%s..%s)"
+              (List.length blocks)
+              (List.hd_exn blocks).height
+              (List.hd_exn blocks).state_hash
+              (List.last_exn blocks).state_hash ;
+            [%log info] "Converting blocks to extensional format..." ;
+            let%bind extensional_blocks =
+              mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~genesis_block
+                ~precomputed_blocks blocks
             in
+            [%log info] "Adding blocks to migrated database..." ;
             query_migrated_db ~f:(fun db ->
                 match%map
-                  Archive_lib.Processor.Block.add_from_extensional ~logger db
-                    extensional_block ~v1_transaction_hash:true
+                  Archive_lib.Processor.Block.add_from_extensional_batch db
+                    extensional_blocks ~v1_transaction_hash:true
+                    ~genesis_block_hash:(Mina_base.State_hash.State_hashes.state_hash genesis_state_hashes)
                 with
                 | Ok _id ->
                     Ok ()
-                | Error err ->
+                | Error (`Congested _) ->
+                    failwith "Could not archive extensional block batch: congested"
+                | (Error (`Decode_rejected _ as err))
+                | (Error (`Encode_failed _ as err))
+                | (Error (`Encode_rejected _ as err))
+                | (Error (`Request_failed _ as err))
+                | (Error (`Request_rejected _ as err))
+                | (Error (`Response_failed _ as err))
+                | (Error (`Response_rejected _ as err)) ->
                     failwithf
-                      "Could not archive extensional block from mainnet block \
-                       with state hash %s, error: %s"
-                      block.state_hash (Caqti_error.show err) () ) )
+                      "Could not archive extensional block batch: %s" (Caqti_error.show err) () ) )
       in
+      (* if the migration was successfully, cleanup the precomputed blocks we downloaded *)
       [%log info] "Deleting all precomputed blocks" ;
       let%bind () = Precomputed_block.delete_fetched ~network in
       [%log info] "Done migrating mainnet blocks!" ;
