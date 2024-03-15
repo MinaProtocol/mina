@@ -303,7 +303,7 @@ module Balance = struct
                   (module Conn)
                   ~block_query ~address ~token_id
                 |> Errors.Lift.wrap )
-            |> Errors.Lift.unwrap )
+            |> Deferred.Result.map_error ~f:(function `App e -> e) )
       ; validate_network_choice = Network.Validate_choice.Real.validate
       }
 
