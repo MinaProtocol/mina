@@ -19,6 +19,6 @@ let assert_ ~f ~expected ~actual =
     let output =
       Yojson.Safe.pretty_to_string
         (`Assoc
-          [("expected", to_yojson expected); ("actual", to_yojson actual)])
+          [ ("expected", to_yojson expected); ("actual", to_yojson actual) ] )
     in
     eprintf "%s" output ; failwith output

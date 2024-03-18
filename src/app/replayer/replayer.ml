@@ -977,6 +977,75 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                 failwith "Expected a checkpoint interval" )
       in
       let found_snarked_ledger_hash = ref false in
+      (* See PR #9782. *)
+      let state_hashes_to_avoid =
+        (* devnet *)
+        [ "3NKNU4WceYUjnQbxaUAmcHQzhGhC8ZxkYKqDKojKMpVjoj9WQZM6"
+        ; "3NKvaxewhJ9e1GWvFFT83p4MA2MPFChFoQTmdJ2zeBNX9rLorGFH"
+        ; "3NKNDWt8f1vVeFdBN8FCyHnAwnc5oXR18UvqriW2tQtHABTgX2tu"
+        ; "3NLR1VaGKs36byogm4atXtiNVre3TtWrrg1Btt3HxGZ2mEBEN5hg"
+        ; "3NL3fHu5bAqBNMmQ1Jh3HPZq7xX67WKFyAEUs2FFHJeiYxbEiq69"
+        ; "3NLuEU1bJ462uzkJpQXDCo2DcpkkJLbK9kXgwpCYHDuofXo7Smrr"
+        ; "3NK9ZYikzJDzXK7CPjyr7jo1S4ZGfKUKa18uTZd96X7YVcQihW1W"
+        ; "3NK6PXGHsrRo8iYzWx43rtnyN2ynmZ7enWU7CMWH6oTUi5CRck7c"
+        ; "3NKNrQG3DvyxDAuhudq7UhYRQ4GL7suKHcfQ3q7nUDXS1NjHyuZE"
+        ; "3NKcbRVyPHeBoWiK8AHXVVYxswv5c4kpmECRS3LTbAVCHzrxbzuH"
+        ; "3NKoxfcbnSkFSkFaMpmpgfVFqQmrwR6xkfpCHePLPh5uYKQLdpJt"
+        ; "3NKVfBD1kXDJ8ZM3xhR5TFZXBRAs5UanSewxQRpXFmoxGxDddkP5"
+        ; "3NKuotwHEdKRBK1yuDNkVUXqCnz5dPpS1xL4UJWghrAUB3t9pRQg"
+        ; "3NKou5o9gJpcKBp8LnkUQgFBBQFZB6z7GD88pWDdwgVkfV8HmQTW"
+        ; "3NKaqDsxAAFMvvxw22PLDkFaQyeHqioxhvb6BcpzbB3i8uaQdta7"
+        ; "3NKCDffYzX5VMH3eH3G8CU6Ba6FndrevGBaJ9NCU7U6nv3iv2bpN"
+        ; "3NL9sVkyZLLHFEvGPzr4ihYPzzZ3W3GixxjofeZib8qbe8hE4jUg"
+        ; "3NLWggBpXBZxaV2R1DaJrL51uS6NshyDejbPn1gpWhp4E9t1cvPU"
+        ; "3NL2cRDQkXEwnv33jTY5UKxLpyUpxKhcnwq7hQcfdDwc9QqXg5K9"
+        ; "3NKvh8kXNtaJAhuC6Eqa8K4r2whzLuN5G7F8M14GTB1tcFKERp3z"
+        ; "3NKVo2E1TGfb2pQ3jv84m7tVid4d6AHnKbDMZLWcrPxWwQJTYiQg"
+        ; "3NL8d9RgUbDXjy92eH6ZVFc1ozn3darQx8u9EViMiCqrv5Ywe42x"
+        ; "3NLGBF3yXbnQQxophx4YZfdXGcTt11KjC7jv8qaf3b8B8tZdrCBh"
+        ; "3NKAbgwCDsdW6m18FSj8mBE2SpdMd7gopc5NMqGHxkqqLykMZrCR"
+        ; "3NKFtTCSqVqKdbm6unoCiQWnKnozwYsiey5aPegV5xMR2MNR9kjZ"
+        ; "3NKEyaQdmFtYWx2swLjkcpBeQGsfo8riNH6Kbdr9myWUQrZkbqjV"
+        ; "3NK7jasQXuACjzJ5mBPNr13Y6Yt8vD6piLc1waFBU4Jte8WzEZ4h"
+        ; "3NLPbRNQi6JFbh7DW9ibPgRhUnExwGaMpiuGJdEQ6Na47kWcP3PW"
+        ; "3NK4EUku6d9fmU3P1t7NnoxsN4sg699JSskJZ4nJs1mWSHs1CL4v"
+        ; "3NLDE8xKUvKMiSpLSd9uvnQaRiXYW6MWw7UXpFD2wbq4WeKRAnKM"
+        ; "3NLZYyohgxGFE3hw6o6tfvXnZLoG6gyzr67WNGPFfpugHtoXaFGq" (*mainnet*)
+        ; "3NKCedb2xxrgiaBFKVpxAJ9Kp7Tu1JG4qCUppJmt3c1RULQYQtrZ"
+        ; "3NKjb8G3Sc4Z5hLckDy2Wg8soZmdghenyAYDuHVF5uNV36Td9DZt"
+        ; "3NKKrhT3QX5tUS18kyGkYnjfNCCppgjy9zcZrmtMeNynEce47zpj"
+        ; "3NKzdd7UjWLygUvgKfJwd3MVj3PD1GnXDHHGoTLyXinVvSoFRyX5"
+        ; "3NKpPvE3NfGnbqRU4U6fDCMdUi9c54kphuDY4jniJuHZ62MyPWmr"
+        ; "3NLP9qXSUAo9b8XjLZ8YpvdvEJ1g4TUdeznBH5kDAFv6kYYCGY51"
+        ; "3NLLEfqqPdWHDtM7nw4S27uejcLZQ5D7N3BzmCNR5acYSaGuJ4pH"
+        ; "3NKJoVQRihbwMUTDJKv4patDDMF8xGrvAaxQ9d2QJovJFegSuEQV"
+        ; "3NKQ8W6L77xjPbz9sPNp357gfJ6a5LMD8K8kwGnW5jyULcCbd5Su"
+        ; "3NLYL2dmLyGd889rwF5EmdjWE2BBGCZcHAwJA8MotiPVDiXLvktw"
+        ; "3NLhmVdQvxpQLNvyehAXZKDsVrkgjb812VfpbgKqBRWSLa9c1kAA"
+        ; "3NKX71ifBPJCZFDLdeLmhY97Zc8Y3xt2JZTFLgqtTnv53JvRcbzx"
+        ; "3NLUhVLiWav4kBszLKZ6oDNC2BkbeX2cftsUGb6egeixjvqu3qqt"
+        ; "3NKtmu2j6UJ9oggDJbtY6UDzZrMgDF8CH5A5xs3GyQUqMq4nS1ZN"
+        ; "3NKJbfqrRzsjDC3FkSv5tsKQ7yp1xxYsXcs6arsoj18MKhcMVNeA"
+        ; "3NKy6JUgC8r6ZGCKcQxPmKu9pN8xv5mGqVEiC1z1dLuVYhc2KEvV"
+        ; "3NLi5AWq9YCT2XrB5vxkC5Psxrjv3JjHmK5DX87duztbCcL2oJkD"
+        ; "3NKm5VGDQXtekWf3erWfjcHciGzjAWB4u7WNE7gAHGYjvkFbF5xj"
+        ; "3NLnTnSMFayzpAahTgyL9mY1og2HDJjcg9kpKsQT5iQcPJ7FtJtJ"
+        ; "3NKGm1K6T9pV7ygFqtScugMQB7EhDozsiz8Fe9LAYG2yx8yYie6p"
+        ; "3NKj4YqZq1RCMDK3YM1gRtFZ2fspR1sNbRjQw4GA6Ut2Ar16jEYF"
+        ; "3NLC7zugGno2Emt3w2DRJx6LdRzmoiW4F9PuAYurLQFmWFqEer1V"
+        ; "3NKAKrhJrvFJtgMvr72ZXTaWPFisgDaND3AxZoPR6gAff5qDuKcq"
+        ; "3NKDaz4DVLp4bQ5FJiXjEQPWmwgzvXAfCLY3w8d5NjzJZNVXnF6Q"
+        ; "3NLKV4BUZwzpYvqcByRhJoKyME6Q5KEcrHPVY21XPfXsbPp486eu"
+        ; "3NLbwy3BrF7gxEPF9WPoJPeED9NUC2RXdDnoJf6GvRwzksJThnM9"
+        ; "3NKfHZ5DJkL3jjzstrfTCjHczMrPzvBsgPQ66trR9yqkE9dHJ7AD"
+        ; "3NKUaab3R1mcG9caqyUUntpjvYD7VYUJ7rWjTCbgxzob3miG3WHK"
+        ; "3NL2aQWNi6JadvfmwkyJVCtd9MjVwDCbvY1bfHbwCm1nJrDwSV2A"
+        ; "3NK7ANsW4LQ62Hk8DJNEF36yyccoECJKmdeAyaf96WmksR2TyM3C"
+        ; "3NKa82y8gNUe8ePYjq7jEh38vyWVLEteHynK686D8qaebeHpmfsS"
+        ; "3NLcmRzkBdmFKqhpKEbw33A7GAd1EG7dg6CVwUhC4RKDTBZGnYDQ"
+        ; "3NLHTdvTPXxUn8YFy4z59NxDcX9DYhthFtv8aPNMmpm2pYuA6Tf6"
+        ]
+      in
       (* apply commands in global slot, sequence order *)
       let rec apply_commands ~last_global_slot_since_genesis ~last_block_id
           ~(block_txns : Mina_transaction.Transaction.t list)
@@ -996,6 +1065,17 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                 ; ("block_id", `Int last_block_id)
                 ]
               last_global_slot_since_genesis
+          else if
+            List.mem state_hashes_to_avoid
+              (State_hash.to_base58_check state_hash)
+              ~equal:String.equal
+          then
+            [%log info]
+              ~metadata:
+                [ ("state_hash", `String (State_hash.to_base58_check state_hash))
+                ]
+              "This block has an inconsistent ledger hash due to a known \
+               historical issue."
           else (
             [%log error]
               "Applied all commands at global slot since genesis %Ld, ledger \
