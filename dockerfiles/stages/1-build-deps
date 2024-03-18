@@ -153,8 +153,7 @@ ENV PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 # --- Ocaml install of a given OCAML_VERSION via opam switch
 # additionally initializes opam with sandboxing disabled, as we did not install bubblewrap above.
 RUN git clone \
-  https://github.com/emberian/opam-repository.git \
-  -b patch-2 \
+  https://github.com/ocaml/opam-repository.git \
   --depth 1 \
   /home/opam/opam-repository \
   && opam init --disable-sandboxing -k git -a ~/opam-repository --bare \
