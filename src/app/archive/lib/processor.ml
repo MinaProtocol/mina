@@ -374,7 +374,8 @@ end
 
 module Account_identifiers = struct
   module T = struct
-    type t = { public_key_id : int; token_id : int } [@@deriving hlist, fields, sexp, compare]
+    type t = { public_key_id : int; token_id : int }
+    [@@deriving hlist, fields, sexp, compare]
   end
 
   include T
@@ -2244,7 +2245,9 @@ module User_command = struct
             ; valid_until
             ; memo =
                 Signed_command.memo t |> Signed_command_memo.to_base58_check
-            ; hash = transaction_hash |> txn_hash_to_base58_check ~v1_transaction_hash
+            ; hash =
+                transaction_hash
+                |> txn_hash_to_base58_check ~v1_transaction_hash
             }
 
     let add_extensional_if_doesn't_exist (module Conn : CONNECTION)
@@ -2285,7 +2288,8 @@ module User_command = struct
                     (Fn.compose Unsigned.UInt32.to_int64
                        Mina_numbers.Global_slot_since_genesis.to_uint32 )
             ; memo = user_cmd.memo |> Signed_command_memo.to_base58_check
-            ; hash = user_cmd.hash |> txn_hash_to_base58_check ~v1_transaction_hash
+            ; hash =
+                user_cmd.hash |> txn_hash_to_base58_check ~v1_transaction_hash
             }
   end
 
@@ -2399,7 +2403,8 @@ module Internal_command = struct
             ~tannot:(function
               | "command_type" -> Some "internal_command_type" | _ -> None )
             ~cols:[ "hash"; "command_type" ] () ) )
-      (txn_hash_to_base58_check ~v1_transaction_hash transaction_hash, command_type)
+      ( txn_hash_to_base58_check ~v1_transaction_hash transaction_hash
+      , command_type )
 
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
@@ -2433,7 +2438,8 @@ module Internal_command = struct
           { command_type = internal_cmd.command_type
           ; receiver_id
           ; fee = Currency.Fee.to_string internal_cmd.fee
-          ; hash = internal_cmd.hash |> txn_hash_to_base58_check ~v1_transaction_hash
+          ; hash =
+              internal_cmd.hash |> txn_hash_to_base58_check ~v1_transaction_hash
           }
 end
 
@@ -2501,7 +2507,8 @@ module Fee_transfer = struct
           ; fee =
               Fee_transfer.Single.fee t |> Currency.Fee.to_uint64
               |> Unsigned.UInt64.to_int64
-          ; hash = transaction_hash |> txn_hash_to_base58_check ~v1_transaction_hash
+          ; hash =
+              transaction_hash |> txn_hash_to_base58_check ~v1_transaction_hash
           }
 end
 
@@ -2548,7 +2555,8 @@ module Coinbase = struct
           ; amount =
               Coinbase.amount t |> Currency.Amount.to_uint64
               |> Unsigned.UInt64.to_int64
-          ; hash = transaction_hash |> txn_hash_to_base58_check ~v1_transaction_hash
+          ; hash =
+              transaction_hash |> txn_hash_to_base58_check ~v1_transaction_hash
           }
 end
 
@@ -3593,19 +3601,23 @@ module Block = struct
   (* NB: this batching logic an lead to partial writes; it is acceptable to be used with the
      migration tool, but not acceptable to be used with the archive node in its current form *)
   let add_from_extensional_batch (module Conn : CONNECTION)
-      ?(v1_transaction_hash = false) ~(genesis_block_hash : State_hash.t) (blocks : Extensional.Block.t list) =
+      ?(v1_transaction_hash = false) ~(genesis_block_hash : State_hash.t)
+      (blocks : Extensional.Block.t list) =
     let open Deferred.Result.Let_syntax in
-
     (* zkapps are currently unsupported in the batch implementation of this function *)
     assert (List.for_all blocks ~f:(fun block -> List.is_empty block.zkapp_cmds)) ;
 
-    let epoch_data_to_repr (e : Mina_base.Epoch_data.t) ~(find_ledger_hash_id : Ledger_hash.t -> int) : Epoch_data.t =
+    let epoch_data_to_repr (e : Mina_base.Epoch_data.t)
+        ~(find_ledger_hash_id : Ledger_hash.t -> int) : Epoch_data.t =
       { seed = Epoch_seed.to_base58_check e.seed
       ; ledger_hash_id = find_ledger_hash_id e.ledger.hash
       ; total_currency = Currency.Amount.to_string e.ledger.total_currency
       ; start_checkpoint = Ledger_hash.to_base58_check e.start_checkpoint
       ; lock_checkpoint = Ledger_hash.to_base58_check e.lock_checkpoint
-      ; epoch_length = Unsigned_extended.UInt32.to_int64 @@ Mina_numbers.Length.to_uint32 e.epoch_length }
+      ; epoch_length =
+          Unsigned_extended.UInt32.to_int64
+          @@ Mina_numbers.Length.to_uint32 e.epoch_length
+      }
     in
     (*
     let account_id_to_repr (id : Account_id.t) ~(find_public_key : Signature_lib.Public_key.Compressed.t -> int) ~(find_token : Token_id.t -> int) : Account_identifiers.t =
@@ -3618,9 +3630,12 @@ module Block = struct
       assert (Token_id.equal id Token_id.default) ;
       { value = Token_id.to_string id
       ; owner_public_key_id = None
-      ; owner_token_id = None}
+      ; owner_token_id = None
+      }
     in
-    let user_cmd_to_repr (c : Extensional.User_command.t) ~(find_public_key_id : Signature_lib.Public_key.Compressed.t -> int) : User_command.Signed_command.t =
+    let user_cmd_to_repr (c : Extensional.User_command.t)
+        ~(find_public_key_id : Signature_lib.Public_key.Compressed.t -> int) :
+        User_command.Signed_command.t =
       let hash = txn_hash_to_base58_check c.hash ~v1_transaction_hash in
       (* let fee_payer_id = find_account_id (Account_id.create c.fee_payer Token_id.default) in *)
       (* let receiver_id = find_account_id (Account_id.create c.receiver Token_id.default) in *)
@@ -3642,7 +3657,9 @@ module Block = struct
       ; memo = Mina_base.Signed_command_memo.to_base58_check c.memo
       }
     in
-    let internal_cmd_to_repr (c : Extensional.Internal_command.t) ~(find_public_key_id : Signature_lib.Public_key.Compressed.t -> int) : Internal_command.t =
+    let internal_cmd_to_repr (c : Extensional.Internal_command.t)
+        ~(find_public_key_id : Signature_lib.Public_key.Compressed.t -> int) :
+        Internal_command.t =
       let hash = txn_hash_to_base58_check c.hash ~v1_transaction_hash in
       { command_type = c.command_type
       ; hash
@@ -3688,76 +3705,118 @@ module Block = struct
     let field_name : type a. a Caqti_type.Field.t -> string option =
       let open Caqti_type in
       function
-      | Bool -> Some "BOOL"
-      | Int -> Some "INT"
-      | Int16 -> Some "SMALLINT"
-      | Int32 -> Some "INT"
-      | Int64 -> Some "BIGINT"
-      | Float -> Some "FLOAT"
-      | _ -> None
+      | Bool ->
+          Some "BOOL"
+      | Int ->
+          Some "INT"
+      | Int16 ->
+          Some "SMALLINT"
+      | Int32 ->
+          Some "INT"
+      | Int64 ->
+          Some "BIGINT"
+      | Float ->
+          Some "FLOAT"
+      | _ ->
+          None
     in
 
     let rec type_field_names : type a. a Caqti_type.t -> string option list =
       function
-      | Unit -> []
-      | Field f -> [field_name f]
-      | Option t -> type_field_names t
+      | Unit ->
+          []
+      | Field f ->
+          [ field_name f ]
+      | Option t ->
+          type_field_names t
       | Tup2 (at, bt) ->
-          List.concat [type_field_names at; type_field_names bt]
+          List.concat [ type_field_names at; type_field_names bt ]
       | Tup3 (at, bt, ct) ->
-          List.concat [type_field_names at; type_field_names bt; type_field_names ct]
+          List.concat
+            [ type_field_names at; type_field_names bt; type_field_names ct ]
       | Tup4 (at, bt, ct, dt) ->
-          List.concat [type_field_names at; type_field_names bt; type_field_names ct; type_field_names dt]
+          List.concat
+            [ type_field_names at
+            ; type_field_names bt
+            ; type_field_names ct
+            ; type_field_names dt
+            ]
       | Custom custom ->
           type_field_names custom.rep
     in
 
     let rec render_field : type a. a Caqti_type.Field.t -> a -> string =
-      fun typ value ->
-        let open Caqti_type in
-        match typ with
-        | Bool -> Bool.to_string value
-        | Int -> Int.to_string value
-        | Int16 -> Int.to_string value
-        | Int32 -> Int32.to_string value
-        | Int64 -> Int64.to_string value
-        | Float -> Float.to_string value
-        | String -> "'" ^ value ^ "'"
-        | Octets -> failwith "todo: support caqti octets"
-        | Pdate -> failwith "todo: support caqti date"
-        | Ptime -> failwith "todo: support caqti ptime"
-        | Ptime_span -> failwith "todo: support caqti ptime_span"
-        | Enum _ -> failwith "todo: support caqti enums"
-        | _ ->
-            (match Caqti_type.Field.coding Conn.driver_info typ with
-            | None -> failwithf "unable to render caqti field: %s" (Caqti_type.Field.to_string typ) ()
-            | Some (Coding coding) ->
-              render_field coding.rep (Result.ok_or_failwith @@ coding.encode value))
+     fun typ value ->
+      let open Caqti_type in
+      match typ with
+      | Bool ->
+          Bool.to_string value
+      | Int ->
+          Int.to_string value
+      | Int16 ->
+          Int.to_string value
+      | Int32 ->
+          Int32.to_string value
+      | Int64 ->
+          Int64.to_string value
+      | Float ->
+          Float.to_string value
+      | String ->
+          "'" ^ value ^ "'"
+      | Octets ->
+          failwith "todo: support caqti octets"
+      | Pdate ->
+          failwith "todo: support caqti date"
+      | Ptime ->
+          failwith "todo: support caqti ptime"
+      | Ptime_span ->
+          failwith "todo: support caqti ptime_span"
+      | Enum _ ->
+          failwith "todo: support caqti enums"
+      | _ -> (
+          match Caqti_type.Field.coding Conn.driver_info typ with
+          | None ->
+              failwithf "unable to render caqti field: %s"
+                (Caqti_type.Field.to_string typ)
+                ()
+          | Some (Coding coding) ->
+              render_field coding.rep
+                (Result.ok_or_failwith @@ coding.encode value) )
     in
     let rec render_type : type a. a Caqti_type.t -> a -> string list =
-      fun typ value ->
-        match typ with
-        | Unit -> []
-        | Field f -> [render_field f value]
-        | Option t -> (
-            match value with
-            | None -> List.init (Caqti_type.length typ) ~f:(Fn.const "NULL")
-            | Some x -> render_type t x)
-        | Tup2 (at, bt) ->
-            let (a, b) = value in
-            List.concat [render_type at a; render_type bt b]
-        | Tup3 (at, bt, ct) ->
-            let (a, b, c) = value in
-            List.concat [render_type at a; render_type bt b; render_type ct c]
-        | Tup4 (at, bt, ct, dt) ->
-            let (a, b, c, d) = value in
-            List.concat [render_type at a; render_type bt b; render_type ct c; render_type dt d]
-        | Custom custom ->
-            render_type custom.rep (Result.ok_or_failwith @@ custom.encode value)
+     fun typ value ->
+      match typ with
+      | Unit ->
+          []
+      | Field f ->
+          [ render_field f value ]
+      | Option t -> (
+          match value with
+          | None ->
+              List.init (Caqti_type.length typ) ~f:(Fn.const "NULL")
+          | Some x ->
+              render_type t x )
+      | Tup2 (at, bt) ->
+          let a, b = value in
+          List.concat [ render_type at a; render_type bt b ]
+      | Tup3 (at, bt, ct) ->
+          let a, b, c = value in
+          List.concat [ render_type at a; render_type bt b; render_type ct c ]
+      | Tup4 (at, bt, ct, dt) ->
+          let a, b, c, d = value in
+          List.concat
+            [ render_type at a
+            ; render_type bt b
+            ; render_type ct c
+            ; render_type dt d
+            ]
+      | Custom custom ->
+          render_type custom.rep (Result.ok_or_failwith @@ custom.encode value)
     in
     let render_row (type a) (typ : a Caqti_type.t) (value : a) : string =
       "(" ^ String.concat ~sep:"," (render_type typ value) ^ ")"
     in
+
     (*
     let render_seq (type a) (typ : a Caqti_type.t) (values : a list) : string =
       let inner =
@@ -3769,7 +3828,6 @@ module Block = struct
       "(" ^ String.concat ~sep:"," inner ^ ")"
     in
     *)
-
 
     (* structured such that it can used with %a formatted strings *)
     (*
@@ -3788,186 +3846,322 @@ module Block = struct
       *)
     in
     *)
-
-    let load_index (type a) (type cmp) (comparator : (a, cmp) Map.comparator) (typ : a Caqti_type.t) (values : a list) ~table ~(fields : string list) : ((a, int, cmp) Map.t, 'err) Deferred.Result.t =
+    let load_index (type a cmp) (comparator : (a, cmp) Map.comparator)
+        (typ : a Caqti_type.t) (values : a list) ~table ~(fields : string list)
+        : ((a, int, cmp) Map.t, 'err) Deferred.Result.t =
       assert (Caqti_type.length typ = List.length fields) ;
-      let fields_sql = String.concat ~sep:"," fields in
-      let query =
-        if List.length fields > 1 then
-          (* sprintf "SELECT %s, id FROM %s WHERE (%s) IN (VALUES %s)" fields_sql table fields_sql values_sql *)
-          let src_fields_sql = String.concat ~sep:"," @@ List.map fields ~f:(fun field -> sprintf "src.%s" field) in
-          (*let data_fields_sql = String.concat ~sep:"," @@ List.map fields ~f:(fun field -> sprintf "data__%s" field) in*)
-          let join_on_sql =
-            (* we use distinction instead of equality here, as NULL != NULL, but NULL IS NOT DISTINCT FROM NULL *)
-            List.zip_exn fields (type_field_names typ)
-            |> List.map ~f:(fun (field, type_name_opt) ->
-                match type_name_opt with
-                | None -> sprintf "src.%s IS NOT DISTINCT FROM data.%s" field field
-                | Some type_name -> sprintf "src.%s IS NOT DISTINCT FROM CAST(data.%s AS %s)" field field type_name)
-            (*List.map fields ~f:(fun field -> sprintf "src.%s IS NOT DISTINCT FROM data.%s" field field)*)
-            |> String.concat ~sep:" AND "
-          in
-          let values_sql = String.concat ~sep:"," @@ List.map values ~f:(render_row typ) in
-          sprintf "SELECT %s, src.id FROM %s AS src JOIN (VALUES %s) as data (%s) ON %s"
-            src_fields_sql
-            table
-            values_sql
-            fields_sql
-            join_on_sql
-        else
-          let values_sql = "(" ^ String.concat ~sep:"," (List.bind values ~f:(render_type typ)) ^ ")" in
-          sprintf "SELECT %s, id FROM %s WHERE %s IN %s" fields_sql table fields_sql values_sql
-      in
-      (* Writer.writef (Lazy.force Writer.stdout) "QUERY = %s\n" query ; *)
-      let%map entries =
-        Conn.collect_list
-          (Caqti_request.collect Caqti_type.unit Caqti_type.(tup2 typ int) query)
-          ()
-      in
-      Map.of_alist_exn comparator entries
+      if List.is_empty values then return (Map.empty comparator)
+      else
+        let fields_sql = String.concat ~sep:"," fields in
+        let query =
+          if List.length fields > 1 then
+            (* sprintf "SELECT %s, id FROM %s WHERE (%s) IN (VALUES %s)" fields_sql table fields_sql values_sql *)
+            let src_fields_sql =
+              String.concat ~sep:","
+              @@ List.map fields ~f:(fun field -> sprintf "src.%s" field)
+            in
+            (*let data_fields_sql = String.concat ~sep:"," @@ List.map fields ~f:(fun field -> sprintf "data__%s" field) in*)
+            let join_on_sql =
+              (* we use distinction instead of equality here, as NULL != NULL, but NULL IS NOT DISTINCT FROM NULL *)
+              List.zip_exn fields (type_field_names typ)
+              |> List.map ~f:(fun (field, type_name_opt) ->
+                     match type_name_opt with
+                     | None ->
+                         sprintf "src.%s IS NOT DISTINCT FROM data.%s" field
+                           field
+                     | Some type_name ->
+                         sprintf
+                           "src.%s IS NOT DISTINCT FROM CAST(data.%s AS %s)"
+                           field field type_name )
+              (*List.map fields ~f:(fun field -> sprintf "src.%s IS NOT DISTINCT FROM data.%s" field field)*)
+              |> String.concat ~sep:" AND "
+            in
+            let values_sql =
+              String.concat ~sep:"," @@ List.map values ~f:(render_row typ)
+            in
+            sprintf
+              "SELECT %s, src.id FROM %s AS src JOIN (VALUES %s) as data (%s) \
+               ON %s"
+              src_fields_sql table values_sql fields_sql join_on_sql
+          else
+            let values_sql =
+              "("
+              ^ String.concat ~sep:"," (List.bind values ~f:(render_type typ))
+              ^ ")"
+            in
+            sprintf "SELECT %s, id FROM %s WHERE %s IN %s" fields_sql table
+              fields_sql values_sql
+        in
+        (* Writer.writef (Lazy.force Writer.stdout) "QUERY = %s\n" query ; *)
+        let%map entries =
+          Conn.collect_list
+            (Caqti_request.collect Caqti_type.unit
+               Caqti_type.(tup2 typ int)
+               query )
+            ()
+        in
+        Map.of_alist_exn comparator entries
     in
 
-    let bulk_insert (type value) (typ : value Caqti_type.t) (values : value list) ~(fields : string list) ~(table : string) : (int list, 'err) Deferred.Result.t =
-      if List.is_empty values then
-        return []
+    let bulk_insert (type value) (typ : value Caqti_type.t)
+        (values : value list) ~(fields : string list) ~(table : string) :
+        (int list, 'err) Deferred.Result.t =
+      if List.is_empty values then return []
       else (
         assert (Caqti_type.length typ = List.length fields) ;
         let fields_sql = String.concat ~sep:"," fields in
-        let values_sql = String.concat ~sep:"," @@ List.map ~f:(render_row typ) values in
+        let values_sql =
+          String.concat ~sep:"," @@ List.map ~f:(render_row typ) values
+        in
         Conn.collect_list
           (Caqti_request.collect Caqti_type.unit Caqti_type.int
-            (sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table fields_sql values_sql))
-          ())
+             (sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table
+                fields_sql values_sql ) )
+          () )
     in
 
-    let partition_existing (type a) (type key) (type key_cmp)
-          (entries : a list)
-          ~(get_key : a -> key)
-          ~(load_index : key list -> ((key, int, key_cmp) Map.t, 'err) Deferred.Result.t)
-        : ([`Existing of (key, int, key_cmp) Map.t] * [`Missing of a list], 'err) Deferred.Result.t =
+    let partition_existing (type a key key_cmp) (entries : a list)
+        ~(get_key : a -> key)
+        ~(load_index :
+           key list -> ((key, int, key_cmp) Map.t, 'err) Deferred.Result.t ) :
+        ( [ `Existing of (key, int, key_cmp) Map.t ] * [ `Missing of a list ]
+        , 'err )
+        Deferred.Result.t =
       let%map ids = load_index (List.map entries ~f:get_key) in
-      let missing = List.filter entries ~f:(fun value -> not (Map.mem ids (get_key value))) in
+      let missing =
+        List.filter entries ~f:(fun value -> not (Map.mem ids (get_key value)))
+      in
       (`Existing ids, `Missing missing)
     in
     (* TODO: undo the unused key vs value abstraction *)
-    let differential_insert (type a) (type value) (type key) (type key_cmp)
-          (key_comparator : (key, key_cmp) Map.comparator)
-          (entries : a list)
-          ~(get_key : a -> key)
-          ~(get_value : a -> value)
-          ~(load_index : key list -> ((key, int, key_cmp) Map.t, 'err) Deferred.Result.t)
-          ~(insert_values  : value list -> (int list, 'err) Deferred.Result.t)
-        : ((key, int, key_cmp) Map.t, 'err) Deferred.Result.t =
-      let%bind `Existing existing_entries, `Missing missing_entries = partition_existing entries ~get_key ~load_index in
+    let differential_insert (type a value key key_cmp)
+        (key_comparator : (key, key_cmp) Map.comparator) (entries : a list)
+        ~(get_key : a -> key) ~(get_value : a -> value)
+        ~(load_index :
+           key list -> ((key, int, key_cmp) Map.t, 'err) Deferred.Result.t )
+        ~(insert_values : value list -> (int list, 'err) Deferred.Result.t) :
+        ((key, int, key_cmp) Map.t, 'err) Deferred.Result.t =
+      let%bind `Existing existing_entries, `Missing missing_entries =
+        partition_existing entries ~get_key ~load_index
+      in
       let missing_values = List.map missing_entries ~f:get_value in
       let%map created_ids = insert_values missing_values in
-      let new_entries = Map.of_alist_exn key_comparator (List.zip_exn (List.map ~f:get_key missing_entries) created_ids) in
+      let new_entries =
+        Map.of_alist_exn key_comparator
+          (List.zip_exn (List.map ~f:get_key missing_entries) created_ids)
+      in
       Map.merge existing_entries new_entries ~f:(fun ~key:_ conflict ->
-        match conflict with
-        | `Both _ -> failwith "duplicate data loaded during differential insertion"
-        | `Left x | `Right x -> Some x)
+          match conflict with
+          | `Both _ ->
+              failwith "duplicate data loaded during differential insertion"
+          | `Left x | `Right x ->
+              Some x )
     in
 
     let state_hash_typ : State_hash.t Caqti_type.t =
       let encode h = Ok (State_hash.to_base58_check h) in
-      let decode s = Result.map_error ~f:Error.to_string_hum (State_hash.of_base58_check s) in
+      let decode s =
+        Result.map_error ~f:Error.to_string_hum (State_hash.of_base58_check s)
+      in
       Caqti_type.custom ~encode ~decode Caqti_type.string
     in
     let public_key_typ : Signature_lib.Public_key.Compressed.t Caqti_type.t =
-      let encode h = Ok (Signature_lib.Public_key.Compressed.to_base58_check h) in
-      let decode s = Result.map_error ~f:Error.to_string_hum (Signature_lib.Public_key.Compressed.of_base58_check s) in
+      let encode h =
+        Ok (Signature_lib.Public_key.Compressed.to_base58_check h)
+      in
+      let decode s =
+        Result.map_error ~f:Error.to_string_hum
+          (Signature_lib.Public_key.Compressed.of_base58_check s)
+      in
       Caqti_type.custom ~encode ~decode Caqti_type.string
     in
     let ledger_hash_typ : Ledger_hash.t Caqti_type.t =
       let encode h = Ok (Ledger_hash.to_base58_check h) in
-      let decode s = Result.map_error ~f:Error.to_string_hum (Ledger_hash.of_base58_check s) in
+      let decode s =
+        Result.map_error ~f:Error.to_string_hum (Ledger_hash.of_base58_check s)
+      in
       Caqti_type.custom ~encode ~decode Caqti_type.string
     in
 
     let external_block_hashes =
-      let block_hashes = State_hash.Set.of_list @@ List.map blocks ~f:(fun {state_hash; _} -> state_hash) in
-      let dependency_hashes = State_hash.Set.of_list @@ List.map blocks ~f:(fun {parent_hash; _} -> parent_hash) in
+      let block_hashes =
+        State_hash.Set.of_list
+        @@ List.map blocks ~f:(fun { state_hash; _ } -> state_hash)
+      in
+      let dependency_hashes =
+        State_hash.Set.of_list
+        @@ List.map blocks ~f:(fun { parent_hash; _ } -> parent_hash)
+      in
       Set.diff dependency_hashes block_hashes
     in
     let%bind `Existing existing_block_ids, `Missing missing_blocks =
       partition_existing
-        ~get_key:(fun {state_hash; _} -> state_hash)
-        ~load_index:(load_index (module State_hash) state_hash_typ ~table:table_name ~fields:["state_hash"])
+        ~get_key:(fun { state_hash; _ } -> state_hash)
+        ~load_index:
+          (load_index
+             (module State_hash)
+             state_hash_typ ~table:table_name ~fields:[ "state_hash" ] )
         blocks
     in
     ( match Set.find external_block_hashes ~f:(Map.mem existing_block_ids) with
-      | Some state_hash ->
-          failwithf "Missing external dependency from batch: failed to find block with state hash %s" (State_hash.to_base58_check state_hash) ()
-      | None -> () ) ;
+    | Some state_hash ->
+        failwithf
+          "Missing external dependency from batch: failed to find block with \
+           state hash %s"
+          (State_hash.to_base58_check state_hash)
+          ()
+    | None ->
+        () ) ;
     let%bind external_block_ids =
-      load_index (module State_hash) state_hash_typ (Set.to_list external_block_hashes) ~table:table_name ~fields:["state_hash"]
+      load_index
+        (module State_hash)
+        state_hash_typ
+        (Set.to_list external_block_hashes)
+        ~table:table_name ~fields:[ "state_hash" ]
     in
 
-    Writer.writef (Lazy.force Writer.stdout) !"Existing blocks: %{Sexp}, Missing blocks: %{Sexp}\n"
-      ([%sexp_of: string list] @@ List.map ~f:State_hash.to_base58_check @@ Map.keys existing_block_ids)
-      ([%sexp_of: string list] @@ List.map missing_blocks ~f:(fun {state_hash; _} -> State_hash.to_base58_check state_hash)) ;
+    Writer.writef (Lazy.force Writer.stdout)
+      !"Existing blocks: %{Sexp}, Missing blocks: %{Sexp}\n"
+      ( [%sexp_of: string list]
+      @@ List.map ~f:State_hash.to_base58_check
+      @@ Map.keys existing_block_ids )
+      ( [%sexp_of: string list]
+      @@ List.map missing_blocks ~f:(fun { state_hash; _ } ->
+             State_hash.to_base58_check state_hash ) ) ;
 
-    let missing_block_staking_epochs = List.map missing_blocks ~f:(fun {staking_epoch_data; _} -> staking_epoch_data) in
-    let missing_block_next_epochs = List.map missing_blocks ~f:(fun {next_epoch_data; _} -> next_epoch_data) in
-    let all_missing_epochs = Staged.unstage (List.stable_dedup_staged ~compare:Mina_base.Epoch_data.compare) (missing_block_staking_epochs @ missing_block_next_epochs) in
+    let missing_block_staking_epochs =
+      List.map missing_blocks ~f:(fun { staking_epoch_data; _ } ->
+          staking_epoch_data )
+    in
+    let missing_block_next_epochs =
+      List.map missing_blocks ~f:(fun { next_epoch_data; _ } -> next_epoch_data)
+    in
+    let all_missing_epochs =
+      Staged.unstage
+        (List.stable_dedup_staged ~compare:Mina_base.Epoch_data.compare)
+        (missing_block_staking_epochs @ missing_block_next_epochs)
+    in
 
-    let missing_snarked_ledger_hashes = List.map missing_blocks ~f:(fun {snarked_ledger_hash; _} -> snarked_ledger_hash) in
-    let missing_epoch_ledger_hashes = List.map all_missing_epochs ~f:(fun {ledger = {hash; _}; _} -> hash) in
-    let all_missing_ledger_hashes = Staged.unstage (List.stable_dedup_staged ~compare:Ledger_hash.compare) (missing_snarked_ledger_hashes @ missing_epoch_ledger_hashes) in
+    let missing_snarked_ledger_hashes =
+      List.map missing_blocks ~f:(fun { snarked_ledger_hash; _ } ->
+          snarked_ledger_hash )
+    in
+    let missing_epoch_ledger_hashes =
+      List.map all_missing_epochs ~f:(fun { ledger = { hash; _ }; _ } -> hash)
+    in
+    let all_missing_ledger_hashes =
+      Staged.unstage
+        (List.stable_dedup_staged ~compare:Ledger_hash.compare)
+        (missing_snarked_ledger_hashes @ missing_epoch_ledger_hashes)
+    in
 
     (* TODO: move user_cmd and internal_cmd portions down directly into public_keys requirements (we don't need their account ids allocated) *)
-    let missing_user_cmd_accounts = List.bind missing_blocks ~f:(fun {user_cmds; _} -> List.bind user_cmds ~f:Extensional.User_command.accounts_referenced) in
-    let missing_internal_cmd_accounts = List.bind missing_blocks ~f:(fun {internal_cmds; _} -> List.map internal_cmds ~f:Extensional.Internal_command.account_referenced) in
-    let missing_zkapp_cmd_accounts = List.bind missing_blocks ~f:(fun {zkapp_cmds; _} -> List.bind zkapp_cmds ~f:Extensional.Zkapp_command.accounts_referenced) in
-    let all_missing_accounts = Staged.unstage (List.stable_dedup_staged ~compare:Account_id.compare) (missing_user_cmd_accounts @ missing_internal_cmd_accounts @ missing_zkapp_cmd_accounts) in
+    let missing_user_cmd_accounts =
+      List.bind missing_blocks ~f:(fun { user_cmds; _ } ->
+          List.bind user_cmds ~f:Extensional.User_command.accounts_referenced )
+    in
+    let missing_internal_cmd_accounts =
+      List.bind missing_blocks ~f:(fun { internal_cmds; _ } ->
+          List.map internal_cmds
+            ~f:Extensional.Internal_command.account_referenced )
+    in
+    let missing_zkapp_cmd_accounts =
+      List.bind missing_blocks ~f:(fun { zkapp_cmds; _ } ->
+          List.bind zkapp_cmds ~f:Extensional.Zkapp_command.accounts_referenced )
+    in
+    let all_missing_accounts =
+      Staged.unstage
+        (List.stable_dedup_staged ~compare:Account_id.compare)
+        ( missing_user_cmd_accounts @ missing_internal_cmd_accounts
+        @ missing_zkapp_cmd_accounts )
+    in
 
     (* TODO *)
-    let all_missing_tokens = [Token_id.default] in
+    let all_missing_tokens = [ Token_id.default ] in
 
-    let missing_block_creators = List.map missing_blocks ~f:(fun {creator; _} -> creator) in
-    let missing_block_winners = List.map missing_blocks ~f:(fun {block_winner; _} -> block_winner) in
-    let missing_account_keys = List.map all_missing_accounts ~f:Account_id.public_key in
-    let all_missing_public_keys = Staged.unstage (List.stable_dedup_staged ~compare:Signature_lib.Public_key.Compressed.compare) (missing_block_creators @ missing_block_winners @ missing_account_keys) in
+    let missing_block_creators =
+      List.map missing_blocks ~f:(fun { creator; _ } -> creator)
+    in
+    let missing_block_winners =
+      List.map missing_blocks ~f:(fun { block_winner; _ } -> block_winner)
+    in
+    let missing_account_keys =
+      List.map all_missing_accounts ~f:Account_id.public_key
+    in
+    let all_missing_public_keys =
+      Staged.unstage
+        (List.stable_dedup_staged
+           ~compare:Signature_lib.Public_key.Compressed.compare )
+        (missing_block_creators @ missing_block_winners @ missing_account_keys)
+    in
 
     let%bind public_key_ids =
-      differential_insert (module Signature_lib.Public_key.Compressed)
-        all_missing_public_keys
-        ~get_key:Fn.id
-        ~get_value:Fn.id
-        ~load_index:(load_index (module Signature_lib.Public_key.Compressed) public_key_typ ~table:"public_keys" ~fields:["value" (* TODO *)])
-        ~insert_values:(bulk_insert public_key_typ ~table:"public_keys" ~fields:["value" (* TODO *)])
+      differential_insert
+        (module Signature_lib.Public_key.Compressed)
+        all_missing_public_keys ~get_key:Fn.id ~get_value:Fn.id
+        ~load_index:
+          (load_index
+             (module Signature_lib.Public_key.Compressed)
+             public_key_typ ~table:"public_keys" ~fields:[ "value" (* TODO *) ] )
+        ~insert_values:
+          (bulk_insert public_key_typ ~table:"public_keys"
+             ~fields:[ "value" (* TODO *) ] )
     in
     let%bind ledger_hash_ids =
-      differential_insert (module Ledger_hash)
-        all_missing_ledger_hashes
-        ~get_key:Fn.id
-        ~get_value:Fn.id
-        ~load_index:(load_index (module Ledger_hash) ledger_hash_typ ~table:"snarked_ledger_hashes" ~fields:["value" (* TODO *)])
-        ~insert_values:(bulk_insert ledger_hash_typ ~table:"snarked_ledger_hashes" ~fields:["value" (* TODO *)])
+      differential_insert
+        (module Ledger_hash)
+        all_missing_ledger_hashes ~get_key:Fn.id ~get_value:Fn.id
+        ~load_index:
+          (load_index
+             (module Ledger_hash)
+             ledger_hash_typ ~table:"snarked_ledger_hashes"
+             ~fields:[ "value" (* TODO *) ] )
+        ~insert_values:
+          (bulk_insert ledger_hash_typ ~table:"snarked_ledger_hashes"
+             ~fields:[ "value" (* TODO *) ] )
     in
     let%bind epoch_ids =
-      let all_missing_epoch_reprs = List.map all_missing_epochs ~f:(epoch_data_to_repr ~find_ledger_hash_id:(Map.find_exn ledger_hash_ids)) in
+      let all_missing_epoch_reprs =
+        List.map all_missing_epochs
+          ~f:
+            (epoch_data_to_repr
+               ~find_ledger_hash_id:(Map.find_exn ledger_hash_ids) )
+      in
       (* TODO: avoid this silly repr type in between, just go directly to and from Mina_base.Epoch_data *)
-      differential_insert (module Epoch_data)
-        all_missing_epoch_reprs
-        ~get_key:Fn.id
-        ~get_value:Fn.id
-        ~load_index:(load_index (module Epoch_data) Epoch_data.typ ~table:Epoch_data.table_name ~fields:Epoch_data.Fields.names)
-        ~insert_values:(bulk_insert Epoch_data.typ ~table:Epoch_data.table_name ~fields:Epoch_data.Fields.names)
+      differential_insert
+        (module Epoch_data)
+        all_missing_epoch_reprs ~get_key:Fn.id ~get_value:Fn.id
+        ~load_index:
+          (load_index
+             (module Epoch_data)
+             Epoch_data.typ ~table:Epoch_data.table_name
+             ~fields:Epoch_data.Fields.names )
+        ~insert_values:
+          (bulk_insert Epoch_data.typ ~table:Epoch_data.table_name
+             ~fields:Epoch_data.Fields.names )
     in
     let%bind token_ids =
-      let tokens = List.map all_missing_tokens ~f:(fun token -> (token, token_id_to_repr token)) in
-      let%map token_repr_ids =
-        differential_insert (module Token)
-          tokens
-          ~get_key:snd
-          ~get_value:snd
-          ~load_index:(load_index (module Token) Token.typ ~table:Token.table_name ~fields:Token.Fields.names)
-          ~insert_values:(bulk_insert Token.typ ~table:Token.table_name ~fields:Token.Fields.names)
+      let tokens =
+        List.map all_missing_tokens ~f:(fun token ->
+            (token, token_id_to_repr token) )
       in
-      Token_id.Map.of_alist_exn @@ List.map tokens ~f:(fun (token, token_repr) ->
-        (token, Map.find_exn token_repr_ids token_repr))
+      let%map token_repr_ids =
+        differential_insert
+          (module Token)
+          tokens ~get_key:snd ~get_value:snd
+          ~load_index:
+            (load_index
+               (module Token)
+               Token.typ ~table:Token.table_name ~fields:Token.Fields.names )
+          ~insert_values:
+            (bulk_insert Token.typ ~table:Token.table_name
+               ~fields:Token.Fields.names )
+      in
+      Token_id.Map.of_alist_exn
+      @@ List.map tokens ~f:(fun (token, token_repr) ->
+             (token, Map.find_exn token_repr_ids token_repr) )
     in
+
     (*
     let%bind account_ids =
       let accounts = List.map all_missing_accounts ~f:(fun id -> (id, account_id_to_repr ~find_public_key:(Map.find_exn public_key_ids) ~find_token:(Map.find_exn token_ids) id)) in
@@ -4022,68 +4216,97 @@ module Block = struct
     *)
 
     (* We only expect a single protocol version at any migration, so we use the old non-batched functions here (which already cache ids) *)
-    let all_protocol_versions = Staged.unstage (List.stable_dedup_staged ~compare:Protocol_version.compare) (List.map blocks ~f:(fun block -> block.protocol_version)) in
+    let all_protocol_versions =
+      Staged.unstage
+        (List.stable_dedup_staged ~compare:Protocol_version.compare)
+        (List.map blocks ~f:(fun block -> block.protocol_version))
+    in
     let%bind protocol_version_ids =
-      Mina_stdlib.Deferred.Result.List.fold all_protocol_versions ~init:Protocol_version.Map.empty ~f:(fun acc version ->
-        let transaction = Protocol_version.transaction version in
-        let network = Protocol_version.network version in
-        let patch = Protocol_version.patch version in
-        let%map id = Protocol_versions.add_if_doesn't_exist (module Conn) ~transaction ~network ~patch in
-        (Map.add_exn acc ~key:version ~data:id))
+      Mina_stdlib.Deferred.Result.List.fold all_protocol_versions
+        ~init:Protocol_version.Map.empty ~f:(fun acc version ->
+          let transaction = Protocol_version.transaction version in
+          let network = Protocol_version.network version in
+          let patch = Protocol_version.patch version in
+          let%map id =
+            Protocol_versions.add_if_doesn't_exist
+              (module Conn)
+              ~transaction ~network ~patch
+          in
+          Map.add_exn acc ~key:version ~data:id )
     in
 
     (* pre-allocate some block rows for missing blocks so that we can resolve references between blocks *)
     (* TODO: share insert-and-index code with other functions *)
     let%bind new_block_ids =
-      let partial_missing_blocks = List.map missing_blocks ~f:(fun block ->
-          let last_vrf_output =
-            (* encode as base64, same as in precomputed blocks JSON *)
-            block.last_vrf_output
-            |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
-          in
-          { state_hash = block.state_hash |> State_hash.to_base58_check
-          ; parent_id = None (* NB: this field gets filled in after this step *)
-          ; parent_hash = block.parent_hash |> State_hash.to_base58_check
-          ; creator_id = Map.find_exn public_key_ids block.creator
-          ; block_winner_id = Map.find_exn public_key_ids block.block_winner
-          ; last_vrf_output
-          ; snarked_ledger_hash_id = Map.find_exn ledger_hash_ids block.snarked_ledger_hash
-          ; staking_epoch_data_id = Map.find_exn epoch_ids (epoch_data_to_repr block.staking_epoch_data ~find_ledger_hash_id:(Map.find_exn ledger_hash_ids))
-          ; next_epoch_data_id = Map.find_exn epoch_ids (epoch_data_to_repr block.next_epoch_data ~find_ledger_hash_id:(Map.find_exn ledger_hash_ids))
-          ; min_window_density =
-              block.min_window_density |> Mina_numbers.Length.to_uint32
-              |> Unsigned.UInt32.to_int64
-          ; sub_window_densities =
-              block.sub_window_densities
-              |> List.map ~f:(fun length ->
-                     Mina_numbers.Length.to_uint32 length
-                     |> Unsigned.UInt32.to_int64 )
-              |> Array.of_list
-          ; total_currency = Currency.Amount.to_string block.total_currency
-          ; ledger_hash = block.ledger_hash |> Ledger_hash.to_base58_check
-          ; height = block.height |> Unsigned.UInt32.to_int64
-          ; global_slot_since_hard_fork =
-              block.global_slot_since_hard_fork
-              |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
-              |> Unsigned.UInt32.to_int64
-          ; global_slot_since_genesis =
-              block.global_slot_since_genesis
-              |> Mina_numbers.Global_slot_since_genesis.to_uint32
-              |> Unsigned.UInt32.to_int64
-          ; protocol_version_id = Map.find_exn protocol_version_ids block.protocol_version
-          ; proposed_protocol_version_id = Option.map block.proposed_protocol_version ~f:(Map.find_exn protocol_version_ids)
-          ; timestamp = Block_time.to_string_exn block.timestamp
-          ; chain_status = Chain_status.to_string block.chain_status
-          })
+      let partial_missing_blocks =
+        List.map missing_blocks ~f:(fun block ->
+            let last_vrf_output =
+              (* encode as base64, same as in precomputed blocks JSON *)
+              block.last_vrf_output
+              |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
+            in
+            { state_hash = block.state_hash |> State_hash.to_base58_check
+            ; parent_id =
+                None (* NB: this field gets filled in after this step *)
+            ; parent_hash = block.parent_hash |> State_hash.to_base58_check
+            ; creator_id = Map.find_exn public_key_ids block.creator
+            ; block_winner_id = Map.find_exn public_key_ids block.block_winner
+            ; last_vrf_output
+            ; snarked_ledger_hash_id =
+                Map.find_exn ledger_hash_ids block.snarked_ledger_hash
+            ; staking_epoch_data_id =
+                Map.find_exn epoch_ids
+                  (epoch_data_to_repr block.staking_epoch_data
+                     ~find_ledger_hash_id:(Map.find_exn ledger_hash_ids) )
+            ; next_epoch_data_id =
+                Map.find_exn epoch_ids
+                  (epoch_data_to_repr block.next_epoch_data
+                     ~find_ledger_hash_id:(Map.find_exn ledger_hash_ids) )
+            ; min_window_density =
+                block.min_window_density |> Mina_numbers.Length.to_uint32
+                |> Unsigned.UInt32.to_int64
+            ; sub_window_densities =
+                block.sub_window_densities
+                |> List.map ~f:(fun length ->
+                       Mina_numbers.Length.to_uint32 length
+                       |> Unsigned.UInt32.to_int64 )
+                |> Array.of_list
+            ; total_currency = Currency.Amount.to_string block.total_currency
+            ; ledger_hash = block.ledger_hash |> Ledger_hash.to_base58_check
+            ; height = block.height |> Unsigned.UInt32.to_int64
+            ; global_slot_since_hard_fork =
+                block.global_slot_since_hard_fork
+                |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
+                |> Unsigned.UInt32.to_int64
+            ; global_slot_since_genesis =
+                block.global_slot_since_genesis
+                |> Mina_numbers.Global_slot_since_genesis.to_uint32
+                |> Unsigned.UInt32.to_int64
+            ; protocol_version_id =
+                Map.find_exn protocol_version_ids block.protocol_version
+            ; proposed_protocol_version_id =
+                Option.map block.proposed_protocol_version
+                  ~f:(Map.find_exn protocol_version_ids)
+            ; timestamp = Block_time.to_string_exn block.timestamp
+            ; chain_status = Chain_status.to_string block.chain_status
+            } )
       in
-      let%map ids = bulk_insert typ partial_missing_blocks ~table:table_name ~fields:Fields.names in
-      State_hash.Map.of_alist_exn @@ List.zip_exn (List.map missing_blocks ~f:(fun {state_hash; _} -> state_hash)) ids
+      let%map ids =
+        bulk_insert typ partial_missing_blocks ~table:table_name
+          ~fields:Fields.names
+      in
+      State_hash.Map.of_alist_exn
+      @@ List.zip_exn
+           (List.map missing_blocks ~f:(fun { state_hash; _ } -> state_hash))
+           ids
     in
     let block_ids =
       let check_conflict ~key:_ conflict =
         match conflict with
-        | `Both _ -> failwith "duplicate data loaded during differential insertion"
-        | `Left x | `Right x -> Some x
+        | `Both _ ->
+            failwith "duplicate data loaded during differential insertion"
+        | `Left x | `Right x ->
+            Some x
       in
       Map.merge existing_block_ids new_block_ids ~f:check_conflict
       |> Map.merge external_block_ids ~f:check_conflict
@@ -4093,78 +4316,138 @@ module Block = struct
       let ids, parent_ids =
         missing_blocks
         |> List.filter ~f:(fun block ->
-            (*
+               (*
             not (State_hash.equal block.parent_hash genesis_block_hash))
             *)
-            Unsigned.UInt32.to_int block.height > 1)
-        |> List.map  ~f:(fun block ->
-          Writer.writef (Lazy.force Writer.stdout) "Looking up hashes (%s, %s) for block at height %d [genesis hash = %s]\n"
-            (State_hash.to_base58_check block.state_hash)
-            (State_hash.to_base58_check block.parent_hash)
-            (Unsigned.UInt32.to_int block.height)
-            (State_hash.to_base58_check genesis_block_hash) ;
-          ( Int.to_string @@ Map.find_exn block_ids block.state_hash
-          , Int.to_string @@ Map.find_exn block_ids block.parent_hash ))
+               Unsigned.UInt32.to_int block.height > 1 )
+        |> List.map ~f:(fun block ->
+               Writer.writef (Lazy.force Writer.stdout)
+                 "Looking up hashes (%s, %s) for block at height %d [genesis \
+                  hash = %s]\n"
+                 (State_hash.to_base58_check block.state_hash)
+                 (State_hash.to_base58_check block.parent_hash)
+                 (Unsigned.UInt32.to_int block.height)
+                 (State_hash.to_base58_check genesis_block_hash) ;
+               ( Int.to_string @@ Map.find_exn block_ids block.state_hash
+               , Int.to_string @@ Map.find_exn block_ids block.parent_hash ) )
         |> List.unzip
       in
       let ids_sql = String.concat ~sep:"," ids in
       let parent_ids_sql = String.concat ~sep:"," parent_ids in
       Conn.exec
         (Caqti_request.exec Caqti_type.unit
-          (sprintf "UPDATE %s AS b SET parent_id = data.parent_id FROM (SELECT unnest(array[%s]) as id, unnest(array[%s]) as parent_id) AS data WHERE b.id = data.id" table_name ids_sql parent_ids_sql))
+           (sprintf
+              "UPDATE %s AS b SET parent_id = data.parent_id FROM (SELECT \
+               unnest(array[%s]) as id, unnest(array[%s]) as parent_id) AS \
+               data WHERE b.id = data.id"
+              table_name ids_sql parent_ids_sql ) )
         ()
     in
 
     let%bind user_cmd_ids =
-      let compare_by_hash (a : User_command.Signed_command.t) (b : User_command.Signed_command.t) =
+      let compare_by_hash (a : User_command.Signed_command.t)
+          (b : User_command.Signed_command.t) =
         String.compare a.hash b.hash
       in
-      List.bind missing_blocks ~f:(fun block -> List.map ~f:(user_cmd_to_repr ~find_public_key_id:(Map.find_exn public_key_ids)) block.user_cmds)
+      List.bind missing_blocks ~f:(fun block ->
+          List.map
+            ~f:
+              (user_cmd_to_repr
+                 ~find_public_key_id:(Map.find_exn public_key_ids) )
+            block.user_cmds )
       |> Staged.unstage (List.stable_dedup_staged ~compare:compare_by_hash)
-      |> differential_insert (module String)
-           ~get_key:(fun {hash; _} -> hash)
+      |> differential_insert
+           (module String)
+           ~get_key:(fun { hash; _ } -> hash)
            ~get_value:Fn.id
-           ~load_index:(load_index (module String) Caqti_type.string ~table:User_command.Signed_command.table_name ~fields:["hash"])
-           ~insert_values:(bulk_insert User_command.Signed_command.typ ~table:User_command.Signed_command.table_name ~fields:User_command.Signed_command.Fields.names)
+           ~load_index:
+             (load_index
+                (module String)
+                Caqti_type.string ~table:User_command.Signed_command.table_name
+                ~fields:[ "hash" ] )
+           ~insert_values:
+             (bulk_insert User_command.Signed_command.typ
+                ~table:User_command.Signed_command.table_name
+                ~fields:User_command.Signed_command.Fields.names )
     in
     let%bind () =
       let joins =
         List.bind missing_blocks ~f:(fun block ->
-          List.map block.user_cmds ~f:(fun {sequence_no; hash; status; failure_reason; _} ->
-            { Block_and_signed_command.block_id = Map.find_exn block_ids block.state_hash
-            ; user_command_id = Map.find_exn user_cmd_ids (txn_hash_to_base58_check ~v1_transaction_hash hash)
-            ; sequence_no
-            ; status
-            ; failure_reason = Option.map ~f:Transaction_status.Failure.to_string failure_reason
-            }))
+            List.map block.user_cmds
+              ~f:(fun { sequence_no; hash; status; failure_reason; _ } ->
+                { Block_and_signed_command.block_id =
+                    Map.find_exn block_ids block.state_hash
+                ; user_command_id =
+                    Map.find_exn user_cmd_ids
+                      (txn_hash_to_base58_check ~v1_transaction_hash hash)
+                ; sequence_no
+                ; status
+                ; failure_reason =
+                    Option.map ~f:Transaction_status.Failure.to_string
+                      failure_reason
+                } ) )
       in
-      Conn.populate Block_and_signed_command.typ (Caqti_async.Stream.of_list joins) ~table:Block_and_signed_command.table_name ~columns:Block_and_signed_command.Fields.names
+      Conn.populate Block_and_signed_command.typ
+        (Caqti_async.Stream.of_list joins)
+        ~table:Block_and_signed_command.table_name
+        ~columns:Block_and_signed_command.Fields.names
     in
 
     let%bind internal_cmd_ids =
       let compare_by_hash (a : Internal_command.t) (b : Internal_command.t) =
         String.compare a.hash b.hash
       in
-      List.bind missing_blocks ~f:(fun block -> List.map ~f:(internal_cmd_to_repr ~find_public_key_id:(Map.find_exn public_key_ids)) block.internal_cmds)
+      List.bind missing_blocks ~f:(fun block ->
+          List.map
+            ~f:
+              (internal_cmd_to_repr
+                 ~find_public_key_id:(Map.find_exn public_key_ids) )
+            block.internal_cmds )
       |> Staged.unstage (List.stable_dedup_staged ~compare:compare_by_hash)
-      |> differential_insert (module String)
-          ~get_key:(fun {hash; _} -> hash)
-          ~get_value:Fn.id
-          ~load_index:(load_index (module String) Caqti_type.string ~table:Internal_command.table_name ~fields:["hash"])
-          ~insert_values:(bulk_insert Internal_command.typ ~table:Internal_command.table_name ~fields:Internal_command.Fields.names)
+      |> differential_insert
+           (module String)
+           ~get_key:(fun { hash; _ } -> hash)
+           ~get_value:Fn.id
+           ~load_index:
+             (load_index
+                (module String)
+                Caqti_type.string ~table:Internal_command.table_name
+                ~fields:[ "hash" ] )
+           ~insert_values:
+             (bulk_insert Internal_command.typ
+                ~table:Internal_command.table_name
+                ~fields:Internal_command.Fields.names )
     in
     let%bind () =
       let joins =
         List.bind missing_blocks ~f:(fun block ->
-          List.map block.internal_cmds ~f:(fun {hash; sequence_no; secondary_sequence_no; status; failure_reason; _} ->
-            { Block_and_internal_command.block_id = Map.find_exn block_ids block.state_hash
-            ; internal_command_id = Map.find_exn internal_cmd_ids (txn_hash_to_base58_check ~v1_transaction_hash hash)
-            ; sequence_no
-            ; secondary_sequence_no
-            ; status
-            ; failure_reason = Option.map ~f:Transaction_status.Failure.to_string failure_reason}))
+            List.map block.internal_cmds
+              ~f:(fun
+                   { hash
+                   ; sequence_no
+                   ; secondary_sequence_no
+                   ; status
+                   ; failure_reason
+                   ; _
+                   }
+                 ->
+                { Block_and_internal_command.block_id =
+                    Map.find_exn block_ids block.state_hash
+                ; internal_command_id =
+                    Map.find_exn internal_cmd_ids
+                      (txn_hash_to_base58_check ~v1_transaction_hash hash)
+                ; sequence_no
+                ; secondary_sequence_no
+                ; status
+                ; failure_reason =
+                    Option.map ~f:Transaction_status.Failure.to_string
+                      failure_reason
+                } ) )
       in
-      Conn.populate Block_and_internal_command.typ (Caqti_async.Stream.of_list joins) ~table:Block_and_internal_command.table_name ~columns:Block_and_internal_command.Fields.names
+      Conn.populate Block_and_internal_command.typ
+        (Caqti_async.Stream.of_list joins)
+        ~table:Block_and_internal_command.table_name
+        ~columns:Block_and_internal_command.Fields.names
     in
 
     (* TODO: currently unsupported *)

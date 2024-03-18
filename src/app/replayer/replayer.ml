@@ -601,9 +601,9 @@ let try_slot ~logger pool slot =
   in
   go ~slot ~tries_left:num_tries
 
-let write_replayer_checkpoint ~logger ~ledger ~state_hash ~last_global_slot_since_genesis
-    ~max_canonical_slot ~checkpoint_output_folder_opt ~checkpoint_file_prefix
-    ~migration_mode =
+let write_replayer_checkpoint ~logger ~ledger ~state_hash
+    ~last_global_slot_since_genesis ~max_canonical_slot
+    ~checkpoint_output_folder_opt ~checkpoint_file_prefix ~migration_mode =
   if
     migration_mode
     || Int64.( <= ) last_global_slot_since_genesis max_canonical_slot
@@ -615,8 +615,11 @@ let write_replayer_checkpoint ~logger ~ledger ~state_hash ~last_global_slot_sinc
         create_replayer_checkpoint ~ledger ~start_slot_since_genesis
       in
       match input_to_yojson input with
-      | `Assoc assoc -> Yojson.Safe.pretty_to_string (`Assoc (("state_hash", State_hash.to_yojson state_hash) :: assoc))
-      | _ -> failwith "no"
+      | `Assoc assoc ->
+          Yojson.Safe.pretty_to_string
+            (`Assoc (("state_hash", State_hash.to_yojson state_hash) :: assoc))
+      | _ ->
+          failwith "no"
     in
     let checkpoint_file =
       let checkpoint_filename =
@@ -1223,8 +1226,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
               let write_checkpoint_file ~checkpoint_output_folder_opt
                   ~checkpoint_file_prefix ~migration_mode () =
                 let write_checkpoint () =
-                  write_replayer_checkpoint ~logger ~ledger
-                    ~state_hash
+                  write_replayer_checkpoint ~logger ~ledger ~state_hash
                     ~last_global_slot_since_genesis ~max_canonical_slot
                     ~checkpoint_output_folder_opt ~checkpoint_file_prefix
                     ~migration_mode

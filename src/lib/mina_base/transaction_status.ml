@@ -58,7 +58,7 @@ module Failure = struct
     end
 
     module V1 = struct
-       type t =
+      type t =
         | Predicate [@value 1]
         | Source_not_present
         | Receiver_not_present
@@ -79,21 +79,36 @@ module Failure = struct
       (* NB: The semantics of the V1 failures do not map perfectly to V2 failures. This function is
        *     defined for convenience only. *)
       let to_latest : t -> V2.t = function
-       | Predicate -> Predicate
-       | Source_not_present -> Source_not_present
-       | Receiver_not_present -> Receiver_not_present
-       | Amount_insufficient_to_create_account -> Amount_insufficient_to_create_account
-       | Cannot_pay_creation_fee_in_token -> Cannot_pay_creation_fee_in_token
-       | Source_insufficient_balance -> Source_insufficient_balance
-       | Source_minimum_balance_violation -> Source_minimum_balance_violation
-       | Receiver_already_exists -> Receiver_already_exists
-       | Not_token_owner -> Token_owner_not_caller
-       | Mismatched_token_permissions -> Update_not_permitted_token_symbol
-       | Overflow -> Overflow
-       | Signed_command_on_snapp_account -> Signed_command_on_zkapp_account
-       | Snapp_account_not_present -> Zkapp_account_not_present
-       | Update_not_permitted -> Update_not_permitted_access
-       | Incorrect_nonce -> Incorrect_nonce
+        | Predicate ->
+            Predicate
+        | Source_not_present ->
+            Source_not_present
+        | Receiver_not_present ->
+            Receiver_not_present
+        | Amount_insufficient_to_create_account ->
+            Amount_insufficient_to_create_account
+        | Cannot_pay_creation_fee_in_token ->
+            Cannot_pay_creation_fee_in_token
+        | Source_insufficient_balance ->
+            Source_insufficient_balance
+        | Source_minimum_balance_violation ->
+            Source_minimum_balance_violation
+        | Receiver_already_exists ->
+            Receiver_already_exists
+        | Not_token_owner ->
+            Token_owner_not_caller
+        | Mismatched_token_permissions ->
+            Update_not_permitted_token_symbol
+        | Overflow ->
+            Overflow
+        | Signed_command_on_snapp_account ->
+            Signed_command_on_zkapp_account
+        | Snapp_account_not_present ->
+            Zkapp_account_not_present
+        | Update_not_permitted ->
+            Update_not_permitted_access
+        | Incorrect_nonce ->
+            Incorrect_nonce
     end
   end]
 

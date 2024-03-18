@@ -19,8 +19,8 @@ let transaction_status_of_extensional ~status ~failure_reason :
   | _ ->
       failwithf "invalid transaction status \"%s\"" status ()
 
-let signed_command_of_extensional_v1 (cmd : Extensional.User_command.Stable.V1.t) :
-    User_command.t With_status.t =
+let signed_command_of_extensional_v1 (cmd : Extensional.User_command.Stable.V1.t)
+    : User_command.t With_status.t =
   let ({ sequence_no = _
        ; typ = command_type
        ; fee_payer
@@ -75,18 +75,27 @@ let signed_command_of_extensional_v1 (cmd : Extensional.User_command.Stable.V1.t
     }
   in
   { data = User_command.Signed_command signed_command
-  ; status = transaction_status_of_extensional ~status ~failure_reason:(Option.map ~f:Transaction_status.Failure.Stable.V1.to_latest failure_reason)
+  ; status =
+      transaction_status_of_extensional ~status
+        ~failure_reason:
+          (Option.map ~f:Transaction_status.Failure.Stable.V1.to_latest
+             failure_reason )
   }
 
 let fake_staged_ledger_diff_of_extensional_v1
     ~(internal_cmds : Extensional.Internal_command.Stable.V1.t list)
-    ~(user_cmds : Extensional.User_command.Stable.V1.t list)
-    (* ~(zkapp_cmds : Extensional.Zkapp_command.t list) *)
-    : Staged_ledger_diff.t =
+    ~(user_cmds : Extensional.User_command.Stable.V1.t list) :
+    Staged_ledger_diff.t =
+  (* ~(zkapp_cmds : Extensional.Zkapp_command.t list) *)
+
   (* currently unsupported: zkapp commands *)
   (* assert (List.is_empty zkapp_cmds) ; *)
   let completed_works = [] (* TODO *) in
-  let internal_command_statuses = List.map internal_cmds ~f:(Fn.const Transaction_status.Applied) (* TODO: is this correct? *) (* List.map internal_cmds ~f:(fun {status; failure_reason; _} -> transaction_status_of_extensional ~status ~failure_reason) *) in
+  let internal_command_statuses =
+    List.map internal_cmds ~f:(Fn.const Transaction_status.Applied)
+    (* TODO: is this correct? *)
+    (* List.map internal_cmds ~f:(fun {status; failure_reason; _} -> transaction_status_of_extensional ~status ~failure_reason) *)
+  in
   (*
   let completed_works, internal_command_statuses =
     List.map internal_cmds ~f:(fun cmd ->
@@ -154,12 +163,15 @@ let fake_precomputed_of_extensional_v1 ~genesis_state_hash ~genesis_ledger_hash
   let supercharge_coinbase = true in
   let epoch_count = Length.zero in
   let min_window_density = Length.zero in
-  let sub_window_densities = List.init constraint_constants.sub_windows_per_window ~f:(Fn.const Length.zero) in
+  let sub_window_densities =
+    List.init constraint_constants.sub_windows_per_window
+      ~f:(Fn.const Length.zero)
+  in
   let last_vrf_output = "00000000000000000000000000000000" in
   let has_ancestor_in_same_checkpoint_window = false in
   let total_currency = Amount.zero in
   let staking_epoch_data : Epoch_data.Value.t =
-    { ledger = {hash = staking_epoch_ledger_hash; total_currency}
+    { ledger = { hash = staking_epoch_ledger_hash; total_currency }
     ; seed = staking_epoch_seed
     ; start_checkpoint = Ledger_hash.empty_hash
     ; lock_checkpoint = Ledger_hash.empty_hash
@@ -167,7 +179,7 @@ let fake_precomputed_of_extensional_v1 ~genesis_state_hash ~genesis_ledger_hash
     }
   in
   let next_epoch_data : Epoch_data.Value.t =
-    { ledger = {hash = next_epoch_ledger_hash; total_currency}
+    { ledger = { hash = next_epoch_ledger_hash; total_currency }
     ; seed = next_epoch_seed
     ; start_checkpoint = Ledger_hash.empty_hash
     ; lock_checkpoint = Ledger_hash.empty_hash
@@ -186,7 +198,9 @@ let fake_precomputed_of_extensional_v1 ~genesis_state_hash ~genesis_ledger_hash
       (Or_error.ok_exn @@ Pending_coinbase.create ~depth:ledger_depth ())
   in
   let protocol_state_proof = Proof.blockchain_dummy in
-  let protocol_version = Protocol_version.create ~transaction:2 ~network:0 ~patch:0 in
+  let protocol_version =
+    Protocol_version.create ~transaction:2 ~network:0 ~patch:0
+  in
   let proposed_protocol_version = Some protocol_version in
   let accounts_accessed = [] in
   let accounts_created = [] in
@@ -244,30 +258,41 @@ let fake_precomputed_of_extensional_v1 ~genesis_state_hash ~genesis_ledger_hash
 let main ~genesis_state_hash ~genesis_ledger_hash ~input_files =
   let output_filename input_filename =
     match Filename.split_extension input_filename with
-    | (base, Some ".json") -> base ^ ".precomputed.json"
-    | _ -> failwithf "invalid input filename \"%s\" (expected file to end in \".json\")" input_filename ()
+    | base, Some ".json" ->
+        base ^ ".precomputed.json"
+    | _ ->
+        failwithf
+          "invalid input filename \"%s\" (expected file to end in \".json\")"
+          input_filename ()
   in
   Deferred.List.iter input_files ~f:(fun input_file ->
-    let%bind input = Reader.file_contents input_file >>| Yojson.Safe.from_string in
-    let extensional_block =
-      let versioned_input = `Assoc [("version", `Int 1); ("data", input)] in
-      Result.ok_or_failwith ([%of_yojson: Extensional.Block.Stable.V1.t] versioned_input)
-    in
-    let precomputed_block = fake_precomputed_of_extensional_v1 ~genesis_state_hash ~genesis_ledger_hash extensional_block in
-    let output =
-      Yojson.Safe.to_string
-        ([%to_yojson: Mina_block.Precomputed.t] precomputed_block)
-    in
-    Writer.with_file (output_filename input_file) ~f:(fun w ->
-      Writer.write_line w output ;
-      Deferred.unit))
+      let%bind input =
+        Reader.file_contents input_file >>| Yojson.Safe.from_string
+      in
+      let extensional_block =
+        let versioned_input = `Assoc [ ("version", `Int 1); ("data", input) ] in
+        Result.ok_or_failwith
+          ([%of_yojson: Extensional.Block.Stable.V1.t] versioned_input)
+      in
+      let precomputed_block =
+        fake_precomputed_of_extensional_v1 ~genesis_state_hash
+          ~genesis_ledger_hash extensional_block
+      in
+      let output =
+        Yojson.Safe.to_string
+          ([%to_yojson: Mina_block.Precomputed.t] precomputed_block)
+      in
+      Writer.with_file (output_filename input_file) ~f:(fun w ->
+          Writer.write_line w output ; Deferred.unit ) )
 
 let (_ : never_returns) =
   (* TODO: real CLI *)
   let genesis_state_hash = State_hash.dummy in
   let genesis_ledger_hash = Ledger_hash.empty_hash in
   let args = Sys.get_argv () in
-  let input_files = Array.to_list (Array.slice args 1 (Array.length args - 1)) in
+  let input_files =
+    Array.to_list (Array.slice args 1 (Array.length args - 1))
+  in
   Async.Scheduler.go_main
     ~main:(fun () ->
       don't_wait_for

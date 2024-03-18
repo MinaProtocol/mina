@@ -67,7 +67,8 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let compatible_with_daemon (t : t) =
     (* patch not considered for compatibility *)
-    Int.equal t.transaction current.transaction && Int.equal t.network current.network
+    Int.equal t.transaction current.transaction
+    && Int.equal t.network current.network
 
   (* when an external transition is deserialized, might contain
      negative numbers

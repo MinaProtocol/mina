@@ -57,7 +57,8 @@ module User_command = struct
         ; nonce : Account.Nonce.Stable.V1.t
         ; amount : Currency.Amount.Stable.V1.t option
         ; fee : Currency.Fee.Stable.V1.t
-        ; valid_until : Mina_numbers.Global_slot_since_genesis.Stable.V1.t option
+        ; valid_until :
+            Mina_numbers.Global_slot_since_genesis.Stable.V1.t option
         ; memo : Signed_command_memo.Stable.V1.t
         ; hash : Transaction_hash.Stable.V1.t
               [@to_yojson Transaction_hash.to_yojson]
@@ -80,7 +81,10 @@ module User_command = struct
   end]
 
   (* fee_payer and source are always the same, so we omit the duplication here *)
-  let accounts_referenced {fee_payer; receiver; _} = [Account_id.create fee_payer Token_id.default; Account_id.create receiver Token_id.default]
+  let accounts_referenced { fee_payer; receiver; _ } =
+    [ Account_id.create fee_payer Token_id.default
+    ; Account_id.create receiver Token_id.default
+    ]
 end
 
 module Internal_command = struct
@@ -108,7 +112,7 @@ module Internal_command = struct
     end
 
     module V1 = struct
-       type t =
+      type t =
         { sequence_no : int
         ; secondary_sequence_no : int
         ; typ : Bounded_types.String.Stable.V1.t
@@ -124,11 +128,12 @@ module Internal_command = struct
         }
       [@@deriving yojson, equal]
 
-       let to_latest _ = failwith "unimplemented"
+      let to_latest _ = failwith "unimplemented"
     end
   end]
 
-  let account_referenced {receiver; _ } = Account_id.create receiver Token_id.default
+  let account_referenced { receiver; _ } =
+    Account_id.create receiver Token_id.default
 end
 
 (* for fee payer and account updates, authorizations are omitted; signatures, proofs not in archive db *)
@@ -154,8 +159,10 @@ module Zkapp_command = struct
     end
   end]
 
-  let accounts_referenced {fee_payer; account_updates; _} =
-    Account_id.create fee_payer.public_key Token_id.default :: List.map account_updates ~f:(fun {public_key; token_id; _} -> Account_id.create public_key token_id)
+  let accounts_referenced { fee_payer; account_updates; _ } =
+    Account_id.create fee_payer.public_key Token_id.default
+    :: List.map account_updates ~f:(fun { public_key; token_id; _ } ->
+           Account_id.create public_key token_id )
 end
 
 module Block = struct
@@ -216,8 +223,10 @@ module Block = struct
         ; next_epoch_ledger_hash : Frozen_ledger_hash.Stable.V1.t
         ; ledger_hash : Ledger_hash.Stable.V1.t
         ; height : Unsigned_extended.UInt32.Stable.V1.t
-        ; global_slot_since_hard_fork : Mina_numbers.Global_slot_since_hard_fork.Stable.V1.t
-        ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+        ; global_slot_since_hard_fork :
+            Mina_numbers.Global_slot_since_hard_fork.Stable.V1.t
+        ; global_slot_since_genesis :
+            Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         ; timestamp : Block_time.Stable.V1.t
         ; user_cmds : User_command.Stable.V1.t list
         ; internal_cmds : Internal_command.Stable.V1.t list
