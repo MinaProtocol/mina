@@ -63,6 +63,8 @@ IFS=, read -ra first_epoch_ne <<< "$first_epoch_ne_str"
 genesis_epoch_staking_hash="${first_epoch_ne[$IX_CUR_EPOCH_HASH]}"
 genesis_epoch_next_hash="${first_epoch_ne[$IX_NEXT_EPOCH_HASH]}"
 
+echo "Genesis epoch staking/next hashes: $genesis_epoch_staking_hash, $genesis_epoch_next_hash"
+
 last_ne_str="$(for i in $(seq $BEST_CHAIN_QUERY_FROM $SLOT_CHAIN_END); do
   blocks $((10303+10*(i%2))) 2>/dev/null || true
   sleep "${MAIN_SLOT}s"
@@ -167,6 +169,7 @@ prefork_hashes_select='{epoch_data:{staking:{hash:.epoch_data.staking.hash},next
 prefork_hashes="$(jq -cS "$prefork_hashes_select" localnet/prefork_hf_ledger_hashes.json)"
 if [[ "$prefork_hashes" != "$expected_prefork_hashes" ]]; then
   echo "Assertion failed: unexpected ledgers in fork_config" >&2
+  echo "Expected: $expected_prefork_hashes" >&2
   exit 3
 fi
 
