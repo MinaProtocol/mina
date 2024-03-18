@@ -108,7 +108,6 @@ latest_nonempty_block(){
     if [[ $max_slot -lt ${f[$IX_SLOT]} ]]; then
       max_slot=${f[$IX_SLOT]}
     fi
-    f[$IX_NON_EMPTY]="true"
     if "${f[$IX_NON_EMPTY]}" && [[ ${latest[$IX_SLOT]} -lt ${f[$IX_SLOT]} ]]; then
       latest=( "${f[@]}" )
     fi
