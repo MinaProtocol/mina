@@ -47,7 +47,10 @@ module User_command = struct
   end]
 
   (* fee_payer and source are always the same, so we omit the duplication here *)
-  let accounts_referenced {fee_payer; receiver; _} = [Account_id.create fee_payer Token_id.default; Account_id.create receiver Token_id.default]
+  let accounts_referenced { fee_payer; receiver; _ } =
+    [ Account_id.create fee_payer Token_id.default
+    ; Account_id.create receiver Token_id.default
+    ]
 end
 
 module Internal_command = struct
@@ -75,7 +78,8 @@ module Internal_command = struct
     end
   end]
 
-  let account_referenced {receiver; _ } = Account_id.create receiver Token_id.default
+  let account_referenced { receiver; _ } =
+    Account_id.create receiver Token_id.default
 end
 
 (* for fee payer and account updates, authorizations are omitted; signatures, proofs not in archive db *)
@@ -101,8 +105,10 @@ module Zkapp_command = struct
     end
   end]
 
-  let accounts_referenced {fee_payer; account_updates; _} =
-    Account_id.create fee_payer.public_key Token_id.default :: List.map account_updates ~f:(fun {public_key; token_id; _} -> Account_id.create public_key token_id)
+  let accounts_referenced { fee_payer; account_updates; _ } =
+    Account_id.create fee_payer.public_key Token_id.default
+    :: List.map account_updates ~f:(fun { public_key; token_id; _ } ->
+           Account_id.create public_key token_id )
 end
 
 module Block = struct

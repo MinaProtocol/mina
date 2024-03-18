@@ -6,8 +6,13 @@ open Caqti_async
 module Mainnet = struct
   module Public_key = struct
     let typ : Signature_lib.Public_key.Compressed.t Caqti_type.t =
-      let encode c = Ok (Signature_lib.Public_key.Compressed.to_base58_check c) in
-      let decode s = Result.map_error ~f:Error.to_string_hum @@ Signature_lib.Public_key.Compressed.of_base58_check s in
+      let encode c =
+        Ok (Signature_lib.Public_key.Compressed.to_base58_check c)
+      in
+      let decode s =
+        Result.map_error ~f:Error.to_string_hum
+        @@ Signature_lib.Public_key.Compressed.of_base58_check s
+      in
       Caqti_type.custom ~encode ~decode Caqti_type.string
 
     let table_name = "public_keys"
@@ -252,13 +257,7 @@ module Mainnet = struct
       }
 
     (* cannot be derived from Fields.names because `type` is an invalid identifier in ocaml *)
-    let field_names =
-      [ "type"
-      ; "receiver_id"
-      ; "fee"
-      ; "token"
-      ; "hash"
-      ]
+    let field_names = [ "type"; "receiver_id"; "fee"; "token"; "hash" ]
 
     let table_name = "internal_commands"
 
