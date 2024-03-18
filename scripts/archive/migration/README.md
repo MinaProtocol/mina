@@ -108,7 +108,9 @@ this command should output migration-replayer-XXX.json which should be used in n
 
 #### Incremental migration
 
-./scripts/archive/migration/berkeley_migration.sh incremental -g  ../../umt_testing/o1labs-umt-pre-fork-run-1-ledger.json -s postgres://postgres:postgres@localhost:5432/umt_testing_increment -t postgres://postgres:postgres@localhost:5432/migrated -b mina_network_block_data -bs 50 -n o1labs-umt-pre-fork-run-1 -r migration-checkpoint-597.json 
+```
+./scripts/archive/migration/berkeley_migration.sh incremental -g  ../../umt_testing/o1labs-umt-pre-fork-run-1-ledger.json -s postgres://postgres:postgres@localhost:5432/umt_testing_increment -t postgres://postgres:postgres@localhost:5432/migrated -b mina_network_block_data -bs 50 -n o1labs-umt-pre-fork-run-1 -r migration-checkpoint-597.json
+```
 
 where:
 
