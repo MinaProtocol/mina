@@ -143,7 +143,7 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
     { base = Accounts accounts
     ; num_accounts = None
     ; balances = []
-    ; hash = Some (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
+    ; hash = None
     ; s3_data_hash = None
     ; name = None
     ; add_genesis_winner = Some true
