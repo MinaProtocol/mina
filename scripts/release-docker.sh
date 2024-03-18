@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-test-executive' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
+VALID_SERVICES=('mina-archive' 'mina-archive-migration' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-test-executive' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -87,6 +87,11 @@ if [[ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then
 case "${SERVICE}" in
 mina-archive)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
+  DOCKER_CONTEXT="dockerfiles/"
+  SERVICE=${SERVICE}${SERVICE_SUFFIX}
+  ;;
+mina-archive-migration)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive-migration"
   DOCKER_CONTEXT="dockerfiles/"
   SERVICE=${SERVICE}${SERVICE_SUFFIX}
   ;;

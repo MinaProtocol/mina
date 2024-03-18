@@ -128,7 +128,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~context:(module Context)
     ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
     ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ;
-  Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
+  upon (Strict_pipe.Reader.read clear_reader) (fun _ ->
       let open Strict_pipe.Writer in
       kill valid_transition_writer ;
       kill primary_transition_writer ;
@@ -137,6 +137,5 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       kill catchup_breadcrumbs_writer ;
       if Ivar.is_full clean_up_catchup_scheduler then
         [%log error] "Ivar.fill bug is here!" ;
-      Ivar.fill clean_up_catchup_scheduler () )
-  |> don't_wait_for ;
+      Ivar.fill clean_up_catchup_scheduler () ) ;
   processed_transition_reader
