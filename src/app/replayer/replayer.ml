@@ -987,7 +987,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
              msg )
   in
   let archive_uri = Uri.of_string archive_uri in
-  match Caqti_async.connect_pool ~max_size:128 archive_uri with
+  let pool_config =
+    Caqti_pool_config.(
+      merge_left (default_from_env ()) (create ~max_size:128 ()))
+  in
+  match Caqti_async.connect_pool ~pool_config archive_uri with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]

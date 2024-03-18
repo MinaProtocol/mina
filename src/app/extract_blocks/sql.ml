@@ -27,12 +27,12 @@ module Subchain = struct
       join_condition
 
   let query_unparented =
-    Caqti_request.collect Caqti_type.string Archive_lib.Processor.Block.typ
+    Mina_caqti.collect_req Caqti_type.string Archive_lib.Processor.Block.typ
       (make_sql ~join_condition:"b.id = chain.parent_id")
 
   let query_from_start =
-    Caqti_request.collect
-      Caqti_type.(tup2 string string)
+    Mina_caqti.collect_req
+      Caqti_type.(t2 string string)
       Archive_lib.Processor.Block.typ
       (make_sql
          ~join_condition:
@@ -48,7 +48,7 @@ module Subchain = struct
     Conn.collect_list query_from_start (end_state_hash, start_state_hash)
 
   let query_all =
-    Caqti_request.collect Caqti_type.unit Archive_lib.Processor.Block.typ
+    Mina_caqti.collect_req Caqti_type.unit Archive_lib.Processor.Block.typ
       {sql| SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
                    next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp, chain_status
             FROM blocks
@@ -62,7 +62,7 @@ end
 
 module Public_key = struct
   let query =
-    Caqti_request.find Caqti_type.int Caqti_type.string
+    Mina_caqti.find_req Caqti_type.int Caqti_type.string
       "SELECT value from public_keys WHERE id = ?"
 
   let run (module Conn : Caqti_async.CONNECTION) id = Conn.find query id
@@ -70,7 +70,7 @@ end
 
 module Snarked_ledger_hashes = struct
   let query =
-    Caqti_request.find Caqti_type.int Caqti_type.string
+    Mina_caqti.find_req Caqti_type.int Caqti_type.string
       "SELECT value from snarked_ledger_hashes WHERE id = ?"
 
   let run (module Conn : Caqti_async.CONNECTION) id = Conn.find query id
@@ -78,8 +78,8 @@ end
 
 module Epoch_data = struct
   let query =
-    Caqti_request.find Caqti_type.int
-      Caqti_type.(tup2 string int)
+    Mina_caqti.find_req Caqti_type.int
+      Caqti_type.(t2 string int)
       "SELECT seed,ledger_hash_id from epoch_data WHERE id = ?"
 
   let run (module Conn : Caqti_async.CONNECTION) id = Conn.find query id
@@ -87,8 +87,8 @@ end
 
 module Blocks_and_user_commands = struct
   let query =
-    Caqti_request.collect Caqti_type.int
-      Caqti_type.(tup2 int int)
+    Mina_caqti.collect_req Caqti_type.int
+      Caqti_type.(t2 int int)
       {sql| SELECT user_command_id, sequence_no
             FROM blocks_user_commands
             WHERE block_id = ?
@@ -116,7 +116,7 @@ module Blocks_and_internal_commands = struct
     Caqti_type.custom ~encode ~decode (to_rep spec)
 
   let query =
-    Caqti_request.collect Caqti_type.int typ
+    Mina_caqti.collect_req Caqti_type.int typ
       {sql| SELECT internal_command_id, sequence_no, secondary_sequence_no, receiver_account_creation_fee_paid, receiver_balance
             FROM (blocks_internal_commands
               INNER JOIN blocks

@@ -36,9 +36,9 @@ module Sql = struct
       Int.pow 2 Genesis_constants.Constraint_constants.compiled.transaction_capacity_log_2
 
     let query_pending =
-      Caqti_request.find_opt
-        Caqti_type.(tup2 string int64)
-        Caqti_type.(tup4 int64 int64 int64 (option int64))
+      Mina_caqti.find_req_opt
+        Caqti_type.(t2 string int64)
+        Caqti_type.(t4 int64 int64 int64 (option int64))
         (sprintf
         {sql|
 SELECT DISTINCT
@@ -156,9 +156,9 @@ AS combo GROUP BY combo.pk_id
 |sql} max_txns)
 
     let query_pending_fallback =
-      Caqti_request.find_opt
-        Caqti_type.(tup2 string int64)
-        Caqti_type.(tup4 int64 int64 int64 (option int64))
+      Mina_caqti.find_req_opt
+        Caqti_type.(t2 string int64)
+        Caqti_type.(t4 int64 int64 int64 (option int64))
         {sql|
 /* In this query, we are recursively traversing the chain (up to the point of canonicity) to a specific height and then, subject to this height at most, (a) finding the balance of some account and (b) finding the nonce in the most recent user command that this account has sent. Then these two subqueries are combined into one row. */
 
@@ -275,9 +275,9 @@ AS combo GROUP BY combo.pk_id
 |sql}
 
     let query_canonical =
-      Caqti_request.find_opt
-        Caqti_type.(tup2 string int64)
-        Caqti_type.(tup4 int64 int64 int64 (option int64))
+      Mina_caqti.find_req_opt
+        Caqti_type.(t2 string int64)
+        Caqti_type.(t4 int64 int64 int64 (option int64))
         (sprintf
         {sql|
 SELECT DISTINCT
@@ -326,9 +326,9 @@ AS combo GROUP BY combo.pk_id
 |sql} max_txns)
 
     let query_canonical_fallback =
-      Caqti_request.find_opt
-        Caqti_type.(tup2 string int64)
-        Caqti_type.(tup3 int64 int64 (option int64))
+      Mina_caqti.find_req_opt
+        Caqti_type.(t2 string int64)
+        Caqti_type.(t3 int64 int64 (option int64))
         {sql| /* See comments on the above query to help understand this one.
                * Since this query acts on only canonical blocks, we can skip the
                * recursive traversal part. */

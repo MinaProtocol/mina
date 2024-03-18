@@ -34,6 +34,7 @@
    coda_runtime_config
    currency
    coda_genesis_ledger
+   mina_caqti
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

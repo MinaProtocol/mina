@@ -342,7 +342,13 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
         csv_datas
   in
   let archive_uri = Uri.of_string archive_uri in
-  match Caqti_async.connect_pool ~max_size:128 archive_uri with
+  match
+    Caqti_async.connect_pool
+      ~pool_config:
+        Caqti_pool_config.(
+          merge_left (default_from_env ()) (create ~max_size:128 ()))
+      archive_uri
+  with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]

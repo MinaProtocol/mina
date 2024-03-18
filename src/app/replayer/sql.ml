@@ -20,8 +20,8 @@ module Block_info = struct
 
   (* find all blocks above the start slot, working back from block with given state hash *)
   let query =
-    Caqti_request.collect
-      Caqti_type.(tup2 string int64)
+    Mina_caqti.collect_req
+      Caqti_type.(t2 string int64)
       typ
       {sql| WITH RECURSIVE chain AS (
 
@@ -78,7 +78,7 @@ let find_command_ids_query s =
 
 module Block = struct
   let state_hash_query =
-    Caqti_request.find Caqti_type.int Caqti_type.string
+    Mina_caqti.find_req Caqti_type.int Caqti_type.string
       {sql| SELECT state_hash FROM blocks
             WHERE id = ?
       |sql}
@@ -87,21 +87,21 @@ module Block = struct
     Conn.find state_hash_query id
 
   let get_height_query =
-    Caqti_request.find Caqti_type.int Caqti_type.int64
+    Mina_caqti.find_req Caqti_type.int Caqti_type.int64
       {sql| SELECT height FROM blocks WHERE id = $1 |sql}
 
   let get_height (module Conn : Caqti_async.CONNECTION) ~block_id =
     Conn.find get_height_query block_id
 
   let max_slot_query =
-    Caqti_request.find Caqti_type.unit Caqti_type.int64
+    Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
       {sql| SELECT MAX(global_slot_since_genesis) FROM blocks |sql}
 
   let get_max_slot (module Conn : Caqti_async.CONNECTION) () =
     Conn.find max_slot_query ()
 
   let max_canonical_slot_query =
-    Caqti_request.find Caqti_type.unit Caqti_type.int64
+    Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
       {sql| SELECT MAX(global_slot_since_genesis) FROM blocks
             WHERE chain_status = 'canonical'
       |sql}
@@ -110,7 +110,7 @@ module Block = struct
     Conn.find max_canonical_slot_query ()
 
   let next_slot_query =
-    Caqti_request.find_opt Caqti_type.int64 Caqti_type.int64
+    Mina_caqti.find_req_opt Caqti_type.int64 Caqti_type.int64
       {sql| SELECT global_slot_since_genesis FROM blocks
             WHERE global_slot_since_genesis >= $1
             AND chain_status <> 'orphaned'
@@ -122,7 +122,7 @@ module Block = struct
     Conn.find_opt next_slot_query slot
 
   let parent_block_id_query =
-    Caqti_request.find Caqti_type.int Caqti_type.int
+    Mina_caqti.find_req Caqti_type.int Caqti_type.int
       {sql| SELECT parent_id FROM blocks
             WHERE id = $1
       |sql}
@@ -131,7 +131,7 @@ module Block = struct
     Conn.find parent_block_id_query id
 
   let genesis_block_id_query =
-    Caqti_request.find Caqti_type.unit Caqti_type.int
+    Mina_caqti.find_req Caqti_type.unit Caqti_type.int
       {sql| SELECT id FROM blocks
             WHERE global_slot_since_genesis = 0
             AND chain_status = 'canonical'
@@ -141,7 +141,7 @@ module Block = struct
     Conn.find genesis_block_id_query ()
 
   let state_hashes_by_slot_query =
-    Caqti_request.collect Caqti_type.int64 Caqti_type.string
+    Mina_caqti.collect_req Caqti_type.int64 Caqti_type.string
       {sql| SELECT state_hash FROM blocks WHERE global_slot_since_genesis = $1 |sql}
 
   let get_state_hashes_by_slot (module Conn : Caqti_async.CONNECTION) slot =
@@ -149,7 +149,7 @@ module Block = struct
 
   (* find all blocks, working back from block with given state hash *)
   let chain_query =
-    Caqti_request.collect Caqti_type.string Caqti_type.string
+    Mina_caqti.collect_req Caqti_type.string Caqti_type.string
       {sql| WITH RECURSIVE chain AS (
 
               SELECT id,parent_id FROM blocks b WHERE b.state_hash = ?
@@ -173,7 +173,7 @@ end
 
 module User_command_ids = struct
   let query =
-    Caqti_request.collect Caqti_type.string Caqti_type.int
+    Mina_caqti.collect_req Caqti_type.string Caqti_type.int
       (find_command_ids_query "user")
 
   let run (module Conn : Caqti_async.CONNECTION) ~state_hash =
@@ -238,7 +238,7 @@ module User_command = struct
     Caqti_type.custom ~encode ~decode (to_rep spec)
 
   let query =
-    Caqti_request.collect Caqti_type.int typ
+    Mina_caqti.collect_req Caqti_type.int typ
       {sql| SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,valid_until,memo,nonce,
                    blocks.id,blocks.height,blocks.global_slot_since_genesis,parent.global_slot_since_genesis,
                    sequence_no,status,created_token,
@@ -266,7 +266,7 @@ end
 
 module Internal_command_ids = struct
   let query =
-    Caqti_request.collect Caqti_type.string Caqti_type.int
+    Mina_caqti.collect_req Caqti_type.string Caqti_type.int
       (find_command_ids_query "internal")
 
   let run (module Conn : Caqti_async.CONNECTION) ~state_hash =
@@ -318,8 +318,8 @@ module Internal_command = struct
      filter internal commands by global slot, because they can be used many times
   *)
   let query =
-    Caqti_request.collect
-      Caqti_type.(tup2 int64 int)
+    Mina_caqti.collect_req
+      Caqti_type.(t2 int64 int)
       typ
       {sql| SELECT type,receiver_id,receiver_balance,fee,token,
               b.id,b.height,b.global_slot_since_genesis,parent.global_slot_since_genesis,
@@ -350,7 +350,7 @@ end
 
 module Public_key = struct
   let query =
-    Caqti_request.find_opt Caqti_type.int Caqti_type.string
+    Mina_caqti.find_req_opt Caqti_type.int Caqti_type.string
       {sql| SELECT value FROM public_keys
             WHERE id = ?
       |sql}
@@ -367,11 +367,11 @@ module Epoch_data = struct
     let decode (epoch_ledger_hash, epoch_data_seed) =
       Ok { epoch_ledger_hash; epoch_data_seed }
     in
-    let rep = Caqti_type.(tup2 string string) in
+    let rep = Caqti_type.(t2 string string) in
     Caqti_type.custom ~encode ~decode rep
 
   let query_epoch_data =
-    Caqti_request.find Caqti_type.int epoch_data_typ
+    Mina_caqti.find_req Caqti_type.int epoch_data_typ
       {sql| SELECT slh.value, ed.seed FROM snarked_ledger_hashes AS slh
 
        INNER JOIN
@@ -388,7 +388,7 @@ module Epoch_data = struct
     Conn.find query_epoch_data epoch_ledger_id
 
   let query_staking_epoch_data_id =
-    Caqti_request.find Caqti_type.string Caqti_type.int
+    Mina_caqti.find_req Caqti_type.string Caqti_type.int
       {sql| SELECT staking_epoch_data_id FROM blocks
 
             WHERE state_hash = ?
@@ -400,7 +400,7 @@ module Epoch_data = struct
     Conn.find query_staking_epoch_data_id state_hash
 
   let query_next_epoch_data_id =
-    Caqti_request.find Caqti_type.string Caqti_type.int
+    Mina_caqti.find_req Caqti_type.string Caqti_type.int
       {sql| SELECT next_epoch_data_id FROM blocks
 
             WHERE state_hash = ?
@@ -413,7 +413,7 @@ end
 module Parent_block = struct
   (* fork block is parent of block with the given state hash *)
   let query_parent_state_hash =
-    Caqti_request.find Caqti_type.string Caqti_type.string
+    Mina_caqti.find_req Caqti_type.string Caqti_type.string
       {sql| SELECT parent.state_hash FROM blocks AS parent
 
             INNER JOIN
@@ -430,8 +430,8 @@ end
 
 module Balances = struct
   let query_insert_nonce =
-    Caqti_request.exec
-      Caqti_type.(tup2 int int64)
+    Mina_caqti.exec_req
+      Caqti_type.(t2 int int64)
       {sql| UPDATE balances
             SET nonce = $2
             WHERE id = $1

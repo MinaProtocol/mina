@@ -7,6 +7,8 @@
    base.caml
    base
    core_kernel
+   stdio
+   async.async_command
    async
    core
    ;;local libraries
@@ -17,6 +19,7 @@
    currency
    consensus
    logger
+   
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

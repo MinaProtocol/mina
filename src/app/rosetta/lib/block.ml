@@ -251,20 +251,20 @@ module Sql = struct
 
       let winner (_, winner) = `Pk winner
 
-      let typ = Caqti_type.(tup2 string string)
+      let typ = Caqti_type.(t2 string string)
     end
 
-    let typ = Caqti_type.(tup3 int Archive_lib.Processor.Block.typ Extras.typ)
+    let typ = Caqti_type.(t3 int Archive_lib.Processor.Block.typ Extras.typ)
 
     let query_count_canonical_at_height =
-      Caqti_request.find Caqti_type.int64 Caqti_type.int64
+      Mina_caqti.find_req Caqti_type.int64 Caqti_type.int64
         {sql| SELECT COUNT(*) FROM blocks
               WHERE height = ?
               AND chain_status = 'canonical'
         |sql}
 
     let query_height_canonical =
-      Caqti_request.find_opt Caqti_type.int64 typ
+      Mina_caqti.find_req_opt Caqti_type.int64 typ
         (* The archive database will only reconcile the canonical columns for
          * blocks older than k + epsilon
          *)
@@ -279,7 +279,7 @@ SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_win
 
 
     let query_height_pending =
-      Caqti_request.find_opt Caqti_type.int64 typ
+      Mina_caqti.find_req_opt Caqti_type.int64 typ
         (* According to the clarification of the Rosetta spec here
          * https://community.rosetta-api.org/t/querying-block-by-just-its-index/84/3 ,
          * it is important to select only the block on the canonical chain for a
@@ -312,7 +312,7 @@ WITH RECURSIVE chain AS (
       |}
 
     let query_hash =
-      Caqti_request.find_opt Caqti_type.string typ
+      Mina_caqti.find_req_opt Caqti_type.string typ
         {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, b.chain_status, pk.value as creator, bw.value as winner FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
@@ -321,8 +321,8 @@ WITH RECURSIVE chain AS (
         WHERE b.state_hash = ? |}
 
     let query_both =
-      Caqti_request.find_opt
-        Caqti_type.(tup2 string int64)
+      Mina_caqti.find_req_opt
+        Caqti_type.(t2 string int64)
         typ
         {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, b.chain_status, pk.value as creator, bw.value as winner FROM blocks b
         INNER JOIN public_keys pk
@@ -332,7 +332,7 @@ WITH RECURSIVE chain AS (
         WHERE b.state_hash = ? AND b.height = ? |}
 
     let query_by_id =
-      Caqti_request.find_opt Caqti_type.int typ
+      Mina_caqti.find_req_opt Caqti_type.int typ
         {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, b.chain_status, pk.value as creator, bw.value as winner FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
@@ -341,7 +341,7 @@ WITH RECURSIVE chain AS (
         WHERE b.id = ? |}
 
     let query_best =
-      Caqti_request.find_opt Caqti_type.unit typ
+      Mina_caqti.find_req_opt Caqti_type.unit typ
         {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, b.chain_status, pk.value as creator, bw.value as winner FROM blocks b
            INNER JOIN public_keys pk
            ON pk.id = b.creator_id
@@ -369,7 +369,7 @@ WITH RECURSIVE chain AS (
           Conn.find_opt query_height_canonical h
         else
           let%bind max_height = Conn.find
-              (Caqti_request.find Caqti_type.unit Caqti_type.int64
+              (Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
                  {sql| SELECT MAX(height) FROM blocks |sql}) ()
           in
           let max_queryable_height = Int64.(-) max_height Network.Sql.max_height_delta in
@@ -438,11 +438,11 @@ WITH RECURSIVE chain AS (
 
     let typ =
       Caqti_type.(
-        tup3 int Archive_lib.Processor.User_command.Signed_command.typ
+        t3 int Archive_lib.Processor.User_command.Signed_command.typ
           Extras.typ)
 
     let query =
-      Caqti_request.collect Caqti_type.int typ
+      Mina_caqti.collect_req Caqti_type.int typ
         {| SELECT u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee,
         u.valid_until, u.memo, u.hash,
         pk1.value as fee_payer, pk2.value as source, pk3.value as receiver,
@@ -470,15 +470,15 @@ WITH RECURSIVE chain AS (
       let sequence_no (_,_,seq_no,_) = seq_no
       let secondary_sequence_no (_,_,_,secondary_seq_no) = secondary_seq_no
 
-      let typ = Caqti_type.(tup4 (option int64) string int int)
+      let typ = Caqti_type.(t4 (option int64) string int int)
     end
 
     let typ =
       Caqti_type.(
-        tup3 int Archive_lib.Processor.Internal_command.typ Extras.typ)
+        t3 int Archive_lib.Processor.Internal_command.typ Extras.typ)
 
     let query =
-      Caqti_request.collect Caqti_type.int typ
+      Mina_caqti.collect_req Caqti_type.int typ
         {| SELECT DISTINCT ON (i.hash,i.type,bic.sequence_no,bic.secondary_sequence_no) i.id, i.type, i.receiver_id, i.fee, i.token, i.hash,
             bic.receiver_account_creation_fee_paid, pk.value as receiver,
             bic.sequence_no, bic.secondary_sequence_no

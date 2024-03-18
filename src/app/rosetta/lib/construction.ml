@@ -848,7 +848,7 @@ module Submit = struct
         Caqti_type.custom ~encode ~decode (to_rep spec)
 
       let query =
-        Caqti_request.find_opt
+        Mina_caqti.find_req_opt
           typ
           Caqti_type.string
           {sql| SELECT uc.id FROM user_commands uc

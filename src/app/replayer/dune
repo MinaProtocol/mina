@@ -43,6 +43,7 @@
    pickles
    sgn
    unsigned_extended
+   mina_caqti
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
