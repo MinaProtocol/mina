@@ -60,8 +60,8 @@ fi
 first_epoch_ne_str="$(blocks 10303 2>/dev/null | latest_nonempty_block)"
 IFS=, read -ra first_epoch_ne <<< "$first_epoch_ne_str"
 
-genesis_epoch_staking_hash="${first_epoch_ne[$IX_CUR_EPOCH_HASH]}"
-genesis_epoch_next_hash="${first_epoch_ne[$IX_NEXT_EPOCH_HASH]}"
+genesis_epoch_staking_hash="${first_epoch_ne[$((3+IX_CUR_EPOCH_HASH))]}"
+genesis_epoch_next_hash="${first_epoch_ne[$((3+IX_NEXT_EPOCH_HASH))]}"
 
 echo "Genesis epoch staking/next hashes: $genesis_epoch_staking_hash, $genesis_epoch_next_hash"
 
