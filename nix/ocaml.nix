@@ -277,6 +277,35 @@ let
 
       devnet = wrapMina self.devnet-pkg { };
 
+      berkeley-migration-pkg = self.mina-dev.overrideAttrs (s: {
+        pname = "mina-berkeley-migration";
+        version = "mainnet";
+        DUNE_PROFILE = "berkeley_archive_migration";
+        # For compatibility with Docker build
+        MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
+        buildPhase = ''
+          dune build --display=short \
+            src/app/berkeley_migration/berkeley_migration.exe \
+            src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe \
+            src/app/replayer/replayer.exe
+        '';
+
+        outputs = [ "out" ];
+
+        installPhase = ''
+          mkdir -p $out/bin
+          pushd _build/default
+          cp src/app/berkeley_migration/berkeley_migration.exe $out/bin/mina-berkeley-migration
+          cp src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe $out/bin/mina-berkeley-migration-verifier
+          cp src/app/replayer/replayer.exe $out/bin/mina-migration-replayer
+          popd
+          remove-references-to -t $(dirname $(dirname $(command -v ocaml))) $out/bin/*
+        '';
+        shellHook = "";
+      });
+
+      berkeley-migration = wrapMina self.berkeley-migration-pkg { };
+
       # Unit tests
       mina_tests = runMinaCheck {
         name = "tests";
