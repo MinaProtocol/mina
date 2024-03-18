@@ -87,7 +87,22 @@ type node_status_data =
   }
 [@@deriving to_yojson]
 
-let send_node_status_data ~logger ~url node_status_data =
+module Simplified = struct
+  type t =
+    { max_observed_block_height : int
+    ; commit_hash : string
+    ; git_branch : string
+    ; chain_id : string
+    ; peer_id : string
+    ; peer_count : int
+    ; timestamp : string
+    ; block_producer_public_key : string option
+    }
+  [@@deriving to_yojson]
+end
+
+let send_node_status_data (type data) ~logger ~url (node_status_data : data)
+    (node_status_data_to_yojson : data -> Yojson.Safe.t) =
   let node_status_json = node_status_data_to_yojson node_status_data in
   let json = `Assoc [ ("data", node_status_json) ] in
   let headers =
@@ -398,9 +413,34 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~chain_id
           reset_gauges () ;
           send_node_status_data ~logger
             ~url:(Uri.of_string node_status_url)
-            node_status_data
+            node_status_data node_status_data_to_yojson
       | Error e ->
           [%log info]
             ~metadata:[ ("error", `String (Error.to_string_hum e)) ]
             "Failed to get bandwidth info from libp2p" ;
           Deferred.unit )
+
+let start_simplified ~logger ~node_status_url ~chain_id ~network
+    ~addrs_and_ports ~slot_duration ~block_producer_public_key_base58 =
+  [%log info] "Starting simplified node status service using URL $url"
+    ~metadata:[ ("url", `String node_status_url) ] ;
+  let five_slots = Time.Span.scale slot_duration 5. in
+  every ~start:(after five_slots) ~continue_on_error:true five_slots
+  @@ fun () ->
+  don't_wait_for
+  @@ let%bind peers = Mina_networking.peers network in
+     let node_status_data =
+       { Simplified.max_observed_block_height =
+           !Mina_metrics.Transition_frontier.max_blocklength_observed
+       ; commit_hash = Mina_version.commit_id
+       ; git_branch = Mina_version.branch
+       ; chain_id
+       ; peer_id = (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
+       ; peer_count = List.length peers
+       ; timestamp = Rfc3339_time.get_rfc3339_time ()
+       ; block_producer_public_key = block_producer_public_key_base58
+       }
+     in
+     send_node_status_data ~logger
+       ~url:(Uri.of_string node_status_url)
+       node_status_data Simplified.to_yojson

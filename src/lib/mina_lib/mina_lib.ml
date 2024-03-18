@@ -1404,15 +1404,33 @@ let start t =
   let () =
     match t.config.node_status_url with
     | Some node_status_url ->
-        Node_status_service.start ~logger:t.config.logger ~node_status_url
-          ~network:t.components.net
-          ~transition_frontier:t.components.transition_frontier
-          ~sync_status:t.sync_status ~chain_id:t.config.chain_id
-          ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
-          ~start_time:t.config.start_time
-          ~slot_duration:
-            (Block_time.Span.to_time_span
-               t.config.precomputed_values.consensus_constants.slot_duration_ms )
+        if t.config.simplified_node_stats then
+          let block_producer_public_key_base58 =
+            Option.map ~f:(fun (_, pk) ->
+                Public_key.Compressed.to_base58_check pk )
+            @@ Keypair.And_compressed_pk.Set.choose
+                 t.config.block_production_keypairs
+          in
+          Node_status_service.start_simplified ~logger:t.config.logger
+            ~node_status_url ~network:t.components.net
+            ~chain_id:t.config.chain_id
+            ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
+            ~slot_duration:
+              (Block_time.Span.to_time_span
+                 t.config.precomputed_values.consensus_constants
+                   .slot_duration_ms )
+            ~block_producer_public_key_base58
+        else
+          Node_status_service.start ~logger:t.config.logger ~node_status_url
+            ~network:t.components.net
+            ~transition_frontier:t.components.transition_frontier
+            ~sync_status:t.sync_status ~chain_id:t.config.chain_id
+            ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
+            ~start_time:t.config.start_time
+            ~slot_duration:
+              (Block_time.Span.to_time_span
+                 t.config.precomputed_values.consensus_constants
+                   .slot_duration_ms )
     | None ->
         ()
   in

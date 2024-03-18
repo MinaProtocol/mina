@@ -39,7 +39,7 @@ let generate_ledger_tarball ~genesis_dir ~ledger_name_prefix ledger =
   in
   [%log info] "Generated ledger tar at %s" tar_path ;
   let hash =
-    Mina_base.State_hash.to_base58_check
+    Mina_base.Ledger_hash.to_base58_check
     @@ Mina_ledger.Ledger.merkle_root ledger
   in
   let%map s3_data_hash = Genesis_ledger_helper.sha3_hash tar_path in
