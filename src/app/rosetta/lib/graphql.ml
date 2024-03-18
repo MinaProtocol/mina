@@ -32,7 +32,7 @@ let query query_obj uri =
   let open Deferred.Result.Let_syntax in
   let headers =
     Cohttp.Header.of_list
-      [("Content-Type", "application/json"); ("Accept", "application/json")]
+      [ ("Content-Type", "application/json"); ("Accept", "application/json") ]
   in
   let%bind response, body =
     Deferred.Or_error.try_with ~here:[%here] ~extract_exn:true (fun () ->
@@ -57,22 +57,21 @@ let query query_obj uri =
           (Error
              (Errors.create ~context:"Response from Mina Daemon is not a 200"
                 (`Graphql_mina_query
-                  (Printf.sprintf "Status code %d -- %s" code body_str))))
+                  (Printf.sprintf "Status code %d -- %s" code body_str) ) ) )
   in
   let open Yojson.Basic.Util in
   ( match (member "errors" body_json, member "data" body_json) with
   | `Null, `Null ->
       Error
         (Errors.create ~context:"Empty response from Mina Daemon"
-           (`Graphql_mina_query "Empty response"))
+           (`Graphql_mina_query "Empty response") )
   | error, `Null ->
       Errors.Transaction_submit.of_request_error (graphql_error_to_string error)
-        |> Option.value
-            ~default:(
-              Errors.create
-                ~context:"Explicit error response from Mina Daemon"
-                (`Graphql_mina_query (graphql_error_to_string error)))
-        |> Result.fail
+      |> Option.value
+           ~default:
+             (Errors.create ~context:"Explicit error response from Mina Daemon"
+                (`Graphql_mina_query (graphql_error_to_string error)) )
+      |> Result.fail
   | _, raw_json ->
       Result.try_with (fun () -> query_obj#parse raw_json)
       |> Result.map_error ~f:(fun e ->
@@ -80,12 +79,10 @@ let query query_obj uri =
                ~context:"JSON parse error in response from Mina Daemon"
                (`Graphql_mina_query
                  (Printf.sprintf "Error parsing graphql response: %s"
-                    (Exn.to_string e))) ) )
+                    (Exn.to_string e) ) ) ) )
   |> Deferred.return
 
 let query_and_catch query_obj uri =
   let open Deferred.Let_syntax in
   let%map res = query query_obj uri in
-  match res with
-  | Ok r -> Ok (`Successful r)
-  | Error e -> Ok (`Failed e)
+  match res with Ok r -> Ok (`Successful r) | Error e -> Ok (`Failed e)
