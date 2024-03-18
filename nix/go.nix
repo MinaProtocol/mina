@@ -5,7 +5,7 @@ final: prev: {
   go-capnproto2 = final.buildGo119Module rec {
     pname = "capnpc-go";
     version = "v3.0.0-alpha.5";
-    vendorSha256 = "sha256-oZ6fUUpAsBS5hvl2+eqWsE3i0lwJzXeVaH2OiqWJQyY=";
+    vendorHash = "sha256-oZ6fUUpAsBS5hvl2+eqWsE3i0lwJzXeVaH2OiqWJQyY=";
     # Don't understand the problem, but it seems to build fine without examples
     excludedPackages = [ "./example/books/ex1" "./example/books/ex2" "./example/hashes" ];
     src = final.fetchFromGitHub {
@@ -36,7 +36,7 @@ final: prev: {
     version = "0.1";
     src = ../src/app/libp2p_helper/src;
     doCheck = false; # TODO: tests hang
-    vendorSha256 = let hashes = final.lib.importJSON ./libp2p_helper.json; in
+    vendorHash = let hashes = final.lib.importJSON ./libp2p_helper.json; in
     # sanity check, to make sure the fixed output drv doesn't keep working
       # when the inputs change
       if builtins.hashFile "sha256" ../src/app/libp2p_helper/src/go.mod
@@ -86,6 +86,6 @@ final: prev: {
       rev = "9a8ba09359482898580bb35c3aa86896364b14ce";
       sha256 = "sha256-3Lk5pa6fAeHGCmDjhaUjUoASxN6ozTD9e2+0wDH7hGs=";
     };
-    vendorSha256 = "sha256-lCBAsCNtorEu0WRZRLEMEaNyjtVIdJSAZg3icrpHIsQ=";
+    vendorHash = "sha256-lCBAsCNtorEu0WRZRLEMEaNyjtVIdJSAZg3icrpHIsQ=";
   };
 }
