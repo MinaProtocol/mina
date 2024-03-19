@@ -206,8 +206,7 @@ let
             src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
             src/app/replayer/replayer.exe \
             src/app/swap_bad_balances/swap_bad_balances.exe \
-            src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-            src/app/berkeley_migration/berkeley_migration.exe
+            src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
           # TODO figure out purpose of the line below
           # dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
           # Building documentation fails, because not everything in the source tree compiles. Ignore the errors.
@@ -246,7 +245,6 @@ let
           cp src/app/missing_blocks_auditor/missing_blocks_auditor.exe $archive/bin/mina-missing-blocks-auditor
           cp src/app/replayer/replayer.exe $archive/bin/mina-replayer
           cp src/app/swap_bad_balances/swap_bad_balances.exe $archive/bin/mina-swap-bad-balances
-          cp src/app/berkeley_migration/berkeley_migration.exe $archive/bin/berkeley_migration
           cp -R _doc/_html $out/share/doc/html
           # cp src/lib/mina_base/sample_keypairs.json $sample/share/mina
           popd
