@@ -49,6 +49,7 @@ let connect uri =
   let%map.Deferred.Result conn = Caqti_async.connect uri in
   wrap_conn ~source:uri conn
   
+(* custom Caqti types for generating type annotations on queries *)
 type _ Caqti_type.field +=
   | Array_nullable_int : int option array Caqti_type.field
 
@@ -269,10 +270,12 @@ let add_if_some (f : 'arg -> ('res, 'err) Deferred.Result.t) :
     'arg option -> ('res option, 'err) Deferred.Result.t =
   Fn.compose deferred_result_lift_opt @@ Option.map ~f
 
+(* if zkApp-related item is Set, run `f` *)
 let add_if_zkapp_set (f : 'arg -> ('res, 'err) Deferred.Result.t) :
     'arg Zkapp_basic.Set_or_keep.t -> ('res option, 'err) Deferred.Result.t =
   Fn.compose (add_if_some f) Zkapp_basic.Set_or_keep.to_option
 
+(* if zkApp-related item is Check, run `f` *)
 let add_if_zkapp_check (f : 'arg -> ('res, 'err) Deferred.Result.t) :
     'arg Zkapp_basic.Or_ignore.t -> ('res option, 'err) Deferred.Result.t =
   Fn.compose (add_if_some f) Zkapp_basic.Or_ignore.to_option
@@ -331,6 +334,9 @@ let insert_assuming_new ~(select : string * 'select Caqti_type.t)
          ~cols:(fst cols) () )
     value
 
+(* run `select_cols` and return the result, if found
+   if not found, run `insert_into_cols` and return the result
+*)
 let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
     ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
     (module Conn : CONNECTION) (value : 'cols) =
@@ -397,11 +403,13 @@ let make_get_opt ~of_option ~f item_opt =
   in
   of_option res_opt
 
+(** convert options to Set or Keep for zkApps-related results *)
 let get_zkapp_set_or_keep (item_opt : 'arg option)
     ~(f : 'arg -> ('res, _) Deferred.Result.t) :
     'res Zkapp_basic.Set_or_keep.t Deferred.t =
   make_get_opt ~of_option:Zkapp_basic.Set_or_keep.of_option ~f item_opt
 
+(** convert options to Check or Ignore for zkApps-related results *)
 let get_zkapp_or_ignore (item_opt : 'arg option)
     ~(f : 'arg -> ('res, _) Deferred.Result.t) :
     'res Zkapp_basic.Or_ignore.t Deferred.t =
