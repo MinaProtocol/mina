@@ -118,12 +118,12 @@ let command =
        flag
          "-o"
          (listed encoded_block)
-         ~doc:"output <format>:<path>; formats are: sexp / json / bin; a dash (-) dentoes stdout"
+         ~doc:"output <format>:<path>; formats are: sexp / json / bin; a dash (-) denotes stdout (example: -o json:-)"
      and input =
        flag
          "-i"
          (optional encoded_block)
-         ~doc:"input <format>:<path>; formats are: sexp / json / bin; a dash (-) dentoes stdin"
+         ~doc:"input <format>:<path>; formats are: sexp / json / bin; a dash (-) denotes stdin (example: -i json:-)"
      and full =
        flag
          "--full"
