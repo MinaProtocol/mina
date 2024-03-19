@@ -225,6 +225,7 @@ installed: [
   "re.1.9.0"
   "re2.v0.14.0"
   "react.1.2.1"
+  "reason.3.8.2"
   "res.5.0.1"
   "result.1.5"
   "rpc_parallel.v0.14.0"
