@@ -443,8 +443,7 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
             [ ("balance_id", `Int balance_id)
             ; ("nonce", `String (Account.Nonce.to_string ledger_nonce))
             ] ;
-        return
-        @@ if continue_on_error then incr error_count else Core_kernel.exit 1 )
+        Deferred.unit )
   | Some nonce ->
       let db_nonce =
         nonce |> Unsigned.UInt32.of_int64 |> Account.Nonce.of_uint32
@@ -478,9 +477,7 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
               ; ("database_nonce", Account.Nonce.to_yojson db_nonce)
               ; ("balance_id", `Int balance_id)
               ] ;
-          return
-          @@ if continue_on_error then incr error_count else Core_kernel.exit 1
-          )
+          Deferred.unit )
       else Deferred.unit
 
 let account_creation_fee_uint64 =
