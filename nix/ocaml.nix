@@ -128,12 +128,9 @@ let
         '';
       });
 
-      # on MacOS, ctypes-foreign-threaded.cma is not installed otherwise
+      # Doesn't have an explicit dependency on ctypes-foreign
       ctypes = super.ctypes.overrideAttrs
-        (oa: {
-          buildInputs = oa.buildInputs ++ [ pkgs.libffi ];
-          buildPhase = "make";
-        });
+        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
 
       # Some "core" Mina executables, without the version info.
       mina-dev = pkgs.stdenv.mkDerivation ({
