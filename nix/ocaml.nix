@@ -81,32 +81,26 @@ let
 
       # Make a script wrapper around a binary, setting all the necessary environment variables and adding necessary tools to PATH.
       # Also passes the version information to the executable.
-      wrapMina =
-        let
-          commit_sha1 = inputs.self.sourceInfo.rev or "<dirty>";
-          commit_date = inputs.flockenzeit.lib.RFC-5322 inputs.self.sourceInfo.lastModified or 0;
-        in
-        package:
-        { deps ? [ pkgs.gnutar pkgs.gzip ], }:
-        pkgs.runCommand "${package.name}-release"
-          {
-            buildInputs = [ pkgs.makeBinaryWrapper pkgs.xorg.lndir ];
-            outputs = package.outputs;
-          }
-          (map
-            (output: ''
-              mkdir -p ${placeholder output}
-              lndir -silent ${package.${output}} ${placeholder output}
-              for i in $(find -L "${placeholder output}/bin" -type f); do
-                wrapProgram "$i" \
-                  --prefix PATH : ${makeBinPath deps} \
-                  --set MINA_LIBP2P_HELPER_PATH ${pkgs.libp2p_helper}/bin/libp2p_helper \
-                  --set MINA_COMMIT_SHA1 ${escapeShellArg commit_sha1} \
-                  --set MINA_COMMIT_DATE ${escapeShellArg commit_date} \
-                  --set MINA_BRANCH "''${MINA_BRANCH-<unknown due to nix build>}"
-              done
-            '')
-            package.outputs);
+      wrapMina = let
+        commit_sha1 = inputs.self.sourceInfo.rev or "<dirty>";
+        commit_date = inputs.flockenzeit.lib.RFC-5322 inputs.self.sourceInfo.lastModified or 0;
+      in package:
+      { deps ? [ pkgs.gnutar pkgs.gzip ], }:
+      pkgs.runCommand "${package.name}-release" {
+        buildInputs = [ pkgs.makeBinaryWrapper pkgs.xorg.lndir ];
+        outputs = package.outputs;
+      } (map (output: ''
+        mkdir -p ${placeholder output}
+        lndir -silent ${package.${output}} ${placeholder output}
+        for i in $(find -L "${placeholder output}/bin" -type f); do
+          wrapProgram "$i" \
+            --prefix PATH : ${makeBinPath deps} \
+            --set MINA_LIBP2P_HELPER_PATH ${pkgs.libp2p_helper}/bin/libp2p_helper \
+            --set MINA_COMMIT_SHA1 ${escapeShellArg commit_sha1} \
+            --set MINA_COMMIT_DATE ${escapeShellArg commit_date} \
+            --set MINA_BRANCH "''${MINA_BRANCH-<unknown due to nix build>}"
+        done
+      '') package.outputs);
 
       # Derivation which has all Mina's dependencies in it, and creates an empty output if the command succeds.
       # Useful for unit tests.
@@ -120,8 +114,7 @@ let
             outputs = [ "out" ];
             installPhase = "touch $out";
           } // extraArgs);
-    in
-    {
+    in {
       # https://github.com/Drup/ocaml-lmdb/issues/41
       lmdb = super.lmdb.overrideAttrs
         (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
@@ -144,9 +137,7 @@ let
 
       # Doesn't have an explicit dependency on ctypes
       rpc_parallel = super.rpc_parallel.overrideAttrs
-        (oa: {
-          buildInputs = oa.buildInputs ++ [ self.ctypes ];
-        });
+        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
 
       # Some "core" Mina executables, without the version info.
       mina-dev = pkgs.stdenv.mkDerivation ({
@@ -167,7 +158,7 @@ let
 
         NIX_LDFLAGS =
           optionalString (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64)
-            "-F${pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation";
+          "-F${pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation";
 
         buildInputs = ocaml-libs ++ external-libs;
 
@@ -323,17 +314,16 @@ let
       berkeley-migration = wrapMina self.berkeley-migration-pkg { };
 
       # Unit tests
-      mina_tests = runMinaCheck
-        {
-          name = "tests";
-          extraArgs = {
-            MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
-            MINA_LIBP2P_PASS = "naughty blue worm";
-            MINA_PRIVKEY_PASS = "naughty blue worm";
-            TZDIR = "${pkgs.tzdata}/share/zoneinfo";
-          };
-          extraInputs = [ pkgs.ephemeralpg ];
-        } ''
+      mina_tests = runMinaCheck {
+        name = "tests";
+        extraArgs = {
+          MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
+          MINA_LIBP2P_PASS = "naughty blue worm";
+          MINA_PRIVKEY_PASS = "naughty blue worm";
+          TZDIR = "${pkgs.tzdata}/share/zoneinfo";
+        };
+        extraInputs = [ pkgs.ephemeralpg ];
+      } ''
         dune build graphql_schema.json --display=short
         export MINA_TEST_POSTGRES="$(pg_tmp -w 1200)"
         pushd src/app/archive
@@ -365,5 +355,4 @@ let
 
       test_executive = wrapMina self.test_executive-dev { };
     };
-in
-scope.overrideScope' overlay
+in scope.overrideScope' overlay
