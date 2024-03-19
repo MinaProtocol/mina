@@ -67,21 +67,6 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
   let module Blockchain_state = Mina_state.Blockchain_state in
   let module Consensus_state = Consensus.Data.Consensus_state in
   let query_mainnet_db ~f = Mina_caqti.query ~f mainnet_pool in
-
-  (*
-  [%log info] "Deleting all precomputed blocks" ;
-  let%bind () = Precomputed_block.delete_fetched ~network in
-  *)
-
-  (*
-  [%log info] "Fetching batch of precomputed blocks" ;
-  let%bind precomputed_blocks =
-    List.filter blocks ~f:(fun block -> Int64.(block.height > 1L))
-    |> List.map ~f:(fun block -> (block.height, block.state_hash))
-    |> Precomputed_block.concrete_fetch_batch ~network ~bucket
-  in
-  [%log info] "Done fetching batch of precomputed blocks" ;
-  *)
   [%log info] "Fetching transaction sequence from prior database" ;
   let%bind block_user_cmds =
     query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
@@ -192,7 +177,6 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
         Map.add_multi acc ~key:join.block_id ~data:ext_cmd )
   in
   [%log info] "Done fetching transaction sequence from prior database" ;
-
   return
     (List.map blocks ~f:(fun block ->
          let state_hash =
@@ -261,7 +245,8 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
          } ) )
 
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
-    ~fork_state_hash:_ ~mina_network_blocks_bucket ~batch_size ~network () =
+    ~fork_state_hash:_ ~mina_network_blocks_bucket ~batch_size ~network
+    ~keep_precomputed_blocks () =
   let logger = Logger.create () in
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
@@ -304,42 +289,16 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
           , _validation ) =
         Mina_block.genesis ~precomputed_values
       in
-      (* TODO: skip this step, but still fill in the canonical sub chain *)
-      (*
-      let%bind mainnet_block_ids =
-        match fork_state_hash with
-        | None ->
-            [%log info] "Querying mainnet canonical blocks" ;
-            query_mainnet_db ~f:(fun db ->
-                Sql.Mainnet.Block.canonical_blocks db () )
-        | Some state_hash ->
-            [%log info]
-              "Mark the chain leads to target state hash %s to be canonical"
-              state_hash ;
-            let%bind fork_id =
-              query_mainnet_db ~f:(fun db ->
-                  Sql.Mainnet.Block.id_from_state_hash db state_hash )
-            in
-            let%bind highest_canonical_block_id =
-              query_mainnet_db ~f:(fun db ->
-                  Sql.Mainnet.Block.get_highest_canonical_block db () )
-            in
-            let%bind subchain_blocks =
-              query_mainnet_db ~f:(fun db ->
-                  Sql.Mainnet.Block.get_subchain db
-                    ~start_block_id:highest_canonical_block_id
-                    ~end_block_id:fork_id )
-            in
-            let%bind () =
-              Deferred.List.iter subchain_blocks ~f:(fun id ->
-                  query_mainnet_db ~f:(fun db ->
-                      Sql.Mainnet.Block.mark_as_canonical db id ) )
-            in
-            query_mainnet_db ~f:(fun db ->
-                Sql.Mainnet.Block.canonical_blocks db () )
+      (* The batch insertion functionality for blocks can lead to impartial writes at the moment as
+         it is not properly wrapped in a transaction. We handle the partial write edge case here at
+         startup in order to be able to resume gracefully in the event of an unfortunate crash. *)
+      let%bind () =
+        query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
+            Conn.exec
+              (Caqti_request.exec Caqti_type.unit
+                 "DELETE FROM %s WHERE parent_id IS NULL AND height > 1" )
+              () )
       in
-      [%log info] "Found %d mainnet blocks" (List.length mainnet_block_ids) ;
-      *)
       [%log info] "Querying mainnet canonical blocks" ;
       let%bind mainnet_blocks_unsorted =
         query_mainnet_db ~f:(fun db ->
@@ -423,13 +382,11 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                        failwithf "Could not archive extensional block batch: %s"
                          (Caqti_error.show err) () ) )
       in
-      (*
-      (* if the migration was successfully, cleanup the precomputed blocks we downloaded *)
-      [%log info] "Deleting all precomputed blocks" ;
-      let%bind () = Precomputed_block.delete_fetched ~network in
-      [%log info] "Done migrating mainnet blocks!" ;
-      *)
-      Deferred.unit
+      if not keep_precomputed_blocks then (
+        [%log info] "Deleting all precomputed blocks" ;
+        let%map () = Precomputed_block.delete_fetched ~network in
+        [%log info] "Done migrating mainnet blocks!" )
+      else Deferred.unit
 
 let () =
   Command.(
@@ -469,6 +426,14 @@ let () =
            Param.flag "--network" ~aliases:[ "-network" ]
              Param.(required string)
              ~doc:"Network name used when downloading precomputed blocks"
+         and keep_precomputed_blocks =
+           Param.flag "--keep-precomputed-blocks"
+             ~aliases:[ "-keep-precomputed-blocks" ]
+             Param.no_arg
+             ~doc:
+               "Keep the precomputed blocks on-disk after the migration is \
+                complete"
          in
          main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
-           ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network )))
+           ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
+           ~keep_precomputed_blocks )))

@@ -22,20 +22,6 @@ module Id = struct
     sprintf "%s-%Ld-%s.json" network height state_hash
 end
 
-let read_json_seq (type a) (reader : Reader.t) (of_yojson : Yojson.Safe.t -> a)
-    : a list Deferred.t =
-  failwith "TODO"
-(*
-  Pipe.fold (Reader.pipe reader) ~init:[] ~f:(fun acc chunk ->
-    ())
-  *)
-
-let camlp_stream_map_to_list (type a b) (stream : a Camlp_stream.t) ~(f : a -> b)
-    : b list =
-  let acc = ref [] in
-  Camlp_stream.iter (fun x -> acc := f x :: !acc) stream ;
-  List.rev !acc
-
 (* We define a subset of the mainnet precomputed block type here for the fields we need, to avoid the need to port some of the tricky old types *)
 
 type blockchain_state = { snarked_ledger_hash : Mina_base.Ledger_hash.t }
@@ -183,145 +169,6 @@ let of_yojson json =
       }
   }
 
-module Bundle = struct
-  type nonrec t = t Mina_base.State_hash.Map.t
-
-  let filename ~network state_hash =
-    sprintf "%s-bundle-%s.tar.gz" network state_hash
-
-  let uri ~bucket ~network state_hash =
-    sprintf "gs://%s/%s-bundle-%s.tar.gz" bucket network state_hash
-
-  let uri_regexp = Str.regexp {|^gs://[^/]+/[^-]+-bundle-\([^-]+\)\.tar.gz$|}
-
-  let list_available ~bucket ~network =
-    match%map
-      Process.run ~prog:"gsutil" ~args:[ "ls"; uri ~bucket ~network "*" ] ()
-    with
-    | Ok output ->
-        String.split ~on:'\n' output
-        |> List.filter ~f:(Fn.compose not String.is_empty)
-        |> List.map ~f:(fun uri ->
-               if Str.string_match uri_regexp uri 0 then
-                 Mina_base.State_hash.of_base58_check (Str.matched_group 1 uri)
-                 |> Or_error.ok_exn
-               else failwithf "Could not parse bundle uri: %s" uri () )
-    | Error err ->
-        failwithf "Could not query available block bundles: %s"
-          (Error.to_string_hum err) ()
-
-  let fetch_and_load_bundle ~logger ~bucket ~network state_hash =
-    let state_hash_str = Mina_base.State_hash.to_base58_check state_hash in
-    let result =
-      let%bind.Deferred.Or_error () =
-        if%bind
-          Unix.access (filename ~network state_hash_str) [ `Read ]
-          >>| Result.is_ok
-        then (
-          [%log info] "Bundle already downloaded locally" ;
-          return (Ok ()) )
-        else (
-          [%log info] "Downloading bundle" ;
-          Deferred.Or_error.ignore_m
-          @@ Process.run ~prog:"gsutil"
-               ~args:[ "-m"; "cp"; uri ~bucket ~network state_hash_str; "." ]
-               () )
-      in
-      [%log info] "Unpacking bundle contents" ;
-      let%bind.Deferred.Or_error tar_process =
-        Process.create ~prog:"tar"
-          ~args:[ "-xOzf"; filename ~network state_hash_str ]
-          ()
-      in
-      let file_reader = Process.stdout tar_process in
-      (* TODO: this only works if each json is on it's own line, which may not always be the case (but is today) *)
-      let blocks_deferred =
-        read_json_seq file_reader of_yojson
-        (*
-        Pipe.fold (Reader.lines file_reader) ~init:[] ~f:(fun acc line ->
-          Writer.write (Lazy.force Writer.stdout) "RECEIVED A LINE\n" ;
-          (*Core.Printf.printf "RECEIVED: %s\n" line ;*)
-          return (of_yojson (Yojson.Safe.from_string line) :: acc))
-        >>| List.rev
-        *)
-      in
-      let%bind.Deferred.Or_error () =
-        Process.wait tar_process >>| Unix.Exit_or_signal.or_error
-      in
-      blocks_deferred >>| Or_error.return
-      (*
-      let%map.Deferred.Result bundle_contents =
-
-        (* we really need to stream in the results from this file... we can't open the entire file 2x *)
-        let d = Process.run ~prog:"tar" ~args:["-xOzf"; filename ~network state_hash_str] () in
-        [%log info] "Started `tar -xOzf %s`" (filename ~network state_hash_str) ;
-        let%map x = d in
-        [%log info] "Finished" ;
-        x
-      in
-      (*
-      [%log info] "Parsing bundle contents" ;
-      Yojson.Safe.stream_from_string bundle_contents
-      |> camlp_stream_map_to_list ~f:of_yojson
-      *)
-      *)
-    in
-    match%map result with
-    | Ok blocks ->
-        blocks
-    | Error err ->
-        failwithf "Could not download block bundle for %s: %s" state_hash_str
-          (Error.to_string_hum err) ()
-
-  (* TODO: dumb hack -- assume the heights match up and that there is one block per height -- need to package a utility for bundling the tar file now though, sadly *)
-  let fetch_and_load_best_bundle ~logger ~bucket ~network (targets : Id.t list)
-      =
-    (* dumb hack -- we don't know the state hashes by only looking at a precomputed block json
-       object, so we assume the heights match up and that there is one block per height *)
-    let target_hashes = Int64.Map.of_alist_exn targets in
-    let target_lengths =
-      Mina_base.State_hash.Map.of_alist_exn
-      @@ List.map targets ~f:(fun (height, state_hash) ->
-             (Mina_base.State_hash.of_base58_check_exn state_hash, height) )
-    in
-    let%bind available_bundles = list_available ~bucket ~network in
-    [%log info] "Found %d available precomputed block bundles"
-      (List.length available_bundles) ;
-    let%map loaded_bundle =
-      let%bind.Deferred.Option best_bundle =
-        available_bundles
-        |> List.filter ~f:(Map.mem target_lengths)
-        |> List.max_elt ~compare:(fun a b ->
-               Int64.compare
-                 (Map.find_exn target_lengths a)
-                 (Map.find_exn target_lengths b) )
-        |> return
-      in
-      [%log info] "Found a bundle for the chain %s"
-        (Mina_base.State_hash.to_base58_check best_bundle) ;
-      let%map blocks =
-        fetch_and_load_bundle ~logger ~bucket ~network best_bundle
-      in
-      [%log info] "Finished fetching and loading bundle" ;
-      let block_map =
-        blocks
-        |> List.map ~f:(fun block ->
-               let height =
-                 Int64.of_int
-                 @@ Mina_numbers.Length.to_int
-                      block.protocol_state.body.consensus_state
-                        .blockchain_length
-               in
-               let state_hash = Map.find_exn target_hashes height in
-               let id : Id.t = (height, state_hash) in
-               (id, block) )
-        |> Id.Map.of_alist_exn
-      in
-      Some block_map
-    in
-    Option.value loaded_bundle ~default:Id.Map.empty
-end
-
 let block_filename_regexp ~network =
   Str.regexp (sprintf "%s-[0-9]+-.+\\.json" network)
 
@@ -341,16 +188,9 @@ let list_directory ~network =
   |> Id.Set.of_list
 
 let concrete_fetch_batch ~logger ~bucket ~network targets =
-  [%log info] "Searching pre-packaged bundles of precomputed blocks" ;
-  let%bind bundled =
-    Bundle.fetch_and_load_best_bundle ~logger ~bucket ~network targets
-  in
-  let%bind individually_downloaded = list_directory ~network in
+  let%bind existing_targets = list_directory ~network in
   [%log info] "Found %d individiaully downloaded precomputed blocks"
-    (Set.length individually_downloaded) ;
-  let existing_targets =
-    Set.union individually_downloaded (Id.Set.of_list @@ Map.keys bundled)
-  in
+    (Set.length existing_targets) ;
   let missing_targets = Set.diff (Id.Set.of_list targets) existing_targets in
   (*
   [%log info] "Determining precomputed block requirements" ;
@@ -399,17 +239,11 @@ let concrete_fetch_batch ~logger ~bucket ~network targets =
         in
         Deferred.List.map targets ~how:`Parallel ~f:(fun target ->
             let _, state_hash = target in
-            let%map block =
-              match Map.find bundled target with
-              | Some block ->
-                  return block
-              | None ->
-                  let%map contents =
-                    Throttle.enqueue file_throttle (fun () ->
-                        Reader.file_contents (Id.filename ~network target) )
-                  in
-                  of_yojson (Yojson.Safe.from_string contents)
+            let%map contents =
+              Throttle.enqueue file_throttle (fun () ->
+                  Reader.file_contents (Id.filename ~network target) )
             in
+            let block = of_yojson (Yojson.Safe.from_string contents) in
             (Mina_base.State_hash.of_base58_check_exn state_hash, block) )
         >>| Mina_base.State_hash.Map.of_alist_exn
     | Error err ->
