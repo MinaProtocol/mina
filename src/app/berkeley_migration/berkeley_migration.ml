@@ -296,7 +296,9 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
         query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
             Conn.exec
               (Caqti_request.exec Caqti_type.unit
-                 (sprintf "DELETE FROM %s WHERE parent_id IS NULL AND height > 1" Archive_lib.Processor.Block.table_name))
+                 (sprintf
+                    "DELETE FROM %s WHERE parent_id IS NULL AND height > 1"
+                    Archive_lib.Processor.Block.table_name ) )
               () )
       in
       [%log info] "Querying mainnet canonical blocks" ;
@@ -384,7 +386,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
       in
       if not keep_precomputed_blocks then (
         [%log info] "Deleting all precomputed blocks" ;
-        let%map () = Precomputed_block.delete_fetched ~network in
+        let%map () = Precomputed_block.delete_fetched ~logger ~network in
         [%log info] "Done migrating mainnet blocks!" )
       else Deferred.unit
 
