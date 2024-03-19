@@ -1,6 +1,5 @@
 (* precomputed_block.ml *)
 
-module Camlp_stream = Stream
 open Core
 open Async
 

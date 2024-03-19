@@ -19,7 +19,6 @@
    base.caml
    async.async_command
    integers
-   camlp-streams
    ;; local libraries
    bounded_types
    logger
