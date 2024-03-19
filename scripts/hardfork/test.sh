@@ -197,6 +197,8 @@ fi
 
 wait "$MAIN_NETWORK_PID"
 
+echo "Config for the fork is correct, starting a new network"
+
 # 8. Node is shutdown and restarted with mina-fork and the config from previous step 
 "$SCRIPT_DIR"/run-localnet.sh -m "$FORK_MINA_EXE" -d "$FORK_DELAY" -i "$FORK_SLOT" \
   -s "$FORK_SLOT" -c localnet/config.json --genesis-ledger-dir localnet/hf_ledgers &

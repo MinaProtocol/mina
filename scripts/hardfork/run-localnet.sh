@@ -205,7 +205,9 @@ done
 
 i=0
 while kill -0 $sw_pid 2>/dev/null; do
-  <localnet/exported_staged_ledger.json jq -r '.[].pk' | shuf | while read acc; do
+  # shuf's exit code is masked by `true` because we do not expect
+  # all of the output to be read
+  <localnet/exported_staged_ledger.json jq -r '.[].pk' | { shuf || true; } | while read acc; do
     if ! kill -0 $sw_pid 2>/dev/null; then
       break
     fi
