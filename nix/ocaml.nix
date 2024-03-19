@@ -45,7 +45,7 @@ let
   implicit-deps = export-installed // external-packages;
 
   # Pins from opam.export
-  pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package;
+  pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package.section;
 
   scope = opam-nix.applyOverlays opam-nix.__overlays
     (opam-nix.defsToScope pkgs { }
