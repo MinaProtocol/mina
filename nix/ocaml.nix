@@ -128,9 +128,18 @@ let
         '';
       });
 
+      # on MacOS, ctypes-foreign-threaded.cma is not installed otherwise
+      ctypes = super.ctypes.overrideAttrs
+        (oa: {
+          buildInputs = oa.buildInputs ++ [ pkgs.libffi ];
+          buildPhase = "make";
+        });
+
       # Doesn't have an explicit dependency on ctypes
       rpc_parallel = super.rpc_parallel.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
+        (oa: {
+          buildInputs = oa.buildInputs ++ [ self.ctypes ];
+        });
 
       # Add specific linker configuration for MacOS ARM architecture
       postgresql = super.postgresql.overrideAttrs (_: {
