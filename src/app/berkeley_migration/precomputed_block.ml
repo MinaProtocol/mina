@@ -249,18 +249,28 @@ let concrete_fetch_batch ~logger ~bucket ~network targets =
         failwithf "Could not download batch of precomputed blocks: %s"
           (Error.to_string_hum err) ()
 
-let delete_fetched ~network : unit Deferred.t =
-  let%bind files = Sys.readdir "." in
-  let block_files =
-    Array.filter files ~f:(fun file ->
-        Str.string_match (block_filename_regexp ~network) file 0 )
+let delete_fetched ~logger ~network : unit Deferred.t =
+  let%bind max_args =
+    match%map Process.run ~prog:"getconf" ~args:[ "ARG_MAX" ] () with
+    | Ok max_args_str ->
+        let max_args = Int.of_string (String.strip max_args_str) in
+        [%log info] "Determined max number of arguments to be %d" max_args ;
+        max_args
+    | Error _ ->
+        let default_max_args = 10_000 in
+        [%log info]
+          "Failed to determine max number of arguments; using default of %d"
+          default_max_args ;
+        default_max_args
   in
-  let args = Array.to_list block_files in
-  if List.length args > 0 then
-    match%map Process.run ~prog:"rm" ~args () with
-    | Ok _ ->
-        ()
-    | Error err ->
-        failwithf "Could not delete fetched precomputed blocks, error %s"
-          (Error.to_string_hum err) ()
-  else Deferred.unit
+  let%bind block_ids = list_directory ~network in
+  Set.to_list block_ids
+  |> List.map ~f:(Id.filename ~network)
+  |> List.chunks_of ~length:(max_args - 1)
+  |> Deferred.List.iter ~how:`Parallel ~f:(fun files ->
+         match%map Process.run ~prog:"rm" ~args:files () with
+         | Ok _ ->
+             ()
+         | Error err ->
+             failwithf "Could not delete fetched precomputed blocks, error %s"
+               (Error.to_string_hum err) () )
