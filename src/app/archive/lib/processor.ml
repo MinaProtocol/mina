@@ -30,27 +30,6 @@ open Pipe_lib
 open Signature_lib
 open Pickles_types
 
-(*
-module type TABLE = sig
-  val table_name : string
-
-  module Repr : Fields.S
-
-  type t
-
-  (* this typ is expected to transport via Repr.t *)
-  (* well... if we expect that, we need to give indices to this to resolve references *)
-  val typ : t Caqti_type.t
-end
-
-module Make_table (Def : TABLE_DEF) : TABLE with type t = Def.t and module Repr = Def.Repr = struct
-  include Def
-
-  let typ =
-    ...
-end
-*)
-
 let applied_str = "applied"
 
 let failed_str = "failed"
@@ -3375,12 +3354,6 @@ module Block = struct
           @@ Mina_numbers.Length.to_uint32 e.epoch_length
       }
     in
-    (*
-    let account_id_to_repr (id : Account_id.t) ~(find_public_key : Signature_lib.Public_key.Compressed.t -> int) ~(find_token : Token_id.t -> int) : Account_identifiers.t =
-      { public_key_id = find_public_key (Account_id.public_key id)
-      ; token_id = find_token (Account_id.token_id id) }
-    in
-    *)
     (* TODO: this doesn't handle non-default tokens, and doesn't cache token owners like the old implementation *)
     let token_id_to_repr (id : Token_id.t) : Token.t =
       assert (Token_id.equal id Token_id.default) ;
@@ -3423,39 +3396,6 @@ module Block = struct
       ; fee = Currency.Fee.to_string c.fee
       }
     in
-
-    (* realization: a list works just fine here *)
-    (*
-    let merge_boxed boxes =
-      Option.value_exn @@ List.reduce boxes ~f:(fun a b ->
-        match (a, b) with
-        | `Unit, `Unit -> `Unit
-        | `Unit, x | x, `Unit -> `Scalar x
-        | `Scalar a, `Scalar b -> `Box [a; b]
-        | `Box a, `Scalar b -> `Box (a @ [b])
-        | `Scalar a, `Box b -> `Box (a :: b)
-        | `Box a, `Box b -> `Box (a @ b))
-    in
-    let rec render_boxed (type a) (info : Caqti_driver_info.t) (typ : a Caqti_type.t) (value : a) =
-      match typ with
-      | Unit -> `Unit
-      | Field f ->
-          let Caqti_type.Field.Coding coding = Option.value_exn (Caqti_type.Field.coding info f) in
-          render_boxed info coding.rep (Result.ok_or_failwith @@ coding.encode value)
-      | Option _opt -> failwith "todo"
-      | Tup2 (at, bt) ->
-          let (a, b) = value in
-          merge_boxed [render_boxed info at a; render_boxed info bt b]
-      | Tup3 (at, bt, ct) ->
-          let (a, b, c) = value in
-          merge_boxed (render_boxed info at a) (render_boxed info bt b) (render_boxed info ct c)
-      | Tup4 (at, bt, ct, dt) ->
-          let (a, b, c, d) = value in
-          merge_boxed (render_boxed info at a) (render_boxed info bt b) (render_boxed info ct c) (render_boxed info dt d)
-      | Custom custom ->
-          render_boxed info custom.rep (Result.ok_or_failwith @@ custom.encode value)
-    in
-    *)
 
     (* we don't need to specify all types here, just the ones that sql may infer incorrectly *)
     let field_name : type a. a Caqti_type.Field.t -> string option =
@@ -3573,35 +3513,6 @@ module Block = struct
       "(" ^ String.concat ~sep:"," (render_type typ value) ^ ")"
     in
 
-    (*
-    let render_seq (type a) (typ : a Caqti_type.t) (values : a list) : string =
-      let inner =
-        if Caqti_type.length typ = 1 then
-          List.bind values ~f:(render_type typ)
-        else
-          List.map values ~f:(render_row typ)
-      in
-      "(" ^ String.concat ~sep:"," inner ^ ")"
-    in
-    *)
-
-    (* structured such that it can used with %a formatted strings *)
-    (*
-    let caqti_repr (type a) (typ : a Caqti_type.t) () (value : a) : string =
-      let buf = Buffer.create 1024 in
-      let fmt = Format.formatter_of_buffer buf in
-      Caqti_type.pp_value fmt (typ, value) ;
-      Format.pp_print_flush fmt () ;
-
-      (* REALLY BAD HACK PLS FIX ME *)
-      (* UNSAFE VERSION *)
-      String.tr ~target:'"' ~replacement:'\'' (Buffer.contents buf)
-      (*
-      let regex = lazy (Str.regexp {|^\(\)"\|\([^\\]\)"|}) in
-      Str.global_replace (Lazy.force regex) {|\1'|} (*(String.tr ~target:'"' ~replacement:'\'')*) (Buffer.contents buf)
-      *)
-    in
-    *)
     let load_index (type a cmp) (comparator : (a, cmp) Map.comparator)
         (typ : a Caqti_type.t) (values : a list) ~table ~(fields : string list)
         : ((a, int, cmp) Map.t, 'err) Deferred.Result.t =
@@ -3611,12 +3522,10 @@ module Block = struct
         let fields_sql = String.concat ~sep:"," fields in
         let query =
           if List.length fields > 1 then
-            (* sprintf "SELECT %s, id FROM %s WHERE (%s) IN (VALUES %s)" fields_sql table fields_sql values_sql *)
             let src_fields_sql =
               String.concat ~sep:","
               @@ List.map fields ~f:(fun field -> sprintf "src.%s" field)
             in
-            (*let data_fields_sql = String.concat ~sep:"," @@ List.map fields ~f:(fun field -> sprintf "data__%s" field) in*)
             let join_on_sql =
               (* we use distinction instead of equality here, as NULL != NULL, but NULL IS NOT DISTINCT FROM NULL *)
               List.zip_exn fields (type_field_names typ)
@@ -3629,7 +3538,6 @@ module Block = struct
                          sprintf
                            "src.%s IS NOT DISTINCT FROM CAST(data.%s AS %s)"
                            field field type_name )
-              (*List.map fields ~f:(fun field -> sprintf "src.%s IS NOT DISTINCT FROM data.%s" field field)*)
               |> String.concat ~sep:" AND "
             in
             let values_sql =
@@ -3648,7 +3556,6 @@ module Block = struct
             sprintf "SELECT %s, id FROM %s WHERE %s IN %s" fields_sql table
               fields_sql values_sql
         in
-        (* Writer.writef (Lazy.force Writer.stdout) "QUERY = %s\n" query ; *)
         let%map entries =
           Conn.collect_list
             (Caqti_request.collect Caqti_type.unit
@@ -3775,15 +3682,6 @@ module Block = struct
         (Set.to_list external_block_hashes)
         ~table:table_name ~fields:[ "state_hash" ]
     in
-
-    Writer.writef (Lazy.force Writer.stdout)
-      !"Existing blocks: %{Sexp}, Missing blocks: %{Sexp}\n"
-      ( [%sexp_of: string list]
-      @@ List.map ~f:State_hash.to_base58_check
-      @@ Map.keys existing_block_ids )
-      ( [%sexp_of: string list]
-      @@ List.map missing_blocks ~f:(fun { state_hash; _ } ->
-             State_hash.to_base58_check state_hash ) ) ;
 
     let missing_block_staking_epochs =
       List.map missing_blocks ~f:(fun { staking_epoch_data; _ } ->
@@ -4077,13 +3975,6 @@ module Block = struct
             *)
                Unsigned.UInt32.to_int block.height > 1 )
         |> List.map ~f:(fun block ->
-               Writer.writef (Lazy.force Writer.stdout)
-                 "Looking up hashes (%s, %s) for block at height %d [genesis \
-                  hash = %s]\n"
-                 (State_hash.to_base58_check block.state_hash)
-                 (State_hash.to_base58_check block.parent_hash)
-                 (Unsigned.UInt32.to_int block.height)
-                 (State_hash.to_base58_check genesis_block_hash) ;
                ( Int.to_string @@ Map.find_exn block_ids block.state_hash
                , Int.to_string @@ Map.find_exn block_ids block.parent_hash ) )
         |> List.unzip
