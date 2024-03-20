@@ -405,6 +405,87 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool ~network
       }
       : Archive_lib.Extensional.Block.t )
 
+let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
+  let open Deferred.Let_syntax in
+  let query_migrated_db ~f = Mina_caqti.query ~f migrated_pool in
+  [%log info] "Populating original genesis ledger balances" ;
+  (* inlined from Archive_lib.Processor.add_genesis_accounts to avoid
+     recomputing values from runtime config *)
+  [%log info] "Creating genesis ledger" ;
+  let ledger =
+    Lazy.force @@ Precomputed_values.genesis_ledger precomputed_values
+  in
+  [%log info] "Created genesis ledger" ;
+  let%bind genesis_block_id =
+    query_migrated_db ~f:(fun db -> Sql.Berkeley.Block.genesis_block_id db ())
+  in
+  let%bind account_ids =
+    let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
+    List.map ~f:(fun account_id ->
+        let index = Mina_ledger.Ledger.index_of_account_exn ledger account_id in
+        (account_id, index) )
+    @@ Mina_base.Account_id.Set.to_list account_id_set
+  in
+  [%log info] "Found %d accounts in genesis ledger" (List.length account_ids) ;
+  let%bind account_ids_to_migrate_unsorted =
+    match%map
+      query_migrated_db ~f:(fun db ->
+          Sql.Berkeley.Accounts_accessed.greatest_ledger_index db
+            genesis_block_id )
+    with
+    | None ->
+        account_ids
+    | Some greatest_migrated_ledger_index ->
+        [%log info]
+          "Already migrated accounts through ledger index %d, resuming \
+           migration"
+          greatest_migrated_ledger_index ;
+        List.filter
+          ~f:(fun (_id, index) -> index > greatest_migrated_ledger_index)
+          account_ids
+  in
+  let account_ids_to_migrate =
+    List.sort account_ids_to_migrate_unsorted
+      ~compare:(fun (_id_1, index_1) (_id_2, index_2) ->
+        compare index_1 index_2 )
+  in
+  [%log info] "Migrating %d accounts" (List.length account_ids_to_migrate) ;
+  let%map () =
+    Deferred.List.iter account_ids_to_migrate ~f:(fun (acct_id, index) ->
+        match Mina_ledger.Ledger.location_of_account ledger acct_id with
+        | None ->
+            [%log error] "Could not get location for account"
+              ~metadata:
+                [ ("account_id", Mina_base.Account_id.to_yojson acct_id) ] ;
+            failwith "Could not get location for genesis account"
+        | Some loc ->
+            let acct =
+              match Mina_ledger.Ledger.get ledger loc with
+              | None ->
+                  [%log error] "Could not get account, given a location"
+                    ~metadata:
+                      [ ("account_id", Mina_base.Account_id.to_yojson acct_id) ] ;
+                  failwith "Could not get genesis account, given a location"
+              | Some acct ->
+                  acct
+            in
+            query_migrated_db ~f:(fun db ->
+                match%map
+                  Archive_lib.Processor.Accounts_accessed.add_if_doesn't_exist
+                    ~logger db genesis_block_id (index, acct)
+                with
+                | Ok _ ->
+                    Ok ()
+                | Error err ->
+                    [%log error] "Could not add genesis account"
+                      ~metadata:
+                        [ ("account_id", Mina_base.Account_id.to_yojson acct_id)
+                        ; ("error", `String (Caqti_error.show err))
+                        ] ;
+                    failwith "Could not add add genesis account" ) )
+  in
+  [%log info] "Done populating original genesis ledger balances!"
+
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
     ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network () =
   let logger = Logger.create () in
@@ -540,6 +621,9 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
       [%log info] "Deleting all precomputed blocks" ;
       let%bind () = Precomputed_block.delete_fetched ~network in
       [%log info] "Done migrating mainnet blocks!" ;
+      let%bind () =
+        migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool
+      in
       Deferred.unit
 
 let () =

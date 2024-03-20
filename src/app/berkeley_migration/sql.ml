@@ -313,5 +313,46 @@ module Berkeley = struct
                  ORDER BY height DESC
                  LIMIT 1
            |sql} )
+
+    let genesis_block_id (module Conn : CONNECTION) =
+      Conn.find
+        (Caqti_request.find Caqti_type.unit Caqti_type.int
+           {sql| SELECT id
+                 FROM blocks
+                 WHERE height = 1
+         |sql} )
+  end
+
+  module Account_identifiers = struct
+    type t = { public_key : string; token : string } [@@deriving hlist]
+
+    let typ =
+      let open Mina_caqti.Type_spec in
+      let spec = Caqti_type.[ string; string ] in
+      let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+      let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+      Caqti_type.custom ~encode ~decode (to_rep spec)
+
+    let load (module Conn : CONNECTION) =
+      Conn.find
+        (Caqti_request.find Caqti_type.int typ
+           {sql| SELECT pk.value, t.value
+                 FROM account_identifiers ai
+                 INNER JOIN tokens t ON ai.token_id = t.id
+                 INNER JOIN public_keys pk on ai.public_key_id = pk.id
+                 WHERE ai.id = $1
+           |sql} )
+  end
+
+  module Accounts_accessed = struct
+    let greatest_ledger_index (module Conn : CONNECTION) =
+      Conn.find_opt
+        (Caqti_request.find_opt Caqti_type.int Caqti_type.int
+           {sql| SELECT ledger_index
+                 FROM accounts_accessed
+                 WHERE block_id = $1
+                 ORDER BY ledger_index DESC
+                 LIMIT 1
+           |sql} )
   end
 end
