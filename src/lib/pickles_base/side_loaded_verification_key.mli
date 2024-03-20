@@ -66,6 +66,8 @@ module Repr : sig
       include Pickles_types.Sigs.Binable.S1 with type 'a t := 'a t
 
       val __versioned__ : unit
+
+      val path_to_type : string
     end
 
     module Latest = V2
@@ -84,6 +86,8 @@ module Width : sig
       type t [@@deriving sexp, equal, compare, hash, yojson]
 
       include Pickles_types.Sigs.Binable.S with type t := t
+
+      val path_to_type : string
 
       val __versioned__ : unit
     end
@@ -112,6 +116,8 @@ module Width : sig
         [@@deriving sexp, equal, compare, hash, yojson]
 
         include Pickles_types.Sigs.Binable.S1 with type 'a t := 'a t
+
+        val path_to_type : string
 
         val __versioned__ : unit
       end

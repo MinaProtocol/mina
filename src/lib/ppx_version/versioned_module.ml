@@ -438,6 +438,125 @@ let mk_all_version_tags_type_decl =
       else type_decl
   end
 
+let get_contained_versioned_modules type_decl =
+  let fold_for_mods =
+    object (self)
+      inherit [string list] Ast_traverse.fold
+
+      method! core_type ty mods = self#core_type_desc ty.ptyp_desc mods
+
+      method! core_type_desc ty_desc mods =
+        let ty_mods =
+          match ty_desc with
+          | Ptyp_arrow (_arg, ty_from, ty_to) ->
+              self#core_type ty_from [] @ self#core_type ty_to []
+          | Ptyp_tuple tys ->
+              List.map tys ~f:(fun ty -> self#core_type ty []) |> List.concat
+          | Ptyp_constr ({ txt; _ }, args) -> (
+              let args_mods =
+                List.map args ~f:(fun arg -> self#core_type arg [])
+                |> List.concat
+              in
+              match txt with
+              | Ldot (Ldot (Ldot (prefix, "Stable"), vn), _)
+                when is_version_module vn
+                     && not
+                          (is_jane_street_stable_module
+                             (Longident.flatten_exn prefix @ [ "Stable"; vn ]) )
+                ->
+                  (* omit 't'/'query'/'response' *)
+                  let ty_mod =
+                    Longident.name (Ldot (Ldot (prefix, "Stable"), vn))
+                  in
+                  ty_mod :: args_mods
+              | _ ->
+                  args_mods )
+          | Ptyp_class (_loc, tys) ->
+              List.map tys ~f:(fun ty -> self#core_type ty []) |> List.concat
+          | Ptyp_alias (ty, _label) ->
+              self#core_type ty []
+          | Ptyp_object (fields, _closed) ->
+              List.map fields ~f:(fun field ->
+                  match field.pof_desc with
+                  | Otag (_label, ty) ->
+                      self#core_type ty []
+                  | Oinherit ty ->
+                      self#core_type ty [] )
+              |> List.concat
+          | Ptyp_poly (_parms, ty) ->
+              self#core_type ty []
+          | Ptyp_package (_mod_name, with_types) ->
+              List.map with_types ~f:(fun (_loc, ty) -> self#core_type ty [])
+              |> List.concat
+          | Ptyp_variant (fields, _closed, _labels) ->
+              List.map fields ~f:(fun field ->
+                  match field.prf_desc with
+                  | Rtag (_label, _const, tys) ->
+                      List.map tys ~f:(fun ty -> self#core_type ty [])
+                      |> List.concat
+                  | Rinherit ty ->
+                      self#core_type ty [] )
+              |> List.concat
+          | Ptyp_any | Ptyp_var _ ->
+              []
+          | Ptyp_extension _ ->
+              []
+        in
+        ty_mods @ mods
+
+      method! type_kind ty_kind mods =
+        let kind_mods =
+          match ty_kind with
+          | Ptype_abstract | Ptype_open ->
+              []
+          | Ptype_variant ctors ->
+              List.map ctors ~f:(fun ctor ->
+                  let args_mods =
+                    match ctor.pcd_args with
+                    | Pcstr_tuple tys ->
+                        List.map tys ~f:(fun ty -> self#core_type ty [])
+                    | Pcstr_record labels ->
+                        List.map labels ~f:(fun label ->
+                            self#core_type label.pld_type [] )
+                  in
+                  let res_mods =
+                    [ Option.value_map ~default:[] ctor.pcd_res ~f:(fun ty ->
+                          self#core_type ty [] )
+                    ]
+                  in
+                  args_mods @ res_mods |> List.concat )
+              |> List.concat
+          | Ptype_record labels ->
+              List.map labels ~f:(fun label ->
+                  self#core_type label.pld_type [] )
+              |> List.concat
+        in
+        kind_mods @ mods
+
+      method! type_declaration ty_decl mods =
+        let params_mods =
+          List.map ty_decl.ptype_params ~f:(fun (ty, _var_inj) ->
+              self#core_type ty [] )
+          |> List.concat
+        in
+        let manifest_mods =
+          Option.value_map ~default:[] ty_decl.ptype_manifest ~f:(fun ty ->
+              self#core_type ty [] )
+        in
+        let cstr_mods =
+          List.map ty_decl.ptype_cstrs ~f:(fun (ty1, ty2, _loc) ->
+              let mods1 = self#core_type ty1 [] in
+              let mods2 = self#core_type ty2 [] in
+              mods1 @ mods2 )
+          |> List.concat
+        in
+        let kind_mods = self#type_kind ty_decl.ptype_kind [] in
+        params_mods @ manifest_mods @ cstr_mods @ kind_mods @ mods
+        |> List.dedup_and_sort ~compare:String.compare
+    end
+  in
+  fold_for_mods#type_declaration type_decl []
+
 let version_type ~version_option ~all_version_tagged ~top_version_tag
     ~json_version_tag ~modl_stri version stri =
   let loc = stri.pstr_loc in
@@ -929,26 +1048,45 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
         [%str let (_ : _) = to_latest]
       else []
     in
-    let register_shape =
+    let registrations =
       let open Ast_builder in
       match t_stri.pstr_desc with
       | Pstr_type (_, [ ty_decl ]) ->
-          (* incomplete shape if there are type parameters *)
-          if List.is_empty ty_decl.ptype_params then
-            let ty_decl_str = ty_decl_to_string ty_decl in
+          let register_contained_types =
+            let modls = get_contained_versioned_modules ty_decl in
+            let contained_type_paths =
+              List.map modls ~f:(fun modl ->
+                  sprintf "%s.path_to_type" modl |> evar )
+              |> elist
+            in
             [%str
-              let (_ : _) =
-                let path =
-                  Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
-                    [%e estring ty_decl.ptype_name.txt]
+              let path_to_type =
+                let module_path =
+                  Core_kernel.String.chop_suffix_if_exists
+                    ~suffix:".path_to_type" __FUNCTION__
                 in
-                Ppx_version_runtime.Shapes.register path bin_shape_t
-                  [%e estring ty_decl_str]]
-          else []
+                Core_kernel.sprintf "%s:%s.%s" __FILE__ module_path
+                  [%e estring ty_decl.ptype_name.txt]
+
+              let (_ : _) =
+                Ppx_version_runtime.Contained_types.register ~path_to_type
+                  ~contained_type_paths:[%e contained_type_paths]]
+          in
+          let register_type_shapes =
+            if List.is_empty ty_decl.ptype_params then
+              let ty_decl_str = ty_decl_to_string ty_decl in
+              [%str
+                let (_ : _) =
+                  Ppx_version_runtime.Shapes.register ~path_to_type
+                    ~type_shape:bin_shape_t ~type_decl:[%e estring ty_decl_str]]
+            else (* incomplete shape if there are type parameters *)
+              []
+          in
+          register_contained_types @ register_type_shapes
       | _ ->
           failwith "Expected single type declaration in structure item"
     in
-    register_shape @ to_latest_guard_modules @ version_tag_items
+    registrations @ to_latest_guard_modules @ version_tag_items
   in
   match stri.pstr_desc with
   | Pstr_type _ ->
@@ -1421,21 +1559,48 @@ let convert_rpc_version (stri : structure_item) =
     let (module Ast_builder) = Ast_builder.make stri.pstr_loc in
     let open Ast_builder in
     let query_ty_decl_str = ty_decl_to_string query_ty_decl in
+    let query_modls = get_contained_versioned_modules query_ty_decl in
+    let query_contained_type_paths =
+      List.map query_modls ~f:(fun modl ->
+          let contained_in = sprintf "%s.path_to_type" modl in
+          evar contained_in )
+      |> elist
+    in
     let response_ty_decl_str = ty_decl_to_string response_ty_decl in
+    let response_modls = get_contained_versioned_modules response_ty_decl in
+    let response_contained_type_paths =
+      List.map response_modls ~f:(fun modl ->
+          let contained_in = sprintf "%s.path_to_type" modl in
+          evar contained_in )
+      |> elist
+    in
     [%str
       let (_ : _) =
         let query_path =
           Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
             [%e estring "query"]
         in
-        Ppx_version_runtime.Shapes.register query_path bin_shape_query
-          [%e estring query_ty_decl_str] ;
+        let (_ : _) =
+          Ppx_version_runtime.Contained_types.register ~path_to_type:query_path
+            ~contained_type_paths:[%e query_contained_type_paths]
+        in
+        let (_ : _) =
+          Ppx_version_runtime.Shapes.register ~path_to_type:query_path
+            ~type_shape:bin_shape_query
+            ~type_decl:[%e estring query_ty_decl_str]
+        in
         let response_path =
           Core_kernel.sprintf "%s:%s.%s" __FILE__ __FUNCTION__
             [%e estring "response"]
         in
-        Ppx_version_runtime.Shapes.register response_path bin_shape_response
-          [%e estring response_ty_decl_str]]
+        let (_ : _) =
+          Ppx_version_runtime.Contained_types.register
+            ~path_to_type:response_path
+            ~contained_type_paths:[%e response_contained_type_paths]
+        in
+        Ppx_version_runtime.Shapes.register ~path_to_type:response_path
+          ~type_shape:bin_shape_response
+          ~type_decl:[%e estring response_ty_decl_str]]
   in
   let add_derivers_to_types = function
     | { pstr_desc = Pstr_type (rec_flag, [ ty_decl ]); pstr_loc }
@@ -1572,6 +1737,7 @@ let version_rpc_module ~loc ~path:_ rpc_name (rpc_body : structure_item list loc
 
    - add deriving bin_io, version to list of deriving items for the type "t" in versioned modules
    - add "module Latest = Vn" to Stable module
+   - add "path_to_type"
    - if Stable.Latest.t has no parameters:
      - if "with_versioned_json" annotation present, add "of_yojson_to_latest"
      - if "with_top_version_tag" annotation present, add "bin_read_top_tagged_to_latest"
@@ -1669,7 +1835,16 @@ let convert_module_type ~loc ~top_version_tagged mod_ty =
         convert_module_type_signature signature
       in
       let sigitems' = List.rev sigitems @ with_version_tags_decls in
-      { module_type = { mod_ty with pmty_desc = Pmty_signature sigitems' }
+      let sigitems'' =
+        let path_to_type =
+          Ast_helper.(
+            Sig.value ~loc
+            @@ Val.mk { txt = "path_to_type"; loc }
+            @@ Typ.constr { txt = Lident "string"; loc } [])
+        in
+        path_to_type :: sigitems'
+      in
+      { module_type = { mod_ty with pmty_desc = Pmty_signature sigitems'' }
       ; convertible = parameterless_t
       ; extra_items = Option.to_list type_decl
       }

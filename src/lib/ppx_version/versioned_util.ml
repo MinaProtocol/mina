@@ -73,4 +73,19 @@ let version_of_versioned_module_name name =
 let jane_street_library_modules = [ "Uuid" ]
 
 let jane_street_modules =
-  [ "Core"; "Core_kernel" ] @ jane_street_library_modules
+  [ "Base"; "Core"; "Core_kernel" ] @ jane_street_library_modules
+
+(* true iff module_path is of form M. ... .Stable.Vn, where M is Base, Core, or Core_kernel, and n is integer *)
+let is_jane_street_stable_module module_path =
+  let hd_elt = List.hd_exn module_path in
+  List.mem jane_street_modules hd_elt ~equal:String.equal
+  &&
+  match List.rev module_path with
+  | vn :: "Stable" :: _ ->
+      is_version_module vn
+  | vn :: label :: "Stable" :: "Time" :: _
+    when List.mem [ "Span"; "With_utc_sexp" ] label ~equal:String.equal ->
+      (* special cases, maybe improper module structure *)
+      is_version_module vn
+  | _ ->
+      false

@@ -105,21 +105,6 @@ let ocaml_builtin_types =
 
 let ocaml_builtin_type_constructors = [ "list"; "array"; "option"; "ref" ]
 
-(* true iff module_path is of form M. ... .Stable.Vn, where M is Core or Core_kernel, and n is integer *)
-let is_jane_street_stable_module module_path =
-  let hd_elt = List.hd_exn module_path in
-  List.mem jane_street_modules hd_elt ~equal:String.equal
-  &&
-  match List.rev module_path with
-  | vn :: "Stable" :: _ ->
-      Versioned_util.is_version_module vn
-  | vn :: label :: "Stable" :: "Time" :: _
-    when List.mem [ "Span"; "With_utc_sexp" ] label ~equal:String.equal ->
-      (* special cases, maybe improper module structure *)
-      is_version_module vn
-  | _ ->
-      false
-
 let trustlisted_prefix prefix ~loc =
   match prefix with
   | Lident id ->

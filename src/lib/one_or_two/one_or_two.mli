@@ -8,6 +8,8 @@ module Stable : sig
     type 'a t = 'a Intfs.t
     [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
 
+    val path_to_type : string
+
     val to_latest : ('a -> 'b) -> 'a t -> 'b t
 
     val of_latest : ('a -> ('b, 'err) Result.t) -> 'a t -> ('b t, 'err) Result.t

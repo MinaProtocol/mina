@@ -100,6 +100,17 @@ struct
           [@@deriving equal, bin_io, sexp, compare, yojson, hash]
         end
 
+        let path_to_type =
+          let module_path =
+            Core_kernel.String.chop_suffix_if_exists ~suffix:".path_to_type"
+              __FUNCTION__
+          in
+          sprintf "%s:%s.%s" __FILE__ module_path "t"
+
+        let (_ : _) =
+          Ppx_version_runtime.Contained_types.register ~path_to_type
+            ~contained_type_paths:[]
+
         (* asserts the versioned-ness of V1
            to do this properly, we'd move the Stable module outside the functor
         *)
@@ -124,6 +135,11 @@ struct
                 if not (on_curve t) then raise (Invalid_curve_point t) ;
                 t
             end)
+
+        let (_ : _) =
+          Ppx_version_runtime.Shapes.register ~path_to_type
+            ~type_shape:bin_shape_t
+            ~type_decl:"BaseField.Stable.Latest.t * BaseField.Stable.Latest.t"
       end
 
       module Latest = V1

@@ -1585,6 +1585,79 @@ let dump_type_shapes =
              Core_kernel.printf "%s, %s, %s, %s\n" path digest shape_summary
                ty_decl ) ) )
 
+let dump_contained_types =
+  Command.basic
+    ~summary:"Print versioned types contained in other versioned types"
+    (Command.Param.return (fun () ->
+         Ppx_version_runtime.Contained_types.iteri
+           ~f:(fun ~key:type_path ~data:contained_type_paths ->
+             Format.printf "Type %s contains " type_path ;
+             let desc =
+               match contained_type_paths with
+               | [] ->
+                   "no versioned types."
+               | [ _ ] ->
+                   "this versioned type:"
+               | _ ->
+                   "these versioned types:"
+             in
+             Format.printf "%s@." desc ;
+             List.iter contained_type_paths ~f:(fun contained_type_path ->
+                 Format.printf "  %s@." contained_type_path ) ) ) )
+
+let show_containing_types =
+  let type_path_flag =
+    let open Command.Param in
+    flag "--type-path" ~aliases:[ "-type-path" ] (required string)
+      ~doc:"STRING Path to versioned type"
+  in
+  Command.basic ~summary:"Print types containing a versioned type, recursively"
+    (Command.Param.map type_path_flag ~f:(fun type_path () ->
+         (* table of types containing a given type
+            where a type is identified by file:module_path
+         *)
+         let containing_tbl : string list String.Table.t =
+           String.Table.of_alist_multi []
+         in
+         let rec add_containing_type type_path =
+           match Ppx_version_runtime.Contained_types.find type_path with
+           | None ->
+               Format.eprintf "Type at path %s not found@." type_path ;
+               Core_kernel.exit 1
+           | Some contained_types ->
+               (* each contained type is contained in type_path *)
+               List.iter contained_types ~f:(fun contained_type ->
+                   let entries =
+                     String.Table.find_multi containing_tbl contained_type
+                   in
+                   if not @@ List.mem entries type_path ~equal:String.equal then
+                     String.Table.add_multi containing_tbl ~key:contained_type
+                       ~data:type_path ;
+                   add_containing_type contained_type )
+         in
+         (* populate containing table *)
+         Ppx_version_runtime.Contained_types.iteri
+           ~f:(fun ~key:type_path ~data:_contained_types ->
+             add_containing_type type_path ) ;
+         (* print table contents *)
+         let rec print_containing_info indent type_path =
+           match String.Table.find_multi containing_tbl type_path with
+           | [] ->
+               Format.printf
+                 "%*sType at %s, which is not contained in any other types.@."
+                 (indent * 2) "" type_path
+           | [ contained_type ] ->
+               Format.printf "%*sType at %s, which is contained in this type:@."
+                 (indent * 2) "" type_path ;
+               print_containing_info (indent + 1) contained_type
+           | contained_types ->
+               Format.printf
+                 "%*sType at %s, which is contained in these types:@."
+                 (indent * 2) "" type_path ;
+               List.iter contained_types ~f:(print_containing_info (indent + 1))
+         in
+         print_containing_info 0 type_path ) )
+
 let primitive_ok = function
   | "array" | "bytes" | "string" | "bigstring" ->
       false
@@ -1994,6 +2067,8 @@ let internal_commands logger =
               () ) ;
           Deferred.return ()) )
   ; ("dump-type-shapes", dump_type_shapes)
+  ; ("dump-contained-types", dump_contained_types)
+  ; ("show-containing-types", show_containing_types)
   ; ("replay-blocks", replay_blocks logger)
   ; ("audit-type-shapes", audit_type_shapes)
   ; ( "test-genesis-block-generation"

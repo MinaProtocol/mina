@@ -3,23 +3,21 @@ open Currency
 open Signature_lib
 
 module Statement : sig
-  type t = Transaction_snark.Statement.t One_or_two.t
-  [@@deriving compare, sexp, yojson, equal]
-
-  include Comparable.S with type t := t
-
-  include Hashable.S with type t := t
-
+  [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t [@@deriving bin_io, compare, sexp, version, yojson, equal]
+      type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
+      [@@deriving compare, sexp, yojson, equal]
 
       include Comparable.S with type t := t
 
       include Hashable.S_binable with type t := t
     end
-  end
-  with type V2.t = t
+  end]
+
+  include Comparable.S with type t := t
+
+  include Hashable.S with type t := t
 
   val gen : t Quickcheck.Generator.t
 
@@ -29,20 +27,18 @@ module Statement : sig
 end
 
 module Info : sig
-  type t =
-    { statements : Statement.Stable.V2.t
-    ; work_ids : int One_or_two.Stable.V1.t
-    ; fee : Fee.Stable.V1.t
-    ; prover : Public_key.Compressed.Stable.V1.t
-    }
-  [@@deriving to_yojson, sexp, compare]
-
+  [%%versioned:
   module Stable : sig
     module V2 : sig
-      type t [@@deriving compare, to_yojson, version, sexp, bin_io]
+      type t =
+        { statements : Statement.Stable.V2.t
+        ; work_ids : int One_or_two.Stable.V1.t
+        ; fee : Fee.Stable.V1.t
+        ; prover : Public_key.Compressed.Stable.V1.t
+        }
+      [@@deriving compare, sexp, to_yojson]
     end
-  end
-  with type V2.t = t
+  end]
 end
 
 (* TODO: The SOK message actually should bind the SNARK to
@@ -51,25 +47,23 @@ end
        H(all_statements_in_bundle || fee || public_key)
 *)
 
-type t = Mina_wire_types.Transaction_snark_work.V2.t =
-  { fee : Fee.t
-  ; proofs : Ledger_proof.t One_or_two.t
-  ; prover : Public_key.Compressed.t
-  }
-[@@deriving compare, sexp, yojson]
+[%%versioned:
+module Stable : sig
+  module V2 : sig
+    type t = Mina_wire_types.Transaction_snark_work.V2.t =
+      { fee : Fee.Stable.V1.t
+      ; proofs : Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
+      ; prover : Public_key.Compressed.Stable.V1.t
+      }
+    [@@deriving sexp, compare, equal, yojson]
+  end
+end]
 
 val fee : t -> Fee.t
 
 val info : t -> Info.t
 
 val statement : t -> Statement.t
-
-module Stable : sig
-  module V2 : sig
-    type t [@@deriving equal, sexp, compare, bin_io, yojson, version]
-  end
-end
-with type V2.t = t
 
 type unchecked = t
 
