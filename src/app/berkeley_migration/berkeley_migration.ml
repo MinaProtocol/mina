@@ -182,7 +182,7 @@ let mainnet_protocol_version =
      hard fork, the replayer won't check ledger hashes for blocks with
      an earlier protocol version.
   *)
-  Protocol_version.create ~transaction:1 ~network:0 ~patch:0
+  Protocol_version.create ~transaction:2 ~network:0 ~patch:0
 
 let mainnet_block_to_extensional ~logger ~mainnet_pool ~network
     ~(genesis_block : Mina_block.t) (block : Sql.Mainnet.Block.t) ~bucket
