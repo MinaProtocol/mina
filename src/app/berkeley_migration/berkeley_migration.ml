@@ -468,7 +468,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
       let%bind () =
         if not keep_precomputed_blocks then (
           [%log info] "Deleting all precomputed blocks" ;
-          let%map () = Precomputed_block.delete_fetched ~logger ~network in
+          let%map () = Precomputed_block.delete_fetched ~network in
           [%log info] "Done migrating mainnet blocks!" )
         else Deferred.unit
       in
