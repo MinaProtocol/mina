@@ -84,7 +84,6 @@ installed: [
   "conf-libffi.2.0.0"
   "conf-libssl.2"
   "conf-m4.1"
-  "conf-openssl.1"
   "conf-perl.1"
   "conf-pkg-config.1.1"
   "conf-postgresql.1"
