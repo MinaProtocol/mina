@@ -31,11 +31,11 @@ ARG WASM_PACK_VERSION=v0.10.3
 ARG ROCKSDB_VERSION=v5.18.4
 
 # Install keys that are missing for bookworm for some unknown reason
-RUN sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6ED0E7B82643E131 \
-  && sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F8D2585B8783D481 \
-  && sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9 \
-  && sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 54404762BBB6E853 \
-  && sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys BDE6D2B9216EC7A8
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6ED0E7B82643E131 \
+  && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F8D2585B8783D481 \
+  && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9 \
+  && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 54404762BBB6E853 \
+  && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys BDE6D2B9216EC7A8
 
 # --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
