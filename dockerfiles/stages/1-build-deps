@@ -30,6 +30,9 @@ ARG WASM_PACK_VERSION=v0.10.3
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.18.4
 
+# Install gnupg to handle keys
+RUN apt-get install gnupg
+
 # Install keys that are missing for bookworm for some unknown reason
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6ED0E7B82643E131 \
   && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F8D2585B8783D481 \
