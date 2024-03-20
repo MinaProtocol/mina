@@ -31,7 +31,7 @@ ARG WASM_PACK_VERSION=v0.10.3
 ARG ROCKSDB_VERSION=v5.18.4
 
 # Install gnupg to handle keys
-RUN apt-get install gpgv
+RUN apt-get install gnupg1
 
 # Install keys that are missing for bookworm for some unknown reason
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 6ED0E7B82643E131 \
