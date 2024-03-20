@@ -71,8 +71,8 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
   let%bind block_user_cmds =
     query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
         Conn.collect_list
-          (Caqti_request.collect Caqti_type.unit
-             (Caqti_type.tup2 Sql.Mainnet.User_command.typ
+          (Mina_caqti.collect_req Caqti_type.unit
+             (Caqti_type.t2 Sql.Mainnet.User_command.typ
                 Sql.Mainnet.Block_user_command.typ )
              (sprintf
                 "SELECT %s, %s FROM %s AS c JOIN %s AS j ON c.id = \
@@ -89,8 +89,8 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
   let%bind block_internal_cmds =
     query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
         Conn.collect_list
-          (Caqti_request.collect Caqti_type.unit
-             (Caqti_type.tup2 Sql.Mainnet.Internal_command.typ
+          (Mina_caqti.collect_req Caqti_type.unit
+             (Caqti_type.t2 Sql.Mainnet.Internal_command.typ
                 Sql.Mainnet.Block_internal_command.typ )
              (sprintf
                 "SELECT %s, %s FROM %s AS c JOIN %s AS j ON c.id = \
@@ -121,8 +121,8 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
     else
       query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
           Conn.collect_list
-            (Caqti_request.collect Caqti_type.unit
-               Caqti_type.(tup2 int Sql.Mainnet.Public_key.typ)
+            (Mina_caqti.collect_req Caqti_type.unit
+               Caqti_type.(t2 int Sql.Mainnet.Public_key.typ)
                (sprintf "SELECT id, value FROM %s WHERE id IN (%s)"
                   Sql.Mainnet.Public_key.table_name
                   ( String.concat ~sep:","
@@ -332,10 +332,18 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
   let mainnet_pool =
-    Caqti_async.connect_pool ~max_size:128 mainnet_archive_uri
+    Caqti_async.connect_pool
+      ~pool_config:
+        Caqti_pool_config.(
+          merge_left (default_from_env ()) (create ~max_size:128 ()))
+      mainnet_archive_uri
   in
   let migrated_pool =
-    Caqti_async.connect_pool ~max_size:128 migrated_archive_uri
+    Caqti_async.connect_pool
+      ~pool_config:
+        Caqti_pool_config.(
+          merge_left (default_from_env ()) (create ~max_size:128 ()))
+      migrated_archive_uri
   in
   match (mainnet_pool, migrated_pool) with
   | Error e, _ | _, Error e ->
@@ -376,7 +384,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
       let%bind () =
         query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
             Conn.exec
-              (Caqti_request.exec Caqti_type.unit
+              (Mina_caqti.exec_req Caqti_type.unit
                  (sprintf
                     "DELETE FROM %s WHERE parent_id IS NULL AND height > 1"
                     Archive_lib.Processor.Block.table_name ) )
@@ -459,7 +467,6 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                    | Error (`Encode_failed _ as err)
                    | Error (`Encode_rejected _ as err)
                    | Error (`Request_failed _ as err)
-                   | Error (`Request_rejected _ as err)
                    | Error (`Response_failed _ as err)
                    | Error (`Response_rejected _ as err) ->
                        failwithf "Could not archive extensional block batch: %s"
