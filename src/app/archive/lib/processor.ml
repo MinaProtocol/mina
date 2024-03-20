@@ -3419,26 +3419,20 @@ module Block = struct
 
     let rec type_field_names : type a. a Caqti_type.t -> string option list =
       function
-      | Unit ->
-          []
       | Field f ->
           [ field_name f ]
       | Option t ->
           type_field_names t
-      | Tup2 (at, bt) ->
-          List.concat [ type_field_names at; type_field_names bt ]
-      | Tup3 (at, bt, ct) ->
-          List.concat
-            [ type_field_names at; type_field_names bt; type_field_names ct ]
-      | Tup4 (at, bt, ct, dt) ->
-          List.concat
-            [ type_field_names at
-            ; type_field_names bt
-            ; type_field_names ct
-            ; type_field_names dt
-            ]
-      | Custom custom ->
-          type_field_names custom.rep
+      | Annot (_, v) ->
+          type_field_names v
+      | Product (_, prod) ->
+          product_type_file_names prod
+    and product_type_file_names :
+        type a i. (a, i) Caqti_type.product -> string option list = function
+      | Proj_end ->
+          []
+      | Proj (t, _, rest) ->
+          type_field_names t @ product_type_file_names rest
     in
 
     let rec render_field : type a. a Caqti_type.Field.t -> a -> string =
@@ -3469,21 +3463,21 @@ module Block = struct
           failwith "todo: support caqti ptime_span"
       | Enum _ ->
           failwith "todo: support caqti enums"
-      | _ -> (
-          match Caqti_type.Field.coding Conn.driver_info typ with
-          | None ->
-              failwithf "unable to render caqti field: %s"
-                (Caqti_type.Field.to_string typ)
-                ()
-          | Some (Coding coding) ->
-              render_field coding.rep
-                (Result.ok_or_failwith @@ coding.encode value) )
+     (* | _ -> (
+         match Caqti_type.Field.coding Conn.driver_info typ with
+         | None ->
+             failwithf "unable to render caqti field: %s"
+               (Caqti_type.Field.to_string typ)
+               ()
+         | Some (Coding coding) ->
+             render_field coding.rep
+               (Result.ok_or_failwith @@ coding.encode value) ) *)
     in
     let rec render_type : type a. a Caqti_type.t -> a -> string list =
      fun typ value ->
       match typ with
-      | Unit ->
-          []
+      | Annot (_, t) ->
+          render_type t value
       | Field f ->
           [ render_field f value ]
       | Option t -> (
@@ -3492,22 +3486,15 @@ module Block = struct
               List.init (Caqti_type.length typ) ~f:(Fn.const "NULL")
           | Some x ->
               render_type t x )
-      | Tup2 (at, bt) ->
-          let a, b = value in
-          List.concat [ render_type at a; render_type bt b ]
-      | Tup3 (at, bt, ct) ->
-          let a, b, c = value in
-          List.concat [ render_type at a; render_type bt b; render_type ct c ]
-      | Tup4 (at, bt, ct, dt) ->
-          let a, b, c, d = value in
-          List.concat
-            [ render_type at a
-            ; render_type bt b
-            ; render_type ct c
-            ; render_type dt d
-            ]
-      | Custom custom ->
-          render_type custom.rep (Result.ok_or_failwith @@ custom.encode value)
+      | Product (_, prod) ->
+          product_render_type prod value
+    and product_render_type :
+        type a i. (a, i) Caqti_type.product -> a -> string list = function
+      | Proj_end ->
+          Fn.const []
+      | Proj (t, getter, rest) ->
+          fun value ->
+            render_type t (getter value) @ product_render_type rest value
     in
     let render_row (type a) (typ : a Caqti_type.t) (value : a) : string =
       "(" ^ String.concat ~sep:"," (render_type typ value) ^ ")"
@@ -3558,8 +3545,8 @@ module Block = struct
         in
         let%map entries =
           Conn.collect_list
-            (Caqti_request.collect Caqti_type.unit
-               Caqti_type.(tup2 typ int)
+            (Mina_caqti.collect_req Caqti_type.unit
+               Caqti_type.(t2 typ int)
                query )
             ()
         in
@@ -3577,7 +3564,7 @@ module Block = struct
           String.concat ~sep:"," @@ List.map ~f:(render_row typ) values
         in
         Conn.collect_list
-          (Caqti_request.collect Caqti_type.unit Caqti_type.int
+          (Mina_caqti.collect_req Caqti_type.unit Caqti_type.int
              (sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table
                 fields_sql values_sql ) )
           () )
@@ -3982,7 +3969,7 @@ module Block = struct
       let ids_sql = String.concat ~sep:"," ids in
       let parent_ids_sql = String.concat ~sep:"," parent_ids in
       Conn.exec
-        (Caqti_request.exec Caqti_type.unit
+        (Mina_caqti.exec_req Caqti_type.unit
            (sprintf
               "UPDATE %s AS b SET parent_id = data.parent_id FROM (SELECT \
                unnest(array[%s]) as id, unnest(array[%s]) as parent_id) AS \

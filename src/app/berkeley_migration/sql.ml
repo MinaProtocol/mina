@@ -106,7 +106,7 @@ module Mainnet = struct
 
     let full_canonical_blocks (module Conn : CONNECTION) =
       Conn.collect_list
-        (Caqti_request.collect Caqti_type.unit typ
+        (Mina_caqti.collect_req Caqti_type.unit typ
            {sql| SELECT id, state_hash, parent_id, parent_hash, creator_id,
                         block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id,
                         next_epoch_data_id, ledger_hash, height, global_slot,
