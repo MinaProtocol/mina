@@ -262,7 +262,11 @@ let compare_ledger_hash ~migrated_replayer_output ~fork_config_file =
   in
   let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
   let checkpoint_ledger_hash = Mina_ledger.Ledger.merkle_root ledger in
-  let fork_ledger_hash = Yojson.Basic.from_file fork_config_file |> member "ledger" |> member "hash" |> to_string |> Ledger_hash.of_base58_check_exn in
+  let fork_ledger_hash =
+    Yojson.Basic.from_file fork_config_file
+    |> member "ledger" |> member "hash" |> to_string
+    |> Ledger_hash.of_base58_check_exn
+  in
   if Ledger_hash.equal checkpoint_ledger_hash fork_ledger_hash then Check.ok
   else
     Check.err
