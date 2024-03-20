@@ -133,4 +133,4 @@ echo "------------------------------------------------------------"
 dpkg-deb --build "${BUILD_DIR}" ${PROJECT}_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
-git restore .
+git restore ..
