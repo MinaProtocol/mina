@@ -347,5 +347,10 @@ let
       });
 
       test_executive = wrapMina self.test_executive-dev { };
+
+      check_opam_switch = super.check_opam_switch.overrideAttrs (oa: {
+        # So that opam in impure shell doesn't get shadowed by the fake one
+        propagateInputs = false;
+      });
     };
 in scope.overrideScope' overlay
