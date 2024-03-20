@@ -146,23 +146,46 @@ module Cassandra = struct
   let submitter ({ submitter; _ } : submission) =
     Public_key.Compressed.of_base58_check_exn submitter
 
+  let zone = Lazy.force Time.Zone.local
+
+  let shard t =
+      let parts = Time.to_ofday t ~zone |> Time.Ofday.to_parts in
+      (parts.hr * 3600 + parts.min * 60 + parts.sec) / 144
+
+  let shards_range start_time end_time =
+    if Time.Span.(Time.diff end_time start_time > of_day 1.0) then
+      List.range ~stop:`inclusive 0 599
+    else
+      let first_shard = shard start_time in
+      let last_shard = shard end_time in
+      if first_shard > last_shard then
+        (List.range ~stop:`inclusive first_shard 599)
+        @ (List.range ~stop:`inclusive 0 last_shard)
+      else
+      List.range ~stop:`inclusive first_shard last_shard
+  
+  let comma_sep ~to_str l =
+    List.map ~f:to_str l |> String.concat ~sep:", "
+
   let load_submissions { conf; period_start; period_end } =
-    let start_day =
-      Time.of_string period_start |> Time.to_date ~zone:Time.Zone.utc
-    in
-    let end_day =
-      Time.of_string period_end |> Time.to_date ~zone:Time.Zone.utc
-    in
+    let start_time = Time.of_string period_start in
+    let end_time = Time.of_string period_end in
+    let start_day = Time.to_date ~zone start_time in
+    let end_day = Time.to_date ~zone end_time in
     let partition_keys =
       Date.dates_between ~min:start_day ~max:end_day
       |> List.map ~f:(fun d -> Date.format d "%Y-%m-%d")
     in
+    let shards = shards_range start_time end_time in
     let partition =
       if List.length partition_keys = 1 then
-        sprintf "submitted_at_date = '%s'" (List.hd_exn partition_keys)
+        sprintf "submitted_at_date = '%s' and shard in (%s)"
+          (List.hd_exn partition_keys)
+          (comma_sep ~to_str:Int.to_string shards)
       else
-        sprintf "submitted_at_date IN (%s)"
-          (String.concat ~sep:"," @@ List.map ~f:(sprintf "'%s'") partition_keys)
+        sprintf "submitted_at_date IN (%s) and shard in (%s)"
+          (comma_sep ~to_str:(sprintf "'%s'") partition_keys)
+          (comma_sep ~to_str:Int.to_string shards)
     in
     Cassandra.select ~conf ~parse:submission_of_yojson
       ~fields:
@@ -213,9 +236,10 @@ module Cassandra = struct
         Cassandra.update ~conf ~table:"submissions"
           ~where:
             (sprintf
-               "submitted_at_date = '%s' and submitted_at = '%s' and submitter \
+               "submitted_at_date = '%s' and shard = %d and submitted_at = '%s' and submitter \
                 = '%s'"
                (List.hd_exn @@ String.split ~on:' ' submission.submitted_at)
+               (shard @@ Time.of_string submission.submitted_at)
                submission.submitted_at submission.submitter )
           Output.(valid_payload_to_cassandra_updates payload)
     | Error e ->
@@ -223,9 +247,10 @@ module Cassandra = struct
         Cassandra.update ~conf ~table:"submissions"
           ~where:
             (sprintf
-               "submitted_at_date = '%s' and submitted_at = '%s' and submitter \
+               "submitted_at_date = '%s' and shard = %d and submitted_at = '%s' and submitter \
                 = '%s'"
                (List.hd_exn @@ String.split ~on:' ' submission.submitted_at)
+               (shard @@ Time.of_string submission.submitted_at)
                submission.submitted_at submission.submitter )
           [ ("validation_error", sprintf "'%s'" (Error.to_string_hum e))
           ; ("raw_block", "NULL")
