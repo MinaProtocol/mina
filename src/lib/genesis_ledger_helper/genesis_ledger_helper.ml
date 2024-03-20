@@ -330,7 +330,8 @@ module Ledger = struct
     tar_path
 
   let padded_accounts_from_runtime_config_opt ~logger ~proof_level
-      ~ledger_name_prefix (config : Runtime_config.Ledger.t) =
+      ~ledger_name_prefix ?overwrite_version (config : Runtime_config.Ledger.t)
+      =
     let add_genesis_winner_account accounts =
       (* We allow configurations to explicitly override adding the genesis
          winner, so that we can guarantee a certain ledger layout for
@@ -367,7 +368,10 @@ module Ledger = struct
       | Hash ->
           None
       | Accounts accounts ->
-          Some (lazy (add_genesis_winner_account (Accounts.to_full accounts)))
+          Some
+            ( lazy
+              (add_genesis_winner_account
+                 (Accounts.to_full ?overwrite_version accounts) ) )
       | Named name -> (
           match Genesis_ledger.fetch_ledger name with
           | Some (module M) ->
@@ -408,12 +412,12 @@ module Ledger = struct
     end) )
 
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      ?(ledger_name_prefix = "genesis_ledger") (config : Runtime_config.Ledger.t)
-      =
+      ?(ledger_name_prefix = "genesis_ledger") ?overwrite_version
+      (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
         let padded_accounts_opt =
           padded_accounts_from_runtime_config_opt ~logger ~proof_level
-            ~ledger_name_prefix config
+            ~ledger_name_prefix ?overwrite_version config
         in
         let open Deferred.Let_syntax in
         let%bind tar_path =

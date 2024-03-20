@@ -638,6 +638,8 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
         [ ("max_canonical_slot", `String (Int64.to_string max_canonical_slot)) ] ;
     Deferred.unit )
 
+let mainnet_version = Mina_numbers.Txn_version.of_int 1
+
 let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
     ~continue_on_error ~checkpoint_interval ~checkpoint_output_folder_opt
     ~checkpoint_file_prefix ~genesis_dir_opt () =
@@ -670,7 +672,10 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
           Genesis_ledger_helper.Ledger.load ~proof_level
             ~genesis_dir:
               (Option.value ~default:Cache_dir.autogen_path genesis_dir_opt)
-            ~logger ~constraint_constants input.genesis_ledger
+            ~logger ~constraint_constants
+            ?overwrite_version:
+              (if migration_mode then Some mainnet_version else None)
+            input.genesis_ledger
         with
         | Error e ->
             [%log fatal]
@@ -1421,11 +1426,34 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
               else
                 let%bind transactions_applied = run_transactions () in
                 let%bind () =
-                  if migration_mode then
+                  if migration_mode then (
                     let accounts_created =
                       List.concat_map transactions_applied
                         ~f:Ledger.Transaction_applied.new_accounts
                     in
+                    let locations =
+                      Ledger.location_of_account_batch ledger accounts_created
+                      |> List.map ~f:(fun (_, loc) -> Option.value_exn loc)
+                    in
+                    let accounts =
+                      Ledger.get_batch ledger locations
+                      |> List.map ~f:(fun (loc, account_opt) ->
+                             let account = account_opt |> Option.value_exn in
+                             ( loc
+                             , Mina_base.Account.Poly.
+                                 { account with
+                                   permissions =
+                                     Mina_base.Permissions.Poly.
+                                       { account.permissions with
+                                         set_verification_key =
+                                           ( fst
+                                               account.permissions
+                                                 .set_verification_key
+                                           , mainnet_version )
+                                       }
+                                 } ) )
+                    in
+                    Ledger.set_batch ledger accounts ;
                     let accounts_accessed =
                       List.concat_map transactions_applied
                         ~f:(fun txn_applied ->
@@ -1464,7 +1492,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                         query_db ~f:(fun db ->
                             Processor.Accounts_accessed.add_if_doesn't_exist db
                               last_block_id ~logger (index, acct) )
-                        |> Deferred.ignore_m )
+                        |> Deferred.ignore_m ) )
                   else (
                     check_ledger_hash_at_slot state_hash ledger_hash ;
                     Deferred.unit )
