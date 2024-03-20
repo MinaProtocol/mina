@@ -272,7 +272,7 @@ let delete_fetched ~network : unit Deferred.t =
          let size_with_new_arg = accumulated_size + String.length block_id in
          if size_with_new_arg > max_args_size then `Emit arg_size
          else `Accumulate size_with_new_arg )
-  |> Deferred.List.iter ~how:`Parallel ~f:(fun files ->
+  |> Deferred.List.iter ~f:(fun files ->
          match%map Process.run ~prog:"rm" ~args:files () with
          | Ok _ ->
              ()
