@@ -21,6 +21,7 @@ pkgs.mkShell {
     wasm-pack
     lmdb
     rosetta-cli
+    ocamlPackages_mina.check_opam_switch
   ];
   OPAMSWITCH = "mina";
   shellHook = ''
