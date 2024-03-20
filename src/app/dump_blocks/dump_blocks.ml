@@ -18,29 +18,25 @@ type 'a codec = (module Encoding.S with type t = 'a)
 
 type conf = Conf : 'a codec io option * 'a codec io list -> conf
 
-let mk_io : type a. (a Encoding.content * Encoding.t io) -> a codec io = function
-  | (Encoding.Precomputed, { encoding = Sexp; filename }) ->
-     { encoding = (module Encoding.Sexp_precomputed)
-     ; filename
-     }
-  | (Precomputed, { encoding = Json; filename }) ->
-     { encoding = (module Encoding.Json_precomputed)
-     ; filename
-     }
-  | (Precomputed, { encoding = Binary; filename }) ->
-     { encoding = (module Encoding.Binary_precomputed)
-     ; filename
-     }
-  | (Block, { encoding = Sexp; filename }) ->
-     { encoding = (module Encoding.Sexp_block)
-     ; filename
-     }
-  | (Block, { encoding = Json; filename }) ->
-     failwith "Json encoding for full blocks not supported."
-  | (Block, { encoding = Binary; filename }) ->
-     { encoding = (module Encoding.Binary_block)
-     ; filename
-     }
+let mk_io : type a. a Encoding.content -> Encoding.t io -> a codec io =
+ fun content io ->
+  let open Encoding in
+  { io with
+    encoding =
+      ( match (content, io.encoding) with
+      | Precomputed, Sexp ->
+          (module Sexp_precomputed)
+      | Precomputed, Json ->
+          (module Json_precomputed)
+      | Precomputed, Binary ->
+          (module Binary_precomputed)
+      | Block, Sexp ->
+          (module Sexp_block)
+      | Block, Json ->
+          failwith "Json encoding for full blocks not supported."
+      | Block, Binary ->
+          (module Binary_block) )
+  }
 
 let encoded_block =
   Command.Arg_type.create (fun s ->
@@ -142,11 +138,11 @@ let command =
      in
      let conf =
        if full then
-         Conf ( Option.map input ~f:(fun i -> mk_io (Block, i))
-              , List.map ~f:mk_io (List.map ~f:(fun x -> (Encoding.Block, x)) outs))
+         Conf ( Option.map input ~f:(mk_io Block)
+              , List.map ~f:(mk_io Encoding.Block) outs)
        else
-         Conf ( Option.map input ~f:(fun i -> mk_io (Precomputed, i))
-              , List.map ~f:mk_io (List.map ~f:(fun x -> (Encoding.Precomputed, x)) outs))
+         Conf ( Option.map input ~f:(mk_io Precomputed)
+              , List.map ~f:(mk_io Encoding.Precomputed) outs)
      in
      fun () ->
      match conf with
