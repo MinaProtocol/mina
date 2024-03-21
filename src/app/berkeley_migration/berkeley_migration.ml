@@ -1,5 +1,3 @@
-(* TODO: cleanup partial writes to blocks table introduced by bulk approach *)
-
 (* berkeley_migration.ml -- migrate archive db from original Mina mainnet to berkeley schema *)
 
 open Core_kernel
