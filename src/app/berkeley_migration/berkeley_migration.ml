@@ -396,7 +396,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                 query_mainnet_db ~f:(fun db ->
                     Sql.Mainnet.Block.mark_as_canonical db id ) )
       in
-      (* The batch insertion functionality for blocks can lead to impartial writes at the moment as
+      (* The batch insertion functionality for blocks can lead to partial writes at the moment as
          it is not properly wrapped in a transaction. We handle the partial write edge case here at
          startup in order to be able to resume gracefully in the event of an unfortunate crash. *)
       let%bind () =
