@@ -3347,8 +3347,8 @@ module Block = struct
       { seed = Epoch_seed.to_base58_check e.seed
       ; ledger_hash_id = find_ledger_hash_id e.ledger.hash
       ; total_currency = Currency.Amount.to_string e.ledger.total_currency
-      ; start_checkpoint = Ledger_hash.to_base58_check e.start_checkpoint
-      ; lock_checkpoint = Ledger_hash.to_base58_check e.lock_checkpoint
+      ; start_checkpoint = State_hash.to_base58_check e.start_checkpoint
+      ; lock_checkpoint = State_hash.to_base58_check e.lock_checkpoint
       ; epoch_length =
           Unsigned_extended.UInt32.to_int64
           @@ Mina_numbers.Length.to_uint32 e.epoch_length
