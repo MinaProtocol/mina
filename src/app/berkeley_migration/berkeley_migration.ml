@@ -470,6 +470,9 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
         List.map mainnet_blocks_to_migrate ~f:(fun { height; state_hash; _ } ->
             (height, state_hash) )
         |> List.filter ~f:(fun (height, _) -> Int64.(height > 1L))
+        |> List.map ~f:(fun (height, state_hash) ->
+               ( Mina_numbers.Length.of_int (Int64.to_int_exn height)
+               , Mina_base.State_hash.of_base58_check_exn state_hash ) )
       in
       let%bind precomputed_blocks =
         Precomputed_block.concrete_fetch_batch ~logger
