@@ -49,7 +49,7 @@ let mainnet_protocol_version =
      hard fork, the replayer won't check ledger hashes for blocks with
      an earlier protocol version.
   *)
-  Protocol_version.create ~transaction:1 ~network:0 ~patch:0
+  Protocol_version.create ~transaction:2 ~network:0 ~patch:0
 
 let compare_user_cmd_seq (a : Archive_lib.Extensional.User_command.t)
     (b : Archive_lib.Extensional.User_command.t) : int =
