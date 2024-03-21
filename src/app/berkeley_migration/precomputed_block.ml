@@ -171,18 +171,21 @@ let of_yojson json =
 let block_filename_regexp ~network =
   Str.regexp (sprintf "%s-[0-9]+-.+\\.json" network)
 
+let parse_filename filename =
+  let rest = Filename.chop_suffix filename ".json" in
+  let%bind.Option rest, state_hash = String.rsplit2 rest ~on:'-' in
+  let%map.Option netname, height = String.rsplit2 rest ~on:'-' in
+  (netname, height, state_hash)
+
 let list_directory ~network =
-  let regexp = Str.regexp {|^\([^-]+\)-\([^-]+\)-\(3N[^-]+\)\.json$|} in
   let%map filenames = Sys.readdir "." in
   Array.to_list filenames
   |> List.filter_map ~f:(fun filename ->
-         if Str.string_match regexp filename 0 then
-           let filename_network = Str.matched_group 1 filename in
-           if String.equal filename_network network then
-             let height = Str.matched_group 2 filename in
-             let state_hash = Str.matched_group 3 filename in
-             Some (Int64.of_int @@ Int.of_string height, state_hash)
-           else None
+         let%bind.Option filename_network, height, state_hash =
+           parse_filename filename
+         in
+         if String.equal filename_network network then
+           Some (Int64.of_int @@ Int.of_string height, state_hash)
          else None )
   |> Id.Set.of_list
 
