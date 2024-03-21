@@ -50,7 +50,7 @@ type output =
 
 module type Get_command_ids = sig
   val run :
-       Mina_caqti.CONNECTION
+       (module Mina_caqti.CONNECTION)
     -> state_hash:string
     -> start_slot:int64
     -> (int list, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
@@ -521,8 +521,8 @@ let get_parent_state_view ~pool block_id =
   in
   return state_view
 
-let zkapp_command_to_transaction ~logger ~source ~pool (cmd : Sql.Zkapp_command.t) :
-    Mina_transaction.Transaction.t Deferred.t =
+let zkapp_command_to_transaction ~logger ~source ~pool
+    (cmd : Sql.Zkapp_command.t) : Mina_transaction.Transaction.t Deferred.t =
   let query_db = Mina_caqti.query pool in
   (* use dummy authorizations *)
   let%bind (fee_payer : Account_update.Fee_payer.t) =
@@ -1410,7 +1410,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
               check_for_complete_block
                 ~cmd_global_slot_since_genesis:zkc.global_slot_since_genesis
             in
-            let%bind txn = zkapp_command_to_transaction ~logger ~pool ~source zkc in
+            let%bind txn =
+              zkapp_command_to_transaction ~logger ~pool ~source zkc
+            in
             apply_commands ~block_txns:(txn :: block_txns)
               ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
               ~last_block_id:zkc.block_id internal_cmds user_cmds zkcs

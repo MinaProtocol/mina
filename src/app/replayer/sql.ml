@@ -432,8 +432,8 @@ module Epoch_data = struct
 
       |sql}
 
-  let get_staking_epoch_data_id (module Conn : Mina_caqti.CONNECTION)
-      state_hash =
+  let get_staking_epoch_data_id (module Conn : Mina_caqti.CONNECTION) state_hash
+      =
     Conn.find query_staking_epoch_data_id state_hash
 
   let query_next_epoch_data_id =

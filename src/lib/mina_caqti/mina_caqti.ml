@@ -48,7 +48,7 @@ let connect_pool ?max_size uri =
 let connect uri =
   let%map.Deferred.Result conn = Caqti_async.connect uri in
   wrap_conn ~source:uri conn
-  
+
 (* custom Caqti types for generating type annotations on queries *)
 type _ Caqti_type.field +=
   | Array_nullable_int : int option array Caqti_type.field

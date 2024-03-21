@@ -85,9 +85,7 @@ let command_prune =
        in
        let go () =
          let open Deferred.Result.Let_syntax in
-         let%bind ((module Conn) as conn) =
-           Mina_caqti.connect postgres.value
-         in
+         let%bind ((module Conn) as conn) = Mina_caqti.connect postgres.value in
          let%bind () = Conn.start () in
          match%bind.Async.Deferred
            let%bind () =

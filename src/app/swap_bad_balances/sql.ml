@@ -15,12 +15,11 @@ module Receiver_balances = struct
             WHERE b.state_hash = $1 AND bic.sequence_no = $2
       |sql}
 
-  let run_ids_from_fee_transfer (module Conn : Mina_caqti.CONNECTION)
-      state_hash seq_no =
+  let run_ids_from_fee_transfer (module Conn : Mina_caqti.CONNECTION) state_hash
+      seq_no =
     Conn.collect_list query_ids_from_fee_transfer (state_hash, seq_no)
 
-  let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION) (pk, balance)
-      =
+  let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION) (pk, balance) =
     let open Deferred.Result.Let_syntax in
     (* if duplicates, any is acceptable *)
     match%bind

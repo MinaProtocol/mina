@@ -894,7 +894,9 @@ module Zkapp_permissions = struct
       Mina_numbers.Txn_version.to_int @@ snd perms.set_verification_key
     in
     let%bind versions =
-      Protocol_versions.find_by_txn_version (module Conn) ~transaction:txn_version
+      Protocol_versions.find_by_txn_version
+        (module Conn)
+        ~transaction:txn_version
     in
     ( match versions with
     | Ok [] ->
