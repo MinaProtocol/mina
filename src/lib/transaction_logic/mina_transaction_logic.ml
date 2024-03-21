@@ -328,6 +328,8 @@ module type S = sig
     val transaction : t -> Transaction.t With_status.t
 
     val transaction_status : t -> Transaction_status.t
+
+    val new_accounts : t -> Account_id.t list
   end
 
   module Global_state : sig
@@ -1410,7 +1412,7 @@ module Make (L : Ledger_intf.S) :
     end
 
     module Zkapp_uri = struct
-      type t = string
+      type t = Bounded_types.String.t
 
       let if_ = value_if
     end

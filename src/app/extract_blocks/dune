@@ -20,6 +20,7 @@
    ;; local libraries
    consensus_vrf
    mina_wire_types
+   bounded_types
    mina_base
    mina_base.import
    kimchi_backend.pasta

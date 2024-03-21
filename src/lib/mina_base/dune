@@ -3,7 +3,6 @@
  (public_name mina_base)
  (inline_tests (flags -verbose -show-counts))
  (library_flags -linkall)
- (flags -w -22)
  (libraries
    ;; opam libraries
    async_kernel
@@ -38,6 +37,7 @@
    sparse_ledger_lib
    snark_params
    signature_lib
+   bounded_types
    rosetta_coding
    random_oracle
    hash_prefix_states

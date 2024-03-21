@@ -61,6 +61,7 @@ RUN apt-get update --quiet \
   curl \
   file \
   git \
+  git-lfs \
   '(^lld-10$|^lld-11$)' \
   m4 \
   pkg-config \

@@ -1,22 +1,22 @@
 open Core_kernel
 
 module Fork_config = struct
-  (* Note that previous_length might be smaller than the gernesis_slot
+  (* Note that length might be smaller than the gernesis_slot
      or equal if a block was produced in every slot possible. *)
   type t =
-    { previous_state_hash : string
-    ; previous_length : int (* number of blocks produced since genesis *)
-    ; previous_global_slot : int (* global slot since genesis *)
+    { state_hash : string
+    ; blockchain_length : int (* number of blocks produced since genesis *)
+    ; global_slot_since_genesis : int (* global slot since genesis *)
     }
   [@@deriving yojson, bin_io_unversioned]
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
-    let%bind previous_global_slot = Int.gen_incl 0 1_000_000 in
-    let%bind previous_length = Int.gen_incl 0 previous_global_slot in
+    let%bind global_slot_since_genesis = Int.gen_incl 0 1_000_000 in
+    let%bind blockchain_length = Int.gen_incl 0 global_slot_since_genesis in
     let%map state_hash = Mina_base.State_hash.gen in
-    let previous_state_hash = Mina_base.State_hash.to_base58_check state_hash in
-    { previous_state_hash; previous_length; previous_global_slot }
+    let state_hash = Mina_base.State_hash.to_base58_check state_hash in
+    { state_hash; blockchain_length; global_slot_since_genesis }
 end
 
 let yojson_strip_fields ~keep_fields = function
@@ -160,29 +160,89 @@ module Json_layout = struct
         end
 
         type t =
-          { edit_state : Auth_required.t [@default None]
-          ; send : Auth_required.t [@default None]
-          ; receive : Auth_required.t [@default None]
-          ; access : Auth_required.t [@default None]
-          ; set_delegate : Auth_required.t [@default None]
-          ; set_permissions : Auth_required.t [@default None]
+          { edit_state : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.edit_state]
+          ; send : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.send]
+          ; receive : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.receive]
+          ; access : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.access]
+          ; set_delegate : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.set_delegate]
+          ; set_permissions : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.set_permissions]
           ; set_verification_key : Verification_key_perm.t
                 [@default
-                  { auth = None
-                  ; txn_version = Mina_numbers.Txn_version.current
+                  { auth =
+                      Auth_required.of_account_perm
+                        (fst
+                           Mina_base.Permissions.user_default
+                             .set_verification_key )
+                  ; txn_version =
+                      snd
+                        Mina_base.Permissions.user_default.set_verification_key
                   }]
-          ; set_zkapp_uri : Auth_required.t [@default None]
-          ; edit_action_state : Auth_required.t [@default None]
-          ; set_token_symbol : Auth_required.t [@default None]
-          ; increment_nonce : Auth_required.t [@default None]
-          ; set_voting_for : Auth_required.t [@default None]
-          ; set_timing : Auth_required.t [@default None]
+          ; set_zkapp_uri : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.set_zkapp_uri]
+          ; edit_action_state : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.edit_action_state]
+          ; set_token_symbol : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.set_token_symbol]
+          ; increment_nonce : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.increment_nonce]
+          ; set_voting_for : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.set_voting_for]
+          ; set_timing : Auth_required.t
+                [@default
+                  Auth_required.of_account_perm
+                    Mina_base.Permissions.user_default.set_timing]
           }
         [@@deriving yojson, fields, sexp, bin_io_unversioned]
 
         let fields = Fields.names |> Array.of_list
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
+
+        let to_yojson t =
+          `Assoc
+            [ ("edit_state", Auth_required.to_yojson t.edit_state)
+            ; ("send", Auth_required.to_yojson t.send)
+            ; ("receive", Auth_required.to_yojson t.receive)
+            ; ("access", Auth_required.to_yojson t.access)
+            ; ("set_delegate", Auth_required.to_yojson t.set_delegate)
+            ; ("set_permissions", Auth_required.to_yojson t.set_permissions)
+            ; ( "set_verification_key"
+              , Verification_key_perm.to_yojson t.set_verification_key )
+            ; ("set_zkapp_uri", Auth_required.to_yojson t.set_zkapp_uri)
+            ; ("edit_action_state", Auth_required.to_yojson t.edit_action_state)
+            ; ("set_token_symbol", Auth_required.to_yojson t.set_token_symbol)
+            ; ("increment_nonce", Auth_required.to_yojson t.increment_nonce)
+            ; ("set_voting_for", Auth_required.to_yojson t.set_voting_for)
+            ; ("set_timing", Auth_required.to_yojson t.set_timing)
+            ]
 
         let of_permissions (perm : Mina_base.Permissions.t) =
           { edit_state = Auth_required.of_account_perm perm.edit_action_state
@@ -332,6 +392,7 @@ module Json_layout = struct
       ; num_accounts : int option [@default None]
       ; balances : Balance_spec.t list [@default []]
       ; hash : string option [@default None]
+      ; s3_data_hash : string option [@default None]
       ; name : string option [@default None]
       ; add_genesis_winner : bool option [@default None]
       }
@@ -409,6 +470,9 @@ module Json_layout = struct
       ; zkapp_transaction_cost_limit : float option [@default None]
       ; max_event_elements : int option [@default None]
       ; max_action_elements : int option [@default None]
+      ; zkapp_cmd_limit_hardcap : int option [@default None]
+      ; slot_tx_end : int option [@default None]
+      ; slot_chain_end : int option [@default None]
       }
     [@@deriving yojson, fields]
 
@@ -422,6 +486,7 @@ module Json_layout = struct
       type t =
         { accounts : Accounts.t option [@default None]
         ; seed : string
+        ; s3_data_hash : string option [@default None]
         ; hash : string option [@default None]
         }
       [@@deriving yojson, fields]
@@ -730,7 +795,8 @@ module Ledger = struct
   type base =
     | Named of string  (** One of the named ledgers in [Genesis_ledger] *)
     | Accounts of Accounts.t  (** A ledger generated from the given accounts *)
-    | Hash of string  (** The ledger with the given root hash *)
+    | Hash
+        (** The ledger with the given root hash stored in the containing Ledger.t *)
   [@@deriving bin_io_unversioned]
 
   type t =
@@ -738,14 +804,21 @@ module Ledger = struct
     ; num_accounts : int option
     ; balances : (int * Currency.Balance.Stable.Latest.t) list
     ; hash : string option
+    ; s3_data_hash : string option
     ; name : string option
     ; add_genesis_winner : bool option
     }
   [@@deriving bin_io_unversioned]
 
   let to_json_layout
-      { base; num_accounts; balances; hash; name; add_genesis_winner } :
-      Json_layout.Ledger.t =
+      { base
+      ; num_accounts
+      ; balances
+      ; hash
+      ; name
+      ; add_genesis_winner
+      ; s3_data_hash
+      } : Json_layout.Ledger.t =
     let balances =
       List.map balances ~f:(fun (number, balance) ->
           { Json_layout.Ledger.Balance_spec.number; balance } )
@@ -755,6 +828,7 @@ module Ledger = struct
       ; num_accounts
       ; balances
       ; hash
+      ; s3_data_hash
       ; name
       ; add_genesis_winner
       }
@@ -764,11 +838,18 @@ module Ledger = struct
         { without_base with name = Some name }
     | Accounts accounts ->
         { without_base with accounts = Some (Accounts.to_json_layout accounts) }
-    | Hash hash ->
-        { without_base with hash = Some hash }
+    | Hash ->
+        without_base
 
   let of_json_layout
-      ({ accounts; num_accounts; balances; hash; name; add_genesis_winner } :
+      ({ accounts
+       ; num_accounts
+       ; balances
+       ; hash
+       ; s3_data_hash
+       ; name
+       ; add_genesis_winner
+       } :
         Json_layout.Ledger.t ) : (t, string) Result.t =
     let open Result.Let_syntax in
     let%map base =
@@ -782,8 +863,8 @@ module Ledger = struct
               return (Named name)
           | None -> (
               match hash with
-              | Some hash ->
-                  return (Hash hash)
+              | Some _ ->
+                  return Hash
               | None ->
                   Error
                     "Runtime_config.Ledger.of_json_layout: Expected a field \
@@ -794,7 +875,14 @@ module Ledger = struct
         ~f:(fun { Json_layout.Ledger.Balance_spec.number; balance } ->
           (number, balance) )
     in
-    { base; num_accounts; balances; hash; name; add_genesis_winner }
+    { base
+    ; num_accounts
+    ; balances
+    ; hash
+    ; s3_data_hash
+    ; name
+    ; add_genesis_winner
+    }
 
   let to_yojson x = Json_layout.Ledger.to_yojson (to_json_layout x)
 
@@ -819,6 +907,7 @@ module Ledger = struct
     ; num_accounts = Some num_accounts
     ; balances
     ; hash
+    ; s3_data_hash = None
     ; name = Some name
     ; add_genesis_winner = Some add_genesis_winner
     }
@@ -1128,6 +1217,9 @@ module Daemon = struct
     ; zkapp_transaction_cost_limit : float option [@default None]
     ; max_event_elements : int option [@default None]
     ; max_action_elements : int option [@default None]
+    ; zkapp_cmd_limit_hardcap : int option [@default None]
+    ; slot_tx_end : int option [@default None]
+    ; slot_chain_end : int option [@default None]
     }
   [@@deriving bin_io_unversioned]
 
@@ -1161,6 +1253,12 @@ module Daemon = struct
         opt_fallthrough ~default:t1.max_event_elements t2.max_event_elements
     ; max_action_elements =
         opt_fallthrough ~default:t1.max_action_elements t2.max_action_elements
+    ; zkapp_cmd_limit_hardcap =
+        opt_fallthrough ~default:t1.zkapp_cmd_limit_hardcap
+          t2.zkapp_cmd_limit_hardcap
+    ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
+    ; slot_chain_end =
+        opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
     }
 
   let gen =
@@ -1171,6 +1269,7 @@ module Daemon = struct
     let%bind zkapp_signed_pair_update_cost = Float.gen_incl 0.0 100.0 in
     let%bind zkapp_transaction_cost_limit = Float.gen_incl 0.0 100.0 in
     let%bind max_event_elements = Int.gen_incl 0 100 in
+    let%bind zkapp_cmd_limit_hardcap = Int.gen_incl 0 1000 in
     let%map max_action_elements = Int.gen_incl 0 1000 in
     { txpool_max_size = Some txpool_max_size
     ; peer_list_url = None
@@ -1180,6 +1279,9 @@ module Daemon = struct
     ; zkapp_transaction_cost_limit = Some zkapp_transaction_cost_limit
     ; max_event_elements = Some max_event_elements
     ; max_action_elements = Some max_action_elements
+    ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
+    ; slot_tx_end = None
+    ; slot_chain_end = None
     }
 end
 
@@ -1208,6 +1310,7 @@ module Epoch_data = struct
       { Json_layout.Epoch_data.Data.accounts = accounts staking.ledger
       ; seed = staking.seed
       ; hash = staking.ledger.hash
+      ; s3_data_hash = staking.ledger.s3_data_hash
       }
     in
     let next =
@@ -1215,6 +1318,7 @@ module Epoch_data = struct
           { Json_layout.Epoch_data.Data.accounts = accounts n.ledger
           ; seed = n.seed
           ; hash = n.ledger.hash
+          ; s3_data_hash = n.ledger.s3_data_hash
           } )
     in
     { Json_layout.Epoch_data.staking; next }
@@ -1223,15 +1327,15 @@ module Epoch_data = struct
    fun { staking; next } ->
     let open Result.Let_syntax in
     let data (t : [ `Staking | `Next ])
-        { Json_layout.Epoch_data.Data.accounts; seed; hash } =
+        { Json_layout.Epoch_data.Data.accounts; seed; hash; s3_data_hash } =
       let%map base =
         match accounts with
         | Some accounts ->
             return @@ Ledger.Accounts accounts
         | None -> (
             match hash with
-            | Some hash ->
-                return @@ Ledger.Hash hash
+            | Some _ ->
+                return @@ Ledger.Hash
             | None ->
                 let ledger_name =
                   match t with `Staking -> "staking" | `Next -> "next"
@@ -1247,6 +1351,7 @@ module Epoch_data = struct
         ; num_accounts = None
         ; balances = []
         ; hash
+        ; s3_data_hash
         ; name = None
         ; add_genesis_winner = Some false
         }
@@ -1399,15 +1504,16 @@ let ledger_of_accounts accounts =
     ; num_accounts = Some (List.length accounts)
     ; balances = List.mapi accounts ~f:(fun i a -> (i, a.balance))
     ; hash = None
+    ; s3_data_hash = None
     ; name = None
     ; add_genesis_winner = Some false
     }
 
-let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
-    ~protocol_state ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
-    ~next_epoch_seed (runtime_config : t) =
+let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
+    ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger ~next_epoch_seed
+    (runtime_config : t) =
   let open Async.Deferred.Result.Let_syntax in
-  let global_slot =
+  let global_slot_since_genesis =
     Mina_numbers.Global_slot_since_hard_fork.to_int global_slot
   in
   let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
@@ -1421,38 +1527,11 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
     |> ledger_accounts
   in
   let ledger = Option.value_exn runtime_config.ledger in
-  let previous_length =
-    let open Option.Let_syntax in
-    let%bind proof = runtime_config.proof in
-    let%map fork = proof.fork in
-    fork.previous_length + blockchain_length
-  in
-  let protocol_constants = Mina_state.Protocol_state.constants protocol_state in
-  let genesis =
-    { Genesis.k =
-        Some
-          (Unsigned.UInt32.to_int
-             protocol_constants.Genesis_constants.Protocol.Poly.k )
-    ; delta = Some (Unsigned.UInt32.to_int protocol_constants.delta)
-    ; slots_per_epoch =
-        Some (Unsigned.UInt32.to_int protocol_constants.slots_per_epoch)
-    ; slots_per_sub_window =
-        Some (Unsigned.UInt32.to_int protocol_constants.slots_per_sub_window)
-    ; genesis_state_timestamp =
-        Some
-          (Block_time.to_string_exn protocol_constants.genesis_state_timestamp)
-    ; grace_period_slots =
-        Some (Unsigned.UInt32.to_int protocol_constants.grace_period_slots)
-    }
-  in
   let fork =
     Fork_config.
-      { previous_state_hash =
-          Mina_base.State_hash.to_base58_check
-            protocol_state.Mina_state.Protocol_state.Poly.previous_state_hash
-      ; previous_length =
-          Option.value ~default:blockchain_length previous_length
-      ; previous_global_slot = global_slot
+      { state_hash = Mina_base.State_hash.to_base58_check state_hash
+      ; blockchain_length
+      ; global_slot_since_genesis
       }
   in
   let%bind () = yield () in
@@ -1477,24 +1556,27 @@ let make_fork_config ~staged_ledger ~global_slot ~blockchain_length
             { ledger = ledger_of_accounts accounts; seed = next_epoch_seed } )
     }
   in
-  let update =
-    make
-    (* add_genesis_winner must be set to false, because this
-       config effectively creates a continuation of the current
-       blockchain state and therefore the genesis ledger already
-       contains the winner of the previous block. No need to
-       artificially add it. In fact, it wouldn't work at all,
-       because the new node would try to create this account at
-       startup, even though it already exists, leading to an error.*)
-      ~epoch_data ~genesis
-      ~ledger:
-        { ledger with
-          base = Accounts accounts
-        ; add_genesis_winner = Some false
-        }
-      ~proof:(Proof_keys.make ~fork ()) ()
+  make
+  (* add_genesis_winner must be set to false, because this
+     config effectively creates a continuation of the current
+     blockchain state and therefore the genesis ledger already
+     contains the winner of the previous block. No need to
+     artificially add it. In fact, it wouldn't work at all,
+     because the new node would try to create this account at
+     startup, even though it already exists, leading to an error.*)
+    ~epoch_data
+    ~ledger:
+      { ledger with base = Accounts accounts; add_genesis_winner = Some false }
+    ~proof:(Proof_keys.make ~fork ()) ()
+
+let slot_tx_end_or_default, slot_chain_end_or_default =
+  let f compile get_runtime t =
+    Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
+    @@ Option.value_map t.daemon ~default:compile ~f:(fun daemon ->
+           Option.merge compile ~f:(fun _c r -> r) @@ get_runtime daemon )
   in
-  combine runtime_config update
+  ( f Mina_compile_config.slot_tx_end (fun d -> d.slot_tx_end)
+  , f Mina_compile_config.slot_chain_end (fun d -> d.slot_chain_end) )
 
 module Test_configs = struct
   let bootstrap =

@@ -26,7 +26,7 @@ let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
       ~previous_state_hash:
         (Option.value_map constraint_constants.fork
            ~default:negative_one_protocol_state_hash
-           ~f:(fun { previous_state_hash; _ } -> previous_state_hash) )
+           ~f:(fun { state_hash; _ } -> state_hash) )
       ~blockchain_state:
         (Blockchain_state.genesis ~constraint_constants ~consensus_constants
            ~genesis_ledger_hash ~genesis_body_reference )

@@ -26,6 +26,7 @@ module Network_config = struct
     ; archive_node_configs : Docker_node_config.Archive_node_config.t list
     ; mina_archive_schema_aux_files : string list
     ; log_precomputed_blocks : bool
+    ; start_filtered_logs : string list
     }
   [@@deriving to_yojson]
 
@@ -56,12 +57,15 @@ module Network_config = struct
         ; snark_worker_fee
         ; num_archive_nodes
         ; log_precomputed_blocks
+        ; start_filtered_logs
         ; proof_config
         ; Test_config.k
         ; delta
         ; slots_per_epoch
         ; slots_per_sub_window
         ; txpool_max_size
+        ; slot_tx_end
+        ; slot_chain_end
         ; _
         } =
       test_config
@@ -145,6 +149,9 @@ module Network_config = struct
             ; zkapp_transaction_cost_limit = None
             ; max_event_elements = None
             ; max_action_elements = None
+            ; zkapp_cmd_limit_hardcap = None
+            ; slot_tx_end
+            ; slot_chain_end
             }
       ; genesis =
           Some
@@ -168,6 +175,7 @@ module Network_config = struct
             ; balances = []
             ; hash = None
             ; name = None
+            ; s3_data_hash = None
             }
       ; epoch_data =
           Option.map epoch_data ~f:(fun { staking = staking_ledger; next } ->
@@ -204,6 +212,7 @@ module Network_config = struct
                   ; balances = []
                   ; hash = None
                   ; name = None
+                  ; s3_data_hash = None
                   }
                   : Runtime_config.Ledger.t )
               in
@@ -518,6 +527,7 @@ module Network_config = struct
         ; mina_archive_image = images.archive_node
         ; runtime_config = Runtime_config.to_yojson runtime_config
         ; log_precomputed_blocks
+        ; start_filtered_logs
         ; block_producer_configs
         ; seed_configs
         ; mina_archive_schema_aux_files

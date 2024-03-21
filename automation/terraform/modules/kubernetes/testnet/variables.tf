@@ -160,6 +160,11 @@ variable "log_precomputed_blocks" {
   default = false
 }
 
+variable "start_filtered_logs" {
+  type    = list(string)
+  default = []
+}
+
 variable "log_txn_pool_gossip" {
   type    = bool
   default = false

@@ -100,11 +100,12 @@ end
 
 module Poly_comm : sig
   module Without_degree_bound : sig
-    type 'a t = 'a array
+    type 'a t = 'a Bounded_types.ArrayN16.Stable.V1.t
   end
 
   module With_degree_bound : sig
-    type 'a t = { unshifted : 'a array; shifted : 'a }
+    type 'a t =
+      { unshifted : 'a Bounded_types.ArrayN16.Stable.V1.t; shifted : 'a }
   end
 end
 
@@ -252,6 +253,17 @@ module Evals : sig
     val map : ('f, 'bool) t -> f:('f -> 'g) -> ('g, 'bool) t
 
     val to_list : ('a, 'b) t -> ('a, 'b) Opt.t list
+
+    (** {4 Generic helpers} *)
+
+    val validate_feature_flags :
+         true_:'boolean
+      -> false_:'boolean
+      -> or_:('boolean -> 'boolean -> 'boolean)
+      -> assert_equal:('boolean -> 'boolean -> unit)
+      -> feature_flags:'boolean Features.t
+      -> (_, 'boolean) t
+      -> unit
   end
 
   type 'a t =

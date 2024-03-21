@@ -90,10 +90,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let older_version = Mina_numbers.Txn_version.of_int 1
 
   let fork_config : Runtime_config.Fork_config.t =
-    { previous_state_hash =
-        "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
-    ; previous_length = 300000
-    ; previous_global_slot = 500000
+    { state_hash = "3NKSiqFZQmAS12U8qeX4KNo8b4199spwNh7mrSs4Ci1Vacpfix2Q"
+    ; blockchain_length = 300000
+    ; global_slot_since_genesis = 500000
     }
 
   let config =
@@ -412,10 +411,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       section "Check that timed2 account is partially vested"
-        (let%bind global_slot_since_hard_fork =
-           Integration_test_lib.Graphql_requests
-           .must_get_global_slot_since_hard_fork ~logger
+        (let%bind best_chain =
+           Integration_test_lib.Graphql_requests.must_get_best_chain ~logger
+             ~max_length:1
              (Network.Node.get_ingress_uri node_b)
+         in
+         let best_tip = List.hd_exn best_chain in
+         let global_slot_since_hard_fork =
+           best_tip.global_slot_since_hard_fork
          in
          let%bind balance = get_account_balances timed2 in
          Balances.log logger ~name:"timed2"
@@ -546,7 +549,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  (Mina_numbers.Global_slot_since_hard_fork.to_int
                     global_slot_since_hard_fork ) ;
                let bad_height =
-                 Unsigned.UInt32.to_int height <= fork_config.previous_length
+                 Unsigned.UInt32.to_int height <= fork_config.blockchain_length
                in
                (* for now, we accept the "link block" with a global slot since genesis equal to the previous global slot
                   see issue #13897
@@ -554,7 +557,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                let bad_slot =
                  Mina_numbers.Global_slot_since_genesis.to_int
                    global_slot_since_genesis
-                 < fork_config.previous_global_slot
+                 < fork_config.global_slot_since_genesis
                in
                if bad_height && bad_slot then
                  Malleable_error.hard_error
@@ -606,7 +609,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "running replayer"
       (let%bind logs =
          Network.Node.run_replayer
-           ~start_slot_since_genesis:fork_config.previous_global_slot ~logger
+           ~start_slot_since_genesis:fork_config.global_slot_since_genesis
+           ~logger
            (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
        check_replayer_logs ~logger logs )

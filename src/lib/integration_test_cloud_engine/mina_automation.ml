@@ -71,6 +71,7 @@ module Network_config = struct
           [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
     ; block_producer_configs : block_producer_config list
     ; log_precomputed_blocks : bool
+    ; start_filtered_logs : string list
     ; archive_node_count : int
     ; mina_archive_schema : string
     ; mina_archive_schema_aux_files : string list
@@ -118,6 +119,7 @@ module Network_config = struct
          ; snark_worker_fee
          ; num_archive_nodes
          ; log_precomputed_blocks (* ; num_plain_nodes *)
+         ; start_filtered_logs
          ; proof_config
          ; k
          ; delta
@@ -125,6 +127,8 @@ module Network_config = struct
          ; slots_per_sub_window
          ; grace_period_slots
          ; txpool_max_size
+         ; slot_tx_end
+         ; slot_chain_end
          }
           : Test_config.t ) =
       test_config
@@ -235,6 +239,9 @@ module Network_config = struct
             ; zkapp_transaction_cost_limit = None
             ; max_event_elements = None
             ; max_action_elements = None
+            ; zkapp_cmd_limit_hardcap = None
+            ; slot_tx_end
+            ; slot_chain_end
             }
       ; genesis =
           Some
@@ -257,6 +264,7 @@ module Network_config = struct
             ; num_accounts = None
             ; balances = []
             ; hash = None
+            ; s3_data_hash = None
             ; name = None
             }
       ; epoch_data =
@@ -328,6 +336,7 @@ module Network_config = struct
                   ; num_accounts = None
                   ; balances = []
                   ; hash = None
+                  ; s3_data_hash = None
                   ; name = None
                   }
                   : Runtime_config.Ledger.t )
@@ -471,6 +480,7 @@ module Network_config = struct
         ; mina_archive_image = images.archive_node
         ; runtime_config = Runtime_config.to_yojson runtime_config
         ; block_producer_configs
+        ; start_filtered_logs
         ; log_precomputed_blocks
         ; archive_node_count = num_archive_nodes
         ; mina_archive_schema

@@ -37,6 +37,7 @@
    currency
    coda_genesis_ledger
    mina_base.import
+   bounded_types
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

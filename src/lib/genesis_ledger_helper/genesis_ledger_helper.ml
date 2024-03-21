@@ -6,9 +6,6 @@ include Genesis_ledger_helper_lib
 
 type exn += Genesis_state_initialization_error
 
-let s3_bucket_prefix =
-  "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net"
-
 module Tar = struct
   let create ~root ~directory ~file () =
     match%map
@@ -58,6 +55,34 @@ let file_exists ?follow_symlinks filename =
       true
   | _ ->
       false
+
+let sha3_hash ledger_file =
+  let st = ref (Digestif.SHA3_256.init ()) in
+  match%map
+    Reader.with_file ledger_file ~f:(fun rdr ->
+        Reader.read_one_chunk_at_a_time rdr ~handle_chunk:(fun buf ~pos ~len ->
+            st := Digestif.SHA3_256.feed_bigstring !st buf ~off:pos ~len ;
+            Deferred.return `Continue ) )
+  with
+  | `Eof ->
+      Digestif.SHA3_256.(get !st |> to_hex)
+  | _ ->
+      failwith "impossible: `Stop not used"
+
+let assert_filehash_equal ~file ~hash ~logger =
+  let%bind computed_hash = sha3_hash file in
+  if String.equal computed_hash hash then Deferred.unit
+  else
+    let%map () = Unix.rename ~src:file ~dst:(file ^ ".incorrect-hash") in
+    [%log error]
+      "Verification failure: downloaded $file and expected SHA3-256 = $hash \
+       but it had $computed_hash"
+      ~metadata:
+        [ ("path", `String file)
+        ; ("expected_hash", `String hash)
+        ; ("computed_hash", `String computed_hash)
+        ] ;
+    failwith "Tarball hash mismatch"
 
 module Ledger = struct
   let hash_filename hash ~ledger_name_prefix =
@@ -123,16 +148,34 @@ module Ledger = struct
         None )
     in
     let load_from_s3 filename =
-      let s3_path = s3_bucket_prefix ^/ filename in
-      let local_path = Cache_dir.s3_install_path ^/ filename in
-      match%bind Cache_dir.load_from_s3 [ s3_path ] [ local_path ] ~logger with
-      | Ok () ->
-          file_exists filename Cache_dir.s3_install_path
-      | Error _ ->
-          [%log trace] "Could not download $ledger from $uri"
+      match config.s3_data_hash with
+      | Some s3_hash -> (
+          let s3_path = Cache_dir.s3_keys_bucket_prefix ^/ filename in
+          let local_path = Cache_dir.s3_install_path ^/ filename in
+          match%bind Cache_dir.load_from_s3 s3_path local_path ~logger with
+          | Ok () ->
+              let%bind () =
+                assert_filehash_equal
+                  ~file:(Cache_dir.s3_install_path ^/ filename)
+                  ~hash:s3_hash ~logger
+              in
+              file_exists filename Cache_dir.s3_install_path
+          | Error e ->
+              [%log trace] "Could not download $ledger from $uri: $error"
+                ~metadata:
+                  [ ("ledger", `String ledger_name_prefix)
+                  ; ("uri", `String s3_path)
+                  ; ("error", `String (Error.to_string_hum e))
+                  ] ;
+              return None )
+      | None ->
+          [%log warn]
+            "Need S3 hash specified in runtime config to verify download for \
+             $ledger (root hash $root_hash), not attempting"
             ~metadata:
-              [ ("ledger", `String ledger_name_prefix)
-              ; ("uri", `String s3_path)
+              [ ( "root_hash"
+                , `String (Option.value ~default:"not specified" config.hash) )
+              ; ("ledger", `String ledger_name_prefix)
               ] ;
           return None
     in
@@ -176,15 +219,15 @@ module Ledger = struct
             search_local named_filename
         | Accounts accounts, _ ->
             search_local_and_s3 ~other_data:(accounts_hash accounts) "accounts"
-        | Hash hash, None ->
-            assert ([%equal: string option] (Some hash) config.hash) ;
+        | Hash, None ->
+            assert (Option.is_some config.hash) ;
             return None
         | _, Some name ->
             search_local_and_s3 name )
 
   let load_from_tar ?(genesis_dir = Cache_dir.autogen_path) ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ?accounts ~ledger_name_prefix filename =
+      ?accounts ~ledger_name_prefix ~expected_merkle_root filename =
     [%log trace] "Loading $ledger from $path"
       ~metadata:
         [ ("ledger", `String ledger_name_prefix); ("path", `String filename) ] ;
@@ -210,8 +253,35 @@ module Ledger = struct
           ( module Genesis_ledger.Of_ledger (struct
             let t =
               lazy
-                (Mina_ledger.Ledger.create ~directory_name:dirname
-                   ~depth:constraint_constants.ledger_depth () )
+                (let ledger =
+                   Mina_ledger.Ledger.create ~directory_name:dirname
+                     ~depth:constraint_constants.ledger_depth ()
+                 in
+                 let ledger_root = Mina_ledger.Ledger.merkle_root ledger in
+                 ( match expected_merkle_root with
+                 | Some expected_merkle_root ->
+                     if not (Ledger_hash.equal ledger_root expected_merkle_root)
+                     then (
+                       [%log error]
+                         "Ledger root hash $root_hash loaded from $path does \
+                          not match root hash expected from the config file: \
+                          $expected_root_hash"
+                         ~metadata:
+                           [ ("root_hash", Ledger_hash.to_yojson ledger_root)
+                           ; ("path", `String filename)
+                           ; ( "expected_root_hash"
+                             , Ledger_hash.to_yojson expected_merkle_root )
+                           ] ;
+                       failwith "Ledger root mismatch" )
+                 | None ->
+                     [%log warn]
+                       "Config file did not specify expected hash for ledger \
+                        loaded from $filename"
+                       ~metadata:
+                         [ ("path", `String filename)
+                         ; ("root_hash", Ledger_hash.to_yojson ledger_root)
+                         ] ) ;
+                 ledger )
 
             let depth = constraint_constants.ledger_depth
           end) )
@@ -222,7 +292,7 @@ module Ledger = struct
     Mina_ledger.Ledger.commit ledger ;
     let dirname = Option.value_exn (Mina_ledger.Ledger.get_directory ledger) in
     let root_hash =
-      State_hash.to_base58_check @@ Mina_ledger.Ledger.merkle_root ledger
+      Ledger_hash.to_base58_check @@ Mina_ledger.Ledger.merkle_root ledger
     in
     let%bind () = Unix.mkdir ~p:() genesis_dir in
     let tar_path = genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix in
@@ -274,7 +344,7 @@ module Ledger = struct
     in
     let accounts_opt =
       match config.base with
-      | Hash _ ->
+      | Hash ->
           None
       | Accounts accounts ->
           Some (lazy (add_genesis_winner_account (Accounts.to_full accounts)))
@@ -334,6 +404,8 @@ module Ledger = struct
         | Some tar_path -> (
             match%map
               load_from_tar ~genesis_dir ~logger ~constraint_constants
+                ~expected_merkle_root:
+                  (Option.map config.hash ~f:Ledger_hash.of_base58_check_exn)
                 ?accounts:padded_accounts_opt ~ledger_name_prefix tar_path
             with
             | Ok ledger ->
@@ -351,15 +423,19 @@ module Ledger = struct
                 match config.base with
                 | Accounts _ ->
                     assert false
-                | Hash hash ->
+                | Hash ->
+                    let missing_hash =
+                      Option.value ~default:"not specified" config.hash
+                    in
                     [%log error]
                       "Could not find or generate a $ledger for $root_hash"
                       ~metadata:
                         [ ("ledger", `String ledger_name_prefix)
-                        ; ("root_hash", `String hash)
+                        ; ("root_hash", `String missing_hash)
                         ] ;
                     Deferred.Or_error.errorf
-                      "Could not find a ledger tar file for hash '%s'" hash
+                      "Could not find a ledger tar file for hash '%s'"
+                      missing_hash
                 | Named ledger_name ->
                     let ledger_filename =
                       named_filename ~constraint_constants
@@ -392,7 +468,7 @@ module Ledger = struct
                   { config with
                     hash =
                       Some
-                        ( State_hash.to_base58_check
+                        ( Ledger_hash.to_base58_check
                         @@ Mina_ledger.Ledger.merkle_root ledger )
                   }
                 in
@@ -402,7 +478,7 @@ module Ledger = struct
                       (Some name, None)
                   | Accounts accounts, _ ->
                       (Some "accounts", Some (accounts_hash accounts))
-                  | Hash _, None ->
+                  | Hash, None ->
                       (None, None)
                   | _, Some name ->
                       (Some name, None)
@@ -431,11 +507,11 @@ module Ledger = struct
                         ; ("named_tar_path", `String link_name)
                         ] ;
                     Ok (packed, config, link_name)
-                | Ok tar_path, None ->
+                | Ok tar_path, _ ->
                     return (Ok (packed, config, tar_path))
                 | Error err, _ ->
                     let root_hash =
-                      State_hash.to_base58_check
+                      Ledger_hash.to_base58_check
                       @@ Mina_ledger.Ledger.merkle_root ledger
                     in
                     let tar_path =
@@ -556,21 +632,10 @@ module Genesis_proof = struct
     with
     | Some filename ->
         return (Some filename)
-    | None -> (
-        let s3_path = s3_bucket_prefix ^/ filename in
-        let local_path = Cache_dir.s3_install_path ^/ filename in
-        match%bind
-          Cache_dir.load_from_s3 [ s3_path ] [ local_path ] ~logger
-        with
-        | Ok () ->
-            file_exists filename Cache_dir.s3_install_path
-        | Error e ->
-            [%log info] "Could not download genesis proof file from $uri"
-              ~metadata:
-                [ ("uri", `String s3_path)
-                ; ("error", Error_json.error_to_yojson e)
-                ] ;
-            return None )
+    | None ->
+        [%log warn] "No genesis proof found for $base_hash"
+          ~metadata:[ ("base_hash", Base_hash.to_yojson base_hash) ] ;
+        return None
 
   let generate_inputs ~runtime_config ~proof_level ~ledger ~genesis_epoch_data
       ~constraint_constants ~blockchain_proof_system_id
@@ -923,6 +988,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
            { base = Named Mina_compile_config.genesis_ledger
            ; num_accounts = None
            ; balances = []
+           ; s3_data_hash = None
            ; hash = None
            ; name = None
            ; add_genesis_winner = None
@@ -950,17 +1016,6 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
       ~blockchain_proof_system_id ~genesis_epoch_data
   in
   (proof_inputs, config)
-
-let init_from_inputs ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    proof_inputs =
-  let open Deferred.Or_error.Let_syntax in
-  let%map values, proof_file =
-    Genesis_proof.load_or_generate ~genesis_dir ~logger proof_inputs
-  in
-  if Option.is_some values.proof_data then
-    [%log info] "Loaded genesis proof from $proof_file"
-      ~metadata:[ ("proof_file", `String proof_file) ] ;
-  values
 
 let init_from_config_file ?genesis_dir ~logger ~proof_level
     (config : Runtime_config.t) :

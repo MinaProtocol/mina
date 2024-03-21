@@ -60,7 +60,9 @@
   network_pool
   zkapps_examples
   cache_dir
-  snarky.backendless)
+  snarky.backendless
+  bounded_types
+  block_time)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

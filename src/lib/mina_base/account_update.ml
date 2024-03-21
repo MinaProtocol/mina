@@ -89,7 +89,6 @@ module Authorization_kind = struct
 
     let deriver obj =
       let open Fields_derivers_zkapps in
-      let open Fields in
       let ( !. ) = ( !. ) ~t_fields_annots in
       let verification_key_hash =
         needs_custom_js ~js_type:field ~name:"VerificationKeyHash" field
@@ -696,7 +695,7 @@ module Update = struct
         ; verification_key :
             Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t
         ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
-        ; zkapp_uri : string Set_or_keep.Stable.V1.t
+        ; zkapp_uri : Bounded_types.String.Stable.V1.t Set_or_keep.Stable.V1.t
         ; token_symbol :
             Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
         ; timing : Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
@@ -977,7 +976,6 @@ module Account_precondition = struct
     (* we used to have 3 constructors, Full, Nonce, and Accept for the type t
        nowadays, the generator creates these 3 different kinds of values, but all mapped to t
     *)
-    let open Zkapp_basic in
     Quickcheck.Generator.variant3 Zkapp_precondition.Account.gen
       Account.Nonce.gen Unit.quickcheck_generator
     |> Quickcheck.Generator.map ~f:(function
@@ -1113,7 +1111,10 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Pickles.Backend.Tick.Field.Stable.V1.t array list
+        type t =
+          Pickles.Backend.Tick.Field.Stable.V1.t
+          Bounded_types.ArrayN16.Stable.V1.t
+          list
         [@@deriving sexp, equal, hash, compare, yojson]
 
         let to_latest = Fn.id
@@ -1426,21 +1427,7 @@ module Body = struct
     }
 
   let to_fee_payer_exn (t : t) : Fee_payer.t =
-    let { public_key
-        ; token_id = _
-        ; update = _
-        ; balance_change
-        ; increment_nonce = _
-        ; events = _
-        ; actions = _
-        ; call_data = _
-        ; preconditions
-        ; use_full_commitment = _
-        ; may_use_token = _
-        ; authorization_kind = _
-        } =
-      t
-    in
+    let { public_key; preconditions; balance_change; _ } = t in
     let fee =
       Currency.Fee.of_uint64
         (balance_change.magnitude |> Currency.Amount.to_uint64)

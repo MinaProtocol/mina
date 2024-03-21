@@ -506,6 +506,7 @@ module Evals = struct
     end
   end]
 
+  (* NB: Equivalent checks are run in-circuit below. *)
   let validate_feature_flags ~feature_flags:(f : bool Features.t)
       { w = _
       ; coefficients = _
@@ -847,6 +848,79 @@ module Evals = struct
         ; range_check_lookup_selector
         ; foreign_field_mul_lookup_selector
         ]
+
+    (* NB: Equivalent checks are done out-of-circuit above. *)
+    let validate_feature_flags ~true_ ~false_ ~or_:( ||| ) ~assert_equal
+        ~feature_flags:(f : 'boolean Features.t)
+        { w = _
+        ; coefficients = _
+        ; z = _
+        ; s = _
+        ; generic_selector = _
+        ; poseidon_selector = _
+        ; complete_add_selector = _
+        ; mul_selector = _
+        ; emul_selector = _
+        ; endomul_scalar_selector = _
+        ; range_check0_selector
+        ; range_check1_selector
+        ; foreign_field_add_selector
+        ; foreign_field_mul_selector
+        ; xor_selector
+        ; rot_selector
+        ; lookup_aggregation
+        ; lookup_table
+        ; lookup_sorted
+        ; runtime_lookup_table
+        ; runtime_lookup_table_selector
+        ; xor_lookup_selector
+        ; lookup_gate_lookup_selector
+        ; range_check_lookup_selector
+        ; foreign_field_mul_lookup_selector
+        } =
+      let opt_flag = function
+        | Opt.Just _ ->
+            true_
+        | Opt.Maybe (b, _) ->
+            b
+        | Opt.Nothing ->
+            false_
+      in
+      let enable_if x flag = assert_equal (opt_flag x) flag in
+      let range_check_lookup = f.range_check0 ||| f.range_check1 ||| f.rot in
+      let lookups_per_row_4 =
+        f.xor ||| range_check_lookup ||| f.foreign_field_mul
+      in
+      let lookups_per_row_3 = lookups_per_row_4 ||| f.lookup in
+      let lookups_per_row_2 = lookups_per_row_3 in
+      enable_if range_check0_selector f.range_check0 ;
+      enable_if range_check1_selector f.range_check1 ;
+      enable_if foreign_field_add_selector f.foreign_field_add ;
+      enable_if foreign_field_mul_selector f.foreign_field_mul ;
+      enable_if xor_selector f.xor ;
+      enable_if rot_selector f.rot ;
+      enable_if lookup_aggregation lookups_per_row_2 ;
+      enable_if lookup_table lookups_per_row_2 ;
+      Vector.iteri lookup_sorted ~f:(fun i x ->
+          let flag =
+            (* NB: lookups_per_row + 1 in sorted, due to the lookup table. *)
+            match i with
+            | 0 | 1 | 2 ->
+                lookups_per_row_2
+            | 3 ->
+                lookups_per_row_3
+            | 4 ->
+                lookups_per_row_4
+            | _ ->
+                assert false
+          in
+          enable_if x flag ) ;
+      enable_if runtime_lookup_table f.runtime_tables ;
+      enable_if runtime_lookup_table_selector f.runtime_tables ;
+      enable_if xor_lookup_selector f.xor ;
+      enable_if lookup_gate_lookup_selector f.lookup ;
+      enable_if range_check_lookup_selector range_check_lookup ;
+      enable_if foreign_field_mul_lookup_selector f.foreign_field_mul
   end
 
   let to_in_circuit (type bool a)
@@ -1253,7 +1327,7 @@ module Openings = struct
     module Stable = struct
       module V1 = struct
         type ('g, 'fq) t =
-          { lr : ('g * 'g) array
+          { lr : ('g * 'g) Bounded_types.ArrayN16.Stable.V1.t
           ; z_1 : 'fq
           ; z_2 : 'fq
           ; delta : 'g
@@ -1289,7 +1363,10 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g_opt t = { unshifted : 'g_opt array; shifted : 'g_opt }
+        type 'g_opt t =
+          { unshifted : 'g_opt Bounded_types.ArrayN16.Stable.V1.t
+          ; shifted : 'g_opt
+          }
         [@@deriving sexp, compare, yojson, hlist, hash, equal]
       end
     end]
@@ -1320,7 +1397,8 @@ module Poly_comm = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'g t = 'g array [@@deriving sexp, compare, yojson, hash, equal]
+        type 'g t = 'g Bounded_types.ArrayN16.Stable.V1.t
+        [@@deriving sexp, compare, yojson, hash, equal]
       end
     end]
   end
@@ -1340,7 +1418,11 @@ module Messages = struct
       [@@@no_toplevel_latest_type]
 
       module V1 = struct
-        type 'g t = { sorted : 'g array; aggreg : 'g; runtime : 'g option }
+        type 'g t =
+          { sorted : 'g Bounded_types.ArrayN16.Stable.V1.t
+          ; aggreg : 'g
+          ; runtime : 'g option
+          }
         [@@deriving fields, sexp, compare, yojson, hash, equal, hlist]
       end
     end]
@@ -1472,7 +1554,8 @@ module Shifts = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type 'field t = 'field array [@@deriving sexp, compare, yojson, equal]
+      type 'field t = 'field Bounded_types.ArrayN16.Stable.V1.t
+      [@@deriving sexp, compare, yojson, equal]
     end
   end]
 end

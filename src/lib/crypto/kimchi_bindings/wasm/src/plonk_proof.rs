@@ -685,8 +685,7 @@ macro_rules! impl_proof {
                                             .map(|a| a.clone().into())
                                             .collect();
                                     let comm = PolyComm::<$G> {
-                                        unshifted: vec![sg],
-                                        shifted: None,
+                                        elems: vec![sg],
                                     };
                                     RecursionChallenge { chals, comm }
                                 })
@@ -785,8 +784,7 @@ macro_rules! impl_proof {
                 fn comm() -> PolyComm<$G> {
                     let g = $G::prime_subgroup_generator();
                     PolyComm {
-                        shifted: Some(g),
-                        unshifted: vec![g, g, g],
+                        elems: vec![g, g, g],
                     }
                 }
 

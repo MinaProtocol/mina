@@ -28,6 +28,7 @@
    ;; local libraries
    mina_wire_types
    mina_base.util
+   bounded_types
    unsigned_extended
    kimchi_backend.pasta
    kimchi_backend.pasta.basic

@@ -155,7 +155,7 @@ groups:
     for: 1h
     labels:
       testnet: "{{ $labels.testnet }}"
-      severity: critical
+      severity: warning
     annotations:
       summary: "{{ $labels.testnet }} slot fill rate is critically low"
       description: "Lower fill rate of {{ $value }} than expected on network {{ $labels.testnet }}."
@@ -216,7 +216,7 @@ groups:
     expr: min by (testnet) ((time() - 1609459200) - Coda_Transaction_pool_useful_transactions_received_time_sec ${rule_filter}) >= 2 * 180
     labels:
       testnet: "{{ $labels.testnet }}"
-      severity: critical
+      severity: warning
     annotations:
       summary: "{{ $labels.testnet }}: no new transactions seen for 2 slots."
       description: "No node has received transactions in their transaction pool in the last 2 slots (6 minutes) on network {{ $labels.testnet }}."
@@ -531,7 +531,7 @@ groups:
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
-      severity: critical
+      severity: warning
     annotations:
       summary: "{{ $labels.testnet }} min density is critically low"
       description: "Critically low min density of {{ $value }} on network {{ $labels.testnet }}."
@@ -542,7 +542,7 @@ groups:
     for: 1h
     labels:
       testnet: "{{ $labels.testnet }}"
-      severity: critical
+      severity: warning
     annotations:
       summary: "{{ $labels.testnet }} slot fill rate is critically low"
       description: "Lower fill rate of {{ $value }} than expected on network {{ $labels.testnet }}."
@@ -603,7 +603,7 @@ groups:
     expr: min by (testnet) ((time() - 1609459200) - Coda_Transaction_pool_useful_transactions_received_time_sec {${berkeley_testnet},${synced_status_filter}} ) >= 2 * 180
     labels:
       testnet: "{{ $labels.testnet }}"
-      severity: critical
+      severity: warning
     annotations:
       summary: "{{ $labels.testnet }}: no new transactions seen for 2 slots."
       description: "No node has received transactions in their transaction pool in the last 2 slots (6 minutes) on network {{ $labels.testnet }}."

@@ -15249,7 +15249,7 @@
             {
               "name": "fork_config",
               "description":
-                "The runtime configuration for a blockchain fork intended to be a continuation of the current one.",
+                "The runtime configuration for a blockchain fork intended to be a continuation of the current one. By default, this returns the newest block that appeared before the transaction stop slot provided in the configuration, or the best tip if no such block exists.",
               "args": [
                 {
                   "name": "height",
@@ -15319,6 +15319,23 @@
               "name": "networkID",
               "description":
                 "The chain-agnostic identifier of the network this daemon is participating in",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "signatureKind",
+              "description":
+                "The signature kind that this daemon instance is using",
               "args": [],
               "type": {
                 "kind": "NON_NULL",

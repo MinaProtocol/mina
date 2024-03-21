@@ -64,6 +64,93 @@ let plugin_flag = Command.Param.return []
 
 [%%endif]
 
+let load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level config_files =
+  let%bind config_jsons =
+    let config_files_paths =
+      List.map config_files ~f:(fun (config_file, _) -> `String config_file)
+    in
+    [%log info] "Reading configuration files $config_files"
+      ~metadata:[ ("config_files", `List config_files_paths) ] ;
+    Deferred.List.filter_map config_files
+      ~f:(fun (config_file, handle_missing) ->
+        match%bind Genesis_ledger_helper.load_config_json config_file with
+        | Ok config_json ->
+            let%map config_json =
+              Genesis_ledger_helper.upgrade_old_config ~logger config_file
+                config_json
+            in
+            Some (config_file, config_json)
+        | Error err -> (
+            match handle_missing with
+            | `Must_exist ->
+                Mina_user_error.raisef ~where:"reading configuration file"
+                  "The configuration file %s could not be read:\n%s" config_file
+                  (Error.to_string_hum err)
+            | `May_be_missing ->
+                [%log warn] "Could not read configuration from $config_file"
+                  ~metadata:
+                    [ ("config_file", `String config_file)
+                    ; ("error", Error_json.error_to_yojson err)
+                    ] ;
+                return None ) )
+  in
+  let config =
+    List.fold ~init:Runtime_config.default config_jsons
+      ~f:(fun config (config_file, config_json) ->
+        match Runtime_config.of_yojson config_json with
+        | Ok loaded_config ->
+            Runtime_config.combine config loaded_config
+        | Error err ->
+            [%log fatal]
+              "Could not parse configuration from $config_file: $error"
+              ~metadata:
+                [ ("config_file", `String config_file)
+                ; ("config_json", config_json)
+                ; ("error", `String err)
+                ] ;
+            failwithf "Could not parse configuration file: %s" err () )
+  in
+  let genesis_dir = Option.value ~default:(conf_dir ^/ "genesis") genesis_dir in
+  let%bind precomputed_values =
+    match%map
+      Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
+        ~proof_level config
+    with
+    | Ok (precomputed_values, _) ->
+        precomputed_values
+    | Error err ->
+        let ( json_config
+            , `Accounts_omitted
+                ( `Genesis genesis_accounts_omitted
+                , `Staking staking_accounts_omitted
+                , `Next next_accounts_omitted ) ) =
+          Runtime_config.to_yojson_without_accounts config
+        in
+        let append_accounts_omitted s =
+          Option.value_map
+            ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
+            ~default:Fn.id
+        in
+        let metadata =
+          append_accounts_omitted "genesis" genesis_accounts_omitted
+          @@ append_accounts_omitted "staking" staking_accounts_omitted
+          @@ append_accounts_omitted "next" next_accounts_omitted []
+          @ [ ("config", json_config)
+            ; ( "name"
+              , `String
+                  (Option.value ~default:"not provided"
+                     (let%bind.Option ledger = config.ledger in
+                      Option.first_some ledger.name ledger.hash ) ) )
+            ; ("error", Error_json.error_to_yojson err)
+            ]
+        in
+        [%log info]
+          "Initializing with runtime configuration. Ledger source: $name"
+          ~metadata ;
+        Error.raise err
+  in
+  return (precomputed_values, config_jsons, config)
+
 let setup_daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -410,6 +497,11 @@ let setup_daemon logger =
       ~aliases:[ "log-precomputed-blocks" ]
       (optional_with_default false bool)
       ~doc:"true|false Include precomputed blocks in the log (default: false)"
+  and start_filtered_logs =
+    flag "--start-filtered-logs" (listed string)
+      ~doc:
+        "LOG-FILTER Include filtered logs for the given filter. May be passed \
+         multiple times"
   and block_reward_threshold =
     flag "--minimum-block-reward" ~aliases:[ "minimum-block-reward" ]
       ~doc:
@@ -448,6 +540,11 @@ let setup_daemon logger =
   and node_error_url =
     flag "--node-error-url" ~aliases:[ "node-error-url" ] (optional string)
       ~doc:"URL of the node error collection service"
+  and simplified_node_stats =
+    flag "--simplified-node-stats"
+      ~aliases:[ "simplified-node-stats" ]
+      (optional_with_default true bool)
+      ~doc:"whether to report simplified node stats (default: true)"
   and contact_info =
     flag "--contact-info" ~aliases:[ "contact-info" ] (optional string)
       ~doc:
@@ -695,91 +792,9 @@ let setup_daemon logger =
             @ List.map config_files ~f:(fun config_file ->
                   (config_file, `Must_exist) )
           in
-          let%bind config_jsons =
-            let config_files_paths =
-              List.map config_files ~f:(fun (config_file, _) ->
-                  `String config_file )
-            in
-            [%log info] "Reading configuration files $config_files"
-              ~metadata:[ ("config_files", `List config_files_paths) ] ;
-            Deferred.List.filter_map config_files
-              ~f:(fun (config_file, handle_missing) ->
-                match%bind
-                  Genesis_ledger_helper.load_config_json config_file
-                with
-                | Ok config_json ->
-                    let%map config_json =
-                      Genesis_ledger_helper.upgrade_old_config ~logger
-                        config_file config_json
-                    in
-                    Some (config_file, config_json)
-                | Error err -> (
-                    match handle_missing with
-                    | `Must_exist ->
-                        Mina_user_error.raisef
-                          ~where:"reading configuration file"
-                          "The configuration file %s could not be read:\n%s"
-                          config_file (Error.to_string_hum err)
-                    | `May_be_missing ->
-                        [%log warn]
-                          "Could not read configuration from $config_file"
-                          ~metadata:
-                            [ ("config_file", `String config_file)
-                            ; ("error", Error_json.error_to_yojson err)
-                            ] ;
-                        return None ) )
-          in
-          let config =
-            List.fold ~init:Runtime_config.default config_jsons
-              ~f:(fun config (config_file, config_json) ->
-                match Runtime_config.of_yojson config_json with
-                | Ok loaded_config ->
-                    Runtime_config.combine config loaded_config
-                | Error err ->
-                    [%log fatal]
-                      "Could not parse configuration from $config_file: $error"
-                      ~metadata:
-                        [ ("config_file", `String config_file)
-                        ; ("config_json", config_json)
-                        ; ("error", `String err)
-                        ] ;
-                    failwithf "Could not parse configuration file: %s" err () )
-          in
-          let genesis_dir =
-            Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
-          in
-          let%bind precomputed_values =
-            match%map
-              Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
-                ~proof_level config
-            with
-            | Ok (precomputed_values, _) ->
-                precomputed_values
-            | Error err ->
-                let ( json_config
-                    , `Accounts_omitted
-                        ( `Genesis genesis_accounts_omitted
-                        , `Staking staking_accounts_omitted
-                        , `Next next_accounts_omitted ) ) =
-                  Runtime_config.to_yojson_without_accounts config
-                in
-                let append_accounts_omitted s =
-                  Option.value_map
-                    ~f:(fun i -> List.cons (s ^ "_accounts_omitted", `Int i))
-                    ~default:Fn.id
-                in
-                let metadata =
-                  append_accounts_omitted "genesis" genesis_accounts_omitted
-                  @@ append_accounts_omitted "staking" staking_accounts_omitted
-                  @@ append_accounts_omitted "next" next_accounts_omitted
-                       [ ("config", json_config)
-                       ; ("error", Error_json.error_to_yojson err)
-                       ]
-                in
-                [%log info]
-                  "Initializing with runtime configuration. Ledger name: $name"
-                  ~metadata ;
-                Error.raise err
+          let%bind precomputed_values, config_jsons, config =
+            load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level
+              config_files
           in
           let rev_daemon_configs =
             List.rev_filter_map config_jsons
@@ -1112,7 +1127,7 @@ let setup_daemon logger =
           in
           let trust_dir = conf_dir ^/ "trust" in
           let%bind () = Async.Unix.mkdir ~p:() trust_dir in
-          let trust_system = Trust_system.create trust_dir in
+          let%bind trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
           let genesis_state_hash =
             (Precomputed_values.genesis_state_hashes precomputed_values)
@@ -1402,9 +1417,11 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~work_reassignment_wait ~archive_process_location
                  ~log_block_creation ~precomputed_values ~start_time
                  ?precomputed_blocks_path ~log_precomputed_blocks
-                 ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
-                 ~node_status_url ~graphql_control_port:itn_graphql_port () )
+                 ~start_filtered_logs ~upload_blocks_to_gcloud
+                 ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
+                 ~uptime_send_node_commit ~stop_time ~node_status_url
+                 ~graphql_control_port:itn_graphql_port ~simplified_node_stats
+                 () )
           in
           { mina
           ; client_trustlist
@@ -1567,6 +1584,100 @@ let dump_type_shapes =
              in
              Core_kernel.printf "%s, %s, %s, %s\n" path digest shape_summary
                ty_decl ) ) )
+
+let primitive_ok = function
+  | "array" | "bytes" | "string" | "bigstring" ->
+      false
+  | "int" | "int32" | "int64" | "nativeint" | "char" | "bool" | "float" ->
+      true
+  | "unit" | "option" | "list" ->
+      true
+  | "kimchi_backend_bigint_32_V1" ->
+      true
+  | "Bounded_types.String.t"
+  | "Bounded_types.String.Tagged.t"
+  | "Bounded_types.Array.t" ->
+      true
+  | "8fabab0a-4992-11e6-8cca-9ba2c4686d9e" ->
+      true (* hashtbl *)
+  | "ac8a9ff4-4994-11e6-9a1b-9fb4e933bd9d" ->
+      true (* Make_iterable_binable *)
+  | s ->
+      failwithf "unknown primitive %s" s ()
+
+let audit_type_shapes : Command.t =
+  let rec shape_ok (shape : Sexp.t) : bool =
+    match shape with
+    | List [ Atom "Exp"; exp ] ->
+        exp_ok exp
+    | List [] ->
+        true
+    | _ ->
+        failwithf "bad shape: %s" (Sexp.to_string shape) ()
+  and exp_ok (exp : Sexp.t) : bool =
+    match exp with
+    | List [ Atom "Base"; Atom tyname; List exps ] ->
+        primitive_ok tyname && List.for_all exps ~f:shape_ok
+    | List [ Atom "Record"; List fields ] ->
+        List.for_all fields ~f:(fun field ->
+            match field with
+            | List [ Atom _; sh ] ->
+                shape_ok sh
+            | _ ->
+                failwithf "unhandled rec field: %s" (Sexp.to_string_hum field)
+                  () )
+    | List [ Atom "Tuple"; List exps ] ->
+        List.for_all exps ~f:shape_ok
+    | List [ Atom "Variant"; List ctors ] ->
+        List.for_all ctors ~f:(fun ctor ->
+            match ctor with
+            | List [ Atom _ctr; List exps ] ->
+                List.for_all exps ~f:shape_ok
+            | _ ->
+                failwithf "unhandled variant: %s" (Sexp.to_string_hum ctor) () )
+    | List [ Atom "Poly_variant"; List [ List [ Atom "sorted"; List ctors ] ] ]
+      ->
+        List.for_all ctors ~f:(fun ctor ->
+            match ctor with
+            | List [ Atom _ctr ] ->
+                true
+            | List [ Atom _ctr; List fields ] ->
+                List.for_all fields ~f:shape_ok
+            | _ ->
+                failwithf "unhandled poly variant: %s" (Sexp.to_string_hum ctor)
+                  () )
+    | List [ Atom "Application"; sh; List args ] ->
+        shape_ok sh && List.for_all args ~f:shape_ok
+    | List [ Atom "Rec_app"; Atom _; List args ] ->
+        List.for_all args ~f:shape_ok
+    | List [ Atom "Var"; Atom _ ] ->
+        true
+    | List (Atom ctr :: _) ->
+        failwithf "unhandled ctor (%s) in exp_ok: %s" ctr
+          (Sexp.to_string_hum exp) ()
+    | List [] | List _ | Atom _ ->
+        failwithf "bad format: %s" (Sexp.to_string_hum exp) ()
+  in
+  let handle_shape (path : string) (shape : Bin_prot.Shape.t) (ty_decl : string)
+      (good : int ref) (bad : int ref) =
+    let open Bin_prot.Shape in
+    let path, file = String.lsplit2_exn ~on:':' path in
+    let canonical = eval shape in
+    let shape_sexp = Canonical.to_string_hum canonical |> Sexp.of_string in
+    if not @@ shape_ok shape_sexp then (
+      incr bad ;
+      Core.eprintf "%s has a bad shape in %s (%s):\n%s\n" path file ty_decl
+        (Canonical.to_string_hum canonical) )
+    else incr good
+  in
+  Command.basic ~summary:"Audit shapes of versioned types"
+    (Command.Param.return (fun () ->
+         let bad, good = (ref 0, ref 0) in
+         Ppx_version_runtime.Shapes.iteri
+           ~f:(fun ~key:path ~data:(shape, ty_decl) ->
+             handle_shape path shape ty_decl good bad ) ;
+         Core.printf "good shapes:\n\t%d\nbad shapes:\n\t%d\n%!" !good !bad ;
+         if !bad > 0 then Core.exit 1 ) )
 
 [%%if force_updates]
 
@@ -1884,6 +1995,60 @@ let internal_commands logger =
           Deferred.return ()) )
   ; ("dump-type-shapes", dump_type_shapes)
   ; ("replay-blocks", replay_blocks logger)
+  ; ("audit-type-shapes", audit_type_shapes)
+  ; ( "test-genesis-block-generation"
+    , Command.async ~summary:"Generate a genesis proof"
+        (let open Command.Let_syntax in
+        let%map_open config_files =
+          flag "--config-file" ~aliases:[ "config-file" ]
+            ~doc:
+              "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
+               default: <config_dir>/daemon.json). Pass multiple times to \
+               override fields from earlier config files"
+            (listed string)
+        and conf_dir = Cli_lib.Flag.conf_dir
+        and genesis_dir =
+          flag "--genesis-ledger-dir" ~aliases:[ "genesis-ledger-dir" ]
+            ~doc:
+              "DIR Directory that contains the genesis ledger and the genesis \
+               blockchain proof (default: <config-dir>)"
+            (optional string)
+        in
+        fun () ->
+          let open Deferred.Let_syntax in
+          Parallel.init_master () ;
+          let logger = Logger.create () in
+          let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
+          let proof_level = Genesis_constants.Proof_level.Full in
+          let config_files =
+            List.map config_files ~f:(fun config_file ->
+                (config_file, `Must_exist) )
+          in
+          let%bind precomputed_values, _config_jsons, _config =
+            load_config_files ~logger ~conf_dir ~genesis_dir
+              ~proof_level:(Some proof_level) config_files
+          in
+          let pids = Child_processes.Termination.create_pid_table () in
+          let%bind prover =
+            (* We create a prover process (unnecessarily) here, to have a more
+               realistic test.
+            *)
+            Prover.create ~logger ~pids ~conf_dir ~proof_level
+              ~constraint_constants:precomputed_values.constraint_constants ()
+          in
+          match%bind
+            Prover.create_genesis_block prover
+              (Genesis_proof.to_inputs precomputed_values)
+          with
+          | Ok block ->
+              Format.eprintf "Generated block@.%s@."
+                ( Yojson.Safe.to_string
+                @@ Blockchain_snark.Blockchain.to_yojson block ) ;
+              exit 0
+          | Error err ->
+              Format.eprintf "Failed to generate block@.%s@."
+                (Yojson.Safe.to_string @@ Error_json.error_to_yojson err) ;
+              exit 1) )
   ]
 
 let mina_commands logger =

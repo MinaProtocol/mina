@@ -36,6 +36,7 @@
    staged_ledger_diff
    ppx_version.runtime
    consensus
+   bounded_types
  )
  (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
