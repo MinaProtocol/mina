@@ -947,7 +947,7 @@ let print_config ~logger config =
     ~metadata
 
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~proof_level (config : Runtime_config.t) =
+    ~proof_level ?overwrite_version (config : Runtime_config.t) =
   print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
   let genesis_constants = Genesis_constants.compiled in
@@ -1007,6 +1007,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   let%bind genesis_ledger, ledger_config, ledger_file =
     Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+      ?overwrite_version
       (Option.value config.ledger
          ~default:
            { base = Named Mina_compile_config.genesis_ledger
@@ -1041,12 +1042,13 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   (proof_inputs, config)
 
-let init_from_config_file ?genesis_dir ~logger ~proof_level
+let init_from_config_file ?genesis_dir ~logger ~proof_level ?overwrite_version
     (config : Runtime_config.t) :
     (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
   let%map inputs, config =
-    inputs_from_config_file ?genesis_dir ~logger ~proof_level config
+    inputs_from_config_file ?genesis_dir ~logger ~proof_level ?overwrite_version
+      config
   in
   let values = Genesis_proof.create_values_no_proof inputs in
   (values, config)

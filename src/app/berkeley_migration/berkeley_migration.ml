@@ -182,7 +182,7 @@ let mainnet_protocol_version =
      hard fork, the replayer won't check ledger hashes for blocks with
      an earlier protocol version.
   *)
-  Protocol_version.create ~transaction:1 ~network:0 ~patch:0
+  Protocol_version.create ~transaction:2 ~network:0 ~patch:0
 
 let mainnet_block_to_extensional ~logger ~mainnet_pool ~network
     ~(genesis_block : Mina_block.t) (block : Sql.Mainnet.Block.t) ~bucket
@@ -486,6 +486,10 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
   in
   [%log info] "Done populating original genesis ledger balances!"
 
+let mainnet_version =
+  Protocol_version.transaction mainnet_protocol_version
+  |> Mina_numbers.Txn_version.of_int
+
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
     ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network () =
   let logger = Logger.create () in
@@ -517,7 +521,8 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
       let%bind precomputed_values =
         match%map
           Genesis_ledger_helper.init_from_config_file ~logger
-            ~proof_level:(Some proof_level) runtime_config
+            ~proof_level:(Some proof_level) ~overwrite_version:mainnet_version
+            runtime_config
         with
         | Ok (precomputed_values, _) ->
             precomputed_values

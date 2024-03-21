@@ -110,7 +110,6 @@ let all_accounts_referred_in_commands_are_recorded migrated_pool ~work_dir =
     query_migrated_db ~f:(fun db ->
         Sql.Berkeley.dump_accounts_accessed_to_csv db account_accessed )
   in
-
   diff_files user_and_internal_cmds account_accessed
 
 let compare_hashes_till_height migrated_pool mainnet_pool ~height ~work_dir =
