@@ -410,25 +410,28 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                       Archive_lib.Processor.Block.table_name ) )
                 () )
         in
-        let garbage_block_ids_sql =
-          String.concat ~sep:"," @@ List.map garbage_block_ids ~f:Int.to_string
-        in
-        let%bind () =
+        if List.is_empty garbage_block_ids then Deferred.unit
+        else
+          let garbage_block_ids_sql =
+            String.concat ~sep:","
+            @@ List.map garbage_block_ids ~f:Int.to_string
+          in
+          let%bind () =
+            query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
+                Conn.exec
+                  (Caqti_request.exec Caqti_type.unit
+                     (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
+                        Archive_lib.Processor.Block_and_signed_command
+                        .table_name garbage_block_ids_sql ) )
+                  () )
+          in
           query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
               Conn.exec
                 (Caqti_request.exec Caqti_type.unit
-                   (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
-                      Archive_lib.Processor.Block_and_signed_command.table_name
-                      garbage_block_ids_sql ) )
+                   (sprintf "DELETE FROM %s WHERE block_id IN %s"
+                      Archive_lib.Processor.Block_and_internal_command
+                      .table_name garbage_block_ids_sql ) )
                 () )
-        in
-        query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
-            Conn.exec
-              (Caqti_request.exec Caqti_type.unit
-                 (sprintf "DELETE FROM %s WHERE block_id IN %s"
-                    Archive_lib.Processor.Block_and_internal_command.table_name
-                    garbage_block_ids_sql ) )
-              () )
       in
       [%log info] "Querying mainnet canonical blocks" ;
       let%bind mainnet_blocks_unsorted =
