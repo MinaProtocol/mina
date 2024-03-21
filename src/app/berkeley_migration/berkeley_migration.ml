@@ -428,7 +428,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
           query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
               Conn.exec
                 (Caqti_request.exec Caqti_type.unit
-                   (sprintf "DELETE FROM %s WHERE block_id IN %s"
+                   (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
                       Archive_lib.Processor.Block_and_internal_command
                       .table_name garbage_block_ids_sql ) )
                 () )
