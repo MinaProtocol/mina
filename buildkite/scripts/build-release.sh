@@ -5,8 +5,7 @@ set -eo pipefail
 ([ -z ${DUNE_PROFILE+x} ] || [ -z ${MINA_DEB_CODENAME+x} ]) && echo "required env vars were not provided" && exit 1
 
 if [[ $1 = "archive_migration" ]] ; then
-    curl -O https://gist.githubusercontent.com/emberian/d1435ac373cd014a2c3054946bb6cd39/raw/caqti-upgrade.patch
-    git apply caqti-upgrade.patch
+    git apply ./buildkite/scripts/caqti-upgrade.patch
 fi
 
 source ~/.profile

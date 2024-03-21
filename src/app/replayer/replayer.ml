@@ -1746,7 +1746,6 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                   !error_count ;
                 exit 1 ) ) )
 
-(* pls rebuild me *)
 let () =
   Command.(
     run
