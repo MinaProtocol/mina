@@ -326,7 +326,7 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
   [%log info] "Done populating original genesis ledger balances!"
 
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
-    ~fork_state_hash:_ ~mina_network_blocks_bucket ~batch_size ~network
+    ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
     ~keep_precomputed_blocks () =
   let logger = Logger.create () in
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
@@ -370,16 +370,64 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
           , _validation ) =
         Mina_block.genesis ~precomputed_values
       in
+      let%bind () =
+        match fork_state_hash with
+        | None ->
+            return ()
+        | Some state_hash ->
+            [%log info]
+              "Mark the chain leads to target state hash %s to be canonical"
+              state_hash ;
+            let%bind fork_id =
+              query_mainnet_db ~f:(fun db ->
+                  Sql.Mainnet.Block.id_from_state_hash db state_hash )
+            in
+            let%bind highest_canonical_block_id =
+              query_mainnet_db ~f:(fun db ->
+                  Sql.Mainnet.Block.get_highest_canonical_block db () )
+            in
+            let%bind subchain_blocks =
+              query_mainnet_db ~f:(fun db ->
+                  Sql.Mainnet.Block.get_subchain db
+                    ~start_block_id:highest_canonical_block_id
+                    ~end_block_id:fork_id )
+            in
+            Deferred.List.iter subchain_blocks ~f:(fun id ->
+                query_mainnet_db ~f:(fun db ->
+                    Sql.Mainnet.Block.mark_as_canonical db id ) )
+      in
       (* The batch insertion functionality for blocks can lead to impartial writes at the moment as
          it is not properly wrapped in a transaction. We handle the partial write edge case here at
          startup in order to be able to resume gracefully in the event of an unfortunate crash. *)
       let%bind () =
-        query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
+        let%bind garbage_block_ids =
+          query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
+              Conn.collect_list
+                (Caqti_request.collect Caqti_type.unit Caqti_type.int
+                   (sprintf
+                      "DELETE FROM %s WHERE parent_id IS NULL AND height > 1 \
+                       RETURNING id"
+                      Archive_lib.Processor.Block.table_name ) )
+                () )
+        in
+        let garbage_block_ids_sql =
+          String.concat ~sep:"," @@ List.map garbage_block_ids ~f:Int.to_string
+        in
+        let%bind () =
+          query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
+              Conn.exec
+                (Caqti_request.exec Caqti_type.unit
+                   (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
+                      Archive_lib.Processor.Block_and_signed_command.table_name
+                      garbage_block_ids_sql ) )
+                () )
+        in
+        query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
             Conn.exec
               (Caqti_request.exec Caqti_type.unit
-                 (sprintf
-                    "DELETE FROM %s WHERE parent_id IS NULL AND height > 1"
-                    Archive_lib.Processor.Block.table_name ) )
+                 (sprintf "DELETE FROM %s WHERE block_id IN %s"
+                    Archive_lib.Processor.Block_and_internal_command.table_name
+                    garbage_block_ids_sql ) )
               () )
       in
       [%log info] "Querying mainnet canonical blocks" ;

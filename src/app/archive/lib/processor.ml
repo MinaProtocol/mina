@@ -3816,59 +3816,6 @@ module Block = struct
              (token, Map.find_exn token_repr_ids token_repr) )
     in
 
-    (*
-    let%bind account_ids =
-      let accounts = List.map all_missing_accounts ~f:(fun id -> (id, account_id_to_repr ~find_public_key:(Map.find_exn public_key_ids) ~find_token:(Map.find_exn token_ids) id)) in
-      let%map account_repr_ids =
-        differential_insert (module Account_identifiers)
-            accounts
-          ~get_key:snd
-          ~get_value:snd
-          ~load_index:(load_index (module Account_identifiers) Account_identifiers.typ ~table:Account_identifiers.table_name ~fields:Account_identifiers.Fields.names)
-          ~insert_values:(bulk_insert Account_identifiers.typ ~table:Account_identifiers.table_name ~fields:Account_identifiers.Fields.names)
-      in
-      Account_id.Map.of_alist_exn @@ List.map accounts ~f:(fun (account, account_repr) ->
-        (account, Map.find_exn account_repr_ids account_repr))
-    in
-    *)
-
-    (*
-    let%bind protocol_version_id =
-      let transaction =
-        Protocol_version.transaction block.protocol_version
-      in
-      let network = Protocol_version.network block.protocol_version in
-      let patch = Protocol_version.patch block.protocol_version in
-      Protocol_versions.add_if_doesn't_exist
-        (module Conn)
-        ~transaction ~network ~patch
-    in
-    let%bind proposed_protocol_version_id =
-      Option.value_map block.proposed_protocol_version
-        ~default:(return None) ~f:(fun ppv ->
-          let transaction = Protocol_version.transaction ppv in
-          let network = Protocol_version.network ppv in
-          let patch = Protocol_version.patch ppv in
-          let%map id =
-            Protocol_versions.add_if_doesn't_exist
-              (module Conn)
-              ~transaction ~network ~patch
-          in
-          Some id )
-    in
-    *)
-    (* TODO: caching would help here quite a bit *)
-    (*
-    let protocol_version_ids =
-      differential_insert (module Protocol_versions)
-        all_protocol_versions
-        ~get_key:Fn.id
-        ~get_value:Fn.id
-        ~load_index:(load_index (module Protocol_versions) Protocol_versions.typ ~table:Protocol_versions.table_name ~fields:Protocol_versions.Fields.names)
-        ~insert_values:(bulk_insert Protocol_versions.typ ~table:Protocol_versions.table_name ~fields:Protocol_versions.Fields.names)
-    in
-    *)
-
     (* We only expect a single protocol version at any migration, so we use the old non-batched functions here (which already cache ids) *)
     let all_protocol_versions =
       Staged.unstage
