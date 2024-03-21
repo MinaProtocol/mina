@@ -53,8 +53,11 @@ case "${DEB_CODENAME##*=}" in
   bionic|focal|impish|jammy)
     IMAGE="ubuntu:${DEB_CODENAME##*=}"
   ;;
-  stretch|buster|bullseye|bookworm|sid)
+  stretch|buster|bullseye|sid)
     IMAGE="debian:${DEB_CODENAME##*=}-slim"
+  ;;
+  bookworm)
+    IMAGE="debian:${DEB_CODENAME##*=}"
   ;;
 esac
 IMAGE="--build-arg image=${IMAGE}"
