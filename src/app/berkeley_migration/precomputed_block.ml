@@ -172,9 +172,11 @@ let block_filename_regexp ~network =
   Str.regexp (sprintf "%s-[0-9]+-.+\\.json" network)
 
 let parse_filename filename =
-  let rest = Filename.chop_suffix filename ".json" in
-  let%bind.Option rest, state_hash = String.rsplit2 rest ~on:'-' in
-  let%map.Option netname, height = String.rsplit2 rest ~on:'-' in
+  let open Option.Let_syntax in
+  let rest, ext = Filename.split_extension filename in
+  let%bind () = match ext with Some "json" -> Some () | _ -> None in
+  let%bind rest, state_hash = String.rsplit2 rest ~on:'-' in
+  let%map netname, height = String.rsplit2 rest ~on:'-' in
   (netname, height, state_hash)
 
 let list_directory ~network =
