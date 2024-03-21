@@ -81,8 +81,7 @@ pushd /home/opam/opam-repository
 git pull
 popd
 
-curl -O https://gist.githubusercontent.com/emberian/996aa08499459f8231b642f8d847ec0a/raw/caqti-compatible.patch
-git apply caqti-compatible.patch
+git apply scripts/archive/caqti-compatible.patch
 opam update
 opam upgrade caqti.2.0.1
 dune build "--profile=${DUNE_PROFILE}" src/app/replayer/replayer.exe
