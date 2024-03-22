@@ -3471,7 +3471,8 @@ module Block = struct
           failwith "todo: support caqti ptime_span"
       | Enum _ ->
           (* we are ignoring the enum annotation in this context because it's not always valid to apply *)
-          value
+          (* NOTE: we assume enum values do not contain special characters (eg "'") *)
+          "'" ^ value ^ "'"
       | _ -> (
           match Caqti_type.Field.coding Conn.driver_info typ with
           | None ->
