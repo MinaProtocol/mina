@@ -30,7 +30,6 @@
    genesis_constants
    genesis_ledger_helper
    mina_base
-   mina_ledger
    mina_base.import
    mina_block
    mina_caqti

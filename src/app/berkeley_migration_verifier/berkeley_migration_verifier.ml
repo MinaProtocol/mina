@@ -235,33 +235,15 @@ let compare_internal_commands migrated_pool mainnet_pool ~work_dir =
     query_mainnet_db ~f:(fun db ->
         Sql.Mainnet.dump_internal_commands db internal_commands_main )
   in
-
   diff_files internal_commands_berk internal_commands_main
 
 let compare_ledger_hash ~migrated_replayer_output ~fork_config_file =
-  let genesis_ledger =
-    Yojson.Safe.from_file migrated_replayer_output
-    |> Yojson.Safe.Util.member "genesis_ledger"
-    |> Runtime_config.Ledger.of_yojson |> Result.ok_or_failwith
+  let checkpoint_ledger_hash =
+    Yojson.Basic.from_file migrated_replayer_output
+    |> member "genesis_ledger"
+    |> member "hash" |> to_string
+    |> Ledger_hash.of_base58_check_exn
   in
-  let%map packed_ledger =
-    match%bind
-      Genesis_ledger_helper.Ledger.load
-        ~proof_level:Genesis_constants.Proof_level.Full
-        ~genesis_dir:Cache_dir.autogen_path
-        ~logger:Logger.(create ())
-        ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-        genesis_ledger
-    with
-    | Error e ->
-        failwith
-          (sprintf "Could not load accounts from checkpoint file %s"
-             (Error.to_string_hum e) )
-    | Ok (packed_ledger, _, _) ->
-        return packed_ledger
-  in
-  let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
-  let checkpoint_ledger_hash = Mina_ledger.Ledger.merkle_root ledger in
   let fork_ledger_hash =
     Yojson.Basic.from_file fork_config_file
     |> member "ledger" |> member "hash" |> to_string
@@ -442,7 +424,7 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
         ~prefix:"A10.6" test_count
       |> Test.eval ;
 
-      let%bind check =
+      let check =
         compare_ledger_hash ~migrated_replayer_output ~fork_config_file
       in
       Test.of_check check ~name:"Verify fork config vs migrated replayer output"
