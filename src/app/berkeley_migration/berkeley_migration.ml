@@ -242,9 +242,10 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
          ; tokens_used = []
          } ) )
 
-let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
-  let open Deferred.Let_syntax in
-  let query_migrated_db ~f = Mina_caqti.query ~f migrated_pool in
+let migrate_genesis_balances (module Conn : CONNECTION) ~logger
+    ~precomputed_values =
+  let open Archive_lib.Processor in
+  let open Deferred.Result.Let_syntax in
   [%log info] "Populating original genesis ledger balances" ;
   (* inlined from Archive_lib.Processor.add_genesis_accounts to avoid
      recomputing values from runtime config *)
@@ -254,8 +255,12 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
   in
   [%log info] "Created genesis ledger" ;
   let%bind genesis_block_id =
-    query_migrated_db ~f:(fun db -> Sql.Berkeley.Block.genesis_block_id db ())
+    Sql.Berkeley.Block.genesis_block_id (module Conn) ()
   in
+  let%bind.Deferred required_account_ids =
+    Deferred.map (Mina_ledger.Ledger.accounts ledger) ~f:Set.to_list
+  in
+  (*
   let%bind account_ids =
     let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
     List.map ~f:(fun account_id ->
@@ -263,7 +268,157 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
         (account_id, index) )
     @@ Mina_base.Account_id.Set.to_list account_id_set
   in
-  [%log info] "Found %d accounts in genesis ledger" (List.length account_ids) ;
+  *)
+  [%log info] "Found %d accounts in genesis ledger"
+    (List.length required_account_ids) ;
+
+  let module Accounts_accessed_primary_id = struct
+    module T = struct
+      type t = { block_id : int; account_identifier_id : int }
+      [@@deriving compare, fields, hlist, sexp]
+    end
+
+    include T
+    include Comparable.Make (T)
+
+    let typ =
+      Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+        Caqti_type.[ int; int ]
+
+    let of_accounts_accessed (a : Accounts_accessed.t) =
+      { block_id = a.block_id; account_identifier_id = a.account_identifier_id }
+  end in
+  (* TODO: dumb -- put this somewhere else *)
+  let public_key_typ : Signature_lib.Public_key.Compressed.t Caqti_type.t =
+    let encode h = Ok (Signature_lib.Public_key.Compressed.to_base58_check h) in
+    let decode s =
+      Result.map_error ~f:Error.to_string_hum
+        (Signature_lib.Public_key.Compressed.of_base58_check s)
+    in
+    Caqti_type.custom ~encode ~decode Caqti_type.string
+  in
+
+  assert (
+    List.for_all required_account_ids ~f:(fun id ->
+        Mina_base.Token_id.equal
+          (Mina_base.Account_id.token_id id)
+          Mina_base.Token_id.default ) ) ;
+  let%bind default_token_id =
+    Token.find (module Conn) Mina_base.Token_id.default
+  in
+  let required_public_keys =
+    Staged.unstage
+      (List.stable_dedup_staged
+         ~compare:Signature_lib.Public_key.Compressed.compare )
+      (List.map required_account_ids ~f:Mina_base.Account_id.public_key)
+  in
+
+  let%bind public_key_ids =
+    differential_insert
+      (module Signature_lib.Public_key.Compressed)
+      required_public_keys ~get_key:Fn.id ~get_value:Fn.id
+      ~load_index:
+        (load_index
+           (module Signature_lib.Public_key.Compressed)
+           public_key_typ
+           (module Conn)
+           ~table:"public_keys" ~fields:[ "value" (* TODO *) ] )
+      ~insert_values:
+        (bulk_insert public_key_typ
+           (module Conn)
+           ~table:"public_keys" ~fields:[ "value" (* TODO *) ] )
+  in
+  let%bind account_ids =
+    let account_ids =
+      List.map required_account_ids ~f:(fun id ->
+          let repr : Account_identifiers.t =
+            { public_key_id =
+                Map.find_exn public_key_ids (Mina_base.Account_id.public_key id)
+            ; token_id = default_token_id
+            }
+          in
+          (id, repr) )
+    in
+    let%map account_repr_ids =
+      differential_insert
+        (module Account_identifiers)
+        account_ids ~get_key:snd ~get_value:snd
+        ~load_index:
+          (load_index
+             (module Account_identifiers)
+             Account_identifiers.typ
+             (module Conn)
+             ~table:Account_identifiers.table_name
+             ~fields:Account_identifiers.Fields.names )
+        ~insert_values:
+          (bulk_insert Account_identifiers.typ
+             (module Conn)
+             ~table:Account_identifiers.table_name
+             ~fields:Account_identifiers.Fields.names )
+    in
+    Mina_base.Account_id.Map.of_alist_exn
+    @@ List.map account_ids ~f:(fun (id, id_repr) ->
+           (id, Map.find_exn account_repr_ids id_repr) )
+  in
+
+  let accounts_accessed =
+    List.map required_account_ids ~f:(fun account_id ->
+        let ledger_index =
+          Mina_ledger.Ledger.index_of_account_exn ledger account_id
+        in
+        let account = Mina_ledger.Ledger.get_at_index_exn ledger ledger_index in
+        let account_identifier_id = Map.find_exn account_ids account_id in
+        let balance = Currency.Balance.to_string account.balance in
+        let nonce =
+          Int64.of_int (Mina_numbers.Account_nonce.to_int account.nonce)
+        in
+        let receipt_chain_hash =
+          Mina_base.Receipt.Chain_hash.to_base58_check
+            account.receipt_chain_hash
+        in
+        let delegate_id =
+          Option.map ~f:(Map.find_exn public_key_ids) account.delegate
+        in
+        let voting_for_id = failwith "TODO" in
+        let timing_id = failwith "TODO" in
+        let permissions_id = failwith "TODO" in
+        assert (Option.is_none account.zkapp) ;
+        { Accounts_accessed.ledger_index
+        ; block_id = genesis_block_id
+        ; account_identifier_id
+        ; token_symbol_id = default_token_id
+        ; balance
+        ; nonce
+        ; receipt_chain_hash
+        ; delegate_id
+        ; voting_for_id
+        ; timing_id
+        ; permissions_id
+        ; zkapp_id = None
+        } )
+  in
+
+  let%map _ =
+    differential_insert
+      (module Accounts_accessed_primary_id)
+      accounts_accessed
+      ~get_key:Accounts_accessed_primary_id.of_accounts_accessed
+      ~get_value:Fn.id
+      ~load_index:
+        (load_index
+           (module Accounts_accessed_primary_id)
+           Accounts_accessed_primary_id.typ
+           (module Conn)
+           ~table:Accounts_accessed.table_name
+           ~fields:Accounts_accessed_primary_id.Fields.names )
+      ~insert_values:
+        (bulk_insert Accounts_accessed.typ
+           (module Conn)
+           ~table:Accounts_accessed.table_name
+           ~fields:Accounts_accessed.Fields.names )
+  in
+
+  (*
   let%bind account_ids_to_migrate_unsorted =
     match%map
       query_migrated_db ~f:(fun db ->
@@ -321,6 +476,7 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
                         ] ;
                     failwith "Could not add add genesis account" ) )
   in
+  *)
   [%log info] "Done populating original genesis ledger balances!"
 
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
@@ -525,7 +681,8 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
         else Deferred.unit
       in
       let%bind () =
-        migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool
+        query_migrated_db
+          ~f:(migrate_genesis_balances ~logger ~precomputed_values)
       in
       Deferred.unit
 

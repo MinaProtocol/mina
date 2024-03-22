@@ -38,6 +38,231 @@ let txn_hash_to_base58_check ?(v1_transaction_hash = false) hash =
   if v1_transaction_hash then Transaction_hash.to_base58_check_v1 hash
   else Transaction_hash.to_base58_check hash
 
+
+(* we don't need to specify all types here, just the ones that sql may infer incorrectly *)
+let field_name : type a. a Caqti_type.Field.t -> string option =
+  let open Caqti_type in
+  function
+  | Bool ->
+      Some "BOOL"
+  | Int ->
+      Some "INT"
+  | Int16 ->
+      Some "SMALLINT"
+  | Int32 ->
+      Some "INT"
+  | Int64 ->
+      Some "BIGINT"
+  | Float ->
+      Some "FLOAT"
+  | _ ->
+      None
+
+let rec type_field_names : type a. a Caqti_type.t -> string option list =
+  function
+  | Unit ->
+      []
+  | Field f ->
+      [ field_name f ]
+  | Option t ->
+      type_field_names t
+  | Tup2 (at, bt) ->
+      List.concat [ type_field_names at; type_field_names bt ]
+  | Tup3 (at, bt, ct) ->
+      List.concat
+        [ type_field_names at; type_field_names bt; type_field_names ct ]
+  | Tup4 (at, bt, ct, dt) ->
+      List.concat
+        [ type_field_names at
+        ; type_field_names bt
+        ; type_field_names ct
+        ; type_field_names dt
+        ]
+  | Custom custom ->
+      type_field_names custom.rep
+
+
+let rec render_field : type a. (module CONNECTION) -> a Caqti_type.Field.t -> a -> string =
+ fun (module Conn : CONNECTION) typ value ->
+  let open Caqti_type in
+  match typ with
+  | Bool ->
+      Bool.to_string value
+  | Int ->
+      Int.to_string value
+  | Int16 ->
+      Int.to_string value
+  | Int32 ->
+      Int32.to_string value
+  | Int64 ->
+      Int64.to_string value
+  | Float ->
+      Float.to_string value
+  | String ->
+      "'" ^ value ^ "'"
+  | Octets ->
+      failwith "todo: support caqti octets"
+  | Pdate ->
+      failwith "todo: support caqti date"
+  | Ptime ->
+      failwith "todo: support caqti ptime"
+  | Ptime_span ->
+      failwith "todo: support caqti ptime_span"
+  | Enum _ ->
+      failwith "todo: support caqti enums"
+  | _ -> (
+      match Caqti_type.Field.coding Conn.driver_info typ with
+      | None ->
+          failwithf "unable to render caqti field: %s"
+            (Caqti_type.Field.to_string typ)
+            ()
+      | Some (Coding coding) ->
+          render_field (module Conn) coding.rep
+            (Result.ok_or_failwith @@ coding.encode value) )
+
+let rec render_type : type a. (module CONNECTION) -> a Caqti_type.t -> a -> string list =
+ fun db typ value ->
+  match typ with
+  | Unit ->
+      []
+  | Field f ->
+      [ render_field db f value ]
+  | Option t -> (
+      match value with
+      | None ->
+          List.init (Caqti_type.length typ) ~f:(Fn.const "NULL")
+      | Some x ->
+          render_type db t x )
+  | Tup2 (at, bt) ->
+      let a, b = value in
+      List.concat [ render_type db at a; render_type db bt b ]
+  | Tup3 (at, bt, ct) ->
+      let a, b, c = value in
+      List.concat [ render_type db at a; render_type db bt b; render_type db ct c ]
+  | Tup4 (at, bt, ct, dt) ->
+      let a, b, c, d = value in
+      List.concat
+        [ render_type db at a
+        ; render_type db bt b
+        ; render_type db ct c
+        ; render_type db dt d
+        ]
+  | Custom custom ->
+      render_type db custom.rep (Result.ok_or_failwith @@ custom.encode value)
+
+let render_row (type a) (db : (module CONNECTION)) (typ : a Caqti_type.t) (value : a) : string =
+  "(" ^ String.concat ~sep:"," (render_type db typ value) ^ ")"
+
+let load_index (type a cmp) (comparator : (a, cmp) Map.comparator)
+    (typ : a Caqti_type.t) (module Conn : CONNECTION) (values : a list) ~table ~(fields : string list)
+    : ((a, int, cmp) Map.t, 'err) Deferred.Result.t =
+  let open Deferred.Result.Let_syntax in
+  assert (Caqti_type.length typ = List.length fields) ;
+  if List.is_empty values then return (Map.empty comparator)
+  else
+    let fields_sql = String.concat ~sep:"," fields in
+    let query =
+      if List.length fields > 1 then
+        let src_fields_sql =
+          String.concat ~sep:","
+          @@ List.map fields ~f:(fun field -> sprintf "src.%s" field)
+        in
+        let join_on_sql =
+          (* we use distinction instead of equality here, as NULL != NULL, but NULL IS NOT DISTINCT FROM NULL *)
+          List.zip_exn fields (type_field_names typ)
+          |> List.map ~f:(fun (field, type_name_opt) ->
+                 match type_name_opt with
+                 | None ->
+                     sprintf "src.%s IS NOT DISTINCT FROM data.%s" field
+                       field
+                 | Some type_name ->
+                     sprintf
+                       "src.%s IS NOT DISTINCT FROM CAST(data.%s AS %s)"
+                       field field type_name )
+          |> String.concat ~sep:" AND "
+        in
+        let values_sql =
+          String.concat ~sep:"," @@ List.map values ~f:(render_row (module Conn) typ)
+        in
+        sprintf
+          "SELECT %s, src.id FROM %s AS src JOIN (VALUES %s) as data (%s) \
+           ON %s"
+          src_fields_sql table values_sql fields_sql join_on_sql
+      else
+        let values_sql =
+          "("
+          ^ String.concat ~sep:"," (List.bind values ~f:(render_type (module Conn) typ))
+          ^ ")"
+        in
+        sprintf "SELECT %s, id FROM %s WHERE %s IN %s" fields_sql table
+          fields_sql values_sql
+    in
+    let%map entries =
+      Conn.collect_list
+        (Caqti_request.collect Caqti_type.unit
+           Caqti_type.(tup2 typ int)
+           query )
+        ()
+    in
+    Map.of_alist_exn comparator entries
+
+let bulk_insert (type value) (typ : value Caqti_type.t)
+    (module Conn : CONNECTION)
+    (values : value list) ~(fields : string list) ~(table : string) :
+    (int list, 'err) Deferred.Result.t =
+  let open Deferred.Result.Let_syntax in
+  assert (Caqti_type.length typ = List.length fields) ;
+  if List.is_empty values then return []
+  else (
+    let fields_sql = String.concat ~sep:"," fields in
+    let values_sql =
+      String.concat ~sep:"," @@ List.map ~f:(render_row (module Conn) typ) values
+    in
+    Conn.collect_list
+      (Caqti_request.collect Caqti_type.unit Caqti_type.int
+         (sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table
+            fields_sql values_sql ) )
+      () )
+
+let partition_existing (type a key key_cmp) (entries : a list)
+    ~(get_key : a -> key)
+    ~(load_index :
+       key list -> ((key, int, key_cmp) Map.t, 'err) Deferred.Result.t ) :
+    ( [ `Existing of (key, int, key_cmp) Map.t ] * [ `Missing of a list ]
+    , 'err )
+    Deferred.Result.t =
+  let open Deferred.Result.Let_syntax in
+  let%map ids = load_index (List.map entries ~f:get_key) in
+  let missing =
+    List.filter entries ~f:(fun value -> not (Map.mem ids (get_key value)))
+  in
+  (`Existing ids, `Missing missing)
+
+(* TODO: undo the unused key vs value abstraction *)
+let differential_insert (type a value key key_cmp)
+    (key_comparator : (key, key_cmp) Map.comparator) (entries : a list)
+    ~(get_key : a -> key) ~(get_value : a -> value)
+    ~(load_index :
+       key list -> ((key, int, key_cmp) Map.t, 'err) Deferred.Result.t )
+    ~(insert_values : value list -> (int list, 'err) Deferred.Result.t) :
+    ((key, int, key_cmp) Map.t, 'err) Deferred.Result.t =
+  let open Deferred.Result.Let_syntax in
+  let%bind `Existing existing_entries, `Missing missing_entries =
+    partition_existing entries ~get_key ~load_index
+  in
+  let missing_values = List.map missing_entries ~f:get_value in
+  let%map created_ids = insert_values missing_values in
+  let new_entries =
+    Map.of_alist_exn key_comparator
+      (List.zip_exn (List.map ~f:get_key missing_entries) created_ids)
+  in
+  Map.merge existing_entries new_entries ~f:(fun ~key:_ conflict ->
+      match conflict with
+      | `Both _ ->
+          failwith "duplicate data loaded during differential insertion"
+      | `Left x | `Right x ->
+          Some x )
+
 module Public_key = struct
   let find (module Conn : CONNECTION) (t : Public_key.Compressed.t) =
     let public_key = Public_key.Compressed.to_base58_check t in
@@ -3397,230 +3622,6 @@ module Block = struct
       }
     in
 
-    (* we don't need to specify all types here, just the ones that sql may infer incorrectly *)
-    let field_name : type a. a Caqti_type.Field.t -> string option =
-      let open Caqti_type in
-      function
-      | Bool ->
-          Some "BOOL"
-      | Int ->
-          Some "INT"
-      | Int16 ->
-          Some "SMALLINT"
-      | Int32 ->
-          Some "INT"
-      | Int64 ->
-          Some "BIGINT"
-      | Float ->
-          Some "FLOAT"
-      | _ ->
-          None
-    in
-
-    let rec type_field_names : type a. a Caqti_type.t -> string option list =
-      function
-      | Unit ->
-          []
-      | Field f ->
-          [ field_name f ]
-      | Option t ->
-          type_field_names t
-      | Tup2 (at, bt) ->
-          List.concat [ type_field_names at; type_field_names bt ]
-      | Tup3 (at, bt, ct) ->
-          List.concat
-            [ type_field_names at; type_field_names bt; type_field_names ct ]
-      | Tup4 (at, bt, ct, dt) ->
-          List.concat
-            [ type_field_names at
-            ; type_field_names bt
-            ; type_field_names ct
-            ; type_field_names dt
-            ]
-      | Custom custom ->
-          type_field_names custom.rep
-    in
-
-    let rec render_field : type a. a Caqti_type.Field.t -> a -> string =
-     fun typ value ->
-      let open Caqti_type in
-      match typ with
-      | Bool ->
-          Bool.to_string value
-      | Int ->
-          Int.to_string value
-      | Int16 ->
-          Int.to_string value
-      | Int32 ->
-          Int32.to_string value
-      | Int64 ->
-          Int64.to_string value
-      | Float ->
-          Float.to_string value
-      | String ->
-          "'" ^ value ^ "'"
-      | Octets ->
-          failwith "todo: support caqti octets"
-      | Pdate ->
-          failwith "todo: support caqti date"
-      | Ptime ->
-          failwith "todo: support caqti ptime"
-      | Ptime_span ->
-          failwith "todo: support caqti ptime_span"
-      | Enum _ ->
-          failwith "todo: support caqti enums"
-      | _ -> (
-          match Caqti_type.Field.coding Conn.driver_info typ with
-          | None ->
-              failwithf "unable to render caqti field: %s"
-                (Caqti_type.Field.to_string typ)
-                ()
-          | Some (Coding coding) ->
-              render_field coding.rep
-                (Result.ok_or_failwith @@ coding.encode value) )
-    in
-    let rec render_type : type a. a Caqti_type.t -> a -> string list =
-     fun typ value ->
-      match typ with
-      | Unit ->
-          []
-      | Field f ->
-          [ render_field f value ]
-      | Option t -> (
-          match value with
-          | None ->
-              List.init (Caqti_type.length typ) ~f:(Fn.const "NULL")
-          | Some x ->
-              render_type t x )
-      | Tup2 (at, bt) ->
-          let a, b = value in
-          List.concat [ render_type at a; render_type bt b ]
-      | Tup3 (at, bt, ct) ->
-          let a, b, c = value in
-          List.concat [ render_type at a; render_type bt b; render_type ct c ]
-      | Tup4 (at, bt, ct, dt) ->
-          let a, b, c, d = value in
-          List.concat
-            [ render_type at a
-            ; render_type bt b
-            ; render_type ct c
-            ; render_type dt d
-            ]
-      | Custom custom ->
-          render_type custom.rep (Result.ok_or_failwith @@ custom.encode value)
-    in
-    let render_row (type a) (typ : a Caqti_type.t) (value : a) : string =
-      "(" ^ String.concat ~sep:"," (render_type typ value) ^ ")"
-    in
-
-    let load_index (type a cmp) (comparator : (a, cmp) Map.comparator)
-        (typ : a Caqti_type.t) (values : a list) ~table ~(fields : string list)
-        : ((a, int, cmp) Map.t, 'err) Deferred.Result.t =
-      assert (Caqti_type.length typ = List.length fields) ;
-      if List.is_empty values then return (Map.empty comparator)
-      else
-        let fields_sql = String.concat ~sep:"," fields in
-        let query =
-          if List.length fields > 1 then
-            let src_fields_sql =
-              String.concat ~sep:","
-              @@ List.map fields ~f:(fun field -> sprintf "src.%s" field)
-            in
-            let join_on_sql =
-              (* we use distinction instead of equality here, as NULL != NULL, but NULL IS NOT DISTINCT FROM NULL *)
-              List.zip_exn fields (type_field_names typ)
-              |> List.map ~f:(fun (field, type_name_opt) ->
-                     match type_name_opt with
-                     | None ->
-                         sprintf "src.%s IS NOT DISTINCT FROM data.%s" field
-                           field
-                     | Some type_name ->
-                         sprintf
-                           "src.%s IS NOT DISTINCT FROM CAST(data.%s AS %s)"
-                           field field type_name )
-              |> String.concat ~sep:" AND "
-            in
-            let values_sql =
-              String.concat ~sep:"," @@ List.map values ~f:(render_row typ)
-            in
-            sprintf
-              "SELECT %s, src.id FROM %s AS src JOIN (VALUES %s) as data (%s) \
-               ON %s"
-              src_fields_sql table values_sql fields_sql join_on_sql
-          else
-            let values_sql =
-              "("
-              ^ String.concat ~sep:"," (List.bind values ~f:(render_type typ))
-              ^ ")"
-            in
-            sprintf "SELECT %s, id FROM %s WHERE %s IN %s" fields_sql table
-              fields_sql values_sql
-        in
-        let%map entries =
-          Conn.collect_list
-            (Caqti_request.collect Caqti_type.unit
-               Caqti_type.(tup2 typ int)
-               query )
-            ()
-        in
-        Map.of_alist_exn comparator entries
-    in
-
-    let bulk_insert (type value) (typ : value Caqti_type.t)
-        (values : value list) ~(fields : string list) ~(table : string) :
-        (int list, 'err) Deferred.Result.t =
-      if List.is_empty values then return []
-      else (
-        assert (Caqti_type.length typ = List.length fields) ;
-        let fields_sql = String.concat ~sep:"," fields in
-        let values_sql =
-          String.concat ~sep:"," @@ List.map ~f:(render_row typ) values
-        in
-        Conn.collect_list
-          (Caqti_request.collect Caqti_type.unit Caqti_type.int
-             (sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table
-                fields_sql values_sql ) )
-          () )
-    in
-
-    let partition_existing (type a key key_cmp) (entries : a list)
-        ~(get_key : a -> key)
-        ~(load_index :
-           key list -> ((key, int, key_cmp) Map.t, 'err) Deferred.Result.t ) :
-        ( [ `Existing of (key, int, key_cmp) Map.t ] * [ `Missing of a list ]
-        , 'err )
-        Deferred.Result.t =
-      let%map ids = load_index (List.map entries ~f:get_key) in
-      let missing =
-        List.filter entries ~f:(fun value -> not (Map.mem ids (get_key value)))
-      in
-      (`Existing ids, `Missing missing)
-    in
-    (* TODO: undo the unused key vs value abstraction *)
-    let differential_insert (type a value key key_cmp)
-        (key_comparator : (key, key_cmp) Map.comparator) (entries : a list)
-        ~(get_key : a -> key) ~(get_value : a -> value)
-        ~(load_index :
-           key list -> ((key, int, key_cmp) Map.t, 'err) Deferred.Result.t )
-        ~(insert_values : value list -> (int list, 'err) Deferred.Result.t) :
-        ((key, int, key_cmp) Map.t, 'err) Deferred.Result.t =
-      let%bind `Existing existing_entries, `Missing missing_entries =
-        partition_existing entries ~get_key ~load_index
-      in
-      let missing_values = List.map missing_entries ~f:get_value in
-      let%map created_ids = insert_values missing_values in
-      let new_entries =
-        Map.of_alist_exn key_comparator
-          (List.zip_exn (List.map ~f:get_key missing_entries) created_ids)
-      in
-      Map.merge existing_entries new_entries ~f:(fun ~key:_ conflict ->
-          match conflict with
-          | `Both _ ->
-              failwith "duplicate data loaded during differential insertion"
-          | `Left x | `Right x ->
-              Some x )
-    in
-
     let state_hash_typ : State_hash.t Caqti_type.t =
       let encode h = Ok (State_hash.to_base58_check h) in
       let decode s =
@@ -3663,7 +3664,7 @@ module Block = struct
         ~load_index:
           (load_index
              (module State_hash)
-             state_hash_typ ~table:table_name ~fields:[ "state_hash" ] )
+             state_hash_typ (module Conn) ~table:table_name ~fields:[ "state_hash" ] )
         blocks
     in
     ( match Set.find external_block_hashes ~f:(Map.mem existing_block_ids) with
@@ -3679,6 +3680,7 @@ module Block = struct
       load_index
         (module State_hash)
         state_hash_typ
+        (module Conn)
         (Set.to_list external_block_hashes)
         ~table:table_name ~fields:[ "state_hash" ]
     in
@@ -3756,9 +3758,9 @@ module Block = struct
         ~load_index:
           (load_index
              (module Signature_lib.Public_key.Compressed)
-             public_key_typ ~table:"public_keys" ~fields:[ "value" (* TODO *) ] )
+             public_key_typ (module Conn) ~table:"public_keys" ~fields:[ "value" (* TODO *) ] )
         ~insert_values:
-          (bulk_insert public_key_typ ~table:"public_keys"
+          (bulk_insert public_key_typ (module Conn) ~table:"public_keys"
              ~fields:[ "value" (* TODO *) ] )
     in
     let%bind ledger_hash_ids =
@@ -3768,10 +3770,10 @@ module Block = struct
         ~load_index:
           (load_index
              (module Ledger_hash)
-             ledger_hash_typ ~table:"snarked_ledger_hashes"
+             ledger_hash_typ (module Conn) ~table:"snarked_ledger_hashes"
              ~fields:[ "value" (* TODO *) ] )
         ~insert_values:
-          (bulk_insert ledger_hash_typ ~table:"snarked_ledger_hashes"
+          (bulk_insert ledger_hash_typ (module Conn) ~table:"snarked_ledger_hashes"
              ~fields:[ "value" (* TODO *) ] )
     in
     let%bind epoch_ids =
@@ -3788,10 +3790,10 @@ module Block = struct
         ~load_index:
           (load_index
              (module Epoch_data)
-             Epoch_data.typ ~table:Epoch_data.table_name
+             Epoch_data.typ (module Conn) ~table:Epoch_data.table_name
              ~fields:Epoch_data.Fields.names )
         ~insert_values:
-          (bulk_insert Epoch_data.typ ~table:Epoch_data.table_name
+          (bulk_insert Epoch_data.typ (module Conn) ~table:Epoch_data.table_name
              ~fields:Epoch_data.Fields.names )
     in
     let%bind token_ids =
@@ -3806,9 +3808,9 @@ module Block = struct
           ~load_index:
             (load_index
                (module Token)
-               Token.typ ~table:Token.table_name ~fields:Token.Fields.names )
+               Token.typ (module Conn) ~table:Token.table_name ~fields:Token.Fields.names )
           ~insert_values:
-            (bulk_insert Token.typ ~table:Token.table_name
+            (bulk_insert Token.typ (module Conn) ~table:Token.table_name
                ~fields:Token.Fields.names )
       in
       Token_id.Map.of_alist_exn
@@ -3893,7 +3895,7 @@ module Block = struct
             } )
       in
       let%map ids =
-        bulk_insert typ partial_missing_blocks ~table:table_name
+        bulk_insert typ (module Conn) partial_missing_blocks ~table:table_name
           ~fields:Fields.names
       in
       State_hash.Map.of_alist_exn
@@ -3957,10 +3959,10 @@ module Block = struct
            ~load_index:
              (load_index
                 (module String)
-                Caqti_type.string ~table:User_command.Signed_command.table_name
+                Caqti_type.string (module Conn) ~table:User_command.Signed_command.table_name
                 ~fields:[ "hash" ] )
            ~insert_values:
-             (bulk_insert User_command.Signed_command.typ
+             (bulk_insert User_command.Signed_command.typ (module Conn)
                 ~table:User_command.Signed_command.table_name
                 ~fields:User_command.Signed_command.Fields.names )
     in
@@ -4031,10 +4033,10 @@ module Block = struct
            ~load_index:
              (load_index
                 (module Internal_command_primary_key)
-                Internal_command_primary_key.typ ~table:Internal_command.table_name
+                Internal_command_primary_key.typ (module Conn) ~table:Internal_command.table_name
                 ~fields:Internal_command_primary_key.Fields.names )
            ~insert_values:
-             (bulk_insert internal_command_typ
+             (bulk_insert internal_command_typ (module Conn)
                 ~table:Internal_command.table_name
                 ~fields:Internal_command.Fields.names )
     in
