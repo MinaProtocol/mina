@@ -4,7 +4,7 @@ buildGoModule {
   pname = "vend";
   version = "unstable-2020-06-04";
 
-  patches = [./remove_tidy.patch];
+  patches = [ ./remove_tidy.patch ];
 
   # A permanent fork from master is maintained to avoid non deterministic go tidy
   src = fetchFromGitHub {
@@ -14,7 +14,7 @@ buildGoModule {
     sha256 = "112p9dz9by2h2m3jha2bv1bvzn2a86bpg1wphgmf9gksjpwy835l";
   };
 
-  vendorSha256 = null;
+  vendorHash = null;
 
   meta = with lib; {
     homepage = "https://github.com/c00w/vend";

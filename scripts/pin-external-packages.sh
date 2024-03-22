@@ -10,3 +10,5 @@ for pkg in $PACKAGES; do
     echo "Pinning package" $pkg
     opam pin -y add src/external/$pkg
 done
+
+opam pin add -y https://github.com/tweag/check_opam_switch.git#d0aa49884e0f9fd4bbb2cd1a32b798a12
