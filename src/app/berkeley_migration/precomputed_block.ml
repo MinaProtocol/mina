@@ -8,17 +8,18 @@ open Async
 *)
 
 module Id = struct
-  (* TODO: is there any good reason for this to be an int64? *)
-  (* TODO: consider just making this `Length.t * State_hash.t` *)
   module T = struct
-    type t = int64 * string [@@deriving compare, sexp]
+    type t = Mina_numbers.Length.t * Mina_base.State_hash.t
+    [@@deriving compare, sexp]
   end
 
   include T
   include Comparable.Make (T)
 
   let filename ~network (height, state_hash) =
-    sprintf "%s-%Ld-%s.json" network height state_hash
+    sprintf "%s-%s-%s.json" network
+      (Mina_numbers.Length.to_string height)
+      (Mina_base.State_hash.to_base58_check state_hash)
 end
 
 (* We define a subset of the mainnet precomputed block type here for the fields we need, to avoid the need to port some of the tricky old types *)
@@ -171,18 +172,29 @@ let of_yojson json =
 let block_filename_regexp ~network =
   Str.regexp (sprintf "%s-[0-9]+-.+\\.json" network)
 
+let parse_filename filename =
+  let open Option.Let_syntax in
+  let rest, ext = Filename.split_extension filename in
+  let%bind () = match ext with Some "json" -> Some () | _ -> None in
+  let%bind rest, state_hash_str = String.rsplit2 rest ~on:'-' in
+  let%bind network, height_str = String.rsplit2 rest ~on:'-' in
+  let%bind height =
+    Option.try_with (fun () ->
+        Mina_numbers.Length.of_int @@ Int.of_string height_str )
+  in
+  let%map state_hash =
+    Or_error.ok (Mina_base.State_hash.of_base58_check state_hash_str)
+  in
+  (network, height, state_hash)
+
 let list_directory ~network =
-  let regexp = Str.regexp {|^\([^-]+\)-\([^-]+\)-\(3N[^-]+\)\.json$|} in
   let%map filenames = Sys.readdir "." in
   Array.to_list filenames
   |> List.filter_map ~f:(fun filename ->
-         if Str.string_match regexp filename 0 then
-           let filename_network = Str.matched_group 1 filename in
-           if String.equal filename_network network then
-             let height = Str.matched_group 2 filename in
-             let state_hash = Str.matched_group 3 filename in
-             Some (Int64.of_int @@ Int.of_string height, state_hash)
-           else None
+         let%bind.Option filename_network, height, state_hash =
+           parse_filename filename
+         in
+         if String.equal filename_network network then Some (height, state_hash)
          else None )
   |> Id.Set.of_list
 
@@ -191,14 +203,6 @@ let concrete_fetch_batch ~logger ~bucket ~network targets =
   [%log info] "Found %d individiaully downloaded precomputed blocks"
     (Set.length existing_targets) ;
   let missing_targets = Set.diff (Id.Set.of_list targets) existing_targets in
-  (*
-  [%log info] "Determining precomputed block requirements" ;
-  let%bind missing_targets =
-    let%map existing = list_directory ~network in
-    [%log info] "Found %d precomputed blocks" (Set.length existing) ;
-    Set.diff (Id.Set.of_list targets) existing
-  in
-  *)
   let num_missing_targets = Set.length missing_targets in
   [%log info] "Will download %d precomputed blocks (this may take a while)"
     num_missing_targets ;
@@ -206,68 +210,81 @@ let concrete_fetch_batch ~logger ~bucket ~network targets =
     List.map (Set.to_list missing_targets) ~f:(fun target ->
         sprintf "gs://%s/%s" bucket (Id.filename ~network target) )
   in
-  if List.is_empty block_uris_to_download then
-    return Mina_base.State_hash.Map.empty
-  else
-    let gsutil_input = String.concat ~sep:"\n" block_uris_to_download in
-    let gsutil_process =
-      Process.run ~prog:"gsutil" ~args:[ "-m"; "cp"; "-I"; "." ]
-        ~stdin:gsutil_input ()
-    in
-    don't_wait_for
-      (let rec progress_loop () =
-         let%bind existing = list_directory ~network in
-         let downloaded_targets =
-           Set.length (Set.inter missing_targets existing)
+  let%bind () =
+    if List.is_empty block_uris_to_download then Deferred.unit
+    else
+      let gsutil_input = String.concat ~sep:"\n" block_uris_to_download in
+      let gsutil_process =
+        Process.run ~prog:"gsutil" ~args:[ "-m"; "cp"; "-I"; "." ]
+          ~stdin:gsutil_input ()
+      in
+      don't_wait_for
+        (let rec progress_loop () =
+           let%bind existing = list_directory ~network in
+           let downloaded_targets =
+             Set.length (Set.inter missing_targets existing)
+           in
+           [%log info] "%d/%d files downloaded (%%%f)" downloaded_targets
+             num_missing_targets
+             Float.(
+               100.0 * of_int downloaded_targets / of_int num_missing_targets) ;
+           let%bind () = after (Time.Span.of_sec 10.0) in
+           if Deferred.is_determined gsutil_process then Deferred.unit
+           else progress_loop ()
          in
-         [%log info] "%d/%d files downloaded (%%%f)" downloaded_targets
-           num_missing_targets
-           Float.(
-             100.0 * of_int downloaded_targets / of_int num_missing_targets) ;
-         let%bind () = after (Time.Span.of_sec 10.0) in
-         if Deferred.is_determined gsutil_process then Deferred.unit
-         else progress_loop ()
-       in
-       progress_loop () ) ;
-    match%bind gsutil_process with
-    | Ok _ ->
-        [%log info] "Finished downloading precomputed blocks" ;
-        (* limit number of open files to avoid exceeding ulimits *)
-        let file_throttle =
-          Throttle.create ~continue_on_error:false ~max_concurrent_jobs:100
-        in
-        Deferred.List.map targets ~how:`Parallel ~f:(fun target ->
-            let _, state_hash = target in
-            let%map contents =
-              Throttle.enqueue file_throttle (fun () ->
-                  Reader.file_contents (Id.filename ~network target) )
-            in
-            let block = of_yojson (Yojson.Safe.from_string contents) in
-            (Mina_base.State_hash.of_base58_check_exn state_hash, block) )
-        >>| Mina_base.State_hash.Map.of_alist_exn
-    | Error err ->
-        failwithf "Could not download batch of precomputed blocks: %s"
-          (Error.to_string_hum err) ()
+         progress_loop () ) ;
+      match%map gsutil_process with
+      | Ok _ ->
+          [%log info] "Finished downloading precomputed blocks"
+      | Error err ->
+          failwithf "Could not download batch of precomputed blocks: %s"
+            (Error.to_string_hum err) ()
+  in
+  (* limit number of open files to avoid exceeding ulimits *)
+  let file_throttle =
+    Throttle.create ~continue_on_error:false ~max_concurrent_jobs:100
+  in
+  Deferred.List.map targets ~how:`Parallel ~f:(fun target ->
+      let _, state_hash = target in
+      let%map contents =
+        Throttle.enqueue file_throttle (fun () ->
+            Reader.file_contents (Id.filename ~network target) )
+      in
+      let block = of_yojson (Yojson.Safe.from_string contents) in
+      (state_hash, block) )
+  >>| Mina_base.State_hash.Map.of_alist_exn
 
-let delete_fetched ~logger ~network : unit Deferred.t =
-  let%bind max_args =
-    match%map Process.run ~prog:"getconf" ~args:[ "ARG_MAX" ] () with
-    | Ok max_args_str ->
-        let max_args = Int.of_string max_args_str in
-        [%log info] "Determined max number of arguments to be %d" max_args ;
-        max_args
-    | Error _ ->
-        let default_max_args = 10_000 in
-        [%log info]
-          "Failed to determine max number of arguments; using default of %d"
-          default_max_args ;
-        default_max_args
+let delete_fetched ~network : unit Deferred.t =
+  (* not perfect, but this is a reasonably portable default *)
+  let max_args_size = (*16kb*) 16 * 1024 in
+  (* break a list up into chunks using a fold operation *)
+  let chunk_using list ~init ~f =
+    let emit chunks_acc curr_acc =
+      if List.is_empty curr_acc then chunks_acc
+      else List.rev curr_acc :: chunks_acc
+    in
+    let rec loop list f_acc chunks_acc curr_acc =
+      match list with
+      | h :: t -> (
+          match f f_acc h with
+          | `Accumulate f_acc' ->
+              loop t f_acc' chunks_acc (h :: curr_acc)
+          | `Emit f_acc' ->
+              loop t f_acc' (emit chunks_acc curr_acc) [] )
+      | [] ->
+          emit chunks_acc curr_acc
+    in
+    List.rev (loop list init [] [])
   in
   let%bind block_ids = list_directory ~network in
   Set.to_list block_ids
   |> List.map ~f:(Id.filename ~network)
-  |> List.chunks_of ~length:(max_args - 1)
-  |> Deferred.List.iter ~how:`Parallel ~f:(fun files ->
+  |> chunk_using ~init:0 ~f:(fun accumulated_size block_id ->
+         let arg_size = String.length block_id in
+         let size_with_new_arg = accumulated_size + String.length block_id in
+         if size_with_new_arg > max_args_size then `Emit arg_size
+         else `Accumulate size_with_new_arg )
+  |> Deferred.List.iter ~f:(fun files ->
          match%map Process.run ~prog:"rm" ~args:files () with
          | Ok _ ->
              ()

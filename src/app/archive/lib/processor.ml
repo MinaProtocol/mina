@@ -3347,8 +3347,8 @@ module Block = struct
       { seed = Epoch_seed.to_base58_check e.seed
       ; ledger_hash_id = find_ledger_hash_id e.ledger.hash
       ; total_currency = Currency.Amount.to_string e.ledger.total_currency
-      ; start_checkpoint = Ledger_hash.to_base58_check e.start_checkpoint
-      ; lock_checkpoint = Ledger_hash.to_base58_check e.lock_checkpoint
+      ; start_checkpoint = State_hash.to_base58_check e.start_checkpoint
+      ; lock_checkpoint = State_hash.to_base58_check e.lock_checkpoint
       ; epoch_length =
           Unsigned_extended.UInt32.to_int64
           @@ Mina_numbers.Length.to_uint32 e.epoch_length
@@ -3413,6 +3413,8 @@ module Block = struct
           Some "BIGINT"
       | Float ->
           Some "FLOAT"
+      | Enum name ->
+          Some name
       | _ ->
           None
     in
@@ -3462,16 +3464,9 @@ module Block = struct
       | Ptime_span ->
           failwith "todo: support caqti ptime_span"
       | Enum _ ->
-          failwith "todo: support caqti enums"
-     (* | _ -> (
-         match Caqti_type.Field.coding Conn.driver_info typ with
-         | None ->
-             failwithf "unable to render caqti field: %s"
-               (Caqti_type.Field.to_string typ)
-               ()
-         | Some (Coding coding) ->
-             render_field coding.rep
-               (Result.ok_or_failwith @@ coding.encode value) ) *)
+          (* we are ignoring the enum annotation in this context because it's not always valid to apply *)
+          (* NOTE: we assume enum values do not contain special characters (eg "'") *)
+          "'" ^ value ^ "'"
     in
     let rec render_type : type a. a Caqti_type.t -> a -> string list =
      fun typ value ->
@@ -3803,59 +3798,6 @@ module Block = struct
              (token, Map.find_exn token_repr_ids token_repr) )
     in
 
-    (*
-    let%bind account_ids =
-      let accounts = List.map all_missing_accounts ~f:(fun id -> (id, account_id_to_repr ~find_public_key:(Map.find_exn public_key_ids) ~find_token:(Map.find_exn token_ids) id)) in
-      let%map account_repr_ids =
-        differential_insert (module Account_identifiers)
-            accounts
-          ~get_key:snd
-          ~get_value:snd
-          ~load_index:(load_index (module Account_identifiers) Account_identifiers.typ ~table:Account_identifiers.table_name ~fields:Account_identifiers.Fields.names)
-          ~insert_values:(bulk_insert Account_identifiers.typ ~table:Account_identifiers.table_name ~fields:Account_identifiers.Fields.names)
-      in
-      Account_id.Map.of_alist_exn @@ List.map accounts ~f:(fun (account, account_repr) ->
-        (account, Map.find_exn account_repr_ids account_repr))
-    in
-    *)
-
-    (*
-    let%bind protocol_version_id =
-      let transaction =
-        Protocol_version.transaction block.protocol_version
-      in
-      let network = Protocol_version.network block.protocol_version in
-      let patch = Protocol_version.patch block.protocol_version in
-      Protocol_versions.add_if_doesn't_exist
-        (module Conn)
-        ~transaction ~network ~patch
-    in
-    let%bind proposed_protocol_version_id =
-      Option.value_map block.proposed_protocol_version
-        ~default:(return None) ~f:(fun ppv ->
-          let transaction = Protocol_version.transaction ppv in
-          let network = Protocol_version.network ppv in
-          let patch = Protocol_version.patch ppv in
-          let%map id =
-            Protocol_versions.add_if_doesn't_exist
-              (module Conn)
-              ~transaction ~network ~patch
-          in
-          Some id )
-    in
-    *)
-    (* TODO: caching would help here quite a bit *)
-    (*
-    let protocol_version_ids =
-      differential_insert (module Protocol_versions)
-        all_protocol_versions
-        ~get_key:Fn.id
-        ~get_value:Fn.id
-        ~load_index:(load_index (module Protocol_versions) Protocol_versions.typ ~table:Protocol_versions.table_name ~fields:Protocol_versions.Fields.names)
-        ~insert_values:(bulk_insert Protocol_versions.typ ~table:Protocol_versions.table_name ~fields:Protocol_versions.Fields.names)
-    in
-    *)
-
     (* We only expect a single protocol version at any migration, so we use the old non-batched functions here (which already cache ids) *)
     let all_protocol_versions =
       Staged.unstage
@@ -4027,9 +3969,33 @@ module Block = struct
         ~columns:Block_and_signed_command.Fields.names
     in
 
+    let module Internal_command_primary_key = struct
+      module T = struct
+        type t = { hash : string; command_type : string }
+        [@@deriving compare, fields, hlist, sexp]
+      end
+
+      include T
+      include Comparable.Make (T)
+
+      let typ =
+        let command_type =
+          let encode = Fn.id in
+          let decode = Result.return in
+          Caqti_type.enum ~encode ~decode "internal_command_type"
+        in
+        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+          Caqti_type.[ string; command_type ]
+
+      let of_command : Internal_command.t -> t =
+       fun { hash; command_type; _ } -> { hash; command_type }
+    end in
     let%bind internal_cmd_ids =
-      let compare_by_hash (a : Internal_command.t) (b : Internal_command.t) =
-        String.compare a.hash b.hash
+      let compare_by_primary_key (a : Internal_command.t)
+          (b : Internal_command.t) =
+        Internal_command_primary_key.compare
+          (Internal_command_primary_key.of_command a)
+          (Internal_command_primary_key.of_command b)
       in
       List.bind missing_blocks ~f:(fun block ->
           List.map
@@ -4037,16 +4003,17 @@ module Block = struct
               (internal_cmd_to_repr
                  ~find_public_key_id:(Map.find_exn public_key_ids) )
             block.internal_cmds )
-      |> Staged.unstage (List.stable_dedup_staged ~compare:compare_by_hash)
+      |> Staged.unstage
+           (List.stable_dedup_staged ~compare:compare_by_primary_key)
       |> differential_insert
-           (module String)
-           ~get_key:(fun { hash; _ } -> hash)
-           ~get_value:Fn.id
+           (module Internal_command_primary_key)
+           ~get_key:Internal_command_primary_key.of_command ~get_value:Fn.id
            ~load_index:
              (load_index
-                (module String)
-                Caqti_type.string ~table:Internal_command.table_name
-                ~fields:[ "hash" ] )
+                (module Internal_command_primary_key)
+                Internal_command_primary_key.typ
+                ~table:Internal_command.table_name
+                ~fields:Internal_command_primary_key.Fields.names )
            ~insert_values:
              (bulk_insert Internal_command.typ
                 ~table:Internal_command.table_name
@@ -4062,14 +4029,17 @@ module Block = struct
                    ; secondary_sequence_no
                    ; status
                    ; failure_reason
-                   ; _
+                   ; command_type
                    }
                  ->
                 { Block_and_internal_command.block_id =
                     Map.find_exn block_ids block.state_hash
                 ; internal_command_id =
                     Map.find_exn internal_cmd_ids
-                      (txn_hash_to_base58_check ~v1_transaction_hash hash)
+                      { hash =
+                          txn_hash_to_base58_check ~v1_transaction_hash hash
+                      ; command_type
+                      }
                 ; sequence_no
                 ; secondary_sequence_no
                 ; status

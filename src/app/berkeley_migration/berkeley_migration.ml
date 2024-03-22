@@ -1,5 +1,3 @@
-(* TODO: cleanup partial writes to blocks table introduced by bulk approach *)
-
 (* berkeley_migration.ml -- migrate archive db from original Mina mainnet to berkeley schema *)
 
 open Core_kernel
@@ -49,7 +47,7 @@ let mainnet_protocol_version =
      hard fork, the replayer won't check ledger hashes for blocks with
      an earlier protocol version.
   *)
-  Protocol_version.create ~transaction:1 ~network:0 ~patch:0
+  Protocol_version.create ~transaction:2 ~network:0 ~patch:0
 
 let compare_user_cmd_seq (a : Archive_lib.Extensional.User_command.t)
     (b : Archive_lib.Extensional.User_command.t) : int =
@@ -244,8 +242,89 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
          ; tokens_used = []
          } ) )
 
+let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
+  let open Deferred.Let_syntax in
+  let query_migrated_db ~f = Mina_caqti.query ~f migrated_pool in
+  [%log info] "Populating original genesis ledger balances" ;
+  (* inlined from Archive_lib.Processor.add_genesis_accounts to avoid
+     recomputing values from runtime config *)
+  [%log info] "Creating genesis ledger" ;
+  let ledger =
+    Lazy.force @@ Precomputed_values.genesis_ledger precomputed_values
+  in
+  [%log info] "Created genesis ledger" ;
+  let%bind genesis_block_id =
+    query_migrated_db ~f:(fun db -> Sql.Berkeley.Block.genesis_block_id db ())
+  in
+  let%bind account_ids =
+    let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
+    List.map ~f:(fun account_id ->
+        let index = Mina_ledger.Ledger.index_of_account_exn ledger account_id in
+        (account_id, index) )
+    @@ Mina_base.Account_id.Set.to_list account_id_set
+  in
+  [%log info] "Found %d accounts in genesis ledger" (List.length account_ids) ;
+  let%bind account_ids_to_migrate_unsorted =
+    match%map
+      query_migrated_db ~f:(fun db ->
+          Sql.Berkeley.Accounts_accessed.greatest_ledger_index db
+            genesis_block_id )
+    with
+    | None ->
+        account_ids
+    | Some greatest_migrated_ledger_index ->
+        [%log info]
+          "Already migrated accounts through ledger index %d, resuming \
+           migration"
+          greatest_migrated_ledger_index ;
+        List.filter
+          ~f:(fun (_id, index) -> index > greatest_migrated_ledger_index)
+          account_ids
+  in
+  let account_ids_to_migrate =
+    List.sort account_ids_to_migrate_unsorted
+      ~compare:(fun (_id_1, index_1) (_id_2, index_2) ->
+        compare index_1 index_2 )
+  in
+  [%log info] "Migrating %d accounts" (List.length account_ids_to_migrate) ;
+  let%map () =
+    Deferred.List.iter account_ids_to_migrate ~f:(fun (acct_id, index) ->
+        match Mina_ledger.Ledger.location_of_account ledger acct_id with
+        | None ->
+            [%log error] "Could not get location for account"
+              ~metadata:
+                [ ("account_id", Mina_base.Account_id.to_yojson acct_id) ] ;
+            failwith "Could not get location for genesis account"
+        | Some loc ->
+            let acct =
+              match Mina_ledger.Ledger.get ledger loc with
+              | None ->
+                  [%log error] "Could not get account, given a location"
+                    ~metadata:
+                      [ ("account_id", Mina_base.Account_id.to_yojson acct_id) ] ;
+                  failwith "Could not get genesis account, given a location"
+              | Some acct ->
+                  acct
+            in
+            query_migrated_db ~f:(fun db ->
+                match%map
+                  Archive_lib.Processor.Accounts_accessed.add_if_doesn't_exist
+                    ~logger db genesis_block_id (index, acct)
+                with
+                | Ok _ ->
+                    Ok ()
+                | Error err ->
+                    [%log error] "Could not add genesis account"
+                      ~metadata:
+                        [ ("account_id", Mina_base.Account_id.to_yojson acct_id)
+                        ; ("error", `String (Caqti_error.show err))
+                        ] ;
+                    failwith "Could not add add genesis account" ) )
+  in
+  [%log info] "Done populating original genesis ledger balances!"
+
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
-    ~fork_state_hash:_ ~mina_network_blocks_bucket ~batch_size ~network
+    ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
     ~keep_precomputed_blocks () =
   let logger = Logger.create () in
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
@@ -297,17 +376,68 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
           , _validation ) =
         Mina_block.genesis ~precomputed_values
       in
-      (* The batch insertion functionality for blocks can lead to impartial writes at the moment as
+      let%bind () =
+        match fork_state_hash with
+        | None ->
+            return ()
+        | Some state_hash ->
+            [%log info]
+              "Mark the chain leads to target state hash %s to be canonical"
+              state_hash ;
+            let%bind fork_id =
+              query_mainnet_db ~f:(fun db ->
+                  Sql.Mainnet.Block.id_from_state_hash db state_hash )
+            in
+            let%bind highest_canonical_block_id =
+              query_mainnet_db ~f:(fun db ->
+                  Sql.Mainnet.Block.get_highest_canonical_block db () )
+            in
+            let%bind subchain_blocks =
+              query_mainnet_db ~f:(fun db ->
+                  Sql.Mainnet.Block.get_subchain db
+                    ~start_block_id:highest_canonical_block_id
+                    ~end_block_id:fork_id )
+            in
+            Deferred.List.iter subchain_blocks ~f:(fun id ->
+                query_mainnet_db ~f:(fun db ->
+                    Sql.Mainnet.Block.mark_as_canonical db id ) )
+      in
+      (* The batch insertion functionality for blocks can lead to partial writes at the moment as
          it is not properly wrapped in a transaction. We handle the partial write edge case here at
          startup in order to be able to resume gracefully in the event of an unfortunate crash. *)
       let%bind () =
-        query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
-            Conn.exec
-              (Mina_caqti.exec_req Caqti_type.unit
-                 (sprintf
-                    "DELETE FROM %s WHERE parent_id IS NULL AND height > 1"
-                    Archive_lib.Processor.Block.table_name ) )
-              () )
+        let%bind garbage_block_ids =
+          query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
+              Conn.collect_list
+                (Mina_caqti.collect_req Caqti_type.unit Caqti_type.int
+                   (sprintf
+                      "DELETE FROM %s WHERE parent_id IS NULL AND height > 1 \
+                       RETURNING id"
+                      Archive_lib.Processor.Block.table_name ) )
+                () )
+        in
+        if List.is_empty garbage_block_ids then Deferred.unit
+        else
+          let garbage_block_ids_sql =
+            String.concat ~sep:","
+            @@ List.map garbage_block_ids ~f:Int.to_string
+          in
+          let%bind () =
+            query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
+                Conn.exec
+                  (Mina_caqti.exec_req Caqti_type.unit
+                     (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
+                        Archive_lib.Processor.Block_and_signed_command
+                        .table_name garbage_block_ids_sql ) )
+                  () )
+          in
+          query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
+              Conn.exec
+                (Mina_caqti.exec_req Caqti_type.unit
+                   (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
+                      Archive_lib.Processor.Block_and_internal_command
+                      .table_name garbage_block_ids_sql ) )
+                () )
       in
       [%log info] "Querying mainnet canonical blocks" ;
       let%bind mainnet_blocks_unsorted =
@@ -348,6 +478,9 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
         List.map mainnet_blocks_to_migrate ~f:(fun { height; state_hash; _ } ->
             (height, state_hash) )
         |> List.filter ~f:(fun (height, _) -> Int64.(height > 1L))
+        |> List.map ~f:(fun (height, state_hash) ->
+               ( Mina_numbers.Length.of_int (Int64.to_int_exn height)
+               , Mina_base.State_hash.of_base58_check_exn state_hash ) )
       in
       let%bind precomputed_blocks =
         Precomputed_block.concrete_fetch_batch ~logger
@@ -391,11 +524,17 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                        failwithf "Could not archive extensional block batch: %s"
                          (Caqti_error.show err) () ) )
       in
-      if not keep_precomputed_blocks then (
-        [%log info] "Deleting all precomputed blocks" ;
-        let%map () = Precomputed_block.delete_fetched ~logger ~network in
-        [%log info] "Done migrating mainnet blocks!" )
-      else Deferred.unit
+      let%bind () =
+        if not keep_precomputed_blocks then (
+          [%log info] "Deleting all precomputed blocks" ;
+          let%map () = Precomputed_block.delete_fetched ~network in
+          [%log info] "Done migrating mainnet blocks!" )
+        else Deferred.unit
+      in
+      let%bind () =
+        migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool
+      in
+      Deferred.unit
 
 let () =
   Command.(
