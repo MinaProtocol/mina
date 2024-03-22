@@ -91,16 +91,16 @@ fi
 
 latest_shash="${latest_ne[$IX_STATE_HASH]}"
 latest_height=${latest_ne[$IX_HEIGHT]}
-latest_slot=${latest_ne[$IX_SLOT]}
+latest_ne_slot=${latest_ne[$IX_SLOT]}
 
-echo "Latest non-empty block: $latest_shash, height: $latest_height, slot: $latest_slot"
-if [[ $latest_slot -ge $SLOT_TX_END ]]; then
-  echo "Assertion failed: non-empty block with slot $latest_slot created after slot tx end" >&2
+echo "Latest non-empty block: $latest_shash, height: $latest_height, slot: $latest_ne_slot"
+if [[ $latest_ne_slot -ge $SLOT_TX_END ]]; then
+  echo "Assertion failed: non-empty block with slot $latest_ne_slot created after slot tx end" >&2
   stop_nodes "$MAIN_MINA_EXE"
   exit 3
 fi
 
-expected_fork_data="{\"fork\":{\"blockchain_length\":$latest_height,\"global_slot_since_genesis\":$latest_slot,\"state_hash\":\"$latest_shash\"},\"next_seed\":\"${latest_ne[$IX_NEXT_EPOCH_SEED]}\",\"staking_seed\":\"${latest_ne[$IX_CUR_EPOCH_SEED]}\"}"
+expected_fork_data="{\"fork\":{\"blockchain_length\":$latest_height,\"global_slot_since_genesis\":$latest_ne_slot,\"state_hash\":\"$latest_shash\"},\"next_seed\":\"${latest_ne[$IX_NEXT_EPOCH_SEED]}\",\"staking_seed\":\"${latest_ne[$IX_CUR_EPOCH_SEED]}\"}"
 
 # 4. Check that no new blocks are created
 sleep 1m
@@ -148,14 +148,14 @@ function find_staking_hash(){
       ix=$((ix+1))
     done
     if [[ $ix == ${#epochs[@]} ]]; then
-      echo "Assertion failed: last snarked ledger for epoch $e_ wasn't captured"
+      echo "Assertion failed: last snarked ledger for epoch $e_ wasn't captured" >&2
       exit 3
     fi
     echo ${last_snarked_hash_pe[$ix]}
   fi
 }
 
-slot_tx_end_epoch=$((SLOT_TX_END/48))
+slot_tx_end_epoch=$((latest_ne_slot/48))
 
 expected_staking_hash=$(find_staking_hash $slot_tx_end_epoch)
 expected_next_hash=$(find_staking_hash $((slot_tx_end_epoch+1)))
