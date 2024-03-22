@@ -23,7 +23,7 @@ num-bigint = { version = "0.2.3" }
 sprs = { version = "0.7.1" }
 rand_core = { version = "0.5" }
 rayon = { version = "1" }
-ocaml = { version = "0.22.0" }
+ocaml = { version = "0.22.0", features = [ "no-caml-startup" ] }
 
 oracle = { path = "../../marlin/oracle" }
 plonk_circuits = { path = "../../marlin/circuits/plonk", features = [ "ocaml_types" ] }
