@@ -30,6 +30,13 @@ ARG WASM_PACK_VERSION=v0.10.3
 # Rocksdb commit tag/branch to clone
 ARG ROCKSDB_VERSION=v5.18.4
 
+# Copy keys into container
+COPY dockerfiles/stages/bookworm-keys/*.gpg .
+# Import the keys
+RUN bash -c "for keyfile in *.gpg; do gpg --import $keyfile; done"
+# Remove the keyfiles from the image
+RUN rm *.gpg
+
 # --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
