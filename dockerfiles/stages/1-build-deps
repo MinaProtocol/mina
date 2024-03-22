@@ -48,6 +48,7 @@ RUN apt-get update --quiet \
   liblmdb-dev \
   liblmdb0 \
   libpq-dev \
+  libprocps-dev \
   libsodium-dev \
   libssl-dev \
   build-essential \
@@ -58,14 +59,13 @@ RUN apt-get update --quiet \
   file \
   git \
   git-lfs \
-  '(^lld-10$|^lld-11$|^lld-14$)' \
+  '(^lld-10$|^lld-11$)' \
   m4 \
   pkg-config \
   rsync \
   sudo \
   unzip \
   zlib1g-dev \
-  && (apt-get install --no-install-recommends --quiet --yes libprocps-dev || true)\
   && rm -rf /var/lib/apt/lists/*
 
 # Symlink image-specific lld version to a single lld executable
