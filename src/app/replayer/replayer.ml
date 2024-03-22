@@ -638,7 +638,7 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
         [ ("max_canonical_slot", `String (Int64.to_string max_canonical_slot)) ] ;
     Deferred.unit )
 
-let mainnet_version = Mina_numbers.Txn_version.of_int 2
+let migrating_from_version = Mina_numbers.Txn_version.of_int 2
 
 let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
     ~continue_on_error ~checkpoint_interval ~checkpoint_output_folder_opt
@@ -680,7 +680,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
               (Option.value ~default:Cache_dir.autogen_path genesis_dir_opt)
             ~logger ~constraint_constants
             ?overwrite_version:
-              (if migration_mode then Some mainnet_version else None)
+              (if migration_mode then Some migrating_from_version else None)
             input.genesis_ledger
         with
         | Error e ->
@@ -1455,7 +1455,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                                            ( fst
                                                account.permissions
                                                  .set_verification_key
-                                           , mainnet_version )
+                                           , migrating_from_version )
                                        }
                                  } ) )
                     in
