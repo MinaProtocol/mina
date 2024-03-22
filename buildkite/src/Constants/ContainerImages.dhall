@@ -10,7 +10,6 @@
   minaToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:73562fcc35dcabd342f66f1d69ae12704e92d69edc0b37e7c88b4d11bc623f23",
   minaToolchainBookworm = "gcr.io/o1labs-192920/mina-toolchain@sha256:73562fcc35dcabd342f66f1d69ae12704e92d69edc0b37e7c88b4d11bc623f23",
   minaToolchain = "gcr.io/o1labs-192920/mina-toolchain@sha256:73562fcc35dcabd342f66f1d69ae12704e92d69edc0b37e7c88b4d11bc623f23",
-  delegationBackendToolchain = "gcr.io/o1labs-192920/delegation-backend-production@sha256:8ca5880845514ef56a36bf766a0f9de96e6200d61b51f80d9f684a0ec9c031f4",
   elixirToolchain = "elixir:1.10-alpine",
   nodeToolchain = "node:14.13.1-stretch-slim",
   ubuntu2004 = "ubuntu:20.04",
