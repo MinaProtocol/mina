@@ -1,4 +1,0 @@
-(* transaction >= 1, network >= 0, patch >= 0 *)
-[%%define protocol_version_transaction 1]
-[%%define protocol_version_network 0]
-[%%define protocol_version_patch 0]
