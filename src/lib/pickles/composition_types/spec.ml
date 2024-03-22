@@ -58,15 +58,15 @@ module rec T : sig
         -> ('xs1 Hlist.HlistId.t, 'xs2 Hlist.HlistId.t, 'env) t
     | Opt :
         { inner : ('a1, 'a2, (< bool1 : bool ; bool2 : 'bool ; .. > as 'env)) t
-        ; flag : Plonk_types.Opt.Flag.t
+        ; flag : Opt.Flag.t
         ; dummy1 : 'a1
         ; dummy2 : 'a2
         ; bool : (module Bool_intf with type var = 'bool)
         }
-        -> ('a1 option, ('a2, 'bool) Plonk_types.Opt.t, 'env) t
+        -> ('a1 option, ('a2, 'bool) Opt.t, 'env) t
     | Opt_unflagged :
         { inner : ('a1, 'a2, (< bool1 : bool ; bool2 : 'bool ; .. > as 'env)) t
-        ; flag : Plonk_types.Opt.Flag.t
+        ; flag : Opt.Flag.t
         ; dummy1 : 'a1
         ; dummy2 : 'a2
         }
@@ -120,13 +120,13 @@ let rec pack :
             Option.map t_constant_opt ~f:(fun t_const -> t_const.(i))
           in
           pack ~zero ~one p spec t_constant_opt t )
-  | Opt { inner; flag; dummy1; dummy2 } -> (
+  | Opt { inner; dummy1; dummy2; flag = _; bool = _ } -> (
       match t with
-      | None ->
+      | Nothing ->
           let t_constant_opt = Option.map t_constant_opt ~f:(fun _ -> dummy1) in
           Array.append [| zero |]
             (pack ~zero ~one p inner t_constant_opt dummy2)
-      | Some x ->
+      | Just x ->
           let t_constant_opt =
             Option.map ~f:(fun x -> Option.value_exn x) t_constant_opt
           in
@@ -139,7 +139,7 @@ let rec pack :
           Array.append
             (p.pack Bool b_constant_opt b)
             (pack ~zero ~one p inner x_constant_opt x) )
-  | Opt_unflagged { inner; flag; dummy1; dummy2 } -> (
+  | Opt_unflagged { inner; dummy1; dummy2; flag = _ } -> (
       match t with
       | None ->
           let t_constant_opt = Option.map t_constant_opt ~f:(fun _ -> dummy1) in
@@ -165,7 +165,7 @@ let rec typ :
     -> (var, value, f) Snarky_backendless.Typ.t =
   let open Snarky_backendless.Typ in
   fun t spec ->
-    match spec with
+    match[@warning "-45"] spec with
     | B spec ->
         t.typ spec
     | Scalar chal ->
@@ -191,11 +191,11 @@ let rec typ :
         let bool = typ t (B Bool) in
         let open B in
         (* Always use the same "maybe" layout which is a boolean and then the value *)
-        Plonk_types.Opt.constant_layout_typ bool flag ~dummy:dummy1
-          ~dummy_var:dummy2 ~true_ ~false_ (typ t inner)
+        Opt.constant_layout_typ bool flag ~dummy:dummy1 ~dummy_var:dummy2 ~true_
+          ~false_ (typ t inner)
     | Opt_unflagged { inner; flag; dummy1; dummy2 } -> (
         match flag with
-        | Plonk_types.Opt.Flag.No ->
+        | Opt.Flag.No ->
             let open Snarky_backendless.Typ in
             unit ()
             |> Snarky_backendless.Typ.transport
@@ -203,8 +203,8 @@ let rec typ :
                  ~back:(fun () -> None)
             |> Snarky_backendless.Typ.transport_var
                  ~there:(function Some _ -> assert false | None -> ())
-                 ~back:(fun x -> None)
-        | Plonk_types.Opt.Flag.(Yes | Maybe) ->
+                 ~back:(fun _ -> None)
+        | Opt.Flag.(Yes | Maybe) ->
             typ t inner
             |> Snarky_backendless.Typ.transport
                  ~there:(function Some x -> x | None -> dummy1)
@@ -226,10 +226,6 @@ let rec typ :
         |> transport ~there:(fun y -> assert_eq x y) ~back:(fun () -> x)
         |> transport_var ~there:(fun _ -> ()) ~back:(fun () -> constant_var)
 
-type 'env exists = T : ('t1, 't2, 'env) T.t -> 'env exists
-
-type generic_spec = { spec : 'env. 'env exists }
-
 module ETyp = struct
   type ('var, 'value, 'f) t =
     | T :
@@ -248,7 +244,7 @@ let rec etyp :
     (f, env) etyp -> (value, var, env) T.t -> (var, value, f) ETyp.t =
   let open Snarky_backendless.Typ in
   fun e spec ->
-    match spec with
+    match[@warning "-45"] spec with
     | B spec ->
         e.etyp spec
     | Scalar chal ->
@@ -282,24 +278,23 @@ let rec etyp :
     | Opt { inner; flag; dummy1; dummy2; bool = (module B) } ->
         let (T (bool, f_bool, f_bool')) = etyp e (B Bool) in
         let (T (a, f_a, f_a')) = etyp e inner in
-        let opt_map ~f1 ~f2 (x : _ Plonk_types.Opt.t) : _ Plonk_types.Opt.t =
+        let opt_map ~f1 ~f2 (x : _ Opt.t) : _ Opt.t =
           match x with
-          | None ->
-              None
-          | Some x ->
-              Some (f1 x)
+          | Nothing ->
+              Opt.nothing
+          | Just x ->
+              Opt.just (f1 x)
           | Maybe (b, x) ->
               Maybe (f2 b, f1 x)
         in
         let f = opt_map ~f1:f_a ~f2:f_bool in
         let f' = opt_map ~f1:f_a' ~f2:f_bool' in
         T
-          ( Plonk_types.Opt.constant_layout_typ ~dummy:dummy1
-              ~dummy_var:(f_a' dummy2) ~true_:(f_bool' B.true_)
-              ~false_:(f_bool' B.false_) bool flag a
+          ( Opt.constant_layout_typ ~dummy:dummy1 ~dummy_var:(f_a' dummy2)
+              ~true_:(f_bool' B.true_) ~false_:(f_bool' B.false_) bool flag a
           , f
           , f' )
-    | Opt_unflagged { inner; flag; dummy1; dummy2 } ->
+    | Opt_unflagged { inner; dummy1; dummy2; flag = _ } ->
         let (T (typ, f, f_inv)) = etyp e inner in
         let f x = Some (f x) in
         let f_inv = function None -> f_inv dummy2 | Some x -> f_inv x in
@@ -309,7 +304,7 @@ let rec etyp :
                ~there:(Option.value ~default:dummy1) ~back:(fun x -> Some x)
         in
         T (typ, f, f_inv)
-    | Constant (x, assert_eq, spec) ->
+    | Constant (x, _assert_eq, spec) ->
         let (T (Typ typ, f, f')) = etyp e spec in
         let constant_var =
           let fields, aux = typ.value_to_fields x in

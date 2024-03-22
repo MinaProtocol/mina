@@ -1,17 +1,16 @@
 module SC = Scalar_challenge
-open Core_kernel
-open Async_kernel
 open Pickles_types
 open Common
 open Import
-open Backend
-open Tuple_lib
 
 module Instance = struct
+  type chunking_data = { num_chunks : int; domain_size : int; zk_rows : int }
+
   type t =
     | T :
         (module Nat.Intf with type n = 'n)
         * (module Intf.Statement_value with type t = 'a)
+        * chunking_data option
         * Verification_key.t
         * 'a
         * ('n, 'n) Proof.t
@@ -19,7 +18,6 @@ module Instance = struct
 end
 
 let verify_heterogenous (ts : Instance.t list) =
-  let module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk in
   let module Tick_field = Backend.Tick.Field in
   let logger = Internal_tracing_context_logger.get () in
   [%log internal] "Verify_heterogenous"
@@ -40,12 +38,13 @@ let verify_heterogenous (ts : Instance.t list) =
     ((fun (lab, b) -> if not b then r := lab :: !r), result)
   in
   [%log internal] "Compute_plonks_and_chals" ;
-  let computed_bp_chals, deferred_values =
+  let _computed_bp_chals, deferred_values =
     List.map ts
       ~f:(fun
            (T
              ( _max_proofs_verified
              , _statement
+             , chunking_data
              , key
              , _app_state
              , T
@@ -55,25 +54,34 @@ let verify_heterogenous (ts : Instance.t list) =
                          { old_bulletproof_challenges; _ }
                      }
                  ; prev_evals = evals
+                 ; proof = _
                  } ) )
          ->
         Timer.start __LOC__ ;
-        let non_chunking =
+        let non_chunking, expected_num_chunks =
+          let expected_num_chunks =
+            Option.value_map ~default:1 chunking_data ~f:(fun x ->
+                x.Instance.num_chunks )
+          in
           let exception Is_chunked in
           match
             Pickles_types.Plonk_types.Evals.map evals.evals.evals
               ~f:(fun (x, y) ->
-                if Array.length x > 1 || Array.length y > 1 then
-                  raise Is_chunked )
+                if
+                  Array.length x > expected_num_chunks
+                  || Array.length y > expected_num_chunks
+                then raise Is_chunked )
           with
           | exception Is_chunked ->
-              false
+              (false, expected_num_chunks)
           | _unit_evals ->
               (* we do not care about _unit_evals, if we reached this point, we
                  know all evals have length 1 for they cannot have length 0 *)
-              true
+              (true, expected_num_chunks)
         in
-        check (lazy "only uses single chunks", non_chunking) ;
+        check
+          ( lazy (sprintf "only uses %i chunks" expected_num_chunks)
+          , non_chunking ) ;
         check
           ( lazy "feature flags are consistent with evaluations"
           , Pickles_types.Plonk_types.Evals.validate_feature_flags
@@ -84,15 +92,22 @@ let verify_heterogenous (ts : Instance.t list) =
         let step_domain =
           Branch_data.domain proof_state.deferred_values.branch_data
         in
+        let expected_domain_size =
+          match chunking_data with
+          | None ->
+              Nat.to_int Backend.Tick.Rounds.n
+          | Some { domain_size; _ } ->
+              domain_size
+        in
         check
           ( lazy "domain size is small enough"
-          , Domain.log2_size step_domain <= Nat.to_int Backend.Tick.Rounds.n ) ;
+          , Domain.log2_size step_domain <= expected_domain_size ) ;
         let sc =
           SC.to_field_constant tick_field ~endo:Endo.Wrap_inner_curve.scalar
         in
         Timer.clock __LOC__ ;
         let { Deferred_values.Minimal.plonk = _
-            ; branch_data
+            ; branch_data = _
             ; bulletproof_challenges
             } =
           Deferred_values.Minimal.map_challenges
@@ -101,7 +116,11 @@ let verify_heterogenous (ts : Instance.t list) =
         in
         Timer.clock __LOC__ ;
         let deferred_values =
-          Wrap_deferred_values.expand_deferred ~evals
+          let zk_rows =
+            Option.value_map ~default:3 chunking_data ~f:(fun x ->
+                x.Instance.zk_rows )
+          in
+          Wrap_deferred_values.expand_deferred ~evals ~zk_rows
             ~old_bulletproof_challenges ~proof_state
         in
         Timer.clock __LOC__ ;
@@ -134,7 +153,7 @@ let verify_heterogenous (ts : Instance.t list) =
   [%log internal] "Accumulator_check" ;
   let%bind accumulator_check =
     Ipa.Step.accumulator_check
-      (List.map ts ~f:(fun (T (_, _, _, _, T t)) ->
+      (List.map ts ~f:(fun (T (_, _, _, _, _, T t)) ->
            ( t.statement.proof_state.messages_for_next_wrap_proof
                .challenge_polynomial_commitment
            , Ipa.Step.compute_challenges
@@ -151,6 +170,7 @@ let verify_heterogenous (ts : Instance.t list) =
            (T
              ( (module Max_proofs_verified)
              , (module A_value)
+             , _chunking_data
              , key
              , app_state
              , T t ) )
@@ -161,7 +181,10 @@ let verify_heterogenous (ts : Instance.t list) =
               Common.hash_messages_for_next_step_proof
                 ~app_state:A_value.to_field_elements
                 (Reduced_messages_for_next_proof_over_same_field.Step.prepare
-                   ~dlog_plonk_index:key.commitments
+                   ~dlog_plonk_index:
+                     (Plonk_verification_key_evals.map
+                        ~f:(fun x -> [| x |])
+                        key.commitments )
                    { t.statement.messages_for_next_step_proof with app_state } )
           ; proof_state =
               { deferred_values =
@@ -186,7 +209,8 @@ let verify_heterogenous (ts : Instance.t list) =
           }
         in
         let input =
-          tock_unpadded_public_input_of_statement prepared_statement
+          tock_unpadded_public_input_of_statement
+            ~feature_flags:Plonk_types.Features.Full.maybe prepared_statement
         in
         let message =
           Wrap_hack.pad_accumulator
@@ -203,7 +227,12 @@ let verify_heterogenous (ts : Instance.t list) =
                t.statement.proof_state.messages_for_next_wrap_proof
                  .old_bulletproof_challenges )
         in
-        (key.index, Wrap_wire_proof.to_kimchi_proof t.proof, input, Some message) )
+        ( key.index
+        , { proof = Wrap_wire_proof.to_kimchi_proof t.proof
+          ; public_evals = None
+          }
+        , input
+        , Some message ) )
   in
   [%log internal] "Compute_batch_verify_inputs_done" ;
   [%log internal] "Dlog_check_batch_verify" ;
@@ -212,10 +241,11 @@ let verify_heterogenous (ts : Instance.t list) =
   Common.time "dlog_check" (fun () -> check (lazy "dlog_check", dlog_check)) ;
   result ()
 
-let verify (type a return_typ n)
+let verify (type a n) ?chunking_data
     (max_proofs_verified : (module Nat.Intf with type n = n))
     (a_value : (module Intf.Statement_value with type t = a))
     (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
   verify_heterogenous
     (List.map ts ~f:(fun (x, p) ->
-         Instance.T (max_proofs_verified, a_value, key, x, p) ) )
+         Instance.T (max_proofs_verified, a_value, chunking_data, key, x, p) )
+    )
