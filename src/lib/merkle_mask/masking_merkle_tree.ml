@@ -16,16 +16,20 @@ module Make (Inputs : Inputs_intf.S) = struct
       issues with bin_io to do so *)
   module Parent = struct
     type t = (Base.t, string (* Location where null was set *)) Result.t
-    [@@deriving sexp]
+    [@@deriving sexp] [@@coverage off]
   end
 
   module Detached_parent_signal = struct
+    [@@@coverage off]
+
     type t = unit Async.Ivar.t
 
     let sexp_of_t (_ : t) = Sexp.List []
 
     let t_of_sexp (_ : Sexp.t) : t = Async.Ivar.create ()
   end
+
+  [@@@coverage off]
 
   type maps_t =
     { accounts : Account.t Location_binable.Map.t
@@ -34,6 +38,8 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; locations : Location.t Account_id.Map.t
     }
   [@@deriving sexp]
+
+  [@@@coverage on]
 
   (** Merges second maps object into the first one,
       potentially overwriting some keys *)
@@ -44,6 +50,8 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; hashes = Map.merge_skewed ~combine base.hashes hashes
     ; locations = Map.merge_skewed ~combine base.locations locations
     }
+
+  [@@@coverage off]
 
   (** Structure managing cache accumulated since the "base" ledger.
 
@@ -63,7 +71,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     Garbage-collection/rotation mechanism for [next] and [current] is based on idea to set
     [current] to [next] and [next] to [t.maps] when the mask at which accumulation of [next] started
-    became detached. *)
+    became detached. **)
   type accumulated_t =
     { mutable current : maps_t
           (** Currently used cache: contains a superset of contents of masks from base ledger to the current mask *)
@@ -93,6 +101,8 @@ module Make (Inputs : Inputs_intf.S) = struct
   [@@deriving sexp]
 
   type unattached = t [@@deriving sexp]
+
+  [@@@coverage on]
 
   let empty_maps () =
     { accounts = Location_binable.Map.empty
@@ -193,13 +203,13 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let get_uuid t = assert_is_attached t ; t.uuid
 
-    let get_directory t =
+    let[@coverage off] get_directory t =
       assert_is_attached t ;
       Base.get_directory (Result.ok_or_failwith t.parent)
 
     let depth t = assert_is_attached t ; t.depth
 
-    let update_maps ~f t =
+    let[@coverage off] update_maps ~f t =
       t.maps <- f t.maps ;
       Option.iter t.accumulated ~f:(fun acc ->
           acc.current <- f acc.current ;
@@ -945,7 +955,7 @@ module Make (Inputs : Inputs_intf.S) = struct
        way (3): load parent accounts into an in-memory list, merge with mask
          accounts, then fold; this becomes intractable if the parent has a large
          number of entries *)
-    let fold_until _t ~init:_ ~f:_ ~finish:_ =
+    let[@coverage off] fold_until _t ~init:_ ~f:_ ~finish:_ =
       failwith "fold_until: not implemented"
 
     module For_testing = struct
