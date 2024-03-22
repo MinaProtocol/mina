@@ -280,7 +280,7 @@ let
       berkeley-migration-pkg = self.mina-dev.overrideAttrs (s: {
         pname = "mina-berkeley-migration";
         version = "mainnet";
-        DUNE_PROFILE = "berkeley_archive_migration";
+        DUNE_PROFILE = "devnet";
         # For compatibility with Docker build
         MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
         buildPhase = ''
