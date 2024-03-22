@@ -844,11 +844,85 @@ module Zkapp_permissions = struct
     [@@deriving fields, hlist, compare, sexp, hash]
   end
 
+  module With_id = struct
+    type t =
+      { id : int
+      ; edit_state : Permissions.Auth_required.t
+      ; send : Permissions.Auth_required.t
+      ; receive : Permissions.Auth_required.t
+      ; access : Permissions.Auth_required.t
+      ; set_delegate : Permissions.Auth_required.t
+      ; set_permissions : Permissions.Auth_required.t
+      ; set_verification_key_auth : Permissions.Auth_required.t
+      ; set_verification_key_txn_version : int
+      ; set_zkapp_uri : Permissions.Auth_required.t
+      ; edit_action_state : Permissions.Auth_required.t
+      ; set_token_symbol : Permissions.Auth_required.t
+      ; increment_nonce : Permissions.Auth_required.t
+      ; set_voting_for : Permissions.Auth_required.t
+      ; set_timing : Permissions.Auth_required.t
+      }
+    [@@deriving fields, hlist, compare, sexp, hash]
+
+    let forget_id
+        { id = _
+        ; edit_state
+        ; send
+        ; receive
+        ; access
+        ; set_delegate
+        ; set_permissions
+        ; set_verification_key_auth
+        ; set_verification_key_txn_version
+        ; set_zkapp_uri
+        ; edit_action_state
+        ; set_token_symbol
+        ; increment_nonce
+        ; set_voting_for
+        ; set_timing
+        } =
+      { T.edit_state
+      ; send
+      ; receive
+      ; access
+      ; set_delegate
+      ; set_permissions
+      ; set_verification_key_auth
+      ; set_verification_key_txn_version
+      ; set_zkapp_uri
+      ; edit_action_state
+      ; set_token_symbol
+      ; increment_nonce
+      ; set_voting_for
+      ; set_timing
+      }
+  end
+
   include T
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       [ auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; Caqti_type.int
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ; auth_required_typ
+      ]
+
+  let typ_with_id : With_id.t Caqti_type.t =
+    let open With_id in
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      [ Caqti_type.int
+      ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
       ; auth_required_typ
@@ -879,13 +953,12 @@ module Zkapp_permissions = struct
   let load_copy =
     load_copy'
       ~default:(fun () -> Hashtbl.create (module T))
-      ~local_copies
-      ~typ:Caqti_type.(tup2 int typ)
+      ~local_copies ~typ:typ_with_id
       ~query:
-        (sprintf {sql| SELECT id, (%s) FROM zkapp_permissions |sql}
-           (String.concat ~sep:"," Fields.names) )
-      ~load_elt:(fun t_to_id (id, t) ->
-        Hashtbl.add_exn t_to_id ~key:t ~data:id ;
+        (sprintf {sql| SELECT %s FROM zkapp_permissions |sql}
+           (String.concat ~sep:"," With_id.Fields.names) )
+      ~load_elt:(fun t_to_id t ->
+        Hashtbl.add_exn t_to_id ~key:(With_id.forget_id t) ~data:t.id ;
         Deferred.unit )
 
   let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
@@ -1416,11 +1489,46 @@ module Timing_info = struct
     [@@deriving hlist, fields, compare, sexp, hash]
   end
 
+  module With_id = struct
+    type t =
+      { id : int
+      ; account_identifier_id : int
+      ; initial_minimum_balance : string
+      ; cliff_time : int64
+      ; cliff_amount : string
+      ; vesting_period : int64
+      ; vesting_increment : string
+      }
+    [@@deriving hlist, fields, compare, sexp, hash]
+
+    let forget_id
+        { id = _
+        ; account_identifier_id
+        ; initial_minimum_balance
+        ; cliff_time
+        ; cliff_amount
+        ; vesting_period
+        ; vesting_increment
+        } =
+      { T.account_identifier_id
+      ; initial_minimum_balance
+      ; cliff_time
+      ; cliff_amount
+      ; vesting_period
+      ; vesting_increment
+      }
+  end
+
   include T
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.[ int; string; int64; string; int64; string ]
+
+  let typ_with_id =
+    let open With_id in
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ int; int; string; int64; string; int64; string ]
 
   let table_name = "timing_info"
 
@@ -1443,13 +1551,12 @@ module Timing_info = struct
   let load_copy =
     load_copy'
       ~default:(fun () -> Hashtbl.create (module T))
-      ~local_copies
-      ~typ:Caqti_type.(tup2 int typ)
+      ~local_copies ~typ:typ_with_id
       ~query:
-        (sprintf {sql| SELECT id, (%s) FROM timing_info |sql}
-           (String.concat ~sep:"," Fields.names) )
-      ~load_elt:(fun t_to_id (id, t) ->
-        Hashtbl.add_exn t_to_id ~key:t ~data:id ;
+        (sprintf {sql| SELECT %s FROM timing_info |sql}
+           (String.concat ~sep:"," With_id.Fields.names) )
+      ~load_elt:(fun t_to_id t ->
+        Hashtbl.add_exn t_to_id ~key:(With_id.forget_id t) ~data:t.id ;
         Deferred.unit )
 
   let find (module Conn : Mina_caqti.CONNECTION) (acc : Account.t) =
@@ -1517,15 +1624,19 @@ module Timing_info = struct
     | Some id ->
         return id
     | None ->
-        Conn.find
-          (Caqti_request.find typ Caqti_type.int
-             {sql| INSERT INTO timing_info
+        let%map new_id =
+          Conn.find
+            (Caqti_request.find typ Caqti_type.int
+               {sql| INSERT INTO timing_info
                     (account_identifier_id,initial_minimum_balance,
                      cliff_time, cliff_amount, vesting_period, vesting_increment)
                    VALUES (?, ?, ?, ?, ?, ?)
                    RETURNING id
              |sql} )
-          values
+            values
+        in
+        Hashtbl.add_exn t_to_id ~key:values ~data:new_id ;
+        new_id
 end
 
 module Snarked_ledger_hash = struct
