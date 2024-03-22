@@ -6,7 +6,7 @@ let query_connection_count =
               WHERE state = 'active'
         |sql}
 
-let run_connection_count (module Conn : Caqti_async.CONNECTION) =
+let run_connection_count (module Conn : Mina_caqti.CONNECTION) =
   Conn.find query_connection_count
 
 let query_lock_count =
@@ -15,5 +15,5 @@ let query_lock_count =
               WHERE mode = 'SIReadLock'
         |sql}
 
-let run_lock_count (module Conn : Caqti_async.CONNECTION) =
+let run_lock_count (module Conn : Mina_caqti.CONNECTION) =
   Conn.find query_lock_count

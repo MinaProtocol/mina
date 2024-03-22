@@ -34,7 +34,7 @@ module Block_info = struct
 
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) state_hash =
+  let run (module Conn : Mina_caqti.CONNECTION) state_hash =
     Conn.collect_list query state_hash
 end
 
@@ -144,7 +144,7 @@ module User_command = struct
 
        |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) user_cmd_id =
+  let run (module Conn : Mina_caqti.CONNECTION) user_cmd_id =
     Conn.collect_list query user_cmd_id
 
   let query_payments_by_source_and_receiver =
@@ -176,7 +176,7 @@ module User_command = struct
 
        |sql}
 
-  let run_payments_by_source_and_receiver (module Conn : Caqti_async.CONNECTION)
+  let run_payments_by_source_and_receiver (module Conn : Mina_caqti.CONNECTION)
       ~source_id ~receiver_id =
     Conn.collect_list query_payments_by_source_and_receiver
       (source_id, receiver_id)
@@ -207,7 +207,7 @@ module User_command = struct
 
        |sql}
 
-  let run_payments_by_receiver (module Conn : Caqti_async.CONNECTION)
+  let run_payments_by_receiver (module Conn : Mina_caqti.CONNECTION)
       ~receiver_id =
     Conn.collect_list query_payments_by_receiver receiver_id
 end
@@ -219,7 +219,7 @@ module Public_key = struct
             WHERE id = ?
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) pk_id =
+  let run (module Conn : Mina_caqti.CONNECTION) pk_id =
     Conn.find_opt query pk_id
 
   let query_for_id =
@@ -228,7 +228,7 @@ module Public_key = struct
             WHERE value = ?
       |sql}
 
-  let run_for_id (module Conn : Caqti_async.CONNECTION) pk =
+  let run_for_id (module Conn : Mina_caqti.CONNECTION) pk =
     Conn.find_opt query_for_id pk
 end
 
@@ -238,7 +238,7 @@ module Block = struct
       {sql| SELECT MAX(global_slot) FROM blocks
       |sql}
 
-  let get_max_slot (module Conn : Caqti_async.CONNECTION) () =
+  let get_max_slot (module Conn : Mina_caqti.CONNECTION) () =
     Conn.find max_slot_query ()
 
   let state_hashes_by_slot_query =
@@ -246,7 +246,7 @@ module Block = struct
       {sql| SELECT state_hash FROM blocks WHERE global_slot = $1
       |sql}
 
-  let get_state_hashes_by_slot (module Conn : Caqti_async.CONNECTION) slot =
+  let get_state_hashes_by_slot (module Conn : Mina_caqti.CONNECTION) slot =
     Conn.collect_list state_hashes_by_slot_query slot
 
   let creator_slot_bounds_query =
@@ -259,7 +259,7 @@ module Block = struct
       |sql}
 
   let get_block_ids_for_creator_in_slot_bounds
-      (module Conn : Caqti_async.CONNECTION) ~creator ~low_slot ~high_slot =
+      (module Conn : Mina_caqti.CONNECTION) ~creator ~low_slot ~high_slot =
     Conn.collect_list creator_slot_bounds_query (creator, low_slot, high_slot)
 end
 
@@ -290,6 +290,6 @@ module Coinbase_receivers_for_block_creator = struct
               AND ic.receiver_id <> b.creator_id
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_creator_id =
+  let run (module Conn : Mina_caqti.CONNECTION) ~block_creator_id =
     Conn.collect_list query block_creator_id
 end

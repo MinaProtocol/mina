@@ -4,7 +4,7 @@ open Core_kernel
 open Async
 
 let query_db pool ~f ~item =
-  match%bind Caqti_async.Pool.use f pool with
+  match%bind Mina_caqti.Pool.use f pool with
   | Ok v ->
       return v
   | Error msg ->
@@ -14,7 +14,7 @@ let query_db pool ~f ~item =
 let main ~archive_uri () =
   let logger = Logger.create () in
   let archive_uri = Uri.of_string archive_uri in
-  match Caqti_async.connect_pool ~max_size:128 archive_uri with
+  match Mina_caqti.connect_pool ~max_size:128 archive_uri with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]

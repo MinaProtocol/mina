@@ -34,7 +34,7 @@ module Block_info = struct
 
            SELECT id,global_slot_since_genesis,state_hash,ledger_hash, snarked_ledger_hash_id FROM chain c                                                                                                                                                                      WHERE c.global_slot_since_genesis >= $2                                                                                                                                                                                                 |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~state_hash ~start_slot =
+  let run (module Conn : Mina_caqti.CONNECTION) ~state_hash ~start_slot =
     Conn.collect_list query (state_hash, start_slot)
 end
 
@@ -76,7 +76,7 @@ module Block = struct
             WHERE id = ?
       |sql}
 
-  let get_state_hash (module Conn : Caqti_async.CONNECTION) id =
+  let get_state_hash (module Conn : Mina_caqti.CONNECTION) id =
     Conn.find state_hash_query id
 
   let parent_id_query =
@@ -85,7 +85,7 @@ module Block = struct
             WHERE id = ?
       |sql}
 
-  let get_parent_id (module Conn : Caqti_async.CONNECTION) id =
+  let get_parent_id (module Conn : Mina_caqti.CONNECTION) id =
     Conn.find parent_id_query id
 
   let unparented_query =
@@ -94,21 +94,21 @@ module Block = struct
             WHERE parent_id IS NULL
       |sql}
 
-  let get_unparented (module Conn : Caqti_async.CONNECTION) () =
+  let get_unparented (module Conn : Mina_caqti.CONNECTION) () =
     Conn.collect_list unparented_query ()
 
   let get_height_query =
     Caqti_request.find Caqti_type.int Caqti_type.int64
       {sql| SELECT height FROM blocks WHERE id = $1 |sql}
 
-  let get_height (module Conn : Caqti_async.CONNECTION) ~block_id =
+  let get_height (module Conn : Mina_caqti.CONNECTION) ~block_id =
     Conn.find get_height_query block_id
 
   let max_slot_query =
     Caqti_request.find Caqti_type.unit Caqti_type.int64
       {sql| SELECT MAX(global_slot_since_genesis) FROM blocks |sql}
 
-  let get_max_slot (module Conn : Caqti_async.CONNECTION) () =
+  let get_max_slot (module Conn : Mina_caqti.CONNECTION) () =
     Conn.find max_slot_query ()
 
   let max_canonical_slot_query =
@@ -117,7 +117,7 @@ module Block = struct
             WHERE chain_status = 'canonical'
       |sql}
 
-  let get_max_canonical_slot (module Conn : Caqti_async.CONNECTION) () =
+  let get_max_canonical_slot (module Conn : Mina_caqti.CONNECTION) () =
     Conn.find max_canonical_slot_query ()
 
   let next_slot_query =
@@ -129,14 +129,14 @@ module Block = struct
             LIMIT 1
       |sql}
 
-  let get_next_slot (module Conn : Caqti_async.CONNECTION) slot =
+  let get_next_slot (module Conn : Mina_caqti.CONNECTION) slot =
     Conn.find_opt next_slot_query slot
 
   let state_hashes_by_slot_query =
     Caqti_request.collect Caqti_type.int64 Caqti_type.string
       {sql| SELECT state_hash FROM blocks WHERE global_slot_since_genesis = $1 |sql}
 
-  let get_state_hashes_by_slot (module Conn : Caqti_async.CONNECTION) slot =
+  let get_state_hashes_by_slot (module Conn : Mina_caqti.CONNECTION) slot =
     Conn.collect_list state_hashes_by_slot_query slot
 
   (* find all blocks, working back from block with given state hash *)
@@ -159,7 +159,7 @@ module Block = struct
 
       |sql}
 
-  let get_chain (module Conn : Caqti_async.CONNECTION) state_hash =
+  let get_chain (module Conn : Mina_caqti.CONNECTION) state_hash =
     Conn.collect_list chain_query state_hash
 
   (* either the bonafide genesis block, or the most recent "linking" block
@@ -186,7 +186,7 @@ module Block = struct
          |sql}
          genesis_winner )
 
-  let genesis_snarked_ledger (module Conn : Caqti_async.CONNECTION) start_slot =
+  let genesis_snarked_ledger (module Conn : Mina_caqti.CONNECTION) start_slot =
     Conn.find genesis_snarked_ledger_query start_slot
 end
 
@@ -197,7 +197,7 @@ module User_command_ids = struct
       Caqti_type.int
       (find_command_ids_query "user")
 
-  let run (module Conn : Caqti_async.CONNECTION) ~state_hash ~start_slot =
+  let run (module Conn : Mina_caqti.CONNECTION) ~state_hash ~start_slot =
     Conn.collect_list query (state_hash, start_slot)
 end
 
@@ -259,7 +259,7 @@ module User_command = struct
 
        |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) user_cmd_id =
+  let run (module Conn : Mina_caqti.CONNECTION) user_cmd_id =
     Conn.collect_list query user_cmd_id
 end
 
@@ -270,7 +270,7 @@ module Zkapp_command_ids = struct
       Caqti_type.int
       (find_command_ids_query "zkapp")
 
-  let run (module Conn : Caqti_async.CONNECTION) ~state_hash ~start_slot =
+  let run (module Conn : Mina_caqti.CONNECTION) ~state_hash ~start_slot =
     Conn.collect_list query (state_hash, start_slot)
 end
 
@@ -311,7 +311,7 @@ module Zkapp_command = struct
 
        |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) zkapp_cmd_id =
+  let run (module Conn : Mina_caqti.CONNECTION) zkapp_cmd_id =
     Conn.collect_list query zkapp_cmd_id
 end
 
@@ -322,7 +322,7 @@ module Internal_command_ids = struct
       Caqti_type.int
       (find_command_ids_query "internal")
 
-  let run (module Conn : Caqti_async.CONNECTION) ~state_hash ~start_slot =
+  let run (module Conn : Mina_caqti.CONNECTION) ~state_hash ~start_slot =
     Conn.collect_list query (state_hash, start_slot)
 end
 
@@ -371,7 +371,7 @@ module Internal_command = struct
             WHERE b.global_slot_since_genesis >= $1
        |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~start_slot ~internal_cmd_id =
+  let run (module Conn : Mina_caqti.CONNECTION) ~start_slot ~internal_cmd_id =
     Conn.collect_list query (start_slot, internal_cmd_id)
 end
 
@@ -382,7 +382,7 @@ module Public_key = struct
             WHERE id = ?
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) pk_id =
+  let run (module Conn : Mina_caqti.CONNECTION) pk_id =
     Conn.find_opt query pk_id
 end
 
@@ -393,7 +393,7 @@ module Snarked_ledger_hashes = struct
             WHERE id = ?
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) id = Conn.find query id
+  let run (module Conn : Mina_caqti.CONNECTION) id = Conn.find query id
 end
 
 module Epoch_data = struct
@@ -421,7 +421,7 @@ module Epoch_data = struct
 
       |sql}
 
-  let get_epoch_data (module Conn : Caqti_async.CONNECTION) epoch_ledger_id =
+  let get_epoch_data (module Conn : Mina_caqti.CONNECTION) epoch_ledger_id =
     Conn.find query_epoch_data epoch_ledger_id
 
   let query_staking_epoch_data_id =
@@ -432,8 +432,8 @@ module Epoch_data = struct
 
       |sql}
 
-  let get_staking_epoch_data_id (module Conn : Caqti_async.CONNECTION)
-      state_hash =
+  let get_staking_epoch_data_id (module Conn : Mina_caqti.CONNECTION) state_hash
+      =
     Conn.find query_staking_epoch_data_id state_hash
 
   let query_next_epoch_data_id =
@@ -443,7 +443,7 @@ module Epoch_data = struct
             WHERE state_hash = ?
       |sql}
 
-  let get_next_epoch_data_id (module Conn : Caqti_async.CONNECTION) state_hash =
+  let get_next_epoch_data_id (module Conn : Mina_caqti.CONNECTION) state_hash =
     Conn.find query_next_epoch_data_id state_hash
 end
 
@@ -460,7 +460,7 @@ module Parent_block = struct
             ON epoch_ledgers_block.parent_id = parent.id
       |sql}
 
-  let get_parent_state_hash (module Conn : Caqti_async.CONNECTION)
+  let get_parent_state_hash (module Conn : Mina_caqti.CONNECTION)
       epoch_ledgers_state_hash =
     Conn.find query_parent_state_hash epoch_ledgers_state_hash
 end

@@ -2,8 +2,52 @@
 
 open Async
 open Core_kernel
-open Caqti_async
 open Mina_base
+
+module type CONNECTION = sig
+  include Caqti_async.CONNECTION
+
+  (** Code expects any queries to differing sources to never interfere. *)
+  val source : Uri.t
+end
+
+module Wrap
+    (Conn : Caqti_async.CONNECTION) (Arg : sig
+      val source : Uri.t
+    end) : CONNECTION = struct
+  include Conn
+  include Arg
+end
+
+let wrap_conn (module Conn : Caqti_async.CONNECTION) ~source =
+  let module Conn =
+    Wrap
+      (Conn)
+      (struct
+        let source = source
+      end)
+  in
+  (module Conn : CONNECTION)
+
+module Pool = struct
+  type ('a, 'e) t = { source : Uri.t; pool : ('a, 'e) Caqti_async.Pool.t }
+
+  let wrap ~source pool = { source; pool }
+
+  let use (f : (module CONNECTION) -> 'a) pool =
+    Caqti_async.Pool.use
+      (fun (module Conn : Caqti_async.CONNECTION) ->
+        f (wrap_conn (module Conn) ~source:pool.source) )
+      pool.pool
+end
+
+let connect_pool ?max_size uri =
+  let%map.Result pool = Caqti_async.connect_pool ?max_size uri in
+  Pool.wrap ~source:uri pool
+
+let connect uri =
+  let%map.Deferred.Result conn = Caqti_async.connect uri in
+  wrap_conn ~source:uri conn
 
 (* custom Caqti types for generating type annotations on queries *)
 type _ Caqti_type.field +=
@@ -281,6 +325,15 @@ let insert_into_cols ~(returning : string) ~(table_name : string)
     (String.concat ~sep:", " cols)
     values returning
 
+let insert_assuming_new ~(select : string * 'select Caqti_type.t)
+    ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
+    (module Conn : CONNECTION) (value : 'cols) =
+  Conn.find
+    ( Caqti_request.find (snd cols) (snd select)
+    @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
+         ~cols:(fst cols) () )
+    value
+
 (* run `select_cols` and return the result, if found
    if not found, run `insert_into_cols` and return the result
 *)
@@ -297,11 +350,7 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
   | Some id ->
       return id
   | None ->
-      Conn.find
-        ( Caqti_request.find (snd cols) (snd select)
-        @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
-             ~cols:(fst cols) () )
-        value
+      insert_assuming_new ~select ~table_name ?tannot ~cols (module Conn) value
 
 let sep_by_comma ?(parenthesis = false) xs =
   List.map xs ~f:(if parenthesis then sprintf "('%s')" else sprintf "'%s'")
@@ -334,7 +383,7 @@ let insert_multi_into_col ~(table_name : string)
     ()
 
 let query ~f pool =
-  match%bind Caqti_async.Pool.use f pool with
+  match%bind Pool.use f pool with
   | Ok v ->
       return v
   | Error msg ->

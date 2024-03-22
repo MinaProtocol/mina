@@ -2,7 +2,7 @@
 
 open Core_kernel
 
-let create_temp_balances_table (module Conn : Caqti_async.CONNECTION) =
+let create_temp_balances_table (module Conn : Mina_caqti.CONNECTION) =
   Conn.exec
     (Caqti_request.exec Caqti_type.unit
        {sql| CREATE TABLE IF NOT EXISTS balances_temp
@@ -17,7 +17,7 @@ let create_temp_balances_table (module Conn : Caqti_async.CONNECTION) =
            )
       |sql} )
 
-let copy_table_to_temp_table (module Conn : Caqti_async.CONNECTION) table =
+let copy_table_to_temp_table (module Conn : Mina_caqti.CONNECTION) table =
   Conn.exec
     (Caqti_request.exec Caqti_type.unit
        (sprintf
@@ -25,7 +25,7 @@ let copy_table_to_temp_table (module Conn : Caqti_async.CONNECTION) table =
                 |sql}
           table table ) )
 
-let create_table_index (module Conn : Caqti_async.CONNECTION) table col =
+let create_table_index (module Conn : Mina_caqti.CONNECTION) table col =
   Conn.exec
     (Caqti_request.exec Caqti_type.unit
        (sprintf
@@ -33,10 +33,10 @@ let create_table_index (module Conn : Caqti_async.CONNECTION) table col =
                 |sql}
           table col table col ) )
 
-let create_temp_table_index (module Conn : Caqti_async.CONNECTION) table col =
+let create_temp_table_index (module Conn : Mina_caqti.CONNECTION) table col =
   create_table_index (module Conn) (sprintf "%s_temp" table) col
 
-let create_table_named_index (module Conn : Caqti_async.CONNECTION) table col
+let create_table_named_index (module Conn : Mina_caqti.CONNECTION) table col
     name =
   Conn.exec
     (Caqti_request.exec Caqti_type.unit
@@ -45,20 +45,20 @@ let create_table_named_index (module Conn : Caqti_async.CONNECTION) table col
                 |sql}
           table name table col ) )
 
-let create_temp_table_named_index (module Conn : Caqti_async.CONNECTION) table
+let create_temp_table_named_index (module Conn : Mina_caqti.CONNECTION) table
     col name =
   create_table_named_index (module Conn) (sprintf "%s_temp" table) col name
 
-let drop_table_index (module Conn : Caqti_async.CONNECTION) table col =
+let drop_table_index (module Conn : Mina_caqti.CONNECTION) table col =
   Conn.exec
     (Caqti_request.exec Caqti_type.unit
        (sprintf {sql| DROP INDEX IF EXISTS idx_%s_%s
           |sql} table col ) )
 
-let drop_temp_table_index (module Conn : Caqti_async.CONNECTION) table col =
+let drop_temp_table_index (module Conn : Mina_caqti.CONNECTION) table col =
   drop_table_index (module Conn) (sprintf "%s_temp" table) col
 
-let create_cursor (module Conn : Caqti_async.CONNECTION) name =
+let create_cursor (module Conn : Mina_caqti.CONNECTION) name =
   Conn.exec
     (Caqti_request.exec Caqti_type.unit
        (sprintf
@@ -67,7 +67,7 @@ let create_cursor (module Conn : Caqti_async.CONNECTION) name =
                  |sql}
           name ) )
 
-let initialize_cursor (module Conn : Caqti_async.CONNECTION) name =
+let initialize_cursor (module Conn : Mina_caqti.CONNECTION) name =
   Conn.exec
     (Caqti_request.exec Caqti_type.unit
        (sprintf
@@ -75,13 +75,13 @@ let initialize_cursor (module Conn : Caqti_async.CONNECTION) name =
                 |sql}
           name ) )
 
-let current_cursor (module Conn : Caqti_async.CONNECTION) name =
+let current_cursor (module Conn : Mina_caqti.CONNECTION) name =
   Conn.find_opt
     (Caqti_request.find_opt Caqti_type.unit Caqti_type.int
        (sprintf {sql| SELECT value FROM %s_cursor
                 |sql} name ) )
 
-let update_cursor (module Conn : Caqti_async.CONNECTION) name ndx =
+let update_cursor (module Conn : Mina_caqti.CONNECTION) name ndx =
   Conn.exec
     (Caqti_request.exec Caqti_type.int
        (sprintf
@@ -90,7 +90,7 @@ let update_cursor (module Conn : Caqti_async.CONNECTION) name ndx =
           name ) )
     ndx
 
-let drop_foreign_key_constraint (module Conn : Caqti_async.CONNECTION) table
+let drop_foreign_key_constraint (module Conn : Mina_caqti.CONNECTION) table
     foreign_key =
   let sql =
     sprintf
@@ -101,7 +101,7 @@ let drop_foreign_key_constraint (module Conn : Caqti_async.CONNECTION) table
   in
   Conn.exec (Caqti_request.exec Caqti_type.unit sql)
 
-let add_balances_foreign_key_constraint (module Conn : Caqti_async.CONNECTION)
+let add_balances_foreign_key_constraint (module Conn : Mina_caqti.CONNECTION)
     table col foreign_key =
   let sql =
     sprintf
@@ -114,7 +114,7 @@ let add_balances_foreign_key_constraint (module Conn : Caqti_async.CONNECTION)
   in
   Conn.exec (Caqti_request.exec Caqti_type.unit sql)
 
-let add_blocks_foreign_key_constraint (module Conn : Caqti_async.CONNECTION)
+let add_blocks_foreign_key_constraint (module Conn : Mina_caqti.CONNECTION)
     table col foreign_key =
   let sql =
     sprintf
@@ -127,7 +127,7 @@ let add_blocks_foreign_key_constraint (module Conn : Caqti_async.CONNECTION)
   in
   Conn.exec (Caqti_request.exec Caqti_type.unit sql)
 
-let find_balance_entry (module Conn : Caqti_async.CONNECTION) ~public_key_id
+let find_balance_entry (module Conn : Mina_caqti.CONNECTION) ~public_key_id
     ~balance ~block_id ~block_height ~block_sequence_no
     ~block_secondary_sequence_no =
   Conn.find_opt
@@ -148,7 +148,7 @@ let find_balance_entry (module Conn : Caqti_async.CONNECTION) ~public_key_id
     , (block_id, block_height, block_sequence_no, block_secondary_sequence_no)
     )
 
-let insert_balance_entry (module Conn : Caqti_async.CONNECTION) ~public_key_id
+let insert_balance_entry (module Conn : Mina_caqti.CONNECTION) ~public_key_id
     ~balance ~block_id ~block_height ~block_sequence_no
     ~block_secondary_sequence_no =
   Conn.find
@@ -176,7 +176,7 @@ let insert_balance_entry (module Conn : Caqti_async.CONNECTION) ~public_key_id
     , (block_id, block_height, block_sequence_no, block_secondary_sequence_no)
     )
 
-let get_internal_commands (module Conn : Caqti_async.CONNECTION) =
+let get_internal_commands (module Conn : Mina_caqti.CONNECTION) =
   Conn.collect_list
     (Caqti_request.collect Caqti_type.unit
        Caqti_type.(tup4 int int64 (tup4 int int int int) int)
@@ -190,7 +190,7 @@ let get_internal_commands (module Conn : Caqti_async.CONNECTION) =
       |sql} )
 
 let update_internal_command_receiver_balance
-    (module Conn : Caqti_async.CONNECTION) ~new_balance_id ~block_id
+    (module Conn : Mina_caqti.CONNECTION) ~new_balance_id ~block_id
     ~internal_command_id ~block_sequence_no ~block_secondary_sequence_no =
   Conn.exec
     (Caqti_request.exec
@@ -207,7 +207,7 @@ let update_internal_command_receiver_balance
       , block_sequence_no
       , block_secondary_sequence_no ) )
 
-let get_user_command_fee_payers (module Conn : Caqti_async.CONNECTION) =
+let get_user_command_fee_payers (module Conn : Mina_caqti.CONNECTION) =
   Conn.collect_list
     (Caqti_request.collect Caqti_type.unit
        Caqti_type.(tup2 (tup4 int int int int) (tup2 int int64))
@@ -220,7 +220,7 @@ let get_user_command_fee_payers (module Conn : Caqti_async.CONNECTION) =
                        bal_fee_payer.public_key_id,bal_fee_payer.balance)
       |sql} )
 
-let get_user_command_sources (module Conn : Caqti_async.CONNECTION) =
+let get_user_command_sources (module Conn : Mina_caqti.CONNECTION) =
   Conn.collect_list
     (Caqti_request.collect Caqti_type.unit
        Caqti_type.(tup2 (tup4 int int int int) (tup2 int int64))
@@ -234,7 +234,7 @@ let get_user_command_sources (module Conn : Caqti_async.CONNECTION) =
                        bal_source.public_key_id,bal_source.balance)
       |sql} )
 
-let get_user_command_receivers (module Conn : Caqti_async.CONNECTION) =
+let get_user_command_receivers (module Conn : Mina_caqti.CONNECTION) =
   Conn.collect_list
     (Caqti_request.collect Caqti_type.unit
        Caqti_type.(tup2 (tup4 int int int int) (tup2 int int64))
@@ -248,7 +248,7 @@ let get_user_command_receivers (module Conn : Caqti_async.CONNECTION) =
                        bal_receiver.public_key_id,bal_receiver.balance)
       |sql} )
 
-let update_user_command_fee_payer_balance (module Conn : Caqti_async.CONNECTION)
+let update_user_command_fee_payer_balance (module Conn : Mina_caqti.CONNECTION)
     ~new_balance_id ~block_id ~user_command_id ~block_sequence_no =
   Conn.exec
     (Caqti_request.exec
@@ -260,7 +260,7 @@ let update_user_command_fee_payer_balance (module Conn : Caqti_async.CONNECTION)
       |sql} )
     (new_balance_id, (block_id, user_command_id, block_sequence_no))
 
-let update_user_command_source_balance (module Conn : Caqti_async.CONNECTION)
+let update_user_command_source_balance (module Conn : Mina_caqti.CONNECTION)
     ~new_balance_id ~block_id ~user_command_id ~block_sequence_no =
   Conn.exec
     (Caqti_request.exec
@@ -273,7 +273,7 @@ let update_user_command_source_balance (module Conn : Caqti_async.CONNECTION)
       |sql} )
     (new_balance_id, (block_id, user_command_id, block_sequence_no))
 
-let update_user_command_receiver_balance (module Conn : Caqti_async.CONNECTION)
+let update_user_command_receiver_balance (module Conn : Mina_caqti.CONNECTION)
     ~new_balance_id ~block_id ~user_command_id ~block_sequence_no =
   Conn.exec
     (Caqti_request.exec
@@ -286,13 +286,13 @@ let update_user_command_receiver_balance (module Conn : Caqti_async.CONNECTION)
       |sql} )
     (new_balance_id, (block_id, user_command_id, block_sequence_no))
 
-let drop_table (module Conn : Caqti_async.CONNECTION) table =
+let drop_table (module Conn : Mina_caqti.CONNECTION) table =
   Conn.exec
     (Caqti_request.exec Caqti_type.unit
        (sprintf {sql| DROP TABLE %s
                 |sql} table ) )
 
-let rename_temp_table (module Conn : Caqti_async.CONNECTION) table =
+let rename_temp_table (module Conn : Mina_caqti.CONNECTION) table =
   Conn.exec
     (Caqti_request.exec Caqti_type.unit
        (sprintf
@@ -301,7 +301,7 @@ let rename_temp_table (module Conn : Caqti_async.CONNECTION) table =
           |sql}
           table table ) )
 
-let get_column_count (module Conn : Caqti_async.CONNECTION) table =
+let get_column_count (module Conn : Mina_caqti.CONNECTION) table =
   Conn.find
     (Caqti_request.find Caqti_type.string Caqti_type.int
        {sql| SELECT COUNT(*) FROM information_schema.columns

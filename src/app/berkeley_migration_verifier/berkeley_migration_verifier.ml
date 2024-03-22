@@ -324,10 +324,10 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
   let mainnet_pool =
-    Caqti_async.connect_pool ~max_size:128 mainnet_archive_uri
+    Mina_caqti.connect_pool ~max_size:128 mainnet_archive_uri
   in
   let migrated_pool =
-    Caqti_async.connect_pool ~max_size:128 migrated_archive_uri
+    Mina_caqti.connect_pool ~max_size:128 migrated_archive_uri
   in
 
   match (mainnet_pool, migrated_pool) with
@@ -415,10 +415,10 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
   let mainnet_pool =
-    Caqti_async.connect_pool ~max_size:128 mainnet_archive_uri
+    Mina_caqti.connect_pool ~max_size:128 mainnet_archive_uri
   in
   let migrated_pool =
-    Caqti_async.connect_pool ~max_size:128 migrated_archive_uri
+    Mina_caqti.connect_pool ~max_size:128 migrated_archive_uri
   in
 
   match (mainnet_pool, migrated_pool) with
