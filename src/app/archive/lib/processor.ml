@@ -3988,6 +3988,15 @@ module Block = struct
     in
 
     let%bind internal_cmd_ids =
+      let command_type_typ =
+        let encode t = Ok (t ^ "::internal_command_type") in
+        let decode t = Ok t in
+        Caqti_type.custom ~encode ~decode Caqti_type.string
+      in
+      let internal_command_typ =
+        Mina_caqti.Type_spec.custom_type ~to_hlist:Internal_command.to_hlist ~of_hlist:Internal_command.of_hlist
+          Caqti_type.[ command_type_typ; int; string; string ]
+      in
       let compare_by_hash (a : Internal_command.t) (b : Internal_command.t) =
         String.compare a.hash b.hash
       in
@@ -4008,7 +4017,7 @@ module Block = struct
                 Caqti_type.string ~table:Internal_command.table_name
                 ~fields:[ "hash" ] )
            ~insert_values:
-             (bulk_insert Internal_command.typ
+             (bulk_insert internal_command_typ
                 ~table:Internal_command.table_name
                 ~fields:Internal_command.Fields.names )
     in
