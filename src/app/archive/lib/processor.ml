@@ -3413,6 +3413,8 @@ module Block = struct
           Some "BIGINT"
       | Float ->
           Some "FLOAT"
+      | Enum name ->
+          Some name
       | _ ->
           None
     in
@@ -3997,8 +3999,13 @@ module Block = struct
       include Comparable.Make (T)
 
       let typ =
+        let command_type =
+          let encode = Fn.id in
+          let decode = Result.return in
+          Caqti_type.enum ~encode ~decode "internal_command_type"
+        in
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-          Caqti_type.[ string; string ]
+          Caqti_type.[ string; command_type ]
 
       let of_command : Internal_command.t -> t =
         fun {hash; command_type; _} -> {hash; command_type}
