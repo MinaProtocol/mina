@@ -23,12 +23,11 @@ Script is very verbose and inform when any of below dependency is missing. For d
 
 #### Mina related 
 
-All mina related apps can be either downloaded in debian or docker. Advanced users can build them locally, but please remember to rename them and use `DUNE_PROFILE=dev` env variable when building berkeley_migration
+All mina related apps can be either downloaded in debian or docker. Advanced users can build them locally, but please remember to rename them
 
 - mina-berkeley-migration
 - mina-berkeley-migration-verifier
 - mina-migration-replayer
-
 
 ### Testing 
 
