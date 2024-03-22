@@ -315,7 +315,7 @@ let compare_replayer_and_fork_config ~migrated_replayer_output ~fork_config_file
       |> Check.errors
 
 let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
-  printf
+  Async.printf
     "Running verifications for incremental migration between '%s' and '%s' \
      schemas. It may take a couple of minutes... \n"
     mainnet_archive_uri migrated_archive_uri ;
@@ -339,7 +339,7 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
         query_migrated_db ~f:(fun db -> Sql.Berkeley.block_height db)
       in
 
-      let test_count = 7 in
+      let test_count = 6 in
       let work_dir = Filename.temp_dir_name in
       let%bind check = migrated_db_is_connected query_migrated_db ~height in
       Test.of_check check ~name:"Migrated blocks are connected" ~idx:1
