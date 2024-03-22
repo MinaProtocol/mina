@@ -21,15 +21,6 @@ Script is very verbose and inform when any of below dependency is missing. For d
 - postgres and psql
 - gsutil
 
-#### Mina related 
-
-All mina related apps can be either downloaded in debian or docker. Advanced users can build them locally, but please remember to rename them and use `DUNE_PROFILE=dev` env variable when building berkeley_migration
-
-- mina-berkeley-migration
-- mina-berkeley-migration-verifier
-- mina-migration-replayer
-
-
 ### Testing 
 
 The best approach to learn about the tool is to start testing it. Below we present end to end testing cycle for migration script based on umt data
