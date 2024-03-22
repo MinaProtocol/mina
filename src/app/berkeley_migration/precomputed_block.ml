@@ -8,17 +8,18 @@ open Async
 *)
 
 module Id = struct
-  (* TODO: is there any good reason for this to be an int64? *)
-  (* TODO: consider just making this `Length.t * State_hash.t` *)
   module T = struct
-    type t = int64 * string [@@deriving compare, sexp]
+    type t = Mina_numbers.Length.t * Mina_base.State_hash.t
+    [@@deriving compare, sexp]
   end
 
   include T
   include Comparable.Make (T)
 
   let filename ~network (height, state_hash) =
-    sprintf "%s-%Ld-%s.json" network height state_hash
+    sprintf "%s-%s-%s.json" network
+      (Mina_numbers.Length.to_string height)
+      (Mina_base.State_hash.to_base58_check state_hash)
 end
 
 (* We define a subset of the mainnet precomputed block type here for the fields we need, to avoid the need to port some of the tricky old types *)
@@ -171,18 +172,29 @@ let of_yojson json =
 let block_filename_regexp ~network =
   Str.regexp (sprintf "%s-[0-9]+-.+\\.json" network)
 
+let parse_filename filename =
+  let open Option.Let_syntax in
+  let rest, ext = Filename.split_extension filename in
+  let%bind () = match ext with Some "json" -> Some () | _ -> None in
+  let%bind rest, state_hash_str = String.rsplit2 rest ~on:'-' in
+  let%bind network, height_str = String.rsplit2 rest ~on:'-' in
+  let%bind height =
+    Option.try_with (fun () ->
+        Mina_numbers.Length.of_int @@ Int.of_string height_str )
+  in
+  let%map state_hash =
+    Or_error.ok (Mina_base.State_hash.of_base58_check state_hash_str)
+  in
+  (network, height, state_hash)
+
 let list_directory ~network =
-  let regexp = Str.regexp {|^\([^-]+\)-\([^-]+\)-\(3N[^-]+\)\.json$|} in
   let%map filenames = Sys.readdir "." in
   Array.to_list filenames
   |> List.filter_map ~f:(fun filename ->
-         if Str.string_match regexp filename 0 then
-           let filename_network = Str.matched_group 1 filename in
-           if String.equal filename_network network then
-             let height = Str.matched_group 2 filename in
-             let state_hash = Str.matched_group 3 filename in
-             Some (Int64.of_int @@ Int.of_string height, state_hash)
-           else None
+         let%bind.Option filename_network, height, state_hash =
+           parse_filename filename
+         in
+         if String.equal filename_network network then Some (height, state_hash)
          else None )
   |> Id.Set.of_list
 
@@ -239,7 +251,7 @@ let concrete_fetch_batch ~logger ~bucket ~network targets =
             Reader.file_contents (Id.filename ~network target) )
       in
       let block = of_yojson (Yojson.Safe.from_string contents) in
-      (Mina_base.State_hash.of_base58_check_exn state_hash, block) )
+      (state_hash, block) )
   >>| Mina_base.State_hash.Map.of_alist_exn
 
 let delete_fetched ~network : unit Deferred.t =

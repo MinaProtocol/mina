@@ -1,5 +1,3 @@
-(* TODO: cleanup partial writes to blocks table introduced by bulk approach *)
-
 (* berkeley_migration.ml -- migrate archive db from original Mina mainnet to berkeley schema *)
 
 open Core_kernel
@@ -396,7 +394,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                 query_mainnet_db ~f:(fun db ->
                     Sql.Mainnet.Block.mark_as_canonical db id ) )
       in
-      (* The batch insertion functionality for blocks can lead to impartial writes at the moment as
+      (* The batch insertion functionality for blocks can lead to partial writes at the moment as
          it is not properly wrapped in a transaction. We handle the partial write edge case here at
          startup in order to be able to resume gracefully in the event of an unfortunate crash. *)
       let%bind () =
@@ -428,7 +426,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
           query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
               Conn.exec
                 (Caqti_request.exec Caqti_type.unit
-                   (sprintf "DELETE FROM %s WHERE block_id IN %s"
+                   (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
                       Archive_lib.Processor.Block_and_internal_command
                       .table_name garbage_block_ids_sql ) )
                 () )
@@ -472,6 +470,9 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
         List.map mainnet_blocks_to_migrate ~f:(fun { height; state_hash; _ } ->
             (height, state_hash) )
         |> List.filter ~f:(fun (height, _) -> Int64.(height > 1L))
+        |> List.map ~f:(fun (height, state_hash) ->
+               ( Mina_numbers.Length.of_int (Int64.to_int_exn height)
+               , Mina_base.State_hash.of_base58_check_exn state_hash ) )
       in
       let%bind precomputed_blocks =
         Precomputed_block.concrete_fetch_batch ~logger
