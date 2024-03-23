@@ -228,7 +228,7 @@ let
         ];
 
         installPhase = ''
-          mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
+          mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin $berkeley_migration/bin
           # TODO uncomment when genesis is generated above
           # mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
           pushd _build/default
