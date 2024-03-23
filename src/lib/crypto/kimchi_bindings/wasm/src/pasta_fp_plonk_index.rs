@@ -275,6 +275,16 @@ pub fn caml_pasta_fp_plonk_index_serialize(index: &WasmPastaFpPlonkIndex) -> Str
     base64::encode(serialized)
 }
 
+#[ocaml_gen::func]
+#[ocaml::func]
+pub fn caml_pasta_fp_plonk_index_visu(
+    index: CamlPastaFpPlonkIndexPtr<'static>,
+    path: Option<String>,
+) -> Result<(), ocaml::Error> {
+    kimchi_visu::visu(&index.as_ref().0, None, path);
+    Ok(())
+}
+
 // helpers
 
 fn format_field(f: &Fp) -> String {

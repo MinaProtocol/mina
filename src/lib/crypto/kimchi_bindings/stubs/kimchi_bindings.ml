@@ -58,6 +58,8 @@ module Protocol = struct
 
         external to_json : int -> t -> string
           = "caml_pasta_fp_plonk_circuit_serialize"
+
+        external to_asm : int -> t -> string = "caml_pasta_fp_plonk_circuit_asm"
       end
 
       module Fq = struct
@@ -81,6 +83,8 @@ module Protocol = struct
 
         external to_json : int -> t -> string
           = "caml_pasta_fq_plonk_circuit_serialize"
+
+        external to_asm : int -> t -> string = "caml_pasta_fq_plonk_circuit_asm"
       end
     end
   end
@@ -223,6 +227,9 @@ module Protocol = struct
 
       external write : bool option -> t -> string -> unit
         = "caml_pasta_fp_plonk_index_write"
+
+      external write_html : t -> string option -> unit
+        = "caml_pasta_fp_plonk_index_visu"
     end
 
     module Fq = struct

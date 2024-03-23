@@ -79,9 +79,7 @@ pub fn caml_pasta_fp_plonk_index_create(
         })
         .build()
     {
-        Err(e) => {
-            return Err(e.into())
-        }
+        Err(e) => return Err(e.into()),
         Ok(cs) => cs,
     };
 
@@ -192,4 +190,14 @@ pub fn caml_pasta_fp_plonk_index_write(
         .0
         .serialize(&mut rmp_serde::Serializer::new(w))
         .map_err(|e| e.into())
+}
+
+#[ocaml_gen::func]
+#[ocaml::func]
+pub fn caml_pasta_fp_plonk_index_visu(
+    index: CamlPastaFpPlonkIndexPtr<'static>,
+    path: Option<String>,
+) -> Result<(), ocaml::Error> {
+    kimchi_visu::visu(&index.as_ref().0, None, path);
+    Ok(())
 }
