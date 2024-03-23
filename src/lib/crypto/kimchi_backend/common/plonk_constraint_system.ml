@@ -47,6 +47,8 @@ module type Gate_vector_intf = sig
   val digest : int -> t -> bytes
 
   val to_json : int -> t -> string
+
+  val to_asm : int -> t -> string
 end
 
 (** A row indexing in a constraint system. *)
@@ -891,6 +893,8 @@ module Make
   val digest : t -> Md5.t
 
   val to_json : t -> string
+
+  val to_asm : t -> string
 end = struct
   open Core_kernel
   open Pickles_types
@@ -1270,6 +1274,11 @@ end = struct
     let gates, _, _ = finalize_and_get_gates sys in
     let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
     Gates.to_json public_input_size gates
+
+  let to_asm (sys : t) : string =
+    let gates, _, _ = finalize_and_get_gates sys in
+    let public_input_size = Set_once.get_exn sys.public_input_size [%here] in
+    Gates.to_asm public_input_size gates
 
   (* Returns a hash of the circuit. *)
   let rec digest (sys : t) =

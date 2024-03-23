@@ -1,0 +1,15 @@
+(executable
+ (name circuit_playground)
+ (public_name circuit_playground)
+ (package circuit_playground)
+ (libraries
+  ;; opam libraries
+  base
+  async_kernel
+  core_kernel
+  ;; local libraries
+  snarky
+  kimchi_backend.pasta
+  snark_params)
+ (preprocess
+  (pps ppx_let ppx_snarky)))

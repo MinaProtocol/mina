@@ -335,6 +335,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                     decl_func!(w, env, caml_pasta_fp_plonk_gate_vector_wrap => "wrap");
                     decl_func!(w, env, caml_pasta_fp_plonk_gate_vector_digest => "digest");
                     decl_func!(w, env, caml_pasta_fp_plonk_circuit_serialize => "to_json");
+                    decl_func!(w, env, caml_pasta_fp_plonk_circuit_asm => "to_asm");
                 });
                 decl_module!(w, env, "Fq", {
                     decl_type!(w, env, CamlPastaFqPlonkGateVector => "t");
@@ -347,6 +348,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_wrap => "wrap");
                     decl_func!(w, env, caml_pasta_fq_plonk_gate_vector_digest => "digest");
                     decl_func!(w, env, caml_pasta_fq_plonk_circuit_serialize => "to_json");
+                    decl_func!(w, env, caml_pasta_fq_plonk_circuit_asm => "to_asm");
                 });
             });
         });
@@ -399,6 +401,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fp_plonk_index_domain_d8_size => "domain_d8_size");
                 decl_func!(w, env, caml_pasta_fp_plonk_index_read => "read");
                 decl_func!(w, env, caml_pasta_fp_plonk_index_write => "write");
+                decl_func!(w, env, caml_pasta_fp_plonk_index_visu => "write_html");
             });
 
             decl_module!(w, env, "Fq", {
