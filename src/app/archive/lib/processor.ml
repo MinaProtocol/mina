@@ -678,15 +678,15 @@ module Zkapp_permissions = struct
     in
     ( match versions with
     | Ok [] ->
-        [%log error]
-          ~metadata:[ ("perms", Permissions.to_yojson perms) ]
-          "No transaction version exists for the permission"
+        failwith
+          (sprintf "No transaction version exists for the permission, %s"
+             (Permissions.to_yojson perms |> Yojson.Safe.to_string) )
     | Ok _ ->
         ()
     | Error e ->
-        [%log error]
-          ~metadata:[ ("error", `String (Caqti_error.show e)) ]
-          "fail to query protocol_versions table, see $error" ) ;
+        failwith
+          (sprintf "fail to query protocol_versions table, see %s"
+             (Caqti_error.show e) ) ) ;
     let value =
       { edit_state = perms.edit_state
       ; send = perms.send

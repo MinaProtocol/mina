@@ -369,7 +369,7 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool ~network
   let internal_cmds = List.rev internal_cmds_rev in
   let accounts_created = user_accounts_created @ internal_accounts_created in
   let zkapp_cmds = [] in
-  let protocol_version = mainnet_protocol_version in
+  let protocol_version = migrating_from_protocol_version in
   let proposed_protocol_version = None in
   let chain_status = Archive_lib.Chain_status.of_string block.chain_status in
   (* always the default token *)
@@ -405,11 +405,9 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool ~network
       }
       : Archive_lib.Extensional.Block.t )
 
-
 let migrating_from_version =
-        Protocol_version.transaction migrating_from_protocol_version
-        |> Mina_numbers.Txn_version.of_int
-      
+  Protocol_version.transaction migrating_from_protocol_version
+  |> Mina_numbers.Txn_version.of_int
 
 let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
   let open Deferred.Let_syntax in
@@ -476,9 +474,15 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
                   acct
             in
             let acct_patched =
-              { acct with 
-              permissions =
-              Mina_base.Permissions.Poly.{ acct.permissions with set_verification_key = ( fst acct.permissions.set_verification_key , mainnet_version )}}
+              { acct with
+                permissions =
+                  Mina_base.Permissions.Poly.
+                    { acct.permissions with
+                      set_verification_key =
+                        ( fst acct.permissions.set_verification_key
+                        , mainnet_version )
+                    }
+              }
             in
             query_migrated_db ~f:(fun db ->
                 match%map
