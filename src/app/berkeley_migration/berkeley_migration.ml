@@ -175,7 +175,7 @@ let user_commands_from_block_id ~mainnet_pool block_id =
 
 let first_batch = ref true
 
-let mainnet_protocol_version =
+let migrating_from_protocol_version =
   (* It would be more accurate to posit distinct patches for each
      mainnet release, but it's sufficient to have a protocol version
      earlier than the berkeley hard fork protocol version. After the
@@ -405,6 +405,12 @@ let mainnet_block_to_extensional ~logger ~mainnet_pool ~network
       }
       : Archive_lib.Extensional.Block.t )
 
+
+let migrating_from_version =
+        Protocol_version.transaction migrating_from_protocol_version
+        |> Mina_numbers.Txn_version.of_int
+      
+
 let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
   let open Deferred.Let_syntax in
   let query_migrated_db ~f = Mina_caqti.query ~f migrated_pool in
@@ -469,10 +475,15 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
               | Some acct ->
                   acct
             in
+            let acct_patched =
+              { acct with 
+              permissions =
+              Mina_base.Permissions.Poly.{ acct.permissions with set_verification_key = ( fst acct.permissions.set_verification_key , mainnet_version )}}
+            in
             query_migrated_db ~f:(fun db ->
                 match%map
                   Archive_lib.Processor.Accounts_accessed.add_if_doesn't_exist
-                    ~logger db genesis_block_id (index, acct)
+                    ~logger db genesis_block_id (index, acct_patched)
                 with
                 | Ok _ ->
                     Ok ()
@@ -485,10 +496,6 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
                     failwith "Could not add add genesis account" ) )
   in
   [%log info] "Done populating original genesis ledger balances!"
-
-let mainnet_version =
-  Protocol_version.transaction mainnet_protocol_version
-  |> Mina_numbers.Txn_version.of_int
 
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
     ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network () =
