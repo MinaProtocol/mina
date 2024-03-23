@@ -799,7 +799,11 @@ module Make (L : Ledger_intf.S) :
           Or_error.errorf "The fee-payer account does not exist"
     in
     let fee = Amount.of_fee fee in
-    let%bind balance = sub_amount account.balance fee in
+    let%bind balance =
+      Result.map_error (sub_amount account.balance fee) ~f:(fun err ->
+        Printf.printf "FEE PAYER INSUFFICIENT BALANCE\n" ;
+        err)
+    in
     let%bind () = validate_nonces nonce account.nonce in
     let%map timing =
       validate_timing ~txn_amount:fee ~txn_global_slot:current_global_slot
@@ -1033,6 +1037,7 @@ module Make (L : Ledger_intf.S) :
           ( { common = applied_common; body = applied_body }
             : Transaction_applied.Signed_command_applied.t )
     | Error failure ->
+        Printf.printf "FAILURE: %s\n" (Transaction_status.Failure.to_string failure) ;
         (* Do not update the ledger. Except for the fee payer which is already updated *)
         let applied_common : Transaction_applied.Signed_command_applied.Common.t
             =
@@ -1049,6 +1054,7 @@ module Make (L : Ledger_intf.S) :
           ( { common = applied_common; body = Failed }
             : Transaction_applied.Signed_command_applied.t )
     | exception Reject err ->
+        Printf.printf "REJECTION: %s\n" (Error.to_string_hum err) ;
         (* TODO: These transactions should never reach this stage, this error
            should be fatal.
         *)
