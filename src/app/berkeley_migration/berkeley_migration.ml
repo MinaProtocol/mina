@@ -40,7 +40,7 @@ let mainnet_transaction_failure_of_string s :
   | _ ->
       failwith "No such transaction failure"
 
-let mainnet_protocol_version =
+let migrating_from_protocol_version =
   (* It would be more accurate to posit distinct patches for each
      mainnet release, but it's sufficient to have a protocol version
      earlier than the berkeley hard fork protocol version. After the
@@ -232,7 +232,7 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
          ; user_cmds
          ; internal_cmds
          ; zkapp_cmds = []
-         ; protocol_version = mainnet_protocol_version
+         ; protocol_version = migrating_from_protocol_version
          ; proposed_protocol_version = None
          ; chain_status =
              Archive_lib.Chain_status.of_string block.chain_status
@@ -241,6 +241,10 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
          ; accounts_created = []
          ; tokens_used = []
          } ) )
+
+let migrating_from_version =
+  Protocol_version.transaction migrating_from_protocol_version
+  |> Mina_numbers.Txn_version.of_int
 
 let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
   let open Deferred.Let_syntax in
@@ -306,10 +310,21 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
               | Some acct ->
                   acct
             in
+            let acct_patched =
+              { acct with
+                permissions =
+                  Mina_base.Permissions.Poly.
+                    { acct.permissions with
+                      set_verification_key =
+                        ( fst acct.permissions.set_verification_key
+                        , migrating_from_version )
+                    }
+              }
+            in
             query_migrated_db ~f:(fun db ->
                 match%map
                   Archive_lib.Processor.Accounts_accessed.add_if_doesn't_exist
-                    ~logger db genesis_block_id (index, acct)
+                    ~logger db genesis_block_id (index, acct_patched)
                 with
                 | Ok _ ->
                     Ok ()
@@ -322,10 +337,6 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
                     failwith "Could not add add genesis account" ) )
   in
   [%log info] "Done populating original genesis ledger balances!"
-
-let mainnet_version =
-  Protocol_version.transaction mainnet_protocol_version
-  |> Mina_numbers.Txn_version.of_int
 
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
     ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
@@ -367,8 +378,8 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
       let%bind precomputed_values =
         match%map
           Genesis_ledger_helper.init_from_config_file ~logger
-            ~proof_level:(Some proof_level) ~overwrite_version:mainnet_version
-            runtime_config
+            ~proof_level:(Some proof_level)
+            ~overwrite_version:migrating_from_version runtime_config
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
