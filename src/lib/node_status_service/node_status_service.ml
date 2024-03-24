@@ -71,6 +71,7 @@ type node_status_data =
   ; pubsub_msg_received : gossip_count
   ; pubsub_msg_broadcasted : gossip_count
   ; received_blocks : block list
+  ; block_producer_public_key : string option
   }
 [@@deriving to_yojson]
 
@@ -168,7 +169,8 @@ let reset_gauges () =
   Queue.clear Transition_frontier.rejected_blocks
 
 let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
-    ~addrs_and_ports ~start_time ~slot_duration =
+    ~addrs_and_ports ~start_time ~slot_duration
+    ~block_producer_public_key_base58 =
   [%log info] "Starting node status service using URL $url"
     ~metadata:[ ("url", `String node_status_url) ] ;
   let five_slots = Time.Span.scale slot_duration 5. in
@@ -366,6 +368,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~network
                       ; is_valid = true
                       ; reason_for_rejection = None
                       } )
+            ; block_producer_public_key = block_producer_public_key_base58
             }
           in
           reset_gauges () ;
