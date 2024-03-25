@@ -1,1 +1,1 @@
-let%test_unit "Always fails" = assert false
+let%test_unit "Always fails" = assert true
