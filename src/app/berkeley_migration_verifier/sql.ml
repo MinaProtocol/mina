@@ -301,7 +301,7 @@ module Berkeley = struct
                  JOIN blocks ON block_id = blocks.id
                  WHERE height <> 1
                  ORDER BY block_id, id |sql}
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_accounts_accessed_to_csv (module Conn : CONNECTION) output_file =
     Conn.exec (dump_account_accessed_to_csv_query ~output_file) ()
@@ -336,7 +336,8 @@ module Berkeley = struct
 
   let dump_user_and_internal_command_info_to_csv_query ~output_file =
     dump_sql_to_csv output_file
-      ~sql:{sql| 
+      ~sql:
+        {sql| 
       ( 
         WITH user_command_ids AS
         ( SELECT user_command_id, block_id, status FROM blocks_user_commands
@@ -360,7 +361,7 @@ module Berkeley = struct
         INNER JOIN internal_commands ON id = internal_command_id
         INNER JOIN account_identifiers ON public_key_id = receiver_id
       ) ORDER BY block_id, id |sql}
-    |> Caqti_request.exec Caqti_type.unit
+    |> Mina_caqti.exec_req Caqti_type.unit
 
   let dump_user_and_internal_command_info_to_csv (module Conn : CONNECTION)
       output_file =
