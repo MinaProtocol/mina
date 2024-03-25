@@ -498,9 +498,6 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                    match%map
                      Archive_lib.Processor.Block.add_from_extensional_batch db
                        extensional_blocks ~v1_transaction_hash:true
-                       ~genesis_block_hash:
-                         (Mina_base.State_hash.State_hashes.state_hash
-                            genesis_state_hashes )
                    with
                    | Ok _id ->
                        Ok ()

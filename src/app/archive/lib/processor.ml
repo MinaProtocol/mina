@@ -3336,7 +3336,7 @@ module Block = struct
   (* NB: this batching logic an lead to partial writes; it is acceptable to be used with the
      migration tool, but not acceptable to be used with the archive node in its current form *)
   let add_from_extensional_batch (module Conn : CONNECTION)
-      ?(v1_transaction_hash = false) ~(genesis_block_hash : State_hash.t)
+      ?(v1_transaction_hash = false)
       (blocks : Extensional.Block.t list) =
     let open Deferred.Result.Let_syntax in
     (* zkapps are currently unsupported in the batch implementation of this function *)
@@ -3798,7 +3798,7 @@ module Block = struct
           (bulk_insert Epoch_data.typ ~table:Epoch_data.table_name
              ~fields:Epoch_data.Fields.names )
     in
-    let%bind token_ids =
+    let%bind _token_ids =
       let tokens =
         List.map all_missing_tokens ~f:(fun token ->
             (token, token_id_to_repr token) )
@@ -4049,6 +4049,8 @@ module Block = struct
                    ; status
                    ; failure_reason
                    ; command_type
+                   ; fee= _
+                   ; receiver = _
                    }
                  ->
                 { Block_and_internal_command.block_id =
