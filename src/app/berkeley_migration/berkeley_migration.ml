@@ -364,7 +364,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
               (Error.to_string_hum err) ()
       in
       [%log info] "Got precomputed values from runtime config" ;
-      let ( With_hash.{ data = genesis_block; hash = genesis_state_hashes }
+      let ( With_hash.{ data = genesis_block; hash = _ }
           , _validation ) =
         Mina_block.genesis ~precomputed_values
       in
