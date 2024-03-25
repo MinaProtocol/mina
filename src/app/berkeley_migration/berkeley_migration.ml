@@ -458,8 +458,8 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
           List.filter mainnet_blocks_unsorted ~f:(fun block ->
               Int64.( > ) block.height greatest_migrated_height )
       in
-      [%log info] "Will migrate %d mainnet blocks"
-        (List.length mainnet_blocks_unmigrated) ;
+      [%log info] "Will migrate %d %s blocks"
+        (List.length mainnet_blocks_unmigrated) network ;
       (* blocks in height order *)
       (* TODO: this ordering is actually already done by the sql query, so we can skip this here *)
       let mainnet_blocks_to_migrate =
