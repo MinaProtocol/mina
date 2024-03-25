@@ -153,7 +153,7 @@ module Mainnet = struct
       
         INNER JOIN chain
       
-        ON b.id = chain.parent_id AND (chain.height <> 1 OR b.state_hash = $1)
+        ON b.id = chain.parent_id AND (chain.height <> 1 OR b.height = 1)
       
         ) SELECT id FROM chain ORDER BY height ASC
       )
