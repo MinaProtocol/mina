@@ -326,6 +326,7 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
     ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
     ~stream_precomputed_blocks ~keep_precomputed_blocks () =
+  Cli_lib.Stdout_log.setup true Logger.Level.Info ;
   let logger = Logger.create () in
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
