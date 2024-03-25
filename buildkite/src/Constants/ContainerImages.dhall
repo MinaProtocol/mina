@@ -6,11 +6,8 @@
   toolchainBase = "codaprotocol/ci-toolchain-base:v3",
   minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:0883076b53bcded937aae691b6e3b611ceaaff970a53e77ee883eca7e8ad3b38",
   minaToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:d6a162257680a757cdbb39cee5762e3ce4e4d03b7f21fe60762b78b64766e098",
-  minaToolchainBookworm = "gcr.io/o1labs-192920/mina-toolchain@sha256:9c4062e76fcd910ad60d3f1f58e2395f6a5e70f16fbef422442aedb70112ac73",
-  minaToolchain = "gcr.io/o1labs-192920/mina-toolchain@sha256:9c4062e76fcd910ad60d3f1f58e2395f6a5e70f16fbef422442aedb70112ac73",
-  -- these toolchains are build from the fix/caqti-pool branch
-  -- they are used for the replayer/migration build, to avoid
-  -- a terrible performance issue.
+  minaToolchainBookworm = "gcr.io/o1labs-192920/mina-toolchain@sha256:d6a162257680a757cdbb39cee5762e3ce4e4d03b7f21fe60762b78b64766e098",
+  minaToolchain = "gcr.io/o1labs-192920/mina-toolchain@sha256:d6a162257680a757cdbb39cee5762e3ce4e4d03b7f21fe60762b78b64766e098",
   minaCaqtiToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:900320a7063bf686d2e5a8fa67a111479b3274f3439beae88f96364e209b7a0d",
   minaCaqtiToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:609210748ee04b2926b86d6590e29b5a32d4709eefdf907f83b819f38cce8f46",
   minaCaqtiToolchainBookworm = "gcr.io/o1labs-192920/mina-toolchain@sha256:609210748ee04b2926b86d6590e29b5a32d4709eefdf907f83b819f38cce8f46",
