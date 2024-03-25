@@ -283,6 +283,8 @@ let
 
       mainnet = wrapMina self.mainnet-pkg { };
 
+      experiment = (opam-nix.buildDuneProject { } "direction" filtered-src { }).direction;
+
       devnet-pkg = self.mina-dev.overrideAttrs (s: {
         version = "devnet";
         DUNE_PROFILE = "devnet";

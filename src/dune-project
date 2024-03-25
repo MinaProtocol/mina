@@ -252,3 +252,4 @@
 (package (name zkapp_command_builder))
 (package (name zkapps_examples))
 (package (name zkapp_limits))
+(generate_opam_files true)
