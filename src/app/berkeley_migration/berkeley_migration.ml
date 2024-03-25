@@ -473,21 +473,10 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
               | Some acct ->
                   acct
             in
-            let acct_patched =
-              { acct with
-                permissions =
-                  Mina_base.Permissions.Poly.
-                    { acct.permissions with
-                      set_verification_key =
-                        ( fst acct.permissions.set_verification_key
-                        , mainnet_version )
-                    }
-              }
-            in
             query_migrated_db ~f:(fun db ->
                 match%map
                   Archive_lib.Processor.Accounts_accessed.add_if_doesn't_exist
-                    ~logger db genesis_block_id (index, acct_patched)
+                    ~logger db genesis_block_id (index, acct)
                 with
                 | Ok _ ->
                     Ok ()
@@ -532,8 +521,8 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
       let%bind precomputed_values =
         match%map
           Genesis_ledger_helper.init_from_config_file ~logger
-            ~proof_level:(Some proof_level) ~overwrite_version:mainnet_version
-            runtime_config
+            ~proof_level:(Some proof_level)
+            ~overwrite_version:migrating_from_version runtime_config
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
