@@ -296,22 +296,12 @@ module Berkeley = struct
   let dump_account_accessed_to_csv_query ~output_file =
     dump_sql_to_csv output_file
       ~sql:
-<<<<<<< HEAD
-        {sql| SELECT account_identifier_id AS id, block_id
-                 FROM accounts_accessed
-                 JOIN blocks ON block_id = blocks.id
-                 WHERE height <> 1
-                 ORDER BY block_id, id
-           |sql}
-    |> Mina_caqti.exec_req Caqti_type.unit
-=======
         {sql| SELECT account_identifier_id AS id, block_id 
                  FROM accounts_accessed
                  JOIN blocks ON block_id = blocks.id
                  WHERE height <> 1
                  ORDER BY block_id, id |sql}
     |> Caqti_request.exec Caqti_type.unit
->>>>>>> 8c02c3bcc0dec31cb0951573c2856066ad9dd092
 
   let dump_accounts_accessed_to_csv (module Conn : CONNECTION) output_file =
     Conn.exec (dump_account_accessed_to_csv_query ~output_file) ()
