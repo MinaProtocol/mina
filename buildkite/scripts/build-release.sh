@@ -24,7 +24,7 @@ echo "--- Upload debs to amazon s3 repo"
 ./buildkite/scripts/publish-deb.sh
 
 if [[ $1 = "archive_migration" ]] ; then 
-    git restore .
+    git apply -R buildkite/scripts/caqti-upgrade.patch
 fi
 
 echo "--- Git diff after build is complete:"
