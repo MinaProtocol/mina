@@ -296,9 +296,11 @@ module Berkeley = struct
   let dump_account_accessed_to_csv_query ~output_file =
     dump_sql_to_csv output_file
       ~sql:
-        "SELECT account_identifier_id AS id, block_id \n\
-        \            FROM accounts_accessed \n\
-        \            ORDER BY block_id, id \n"
+        {sql| SELECT account_identifier_id AS id, block_id 
+                 FROM accounts_accessed
+                 JOIN blocks ON block_id = blocks.id
+                 WHERE height <> 1
+                 ORDER BY block_id, id |sql}
     |> Caqti_request.exec Caqti_type.unit
 
   let dump_accounts_accessed_to_csv (module Conn : CONNECTION) output_file =
