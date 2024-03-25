@@ -22,7 +22,9 @@ in Pipeline.build Pipeline.Config::{
         S.strictlyStart (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Command/TestExecutive"),
         S.strictlyStart (S.contains "automation/terraform/modules/o1-integration"),
-        S.strictlyStart (S.contains "automation/terraform/modules/kubernetes/testnet")
+        S.strictlyStart (S.contains "automation/terraform/modules/kubernetes/testnet"),
+        S.strictlyStart (S.contains "automation/buildkite/script/run-test-executive-cloud"),
+        S.strictlyStart (S.contains "automation/buildkite/script/run-test-executive-local")
     ],
     path = "Test",
     name = "TestnetIntegrationTests",
@@ -30,18 +32,18 @@ in Pipeline.build Pipeline.Config::{
     mode = PipelineMode.Type.Stable
   },
   steps = [
-    TestExecutive.execute "peers-reliability" dependsOn,
-    TestExecutive.execute "chain-reliability" dependsOn,
-    TestExecutive.execute "payment" dependsOn,
-    TestExecutive.execute "gossip-consis" dependsOn,
-    TestExecutive.execute "block-prod-prio" dependsOn,
-    TestExecutive.execute "medium-bootstrap" dependsOn,
-    TestExecutive.execute "block-reward" dependsOn,
-    TestExecutive.execute "zkapps" dependsOn,
-    TestExecutive.execute "zkapps-timing" dependsOn,
-    TestExecutive.execute "zkapps-nonce" dependsOn,
-    TestExecutive.execute "verification-key" dependsOn,
-    TestExecutive.execute "slot-end" dependsOn,
-    TestExecutive.execute "epoch-ledger" dependsOn
+    TestExecutive.executeCloud "peers-reliability" dependsOn,
+    TestExecutive.executeCloud "chain-reliability" dependsOn,
+    TestExecutive.executeLocal "payment" dependsOn,
+    TestExecutive.executeCloud "gossip-consis" dependsOn,
+    TestExecutive.executeCloud "block-prod-prio" dependsOn,
+    TestExecutive.executeCloud "medium-bootstrap" dependsOn,
+    TestExecutive.executeCloud "block-reward" dependsOn,
+    TestExecutive.executeCloud "zkapps" dependsOn,
+    TestExecutive.executeCloud "zkapps-timing" dependsOn,
+    TestExecutive.executeCloud "zkapps-nonce" dependsOn,
+    TestExecutive.executeCloud "verification-key" dependsOn,
+    TestExecutive.executeCloud "slot-end" dependsOn,
+    TestExecutive.executeCloud "epoch-ledger" dependsOn
   ]
 }
