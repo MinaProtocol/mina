@@ -310,21 +310,10 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
               | Some acct ->
                   acct
             in
-            let acct_patched =
-              { acct with
-                permissions =
-                  Mina_base.Permissions.Poly.
-                    { acct.permissions with
-                      set_verification_key =
-                        ( fst acct.permissions.set_verification_key
-                        , migrating_from_version )
-                    }
-              }
-            in
             query_migrated_db ~f:(fun db ->
                 match%map
                   Archive_lib.Processor.Accounts_accessed.add_if_doesn't_exist
-                    ~logger db genesis_block_id (index, acct_patched)
+                    ~logger db genesis_block_id (index, acct)
                 with
                 | Ok _ ->
                     Ok ()

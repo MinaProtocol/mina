@@ -692,9 +692,6 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
             return packed_ledger
       in
       let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
-      let%bind () = write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis:1000L ~max_canonical_slot:1000L
-        ~checkpoint_output_folder_opt ~checkpoint_file_prefix ~migration_mode
-      in
       let epoch_ledgers_state_hash_opt =
         Option.map input.target_epoch_ledgers_state_hash
           ~f:State_hash.to_base58_check
