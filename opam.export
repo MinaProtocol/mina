@@ -175,7 +175,7 @@ installed: [
   "odoc-parser.1.0.0"
   "opam-core.2.1.2"
   "opam-depext.1.2.1"
-  "opam-file-format.2.1.4"
+  "opam-file-format.2.1.6"
   "opam-format.2.1.2"
   "ounit2.2.2.6"
   "parsexp.v0.14.2"
