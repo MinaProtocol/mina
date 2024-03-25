@@ -249,7 +249,7 @@ let compare_ledger_hash ~migrated_replayer_output ~fork_config_file =
       Genesis_ledger_helper.Ledger.load
         ~proof_level:Genesis_constants.Proof_level.Full
         ~genesis_dir:Cache_dir.autogen_path
-        ~logger:Logger.(create ())
+        ~logger:Logger.(null ())
         ~constraint_constants:Genesis_constants.Constraint_constants.compiled
         genesis_ledger
     with
