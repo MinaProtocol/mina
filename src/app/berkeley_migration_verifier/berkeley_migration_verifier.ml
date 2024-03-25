@@ -238,7 +238,7 @@ let compare_internal_commands migrated_pool mainnet_pool ~work_dir =
 
   diff_files internal_commands_berk internal_commands_main
 
-let compare_ledger_hash ~migrated_replayer_output ~fork_ledger_hash =
+let compare_ledger_hash ~migrated_replayer_output ~fork_config_file =
   let genesis_ledger =
     Yojson.Safe.from_file migrated_replayer_output
     |> Yojson.Safe.Util.member "genesis_ledger"
@@ -262,7 +262,11 @@ let compare_ledger_hash ~migrated_replayer_output ~fork_ledger_hash =
   in
   let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
   let checkpoint_ledger_hash = Mina_ledger.Ledger.merkle_root ledger in
-  let fork_ledger_hash = Ledger_hash.of_base58_check_exn fork_ledger_hash in
+  let fork_ledger_hash = 
+    Yojson.Basic.from_file fork_config_file 
+    |> member "ledger" |> member "hash" |> to_string 
+    |> Ledger_hash.of_base58_check_exn
+  in
   if Ledger_hash.equal checkpoint_ledger_hash fork_ledger_hash then Check.ok
   else
     Check.err
@@ -360,7 +364,7 @@ let fork_block_height_exn ~fork_config_file =
   fork_config_exn ~fork_config_file |> member "blockchain_length" |> to_int
 
 let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
-    ~migrated_replayer_output ~fork_config_file ~fork_ledger_hash () =
+    ~migrated_replayer_output ~fork_config_file () =
   Async.printf
     "Running verifications for incremental migration between '%s' and '%s' \
      schemas. It may take a couple of minutes... \n"
@@ -439,7 +443,7 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
       |> Test.eval ;
 
       let%bind check =
-        compare_ledger_hash ~migrated_replayer_output ~fork_ledger_hash
+        compare_ledger_hash ~migrated_replayer_output ~fork_config_file
       in
       Test.of_check check ~name:"Verify fork config vs migrated replayer output"
         ~idx:7 ~prefix:"A10.7" test_count
@@ -486,14 +490,9 @@ let post_fork_migration_command =
       Command.Param.flag "--fork-config-file" ~aliases:[ "-fork-config-file" ]
         Command.Param.(required string)
         ~doc:"String Path to fork config file"
-    and fork_ledger_hash =
-      Command.Param.flag "--fork-ledger-hash" ~aliases:[ "-fork-ledger-hash" ]
-        Command.Param.(required string)
-        ~doc:"String Ledger hash of the fork genesis ledger"
     in
-
     post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
-      ~migrated_replayer_output ~fork_config_file ~fork_ledger_hash)
+      ~migrated_replayer_output ~fork_config_file)
 
 let commands =
   [ ("pre-fork", incremental_migration_command)
