@@ -7,7 +7,7 @@ let () = Key_cache_native.linkme (* Ensure that we use the native key cache. *)
 
 module Accounts = struct
   module Single = struct
-    let to_account_with_pk ?overwrite_version :
+    let to_account_with_pk :
         Runtime_config.Accounts.Single.t -> Mina_base.Account.t Or_error.t =
      fun t ->
       let open Or_error.Let_syntax in
@@ -75,12 +75,7 @@ module Accounts = struct
                   .auth
                 ; txn_version
                 } =
-              ( auth_required auth
-              , match overwrite_version with
-                | Some version ->
-                    version
-                | None ->
-                    txn_version )
+              (auth_required auth, txn_version)
             in
             { Mina_base.Permissions.Poly.edit_state = auth_required edit_state
             ; access = auth_required access
@@ -315,7 +310,7 @@ module Accounts = struct
       }
   end
 
-  let to_full ?overwrite_version :
+  let to_full :
       Runtime_config.Accounts.t -> (Private_key.t option * Account.t) list =
     List.map
       ~f:(fun ({ Runtime_config.Accounts.pk; sk; _ } as account_config) ->
@@ -331,8 +326,7 @@ module Accounts = struct
               None
         in
         let account =
-          Single.to_account_with_pk ?overwrite_version
-            { account_config with pk }
+          Single.to_account_with_pk { account_config with pk }
           |> Or_error.ok_exn
         in
         (sk, account) )
