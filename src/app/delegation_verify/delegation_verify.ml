@@ -86,12 +86,8 @@ module Make_verifier (Source : Submission.Data_source) = struct
     let block_hash = Source.block_hash sub in
     if Known_blocks.is_known block_hash then ()
     else
-      let load_block_action =
-        if Source.is_cassandra src then Source.load_block_from_submission sub
-        else Source.load_block src ~block_hash
-      in
       Known_blocks.add ?validate ~verify_blockchain_snarks ~block_hash
-        load_block_action
+        (Source.load_block sub src)
 
   let verify ~validate (submission : Source.submission) =
     let open Deferred.Result.Let_syntax in
@@ -100,7 +96,7 @@ module Make_verifier (Source : Submission.Data_source) = struct
     let%bind () = Known_blocks.is_valid block_hash in
     let%map () =
       if validate then
-        match Source.snark_work submission with
+        match%bind Deferred.return @@ Source.snark_work submission with
         | None ->
             Deferred.Result.return ()
         | Some
@@ -165,8 +161,6 @@ let filesystem_command =
         let module V = Make_verifier (struct
           include Submission.Filesystem
 
-          let is_cassandra _ = false
-
           let verify_blockchain_snarks = verify_blockchain_snarks
 
           let verify_transaction_snarks = verify_transaction_snarks
@@ -199,8 +193,6 @@ let cassandra_command =
         let module V = Make_verifier (struct
           include Submission.Cassandra
 
-          let is_cassandra _ = true
-
           let verify_blockchain_snarks = verify_blockchain_snarks
 
           let verify_transaction_snarks = verify_transaction_snarks
@@ -219,9 +211,37 @@ let cassandra_command =
             Output.display_error @@ Error.to_string_hum e ;
             exit 1)
 
+let stdin_command =
+  Command.async
+    ~summary:"Verify submissions and blocks read from standard input"
+    Command.Let_syntax.(
+      let%map_open config_file = config_flag and no_checks = no_checks_flag in
+      fun () ->
+        let open Deferred.Let_syntax in
+        let logger = Logger.create () in
+        let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
+          instantiate_verify_functions ~logger config_file
+        in
+        let module V = Make_verifier (struct
+          include Submission.Stdin
+
+          let verify_blockchain_snarks = verify_blockchain_snarks
+
+          let verify_transaction_snarks = verify_transaction_snarks
+        end) in
+        match%bind V.process ~validate:(not no_checks) () with
+        | Ok () ->
+            Deferred.unit
+        | Error e ->
+            Output.display_error @@ Error.to_string_hum e ;
+            exit 1)
+
 let command =
   Command.group
     ~summary:"A tool for verifying JSON payload submitted by the uptime service"
-    [ ("fs", filesystem_command); ("cassandra", cassandra_command) ]
+    [ ("fs", filesystem_command)
+    ; ("cassandra", cassandra_command)
+    ; ("stdin", stdin_command)
+    ]
 
 let () = Async.Command.run command
