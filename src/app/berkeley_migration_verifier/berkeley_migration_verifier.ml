@@ -505,8 +505,8 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
       let%bind check =
         compare_internal_commands migrated_pool mainnet_pool ~work_dir
       in
-      Test.of_check check ~name:"Verify internal commands" ~idx:7
-        ~prefix:"D3.8" test_count
+      Test.of_check check ~name:"Verify internal commands" ~idx:7 ~prefix:"D3.8"
+        test_count
       |> Test.eval ;
 
       let check =
