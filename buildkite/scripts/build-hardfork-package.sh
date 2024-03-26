@@ -36,7 +36,7 @@ echo "--- Migrate accounts to new network format"
 #       For now, this is hard-coded to the mainnet -> berkeley migration, but we need to select
 #       a migration to perform in the future.
 # NB: we use sed here instead of jq, because jq is extremely slow at processing this file
-sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "1"}/' config.json
+sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "2"}/' config.json
 
 case "${NETWORK_NAME}" in
   mainnet)
