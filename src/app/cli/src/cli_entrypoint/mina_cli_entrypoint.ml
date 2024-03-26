@@ -400,11 +400,12 @@ let setup_daemon logger =
   and node_error_url =
     flag "--node-error-url" ~aliases:[ "node-error-url" ] (optional string)
       ~doc:"URL of the node error collection service"
-  and simplified_node_stats =
-    flag "--simplified-node-stats"
-      ~aliases:[ "simplified-node-stats" ]
-      (optional_with_default true bool)
-      ~doc:"whether to report simplified node stats (default: true)"
+  and node_status_type =
+    flag "--node-status-type" ~aliases:[ "node-status-type" ]
+      (optional_with_default `Simple Cli_lib.Arg_type.node_status_type)
+      ~doc:
+        "full|simple|none Whether to report simple, full or no node stats \
+         (default: simple)"
   and contact_info =
     flag "--contact-info" ~aliases:[ "contact-info" ] (optional string)
       ~doc:
@@ -1306,7 +1307,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ?precomputed_blocks_path ~log_precomputed_blocks
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
                  ~uptime_submitter_keypair ~stop_time ~node_status_url
-                 ~simplified_node_stats () )
+                 ~node_status_type () )
           in
           { Coda_initialization.coda
           ; client_trustlist
