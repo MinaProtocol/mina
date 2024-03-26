@@ -1546,10 +1546,10 @@ index 297081b7b3..0bdddcfdaa 100644
                   FROM accounts_accessed
                   WHERE block_id = $1
 diff --git a/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml b/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
-index f537435e25..f3d0c9e7ae 100644
+index 9fdec53bbc..684dc0073f 100644
 --- a/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
 +++ b/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
-@@ -323,11 +323,15 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
+@@ -342,11 +342,15 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
  
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
@@ -1567,7 +1567,7 @@ index f537435e25..f3d0c9e7ae 100644
    in
  
    match (mainnet_pool, migrated_pool) with
-@@ -415,10 +419,18 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
+@@ -434,10 +438,18 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
    let mainnet_pool =
@@ -1589,10 +1589,10 @@ index f537435e25..f3d0c9e7ae 100644
  
    match (mainnet_pool, migrated_pool) with
 diff --git a/src/app/berkeley_migration_verifier/sql.ml b/src/app/berkeley_migration_verifier/sql.ml
-index 0bbfc2cacd..4f613b6fc2 100644
+index ff6c92ec9b..e48f33bdb7 100644
 --- a/src/app/berkeley_migration_verifier/sql.ml
 +++ b/src/app/berkeley_migration_verifier/sql.ml
-@@ -11,7 +11,7 @@ module Mainnet = struct
+@@ -38,7 +38,7 @@ module Mainnet = struct
          "  SELECT state_hash, ledger_hash FROM blocks\n\
          \            WHERE chain_status = 'canonical'\n\
          \          "
@@ -1601,7 +1601,7 @@ index 0bbfc2cacd..4f613b6fc2 100644
  
    let dump_block_hashes_till_height_query ~output_file ~height =
      dump_sql_to_csv output_file
-@@ -22,7 +22,7 @@ module Mainnet = struct
+@@ -49,7 +49,7 @@ module Mainnet = struct
             \            WHERE chain_status = 'canonical'\n\
             \            AND height <= %d ORDER BY height\n\
             \      " height )
@@ -1610,7 +1610,7 @@ index 0bbfc2cacd..4f613b6fc2 100644
  
    let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
        height =
-@@ -36,7 +36,7 @@ module Mainnet = struct
+@@ -63,7 +63,7 @@ module Mainnet = struct
          \            WHERE chain_status = 'canonical'\n\
          \            ORDER BY height\n\
          \      "
@@ -1619,7 +1619,7 @@ index 0bbfc2cacd..4f613b6fc2 100644
  
    let dump_block_hashes (module Conn : CONNECTION) output_file =
      Conn.exec (dump_block_hashes_query ~output_file) ()
-@@ -60,7 +60,7 @@ module Mainnet = struct
+@@ -87,7 +87,7 @@ module Mainnet = struct
             \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
              fee_payer_keys.id ORDER BY height, sequence_no\n\
             \      " height )
@@ -1628,7 +1628,7 @@ index 0bbfc2cacd..4f613b6fc2 100644
  
    let dump_user_commands_till_height (module Conn : CONNECTION) output_file
        height =
-@@ -85,7 +85,7 @@ module Mainnet = struct
+@@ -112,7 +112,7 @@ module Mainnet = struct
             \        ORDER BY height, sequence_no, secondary_sequence_no, type \n\
             \   \n\
             \          " height )
@@ -1637,7 +1637,7 @@ index 0bbfc2cacd..4f613b6fc2 100644
  
    let dump_internal_commands_till_height (module Conn : CONNECTION) output_file
        height =
-@@ -108,7 +108,7 @@ module Mainnet = struct
+@@ -135,7 +135,7 @@ module Mainnet = struct
          \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
           fee_payer_keys.id ORDER BY height, sequence_no\n\
          \      "
@@ -1646,7 +1646,7 @@ index 0bbfc2cacd..4f613b6fc2 100644
  
    let dump_user_commands (module Conn : CONNECTION) output_file =
      Conn.exec (dump_user_commands_query ~output_file) ()
-@@ -131,13 +131,13 @@ module Mainnet = struct
+@@ -158,13 +158,13 @@ module Mainnet = struct
             \        ORDER BY height, sequence_no, secondary_sequence_no, type \n\
             \   \n\
             \          " )
@@ -1662,16 +1662,16 @@ index 0bbfc2cacd..4f613b6fc2 100644
        {sql|
        UPDATE blocks
      Set chain_status = 'canonical'
-@@ -166,7 +166,7 @@ end
+@@ -208,7 +208,7 @@ module Berkeley = struct
+     Conn.exec (dump_accounts_created_to_csv_query ~output_file) ()
  
- module Berkeley = struct
    let height_query =
 -    Caqti_request.find Caqti_type.unit Caqti_type.int
 +    Mina_caqti.find_req Caqti_type.unit Caqti_type.int
        {sql| 
              SELECT height from blocks order by height desc limit 1;
            |sql}
-@@ -174,7 +174,7 @@ module Berkeley = struct
+@@ -216,7 +216,7 @@ module Berkeley = struct
    let block_height (module Conn : CONNECTION) = Conn.find height_query ()
  
    let canonical_blocks_count_till_height_query =
@@ -1680,7 +1680,7 @@ index 0bbfc2cacd..4f613b6fc2 100644
        {sql|
          WITH RECURSIVE chain AS 
          (  
-@@ -192,7 +192,7 @@ module Berkeley = struct
+@@ -234,7 +234,7 @@ module Berkeley = struct
      Conn.find canonical_blocks_count_till_height_query height
  
    let blocks_count_query =
@@ -1689,7 +1689,7 @@ index 0bbfc2cacd..4f613b6fc2 100644
        {sql|
            SELECT count(*) FROM blocks ;
          |sql}
-@@ -218,7 +218,7 @@ module Berkeley = struct
+@@ -260,7 +260,7 @@ module Berkeley = struct
             \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
              fee_payer_keys.id ORDER BY height, sequence_no\n\
             \     " height )
@@ -1698,7 +1698,7 @@ index 0bbfc2cacd..4f613b6fc2 100644
  
    let dump_user_commands_till_height (module Conn : CONNECTION) output_file
        height =
-@@ -243,7 +243,7 @@ module Berkeley = struct
+@@ -285,7 +285,7 @@ module Berkeley = struct
             \        ORDER BY height, sequence_no, secondary_sequence_no, \
              command_type \n\
             \      " height )
@@ -1707,7 +1707,7 @@ index 0bbfc2cacd..4f613b6fc2 100644
  
    let dump_internal_commands_till_height (module Conn : CONNECTION) output_file
        height =
-@@ -266,7 +266,7 @@ module Berkeley = struct
+@@ -308,7 +308,7 @@ module Berkeley = struct
          \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
           fee_payer_keys.id ORDER BY height, sequence_no\n\
          \     "
@@ -1716,7 +1716,7 @@ index 0bbfc2cacd..4f613b6fc2 100644
  
    let dump_user_commands (module Conn : CONNECTION) output_file =
      Conn.exec (dump_user_commands_query ~output_file) ()
-@@ -288,7 +288,7 @@ module Berkeley = struct
+@@ -330,7 +330,7 @@ module Berkeley = struct
          \        ORDER BY height, sequence_no, secondary_sequence_no, \
           command_type \n\
          \      "
@@ -1725,7 +1725,7 @@ index 0bbfc2cacd..4f613b6fc2 100644
  
    let dump_internal_commands (module Conn : CONNECTION) output_file =
      Conn.exec (dump_internal_commands_query ~output_file) ()
-@@ -301,7 +301,7 @@ module Berkeley = struct
+@@ -343,7 +343,7 @@ module Berkeley = struct
                   JOIN blocks ON block_id = blocks.id
                   WHERE height <> 1
                   ORDER BY block_id, id |sql}
@@ -1734,7 +1734,7 @@ index 0bbfc2cacd..4f613b6fc2 100644
  
    let dump_accounts_accessed_to_csv (module Conn : CONNECTION) output_file =
      Conn.exec (dump_account_accessed_to_csv_query ~output_file) ()
-@@ -315,7 +315,7 @@ module Berkeley = struct
+@@ -357,7 +357,7 @@ module Berkeley = struct
             \    AND height <= %d ORDER BY height\n\
             \ \n\
             \     " height )
@@ -1743,7 +1743,7 @@ index 0bbfc2cacd..4f613b6fc2 100644
  
    let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
        height =
-@@ -329,7 +329,7 @@ module Berkeley = struct
+@@ -371,7 +371,7 @@ module Berkeley = struct
          \      WHERE chain_status = 'canonical'\n\
          \      ORDER BY height\n\
          \      "
@@ -1752,7 +1752,7 @@ index 0bbfc2cacd..4f613b6fc2 100644
  
    let dump_block_hashes (module Conn : CONNECTION) output_file =
      Conn.exec (dump_block_hashes_query ~output_file) ()
-@@ -361,21 +361,21 @@ module Berkeley = struct
+@@ -403,21 +403,21 @@ module Berkeley = struct
          INNER JOIN internal_commands ON id = internal_command_id
          INNER JOIN account_identifiers ON public_key_id = receiver_id
        ) ORDER BY block_id, id |sql}
