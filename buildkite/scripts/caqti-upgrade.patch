@@ -154,7 +154,7 @@ index c69e1805d1..aac3552028 100644
             SELECT COUNT( * ) FROM blocks
             WHERE parent_id IS NULL
 diff --git a/src/app/archive/lib/processor.ml b/src/app/archive/lib/processor.ml
-index 2b1c58948c..e13f945eb6 100644
+index 33063c8ad7..22769ced53 100644
 --- a/src/app/archive/lib/processor.ml
 +++ b/src/app/archive/lib/processor.ml
 @@ -29,6 +29,7 @@ open Mina_block
@@ -948,15 +948,7 @@ index 2b1c58948c..e13f945eb6 100644
                 (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                    ~tannot:(function
                      | "chain_status" ->
-@@ -3338,6 +3338,7 @@ module Block = struct
-   let add_from_extensional_batch (module Conn : CONNECTION)
-       ?(v1_transaction_hash = false)
-       (blocks : Extensional.Block.t list) =
-+    let _ = genesis_block_hash in
-     let open Deferred.Result.Let_syntax in
-     (* zkapps are currently unsupported in the batch implementation of this function *)
-     assert (List.for_all blocks ~f:(fun block -> List.is_empty block.zkapp_cmds)) ;
-@@ -3398,9 +3399,7 @@ module Block = struct
+@@ -3397,9 +3397,7 @@ module Block = struct
      in
  
      (* we don't need to specify all types here, just the ones that sql may infer incorrectly *)
@@ -967,7 +959,7 @@ index 2b1c58948c..e13f945eb6 100644
        | Bool ->
            Some "BOOL"
        | Int ->
-@@ -3413,39 +3412,36 @@ module Block = struct
+@@ -3412,39 +3410,36 @@ module Block = struct
            Some "BIGINT"
        | Float ->
            Some "FLOAT"
@@ -1026,7 +1018,7 @@ index 2b1c58948c..e13f945eb6 100644
        match typ with
        | Bool ->
            Bool.to_string value
-@@ -3473,45 +3469,30 @@ module Block = struct
+@@ -3472,45 +3467,30 @@ module Block = struct
            (* we are ignoring the enum annotation in this context because it's not always valid to apply *)
            (* NOTE: we assume enum values do not contain special characters (eg "'") *)
            "'" ^ value ^ "'"
@@ -1094,7 +1086,7 @@ index 2b1c58948c..e13f945eb6 100644
      in
      let render_row (type a) (typ : a Caqti_type.t) (value : a) : string =
        "(" ^ String.concat ~sep:"," (render_type typ value) ^ ")"
-@@ -3562,8 +3543,8 @@ module Block = struct
+@@ -3561,8 +3541,8 @@ module Block = struct
          in
          let%map entries =
            Conn.collect_list
@@ -1105,7 +1097,7 @@ index 2b1c58948c..e13f945eb6 100644
                 query )
              ()
          in
-@@ -3581,7 +3562,7 @@ module Block = struct
+@@ -3580,7 +3560,7 @@ module Block = struct
            String.concat ~sep:"," @@ List.map ~f:(render_row typ) values
          in
          Conn.collect_list
@@ -1114,7 +1106,7 @@ index 2b1c58948c..e13f945eb6 100644
               (sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table
                  fields_sql values_sql ) )
            () )
-@@ -3933,7 +3914,7 @@ module Block = struct
+@@ -3932,7 +3912,7 @@ module Block = struct
        let ids_sql = String.concat ~sep:"," ids in
        let parent_ids_sql = String.concat ~sep:"," parent_ids in
        Conn.exec
@@ -1123,59 +1115,7 @@ index 2b1c58948c..e13f945eb6 100644
             (sprintf
                "UPDATE %s AS b SET parent_id = data.parent_id FROM (SELECT \
                 unnest(array[%s]) as id, unnest(array[%s]) as parent_id) AS \
-@@ -4010,12 +3991,14 @@ module Block = struct
-           Caqti_type.[ string; command_type ]
- 
-       let of_command : Internal_command.t -> t =
--        fun {hash; command_type; _} -> {hash; command_type}
-+       fun { hash; command_type; _ } -> { hash; command_type }
-     end in
--
-     let%bind internal_cmd_ids =
--      let compare_by_primary_key (a : Internal_command.t) (b : Internal_command.t) =
--        Internal_command_primary_key.compare (Internal_command_primary_key.of_command a) (Internal_command_primary_key.of_command b)
-+      let compare_by_primary_key (a : Internal_command.t)
-+          (b : Internal_command.t) =
-+        Internal_command_primary_key.compare
-+          (Internal_command_primary_key.of_command a)
-+          (Internal_command_primary_key.of_command b)
-       in
-       List.bind missing_blocks ~f:(fun block ->
-           List.map
-@@ -4023,15 +4006,16 @@ module Block = struct
-               (internal_cmd_to_repr
-                  ~find_public_key_id:(Map.find_exn public_key_ids) )
-             block.internal_cmds )
--      |> Staged.unstage (List.stable_dedup_staged ~compare:compare_by_primary_key)
-+      |> Staged.unstage
-+           (List.stable_dedup_staged ~compare:compare_by_primary_key)
-       |> differential_insert
-            (module Internal_command_primary_key)
--           ~get_key:Internal_command_primary_key.of_command
--           ~get_value:Fn.id
-+           ~get_key:Internal_command_primary_key.of_command ~get_value:Fn.id
-            ~load_index:
-              (load_index
-                 (module Internal_command_primary_key)
--                Internal_command_primary_key.typ ~table:Internal_command.table_name
-+                Internal_command_primary_key.typ
-+                ~table:Internal_command.table_name
-                 ~fields:Internal_command_primary_key.Fields.names )
-            ~insert_values:
-              (bulk_insert Internal_command.typ
-@@ -4057,7 +4041,10 @@ module Block = struct
-                     Map.find_exn block_ids block.state_hash
-                 ; internal_command_id =
-                     Map.find_exn internal_cmd_ids
--                      {hash = txn_hash_to_base58_check ~v1_transaction_hash hash; command_type}
-+                      { hash =
-+                          txn_hash_to_base58_check ~v1_transaction_hash hash
-+                      ; command_type
-+                      }
-                 ; sequence_no
-                 ; secondary_sequence_no
-                 ; status
-@@ -4137,7 +4124,7 @@ module Block = struct
+@@ -4142,7 +4122,7 @@ module Block = struct
                  Some id )
            in
            Conn.find
@@ -1184,7 +1124,7 @@ index 2b1c58948c..e13f945eb6 100644
                 (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                    ~tannot:(function
                      | "sub_window_densities" ->
-@@ -4299,8 +4286,8 @@ module Block = struct
+@@ -4304,8 +4284,8 @@ module Block = struct
    let set_parent_id_if_null (module Conn : CONNECTION) ~parent_hash
        ~(parent_id : int) =
      Conn.exec
@@ -1195,7 +1135,7 @@ index 2b1c58948c..e13f945eb6 100644
           {sql| UPDATE blocks SET parent_id = ?
                 WHERE parent_hash = ?
                 AND parent_id IS NULL
-@@ -4316,8 +4303,8 @@ module Block = struct
+@@ -4321,8 +4301,8 @@ module Block = struct
      in
      let columns = concat Fields.names in
      Conn.collect_list
@@ -1206,7 +1146,7 @@ index 2b1c58948c..e13f945eb6 100644
           typ
           (sprintf
              {sql| WITH RECURSIVE chain AS (
-@@ -4343,37 +4330,37 @@ module Block = struct
+@@ -4348,37 +4328,37 @@ module Block = struct
  
    let get_highest_canonical_block_opt (module Conn : CONNECTION) =
      Conn.find_opt
@@ -1253,7 +1193,7 @@ index 2b1c58948c..e13f945eb6 100644
           {sql| UPDATE blocks SET chain_status='orphaned'
                 WHERE height = $2
                 AND state_hash <> $1
-@@ -4462,7 +4449,7 @@ module Block = struct
+@@ -4467,7 +4447,7 @@ module Block = struct
        | None, Some num_blocks -> (
            match%map
              Conn.find_opt
@@ -1262,7 +1202,7 @@ index 2b1c58948c..e13f945eb6 100644
                   "SELECT MAX(height) FROM blocks" )
                ()
            with
-@@ -4478,8 +4465,8 @@ module Block = struct
+@@ -4483,8 +4463,8 @@ module Block = struct
        let%bind () =
          (* Delete user commands from old blocks. *)
          Conn.exec
@@ -1273,7 +1213,7 @@ index 2b1c58948c..e13f945eb6 100644
               "DELETE FROM user_commands\n\
                WHERE id IN\n\
                (SELECT user_command_id FROM blocks_user_commands\n\
-@@ -4490,8 +4477,8 @@ module Block = struct
+@@ -4495,8 +4475,8 @@ module Block = struct
        let%bind () =
          (* Delete old blocks. *)
          Conn.exec
@@ -1284,7 +1224,7 @@ index 2b1c58948c..e13f945eb6 100644
               "DELETE FROM blocks WHERE blocks.height < ? OR blocks.timestamp < \
                ?" )
            (height, timestamp)
-@@ -4499,7 +4486,7 @@ module Block = struct
+@@ -4504,7 +4484,7 @@ module Block = struct
        let%bind () =
          (* Delete orphaned internal commands. *)
          Conn.exec
@@ -1293,7 +1233,7 @@ index 2b1c58948c..e13f945eb6 100644
               "DELETE FROM internal_commands\n\
                WHERE id NOT IN\n\
                (SELECT internal_commands.id FROM internal_commands\n\
-@@ -4510,7 +4497,7 @@ module Block = struct
+@@ -4515,7 +4495,7 @@ module Block = struct
        let%bind () =
          (* Delete orphaned snarked ledger hashes. *)
          Conn.exec
@@ -1302,7 +1242,7 @@ index 2b1c58948c..e13f945eb6 100644
               "DELETE FROM snarked_ledger_hashes\n\
                WHERE id NOT IN\n\
                (SELECT snarked_ledger_hash_id FROM blocks)" )
-@@ -4519,7 +4506,7 @@ module Block = struct
+@@ -4524,7 +4504,7 @@ module Block = struct
        let%bind () =
          (* Delete orphaned public keys. *)
          Conn.exec
@@ -1311,7 +1251,7 @@ index 2b1c58948c..e13f945eb6 100644
               "DELETE FROM public_keys\n\
                WHERE id NOT IN (SELECT fee_payer_id FROM user_commands)\n\
                AND id NOT IN (SELECT source_id FROM user_commands)\n\
-@@ -4945,7 +4932,13 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
+@@ -4950,7 +4930,13 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
            Strict_pipe.Writer.write extensional_block_writer extensional_block )
      ]
    in
@@ -1346,7 +1286,7 @@ index 95e0a9df56..082d1c4021 100644
        [%log fatal]
          ~metadata:[ ("error", `String (Caqti_error.show e)) ]
 diff --git a/src/app/berkeley_migration/berkeley_migration.ml b/src/app/berkeley_migration/berkeley_migration.ml
-index e84501dc8c..cd53c6824c 100644
+index 6c1873978a..f5eb0de329 100644
 --- a/src/app/berkeley_migration/berkeley_migration.ml
 +++ b/src/app/berkeley_migration/berkeley_migration.ml
 @@ -69,8 +69,8 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
@@ -1382,28 +1322,25 @@ index e84501dc8c..cd53c6824c 100644
                 (sprintf "SELECT id, value FROM %s WHERE id IN (%s)"
                    Sql.Mainnet.Public_key.table_name
                    ( String.concat ~sep:","
-@@ -330,10 +330,18 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -329,11 +329,15 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+   let logger = Logger.create () in
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
++  let pool_config =
++    Caqti_pool_config.(
++      merge_left (default_from_env ()) (create ~max_size:128 ()))
++  in
    let mainnet_pool =
 -    Caqti_async.connect_pool ~max_size:128 mainnet_archive_uri
-+    Caqti_async.connect_pool
-+      ~pool_config:
-+        Caqti_pool_config.(
-+          merge_left (default_from_env ()) (create ~max_size:128 ()))
-+      mainnet_archive_uri
++    Caqti_async.connect_pool ~pool_config mainnet_archive_uri
    in
    let migrated_pool =
 -    Caqti_async.connect_pool ~max_size:128 migrated_archive_uri
-+    Caqti_async.connect_pool
-+      ~pool_config:
-+        Caqti_pool_config.(
-+          merge_left (default_from_env ()) (create ~max_size:128 ()))
-+      migrated_archive_uri
++    Caqti_async.connect_pool ~pool_config migrated_archive_uri
    in
    match (mainnet_pool, migrated_pool) with
    | Error e, _ | _, Error e ->
-@@ -401,7 +409,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -400,7 +404,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
          let%bind garbage_block_ids =
            query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
                Conn.collect_list
@@ -1412,7 +1349,7 @@ index e84501dc8c..cd53c6824c 100644
                     (sprintf
                        "DELETE FROM %s WHERE parent_id IS NULL AND height > 1 \
                         RETURNING id"
-@@ -417,7 +425,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -416,7 +420,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
            let%bind () =
              query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
                  Conn.exec
@@ -1421,7 +1358,7 @@ index e84501dc8c..cd53c6824c 100644
                       (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
                          Archive_lib.Processor.Block_and_signed_command
                          .table_name garbage_block_ids_sql ) )
-@@ -425,7 +433,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -424,7 +428,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
            in
            query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
                Conn.exec
@@ -1430,14 +1367,14 @@ index e84501dc8c..cd53c6824c 100644
                     (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
                        Archive_lib.Processor.Block_and_internal_command
                        .table_name garbage_block_ids_sql ) )
-@@ -508,7 +516,6 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
-                    | Error (`Encode_failed _ as err)
-                    | Error (`Encode_rejected _ as err)
-                    | Error (`Request_failed _ as err)
--                   | Error (`Request_rejected _ as err)
-                    | Error (`Response_failed _ as err)
-                    | Error (`Response_rejected _ as err) ->
-                        failwithf "Could not archive extensional block batch: %s"
+@@ -522,7 +526,6 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+                      | Error (`Encode_failed _ as err)
+                      | Error (`Encode_rejected _ as err)
+                      | Error (`Request_failed _ as err)
+-                     | Error (`Request_rejected _ as err)
+                      | Error (`Response_failed _ as err)
+                      | Error (`Response_rejected _ as err) ->
+                          failwithf
 diff --git a/src/app/berkeley_migration/sql.ml b/src/app/berkeley_migration/sql.ml
 index 297081b7b3..0bdddcfdaa 100644
 --- a/src/app/berkeley_migration/sql.ml
@@ -1609,31 +1546,28 @@ index 297081b7b3..0bdddcfdaa 100644
                   FROM accounts_accessed
                   WHERE block_id = $1
 diff --git a/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml b/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
-index f537435e25..c5f2ceae03 100644
+index f537435e25..f3d0c9e7ae 100644
 --- a/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
 +++ b/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
-@@ -324,10 +324,18 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
+@@ -323,11 +323,15 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
+ 
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
++  let pool_config =
++    Caqti_pool_config.(
++      merge_left (default_from_env ()) (create ~max_size:128 ()))
++  in
    let mainnet_pool =
 -    Caqti_async.connect_pool ~max_size:128 mainnet_archive_uri
-+    Caqti_async.connect_pool
-+      ~pool_config:
-+        Caqti_pool_config.(
-+          merge_left (default_from_env ()) (create ~max_size:128 ()))
-+      mainnet_archive_uri
++    Caqti_async.connect_pool ~pool_config mainnet_archive_uri
    in
    let migrated_pool =
 -    Caqti_async.connect_pool ~max_size:128 migrated_archive_uri
-+    Caqti_async.connect_pool
-+      ~pool_config:
-+        Caqti_pool_config.(
-+          merge_left (default_from_env ()) (create ~max_size:128 ()))
-+      migrated_archive_uri
++    Caqti_async.connect_pool ~pool_config migrated_archive_uri
    in
  
    match (mainnet_pool, migrated_pool) with
-@@ -415,10 +423,18 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
+@@ -415,10 +419,18 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
    let mainnet_pool =
@@ -1655,7 +1589,7 @@ index f537435e25..c5f2ceae03 100644
  
    match (mainnet_pool, migrated_pool) with
 diff --git a/src/app/berkeley_migration_verifier/sql.ml b/src/app/berkeley_migration_verifier/sql.ml
-index 17ba9640a3..e51c463756 100644
+index 0bbfc2cacd..4f613b6fc2 100644
 --- a/src/app/berkeley_migration_verifier/sql.ml
 +++ b/src/app/berkeley_migration_verifier/sql.ml
 @@ -11,7 +11,7 @@ module Mainnet = struct
@@ -1791,16 +1725,16 @@ index 17ba9640a3..e51c463756 100644
  
    let dump_internal_commands (module Conn : CONNECTION) output_file =
      Conn.exec (dump_internal_commands_query ~output_file) ()
-@@ -299,7 +299,7 @@ module Berkeley = struct
-         "SELECT account_identifier_id AS id, block_id \n\
-         \            FROM accounts_accessed \n\
-         \            ORDER BY block_id, id \n"
+@@ -301,7 +301,7 @@ module Berkeley = struct
+                  JOIN blocks ON block_id = blocks.id
+                  WHERE height <> 1
+                  ORDER BY block_id, id |sql}
 -    |> Caqti_request.exec Caqti_type.unit
 +    |> Mina_caqti.exec_req Caqti_type.unit
  
    let dump_accounts_accessed_to_csv (module Conn : CONNECTION) output_file =
      Conn.exec (dump_account_accessed_to_csv_query ~output_file) ()
-@@ -313,7 +313,7 @@ module Berkeley = struct
+@@ -315,7 +315,7 @@ module Berkeley = struct
             \    AND height <= %d ORDER BY height\n\
             \ \n\
             \     " height )
@@ -1809,7 +1743,7 @@ index 17ba9640a3..e51c463756 100644
  
    let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
        height =
-@@ -327,7 +327,7 @@ module Berkeley = struct
+@@ -329,7 +329,7 @@ module Berkeley = struct
          \      WHERE chain_status = 'canonical'\n\
          \      ORDER BY height\n\
          \      "
@@ -1818,10 +1752,10 @@ index 17ba9640a3..e51c463756 100644
  
    let dump_block_hashes (module Conn : CONNECTION) output_file =
      Conn.exec (dump_block_hashes_query ~output_file) ()
-@@ -359,21 +359,21 @@ module Berkeley = struct
-         \    INNER JOIN internal_commands ON id = internal_command_id\n\
-         \    INNER JOIN account_identifiers ON public_key_id = receiver_id\n\
-         \  ) ORDER BY block_id, id"
+@@ -361,21 +361,21 @@ module Berkeley = struct
+         INNER JOIN internal_commands ON id = internal_command_id
+         INNER JOIN account_identifiers ON public_key_id = receiver_id
+       ) ORDER BY block_id, id |sql}
 -    |> Caqti_request.exec Caqti_type.unit
 +    |> Mina_caqti.exec_req Caqti_type.unit
  
