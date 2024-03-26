@@ -206,9 +206,7 @@ let
             src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
             src/app/replayer/replayer.exe \
             src/app/swap_bad_balances/swap_bad_balances.exe \
-            src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-            src/app/berkeley_migration/berkeley_migration.exe \
-            src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe
+            src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
           # TODO figure out purpose of the line below
           # dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
           # Building documentation fails, because not everything in the source tree compiles. Ignore the errors.
@@ -224,11 +222,10 @@ let
           "genesis"
           "sample"
           "batch_txn_tool"
-          "berkeley_migration"
         ];
 
         installPhase = ''
-          mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin $berkeley_migration/bin
+          mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
           # TODO uncomment when genesis is generated above
           # mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
           pushd _build/default
@@ -247,9 +244,6 @@ let
           cp src/app/archive_blocks/archive_blocks.exe $archive/bin/mina-archive-blocks
           cp src/app/missing_blocks_auditor/missing_blocks_auditor.exe $archive/bin/mina-missing-blocks-auditor
           cp src/app/replayer/replayer.exe $archive/bin/mina-replayer
-          cp src/app/replayer/replayer.exe $berkeley_migration/bin/mina-replayer
-          cp src/app/berkeley_migration/berkeley_migration.exe $berkeley_migration/bin/mina-berkeley-migration
-          cp src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe $berkeley_migration/bin/mina-berkeley-migration-verifier
           cp src/app/swap_bad_balances/swap_bad_balances.exe $archive/bin/mina-swap-bad-balances
           cp -R _doc/_html $out/share/doc/html
           # cp src/lib/mina_base/sample_keypairs.json $sample/share/mina
@@ -282,6 +276,35 @@ let
       });
 
       devnet = wrapMina self.devnet-pkg { };
+
+      berkeley-migration-pkg = self.mina-dev.overrideAttrs (s: {
+        pname = "mina-berkeley-migration";
+        version = "mainnet";
+        DUNE_PROFILE = "berkeley_archive_migration";
+        # For compatibility with Docker build
+        MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
+        buildPhase = ''
+          dune build --display=short \
+            src/app/berkeley_migration/berkeley_migration.exe \
+            src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe \
+            src/app/replayer/replayer.exe
+        '';
+
+        outputs = [ "out" ];
+
+        installPhase = ''
+          mkdir -p $out/bin
+          pushd _build/default
+          cp src/app/berkeley_migration/berkeley_migration.exe $out/bin/mina-berkeley-migration
+          cp src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe $out/bin/mina-berkeley-migration-verifier
+          cp src/app/replayer/replayer.exe $out/bin/mina-migration-replayer
+          popd
+          remove-references-to -t $(dirname $(dirname $(command -v ocaml))) $out/bin/*
+        '';
+        shellHook = "";
+      });
+
+      berkeley-migration = wrapMina self.berkeley-migration-pkg { };
 
       # Unit tests
       mina_tests = runMinaCheck {

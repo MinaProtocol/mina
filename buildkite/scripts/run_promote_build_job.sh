@@ -32,7 +32,7 @@ function usage() {
   echo "  CODENAME            The Debian codename (Bullseye, Buster etc.)"
   echo "  VERSION             The Docker or Debian version"
   echo "  NEW_VERSION         The new Debian version or new Docker tag"
-  echo "  PROFILE             The Docker and Debian profile (Standard, Lightnet)"
+  echo "  PROFILE             The Docker and Debian profile (Standard, Lightnet, BerkeleyMigration)"
   echo "  FROM_CHANNEL        The Docker name (mina-berkeley, mina-archive etc.)"
   echo "  TO_CHANNEL          The Docker version"
   echo "  PUBLISH             The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io"
