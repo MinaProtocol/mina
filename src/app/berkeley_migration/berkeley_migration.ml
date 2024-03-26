@@ -325,7 +325,7 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
 
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
     ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
-    ~keep_precomputed_blocks () =
+    ~stream_precomputed_blocks ~keep_precomputed_blocks () =
   let logger = Logger.create () in
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
@@ -466,55 +466,79 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
         List.sort mainnet_blocks_unmigrated ~compare:(fun block1 block2 ->
             Int64.compare block1.height block2.height )
       in
-      let required_precomputed_block_ids =
-        List.map mainnet_blocks_to_migrate ~f:(fun { height; state_hash; _ } ->
+      let required_precomputed_blocks (blocks : Sql.Mainnet.Block.t list) :
+          Precomputed_block.Id.t list =
+        List.map blocks ~f:(fun { height; state_hash; _ } ->
             (height, state_hash) )
         |> List.filter ~f:(fun (height, _) -> Int64.(height > 1L))
         |> List.map ~f:(fun (height, state_hash) ->
                ( Mina_numbers.Length.of_int (Int64.to_int_exn height)
                , Mina_base.State_hash.of_base58_check_exn state_hash ) )
       in
-      let%bind precomputed_blocks =
+      let fetch_precomputed_blocks_for (blocks : Sql.Mainnet.Block.t list) =
         Precomputed_block.concrete_fetch_batch ~logger
           ~bucket:mina_network_blocks_bucket ~network
-          required_precomputed_block_ids
+          (required_precomputed_blocks blocks)
+      in
+      let%bind prefetched_precomputed_blocks =
+        if stream_precomputed_blocks then return Mina_base.State_hash.Map.empty
+        else (
+          [%log info] "Prefetching all required precomputed blocks" ;
+          fetch_precomputed_blocks_for mainnet_blocks_to_migrate )
       in
       [%log info] "Migrating mainnet blocks" ;
       let%bind () =
         List.chunks_of ~length:batch_size mainnet_blocks_to_migrate
         |> Deferred.List.iter ~f:(fun (blocks : Sql.Mainnet.Block.t list) ->
-               (* TODO: state hash list in metadata *)
                [%log info] "Migrating %d blocks starting at height %Ld (%s..%s)"
                  (List.length blocks) (List.hd_exn blocks).height
                  (List.hd_exn blocks).state_hash
                  (List.last_exn blocks).state_hash ;
+               let%bind precomputed_blocks =
+                 if stream_precomputed_blocks then (
+                   [%log info] "Fetching batch of precomputed blocks" ;
+                   fetch_precomputed_blocks_for blocks )
+                 else return prefetched_precomputed_blocks
+               in
                [%log info] "Converting blocks to extensional format..." ;
                let%bind extensional_blocks =
                  mainnet_block_to_extensional_batch ~logger ~mainnet_pool
                    ~genesis_block ~precomputed_blocks blocks
                in
                [%log info] "Adding blocks to migrated database..." ;
-               query_migrated_db ~f:(fun db ->
-                   match%map
-                     Archive_lib.Processor.Block.add_from_extensional_batch db
-                       extensional_blocks ~v1_transaction_hash:true
-                   with
-                   | Ok _id ->
-                       Ok ()
-                   | Error (`Congested _) ->
-                       failwith
-                         "Could not archive extensional block batch: congested"
-                   | Error (`Decode_rejected _ as err)
-                   | Error (`Encode_failed _ as err)
-                   | Error (`Encode_rejected _ as err)
-                   | Error (`Request_failed _ as err)
-                   | Error (`Request_rejected _ as err)
-                   | Error (`Response_failed _ as err)
-                   | Error (`Response_rejected _ as err) ->
-                       failwithf "Could not archive extensional block batch: %s"
-                         (Caqti_error.show err) () ) )
+               let%bind () =
+                 query_migrated_db ~f:(fun db ->
+                     match%map
+                       Archive_lib.Processor.Block.add_from_extensional_batch db
+                         extensional_blocks ~v1_transaction_hash:true
+                         ~genesis_block_hash:
+                           (Mina_base.State_hash.State_hashes.state_hash
+                              genesis_state_hashes )
+                     with
+                     | Ok _id ->
+                         Ok ()
+                     | Error (`Congested _) ->
+                         failwith
+                           "Could not archive extensional block batch: \
+                            congested"
+                     | Error (`Decode_rejected _ as err)
+                     | Error (`Encode_failed _ as err)
+                     | Error (`Encode_rejected _ as err)
+                     | Error (`Request_failed _ as err)
+                     | Error (`Request_rejected _ as err)
+                     | Error (`Response_failed _ as err)
+                     | Error (`Response_rejected _ as err) ->
+                         failwithf
+                           "Could not archive extensional block batch: %s"
+                           (Caqti_error.show err) () )
+               in
+               if stream_precomputed_blocks && not keep_precomputed_blocks then
+                 Precomputed_block.delete_fetched_concrete ~network
+                   (required_precomputed_blocks blocks)
+               else return () )
       in
       let%bind () =
+        (* this will still run even if we are downloading precomputed blocks in batches, to handle any leftover blocks from prior runs *)
         if not keep_precomputed_blocks then (
           [%log info] "Deleting all precomputed blocks" ;
           let%map () = Precomputed_block.delete_fetched ~network in
@@ -564,6 +588,13 @@ let () =
            Param.flag "--network" ~aliases:[ "-network" ]
              Param.(required string)
              ~doc:"Network name used when downloading precomputed blocks"
+         and stream_precomputed_blocks =
+           Param.flag "--stream-precomputed-blocks"
+             ~aliases:[ "-stream-precomputed-blocks" ]
+             Param.no_arg
+             ~doc:
+               "Download precomputed blocks in chunks; this is much slower,\n\
+               \                but uses far less disk space"
          and keep_precomputed_blocks =
            Param.flag "--keep-precomputed-blocks"
              ~aliases:[ "-keep-precomputed-blocks" ]
@@ -574,4 +605,4 @@ let () =
          in
          main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
            ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
-           ~keep_precomputed_blocks )))
+           ~stream_precomputed_blocks ~keep_precomputed_blocks )))
