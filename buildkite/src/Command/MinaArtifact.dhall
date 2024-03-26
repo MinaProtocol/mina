@@ -28,7 +28,7 @@ in
 let HardforkPipelineMode  = < ForTest | ForRelease >
 
 let fromEnvOrTest = \(mode : HardforkPipelineMode) -> \(envVar : Text) -> \(default : Text) ->
-  merge { ForTest = "${envVar}=\$${envVar}", ForRelease = "${envVar}=${default}" } mode
+  merge { ForRelease = "${envVar}=\$${envVar}", ForTest = "${envVar}=${default}" } mode
 
 
 --- NB: unlike the regular artifact piopeline, the hardfork pipeline receives many of its parameters as env vars
