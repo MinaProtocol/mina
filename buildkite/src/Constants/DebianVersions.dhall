@@ -27,14 +27,29 @@ let lowerName = \(debVersion : DebVersion) ->
 
 --- Bullseye and Focal are so similar that they share a toolchain runner
 --- Same with Bookworm and Jammy
-let toolchainRunner = \(debVersion : DebVersion) ->
+let toolchainRunner = \(debVersion : DebVersion) -> \(profile : Profiles.Type) ->
+  let baseRunner = merge {
+     Bookworm = RunInToolchain.runInToolchainBookworm
+     , Bullseye = RunInToolchain.runInToolchainBullseye
+     , Buster = RunInToolchain.runInToolchainBuster
+     , Jammy = RunInToolchain.runInToolchainBookworm
+     , Focal = RunInToolchain.runInToolchainBullseye
+   } debVersion
+  in
+  let caqtiRunner = merge {
+      Bookworm = RunInToolchain.runInToolchainCaqtiBookworm
+      , Bullseye = RunInToolchain.runInToolchainCaqtiBullseye
+      , Buster = RunInToolchain.runInToolchainCaqtiBuster
+      , Jammy = RunInToolchain.runInToolchainCaqtiBookworm
+      , Focal = RunInToolchain.runInToolchainCaqtiBullseye
+    } debVersion
+  in
   merge {
-    Bookworm = RunInToolchain.runInToolchainBookworm
-    , Bullseye = RunInToolchain.runInToolchainBullseye
-    , Buster = RunInToolchain.runInToolchainBuster
-    , Jammy = RunInToolchain.runInToolchainBookworm
-    , Focal = RunInToolchain.runInToolchainBullseye
-  } debVersion
+    Standard = baseRunner
+    , Lightnet = baseRunner
+    , BerkeleyMigration = caqtiRunner
+    , Hardfork = baseRunner
+  } profile
 
 --- Bullseye and Focal are so similar that they share a toolchain image
 --- Same with Bookworm and Jammy
