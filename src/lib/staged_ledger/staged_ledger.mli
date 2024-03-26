@@ -260,7 +260,8 @@ module Application_state : sig
     ; total_space_remaining : int
     }
 
-  val init : ?zkapp_limit:int -> total_limit:int -> t
+  (** [init ?zkapp_limit total_limit] *)
+  val init : ?zkapp_limit:int -> int -> t
 
   val try_applying_txn :
        ?logger:Logger.t
