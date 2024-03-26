@@ -254,7 +254,7 @@ let concrete_fetch_batch ~logger ~bucket ~network targets =
       (state_hash, block) )
   >>| Mina_base.State_hash.Map.of_alist_exn
 
-let delete_fetched ~network : unit Deferred.t =
+let delete_fetched_concrete ~network targets : unit Deferred.t =
   (* not perfect, but this is a reasonably portable default *)
   let max_args_size = (*16kb*) 16 * 1024 in
   (* break a list up into chunks using a fold operation *)
@@ -276,9 +276,7 @@ let delete_fetched ~network : unit Deferred.t =
     in
     List.rev (loop list init [] [])
   in
-  let%bind block_ids = list_directory ~network in
-  Set.to_list block_ids
-  |> List.map ~f:(Id.filename ~network)
+  List.map targets ~f:(Id.filename ~network)
   |> chunk_using ~init:0 ~f:(fun accumulated_size block_id ->
          let arg_size = String.length block_id in
          let size_with_new_arg = accumulated_size + String.length block_id in
@@ -291,3 +289,7 @@ let delete_fetched ~network : unit Deferred.t =
          | Error err ->
              failwithf "Could not delete fetched precomputed blocks, error %s"
                (Error.to_string_hum err) () )
+
+let delete_fetched ~network : unit Deferred.t =
+  let%bind block_ids = list_directory ~network in
+  delete_fetched_concrete ~network (Set.to_list block_ids)
