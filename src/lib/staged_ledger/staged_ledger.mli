@@ -133,7 +133,7 @@ module Scan_state : sig
     -> unit Deferred.Or_error.t
 end
 
-module Pre_diff_info : Pre_diff_info.S
+module Pre_diff_info : Pre_diff_info_intf.S
 
 module Staged_ledger_error : sig
   type t =

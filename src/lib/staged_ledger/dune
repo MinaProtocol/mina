@@ -4,6 +4,7 @@
  (library_flags -linkall)
  (flags -open Core_kernel)
  (inline_tests (flags -verbose -show-counts))
+  (modules_without_implementation pre_diff_info_intf)
  (libraries
    ;; opam libraries
   async
