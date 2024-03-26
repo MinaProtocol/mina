@@ -364,8 +364,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
               (Error.to_string_hum err) ()
       in
       [%log info] "Got precomputed values from runtime config" ;
-      let ( With_hash.{ data = genesis_block; hash = _ }
-          , _validation ) =
+      let With_hash.{ data = genesis_block; hash = _ }, _validation =
         Mina_block.genesis ~precomputed_values
       in
       let%bind () =
@@ -459,7 +458,8 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
               Int64.( > ) block.height greatest_migrated_height )
       in
       [%log info] "Will migrate %d %s blocks"
-        (List.length mainnet_blocks_unmigrated) network ;
+        (List.length mainnet_blocks_unmigrated)
+        network ;
       (* blocks in height order *)
       (* TODO: this ordering is actually already done by the sql query, so we can skip this here *)
       let mainnet_blocks_to_migrate =

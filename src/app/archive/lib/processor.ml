@@ -3336,8 +3336,7 @@ module Block = struct
   (* NB: this batching logic an lead to partial writes; it is acceptable to be used with the
      migration tool, but not acceptable to be used with the archive node in its current form *)
   let add_from_extensional_batch (module Conn : CONNECTION)
-      ?(v1_transaction_hash = false)
-      (blocks : Extensional.Block.t list) =
+      ?(v1_transaction_hash = false) (blocks : Extensional.Block.t list) =
     let open Deferred.Result.Let_syntax in
     (* zkapps are currently unsupported in the batch implementation of this function *)
     assert (List.for_all blocks ~f:(fun block -> List.is_empty block.zkapp_cmds)) ;
@@ -4010,12 +4009,14 @@ module Block = struct
           Caqti_type.[ string; command_type ]
 
       let of_command : Internal_command.t -> t =
-        fun {hash; command_type; _} -> {hash; command_type}
+       fun { hash; command_type; _ } -> { hash; command_type }
     end in
-
     let%bind internal_cmd_ids =
-      let compare_by_primary_key (a : Internal_command.t) (b : Internal_command.t) =
-        Internal_command_primary_key.compare (Internal_command_primary_key.of_command a) (Internal_command_primary_key.of_command b)
+      let compare_by_primary_key (a : Internal_command.t)
+          (b : Internal_command.t) =
+        Internal_command_primary_key.compare
+          (Internal_command_primary_key.of_command a)
+          (Internal_command_primary_key.of_command b)
       in
       List.bind missing_blocks ~f:(fun block ->
           List.map
@@ -4023,15 +4024,16 @@ module Block = struct
               (internal_cmd_to_repr
                  ~find_public_key_id:(Map.find_exn public_key_ids) )
             block.internal_cmds )
-      |> Staged.unstage (List.stable_dedup_staged ~compare:compare_by_primary_key)
+      |> Staged.unstage
+           (List.stable_dedup_staged ~compare:compare_by_primary_key)
       |> differential_insert
            (module Internal_command_primary_key)
-           ~get_key:Internal_command_primary_key.of_command
-           ~get_value:Fn.id
+           ~get_key:Internal_command_primary_key.of_command ~get_value:Fn.id
            ~load_index:
              (load_index
                 (module Internal_command_primary_key)
-                Internal_command_primary_key.typ ~table:Internal_command.table_name
+                Internal_command_primary_key.typ
+                ~table:Internal_command.table_name
                 ~fields:Internal_command_primary_key.Fields.names )
            ~insert_values:
              (bulk_insert Internal_command.typ
@@ -4049,7 +4051,7 @@ module Block = struct
                    ; status
                    ; failure_reason
                    ; command_type
-                   ; fee= _
+                   ; fee = _
                    ; receiver = _
                    }
                  ->
@@ -4057,7 +4059,10 @@ module Block = struct
                     Map.find_exn block_ids block.state_hash
                 ; internal_command_id =
                     Map.find_exn internal_cmd_ids
-                      {hash = txn_hash_to_base58_check ~v1_transaction_hash hash; command_type}
+                      { hash =
+                          txn_hash_to_base58_check ~v1_transaction_hash hash
+                      ; command_type
+                      }
                 ; sequence_no
                 ; secondary_sequence_no
                 ; status
