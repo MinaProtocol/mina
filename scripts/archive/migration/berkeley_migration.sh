@@ -30,6 +30,7 @@ function check_required() {
 check_required mina-berkeley-migration
 check_required mina-berkeley-migration-verifier
 check_required mina-migration-replayer
+check_required mina-logproc
 check_required jq
 check_required gsutil
 
@@ -269,7 +270,7 @@ function run_initial_migration() {
         --config-file "$__genesis_ledger" \
         --blocks-bucket "$__blocks_bucket" \
         $(format_migration_args "$__keep_precomputed_blocks" "$__stream_blocks") \
-        --network "$__network" | tee "$__berkely_migration_log"
+        --network "$__network" |& tee "$__berkely_migration_log" | mina-logproc
 
     set +e # skip error because we will do validations and we are better than replayer i reporting
 
@@ -278,7 +279,7 @@ function run_initial_migration() {
         --archive-uri "$__migrated_archive_uri" \
         --input-file "$__config_file" \
         --checkpoint-interval 1000 \
-        --checkpoint-file-prefix "$CHECKPOINT_PREFIX" | tee "$__replayer_log"
+        --checkpoint-file-prefix "$CHECKPOINT_PREFIX" | tee "$__replayer_log" | mina-logproc
 
     check_logs "$__berkely_migration_log" "$__replayer_log"
 
@@ -499,7 +500,7 @@ function run_incremental_migration() {
         --config-file "$__genesis_ledger" \
         --blocks-bucket "$__blocks_bucket" \
         $(format_migration_args "$__keep_precomputed_blocks" "$__stream_blocks") \
-        --network "$__network" | tee "$__berkely_migration_log"
+        --network "$__network" |& tee "$__berkely_migration_log" | mina-logproc
     
     set +e # skip error because we will do validations and we are better than replayer i reporting
 
@@ -508,7 +509,7 @@ function run_incremental_migration() {
         --archive-uri "$__migrated_archive_uri" \
         --input-file "$__replayer_checkpoint" \
         --checkpoint-interval "$__checkpoint_interval" \
-        --checkpoint-file-prefix "$CHECKPOINT_PREFIX" | tee "$__replayer_log"  
+        --checkpoint-file-prefix "$CHECKPOINT_PREFIX" |& tee "$__replayer_log" | mina-logproc
 
     check_logs "$__berkely_migration_log" "$__replayer_log"
 
@@ -729,7 +730,7 @@ function run_final_migration() {
         --blocks-bucket "$__blocks_bucket" \
         $(format_migration_args "$__keep_precomputed_blocks" "$__stream_blocks") \
         --fork-state-hash "$__fork_state_hash" \
-        --network "$__network" | tee "$__berkely_migration_log"
+        --network "$__network" |& tee "$__berkely_migration_log" | mina-logproc
     
     set +e # skip error because we will do validations and we are better than replayer i reporting
 
@@ -738,7 +739,7 @@ function run_final_migration() {
         --archive-uri "$__migrated_archive_uri" \
         --input-file "$__replayer_checkpoint" \
         --checkpoint-interval "$__checkpoint_interval" \
-        --checkpoint-file-prefix "$CHECKPOINT_PREFIX" | tee "$__replayer_log"
+        --checkpoint-file-prefix "$CHECKPOINT_PREFIX" |& tee "$__replayer_log" | mina-logproc
 
     check_logs "$__berkely_migration_log" "$__replayer_log"
     set -e # exit immediately on errors
