@@ -5,6 +5,18 @@ open Caqti_async
 
 module Mainnet = struct
   module Public_key = struct
+    let typ : Signature_lib.Public_key.Compressed.t Caqti_type.t =
+      let encode c =
+        Ok (Signature_lib.Public_key.Compressed.to_base58_check c)
+      in
+      let decode s =
+        Result.map_error ~f:Error.to_string_hum
+        @@ Signature_lib.Public_key.Compressed.of_base58_check s
+      in
+      Caqti_type.custom ~encode ~decode Caqti_type.string
+
+    let table_name = "public_keys"
+
     let find_by_id (module Conn : CONNECTION) id =
       Conn.find
         (Caqti_request.find Caqti_type.int Caqti_type.string
@@ -22,7 +34,8 @@ module Mainnet = struct
 
   module Block = struct
     type t =
-      { state_hash : string
+      { id : int
+      ; state_hash : string
       ; parent_id : int option
       ; parent_hash : string
       ; creator_id : int
@@ -43,7 +56,8 @@ module Mainnet = struct
       let open Mina_caqti.Type_spec in
       let spec =
         Caqti_type.
-          [ string
+          [ int
+          ; string
           ; option int
           ; string
           ; int
@@ -75,7 +89,7 @@ module Mainnet = struct
     let load (module Conn : CONNECTION) ~(id : int) =
       Conn.find
         (Caqti_request.find Caqti_type.int typ
-           {sql| SELECT state_hash, parent_id, parent_hash, creator_id,
+           {sql| SELECT id, state_hash, parent_id, parent_hash, creator_id,
                         block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id,
                         next_epoch_data_id, ledger_hash, height, global_slot,
                         global_slot_since_genesis, timestamp, chain_status FROM blocks
@@ -88,6 +102,18 @@ module Mainnet = struct
            {sql| SELECT id
                  FROM blocks
                  WHERE chain_status = 'canonical'
+         |sql} )
+
+    let full_canonical_blocks (module Conn : CONNECTION) =
+      Conn.collect_list
+        (Caqti_request.collect Caqti_type.unit typ
+           {sql| SELECT id, state_hash, parent_id, parent_hash, creator_id,
+                        block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id,
+                        next_epoch_data_id, ledger_hash, height, global_slot,
+                        global_slot_since_genesis, timestamp, chain_status
+                 FROM blocks
+                 WHERE chain_status = 'canonical'
+                 ORDER BY height ASC
          |sql} )
 
     let mark_as_canonical (module Conn : CONNECTION) id =
@@ -111,18 +137,18 @@ module Mainnet = struct
            {sql| WITH RECURSIVE chain AS (
                     SELECT id, parent_id, height
                     FROM blocks b WHERE b.id = $1
-      
+
                     UNION ALL
-      
-                    SELECT b.id, b.parent_id, b.height 
+
+                    SELECT b.id, b.parent_id, b.height
                     FROM blocks b
-      
+
                     INNER JOIN chain
-      
+
                     ON b.id = chain.parent_id AND (chain.id <> $2 OR b.id = $2)
-      
+
                  )
-      
+
                  SELECT id
                  FROM chain ORDER BY height ASC
                |sql} )
@@ -139,11 +165,13 @@ module Mainnet = struct
       ; fee_payer_account_creation_fee_paid : int64 option
       ; receiver_account_creation_fee_paid : int64 option
       ; created_token : int64 option
-      ; fee_payer_balance_id : int
-      ; source_balance_id : int option
-      ; receiver_balance_id : int option
+      ; fee_payer_balance : int
+      ; source_balance : int option
+      ; receiver_balance : int option
       }
-    [@@deriving hlist]
+    [@@deriving hlist, fields]
+
+    let table_name = "blocks_user_commands"
 
     let typ =
       let open Mina_caqti.Type_spec in
@@ -194,7 +222,9 @@ module Mainnet = struct
       ; receiver_account_creation_fee_paid : int64 option
       ; receiver_balance : int
       }
-    [@@deriving hlist]
+    [@@deriving hlist, fields]
+
+    let table_name = "blocks_internal_commands"
 
     let typ =
       let open Mina_caqti.Type_spec in
@@ -225,6 +255,11 @@ module Mainnet = struct
       ; token : int64
       ; hash : string
       }
+
+    (* cannot be derived from Fields.names because `type` is an invalid identifier in ocaml *)
+    let field_names = [ "type"; "receiver_id"; "fee"; "token"; "hash" ]
+
+    let table_name = "internal_commands"
 
     let typ =
       let encode t = Ok ((t.typ, t.receiver_id, t.fee, t.token), t.hash) in
@@ -260,6 +295,24 @@ module Mainnet = struct
       ; hash : string
       }
     [@@deriving hlist]
+
+    (* cannot be derived from Fields.names because `type` is an invalid identifier in ocaml *)
+    let field_names =
+      [ "type"
+      ; "fee_payer_id"
+      ; "source_id"
+      ; "receiver_id"
+      ; "fee_token"
+      ; "token"
+      ; "nonce"
+      ; "amount"
+      ; "fee"
+      ; "valid_until"
+      ; "memo"
+      ; "hash"
+      ]
+
+    let table_name = "user_commands"
 
     let typ =
       let open Mina_caqti.Type_spec in

@@ -296,9 +296,11 @@ module Berkeley = struct
   let dump_account_accessed_to_csv_query ~output_file =
     dump_sql_to_csv output_file
       ~sql:
-        "SELECT account_identifier_id AS id, block_id \n\
-        \            FROM accounts_accessed \n\
-        \            ORDER BY block_id, id \n"
+        {sql| SELECT account_identifier_id AS id, block_id 
+                 FROM accounts_accessed
+                 JOIN blocks ON block_id = blocks.id
+                 WHERE height <> 1
+                 ORDER BY block_id, id |sql}
     |> Caqti_request.exec Caqti_type.unit
 
   let dump_accounts_accessed_to_csv (module Conn : CONNECTION) output_file =
@@ -335,30 +337,30 @@ module Berkeley = struct
   let dump_user_and_internal_command_info_to_csv_query ~output_file =
     dump_sql_to_csv output_file
       ~sql:
-        "\n\
-        \  ( \n\
-        \    WITH user_command_ids AS\n\
-        \    ( SELECT user_command_id, block_id FROM blocks_user_commands\n\
-        \      INNER JOIN blocks ON id = block_id\n\
-        \      WHERE chain_status = 'canonical'\n\
-        \    )\n\
-        \    SELECT account_identifiers.id, block_id FROM user_command_ids\n\
-        \    INNER JOIN user_commands ON id = user_command_id\n\
-        \    INNER JOIN account_identifiers ON public_key_id = receiver_id\n\
-        \                                   OR public_key_id = fee_payer_id\n\
-        \  )\n\
-        \    UNION\n\
-        \  (\n\
-        \    WITH internal_command_ids AS\n\
-        \    ( SELECT internal_command_id, block_id FROM \
-         blocks_internal_commands\n\
-        \      INNER JOIN blocks ON id = block_id\n\
-        \      WHERE chain_status = 'canonical'\n\
-        \    ) \n\
-        \    SELECT account_identifiers.id, block_id FROM internal_command_ids\n\
-        \    INNER JOIN internal_commands ON id = internal_command_id\n\
-        \    INNER JOIN account_identifiers ON public_key_id = receiver_id\n\
-        \  ) ORDER BY block_id, id"
+        {sql| 
+      ( 
+        WITH user_command_ids AS
+        ( SELECT user_command_id, block_id, status FROM blocks_user_commands
+          INNER JOIN blocks ON id = block_id
+          WHERE chain_status = 'canonical'
+        )
+        SELECT account_identifiers.id, block_id FROM user_command_ids
+        INNER JOIN user_commands ON id = user_command_id
+        INNER JOIN account_identifiers ON (public_key_id = receiver_id AND status = 'applied')
+                                       OR public_key_id = fee_payer_id 
+      )
+        UNION
+      (
+        WITH internal_command_ids AS
+        ( SELECT internal_command_id, block_id FROM blocks_internal_commands
+          INNER JOIN blocks ON id = block_id
+          WHERE chain_status = 'canonical'
+          AND status = 'applied'
+        ) 
+        SELECT account_identifiers.id, block_id FROM internal_command_ids
+        INNER JOIN internal_commands ON id = internal_command_id
+        INNER JOIN account_identifiers ON public_key_id = receiver_id
+      ) ORDER BY block_id, id |sql}
     |> Caqti_request.exec Caqti_type.unit
 
   let dump_user_and_internal_command_info_to_csv (module Conn : CONNECTION)

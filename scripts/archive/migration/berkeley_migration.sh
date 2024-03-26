@@ -54,6 +54,23 @@ function version(){
     exit 0
 }
 
+function format_migration_args() { # keep_precomputed_blocks stream_blocks
+    local __args=""
+    case $1 in
+    true )
+        __args+=" --keep-precomputed-blocks"
+        ;;
+    esac
+
+    case $2 in
+    true )
+        __args+=" --stream-precomputed-blocks"
+        ;;
+    esac
+
+    echo $__args
+}
+
 function initial_help(){
     echo Initial migration based on genesis ledger and empty migration target database
     echo ""
@@ -68,6 +85,8 @@ function initial_help(){
     printf "  %-25s %s\n" "-b | --blocks-bucket" "[string] name of precomputed blocks bucket. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
     printf "  %-25s %s\n" "-bs | --blocks-batch-size" "[int] number of precomputed blocks to be fetch at once from Gcloud. Bigger number like 1000 can help speed up migration process";
     printf "  %-25s %s\n" "-n | --network" "[string] network name when determining precomputed blocks. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
+    printf "  %-25s %s\n" "-d | --delete-blocks" "delete blocks after they are processed (saves space with -sb)"
+    printf "  %-25s %s\n" "-p | --prefetch-blocks" "downloads all blocks at once instead of incrementally"
     echo ""
     echo "Example:"
     echo ""
@@ -93,6 +112,8 @@ function initial(){
     local __migrated_archive_uri='' 
     local __genesis_ledger=''
     local __blocks_bucket=''
+    local __keep_precomputed_blocks=true
+    local __stream_blocks=true
     local __network='' 
 
     while [ ${#} -gt 0 ]; do
@@ -124,6 +145,14 @@ function initial(){
             -n | --network )
                 __network=${2:?$error_message}
                 shift 2;
+            ;;
+            -d | --delete-blocks )
+                __keep_precomputed_blocks=false
+                shift 1;
+            ;;
+            -p | --prefetch-blocks )
+                __stream_blocks=false
+                shift 1;
             ;;
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
@@ -172,6 +201,8 @@ function initial(){
         "$__migrated_archive_uri" \
         "$__genesis_ledger" \
         "$__blocks_bucket" \
+        "$__keep_precomputed_blocks" \
+        "$__stream_blocks" \
         "$__network"
 }
 
@@ -213,7 +244,9 @@ function run_initial_migration() {
     local __migrated_archive_uri=$3 
     local __genesis_ledger=$4
     local __blocks_bucket=$5
-    local __network=$6
+    local __keep_precomputed_blocks=$6
+    local __stream_blocks=$7
+    local __network=$8
     
     local __date=$(date '+%Y-%m-%d_%H_%M_%S')
     local __berkely_migration_log="berkeley_migration_$__date.log"
@@ -235,6 +268,7 @@ function run_initial_migration() {
         --batch-size "$__batch_size" \
         --config-file "$__genesis_ledger" \
         --blocks-bucket "$__blocks_bucket" \
+        $(format_migration_args "$__keep_precomputed_blocks" "$__stream_blocks") \
         --network "$__network" | tee "$__berkely_migration_log"
 
     set +e # skip error because we will do validations and we are better than replayer i reporting
@@ -273,6 +307,8 @@ function incremental_help(){
     printf "  %-25s %s\n" "-b | --blocks-bucket" "[string] name of precomputed blocks bucket. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
     printf "  %-25s %s\n" "-bs | --blocks-batch-size" "[int] number of precomputed blocks to be fetch at once from Gcloud. Bigger number like 1000 can help speed up migration process";
     printf "  %-25s %s\n" "-n | --network" "[string] network name when determining precomputed blocks. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
+    printf "  %-25s %s\n" "-d | --delete-blocks" "delete blocks after they are processed (saves space with -sb)"
+    printf "  %-25s %s\n" "-p | --prefetch-blocks" "downloads all blocks at once instead of incrementally"
     echo ""
     echo "Example:"
     echo ""
@@ -326,6 +362,8 @@ function incremental(){
     local __genesis_ledger=''
     local __replayer_checkpoint=''
     local __blocks_bucket=''
+    local __keep_precomputed_blocks=true
+    local __stream_blocks=true
     local __network=''
     local __checkpoint_interval=1000
 
@@ -366,6 +404,14 @@ function incremental(){
             -n | --network )
                 __network=${2:?$error_message}
                 shift 2;
+            ;;
+            -d | --delete-blocks )
+                __keep_precomputed_blocks=false
+                shift 1;
+            ;;
+            -p | --prefetch-blocks )
+                __stream_blocks=false
+                shift 1;
             ;;
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
@@ -416,6 +462,8 @@ function incremental(){
         "$__migrated_archive_uri" \
         "$__genesis_ledger" \
         "$__blocks_bucket" \
+        "$__keep_precomputed_blocks" \
+        "$__stream_blocks" \
         "$__network" \
         "$__checkpoint_interval" \
         "$__replayer_checkpoint"
@@ -428,9 +476,11 @@ function run_incremental_migration() {
     local __migrated_archive_uri=$3 
     local __genesis_ledger=$4
     local __blocks_bucket=$5
-    local __network=$6
-    local __checkpoint_interval=$7  
-    local __replayer_checkpoint=$8
+    local __keep_precomputed_blocks=$5
+    local __stream_blocks=$6
+    local __network=$7
+    local __checkpoint_interval=$8
+    local __replayer_checkpoint=$9
 
     local __date=$(date '+%Y-%m-%d_%H%M')
     local __berkely_migration_log="berkeley_migration_$__date.log"
@@ -448,6 +498,7 @@ function run_incremental_migration() {
         --batch-size "$__batch_size" \
         --config-file "$__genesis_ledger" \
         --blocks-bucket "$__blocks_bucket" \
+        $(format_migration_args "$__keep_precomputed_blocks" "$__stream_blocks") \
         --network "$__network" | tee "$__berkely_migration_log"
     
     set +e # skip error because we will do validations and we are better than replayer i reporting
@@ -489,6 +540,8 @@ function final_help(){
     printf "  %-25s %s\n" "-bs | --blocks-batch-size" "[int] number of precomputed blocks to be fetch at once from Gcloud. Bigger number like 1000 can help speed up migration process";
     printf "  %-25s %s\n" "-n | --network" "[string] network name when determining precomputed blocks. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
     printf "  %-25s %s\n" "-fc | --fork-config" "[file] Fork-state config file is dump file in form of json containing fork block and ledger file. It should be provied by MF or O(1)Labs team after fork block is announced";
+    printf "  %-25s %s\n" "-d | --delete-blocks" "delete blocks after they are processed (saves space with -sb)"
+    printf "  %-25s %s\n" "-p | --prefetch-blocks" "downloads all blocks at once instead of incrementally"
     echo ""
     echo "Example:"
     echo ""
@@ -513,6 +566,8 @@ function final(){
     local __genesis_ledger=''
     local __replayer_checkpoint=''
     local __blocks_bucket=''
+    local __keep_precomputed_blocks=true
+    local __stream_blocks=true
     local __network='' 
     local __checkpoint_interval=1000
     local __fork_state_hash=''
@@ -563,6 +618,14 @@ function final(){
             -n | --network )
                 __network=${2:?$error_message}
                 shift 2;
+            ;;
+            -d | --delete-blocks )
+                __keep_precomputed_blocks=false
+                shift 1;
+            ;;
+            -p | --prefetch-blocks )
+                __stream_blocks=false
+                shift 1;
             ;;
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
@@ -624,6 +687,8 @@ function final(){
         "$__migrated_archive_uri" \
         "$__genesis_ledger" \
         "$__blocks_bucket" \
+        "$__keep_precomputed_blocks" \
+        "$__stream_blocks" \
         "$__network" \
         "$__fork_state_hash" \
         "$__checkpoint_interval" \
@@ -637,11 +702,13 @@ function run_final_migration() {
     local __migrated_archive_uri=$3 
     local __genesis_ledger=$4
     local __blocks_bucket=$5
-    local __network=$6
-    local __fork_state_hash=$7
-    local __checkpoint_interval=$8  
-    local __replayer_checkpoint=$9  
-    local __fork_config=${10}
+    local __keep_precomputed_blocks=$6
+    local __stream_blocks=$7
+    local __network=$8
+    local __fork_state_hash=$9
+    local __checkpoint_interval=${10}
+    local __replayer_checkpoint=${11}
+    local __fork_config=${12}
     
     
     local __date=$(date '+%Y-%m-%d_%H%M')
@@ -660,6 +727,7 @@ function run_final_migration() {
         --batch-size "$__batch_size" \
         --config-file "$__genesis_ledger" \
         --blocks-bucket "$__blocks_bucket" \
+        $(format_migration_args "$__keep_precomputed_blocks" "$__stream_blocks") \
         --fork-state-hash "$__fork_state_hash" \
         --network "$__network" | tee "$__berkely_migration_log"
     

@@ -669,7 +669,7 @@ let%test_unit "json value" =
         setPermissions: "Signature",
         setVerificationKey: {
           auth: "Signature",
-          txnVersion: "2"
+          txnVersion: "3"
           },
         setZkappUri: "Signature",
         editActionState: "Signature",
