@@ -336,7 +336,8 @@ module Berkeley = struct
 
   let dump_user_and_internal_command_info_to_csv_query ~output_file =
     dump_sql_to_csv output_file
-      ~sql:{sql| 
+      ~sql:
+        {sql| 
       ( 
         WITH user_command_ids AS
         ( SELECT user_command_id, block_id, status FROM blocks_user_commands
