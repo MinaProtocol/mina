@@ -1,0 +1,7 @@
+(library
+ (name failing_unit_tests)
+ (libraries ppx_inline_test.config)
+ (inline_tests)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_inline_test ))
+ (synopsis "a unit test that always fails, to test CI"))
