@@ -4,4 +4,4 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-in  Pipeline.build (MinaArtifact.hardforkPipeline DebianVersions.DebVersion.Bullseye)
+in  Pipeline.build (MinaArtifact.hardforkPipeline MinaArtifact.HardforkPipelineMode/Type.ForRelease DebianVersions.DebVersion.Bullseye)

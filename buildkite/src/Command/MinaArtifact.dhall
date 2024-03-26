@@ -25,8 +25,15 @@ let Artifacts = ../Constants/Artifacts.dhall
 
 in
 
+let HardforkPipelineMode  = < ForTest | ForRelease >
+
+let fromEnvOrTest = \(mode : HardforkPipelineMode) -> \(envVar : Text) -> \(default : Text) ->
+  merge { ForTest = "${envVar}=\$${envVar}", ForRelease = "${envVar}=${default}" } mode
+
+
 --- NB: unlike the regular artifact piopeline, the hardfork pipeline receives many of its parameters as env vars
-let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
+let hardforkPipeline : HardforkPipelineMode -> DebianVersions.DebVersion ->  Pipeline.Config.Type =
+  \(hardforkPipelineMode : HardforkPipelineMode) ->
   \(debVersion : DebianVersions.DebVersion) ->
       --- TODO: Refactor the dhall interface so that we don't need to keep nesting docker containers.
       --- I've already refactored some of it such that everything works in the root docker contains,
@@ -83,18 +90,19 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
       let profile = Profiles.Type.Standard
       --- TODO: network is currently hard-coded, but should be determined from env vars
       let network = "\\\${NETWORK_NAME}-hardfork"
-      let pipelineName = "MinaArtifactHardfork${DebianVersions.capitalName debVersion}${Profiles.toSuffixUppercase profile}"
+      let hfmode = merge { ForTest = "Test" , ForRelease = "Release" } hardforkPipelineMode
+      let pipelineName = "MinaArtifactHardfork${DebianVersions.capitalName debVersion}${Profiles.toSuffixUppercase profile}${hfmode}"
       let generateLedgersJobKey = "generate-ledger-tars-from-config"
-
+      let fromEnvOrTest = fromEnvOrTest hardforkPipelineMode
       in
   
       Pipeline.Config::{
         spec = JobSpec::{
           dirtyWhen = [ S.everything ]
-        , path = "Release"
+        , path = hfmode
         , name = pipelineName
         , tags = [ PipelineTag.Type.Release ]
-        , mode = PipelineMode.Type.PackageGeneration
+        , mode = merge { ForRelease = PipelineMode.Type.PackageGeneration, ForTest = PipelineMode.Type.Stable } hardforkPipelineMode
         }
       , steps =
         [ Command.build
@@ -102,14 +110,14 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
               commands =
                 DebianVersions.toolchainRunner
                   debVersion
-                  [ "NETWORK_NAME=\$NETWORK_NAME"
-                  , "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL"
+                  [ fromEnvOrTest "NETWORK_NAME" "devnet"
+                  , fromEnvOrTest "CONFIG_JSON_GZ_URL" "https://storage.googleapis.com/tmp-hardfork-testing/fork-devnet-march-22-2024.json.gz"
                   , "AWS_ACCESS_KEY_ID"
                   , "AWS_SECRET_ACCESS_KEY"
                   , "MINA_BRANCH=\$BUILDKITE_BRANCH"
                   , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
                   , "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
-                  , "TESTNET_NAME=\$NETWORK_NAME-hardfork"
+                  , "TESTNET_NAME=\$NETWORK_NAME-hardfork-${hfmode}"
                   , "GENESIS_TIMESTAMP=\$GENESIS_TIMESTAMP"
                   ]
                   "./buildkite/scripts/build-hardfork-package.sh"
@@ -298,4 +306,5 @@ in
 {
   pipeline = pipeline
   , hardforkPipeline = hardforkPipeline
+  , HardforkPipelineMode/Type = HardforkPipelineMode
 }
