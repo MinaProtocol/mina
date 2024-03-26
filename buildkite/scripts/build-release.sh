@@ -4,10 +4,6 @@ set -eo pipefail
 
 ([ -z ${DUNE_PROFILE+x} ] || [ -z ${MINA_DEB_CODENAME+x} ]) && echo "required env vars were not provided" && exit 1
 
-if [[ $1 = "archive_migration" ]] ; then
-    git apply ./buildkite/scripts/caqti-upgrade.patch
-fi
-
 source ~/.profile
 
 ./buildkite/scripts/build-artifact.sh
@@ -22,10 +18,6 @@ echo "--- Prepare debian packages"
 
 echo "--- Upload debs to amazon s3 repo"
 ./buildkite/scripts/publish-deb.sh
-
-if [[ $1 = "archive_migration" ]] ; then 
-    git apply -R buildkite/scripts/caqti-upgrade.patch
-fi
 
 echo "--- Git diff after build is complete:"
 #git diff --exit-code -- .
