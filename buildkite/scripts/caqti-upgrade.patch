@@ -154,7 +154,7 @@ index c69e1805d1..aac3552028 100644
             SELECT COUNT( * ) FROM blocks
             WHERE parent_id IS NULL
 diff --git a/src/app/archive/lib/processor.ml b/src/app/archive/lib/processor.ml
-index b27584efd8..1ff478f86c 100644
+index 2b1c58948c..e13f945eb6 100644
 --- a/src/app/archive/lib/processor.ml
 +++ b/src/app/archive/lib/processor.ml
 @@ -29,6 +29,7 @@ open Mina_block
@@ -950,7 +950,7 @@ index b27584efd8..1ff478f86c 100644
                      | "chain_status" ->
 @@ -3338,6 +3338,7 @@ module Block = struct
    let add_from_extensional_batch (module Conn : CONNECTION)
-       ?(v1_transaction_hash = false) ~(genesis_block_hash : State_hash.t)
+       ?(v1_transaction_hash = false)
        (blocks : Extensional.Block.t list) =
 +    let _ = genesis_block_hash in
      let open Deferred.Result.Let_syntax in
@@ -1114,15 +1114,6 @@ index b27584efd8..1ff478f86c 100644
               (sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table
                  fields_sql values_sql ) )
            () )
-@@ -3798,7 +3779,7 @@ module Block = struct
-           (bulk_insert Epoch_data.typ ~table:Epoch_data.table_name
-              ~fields:Epoch_data.Fields.names )
-     in
--    let%bind token_ids =
-+    let%bind _token_ids =
-       let tokens =
-         List.map all_missing_tokens ~f:(fun token ->
-             (token, token_id_to_repr token) )
 @@ -3933,7 +3914,7 @@ module Block = struct
        let ids_sql = String.concat ~sep:"," ids in
        let parent_ids_sql = String.concat ~sep:"," parent_ids in
@@ -1172,15 +1163,7 @@ index b27584efd8..1ff478f86c 100644
                  ~fields:Internal_command_primary_key.Fields.names )
             ~insert_values:
               (bulk_insert Internal_command.typ
-@@ -4049,13 +4033,18 @@ module Block = struct
-                    ; status
-                    ; failure_reason
-                    ; command_type
-+                   ; receiver = _
-+                   ; fee = _
-                    }
-                  ->
-                 { Block_and_internal_command.block_id =
+@@ -4057,7 +4041,10 @@ module Block = struct
                      Map.find_exn block_ids block.state_hash
                  ; internal_command_id =
                      Map.find_exn internal_cmd_ids
@@ -1192,7 +1175,7 @@ index b27584efd8..1ff478f86c 100644
                  ; sequence_no
                  ; secondary_sequence_no
                  ; status
-@@ -4135,7 +4124,7 @@ module Block = struct
+@@ -4137,7 +4124,7 @@ module Block = struct
                  Some id )
            in
            Conn.find
@@ -1201,7 +1184,7 @@ index b27584efd8..1ff478f86c 100644
                 (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                    ~tannot:(function
                      | "sub_window_densities" ->
-@@ -4297,8 +4286,8 @@ module Block = struct
+@@ -4299,8 +4286,8 @@ module Block = struct
    let set_parent_id_if_null (module Conn : CONNECTION) ~parent_hash
        ~(parent_id : int) =
      Conn.exec
@@ -1212,7 +1195,7 @@ index b27584efd8..1ff478f86c 100644
           {sql| UPDATE blocks SET parent_id = ?
                 WHERE parent_hash = ?
                 AND parent_id IS NULL
-@@ -4314,8 +4303,8 @@ module Block = struct
+@@ -4316,8 +4303,8 @@ module Block = struct
      in
      let columns = concat Fields.names in
      Conn.collect_list
@@ -1223,7 +1206,7 @@ index b27584efd8..1ff478f86c 100644
           typ
           (sprintf
              {sql| WITH RECURSIVE chain AS (
-@@ -4341,37 +4330,37 @@ module Block = struct
+@@ -4343,37 +4330,37 @@ module Block = struct
  
    let get_highest_canonical_block_opt (module Conn : CONNECTION) =
      Conn.find_opt
@@ -1270,7 +1253,7 @@ index b27584efd8..1ff478f86c 100644
           {sql| UPDATE blocks SET chain_status='orphaned'
                 WHERE height = $2
                 AND state_hash <> $1
-@@ -4460,7 +4449,7 @@ module Block = struct
+@@ -4462,7 +4449,7 @@ module Block = struct
        | None, Some num_blocks -> (
            match%map
              Conn.find_opt
@@ -1279,7 +1262,7 @@ index b27584efd8..1ff478f86c 100644
                   "SELECT MAX(height) FROM blocks" )
                ()
            with
-@@ -4476,8 +4465,8 @@ module Block = struct
+@@ -4478,8 +4465,8 @@ module Block = struct
        let%bind () =
          (* Delete user commands from old blocks. *)
          Conn.exec
@@ -1290,7 +1273,7 @@ index b27584efd8..1ff478f86c 100644
               "DELETE FROM user_commands\n\
                WHERE id IN\n\
                (SELECT user_command_id FROM blocks_user_commands\n\
-@@ -4488,8 +4477,8 @@ module Block = struct
+@@ -4490,8 +4477,8 @@ module Block = struct
        let%bind () =
          (* Delete old blocks. *)
          Conn.exec
@@ -1301,7 +1284,7 @@ index b27584efd8..1ff478f86c 100644
               "DELETE FROM blocks WHERE blocks.height < ? OR blocks.timestamp < \
                ?" )
            (height, timestamp)
-@@ -4497,7 +4486,7 @@ module Block = struct
+@@ -4499,7 +4486,7 @@ module Block = struct
        let%bind () =
          (* Delete orphaned internal commands. *)
          Conn.exec
@@ -1310,7 +1293,7 @@ index b27584efd8..1ff478f86c 100644
               "DELETE FROM internal_commands\n\
                WHERE id NOT IN\n\
                (SELECT internal_commands.id FROM internal_commands\n\
-@@ -4508,7 +4497,7 @@ module Block = struct
+@@ -4510,7 +4497,7 @@ module Block = struct
        let%bind () =
          (* Delete orphaned snarked ledger hashes. *)
          Conn.exec
@@ -1319,7 +1302,7 @@ index b27584efd8..1ff478f86c 100644
               "DELETE FROM snarked_ledger_hashes\n\
                WHERE id NOT IN\n\
                (SELECT snarked_ledger_hash_id FROM blocks)" )
-@@ -4517,7 +4506,7 @@ module Block = struct
+@@ -4519,7 +4506,7 @@ module Block = struct
        let%bind () =
          (* Delete orphaned public keys. *)
          Conn.exec
@@ -1328,7 +1311,7 @@ index b27584efd8..1ff478f86c 100644
               "DELETE FROM public_keys\n\
                WHERE id NOT IN (SELECT fee_payer_id FROM user_commands)\n\
                AND id NOT IN (SELECT source_id FROM user_commands)\n\
-@@ -4943,7 +4932,13 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
+@@ -4945,7 +4932,13 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
            Strict_pipe.Writer.write extensional_block_writer extensional_block )
      ]
    in
@@ -1344,54 +1327,9 @@ index b27584efd8..1ff478f86c 100644
        [%log error]
          "Failed to create a Caqti pool for Postgresql, see error: $error"
 diff --git a/src/app/berkeley_account_tables/berkeley_account_tables.ml b/src/app/berkeley_account_tables/berkeley_account_tables.ml
-index 95e0a9df56..a32ef59e4d 100644
+index 95e0a9df56..082d1c4021 100644
 --- a/src/app/berkeley_account_tables/berkeley_account_tables.ml
 +++ b/src/app/berkeley_account_tables/berkeley_account_tables.ml
-@@ -330,7 +330,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
-     (ics : Sql.Internal_command.t list) :
-     (Mina_transaction.Transaction.t option * Sql.Internal_command.t list)
-     Deferred.t =
--  [%log info]
-+  [%log spam]
-     "Converting internal command (%s) with global slot since genesis %Ld, \
-      sequence number %d, and secondary sequence number %d to transaction"
-     ic.typ ic.global_slot_since_genesis ic.sequence_no ic.secondary_sequence_no ;
-@@ -351,7 +351,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
-       (* combining situation 2
-          two fee transfer commands with same global slot since genesis, sequence number
-       *)
--      [%log info]
-+      [%log spam]
-         "Combining two fee transfers at global slot since genesis %Ld with \
-          sequence number %d"
-         ic.global_slot_since_genesis ic.sequence_no ;
-@@ -406,7 +406,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
- 
- let user_command_to_transaction ~logger ~pool (cmd : Sql.User_command.t) :
-     Mina_transaction.Transaction.t Deferred.t =
--  [%log info]
-+  [%log spam]
-     "Converting user command (%s) with nonce %Ld, global slot since genesis \
-      %Ld, and sequence number %d to transaction"
-     cmd.typ cmd.nonce cmd.global_slot_since_genesis cmd.sequence_no ;
-@@ -532,7 +532,7 @@ let zkapp_command_to_transaction ~logger ~pool (cmd : Sql.Zkapp_command.t) :
-     ({ body; authorization = Signature.dummy } : Account_update.Fee_payer.t)
-   in
-   let nonce_str = Mina_numbers.Account_nonce.to_string fee_payer.body.nonce in
--  [%log info]
-+  [%log spam]
-     "Converting zkApp command with fee payer nonce %s, global slot since \
-      genesis %Ld, and sequence number %d to transaction"
-     nonce_str cmd.global_slot_since_genesis cmd.sequence_no ;
-@@ -616,7 +616,7 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
-     let checkpoint_file =
-       sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
-     in
--    [%log info] "Writing checkpoint file"
-+    [%log debug] "Writing checkpoint file"
-       ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
-     Out_channel.with_file checkpoint_file ~f:(fun oc ->
-         Out_channel.output_string oc replayer_checkpoint ) )
 @@ -641,7 +641,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
               msg )
    in
@@ -1407,51 +1345,8 @@ index 95e0a9df56..a32ef59e4d 100644
    | Error e ->
        [%log fatal]
          ~metadata:[ ("error", `String (Caqti_error.show e)) ]
-@@ -1016,7 +1022,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
-                     ] ;
-                 if continue_on_error then incr error_count
-                 else Core_kernel.exit 1 ) ) ;
--          [%log info]
-+          [%log spam]
-             "Verifying accounts accessed in block with global slot since \
-              genesis %Ld"
-             last_global_slot_since_genesis ;
-@@ -1122,7 +1128,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
-               let rec count_txns ~signed_count ~zkapp_count ~fee_transfer_count
-                   ~coinbase_count = function
-                 | [] ->
--                    [%log info]
-+                    [%log spam]
-                       "Replaying transactions in block with state hash \
-                        $state_hash"
-                       ~metadata:
-@@ -1246,13 +1252,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
-                 Frozen_ledger_hash.equal snarked_hash
-                   (First_pass_ledger_hashes.get_last_snarked_hash ())
-               then
--                [%log info]
-+                [%log spam]
-                   "Snarked ledger hash same as in the preceding block, not \
-                    checking it again"
-               else if
-               Frozen_ledger_hash.equal snarked_hash genesis_snarked_ledger_hash
-             then
--                [%log info] "Snarked ledger hash is genesis snarked ledger hash"
-+                [%log spam] "Snarked ledger hash is genesis snarked ledger hash"
-               else
-                 match First_pass_ledger_hashes.find snarked_hash with
-                 | None ->
-@@ -1279,7 +1285,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
-                     First_pass_ledger_hashes.set_last_snarked_hash snarked_hash ;
-                     First_pass_ledger_hashes.flush_older_than n ) ;
-               if List.is_empty block_txns then (
--                [%log info]
-+                [%log spam]
-                   "No transactions to run for block with state hash $state_hash"
-                   ~metadata:
-                     [ ("state_hash", State_hash.to_yojson state_hash)
 diff --git a/src/app/berkeley_migration/berkeley_migration.ml b/src/app/berkeley_migration/berkeley_migration.ml
-index 40ba37a71c..17bce4882f 100644
+index e84501dc8c..cd53c6824c 100644
 --- a/src/app/berkeley_migration/berkeley_migration.ml
 +++ b/src/app/berkeley_migration/berkeley_migration.ml
 @@ -69,8 +69,8 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
@@ -1487,12 +1382,7 @@ index 40ba37a71c..17bce4882f 100644
                 (sprintf "SELECT id, value FROM %s WHERE id IN (%s)"
                    Sql.Mainnet.Public_key.table_name
                    ( String.concat ~sep:","
-@@ -326,14 +326,23 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
- let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
-     ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
-     ~keep_precomputed_blocks () =
-+  Cli_lib.Stdout_log.setup false Logger.Level.Info ;
-   let logger = Logger.create () in
+@@ -330,10 +330,18 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
    let mainnet_pool =
@@ -1513,7 +1403,7 @@ index 40ba37a71c..17bce4882f 100644
    in
    match (mainnet_pool, migrated_pool) with
    | Error e, _ | _, Error e ->
-@@ -401,7 +410,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -401,7 +409,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
          let%bind garbage_block_ids =
            query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
                Conn.collect_list
@@ -1522,7 +1412,7 @@ index 40ba37a71c..17bce4882f 100644
                     (sprintf
                        "DELETE FROM %s WHERE parent_id IS NULL AND height > 1 \
                         RETURNING id"
-@@ -417,7 +426,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -417,7 +425,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
            let%bind () =
              query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
                  Conn.exec
@@ -1531,7 +1421,7 @@ index 40ba37a71c..17bce4882f 100644
                       (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
                          Archive_lib.Processor.Block_and_signed_command
                          .table_name garbage_block_ids_sql ) )
-@@ -425,7 +434,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -425,7 +433,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
            in
            query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
                Conn.exec
@@ -1540,7 +1430,7 @@ index 40ba37a71c..17bce4882f 100644
                     (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
                        Archive_lib.Processor.Block_and_internal_command
                        .table_name garbage_block_ids_sql ) )
-@@ -511,7 +520,6 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -508,7 +516,6 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                     | Error (`Encode_failed _ as err)
                     | Error (`Encode_rejected _ as err)
                     | Error (`Request_failed _ as err)
@@ -1548,18 +1438,6 @@ index 40ba37a71c..17bce4882f 100644
                     | Error (`Response_failed _ as err)
                     | Error (`Response_rejected _ as err) ->
                         failwithf "Could not archive extensional block batch: %s"
-diff --git a/src/app/berkeley_migration/dune b/src/app/berkeley_migration/dune
-index 04e5725d8f..24d1975db2 100644
---- a/src/app/berkeley_migration/dune
-+++ b/src/app/berkeley_migration/dune
-@@ -43,6 +43,7 @@
-    signature_lib
-    unsigned_extended
-    with_hash
-+   cli_lib
-    )
-  (preprocessor_deps ../../config.mlh)
-  (instrumentation (backend bisect_ppx))
 diff --git a/src/app/berkeley_migration/sql.ml b/src/app/berkeley_migration/sql.ml
 index 297081b7b3..0bdddcfdaa 100644
 --- a/src/app/berkeley_migration/sql.ml
@@ -1731,7 +1609,7 @@ index 297081b7b3..0bdddcfdaa 100644
                   FROM accounts_accessed
                   WHERE block_id = $1
 diff --git a/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml b/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
-index d687c197d4..93a7aceea9 100644
+index f537435e25..c5f2ceae03 100644
 --- a/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
 +++ b/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
 @@ -324,10 +324,18 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
@@ -1777,7 +1655,7 @@ index d687c197d4..93a7aceea9 100644
  
    match (mainnet_pool, migrated_pool) with
 diff --git a/src/app/berkeley_migration_verifier/sql.ml b/src/app/berkeley_migration_verifier/sql.ml
-index 17ba9640a3..1982ba1980 100644
+index 17ba9640a3..e51c463756 100644
 --- a/src/app/berkeley_migration_verifier/sql.ml
 +++ b/src/app/berkeley_migration_verifier/sql.ml
 @@ -11,7 +11,7 @@ module Mainnet = struct
@@ -1913,19 +1791,16 @@ index 17ba9640a3..1982ba1980 100644
  
    let dump_internal_commands (module Conn : CONNECTION) output_file =
      Conn.exec (dump_internal_commands_query ~output_file) ()
-@@ -298,8 +298,10 @@ module Berkeley = struct
-       ~sql:
+@@ -299,7 +299,7 @@ module Berkeley = struct
          "SELECT account_identifier_id AS id, block_id \n\
          \            FROM accounts_accessed \n\
-+        \            JOIN blocks ON block_id = blocks.id \n\
-+        \            WHERE height <> 1\n\
          \            ORDER BY block_id, id \n"
 -    |> Caqti_request.exec Caqti_type.unit
 +    |> Mina_caqti.exec_req Caqti_type.unit
  
    let dump_accounts_accessed_to_csv (module Conn : CONNECTION) output_file =
      Conn.exec (dump_account_accessed_to_csv_query ~output_file) ()
-@@ -313,7 +315,7 @@ module Berkeley = struct
+@@ -313,7 +313,7 @@ module Berkeley = struct
             \    AND height <= %d ORDER BY height\n\
             \ \n\
             \     " height )
@@ -1934,7 +1809,7 @@ index 17ba9640a3..1982ba1980 100644
  
    let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
        height =
-@@ -327,7 +329,7 @@ module Berkeley = struct
+@@ -327,7 +327,7 @@ module Berkeley = struct
          \      WHERE chain_status = 'canonical'\n\
          \      ORDER BY height\n\
          \      "
@@ -1943,59 +1818,11 @@ index 17ba9640a3..1982ba1980 100644
  
    let dump_block_hashes (module Conn : CONNECTION) output_file =
      Conn.exec (dump_block_hashes_query ~output_file) ()
-@@ -335,45 +337,45 @@ module Berkeley = struct
-   let dump_user_and_internal_command_info_to_csv_query ~output_file =
-     dump_sql_to_csv output_file
-       ~sql:
--        "\n\
--        \  ( \n\
--        \    WITH user_command_ids AS\n\
--        \    ( SELECT user_command_id, block_id FROM blocks_user_commands\n\
--        \      INNER JOIN blocks ON id = block_id\n\
--        \      WHERE chain_status = 'canonical'\n\
--        \    )\n\
--        \    SELECT account_identifiers.id, block_id FROM user_command_ids\n\
--        \    INNER JOIN user_commands ON id = user_command_id\n\
--        \    INNER JOIN account_identifiers ON public_key_id = receiver_id\n\
--        \                                   OR public_key_id = fee_payer_id\n\
--        \  )\n\
--        \    UNION\n\
--        \  (\n\
--        \    WITH internal_command_ids AS\n\
--        \    ( SELECT internal_command_id, block_id FROM \
--         blocks_internal_commands\n\
--        \      INNER JOIN blocks ON id = block_id\n\
--        \      WHERE chain_status = 'canonical'\n\
--        \    ) \n\
--        \    SELECT account_identifiers.id, block_id FROM internal_command_ids\n\
--        \    INNER JOIN internal_commands ON id = internal_command_id\n\
--        \    INNER JOIN account_identifiers ON public_key_id = receiver_id\n\
--        \  ) ORDER BY block_id, id"
+@@ -359,21 +359,21 @@ module Berkeley = struct
+         \    INNER JOIN internal_commands ON id = internal_command_id\n\
+         \    INNER JOIN account_identifiers ON public_key_id = receiver_id\n\
+         \  ) ORDER BY block_id, id"
 -    |> Caqti_request.exec Caqti_type.unit
-+        {sql| 
-+        (  WITH user_command_ids AS
-+          ( SELECT user_command_id, block_id, status FROM blocks_user_commands
-+            INNER JOIN blocks ON id = block_id
-+            WHERE chain_status = 'canonical'
-+          )
-+          SELECT account_identifiers.id, block_id FROM user_command_ids
-+          INNER JOIN user_commands ON id = user_command_id
-+          INNER JOIN account_identifiers ON (public_key_id = receiver_id AND status = 'applied')
-+                                         OR public_key_id = fee_payer_id 
-+        )
-+          UNION
-+        (
-+          WITH internal_command_ids AS
-+          ( SELECT internal_command_id, block_id FROM blocks_internal_commands
-+            INNER JOIN blocks ON id = block_id
-+            WHERE chain_status = 'canonical'
-+            AND status = 'applied'
-+          ) 
-+          SELECT account_identifiers.id, block_id FROM internal_command_ids
-+          INNER JOIN internal_commands ON id = internal_command_id
-+          INNER JOIN account_identifiers ON public_key_id = receiver_id
-+        ) ORDER BY block_id, id
-+      |sql}
 +    |> Mina_caqti.exec_req Caqti_type.unit
  
    let dump_user_and_internal_command_info_to_csv (module Conn : CONNECTION)
@@ -2727,94 +2554,11 @@ index 1fbc9e3104..017b6574fc 100644
    | Error e ->
        [%log fatal]
          ~metadata:[ ("error", `String (Caqti_error.show e)) ]
-diff --git a/src/app/replayer/dune b/src/app/replayer/dune
-index 0ecbf97469..cf05b70015 100644
---- a/src/app/replayer/dune
-+++ b/src/app/replayer/dune
-@@ -60,6 +60,7 @@
-    random_oracle
-    codable
-    ppx_version.runtime
-+   cli_lib
-  )
-  (preprocessor_deps ../../config.mlh)
-  (instrumentation (backend bisect_ppx))
 diff --git a/src/app/replayer/replayer.ml b/src/app/replayer/replayer.ml
-index b42081085c..a895c8a0c1 100644
+index b42081085c..8c4d49ea41 100644
 --- a/src/app/replayer/replayer.ml
 +++ b/src/app/replayer/replayer.ml
-@@ -329,7 +329,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
-     (ics : Sql.Internal_command.t list) :
-     (Mina_transaction.Transaction.t option * Sql.Internal_command.t list)
-     Deferred.t =
--  [%log info]
-+  [%log spam]
-     "Converting internal command (%s) with global slot since genesis %Ld, \
-      sequence number %d, and secondary sequence number %d to transaction"
-     ic.typ ic.global_slot_since_genesis ic.sequence_no ic.secondary_sequence_no ;
-@@ -350,7 +350,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
-       (* combining situation 2
-          two fee transfer commands with same global slot since genesis, sequence number
-       *)
--      [%log info]
-+      [%log spam]
-         "Combining two fee transfers at global slot since genesis %Ld with \
-          sequence number %d"
-         ic.global_slot_since_genesis ic.sequence_no ;
-@@ -385,7 +385,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
-               , ic.secondary_sequence_no )
-           in
-           if Option.is_some fee_transfer then
--            [%log info]
-+            [%log spam]
-               "Coinbase transaction at global slot since genesis %Ld, sequence \
-                number %d, and secondary sequence number %d contains a fee \
-                transfer"
-@@ -405,7 +405,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
- 
- let user_command_to_transaction ~logger ~pool (cmd : Sql.User_command.t) :
-     Mina_transaction.Transaction.t Deferred.t =
--  [%log info]
-+  [%log spam]
-     "Converting user command (%s) with nonce %Ld, global slot since genesis \
-      %Ld, and sequence number %d to transaction"
-     cmd.typ cmd.nonce cmd.global_slot_since_genesis cmd.sequence_no ;
-@@ -531,7 +531,7 @@ let zkapp_command_to_transaction ~logger ~pool (cmd : Sql.Zkapp_command.t) :
-     ({ body; authorization = Signature.dummy } : Account_update.Fee_payer.t)
-   in
-   let nonce_str = Mina_numbers.Account_nonce.to_string fee_payer.body.nonce in
--  [%log info]
-+  [%log spam]
-     "Converting zkApp command with fee payer nonce %s, global slot since \
-      genesis %Ld, and sequence number %d to transaction"
-     nonce_str cmd.global_slot_since_genesis cmd.sequence_no ;
-@@ -572,7 +572,7 @@ let find_canonical_chain ~logger pool slot =
-   let find_state_hash_chain state_hash =
-     match%map query_db ~f:(fun db -> Sql.Block.get_chain db state_hash) with
-     | [] ->
--        [%log info] "Block with state hash %s is not along canonical chain"
-+        [%log spam] "Block with state hash %s is not along canonical chain"
-           state_hash ;
-         None
-     | _ ->
-@@ -594,7 +594,7 @@ let try_slot ~logger pool slot =
-     | None ->
-         go ~slot:(Int64.pred slot) ~tries_left:(tries_left - 1)
-     | Some state_hash ->
--        [%log info]
-+        [%log spam]
-           "Found possible canonical chain to target state hash %s at slot %Ld"
-           state_hash slot ;
-         return state_hash
-@@ -641,6 +641,7 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
- let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
-     ~continue_on_error ~checkpoint_interval ~checkpoint_output_folder_opt
-     ~checkpoint_file_prefix ~genesis_dir_opt () =
-+  Cli_lib.Stdout_log.setup false Logger.Level.Info ;
-   let logger = Logger.create () in
-   let json = Yojson.Safe.from_file input_file in
-   let input =
-@@ -653,7 +654,13 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
+@@ -653,7 +653,13 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
               msg )
    in
    let archive_uri = Uri.of_string archive_uri in
@@ -2829,91 +2573,6 @@ index b42081085c..a895c8a0c1 100644
    | Error e ->
        [%log fatal]
          ~metadata:[ ("error", `String (Caqti_error.show e)) ]
-@@ -1091,7 +1098,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
-             if continue_on_error then incr error_count else Core_kernel.exit 1 )
-         in
-         let check_account_accessed state_hash =
--          [%log info] "Checking accounts accessed in block just processed"
-+          [%log spam] "Checking accounts accessed in block just processed"
-             ~metadata:
-               [ ("state_hash", State_hash.to_yojson state_hash)
-               ; ( "global_slot_since_genesis"
-@@ -1106,7 +1113,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
-             query_db ~f:(fun db ->
-                 Processor.Accounts_created.all_from_block db last_block_id )
-           in
--          [%log info]
-+          [%log spam]
-             "Verifying that accounts created are also deemed accessed in block \
-              with global slot since genesis %Ld"
-             last_global_slot_since_genesis ;
-@@ -1130,7 +1137,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
-                     ] ;
-                 if continue_on_error then incr error_count
-                 else Core_kernel.exit 1 ) ) ;
--          [%log info]
-+          [%log spam]
-             "Verifying accounts accessed in block with global slot since \
-              genesis %Ld"
-             last_global_slot_since_genesis ;
-@@ -1191,7 +1198,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
-                 "Missing state hash information for current global slot" ;
-               Core.exit 1
-           | Some (state_hash, _ledger_hash, _snarked_hash) ->
--              [%log info]
-+              [%log spam]
-                 ~metadata:
-                   [ ( "state_hash"
-                     , `String (State_hash.to_base58_check state_hash) )
-@@ -1239,7 +1246,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
-               let rec count_txns ~signed_count ~zkapp_count ~fee_transfer_count
-                   ~coinbase_count = function
-                 | [] ->
--                    [%log info]
-+                    [%log spam]
-                       "Replaying transactions in block with state hash \
-                        $state_hash"
-                       ~metadata:
-@@ -1368,20 +1375,20 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
-                 apply_transaction_phases (List.rev block_txns)
-               in
-               ( if migration_mode then
--                [%log info]
-+                [%log spam]
-                   "We are doing migration, so the snarked_ledger_hash in \
-                    global_slot_hashes_tbl is irrelevant"
-               else if
-               Frozen_ledger_hash.equal snarked_hash
-                 (First_pass_ledger_hashes.get_last_snarked_hash ())
-             then
--                [%log info]
-+                [%log spam]
-                   "Snarked ledger hash same as in the preceding block, not \
-                    checking it again"
-               else if
-               Frozen_ledger_hash.equal snarked_hash genesis_snarked_ledger_hash
-             then
--                [%log info] "Snarked ledger hash is genesis snarked ledger hash"
-+                [%log spam] "Snarked ledger hash is genesis snarked ledger hash"
-               else
-                 match First_pass_ledger_hashes.find snarked_hash with
-                 | None ->
-@@ -1402,13 +1409,13 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
-                     if continue_on_error then incr error_count
-                     else Core_kernel.exit 1
-                 | Some (_hash, n) ->
--                    [%log info]
-+                    [%log spam]
-                       "Found snarked ledger hash among first-pass ledger hashes" ;
-                     found_snarked_ledger_hash := true ;
-                     First_pass_ledger_hashes.set_last_snarked_hash snarked_hash ;
-                     First_pass_ledger_hashes.flush_older_than n ) ;
-               if List.is_empty block_txns then (
--                [%log info]
-+                [%log spam]
-                   "No transactions to run for block with state hash $state_hash"
-                   ~metadata:
-                     [ ("state_hash", State_hash.to_yojson state_hash)
 diff --git a/src/app/replayer/sql.ml b/src/app/replayer/sql.ml
 index 40caaf5af1..54c32b7274 100644
 --- a/src/app/replayer/sql.ml
