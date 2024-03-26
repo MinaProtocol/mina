@@ -453,7 +453,7 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
         migrated_db_is_connected query_migrated_db ~height:fork_height
       in
       Test.of_check check ~name:"Migrated blocks are connected" ~idx:1
-        ~prefix:"A10.1" test_count
+        ~prefix:"D3.2" test_count
       |> Test.eval ;
 
       let%bind check =
@@ -461,7 +461,7 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
           ~height:fork_height
       in
       Test.of_check check ~name:"No orphaned nor pending blocks in migrated db"
-        ~idx:2 ~prefix:"A10.2" test_count
+        ~idx:2 ~prefix:"D3.3" test_count
       |> Test.eval ;
 
       let%bind check =
@@ -471,7 +471,7 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
         ~name:
           "All accounts referred in internal commands or transactions are \
            recorded in the accounts_accessed table."
-        ~idx:3 ~prefix:"A10.3" test_count
+        ~idx:3 ~prefix:"D3.4" test_count
       |> Test.eval ;
 
       let%bind check =
@@ -481,7 +481,7 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
         ~name:
           "The content of accounts_created table is correct (by checking \
            against pre-migrated database)"
-        ~idx:4 ~prefix:"A3.6" test_count
+        ~idx:4 ~prefix:"D3.5" test_count
       |> Test.eval ;
       let%bind _ =
         query_mainnet_db ~f:(fun db ->
@@ -492,13 +492,13 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
       let%bind check = compare_hashes migrated_pool mainnet_pool ~work_dir in
       Test.of_check check
         ~name:"All block hashes (state_hash, ledger_hashes) are equal" ~idx:5
-        ~prefix:"A10.4" test_count
+        ~prefix:"D3.6" test_count
       |> Test.eval ;
 
       let%bind check =
         compare_user_commands migrated_pool mainnet_pool ~work_dir
       in
-      Test.of_check check ~name:"Verify user commands" ~idx:6 ~prefix:"A10.5"
+      Test.of_check check ~name:"Verify user commands" ~idx:6 ~prefix:"D3.7"
         test_count
       |> Test.eval ;
 
@@ -506,7 +506,7 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
         compare_internal_commands migrated_pool mainnet_pool ~work_dir
       in
       Test.of_check check ~name:"Verify internal commands" ~idx:7
-        ~prefix:"A10.6" test_count
+        ~prefix:"D3.8" test_count
       |> Test.eval ;
 
       let check =
@@ -514,7 +514,7 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
           ~fork_config_file
       in
       Test.of_check check ~name:"Verify fork config vs migrated replayer output"
-        ~idx:8 ~prefix:"A10.7" test_count
+        ~idx:8 ~prefix:"A10.3" test_count
       |> Test.eval ;
 
       if Int.( = ) !exit_code 0 then Deferred.Or_error.ok_unit
