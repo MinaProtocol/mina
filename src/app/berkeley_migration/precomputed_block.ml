@@ -200,7 +200,7 @@ let list_directory ~network =
 
 let concrete_fetch_batch ~logger ~bucket ~network targets =
   let%bind existing_targets = list_directory ~network in
-  [%log info] "Found %d individiaully downloaded precomputed blocks"
+  [%log info] "Found %d individually downloaded precomputed blocks"
     (Set.length existing_targets) ;
   let missing_targets = Set.diff (Id.Set.of_list targets) existing_targets in
   let num_missing_targets = Set.length missing_targets in
