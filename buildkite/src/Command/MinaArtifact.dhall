@@ -136,7 +136,7 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
                 Cmd.runInDocker Cmd.Docker::{ 
                   image = "gcr.io/o1labs-192920/mina-daemon:\${BUILDKITE_COMMIT:0:7}-${DebianVersions.lowerName debVersion}-${network}"
                 , extraEnv = [ "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL",  "NETWORK_NAME=\$NETWORK_NAME" ]
-                } "curl \$CONFIG_JSON_GZ_URL > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config config.json /workdir/verification"
+                } "curl \$CONFIG_JSON_GZ_URL > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config \$NETWORK_NAME config.json /workdir/verification"
             ]
             , label = "Verify packaged artifacts"
             , key = "verify-packaged-artifacts"

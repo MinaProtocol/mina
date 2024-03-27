@@ -3,7 +3,7 @@
 set -eo pipefail
 
 if [ $# -lt 2 ]; then
-    echo "Usage: $0 <mainnet-fork-config.json> <working-dir>"
+    echo "Usage: $0 <network-name> <fork-config.json> <working-dir>"
     cat <<EOF
 This script is used to validate that an installed package is correct
 according to an exported fork_config.json file.
@@ -21,6 +21,9 @@ Inputs:
 - FORKING_FROM_CONFIG_JSON (default: /var/lib/coda/mainnet.json)
   the pre-fork genesis ledger
 - SECONDS_PER_SLOT (default: 180)
+- PRECOMPUTED_FORK_BLOCK (default: fetches with gsutil)
+- GSUTIL (default: gsutil)
+  the Google Cloud Storage utility if the PRECOMPUTED_FORK_BLOCK isn't a file
 
 Ensures:
 - The accounts listed in config.json are the ones in the PACKAGED_DAEMON_CONFIG
@@ -50,6 +53,12 @@ source_build_fallback() {
 MINA_EXE=${MINA_EXE:-$(source_build_fallback "$(command -v mina)" ./_build/default/src/app/cli/src/mina.exe)}
 MINA_GENESIS_EXE=${MINA_GENESIS_EXE:-$(source_build_fallback "$(command -v mina-create-genesis)" ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe)}
 CREATE_RUNTIME_CONFIG=${CREATE_RUNTIME_CONFIG:-$(source_build_fallback "$(command -v mina-hf-create-runtime-config)" ./scripts/hardfork/create_runtime_config.sh)}
+GSUTIL=${GSUTIL:-$(source_build_fallback "$(command -v gsutil)" false)}
+
+if [[ -e "$PRECOMPUTED_FORK_BLOCK"  && ! -x "$GSUTIL" ]]; then
+    echo "Error: gsutil is required when PRECOMPUTED_FORK_BLOCK is nonexistent path"
+    exit 1
+fi
 
 installed_config=$(echo /var/lib/coda/config_*.json)
 PACKAGED_DAEMON_CONFIG=${PACKAGED_DAEMON_CONFIG:-$installed_config}
@@ -67,7 +76,20 @@ export FORKING_FROM_CONFIG_JSON=${FORKING_FROM_CONFIG_JSON:-$(source_build_fallb
 
 export MINA_LIBP2P_PASS=''
 
-workdir=$2
+fork_block_state_hash=$(jq -r '.proof.fork.state_hash' "$2")
+fork_block_length=$(jq -r '.proof.fork.blockchain_length' "$2")
+
+if [ ! -e "$PRECOMPUTED_FORK_BLOCK" ]; then
+    if [ "$PRECOMPUTED_FORK_BLOCK" = "" ]; then
+        "$GSUTIL" cp "gs://mina_network_block_data/$1-$fork_block_length-$fork_block_state_hash.json" "$workdir/precomputed_fork_block.json"
+    else
+        "$GSUTIL" cp "$PRECOMPUTED_FORK_BLOCK" "$workdir/precomputed_fork_block.json"
+    fi
+else
+    cp "$PRECOMPUTED_FORK_BLOCK" "$workdir/precomputed_fork_block.json"
+fi
+
+workdir=$3
 mkdir -p "$workdir"
 mkdir -p "$workdir/ledgers"
 mkdir -p "$workdir/ledgers-backup"
@@ -80,11 +102,11 @@ fi
 
 echo "generating genesis ledgers ... (this may take a while)" >&2
 
-cp "$1" "$workdir/config.json"
+cp "$2" "$workdir/config.json"
 sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "2"}/' "$workdir/config.json"
 "$MINA_GENESIS_EXE" --config-file "$workdir/config.json"  --genesis-dir "$workdir/ledgers"  --hash-output-file "$workdir/hashes.json"
 
-FORK_CONFIG_JSON="$1" \
+FORK_CONFIG_JSON="$2" \
 LEDGER_HASHES_JSON="$workdir/hashes.json" \
 GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$PACKAGED_DAEMON_CONFIG") \
 "$CREATE_RUNTIME_CONFIG" > "$workdir/config-substituted.json"
@@ -120,10 +142,13 @@ mv -t /var/lib/coda "$workdir/ledgers-backup"/*
 echo "Performing final comparisons..." >&2
 error=0
 
-result=$(jq --slurpfile a "$workdir/config-substituted.json" --slurpfile b "$PACKAGED_DAEMON_CONFIG" -n '
+result=$(jq --slurpfile block "$workdir/precomputed_fork_block.json" --slurpfile a "$workdir/config-substituted.json" --slurpfile b "$PACKAGED_DAEMON_CONFIG" -n '
   ($a[0].epoch_data.staking.hash == $b[0].epoch_data.staking.hash and
    $a[0].epoch_data.next.hash == $b[0].epoch_data.next.hash and
-   $a[0].ledger.hash == $b[0].ledger.hash)')
+   $a[0].epoch_data.staking.hash == $block[0].protocol_state.body.consensus_state.staking_epoch_data.ledger.hash and
+   $a[0].epoch_data.next.hash == $block[0].protocol_state.body.consensus_state.next_epoch_data.ledger.hash and
+   $a[0].ledger.hash == $b[0].ledger.hash and
+   $a[0].ledger.hash == $block[0].protocol_state.body.consensus_state.blockchain_state.ledger_hash)')
 
 if [ "$result" != "true" ]; then
     echo "Packaged config hashes in $PACKAGED_DAEMON_CONFIG not expected compared to $workdir/config-substituted.json" >&2
