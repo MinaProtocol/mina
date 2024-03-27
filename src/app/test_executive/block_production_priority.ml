@@ -55,6 +55,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           work_delay = Some 1
         ; transaction_capacity =
             Some Runtime_config.Proof_keys.Transaction_capacity.small
+        ; fork =
+            Some
+              { state_hash =
+                  "3NKtK83Ms5KgiYnyDqAWDbVLRizxP4dmJEk3GBGYEMPQtQpXRpaD"
+              ; blockchain_length = 30000
+              ; global_slot_since_genesis = 42185
+              }
         }
     }
 

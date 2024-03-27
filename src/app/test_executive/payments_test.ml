@@ -17,6 +17,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
+  let global_slot_since_genesis = 42185
+
   (* TODO: refactor all currency values to decimal represenation *)
   (* TODO: test account creation fee *)
   let config =
@@ -29,7 +31,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; create ~account_name:"untimed-node-b-key" ~balance:"300000" ()
         ; create ~account_name:"timed-node-c-key" ~balance:"30000"
             ~timing:
-              (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:8
+              (make_timing ~min_balance:10_000_000_000_000
+                 ~cliff_time:(8 + global_slot_since_genesis)
                  ~cliff_amount:0 ~vesting_period:4
                  ~vesting_increment:5_000_000_000_000 )
             (* 30_000_000_000_000 mina is the total.  initially, the balance will be 10k mina.  after 8 global slots, the cliff is hit, although the cliff amount is 0.  4 slots after that, 5_000_000_000_000 mina will vest, and 4 slots after that another 5_000_000_000_000 will vest, and then twice again, for a total of 30k mina all fully liquid and unlocked at the end of the schedule*)
@@ -57,6 +60,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           work_delay = Some 1
         ; transaction_capacity =
             Some Runtime_config.Proof_keys.Transaction_capacity.small
+        ; fork =
+            Some
+              { state_hash =
+                  "3NKtK83Ms5KgiYnyDqAWDbVLRizxP4dmJEk3GBGYEMPQtQpXRpaD"
+              ; blockchain_length = 30000
+              ; global_slot_since_genesis = 42185
+              }
         }
     }
 
@@ -549,6 +559,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     section_hard "running replayer"
       (let%bind logs =
          Network.Node.run_replayer ~logger
+           ~start_slot_since_genesis:global_slot_since_genesis
            (List.hd_exn @@ (Network.archive_nodes network |> Core.Map.data))
        in
        check_replayer_logs ~logger logs )

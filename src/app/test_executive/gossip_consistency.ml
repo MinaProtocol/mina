@@ -28,6 +28,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
         ]
+    ; proof_config =
+        { proof_config_default with
+          fork =
+            Some
+              { state_hash =
+                  "3NKtK83Ms5KgiYnyDqAWDbVLRizxP4dmJEk3GBGYEMPQtQpXRpaD"
+              ; blockchain_length = 30000
+              ; global_slot_since_genesis = 42185
+              }
+        }
     }
 
   let run network t =
