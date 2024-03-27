@@ -44,6 +44,8 @@ module T = struct
   module Pre_diff_info = Pre_diff_info
 
   module Staged_ledger_error = struct
+    [@@@warning "-4"]
+
     type t =
       | Non_zero_fee_excess of
           Scan_state.Space_partition.t * Transaction.t With_status.t list
@@ -62,6 +64,8 @@ module T = struct
       | ZkApps_exceed_limit of int * int
       | Unexpected of Error.t
     [@@deriving sexp]
+
+    [@@@warning "+4"]
 
     let to_string = function
       | Couldn't_reach_verifier e ->
@@ -484,7 +488,7 @@ module T = struct
     match t with
     | Coinbase c ->
         Pending_coinbase.Stack.push_coinbase c current_stack
-    | _ ->
+    | Command _ | Fee_transfer _ ->
         current_stack
 
   let push_state current_stack state_body_hash global_slot =
@@ -838,7 +842,7 @@ module T = struct
           match t.With_status.data with
           | Transaction.Coinbase _ ->
               Stop true
-          | _ ->
+          | Transaction.Command _ | Transaction.Fee_transfer _ ->
               Continue acc )
         ~finish:Fn.id
     in
@@ -1036,7 +1040,8 @@ module T = struct
     let%bind () =
       (* Check number of zkApps in a block does not exceed hardcap *)
       O1trace.thread "zkapp_hardcap_check" (fun () ->
-          let is_zkapp : Transaction.t With_status.t -> bool = function
+          let[@warning "-4"] is_zkapp : Transaction.t With_status.t -> bool =
+            function
             | { With_status.data =
                   Transaction.Command (Mina_base.User_command.Zkapp_command _)
               ; status = _
@@ -1682,7 +1687,7 @@ module T = struct
             match t.budget with
             | Ok b ->
                 option "Currency overflow" (Fee.add b to_be_discarded.fee)
-            | _ ->
+            | Error _ ->
                 rebudget new_t
           in
           ({ new_t with budget }, Some w)
@@ -1727,7 +1732,7 @@ module T = struct
             | Ok b ->
                 option "Fee insufficient"
                   (Fee.sub b User_command.(fee (forget_check uc)))
-            | _ ->
+            | Error _ ->
                 rebudget new_t
           in
           ({ new_t with budget }, Some uc)
@@ -1752,7 +1757,7 @@ module T = struct
             Ok (Two None)
         | One (Some ft) ->
             Ok (Two (Some (ft, None)))
-        | _ ->
+        | Two _ ->
             Or_error.error_string "Coinbase count cannot be more than two"
       in
       let by_one res =
@@ -1867,7 +1872,7 @@ module T = struct
                 Staged_ledger_diff.At_most_one.Zero
             | One x ->
                 One x
-            | _ ->
+            | Two _ ->
                 [%log error]
                   "Error creating staged ledger diff: Should have at most one \
                    coinbase in the second pre_diff" ;
@@ -2048,7 +2053,7 @@ module T = struct
 
     let try_applying_txn ?logger ~apply (state : t) (txn : txn) =
       let open Continue_or_stop in
-      match (state.zkapp_space_remaining, txn) with
+      match[@warning "-4"] (state.zkapp_space_remaining, txn) with
       | _ when state.total_space_remaining < 1 ->
           Stop (state.valid_seq, state.invalid)
       | Some zkapp_limit, User_command.Zkapp_command _ when zkapp_limit < 1 ->
@@ -3373,7 +3378,7 @@ let%test_module "staged ledger tests" =
                         ~zkapp_cmd_limit_hardcap
                     in
                     let checked', diff' =
-                      match apply_res with
+                      match[@warning "-4"] apply_res with
                       | Error (Sl.Staged_ledger_error.Non_zero_fee_excess _) ->
                           (true, empty_diff)
                       | Error err ->
@@ -3726,7 +3731,7 @@ let%test_module "staged ledger tests" =
                 assert (Fee.equal fee fee')
               in
               let first_pre_diff, second_pre_diff_opt = diff.diff in
-              match
+              match[@warning "-4"]
                 ( first_pre_diff.coinbase
                 , Option.value_map second_pre_diff_opt
                     ~default:Staged_ledger_diff.At_most_one.Zero ~f:(fun d ->
@@ -4365,7 +4370,7 @@ let%test_module "staged ledger tests" =
               match diff_result with
               | Error e ->
                   Error.raise (Pre_diff_info.Error.to_error e)
-              | Ok (diff, _invalid_txns) -> (
+              | Ok (diff, _invalid_txns) ->
                   assert (
                     List.length
                       (Staged_ledger_diff.With_valid_signatures_and_proofs
@@ -4392,22 +4397,23 @@ let%test_module "staged ledger tests" =
                         ({ f with commands = [ failed_command ] }, s)
                     }
                   in
-                  match%map
-                    Sl.apply ~constraint_constants ~global_slot !sl
-                      (Staged_ledger_diff.forget diff)
-                      ~logger ~verifier ~get_completed_work:(Fn.const None)
-                      ~current_state_view ~state_and_body_hash
-                      ~coinbase_receiver ~supercharge_coinbase:false
-                      ~zkapp_cmd_limit_hardcap
-                  with
-                  | Ok _x ->
-                      assert false
-                  (*TODO: check transaction logic errors here. Verified that the error is here is [The source account has an insufficient balance]*)
-                  | Error (Staged_ledger_error.Unexpected _ as e) ->
-                      [%log info] "Error %s" (Staged_ledger_error.to_string e) ;
-                      assert true
-                  | Error _ ->
-                      assert false ) ) )
+                  [%map
+                    match[@warning "-4"]
+                      Sl.apply ~constraint_constants ~global_slot !sl
+                        (Staged_ledger_diff.forget diff)
+                        ~logger ~verifier ~get_completed_work:(Fn.const None)
+                        ~current_state_view ~state_and_body_hash
+                        ~coinbase_receiver ~supercharge_coinbase:false
+                        ~zkapp_cmd_limit_hardcap
+                    with
+                    | Ok _x ->
+                        assert false
+                    (*TODO: check transaction logic errors here. Verified that the error is here is [The source account has an insufficient balance]*)
+                    | Error (Staged_ledger_error.Unexpected _ as e) ->
+                        [%log info] "Error %s" (Staged_ledger_error.to_string e) ;
+                        assert true
+                    | Error _ ->
+                        assert false] ) )
 
     let gen_spec_keypair_and_global_slot =
       let open Quickcheck.Generator.Let_syntax in
@@ -5067,7 +5073,7 @@ let%test_module "staged ledger tests" =
                   in
                   let commands = Staged_ledger_diff.commands diff in
                   assert (List.length commands = 1) ;
-                  match List.hd_exn commands with
+                  match[@warning "-4"] List.hd_exn commands with
                   | { With_status.data = Zkapp_command _ps; status = Applied }
                     ->
                       return ()
