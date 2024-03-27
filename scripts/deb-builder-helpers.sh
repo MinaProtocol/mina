@@ -335,7 +335,7 @@ build_archive_deb () {
   cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-replayer"
   cp ./default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILDDIR}/usr/local/bin/mina-swap-bad-balances"
-  cp ../scripts/archive/missing-blocks-guardian.sh "${BUILD_DIR}/usr/local/bin/mina-missing-blocks-guardian"
+  cp ../scripts/archive/missing-blocks-guardian.sh "${BUILDDIR}/usr/local/bin/mina-missing-blocks-guardian"
 
   build_deb "$ARCHIVE_DEB"
 
