@@ -11,9 +11,8 @@ in
 
 Pipeline.build 
     (ArtifactPipelines.pipeline 
-        [ Artifacts.Type.Daemon ]
-        DebianVersions.DebVersion.Bullseye 
-        Profiles.Type.Lightnet 
-        Toolchain.SelectionMode.ByDebian
-        PipelineMode.Type.PullRequest
+        ArtifactPipelines.MinaBuildSpec::{
+            artifacts = [ Artifacts.Type.Daemon ],
+            profile = Profiles.Type.Lightnet 
+        }
     )

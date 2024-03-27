@@ -11,9 +11,8 @@ in
 
 Pipeline.build 
     (ArtifactPipelines.pipeline 
-        [ Artifacts.Type.Daemon , Artifacts.Type.Archive , Artifacts.Type.BatchTxn , Artifacts.Type.TestExecutive , Artifacts.Type.Rosetta , Artifacts.Type.ZkappTestTransaction ]
-        DebianVersions.DebVersion.Buster 
-        Profiles.Type.Standard 
-        Toolchain.SelectionMode.ByDebian
-        PipelineMode.Type.PullRequest
+        ArtifactPipelines.MinaBuildSpec::{
+            artifacts = [ Artifacts.Type.Daemon , Artifacts.Type.Archive , Artifacts.Type.BatchTxn , Artifacts.Type.TestExecutive , Artifacts.Type.Rosetta , Artifacts.Type.ZkappTestTransaction ],
+            debVersion = DebianVersions.DebVersion.Buster,
+        }
     )

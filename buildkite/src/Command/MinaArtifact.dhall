@@ -251,25 +251,41 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
       } artifact
 in 
 
-let pipeline : List Artifacts.Type -> DebianVersions.DebVersion  -> Profiles.Type ->  Toolchain.SelectionMode -> PipelineMode.Type  -> Pipeline.Config.Type = 
-  \(artifacts: List Artifacts.Type) ->
-  \(debVersion : DebianVersions.DebVersion) ->
-  \(profile: Profiles.Type) ->
-  \(toolchainSelectMode: Toolchain.SelectionMode) ->
-  \(mode: PipelineMode.Type) ->
+
+let MinaBuildSpec = {
+  Type = {
+    prefix: Text,
+    artifacts: List Artifacts.Type,
+    debVersion : DebianVersions.DebVersion,
+    profile: Profiles.Type,
+    toolchainSelectMode: Toolchain.SelectionMode,
+    mode: PipelineMode.Type,
+  },
+  default = {
+    prefix = "MinaArtifact",
+    artifacts = Artifacts.AllButTests,
+    debVersion = DebianVersions.DebVersion.Bullseye,
+    profile = Profiles.Type.Standard,
+    toolchainSelectMode = Toolchain.SelectionMode.ByDebian,
+    mode = PipelineMode.Type.PullRequest
+  }
+}
+
+let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type = 
+  \(spec: MinaBuildSpec.Type) ->
     let steps = [
-        Libp2p.step debVersion,
+        Libp2p.step spec.debVersion,
         Command.build
           Command.Config::{
-            commands = Toolchain.select toolchainSelectMode debVersion [
-              "DUNE_PROFILE=${Profiles.duneProfile profile}",
+            commands = Toolchain.select spec.toolchainSelectMode spec.debVersion [
+              "DUNE_PROFILE=${Profiles.duneProfile spec.profile}",
               "AWS_ACCESS_KEY_ID",
               "AWS_SECRET_ACCESS_KEY",
               "MINA_BRANCH=$BUILDKITE_BRANCH",
               "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
-              "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
-            ] "./buildkite/scripts/build-release.sh ${Artifacts.toDebianNames artifacts}",
-            label = "Build Mina for ${DebianVersions.capitalName debVersion} ${Profiles.toSuffixUppercase profile}",
+              "MINA_DEB_CODENAME=${DebianVersions.lowerName spec.debVersion}"
+            ] "./buildkite/scripts/build-release.sh ${Artifacts.toDebianNames spec.artifacts}",
+            label = "Build Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile}",
             key = "build-deb-pkg",
             target = Size.XLarge,
             retries = [
@@ -281,23 +297,24 @@ let pipeline : List Artifacts.Type -> DebianVersions.DebVersion  -> Profiles.Typ
       ] # (List/map
             Artifacts.Type
             Command.Type
-            (\(artifact : Artifacts.Type) ->  DockerImage.generateStep (docker_step artifact debVersion profile) )
-            artifacts)
+            (\(artifact : Artifacts.Type) ->  DockerImage.generateStep (docker_step artifact spec.debVersion spec.profile) )
+            spec.artifacts)
     in
 
     Pipeline.Config::{
       spec =
         JobSpec::{
-          dirtyWhen = DebianVersions.dirtyWhen debVersion,
+          dirtyWhen = DebianVersions.dirtyWhen spec.debVersion,
           path = "Release",
-          name = "MinaArtifact${DebianVersions.capitalName debVersion}${Profiles.toSuffixUppercase profile}",
+          name = "${spec.prefix}${DebianVersions.capitalName spec.debVersion}${Profiles.toSuffixUppercase spec.profile}",
           tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ],
-          mode = mode
+          mode = spec.mode
         },
       steps = steps    }
 
 in
 {
   pipeline = pipeline
+  , MinaBuildSpec = MinaBuildSpec
   , hardforkPipeline = hardforkPipeline
 }

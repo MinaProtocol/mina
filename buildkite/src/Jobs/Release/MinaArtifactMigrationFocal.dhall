@@ -12,9 +12,10 @@ in
 
 Pipeline.build 
     (ArtifactPipelines.pipeline 
-        [ Artifacts.Type.ArchiveMigration ]
-        DebianVersions.DebVersion.Focal 
-        Profiles.Type.Standard
-        (Toolchain.SelectionMode.Custom ContainerImages.minaCaqtiToolchain )
-        PipelineMode.Type.PullRequest
+        ArtifactPipelines.MinaBuildSpec::{
+            artifacts = [ Artifacts.Type.ArchiveMigration ],
+            prefix = "MinaArchiveMigration",
+            profile = DebianVersions.DebVersion.Focal,
+            toolchainSelectMode = (Toolchain.SelectionMode.Custom ContainerImages.minaCaqtiToolchain )
+        }
     )
