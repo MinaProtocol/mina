@@ -1,11 +1,7 @@
 open Core_kernel
 open Mina_base
 
-[@@@warning "-4"]
-
 type count_and_fee = int * Currency.Fee.t [@@deriving to_yojson]
-
-[@@@warning "+4"]
 
 module Fee_Summable = struct
   open Currency
@@ -18,7 +14,7 @@ module Fee_Summable = struct
 end
 
 module Summary = struct
-  [@@@warning "-4-32"] (* lens generates unused functions *)
+  [@@@warning "-32"] (* lens generates unused functions *)
 
   type resources =
     { completed_work : count_and_fee
@@ -27,8 +23,6 @@ module Summary = struct
     }
   [@@deriving to_yojson, lens]
 
-  [@@@warning "+4"]
-
   type command_constraints =
     { insufficient_work : int; insufficient_space : int }
   [@@deriving to_yojson, lens]
@@ -36,8 +30,6 @@ module Summary = struct
   type completed_work_constraints =
     { insufficient_fees : int; extra_work : int }
   [@@deriving to_yojson, lens]
-
-  [@@@warning "-4"]
 
   type t =
     { partition : [ `First | `Second ]
@@ -50,7 +42,7 @@ module Summary = struct
     }
   [@@deriving to_yojson, lens]
 
-  [@@@warning "+4+32"] (* end lens-related warning disabling *)
+  [@@@warning "+32"] (* end lens-related warning disabling *)
 
   let coinbase_fees
       (coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t) =
@@ -142,7 +134,7 @@ module Summary = struct
 end
 
 module Detail = struct
-  [@@@warning "-4-32"]
+  [@@@warning "-32"]
 
   type line =
     { reason :
@@ -158,7 +150,7 @@ module Detail = struct
     }
   [@@deriving to_yojson, lens]
 
-  [@@@warning "+4+32"]
+  [@@@warning "+32"]
 
   type t = line list [@@deriving to_yojson]
 
@@ -214,11 +206,7 @@ module Detail = struct
         :: x :: xs
 end
 
-[@@@warning "-4"]
-
 type t = Summary.t * Detail.t [@@deriving to_yojson]
-
-[@@@warning "+4"]
 
 type summary_list = Summary.t list [@@deriving to_yojson]
 
