@@ -28,6 +28,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
         ]
+    ; proof_config =
+        { proof_config_default with block_window_duration_ms = Some 60000 }
     }
 
   let run network t =
