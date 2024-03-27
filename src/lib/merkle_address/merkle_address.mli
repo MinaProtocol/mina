@@ -6,6 +6,8 @@ module Stable : sig
   module V1 : sig
     type nonrec t = t
     [@@deriving sexp, bin_io, hash, equal, compare, to_yojson, version]
+
+    val path_to_type : string
   end
 
   module Latest : module type of V1

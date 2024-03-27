@@ -15,13 +15,12 @@ let tuple6_to_vec (w0, w1, w2, w3, w4, w5) = Vector.[ w0; w1; w2; w3; w4; w5 ]
 let tuple6_of_vec Vector.[ w0; w1; w2; w3; w4; w5 ] = (w0, w1, w2, w3, w4, w5)
 
 module type Stable_v1 = sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving version, bin_io, sexp, compare, yojson, hash, equal]
+      type t [@@deriving sexp, compare, yojson, hash, equal]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.V1.t [@@deriving sexp, compare, yojson, hash, equal]
 end
@@ -170,7 +169,7 @@ module Make (Inputs : Inputs_intf) = struct
           Pickles_types.Plonk_types.Proof.Stable.V2.t
         [@@deriving compare, sexp, yojson, hash, equal]
 
-        let id = "plong_dlog_proof_" ^ Inputs.id
+        let id = "plonk_dlog_proof_" ^ Inputs.id
 
         type 'a creator =
              messages:G.Affine.t Pickles_types.Plonk_types.Messages.Stable.V2.t

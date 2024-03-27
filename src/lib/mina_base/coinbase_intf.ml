@@ -4,6 +4,7 @@ open Mina_base_import
 module type Full = sig
   module Fee_transfer = Coinbase_fee_transfer
 
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type t = private
@@ -11,19 +12,9 @@ module type Full = sig
         ; amount : Currency.Amount.Stable.V1.t
         ; fee_transfer : Fee_transfer.Stable.V1.t option
         }
-      [@@deriving sexp, bin_io, compare, equal, version, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
     end
-
-    module Latest = V1
-  end
-
-  (* bin_io intentionally omitted in deriving list *)
-  type t = Stable.Latest.t = private
-    { receiver : Public_key.Compressed.t
-    ; amount : Currency.Amount.t
-    ; fee_transfer : Fee_transfer.t option
-    }
-  [@@deriving sexp, compare, equal, hash, yojson]
+  end]
 
   include Codable.Base58_check_intf with type t := t
 

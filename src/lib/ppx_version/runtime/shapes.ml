@@ -14,8 +14,11 @@ let equal_shapes shape1 shape2 =
   let canonical2 = Bin_prot.Shape.eval shape2 in
   Bin_prot.Shape.Canonical.compare canonical1 canonical2 = 0
 
-let register path_to_type (shape : Bin_prot.Shape.t) (ty_decl : string) =
-  match Shape_tbl.add shape_tbl ~key:path_to_type ~data:(shape, ty_decl) with
+let register ~path_to_type ~(type_shape : Bin_prot.Shape.t) ~(type_decl : string)
+    =
+  match
+    Shape_tbl.add shape_tbl ~key:path_to_type ~data:(type_shape, type_decl)
+  with
   | `Ok ->
       ()
   | `Duplicate -> (
@@ -23,8 +26,8 @@ let register path_to_type (shape : Bin_prot.Shape.t) (ty_decl : string) =
          once will yield duplicates; OK if the shapes are the same
       *)
       match find path_to_type with
-      | Some (shape', _ty_decl) ->
-          if not (equal_shapes shape shape') then
+      | Some (type_shape', _type_decl') ->
+          if not (equal_shapes type_shape type_shape') then
             failwithf "Different type shapes at path %s" path_to_type ()
           else ()
       | None ->

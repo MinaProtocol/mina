@@ -113,10 +113,16 @@ module Comparable : sig
   end
 end
 
-module type VERSIONED = sig
+module type VERSIONED_NO_TYPE_PATH = sig
   val version : int
 
   val __versioned__ : unit
+end
+
+module type VERSIONED = sig
+  include VERSIONED_NO_TYPE_PATH
+
+  val path_to_type : string
 end
 
 module Serializable : sig

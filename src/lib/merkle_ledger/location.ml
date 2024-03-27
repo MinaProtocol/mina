@@ -5,7 +5,7 @@ module Bigstring = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = Bigstring.Stable.V1.t [@@deriving sexp, compare]
+      type t = Core_kernel.Bigstring.Stable.V1.t [@@deriving sexp, compare]
 
       let to_latest = Fn.id
 

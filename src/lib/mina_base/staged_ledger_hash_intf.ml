@@ -27,6 +27,8 @@ module type Full = sig
     module V1 : sig
       type nonrec t = t
       [@@deriving bin_io, sexp, equal, compare, hash, yojson, version]
+
+      val path_to_type : string
     end
 
     module Latest : module type of V1

@@ -17,6 +17,13 @@ struct
     module V1 = struct
       type 'a t = 'a array [@@deriving sexp, yojson, bin_io]
 
+      let path_to_type =
+        let module_path =
+          Core_kernel.String.chop_suffix_if_exists ~suffix:".path_to_type"
+            __FUNCTION__
+        in
+        sprintf "%s:%s.%s" __FILE__ module_path "t"
+
       let __versioned__ = ()
 
       let hash_fold_t = hash_fold_array_frozen
@@ -45,6 +52,12 @@ struct
         else (
           pos_ref := pos ;
           bin_read_array bin_read_el buf ~pos_ref )
+
+      let (_ : _) =
+        Ppx_version_runtime.Contained_types.register ~path_to_type
+          ~contained_type_paths:[]
+
+      (* no shape to register, there's a type parameter *)
     end
   end
 
@@ -91,6 +104,21 @@ module String = struct
         else (
           pos_ref := pos ;
           bin_read_string buf ~pos_ref )
+
+      let path_to_type =
+        let module_path =
+          Core_kernel.String.chop_suffix_if_exists ~suffix:".path_to_type"
+            __FUNCTION__
+        in
+        sprintf "%s:%s.%s" __FILE__ module_path "t"
+
+      let (_ : _) =
+        Ppx_version_runtime.Contained_types.register ~path_to_type
+          ~contained_type_paths:[]
+
+      let (_ : _) =
+        Ppx_version_runtime.Shapes.register ~path_to_type
+          ~type_shape:bin_shape_t ~type_decl:"string"
     end
   end
 
@@ -143,6 +171,13 @@ module Wrapped_error = struct
 
       let __versioned__ = ()
 
+      let path_to_type =
+        let module_path =
+          Core_kernel.String.chop_suffix_if_exists ~suffix:".path_to_type"
+            __FUNCTION__
+        in
+        sprintf "%s:%s.%s" __FILE__ module_path "t"
+
       let to_latest = Core_kernel.Fn.id
 
       include String.Of_stringable (struct
@@ -154,6 +189,14 @@ module Wrapped_error = struct
         let of_string s =
           Core_kernel.Error.t_of_sexp (Core_kernel.Sexp.of_string s)
       end)
+
+      let (_ : _) =
+        Ppx_version_runtime.Contained_types.register ~path_to_type
+          ~contained_type_paths:[]
+
+      let (_ : _) =
+        Ppx_version_runtime.Shapes.register ~path_to_type
+          ~type_shape:bin_shape_t ~type_decl:"Core_kernel.Error.Stable.V2.t"
     end
   end
 
