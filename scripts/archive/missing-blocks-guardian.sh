@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# This script is adapted from https://github.com/MinaProtocol/mina/blob/develop/src/app/rosetta/download-missing-blocks.sh
+# This script is adapted from https://github.com/MinaProtocol/mina/blob/1.4.1/src/app/rosetta/download-missing-blocks.sh
 # It is used to populate a postgres database with missing precomputed archiveDB blocks
 
 # Function to display usage information
@@ -16,11 +16,11 @@ usage() {
     echo ""
     echo "Environment variables:"
     echo "  Required:"
-    echo "    DB_USERNAME             Database username"
-    echo "    DB_HOST                 Database connection endpoint"
-    echo "    DB_PORT                 Database connection port"
-    echo "    DB_NAME                 Database name"
-    echo "    PGPASSWORD              Postgresql password"
+    echo "    POSTGRES_USERNAME       Database username"
+    echo "    POSTGRES_HOST           Database connection endpoint"
+    echo "    POSTGRES_PORT           Database connection port"
+    echo "    POSTGRES_DBNAME         Database name"
+    echo "    POSTGRES_PASSWORD       Postgresql password"
     echo "    PRECOMPUTED_BLOCKS_URL  Url of the bucket with the precomputed blocks"
     echo ""
     echo "  Optional:"
@@ -37,33 +37,33 @@ trap "echo $'\nRecieved termination signal. Exiting the script\n'; exit 1" 1 2 3
 
 # Checks required env variables
 check_env_vars() {
-  if [ -z "$DB_USERNAME" ]; then
-      echo $'[ERROR] The DB_USERNAME environment variable is not set or is empty. Exiting the script'
+  if [ -z "$POSTGRES_USERNAME" ]; then
+      echo $'[ERROR] The POSTGRES_USERNAME environment variable is not set or is empty. Exiting the script'
       exit 1
   fi
   
-  if [ -z "$PGPASSWORD" ]; then
-      echo $'[ERROR] The PGPASSWORD environment variable is not set or is empty. Exiting the script'             
+  if [ -z "$POSTGRES_PASSWORD" ]; then
+      echo $'[ERROR] The POSTGRES_PASSWORD environment variable is not set or is empty. Exiting the script'
       exit 1
   fi
   
-  if [ -z "$DB_HOST" ]; then
-      echo $'[ERROR] The DB_HOST environment variable is not set or is empty. Exiting the script'                
+  if [ -z "$POSTGRES_HOST" ]; then
+      echo $'[ERROR] The POSTGRES_HOST environment variable is not set or is empty. Exiting the script'
       exit 1
   fi
   
-  if [ -z "$DB_PORT" ]; then
-      echo $'[ERROR] The DB_PORT environment variable is not set or is empty. Exiting the script'                
+  if [ -z "$POSTGRES_PORT" ]; then
+      echo $'[ERROR] The POSTGRES_PORT environment variable is not set or is empty. Exiting the script'
       exit 1
   fi
   
-  if [ -z "$DB_NAME" ]; then
-      echo $'[ERROR] The DB_NAME environment variable is not set or is empty. Exiting the script'                
+  if [ -z "$POSTGRES_DBNAME" ]; then
+      echo $'[ERROR] The POSTGRES_DBNAME environment variable is not set or is empty. Exiting the script'
       exit 1
   fi
   
   if [ -z "$PRECOMPUTED_BLOCKS_URL" ]; then
-      echo $'[ERROR] The PRECOMPUTED_BLOCKS_URL environment variable is not set or is empty. Exiting the script'  
+      echo $'[ERROR] The PRECOMPUTED_BLOCKS_URL environment variable is not set or is empty. Exiting the script'
       exit 1
   fi
   
@@ -141,8 +141,8 @@ main() {
 
   check_env_vars
 
-  echo "[INFO] Using connection string postgres://${DB_USERNAME}:<your_password>@${DB_HOST}:${DB_PORT}/${DB_NAME}"
-  PG_CONN=postgres://${DB_USERNAME}:${PGPASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
+  echo "[INFO] Using connection string postgres://${POSTGRES_USERNAME}:<your_password>@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DBNAME}"
+  PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DBNAME}
 
   # Wait until there is a block missing
   PARENT=null

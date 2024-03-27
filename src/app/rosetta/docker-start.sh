@@ -47,8 +47,11 @@ export MINA_FLAGS=${MINA_FLAGS:=$DEFAULT_FLAGS}
 # Postgres database connection string and related variables
 POSTGRES_USERNAME=${POSTGRES_USERNAME:=pguser}
 POSTGRES_DBNAME=${POSTGRES_DBNAME:=archive_balances_migrated}
+POSTGRES_PORT=${POSTGRES_PORT:=5432}
+POSTGRES_HOST=${POSTGRES_HOST:=127.0.0.1}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD:=pguser}
 POSTGRES_DATA_DIR=${POSTGRES_DATA_DIR:=/data/postgresql}
-PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${POSTGRES_DBNAME}
+PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DBNAME}
 DUMP_TIME=${DUMP_TIME:=0000}
 
 # Postgres
@@ -93,7 +96,7 @@ MINA_DAEMON_PID=$!
 sleep 30
 
 echo "========================= POPULATING MISSING BLOCKS ==========================="
-./download-missing-blocks.sh ${MINA_NETWORK} ${POSTGRES_DBNAME} ${POSTGRES_USERNAME} &
+../../../scripts/archive/missing-blocks-guardian.sh daemon &
 
 
 if ! kill -0 "${MINA_DAEMON_PID}"; then
