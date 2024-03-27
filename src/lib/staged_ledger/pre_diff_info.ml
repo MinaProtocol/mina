@@ -3,42 +3,9 @@ open Mina_base
 open Mina_transaction
 open Signature_lib
 
-module type S = sig
-  module Error : sig
-    type t =
-      | Verification_failed of Verifier.Failure.t
-      | Coinbase_error of string
-      | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
-      | Internal_command_status_mismatch
-      | Unexpected of Error.t
-    [@@deriving sexp]
-
-    val to_string : t -> string
-
-    val to_error : t -> Error.t
-  end
-
-  val get_unchecked :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> coinbase_receiver:Public_key.Compressed.t
-    -> supercharge_coinbase:bool
-    -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
-    -> ( Transaction.Valid.t With_status.t list
-         * Transaction_snark_work.t list
-         * int
-         * Currency.Amount.t list
-       , Error.t )
-       result
-
-  val get_transactions :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> coinbase_receiver:Public_key.Compressed.t
-    -> supercharge_coinbase:bool
-    -> Staged_ledger_diff.t
-    -> (Transaction.t With_status.t list, Error.t) result
-end
-
 module Error = struct
+  [@@@warning "-4"]
+
   type t =
     | Verification_failed of Verifier.Failure.t
     | Coinbase_error of string
@@ -46,6 +13,8 @@ module Error = struct
     | Internal_command_status_mismatch
     | Unexpected of Error.t
   [@@deriving sexp]
+
+  [@@@warning "+4"]
 
   let to_string = function
     | Verification_failed t ->
@@ -292,7 +261,7 @@ let get_individual_info (type c) ~constraint_constants coinbase_parts ~receiver
             match cmd with
             | Transaction.Coinbase _ | Transaction.Fee_transfer _ ->
                 { With_status.data = cmd; status }
-            | _ ->
+            | Transaction.Command _ ->
                 (* Caught by [try_with] above, it doesn't matter what we throw. *)
                 assert false ) )
     |> Result.map_error ~f:(fun _ -> Error.Internal_command_status_mismatch)
@@ -310,8 +279,9 @@ let get_individual_info (type c) ~constraint_constants coinbase_parts ~receiver
 
 open Staged_ledger_diff
 
+(* TODO: Use pattern-matching instead of fst snd *)
 let check_coinbase (diff : _ Pre_diff_two.t * _ Pre_diff_one.t option) =
-  match
+  match[@warning "-4"]
     ( (fst diff).coinbase
     , Option.value_map ~default:At_most_one.Zero (snd diff) ~f:(fun d ->
           d.coinbase ) )
