@@ -112,6 +112,25 @@ let all_accounts_referred_in_commands_are_recorded migrated_pool ~work_dir =
 
   diff_files user_and_internal_cmds account_accessed
 
+let accounts_created_table_is_correct migrated_pool mainnet_pool ~work_dir =
+  let query_mainnet_db = Mina_caqti.query mainnet_pool in
+  let query_migrated_db = Mina_caqti.query migrated_pool in
+  let accounts_created_mainnet =
+    Filename.concat work_dir "accounts_created_mainnet.csv"
+  in
+  let accounts_created = Filename.concat work_dir "accounts_created.csv" in
+
+  let open Deferred.Let_syntax in
+  let%bind () =
+    query_mainnet_db ~f:(fun db ->
+        Sql.Mainnet.dump_accounts_created_to_csv db accounts_created_mainnet )
+  in
+  let%bind () =
+    query_migrated_db ~f:(fun db ->
+        Sql.Berkeley.dump_accounts_created_to_csv db accounts_created )
+  in
+  diff_files accounts_created_mainnet accounts_created
+
 let compare_hashes_till_height migrated_pool mainnet_pool ~height ~work_dir =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
@@ -371,13 +390,13 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
       let query_mainnet_db = Mina_caqti.query mainnet_pool in
       let query_migrated_db = Mina_caqti.query migrated_pool in
 
-      let test_count = 7 in
+      let test_count = 8 in
       let work_dir = Filename.temp_dir_name in
       let%bind check =
         migrated_db_is_connected query_migrated_db ~height:fork_height
       in
       Test.of_check check ~name:"Migrated blocks are connected" ~idx:1
-        ~prefix:"A10.1" test_count
+        ~prefix:"D3.2" test_count
       |> Test.eval ;
 
       let%bind check =
@@ -385,7 +404,7 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
           ~height:fork_height
       in
       Test.of_check check ~name:"No orphaned nor pending blocks in migrated db"
-        ~idx:2 ~prefix:"A10.2" test_count
+        ~idx:2 ~prefix:"D3.3" test_count
       |> Test.eval ;
 
       let%bind check =
@@ -395,9 +414,18 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
         ~name:
           "All accounts referred in internal commands or transactions are \
            recorded in the accounts_accessed table."
-        ~idx:3 ~prefix:"A10.3" test_count
+        ~idx:3 ~prefix:"D3.4" test_count
       |> Test.eval ;
 
+      let%bind check =
+        accounts_created_table_is_correct migrated_pool mainnet_pool ~work_dir
+      in
+      Test.of_check check
+        ~name:
+          "The content of accounts_created table is correct (by checking \
+           against pre-migrated database)"
+        ~idx:4 ~prefix:"D3.5" test_count
+      |> Test.eval ;
       let%bind _ =
         query_mainnet_db ~f:(fun db ->
             Sql.Mainnet.mark_chain_till_fork_block_as_canonical db
@@ -406,29 +434,29 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
 
       let%bind check = compare_hashes migrated_pool mainnet_pool ~work_dir in
       Test.of_check check
-        ~name:"All block hashes (state_hash, ledger_hashes) are equal" ~idx:4
-        ~prefix:"A10.4" test_count
+        ~name:"All block hashes (state_hash, ledger_hashes) are equal" ~idx:5
+        ~prefix:"D3.6" test_count
       |> Test.eval ;
 
       let%bind check =
         compare_user_commands migrated_pool mainnet_pool ~work_dir
       in
-      Test.of_check check ~name:"Verify user commands" ~idx:5 ~prefix:"A10.5"
+      Test.of_check check ~name:"Verify user commands" ~idx:6 ~prefix:"D3.7"
         test_count
       |> Test.eval ;
 
       let%bind check =
         compare_internal_commands migrated_pool mainnet_pool ~work_dir
       in
-      Test.of_check check ~name:"Verify internal commands" ~idx:6
-        ~prefix:"A10.6" test_count
+      Test.of_check check ~name:"Verify internal commands" ~idx:7 ~prefix:"D3.8"
+        test_count
       |> Test.eval ;
 
       let check =
         compare_ledger_hash ~migrated_replayer_output ~fork_config_file
       in
       Test.of_check check ~name:"Verify fork config vs migrated replayer output"
-        ~idx:7 ~prefix:"A10.7" test_count
+        ~idx:8 ~prefix:"A10.3" test_count
       |> Test.eval ;
 
       if Int.( = ) !exit_code 0 then Deferred.Or_error.ok_unit

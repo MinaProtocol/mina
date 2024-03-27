@@ -4,6 +4,33 @@ let dump_sql_to_csv output_file ~sql =
   Printf.sprintf "COPY ( %s ) TO '%s' DELIMITER ',' CSV HEADER " sql output_file
 
 module Mainnet = struct
+  let dump_accounts_created_to_csv_query ~output_file =
+    dump_sql_to_csv output_file
+      ~sql:
+        {sql|
+      ( SELECT height, value AS public_key, state_hash, receiver_account_creation_fee_paid AS creation_fee
+        FROM blocks_user_commands
+        JOIN blocks          ON block_id = blocks.id AND chain_status = 'canonical'
+        JOIN user_commands   ON user_command_id = user_commands.id
+        JOIN public_keys     ON receiver_id     = public_keys.id
+        WHERE receiver_account_creation_fee_paid IS NOT NULL
+        AND   status = 'applied'
+      )
+      UNION
+      (
+        SELECT height, value AS public_key, state_hash, receiver_account_creation_fee_paid AS creation_fee
+        FROM blocks_internal_commands
+        JOIN blocks            ON block_id            = blocks.id AND chain_status = 'canonical'
+        JOIN internal_commands ON internal_command_id = internal_commands.id
+        JOIN public_keys       ON receiver_id         = public_keys.id
+        WHERE receiver_account_creation_fee_paid IS NOT NULL
+      ) 
+      ORDER BY height, public_key |sql}
+    |> Caqti_request.exec Caqti_type.unit
+
+  let dump_accounts_created_to_csv (module Conn : CONNECTION) output_file =
+    Conn.exec (dump_accounts_created_to_csv_query ~output_file) ()
+
   let dump_state_and_ledger_hashes_to_csv_query ~output_file =
     (* Workaround for replacing output file as caqti has an issue with using ? in place of FILE argument*)
     dump_sql_to_csv output_file
@@ -165,6 +192,21 @@ module Mainnet = struct
 end
 
 module Berkeley = struct
+  let dump_accounts_created_to_csv_query ~output_file =
+    dump_sql_to_csv output_file
+      ~sql:
+        {sql|
+      SELECT height, value AS public_key, state_hash, creation_fee
+      FROM accounts_created
+      JOIN blocks              ON block_id              = blocks.id
+      JOIN account_identifiers ON account_identifier_id = account_identifiers.id 
+      JOIN public_keys         ON public_key_id         = public_keys.id
+      ORDER BY height, public_key |sql}
+    |> Caqti_request.exec Caqti_type.unit
+
+  let dump_accounts_created_to_csv (module Conn : CONNECTION) output_file =
+    Conn.exec (dump_accounts_created_to_csv_query ~output_file) ()
+
   let height_query =
     Caqti_request.find Caqti_type.unit Caqti_type.int
       {sql| 
