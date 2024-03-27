@@ -4,6 +4,10 @@ Implementation of the [Rosetta API](https://www.rosetta-api.org/) for Mina.
 
 ## Changelog
 
+2024/03/27:
+
+- Change `download-missing-blocks.sh` with `missing-blocks-guardian.sh`.
+
 2022/04/20: Add `MINA_ROSETTA_TERMINATE_ON_SERVER_ERROR` environment
   variable.  If that variable is set to any value, the process will
   terminate with exit code 1 if the server encounters an internal
@@ -236,33 +240,37 @@ Examples queries via Rosetta:
 Any queries that rely on historical data will fail until the archive database is populated. This happens automatically with the relevant entrypoints.
 
 ## Design Choices
-
-### Database Bootstrap Scripts
-
-#### init-db.sh
-
+ 
+### Database Bootstrap Scripts 
+ 
+#### init-db.sh 
+ 
 As Mina does not store or broadcast historical blocks beyond the "transition frontier" (approximately 290 blocks), Rosetta requires logic to fetch historical data from a trusted archive node database. `docker-start.sh` and the `init-db.sh` script that it calls set up a fresh database when the node is first launched (located in /data/postgresql by default) and then restores the latest O(1) Labs nightly backup into that new database. If this data is persisted across reboots/deployments then the `init-db.sh` script will short-circuit and refuse to restore from the database backup.
+ 
+#### missing-blocks-guardian.sh
 
-#### download-missing-blocks.sh
+The script has 3 operational modes: audit, single-run and daemon. Each do the following:
 
-In all cases, `download-missing-blocks.sh` will check the database every 5 minutes for any gaps / missing blocks until the first missing block is encountered. Once this happens, `mina-missing-blocks-auditor` will return the state hash and block height for whichever blocks are missing, and the script will download them one at a time from O(1) Labs json block backups until the missing blocks auditor reaches the genesis block.
+* **audit** - checks the health of the archive database and reports on stdout
+* **single-run** - checks the health and runs the recovery logic once if needed
+* **daemon** - checks the health of the database every 10 minutes and if needed runs recovery logic every hour
 
-If the data in postgresql is really stale (>24 hours), it would likely be better/quicker to delete the /data/ directory and force `init-db.sh` to restore from a complete database backup instead of relying on the individual block restore mechanism to download hundreds of blocks.
+To use any of the modes in the background use `&` at the end of the command on the command line
 
-### Network names
-
+### Network names 
+ 
 Networks supported are `rosetta-demo`, `devnet`, and `mainnet`. Currently, the rosetta implementation does not distinguish between these networks, but this will change in the future. The default entrypoint script, `docker-start.sh` runs a mina daemon connected to the Mina [Mainnet](https://docs.minaprotocol.com/node-operators/connecting-to-the-network) network with an empty archive node and the rosetta api. To connect to our [Devnet](https://docs.minaprotocol.com/node-operators/connecting-to-devnet) network, the `docker-devnet-start.sh` entrypoint is provided and it functions identically to `docker-start.sh` except for Devnet. Additionally, there is a built-in entrypoint script for `rosetta-demo` called `docker-demo-start.sh` which runs a sandboxed node with a simple genesis ledger with one keypair, attaches it to an archive-node and postgres database, and launches the rosetta-api so you can make queries against it.
 
-### Operation Statuses
+### Operation Statuses  
 
 Operations are always `Pending` if retrieved from the mempool. `Success` if they are in a block and fully applied. A transaction status of `Failed` occurs for transactions within a block whenever certain invariants are not met such as not sending enough to cover the account creation fee. Other reaons include misconfiguring new tokens or snapps. See [this section of the code](https://github.com/MinaProtocol/mina/blob/4ae482b656c743fc4ea824419cebe2f2ff77ef96/src/lib/coda_base/user_command_status.ml#L8) for an exhaustive list.
 
-### Operations Types
+### Operations Types  
 
 See [this section of the code](https://github.com/MinaProtocol/mina/blob/4ae482b656c743fc4ea824419cebe2f2ff77ef96/src/lib/rosetta_lib/operation_types.ml#L4) for an exhaustive list of operation types. Notable balance changing events are fee increases and decreases ("fee_payer_dec", "fee_receiver_inc"), payment increases and decreases ("payment_source_dec", "payment_receiver_inc"), and account creation fee ("account_creation_fee_via_payment", "account_creation_fee_via_fee_payer"), and the block reward or coinbase ("coinbase_inc").
 
-### Account metadata
-
+### Account metadata   
+ 
 Accounts in Mina are not uniquely identified by an address alone, you must also couple it with a `token_id`. A `token_id` of 1 denotes the default MINA token. Note that the `token_id` is passed via the metadata field of `account_identifier`.
 
 ### Operations for Supported Transactions via Construction
