@@ -1034,13 +1034,13 @@ let pending_snark_work =
                  (Array.map
                     ~f:(fun bundle ->
                       Array.map bundle.workBundle ~f:(fun w ->
-                          let f = w.fee_excess in
+                          let fee_excess_left = w.fee_excess.feeExcessLeft in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id = w.work_id
                           ; fee_excess =
                               Currency.Amount.Signed.of_fee
-                                (to_signed_fee_exn f.sign
-                                   (Currency.Amount.to_fee f.fee_magnitude) )
+                                (to_signed_fee_exn fee_excess_left.sign
+                                   fee_excess_left.feeMagnitude )
                           ; supply_increase = w.supply_increase
                           ; source_first_pass_ledger_hash =
                               w.source_first_pass_ledger_hash
@@ -1512,7 +1512,7 @@ let create_account =
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             response.createAccount.public_key
+             response.createAccount.account.public_key
          in
          printf "\n😄 Added new account!\nPublic key: %s\n" pk_string ) )
 
@@ -1529,7 +1529,7 @@ let create_hd_account =
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             response.createHDAccount.public_key
+             response.createHDAccount.account.public_key
          in
          printf "\n😄 created HD account with HD-index %s!\nPublic key: %s\n"
            (Mina_numbers.Hd_index.to_string hd_index)
@@ -1563,7 +1563,7 @@ let unlock_account =
              in
              let pk_string =
                Public_key.Compressed.to_base58_check
-                 response.unlockAccount.public_key
+                 response.unlockAccount.account.public_key
              in
              printf "\n🔓 Unlocked account!\nPublic key: %s\n" pk_string
          | Error e ->

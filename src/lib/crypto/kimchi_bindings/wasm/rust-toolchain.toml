@@ -1,2 +1,6 @@
+# A nightly is necessary to enable the use of #![feature]
 [toolchain]
-channel = "nightly-2023-02-05"
+# This should stay in line with the versions in
+# - kimchi_bindings/js/node_js/build.sh
+# - kimchi_bindings/js/web/build.sh
+channel = "nightly-2023-09-01" # roughly matches 1.72

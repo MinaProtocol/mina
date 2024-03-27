@@ -1,7 +1,9 @@
-use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi};
-
+use crate::wasm_flat_vector::WasmFlatVector;
+use paste::paste;
 use std::convert::From;
 use std::ops::Deref;
+use wasm_bindgen::convert::{FromWasmAbi, IntoWasmAbi, OptionFromWasmAbi, OptionIntoWasmAbi};
+use wasm_bindgen::prelude::*;
 
 #[derive(Clone, Debug)]
 pub struct WasmVector<T>(Vec<T>);
@@ -113,4 +115,52 @@ impl<T: IntoWasmAbi<Abi = u32>> OptionIntoWasmAbi for WasmVector<T> {
     fn none() -> Self::Abi {
         <Vec<u32> as OptionIntoWasmAbi>::none()
     }
+}
+
+macro_rules! impl_vec_vec_fp {
+    ( $F:ty, $WasmF:ty ) => {
+        paste! {
+            #[wasm_bindgen]
+            pub struct [<WasmVecVec $F:camel>](#[wasm_bindgen(skip)] pub Vec<Vec<$F>>);
+
+            #[wasm_bindgen]
+            impl [<WasmVecVec $F:camel>] {
+                #[wasm_bindgen(constructor)]
+                pub fn create(n: i32) -> Self {
+                    [<WasmVecVec $F:camel>](Vec::with_capacity(n as usize))
+                }
+
+                #[wasm_bindgen]
+                pub fn push(&mut self, x: WasmFlatVector<$WasmF>) {
+                    self.0.push(x.into_iter().map(Into::into).collect())
+                }
+
+                #[wasm_bindgen]
+                pub fn get(&self, i: i32) -> WasmFlatVector<$WasmF> {
+                    self.0[i as usize].clone().into_iter().map(Into::into).collect()
+                }
+
+                #[wasm_bindgen]
+                pub fn set(&mut self, i: i32, x: WasmFlatVector<$WasmF>) {
+                    self.0[i as usize] = x.into_iter().map(Into::into).collect()
+                }
+            }
+        }
+    };
+}
+
+pub mod fp {
+    use super::*;
+    use crate::arkworks::WasmPastaFp;
+    use mina_curves::pasta::Fp;
+
+    impl_vec_vec_fp!(Fp, WasmPastaFp);
+}
+
+pub mod fq {
+    use super::*;
+    use crate::arkworks::WasmPastaFq;
+    use mina_curves::pasta::Fq;
+
+    impl_vec_vec_fp!(Fq, WasmPastaFq);
 }

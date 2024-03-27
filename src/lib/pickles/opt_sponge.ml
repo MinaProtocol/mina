@@ -21,7 +21,7 @@ type 'f sponge_state =
 type 'f t =
   { mutable state : 'f array
   ; params : 'f Sponge.Params.t
-  ; needs_final_permute_if_empty : bool
+  ; mutable needs_final_permute_if_empty : bool
   ; mutable sponge_state : 'f sponge_state
   }
 
@@ -34,7 +34,7 @@ struct
 
   type nonrec t = Field.t t
 
-  let state { state; _ } = Array.copy state
+  let _state { state; _ } = Array.copy state
 
   let copy { state; params; sponge_state; needs_final_permute_if_empty } =
     { state = Array.copy state
@@ -45,15 +45,15 @@ struct
 
   let initial_state = Array.init m ~f:(fun _ -> Field.zero)
 
-  let of_sponge { Sponge.state; params; sponge_state } =
+  let of_sponge { Sponge.state; params; sponge_state; id = _ } =
     match sponge_state with
-    | Squeezed n ->
+    | Sponge.Squeezed n ->
         { sponge_state = Squeezed n
         ; state = Array.copy state
         ; needs_final_permute_if_empty = true
         ; params
         }
-    | Absorbed n -> (
+    | Sponge.Absorbed n -> (
         let abs i =
           { sponge_state = Absorbing { next_index = i; xs = [] }
           ; state = Array.copy state
@@ -104,102 +104,105 @@ struct
         assert_r1cs x (i_equals_j :> Field.t) Field.(a_j' - a.(j)) ;
         a.(j) <- a_j' )
 
+  let cond_permute ~params ~permute state =
+    let permuted = P.block_cipher params (Array.copy state) in
+    for i = 0 to m - 1 do
+      state.(i) <- Field.if_ permute ~then_:permuted.(i) ~else_:state.(i)
+    done
+
+  let consume_pairs ~params ~state ~pos:start_pos pairs =
+    Array.fold ~init:start_pos pairs ~f:(fun p ((b, x), (b', y)) ->
+        (* Semantically, we want to do this.
+           match b, b' with
+           | 1, 1 ->
+            if p = 0
+            then state := perm {state with .0 += x, .1 += y }
+            else state := {perm {state with .1 += x} with .0 += y}
+           | 1, 0 ->
+            if p = 0
+            then state := {state with .0 += x}
+            else state := perm {state with .1 += x}
+           | 0, 1 ->
+            if p = 0
+            then state := {state with .0 += y }
+            else state := perm {state with .1 += y}
+           | 0, 0 ->
+            state
+        *)
+        let p' = Boolean.( lxor ) p b in
+        let pos_after = Boolean.( lxor ) p' b' in
+        let y = Field.(y * (b' :> t)) in
+        let add_in_y_after_perm =
+          (* post
+             add in
+             (1, 1, 1)
+
+             do not add in
+             (1, 1, 0)
+             (0, 1, 0)
+             (0, 1, 1)
+
+             (1, 0, 0)
+             (1, 0, 1)
+             (0, 0, 0)
+             (0, 0, 1)
+          *)
+          (* Only one case where we add in y after the permutation is applied *)
+          Boolean.all [ b; b'; p ]
+        in
+        let add_in_y_before_perm = Boolean.not add_in_y_after_perm in
+        add_in state p Field.(x * (b :> t)) ;
+        add_in state p' Field.(y * (add_in_y_before_perm :> t)) ;
+        let permute =
+          (* (b, b', p)
+              true:
+              (0, 1, 1)
+              (1, 0, 1)
+              (1, 1, 0)
+              (1, 1, 1)
+
+             false:
+              (0, 0, 0)
+              (0, 0, 1)
+              (0, 1, 0)
+              (1, 0, 0)
+          *)
+          (* (b && b') || (p && (b || b')) *)
+          Boolean.(any [ all [ b; b' ]; all [ p; b ||| b' ] ])
+        in
+        cond_permute ~params ~permute state ;
+        add_in state p' Field.(y * (add_in_y_after_perm :> t)) ;
+        pos_after )
+
   let consume ~needs_final_permute_if_empty ~params ~start_pos input state =
     assert (Array.length state = m) ;
     let n = Array.length input in
-    let pos = ref start_pos in
-    let cond_permute permute =
-      let permuted = P.block_cipher params (Array.copy state) in
-      for i = 0 to m - 1 do
-        state.(i) <- Field.if_ permute ~then_:permuted.(i) ~else_:state.(i)
-      done
+    let num_pairs = n / 2 in
+    let remaining = n - (2 * num_pairs) in
+    let pairs =
+      Array.init num_pairs ~f:(fun i -> (input.(2 * i), input.((2 * i) + 1)))
     in
-    let pairs = n / 2 in
-    let remaining = n - (2 * pairs) in
-    for i = 0 to pairs - 1 do
-      (* Semantically, we want to do this.
-         match b, b' with
-         | 1, 1 ->
-          if p = 0
-          then state := perm {state with .0 += x, .1 += y }
-          else state := {perm {state with .1 += x} with .0 += y}
-         | 1, 0 ->
-          if p = 0
-          then state := {state with .0 += x}
-          else state := perm {state with .1 += x}
-         | 0, 1 ->
-          if p = 0
-          then state := {state with .0 += y }
-          else state := perm {state with .1 += y}
-         | 0, 0 ->
-          state
-      *)
-      let b, x = input.(2 * i) in
-      let b', y = input.((2 * i) + 1) in
-      let p = !pos in
-      let p' = Boolean.( lxor ) p b in
-      pos := Boolean.( lxor ) p' b' ;
-      let y = Field.(y * (b' :> t)) in
-      let add_in_y_after_perm =
-        (* post
-           add in
-           (1, 1, 1)
-
-           do not add in
-           (1, 1, 0)
-           (0, 1, 0)
-           (0, 1, 1)
-
-           (1, 0, 0)
-           (1, 0, 1)
-           (0, 0, 0)
-           (0, 0, 1)
-        *)
-        (* Only one case where we add in y after the permutation is applied *)
-        Boolean.all [ b; b'; p ]
-      in
-      let add_in_y_before_perm = Boolean.not add_in_y_after_perm in
-      add_in state p Field.(x * (b :> t)) ;
-      add_in state p' Field.(y * (add_in_y_before_perm :> t)) ;
-      let permute =
-        (* (b, b', p)
-            true:
-            (0, 1, 1)
-            (1, 0, 1)
-            (1, 1, 0)
-            (1, 1, 1)
-
-           false:
-            (0, 0, 0)
-            (0, 0, 1)
-            (0, 1, 0)
-            (1, 0, 0)
-        *)
-        (* (b && b') || (p && (b || b')) *)
-        Boolean.(any [ all [ b; b' ]; all [ p; b ||| b' ] ])
-      in
-      cond_permute permute ;
-      add_in state p' Field.(y * (add_in_y_after_perm :> t))
-    done ;
+    let pos = consume_pairs ~params ~state ~pos:start_pos pairs in
     let empty_imput =
       Boolean.not (Boolean.Array.any (Array.map input ~f:fst))
     in
     let should_permute =
       match remaining with
       | 0 ->
-          if needs_final_permute_if_empty then Boolean.(empty_imput ||| !pos)
-          else !pos
+          if needs_final_permute_if_empty then Boolean.(empty_imput ||| pos)
+          else pos
       | 1 ->
           let b, x = input.(n - 1) in
-          let p = !pos in
-          pos := Boolean.( lxor ) p b ;
+          let p = pos in
+          let pos_after = Boolean.( lxor ) p b in
+          ignore (pos_after : Boolean.var) ;
           add_in state p Field.(x * (b :> t)) ;
           if needs_final_permute_if_empty then Boolean.any [ p; b; empty_imput ]
           else Boolean.any [ p; b ]
       | _ ->
           assert false
     in
-    cond_permute should_permute
+    cond_permute ~params ~permute:should_permute state
 
   let absorb (t : t) x =
     match t.sponge_state with
@@ -221,77 +224,65 @@ struct
     | Absorbing { next_index; xs } ->
         consume ~needs_final_permute_if_empty:t.needs_final_permute_if_empty
           ~start_pos:next_index ~params:t.params (Array.of_list_rev xs) t.state ;
+        t.needs_final_permute_if_empty <- true ;
         t.sponge_state <- Squeezed 1 ;
         t.state.(0)
 
-  let%test_module "opt_sponge" =
-    ( module struct
-      module S = Sponge.Make_sponge (P)
+  let consume_all_pending (t : t) =
+    match t.sponge_state with
+    | Squeezed _ ->
+        failwith "Nothing pending"
+    | Absorbing { next_index; xs } ->
+        let input = Array.of_list_rev xs in
+        assert (Array.length t.state = m) ;
+        let n = Array.length input in
+        let num_pairs = n / 2 in
+        let remaining = n - (2 * num_pairs) in
+        let pairs =
+          Array.init num_pairs ~f:(fun i ->
+              (input.(2 * i), input.((2 * i) + 1)) )
+        in
+        let pos =
+          consume_pairs ~params:t.params ~state:t.state ~pos:next_index pairs
+        in
+        let pos_after =
+          if remaining = 1 then (
+            let b, x = input.(n - 1) in
+            let p = pos in
+            let pos_after = Boolean.( lxor ) p b in
+            add_in t.state p Field.(x * (b :> t)) ;
+            pos_after )
+          else pos
+        in
+        (* TODO: We should propagate the emptiness state of the pairs,
+           otherwise this will break in some edge cases.
+        *)
+        t.sponge_state <- Absorbing { next_index = pos_after; xs = [] }
 
-      let%test_unit "correctness" =
-        let params : _ Sponge.Params.t =
-          let a () =
-            Array.init 3 ~f:(fun _ -> Field.(constant (Constant.random ())))
-          in
-          { mds = Array.init 3 ~f:(fun _ -> a ())
-          ; round_constants = Array.init 40 ~f:(fun _ -> a ())
-          }
-        in
-        let gen =
-          let open Quickcheck.Generator.Let_syntax in
-          let%bind n = Quickcheck.Generator.small_positive_int
-          and n_pre = Quickcheck.Generator.small_positive_int in
-          let%map xs = List.gen_with_length n Field.Constant.gen
-          and bs = List.gen_with_length n Bool.quickcheck_generator
-          and pre = List.gen_with_length n_pre Field.Constant.gen in
-          (pre, List.zip_exn bs xs)
-        in
-        Quickcheck.test gen ~trials:10 ~f:(fun (pre, ps) ->
-            let filtered =
-              List.filter_map ps ~f:(fun (b, x) -> if b then Some x else None)
-            in
-            let init () =
-              let pre =
-                exists
-                  (Typ.list ~length:(List.length pre) Field.typ)
-                  ~compute:(fun () -> pre)
-              in
-              let s = S.create params in
-              List.iter pre ~f:(S.absorb s) ;
-              s
-            in
-            let filtered_res =
-              let n = List.length filtered in
-              Impl.Internal_Basic.Test.checked_to_unchecked
-                (Typ.list ~length:n Field.typ)
-                Field.typ
-                (fun xs ->
-                  make_checked (fun () ->
-                      let s = init () in
-                      List.iter xs ~f:(S.absorb s) ;
-                      S.squeeze s ) )
-                filtered
-            in
-            let opt_res =
-              let n = List.length ps in
-              Impl.Internal_Basic.Test.checked_to_unchecked
-                (Typ.list ~length:n (Typ.tuple2 Boolean.typ Field.typ))
-                Field.typ
-                (fun xs ->
-                  make_checked (fun () ->
-                      let s =
-                        if List.length pre = 0 then create params
-                        else of_sponge (init ())
-                      in
-                      List.iter xs ~f:(absorb s) ;
-                      squeeze s ) )
-                ps
-            in
-            if not (Field.Constant.equal filtered_res opt_res) then
-              failwithf
-                !"hash(%{sexp:Field.Constant.t list}) = %{sexp:Field.Constant.t}\n\
-                  hash(%{sexp:(bool * Field.Constant.t) list}) = \
-                  %{sexp:Field.Constant.t}"
-                filtered filtered_res ps opt_res () )
-    end )
+  let recombine ~original_sponge b (t : t) =
+    match[@warning "-4"] (original_sponge.sponge_state, t.sponge_state) with
+    | Squeezed orig_i, Squeezed curr_i ->
+        if orig_i <> curr_i then failwithf "Squeezed %i vs %i" orig_i curr_i () ;
+        Array.iteri original_sponge.state ~f:(fun i x ->
+            t.state.(i) <- Field.if_ b ~then_:t.state.(i) ~else_:x )
+    | ( Absorbing { next_index = next_index_orig; xs = xs_orig }
+      , Absorbing { next_index = next_index_curr; xs = xs_curr } ) ->
+        (* TODO: Should test for full equality here, if we want to catch all
+           sponge misuses.
+           OTOH, if you're using this sponge then you'd better know what it's
+           doing..
+        *)
+        if List.length xs_orig <> List.length xs_curr then
+          failwithf "Pending absorptions %i vs %i" (List.length xs_orig)
+            (List.length xs_curr) () ;
+        Array.iteri original_sponge.state ~f:(fun i x ->
+            t.state.(i) <- Field.if_ b ~then_:t.state.(i) ~else_:x ) ;
+        t.sponge_state <-
+          Absorbing
+            { next_index =
+                Boolean.if_ b ~then_:next_index_curr ~else_:next_index_orig
+            ; xs = xs_curr
+            }
+    | _, _ ->
+        failwith "Incompatible states"
 end

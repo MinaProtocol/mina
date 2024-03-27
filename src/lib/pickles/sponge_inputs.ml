@@ -1,11 +1,3 @@
-open Core_kernel
-
-module type Field = sig
-  include Sponge.Intf.Field
-
-  val square : t -> t
-end
-
 module Make
     (Impl : Snarky_backendless.Snark_intf.Run) (B : sig
       open Impl
@@ -39,11 +31,10 @@ struct
     done ;
     res
 
-  open Impl
-  open Field
-  module Field = Field
+  module Field = Impl.Field
 
-  let block_cipher (params : _ Sponge.Params.t) init =
+  let block_cipher (_params : _ Sponge.Params.t) init =
+    let open Impl in
     Impl.with_label __LOC__ (fun () ->
         let t =
           exists
@@ -63,7 +54,7 @@ struct
         t.(Int.(Array.length t - 1)) )
 
   let add_assign ~state i x =
-    state.(i) <- Util.seal (module Impl) (state.(i) + x)
+    state.(i) <- Util.seal (module Impl) Field.(state.(i) + x)
 
   let copy = Array.copy
 end

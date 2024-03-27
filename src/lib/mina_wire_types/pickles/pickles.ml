@@ -99,6 +99,10 @@ module M = struct
                 ( Snark_params.Tick.Field.t
                 , Snark_params.Tick.Field.t array )
                 Pickles_types.Plonk_types.All_evals.t
+                  (* A job half-done may be worse than not done at all.
+                     TODO: Migrate Plonk_types here, and actually include the
+                     *wire* type, not this in-memory version.
+                  *)
             ; proof : Wrap_wire_proof.V1.t
             }
         end

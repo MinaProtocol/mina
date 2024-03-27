@@ -71,6 +71,7 @@ module Network_config = struct
           [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
     ; block_producer_configs : block_producer_config list
     ; log_precomputed_blocks : bool
+    ; start_filtered_logs : string list
     ; archive_node_count : int
     ; mina_archive_schema : string
     ; mina_archive_schema_aux_files : string list
@@ -118,6 +119,7 @@ module Network_config = struct
          ; snark_worker_fee
          ; num_archive_nodes
          ; log_precomputed_blocks (* ; num_plain_nodes *)
+         ; start_filtered_logs
          ; proof_config
          ; k
          ; delta
@@ -478,6 +480,7 @@ module Network_config = struct
         ; mina_archive_image = images.archive_node
         ; runtime_config = Runtime_config.to_yojson runtime_config
         ; block_producer_configs
+        ; start_filtered_logs
         ; log_precomputed_blocks
         ; archive_node_count = num_archive_nodes
         ; mina_archive_schema

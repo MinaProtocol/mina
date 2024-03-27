@@ -242,7 +242,7 @@ let scan_state_merge_node :
       let sok_msg : Mina_base.Sok_message.t =
         { fee = Currency.Fee.zero; prover = sample_pk_compressed }
       in
-      let proof = Mina_base.Proof.transaction_dummy in
+      let proof = Lazy.force Mina_base.Proof.transaction_dummy in
       let statement =
         let without_sok =
           Quickcheck.random_value ~seed:(`Deterministic "no sok left")
@@ -258,7 +258,7 @@ let scan_state_merge_node :
         { fee = Currency.Fee.zero; prover = sample_pk_compressed }
       in
       (* so the left, right proofs differ, don't want sharing *)
-      let proof = Mina_base.Proof.blockchain_dummy in
+      let proof = Lazy.force Mina_base.Proof.blockchain_dummy in
       let statement =
         let without_sok =
           Quickcheck.random_value ~seed:(`Deterministic "no sok right")

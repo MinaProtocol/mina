@@ -1,0 +1,10 @@
+(library
+ (name hash_prefix_create)
+ (public_name hash_prefix_create)
+ (libraries hash_prefixes random_oracle)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version))
+ (virtual_modules hash_prefix_create)
+ (default_implementation hash_prefix_create.native))

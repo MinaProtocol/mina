@@ -112,7 +112,8 @@ module Ledger = struct
         ; List.to_string balances ~f:(fun (i, balance) ->
               sprintf "%i %s" i (Currency.Balance.to_string balance) )
         ; (* Distinguish ledgers when the hash function is different. *)
-          Snark_params.Tick.Field.to_string Mina_base.Account.empty_digest
+          Snark_params.Tick.Field.to_string
+            (Lazy.force Mina_base.Account.empty_digest)
         ; (* Distinguish ledgers when the account record layout has changed. *)
           Bin_prot.Writer.to_string Mina_base.Account.Stable.Latest.bin_writer_t
             Mina_base.Account.empty
@@ -234,32 +235,10 @@ module Ledger = struct
       Tar.filename_without_extension @@ Filename.basename filename
     in
     let dirname = genesis_dir ^/ dirname in
-    (* remove dir if it exists *)
-    let%bind () =
-      if%bind file_exists ~follow_symlinks:true dirname then (
-        [%log trace] "Genesis ledger dir $path already exists, removing"
-          ~metadata:[ ("path", `String dirname) ] ;
-        let rec remove_dir dir =
-          let%bind files = Sys.ls_dir dir in
-          let%bind () =
-            Deferred.List.iter files ~f:(fun file ->
-                let file = dir ^/ file in
-                remove file )
-          in
-          Unix.rmdir dir
-        and remove file =
-          match%bind Sys.is_directory file with
-          | `Yes ->
-              remove_dir file
-          | _ ->
-              Unix.unlink file
-        in
-        remove dirname )
-      else Deferred.unit
+    let%bind () = File_system.create_dir ~clear_if_exists:true dirname in
+    let%map.Deferred.Or_error () =
+      Tar.extract ~root:dirname ~file:filename ()
     in
-    let%bind () = Unix.mkdir ~p:() dirname in
-    let open Deferred.Or_error.Let_syntax in
-    let%map () = Tar.extract ~root:dirname ~file:filename () in
     let (packed : Genesis_ledger.Packed.t) =
       match accounts with
       | Some accounts ->
@@ -325,8 +304,9 @@ module Ledger = struct
         ; ("path", `String tar_path)
         ; ("dir", `String dirname)
         ] ;
-    let open Deferred.Or_error.Let_syntax in
-    let%map () = Tar.create ~root:dirname ~file:tar_path ~directory:"." () in
+    let%map.Deferred.Or_error () =
+      Tar.create ~root:dirname ~file:tar_path ~directory:"." ()
+    in
     tar_path
 
   let padded_accounts_from_runtime_config_opt ~logger ~proof_level

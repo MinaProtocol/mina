@@ -1,0 +1,9 @@
+(library
+ (public_name hash_prefix_create.js)
+ (name hash_prefix_create_js)
+ (libraries pickles random_oracle js_of_ocaml base core_kernel)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version))
+ (implements hash_prefix_create))

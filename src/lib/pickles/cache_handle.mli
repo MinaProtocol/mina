@@ -1,4 +1,4 @@
-(* Cache handle *)
+(** Cache handle. It is currently used to cache proving and verifying keys for pickles *)
 
 type t = Dirty.t lazy_t
 

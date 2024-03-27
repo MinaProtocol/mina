@@ -1,0 +1,11 @@
+(tests
+ (names test_constant)
+ (flags
+  (:standard -warn-error +a)
+  -open Core_kernel
+  -open Limb_vector
+  )
+ (package pickles)
+ (preprocess (pps ppx_jane))
+ (libraries alcotest core_kernel pickles pickles.limb_vector)
+ (action (run %{test})))

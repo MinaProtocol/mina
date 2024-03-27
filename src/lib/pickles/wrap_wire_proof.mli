@@ -4,7 +4,6 @@
 
 open Core_kernel
 open Pickles_types
-open Plonk_types
 module Columns = Nat.N15
 module Columns_vec = Vector.Vector_15
 module Coefficients = Nat.N15

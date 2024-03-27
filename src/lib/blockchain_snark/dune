@@ -36,6 +36,8 @@
    kimchi_backend.pasta.basic
    data_hash_lib
    ppx_version.runtime
+   snark_keys_header
+   mina_version
  )
  (inline_tests (flags -verbose -show-counts))
  (preprocess

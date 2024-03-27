@@ -325,7 +325,7 @@ struct Libp2pHelperInterface {
   }
 
   # validation is a special push message where the sequence number
-  # corresponds to the the push message sent to the daemon in the
+  # corresponds to the push message sent to the daemon in the
   # GossipReceived message
   struct Validation {
     validationId @0 :ValidationId;

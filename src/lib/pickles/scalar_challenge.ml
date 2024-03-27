@@ -120,11 +120,12 @@ let to_field_checked' (type f) ?(num_bits = num_bits)
   done ;
   with_label __LOC__ (fun () ->
       assert_
-        { annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
-              T (EC_endoscalar { state = Array.of_list_rev !state }))
-        } ) ;
+        Snarky_backendless.Constraint.
+          { annotation = Some __LOC__
+          ; basic =
+              Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.(
+                T (EC_endoscalar { state = Array.of_list_rev !state }))
+          } ) ;
   (!a, !b, !n)
 
 let to_field_checked (type f) ?num_bits
@@ -150,43 +151,6 @@ let to_field_constant (type f) ~endo
     if r_2i1 then a := F.(!a + s) else b := F.(!b + s)
   done ;
   F.((!a * endo) + !b)
-
-let test (type f)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-    ~(endo : f) =
-  let open Impl in
-  let module T = Internal_Basic in
-  let n = 128 in
-  let module Field_constant = struct
-    include Field.Constant
-
-    type nonrec bool = bool
-
-    let if_ b ~then_ ~else_ = if b then then_ () else else_ ()
-  end in
-  Quickcheck.test ~trials:10
-    (Quickcheck.Generator.list_with_length n Bool.quickcheck_generator)
-    ~f:(fun xs ->
-      try
-        T.Test.test_equal ~equal:Field.Constant.equal
-          ~sexp_of_t:Field.Constant.sexp_of_t
-          (Typ.list ~length:n Boolean.typ)
-          Field.typ
-          (fun s ->
-            make_checked (fun () ->
-                to_field_checked
-                  (module Impl)
-                  ~endo
-                  (SC.create (Impl.Field.pack s)) ) )
-          (fun s ->
-            to_field_constant
-              (module Field_constant)
-              ~endo
-              (SC.create (Challenge.Constant.of_bits s)) )
-          xs
-      with e ->
-        eprintf !"Input %{sexp: bool list}\n%!" xs ;
-        raise e )
 
 module Make
     (Impl : Snarky_backendless.Snark_intf.Run)
@@ -308,37 +272,6 @@ struct
     !acc
 
   let endo ?num_bits t s = with_label "endo" (fun () -> endo ?num_bits t s)
-
-  let%test_unit "endo" =
-    let module T = Internal_Basic in
-    let random_point =
-      let rec pt x =
-        let y2 = G.Params.(T.Field.(b + (x * (a + (x * x))))) in
-        if T.Field.is_square y2 then (x, T.Field.sqrt y2)
-        else pt T.Field.(x + one)
-      in
-      G.Constant.of_affine (pt (T.Field.random ()))
-    in
-    let n = 128 in
-    Quickcheck.test ~trials:10
-      (Quickcheck.Generator.list_with_length n Bool.quickcheck_generator)
-      ~f:(fun xs ->
-        try
-          T.Test.test_equal ~equal:G.Constant.equal
-            ~sexp_of_t:G.Constant.sexp_of_t
-            (Typ.tuple2 G.typ (Typ.list ~length:n Boolean.typ))
-            G.typ
-            (fun (g, s) ->
-              make_checked (fun () -> endo g (SC.create (Field.pack s))) )
-            (fun (g, s) ->
-              let x =
-                Constant.to_field (SC.create (Challenge.Constant.of_bits s))
-              in
-              G.Constant.scale g x )
-            (random_point, xs)
-        with e ->
-          eprintf !"Input %{sexp: bool list}\n%!" xs ;
-          raise e )
 
   let endo_inv ((gx, gy) as g) chal =
     let res =

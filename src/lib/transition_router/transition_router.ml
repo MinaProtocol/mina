@@ -302,6 +302,11 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
     [ ( high_connectivity
       >>| fun () ->
       [%log info] "Already connected to enough peers, start initialization" )
+    ; ( if is_seed then (
+        [%log info]
+          "We are seed, not waiting for peers to show up, start initialization" ;
+        Deferred.unit )
+      else Deferred.never () )
     ; ( after (Time_ns.Span.of_sec connectivity_time_upperbound)
       >>= fun () ->
       Mina_networking.peers network

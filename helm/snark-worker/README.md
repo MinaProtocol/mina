@@ -19,7 +19,7 @@ Parameter | Description
 --- | ---
 `testnetName` | Mina protocol testnet name to deploy to
 `coordinator.publicKey` | Mina account/wallet public key to use for registering for SNARK work payments
-`coda.seedPeers` | peers to bootstrap the the archive node's Mina daemon
+`coda.seedPeers` | peers to bootstrap the archive node's Mina daemon
 
 ### Optional Settings
 

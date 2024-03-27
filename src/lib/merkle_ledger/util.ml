@@ -1,5 +1,3 @@
-open Core_kernel
-
 module type Inputs_intf = sig
   module Location : Location_intf.S
 

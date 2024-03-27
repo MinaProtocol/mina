@@ -203,6 +203,9 @@ spec:
           {{- if $.Values.mina.logPrecomputedBlocks }}
           "-log-precomputed-blocks", "true",
           {{- end -}}
+          {{- range $.Values.mina.startFilteredLogs }}
+          "--start-filtered-logs", {{ . | quote }},
+          {{- end -}}
           {{- if $.Values.mina.logTxnPoolGossip }}
           "-log-txn-pool-gossip", "true",
           {{- end -}}

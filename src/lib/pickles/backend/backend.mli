@@ -1,3 +1,8 @@
+(** Pickles backend, i.e. curves used by the inductive proof system.
+    At the time of writing, Pallas and Vesta curves (so-called Pasta) are
+    hardcoded. The 2-cycle is called [Tick] and [Tock].
+*)
+
 module Tick : sig
   include module type of Kimchi_backend.Pasta.Vesta_based_plonk
 

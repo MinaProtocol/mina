@@ -1,3 +1,7 @@
+(** Structures for message passing between proofs over the same field, passed
+    opaquely as a hash through the intermediate proof over the other field.
+*)
+
 module Step : sig
   module Stable : sig
     module V1 : sig

@@ -6,7 +6,7 @@ echo "Exporting Variables: "
 export MINA_REPO="https://github.com/MinaProtocol/mina.git"
 
 function find_most_recent_numeric_tag() {
-    TAG=$(git describe --always --abbrev=0 $1 | sed 's!/!-!g; s!_!-!g')
+    TAG=$(git describe --always --abbrev=0 $1 | sed 's!/!-!g; s!_!-!g; s!#!-!g')
     if [[ $TAG != [0-9]* ]]; then
         TAG=$(find_most_recent_numeric_tag $TAG~)
     fi
@@ -14,7 +14,7 @@ function find_most_recent_numeric_tag() {
 }
 
 export GITHASH=$(git rev-parse --short=7 HEAD)
-export GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!g; s!_!-!g' )
+export GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!g; s!_!-!g; s!#!-!g' )
 
 export THIS_COMMIT_TAG=$(git tag --points-at HEAD)
 export PROJECT="mina"
@@ -25,7 +25,7 @@ export BUILD_URL=${BUILDKITE_BUILD_URL}
 set -u
 
 export MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=bullseye}
-[[ -n "$BUILDKITE_BRANCH" ]] && export GITBRANCH=$(echo "$BUILDKITE_BRANCH" | sed 's!/!-!g; s!_!-!g')
+[[ -n "$BUILDKITE_BRANCH" ]] && export GITBRANCH=$(echo "$BUILDKITE_BRANCH" | sed 's!/!-!g; s!_!-!g; s!#!-!g')
  
 
 if [ "${BUILDKITE_REPO}" != "${MINA_REPO}" ]; then 
@@ -75,11 +75,11 @@ fi
 
 if [[ -n "${THIS_COMMIT_TAG}" ]]; then # If the commit is tagged
     export MINA_DEB_VERSION="${GITTAG}-${GITHASH}"
-    export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')"
 else
     export MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
-    export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')"
 fi
+
+export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g; s!#!-!g')"
 
 # Determine the packages to build (mainnet y/N)
 case $GITBRANCH in

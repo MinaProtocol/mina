@@ -27,29 +27,14 @@ let lowerName = \(debVersion : DebVersion) ->
 
 --- Bullseye and Focal are so similar that they share a toolchain runner
 --- Same with Bookworm and Jammy
-let toolchainRunner = \(debVersion : DebVersion) -> \(profile : Profiles.Type) ->
-  let baseRunner = merge {
-     Bookworm = RunInToolchain.runInToolchainBookworm
-     , Bullseye = RunInToolchain.runInToolchainBullseye
-     , Buster = RunInToolchain.runInToolchainBuster
-     , Jammy = RunInToolchain.runInToolchainBookworm
-     , Focal = RunInToolchain.runInToolchainBullseye
-   } debVersion
-  in
-  let caqtiRunner = merge {
-      Bookworm = RunInToolchain.runInToolchainCaqtiBookworm
-      , Bullseye = RunInToolchain.runInToolchainCaqtiBullseye
-      , Buster = RunInToolchain.runInToolchainCaqtiBuster
-      , Jammy = RunInToolchain.runInToolchainCaqtiBookworm
-      , Focal = RunInToolchain.runInToolchainCaqtiBullseye
-    } debVersion
-  in
+let toolchainRunner = \(debVersion : DebVersion) ->
   merge {
-    Standard = baseRunner
-    , Lightnet = baseRunner
-    , BerkeleyMigration = caqtiRunner
-    , Hardfork = baseRunner
-  } profile
+    Bookworm = RunInToolchain.runInToolchainBookworm
+    , Bullseye = RunInToolchain.runInToolchainBullseye
+    , Buster = RunInToolchain.runInToolchainBuster
+    , Jammy = RunInToolchain.runInToolchainBookworm
+    , Focal = RunInToolchain.runInToolchainBullseye
+  } debVersion
 
 --- Bullseye and Focal are so similar that they share a toolchain image
 --- Same with Bookworm and Jammy
@@ -85,6 +70,7 @@ let minimalDirtyWhen = [
   S.exactly "scripts/rebuild-deb" "sh",
   S.exactly "scripts/release-docker" "sh",
   S.exactly "buildkite/scripts/build-artifact" "sh",
+  S.exactly "buildkite/scripts/check-compatibility" "sh",
   -- Snark profiler dirtyWhen
   S.exactly "buildkite/src/Jobs/Test/RunSnarkProfiler" "dhall",
   S.exactly "buildkite/scripts/run-snark-transaction-profiler" "sh",

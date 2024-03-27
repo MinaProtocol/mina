@@ -11,7 +11,7 @@ module Hash = struct
 
   let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
-  let empty_account = Ledger_hash.of_digest Account.empty_digest
+  let empty_account = Ledger_hash.of_digest (Lazy.force Account.empty_digest)
 end
 
 let%test_module "transaction logic consistency" =

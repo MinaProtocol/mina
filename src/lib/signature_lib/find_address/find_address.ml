@@ -167,7 +167,7 @@ let fixed_prefix =
     `first_different_position`.
 
     Note: this code uses the knowledge that the Mina base58-check alphabet has
-    its characters in the same order as the the standard ASCII encoding,
+    its characters in the same order as the standard ASCII encoding,
     iterating over the characters using their ASCII ordering rather than
     looking them up in the alphabet directly.
 

@@ -1,3 +1,9 @@
+### Build status
+
+| Develop | Berkeley | Compatible | 
+| ------- | -------- | ---------- |
+| [![Build status - develop](https://badge.buildkite.com/0c47452f3ea619d3217d388e0de522b218db28c3e161887a9a.svg?branch=develop)](https://buildkite.com/o-1-labs-2/mina-end-to-end-nightlies) | [![Build status - berkeley](https://badge.buildkite.com/0c47452f3ea619d3217d388e0de522b218db28c3e161887a9a.svg?branch=berkeley)](https://buildkite.com/o-1-labs-2/mina-end-to-end-nightlies) | [![Build status - compatible](https://badge.buildkite.com/0c47452f3ea619d3217d388e0de522b218db28c3e161887a9a.svg?branch=compatible)](https://buildkite.com/o-1-labs-2/mina-end-to-end-nightlies)
+
 <a href="https://minaprotocol.com">
   <img src="https://github.com/MinaProtocol/docs/blob/main/public/static/img/svg/mina-wordmark-redviolet.svg?raw=true&sanitize=true" width="350" alt="Mina logo">
 </a>

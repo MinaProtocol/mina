@@ -1,4 +1,5 @@
-(* Domains *)
+(** Artifact when Marlin was used as Marlin requires multiple domains. It should
+    not be used anymore. *)
 
 module Stable : sig
   module V2 : sig

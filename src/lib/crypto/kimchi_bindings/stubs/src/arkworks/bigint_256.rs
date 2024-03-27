@@ -239,12 +239,12 @@ mod tests {
     #[test]
     fn biguint() {
         let x = 10000.to_biguint().unwrap();
-        println!("biguint.to_string: {}", x.to_string());
+        println!("biguint.to_string: {}", x);
         let y = CamlBigInteger256::try_from(x.clone()).unwrap();
         println!("camlbigint.to_string: {}", y.to_string());
         //assert!(&y.to_string() == "10000");
         let x2: BigUint = y.into();
         assert!(x2 == x);
-        println!("biguint.to_string: {}", x2.to_string());
+        println!("biguint.to_string: {}", x2);
     }
 }

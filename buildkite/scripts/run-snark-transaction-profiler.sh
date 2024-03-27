@@ -11,7 +11,6 @@ apt-get install -y git apt-transport-https ca-certificates tzdata curl python3
 TESTNET_NAME="berkeley"
 
 git config --global --add safe.directory /workdir
-
 source buildkite/scripts/export-git-env-vars.sh
 
 echo "Installing mina daemon package: mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"

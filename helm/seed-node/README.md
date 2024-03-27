@@ -30,7 +30,7 @@ Parameter | Description | Default
 `seed.rpcPort` | Mina client peer communication port | `8301`
 `seed.discoveryKeyPair` | Key pair used for identifying and connecting to the seed by external clients 
 `coda.image` | container image to use for operating the archive node's Mina daemon | `codaprotocol/coda-daemon:0.0.12-beta-develop-589b507`
-`coda.seedPeers` | peers to bootstrap the the archive node's Mina daemon
+`coda.seedPeers` | peers to bootstrap the archive node's Mina daemon
 `coda.runtimeConfig` | Mina daemon configuration to use at runtime | `undefined`
 
 ## seed-node launch examples
