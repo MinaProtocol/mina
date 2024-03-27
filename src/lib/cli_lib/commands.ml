@@ -20,6 +20,51 @@ let generate_keypair =
       (Rosetta_coding.Coding.of_public_key kp.public_key) ;
     exit 0)
 
+let balance =
+  Command.Arg_type.map Command.Param.string
+    ~f:Currency.Balance.of_mina_string_exn
+
+let generate_ledger_accounts =
+  Command.async ~summary:"Generate a ledger for testing"
+    (let open Command.Let_syntax in
+    let%map_open n =
+      Command.Param.flag "-n"
+        ~doc:(Printf.sprintf "NN number of accounts to generate")
+        (required int)
+    and min_balance =
+      flag "--min-balance" ~doc:"MINA Minimum balance of a key"
+        (optional balance)
+    and max_balance =
+      flag "--max-balance" ~doc:"MINA Maximum balance of a key"
+        (optional balance)
+    in
+    Exceptions.handle_nicely
+    @@ fun () ->
+    let min_balance = Option.value ~default:Currency.Balance.zero min_balance in
+    let max_balance =
+      Option.value ~default:(Currency.Balance.of_mina_int_exn 100) max_balance
+    in
+    let balance_seq =
+      Quickcheck.random_sequence ~seed:`Nondeterministic
+      @@ Currency.Balance.gen_incl min_balance max_balance
+    in
+    let ledger =
+      Sequence.take balance_seq n
+      |> Sequence.map ~f:(fun balance ->
+             let kp = Keypair.create () in
+             { Runtime_config.Json_layout.Accounts.Single.default with
+               pk =
+                 Public_key.compress kp.public_key
+                 |> Public_key.Compressed.to_base58_check
+             ; sk = Some (Private_key.to_base58_check kp.private_key)
+             ; balance
+             } )
+      |> Sequence.to_list
+    in
+    Yojson.Safe.pretty_print Format.std_formatter
+    @@ Runtime_config.Json_layout.Accounts.to_yojson ledger ;
+    exit 0)
+
 let validate_keypair =
   Command.async ~summary:"Validate a public, private keypair"
     (let open Command.Let_syntax in
