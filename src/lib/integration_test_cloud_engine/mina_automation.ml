@@ -5,20 +5,6 @@ open Signature_lib
 open Mina_base
 open Integration_test_lib
 
-let aws_region = "us-west-2"
-
-let aws_route53_zone_id = "ZJPR9NA6W9M7F"
-
-let project_id = "o1labs-192920"
-
-let cluster_id = "gke_o1labs-192920_us-west1_mina-integration-west1"
-
-let cluster_name = "mina-integration-west1"
-
-let cluster_region = "us-west1"
-
-let cluster_zone = "us-west1a"
-
 module Network_config = struct
   module Cli_inputs = Cli_inputs
 
@@ -88,6 +74,7 @@ module Network_config = struct
   type t =
     { mina_automation_location : string
     ; debug_arg : bool
+    ; cluster_zone : string
     ; genesis_keypairs :
         (Network_keypair.t Core.String.Map.t
         [@to_yojson
@@ -465,12 +452,13 @@ module Network_config = struct
     (* NETWORK CONFIG *)
     { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
+    ; cluster_zone = cli_inputs.cluster_config.cluster_zone
     ; genesis_keypairs
     ; constants
     ; terraform =
-        { cluster_name
-        ; cluster_region
-        ; k8s_context = cluster_id
+        { cluster_name = cli_inputs.cluster_config.cluster_name
+        ; cluster_region = cli_inputs.cluster_config.cluster_region
+        ; k8s_context = cli_inputs.cluster_config.cluster_id
         ; testnet_name
         ; deploy_graphql_ingress = requires_graphql
         ; mina_image = images.mina
@@ -487,7 +475,7 @@ module Network_config = struct
         ; mina_archive_schema_aux_files
         ; snark_coordinator_config
         ; snark_worker_fee
-        ; aws_route53_zone_id
+        ; aws_route53_zone_id = Constants.aws_route53_zone_id
         ; cpu_request = 6
         ; mem_request = "12Gi"
         ; worker_cpu_request = 6
@@ -509,9 +497,9 @@ module Network_config = struct
         }
     ; Block.Provider
         { Block.Provider.provider = "google"
-        ; region = cluster_region
-        ; zone = Some cluster_zone
-        ; project = Some project_id
+        ; region = network_config.terraform.cluster_region
+        ; zone = Some network_config.cluster_zone
+        ; project = Some Constants.project_id
         ; alias = None
         }
     ; Block.Module
@@ -530,7 +518,8 @@ module Network_config = struct
         resource.labels.cluster_name="%s"
         resource.labels.namespace_name="%s"
       |}
-      project_id cluster_region cluster_name
+      Constants.project_id network_config.terraform.cluster_region
+      network_config.terraform.cluster_name
       network_config.terraform.testnet_name
 end
 
@@ -741,7 +730,7 @@ module Network_manager = struct
     in
     let t =
       { logger
-      ; cluster = cluster_id
+      ; cluster = network_config.terraform.k8s_context
       ; namespace = network_config.terraform.testnet_name
       ; testnet_name = network_config.terraform.testnet_name
       ; graphql_enabled = network_config.terraform.deploy_graphql_ingress
