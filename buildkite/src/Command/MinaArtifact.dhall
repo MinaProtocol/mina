@@ -259,7 +259,7 @@ let MinaBuildSpec = {
     debVersion : DebianVersions.DebVersion,
     profile: Profiles.Type,
     toolchainSelectMode: Toolchain.SelectionMode,
-    mode: PipelineMode.Type,
+    mode: PipelineMode.Type
   },
   default = {
     prefix = "MinaArtifact",
