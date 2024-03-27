@@ -45,7 +45,7 @@ let
   implicit-deps = export-installed // external-packages;
 
   # Pins from opam.export
-  pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package;
+  pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package.section;
 
   scope = opam-nix.applyOverlays opam-nix.__overlays
     (opam-nix.defsToScope pkgs { }
@@ -128,9 +128,9 @@ let
         '';
       });
 
-      # Doesn't have an explicit dependency on ctypes
-      rpc_parallel = super.rpc_parallel.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
+      # Doesn't have an explicit dependency on ctypes-foreign
+      ctypes = super.ctypes.overrideAttrs
+        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
 
       # Some "core" Mina executables, without the version info.
       mina-dev = pkgs.stdenv.mkDerivation ({
@@ -347,5 +347,10 @@ let
       });
 
       test_executive = wrapMina self.test_executive-dev { };
+
+      check_opam_switch = super.check_opam_switch.overrideAttrs (oa: {
+        # So that opam in impure shell doesn't get shadowed by the fake one
+        propagateInputs = false;
+      });
     };
 in scope.overrideScope' overlay
