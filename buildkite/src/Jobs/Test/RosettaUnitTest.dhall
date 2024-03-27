@@ -31,8 +31,7 @@ Pipeline.build
   Pipeline.Config::{
     spec = 
       let unitDirtyWhen = [
-        S.strictlyStart (S.contains "src/lib"),
-        S.strictlyStart (S.contains "src/app/rosetta"),
+        S.strictlyStart (S.contains "src"),
         S.exactly "buildkite/src/Jobs/Test/RosettaUnitTest" "dhall",
         S.exactly "buildkite/scripts/unit-test" "sh"
       ]
