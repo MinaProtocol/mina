@@ -47,9 +47,12 @@ DEFAULT_FLAGS="--config-dir ${MINA_CONFIG_DIR} --peer-list-url ${PEER_LIST_URL} 
 export MINA_FLAGS=${MINA_FLAGS:=$DEFAULT_FLAGS}
 # Postgres database connection string and related variables
 POSTGRES_USERNAME=${POSTGRES_USERNAME:=pguser}
-POSTGRES_DBNAME=${POSTGRES_DBNAME:=archive}
+POSTGRES_DBNAME=${POSTGRES_DBNAME:=archive_balances_migrated}
+POSTGRES_PORT=${POSTGRES_PORT:=5432}
+POSTGRES_HOST=${POSTGRES_HOST:=127.0.0.1}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD:=pguser}
 POSTGRES_DATA_DIR=${POSTGRES_DATA_DIR:=/data/postgresql}
-PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${POSTGRES_DBNAME}
+PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_PASSWORD}@${POSTGRES_DATA_DIR}:${POSTGRES_PORT}/${POSTGRES_DBNAME}
 DUMP_TIME=${DUMP_TIME:=0000}
 
 # Genesis Ledger
@@ -108,7 +111,8 @@ MINA_DAEMON_PID=$!
 sleep 30
 
 echo "========================= POPULATING MISSING BLOCKS ==========================="
-./download-missing-blocks.sh --network ${MINA_NETWORK} --archive-uri ${PG_CONN} &
+../../../scripts/archive/missing-blocks-guardian.sh daemon &
+
 
 if ! kill -0 "${MINA_DAEMON_PID}"; then
   echo "[FATAL] Mina daemon failed to start, exiting docker-start.sh"
