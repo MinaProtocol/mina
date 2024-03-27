@@ -24,7 +24,8 @@ module Worker = struct
     module Get_work = struct
       module V2 = struct
         module T = struct
-          type query = unit
+          (* Contains constraint systems digest for compatibility check *)
+          type query = (string * string) list
 
           type response =
             ( ( Transaction_witness.Stable.V2.t
