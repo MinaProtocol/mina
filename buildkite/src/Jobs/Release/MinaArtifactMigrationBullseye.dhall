@@ -14,7 +14,7 @@ Pipeline.build
     (ArtifactPipelines.pipeline 
         ArtifactPipelines.MinaBuildSpec::{
             artifacts = [ Artifacts.Type.ArchiveMigration ],
-            prefix = "MinaArchiveMigration",
+            prefix = "MinaArtifactMigration",
             toolchainSelectMode = (Toolchain.SelectionMode.Custom ContainerImages.minaCaqtiToolchain )
         }
     )
