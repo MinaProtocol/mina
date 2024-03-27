@@ -8,4 +8,4 @@ let of_context context =
     ~official_name:"mina-archive-blocks"
 
 let run t ~blocks ~archive_uri =
-  run t ~args:[ "--archive-uri"; conn_str; "-precomputed" ] @ blocks_in_docker
+  run t ~args:([ "--archive-uri"; archive_uri; "-precomputed" ] @ blocks)

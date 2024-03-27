@@ -48,12 +48,11 @@ module HardForkSteps = struct
     in
     Deferred.return (Settings.connection_str_to t.env db_name)
 
-  let perform_berkeley_migration t ~batch_size ~genesis_ledger
-      ~source_archive_uri ~source_blocks_bucket ~target_archive_uri
-      ~end_global_slot =
+  let perform_berkeley_migration t ~batch_size ~genesis_ledger ~network
+      ~source_archive_uri ~source_blocks_bucket ~target_archive_uri =
     Berkeley_migration.of_context (run_context t)
     |> Berkeley_migration.run ~batch_size ~genesis_ledger ~source_archive_uri
-         ~source_blocks_bucket ~target_archive_uri ~end_global_slot
+         ~source_blocks_bucket ~target_archive_uri ~network
 
   let run_migration_replayer t ~archive_uri ~input_config ~interval_checkpoint
       ~output_ledger =
@@ -62,6 +61,12 @@ module HardForkSteps = struct
          ~output_ledger ~migration_mode:true
          ~checkpoint_output_folder:t.working_dir
          ~checkpoint_file_prefix:"migration"
+
+  let run_migration_verifier t ~source_archive_uri ~target_archive_uri
+      ~migrated_replayer_output ~fork_config_path =
+    Berkeley_migration_verifier.of_context (run_context t)
+    |> Berkeley_migration_verifier.run ~source_archive_uri ~target_archive_uri
+         ~migrated_replayer_output ~fork_config_path
 
   let gather_files_with_prefix root ~substring =
     Sys.readdir root |> Array.to_list
@@ -148,6 +153,26 @@ module HardForkSteps = struct
                (Printf.sprintf "Cannot find latest state has for slot: %d"
                   migration_end_slot ) )
 
+  let blockchain_length_for_state_hash conn_str state_hash =
+    let open Deferred.Let_syntax in
+    let uri = Uri.of_string conn_str in
+    let mainnet_pool = Caqti_async.connect_pool ~max_size:128 uri in
+    match mainnet_pool with
+    | Error _ ->
+        failwithf "Failed to create Caqti pools for Postgresql to %s"
+          (Uri.to_string uri) ()
+    | Ok mainnet_pool ->
+        let query_mainnet_db = Mina_caqti.query mainnet_pool in
+        let%bind maybe_slot =
+          query_mainnet_db ~f:(fun db ->
+              Sql.Mainnet.blockchain_length_for_state_hash db state_hash )
+        in
+        Deferred.return
+          (Option.value_exn maybe_slot
+             ~message:
+               (Printf.sprintf "Cannot find height has for state hash: %s"
+                  state_hash ) )
+
   let get_migration_end_slot_for_state_hash conn_str state_hash =
     let open Deferred.Let_syntax in
     let uri = Uri.of_string conn_str in
@@ -167,159 +192,6 @@ module HardForkSteps = struct
              ~message:
                (Printf.sprintf "Cannot find slot has for state hash: %s"
                   state_hash ) )
-
-  let assert_migrated_db_contains_only_canonical_blocks query_migrated_db =
-    let%bind pending_blocks =
-      query_migrated_db ~f:(fun db -> Sql.Berkeley.count_orphaned_blocks db)
-    in
-    let%bind orphaned_blocks =
-      query_migrated_db ~f:(fun db -> Sql.Berkeley.count_pending_blocks db)
-    in
-    match orphaned_blocks + pending_blocks with
-    | 0 ->
-        Deferred.unit
-    | _ ->
-        failwithf
-          "Expected to have at only canonical block while having %d orphaned \
-           and %d pending"
-          orphaned_blocks pending_blocks ()
-
-  let assert_migrated_db_contains_no_orphaned_blocks query_migrated_db =
-    let%bind orphaned_blocks =
-      query_migrated_db ~f:(fun db -> Sql.Berkeley.count_orphaned_blocks db)
-    in
-    match orphaned_blocks with
-    | 0 ->
-        Deferred.unit
-    | _ ->
-        failwith "Expected to have none orphaned blocks"
-
-  let assert_migrated_db_contains_pending_blocks query_migrated_db =
-    let%bind pending_blocks =
-      query_migrated_db ~f:(fun db -> Sql.Berkeley.count_pending_blocks db)
-    in
-    match pending_blocks with
-    | 0 ->
-        failwith "Expected to have at least one pending block"
-    | _ ->
-        Deferred.unit
-
-  let compare_hashes mainnet_archive_conn_str migrated_archive_conn_str
-      end_global_slot ~should_contain_pending_blocks =
-    let mainnet_archive_uri = Uri.of_string mainnet_archive_conn_str in
-    let migrated_archive_uri = Uri.of_string migrated_archive_conn_str in
-    let mainnet_pool =
-      Caqti_async.connect_pool ~max_size:128 mainnet_archive_uri
-    in
-    let migrated_pool =
-      Caqti_async.connect_pool ~max_size:128 migrated_archive_uri
-    in
-    match (mainnet_pool, migrated_pool) with
-    | Error _e, _ | _, Error _e ->
-        failwith "Failed to create Caqti pools for Postgresql"
-    | Ok mainnet_pool, Ok migrated_pool ->
-        let query_mainnet_db = Mina_caqti.query mainnet_pool in
-        let query_migrated_db = Mina_caqti.query migrated_pool in
-        let compare_hashes ~fetch_data_sql ~find_element_sql name =
-          let%bind expected_hashes = query_mainnet_db ~f:fetch_data_sql in
-          Deferred.List.iter expected_hashes ~f:(fun hash ->
-              let%bind element_id = find_element_sql hash in
-              if element_id |> Option.is_none then
-                failwithf "Cannot find %s hash ('%s') in migrated database" name
-                  hash ()
-              else Deferred.unit )
-        in
-        let%bind _ =
-          compare_hashes
-            ~fetch_data_sql:(fun db ->
-              Sql.Mainnet.user_commands_hashes db end_global_slot )
-            ~find_element_sql:(fun hash ->
-              query_migrated_db ~f:(fun db ->
-                  Sql.Berkeley.find_user_command_id_by_hash db hash ) )
-            "user_commands"
-        in
-        let%bind _ =
-          compare_hashes
-            ~fetch_data_sql:(fun db ->
-              Sql.Mainnet.internal_commands_hashes db end_global_slot )
-            ~find_element_sql:(fun hash ->
-              query_migrated_db ~f:(fun db ->
-                  Sql.Berkeley.find_internal_command_id_by_hash db hash ) )
-            "internal_commands"
-        in
-        let%bind _ =
-          assert_migrated_db_contains_no_orphaned_blocks query_migrated_db
-        in
-        let%bind _ =
-          match should_contain_pending_blocks with
-          | true ->
-              assert_migrated_db_contains_pending_blocks query_migrated_db
-          | false ->
-              assert_migrated_db_contains_only_canonical_blocks
-                query_migrated_db
-        in
-        let%bind _ =
-          compare_hashes
-            ~fetch_data_sql:(fun db ->
-              match should_contain_pending_blocks with
-              | true ->
-                  Sql.Mainnet.block_hashes_only_canonical db end_global_slot
-              | false ->
-                  Sql.Mainnet.block_hashes_no_orphaned db end_global_slot )
-            ~find_element_sql:(fun hash ->
-              query_migrated_db ~f:(fun db ->
-                  Sql.Berkeley.find_block_by_state_hash db hash ) )
-            "block_state_hashes"
-        in
-        let%bind _ =
-          compare_hashes
-            ~fetch_data_sql:(fun db ->
-              match should_contain_pending_blocks with
-              | true ->
-                  Sql.Mainnet.block_parent_hashes_only_canonical db
-                    end_global_slot
-              | false ->
-                  Sql.Mainnet.block_parent_hashes_no_orphaned db end_global_slot
-              )
-            ~find_element_sql:(fun hash ->
-              query_migrated_db ~f:(fun db ->
-                  Sql.Berkeley.find_block_by_parent_hash db hash ) )
-            "block_parent_state_hashes"
-        in
-        let%bind _ =
-          compare_hashes
-            ~fetch_data_sql:(fun db ->
-              match should_contain_pending_blocks with
-              | true ->
-                  Sql.Mainnet.ledger_hashes_only_canonical db end_global_slot
-              | false ->
-                  Sql.Mainnet.ledger_hashes_no_orphaned db end_global_slot )
-            ~find_element_sql:(fun hash ->
-              query_migrated_db ~f:(fun db ->
-                  Sql.Berkeley.find_block_by_ledger_hash db hash ) )
-            "ledger_hashes"
-        in
-
-        let%bind expected_hashes =
-          query_mainnet_db ~f:(fun db ->
-              Sql.Common.block_state_hashes db end_global_slot )
-        in
-        let%bind actual_hashes =
-          query_migrated_db ~f:(fun db ->
-              Sql.Common.block_state_hashes db end_global_slot )
-        in
-        List.iter expected_hashes ~f:(fun (expected_child, expected_parent) ->
-            if
-              List.exists actual_hashes ~f:(fun (actual_child, actual_parent) ->
-                  String.equal expected_child actual_child
-                  && String.equal expected_parent actual_parent )
-            then ()
-            else
-              failwithf
-                "Relation between blocks skew. Cannot find original subchain \
-                 '%s' -> '%s' in migrated database"
-                expected_child expected_parent () ) ;
-        Deferred.unit
 
   let import_mainnet_dump t date =
     let%bind archive =
@@ -369,105 +241,32 @@ module HardForkSteps = struct
     Util.run_cmd_exn "." "rm"
       [ "-f"; Printf.sprintf "%s/%s-checkpoint*.json" t.working_dir prefix ]
 
-  let compare_replayer_outputs expected actual ~compare_receipt_chain_hashes =
-    let expected_output = Replayer.Output.of_json_file_exn expected in
-    let actual_output = Replayer.Output.of_json_file_exn actual in
-
-    let get_accounts (output : Replayer.Output.t) file =
-      let ledger =
-        match output.target_genesis_ledger with
-        | None ->
-            failwithf
-              "replayer output file (%s) does not have any target ledger " file
-              ()
-        | Some ledger ->
-            ledger
-      in
-      match ledger.base with
-      | Named _ ->
-          failwithf "%s file does not have any account" file ()
-      | Accounts accounts ->
-          accounts
-      | Hash _ ->
-          failwithf "%s file does not have any account" file ()
+  let replayer_output_to_fork_config ~replayer_output ~state_hash
+      ~source_archive_uri ~fork_config_path =
+    let replayer_output = Replayer.Output.of_json_file_exn replayer_output in
+    let%bind blockchain_length =
+      get_migration_end_slot_for_state_hash source_archive_uri state_hash
+    in
+    let%bind global_slot_since_genesis =
+      blockchain_length_for_state_hash source_archive_uri state_hash
     in
 
-    let expected_accounts = get_accounts expected_output expected in
-    let actual_accounts = get_accounts actual_output actual in
-
-    List.iter expected_accounts ~f:(fun expected_account ->
-        let get_value_or_none option = Option.value option ~default:"None" in
-        let compare_balances (actual_account : Runtime_config.Accounts.Single.t)
-            (expected_account : Runtime_config.Accounts.Single.t) =
-          if
-            Currency.Balance.( = ) expected_account.balance
-              actual_account.balance
-          then ()
-          else
-            failwithf
-              "Incorrect balance for account %s when comparing replayer \
-               outputs expected:(%s) vs actual(%s)"
-              expected_account.pk expected actual ()
-        in
-        let compare_receipt (actual_account : Runtime_config.Accounts.Single.t)
-            (expected_account : Runtime_config.Accounts.Single.t) =
-          let expected_receipt_chain_hash =
-            get_value_or_none expected_account.receipt_chain_hash
-          in
-          let actual_account_receipt_chain_hash =
-            get_value_or_none actual_account.receipt_chain_hash
-          in
-          if
-            String.( = ) expected_receipt_chain_hash
-              actual_account_receipt_chain_hash
-          then ()
-          else
-            failwithf
-              "Incorrect receipt chain hash for account %s when comparing \
-               replayer outputs expected:(%s) vs actual(%s)"
-              expected_account.pk expected_receipt_chain_hash
-              actual_account_receipt_chain_hash ()
-        in
-        let compare_delegation
-            (actual_account : Runtime_config.Accounts.Single.t)
-            (expected_account : Runtime_config.Accounts.Single.t) =
-          let expected_delegation =
-            get_value_or_none expected_account.delegate
-          in
-          let actual_delegation = get_value_or_none actual_account.delegate in
-          if String.( = ) expected_delegation actual_delegation then ()
-          else
-            failwithf
-              "Incorrect delegation for account %s when comparing replayer \
-               outputs expected:(%s) vs actual(%s)"
-              expected_account.pk expected_delegation actual_delegation ()
-        in
-
-        match
-          List.find actual_accounts ~f:(fun actual_account ->
-              String.( = ) expected_account.pk actual_account.pk )
-        with
-        | Some actual_account ->
-            compare_balances actual_account expected_account ;
-            if compare_receipt_chain_hashes then
-              compare_receipt actual_account expected_account ;
-            compare_delegation actual_account expected_account
-        | None ->
-            failwithf
-              "Cannot find account in actual file %s when comparing replayer \
-               outputs expected:(%s) vs actual(%s)"
-              expected_account.pk expected actual () )
-
-  let get_expected_ledger folder name =
-    let expected_ledger_path = Printf.sprintf "%s/%s" folder name in
-    let expected_ledger =
-      Yojson.Safe.from_file expected_ledger_path
-      |> Replayer.Output.of_yojson |> Result.ok_or_failwith
+    let fork =
+      Runtime_config.Fork_config.
+        { state_hash; blockchain_length : int; global_slot_since_genesis }
     in
-    let end_migration_ledger_hash =
-      expected_ledger.target_epoch_ledgers_state_hash
-    in
-    return (expected_ledger_path, end_migration_ledger_hash)
+
+    let proof = Runtime_config.Proof_keys.make ~fork () in
+    let ledger = replayer_output.target_genesis_ledger in
+
+    return
+      ( match ledger with
+      | None ->
+          failwith "empty ledger in replayer output"
+      | Some ledger ->
+          Runtime_config.make ~proof ~ledger ()
+          |> Runtime_config.to_yojson
+          |> Yojson.Safe.to_file fork_config_path )
 
   let assert_no_replayer_migration_checkpoint_on_pending_blocks root =
     let len = gather_replayer_migration_checkpoint_files root |> List.length in
@@ -478,7 +277,7 @@ module HardForkSteps = struct
         len ()
     else ()
 
-  let archive_mainnet_precomputed_blocks t blocks conn_str =
+  let archive_mainnet_precomputed_blocks t blocks archive_uri =
     let workdir = "/workdir" in
     let blocks_in_docker =
       List.map blocks ~f:(fun block ->
@@ -486,13 +285,14 @@ module HardForkSteps = struct
     in
 
     let archive_blocks =
-      Archive_blocks.of_context Docker
-        { image = t.env.reference.docker
-        ; workdir
-        ; volume =
-            Printf.sprintf "%s:%s" (Filename.realpath t.working_dir) workdir
-        ; network = "hardfork"
-        }
+      Archive_blocks.of_context
+        (Docker
+           { image = t.env.reference.docker
+           ; workdir
+           ; volume =
+               Printf.sprintf "%s:%s" (Filename.realpath t.working_dir) workdir
+           ; network = "hardfork"
+           } )
     in
 
     Archive_blocks.run archive_blocks ~archive_uri ~blocks:blocks_in_docker
@@ -547,4 +347,14 @@ module HardForkSteps = struct
              let left = get_length left in
              let right = get_length right in
              left - right ) )
+
+  let build_mainnet_database t ~num_blocks =
+    let%bind conn_str_mainnet_source_db = import_genesis_mainnet_dump t in
+    let%bind blocks =
+      download_mainnet_precomputed_blocks t ~from:2 ~num_blocks
+    in
+    let%bind _ =
+      archive_mainnet_precomputed_blocks t blocks conn_str_mainnet_source_db
+    in
+    return conn_str_mainnet_source_db
 end

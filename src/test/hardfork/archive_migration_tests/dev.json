@@ -15,7 +15,7 @@
   "db" : {
     "password" : "postgres",
     "user" : "postgres",
-    "port" : 5555,
-    "host" : "172.21.0.1"
+    "port" : 5432,
+    "host" : "localhost"
   }
 }

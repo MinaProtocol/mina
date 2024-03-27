@@ -49,6 +49,17 @@ module Mainnet = struct
   let latest_state_hash (module Conn : CONNECTION) =
     Conn.find_opt latest_state_hash ()
 
+  let blockchain_length_for_state_hash_query =
+    Caqti_request.find_opt Caqti_type.string Caqti_type.int
+      {sql| 
+          SELECT height FROM blocks 
+          WHERE state_hash = ?
+          LIMIT 1
+          |sql}
+
+  let blockchain_length_for_state_hash (module Conn : CONNECTION) state_hash =
+    Conn.find_opt blockchain_length_for_state_hash_query state_hash
+
   let max_length_query =
     Caqti_request.find_opt Caqti_type.unit Caqti_type.int64
       {sql| 

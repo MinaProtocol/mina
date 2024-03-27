@@ -7,15 +7,7 @@ let of_context context =
     ~official_name:"mina-berkeley-migration"
 
 let run t ~batch_size ~genesis_ledger ~source_archive_uri ~source_blocks_bucket
-    ~target_archive_uri ~end_global_slot =
-  let maybe_end_global_slot =
-    match end_global_slot with
-    | None ->
-        []
-    | Some end_global_slot ->
-        [ "--end-global-slot"; string_of_int end_global_slot ]
-  in
-
+    ~target_archive_uri ~network =
   let args =
     [ "--batch-size"
     ; string_of_int batch_size
@@ -25,9 +17,10 @@ let run t ~batch_size ~genesis_ledger ~source_archive_uri ~source_blocks_bucket
     ; source_archive_uri
     ; "--migrated-archive-uri"
     ; target_archive_uri
-    ; "--mainnet-blocks-bucket"
+    ; "--blocks-bucket"
     ; source_blocks_bucket
+    ; "--network"
+    ; network
     ]
-    @ maybe_end_global_slot
   in
   run t ~args
