@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# This script is adapted from https://github.com/MinaProtocol/mina/blob/develop/src/app/rosetta/download-missing-blocks.sh
+# This script is adapted from https://github.com/MinaProtocol/mina/blob/1.4.1/src/app/rosetta/download-missing-blocks.sh
 # It is used to populate a postgres database with missing precomputed archiveDB blocks
 
 # Function to display usage information
