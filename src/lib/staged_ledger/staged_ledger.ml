@@ -2463,8 +2463,6 @@ let%test_module "staged ledger tests" =
       in
       (ledger_proof, diff)
 
-    module Transfer = Mina_ledger.Ledger_transfer.Make (Ledger) (Ledger)
-
     (* Run the given function inside of the Deferred monad, with a staged
          ledger and a separate test ledger, after applying the given
          init_state to both. In the below tests we apply the same commands to
