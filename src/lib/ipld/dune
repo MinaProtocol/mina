@@ -1,0 +1,13 @@
+(library
+ (name ipld)
+ (public_name ipld)
+ (libraries
+  ;; opam libraries
+  core_kernel
+  cid
+  ;; local libraries
+  )
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane)))

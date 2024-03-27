@@ -77,6 +77,7 @@
 (package (name internal_tracing))
 (package (name interpolator_lib))
 (package (name interruptible))
+(package (name ipld))
 (package (name itn_crypto))
 (package (name itn_logger))
 (package (name key_cache))
