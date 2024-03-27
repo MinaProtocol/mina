@@ -22,6 +22,7 @@ let DockerImage = ./DockerImage.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
 let Profiles = ../Constants/Profiles.dhall
 let Artifacts = ../Constants/Artifacts.dhall
+let Toolchain = ../Constants/Toolchain.dhall
 
 in
 
@@ -100,9 +101,8 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
         [ Command.build
             Command.Config::{
               commands =
-                DebianVersions.toolchainRunner
+                Toolchain.runner
                   debVersion
-                  profile
                   [ "NETWORK_NAME=\$NETWORK_NAME"
                   , "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL"
                   , "AWS_ACCESS_KEY_ID"
@@ -251,16 +251,17 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
       } artifact
 in 
 
-let pipeline : List Artifacts.Type -> DebianVersions.DebVersion  -> Profiles.Type ->  PipelineMode.Type -> Pipeline.Config.Type = 
+let pipeline : List Artifacts.Type -> DebianVersions.DebVersion  -> Profiles.Type ->  Toolchain.SelectionMode -> PipelineMode.Type  -> Pipeline.Config.Type = 
   \(artifacts: List Artifacts.Type) ->
   \(debVersion : DebianVersions.DebVersion) ->
   \(profile: Profiles.Type) ->
+  \(toolchainSelectMode: Toolchain.SelectionMode) ->
   \(mode: PipelineMode.Type) ->
     let steps = [
         Libp2p.step debVersion,
         Command.build
           Command.Config::{
-            commands = DebianVersions.toolchainRunner debVersion profile [
+            commands = Toolchain.select toolchainSelectMode debVersion [
               "DUNE_PROFILE=${Profiles.duneProfile profile}",
               "AWS_ACCESS_KEY_ID",
               "AWS_SECRET_ACCESS_KEY",
