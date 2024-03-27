@@ -56,7 +56,6 @@ git fetch
 #
 #       error: program 'git' failed with exit code 128
 # That is why we checkout branch explicitly
-git fetch origin $1
 git checkout $1
 
 git submodule sync
