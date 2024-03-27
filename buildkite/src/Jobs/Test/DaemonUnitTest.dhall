@@ -33,8 +33,7 @@ Pipeline.build
   Pipeline.Config::{
     spec = 
       let unitDirtyWhen = [
-        S.strictlyStart (S.contains "src/lib"),
-        S.strictlyStart (S.contains "src/nonconsensus"),
+        S.strictlyStart (S.contains "src"),
         S.strictly (S.contains "Makefile"),
         S.exactly "buildkite/src/Jobs/Test/DaemonUnitTest" "dhall",
         S.exactly "buildkite/src/Constants/ContainerImages" "dhall",
