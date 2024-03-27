@@ -694,7 +694,7 @@ module Sql = struct
            ON pk_source.id = u.source_id
          INNER JOIN public_keys pk_receiver
            ON pk_receiver.id = u.receiver_id
-         INNER JOIN account_identifiers ai_receiver
+         LEFT JOIN account_identifiers ai_receiver
            ON ai_receiver.public_key_id = pk_receiver.id
         /* Account creation fees are attributed to the first successful command in the
            block that mentions the account with the following LEFT JOIN */
@@ -718,10 +718,10 @@ module Sql = struct
                   WHERE uc2.receiver_id = u.receiver_id
                     AND buc2.block_id = buc.block_id
                     AND buc2.status = 'applied')))
-         INNER JOIN tokens t
+         LEFT JOIN tokens t
            ON t.id = ai_receiver.token_id
          WHERE buc.block_id = ?
-           AND t.value = ?
+           AND (t.value = ? OR t.id IS NULL)
         |} fields)
 
     let run (module Conn : Caqti_async.CONNECTION) id =
