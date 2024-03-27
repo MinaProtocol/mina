@@ -12,7 +12,7 @@ traversal:
     - src/external
     - src/lib/marlin
     - src/lib/crypto/proof-systems
-    - src/lib/snarky
+    - src/external/snarky
     - frontend/wallet/tablecloth
     # Unsure of the relevance anymore
     - frontend/wallet/README.md

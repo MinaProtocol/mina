@@ -1,5 +1,7 @@
 (executable
  (name ledger_export_benchmark)
+ (package ledger_export_benchmark)
+ (public_name ledger_export_benchmark)
  (libraries
    base
    core

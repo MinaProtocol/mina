@@ -2,7 +2,7 @@
 
 set -eu
 
-cd src/lib/snarky
+cd src/external/snarky
 
 CURR=$(git rev-parse HEAD)
 # temporarily skip SSL verification (for CI)

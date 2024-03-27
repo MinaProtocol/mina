@@ -1,5 +1,7 @@
 (executable
  (name print_blockchain_snark_vk)
+ (package print_blockchain_snark_vk)
+ (public_name print_blockchain_snark_vk)
  (libraries
    blockchain_snark)
  (instrumentation (backend bisect_ppx))

@@ -1,5 +1,7 @@
 (executable
  (name batch_txn_tool)
+ (package batch_txn_tool)
+ (public_name batch_txn_tool)
  (libraries
    ;; opam libraries
    async.async_command

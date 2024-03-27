@@ -1,5 +1,7 @@
 (executable
  (name test_executive)
+ (package test_executive)
+ (public_name test_executive)
  (libraries
   ;; opam libraries
   async_kernel
