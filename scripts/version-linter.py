@@ -24,6 +24,7 @@ import io
 import sys
 import re
 import sexpdata
+import requests
 
 exit_code=0
 
@@ -31,19 +32,50 @@ def set_error():
   global exit_code
   exit_code=1
 
-def branch_commit(branch):
+def branch_commits(branch,n):
   print ('Retrieving', branch, 'head commit...')
-  result=subprocess.run(['git','log','-n','1','--format="%h"','--abbrev=7','--no-merges',f'{branch}'],
+  result=subprocess.run(['git','log','-n',str(n),'--format="%h"','--abbrev=7','--no-merges',f'{branch}'],
                         capture_output=True)
   output=result.stdout.decode('ascii')
   print ('command stdout:', output)
   print ('command stderr:', result.stderr.decode('ascii'))
-  return output.replace('"','').replace('\n','')
+  return output.replace('"','').splitlines()
 
-def download_type_shapes(role,branch,sha1) :
+def url_to_type_shape_file(file):
+  '''
+    Return url to mina type shape file
+  '''
+  return f'https://storage.googleapis.com/mina-type-shapes/{file}'
+
+def sha_exists(sha1):
+  '''
+    Checks if mina type shape with given sha exists
+  '''
+  file = type_shape_file(sha1)
+  return url_exists(url_to_type_shape_file(file))
+
+def url_exists(url):
+  '''
+    Checks if url exists (by sending head and validating that status code is ok)
+  '''
+  return requests.head(url).status_code == 200
+
+def find_latest_type_shape_ref_on(branch,n=1):
+  '''
+    Function tries to find best type shape reference commit by retrieving n last commits 
+    and iterate over collection testing if any item points to valid url   
+  '''
+  commits = branch_commits(branch, n)
+  candidates = list(filter(lambda x: sha_exists(x), commits))
+  if not any(candidates): 
+    raise Exception(f'Cannot find type shape file for {branch}. I tried {n} last commits')
+  else: 
+    return candidates[0]
+
+def download_type_shape(role,branch,sha1) :
   file=type_shape_file(sha1)
   print ('Downloading type shape file',file,'for',role,'branch',branch,'at commit',sha1)
-  result=subprocess.run(['wget','--no-clobber',f'https://storage.googleapis.com/mina-type-shapes/{file}'])
+  result=subprocess.run(['wget','--no-clobber',url_to_type_shape_file(file)])
 
 def type_shape_file(sha1) :
   # created by buildkite build-artifact script
@@ -233,18 +265,18 @@ if __name__ == "__main__":
 
   subprocess.run(['git','fetch'],capture_output=False)
 
-  base_branch_commit=branch_commit(base_branch)
-  download_type_shapes('base',base_branch,base_branch_commit)
+  base_branch_commit = find_latest_type_shape_ref_on(base_branch,n=10)
+  download_type_shape('base',base_branch,base_branch_commit)
 
   print('')
 
-  release_branch_commit=branch_commit(release_branch)
-  download_type_shapes('release',release_branch,release_branch_commit)
+  release_branch_commit=find_latest_type_shape_ref_on(release_branch, n=10)
+  download_type_shape('release',release_branch,release_branch_commit)
 
   print('')
 
-  pr_branch_commit=branch_commit(pr_branch)
-  download_type_shapes('pr',pr_branch,pr_branch_commit)
+  pr_branch_commit=find_latest_type_shape_ref_on(pr_branch)
+  download_type_shape('pr',pr_branch,pr_branch_commit)
 
   print('')
 
