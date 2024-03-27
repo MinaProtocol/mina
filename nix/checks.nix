@@ -7,7 +7,7 @@ inputs: pkgs: {
     src = ../.;
     # todo: submodules :(
     buildPhase = ''
-      mkdir -p src/lib/snarky
+      mkdir -p src/external/snarky
       bash ./scripts/lint_codeowners.sh
     '';
     installPhase = "touch $out";

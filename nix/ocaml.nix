@@ -16,7 +16,9 @@ let
   repos = [ external-repo inputs.opam-repository ];
 
   export = opam-nix.importOpam "${src}/opam.export";
-  external-packages = pkgs.lib.getAttrs [ "sodium" "base58" ]
+  external-packages = pkgs.lib.getAttrs [ "sodium" "base58"
+    "h_list" "bitstring_lib" "snarky_signature" "snarky" "snarky_curve" "fold_lib" "group_map" "snarkette" "tuple_lib" "sponge" "snarky_bench" "interval_union" "ppx_snarky" "snarky_integer"
+    ]
     (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
   # Packages which are `installed` in the export.
@@ -45,9 +47,71 @@ let
   implicit-deps = export-installed // external-packages;
 
   # Pins from opam.export
-  pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package;
+  pins = builtins.mapAttrs (name: pkg: { inherit name; } // builtins.removeAttrs pkg ["name"]) export.package.section;
 
-  scope = opam-nix.applyOverlays opam-nix.__overlays
+  minaEnv = {
+    # TODO, get these from somewhere
+    MARLIN_REPO_SHA = "<unknown>";
+    MINA_COMMIT_SHA1 = "<unknown>";
+    MINA_COMMIT_DATE = "<unknown>";
+    MINA_BRANCH = "<unknown>";
+
+    DUNE_PROFILE = "dev";
+    DISABLE_CHECK_OPAM_SWITCH = "true";
+
+    NIX_LDFLAGS =
+      optionalString (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64)
+      "-F${pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation";
+
+    # todo: slimmed rocksdb
+    MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
+    GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
+
+    # this is used to retrieve the path of the built static library
+    # and copy it from within a dune rule
+    # (see src/lib/crypto/kimchi_bindings/stubs/dune)
+    MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
+
+    MINA_VERSION_IMPLEMENTATION = "mina_version.runtime";
+
+    PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
+    PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
+  } // optionalAttrs pkgs.stdenv.isDarwin {
+    OCAMLPARAM = "_,cclib=-lc++";
+  };
+
+  ocamlPkgOverlay = self: super:
+    {
+      # https://github.com/Drup/ocaml-lmdb/issues/41
+      lmdb = super.lmdb.overrideAttrs
+        (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
+
+      # Can't find sodium-static and ctypes
+      sodium = super.sodium.overrideAttrs (_: {
+        NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
+        propagatedBuildInputs = [ pkgs.sodium-static ];
+        preBuild = ''
+          export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
+        '';
+      });
+
+      # Doesn't have an explicit dependency on ctypes-foreign
+      ctypes = super.ctypes.overrideAttrs
+        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
+
+      # Doesn't have an explicit dependency on ctypes
+      rpc_parallel = super.rpc_parallel.overrideAttrs
+        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
+
+      check_opam_switch = super.check_opam_switch.overrideAttrs (oa: {
+        # So that opam in impure shell doesn't get shadowed by the fake one
+        propagateInputs = false;
+      });
+    };
+
+  ocamlOverlays = opam-nix.__overlays ++ [ ocamlPkgOverlay ];
+
+  scope = opam-nix.applyOverlays ocamlOverlays
     (opam-nix.defsToScope pkgs { }
       ((opam-nix.queryToDefs repos (extra-packages // implicit-deps)) // pins));
 
@@ -106,44 +170,16 @@ let
             outputs = [ "out" ];
             installPhase = "touch $out";
           } // extraArgs);
+
     in {
-      # https://github.com/Drup/ocaml-lmdb/issues/41
-      lmdb = super.lmdb.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
-
-      # Can't find sodium-static and ctypes
-      sodium = super.sodium.overrideAttrs (_: {
-        NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
-        propagatedBuildInputs = [ pkgs.sodium-static ];
-        preBuild = ''
-          export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
-        '';
-      });
-
-      # Doesn't have an explicit dependency on ctypes
-      rpc_parallel = super.rpc_parallel.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
-
       # Some "core" Mina executables, without the version info.
-      mina-dev = pkgs.stdenv.mkDerivation ({
+      mina-dev = pkgs.stdenv.mkDerivation (minaEnv // {
         pname = "mina";
         version = "dev";
         # Prevent unnecessary rebuilds on non-source changes
         inherit src;
 
         withFakeOpam = false;
-
-        # TODO, get this from somewhere
-        MARLIN_REPO_SHA = "<unknown>";
-        MINA_COMMIT_SHA1 = "<unknown>";
-        MINA_COMMIT_DATE = "<unknown>";
-        MINA_BRANCH = "<unknown>";
-
-        DUNE_PROFILE = "dev";
-
-        NIX_LDFLAGS =
-          optionalString (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64)
-          "-F${pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation";
 
         buildInputs = ocaml-libs ++ external-libs;
 
@@ -156,21 +192,6 @@ let
           pkgs.removeReferencesTo
           pkgs.fd
         ] ++ ocaml-libs;
-
-        # todo: slimmed rocksdb
-        MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
-        GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
-
-        # this is used to retrieve the path of the built static library
-        # and copy it from within a dune rule
-        # (see src/lib/crypto/kimchi_bindings/stubs/dune)
-        MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
-        DISABLE_CHECK_OPAM_SWITCH = "true";
-
-        MINA_VERSION_IMPLEMENTATION = "mina_version.runtime";
-
-        PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
-        PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
 
         configurePhase = ''
           export MINA_ROOT="$PWD"
@@ -251,8 +272,6 @@ let
         '';
         shellHook =
           "export MINA_LIBP2P_HELPER_PATH=${pkgs.libp2p_helper}/bin/libp2p_helper";
-      } // optionalAttrs pkgs.stdenv.isDarwin {
-        OCAMLPARAM = "_,cclib=-lc++";
       });
 
       # Same as above, but wrapped with version info.
@@ -283,7 +302,78 @@ let
 
       mainnet = wrapMina self.mainnet-pkg { };
 
-      experiment = (opam-nix.buildDuneProject { } "direction" filtered-src { }).direction;
+      experiment =
+        # let deps = builtins.removeAttrs export-installed (builtins.attrNames pins.section ++ builtins.attrNames external-packages); in
+        # let deps = builtins.removeAttrs export-installed ["check_opam_switch"] // { base58 = "0.1.3"; }; in
+        let
+        # deps = builtins.removeAttrs export-installed (builtins.attrNames pins) // { base58 = "0.1.3"; };
+        deps = extra-packages // implicit-deps ;
+        src-with-opam-files = pkgs.stdenv.mkDerivation {
+          name = "mina-dune-project";
+          src = filtered-src;
+          nativeBuildInputs = with self; [ dune ocaml pkgs.jq ];
+          phases = [ "unpackPhase" "buildPhase" "installPhase" ];
+          buildPhase = ''
+            tr "\n" " " <src/dune-project | grep -oE '\(\s*package\s*\(name\s\s*[^\)]*\)\)' \
+              | sed -r 's/\((name|package)//g' \
+              | sed -r 's/\s|\)//g' | sed -r 's%^.*$%src/\0.opam%g' | xargs dune build
+
+            # Build library dependency mapping
+            ${pkgs.bash}/bin/bash ./nix/dump-dune-deps.sh > deps.json
+          '';
+          installPhase = ''
+            rm _build -rf
+            <deps.json jq -r 'to_entries | .[] | "if [[ -f src/" + .key + ".opam ]]; then mv -f src/" + .key + ".opam " + .value.path + "; fi"' | ${pkgs.bash}/bin/bash
+            cp -R . $out
+          '';
+        };
+        depsMap = builtins.fromJSON (builtins.readFile "${src-with-opam-files}/deps.json");
+        getDeps = names: self: builtins.attrValues (pkgs.lib.filterAttrs (n: v: builtins.elem n names) self);
+        myOverlay = self: super:
+          let ppxs = [ self.ppx_version ];
+          custom =
+          {
+            ppx_version = super.ppx_version.overrideAttrs (s: minaEnv // {
+              buildInputs = s.buildInputs ++ getDeps depsMap.ppx_version.deps self ++ external-libs;
+              nativeBuildInputs = s.nativeBuildInputs ++ external-libs;
+              configurePhase =
+                ''
+                  ${s.configurePhase}
+                  [ ! -f dune-project ] && echo '(lang dune 3.3)' > dune-project
+                '';
+            });
+          }; in custom //
+          (pkgs.lib.concatMapAttrs (name: old:
+            if builtins.hasAttr name custom || ! builtins.hasAttr name depsMap then {}
+            else
+              {
+                ${name} = old.overrideAttrs (s: 
+                minaEnv // {
+                  buildInputs = ppxs ++ s.buildInputs ++ getDeps (builtins.getAttr name depsMap).deps self ++ external-libs;
+                  nativeBuildInputs = s.nativeBuildInputs ++ external-libs;
+                  configurePhase =
+                    ''
+                      ${s.configurePhase}
+                      [ ! -f dune-project ] && echo '(lang dune 3.3)' > dune-project
+                    '';
+                });
+              }
+          ) super)
+          ;
+       prj =
+          (opam-nix.buildOpamProject' {
+            inherit pkgs repos;
+            recursive = true;
+            defs = pins;
+            useOpamList = false;
+            overlays = ocamlOverlays ++ [ myOverlay ];
+            resolveArgs = { env = {
+                DUNE_PROFILE = "dev";
+                DISABLE_CHECK_OPAM_SWITCH = "true";
+              }; };
+          } src-with-opam-files deps );
+        in
+        prj.direction;
 
       devnet-pkg = self.mina-dev.overrideAttrs (s: {
         version = "devnet";
