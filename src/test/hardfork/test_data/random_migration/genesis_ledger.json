@@ -1,0 +1,48 @@
+{
+  "genesis": {
+    "genesis_state_timestamp": "2023-12-05T21:59:37+0100",
+    "k": 24
+  },
+  "ledger": {
+    "name": "release",
+    "num_accounts": 250,
+    "accounts": [
+      {
+        "pk": "B62qoRdtEBWMPRiZvxrihxYzzU2hW7KBtqxNfhfwJKNkVwsJdgYmYmL",
+        "sk": null,
+        "balance": "65500.000000000",
+        "delegate": "B62qmxTL9HvQDEvdNWjgon9ouZhTfssAHzyUqmqtjjGFEsevEAYBMUt"
+      },
+      {
+        "pk": "B62qmxTL9HvQDEvdNWjgon9ouZhTfssAHzyUqmqtjjGFEsevEAYBMUt",
+        "sk": null,
+        "delegate": null,
+        "balance": "500.000000000"
+      },
+      {
+        "pk": "B62qrgvZn4ty5h8KwMDuz61naGDAdqcXcQmxsZoFx8JFnhZ2ohFEdkZ",
+        "sk": null,
+        "balance": "11550000.000000000",
+        "delegate": "B62qnGkv9fhuW86rWN3nYiaqD8A1m9dFAyWW9nATnYCj3HNtXrLUe1y"
+      },
+      {
+        "pk": "B62qnGkv9fhuW86rWN3nYiaqD8A1m9dFAyWW9nATnYCj3HNtXrLUe1y",
+        "sk": null,
+        "balance": "0.000000000",
+        "delegate": null
+      },
+      {
+        "pk": "B62qnUczQQgdSrP54pvyJGT8oeCNS5eTUu95bR3y9w2TYgDCq6PpVK5",
+        "sk": null,
+        "balance": "11550000.000000000",
+        "delegate": "B62qnzmHfkfVEAGhSgu5bLdsanaH6vQ1GDgdNDbKAiewPcfmMf2CXpA"
+      },
+      {
+        "pk": "B62qnzmHfkfVEAGhSgu5bLdsanaH6vQ1GDgdNDbKAiewPcfmMf2CXpA",
+        "sk": null,
+        "balance": "0.000000000",
+        "delegate": null
+      }
+    ]
+  }
+}

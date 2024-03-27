@@ -99,6 +99,10 @@ bot)
   DOCKERFILE_PATH="frontend/bot/Dockerfile"
   DOCKER_CONTEXT="frontend/bot"
   ;;
+bot)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-test-suite"
+  DOCKER_CONTEXT="dockerfiles/"
+  ;;
 mina-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
   DOCKER_CONTEXT="dockerfiles/"
