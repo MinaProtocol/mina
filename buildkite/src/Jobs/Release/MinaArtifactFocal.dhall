@@ -14,4 +14,5 @@ Pipeline.build
         ArtifactPipelines.MinaBuildSpec::{
             artifacts = [ Artifacts.Type.Daemon , Artifacts.Type.Archive , Artifacts.Type.BatchTxn , Artifacts.Type.TestExecutive , Artifacts.Type.Rosetta , Artifacts.Type.ZkappTestTransaction ],
             profile = DebianVersions.DebVersion.Focal
+        }
     )
