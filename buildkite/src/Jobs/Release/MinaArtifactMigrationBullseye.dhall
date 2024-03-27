@@ -12,7 +12,7 @@ in
 Pipeline.build 
     (ArtifactPipelines.pipeline 
         [ Artifacts.Type.ArchiveMigration ]
-        DebianVersions.DebVersion.Focal 
-        Profiles.Type.BerkeleyMigration
+        DebianVersions.DebVersion.Bullseye 
+        Profiles.Type.Standard
         PipelineMode.Type.PullRequest
     )
