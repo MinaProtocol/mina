@@ -259,8 +259,7 @@ let compare_internal_commands migrated_pool mainnet_pool ~work_dir =
 let compare_ledger_hash ~migrated_replayer_output ~fork_config_file =
   let checkpoint_ledger_hash =
     Yojson.Basic.from_file migrated_replayer_output
-    |> member "genesis_ledger"
-    |> member "hash" |> to_string
+    |> member "genesis_ledger" |> member "hash" |> to_string
     |> Ledger_hash.of_base58_check_exn
   in
   let fork_ledger_hash =
