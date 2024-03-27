@@ -76,7 +76,7 @@ let PromoteDockerSpec = {
 let promoteDebianStep = \(spec : PromoteDebianSpec.Type) ->
     Command.build
       Command.Config::{
-        commands = DebianVersions.toolchainRunner DebianVersions.DebVersion.Bullseye [
+        commands = DebianVersions.toolchainRunner DebianVersions.DebVersion.Bullseye spec.profile [
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY"
         ] "./buildkite/scripts/promote-deb.sh --package ${Package.debianName spec.package}${Profiles.toLabelSegment spec.profile} --version ${spec.version} --new-version ${spec.new_version} --architecture ${spec.architecture} --codename ${DebianVersions.lowerName spec.codename} --from-component ${DebianChannel.lowerName spec.from_channel} --to-component ${DebianChannel.lowerName spec.to_channel}",

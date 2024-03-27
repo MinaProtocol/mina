@@ -102,6 +102,7 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
               commands =
                 DebianVersions.toolchainRunner
                   debVersion
+                  profile
                   [ "NETWORK_NAME=\$NETWORK_NAME"
                   , "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL"
                   , "AWS_ACCESS_KEY_ID"
@@ -259,7 +260,7 @@ let pipeline : List Artifacts.Type -> DebianVersions.DebVersion  -> Profiles.Typ
         Libp2p.step debVersion,
         Command.build
           Command.Config::{
-            commands = DebianVersions.toolchainRunner debVersion [
+            commands = DebianVersions.toolchainRunner debVersion profile [
               "DUNE_PROFILE=${Profiles.duneProfile profile}",
               "AWS_ACCESS_KEY_ID",
               "AWS_SECRET_ACCESS_KEY",
