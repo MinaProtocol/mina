@@ -313,7 +313,7 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
             query_migrated_db ~f:(fun db ->
                 match%map
                   Archive_lib.Processor.Accounts_accessed.add_if_doesn't_exist
-                    ~logger db genesis_block_id (index, acct)
+                    db genesis_block_id (index, acct)
                 with
                 | Ok _ ->
                     Ok ()

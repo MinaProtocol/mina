@@ -187,6 +187,12 @@ let%test_module "Archive node unit tests" =
                         acct_id ;
                       add_token_owners tree.calls )
               in
+              let%bind _ =
+                Processor.Protocol_versions.add_if_doesn't_exist conn
+                  ~transaction:Protocol_version.(transaction current)
+                  ~network:Protocol_version.(network current)
+                  ~patch:Protocol_version.(patch current)
+              in
               add_token_owners p.account_updates ;
               match%map
                 let open Deferred.Result.Let_syntax in
