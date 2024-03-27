@@ -49,10 +49,11 @@ module HardForkSteps = struct
     Deferred.return (Settings.connection_str_to t.env db_name)
 
   let perform_berkeley_migration t ~batch_size ~genesis_ledger ~network
-      ~source_archive_uri ~source_blocks_bucket ~target_archive_uri =
+      ~source_archive_uri ~source_blocks_bucket ~target_archive_uri
+      ~fork_block_hash =
     Berkeley_migration.of_context (run_context t)
     |> Berkeley_migration.run ~batch_size ~genesis_ledger ~source_archive_uri
-         ~source_blocks_bucket ~target_archive_uri ~network
+         ~source_blocks_bucket ~target_archive_uri ~network ~fork_block_hash
 
   let run_migration_replayer t ~archive_uri ~input_config ~interval_checkpoint
       ~output_ledger =
@@ -118,7 +119,7 @@ module HardForkSteps = struct
         let query_db = Mina_caqti.query pool in
         query_db ~f:(fun db -> Sql.Mainnet.max_state_hash db)
 
-  let get_latest_state_hash uri =
+  let get_latest_canonical_state_hash uri =
     let open Deferred.Let_syntax in
     let mainnet_pool = Caqti_async.connect_pool ~max_size:128 uri in
 
@@ -129,7 +130,8 @@ module HardForkSteps = struct
     | Ok mainnet_pool ->
         let query_mainnet_db = Mina_caqti.query mainnet_pool in
         let%bind maybe_slot =
-          query_mainnet_db ~f:(fun db -> Sql.Mainnet.latest_state_hash db)
+          query_mainnet_db ~f:(fun db ->
+              Sql.Mainnet.latest_canonical_state_hash db )
         in
         Deferred.return maybe_slot
 
@@ -241,33 +243,6 @@ module HardForkSteps = struct
     Util.run_cmd_exn "." "rm"
       [ "-f"; Printf.sprintf "%s/%s-checkpoint*.json" t.working_dir prefix ]
 
-  let replayer_output_to_fork_config ~replayer_output ~state_hash
-      ~source_archive_uri ~fork_config_path =
-    let replayer_output = Replayer.Output.of_json_file_exn replayer_output in
-    let%bind blockchain_length =
-      get_migration_end_slot_for_state_hash source_archive_uri state_hash
-    in
-    let%bind global_slot_since_genesis =
-      blockchain_length_for_state_hash source_archive_uri state_hash
-    in
-
-    let fork =
-      Runtime_config.Fork_config.
-        { state_hash; blockchain_length : int; global_slot_since_genesis }
-    in
-
-    let proof = Runtime_config.Proof_keys.make ~fork () in
-    let ledger = replayer_output.target_genesis_ledger in
-
-    return
-      ( match ledger with
-      | None ->
-          failwith "empty ledger in replayer output"
-      | Some ledger ->
-          Runtime_config.make ~proof ~ledger ()
-          |> Runtime_config.to_yojson
-          |> Yojson.Safe.to_file fork_config_path )
-
   let assert_no_replayer_migration_checkpoint_on_pending_blocks root =
     let len = gather_replayer_migration_checkpoint_files root |> List.length in
     if len > 0 then
@@ -291,7 +266,7 @@ module HardForkSteps = struct
            ; workdir
            ; volume =
                Printf.sprintf "%s:%s" (Filename.realpath t.working_dir) workdir
-           ; network = "hardfork"
+           ; network = "host"
            } )
     in
 
@@ -314,7 +289,7 @@ module HardForkSteps = struct
            { image = t.env.reference.docker
            ; workdir
            ; volume = Printf.sprintf "%s:%s" host_volume workdir
-           ; network = "hardfork"
+           ; network = "host"
            } )
     in
 
@@ -351,7 +326,7 @@ module HardForkSteps = struct
   let build_mainnet_database t ~num_blocks =
     let%bind conn_str_mainnet_source_db = import_genesis_mainnet_dump t in
     let%bind blocks =
-      download_mainnet_precomputed_blocks t ~from:2 ~num_blocks
+      download_mainnet_precomputed_blocks t ~from:1 ~num_blocks
     in
     let%bind _ =
       archive_mainnet_precomputed_blocks t blocks conn_str_mainnet_source_db

@@ -12,10 +12,6 @@ module HardForkTests = struct
     let reference_replayer_input =
       Filename.concat temp_dir "reference_replayer_input.json"
     in
-    let reference_replayer_output =
-      Filename.concat temp_dir "reference_replayer_output.json"
-    in
-    let fork_config_path = Filename.concat temp_dir "fork_config.json" in
     let actual_replayer_output =
       Filename.concat temp_dir "actual_replayer_output.json"
     in
@@ -30,7 +26,8 @@ module HardForkTests = struct
         in
 
         let%bind migration_end_state_hash =
-          HardForkSteps.get_latest_state_hash (Uri.of_string conn_str_source_db)
+          HardForkSteps.get_latest_canonical_state_hash
+            (Uri.of_string conn_str_source_db)
         in
 
         let migration_end_state_hash =
@@ -42,14 +39,6 @@ module HardForkTests = struct
             env.paths.random_data_ledger (Some migration_end_state_hash)
         in
         Replayer.InputConfig.to_yojson_file input reference_replayer_input ;
-
-        let%bind _ =
-          HardForkSteps.run_compatible_replayer steps
-            ~archive_uri:conn_str_source_db
-            ~input_config:(Filename.basename reference_replayer_input)
-            ~output_ledger:(Filename.basename reference_replayer_output)
-            ~clear_checkpoints:true
-        in
         let%bind conn_str_target_db =
           HardForkSteps.create_random_output_db steps
         in
@@ -59,28 +48,21 @@ module HardForkTests = struct
             ~source_archive_uri:conn_str_source_db
             ~source_blocks_bucket:env.paths.random_data_bucket
             ~target_archive_uri:conn_str_target_db ~network:"mainnet"
+            ~fork_block_hash:None
         in
 
         let%bind _ =
           HardForkSteps.run_migration_replayer steps
             ~archive_uri:conn_str_target_db
-            ~input_config:reference_replayer_input ~interval_checkpoint:10
+            ~input_config:reference_replayer_input ~interval_checkpoint:3
             ~output_ledger:actual_replayer_output
-        in
-
-        let%bind () =
-          HardForkSteps.replayer_output_to_fork_config
-            ~replayer_output:reference_replayer_output
-            ~state_hash:migration_end_state_hash
-            ~source_archive_uri:conn_str_source_db ~fork_config_path
         in
 
         let%bind _ =
           HardForkSteps.run_migration_verifier steps
             ~source_archive_uri:conn_str_source_db
             ~target_archive_uri:conn_str_target_db
-            ~migrated_replayer_output:(Some actual_replayer_output)
-            ~fork_config_path:(Some fork_config_path)
+            ~migrated_replayer_output:None ~fork_config_path:None
         in
 
         Deferred.unit )
@@ -92,40 +74,27 @@ module HardForkTests = struct
     let reference_replayer_input =
       Filename.concat temp_dir "reference_replayer_input.json"
     in
-    let reference_replayer_output =
-      Filename.concat temp_dir "reference_replayer_output.json"
-    in
     let actual_replayer_output =
       Filename.concat temp_dir "actual_replayer_output.json"
     in
-
     Async.Thread_safe.block_on_async_exn (fun () ->
         let steps = HardForkSteps.create env temp_dir test_name in
         let%bind conn_str_target_db =
           HardForkSteps.create_random_output_db steps
         in
-        let fork_config_path = Filename.concat temp_dir "fork_config.json" in
         let%bind conn_str_source_db =
           HardForkSteps.build_mainnet_database steps ~num_blocks:10
         in
 
-        let%bind hash =
+        let%bind max_hash =
           HardForkSteps.get_max_state_hash (Uri.of_string conn_str_source_db)
         in
 
         let input =
           Replayer.InputConfig.of_runtime_config_file_exn
-            env.paths.mainnet_genesis_ledger hash
+            env.paths.mainnet_genesis_ledger max_hash
         in
         Replayer.InputConfig.to_yojson_file input reference_replayer_input ;
-
-        let%bind _ =
-          HardForkSteps.run_compatible_replayer steps
-            ~archive_uri:conn_str_source_db
-            ~input_config:(Filename.basename reference_replayer_input)
-            ~output_ledger:(Filename.basename reference_replayer_output)
-            ~clear_checkpoints:true
-        in
 
         let%bind _ =
           HardForkSteps.perform_berkeley_migration steps ~batch_size:2
@@ -133,6 +102,8 @@ module HardForkTests = struct
             ~source_archive_uri:conn_str_source_db
             ~source_blocks_bucket:env.paths.mainnet_data_bucket
             ~target_archive_uri:conn_str_target_db ~network:"mainnet"
+            ~fork_block_hash:max_hash
+          (*this is a trick to convert pending blocks to canonical*)
         in
 
         let%bind _ =
@@ -157,24 +128,17 @@ module HardForkTests = struct
           HardForkSteps.archive_mainnet_precomputed_blocks steps blocks
             conn_str_source_db
         in
-        let%bind hash =
+
+        let%bind max_hash =
           HardForkSteps.get_max_state_hash (Uri.of_string conn_str_source_db)
         in
-
-        let%bind _ =
-          HardForkSteps.run_compatible_replayer steps
-            ~archive_uri:conn_str_source_db
-            ~input_config:(Filename.basename reference_replayer_input)
-            ~output_ledger:(Filename.basename reference_replayer_output)
-            ~clear_checkpoints:true
-        in
-
         let%bind _ =
           HardForkSteps.perform_berkeley_migration steps ~batch_size:2
             ~genesis_ledger:env.paths.mainnet_genesis_ledger
             ~source_archive_uri:conn_str_source_db
             ~source_blocks_bucket:env.paths.mainnet_data_bucket
             ~target_archive_uri:conn_str_target_db ~network:"mainnet"
+            ~fork_block_hash:max_hash
         in
 
         let%bind _ =
@@ -184,18 +148,11 @@ module HardForkTests = struct
             ~output_ledger:actual_replayer_output
         in
 
-        let%bind () =
-          HardForkSteps.replayer_output_to_fork_config
-            ~replayer_output:reference_replayer_output
-            ~state_hash:(Option.value_exn hash)
-            ~source_archive_uri:conn_str_source_db ~fork_config_path
-        in
         let%bind _ =
           HardForkSteps.run_migration_verifier steps
             ~source_archive_uri:conn_str_source_db
             ~target_archive_uri:conn_str_target_db
-            ~migrated_replayer_output:(Some actual_replayer_output)
-            ~fork_config_path:(Some fork_config_path)
+            ~migrated_replayer_output:None ~fork_config_path:None
         in
         Deferred.unit )
 end

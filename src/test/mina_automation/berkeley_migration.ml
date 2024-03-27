@@ -7,7 +7,15 @@ let of_context context =
     ~official_name:"mina-berkeley-migration"
 
 let run t ~batch_size ~genesis_ledger ~source_archive_uri ~source_blocks_bucket
-    ~target_archive_uri ~network =
+    ~target_archive_uri ~network ~(fork_block_hash : string option) =
+  let fork_block_hash_arg =
+    match fork_block_hash with
+    | Some fork_block_hash ->
+        [ "--fork-state-hash"; fork_block_hash ]
+    | None ->
+        []
+  in
+
   let args =
     [ "--batch-size"
     ; string_of_int batch_size
@@ -22,5 +30,7 @@ let run t ~batch_size ~genesis_ledger ~source_archive_uri ~source_blocks_bucket
     ; "--network"
     ; network
     ]
+    @ fork_block_hash_arg
   in
+
   run t ~args
