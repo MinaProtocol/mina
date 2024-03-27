@@ -46,8 +46,8 @@
    "quiet":                      false,
    "initial_balance_fetch_disabled": false,
    "end_conditions": {
-     "create_account":      3,
-     "payment":    5,
+     "create_account":      10,
+     "payment":    20,
      "delegation": 5
    }
  },
@@ -75,7 +75,7 @@
   "initial_balance_fetch_disabled": false,
   "end_conditions": {
     "reconciliation_coverage": {
-      "from_tip": true,
+      "tip": true,
       "coverage": 1.0
     }
   }
