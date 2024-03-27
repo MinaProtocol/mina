@@ -7,6 +7,22 @@ module Hex64 : sig
 
   type t = int64
 
+  (** [to_hex t] converts [t] to its hex-string representation.
+
+      This is a "pure" hexadecimal representation, i.e., it does NOT sport any
+      prefix like 'Ox' or '#x'.
+   *)
+  val to_hex : t -> string
+
+  (** [of_hex s] converts a "pure" hexadecimal string representation into
+      {!type:t}.
+
+      [s] should not contain any prefix information.
+
+      @raise Invalid_argument if the string is not convertible
+   *)
+  val of_hex : string -> t
+
   module Stable : sig
     module V1 : sig
       type nonrec t = t
@@ -17,7 +33,7 @@ module Hex64 : sig
   end
 end
 
-module Make (N : Pickles_types.Vector.Nat_intf) : sig
+module Make (N : Pickles_types.Nat.Intf) : sig
   module A : module type of Pickles_types.Vector.With_length (N)
 
   val length : int
