@@ -325,8 +325,9 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
 
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
     ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
-    ~stream_precomputed_blocks ~keep_precomputed_blocks () =
-  Cli_lib.Stdout_log.setup true Logger.Level.Info ;
+    ~stream_precomputed_blocks ~keep_precomputed_blocks ~log_json ~log_level ()
+    =
+  Cli_lib.Stdout_log.setup log_json log_level ;
   let logger = Logger.create () in
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
@@ -600,7 +601,9 @@ let () =
              ~doc:
                "Keep the precomputed blocks on-disk after the migration is \
                 complete"
-         in
+         and log_json = Cli_lib.Flag.Log.json
+         and log_level = Cli_lib.Flag.Log.level in
          main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
            ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
-           ~stream_precomputed_blocks ~keep_precomputed_blocks )))
+           ~stream_precomputed_blocks ~keep_precomputed_blocks ~log_json
+           ~log_level )))

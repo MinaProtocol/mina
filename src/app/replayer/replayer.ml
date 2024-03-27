@@ -640,8 +640,8 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
 
 let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
     ~continue_on_error ~checkpoint_interval ~checkpoint_output_folder_opt
-    ~checkpoint_file_prefix ~genesis_dir_opt () =
-  Cli_lib.Stdout_log.setup true Logger.Level.Info ;
+    ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level () =
+  Cli_lib.Stdout_log.setup log_json log_level ;
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -1793,7 +1793,8 @@ let () =
            Param.flag "--checkpoint-file-prefix"
              ~doc:"string Checkpoint file prefix (default: 'replayer')"
              Param.(optional_with_default "replayer" string)
-         in
+         and log_json = Cli_lib.Flag.Log.json
+         and log_level = Cli_lib.Flag.Log.level in
          main ~input_file ~output_file_opt ~migration_mode ~archive_uri
            ~checkpoint_interval ~continue_on_error ~checkpoint_output_folder_opt
-           ~checkpoint_file_prefix ~genesis_dir_opt )))
+           ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level )))
