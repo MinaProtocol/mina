@@ -3,7 +3,7 @@ open Mina_base
 
 [@@@warning "-4"]
 
-type count_and_fee = int * Currency.Fee.t [@@deriving sexp, to_yojson]
+type count_and_fee = int * Currency.Fee.t [@@deriving to_yojson]
 
 [@@@warning "+4"]
 
@@ -18,24 +18,24 @@ module Fee_Summable = struct
 end
 
 module Summary = struct
-  [@@@warning "-4"]
+  [@@@warning "-4-32"] (* lens generates unused functions *)
 
   type resources =
     { completed_work : count_and_fee
     ; commands : count_and_fee
     ; coinbase_work_fees : Currency.Fee.t Staged_ledger_diff.At_most_two.t
     }
-  [@@deriving sexp, to_yojson, lens]
+  [@@deriving to_yojson, lens]
 
   [@@@warning "+4"]
 
   type command_constraints =
     { insufficient_work : int; insufficient_space : int }
-  [@@deriving sexp, to_yojson, lens]
+  [@@deriving to_yojson, lens]
 
   type completed_work_constraints =
     { insufficient_fees : int; extra_work : int }
-  [@@deriving sexp, to_yojson, lens]
+  [@@deriving to_yojson, lens]
 
   [@@@warning "-4"]
 
@@ -48,9 +48,9 @@ module Summary = struct
     ; discarded_completed_work : completed_work_constraints
     ; end_resources : resources
     }
-  [@@deriving sexp, to_yojson, lens]
+  [@@deriving to_yojson, lens]
 
-  [@@@warning "+4"]
+  [@@@warning "+4+32"] (* end lens-related warning disabling *)
 
   let coinbase_fees
       (coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t) =
@@ -142,7 +142,7 @@ module Summary = struct
 end
 
 module Detail = struct
-  [@@@warning "-4"]
+  [@@@warning "-4-32"]
 
   type line =
     { reason :
@@ -156,11 +156,11 @@ module Detail = struct
     ; completed_work : count_and_fee
     ; coinbase : Currency.Fee.t Staged_ledger_diff.At_most_two.t
     }
-  [@@deriving sexp, to_yojson, lens]
+  [@@deriving to_yojson, lens]
 
-  [@@@warning "+4"]
+  [@@@warning "+4+32"]
 
-  type t = line list [@@deriving sexp, to_yojson]
+  type t = line list [@@deriving to_yojson]
 
   let init ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
       ~(commands : User_command.Valid.t Sequence.t)
@@ -216,15 +216,13 @@ end
 
 [@@@warning "-4"]
 
-type t = Summary.t * Detail.t [@@deriving sexp, to_yojson]
+type t = Summary.t * Detail.t [@@deriving to_yojson]
 
 [@@@warning "+4"]
 
-type log_list = t list [@@deriving sexp, to_yojson]
+type summary_list = Summary.t list [@@deriving to_yojson]
 
-type summary_list = Summary.t list [@@deriving sexp, to_yojson]
-
-type detail_list = Detail.t list [@@deriving sexp, to_yojson]
+type detail_list = Detail.t list [@@deriving to_yojson]
 
 let init ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
     ~(commands : User_command.Valid.t Sequence.t)
