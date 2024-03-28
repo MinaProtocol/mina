@@ -10,7 +10,9 @@ fi
 
 source ~/.profile
 source ./buildkite/scripts/export-git-env-vars.sh
-
+if [[ ${BUILDKITE_BRANCH} = "prealfaalfa" ]]; then
+    export MINA_BUILD_MAINNET=true
+fi
 ./buildkite/scripts/build-artifact.sh
 
 echo "--- Bundle all packages for Debian ${MINA_DEB_CODENAME}"
