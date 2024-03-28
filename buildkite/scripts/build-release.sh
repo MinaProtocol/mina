@@ -9,6 +9,7 @@ if [[ $1 = "archive_migration" ]] ; then
 fi
 
 source ~/.profile
+[[ "${CI}" ]] && source ./buildkite/scripts/export-git-env-vars.sh
 
 ./buildkite/scripts/build-artifact.sh
 
