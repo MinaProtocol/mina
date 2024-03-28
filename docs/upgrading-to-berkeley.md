@@ -66,7 +66,7 @@ done
 A script is installed (from `./scripts/mina-verify-packaged-fork-config`) that automates this process. If you want to verify that an installed Mina package was generated from the same configuration as the one exported earlier, it is as easy as:
 
 ```
-mina-verify-packaged-fork-config fork_config.json /tmp/mina-verification
+mina-verify-packaged-fork-config (mainnet|devnet) fork_config.json /tmp/mina-verification
 ```
 
 Many of the script inputs are environment variables that default to the locations used by the debs. If you are building from source, inspect the script, determine what you need to change, and then run it.
