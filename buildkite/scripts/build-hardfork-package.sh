@@ -40,7 +40,7 @@ sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth"
 
 case "${NETWORK_NAME}" in
   mainnet)
-    MINA_BUILD_MAINNET=1 ./buildkite/scripts/build-artifact.sh
+    MINA_BUILD_MAINNET=true ./buildkite/scripts/build-artifact.sh
     ;;
   *)
     ./buildkite/scripts/build-artifact.sh

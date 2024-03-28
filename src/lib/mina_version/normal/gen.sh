@@ -9,7 +9,6 @@ root="${MINA_ROOT-$(git rev-parse --show-toplevel || echo ../../../../../..)}"
 pushd "$root" > /dev/null
   id="${MINA_COMMIT_SHA1-$(git rev-parse --verify HEAD || echo "<unknown>")}"
   commit_id_short="$(printf "%s" "$id" | cut -c1-8)"
-  if [[ -e .git ]] && ! git diff --quiet; then id="[DIRTY]$id"; fi
   commit_date="${MINA_COMMIT_DATE-$(git show HEAD -s --format="%cI" || echo "<unknown>")}"
 
   mina_submodule=$(git submodule status | grep "mina" || true)
@@ -20,7 +19,6 @@ pushd "$root" > /dev/null
   fi
     marlin_commit_id="${MARLIN_COMMIT_ID-$(git rev-parse --verify HEAD || echo "<unknown>")}"
     marlin_commit_id_short="$(printf '%s' "$marlin_commit_id" | cut -c1-8)"
-    if [[ -e .git ]] && ! git diff --quiet; then marlin_commit_id="[DIRTY]$marlin_commit_id"; fi
     marlin_commit_date="${MARLIN_COMMIT_DATE-$(git show HEAD -s --format="%cI" || echo "<unknown>")}"
   popd > /dev/null
 popd > /dev/null
