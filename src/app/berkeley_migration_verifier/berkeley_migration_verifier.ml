@@ -3,6 +3,7 @@
 open Async
 open Yojson.Basic.Util
 open Core
+open Mina_base
 
 module Check = struct
   type t = Ok | Error of string list
@@ -10,8 +11,6 @@ module Check = struct
   let ok = Ok
 
   let err error = Error [ error ]
-
-  let errors errors = if List.is_empty errors then Ok else Error errors
 end
 
 let exit_code = ref 0
@@ -110,7 +109,6 @@ let all_accounts_referred_in_commands_are_recorded migrated_pool ~work_dir =
     query_migrated_db ~f:(fun db ->
         Sql.Berkeley.dump_accounts_accessed_to_csv db account_accessed )
   in
-
   diff_files user_and_internal_cmds account_accessed
 
 let accounts_created_table_is_correct migrated_pool mainnet_pool ~work_dir =
@@ -255,84 +253,27 @@ let compare_internal_commands migrated_pool mainnet_pool ~work_dir =
     query_mainnet_db ~f:(fun db ->
         Sql.Mainnet.dump_internal_commands db internal_commands_main )
   in
-
   diff_files internal_commands_berk internal_commands_main
 
-module CommonAccountElement = struct
-  type t =
-    { pk : string
-    ; balance : string
-    ; delegate : string
-    ; receipt_chain_hash : string
-    ; voting_for : string
-    ; nonce : string
-    }
-
-  let of_yojson_node json_item =
-    { pk = member "pk" json_item |> to_string
-    ; balance = member "balance" json_item |> to_string
-    ; delegate = member "delegate" json_item |> to_string
-    ; receipt_chain_hash = member "receipt_chain_hash" json_item |> to_string
-    ; voting_for = member "voting_for" json_item |> to_string
-    ; nonce =
-        member "nonce" json_item |> to_string_option
-        |> Option.value ~default:"0"
-    }
-
-  let to_string t =
-    sprintf
-      "{\n\
-      \      pk: %s \n\
-      \      ; balance: %s\n\
-      \      ; delegate: %s\n\
-      \      ; receipt_chain_hash: %s\n\
-      \      ; voting_for: %s\n\
-      \      ; nonce: %s\n\
-      \    }" t.pk t.balance t.delegate t.receipt_chain_hash t.voting_for
-      t.nonce
-
-  let equal_ignore_receipt_chain_hash t1 t2 =
-    String.equal t1.pk t2.pk
-    && String.equal t1.balance t2.balance
-    && String.equal t1.delegate t2.delegate
-    && String.equal t1.voting_for t2.voting_for
-    && String.equal t1.receipt_chain_hash t2.receipt_chain_hash
-    && String.equal t1.nonce t2.nonce
-end
-
-let compare_replayer_and_fork_config ~migrated_replayer_output ~fork_config_file
-    =
-  let replayer_accounts =
+let compare_ledger_hash ~migrated_replayer_output ~fork_config_file =
+  let checkpoint_ledger_hash =
     Yojson.Basic.from_file migrated_replayer_output
-    |> member "genesis_ledger" |> member "accounts" |> to_list
-    |> List.map ~f:CommonAccountElement.of_yojson_node
+    |> member "genesis_ledger" |> member "hash" |> to_string
+    |> Ledger_hash.of_base58_check_exn
   in
-  let forked_accounts =
+  let fork_ledger_hash =
     Yojson.Basic.from_file fork_config_file
-    |> member "ledger" |> member "accounts" |> to_list
-    |> List.map ~f:CommonAccountElement.of_yojson_node
+    |> member "ledger" |> member "hash" |> to_string
+    |> Ledger_hash.of_base58_check_exn
   in
-  match List.zip forked_accounts replayer_accounts with
-  | Unequal_lengths ->
-      Check.err
-        (sprintf "unequal length [%d](%s) vs [%d](%s)"
-           (List.length forked_accounts)
-           fork_config_file
-           (List.length replayer_accounts)
-           migrated_replayer_output )
-  | Ok list ->
-      List.filter_map list ~f:(fun elements ->
-          let left, right = elements in
-          if
-            not
-              (CommonAccountElement.equal_ignore_receipt_chain_hash left right)
-          then
-            Some
-              (sprintf "%s vs %s"
-                 (CommonAccountElement.to_string left)
-                 (CommonAccountElement.to_string right) )
-          else None )
-      |> Check.errors
+  if Ledger_hash.equal checkpoint_ledger_hash fork_ledger_hash then Check.ok
+  else
+    Check.err
+      (sprintf
+         "Ledger hash computed from checkpoint file %s is different from \
+          ledger hash in fork genesis config %s"
+         (Ledger_hash.to_base58_check checkpoint_ledger_hash)
+         (Ledger_hash.to_base58_check fork_ledger_hash) )
 
 let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
   Async.printf
@@ -510,8 +451,7 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
       |> Test.eval ;
 
       let check =
-        compare_replayer_and_fork_config ~migrated_replayer_output
-          ~fork_config_file
+        compare_ledger_hash ~migrated_replayer_output ~fork_config_file
       in
       Test.of_check check ~name:"Verify fork config vs migrated replayer output"
         ~idx:8 ~prefix:"A10.3" test_count
