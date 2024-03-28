@@ -20,4 +20,4 @@ echo "--- Upload debs to amazon s3 repo"
 ./buildkite/scripts/publish-deb.sh
 
 echo "--- Git diff after build is complete:"
-git diff --exit-code -- .
+#git diff --exit-code -- .

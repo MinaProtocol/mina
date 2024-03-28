@@ -83,7 +83,7 @@ for common troubleshooting steps.
 
 There are three main pieces of Mina documentation:
 
-1. The [https://github.com/o1-labs/docs2)](https://github.com/o1-labs/docs2) repository for the [Mina Protocol](https://docs.minaprotocol.com/) docs website.
+1. The [https://github.com/o1-labs/docs2](https://github.com/o1-labs/docs2) repository for the [Mina Protocol](https://docs.minaprotocol.com/) docs website.
 2. The `README.md` files in various directories explain the contents of that
    directory at a high level: the purpose of the library, design constraints, anything else
    specific to that directory.
