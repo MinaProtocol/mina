@@ -63,7 +63,6 @@ cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILD_DIR}/usr/local/b
 cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILD_DIR}/usr/local/bin/mina-missing-blocks-auditor"
 cp ./default/src/app/replayer/replayer.exe "${BUILD_DIR}/usr/local/bin/mina-replayer"
 cp ./default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILD_DIR}/usr/local/bin/mina-swap-bad-balances"
-cp ../scripts/archive/missing-blocks-guardian.sh "${BUILD_DIR}/usr/local/bin/mina-missing-blocks-guardian"
 chmod --recursive +rx "${BUILD_DIR}/usr/local/bin"
 
 # echo contents of deb
@@ -121,6 +120,8 @@ mkdir -p "${BUILD_DIR}/usr/local/bin"
 pwd
 ls
 cp ./default/src/app/replayer/replayer.exe "${BUILD_DIR}/usr/local/bin/mina-maintenance-replayer"
+cp ../scripts/archive/missing-blocks-guardian.sh "${BUILD_DIR}/usr/local/bin/mina-missing-blocks-guardian"
+
 chmod --recursive +rx "${BUILD_DIR}/usr/local/bin"
 
 # echo contents of deb
