@@ -90,6 +90,16 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
         in
         DockerImage.generateStep archiveSpec,
 
+        -- archive image
+        let archiveSpec = DockerImage.ReleaseSpec::{
+          deps=DebianVersions.dependsOn debVersion,
+          service="mina-archive-maintenance",
+          deb_codename="${DebianVersions.lowerName debVersion}",
+          step_key="archive-maintenance-${DebianVersions.lowerName debVersion}-docker-image"
+        }
+        in
+        DockerImage.generateStep archiveSpec,
+
         -- rosetta image
         let rosettaSpec = DockerImage.ReleaseSpec::{
           service="mina-rosetta",
