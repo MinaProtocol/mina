@@ -426,30 +426,9 @@ let%test_module "test functor on in memory databases" =
                 List.map ~f:snd
                 @@ MT.get_all_accounts_rooted_at_exn mdb (MT.Addr.root ())
               in
-              assert (List.length accounts = List.length retrieved_accounts) ;
+              assert (
+                Stdlib.List.compare_lengths accounts retrieved_accounts = 0 ) ;
               assert (List.equal Account.equal accounts retrieved_accounts) )
-
-      let%test_unit "removing accounts restores Merkle root" =
-        Test.with_instance (fun mdb ->
-            let num_accounts = 5 in
-            let account_ids = Account_id.gen_accounts num_accounts in
-            let balances =
-              Quickcheck.random_value
-                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-            in
-            let accounts =
-              List.map2_exn account_ids balances ~f:Account.create
-            in
-            let merkle_root0 = MT.merkle_root mdb in
-            List.iter accounts ~f:(fun account ->
-                ignore @@ create_new_account_exn mdb account ) ;
-            let merkle_root1 = MT.merkle_root mdb in
-            (* adding accounts should change the Merkle root *)
-            assert (not (Hash.equal merkle_root0 merkle_root1)) ;
-            MT.remove_accounts_exn mdb account_ids ;
-            (* should see original Merkle root after removing the accounts *)
-            let merkle_root2 = MT.merkle_root mdb in
-            assert (Hash.equal merkle_root2 merkle_root0) )
 
       let%test_unit "fold over account balances" =
         Test.with_instance (fun mdb ->
@@ -461,7 +440,7 @@ let%test_module "test functor on in memory databases" =
             in
             let total =
               List.fold balances ~init:0 ~f:(fun accum balance ->
-                  Balance.to_int balance + accum )
+                  Balance.to_nanomina_int balance + accum )
             in
             let accounts =
               List.map2_exn account_ids balances ~f:Account.create
@@ -470,7 +449,7 @@ let%test_module "test functor on in memory databases" =
                 ignore @@ create_new_account_exn mdb account ) ;
             let retrieved_total =
               MT.foldi mdb ~init:0 ~f:(fun _addr total account ->
-                  Balance.to_int (Account.balance account) + total )
+                  Balance.to_nanomina_int (Account.balance account) + total )
             in
             assert (Int.equal retrieved_total total) )
 

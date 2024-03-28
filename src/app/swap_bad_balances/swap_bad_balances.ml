@@ -30,7 +30,7 @@ let main ~archive_uri ~state_hash ~sequence_no () =
               sequence_no )
           ~item:"receiver balance ids"
       in
-      if List.length receiver_balance_ids <> 2 then (
+      if Mina_stdlib.List.Length.Compare.(receiver_balance_ids <> 2) then (
         [%log fatal]
           "Expected two receiver balance ids, one for each fee transfer" ;
         Core_kernel.exit 1 ) ;

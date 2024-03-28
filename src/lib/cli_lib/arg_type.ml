@@ -4,7 +4,7 @@ open Signature_lib
 let validate_int16 x =
   let max_port = 1 lsl 16 in
   if 0 <= x && x < max_port then Ok x
-  else Or_error.errorf !"Port not between 0 and %d" max_port
+  else Or_error.errorf "Port not between 0 and %d" max_port
 
 let int16 =
   Command.Arg_type.map Command.Param.int
@@ -73,14 +73,15 @@ let peer : Host_and_port.t Command.Arg_type.t =
   Command.Arg_type.create (fun s -> Host_and_port.of_string s)
 
 let global_slot =
-  Command.Arg_type.map Command.Param.int ~f:Mina_numbers.Global_slot.of_int
+  Command.Arg_type.map Command.Param.int
+    ~f:Mina_numbers.Global_slot_since_genesis.of_int
 
 let txn_fee =
-  Command.Arg_type.map Command.Param.string ~f:Currency.Fee.of_formatted_string
+  Command.Arg_type.map Command.Param.string ~f:Currency.Fee.of_mina_string_exn
 
 let txn_amount =
   Command.Arg_type.map Command.Param.string
-    ~f:Currency.Amount.of_formatted_string
+    ~f:Currency.Amount.of_mina_string_exn
 
 let txn_nonce =
   let open Mina_base in
@@ -111,10 +112,11 @@ let log_level =
 
 let user_command =
   Command.Arg_type.create (fun s ->
-      try Mina_base.Signed_command.of_base58_check_exn s
-      with e ->
-        Error.tag (Error.of_exn e) ~tag:"Couldn't decode transaction id"
-        |> Error.raise )
+      match Mina_base.Signed_command.of_base64 s with
+      | Ok s ->
+          s
+      | Error err ->
+          Error.tag err ~tag:"Couldn't decode transaction id" |> Error.raise )
 
 module Work_selection_method = struct
   [%%versioned

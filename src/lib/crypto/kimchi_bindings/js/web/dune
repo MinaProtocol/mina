@@ -1,0 +1,34 @@
+(library
+ (name web_backend)
+ (public_name bindings_js.web_backend)
+ (js_of_ocaml
+  (flags
+   (:include flags.sexp))
+  (javascript_files web_backend.js))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version js_of_ocaml-ppx)))
+
+(rule
+ (targets
+  plonk_wasm_bg.wasm.d.ts
+  plonk_wasm_bg.wasm
+  plonk_wasm.d.ts
+  plonk_wasm.js
+  flags.sexp)
+ (deps
+  ../../wasm/Cargo.toml
+  ../../wasm/Cargo.lock
+  (source_tree ../../wasm/src)
+  (source_tree ../../wasm/.cargo/config)
+  (source_tree ../../../proof-systems))
+ (locks /cargo-lock) ; lock for rustup
+ (action
+  (progn
+   (run chmod -R +w ../../wasm .)
+   (setenv
+    CARGO_TARGET_DIR
+    "%{read:../../../kimchi_bindings/stubs/dune-build-root}/cargo_kimchi_wasm"
+    (run ./build.sh))
+   (write-file flags.sexp "()"))))

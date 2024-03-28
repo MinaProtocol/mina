@@ -6,7 +6,7 @@ module Stable = struct
     type t =
       { trust : float
       ; trust_last_updated : Core.Time.Stable.V1.t
-      ; banned_until_opt : Core.Time.Stable.V1.t Core_kernel.Option.Stable.V1.t
+      ; banned_until_opt : Core.Time.Stable.V1.t option
       }
 
     let to_latest = Fn.id

@@ -15,8 +15,13 @@ module Thread : sig
   val dump_thread_graph : unit -> bytes
 
   module Fiber : sig
-    type t = Thread.Fiber.t = { id : int; parent : t option; thread : Thread.t }
+    type t = Thread.Fiber.t =
+      { id : int; parent : t option; thread : Thread.t; key : string list }
+
+    val key : t -> string list
   end
+
+  val iter_fibers : f:(Fiber.t -> unit) -> unit
 end
 
 module Plugins : module type of Plugins
@@ -28,3 +33,5 @@ val background_thread : string -> (unit -> unit Deferred.t) -> unit
 val thread : string -> (unit -> 'a Deferred.t) -> 'a Deferred.t
 
 val sync_thread : string -> (unit -> 'a) -> 'a
+
+val local_storage_id : string list Type_equal.Id.t

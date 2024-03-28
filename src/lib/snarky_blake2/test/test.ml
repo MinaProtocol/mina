@@ -9,12 +9,11 @@ let%test_module "blake2-equality test" =
 
     let checked_to_unchecked typ1 typ2 checked input =
       let open Impl in
-      let (), checked_result =
+      let checked_result =
         run_and_check
           (let%bind input = exists typ1 ~compute:(As_prover.return input) in
            let%map result = checked input in
            As_prover.read typ2 result )
-          ()
         |> Or_error.ok_exn
       in
       checked_result
@@ -37,14 +36,14 @@ let%test_module "blake2-equality test" =
 
     let%test_unit "constraint count" =
       assert (
-        Impl.constraint_count
-          (let open Impl in
-          let%bind bits =
-            exists
-              (Typ.array ~length:512 Boolean.typ_unchecked)
-              ~compute:(As_prover.return (Array.create ~len:512 true))
-          in
-          blake2s bits)
+        Impl.constraint_count (fun () ->
+            let open Impl in
+            let%bind bits =
+              exists
+                (Typ.array ~length:512 Boolean.typ_unchecked)
+                ~compute:(As_prover.return (Array.create ~len:512 true))
+            in
+            blake2s bits )
         <= 21278 )
 
     let%test_unit "blake2 equality" =

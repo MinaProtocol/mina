@@ -14,7 +14,7 @@
 )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_deriving.std))
- (inline_tests))
+ (inline_tests (flags -verbose -show-counts)))
 
 ;; interpolator is made separately available because
 ;; filter depends on re2, which binds to C++ code,
@@ -32,4 +32,4 @@
 )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_deriving.std))
- (inline_tests))
+ (inline_tests (flags -verbose -show-counts)))

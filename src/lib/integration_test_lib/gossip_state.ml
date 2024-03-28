@@ -75,7 +75,7 @@ let add (gossip_state : t) (type a)
     ((gossip_message : a), (dir : Event_type.Gossip.Direction.t)) : unit =
   let set : a Set.t By_direction.t =
     match event_type with
-    | Block_gossip ->
+    | Event_type.Block_gossip ->
         gossip_state.blocks
     | Transactions_gossip ->
         gossip_state.transactions

@@ -1,0 +1,21 @@
+(library
+ (name mina_base_test_helpers)
+ (libraries
+  ;; opam libraries
+  base
+  base.caml
+  core_kernel
+  integers
+  sexplib0
+  yojson
+  ;; local libraries
+  currency
+  mina_base
+  mina_base.import
+  mina_numbers
+  monad_lib
+  signature_lib)
+ (preprocess
+  (pps ppx_base ppx_let ppx_assert ppx_version))
+ (instrumentation
+  (backend bisect_ppx)))

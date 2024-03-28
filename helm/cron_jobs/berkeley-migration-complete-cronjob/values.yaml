@@ -1,0 +1,91 @@
+image: &image
+  repository: gcr.io/o1labs-192920/mina-archive-berkeley-archive-migration
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "2.0.0berkeley-rc1-dkijania-migration-package-c89d556-bullseye"
+
+gcloudKeyfileRef: ref+gcpsecrets://o1labs-192920/blockDataUploadGcpKeyfile
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+podAnnotations: {}
+podLabels: {}
+
+resources: &resources
+  limits:
+    memory: 32.0Gi
+    cpu: 20.0
+  requests:
+    memory: 1Gi
+    cpu: 1
+
+# Additional volumes on the output Deployment definition.
+volumes: []
+# - name: foo
+#   secret:
+#     secretName: mysecret
+#     optional: false
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts: []
+# - name: foo
+#   mountPath: "/etc/foo"
+#   readOnly: true
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+annotations: {}
+
+replayers:
+- name: migration
+  schedule: "0 2 * * *"
+  image: *image
+  resources: *resources
+  script:
+    secretName: migration
+    scriptName: migration.sh
+  env:
+  - name: DUMPS_BUCKET
+    value: mina-archive-dumps
+  - name: DUMPS_PREFIX_FROM
+    value: migration-source-o1labs-hf-test-pre-fork-run-2
+  - name: SCHEMA_NAME_FROM
+    value: archive
+  - name: SCHEMA_NAME_TO
+    value: archive_migrated
+  - name: DUMPS_PREFIX_TO
+    value: o1labs-hf-test-pre-fork-run-2-migrated
+  - name: PRECOMP_BLOCKS_BUCKET
+    value: mina_network_block_data
+  - name: NETWORK_NAME
+    value: o1labs-hf-test-pre-fork-run-2
+  - name: MIGRATION_LOG
+    value: o1labs-hf-test-pre-fork-run-2_migration
+  - name: INITIAL_RUN
+    value: false
+  - name: GENESIS_LEDGER_URI
+    value: "https://storage.googleapis.com/o1labs-gitops-infrastructure/o1labs-hf-test-pre-fork-run-2/o1labs-hf-test-pre-fork-run-2-ledger.json"
+  - name: CREATE_SCRIPT_URI
+    value: "https://raw.githubusercontent.com/MinaProtocol/mina/berkeley/src/app/archive"
+  - name: CHECKPOINT_BUCKET
+    value: archive-migration-checkpoints
+  - name: CHECKPOINT_PREFIX
+    value: o1labs-hf-test-pre-fork-run-2-replayer-migration
+#  - name: FORK_STATE_HASH
+#    value: ""
+  - name: PRECOMPUTED_BLOCKS_DOWNLOAD_BATCH_SIZE
+    value: 5
+# - name: test-run
+#   schedule: "0 2 * * *"
+#   image: *image
+#   resources: *resources
+#   script:
+#     secretName: test-run
+#     scriptName: test-run.sh
+

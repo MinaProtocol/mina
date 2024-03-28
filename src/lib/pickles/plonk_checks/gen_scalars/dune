@@ -1,0 +1,16 @@
+(executable
+ (name gen_scalars)
+ (modes native)
+ (link_flags (-linkall))
+ (libraries
+   ;; opam libraries
+   core_kernel
+   stdio
+   base
+   ;; local libraries
+   kimchi_bindings
+   kimchi_types
+   pasta_bindings
+)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version)))

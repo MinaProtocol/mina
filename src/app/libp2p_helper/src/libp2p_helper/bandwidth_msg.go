@@ -17,7 +17,7 @@ func fromBandwidthInfoReq(req ipcRpcRequest) (rpcRequest, error) {
 	return BandwidthInfoReq(i), err
 }
 
-func (msg BandwidthInfoReq) handle(app *app, seqno uint64) *capnp.Message {
+func (msg BandwidthInfoReq) handle(app *app, seqno uint64) (*capnp.Message, func()) {
 	if app.P2p == nil {
 		return mkRpcRespError(seqno, needsConfigure())
 	}

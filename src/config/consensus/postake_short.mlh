@@ -4,3 +4,4 @@
 [%%define slots_per_epoch 576]
 [%%define slots_per_sub_window 2]
 [%%define sub_windows_per_window 3]
+[%%define grace_period_slots 180]

@@ -67,6 +67,8 @@ module GADT = struct
   module type S = sig
     include Database_intf
 
+    module Some_key : Key_intf.Some_key_intf with type 'a unwrapped_t := 'a g
+
     module T : sig
       type nonrec t = t
     end
@@ -79,6 +81,8 @@ module GADT = struct
 
     val get_raw : t -> key:'a g -> Bigstring.t option
 
+    val get_batch : t -> keys:Some_key.t list -> Some_key.with_value option list
+
     module Batch : sig
       include Database_intf with type 'a g := 'a g
 
@@ -86,17 +90,7 @@ module GADT = struct
     end
   end
 
-  module type Key_intf = sig
-    type 'a t
-
-    val to_string : 'a t -> string
-
-    val binable_key_type : 'a t -> 'a t Bin_prot.Type_class.t
-
-    val binable_data_type : 'a t -> 'a Bin_prot.Type_class.t
-  end
-
-  module Make (Key : Key_intf) : S with type 'a g := 'a Key.t = struct
+  module Make (Key : Key_intf.S) : S with type 'a g := 'a Key.t = struct
     let bin_key_dump (key : 'a Key.t) =
       Bin_prot.Utils.bin_dump (Key.binable_key_type key).writer key
 
@@ -132,10 +126,27 @@ module GADT = struct
     let get_raw t ~(key : 'a Key.t) = Database.get t ~key:(bin_key_dump key)
 
     let get t ~(key : 'a Key.t) =
-      let open Option.Let_syntax in
-      let%map serialized_value = Database.get t ~key:(bin_key_dump key) in
-      let bin_key = Key.binable_data_type key in
-      bin_key.reader.read serialized_value ~pos_ref:(ref 0)
+      let%map.Option serialized_value =
+        Database.get t ~key:(bin_key_dump key)
+      in
+      let bin_data = Key.binable_data_type key in
+      bin_data.reader.read serialized_value ~pos_ref:(ref 0)
+
+    module Some_key = Key_intf.Some_key (Key)
+
+    let get_batch t ~keys =
+      let open Some_key in
+      let skeys = List.map keys ~f:(fun (Some_key k) -> bin_key_dump k) in
+      let serialized_value_opts = Database.get_batch ~keys:skeys t in
+      let f (Some_key k) =
+        Option.map ~f:(fun serialized_value ->
+            let bin_data = Key.binable_data_type k in
+            let value =
+              bin_data.reader.read serialized_value ~pos_ref:(ref 0)
+            in
+            Some_key_value (k, value) )
+      in
+      List.map2_exn keys serialized_value_opts ~f
 
     module Batch = struct
       include Make_Serializer (Database.Batch)

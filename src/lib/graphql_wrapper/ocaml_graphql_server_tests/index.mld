@@ -1,0 +1,7 @@
+{0 Graphql_wrapper tests}
+
+This folder contains tests from version 0.13.0 of the [ocaml-graphql-server] library that are used to test the [graphql_wrapper] library (since the wrapper preserves an interface similar to the wrapped library).
+
+The tests are modified to use ppx_inline_test instead of alcotest.
+
+The original tests are distributed under the MIT licence and can be found here: https://github.com/andreas/ocaml-graphql-server/tree/0.13.0/graphql/test.

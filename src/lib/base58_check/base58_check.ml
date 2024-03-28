@@ -1,5 +1,8 @@
 (* base58_check.ml : implement Base58Check algorithm
    see: https://www.oreilly.com/library/view/mastering-bitcoin-2nd/9781491954379/ch04.html#base58
+   also: https://datatracker.ietf.org/doc/html/draft-msporny-base58-03
+
+   the algorithm is modified for long strings, to apply encoding on chunks of the input
 *)
 
 open Core_kernel
@@ -30,11 +33,7 @@ struct
 
   let version_string = String.make 1 version_byte
 
-  (* the Base58 library's "convert" routine, used for both
-      encoding and decoding, runs in time O(n^2); limit
-      length of input when encoding to avoid bottlenecks
-  *)
-  let max_encodable_length = 8192
+  let max_length = 8192
 
   let compute_checksum payload =
     (* double-hash using SHA256 *)
@@ -47,10 +46,15 @@ struct
     let second_hash = get ctx3 |> to_raw_string in
     second_hash |> String.sub ~pos:0 ~len:checksum_len
 
+  (* we don't name this with _exn, we don't expect to raise an exception
+     if we do, we're encoding types that shouldn't be encoded
+  *)
   let encode payload =
     let len = String.length payload in
-    if len > max_encodable_length then
-      failwith (sprintf "Base58_check.encode: input too long (%d bytes)" len) ;
+    if len > max_length then
+      failwithf
+        "String is too long (%d bytes) to Base58Check-encode, max length is %d"
+        len max_length () ;
     let checksum = compute_checksum payload in
     let bytes = version_string ^ payload ^ checksum |> Bytes.of_string in
     B58.encode mina_alphabet bytes |> Bytes.to_string

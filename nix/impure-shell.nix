@@ -12,12 +12,15 @@ pkgs.mkShell {
     postgresql.out
     sodium-static.out
     sodium-static.dev
-    go
+    go_1_18
     capnproto
     zlib.dev
     bzip2.dev
     ncurses
-    cargo
+    rustup
+    wasm-pack
+    lmdb
+    rosetta-cli
   ];
   OPAMSWITCH = "mina";
   shellHook = ''

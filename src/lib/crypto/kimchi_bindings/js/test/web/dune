@@ -1,0 +1,18 @@
+(executable
+ (name web_test)
+ (modes js)
+ (js_of_ocaml
+  (flags +toplevel.js +dynlink.js))
+ (libraries
+  bindings_js_test
+  kimchi_bindings
+  js_of_ocaml
+  bindings_js
+  web_backend
+  logger.fake
+  pasta_bindings.backend.none)
+ (link_deps ../../web/plonk_wasm.js ../../web/plonk_wasm_bg.wasm)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version js_of_ocaml-ppx)))

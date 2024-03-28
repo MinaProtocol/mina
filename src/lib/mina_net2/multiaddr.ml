@@ -22,6 +22,12 @@ let to_peer t =
   | _ ->
       None
 
+let of_peer ({ host; libp2p_port; peer_id } : Peer.t) =
+  (* assume host is IPv4 address *)
+  sprintf "/ip4/%s/tcp/%d/p2p/%s"
+    (Unix.Inet_addr.to_string host)
+    libp2p_port peer_id
+
 let valid_as_peer t =
   match String.split ~on:'/' t with
   | [ ""; protocol; _; "tcp"; _; "p2p"; _ ]

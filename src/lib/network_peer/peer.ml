@@ -7,7 +7,8 @@ module Id = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = string [@@deriving compare, hash, equal, sexp]
+      type t = Bounded_types.String.Stable.V1.t
+      [@@deriving compare, hash, equal, sexp]
 
       let to_latest = Fn.id
     end
@@ -20,13 +21,40 @@ module Id = struct
   let unsafe_of_string (s : string) : t = s
 end
 
+module Inet_addr = struct
+  [%%versioned_binable
+  module Stable = struct
+    module V1 = struct
+      type t = Unix.Inet_addr.t [@@deriving sexp, compare, hash]
+
+      let to_latest = Fn.id
+
+      let of_yojson = function
+        | `String s ->
+            Ok (Unix.Inet_addr.of_string s)
+        | _ ->
+            Error "expected string"
+
+      let to_yojson ip_addr = `String (Unix.Inet_addr.to_string ip_addr)
+
+      include Bounded_types.String.Of_stringable (struct
+        type nonrec t = t
+
+        [%%define_locally Unix.Inet_addr.(to_string, of_string)]
+      end)
+    end
+  end]
+
+  [%%define_locally Stable.V1.(to_yojson, of_yojson)]
+end
+
 [%%versioned
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
   module V1 = struct
     type t =
-      { host : Core.Unix.Inet_addr.Stable.V1.t (* IPv4 or IPv6 address *)
+      { host : Inet_addr.Stable.V1.t (* IPv4 or IPv6 address *)
       ; libp2p_port : int (* TCP *)
       ; peer_id : Id.Stable.V1.t
       }
@@ -115,7 +143,11 @@ module Display = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = { host : string; libp2p_port : int; peer_id : string }
+      type t =
+        { host : Bounded_types.String.Stable.V1.t
+        ; libp2p_port : int
+        ; peer_id : Bounded_types.String.Stable.V1.t
+        }
       [@@deriving yojson, version, sexp, fields]
 
       let to_latest = Fn.id

@@ -6,12 +6,16 @@ open Snark_params.Tick
 [%%versioned:
 module Stable : sig
   module V1 : sig
+    [@@@with_all_version_tags]
+
     type t = Field.t * Inner_curve.Scalar.t
     [@@deriving sexp, equal, compare, hash]
 
     include Codable.S with type t := t
   end
 end]
+
+val gen : t Quickcheck.Generator.t
 
 include Codable.S with type t := t
 
@@ -21,7 +25,7 @@ type var = Field.Var.t * Inner_curve.Scalar.var
 
 [%%endif]
 
-include Codable.Base58_check_base_intf with type t := t
+include Codable.Base58_check_intf with type t := t
 
 val dummy : t
 

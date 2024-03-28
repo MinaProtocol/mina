@@ -69,7 +69,7 @@ locals {
 
 
 module "ci_testnet" {
-  source    = "../../modules/o1-testnet"
+  source = "../../modules/o1-testnet"
 
   artifact_path = var.ci_artifact_path
 
@@ -108,21 +108,23 @@ module "ci_testnet" {
 
   snark_coordinators = [
     {
-      snark_worker_replicas   = var.snark_worker_count
-      snark_worker_fee        = "0.025"
-      snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
-      snark_coordinators_host_port  = 10401
+      snark_coordinator_name       = "ci-net"
+      snark_worker_replicas        = var.snark_worker_count
+      snark_worker_fee             = "0.025"
+      snark_worker_public_key      = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
+      snark_coordinators_host_port = 10401
+      persist_working_dir          = false
     }
   ]
 
-  whales= [
-    for i in range(var.whale_count):{
+  whales = [
+    for i in range(var.whale_count) : {
       duplicates = 1
     }
   ]
-  
-  fishes= [
-    for i in range(var.fish_count):{
+
+  fishes = [
+    for i in range(var.fish_count) : {
       duplicates = 1
     }
   ]

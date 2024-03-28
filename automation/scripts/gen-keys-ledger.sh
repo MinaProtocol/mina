@@ -1,4 +1,5 @@
 #! /bin/bash
+MINA_DAEMON_IMAGE="minaprotocol/mina-daemon:1.3.2beta2-release-2.0.0-6f9d956-focal-berkeley"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -70,7 +71,7 @@ done
 echo "generating seeds' libp2p keys"
 mkdir "${KEYSDIR}/libp2p-keys"
 for i in $(seq 1 $SEEDS); do
-    mina advanced generate-libp2p-keypair --privkey-path "${KEYSDIR}/libp2p-keys/seed-${i}" 2>/dev/null
+    mina libp2p generate-keypair --privkey-path "${KEYSDIR}/libp2p-keys/seed-${i}" 2>/dev/null
 done
 
 

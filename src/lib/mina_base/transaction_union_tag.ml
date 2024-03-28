@@ -10,17 +10,11 @@ open Snark_params.Tick
 
 [%%else]
 
-open Import
+open Mina_base_import
 
 [%%endif]
 
-type t =
-  | Payment
-  | Stake_delegation
-  | Create_account
-  | Mint_tokens
-  | Fee_transfer
-  | Coinbase
+type t = Payment | Stake_delegation | Fee_transfer | Coinbase
 [@@deriving enum, equal, sexp]
 
 let to_string = function
@@ -28,10 +22,6 @@ let to_string = function
       "payment"
   | Stake_delegation ->
       "delegation"
-  | Create_account ->
-      "create_account"
-  | Mint_tokens ->
-      "mint_tokens"
   | Fee_transfer ->
       "fee-transfer"
   | Coinbase ->
@@ -54,17 +44,13 @@ module Bits = struct
 
   let stake_delegation = of_t Stake_delegation
 
-  let create_account = of_t Create_account
-
-  let mint_tokens = of_t Mint_tokens
-
   let fee_transfer = of_t Fee_transfer
 
   let coinbase = of_t Coinbase
 
   let to_bits (b1, b2, b3) = [ b1; b2; b3 ]
 
-  let to_input t = Random_oracle.Input.bitstring (to_bits t)
+  let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 
   [%%ifdef consensus_mechanism]
 
@@ -84,8 +70,6 @@ module Unpacked = struct
     type 'bool t =
       { is_payment : 'bool
       ; is_stake_delegation : 'bool
-      ; is_create_account : 'bool
-      ; is_mint_tokens : 'bool
       ; is_fee_transfer : 'bool
       ; is_coinbase : 'bool
       ; is_user_command : 'bool
@@ -96,7 +80,7 @@ module Unpacked = struct
 
     let typ (bool : ('bool_var, 'bool) Typ.t) : ('bool_var t, 'bool t) Typ.t =
       Typ.of_hlistable
-        [ bool; bool; bool; bool; bool; bool; bool ]
+        [ bool; bool; bool; bool; bool ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
@@ -109,8 +93,6 @@ module Unpacked = struct
   let empty : t =
     { is_payment = false
     ; is_stake_delegation = false
-    ; is_create_account = false
-    ; is_mint_tokens = false
     ; is_fee_transfer = false
     ; is_coinbase = false
     ; is_user_command = false
@@ -120,11 +102,6 @@ module Unpacked = struct
 
   let stake_delegation =
     { empty with is_stake_delegation = true; is_user_command = true }
-
-  let create_account =
-    { empty with is_create_account = true; is_user_command = true }
-
-  let mint_tokens = { empty with is_mint_tokens = true; is_user_command = true }
 
   let fee_transfer =
     { empty with is_fee_transfer = true; is_user_command = false }
@@ -136,8 +113,6 @@ module Unpacked = struct
       List.Assoc.find ~equal:Bits.equal
         [ (Bits.payment, payment)
         ; (Bits.stake_delegation, stake_delegation)
-        ; (Bits.create_account, create_account)
-        ; (Bits.mint_tokens, mint_tokens)
         ; (Bits.fee_transfer, fee_transfer)
         ; (Bits.coinbase, coinbase)
         ]
@@ -153,8 +128,6 @@ module Unpacked = struct
       List.Assoc.find ~equal
         [ (payment, Bits.payment)
         ; (stake_delegation, Bits.stake_delegation)
-        ; (create_account, Bits.create_account)
-        ; (mint_tokens, Bits.mint_tokens)
         ; (fee_transfer, Bits.fee_transfer)
         ; (coinbase, Bits.coinbase)
         ]
@@ -172,8 +145,6 @@ module Unpacked = struct
   let to_bits_var
       ({ is_payment
        ; is_stake_delegation
-       ; is_create_account
-       ; is_mint_tokens
        ; is_fee_transfer
        ; is_coinbase
        ; is_user_command = _
@@ -191,8 +162,6 @@ module Unpacked = struct
         ~init:Field.(Var.(constant zero, constant zero, constant zero))
         [ (Bits.payment, is_payment)
         ; (Bits.stake_delegation, is_stake_delegation)
-        ; (Bits.create_account, is_create_account)
-        ; (Bits.mint_tokens, is_mint_tokens)
         ; (Bits.fee_transfer, is_fee_transfer)
         ; (Bits.coinbase, is_coinbase)
         ]
@@ -206,40 +175,35 @@ module Unpacked = struct
     Boolean.Unsafe.(of_cvar b1, of_cvar b2, of_cvar b3)
 
   let typ : (var, t) Typ.t =
-    let base_typ = Poly.typ Boolean.typ in
-    { base_typ with
-      check =
-        (fun ( { is_payment
-               ; is_stake_delegation
-               ; is_create_account
-               ; is_mint_tokens
-               ; is_fee_transfer
-               ; is_coinbase
-               ; is_user_command
-               } as t ) ->
-          let open Checked.Let_syntax in
-          let%bind () = base_typ.check t in
-          let%bind () =
-            [%with_label "Only one tag is set"]
-              (Boolean.Assert.exactly_one
-                 [ is_payment
+    let (Typ base_typ) = Poly.typ Boolean.typ in
+    Typ
+      { base_typ with
+        check =
+          (fun ( { is_payment
                  ; is_stake_delegation
-                 ; is_create_account
-                 ; is_mint_tokens
                  ; is_fee_transfer
                  ; is_coinbase
-                 ] )
-          in
-          [%with_label "User command flag is correctly set"]
-            (Boolean.Assert.exactly_one
-               [ is_user_command; is_fee_transfer; is_coinbase ] ) )
-    }
+                 ; is_user_command
+                 } as t ) ->
+            let open Checked.Let_syntax in
+            let%bind () = base_typ.check t in
+            let%bind () =
+              [%with_label_ "Only one tag is set"] (fun () ->
+                  Boolean.Assert.exactly_one
+                    [ is_payment
+                    ; is_stake_delegation
+                    ; is_fee_transfer
+                    ; is_coinbase
+                    ] )
+            in
+            [%with_label_ "User command flag is correctly set"] (fun () ->
+                Boolean.Assert.exactly_one
+                  [ is_user_command; is_fee_transfer; is_coinbase ] ) )
+      }
 
   let constant
       ({ is_payment
        ; is_stake_delegation
-       ; is_create_account
-       ; is_mint_tokens
        ; is_fee_transfer
        ; is_coinbase
        ; is_user_command
@@ -247,8 +211,6 @@ module Unpacked = struct
         t ) : var =
     { is_payment = Boolean.var_of_value is_payment
     ; is_stake_delegation = Boolean.var_of_value is_stake_delegation
-    ; is_create_account = Boolean.var_of_value is_create_account
-    ; is_mint_tokens = Boolean.var_of_value is_mint_tokens
     ; is_fee_transfer = Boolean.var_of_value is_fee_transfer
     ; is_coinbase = Boolean.var_of_value is_coinbase
     ; is_user_command = Boolean.var_of_value is_user_command
@@ -259,10 +221,6 @@ module Unpacked = struct
   let is_stake_delegation ({ is_stake_delegation; _ } : var) =
     is_stake_delegation
 
-  let is_create_account ({ is_create_account; _ } : var) = is_create_account
-
-  let is_mint_tokens ({ is_mint_tokens; _ } : var) = is_mint_tokens
-
   let is_fee_transfer ({ is_fee_transfer; _ } : var) = is_fee_transfer
 
   let is_coinbase ({ is_coinbase; _ } : var) = is_coinbase
@@ -271,7 +229,7 @@ module Unpacked = struct
 
   let to_bits t = Bits.to_bits (to_bits_var t)
 
-  let to_input t = Random_oracle.Input.bitstring (to_bits t)
+  let to_input_legacy t = Random_oracle.Input.Legacy.bitstring (to_bits t)
 
   [%%endif]
 end
@@ -281,10 +239,6 @@ let unpacked_t_of_t = function
       Unpacked.payment
   | Stake_delegation ->
       Unpacked.stake_delegation
-  | Create_account ->
-      Unpacked.create_account
-  | Mint_tokens ->
-      Unpacked.mint_tokens
   | Fee_transfer ->
       Unpacked.fee_transfer
   | Coinbase ->
@@ -292,7 +246,7 @@ let unpacked_t_of_t = function
 
 let to_bits tag = Bits.to_bits (Unpacked.to_bits_t (unpacked_t_of_t tag))
 
-let to_input tag = Random_oracle.Input.bitstring (to_bits tag)
+let to_input_legacy tag = Random_oracle.Input.Legacy.bitstring (to_bits tag)
 
 [%%ifdef consensus_mechanism]
 
@@ -301,8 +255,6 @@ let t_of_unpacked_t (unpacked : Unpacked.t) : t =
     List.Assoc.find ~equal:Unpacked.equal
       [ (Unpacked.payment, Payment)
       ; (Unpacked.stake_delegation, Stake_delegation)
-      ; (Unpacked.create_account, Create_account)
-      ; (Unpacked.mint_tokens, Mint_tokens)
       ; (Unpacked.fee_transfer, Fee_transfer)
       ; (Unpacked.coinbase, Coinbase)
       ]
@@ -343,12 +295,6 @@ let%test_module "predicates" =
     let%test_unit "is_stake_delegation" =
       test_predicate Unpacked.is_stake_delegation (equal Stake_delegation)
 
-    let%test_unit "is_create_account" =
-      test_predicate Unpacked.is_create_account (equal Create_account)
-
-    let%test_unit "is_mint_tokens" =
-      test_predicate Unpacked.is_mint_tokens (equal Mint_tokens)
-
     let%test_unit "is_fee_transfer" =
       test_predicate Unpacked.is_fee_transfer (equal Fee_transfer)
 
@@ -357,7 +303,7 @@ let%test_module "predicates" =
 
     let%test_unit "is_user_command" =
       test_predicate Unpacked.is_user_command
-        (one_of [ Payment; Stake_delegation; Create_account; Mint_tokens ])
+        (one_of [ Payment; Stake_delegation ])
 
     let%test_unit "not_user_command" =
       test_predicate

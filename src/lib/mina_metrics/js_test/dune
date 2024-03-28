@@ -1,6 +1,6 @@
 (executable
  (name mina_metrics_js_test)
- (libraries mina_metrics mina_metrics.none)
+ (libraries mina_metrics mina_metrics.none logger.fake)
  (modes js)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))

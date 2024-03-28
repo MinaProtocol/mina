@@ -1,3 +1,36 @@
+(* register_event.ml -- deriver for structured events *)
+
+(* When declaring new structured events, add the deriver.
+
+   The constructor for the type can be nullary, or have a record argument
+
+   The registration can specify a `msg` for the event, which can be any
+      string-valued expression, or omit it (in which case the `msg` is
+      computed from the constructor and any argument)
+
+   A `msg` may refer to a record label `f` in the record argument with
+   the syntax `$f`. Such references are checked at compile-time. For a label
+   of type `M.t`, the function `M.to_yojson` must exist.
+
+   Examples:
+
+     -- nullary constructor, no msg
+     type Structured_log_events.t += Foo
+      [@@deriving register_event]
+
+     -- nullary constructor, with string constant msg
+     type Structured_log_events.t += Bar
+      [@@deriving register_event { msg = "got a Bar!" }]
+
+     -- record, with computed msg
+     type Structured_log_events.t += Quux
+      [@@deriving register_event { msg = sprintf "compiled at: %0.02f" (Unix.gettimeofday ()) }]
+
+     -- record, with msg referring to record labels
+     type Structured_log_events.t += Baz of { n : int; s : string; p : M.t }
+      [@@deriving register_event { msg = "n = $n, s = $s, and p = $p" } ]
+*)
+
 open Core_kernel
 open Ppxlib
 
@@ -11,7 +44,7 @@ let checked_interpolations_statically ~loc msg label_names =
       (* check that every interpolation point $foo in msg has a matching label;
          OK to have extra labels not mentioned in message
       *)
-      match Logproc_lib.Interpolator.parse s with
+      match Interpolator_lib.Interpolator.parse s with
       | Error err ->
           Location.raise_errorf ~loc
             "Encountered an error while parsing the msg: %s" err
@@ -168,11 +201,12 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                       ~f:(fun { pld_name = { txt = name; _ }; pld_type; _ } acc ->
                         Ppx_deriving_yojson.wrap_runtime
                         @@ [%expr
+                             let module Result = Core_kernel.Result in
                              match
                                Core_kernel.Map.find args_list [%e estring name]
                              with
                              | Some [%p pvar name] ->
-                                 Core_kernel.Result.bind
+                                 Result.bind
                                    ([%e
                                       of_yojson
                                         ~path:(split_path @ [ ctor; name ])
@@ -180,7 +214,7 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                                       [%e evar name] )
                                    ~f:(fun [%p pvar name] -> [%e acc])
                              | None ->
-                                 Core_kernel.Result.fail
+                                 Result.fail
                                    [%e
                                      estring
                                        (sprintf "%s, parse: missing argument %s"

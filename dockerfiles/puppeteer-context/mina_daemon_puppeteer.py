@@ -89,7 +89,8 @@ def start_daemon():
     mina_process = subprocess.Popen(
         ['mina'] + daemon_args,
         stdout=f,
-        stderr=subprocess.STDOUT
+        stderr=subprocess.STDOUT,
+        cwd="/root/.mina-config"
     )
   log("touching /root/daemon-active" )
   Path('daemon-active').touch()

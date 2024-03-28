@@ -1,0 +1,21 @@
+(library
+ (name itn_logger)
+ (public_name itn_logger)
+ (libraries
+   ;; opam libraries
+   base
+   base.caml
+   bin_prot.shape
+   async
+   async.async_rpc
+   async_kernel
+   async_rpc_kernel
+   async_unix
+   core
+   core_kernel
+   yojson
+   ;; local libraries
+   mina_compile_config
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_mina ppx_jane)))

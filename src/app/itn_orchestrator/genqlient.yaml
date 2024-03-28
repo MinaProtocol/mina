@@ -1,0 +1,24 @@
+# Default genqlient config; for full documentation see:
+# https://github.com/Khan/genqlient/blob/main/docs/genqlient.yaml
+schema: schema.graphql
+operations:
+- genqlient.graphql
+generated: src/graphql_generated.go
+package: itn_orchestrator
+bindings:
+  CurrencyAmount:
+    type: uint64
+    marshaler: itn_json_types.MarshalUint64
+    unmarshaler: itn_json_types.UnmarshalUint64
+  Fee:
+    type: uint64
+    marshaler: itn_json_types.MarshalUint64
+    unmarshaler: itn_json_types.UnmarshalUint64
+  PublicKey:
+    type: itn_json_types.MinaPublicKey
+  PrivateKey:
+    type: itn_json_types.MinaPrivateKey
+  UInt16:
+    type: uint16
+    marshaler: itn_json_types.MarshalUint16
+    unmarshaler: itn_json_types.UnmarshalUint16

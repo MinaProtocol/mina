@@ -29,6 +29,6 @@ for f in "$@"; do
   if [[ "$cmd" == "test" ]]; then
     ( cd "src/$f" && "$GO" "$cmd" )
   else
-    ( cd "src/$f" && "$GO" "$cmd" -o "$RESULT_BIN/$f" )
+    ( cd "src/$f" && "$GO" "$cmd" -buildvcs=false -o "$RESULT_BIN/$f" )
   fi
 done

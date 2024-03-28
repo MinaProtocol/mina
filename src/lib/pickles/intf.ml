@@ -126,7 +126,7 @@ module Evals = struct
   module type S = sig
     type n
 
-    val n : n Vector.nat
+    val n : n Nat.t
 
     include Binable.S1 with type 'a t = ('a, n) Vector.t
 
@@ -205,12 +205,12 @@ module Sponge (Impl : Snarky_backendless.Snark_intf.Run) = struct
       with module Field := Field
        and module State := Sponge.State
        and type input := Field.t
-       and type digest := length:int -> Boolean.var list * Field.t
+       and type digest := Field.t
        and type t = Field.t Sponge.t
 end
 
 module type Inputs_base = sig
-  module Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit
+  module Impl : Snarky_backendless.Snark_intf.Run
 
   module Inner_curve : sig
     open Impl
@@ -267,7 +267,7 @@ module Wrap_main_inputs = struct
   end
 end
 
-module Pairing_main_inputs = struct
+module Step_main_inputs = struct
   module type S = sig
     include Inputs_base
 
@@ -278,7 +278,7 @@ module Pairing_main_inputs = struct
            and module State := Sponge_lib.State
            and type input :=
             [ `Field of Impl.Field.t | `Bits of Impl.Boolean.var list ]
-           and type digest := length:int -> Impl.Boolean.var list * Impl.Field.t
+           and type digest := Impl.Field.t
            and type t = Impl.Field.t Sponge_lib.t
 
       val squeeze_field : t -> Impl.Field.t

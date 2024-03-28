@@ -20,10 +20,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { account_name = "node-a-key"; balance = "1000"; timing = Untimed }
-        ; { account_name = "node-b-key"; balance = "1000"; timing = Untimed }
-        ; { account_name = "node-c-key"; balance = "0"; timing = Untimed }
-        ]
+        (let open Test_account in
+        [ Test_account.create ~account_name:"node-a-key" ~balance:"1000" ()
+        ; create ~account_name:"node-b-key" ~balance:"1000" ()
+        ; create ~account_name:"node-c-key" ~balance:"0" ()
+        ])
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -68,6 +69,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          wait_for t
            ( Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]
            |> Wait_condition.with_timeouts
+                ~soft_timeout:(Network_time_span.Slots 3)
                 ~hard_timeout:
                   (Network_time_span.Literal
                      (Time.Span.of_ms (15. *. 60. *. 1000.)) ) ) )
@@ -87,8 +89,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let sender_bp = node_b in
          let%bind sender_pub_key = pub_key_of_node sender_bp in
          let num_payments = 3 in
-         let amount = Currency.Amount.of_formatted_string "10" in
-         let fee = Currency.Fee.of_formatted_string "1" in
+         let amount = Currency.Amount.of_mina_string_exn "10" in
+         let fee = Currency.Fee.of_mina_string_exn "1" in
          [%log info] "chain_reliability_test: will now send %d payments"
            num_payments ;
          let%bind hashlist =

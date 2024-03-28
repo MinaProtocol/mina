@@ -1,6 +1,8 @@
 module Input = Random_oracle_input
 
 module type S = sig
+  type input
+
   module State : sig
     type _ t
   end
@@ -17,6 +19,10 @@ module type S = sig
     val to_bits : ?length:int -> t -> bool list
   end
 
+  val state_size : int
+
+  val rate : int
+
   val initial_state : field State.t
 
   val update : state:field State.t -> field array -> field State.t
@@ -25,5 +31,5 @@ module type S = sig
 
   val hash : ?init:field_constant State.t -> field array -> Digest.t
 
-  val pack_input : (field, bool) Input.t -> field array
+  val pack_input : input -> field array
 end

@@ -3,4 +3,4 @@
  (public_name merkle_list_verifier)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_compare))
- (libraries core_kernel non_empty_list))
+ (libraries core_kernel mina_stdlib))

@@ -1,10 +1,12 @@
 open Core_kernel
 open Async_kernel
 open Mina_base
+open Mina_transaction
+module Ledger = Mina_ledger.Ledger
 
 [%%versioned:
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type t [@@deriving sexp]
 
     val hash : t -> Staged_ledger_hash.Aux_hash.t
@@ -16,10 +18,11 @@ module Transaction_with_witness : sig
   type t =
     { transaction_with_info : Ledger.Transaction_applied.t
     ; state_hash : State_hash.t * State_body_hash.t
-    ; state_view : Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
     ; statement : Transaction_snark.Statement.t
     ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
-    ; ledger_witness : Sparse_ledger.t
+    ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
+    ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
+    ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     }
   [@@deriving sexp]
 end
@@ -46,12 +49,14 @@ module Make_statement_scanner (Verifier : sig
   val verify :
        verifier:t
     -> Ledger_proof_with_sok_message.t list
-    -> bool Deferred.Or_error.t
+    -> unit Or_error.t Deferred.Or_error.t
 end) : sig
   val scan_statement :
-       t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> statement_check:[ `Full | `Partial ]
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> t
+    -> statement_check:
+         [ `Full of State_hash.t -> Mina_state.Protocol_state.value Or_error.t
+         | `Partial ]
     -> verifier:Verifier.t
     -> ( Transaction_snark.Statement.t
        , [ `Empty | `Error of Error.t ] )
@@ -60,37 +65,44 @@ end) : sig
   val check_invariants :
        t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> statement_check:[ `Full | `Partial ]
+    -> statement_check:
+         [ `Full of State_hash.t -> Mina_state.Protocol_state.value Or_error.t
+         | `Partial ]
     -> verifier:Verifier.t
     -> error_prefix:string
-    -> ledger_hash_end:Frozen_ledger_hash.t
-    -> ledger_hash_begin:Frozen_ledger_hash.t option
-    -> next_available_token_begin:Token_id.t option
-    -> next_available_token_end:Token_id.t
+    -> last_proof_statement:Transaction_snark.Statement.t option
+    -> registers_end:Mina_state.Registers.Value.t
     -> (unit, Error.t) Deferred.Result.t
 end
 
-(*All the transactions with undos*)
-module Staged_undos : sig
-  type t
+module Transactions_ordered : sig
+  module Poly : sig
+    type 'a t =
+      { first_pass : 'a list
+      ; second_pass : 'a list
+      ; previous_incomplete : 'a list
+      ; current_incomplete : 'a list
+      }
+    [@@deriving sexp, to_yojson]
+  end
 
-  val apply :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> t
-    -> Ledger.t
-    -> unit Or_error.t
+  type t = Transaction_with_witness.t Poly.t [@@deriving sexp, to_yojson]
 end
-
-val staged_undos : t -> Staged_undos.t
 
 val empty :
   constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
 
 val fill_work_and_enqueue_transactions :
      t
+  -> logger:Logger.t
   -> Transaction_with_witness.t list
   -> Transaction_snark_work.t list
-  -> ( (Ledger_proof.t * (Transaction.t With_status.t * State_hash.t) list)
+  -> ( ( Ledger_proof.t
+       * ( Transaction.t With_status.t
+         * State_hash.t
+         * Mina_numbers.Global_slot_since_genesis.t )
+         Transactions_ordered.Poly.t
+         list )
        option
      * t )
      Or_error.t
@@ -98,26 +110,119 @@ val fill_work_and_enqueue_transactions :
 val latest_ledger_proof :
      t
   -> ( Ledger_proof_with_sok_message.t
-     * (Transaction.t With_status.t * State_hash.t) list )
+     * ( Transaction.t With_status.t
+       * State_hash.t
+       * Mina_numbers.Global_slot_since_genesis.t )
+       Transactions_ordered.Poly.t
+       list )
      option
+
+(** Apply transactions coorresponding to the last emitted proof based on the
+    two-pass system- first pass includes legacy transactions and zkapp payments
+    and the second pass includes account updates. [ignore_incomplete] is to
+    ignore the account updates that were not completed in a single scan state
+    tree corresponding to a proof. Set this to true when applying transactions
+    to get the snarked ledger corresponding to a proof.
+    *)
+val get_snarked_ledger_sync :
+     ledger:Ledger.t
+  -> get_protocol_state:
+       (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
+  -> apply_first_pass:
+       (   global_slot:Mina_numbers.Global_slot_since_genesis.t
+        -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+        -> Ledger.t
+        -> Transaction.t
+        -> Ledger.Transaction_partially_applied.t Or_error.t )
+  -> apply_second_pass:
+       (   Ledger.t
+        -> Ledger.Transaction_partially_applied.t
+        -> Ledger.Transaction_applied.t Or_error.t )
+  -> apply_first_pass_sparse_ledger:
+       (   global_slot:Mina_numbers.Global_slot_since_genesis.t
+        -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+        -> Mina_ledger.Sparse_ledger.t
+        -> Mina_transaction.Transaction.t
+        -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
+           Or_error.t )
+  -> t
+  -> unit Or_error.t
+
+val get_snarked_ledger_async :
+     ?async_batch_size:int
+  -> ledger:Ledger.t
+  -> get_protocol_state:
+       (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
+  -> apply_first_pass:
+       (   global_slot:Mina_numbers.Global_slot_since_genesis.t
+        -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+        -> Ledger.t
+        -> Transaction.t
+        -> Ledger.Transaction_partially_applied.t Or_error.t )
+  -> apply_second_pass:
+       (   Ledger.t
+        -> Ledger.Transaction_partially_applied.t
+        -> Ledger.Transaction_applied.t Or_error.t )
+  -> apply_first_pass_sparse_ledger:
+       (   global_slot:Mina_numbers.Global_slot_since_genesis.t
+        -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+        -> Mina_ledger.Sparse_ledger.t
+        -> Mina_transaction.Transaction.t
+        -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
+           Or_error.t )
+  -> t
+  -> unit Deferred.Or_error.t
+
+(** Apply all the staged transactions to snarked ledger based on the
+    two-pass system to obtain the staged ledger- first pass includes legacy
+    transactions and zkapp payments and the second pass includes account
+    updates.
+    Returns the target first pass ledger hash after all the transactions have
+    been applied
+    *)
+val get_staged_ledger_async :
+     ?async_batch_size:int
+  -> ledger:Ledger.t
+  -> get_protocol_state:
+       (State_hash.t -> Mina_state.Protocol_state.Value.t Or_error.t)
+  -> apply_first_pass:
+       (   global_slot:Mina_numbers.Global_slot_since_genesis.t
+        -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+        -> Ledger.t
+        -> Transaction.t
+        -> Ledger.Transaction_partially_applied.t Or_error.t )
+  -> apply_second_pass:
+       (   Ledger.t
+        -> Ledger.Transaction_partially_applied.t
+        -> Ledger.Transaction_applied.t Or_error.t )
+  -> apply_first_pass_sparse_ledger:
+       (   global_slot:Mina_numbers.Global_slot_since_genesis.t
+        -> txn_state_view:Mina_base.Zkapp_precondition.Protocol_state.View.t
+        -> Mina_ledger.Sparse_ledger.t
+        -> Mina_transaction.Transaction.t
+        -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
+           Or_error.t )
+  -> t
+  -> [ `First_pass_ledger_hash of Ledger_hash.t ] Deferred.Or_error.t
 
 val free_space : t -> int
 
 val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
 
+(* a 0 index means next-to-latest tree *)
+val base_jobs_on_earlier_tree :
+  t -> index:int -> Transaction_with_witness.t list
+
 val hash : t -> Staged_ledger_hash.Aux_hash.t
 
-val target_merkle_root : t -> Frozen_ledger_hash.t option
-
-(** All the transactions in the order in which they were applied*)
-val staged_transactions : t -> Transaction.t With_status.t list
-
-(** All the transactions with parent protocol state of the block in which they were included in the order in which they were applied*)
-val staged_transactions_with_protocol_states :
+(** All the transactions with hash of the parent block in which they were included in the order in which they were applied*)
+val staged_transactions_with_state_hash :
      t
-  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> (Transaction.t With_status.t * Mina_state.Protocol_state.value) list
-     Or_error.t
+  -> ( Transaction.t With_status.t
+     * State_hash.t
+     * Mina_numbers.Global_slot_since_genesis.t )
+     Transactions_ordered.Poly.t
+     list
 
 (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)
 val partition_if_overflowing : t -> Space_partition.t
@@ -161,10 +266,7 @@ val check_required_protocol_states :
 val all_work_pairs :
      t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> ( Transaction.t
-     , Transaction_witness.t
-     , Ledger_proof.t )
-     Snark_work_lib.Work.Single.Spec.t
+  -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
      list
      Or_error.t

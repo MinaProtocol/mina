@@ -1,11 +1,11 @@
 (* This is temporary until we decide to switch over fully to "super catchup".
 
-   Normal catchup does not maintain enough state on its own to decide whether a long catchup job is in progress. 
+   Normal catchup does not maintain enough state on its own to decide whether a long catchup job is in progress.
    Thus, we have the frontier hold onto a "catchup hash tree" which contains information about which nodes are
    involved in catchup jobs.
 
    Super catchup maintains an explicit tree of blocks that are involved in catchup, which contains enough information
-   to decide whether a long catchup job is in progress, and so we do not need a separate tree of hashes.  
+   to decide whether a long catchup job is in progress, and so we do not need a separate tree of hashes.
 *)
 
 type t = Hash of Catchup_hash_tree.t | Full of Full_catchup_tree.t

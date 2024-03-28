@@ -16,5 +16,5 @@
    logger
 )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_here ppx_let ppx_custom_printf))
+ (preprocess (pps ppx_mina ppx_version ppx_here ppx_let ppx_custom_printf))
  (implements cache_dir))

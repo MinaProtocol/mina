@@ -2,7 +2,12 @@ open Core_kernel
 open Async
 open Rosetta_lib
 
-let router ~graphql_uri ~pool ~logger route body =
+let router ~graphql_uri
+    ~(pool :
+       ( (Caqti_async.connection, [> Caqti_error.connect ]) Caqti_async.Pool.t
+       , [ `App of Errors.t ] )
+       Deferred.Result.t
+       lazy_t ) ~logger route body =
   let open Deferred.Result.Let_syntax in
   let get_graphql_uri_or_error () =
     match graphql_uri with
@@ -17,21 +22,26 @@ let router ~graphql_uri ~pool ~logger route body =
     |> Deferred.Result.map_error ~f:(function
          | `App e ->
              `App e
-         | `Page_not_found ->
-             `Page_not_found
-         | `Exception exn ->
-             `Exception exn
          | `Connect_failed _e ->
              `App (Errors.create (`Sql "Connect failed"))
          | `Connect_rejected _e ->
              `App (Errors.create (`Sql "Connect rejected"))
          | `Post_connect _e ->
-             `App (Errors.create (`Sql "Post connect error")))
+             `App (Errors.create (`Sql "Post connect error")) )
+  in
+  let with_db' f =
+    Deferred.Result.map_error (with_db f) ~f:(function
+      (* This is unreachable, but the type system doesn't know that *)
+      | `App _ when false ->
+          `Page_not_found
+      | `App _ as x ->
+          x )
   in
   try
     match route with
     | "network" :: tl ->
-        Network.router tl body ~get_graphql_uri_or_error ~logger ~with_db
+        Network.router tl body ~get_graphql_uri_or_error ~logger
+          ~with_db:with_db'
     | "account" :: tl ->
         let%bind graphql_uri = get_graphql_uri_or_error () in
         Account.router tl body ~graphql_uri ~logger ~with_db
@@ -40,9 +50,10 @@ let router ~graphql_uri ~pool ~logger route body =
         Mempool.router tl body ~graphql_uri ~logger
     | "block" :: tl ->
         let%bind graphql_uri = get_graphql_uri_or_error () in
-        Block.router tl body ~graphql_uri ~logger ~with_db
+        Block.router tl body ~graphql_uri ~logger ~with_db:with_db'
     | "construction" :: tl ->
-        Construction.router tl body ~get_graphql_uri_or_error ~logger ~with_db
+        Construction.router tl body ~get_graphql_uri_or_error ~logger
+          ~with_db:with_db'
     | _ ->
         Deferred.return (Error `Page_not_found)
   with exn -> Deferred.return (Error (`Exception exn))
@@ -60,7 +71,7 @@ let pg_log_data ~logger ~pool : unit Deferred.t =
               ~metadata:
                 [ ("num_pg_connections", `String (Int64.to_string num_conns))
                 ; ("num_pg_locks", `String (Int64.to_string num_locks))
-                ])
+                ] )
           pool
       in
       let pg_data_interval =
@@ -207,7 +218,7 @@ let command =
                     "Exception while handling Rosetta server request: $error. \
                      Terminating because environment variable %s is set"
                     env_var ~metadata ;
-                  ignore (exit 1)))
+                  ignore (exit 1) ) )
         (Async.Tcp.Where_to_listen.bind_to All_addresses (On_port port))
         (server_handler ~pool ~graphql_uri ~logger)
     in

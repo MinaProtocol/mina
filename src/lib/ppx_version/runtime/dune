@@ -1,0 +1,11 @@
+(library
+ (name ppx_version_runtime)
+ (public_name ppx_version.runtime)
+ (libraries
+   base
+   core_kernel
+   sexplib0
+   bin_prot
+   bin_prot.shape))
+
+

@@ -5,7 +5,7 @@ open Mina_net2
 (* Only show stdout for failed inline tests. *)
 open Inline_test_quiet_logs
 
-let%test_module "coda network tests" =
+let%test_module "Mina network tests" =
   ( module struct
     let logger = Logger.create ()
 
@@ -19,21 +19,21 @@ let%test_module "coda network tests" =
         create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [ ("name", `String "a") ])
           ~conf_dir:a_tmp ~pids ~on_peer_connected:Fn.ignore
-          ~on_peer_disconnected:Fn.ignore
+          ~on_peer_disconnected:Fn.ignore ()
         >>| Or_error.ok_exn
       in
       let%bind b =
         create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [ ("name", `String "b") ])
           ~conf_dir:b_tmp ~pids ~on_peer_connected:Fn.ignore
-          ~on_peer_disconnected:Fn.ignore
+          ~on_peer_disconnected:Fn.ignore ()
         >>| Or_error.ok_exn
       in
       let%bind c =
         create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [ ("name", `String "c") ])
           ~conf_dir:c_tmp ~pids ~on_peer_connected:Fn.ignore
-          ~on_peer_disconnected:Fn.ignore
+          ~on_peer_disconnected:Fn.ignore ()
         >>| Or_error.ok_exn
       in
       let%bind kp_a = generate_random_keypair a in
@@ -42,7 +42,7 @@ let%test_module "coda network tests" =
       let maddrs = List.map [ "/ip4/127.0.0.1/tcp/0" ] ~f:Multiaddr.of_string in
       let%bind () =
         configure a ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
-          ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+          ~network_id ~peer_exchange:true ~peer_protection_ratio:0.2
           ~direct_peers:[] ~seed_peers:[] ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~max_connections:50 ~min_connections:20
           ~validation_queue_size:150
@@ -63,7 +63,7 @@ let%test_module "coda network tests" =
         "Seed_peer: $peer" ;
       let%bind () =
         configure b ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs
-          ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+          ~network_id ~peer_exchange:true ~peer_protection_ratio:0.2
           ~direct_peers:[] ~seed_peers:[ seed_peer ] ~flooding:false
           ~min_connections:20 ~metrics_port:None ~unsafe_no_trust_ip:true
           ~max_connections:50 ~validation_queue_size:150
@@ -73,7 +73,7 @@ let%test_module "coda network tests" =
         >>| Or_error.ok_exn
       and () =
         configure c ~external_maddr:(List.hd_exn maddrs) ~me:kp_c ~maddrs
-          ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+          ~network_id ~peer_exchange:true ~peer_protection_ratio:0.2
           ~direct_peers:[] ~seed_peers:[ seed_peer ] ~flooding:false
           ~metrics_port:None ~unsafe_no_trust_ip:true ~max_connections:50
           ~min_connections:20 ~validation_queue_size:150

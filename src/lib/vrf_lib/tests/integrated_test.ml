@@ -30,11 +30,11 @@ module Message = struct
 
   type var = Mina_base.State_hash.var t
 
-  let data_spec = Tick.Data_spec.[ Mina_base.State_hash.typ ]
-
   let typ =
-    Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
-      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    Tick.Typ.of_hlistable
+      [ Mina_base.State_hash.typ ]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
 
   let gen =
     let open Quickcheck.Let_syntax in

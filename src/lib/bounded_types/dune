@@ -1,0 +1,9 @@
+(library
+ (name bounded_types)
+ (public_name bounded_types)
+ (instrumentation (backend bisect_ppx))
+ (libraries ppx_version.runtime stdlib base.caml core_kernel bin_prot bin_prot.shape ppx_inline_test.config sexplib0)
+ (inline_tests)
+ (preprocess (pps ppx_jane ppx_mina ppx_deriving_yojson ppx_inline_test))
+ (library_flags -linkall)
+ (synopsis "Put bounds on bin_prot deserializing"))

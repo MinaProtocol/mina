@@ -1,6 +1,5 @@
 (library
  (name precomputed_values)
- (flags -warn-error -22)
  (public_name precomputed_values)
  (libraries
    ;; opam libraries
@@ -16,8 +15,9 @@
    snarky.backendless
    coda_genesis_ledger
    consensus
-   coda_runtime_config
+   mina_runtime_config
    test_genesis_ledger
+   staged_ledger_diff
  )
  (ppx_runtime_libraries base)
  (preprocess

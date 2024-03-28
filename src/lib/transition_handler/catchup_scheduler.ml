@@ -204,6 +204,10 @@ let watch t ~timeout_duration ~cached_transition ~valid_cb =
     |> Mina_block.header |> Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
   in
+  Internal_tracing.with_state_hash hash
+  @@ fun () ->
+  [%log' internal t.logger] "@block_metadata"
+    ~metadata:[ ("previous_state_hash", State_hash.to_yojson parent_hash) ] ;
   Option.value_map valid_cb ~default:() ~f:(fun data ->
       match Hashtbl.add t.validation_callbacks ~key:hash ~data with
       | `Ok ->
@@ -329,7 +333,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None ~pids )
+            ~conf_dir:None ~pids () )
 
     (* cast a breadcrumb into a cached, enveloped, partially validated transition *)
     let downcast_breadcrumb breadcrumb =

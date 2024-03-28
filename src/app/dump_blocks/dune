@@ -1,0 +1,28 @@
+(executable
+ (name dump_blocks)
+ (public_name dump_blocks)
+ (libraries
+   async
+   async_kernel
+   async_unix
+   base
+   block_time
+   bounded_types
+   core
+   core_kernel
+   core_unix.command_unix
+   logger
+   mina_base
+   mina_block
+   mina_state
+   mina_wire_types
+   ppx_inline_test.runner.lib
+   precomputed_values
+   sexplib0
+   transition_frontier
+   transition_frontier_base
+   transition_frontier_full_frontier
+   yojson)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_let ppx_custom_printf))
+ (modes native))

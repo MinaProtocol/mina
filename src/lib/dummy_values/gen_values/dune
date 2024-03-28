@@ -1,5 +1,6 @@
 (executable
  (name gen_values)
+ (link_flags (-linkall))
  (libraries
    ;; opam libraries
    async_unix
