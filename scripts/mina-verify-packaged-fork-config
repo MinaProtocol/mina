@@ -76,9 +76,17 @@ export FORKING_FROM_CONFIG_JSON=${FORKING_FROM_CONFIG_JSON:-$(source_build_fallb
 
 export MINA_LIBP2P_PASS=''
 
+workdir=$3
+mkdir -p "$workdir"
+mkdir -p "$workdir/ledgers"
+mkdir -p "$workdir/ledgers-backup"
+mkdir -p "$workdir/keys"
+chmod 700 "$workdir/keys"
+
 fork_block_state_hash=$(jq -r '.proof.fork.state_hash' "$2")
 fork_block_length=$(jq -r '.proof.fork.blockchain_length' "$2")
 
+# Put the fork block where we want it, fetch it from gcloud if necessary
 if [ ! -e "$PRECOMPUTED_FORK_BLOCK" ]; then
     if [ "$PRECOMPUTED_FORK_BLOCK" = "" ]; then
         "$GSUTIL" cp "gs://mina_network_block_data/$1-$fork_block_length-$fork_block_state_hash.json" "$workdir/precomputed_fork_block.json"
@@ -89,12 +97,6 @@ else
     cp "$PRECOMPUTED_FORK_BLOCK" "$workdir/precomputed_fork_block.json"
 fi
 
-workdir=$3
-mkdir -p "$workdir"
-mkdir -p "$workdir/ledgers"
-mkdir -p "$workdir/ledgers-backup"
-mkdir -p "$workdir/keys"
-chmod 700 "$workdir/keys"
 
 if [ ! -e "$workdir/keys/p2p" ]; then
     "$MINA_EXE" libp2p generate-keypair --privkey-path "$workdir/keys/p2p"
@@ -142,7 +144,7 @@ mv -t /var/lib/coda "$workdir/ledgers-backup"/*
 echo "Performing final comparisons..." >&2
 error=0
 
-result=$(jq --slurpfile hashes "$workdir/hashes.json" --slurpfile a "$workdir/config-substituted.json" --slurpfile b "$PACKAGED_DAEMON_CONFIG" -n '
+result=$(jq --slurpfile block "$workdir/precomputed_fork_block.json" --slurpfile hashes "$workdir/hashes.json" --slurpfile a "$workdir/config-substituted.json" --slurpfile b "$PACKAGED_DAEMON_CONFIG" -n '
   ($a[0].epoch_data.staking.hash == $b[0].epoch_data.staking.hash and
    $a[0].epoch_data.next.hash == $b[0].epoch_data.next.hash and
    $hashes[0].epoch_data.staking.oldhash == $block[0].protocol_state.body.consensus_state.staking_epoch_data.ledger.hash and
