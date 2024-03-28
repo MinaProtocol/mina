@@ -330,7 +330,29 @@ module Ledger = struct
     tar_path
 
   let padded_accounts_from_runtime_config_opt ~logger ~proof_level
-      ~ledger_name_prefix (config : Runtime_config.Ledger.t) =
+      ~ledger_name_prefix ?overwrite_version (config : Runtime_config.Ledger.t)
+      =
+    let patch_accounts_version accounts_with_keys =
+      match overwrite_version with
+      | Some version ->
+          List.map accounts_with_keys ~f:(fun (key, account) ->
+              let patched_account =
+                Mina_base.Account.Poly.
+                  { account with
+                    permissions =
+                      Mina_base.Permissions.Poly.
+                        { account.permissions with
+                          set_verification_key =
+                            ( fst account.permissions.set_verification_key
+                            , version )
+                        }
+                  }
+              in
+              (key, patched_account) )
+      | None ->
+          accounts_with_keys
+    in
+
     let add_genesis_winner_account accounts =
       (* We allow configurations to explicitly override adding the genesis
          winner, so that we can guarantee a certain ledger layout for
@@ -367,7 +389,10 @@ module Ledger = struct
       | Hash ->
           None
       | Accounts accounts ->
-          Some (lazy (add_genesis_winner_account (Accounts.to_full accounts)))
+          Some
+            ( lazy
+              (patch_accounts_version
+                 (add_genesis_winner_account (Accounts.to_full accounts)) ) )
       | Named name -> (
           match Genesis_ledger.fetch_ledger name with
           | Some (module M) ->
@@ -408,12 +433,12 @@ module Ledger = struct
     end) )
 
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      ?(ledger_name_prefix = "genesis_ledger") (config : Runtime_config.Ledger.t)
-      =
+      ?(ledger_name_prefix = "genesis_ledger") ?overwrite_version
+      (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
         let padded_accounts_opt =
           padded_accounts_from_runtime_config_opt ~logger ~proof_level
-            ~ledger_name_prefix config
+            ~ledger_name_prefix ?overwrite_version config
         in
         let open Deferred.Let_syntax in
         let%bind tar_path =
@@ -943,7 +968,7 @@ let print_config ~logger config =
     ~metadata
 
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~proof_level (config : Runtime_config.t) =
+    ~proof_level ?overwrite_version (config : Runtime_config.t) =
   print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
   let genesis_constants = Genesis_constants.compiled in
@@ -1003,6 +1028,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   let%bind genesis_ledger, ledger_config, ledger_file =
     Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+      ?overwrite_version
       (Option.value config.ledger
          ~default:
            { base = Named Mina_compile_config.genesis_ledger
@@ -1037,12 +1063,13 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   (proof_inputs, config)
 
-let init_from_config_file ?genesis_dir ~logger ~proof_level
+let init_from_config_file ?genesis_dir ~logger ~proof_level ?overwrite_version
     (config : Runtime_config.t) :
     (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
   let%map inputs, config =
-    inputs_from_config_file ?genesis_dir ~logger ~proof_level config
+    inputs_from_config_file ?genesis_dir ~logger ~proof_level ?overwrite_version
+      config
   in
   let values = Genesis_proof.create_values_no_proof inputs in
   (values, config)

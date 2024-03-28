@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
-set -o pipefail
+set -eo pipefail
 
 export MINA_LIBP2P_PASS=
 export MINA_PRIVKEY_PASS=
@@ -11,13 +10,16 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 TX_INTERVAL=${TX_INTERVAL:-30s}
 
 # Delay between now and genesis timestamp, in minutes
+# Ignored if GENESIS_TIMESTAMP variable is specified
 DELAY_MIN=${DELAY_MIN:-20}
 
 # Allows to use berkeley ledger when equals to .berkeley
 CONF_SUFFIX=${CONF_SUFFIX:-}
 
-# Allows to specify a specific configuration file
-# Genesis timestamp will be updated before use of configuration file
+# Allows to specify a specific configuration file.
+# If specified, ledger will not be generated.
+# Specified config file is applied the latest and
+# will override settings set by this script.
 CUSTOM_CONF=${CUSTOM_CONF:-}
 
 # Specify slot_tx_end parameter in the config
@@ -78,6 +80,10 @@ fi
 # Check mina command exists
 command -v "$MINA_EXE" >/dev/null || { echo "No 'mina' executable found"; exit 1; }
 
+# Genesis timestamp to use in config
+calculated_timestamp="$( d=$(date +%s); date -u -d @$((d - d % 60 + DELAY_MIN*60)) '+%F %H:%M:%S+00:00' )"
+GENESIS_TIMESTAMP=${GENESIS_TIMESTAMP:-"$calculated_timestamp"}
+
 ##########################################################
 # Generate configuration in localnet/config
 ##########################################################
@@ -108,10 +114,8 @@ if [[ "${NODE_ARGS_2[0]}" == "--discovery-keypair" ]]; then
 fi
 
 if [[ "$CUSTOM_CONF" == "" ]] && [[ ! -f $CONF_DIR/ledger.json ]]; then
-  ( cd $CONF_DIR && "$SCRIPT_DIR/prepare-test-ledger.sh" -c 100000 -b 1000000 $(cat bp.pub) >ledger.json )
+  ( cd $CONF_DIR && "$SCRIPT_DIR/../prepare-test-ledger.sh" -c 100000 -b 1000000 $(cat bp.pub) >ledger.json )
 fi
-
-timestamp="$( d=$(date +%s); date -u -d @$((d - d % 60 + DELAY_MIN*60)) +%FT%H:%M:%S+00:00 )"
 
 if [[ "$SLOT_TX_END" != "" ]]; then
   slot_ends=".daemon.slot_tx_end = $SLOT_TX_END | "
@@ -120,49 +124,41 @@ if [[ "$SLOT_CHAIN_END" != "" ]]; then
   slot_ends="$slot_ends .daemon.slot_chain_end = $SLOT_CHAIN_END | "
 fi
 
-update_config_expr=".genesis.genesis_state_timestamp = \"$timestamp\" | .proof.block_window_duration_ms = ${SLOT}000"
+update_config_expr="$slot_ends .genesis.genesis_state_timestamp = \"$GENESIS_TIMESTAMP\""
 
-if [[ "$CUSTOM_CONF" == "" ]]; then
-  jq --slurpfile accounts $CONF_DIR/ledger.json "$slot_ends .ledger.accounts = \$accounts[0] | $update_config_expr" > $CONF_DIR/daemon.json << EOF
+jq "$update_config_expr" > $CONF_DIR/base.json << EOF
 {
   "genesis": {
-    "genesis_state_timestamp": "",
     "slots_per_epoch": 48,
-    "k": 2,
-    "transaction_capacity": { "log_2": 2 },
+    "k": 10,
     "grace_period_slots": 3
   },
   "proof": {
     "work_delay": 1,
     "level": "full",
-    "sub_windows_per_window": 11,
-    "ledger_depth": 20,
     "transaction_capacity": { "2_to_the": 2 },
-    "coinbase_amount": "720",
-    "supercharged_coinbase_factor": 1,
-    "account_creation_fee": "1"
-  },
-  "ledger": {
-    "name": "localnet",
-    "accounts": []
+    "block_window_duration_ms": ${SLOT}000
   }
 }
 EOF
 
+MAINNET_TO_BERKELEY_EXPR='.ledger.accounts = [.ledger.accounts[] | del(.token_permissions, .permissions.stake) | .token = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf" | .token_symbol = "" | select(.permissions.set_verification_key == "signature").permissions.set_verification_key |= {auth:"signature", txn_version: "1"} ]'
+
+if [[ "$CUSTOM_CONF" == "" ]]; then
+  { echo '{"ledger": {"accounts": '; cat $CONF_DIR/ledger.json; echo '}}'; } > $CONF_DIR/daemon.json
   # Convert ledger to berkeley format
-  jq '.ledger.accounts = [.ledger.accounts[] | del(.token_permissions, .permissions.stake) | .token = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf" | .token_symbol = "" | select(.permissions.set_verification_key == "signature").permissions.set_verification_key |= {auth:"signature", txn_version: "1"} ]' <$CONF_DIR/daemon.json >$CONF_DIR/daemon.berkeley.json
-
+  jq "$MAINNET_TO_BERKELEY_EXPR" <$CONF_DIR/daemon.json >$CONF_DIR/daemon.berkeley.json
 else
-  <"$CUSTOM_CONF" jq "$update_config_expr" > $CONF_DIR/daemon.json
+  cp "$CUSTOM_CONF" $CONF_DIR/daemon.json
 fi
-
 
 ##############################################################
 # Launch two Mina nodes and send transactions on an interval
 ##############################################################
 
-CONF_FILE="$PWD/$CONF_DIR/daemon$CONF_SUFFIX.json"
-COMMON_ARGS=( --config-file "$CONF_FILE" --file-log-level Info --log-level Error --seed )
+COMMON_ARGS=( --file-log-level Info --log-level Error --seed )
+COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/base.json" )
+COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/daemon$CONF_SUFFIX.json" )
 
 if [[ "$GENESIS_LEDGER_DIR" != "" ]]; then
   rm -Rf localnet/genesis_{1,2}
@@ -208,10 +204,12 @@ while ! "$MINA_EXE" ledger export staged-ledger --daemon-port 10311 > localnet/e
 done
 
 i=0
-while kill -0 $sw_pid; do
-  <localnet/exported_staged_ledger.json jq -r '.[].pk' | shuf | while read acc; do
-    if ! kill -0 $sw_pid; then
-      exit 0
+while kill -0 $sw_pid 2>/dev/null; do
+  # shuf's exit code is masked by `true` because we do not expect
+  # all of the output to be read
+  <localnet/exported_staged_ledger.json jq -r '.[].pk' | { shuf || true; } | while read acc; do
+    if ! kill -0 $sw_pid 2>/dev/null; then
+      break
     fi
     "$MINA_EXE" client send-payment --sender "$(cat $CONF_DIR/bp.pub)" --receiver "$acc" \
       --amount 0.1 --memo "payment_$i" --rest-server 10313 2>/dev/null \
