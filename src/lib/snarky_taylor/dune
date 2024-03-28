@@ -13,4 +13,5 @@
    ;; local libraries
    snarky.backendless
    snarky_integer
+   snarky ; TODO needed for nix
    ))

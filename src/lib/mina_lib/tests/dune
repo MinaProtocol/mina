@@ -1,6 +1,5 @@
 (library
  (name mina_lib_tests)
- (public_name mina_lib_tests)
  (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
@@ -43,7 +42,7 @@
    block_time
    pipe_lib
    signature_lib
-   runtime_config
+   mina_runtime_config
    trust_system
    protocol_version
    transition_frontier_base

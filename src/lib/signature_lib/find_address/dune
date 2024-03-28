@@ -7,7 +7,7 @@
    ;; local libraries
    pickles.backend
    pickles
-   kimchi_pasta
+   kimchi_backend.pasta
    kimchi_backend.pasta.basic
    kimchi_backend
    signature_lib

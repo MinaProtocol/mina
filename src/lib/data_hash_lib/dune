@@ -14,7 +14,7 @@
    sexplib0
    base.caml
    ;; local libraries
-   fields_derivers.graphql
+   fields_derivers_graphql
    fields_derivers
    bitstring_lib
    pickles
@@ -29,11 +29,12 @@
    random_oracle
    base58_check
    snarky.intf
-   fields_derivers.zkapps
-   fields_derivers.json
+   fields_derivers_zkapps
+   fields_derivers_json
    test_util
    ppx_version.runtime
    mina_wire_types
+   graphql_basic_scalars ; for a subpackage (hack for nix)
  )
  (preprocessor_deps ../../config.mlh)
  (preprocess

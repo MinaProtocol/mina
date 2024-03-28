@@ -8,6 +8,7 @@
    core_kernel
    async_kernel
    bignum.bigint
+   bignum ; unnecessary, but fixes nix
    ;; local libraries
    fold_lib
 )

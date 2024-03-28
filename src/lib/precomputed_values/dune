@@ -18,6 +18,7 @@
    mina_runtime_config
    test_genesis_ledger
    staged_ledger_diff
+   ppx_util global_signer_private_key ; for a subpackage (hack for nix)
  )
  (ppx_runtime_libraries base)
  (preprocess

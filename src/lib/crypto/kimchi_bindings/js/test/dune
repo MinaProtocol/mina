@@ -14,7 +14,7 @@
    pasta_bindings
    kimchi_backend
    kimchi_backend.common
-   kimchi_pasta
+   kimchi_backend.pasta
    kimchi_backend.pasta.basic
    kimchi_pasta_constraint_system
    mina_metrics.none

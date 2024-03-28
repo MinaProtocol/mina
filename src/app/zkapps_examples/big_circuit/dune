@@ -8,8 +8,8 @@
   currency
   pasta_bindings
   kimchi_backend
-  kimchi_backend_common
-  kimchi_pasta
+  kimchi_backend.common
+  kimchi_backend.pasta
   kimchi_backend.pasta.basic
   kimchi_backend.pasta.constraint_system
   mina_base

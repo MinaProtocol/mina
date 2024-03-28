@@ -37,13 +37,13 @@
    mina_signature_kind
    fold_lib
    snarkette
-   fields_derivers.graphql
+   fields_derivers_graphql
    base58_check
    pickles_base
    pickles_types
    with_hash
    random_oracle_input
-   fields_derivers.json
+   fields_derivers_json
    codable
    blake2
  )

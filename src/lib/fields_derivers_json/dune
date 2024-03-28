@@ -1,6 +1,6 @@
 (library
  (name fields_derivers_json)
- (public_name fields_derivers.json)
+ (public_name fields_derivers_json)
  (libraries
    ;; opam libraries
    yojson

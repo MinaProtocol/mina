@@ -54,7 +54,7 @@
   random_oracle_input
   pickles.composition_types
   pickles.plonk_checks
-  pickles.one_hot_vector
+  one_hot_vector
   snarky_log
   group_map
   snarky_curve

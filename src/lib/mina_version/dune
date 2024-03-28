@@ -5,4 +5,5 @@
  (preprocess (pps ppx_version))
  (public_name mina_version)
  (virtual_modules mina_version)
- (default_implementation mina_version.normal))
+ ; TODO make it "normal", hack for nix
+ (default_implementation mina_version.dummy))

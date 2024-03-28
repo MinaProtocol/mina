@@ -13,8 +13,8 @@
    currency
    genesis_constants
    kimchi_backend
-   kimchi_backend_common
-   kimchi_pasta
+   kimchi_backend.common
+   kimchi_backend.pasta
    mina_base
    mina_base.import
    pasta_bindings

@@ -45,7 +45,7 @@
   random_oracle_input
   pickles.composition_types
   pickles.plonk_checks
-  pickles.one_hot_vector
+  one_hot_vector
   snarky_log
   group_map
   snarky_curve
@@ -55,7 +55,7 @@
   promise
   kimchi_backend.common
   logger
-  internal_tracing.context_logger
+  internal_tracing_context_logger
   ppx_version.runtime
   error_json
   pickles_optional_custom_gates_circuits)

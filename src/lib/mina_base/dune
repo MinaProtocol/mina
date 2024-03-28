@@ -25,7 +25,6 @@
    protocol_version
    mina_wire_types
    run_in_thread
-   kimchi_backend_common
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    mina_base.import
@@ -54,9 +53,9 @@
    crypto_params
    debug_assert
    fold_lib
-   fields_derivers.zkapps
-   fields_derivers.json
-   fields_derivers.graphql
+   fields_derivers_zkapps
+   fields_derivers_json
+   fields_derivers_graphql
    one_or_two
    outside_hash_image
    quickcheck_lib

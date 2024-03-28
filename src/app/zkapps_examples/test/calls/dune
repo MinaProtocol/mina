@@ -17,7 +17,7 @@
    genesis_constants
    pasta_bindings
    kimchi_backend
-   kimchi_pasta
+   kimchi_backend.pasta
    kimchi_backend.pasta.basic
    merkle_ledger
    mina_base

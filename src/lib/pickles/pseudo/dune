@@ -14,7 +14,7 @@
    ;; local libraries
    pickles_types
    pickles.plonk_checks
-   pickles.one_hot_vector
+   one_hot_vector
    snarky.backendless
    pickles_base
  )

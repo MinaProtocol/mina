@@ -15,9 +15,9 @@
   genesis_constants
   codable
   currency
-  fields_derivers.zkapps
-  fields_derivers.json
-  fields_derivers.graphql
+  fields_derivers_zkapps
+  fields_derivers_json
+  fields_derivers_graphql
   kimchi_backend.pasta
   kimchi_backend.pasta.basic
   mina_base

@@ -1,7 +1,10 @@
 (library
  (public_name run_in_thread)
  (name run_in_thread)
- (libraries async_kernel)
+ (libraries async_kernel
+  ; packages below are required for subpackages (hack for nix)
+  async async_unix
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
  (virtual_modules run_in_thread)

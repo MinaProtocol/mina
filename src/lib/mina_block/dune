@@ -51,7 +51,7 @@
    pickles
    pickles.backend
    pasta_bindings
-   kimchi_pasta
+   kimchi_backend.pasta
    kimchi_backend.pasta.basic
    random_oracle
    random_oracle_input

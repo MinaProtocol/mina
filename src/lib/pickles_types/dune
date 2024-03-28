@@ -34,6 +34,7 @@
   ;; local libraries
   kimchi_types
   snarky.backendless
+  snarky ; TODO needed for nix
   tuple_lib
   ppx_version.runtime
   bounded_types

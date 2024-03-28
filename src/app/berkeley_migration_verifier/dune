@@ -39,7 +39,7 @@
    mina_wire_types
    one_or_two
    protocol_version
-   runtime_config
+   mina_runtime_config
    signature_lib
    unsigned_extended
    with_hash

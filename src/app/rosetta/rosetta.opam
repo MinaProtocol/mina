@@ -1,11 +1,22 @@
-opam-version: "1.2"
-version: "0.1"
-build: [
-  ["dune" "build" "--only" "src" "--root" "." "-j" jobs "@install"]
-]
-
+opam-version: "2.0"
 depends: [
+  "dune" {>= "3.3"}
+  "odoc" {with-doc}
   "caqti"
   "caqti-async"
   "caqti-driver-postgresql"
+]
+build: [
+  ["dune" "subst"] {dev}
+  [
+    "dune"
+    "build"
+    "-p"
+    name
+    "-j"
+    jobs
+    "@install"
+    "@runtest" {with-test}
+    "@doc" {with-doc}
+  ]
 ]

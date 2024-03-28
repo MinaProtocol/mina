@@ -9,4 +9,5 @@
    core_kernel
    ;; local libraries
    snarky.backendless
+   snarky ; TODO needed for nix
    group_map))

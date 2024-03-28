@@ -1,7 +1,10 @@
 (library
  (public_name promise)
  (name promise)
- (libraries base async_kernel)
+ (libraries base async_kernel
+  ; packages below are required for subpackages (hack for nix)
+  run_in_thread
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
  (virtual_modules promise)

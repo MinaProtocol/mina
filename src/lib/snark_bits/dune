@@ -11,6 +11,7 @@
   ;; local libraries
   fold_lib
   snarky.backendless
+  snarky ; TODO needed for nix
   tuple_lib
   bitstring_lib
   snarky.intf

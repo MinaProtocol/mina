@@ -22,4 +22,5 @@
    kimchi_backend.pasta.basic
    fold_lib
    random_oracle.permutation
+   kimchi_bindings_pasta_fp_poseidon ; for subpackage (hack for nix)
 ))

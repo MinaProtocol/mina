@@ -1,6 +1,6 @@
 (library
  (name fields_derivers_graphql)
- (public_name fields_derivers.graphql)
+ (public_name fields_derivers_graphql)
  (libraries
    ;; opam libraries
    async_kernel

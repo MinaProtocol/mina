@@ -1,7 +1,10 @@
 (library
  (name mina_metrics)
  (public_name mina_metrics)
- (libraries async_kernel logger uri core_kernel)
+ (libraries async_kernel logger uri core_kernel
+  ; packages below are required for subpackages (hack for nix)
+  o1trace cohttp cohttp-async conduit-async prometheus
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
  (virtual_modules mina_metrics)

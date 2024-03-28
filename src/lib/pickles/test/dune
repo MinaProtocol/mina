@@ -25,7 +25,7 @@
   pickles.backend
   pickles.composition_types
   pickles.limb_vector
-  pickles.one_hot_vector
+  one_hot_vector
   pickles.plonk_checks
   pickles_base
   pickles_types

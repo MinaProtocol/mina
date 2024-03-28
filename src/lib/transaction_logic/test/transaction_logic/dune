@@ -17,7 +17,7 @@
    currency
    data_hash_lib
    genesis_constants
-   kimchi_backend_common
+   kimchi_backend.common
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    mina_base

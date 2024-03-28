@@ -99,7 +99,7 @@
    pickles.backend
    pickles_types
    graphql
-   fields_derivers.graphql
+   fields_derivers_graphql
    o1trace
    verifier
    graphql_wrapper

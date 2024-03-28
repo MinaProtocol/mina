@@ -45,7 +45,7 @@
    mina_compile_config
    mina_state
    transaction_protocol_state
-   ppx_version_runtime
+   ppx_version
  )
  (preprocess
   (pps

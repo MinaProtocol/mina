@@ -19,6 +19,7 @@
    pickles
    tuple_lib
    kimchi_backend
+   crs ; for a subpackage (nix hack)
  )
  (preprocess
   (pps ppx_version ppx_jane h_list.ppx))

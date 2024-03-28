@@ -24,7 +24,7 @@ module Make (Inputs : Inputs_intf) = struct
   let name =
     sprintf "%s_%d_%s_v3" name
       (Pickles_types.Nat.to_int Rounds.n)
-      Version.marlin_repo_sha
+      (* Version.marlin_repo_sha *) ""
 
   let set_urs_info, load_urs =
     let urs_info = Set_once.create () in

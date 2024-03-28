@@ -1,6 +1,6 @@
 (library
  (name fields_derivers_zkapps)
- (public_name fields_derivers.zkapps)
+ (public_name fields_derivers_zkapps)
  (libraries
    ;; opam libraries
    result
@@ -15,8 +15,8 @@
    graphql_parser
    ;; local libraries
    signature_lib
-   fields_derivers.graphql
-   fields_derivers.json
+   fields_derivers_graphql
+   fields_derivers_json
    currency
    mina_numbers
    snark_params

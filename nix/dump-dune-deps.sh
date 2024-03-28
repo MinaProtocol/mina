@@ -1,7 +1,7 @@
 deps_expr='\(\s*libraries\s\s*([^\)]*)\)'
 name_expr='\(\s*public_name\s\s*([^\)]*)\)'
 { find src/{app,lib,test} -mindepth 2 -name dune; echo src/config/dune; echo src/libp2p_ipc/dune; } | while read dune; do
-  sed 's/;.*$//g' "$dune" | tr "\n" " " > tmp_file
+  sed 's/;.*$//g' "$dune" | tr "\n" " " | sed -r 's%\(\s*re_export\s\s*([^\)]*)\s*\)%\1%g' > tmp_file
 
   IFS=';' read -ra names < <( grep -oE "$name_expr" tmp_file | sed -r "s/$name_expr/\1/g" | tr "\n" ';')
   IFS=';' read -ra depss < <( grep -oE "$deps_expr" tmp_file | sed -r "s/$deps_expr/\1/g" | sed 's/\s*$//g' | sed 's/\s\s*/\",\"/g' | tr "\n" ';')

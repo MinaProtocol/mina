@@ -29,4 +29,8 @@
   kimchi_backend.pasta.constraint_system
   pickles_types
   sponge
-  snarky.intf))
+  snarky.intf
+  ; packages below are required for subpackages (hack for nix)
+  internal_tracing_context_logger mina_stdlib promise allocation_functor
+  digestif 
+  ))

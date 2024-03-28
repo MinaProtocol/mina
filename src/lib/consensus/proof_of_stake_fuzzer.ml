@@ -1,4 +1,4 @@
-[%%import "../../config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 open Async

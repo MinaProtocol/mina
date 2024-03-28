@@ -29,7 +29,7 @@
    pasta_bindings
    kimchi_backend.common
    kimchi_backend
-   kimchi_pasta
+   kimchi_backend.pasta
    kimchi_backend.pasta.basic
    mina_base
    mina_base.import
