@@ -49,7 +49,7 @@ else
 
   # Determine deb repo to use
   case $GITBRANCH in
-      berkeley|rampup|compatible|master|release*) # whitelist of branches that can be tagged
+      berkeley|rampup|compatible|master|prealfalfa|release*) # whitelist of branches that can be tagged
           case "${THIS_COMMIT_TAG}" in
             *alpha*) # any tag including the string `alpha`
               RELEASE=alpha ;;
@@ -83,7 +83,7 @@ export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 
 
 # Determine the packages to build (mainnet y/N)
 case $GITBRANCH in
-    compatible|master|release/1*) # whitelist of branches that are "mainnet-like"
+    compatible|master|prealfalfa|release/1*) # whitelist of branches that are "mainnet-like"
       MINA_BUILD_MAINNET=true ;;
     *) # Other branches
       MINA_BUILD_MAINNET=false ;;
