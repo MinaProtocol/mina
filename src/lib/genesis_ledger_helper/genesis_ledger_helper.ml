@@ -329,30 +329,25 @@ module Ledger = struct
     let%map () = Tar.create ~root:dirname ~file:tar_path ~directory:"." () in
     tar_path
 
+  let patch_account ~version account =
+    Mina_base.Account.Poly.
+      { account with
+        permissions =
+          Mina_base.Permissions.Poly.
+            { account.permissions with
+              set_verification_key =
+                (fst account.permissions.set_verification_key, version)
+            }
+      }
+  let patch_accounts' ~version =
+    List.map ~f:(fun account -> patch_account ~version account)
+
+  let patch_accounts' ~version =
+    List.map ~f:(fun (key, account) -> (key, patch_account ~version account))
+
   let padded_accounts_from_runtime_config_opt ~logger ~proof_level
       ~ledger_name_prefix ?overwrite_version (config : Runtime_config.Ledger.t)
       =
-    let patch_accounts_version accounts_with_keys =
-      match overwrite_version with
-      | Some version ->
-          List.map accounts_with_keys ~f:(fun (key, account) ->
-              let patched_account =
-                Mina_base.Account.Poly.
-                  { account with
-                    permissions =
-                      Mina_base.Permissions.Poly.
-                        { account.permissions with
-                          set_verification_key =
-                            ( fst account.permissions.set_verification_key
-                            , version )
-                        }
-                  }
-              in
-              (key, patched_account) )
-      | None ->
-          accounts_with_keys
-    in
-
     let add_genesis_winner_account accounts =
       (* We allow configurations to explicitly override adding the genesis
          winner, so that we can guarantee a certain ledger layout for
@@ -391,8 +386,14 @@ module Ledger = struct
       | Accounts accounts ->
           Some
             ( lazy
-              (patch_accounts_version
-                 (add_genesis_winner_account (Accounts.to_full accounts)) ) )
+              (let accts =
+                 add_genesis_winner_account (Accounts.to_full accounts)
+               in
+               match overwrite_version with
+               | Some version ->
+                   patch_accounts' ~version accts
+               | None ->
+                   accts ) )
       | Named name -> (
           match Genesis_ledger.fetch_ledger name with
           | Some (module M) ->
