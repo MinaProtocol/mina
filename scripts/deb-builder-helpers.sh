@@ -331,21 +331,18 @@ build_archive_deb () {
   cp ./default/src/app/archive/archive.exe "${BUILDDIR}/usr/local/bin/mina-archive"
   cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
   cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
-  
-  cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
-  
-  mkdir -p "${BUILDDIR}/etc/mina/archive"
-  cp ../scripts/archive/download-missing-blocks.sh "${BUILDDIR}/etc/mina/archive"
-  
+
   cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-replayer"
   cp ./default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILDDIR}/usr/local/bin/mina-swap-bad-balances"
+  cp ../scripts/archive/missing-blocks-guardian.sh "${BUILDDIR}/usr/local/bin/mina-missing-blocks-guardian"
 
   build_deb "$ARCHIVE_DEB"
 
 }
+##################################### END ARCHIVE PACKAGE ######################################
 
-##################################### ARCHIVE PACKAGE ##########################################
+##################################### ARCHIVE MIGRATION PACKAGE ##########################################
 build_archive_migration_deb () {
 
   ARCHIVE_MIGRATION_DEB=mina-archive-migration${DEB_SUFFIX}
@@ -364,7 +361,7 @@ build_archive_migration_deb () {
   build_deb "$ARCHIVE_MIGRATION_DEB"
 
 }
-##################################### END ARCHIVE PACKAGE ######################################
+##################################### END ARCHIVE MIGRATION PACKAGE ######################################
 
 ##################################### ZKAPP TEST TXN #######################################
 build_zkapp_test_transaction_deb () {
