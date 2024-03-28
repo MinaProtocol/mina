@@ -339,8 +339,6 @@ module Ledger = struct
                 (fst account.permissions.set_verification_key, version)
             }
       }
-  let patch_accounts' ~version =
-    List.map ~f:(fun account -> patch_account ~version account)
 
   let patch_accounts' ~version =
     List.map ~f:(fun (key, account) -> (key, patch_account ~version account))
