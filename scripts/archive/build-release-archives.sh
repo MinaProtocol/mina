@@ -120,6 +120,8 @@ mkdir -p "${BUILD_DIR}/usr/local/bin"
 pwd
 ls
 cp ./default/src/app/replayer/replayer.exe "${BUILD_DIR}/usr/local/bin/mina-maintenance-replayer"
+cp ../scripts/archive/missing-blocks-guardian.sh "${BUILD_DIR}/usr/local/bin/mina-missing-blocks-guardian"
+
 chmod --recursive +rx "${BUILD_DIR}/usr/local/bin"
 
 # echo contents of deb
