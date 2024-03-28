@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# This script is adapted from https://github.com/MinaProtocol/mina/blob/develop/src/app/rosetta/download-missing-blocks.sh
+# This script is adapted from https://github.com/MinaProtocol/mina/blob/1.4.1/src/app/rosetta/download-missing-blocks.sh
 # It is used to populate a postgres database with missing precomputed archiveDB blocks
 
 # Function to display usage information
@@ -163,7 +163,11 @@ main() {
       PARENT="$($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq_parent_hash)"
       echo "[BOOTSTRAP] $($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq -rs .[].message)"
       [[ "$PARENT" != "null" ]] && echo "[BOOTSTRAP] Some blocks are missing, moving to recovery logic..." && bootstrap $SINGLE_RUN
-      echo "[RESOLUTION] The bootstrap process finished, the Archive node should be synced with no missing blocks! Rerun the script in audit mode to be sure."
+      if [ $? -eq 0 ]; then
+        echo "[RESOLUTION] The bootstrap process finished successfuly, the Archive node should be synced with no missing blocks!"
+      else
+        echo "[ERROR] The bootstrap process failed with exit code $?. The database remains unhealthy.\n For more information about the error try running $MISSING_BLOCKS_AUDITOR separately."
+      fi
       exit 0
       ;; 
 
@@ -175,6 +179,9 @@ main() {
         echo "[BOOTSTRAP] $($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq -rs .[].message)"
         if [[ "$PARENT" != "null" ]]; then
           echo "[BOOTSTRAP] Some blocks are missing, moving to recovery logic..." && bootstrap $SINGLE_RUN
+          if [ $? -eq 1]; then
+            echo "[ERROR] The bootstrap process failed with exit code $?. The database remains unhealthy.\n For more information about the error try running $MISSING_BLOCKS_AUDITOR separately."
+          fi
         else
           echo "[INFO] Waiting for $((${TIMEOUT}/60)) minutes"
           sleep $TIMEOUT # Wait for the daemon to catchup and start downloading new blocks
