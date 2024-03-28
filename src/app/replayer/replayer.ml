@@ -35,8 +35,8 @@ type input =
   ; last_snarked_ledger_hash : Ledger_hash.t option [@default None]
   ; target_epoch_ledger_hashes : (Ledger_hash.t * Ledger_hash.t) option
         [@default None]
-  ; has_seen_staking_epoch_ledger_hash : bool [@default false]
-  ; has_seen_next_epoch_ledger_hash : bool [@default false]
+  ; has_seen_staking_epoch_ledger_hash : bool * int64 [@default false, 0L]
+  ; has_seen_next_epoch_ledger_hash : bool * int64 [@default false, 0L]
   }
 [@@deriving yojson]
 
@@ -71,18 +71,18 @@ let create_ledger_as_list ledger =
       Genesis_ledger_helper.Accounts.Single.of_account acc None )
 
 module Epoch_ledger_hashes = struct
-  let has_seen_staking_epoch_ledger_hash = ref false
+  let has_seen_staking_epoch_ledger_hash = ref (false, 0L)
 
-  let has_seen_next_epoch_ledger_hash = ref false
+  let has_seen_next_epoch_ledger_hash = ref (false, 0L)
 
-  let check_epoch_ledger_hashes ~target_epoch_ledger_hashes ledger_hash =
+  let check_epoch_ledger_hashes ~target_epoch_ledger_hashes ~ledger_hash
+      ~global_slot =
     match target_epoch_ledger_hashes with
     | Some (staking, next) ->
-        has_seen_staking_epoch_ledger_hash :=
-          !has_seen_staking_epoch_ledger_hash
-          || Ledger_hash.equal staking ledger_hash ;
-        has_seen_next_epoch_ledger_hash :=
-          !has_seen_next_epoch_ledger_hash || Ledger_hash.equal next ledger_hash
+        if Ledger_hash.equal staking ledger_hash then
+          has_seen_staking_epoch_ledger_hash := (true, global_slot) ;
+        if Ledger_hash.equal next ledger_hash then
+          has_seen_next_epoch_ledger_hash := (true, global_slot)
     | None ->
         ()
 end
@@ -184,11 +184,13 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis ~input :
   ; first_pass_ledger_hashes
   ; last_snarked_ledger_hash
   ; has_seen_staking_epoch_ledger_hash =
-      input.has_seen_staking_epoch_ledger_hash
-      || !Epoch_ledger_hashes.has_seen_staking_epoch_ledger_hash
+      ( if fst !Epoch_ledger_hashes.has_seen_staking_epoch_ledger_hash then
+        !Epoch_ledger_hashes.has_seen_staking_epoch_ledger_hash
+      else input.has_seen_staking_epoch_ledger_hash )
   ; has_seen_next_epoch_ledger_hash =
-      input.has_seen_next_epoch_ledger_hash
-      || !Epoch_ledger_hashes.has_seen_next_epoch_ledger_hash
+      ( if fst !Epoch_ledger_hashes.has_seen_next_epoch_ledger_hash then
+        !Epoch_ledger_hashes.has_seen_next_epoch_ledger_hash
+      else input.has_seen_next_epoch_ledger_hash )
   }
 
 (* map from global slots (since genesis) to state hash, ledger hash, snarked ledger hash triples *)
@@ -1333,7 +1335,8 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                             Epoch_ledger_hashes.check_epoch_ledger_hashes
                               ~target_epoch_ledger_hashes:
                                 input.target_epoch_ledger_hashes
-                              (Ledger.merkle_root ledger) ;
+                              ~ledger_hash:(Ledger.merkle_root ledger)
+                              ~global_slot:last_global_slot_since_genesis ;
                             let%bind () =
                               update_staking_epoch_data ~logger pool
                                 ~last_block_id ~ledger ~staking_epoch_ledger
