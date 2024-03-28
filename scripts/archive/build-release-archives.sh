@@ -75,3 +75,62 @@ find "${BUILD_DIR}"
 echo "------------------------------------------------------------"
 dpkg-deb --build "${BUILD_DIR}" ${PROJECT}_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
+
+cd ..
+
+pushd /home/opam/opam-repository
+git pull
+popd
+
+git apply scripts/archive/caqti-compatible.patch
+opam update
+opam upgrade caqti.2.0.1
+dune build "--profile=${DUNE_PROFILE}" src/app/replayer/replayer.exe
+
+cd _build
+
+PROJECT="mina-maintenance-replayer"
+BUILD_DIR="deb_build"
+
+###### replayer deb
+
+mkdir -p "${BUILD_DIR}/DEBIAN"
+cat << EOF > "${BUILD_DIR}/DEBIAN/control"
+Package: ${PROJECT}
+Version: ${MINA_DEB_VERSION}
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: ${SHARED_DEPS}${ARCHIVE_DEPS}
+License: Apache-2.0
+Homepage: https://minaprotocol.com/
+Maintainer: O(1)Labs <build@o1labs.org>
+Description: Mina Replayer
+ Compatible with Mina Daemon
+ Upgraded Caqti version for low memory usage
+ Built from ${GITHASH} by ${BUILDKITE_BUILD_URL:-"Mina CI"}
+EOF
+
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILD_DIR}/DEBIAN/control"
+
+echo "------------------------------------------------------------"
+# Binaries
+mkdir -p "${BUILD_DIR}/usr/local/bin"
+pwd
+ls
+cp ./default/src/app/replayer/replayer.exe "${BUILD_DIR}/usr/local/bin/mina-maintenance-replayer"
+chmod --recursive +rx "${BUILD_DIR}/usr/local/bin"
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILD_DIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+dpkg-deb --build "${BUILD_DIR}" ${PROJECT}_${MINA_DEB_VERSION}.deb
+ls -lh mina*.deb
+
+git restore ..
