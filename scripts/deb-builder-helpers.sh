@@ -25,6 +25,10 @@ cd "${SCRIPTPATH}/../_build"
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
 
+SUGGESTED_DEPS="jq, curl, wget"
+
+ARCHIVE_MIGRATION_DEPS="google-cloud-sdk"
+
 TEST_EXECUTIVE_DEPS=", mina-logproc, python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, terraform, helm"
 
 case "${MINA_DEB_CODENAME}" in
@@ -73,6 +77,7 @@ create_control_file() {
   echo "Package Name: ${1}"
   echo "Dependencies: ${2}"
   echo "Description: ${3}"
+  echo "Suggests: ${4}"
 
   # Make sure the directory exists
   mkdir -p "${BUILDDIR}/DEBIAN"
@@ -93,6 +98,7 @@ Architecture: amd64
 Maintainer: O(1)Labs <build@o1labs.org>
 Installed-Size:
 Depends: ${2}
+Suggests: ${4}
 Section: base
 Priority: optional
 Homepage: https://minaprotocol.com/
@@ -325,8 +331,7 @@ build_archive_deb () {
   echo "--- Building archive deb"
 
 
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process Compatible with Mina Daemon'
 
   cp ./default/src/app/archive/archive.exe "${BUILDDIR}/usr/local/bin/mina-archive"
   cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
@@ -354,8 +359,7 @@ build_archive_migration_deb () {
   echo "------------------------------------------------------------"
   echo "--- Building archive migration deb"
 
-  create_control_file "$ARCHIVE_MIGRATION_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
+  create_control_file "$ARCHIVE_MIGRATION_DEB" "${ARCHIVE_DEPS} ,${ARCHIVE_MIGRATION_DEPS} ,${SUGGESTED_DEPS}" 'Mina Archive Process Compatible with Mina Daemon'
 
   cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
   cp ./default/src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-verifier"
