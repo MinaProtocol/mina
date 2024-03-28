@@ -24,7 +24,7 @@ let commands =
       , Cmd.run "./scripts/lint_rfcs.sh"
       , Cmd.run "make check-snarky-submodule"
       , Cmd.run "./scripts/lint_preprocessor_deps.sh"
-      , Cmd.run "both(){git apply \$1 && git apply -R \$1}; both scripts/hardfork/localnet-patches/berkeley.patch && both buildkite/scripts/caqti-upgrade.patch && both buildkite/scripts/caqti-upgrade-plus-archive-init-speedup.patch"
+      , Cmd.run "./scripts/check_patches.sh"
       ]
 
 in  Pipeline.build
