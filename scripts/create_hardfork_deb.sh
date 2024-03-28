@@ -49,7 +49,7 @@ done
 
 build_deb "${NETWORK_TAG}"
 build_logproc_deb
-$BUILD_KEYPAIR_DEB && MINA_BUILD_MAINNET=1 build_keypair_deb
+$BUILD_KEYPAIR_DEB && MINA_BUILD_MAINNET=true build_keypair_deb
 build_archive_deb
 build_batch_txn_deb
 build_test_executive_deb

@@ -79,7 +79,10 @@ if [[ ! -f "$ledger_file" ]]; then
     exit 2
   fi
   curl "$ledger_url" >"$ledger_file"
-  cmp "$ledger_file" >/dev/null <<< "Ledger not found: next staking ledger is not finalized yet" && echo "Next ledger not finalized yet" >&2 && rm "$ledger_file" && exit 2
+  not_finalized_msg="Ledger not found: next staking ledger is not finalized yet"
+  if [[ "$(head -c ${#not_finalized_msg})" == "$not_finalized_msg" ]]; then
+    echo "Next ledger not finalized yet" >&2 && rm "$ledger_file" && exit 2
+  fi
 fi
 
 keys_=""
