@@ -2,99 +2,54 @@ let Prelude = ../External/Prelude.dhall
 let Cmd = ../Lib/Cmds.dhall
 let Mina = ../Command/Mina.dhall
 let S = ../Lib/SelectFiles.dhall
+let ContainerImages = ../Constants/ContainerImages.dhall
 
 let r = Cmd.run
 
-let runInToolchainBookworm : List Text -> Text -> List Cmd.Type =
+let runInToolchainImage : Text -> List Text  -> Text ->  List Cmd.Type =
+  \(image: Text) ->
   \(environment : List Text) ->
   \(innerScript : Text) ->
     [ Mina.fixPermissionsCommand ] # [
       Cmd.runInDocker
-        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaToolchainBookworm, extraEnv = environment })
+        (Cmd.Docker::{ image = image, extraEnv = environment })
         (innerScript)
     ]
+
+in
+
+let runInToolchainBookworm : List Text -> Text -> List Cmd.Type =
+  \(environment : List Text) ->
+  \(innerScript : Text) ->
+    runInToolchainImage ContainerImages.minaToolchainBookworm environment innerScript
 
 in
 
 let runInToolchainBullseye : List Text -> Text -> List Cmd.Type =
   \(environment : List Text) ->
   \(innerScript : Text) ->
-    [ Mina.fixPermissionsCommand ] # [
-      Cmd.runInDocker
-        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaToolchainBullseye, extraEnv = environment })
-        (innerScript)
-    ]
+    runInToolchainImage ContainerImages.minaToolchainBullseye environment innerScript 
 
 in
 
 let runInToolchainBuster : List Text -> Text -> List Cmd.Type =
   \(environment : List Text) ->
   \(innerScript : Text) ->
-    [ Mina.fixPermissionsCommand ] # [
-      Cmd.runInDocker
-        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaToolchainBuster, extraEnv = environment })
-        (innerScript)
-    ]
+    runInToolchainImage ContainerImages.minaToolchainBuster environment innerScript 
+
 
 let runInToolchain : List Text -> Text -> List Cmd.Type =
   \(environment : List Text) ->
   \(innerScript : Text) ->
-    [ Mina.fixPermissionsCommand ] # [
-      Cmd.runInDocker
-        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaToolchain, extraEnv = environment })
-        (innerScript)
-    ]
+    runInToolchainImage ContainerImages.minaToolchain environment innerScript 
+
 
 in
 
-let runInToolchainCaqtiBookworm : List Text -> Text -> List Cmd.Type =
-  \(environment : List Text) ->
-  \(innerScript : Text) ->
-    [ Mina.fixPermissionsCommand ] # [
-      Cmd.runInDocker
-        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaCaqtiToolchainBookworm, extraEnv = environment })
-        (innerScript)
-    ]
-
-in
-
-let runInToolchainCaqtiBullseye : List Text -> Text -> List Cmd.Type =
-  \(environment : List Text) ->
-  \(innerScript : Text) ->
-    [ Mina.fixPermissionsCommand ] # [
-      Cmd.runInDocker
-        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaCaqtiToolchainBullseye, extraEnv = environment })
-        (innerScript)
-    ]
-
-in
-
-let runInToolchainCaqtiBuster : List Text -> Text -> List Cmd.Type =
-  \(environment : List Text) ->
-  \(innerScript : Text) ->
-    [ Mina.fixPermissionsCommand ] # [
-      Cmd.runInDocker
-        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaCaqtiToolchainBuster, extraEnv = environment })
-        (innerScript)
-    ]
-
-let runInToolchainCaqti : List Text -> Text -> List Cmd.Type =
-  \(environment : List Text) ->
-  \(innerScript : Text) ->
-    [ Mina.fixPermissionsCommand ] # [
-      Cmd.runInDocker
-        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaCaqtiToolchain, extraEnv = environment })
-        (innerScript)
-    ]
-
-in
 {
   runInToolchain = runInToolchain
+  , runInToolchainImage  = runInToolchainImage
   , runInToolchainBookworm = runInToolchainBookworm
   , runInToolchainBullseye = runInToolchainBullseye
   , runInToolchainBuster = runInToolchainBuster
-  , runInToolchainCaqti = runInToolchainCaqti
-  , runInToolchainCaqtiBookworm = runInToolchainCaqtiBookworm
-  , runInToolchainCaqtiBullseye = runInToolchainCaqtiBullseye
-  , runInToolchainCaqtiBuster = runInToolchainCaqtiBuster
 }
