@@ -43,6 +43,7 @@
    signature_lib
    unsigned_extended
    with_hash
+   cli_lib
    )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

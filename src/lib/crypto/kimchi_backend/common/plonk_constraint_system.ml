@@ -1516,9 +1516,9 @@ end = struct
         let s, x = red v in
         match x with
         | `Var x ->
-            (* -x + x * x = 0  *)
+            (* -s*x + s^2*x*x = 0  *)
             add_generic_constraint ~l:x ~r:x
-              [| Fp.(negate one); Fp.zero; Fp.zero; Fp.one; Fp.zero |]
+              [| Fp.negate s; Fp.zero; Fp.zero; Fp.square s; Fp.zero |]
               sys
         | `Constant ->
             assert (Fp.(equal s (s * s))) )
