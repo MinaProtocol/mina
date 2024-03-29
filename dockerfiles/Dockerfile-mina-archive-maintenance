@@ -37,7 +37,7 @@ RUN apt-get update --quiet --yes \
 # archive-node package
 RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
-  && apt-get install --quiet --yes "mina-archive-maintenance=$deb_version" \
+  && apt-get install --quiet --yes "mina-archive=$deb_version" "mina-archive-maintenance=$deb_version" \
   && rm -rf /var/lib/apt/lists/*
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]
