@@ -88,7 +88,7 @@ dune build "--profile=${DUNE_PROFILE}" src/app/replayer/replayer.exe
 
 cd _build
 
-PROJECT="mina-maintenance-replayer"
+PROJECT="mina-archive-maintenance"
 BUILD_DIR="deb_build"
 
 ###### replayer deb
