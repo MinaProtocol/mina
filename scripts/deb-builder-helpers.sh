@@ -70,10 +70,10 @@ esac
 BUILDDIR="deb_build"
 
 # Function to ease creation of Debian package control files
-create_control_file() { "${SUGGESTED_DEPS}"
+create_control_file() {
 
   echo "------------------------------------------------------------"
-  echo "create_control_file inputs:" "${SUGGESTED_DEPS}"
+  echo "create_control_file inputs:" 
   echo "Package Name: ${1}"
   echo "Dependencies: ${2}"
   echo "Description: ${3}"
@@ -357,7 +357,7 @@ build_archive_migration_deb () {
   echo "------------------------------------------------------------"
   echo "--- Building archive migration deb"
 
-  create_control_file "$ARCHIVE_MIGRATION_DEB" "${ARCHIVE_DEPS} ,${ARCHIVE_MIGRATION_DEPS} ,${SUGGESTED_DEPS}" 'Berkeley Archive Migration And Verification Tools' ""
+  create_control_file "$ARCHIVE_MIGRATION_DEB" "${ARCHIVE_DEPS} ,${ARCHIVE_MIGRATION_DEPS} ,${SUGGESTED_DEPS}" 'Berkeley Archive Migration And Verification Tools' "mina-logproc"
 
   cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
   cp ./default/src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-verifier"
