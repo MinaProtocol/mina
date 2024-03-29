@@ -6,7 +6,7 @@
 {
   toolchainBase = "codaprotocol/ci-toolchain-base:v3",
   minaToolchainStretch = "gcr.io/o1labs-192920/mina-toolchain@sha256:e4920236094ab23caad9ec9cda39babde6b777541db054e8138f71ac464f57b5",
-  minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:671a0d42224f9fe364cac5c0b35b42fe2a947ea5f838806f2b02fdfd82519f43",
+  minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:152fd2d4375fa3ecbfeb60608f62bd4430f19582092e69809bc445c7a1f2f5f6",
   minaToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:d9561c6dfe0e77106233f6e000fa249f41abc26ced742cd641717e4d133afcc9",
   minaToolchainBookworm = "gcr.io/o1labs-192920/mina-toolchain@sha256:d9561c6dfe0e77106233f6e000fa249f41abc26ced742cd641717e4d133afcc9",
   minaToolchain = "gcr.io/o1labs-192920/mina-toolchain@sha256:d9561c6dfe0e77106233f6e000fa249f41abc26ced742cd641717e4d133afcc9",
