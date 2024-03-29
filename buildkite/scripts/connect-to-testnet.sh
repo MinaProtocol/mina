@@ -13,7 +13,7 @@ WAIT_BETWEEN_POLLING_GRAPHQL=$2
 WAIT_AFTER_FINAL_CHECK=$3
 
 case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
-  rampup|berkeley|release/2.0.0|develop)
+  rampup|release-automation-testing/*|berkeley|release/2.0.0|develop)
   ;;
   *)
     echo "Not pulling against rampup, not running the connect test"

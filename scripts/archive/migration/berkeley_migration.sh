@@ -16,7 +16,7 @@ RED='\033[0;31m'
 # global variable
 ################################################################################
 declare -r CLI_VERSION='1.0.0';
-declare -r CLI_NAME='berkeley_migration.sh';
+declare -r CLI_NAME='mina-berkeley-migration-script';
 declare -r PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 
 CHECKPOINT_PREFIX=migration
