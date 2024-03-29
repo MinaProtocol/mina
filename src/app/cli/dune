@@ -1,4 +1,4 @@
-(include ../../../dune.flags.inc)
+(include ../../dune.flags.inc)
 
 (executable
  (package cli)

@@ -12,5 +12,7 @@ name_expr='\(\s*public_name\s\s*([^\)]*)\)'
     ix=$((ix+1))
     echo "\"$name\":{\"deps\":[\"$deps\"],\"path\":\"$(dirname "$dune")\"}"
   done
+  # TODO extract it automatically
+  echo '"cli":{"deps":["mina_signature_kind","mina_cli_entrypoint"],"path":"src/app/cli"}'
 done | tr "\n" "," | sed 's/^/{/g' | sed 's/,$/}/g'
 rm tmp_file

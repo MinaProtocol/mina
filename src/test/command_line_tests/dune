@@ -12,7 +12,7 @@
    alcotest
    cmdliner
    ;; mina libraries
-   init
+   mina_init
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane ppx_compare))

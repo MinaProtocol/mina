@@ -274,6 +274,8 @@
 (package (name fields_derivers_graphql))
 (package (name fields_derivers_json))
 (package (name fields_derivers_zkapps))
+(package (name cli))
+(package (name mina_init))
 (package (name mina_cli_entrypoint))
 (package (name transition_frontier))
 (package (name transition_frontier_base))

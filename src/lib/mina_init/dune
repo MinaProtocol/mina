@@ -5,7 +5,7 @@
 
 (library
  (name init)
- (public_name init)
+ (public_name mina_init)
  (libraries
    ;;opam libraries
    stdio
@@ -124,9 +124,9 @@
    internal_tracing
  )
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../../../config.mlh
-                    ../../../../../graphql_schema.json
-                    ../../../../graphql-ppx-config.inc)
+ (preprocessor_deps ../../config.mlh
+                    ../../../graphql_schema.json
+                    ../../graphql-ppx-config.inc)
  (preprocess (pps ppx_deriving_yojson ppx_mina ppx_version
                   ; ppx_jane except ppx_optcomp
                   ppx_base ppx_assert ppx_bench ppx_bin_prot ppx_custom_printf

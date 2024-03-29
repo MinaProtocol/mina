@@ -368,10 +368,11 @@ let
         patchDuneGraphql = self: ''
           dune_files=$(find -name dune -type f)
           ( [[ "$dune_files" != "" ]] && grep -o graphql_schema.json $dune_files >/dev/null && \
-            sed -i -r 's%(\.\./)*graphql_schema.json%${self.graphql-schema}/graphql_schema.json%g' $dune_files ) || true
+            cp ${self.graphql-schema}/graphql_schema.json ./ && \
+            sed -i -r 's%(\.\./)*graphql_schema.json%graphql_schema.json%g' $dune_files ) || true
           ( [[ "$dune_files" != "" ]] && grep -o graphql-ppx-config.inc $dune_files >/dev/null && \
             cp ${self.graphql-schema}/graphql-ppx-config.inc ./ && \
-            sed -i -r 's%(\.\./)*graphql-ppx-config.inc%./graphql-ppx-config.inc%g' $dune_files ) || true
+            sed -i -r 's%(\.\./)*graphql-ppx-config\.inc%./graphql-ppx-config.inc%g' $dune_files ) || true
           '';
         patchDune = ''
           [ -f dune-project ] || echo '(lang dune 3.3)' > dune-project
@@ -422,10 +423,10 @@ let
             # Build library dependency mapping
             ${pkgs.bash}/bin/bash ./nix/dump-dune-deps.sh > deps.json
 
-            dune_files=$(find src/app -name dune -type f)
-            ( [[ "$dune_files" != "" ]] && grep -o dune.flags.inc $dune_files >/dev/null && \
-              sed -i -r 's%(\.\./)*dune\.flags\.inc%./dune.flags.inc%g' $dune_files && \
-              { for f in $dune_files; do cp src/dune*.inc $(dirname $f); done; } ) || true
+            dune_files=$(grep -l dune.flags.inc $(find src/app src/lib -name dune -type f))
+            [[ "$dune_files" == "" ]] || \
+              ( sed -i -r 's%(\.\./)*dune\.flags\.inc%./dune.flags.inc%g' $dune_files && \
+              { for f in $dune_files; do cp src/dune*.inc $(dirname $f); done; } )
           '';
           installPhase = ''
             rm _build -rf
@@ -434,8 +435,9 @@ let
           '';
         };
         depsMap = builtins.fromJSON (builtins.readFile "${src-with-opam-files}/deps.json");
+        depsEl = name : (if builtins.hasAttr name depsMap then builtins.getAttr name depsMap else {deps=[];});
         getDeps = names: self: builtins.attrValues (pkgs.lib.filterAttrs (n: _: builtins.elem n names) self);
-        graphqlDependents = ["init" "rosetta_app_lib" "batch_txn_tool" "integration_test_cloud_engine" "integration_test_lib" "generated_graphql_queries" "integration_test_local_engine"];
+        graphqlDependents = ["mina_init" "rosetta_app_lib" "batch_txn_tool" "integration_test_cloud_engine" "integration_test_lib" "generated_graphql_queries" "integration_test_local_engine"];
         myOverlay = self: super:
           let ppx_names = ["ppx_version" "ppx_mina" "ppx_register_event" "ppx_representatives" "ppx_to_enum" "ppx_annot"];
           ppxs = builtins.attrValues (pkgs.lib.getAttrs ppx_names self) ++ [self.ppx_base self.ppx_optcomp self.ppx_bitstring];
@@ -449,7 +451,7 @@ let
           custom =
             builtins.mapAttrs (name: old:
               old.overrideAttrs (s: minaEnv // {
-              buildInputs = s.buildInputs ++ getDeps (builtins.getAttr name depsMap).deps self ++ external-libs ++ customDeps name;
+              buildInputs = s.buildInputs ++ getDeps (depsEl name).deps self ++ external-libs ++ customDeps name;
               nativeBuildInputs = s.nativeBuildInputs ++ external-libs;
               configurePhase =
                 ''
@@ -460,12 +462,12 @@ let
           in
           custom //
           (pkgs.lib.concatMapAttrs (name: old:
-            if builtins.hasAttr name custom || ! builtins.hasAttr name depsMap then {}
+            if (builtins.hasAttr name custom || ! builtins.hasAttr name depsMap) && ! builtins.elem name ["cli"] then {}
             else
               {
                 ${name} = old.overrideAttrs (s:
                 minaEnv // {
-                  buildInputs = ppxs ++ s.buildInputs ++ getDeps (builtins.getAttr name depsMap).deps self ++ external-libs ++
+                  buildInputs = ppxs ++ s.buildInputs ++ getDeps (depsEl name).deps self ++ external-libs ++
                     ( if builtins.elem name graphqlDependents then [self.graphql_ppx]
                     else []);
                   nativeBuildInputs = s.nativeBuildInputs ++ external-libs ++ [pkgs.capnproto self.capnp self.rocks];
@@ -488,13 +490,13 @@ let
                       with inputs.nix-filter.lib;
                       filter {
                         root = ../src;
-                        include =
-                          [ (matchExt "inc") ];
+                        include = [ "./graphql-ppx-config.inc" ];
                       };
                     name = "graphql-schema";
-                    phases = [ "installPhase" ];
+                    phases = [ "unpackPhase" "installPhase" ];
                     installPhase = ''
-                      cp -R . $out
+                      mkdir -p $out
+                      cp graphql-ppx-config.inc $out/
                       ${self.graphql_schema_dump}/bin/graphql_schema_dump > $out/graphql_schema.json
                     '';
                   };
@@ -512,7 +514,7 @@ let
                 DISABLE_CHECK_OPAM_SWITCH = "true";
               }; };
           } src-with-opam-files deps );
-        in prj.mina_cli_entrypoint;
+        in prj.cli;
 
       devnet-pkg = self.mina-dev.overrideAttrs (s: {
         version = "devnet";

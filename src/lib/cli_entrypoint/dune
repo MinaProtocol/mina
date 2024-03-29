@@ -1,8 +1,8 @@
-(include ../../../../dune.flags.inc)
+(include ../../dune.flags.inc)
 
 (library
  (name mina_cli_entrypoint)
- (public_name cli.mina_cli_entrypoint)
+ (public_name mina_cli_entrypoint)
  (modes native)
  (libraries
    ;;opam libraries
@@ -14,7 +14,7 @@
    core
    bin_prot
    bin_prot.shape
-   init
+   mina_init
    async
    core.daemon
    base.caml
