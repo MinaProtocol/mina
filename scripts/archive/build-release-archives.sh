@@ -116,7 +116,7 @@ cat "${BUILD_DIR}/DEBIAN/control"
 
 echo "------------------------------------------------------------"
 # Binaries
-rm -rf "${BUILDDIR}/usr/local/bin"
+rm -rf "${BUILD_DIR}/usr/local/bin"
 mkdir -p "${BUILD_DIR}/usr/local/bin"
 pwd
 ls
