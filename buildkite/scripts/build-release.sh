@@ -10,8 +10,9 @@ fi
 
 source ~/.profile
 source ./buildkite/scripts/export-git-env-vars.sh
-if [[ ${BUILDKITE_BRANCH} = "prealfaalfa" ]]; then
+if [[ ${BUILDKITE_BRANCH} = "prealfalfa" ]]; then
     export MINA_BUILD_MAINNET=true
+    echo "[INFO] Overriding MINA_BUILD_MAINNET for integration dry-run"
 fi
 ./buildkite/scripts/build-artifact.sh
 
