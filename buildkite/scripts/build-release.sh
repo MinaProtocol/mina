@@ -10,10 +10,6 @@ fi
 
 source ~/.profile
 source ./buildkite/scripts/export-git-env-vars.sh
-if [[ ${BUILDKITE_BRANCH} = "prealfalfa" ]]; then
-    export MINA_BUILD_MAINNET=true
-    echo "[INFO] Overriding MINA_BUILD_MAINNET for integration dry-run"
-fi
 ./buildkite/scripts/build-artifact.sh
 
 echo "--- Bundle all packages for Debian ${MINA_DEB_CODENAME}"
