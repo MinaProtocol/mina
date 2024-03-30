@@ -240,7 +240,7 @@ module Transport = struct
 
     let create () = ()
 
-    let transport () = print_endline
+    let transport () s = Progress.interject_with (fun () -> print_endline s)
   end
 
   let stdout () = T ((module Stdout), Stdout.create ())
