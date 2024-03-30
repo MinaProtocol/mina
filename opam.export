@@ -28,6 +28,7 @@ roots: [
   "ocp-browser.1.3.3"
   "ocp-indent.1.7.0"
   "odoc.2.1.0"
+  "progress.0.2.2"
   "ppx_bitstring.4.1.0"
   "ppx_deriving.5.2.1"
   "ppx_deriving_yojson.3.6.1"
