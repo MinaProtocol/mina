@@ -70,8 +70,8 @@
           filter {
             root = ./.;
             include =
-              [ (inDirectory "src") "dune" "dune-project"
-                "./graphql_schema.json" "opam.export" ];
+              [ (inDirectory "src") "dune" "dune-project" "./nix/dump-dune-deps.sh" ];
+            exclude = [ (inDirectory "src/external") (inDirectory "src/nonconsensus") ];
           };
     in {
       overlays = {

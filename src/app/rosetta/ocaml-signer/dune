@@ -1,6 +1,6 @@
 (library
  (name signer_cli)
- (public_name signer.cli)
+ (public_name signer_cli)
  (modules signer_cli)
  (libraries
    ;;opam libraries

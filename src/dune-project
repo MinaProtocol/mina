@@ -283,4 +283,10 @@
 (package (name transition_frontier_full_frontier))
 (package (name transition_frontier_persistent_frontier))
 (package (name transition_frontier_persistent_root))
-(generate_opam_files true)
+(package (name delegation_verify))
+(package (name signer_cli))
+(package (name rosetta_app_lib))
+(package (name benchmarks))
+(package (name zkapp_test_transaction_lib))
+(package (name internal_tracing))
+

@@ -1,5 +1,7 @@
 (executable
  (name delegation_verify)
+ (public_name delegation_verify)
+ (package delegation_verify)
  (libraries
    core_kernel
    async

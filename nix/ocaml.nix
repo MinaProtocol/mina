@@ -160,10 +160,21 @@ let
 
   sourceInfo = inputs.self.sourceInfo or { };
 
+<<<<<<< HEAD
   # "System" dependencies required by all Mina packages
   external-libs = with pkgs;
     [ zlib bzip2 gmp openssl libffi ]
     ++ lib.optional (!(stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
+=======
+  # Only get the ocaml stuff, to reduce the amount of unnecessary rebuilds
+  filtered-src = with inputs.nix-filter.lib;
+    filter {
+      root = ../.;
+      include =
+        [ (inDirectory "src") "dune" "dune-project" "./nix/dump-dune-deps.sh" ];
+      exclude = [ (inDirectory "src/external") (inDirectory "src/nonconsensus") ];
+    };
+>>>>>>> Remove unnecessary opam2nix invocations
 
   overlay = self: super:
     let
@@ -348,11 +359,12 @@ let
               root = ../src;
               include =
                 [ (inDirectory "config") ];
-            }; in
-          pkgs.stdenv.mkDerivation {
+              };
             DUNE_PROFILE = "devnet";
-            inherit src;
-            name = "mina-dune-project";
+          in
+          pkgs.stdenv.mkDerivation {
+            inherit src DUNE_PROFILE;
+            name = "mina-config-${DUNE_PROFILE}";
             nativeBuildInputs = with self; [ dune ocaml ];
             phases = [ "unpackPhase" "buildPhase" "installPhase" ];
             buildPhase = ''
@@ -382,59 +394,56 @@ let
             sed -i 's~\[%%import "/src/config.mlh"\]~\[%%import "${minaConfig}/config.mlh"\]~g' \
             $(find \( -name '*.ml' -or -name '*.mli' \) -type f) ) || true
           '';
-        opam-files = 
+        depsFiles =
           let src =
-             with inputs.nix-filter.lib;
-              filter {
-                root = ../.;
-                include =
-                  [ "dune" "dune-project" "./nix/dump-dune-deps.sh" ];
-                exclude = [ (inDirectory "src/external") ];
-              }; in
+             builtins.filterSource
+              (path: type: type != "file" || builtins.elem (baseNameOf path) ["dune" "dune-project" "dump-dune-deps.sh"])
+                ../.;
+              in
           pkgs.stdenv.mkDerivation {
-          name = "mina-opam-files";
+          name = "mina-deps-json";
           inherit src;
           nativeBuildInputs = with self; [ dune ocaml pkgs.jq ];
           phases = [ "unpackPhase" "buildPhase" "installPhase" ];
           buildPhase = ''
-            tr "\n" " " <src/dune-project | grep -oE '\(\s*package\s*\(name\s\s*[^\)]*\)\)' \
-              | sed -r 's/\((name|package)//g' \
-              | sed -r 's/\s|\)//g' | sed -r 's%^.*$%src/\0.opam%g' | xargs dune build
-
-            # Build library dependency mapping
             ${pkgs.bash}/bin/bash ./nix/dump-dune-deps.sh > deps.json
+            packages=" $(tr "\n" " " <src/dune-project | grep -oE '\(\s*package\s*\(name\s\s*[^\)]*\)\)' \
+              | sed -r 's/\((name|package)//g' \
+              | sed -r 's/\s|\)//g' | tr "\n" " " ) "
+            <deps.json jq -r "to_entries | .[] | \"if [[ \\\"$packages\\\" =~ ' \" + .key + \" ' ]]; then cp -f ${./opam.template} \" + .value.path + \"/\" + .key + \".opam; fi\"" > gen-opam-files.sh
           '';
           installPhase = ''
-            rm _build -rf
-            <deps.json jq -r 'to_entries | .[] | "if [[ -f src/" + .key + ".opam ]]; then mv -f src/" + .key + ".opam " + .value.path + "; fi"' | ${pkgs.bash}/bin/bash
-            cp -R . $out
+            mkdir -p $out
+            cp deps.json gen-opam-files.sh $out
           '';
         };
         src-with-opam-files = pkgs.stdenv.mkDerivation {
+<<<<<<< HEAD
           name = "mina-dune-project";
           inherit src;
+=======
+          name = "mina-src-with-opam";
+          src = filtered-src;
+>>>>>>> Remove unnecessary opam2nix invocations
           nativeBuildInputs = with self; [ dune ocaml pkgs.jq ];
           phases = [ "unpackPhase" "buildPhase" "installPhase" ];
           buildPhase = ''
-            tr "\n" " " <src/dune-project | grep -oE '\(\s*package\s*\(name\s\s*[^\)]*\)\)' \
-              | sed -r 's/\((name|package)//g' \
-              | sed -r 's/\s|\)//g' | sed -r 's%^.*$%src/\0.opam%g' | xargs dune build
-
-            # Build library dependency mapping
-            ${pkgs.bash}/bin/bash ./nix/dump-dune-deps.sh > deps.json
+            ${pkgs.bash}/bin/bash ${depsFiles}/gen-opam-files.sh
 
             dune_files=$(grep -l dune.flags.inc $(find src/app src/lib -name dune -type f))
             [[ "$dune_files" == "" ]] || \
               ( sed -i -r 's%(\.\./)*dune\.flags\.inc%./dune.flags.inc%g' $dune_files && \
               { for f in $dune_files; do cp src/dune*.inc $(dirname $f); done; } )
-          '';
+            '';
           installPhase = ''
-            rm _build -rf
-            <deps.json jq -r 'to_entries | .[] | "if [[ -f src/" + .key + ".opam ]]; then mv -f src/" + .key + ".opam " + .value.path + "; fi"' | ${pkgs.bash}/bin/bash
             cp -R . $out
           '';
         };
-        depsMap = builtins.fromJSON (builtins.readFile "${src-with-opam-files}/deps.json");
+        opamTemplate = opam-nix.importOpam ./opam.template;
+        depsMap = builtins.fromJSON (builtins.readFile "${depsFiles}/deps.json");
+        opamCache = pkgs.lib.concatMapAttrs (n: dep:
+          {"${dep.path}/${n}.opam" = opamTemplate;}
+        ) depsMap;
         depsEl = name : (if builtins.hasAttr name depsMap then builtins.getAttr name depsMap else {deps=[];});
         getDeps = names: self: builtins.attrValues (pkgs.lib.filterAttrs (n: _: builtins.elem n names) self);
         graphqlDependents = ["mina_init" "rosetta_app_lib" "batch_txn_tool" "integration_test_cloud_engine" "integration_test_lib" "generated_graphql_queries" "integration_test_local_engine"];
@@ -504,7 +513,7 @@ let
           ;
        prj =
           (opam-nix.buildOpamProject' {
-            inherit pkgs repos;
+            inherit pkgs repos opamCache;
             recursive = true;
             defs = pins;
             useOpamList = false;

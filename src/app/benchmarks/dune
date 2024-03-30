@@ -2,7 +2,8 @@
 
 (executable
  (name benchmarks)
- (public_name main)
+ (public_name benchmarks)
+ (package benchmarks)
  (libraries core_bench.inline_benchmarks vrf_lib_tests mina_base core_kernel core base bounded_types)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
