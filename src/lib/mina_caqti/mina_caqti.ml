@@ -5,15 +5,6 @@ open Core_kernel
 open Caqti_async
 open Mina_base
 
-type _ Caqti_type.field +=
-  | Array_nullable_int : int option array Caqti_type.field
-
-type _ Caqti_type.field +=
-  | Array_nullable_int64 : int64 option array Caqti_type.field
-
-type _ Caqti_type.field +=
-  | Array_nullable_string : string option array Caqti_type.field
-
 module Type_spec = struct
   type (_, _) t =
     | [] : (unit, unit) t
@@ -25,7 +16,7 @@ module Type_spec = struct
      | [] ->
          (Caqti_type.unit : tuple Caqti_type.t)
      | rep :: spec ->
-         Caqti_type.tup2 rep (to_rep spec)
+         Caqti_type.t2 rep (to_rep spec)
 
   let rec hlist_to_tuple :
             'hlist 'tuple.
@@ -93,59 +84,14 @@ let make_coding (type a) ~(elem_to_string : a -> string)
   in
   (encode, decode)
 
-(* register coding for nullable int arrays *)
-let () =
-  let open Caqti_type.Field in
-  let rep = Caqti_type.String in
+(** this type may require type annotations in queries, eg.
+   `SELECT id FROM zkapp_states WHERE element_ids = ?::int[]`
+*)
+let array_nullable_int_typ =
   let encode, decode =
     make_coding ~elem_to_string:Int.to_string ~elem_of_string:Int.of_string
   in
-  let get_coding : type a. _ -> a t -> a coding =
-   fun _ -> function
-    | Array_nullable_int ->
-        Coding { rep; encode; decode }
-    | _ ->
-        assert false
-  in
-  define_coding Array_nullable_int { get_coding }
-
-(* register coding for nullable int64 arrays *)
-let () =
-  let open Caqti_type.Field in
-  let rep = Caqti_type.String in
-  let encode, decode =
-    make_coding ~elem_to_string:Int64.to_string ~elem_of_string:Int64.of_string
-  in
-  let get_coding : type a. _ -> a t -> a coding =
-   fun _ -> function
-    | Array_nullable_int64 ->
-        Coding { rep; encode; decode }
-    | _ ->
-        assert false
-  in
-  define_coding Array_nullable_int64 { get_coding }
-
-(* register coding for nullable string arrays *)
-let () =
-  let open Caqti_type.Field in
-  let rep = Caqti_type.String in
-  let encode, decode =
-    make_coding ~elem_to_string:Fn.id ~elem_of_string:Fn.id
-  in
-  let get_coding : type a. _ -> a t -> a coding =
-   fun _ -> function
-    | Array_nullable_string ->
-        Coding { rep; encode; decode }
-    | _ ->
-        assert false
-  in
-  define_coding Array_nullable_string { get_coding }
-
-(* this type may require type annotations in queries, eg.
-   `SELECT id FROM zkapp_states WHERE element_ids = ?::int[]`
-*)
-let array_nullable_int_typ : int option array Caqti_type.t =
-  Caqti_type.field Array_nullable_int
+  Caqti_type.custom ~encode ~decode Caqti_type.string
 
 let array_int_typ : int array Caqti_type.t =
   let open Result.Let_syntax in
@@ -158,11 +104,14 @@ let array_int_typ : int array Caqti_type.t =
   in
   Caqti_type.custom array_nullable_int_typ ~encode ~decode
 
-(* this type may require type annotations in queries, eg.
+(** this type may require type annotations in queries, eg.
    `SELECT id FROM zkapp_states WHERE element_ids = ?::bigint[]`
 *)
-let array_nullable_int64_typ : int64 option array Caqti_type.t =
-  Caqti_type.field Array_nullable_int64
+let array_nullable_int64_typ =
+  let encode, decode =
+    make_coding ~elem_to_string:Int64.to_string ~elem_of_string:Int64.of_string
+  in
+  Caqti_type.custom ~encode ~decode Caqti_type.string
 
 let array_int64_typ : int64 array Caqti_type.t =
   let open Result.Let_syntax in
@@ -175,11 +124,14 @@ let array_int64_typ : int64 array Caqti_type.t =
   in
   Caqti_type.custom array_nullable_int64_typ ~encode ~decode
 
-(* this type may require type annotations in queries, e.g.
+(** this type may require type annotations in queries, e.g.
    `SELECT id FROM zkapp_states WHERE element_ids = ?::string[]`
 *)
-let array_nullable_string_typ : string option array Caqti_type.t =
-  Caqti_type.field Array_nullable_string
+let array_nullable_string_typ =
+  let encode, decode =
+    make_coding ~elem_to_string:Fn.id ~elem_of_string:Fn.id
+  in
+  Caqti_type.custom ~encode ~decode Caqti_type.string
 
 let array_string_typ : string array Caqti_type.t =
   let open Result.Let_syntax in
@@ -283,7 +235,7 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
     (module Conn : CONNECTION) (value : 'cols) =
   let open Deferred.Result.Let_syntax in
   Conn.find_opt
-    ( Caqti_request.find_opt (snd cols) (snd select)
+    ( Caqti_request.Infix.(snd cols ->? snd select)
     @@ select_cols ~select:(fst select) ~table_name ?tannot ~cols:(fst cols) ()
     )
     value
@@ -292,7 +244,7 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
       return id
   | None ->
       Conn.find
-        ( Caqti_request.find (snd cols) (snd select)
+        ( Caqti_request.Infix.(snd cols ->! snd select)
         @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
              ~cols:(fst cols) () )
         value
@@ -314,7 +266,11 @@ let insert_multi_into_col ~(table_name : string)
       (sep_by_comma ~parenthesis:true values)
       (fst col)
   in
-  let%bind () = Conn.exec (Caqti_request.exec Caqti_type.unit insert) () in
+  let%bind () =
+    Conn.exec
+      (Caqti_request.Infix.(Caqti_type.unit ->. Caqti_type.unit) insert)
+      ()
+  in
   let search =
     sprintf
       {sql| SELECT %s, id FROM %s
@@ -322,9 +278,8 @@ let insert_multi_into_col ~(table_name : string)
       (fst col) table_name (fst col) (sep_by_comma values)
   in
   Conn.collect_list
-    (Caqti_request.collect Caqti_type.unit
-       Caqti_type.(tup2 (snd col) int)
-       search )
+    Caqti_request.Infix.(
+      (Caqti_type.unit ->* Caqti_type.(t2 (snd col) int)) search)
     ()
 
 let query ~f pool =
@@ -361,3 +316,11 @@ let get_zkapp_or_ignore (item_opt : 'arg option)
 let get_opt_item (arg_opt : 'arg option)
     ~(f : 'arg -> ('res, _) Deferred.Result.t) : 'res option Deferred.t =
   make_get_opt ~of_option:Fn.id ~f arg_opt
+
+let find_req t u s = Caqti_request.Infix.(t ->! u) s
+
+let find_opt_req t u s = Caqti_request.Infix.(t ->? u) s
+
+let collect_req t u s = Caqti_request.Infix.(t ->* u) s
+
+let exec_req t s = Caqti_request.Infix.(t ->. Caqti_type.unit) s

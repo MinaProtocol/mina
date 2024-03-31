@@ -29,6 +29,7 @@ open Mina_block
 open Pipe_lib
 open Signature_lib
 open Pickles_types
+open Mina_caqti
 
 let applied_str = "applied"
 
@@ -42,20 +43,20 @@ module Public_key = struct
   let find (module Conn : CONNECTION) (t : Public_key.Compressed.t) =
     let public_key = Public_key.Compressed.to_base58_check t in
     Conn.find
-      (Caqti_request.find Caqti_type.string Caqti_type.int
+      (Caqti_request.Infix.(Caqti_type.string ->! Caqti_type.int)
          "SELECT id FROM public_keys WHERE value = ?" )
       public_key
 
   let find_opt (module Conn : CONNECTION) (t : Public_key.Compressed.t) =
     let public_key = Public_key.Compressed.to_base58_check t in
     Conn.find_opt
-      (Caqti_request.find_opt Caqti_type.string Caqti_type.int
+      (Caqti_request.Infix.(Caqti_type.string ->? Caqti_type.int)
          "SELECT id FROM public_keys WHERE value = ?" )
       public_key
 
   let find_by_id (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int Caqti_type.string
+      (Caqti_request.Infix.(Caqti_type.int ->! Caqti_type.string)
          "SELECT value FROM public_keys WHERE id = ?" )
       id
 
@@ -68,7 +69,7 @@ module Public_key = struct
     | None ->
         let public_key = Public_key.Compressed.to_base58_check t in
         Conn.find
-          (Caqti_request.find Caqti_type.string Caqti_type.int
+          (Caqti_request.Infix.(Caqti_type.string ->! Caqti_type.int)
              "INSERT INTO public_keys (value) VALUES (?) RETURNING id" )
           public_key
 end
@@ -107,7 +108,7 @@ module Token = struct
 
   let find_by_id (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 
@@ -117,15 +118,15 @@ module Token = struct
          (Mina_caqti.select_cols ~table_name ~select:"id" ~cols:[ "value" ] ()) )
       (Token_id.to_string token_id)
 
-  let find (module Conn : CONNECTION) = make_finder Conn.find Caqti_request.find
+  let find (module Conn : CONNECTION) = make_finder Conn.find find_req
 
   let find_opt (module Conn : CONNECTION) =
-    make_finder Conn.find_opt Caqti_request.find_opt
+    make_finder Conn.find_opt find_opt_req
 
   let find_no_owner_opt (module Conn : CONNECTION) token_id =
     let value = Token_id.to_string token_id in
     Conn.find_opt
-      (Caqti_request.find_opt Caqti_type.string Caqti_type.int
+      (find_opt_req Caqti_type.string Caqti_type.int
          {sql| SELECT id
                FROM tokens
                WHERE value = $1
@@ -137,8 +138,8 @@ module Token = struct
   let set_owner (module Conn : CONNECTION) ~id ~owner_public_key_id
       ~owner_token_id =
     Conn.find
-      (Caqti_request.find
-         Caqti_type.(tup3 int int int)
+      (find_req
+         Caqti_type.(t3 int int int)
          Caqti_type.int
          {sql| UPDATE tokens
                SET owner_public_key_id = $2, owner_token_id = $3
@@ -202,7 +203,7 @@ module Voting_for = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int Caqti_type.string
+      (find_req Caqti_type.int Caqti_type.string
          (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "value" ]) )
       id
 end
@@ -223,7 +224,7 @@ module Token_symbols = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int Caqti_type.string
+      (find_req Caqti_type.int Caqti_type.string
          (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "value" ]) )
       id
 end
@@ -269,8 +270,8 @@ module Account_identifiers = struct
             return None
         | Some tok_id ->
             Conn.find_opt
-              (Caqti_request.find_opt
-                 Caqti_type.(tup2 int int)
+              (find_opt_req
+                 Caqti_type.(t2 int int)
                  Caqti_type.int
                  (Mina_caqti.select_cols ~select:"id" ~table_name
                     ~cols:Fields.names () ) )
@@ -283,15 +284,15 @@ module Account_identifiers = struct
     let token = Account_id.token_id account_id in
     let%bind token_id = Token.find (module Conn) token in
     Conn.find
-      (Caqti_request.find
-         Caqti_type.(tup2 int int)
+      (find_req
+         Caqti_type.(t2 int int)
          Caqti_type.int
          (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()) )
       (public_key_id, token_id)
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -309,7 +310,7 @@ module Zkapp_field = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int Caqti_type.string
+      (find_req Caqti_type.int Caqti_type.string
          (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "field" ]) )
       id
 end
@@ -334,7 +335,7 @@ module Zkapp_field_array = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int Mina_caqti.array_int_typ
+      (find_req Caqti_type.int Mina_caqti.array_int_typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "element_ids" ]) )
       id
 end
@@ -406,7 +407,7 @@ module Zkapp_states_nullable = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -467,7 +468,7 @@ module Zkapp_states = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -509,7 +510,7 @@ module Zkapp_action_states = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -531,7 +532,7 @@ module Zkapp_verification_key_hashes = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int Caqti_type.string
+      (find_req Caqti_type.int Caqti_type.string
          (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "value" ]) )
       id
 end
@@ -566,7 +567,7 @@ module Zkapp_verification_keys = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -596,22 +597,22 @@ module Protocol_versions = struct
 
   let find (module Conn : CONNECTION) ~transaction ~network ~patch =
     Conn.find
-      (Caqti_request.find
-         Caqti_type.(tup3 int int int)
+      (find_req
+         Caqti_type.(t3 int int int)
          Caqti_type.int
          (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()) )
       (transaction, network, patch)
 
   let find_txn_version (module Conn : CONNECTION) ~transaction =
     Conn.collect_list
-      (Caqti_request.collect Caqti_type.int Caqti_type.int
+      (collect_req Caqti_type.int Caqti_type.int
          {sql| SELECT id FROM protocol_versions WHERE transaction = ?
         |sql} )
       transaction
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -727,7 +728,7 @@ module Zkapp_permissions = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -780,7 +781,7 @@ module Zkapp_timing_info = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -801,7 +802,7 @@ module Zkapp_uri = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int Caqti_type.string
+      (find_req Caqti_type.int Caqti_type.string
          (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "value" ]) )
       id
 end
@@ -894,7 +895,7 @@ module Zkapp_updates = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -922,7 +923,7 @@ module Zkapp_balance_bounds = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -951,7 +952,7 @@ module Zkapp_nonce_bounds = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -1035,7 +1036,7 @@ module Zkapp_account_precondition = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -1063,7 +1064,7 @@ module Zkapp_token_id_bounds = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -1095,7 +1096,7 @@ module Zkapp_timestamp_bounds = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -1123,7 +1124,7 @@ module Zkapp_length_bounds = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -1151,7 +1152,7 @@ module Zkapp_amount_bounds = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -1186,7 +1187,7 @@ module Zkapp_global_slot_bounds = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -1215,7 +1216,7 @@ module Timing_info = struct
       Account_identifiers.find (module Conn) account_id
     in
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          {sql| SELECT account_identifier_id, initial_minimum_balance,
                       cliff_time, cliff_amount,
                       vesting_period, vesting_increment
@@ -1227,7 +1228,7 @@ module Timing_info = struct
   let find_by_account_identifier_id_opt (module Conn : CONNECTION)
       account_identifier_id =
     Conn.find_opt
-      (Caqti_request.find_opt Caqti_type.int typ
+      (find_opt_req Caqti_type.int typ
          {sql| SELECT account_identifier_id, initial_minimum_balance,
                       cliff_time, cliff_amount,
                       vesting_period, vesting_increment
@@ -1270,7 +1271,7 @@ module Timing_info = struct
     in
     match%bind
       Conn.find_opt
-        (Caqti_request.find_opt typ Caqti_type.int
+        (find_opt_req typ Caqti_type.int
            {sql| SELECT id FROM timing_info
                  WHERE account_identifier_id = ?
                  AND initial_minimum_balance = ?
@@ -1284,7 +1285,7 @@ module Timing_info = struct
         return id
     | None ->
         Conn.find
-          (Caqti_request.find typ Caqti_type.int
+          (find_req typ Caqti_type.int
              {sql| INSERT INTO timing_info
                     (account_identifier_id,initial_minimum_balance,
                      cliff_time, cliff_amount, vesting_period, vesting_increment)
@@ -1295,13 +1296,13 @@ module Timing_info = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 
   let load_opt (module Conn : CONNECTION) id =
     Conn.find_opt
-      (Caqti_request.find_opt Caqti_type.int typ
+      (find_opt_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -1310,13 +1311,13 @@ module Snarked_ledger_hash = struct
   let find (module Conn : CONNECTION) (t : Frozen_ledger_hash.t) =
     let hash = Frozen_ledger_hash.to_base58_check t in
     Conn.find
-      (Caqti_request.find Caqti_type.string Caqti_type.int
+      (find_req Caqti_type.string Caqti_type.int
          "SELECT id FROM snarked_ledger_hashes WHERE value = ?" )
       hash
 
   let find_by_id (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int Caqti_type.string
+      (find_req Caqti_type.int Caqti_type.string
          "SELECT value FROM snarked_ledger_hashes WHERE id = ?" )
       id
 
@@ -1326,7 +1327,7 @@ module Snarked_ledger_hash = struct
     let hash = Frozen_ledger_hash.to_base58_check t in
     match%bind
       Conn.find_opt
-        (Caqti_request.find_opt Caqti_type.string Caqti_type.int
+        (find_opt_req Caqti_type.string Caqti_type.int
            "SELECT id FROM snarked_ledger_hashes WHERE value = ?" )
         hash
     with
@@ -1334,13 +1335,13 @@ module Snarked_ledger_hash = struct
         return id
     | None ->
         Conn.find
-          (Caqti_request.find Caqti_type.string Caqti_type.int
+          (find_req Caqti_type.string Caqti_type.int
              "INSERT INTO snarked_ledger_hashes (value) VALUES (?) RETURNING id" )
           hash
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int Caqti_type.string
+      (find_req Caqti_type.int Caqti_type.string
          "SELECT value FROM snarked_ledger_hashes WHERE id = ?" )
       id
 end
@@ -1376,7 +1377,7 @@ module Zkapp_epoch_ledger = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -1436,7 +1437,7 @@ module Zkapp_epoch_data = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -1511,7 +1512,7 @@ module Zkapp_network_precondition = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -1603,7 +1604,7 @@ module Zkapp_events = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int Mina_caqti.array_int_typ
+      (find_req Caqti_type.int Mina_caqti.array_int_typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "element_ids" ]) )
       id
 end
@@ -1755,7 +1756,7 @@ module Zkapp_account_update_body = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -1786,7 +1787,7 @@ module Zkapp_account_update = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -1830,7 +1831,7 @@ module Zkapp_fee_payer_body = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -1887,7 +1888,7 @@ module Epoch_data = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -1928,13 +1929,13 @@ module User_command = struct
     let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
         ~v1_transaction_hash =
       Conn.find_opt
-        (Caqti_request.find_opt Caqti_type.string Caqti_type.int
+        (find_opt_req Caqti_type.string Caqti_type.int
            (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:[ "hash" ] ()) )
         (txn_hash_to_base58_check transaction_hash ~v1_transaction_hash)
 
     let load (module Conn : CONNECTION) ~(id : int) =
       Conn.find
-        (Caqti_request.find Caqti_type.int typ
+        (find_req Caqti_type.int typ
            (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
         id
 
@@ -1978,7 +1979,7 @@ module User_command = struct
           in
           (* TODO: Converting these uint64s to int64 can overflow; see #5419 *)
           Conn.find
-            (Caqti_request.find typ Caqti_type.int
+            (find_req typ Caqti_type.int
                (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                   ~tannot:(function
                     | "command_type" -> Some "user_command_type" | _ -> None )
@@ -2025,7 +2026,7 @@ module User_command = struct
             Public_key.add_if_doesn't_exist (module Conn) user_cmd.receiver
           in
           Conn.find
-            (Caqti_request.find typ Caqti_type.int
+            (find_req typ Caqti_type.int
                (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                   ~tannot:(function
                     | "command_type" -> Some "user_command_type" | _ -> None )
@@ -2066,14 +2067,14 @@ module User_command = struct
     let find_opt (module Conn : CONNECTION)
         ~(transaction_hash : Transaction_hash.t) =
       Conn.find_opt
-        ( Caqti_request.find_opt Caqti_type.string Caqti_type.int
+        ( find_opt_req Caqti_type.string Caqti_type.int
         @@ Mina_caqti.select_cols ~select:"id" ~table_name ~cols:[ "hash" ] ()
         )
         (Transaction_hash.to_base58_check transaction_hash)
 
     let load (module Conn : CONNECTION) id =
       Conn.find
-        ( Caqti_request.find Caqti_type.int typ
+        ( find_req Caqti_type.int typ
         @@ Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names )
         id
 
@@ -2149,8 +2150,8 @@ module Internal_command = struct
   let find_opt (module Conn : CONNECTION) ~(v1_transaction_hash : bool)
       ~(transaction_hash : Transaction_hash.t) ~(command_type : string) =
     Conn.find_opt
-      (Caqti_request.find_opt
-         Caqti_type.(tup2 string string)
+      (find_opt_req
+         Caqti_type.(t2 string string)
          Caqti_type.int
          (Mina_caqti.select_cols ~select:"id" ~table_name
             ~tannot:(function
@@ -2161,7 +2162,7 @@ module Internal_command = struct
 
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 
@@ -2182,7 +2183,7 @@ module Internal_command = struct
           Public_key.add_if_doesn't_exist (module Conn) internal_cmd.receiver
         in
         Conn.find
-          (Caqti_request.find typ Caqti_type.int
+          (find_req typ Caqti_type.int
              (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                 ~tannot:(function
                   | "command_type" -> Some "internal_command_type" | _ -> None
@@ -2227,7 +2228,7 @@ module Fee_transfer = struct
       in
       Ok { kind; receiver_id; fee; hash }
     in
-    let rep = Caqti_type.(tup4 string int int64 string) in
+    let rep = Caqti_type.(t4 string int int64 string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
@@ -2249,7 +2250,7 @@ module Fee_transfer = struct
           Public_key.add_if_doesn't_exist (module Conn) pk
         in
         Conn.find
-          (Caqti_request.find typ Caqti_type.int
+          (find_req typ Caqti_type.int
              {sql| INSERT INTO internal_commands
                     (command_type, receiver_id, fee, hash)
                    VALUES (?::internal_command_type, ?, ?, ?)
@@ -2277,7 +2278,7 @@ module Coinbase = struct
     let decode (_, receiver_id, amount, hash) =
       Ok { receiver_id; amount; hash }
     in
-    let rep = Caqti_type.(tup4 string int int64 string) in
+    let rep = Caqti_type.(t4 string int int64 string) in
     Caqti_type.custom ~encode ~decode rep
 
   let add_if_doesn't_exist (module Conn : CONNECTION)
@@ -2298,7 +2299,7 @@ module Coinbase = struct
           Public_key.add_if_doesn't_exist (module Conn) pk
         in
         Conn.find
-          (Caqti_request.find typ Caqti_type.int
+          (find_req typ Caqti_type.int
              {sql| INSERT INTO internal_commands
                     (command_type, receiver_id, fee, hash)
                    VALUES (?::internal_command_type, ?, ?, ?)
@@ -2337,7 +2338,7 @@ module Block_and_internal_command = struct
       Option.map ~f:Transaction_status.Failure.to_string failure_reason
     in
     Conn.exec
-      (Caqti_request.exec typ
+      (exec_req typ
          {sql| INSERT INTO blocks_internal_commands
                  (block_id,
                  internal_command_id,
@@ -2358,8 +2359,8 @@ module Block_and_internal_command = struct
   let find (module Conn : CONNECTION) ~block_id ~internal_command_id
       ~sequence_no ~secondary_sequence_no =
     Conn.find_opt
-      (Caqti_request.find_opt
-         Caqti_type.(tup4 int int int int)
+      (find_opt_req
+         Caqti_type.(t4 int int int int)
          Caqti_type.string
          {sql| SELECT 'exists' FROM blocks_internal_commands
                WHERE block_id = $1
@@ -2390,8 +2391,8 @@ module Block_and_internal_command = struct
       ~sequence_no ~secondary_sequence_no =
     let comma_cols = String.concat Fields.names ~sep:"," in
     Conn.find
-      (Caqti_request.find
-         Caqti_type.(tup4 int int int int)
+      (find_req
+         Caqti_type.(t4 int int int int)
          typ
          (sprintf
             {sql| SELECT %s FROM blocks_internal_commands
@@ -2426,7 +2427,7 @@ module Block_and_signed_command = struct
       Option.map ~f:Transaction_status.Failure.to_string failure_reason
     in
     Conn.exec
-      (Caqti_request.exec typ
+      (exec_req typ
          {sql| INSERT INTO blocks_user_commands
                  (block_id,
                  user_command_id,
@@ -2456,8 +2457,8 @@ module Block_and_signed_command = struct
     let open Deferred.Result.Let_syntax in
     match%bind
       Conn.find_opt
-        (Caqti_request.find_opt
-           Caqti_type.(tup3 int int int)
+        (find_opt_req
+           Caqti_type.(t3 int int int)
            Caqti_type.string
            {sql| SELECT 'exists' FROM blocks_user_commands
                  WHERE block_id = $1
@@ -2476,8 +2477,8 @@ module Block_and_signed_command = struct
   let load (module Conn : CONNECTION) ~block_id ~user_command_id ~sequence_no =
     let comma_cols = String.concat Fields.names ~sep:"," in
     Conn.find
-      (Caqti_request.find
-         Caqti_type.(tup3 int int int)
+      (find_req
+         Caqti_type.(t3 int int int)
          typ
          (sprintf
             {sql| SELECT %s FROM blocks_user_commands
@@ -2511,7 +2512,7 @@ module Zkapp_account_update_failures = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name
             ~cols:[ "index"; "failures" ] ) )
       id
@@ -2554,8 +2555,7 @@ module Block_and_zkapp_command = struct
     in
     Mina_caqti.select_insert_into_cols
       ~select:
-        ( "block_id, zkapp_command_id, sequence_no"
-        , Caqti_type.(tup3 int int int) )
+        ("block_id, zkapp_command_id, sequence_no", Caqti_type.(t3 int int int))
       ~table_name
       ~cols:
         ( [ "block_id"
@@ -2578,8 +2578,8 @@ module Block_and_zkapp_command = struct
   let load (module Conn : CONNECTION) ~block_id ~zkapp_command_id ~sequence_no =
     let comma_cols = String.concat Fields.names ~sep:"," in
     Conn.find
-      (Caqti_request.find
-         Caqti_type.(tup3 int int int)
+      (find_req
+         Caqti_type.(t3 int int int)
          typ
          (Mina_caqti.select_cols ~table_name ~select:comma_cols
             ~cols:[ "block_id"; "zkapp_command_id"; "sequence_no" ]
@@ -2589,7 +2589,7 @@ module Block_and_zkapp_command = struct
   let all_from_block (module Conn : CONNECTION) ~block_id =
     let comma_cols = String.concat Fields.names ~sep:"," in
     Conn.collect_list
-      (Caqti_request.collect Caqti_type.int typ
+      (collect_req Caqti_type.int typ
          (Mina_caqti.select_cols ~table_name ~select:comma_cols
             ~cols:[ "block_id" ] () ) )
       block_id
@@ -2661,7 +2661,7 @@ module Zkapp_account = struct
 
   let load (module Conn : CONNECTION) id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
@@ -2705,8 +2705,8 @@ module Accounts_accessed = struct
   let find_opt (module Conn : CONNECTION) ~block_id ~account_identifier_id =
     let comma_cols = String.concat Fields.names ~sep:"," in
     Conn.find_opt
-      (Caqti_request.find_opt
-         Caqti_type.(tup2 int int)
+      (find_opt_req
+         Caqti_type.(t2 int int)
          typ
          (sprintf
             {sql| SELECT %s
@@ -2777,7 +2777,7 @@ module Accounts_accessed = struct
           }
         in
         Mina_caqti.select_insert_into_cols
-          ~select:("block_id,account_identifier_id", Caqti_type.(tup2 int int))
+          ~select:("block_id,account_identifier_id", Caqti_type.(t2 int int))
           ~table_name ~cols:(Fields.names, typ)
           (module Conn)
           account_accessed
@@ -2793,7 +2793,7 @@ module Accounts_accessed = struct
   let all_from_block (module Conn : CONNECTION) block_id =
     let comma_cols = String.concat Fields.names ~sep:"," in
     Conn.collect_list
-      (Caqti_request.collect Caqti_type.int typ
+      (collect_req Caqti_type.int typ
          (Mina_caqti.select_cols ~select:comma_cols ~table_name
             ~cols:[ "block_id" ] () ) )
       block_id
@@ -2818,7 +2818,7 @@ module Accounts_created = struct
     in
     let creation_fee = Currency.Fee.to_string creation_fee in
     Mina_caqti.select_insert_into_cols
-      ~select:("block_id,account_identifier_id", Caqti_type.(tup2 int int))
+      ~select:("block_id,account_identifier_id", Caqti_type.(t2 int int))
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
       { block_id; account_identifier_id; creation_fee }
@@ -2833,7 +2833,7 @@ module Accounts_created = struct
 
   let all_from_block (module Conn : CONNECTION) block_id =
     Conn.collect_list
-      (Caqti_request.collect Caqti_type.int typ
+      (collect_req Caqti_type.int typ
          {sql| SELECT block_id, account_identifier_id, creation_fee
                FROM accounts_created
                WHERE block_id = ?
@@ -2899,14 +2899,14 @@ module Block = struct
          "SELECT id FROM blocks WHERE state_hash = ?" )
       (State_hash.to_base58_check state_hash)
 
-  let find (module Conn : CONNECTION) = make_finder Conn.find Caqti_request.find
+  let find (module Conn : CONNECTION) = make_finder Conn.find find_req
 
   let find_opt (module Conn : CONNECTION) =
-    make_finder Conn.find_opt Caqti_request.find_opt
+    make_finder Conn.find_opt find_opt_req
 
   let load (module Conn : CONNECTION) ~id =
     Conn.find
-      (Caqti_request.find Caqti_type.int typ
+      (find_req Caqti_type.int typ
          (Mina_caqti.select_cols_from_id ~table_name:"blocks" ~cols:Fields.names) )
       id
 
@@ -3011,7 +3011,7 @@ module Block = struct
         let blockchain_state = Protocol_state.blockchain_state protocol_state in
         let%bind block_id =
           Conn.find
-            (Caqti_request.find typ Caqti_type.int
+            (find_req typ Caqti_type.int
                (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                   ~tannot:(function
                     | "chain_status" ->
@@ -3393,9 +3393,7 @@ module Block = struct
     in
 
     (* we don't need to specify all types here, just the ones that sql may infer incorrectly *)
-    let field_name : type a. a Caqti_type.Field.t -> string option =
-      let open Caqti_type in
-      function
+    let field_name : type a. a Caqti_type.Field.t -> string option = function
       | Bool ->
           Some "BOOL"
       | Int ->
@@ -3408,39 +3406,36 @@ module Block = struct
           Some "BIGINT"
       | Float ->
           Some "FLOAT"
+      | String ->
+          Some "TEXT"
       | Enum name ->
           Some name
-      | _ ->
-          None
+      | Octets | Pdate | Ptime | Ptime_span ->
+          failwith "unsupported field type"
     in
 
     let rec type_field_names : type a. a Caqti_type.t -> string option list =
+      let open Caqti_type in
       function
-      | Unit ->
-          []
       | Field f ->
           [ field_name f ]
       | Option t ->
           type_field_names t
-      | Tup2 (at, bt) ->
-          List.concat [ type_field_names at; type_field_names bt ]
-      | Tup3 (at, bt, ct) ->
-          List.concat
-            [ type_field_names at; type_field_names bt; type_field_names ct ]
-      | Tup4 (at, bt, ct, dt) ->
-          List.concat
-            [ type_field_names at
-            ; type_field_names bt
-            ; type_field_names ct
-            ; type_field_names dt
-            ]
-      | Custom custom ->
-          type_field_names custom.rep
+      | Product (_, prod) ->
+          let rec loop : type a i. _ -> (a, i) product -> _ =
+           fun acc -> function
+            | Proj_end ->
+                List.concat (List.rev acc)
+            | Proj (t, _, prod) ->
+                loop (type_field_names t :: acc) prod
+          in
+          loop [] prod
+      | Annot (_, t) ->
+          type_field_names t
     in
 
-    let rec render_field : type a. a Caqti_type.Field.t -> a -> string =
+    let render_field : type a. a Caqti_type.Field.t -> a -> string =
      fun typ value ->
-      let open Caqti_type in
       match typ with
       | Bool ->
           Bool.to_string value
@@ -3468,45 +3463,30 @@ module Block = struct
           (* we are ignoring the enum annotation in this context because it's not always valid to apply *)
           (* NOTE: we assume enum values do not contain special characters (eg "'") *)
           "'" ^ value ^ "'"
-      | _ -> (
-          match Caqti_type.Field.coding Conn.driver_info typ with
-          | None ->
-              failwithf "unable to render caqti field: %s"
-                (Caqti_type.Field.to_string typ)
-                ()
-          | Some (Coding coding) ->
-              render_field coding.rep
-                (Result.ok_or_failwith @@ coding.encode value) )
     in
     let rec render_type : type a. a Caqti_type.t -> a -> string list =
-     fun typ value ->
-      match typ with
-      | Unit ->
-          []
-      | Field f ->
-          [ render_field f value ]
-      | Option t -> (
-          match value with
-          | None ->
-              List.init (Caqti_type.length typ) ~f:(Fn.const "NULL")
-          | Some x ->
-              render_type t x )
-      | Tup2 (at, bt) ->
-          let a, b = value in
-          List.concat [ render_type at a; render_type bt b ]
-      | Tup3 (at, bt, ct) ->
-          let a, b, c = value in
-          List.concat [ render_type at a; render_type bt b; render_type ct c ]
-      | Tup4 (at, bt, ct, dt) ->
-          let a, b, c, d = value in
-          List.concat
-            [ render_type at a
-            ; render_type bt b
-            ; render_type ct c
-            ; render_type dt d
-            ]
-      | Custom custom ->
-          render_type custom.rep (Result.ok_or_failwith @@ custom.encode value)
+      let open Caqti_type in
+      fun typ value ->
+        match typ with
+        | Field f ->
+            [ render_field f value ]
+        | Option t -> (
+            match value with
+            | None ->
+                List.init (Caqti_type.length typ) ~f:(Fn.const "NULL")
+            | Some x ->
+                render_type t x )
+        | Product (_, prod) ->
+            let rec loop : type i. _ -> (a, i) product -> _ =
+             fun acc -> function
+              | Proj_end ->
+                  List.concat (List.rev acc)
+              | Proj (t, prj, prod) ->
+                  loop (render_type t (prj value) :: acc) prod
+            in
+            loop [] prod
+        | Annot (_, t) ->
+            render_type t value
     in
     let render_row (type a) (typ : a Caqti_type.t) (value : a) : string =
       "(" ^ String.concat ~sep:"," (render_type typ value) ^ ")"
@@ -3557,8 +3537,8 @@ module Block = struct
         in
         let%map entries =
           Conn.collect_list
-            (Caqti_request.collect Caqti_type.unit
-               Caqti_type.(tup2 typ int)
+            (Mina_caqti.collect_req Caqti_type.unit
+               Caqti_type.(t2 typ int)
                query )
             ()
         in
@@ -3576,7 +3556,7 @@ module Block = struct
           String.concat ~sep:"," @@ List.map ~f:(render_row typ) values
         in
         Conn.collect_list
-          (Caqti_request.collect Caqti_type.unit Caqti_type.int
+          (Mina_caqti.collect_req Caqti_type.unit Caqti_type.int
              (sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table
                 fields_sql values_sql ) )
           () )
@@ -3928,7 +3908,7 @@ module Block = struct
       let ids_sql = String.concat ~sep:"," ids in
       let parent_ids_sql = String.concat ~sep:"," parent_ids in
       Conn.exec
-        (Caqti_request.exec Caqti_type.unit
+        (Mina_caqti.exec_req Caqti_type.unit
            (sprintf
               "UPDATE %s AS b SET parent_id = data.parent_id FROM (SELECT \
                unnest(array[%s]) as id, unnest(array[%s]) as parent_id) AS \
@@ -4138,7 +4118,7 @@ module Block = struct
                 Some id )
           in
           Conn.find
-            (Caqti_request.find typ Caqti_type.int
+            (find_req typ Caqti_type.int
                (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                   ~tannot:(function
                     | "sub_window_densities" ->
@@ -4299,8 +4279,8 @@ module Block = struct
   let set_parent_id_if_null (module Conn : CONNECTION) ~parent_hash
       ~(parent_id : int) =
     Conn.exec
-      (Caqti_request.exec
-         Caqti_type.(tup2 int string)
+      (exec_req
+         Caqti_type.(t2 int string)
          {sql| UPDATE blocks SET parent_id = ?
                WHERE parent_hash = ?
                AND parent_id IS NULL
@@ -4316,8 +4296,8 @@ module Block = struct
     in
     let columns = concat Fields.names in
     Conn.collect_list
-      (Caqti_request.collect
-         Caqti_type.(tup2 int int)
+      (collect_req
+         Caqti_type.(t2 int int)
          typ
          (sprintf
             {sql| WITH RECURSIVE chain AS (
@@ -4343,37 +4323,37 @@ module Block = struct
 
   let get_highest_canonical_block_opt (module Conn : CONNECTION) =
     Conn.find_opt
-      (Caqti_request.find_opt Caqti_type.unit
-         Caqti_type.(tup2 int int64)
+      (find_opt_req Caqti_type.unit
+         Caqti_type.(t2 int int64)
          "SELECT id,height FROM blocks WHERE chain_status='canonical' ORDER BY \
           height DESC LIMIT 1" )
 
   let get_nearest_canonical_block_above (module Conn : CONNECTION) height =
     Conn.find
-      (Caqti_request.find Caqti_type.int64
-         Caqti_type.(tup2 int int64)
+      (find_req Caqti_type.int64
+         Caqti_type.(t2 int int64)
          "SELECT id,height FROM blocks WHERE chain_status='canonical' AND \
           height > ? ORDER BY height ASC LIMIT 1" )
       height
 
   let get_nearest_canonical_block_below (module Conn : CONNECTION) height =
     Conn.find
-      (Caqti_request.find Caqti_type.int64
-         Caqti_type.(tup2 int int64)
+      (find_req Caqti_type.int64
+         Caqti_type.(t2 int int64)
          "SELECT id,height FROM blocks WHERE chain_status='canonical' AND \
           height < ? ORDER BY height DESC LIMIT 1" )
       height
 
   let mark_as_canonical (module Conn : CONNECTION) ~state_hash =
     Conn.exec
-      (Caqti_request.exec Caqti_type.string
+      (exec_req Caqti_type.string
          "UPDATE blocks SET chain_status='canonical' WHERE state_hash = ?" )
       state_hash
 
   let mark_as_orphaned (module Conn : CONNECTION) ~state_hash ~height =
     Conn.exec
-      (Caqti_request.exec
-         Caqti_type.(tup2 string int64)
+      (exec_req
+         Caqti_type.(t2 string int64)
          {sql| UPDATE blocks SET chain_status='orphaned'
                WHERE height = $2
                AND state_hash <> $1
@@ -4462,7 +4442,7 @@ module Block = struct
       | None, Some num_blocks -> (
           match%map
             Conn.find_opt
-              (Caqti_request.find_opt Caqti_type.unit Caqti_type.int
+              (find_opt_req Caqti_type.unit Caqti_type.int
                  "SELECT MAX(height) FROM blocks" )
               ()
           with
@@ -4478,8 +4458,8 @@ module Block = struct
       let%bind () =
         (* Delete user commands from old blocks. *)
         Conn.exec
-          (Caqti_request.exec
-             Caqti_type.(tup2 int int64)
+          (exec_req
+             Caqti_type.(t2 int int64)
              "DELETE FROM user_commands\n\
               WHERE id IN\n\
               (SELECT user_command_id FROM blocks_user_commands\n\
@@ -4490,8 +4470,8 @@ module Block = struct
       let%bind () =
         (* Delete old blocks. *)
         Conn.exec
-          (Caqti_request.exec
-             Caqti_type.(tup2 int int64)
+          (exec_req
+             Caqti_type.(t2 int int64)
              "DELETE FROM blocks WHERE blocks.height < ? OR blocks.timestamp < \
               ?" )
           (height, timestamp)
@@ -4499,7 +4479,7 @@ module Block = struct
       let%bind () =
         (* Delete orphaned internal commands. *)
         Conn.exec
-          (Caqti_request.exec Caqti_type.unit
+          (exec_req Caqti_type.unit
              "DELETE FROM internal_commands\n\
               WHERE id NOT IN\n\
               (SELECT internal_commands.id FROM internal_commands\n\
@@ -4510,7 +4490,7 @@ module Block = struct
       let%bind () =
         (* Delete orphaned snarked ledger hashes. *)
         Conn.exec
-          (Caqti_request.exec Caqti_type.unit
+          (exec_req Caqti_type.unit
              "DELETE FROM snarked_ledger_hashes\n\
               WHERE id NOT IN\n\
               (SELECT snarked_ledger_hash_id FROM blocks)" )
@@ -4519,7 +4499,7 @@ module Block = struct
       let%bind () =
         (* Delete orphaned public keys. *)
         Conn.exec
-          (Caqti_request.exec Caqti_type.unit
+          (exec_req Caqti_type.unit
              "DELETE FROM public_keys\n\
               WHERE id NOT IN (SELECT fee_payer_id FROM user_commands)\n\
               AND id NOT IN (SELECT source_id FROM user_commands)\n\
@@ -4944,7 +4924,13 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
           Strict_pipe.Writer.write extensional_block_writer extensional_block )
     ]
   in
-  match Caqti_async.connect_pool ~max_size:30 postgres_address with
+  match
+    Caqti_async.connect_pool
+      ~pool_config:
+        Caqti_pool_config.(
+          merge_left (default_from_env ()) (create ~max_size:30 ()))
+      postgres_address
+  with
   | Error e ->
       [%log error]
         "Failed to create a Caqti pool for Postgresql, see error: $error"
