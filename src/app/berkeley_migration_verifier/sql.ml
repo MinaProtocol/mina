@@ -1,5 +1,3 @@
-open Caqti_async
-
 let dump_sql_to_csv output_file ~sql =
   Printf.sprintf "COPY ( %s ) TO '%s' DELIMITER ',' CSV HEADER " sql output_file
 
@@ -28,7 +26,7 @@ module Mainnet = struct
       ORDER BY height, public_key |sql}
     |> Mina_caqti.exec_req Caqti_type.unit
 
-  let dump_accounts_created_to_csv (module Conn : CONNECTION) output_file =
+  let dump_accounts_created_to_csv (module Conn : Mina_caqti.CONNECTION) output_file =
     Conn.exec (dump_accounts_created_to_csv_query ~output_file) ()
 
   let dump_state_and_ledger_hashes_to_csv_query ~output_file =
@@ -51,8 +49,8 @@ module Mainnet = struct
            \      " height )
     |> Mina_caqti.exec_req Caqti_type.unit
 
-  let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
-      height =
+  let dump_block_hashes_till_height (module Conn : Mina_caqti.CONNECTION)
+      output_file height =
     Conn.exec (dump_block_hashes_till_height_query ~output_file ~height) ()
 
   let dump_block_hashes_query ~output_file =
@@ -65,7 +63,7 @@ module Mainnet = struct
         \      "
     |> Mina_caqti.exec_req Caqti_type.unit
 
-  let dump_block_hashes (module Conn : CONNECTION) output_file =
+  let dump_block_hashes (module Conn : Mina_caqti.CONNECTION) output_file =
     Conn.exec (dump_block_hashes_query ~output_file) ()
 
   let dump_user_commands_till_height_query ~output_file ~height =
@@ -89,8 +87,8 @@ module Mainnet = struct
            \      " height )
     |> Mina_caqti.exec_req Caqti_type.unit
 
-  let dump_user_commands_till_height (module Conn : CONNECTION) output_file
-      height =
+  let dump_user_commands_till_height (module Conn : Mina_caqti.CONNECTION)
+      output_file height =
     Conn.exec (dump_user_commands_till_height_query ~output_file ~height) ()
 
   let dump_internal_commands_till_height_query ~output_file ~height =
@@ -114,8 +112,8 @@ module Mainnet = struct
            \          " height )
     |> Mina_caqti.exec_req Caqti_type.unit
 
-  let dump_internal_commands_till_height (module Conn : CONNECTION) output_file
-      height =
+  let dump_internal_commands_till_height (module Conn : Mina_caqti.CONNECTION)
+      output_file height =
     Conn.exec (dump_internal_commands_till_height_query ~output_file ~height) ()
 
   let dump_user_commands_query ~output_file =
@@ -137,7 +135,7 @@ module Mainnet = struct
         \      "
     |> Mina_caqti.exec_req Caqti_type.unit
 
-  let dump_user_commands (module Conn : CONNECTION) output_file =
+  let dump_user_commands (module Conn : Mina_caqti.CONNECTION) output_file =
     Conn.exec (dump_user_commands_query ~output_file) ()
 
   let dump_internal_commands_query ~output_file =
@@ -160,7 +158,7 @@ module Mainnet = struct
            \          " )
     |> Mina_caqti.exec_req Caqti_type.unit
 
-  let dump_internal_commands (module Conn : CONNECTION) output_file =
+  let dump_internal_commands (module Conn : Mina_caqti.CONNECTION) output_file =
     Conn.exec (dump_internal_commands_query ~output_file) ()
 
   let mark_chain_till_fork_block_as_canonical_query =
@@ -186,8 +184,8 @@ module Mainnet = struct
       )
       |sql}
 
-  let mark_chain_till_fork_block_as_canonical (module Conn : CONNECTION)
-      fork_state_hash =
+  let mark_chain_till_fork_block_as_canonical
+      (module Conn : Mina_caqti.CONNECTION) fork_state_hash =
     Conn.exec mark_chain_till_fork_block_as_canonical_query fork_state_hash
 end
 
@@ -204,7 +202,7 @@ module Berkeley = struct
       ORDER BY height, public_key |sql}
     |> Mina_caqti.exec_req Caqti_type.unit
 
-  let dump_accounts_created_to_csv (module Conn : CONNECTION) output_file =
+  let dump_accounts_created_to_csv (module Conn : Mina_caqti.CONNECTION) output_file =
     Conn.exec (dump_accounts_created_to_csv_query ~output_file) ()
 
   let height_query =
@@ -213,7 +211,8 @@ module Berkeley = struct
             SELECT height from blocks order by height desc limit 1;
           |sql}
 
-  let block_height (module Conn : CONNECTION) = Conn.find height_query ()
+  let block_height (module Conn : Mina_caqti.CONNECTION) =
+    Conn.find height_query ()
 
   let canonical_blocks_count_till_height_query =
     Mina_caqti.find_req Caqti_type.int Caqti_type.int
@@ -230,7 +229,8 @@ module Berkeley = struct
         ) SELECT count(*) FROM chain where chain_status = 'canonical';
       |sql}
 
-  let canonical_blocks_count_till_height (module Conn : CONNECTION) height =
+  let canonical_blocks_count_till_height (module Conn : Mina_caqti.CONNECTION)
+      height =
     Conn.find canonical_blocks_count_till_height_query height
 
   let blocks_count_query =
@@ -239,7 +239,8 @@ module Berkeley = struct
           SELECT count(*) FROM blocks ;
         |sql}
 
-  let blocks_count (module Conn : CONNECTION) = Conn.find blocks_count_query ()
+  let blocks_count (module Conn : Mina_caqti.CONNECTION) =
+    Conn.find blocks_count_query ()
 
   let dump_user_commands_till_height_query ~output_file ~height =
     dump_sql_to_csv output_file
@@ -262,8 +263,8 @@ module Berkeley = struct
            \     " height )
     |> Mina_caqti.exec_req Caqti_type.unit
 
-  let dump_user_commands_till_height (module Conn : CONNECTION) output_file
-      height =
+  let dump_user_commands_till_height (module Conn : Mina_caqti.CONNECTION)
+      output_file height =
     Conn.exec (dump_user_commands_till_height_query ~output_file ~height) ()
 
   let dump_internal_commands_till_height_query ~output_file ~height =
@@ -287,8 +288,8 @@ module Berkeley = struct
            \      " height )
     |> Mina_caqti.exec_req Caqti_type.unit
 
-  let dump_internal_commands_till_height (module Conn : CONNECTION) output_file
-      height =
+  let dump_internal_commands_till_height (module Conn : Mina_caqti.CONNECTION)
+      output_file height =
     Conn.exec (dump_internal_commands_till_height_query ~output_file ~height) ()
 
   let dump_user_commands_query ~output_file =
@@ -310,7 +311,7 @@ module Berkeley = struct
         \     "
     |> Mina_caqti.exec_req Caqti_type.unit
 
-  let dump_user_commands (module Conn : CONNECTION) output_file =
+  let dump_user_commands (module Conn : Mina_caqti.CONNECTION) output_file =
     Conn.exec (dump_user_commands_query ~output_file) ()
 
   let dump_internal_commands_query ~output_file =
@@ -332,7 +333,7 @@ module Berkeley = struct
         \      "
     |> Mina_caqti.exec_req Caqti_type.unit
 
-  let dump_internal_commands (module Conn : CONNECTION) output_file =
+  let dump_internal_commands (module Conn : Mina_caqti.CONNECTION) output_file =
     Conn.exec (dump_internal_commands_query ~output_file) ()
 
   let dump_account_accessed_to_csv_query ~output_file =
@@ -345,7 +346,8 @@ module Berkeley = struct
                  ORDER BY block_id, id |sql}
     |> Mina_caqti.exec_req Caqti_type.unit
 
-  let dump_accounts_accessed_to_csv (module Conn : CONNECTION) output_file =
+  let dump_accounts_accessed_to_csv (module Conn : Mina_caqti.CONNECTION)
+      output_file =
     Conn.exec (dump_account_accessed_to_csv_query ~output_file) ()
 
   let dump_block_hashes_till_height_query ~output_file ~height =
@@ -359,8 +361,8 @@ module Berkeley = struct
            \     " height )
     |> Mina_caqti.exec_req Caqti_type.unit
 
-  let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
-      height =
+  let dump_block_hashes_till_height (module Conn : Mina_caqti.CONNECTION)
+      output_file height =
     Conn.exec (dump_block_hashes_till_height_query ~output_file ~height) ()
 
   let dump_block_hashes_query ~output_file =
@@ -373,7 +375,7 @@ module Berkeley = struct
         \      "
     |> Mina_caqti.exec_req Caqti_type.unit
 
-  let dump_block_hashes (module Conn : CONNECTION) output_file =
+  let dump_block_hashes (module Conn : Mina_caqti.CONNECTION) output_file =
     Conn.exec (dump_block_hashes_query ~output_file) ()
 
   let dump_user_and_internal_command_info_to_csv_query ~output_file =
@@ -405,15 +407,15 @@ module Berkeley = struct
       ) ORDER BY block_id, id |sql}
     |> Mina_caqti.exec_req Caqti_type.unit
 
-  let dump_user_and_internal_command_info_to_csv (module Conn : CONNECTION)
-      output_file =
+  let dump_user_and_internal_command_info_to_csv
+      (module Conn : Mina_caqti.CONNECTION) output_file =
     Conn.exec (dump_user_and_internal_command_info_to_csv_query ~output_file) ()
 
   let get_account_accessed_count_query =
     Mina_caqti.find_req Caqti_type.unit Caqti_type.int
       {sql| SELECT count(*) FROM accounts_accessed; |sql}
 
-  let count_account_accessed (module Conn : CONNECTION) =
+  let count_account_accessed (module Conn : Mina_caqti.CONNECTION) =
     Conn.find get_account_accessed_count_query ()
 
   let get_account_id_accessed_in_commands_query =
@@ -439,6 +441,7 @@ module Berkeley = struct
      
       |sql}
 
-  let get_account_id_accessed_in_commands (module Conn : CONNECTION) =
+  let get_account_id_accessed_in_commands (module Conn : Mina_caqti.CONNECTION)
+      =
     Conn.find get_account_id_accessed_in_commands_query ()
 end

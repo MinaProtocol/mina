@@ -91,9 +91,9 @@ let update_of_id pool update_id =
   let open Zkapp_basic in
   let query_db ~f = Mina_caqti.query ~f pool in
   let with_pool ~f arg =
-    let open Caqti_async in
+    let open Mina_caqti in
     Pool.use
-      (fun (module Conn : CONNECTION) -> f (module Conn : CONNECTION) arg)
+      (fun (module Conn : Mina_caqti.CONNECTION) -> f (module Conn : Mina_caqti.CONNECTION) arg)
       pool
   in
   let%bind { app_state_id
@@ -636,9 +636,9 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
     (int * Account.t) Deferred.t =
   let query_db ~f = Mina_caqti.query ~f pool in
   let with_pool ~f arg =
-    let open Caqti_async in
+    let open Mina_caqti in
     Pool.use
-      (fun (module Conn : CONNECTION) -> f (module Conn : CONNECTION) arg)
+      (fun (module Conn : Mina_caqti.CONNECTION) -> f (module Conn : Mina_caqti.CONNECTION) arg)
       pool
   in
   let pk_of_id = pk_of_id pool in

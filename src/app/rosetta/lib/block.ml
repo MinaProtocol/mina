@@ -557,10 +557,10 @@ module Sql = struct
         |}
            b_fields )
 
-    let run_by_id (module Conn : Caqti_async.CONNECTION) id =
+    let run_by_id (module Conn : Mina_caqti.CONNECTION) id =
       Conn.find_opt query_by_id id
 
-    let run_has_canonical_height (module Conn : Caqti_async.CONNECTION) ~height
+    let run_has_canonical_height (module Conn : Mina_caqti.CONNECTION) ~height
         =
       let open Deferred.Result.Let_syntax in
       let%map num_canonical_at_height =
@@ -568,7 +568,7 @@ module Sql = struct
       in
       Int64.( > ) num_canonical_at_height Int64.zero
 
-    let run (module Conn : Caqti_async.CONNECTION) = function
+    let run (module Conn : Mina_caqti.CONNECTION) = function
       | Some (`This (`Height h)) ->
           let open Deferred.Result.Let_syntax in
           let%bind has_canonical_height =
@@ -693,7 +693,7 @@ module Sql = struct
         |}
            fields )
 
-    let run (module Conn : Caqti_async.CONNECTION) id =
+    let run (module Conn : Mina_caqti.CONNECTION) id =
       Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
   end
 
@@ -761,7 +761,7 @@ module Sql = struct
       |}
            fields )
 
-    let run (module Conn : Caqti_async.CONNECTION) id =
+    let run (module Conn : Mina_caqti.CONNECTION) id =
       Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
   end
 
@@ -830,7 +830,7 @@ module Sql = struct
          WHERE bzc.block_id = ?
       |}
 
-    let run (module Conn : Caqti_async.CONNECTION) id =
+    let run (module Conn : Mina_caqti.CONNECTION) id =
       Conn.collect_list query id
   end
 
@@ -878,12 +878,12 @@ module Sql = struct
     |}
            fields )
 
-    let run (module Conn : Caqti_async.CONNECTION) command_id block_id =
+    let run (module Conn : Mina_caqti.CONNECTION) command_id block_id =
       Conn.collect_list query
         (command_id, Mina_base.Token_id.(to_string default), block_id)
   end
 
-  let run (module Conn : Caqti_async.CONNECTION) input =
+  let run (module Conn : Mina_caqti.CONNECTION) input =
     let module M = struct
       include Deferred.Result
 
@@ -1116,12 +1116,12 @@ module Specific = struct
     module Mock = T (Result)
 
     let real :
-        logger:Logger.t -> db:(module Caqti_async.CONNECTION) -> 'gql Real.t =
+        logger:Logger.t -> db:(module Mina_caqti.CONNECTION) -> 'gql Real.t =
      fun ~logger ~db ->
       { logger
       ; db_block =
           (fun query ->
-            let (module Conn : Caqti_async.CONNECTION) = db in
+            let (module Conn : Mina_caqti.CONNECTION) = db in
             Sql.run (module Conn) query )
       ; validate_network_choice = Network.Validate_choice.Real.validate
       }

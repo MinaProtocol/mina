@@ -479,13 +479,7 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks () =
   (* sanity-check input state hashes *)
   check_state_hash ~logger start_state_hash_opt ;
   check_state_hash ~logger end_state_hash_opt ;
-  match
-    Caqti_async.connect_pool
-      ~pool_config:
-        Caqti_pool_config.(
-          merge_left (default_from_env ()) (create ~max_size:128 ()))
-      archive_uri
-  with
+  match Mina_caqti.connect_pool ~max_size:128 archive_uri with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]

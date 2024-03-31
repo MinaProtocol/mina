@@ -2,8 +2,67 @@
 
 open Async
 open Core_kernel
-open Caqti_async
 open Mina_base
+
+let find_req t u s = Caqti_request.Infix.(t ->! u) s
+
+let find_opt_req t u s = Caqti_request.Infix.(t ->? u) s
+
+let collect_req t u s = Caqti_request.Infix.(t ->* u) s
+
+let exec_req t s = Caqti_request.Infix.(t ->. Caqti_type.unit) s
+
+module type CONNECTION = sig
+  include Caqti_async.CONNECTION
+
+  (** Code expects any queries to differing sources to never interfere. *)
+  val source : Uri.t
+end
+
+module Wrap
+    (Conn : Caqti_async.CONNECTION) (Arg : sig
+      val source : Uri.t
+    end) : CONNECTION = struct
+  include Conn
+  include Arg
+end
+
+let wrap_conn (module Conn : Caqti_async.CONNECTION) ~source =
+  let module Conn =
+    Wrap
+      (Conn)
+      (struct
+        let source = source
+      end)
+  in
+  (module Conn : CONNECTION)
+
+module Pool = struct
+  type ('a, 'e) t = { source : Uri.t; pool : ('a, 'e) Caqti_async.Pool.t }
+
+  let wrap ~source pool = { source; pool }
+
+  let use (f : (module CONNECTION) -> 'a) pool =
+    Caqti_async.Pool.use
+      (fun (module Conn : Caqti_async.CONNECTION) ->
+        f (wrap_conn (module Conn) ~source:pool.source) )
+      pool.pool
+end
+
+let connect_pool ?max_size uri =
+  let size = max_size in
+  let%map.Result pool =
+    Caqti_async.connect_pool
+      ~pool_config:
+        Caqti_pool_config.(
+          merge_left (default_from_env ()) (create ?max_size:size ()))
+      uri
+  in
+  Pool.wrap ~source:uri pool
+
+let connect uri =
+  let%map.Deferred.Result conn = Caqti_async.connect uri in
+  wrap_conn ~source:uri conn
 
 module Type_spec = struct
   type (_, _) t =
@@ -230,6 +289,18 @@ let insert_into_cols ~(returning : string) ~(table_name : string)
     (String.concat ~sep:", " cols)
     values returning
 
+let insert_assuming_new ~(select : string * 'select Caqti_type.t)
+    ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
+    (module Conn : CONNECTION) (value : 'cols) =
+  Conn.find
+    ( find_req (snd cols) (snd select)
+    @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
+         ~cols:(fst cols) () )
+    value
+
+(* run `select_cols` and return the result, if found
+   if not found, run `insert_into_cols` and return the result
+*)
 let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
     ~(table_name : string) ?tannot ~(cols : string list * 'cols Caqti_type.t)
     (module Conn : CONNECTION) (value : 'cols) =
@@ -283,7 +354,7 @@ let insert_multi_into_col ~(table_name : string)
     ()
 
 let query ~f pool =
-  match%bind Caqti_async.Pool.use f pool with
+  match%bind Pool.use f pool with
   | Ok v ->
       return v
   | Error msg ->
@@ -316,11 +387,3 @@ let get_zkapp_or_ignore (item_opt : 'arg option)
 let get_opt_item (arg_opt : 'arg option)
     ~(f : 'arg -> ('res, _) Deferred.Result.t) : 'res option Deferred.t =
   make_get_opt ~of_option:Fn.id ~f arg_opt
-
-let find_req t u s = Caqti_request.Infix.(t ->! u) s
-
-let find_opt_req t u s = Caqti_request.Infix.(t ->? u) s
-
-let collect_req t u s = Caqti_request.Infix.(t ->* u) s
-
-let exec_req t s = Caqti_request.Infix.(t ->. Caqti_type.unit) s

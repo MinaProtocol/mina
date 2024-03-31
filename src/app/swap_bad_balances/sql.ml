@@ -15,12 +15,11 @@ module Receiver_balances = struct
             WHERE b.state_hash = $1 AND bic.sequence_no = $2
       |sql}
 
-  let run_ids_from_fee_transfer (module Conn : Caqti_async.CONNECTION)
-      state_hash seq_no =
+  let run_ids_from_fee_transfer (module Conn : Mina_caqti.CONNECTION) state_hash
+      seq_no =
     Conn.collect_list query_ids_from_fee_transfer (state_hash, seq_no)
 
-  let add_if_doesn't_exist (module Conn : Caqti_async.CONNECTION) (pk, balance)
-      =
+  let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION) (pk, balance) =
     let open Deferred.Result.Let_syntax in
     (* if duplicates, any is acceptable *)
     match%bind
@@ -47,7 +46,7 @@ module Receiver_balances = struct
               RETURNING id" )
           (pk, balance)
 
-  let load (module Conn : Caqti_async.CONNECTION) id =
+  let load (module Conn : Mina_caqti.CONNECTION) id =
     Conn.find
       (Mina_caqti.find_req
          Caqti_type.(int)
@@ -69,7 +68,7 @@ module Receiver_balances = struct
             AND bic.receiver_balance = $3
       |sql}
 
-  let swap_in_new_balance (module Conn : Caqti_async.CONNECTION) state_hash
+  let swap_in_new_balance (module Conn : Mina_caqti.CONNECTION) state_hash
       seq_no old_balance_id new_balance_id =
     Conn.exec query_swap_in_new_balance
       (state_hash, seq_no, old_balance_id, new_balance_id)

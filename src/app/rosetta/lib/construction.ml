@@ -878,7 +878,7 @@ module Submit = struct
                 AND uc.amount = $4
                 AND uc.fee = $5 |sql}
 
-      let run (module Conn : Caqti_async.CONNECTION) ~nonce ~source ~receiver
+      let run (module Conn : Mina_caqti.CONNECTION) ~nonce ~source ~receiver
           ~amount ~fee =
         let open Unsigned_extended in
         Conn.find_opt query
@@ -926,7 +926,7 @@ module Submit = struct
     module Mock = T (Result)
 
     let real :
-           db:(module Caqti_async.CONNECTION)
+           db:(module Mina_caqti.CONNECTION)
         -> graphql_uri:Uri.t
         -> ( 'gql_payment
            , 'gql_delegation

@@ -4,7 +4,7 @@ open Rosetta_lib
 
 let router ~graphql_uri
     ~(pool :
-       ( (Caqti_async.connection, [> Caqti_error.connect ]) Caqti_async.Pool.t
+       ( (Caqti_async.connection, [> Caqti_error.connect ]) Mina_caqti.Pool.t
        , [ `App of Errors.t ] )
        Deferred.Result.t
        lazy_t ) ~logger route body =
@@ -18,7 +18,7 @@ let router ~graphql_uri
   in
   let with_db f =
     let%bind pool = Lazy.force pool in
-    Caqti_async.Pool.use (fun db -> f ~db) pool
+    Mina_caqti.Pool.use (fun db -> f ~db) pool
     |> Deferred.Result.map_error ~f:(function
          | `App e ->
              `App e
@@ -62,7 +62,7 @@ let pg_log_data ~logger ~pool : unit Deferred.t =
   match%bind Lazy.force pool with
   | Ok pool ->
       let get_logs () : (unit, _) Deferred.Result.t =
-        Caqti_async.Pool.use
+        Mina_caqti.Pool.use
           (fun db ->
             let open Deferred.Result.Let_syntax in
             let%bind num_conns = Pg_data.run_connection_count db () in
@@ -187,10 +187,7 @@ let command =
               "MINA_ROSETTA_MAX_DB_POOL_SIZE not set or invalid. Please set \
                this to a number (try 64 or 128)"
         in
-        match Caqti_async.connect_pool       ~pool_config:
-        Caqti_pool_config.(
-          merge_left (default_from_env ()) (create ~max_size:max_pool_size ()))
- archive_uri with
+        match Mina_caqti.connect_pool ~max_size:max_pool_size archive_uri with
         | Error e ->
             [%log error]
               ~metadata:[ ("error", `String (Caqti_error.show e)) ]

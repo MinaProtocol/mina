@@ -2,7 +2,6 @@
 
 open Core_kernel
 open Async
-open Caqti_async
 
 (* before running this program for the first time, import the berkeley schema to the
    migrated database name
@@ -67,7 +66,7 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
   let query_mainnet_db ~f = Mina_caqti.query ~f mainnet_pool in
   [%log debug] "Fetching transaction sequence from prior database" ;
   let%bind block_user_cmds =
-    query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
+    query_mainnet_db ~f:(fun (module Conn : Mina_caqti.CONNECTION) ->
         Conn.collect_list
           (Mina_caqti.collect_req Caqti_type.unit
              (Caqti_type.t2 Sql.Mainnet.User_command.typ
@@ -85,7 +84,7 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
           () )
   in
   let%bind block_internal_cmds =
-    query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
+    query_mainnet_db ~f:(fun (module Conn : Mina_caqti.CONNECTION) ->
         Conn.collect_list
           (Mina_caqti.collect_req Caqti_type.unit
              (Caqti_type.t2 Sql.Mainnet.Internal_command.typ
@@ -117,7 +116,7 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
   let%bind public_keys =
     if List.is_empty required_public_key_ids then return Int.Map.empty
     else
-      query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
+      query_mainnet_db ~f:(fun (module Conn : Mina_caqti.CONNECTION) ->
           Conn.collect_list
             (Mina_caqti.collect_req Caqti_type.unit
                Caqti_type.(t2 int Sql.Mainnet.Public_key.typ)
@@ -343,15 +342,11 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
   let logger = Logger.create () in
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
-  let pool_config =
-    Caqti_pool_config.(
-      merge_left (default_from_env ()) (create ~max_size:128 ()))
-  in
   let mainnet_pool =
-    Caqti_async.connect_pool ~pool_config mainnet_archive_uri
+    Mina_caqti.connect_pool ~max_size:128 mainnet_archive_uri
   in
   let migrated_pool =
-    Caqti_async.connect_pool ~pool_config migrated_archive_uri
+    Mina_caqti.connect_pool ~max_size:128 migrated_archive_uri
   in
   match (mainnet_pool, migrated_pool) with
   | Error e, _ | _, Error e ->
@@ -417,7 +412,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
          startup in order to be able to resume gracefully in the event of an unfortunate crash. *)
       let%bind () =
         let%bind garbage_block_ids =
-          query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
+          query_migrated_db ~f:(fun (module Conn : Mina_caqti.CONNECTION) ->
               Conn.collect_list
                 (Mina_caqti.collect_req Caqti_type.unit Caqti_type.int
                    (sprintf
@@ -433,7 +428,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
             @@ List.map garbage_block_ids ~f:Int.to_string
           in
           let%bind () =
-            query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
+            query_migrated_db ~f:(fun (module Conn : Mina_caqti.CONNECTION) ->
                 Conn.exec
                   (Mina_caqti.exec_req Caqti_type.unit
                      (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
@@ -441,7 +436,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                         .table_name garbage_block_ids_sql ) )
                   () )
           in
-          query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
+          query_migrated_db ~f:(fun (module Conn : Mina_caqti.CONNECTION) ->
               Conn.exec
                 (Mina_caqti.exec_req Caqti_type.unit
                    (sprintf "DELETE FROM %s WHERE block_id IN (%s)"

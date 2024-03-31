@@ -50,7 +50,7 @@ type output =
 
 module type Get_command_ids = sig
   val run :
-       Caqti_async.connection
+       (module Mina_caqti.CONNECTION)
     -> state_hash:string
     -> start_slot:int64
     -> (int list, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
@@ -174,7 +174,7 @@ let get_slot_hashes slot = Hashtbl.find global_slot_hashes_tbl slot
 
 let process_block_infos_of_state_hash ~logger pool ~state_hash ~start_slot ~f =
   match%bind
-    Caqti_async.Pool.use
+    Mina_caqti.Pool.use
       (fun db -> Sql.Block_info.run db ~state_hash ~start_slot)
       pool
   with
@@ -521,8 +521,8 @@ let get_parent_state_view ~pool block_id =
   in
   return state_view
 
-let zkapp_command_to_transaction ~logger ~pool (cmd : Sql.Zkapp_command.t) :
-    Mina_transaction.Transaction.t Deferred.t =
+let zkapp_command_to_transaction ~logger ~source ~pool
+    (cmd : Sql.Zkapp_command.t) : Mina_transaction.Transaction.t Deferred.t =
   let query_db = Mina_caqti.query pool in
   (* use dummy authorizations *)
   let%bind (fee_payer : Account_update.Fee_payer.t) =
@@ -543,7 +543,7 @@ let zkapp_command_to_transaction ~logger ~pool (cmd : Sql.Zkapp_command.t) :
           query_db ~f:(fun db -> Processor.Zkapp_account_update.load db id)
         in
         let%map body =
-          Archive_lib.Load_data.get_account_update_body ~pool body_id
+          Archive_lib.Load_data.get_account_update_body ~source ~pool body_id
         in
         let (authorization : Control.t) =
           match body.authorization_kind with
@@ -641,13 +641,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
              msg )
   in
   let archive_uri = Uri.of_string archive_uri in
-  match
-    Caqti_async.connect_pool
-      ~pool_config:
-        Caqti_pool_config.(
-          merge_left (default_from_env ()) (create ~max_size:30 ()))
-      archive_uri
-  with
+  match Mina_caqti.connect_pool ~max_size:128 archive_uri with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]
@@ -787,7 +781,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       (* end mutable state *)
       let get_command_ids (module Command_ids : Get_command_ids) name =
         match%bind
-          Caqti_async.Pool.use
+          Mina_caqti.Pool.use
             (fun db ->
               Command_ids.run db ~state_hash:target_state_hash
                 ~start_slot:input.start_slot_since_genesis )
@@ -823,7 +817,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         Deferred.List.map internal_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
             match%map
-              Caqti_async.Pool.use
+              Mina_caqti.Pool.use
                 (fun db ->
                   Sql.Internal_command.run db
                     ~start_slot:input.start_slot_since_genesis
@@ -880,7 +874,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         Deferred.List.map user_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
             match%map
-              Caqti_async.Pool.use (fun db -> Sql.User_command.run db id) pool
+              Mina_caqti.Pool.use (fun db -> Sql.User_command.run db id) pool
             with
             | Ok [] ->
                 failwithf "Expected at least one user command with id %d" id ()
@@ -911,7 +905,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         Deferred.List.map zkapp_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
             match%map
-              Caqti_async.Pool.use (fun db -> Sql.Zkapp_command.run db id) pool
+              Mina_caqti.Pool.use (fun db -> Sql.Zkapp_command.run db id) pool
             with
             | Ok [] ->
                 failwithf "Expected at least one zkApp command with id %d" id ()
@@ -1416,7 +1410,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
               check_for_complete_block
                 ~cmd_global_slot_since_genesis:zkc.global_slot_since_genesis
             in
-            let%bind txn = zkapp_command_to_transaction ~logger ~pool zkc in
+            let%bind txn =
+              zkapp_command_to_transaction ~logger ~pool ~source zkc
+            in
             apply_commands ~block_txns:(txn :: block_txns)
               ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
               ~last_block_id:zkc.block_id internal_cmds user_cmds zkcs
