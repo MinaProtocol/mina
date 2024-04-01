@@ -2,22 +2,8 @@ open Core
 open Async
 module Ledger = Mina_ledger.Ledger
 
-let extract_ledgers (config : Runtime_config.t) =
-  let ledger = Option.value_exn ~message:"No ledger provided" config.ledger in
-  let staking_ledger =
-    let%map.Option { staking; _ } = config.epoch_data in
-    staking.ledger
-  in
-  let next_ledger =
-    let%bind.Option { next; _ } = config.epoch_data in
-    let%map.Option { ledger; _ } = next in
-    ledger
-  in
-  (ledger, staking_ledger, next_ledger)
-
 module Hashes = struct
-  type t = { s3_data_hash : string; hash : string; oldhash : string }
-  [@@deriving to_yojson]
+  type t = { s3_data_hash : string; hash : string } [@@deriving to_yojson]
 end
 
 module Hash_json = struct
@@ -33,61 +19,44 @@ let ledger_depth =
 
 let logger = Logger.create ()
 
-let hash_root ledger =
-  Mina_base.Ledger_hash.to_base58_check @@ Mina_ledger.Ledger.merkle_root ledger
-
-let migrating_from_version =
-  Protocol_version.transaction
-    (Protocol_version.create ~transaction:2 ~network:0 ~patch:0)
-  |> Mina_numbers.Txn_version.of_int
-
 let load_ledger (accounts : Runtime_config.Accounts.t) =
   let accounts =
     List.map accounts ~f:(fun account ->
         (None, Runtime_config.Accounts.Single.to_account account) )
-  in
-  let accounts_altered =
-    Genesis_ledger_helper.Ledger.patch_accounts' ~version:migrating_from_version
-      accounts
-    |> List.map ~f:(fun (k, acc) -> (k, acc))
   in
   let packed =
     Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
       ~depth:ledger_depth
       (lazy accounts)
   in
-  let packed_patched =
-    Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-      ~depth:ledger_depth
-      (lazy accounts_altered)
-  in
-  ( Lazy.force (Genesis_ledger.Packed.t packed)
-  , hash_root @@ Lazy.force (Genesis_ledger.Packed.t packed_patched) )
+  Lazy.force (Genesis_ledger.Packed.t packed)
 
-let generate_ledger_tarball ~genesis_dir ~ledger_name_prefix ~oldhash ledger =
+let generate_ledger_tarball ~genesis_dir ~ledger_name_prefix ledger =
   let%bind tar_path =
     Deferred.Or_error.ok_exn
     @@ Genesis_ledger_helper.Ledger.generate_tar ~genesis_dir ~logger
          ~ledger_name_prefix ledger
   in
   [%log info] "Generated ledger tar at %s" tar_path ;
-  let hash = hash_root ledger in
+  let hash =
+    Mina_base.Ledger_hash.to_base58_check
+    @@ Mina_ledger.Ledger.merkle_root ledger
+  in
   let%map s3_data_hash = Genesis_ledger_helper.sha3_hash tar_path in
-  { Hashes.s3_data_hash; hash; oldhash }
+  { Hashes.s3_data_hash; hash }
 
-let generate_hash_json ~genesis_dir (ledger, oldroot)
-    (staking_ledger, oldstaking) (next_ledger, oldnext) =
+let generate_hash_json ~genesis_dir ledger staking_ledger next_ledger =
   let%bind ledger_hashes =
     generate_ledger_tarball ~ledger_name_prefix:"genesis_ledger" ~genesis_dir
-      ~oldhash:oldroot ledger
+      ledger
   in
   let%bind staking =
     generate_ledger_tarball ~ledger_name_prefix:"epoch_ledger" ~genesis_dir
-      ~oldhash:oldstaking staking_ledger
+      staking_ledger
   in
   let%map next =
     generate_ledger_tarball ~ledger_name_prefix:"epoch_ledger" ~genesis_dir
-      ~oldhash:oldnext next_ledger
+      next_ledger
   in
   { Hash_json.ledger = ledger_hashes; epoch_data = { staking; next } }
 
@@ -117,7 +86,6 @@ let extract_accounts_exn = function
   | { Runtime_config.Ledger.base = Accounts accounts
     ; balances = []
     ; add_genesis_winner = None
-    ; _
     } ->
       accounts
   | _ ->
@@ -134,12 +102,21 @@ let load_config_exn config_file =
            Failure ("Could not parse configuration: " ^ err) )
     |> Result.ok_exn
   in
-  let ledger, staking_ledger, next_ledger = extract_ledgers config in
   if
     Option.(
       is_some config.daemon || is_some config.genesis
       || Option.value_map ~default:false ~f:is_dirty_proof config.proof)
   then failwith "Runtime config has unexpected fields" ;
+  let ledger = Option.value_exn ~message:"No ledger provided" config.ledger in
+  let staking_ledger =
+    let%map.Option { staking; _ } = config.epoch_data in
+    staking.ledger
+  in
+  let next_ledger =
+    let%bind.Option { next; _ } = config.epoch_data in
+    let%map.Option { ledger; _ } = next in
+    ledger
+  in
   ( extract_accounts_exn ledger
   , Option.map ~f:extract_accounts_exn staking_ledger
   , Option.map ~f:extract_accounts_exn next_ledger )
