@@ -147,10 +147,10 @@ error=0
 result=$(jq --slurpfile block "$workdir/precomputed_fork_block.json" --slurpfile hashes "$workdir/hashes.json" --slurpfile a "$workdir/config-substituted.json" --slurpfile b "$PACKAGED_DAEMON_CONFIG" -n '
   ($a[0].epoch_data.staking.hash == $b[0].epoch_data.staking.hash and
    $a[0].epoch_data.next.hash == $b[0].epoch_data.next.hash and
-   $hashes[0].epoch_data.staking.oldhash == $block[0].protocol_state.body.consensus_state.staking_epoch_data.ledger.hash and
-   $hashes[0].epoch_data.next.oldhash == $block[0].protocol_state.body.consensus_state.next_epoch_data.ledger.hash and
+   $hashes[0].epoch_data.staking.old_hash == $block[0].protocol_state.body.consensus_state.staking_epoch_data.ledger.hash and
+   $hashes[0].epoch_data.next.old_hash == $block[0].protocol_state.body.consensus_state.next_epoch_data.ledger.hash and
    $a[0].ledger.hash == $b[0].ledger.hash and
-   $hashes[0].ledger.oldhash == $block[0].protocol_state.body.consensus_state.blockchain_state.ledger_hash)')
+   $hashes[0].ledger.old_hash == $block[0].protocol_state.body.consensus_state.blockchain_state.ledger_hash)')
 
 if [ "$result" != "true" ]; then
     echo "Packaged config hashes in $PACKAGED_DAEMON_CONFIG not expected compared to $workdir/config-substituted.json" >&2

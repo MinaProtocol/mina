@@ -16,7 +16,7 @@ let extract_ledgers (config : Runtime_config.t) =
   (ledger, staking_ledger, next_ledger)
 
 module Hashes = struct
-  type t = { s3_data_hash : string; hash : string; oldhash : string }
+  type t = { s3_data_hash : string; hash : string; old_hash : string }
   [@@deriving to_yojson]
 end
 
@@ -41,6 +41,8 @@ let migrating_from_version =
     (Protocol_version.create ~transaction:2 ~network:0 ~patch:0)
   |> Mina_numbers.Txn_version.of_int
 
+let migrating_from_ledger_depth = 20
+
 let load_ledger (accounts : Runtime_config.Accounts.t) =
   let accounts =
     List.map accounts ~f:(fun account ->
@@ -58,13 +60,13 @@ let load_ledger (accounts : Runtime_config.Accounts.t) =
   in
   let packed_patched =
     Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-      ~depth:ledger_depth
+      ~depth:migrating_from_ledger_depth
       (lazy accounts_altered)
   in
   ( Lazy.force (Genesis_ledger.Packed.t packed)
   , hash_root @@ Lazy.force (Genesis_ledger.Packed.t packed_patched) )
 
-let generate_ledger_tarball ~genesis_dir ~ledger_name_prefix ~oldhash ledger =
+let generate_ledger_tarball ~genesis_dir ~ledger_name_prefix ~old_hash ledger =
   let%bind tar_path =
     Deferred.Or_error.ok_exn
     @@ Genesis_ledger_helper.Ledger.generate_tar ~genesis_dir ~logger
@@ -73,21 +75,21 @@ let generate_ledger_tarball ~genesis_dir ~ledger_name_prefix ~oldhash ledger =
   [%log info] "Generated ledger tar at %s" tar_path ;
   let hash = hash_root ledger in
   let%map s3_data_hash = Genesis_ledger_helper.sha3_hash tar_path in
-  { Hashes.s3_data_hash; hash; oldhash }
+  { Hashes.s3_data_hash; hash; old_hash }
 
-let generate_hash_json ~genesis_dir (ledger, oldroot)
-    (staking_ledger, oldstaking) (next_ledger, oldnext) =
+let generate_hash_json ~genesis_dir (ledger, old_root)
+    (staking_ledger, old_staking) (next_ledger, old_next) =
   let%bind ledger_hashes =
     generate_ledger_tarball ~ledger_name_prefix:"genesis_ledger" ~genesis_dir
-      ~oldhash:oldroot ledger
+      ~old_hash:old_root ledger
   in
   let%bind staking =
     generate_ledger_tarball ~ledger_name_prefix:"epoch_ledger" ~genesis_dir
-      ~oldhash:oldstaking staking_ledger
+      ~old_hash:old_staking staking_ledger
   in
   let%map next =
     generate_ledger_tarball ~ledger_name_prefix:"epoch_ledger" ~genesis_dir
-      ~oldhash:oldnext next_ledger
+      ~old_hash:old_next next_ledger
   in
   { Hash_json.ledger = ledger_hashes; epoch_data = { staking; next } }
 
