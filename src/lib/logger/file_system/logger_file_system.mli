@@ -11,6 +11,8 @@ val dumb_logrotate :
   -> num_rotate:int
   -> Logger.Transport.t
 
+val evergrowing : log_filename:string -> Logger.Transport.t
+
 (** Pretty printer for time, in "%Y-%m-%d %H:%M:%S UTC" format.
 
     On linking this library, this is used to override the JS-safe

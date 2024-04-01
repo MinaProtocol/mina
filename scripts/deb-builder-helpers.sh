@@ -27,7 +27,7 @@ SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
 
 SUGGESTED_DEPS="jq, curl, wget"
 
-ARCHIVE_MIGRATION_DEPS="jq, mina-logproc, google-cloud-sdk"
+ARCHIVE_MIGRATION_DEPS="jq, google-cloud-sdk"
 
 TEST_EXECUTIVE_DEPS=", mina-logproc, python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, terraform, helm"
 
@@ -362,7 +362,7 @@ build_archive_migration_deb () {
   cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
   cp ./default/src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-verifier"
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-migration-replayer"
-  cp ../scripts/archive/migration/berkeley_migration.sh "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-script"
+  cp ../scripts/archive/migration/mina-berkeley-migration-script "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-script"
   
   build_deb "$ARCHIVE_MIGRATION_DEB"
 }

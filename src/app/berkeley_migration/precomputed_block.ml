@@ -172,6 +172,10 @@ let of_yojson json =
 let block_filename_regexp ~network =
   Str.regexp (sprintf "%s-[0-9]+-.+\\.json" network)
 
+let bar ?data ~total label =
+  let open Progress.Line in
+  list [ const label; spinner (); bar ?data total; eta total; count_to total ]
+
 let parse_filename filename =
   let open Option.Let_syntax in
   let rest, ext = Filename.split_extension filename in
@@ -200,7 +204,7 @@ let list_directory ~network =
 
 let concrete_fetch_batch ~logger ~bucket ~network targets =
   let%bind existing_targets = list_directory ~network in
-  [%log info] "Found %d individually downloaded precomputed blocks"
+  [%log debug] "Found %d individually downloaded precomputed blocks"
     (Set.length existing_targets) ;
   let missing_targets = Set.diff (Id.Set.of_list targets) existing_targets in
   let num_missing_targets = Set.length missing_targets in
@@ -219,20 +223,20 @@ let concrete_fetch_batch ~logger ~bucket ~network targets =
           ~stdin:gsutil_input ()
       in
       don't_wait_for
-        (let rec progress_loop () =
-           let%bind existing = list_directory ~network in
-           let downloaded_targets =
-             Set.length (Set.inter missing_targets existing)
-           in
-           [%log info] "%d/%d files downloaded (%%%f)" downloaded_targets
-             num_missing_targets
-             Float.(
-               100.0 * of_int downloaded_targets / of_int num_missing_targets) ;
-           let%bind () = after (Time.Span.of_sec 10.0) in
-           if Deferred.is_determined gsutil_process then Deferred.unit
-           else progress_loop ()
-         in
-         progress_loop () ) ;
+        (Progress.with_reporter
+           (bar ~data:`Latest ~total:num_missing_targets "Downloading blocks")
+           (fun f ->
+             let rec progress_loop () =
+               let%bind existing = list_directory ~network in
+               let downloaded_targets =
+                 Set.length (Set.inter missing_targets existing)
+               in
+               f downloaded_targets ;
+               let%bind () = after (Time.Span.of_sec 10.0) in
+               if Deferred.is_determined gsutil_process then Deferred.unit
+               else progress_loop ()
+             in
+             progress_loop () ) ) ;
       match%map gsutil_process with
       | Ok _ ->
           [%log info] "Finished downloading precomputed blocks"
@@ -244,14 +248,26 @@ let concrete_fetch_batch ~logger ~bucket ~network targets =
   let file_throttle =
     Throttle.create ~continue_on_error:false ~max_concurrent_jobs:100
   in
-  Deferred.List.map targets ~how:`Parallel ~f:(fun target ->
-      let _, state_hash = target in
-      let%map contents =
-        Throttle.enqueue file_throttle (fun () ->
-            Reader.file_contents (Id.filename ~network target) )
+
+  Progress.with_reporter
+    (bar ~data:`Sum ~total:(List.length targets) "Parsing blocks for metadata")
+    (fun progress ->
+      let in_this_batch = ref 0 in
+      let res =
+        Deferred.List.map targets ~how:`Parallel ~f:(fun target ->
+            let _, state_hash = target in
+            let%map contents =
+              Throttle.enqueue file_throttle (fun () ->
+                  Reader.file_contents (Id.filename ~network target) )
+            in
+            let block = of_yojson (Yojson.Safe.from_string contents) in
+            incr in_this_batch ;
+            if !in_this_batch > 100 then (
+              progress 100 ;
+              in_this_batch := 0 ) ;
+            (state_hash, block) )
       in
-      let block = of_yojson (Yojson.Safe.from_string contents) in
-      (state_hash, block) )
+      progress !in_this_batch ; res )
   >>| Mina_base.State_hash.Map.of_alist_exn
 
 let delete_fetched_concrete ~network targets : unit Deferred.t =
@@ -276,19 +292,24 @@ let delete_fetched_concrete ~network targets : unit Deferred.t =
     in
     List.rev (loop list init [] [])
   in
-  List.map targets ~f:(Id.filename ~network)
-  |> chunk_using ~init:0 ~f:(fun accumulated_size block_id ->
-         let arg_size = String.length block_id in
-         let size_with_new_arg = accumulated_size + String.length block_id in
-         if size_with_new_arg > max_args_size then `Emit arg_size
-         else `Accumulate size_with_new_arg )
-  |> Deferred.List.iter ~f:(fun files ->
-         match%map Process.run ~prog:"rm" ~args:files () with
-         | Ok _ ->
-             ()
-         | Error err ->
-             failwithf "Could not delete fetched precomputed blocks, error %s"
-               (Error.to_string_hum err) () )
+  let batches =
+    List.map targets ~f:(Id.filename ~network)
+    |> chunk_using ~init:0 ~f:(fun accumulated_size block_id ->
+           let arg_size = String.length block_id in
+           let size_with_new_arg = accumulated_size + String.length block_id in
+           if size_with_new_arg > max_args_size then `Emit arg_size
+           else `Accumulate size_with_new_arg )
+  in
+  Progress.with_reporter
+    (bar ~data:`Sum ~total:(List.length targets) "Removing blocks")
+    (fun progress ->
+      Deferred.List.iter batches ~f:(fun files ->
+          match%map Process.run ~prog:"rm" ~args:files () with
+          | Ok _ ->
+              progress (List.length files)
+          | Error err ->
+              failwithf "Could not delete fetched precomputed blocks, error %s"
+                (Error.to_string_hum err) () ) )
 
 let delete_fetched ~network : unit Deferred.t =
   let%bind block_ids = list_directory ~network in
