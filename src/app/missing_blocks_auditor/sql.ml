@@ -4,49 +4,49 @@ module Unparented_blocks = struct
   (* parent_hashes represent ends of chains leading to an orphan block *)
 
   let query =
-    Caqti_request.collect Caqti_type.unit
-      Caqti_type.(tup4 int string int string)
+    Mina_caqti.collect_req Caqti_type.unit
+      Caqti_type.(t4 int string int string)
       {sql|
            SELECT id, state_hash, height, parent_hash FROM blocks
            WHERE parent_id IS NULL
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) () = Conn.collect_list query ()
+  let run (module Conn : Mina_caqti.CONNECTION) () = Conn.collect_list query ()
 end
 
 module Missing_blocks_gap = struct
   let query =
-    Caqti_request.find Caqti_type.int Caqti_type.int
+    Mina_caqti.find_req Caqti_type.int Caqti_type.int
       {sql| SELECT $1 - MAX(height) - 1 FROM blocks
             WHERE height < $1
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) height = Conn.find query height
+  let run (module Conn : Mina_caqti.CONNECTION) height = Conn.find query height
 end
 
 module Chain_status = struct
   let query_highest_canonical =
-    Caqti_request.find Caqti_type.unit Caqti_type.int64
+    Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
       {sql| SELECT max(height) FROM blocks
             WHERE chain_status = 'canonical'
       |sql}
 
-  let run_highest_canonical (module Conn : Caqti_async.CONNECTION) () =
+  let run_highest_canonical (module Conn : Mina_caqti.CONNECTION) () =
     Conn.find query_highest_canonical ()
 
   let query_count_pending_below =
-    Caqti_request.find Caqti_type.int64 Caqti_type.int64
+    Mina_caqti.find_req Caqti_type.int64 Caqti_type.int64
       {sql| SELECT count(*) FROM blocks
             WHERE chain_status = 'pending'
             AND height <= ?
       |sql}
 
-  let run_count_pending_below (module Conn : Caqti_async.CONNECTION) height =
+  let run_count_pending_below (module Conn : Mina_caqti.CONNECTION) height =
     Conn.find query_count_pending_below height
 
   let query_canonical_chain =
-    Caqti_request.collect Caqti_type.int64
-      Caqti_type.(tup3 int string string)
+    Mina_caqti.collect_req Caqti_type.int64
+      Caqti_type.(t3 int string string)
       {sql| WITH RECURSIVE chain AS (
 
                (SELECT id, state_hash, parent_id, chain_status
@@ -69,6 +69,6 @@ module Chain_status = struct
               ORDER BY id ASC
       |sql}
 
-  let run_canonical_chain (module Conn : Caqti_async.CONNECTION) height =
+  let run_canonical_chain (module Conn : Mina_caqti.CONNECTION) height =
     Conn.collect_list query_canonical_chain height
 end

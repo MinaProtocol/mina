@@ -2,7 +2,6 @@
 
 open Core_kernel
 open Async
-open Caqti_async
 
 (* before running this program for the first time, import the berkeley schema to the
    migrated database name
@@ -65,12 +64,12 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
   let module Blockchain_state = Mina_state.Blockchain_state in
   let module Consensus_state = Consensus.Data.Consensus_state in
   let query_mainnet_db ~f = Mina_caqti.query ~f mainnet_pool in
-  [%log info] "Fetching transaction sequence from prior database" ;
+  [%log debug] "Fetching transaction sequence from prior database" ;
   let%bind block_user_cmds =
-    query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
+    query_mainnet_db ~f:(fun (module Conn : Mina_caqti.CONNECTION) ->
         Conn.collect_list
-          (Caqti_request.collect Caqti_type.unit
-             (Caqti_type.tup2 Sql.Mainnet.User_command.typ
+          (Mina_caqti.collect_req Caqti_type.unit
+             (Caqti_type.t2 Sql.Mainnet.User_command.typ
                 Sql.Mainnet.Block_user_command.typ )
              (sprintf
                 "SELECT %s, %s FROM %s AS c JOIN %s AS j ON c.id = \
@@ -85,10 +84,10 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
           () )
   in
   let%bind block_internal_cmds =
-    query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
+    query_mainnet_db ~f:(fun (module Conn : Mina_caqti.CONNECTION) ->
         Conn.collect_list
-          (Caqti_request.collect Caqti_type.unit
-             (Caqti_type.tup2 Sql.Mainnet.Internal_command.typ
+          (Mina_caqti.collect_req Caqti_type.unit
+             (Caqti_type.t2 Sql.Mainnet.Internal_command.typ
                 Sql.Mainnet.Block_internal_command.typ )
              (sprintf
                 "SELECT %s, %s FROM %s AS c JOIN %s AS j ON c.id = \
@@ -117,10 +116,10 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
   let%bind public_keys =
     if List.is_empty required_public_key_ids then return Int.Map.empty
     else
-      query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
+      query_mainnet_db ~f:(fun (module Conn : Mina_caqti.CONNECTION) ->
           Conn.collect_list
-            (Caqti_request.collect Caqti_type.unit
-               Caqti_type.(tup2 int Sql.Mainnet.Public_key.typ)
+            (Mina_caqti.collect_req Caqti_type.unit
+               Caqti_type.(t2 int Sql.Mainnet.Public_key.typ)
                (sprintf "SELECT id, value FROM %s WHERE id IN (%s)"
                   Sql.Mainnet.Public_key.table_name
                   ( String.concat ~sep:","
@@ -174,7 +173,7 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
         in
         Map.add_multi acc ~key:join.block_id ~data:ext_cmd )
   in
-  [%log info] "Done fetching transaction sequence from prior database" ;
+  [%log debug] "Done fetching transaction sequence from prior database" ;
   return
     (List.map blocks ~f:(fun block ->
          let state_hash =
@@ -252,11 +251,11 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
   [%log info] "Populating original genesis ledger balances" ;
   (* inlined from Archive_lib.Processor.add_genesis_accounts to avoid
      recomputing values from runtime config *)
-  [%log info] "Creating genesis ledger" ;
+  [%log info] "Loading genesis ledger" ;
   let ledger =
     Lazy.force @@ Precomputed_values.genesis_ledger precomputed_values
   in
-  [%log info] "Created genesis ledger" ;
+  [%log info] "Done!" ;
   let%bind genesis_block_id =
     query_migrated_db ~f:(fun db -> Sql.Berkeley.Block.genesis_block_id db ())
   in
@@ -290,40 +289,48 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
       ~compare:(fun (_id_1, index_1) (_id_2, index_2) ->
         compare index_1 index_2 )
   in
-  [%log info] "Migrating %d accounts" (List.length account_ids_to_migrate) ;
+  let total = List.length account_ids_to_migrate in
   let%map () =
-    Deferred.List.iter account_ids_to_migrate ~f:(fun (acct_id, index) ->
-        match Mina_ledger.Ledger.location_of_account ledger acct_id with
-        | None ->
-            [%log error] "Could not get location for account"
-              ~metadata:
-                [ ("account_id", Mina_base.Account_id.to_yojson acct_id) ] ;
-            failwith "Could not get location for genesis account"
-        | Some loc ->
-            let acct =
-              match Mina_ledger.Ledger.get ledger loc with
-              | None ->
-                  [%log error] "Could not get account, given a location"
-                    ~metadata:
-                      [ ("account_id", Mina_base.Account_id.to_yojson acct_id) ] ;
-                  failwith "Could not get genesis account, given a location"
-              | Some acct ->
-                  acct
-            in
-            query_migrated_db ~f:(fun db ->
-                match%map
-                  Archive_lib.Processor.Accounts_accessed.add_if_doesn't_exist
-                    db genesis_block_id (index, acct)
-                with
-                | Ok _ ->
-                    Ok ()
-                | Error err ->
-                    [%log error] "Could not add genesis account"
-                      ~metadata:
-                        [ ("account_id", Mina_base.Account_id.to_yojson acct_id)
-                        ; ("error", `String (Caqti_error.show err))
-                        ] ;
-                    failwith "Could not add add genesis account" ) )
+    Progress.with_reporter
+      Progress.Line.(
+        list
+          [ const "Migrating accounts"; spinner (); bar total; count_to total ])
+      (fun progress ->
+        Deferred.List.iter account_ids_to_migrate ~f:(fun (acct_id, index) ->
+            match Mina_ledger.Ledger.location_of_account ledger acct_id with
+            | None ->
+                [%log error] "Could not get location for account"
+                  ~metadata:
+                    [ ("account_id", Mina_base.Account_id.to_yojson acct_id) ] ;
+                failwith "Could not get location for genesis account"
+            | Some loc ->
+                let acct =
+                  match Mina_ledger.Ledger.get ledger loc with
+                  | None ->
+                      [%log error] "Could not get account, given a location"
+                        ~metadata:
+                          [ ( "account_id"
+                            , Mina_base.Account_id.to_yojson acct_id )
+                          ] ;
+                      failwith "Could not get genesis account, given a location"
+                  | Some acct ->
+                      acct
+                in
+                query_migrated_db ~f:(fun db ->
+                    match%map
+                      Archive_lib.Processor.Accounts_accessed
+                      .add_if_doesn't_exist db genesis_block_id (index, acct)
+                    with
+                    | Ok _ ->
+                        progress 1 ; Ok ()
+                    | Error err ->
+                        [%log error] "Could not add genesis account"
+                          ~metadata:
+                            [ ( "account_id"
+                              , Mina_base.Account_id.to_yojson acct_id )
+                            ; ("error", `String (Caqti_error.show err))
+                            ] ;
+                        failwith "Could not add add genesis account" ) ) )
   in
   [%log info] "Done populating original genesis ledger balances!"
 
@@ -336,10 +343,10 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
   let mainnet_pool =
-    Caqti_async.connect_pool ~max_size:128 mainnet_archive_uri
+    Mina_caqti.connect_pool ~max_size:128 mainnet_archive_uri
   in
   let migrated_pool =
-    Caqti_async.connect_pool ~max_size:128 migrated_archive_uri
+    Mina_caqti.connect_pool ~max_size:128 migrated_archive_uri
   in
   match (mainnet_pool, migrated_pool) with
   | Error e, _ | _, Error e ->
@@ -405,9 +412,9 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
          startup in order to be able to resume gracefully in the event of an unfortunate crash. *)
       let%bind () =
         let%bind garbage_block_ids =
-          query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
+          query_migrated_db ~f:(fun (module Conn : Mina_caqti.CONNECTION) ->
               Conn.collect_list
-                (Caqti_request.collect Caqti_type.unit Caqti_type.int
+                (Mina_caqti.collect_req Caqti_type.unit Caqti_type.int
                    (sprintf
                       "DELETE FROM %s WHERE parent_id IS NULL AND height > 1 \
                        RETURNING id"
@@ -421,17 +428,17 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
             @@ List.map garbage_block_ids ~f:Int.to_string
           in
           let%bind () =
-            query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
+            query_migrated_db ~f:(fun (module Conn : Mina_caqti.CONNECTION) ->
                 Conn.exec
-                  (Caqti_request.exec Caqti_type.unit
+                  (Mina_caqti.exec_req Caqti_type.unit
                      (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
                         Archive_lib.Processor.Block_and_signed_command
                         .table_name garbage_block_ids_sql ) )
                   () )
           in
-          query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
+          query_migrated_db ~f:(fun (module Conn : Mina_caqti.CONNECTION) ->
               Conn.exec
-                (Caqti_request.exec Caqti_type.unit
+                (Mina_caqti.exec_req Caqti_type.unit
                    (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
                       Archive_lib.Processor.Block_and_internal_command
                       .table_name garbage_block_ids_sql ) )
@@ -493,53 +500,70 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
           [%log info] "Prefetching all required precomputed blocks" ;
           fetch_precomputed_blocks_for mainnet_blocks_to_migrate )
       in
-      [%log info] "Migrating mainnet blocks" ;
+      (* 3 * because we want to report download, migration, and reupload separately *)
+      let total_reports_expected = 3 * List.length mainnet_blocks_to_migrate in
       let%bind () =
-        List.chunks_of ~length:batch_size mainnet_blocks_to_migrate
-        |> Deferred.List.iter ~f:(fun (blocks : Sql.Mainnet.Block.t list) ->
-               [%log info] "Migrating %d blocks starting at height %Ld (%s..%s)"
-                 (List.length blocks) (List.hd_exn blocks).height
-                 (List.hd_exn blocks).state_hash
-                 (List.last_exn blocks).state_hash ;
-               let%bind precomputed_blocks =
-                 if stream_precomputed_blocks then (
-                   [%log info] "Fetching batch of precomputed blocks" ;
-                   fetch_precomputed_blocks_for blocks )
-                 else return prefetched_precomputed_blocks
-               in
-               [%log info] "Converting blocks to extensional format..." ;
-               let%bind extensional_blocks =
-                 mainnet_block_to_extensional_batch ~logger ~mainnet_pool
-                   ~genesis_block ~precomputed_blocks blocks
-               in
-               [%log info] "Adding blocks to migrated database..." ;
-               let%bind () =
-                 query_migrated_db ~f:(fun db ->
-                     match%map
-                       Archive_lib.Processor.Block.add_from_extensional_batch db
-                         extensional_blocks ~v1_transaction_hash:true
-                     with
-                     | Ok _id ->
-                         Ok ()
-                     | Error (`Congested _) ->
-                         failwith
-                           "Could not archive extensional block batch: \
-                            congested"
-                     | Error (`Decode_rejected _ as err)
-                     | Error (`Encode_failed _ as err)
-                     | Error (`Encode_rejected _ as err)
-                     | Error (`Request_failed _ as err)
-                     | Error (`Request_rejected _ as err)
-                     | Error (`Response_failed _ as err)
-                     | Error (`Response_rejected _ as err) ->
-                         failwithf
-                           "Could not archive extensional block batch: %s"
-                           (Caqti_error.show err) () )
-               in
-               if stream_precomputed_blocks && not keep_precomputed_blocks then
-                 Precomputed_block.delete_fetched_concrete ~network
-                   (required_precomputed_blocks blocks)
-               else return () )
+        Progress.with_reporter
+          Progress.Line.(
+            list
+              [ const "Migrating blocks"
+              ; spinner ()
+              ; bar total_reports_expected
+              ; eta total_reports_expected
+              ; percentage_of total_reports_expected
+              ])
+          (fun f ->
+            List.chunks_of ~length:batch_size mainnet_blocks_to_migrate
+            |> Deferred.List.iter ~f:(fun (blocks : Sql.Mainnet.Block.t list) ->
+                   [%log debug]
+                     "Migrating %d blocks starting at height %Ld (%s..%s)"
+                     (List.length blocks) (List.hd_exn blocks).height
+                     (List.hd_exn blocks).state_hash
+                     (List.last_exn blocks).state_hash ;
+                   let%bind precomputed_blocks =
+                     if stream_precomputed_blocks then (
+                       [%log debug] "Fetching batch of precomputed blocks" ;
+                       fetch_precomputed_blocks_for blocks )
+                     else return prefetched_precomputed_blocks
+                   in
+                   f (Map.length precomputed_blocks) ;
+                   [%log debug] "Converting blocks to extensional format..." ;
+                   let%bind extensional_blocks =
+                     mainnet_block_to_extensional_batch ~logger ~mainnet_pool
+                       ~genesis_block ~precomputed_blocks blocks
+                   in
+                   f (List.length extensional_blocks) ;
+                   [%log debug] "Adding blocks to migrated database..." ;
+                   let%bind () =
+                     query_migrated_db ~f:(fun db ->
+                         match%map
+                           Archive_lib.Processor.Block
+                           .add_from_extensional_batch db extensional_blocks
+                             ~v1_transaction_hash:true
+                         with
+                         | Ok _id ->
+                             f (List.length extensional_blocks) ;
+                             Ok ()
+                         | Error (`Congested _) ->
+                             failwith
+                               "Could not archive extensional block batch: \
+                                congested"
+                         | Error (`Decode_rejected _ as err)
+                         | Error (`Encode_failed _ as err)
+                         | Error (`Encode_rejected _ as err)
+                         | Error (`Request_failed _ as err)
+                         | Error (`Request_rejected _ as err)
+                         | Error (`Response_failed _ as err)
+                         | Error (`Response_rejected _ as err) ->
+                             failwithf
+                               "Could not archive extensional block batch: %s"
+                               (Caqti_error.show err) () )
+                   in
+                   if stream_precomputed_blocks && not keep_precomputed_blocks
+                   then
+                     Precomputed_block.delete_fetched_concrete ~network
+                       (required_precomputed_blocks blocks)
+                   else return () ) )
       in
       let%bind () =
         (* this will still run even if we are downloading precomputed blocks in batches, to handle any leftover blocks from prior runs *)

@@ -16,7 +16,7 @@ module Block_info = struct
 
   (* find all blocks, working back from block with given state hash *)
   let query =
-    Caqti_request.collect Caqti_type.string typ
+    Mina_caqti.collect_req Caqti_type.string typ
       {sql| WITH RECURSIVE chain AS (
 
               SELECT id,parent_id,global_slot,state_hash,ledger_hash FROM blocks b WHERE b.state_hash = ?
@@ -34,7 +34,7 @@ module Block_info = struct
 
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) state_hash =
+  let run (module Conn : Mina_caqti.CONNECTION) state_hash =
     Conn.collect_list query state_hash
 end
 
@@ -122,7 +122,7 @@ module User_command = struct
     Caqti_type.custom ~encode ~decode (to_rep spec)
 
   let query =
-    Caqti_request.collect Caqti_type.int typ
+    Mina_caqti.collect_req Caqti_type.int typ
       {sql| SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,valid_until,memo,nonce,
                    blocks.id,blocks.global_slot,parent.global_slot_since_genesis,
                    sequence_no,status,created_token,
@@ -144,12 +144,12 @@ module User_command = struct
 
        |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) user_cmd_id =
+  let run (module Conn : Mina_caqti.CONNECTION) user_cmd_id =
     Conn.collect_list query user_cmd_id
 
   let query_payments_by_source_and_receiver =
-    Caqti_request.collect
-      Caqti_type.(tup2 int int)
+    Mina_caqti.collect_req
+      Caqti_type.(t2 int int)
       typ
       {sql| SELECT type,fee_payer_id, source_id, receiver_id, fee,fee_token,
                token, amount, valid_until, memo, nonce, blocks.id, blocks.global_slot,
@@ -176,13 +176,13 @@ module User_command = struct
 
        |sql}
 
-  let run_payments_by_source_and_receiver (module Conn : Caqti_async.CONNECTION)
+  let run_payments_by_source_and_receiver (module Conn : Mina_caqti.CONNECTION)
       ~source_id ~receiver_id =
     Conn.collect_list query_payments_by_source_and_receiver
       (source_id, receiver_id)
 
   let query_payments_by_receiver =
-    Caqti_request.collect Caqti_type.int typ
+    Mina_caqti.collect_req Caqti_type.int typ
       {sql| SELECT type,fee_payer_id, source_id, receiver_id, fee,fee_token,
                token, amount, valid_until, memo, nonce, blocks.id, blocks.global_slot,
                parent.global_slot_since_genesis, sequence_no, status, created_token,
@@ -207,51 +207,51 @@ module User_command = struct
 
        |sql}
 
-  let run_payments_by_receiver (module Conn : Caqti_async.CONNECTION)
+  let run_payments_by_receiver (module Conn : Mina_caqti.CONNECTION)
       ~receiver_id =
     Conn.collect_list query_payments_by_receiver receiver_id
 end
 
 module Public_key = struct
   let query =
-    Caqti_request.find_opt Caqti_type.int Caqti_type.string
+    Mina_caqti.find_opt_req Caqti_type.int Caqti_type.string
       {sql| SELECT value FROM public_keys
             WHERE id = ?
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) pk_id =
+  let run (module Conn : Mina_caqti.CONNECTION) pk_id =
     Conn.find_opt query pk_id
 
   let query_for_id =
-    Caqti_request.find_opt Caqti_type.string Caqti_type.int
+    Mina_caqti.find_opt_req Caqti_type.string Caqti_type.int
       {sql| SELECT id FROM public_keys
             WHERE value = ?
       |sql}
 
-  let run_for_id (module Conn : Caqti_async.CONNECTION) pk =
+  let run_for_id (module Conn : Mina_caqti.CONNECTION) pk =
     Conn.find_opt query_for_id pk
 end
 
 module Block = struct
   let max_slot_query =
-    Caqti_request.find Caqti_type.unit Caqti_type.int
+    Mina_caqti.find_req Caqti_type.unit Caqti_type.int
       {sql| SELECT MAX(global_slot) FROM blocks
       |sql}
 
-  let get_max_slot (module Conn : Caqti_async.CONNECTION) () =
+  let get_max_slot (module Conn : Mina_caqti.CONNECTION) () =
     Conn.find max_slot_query ()
 
   let state_hashes_by_slot_query =
-    Caqti_request.collect Caqti_type.int Caqti_type.string
+    Mina_caqti.collect_req Caqti_type.int Caqti_type.string
       {sql| SELECT state_hash FROM blocks WHERE global_slot = $1
       |sql}
 
-  let get_state_hashes_by_slot (module Conn : Caqti_async.CONNECTION) slot =
+  let get_state_hashes_by_slot (module Conn : Mina_caqti.CONNECTION) slot =
     Conn.collect_list state_hashes_by_slot_query slot
 
   let creator_slot_bounds_query =
-    Caqti_request.collect
-      Caqti_type.(tup3 int int64 int64)
+    Mina_caqti.collect_req
+      Caqti_type.(t3 int int64 int64)
       Caqti_type.int
       {sql| SELECT id FROM blocks
             WHERE creator_id = $1
@@ -259,7 +259,7 @@ module Block = struct
       |sql}
 
   let get_block_ids_for_creator_in_slot_bounds
-      (module Conn : Caqti_async.CONNECTION) ~creator ~low_slot ~high_slot =
+      (module Conn : Mina_caqti.CONNECTION) ~creator ~low_slot ~high_slot =
     Conn.collect_list creator_slot_bounds_query (creator, low_slot, high_slot)
 end
 
@@ -268,7 +268,7 @@ module Coinbase_receivers_for_block_creator = struct
      with given creator_id, where the receiver distinct from the creator_id
   *)
   let query =
-    Caqti_request.collect Caqti_type.int Caqti_type.int
+    Mina_caqti.collect_req Caqti_type.int Caqti_type.int
       {sql| SELECT DISTINCT ic.receiver_id
 
             FROM blocks b
@@ -290,6 +290,6 @@ module Coinbase_receivers_for_block_creator = struct
               AND ic.receiver_id <> b.creator_id
       |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_creator_id =
+  let run (module Conn : Mina_caqti.CONNECTION) ~block_creator_id =
     Conn.collect_list query block_creator_id
 end

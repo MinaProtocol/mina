@@ -59,8 +59,13 @@ else
               RELEASE=berkeley ;;
             *rampup*) # any tag including the string `rampup`
               RELEASE=rampup ;;
-            ?*) # Any other non-empty tag. ? matches a single character and * matches 0 or more characters.
-              RELEASE=stable ;;
+            ?*)
+              # if the tag is a version number sans any suffix, then it's a stable release
+              if grep -qP '^\d+\.\d+\.\d+$' <<< "${THIS_COMMIT_TAG}"; then
+                RELEASE=stable
+              else
+                RELEASE=unstable
+              fi ;;
             "") # No tag
               RELEASE="${GITHASH}" ;; # avoids deb-s3 concurrency issues between PRs
             *) # The above set of cases should be exhaustive, if they're not then still set RELEASE=unstable

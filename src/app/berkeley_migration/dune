@@ -19,6 +19,7 @@
    base.caml
    async.async_command
    integers
+   progress
    ;; local libraries
    bounded_types
    logger

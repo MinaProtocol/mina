@@ -21,7 +21,7 @@ let make_archive_copy_uri archive_uri =
   Uri.with_path archive_uri ("/copy_of_" ^ db)
 
 let query_db pool ~f ~item =
-  match%bind Caqti_async.Pool.use f pool with
+  match%bind Mina_caqti.Pool.use f pool with
   | Ok v ->
       return v
   | Error msg ->
@@ -124,7 +124,7 @@ let main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
   let copy_uri = make_archive_copy_uri archive_uri in
   [%log info] "Connecting to original database" ;
   let%bind () =
-    match Caqti_async.connect_pool ~max_size:128 archive_uri with
+    match Mina_caqti.connect_pool ~max_size:128 archive_uri with
     | Error e ->
         [%log fatal]
           ~metadata:[ ("error", `String (Caqti_error.show e)) ]
@@ -137,7 +137,7 @@ let main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
         [%log info] "Dropping copied database, in case it already exists" ;
         let%bind () =
           match%bind
-            Caqti_async.Pool.use
+            Mina_caqti.Pool.use
               (fun db -> Sql.Copy_database.run_drop_db db ~copy_db)
               pool
           with
@@ -159,7 +159,7 @@ let main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
         ()
   in
   [%log info] "Connecting to copied database" ;
-  match Caqti_async.connect_pool ~max_size:128 copy_uri with
+  match Mina_caqti.connect_pool ~max_size:128 copy_uri with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]

@@ -12,6 +12,7 @@
    bin_prot.shape
    base.caml
    base.base_internalhash_types
+   progress
    ;; local libraries
    itn_logger
    interpolator_lib
