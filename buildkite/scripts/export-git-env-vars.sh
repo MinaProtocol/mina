@@ -69,7 +69,9 @@ else
                 RELEASE=unstable
               fi ;;
             "") # No tag
-              RELEASE="${GITHASH}" ;; # avoids deb-s3 concurrency issues between PRs
+              RELEASE="unstable" ;;
+              # real soon now:
+              # RELEASE="${GITHASH}" ;; # avoids deb-s3 concurrency issues between PRs
             *) # The above set of cases should be exhaustive, if they're not then still set RELEASE=unstable
               RELEASE=unstable
               echo "git tag --points-at HEAD may have failed, falling back to unstable. Value: \"$(git tag --points-at HEAD)\""
