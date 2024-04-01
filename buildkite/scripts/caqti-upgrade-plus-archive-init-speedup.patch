@@ -1,4 +1,4 @@
-From 635208f5d06fd10909d05690c06470f8b0d11b33 Mon Sep 17 00:00:00 2001
+From cb2463f19908e9c5531c7f80148e975060c954d9 Mon Sep 17 00:00:00 2001
 From: ember arlynx <ember.arlynx@o1labs.org>
 Date: Sat, 30 Mar 2024 22:44:15 -0400
 Subject: [PATCH] applied caqti+archive
@@ -24,7 +24,7 @@ index c1271a6825..dff4183b0e 100644
        },
        "original": {
 diff --git a/opam.export b/opam.export
-index f8c7614cfc..2678cd6d4b 100644
+index 655b623d35..d5a81b5465 100644
 --- a/opam.export
 +++ b/opam.export
 @@ -8,7 +8,6 @@ roots: [
@@ -35,7 +35,7 @@ index f8c7614cfc..2678cd6d4b 100644
    "cohttp-async.5.0.0"
    "core_extended.v0.14.0"
    "extlib.1.7.8"
-@@ -70,11 +69,10 @@ installed: [
+@@ -69,11 +68,10 @@ installed: [
    "camlp4.4.14+1"
    "camomile.1.0.2"
    "capnp.3.4.0"
@@ -50,7 +50,7 @@ index f8c7614cfc..2678cd6d4b 100644
    "cmdliner.1.0.3"
    "cohttp.5.0.0"
    "cohttp-async.5.0.0"
-@@ -140,6 +138,7 @@ installed: [
+@@ -138,6 +136,7 @@ installed: [
    "lmdb.1.0"
    "logs.0.7.0"
    "lwt.5.4.0"
@@ -58,7 +58,7 @@ index f8c7614cfc..2678cd6d4b 100644
    "lwt_log.1.1.1"
    "lwt_react.1.1.2"
    "macaddr.5.0.1"
-@@ -273,7 +272,6 @@ installed: [
+@@ -266,7 +265,6 @@ installed: [
  pinned: [
    "async_kernel.v0.14.0"
    "capnp.3.4.0"
@@ -66,7 +66,7 @@ index f8c7614cfc..2678cd6d4b 100644
    "graphql_ppx.1.2.2"
    "rpc_parallel.v0.14.0"
  ]
-@@ -357,42 +355,6 @@ Cap'n Proto is a multi-language code generation framework designed for
+@@ -350,42 +348,6 @@ Cap'n Proto is a multi-language code generation framework designed for
        "sha256=03aac06742f3d4ec8a189f0db65d46393b7497e8637ece15c39ff4ec01117b8b"
    }
  }
@@ -2991,7 +2991,7 @@ index 670f44c8e1..01d4912c28 100644
                ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
                ~last_block_id:zkc.block_id internal_cmds user_cmds zkcs
 diff --git a/src/app/berkeley_migration/berkeley_migration.ml b/src/app/berkeley_migration/berkeley_migration.ml
-index 8f6ac0d063..91aa0b63ab 100644
+index 0669b3d4b2..dae5863bc1 100644
 --- a/src/app/berkeley_migration/berkeley_migration.ml
 +++ b/src/app/berkeley_migration/berkeley_migration.ml
 @@ -2,7 +2,6 @@
@@ -3004,7 +3004,7 @@ index 8f6ac0d063..91aa0b63ab 100644
     migrated database name
 @@ -67,10 +66,10 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
    let query_mainnet_db ~f = Mina_caqti.query ~f mainnet_pool in
-   [%log debug] "Fetching transaction sequence from prior database" ;
+   [%log info] "Fetching transaction sequence from prior database" ;
    let%bind block_user_cmds =
 -    query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
 +    query_mainnet_db ~f:(fun (module Conn : Mina_caqti.CONNECTION) ->
@@ -3044,7 +3044,7 @@ index 8f6ac0d063..91aa0b63ab 100644
                 (sprintf "SELECT id, value FROM %s WHERE id IN (%s)"
                    Sql.Mainnet.Public_key.table_name
                    ( String.concat ~sep:","
-@@ -344,10 +343,10 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -340,10 +339,10 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
    let mainnet_pool =
@@ -3057,7 +3057,7 @@ index 8f6ac0d063..91aa0b63ab 100644
    in
    match (mainnet_pool, migrated_pool) with
    | Error e, _ | _, Error e ->
-@@ -413,9 +412,9 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -409,9 +408,9 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
           startup in order to be able to resume gracefully in the event of an unfortunate crash. *)
        let%bind () =
          let%bind garbage_block_ids =
@@ -3069,7 +3069,7 @@ index 8f6ac0d063..91aa0b63ab 100644
                     (sprintf
                        "DELETE FROM %s WHERE parent_id IS NULL AND height > 1 \
                         RETURNING id"
-@@ -429,17 +428,17 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -425,17 +424,17 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
              @@ List.map garbage_block_ids ~f:Int.to_string
            in
            let%bind () =
@@ -3091,14 +3091,14 @@ index 8f6ac0d063..91aa0b63ab 100644
                     (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
                        Archive_lib.Processor.Block_and_internal_command
                        .table_name garbage_block_ids_sql ) )
-@@ -553,7 +552,6 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
-                          | Error (`Encode_failed _ as err)
-                          | Error (`Encode_rejected _ as err)
-                          | Error (`Request_failed _ as err)
--                         | Error (`Request_rejected _ as err)
-                          | Error (`Response_failed _ as err)
-                          | Error (`Response_rejected _ as err) ->
-                              failwithf
+@@ -533,7 +532,6 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+                      | Error (`Encode_failed _ as err)
+                      | Error (`Encode_rejected _ as err)
+                      | Error (`Request_failed _ as err)
+-                     | Error (`Request_rejected _ as err)
+                      | Error (`Response_failed _ as err)
+                      | Error (`Response_rejected _ as err) ->
+                          failwithf
 diff --git a/src/app/berkeley_migration/sql.ml b/src/app/berkeley_migration/sql.ml
 index 297081b7b3..4b677e43f3 100644
 --- a/src/app/berkeley_migration/sql.ml
@@ -4653,7 +4653,7 @@ index 1fbc9e3104..b01932ec95 100644
        [%log fatal]
          ~metadata:[ ("error", `String (Caqti_error.show e)) ]
 diff --git a/src/app/replayer/replayer.ml b/src/app/replayer/replayer.ml
-index 46ca5715ae..7d6a5bbc52 100644
+index f9f22df42c..5023ea7217 100644
 --- a/src/app/replayer/replayer.ml
 +++ b/src/app/replayer/replayer.ml
 @@ -46,7 +46,7 @@ type output =
@@ -4674,7 +4674,7 @@ index 46ca5715ae..7d6a5bbc52 100644
        (fun db -> Sql.Block_info.run db ~state_hash ~start_slot)
        pool
    with
-@@ -656,7 +656,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
+@@ -661,7 +661,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
               msg )
    in
    let archive_uri = Uri.of_string archive_uri in
@@ -4683,7 +4683,7 @@ index 46ca5715ae..7d6a5bbc52 100644
    | Error e ->
        [%log fatal]
          ~metadata:[ ("error", `String (Caqti_error.show e)) ]
-@@ -794,7 +794,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
+@@ -799,7 +799,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
        (* end mutable state *)
        let get_command_ids (module Command_ids : Get_command_ids) name =
          match%bind
@@ -4692,35 +4692,35 @@ index 46ca5715ae..7d6a5bbc52 100644
              (fun db ->
                Command_ids.run db ~state_hash:target_state_hash
                  ~start_slot:input.start_slot_since_genesis )
-@@ -834,7 +834,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
-               ~f:(fun ids ->
-                 let open Deferred.Let_syntax in
-                 match%map
--                  Caqti_async.Pool.use
-+                  Mina_caqti.Pool.use
-                     (fun db ->
-                       Sql.Internal_command.run db
-                         ~start_slot:input.start_slot_since_genesis
-@@ -909,7 +909,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
-               ~f:(fun ids ->
-                 let open Deferred.Let_syntax in
-                 match%map
--                  Caqti_async.Pool.use
-+                  Mina_caqti.Pool.use
-                     (fun db -> Sql.User_command.run db ids)
-                     pool
-                 with
-@@ -957,7 +957,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
-             Deferred.List.map zkapp_cmd_ids ~f:(fun id ->
-                 let open Deferred.Let_syntax in
-                 match%map
--                  Caqti_async.Pool.use
-+                  Mina_caqti.Pool.use
-                     (fun db -> Sql.Zkapp_command.run db id)
-                     pool
-                 with
+@@ -835,7 +835,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
+         Deferred.List.map internal_cmd_ids ~f:(fun id ->
+             let open Deferred.Let_syntax in
+             match%map
+-              Caqti_async.Pool.use
++              Mina_caqti.Pool.use
+                 (fun db ->
+                   Sql.Internal_command.run db
+                     ~start_slot:input.start_slot_since_genesis
+@@ -892,7 +892,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
+         Deferred.List.map user_cmd_ids ~f:(fun id ->
+             let open Deferred.Let_syntax in
+             match%map
+-              Caqti_async.Pool.use (fun db -> Sql.User_command.run db id) pool
++              Mina_caqti.Pool.use (fun db -> Sql.User_command.run db id) pool
+             with
+             | Ok [] ->
+                 failwithf "Expected at least one user command with id %d" id ()
+@@ -923,7 +923,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
+         Deferred.List.map zkapp_cmd_ids ~f:(fun id ->
+             let open Deferred.Let_syntax in
+             match%map
+-              Caqti_async.Pool.use (fun db -> Sql.Zkapp_command.run db id) pool
++              Mina_caqti.Pool.use (fun db -> Sql.Zkapp_command.run db id) pool
+             with
+             | Ok [] ->
+                 failwithf "Expected at least one zkApp command with id %d" id ()
 diff --git a/src/app/replayer/sql.ml b/src/app/replayer/sql.ml
-index d361c69a5c..184321f3ff 100644
+index 40caaf5af1..160e213187 100644
 --- a/src/app/replayer/sql.ml
 +++ b/src/app/replayer/sql.ml
 @@ -18,8 +18,8 @@ module Block_info = struct
@@ -4883,8 +4883,8 @@ index d361c69a5c..184321f3ff 100644
          ]
  
    let query =
--    Caqti_request.collect Mina_caqti.array_int_typ typ
-+    Mina_caqti.collect_req Mina_caqti.array_int_typ typ
+-    Caqti_request.collect Caqti_type.int typ
++    Mina_caqti.collect_req Caqti_type.int typ
        {sql| SELECT command_type,fee_payer_id, source_id,receiver_id,fee,amount,valid_until,memo,nonce,
                     blocks.id,blocks.height,blocks.global_slot_since_genesis,
                     sequence_no,status
@@ -4892,9 +4892,9 @@ index d361c69a5c..184321f3ff 100644
  
         |sql}
  
--  let run (module Conn : Caqti_async.CONNECTION) user_cmd_ids =
-+  let run (module Conn : Mina_caqti.CONNECTION) user_cmd_ids =
-     Conn.collect_list query (List.to_array user_cmd_ids)
+-  let run (module Conn : Caqti_async.CONNECTION) user_cmd_id =
++  let run (module Conn : Mina_caqti.CONNECTION) user_cmd_id =
+     Conn.collect_list query user_cmd_id
  end
  
  module Zkapp_command_ids = struct
@@ -4948,9 +4948,9 @@ index d361c69a5c..184321f3ff 100644
    *)
    let query =
 -    Caqti_request.collect
--      Caqti_type.(tup2 int64 Mina_caqti.array_int_typ)
+-      Caqti_type.(tup2 int64 int)
 +    Mina_caqti.collect_req
-+      Caqti_type.(t2 int64 Mina_caqti.array_int_typ)
++      Caqti_type.(t2 int64 int)
        typ
        {sql| SELECT command_type,receiver_id,fee,
                     b.id,b.height,b.global_slot_since_genesis,
@@ -4958,9 +4958,9 @@ index d361c69a5c..184321f3ff 100644
              WHERE b.global_slot_since_genesis >= $1
         |sql}
  
--  let run (module Conn : Caqti_async.CONNECTION) ~start_slot ~internal_cmd_ids =
-+  let run (module Conn : Mina_caqti.CONNECTION) ~start_slot ~internal_cmd_ids =
-     Conn.collect_list query (start_slot, List.to_array internal_cmd_ids)
+-  let run (module Conn : Caqti_async.CONNECTION) ~start_slot ~internal_cmd_id =
++  let run (module Conn : Mina_caqti.CONNECTION) ~start_slot ~internal_cmd_id =
+     Conn.collect_list query (start_slot, internal_cmd_id)
  end
  
  module Public_key = struct
