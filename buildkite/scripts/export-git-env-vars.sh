@@ -59,6 +59,8 @@ else
               RELEASE=berkeley ;;
             *rampup*) # any tag including the string `rampup`
               RELEASE=rampup ;;
+            *devnet-tooling*)
+              RELEASE=devnet ;;
             ?*)
               # if the tag is a version number sans any suffix, then it's a stable release
               if grep -qP '^\d+\.\d+\.\d+$' <<< "${THIS_COMMIT_TAG}"; then
