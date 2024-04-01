@@ -513,7 +513,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
               ; eta total_reports_expected
               ; percentage_of total_reports_expected
               ])
-          (fun f ->
+          (fun progress ->
             List.chunks_of ~length:batch_size mainnet_blocks_to_migrate
             |> Deferred.List.iter ~f:(fun (blocks : Sql.Mainnet.Block.t list) ->
                    [%log debug]
@@ -527,13 +527,13 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                        fetch_precomputed_blocks_for blocks )
                      else return prefetched_precomputed_blocks
                    in
-                   f (Map.length precomputed_blocks) ;
+                   progress (Map.length precomputed_blocks) ;
                    [%log debug] "Converting blocks to extensional format..." ;
                    let%bind extensional_blocks =
                      mainnet_block_to_extensional_batch ~logger ~mainnet_pool
                        ~genesis_block ~precomputed_blocks blocks
                    in
-                   f (List.length extensional_blocks) ;
+                   progress (List.length extensional_blocks) ;
                    [%log debug] "Adding blocks to migrated database..." ;
                    let%bind () =
                      query_migrated_db ~f:(fun db ->
@@ -543,7 +543,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                              ~v1_transaction_hash:true
                          with
                          | Ok _id ->
-                             f (List.length extensional_blocks) ;
+                             progress (List.length extensional_blocks) ;
                              Ok ()
                          | Error (`Congested _) ->
                              failwith

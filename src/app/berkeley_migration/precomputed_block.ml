@@ -204,7 +204,7 @@ let list_directory ~network =
 
 let concrete_fetch_batch ~logger ~bucket ~network targets =
   let%bind existing_targets = list_directory ~network in
-  [%log info] "Found %d individually downloaded precomputed blocks"
+  [%log debug] "Found %d individually downloaded precomputed blocks"
     (Set.length existing_targets) ;
   let missing_targets = Set.diff (Id.Set.of_list targets) existing_targets in
   let num_missing_targets = Set.length missing_targets in
@@ -252,14 +252,22 @@ let concrete_fetch_batch ~logger ~bucket ~network targets =
   Progress.with_reporter
     (bar ~data:`Sum ~total:(List.length targets) "Parsing blocks for metadata")
     (fun progress ->
-      Deferred.List.map targets ~how:`Parallel ~f:(fun target ->
-          let _, state_hash = target in
-          let%map contents =
-            Throttle.enqueue file_throttle (fun () ->
-                Reader.file_contents (Id.filename ~network target) )
-          in
-          let block = of_yojson (Yojson.Safe.from_string contents) in
-          progress 1 ; (state_hash, block) ) )
+      let in_this_batch = ref 0 in
+      let res =
+        Deferred.List.map targets ~how:`Parallel ~f:(fun target ->
+            let _, state_hash = target in
+            let%map contents =
+              Throttle.enqueue file_throttle (fun () ->
+                  Reader.file_contents (Id.filename ~network target) )
+            in
+            let block = of_yojson (Yojson.Safe.from_string contents) in
+            incr in_this_batch ;
+            if !in_this_batch > 100 then (
+              progress 100 ;
+              in_this_batch := 0 ) ;
+            (state_hash, block) )
+      in
+      progress !in_this_batch ; res )
   >>| Mina_base.State_hash.Map.of_alist_exn
 
 let delete_fetched_concrete ~network targets : unit Deferred.t =

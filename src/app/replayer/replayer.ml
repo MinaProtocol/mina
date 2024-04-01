@@ -825,10 +825,14 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
         (List.length user_cmd_ids)
         (List.length internal_cmd_ids)
         (List.length zkapp_cmd_ids) ;
-      [%log info] "Loading internal commands" ;
       let%bind unsorted_internal_cmds_list =
         Progress.with_reporter
-          Progress.Line.(list [ const "Loading internal commands"; spinner () ])
+          Progress.Line.(
+            list
+              [ const "Loading internal commands"
+              ; spinner ()
+              ; count_to (List.length internal_cmd_ids)
+              ])
           (fun progress ->
             Deferred.List.map (List.chunks_of ~length:400 internal_cmd_ids)
               ~f:(fun ids ->
