@@ -55,7 +55,9 @@ module Ledger_inner = struct
 
         let merge = Ledger_hash.merge
 
-        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
+        let hash_account ?omit_set_verification_key_tx_version =
+          Fn.compose Ledger_hash.of_digest
+            (Account.digest ?omit_set_verification_key_tx_version)
 
         let empty_account = Ledger_hash.of_digest Account.empty_digest
       end

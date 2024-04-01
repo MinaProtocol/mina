@@ -117,7 +117,11 @@ module type S = sig
 
   val set : t -> Location.t -> account -> unit
 
-  val set_batch : t -> (Location.t * account) list -> unit
+  val set_batch :
+       ?omit_set_verification_key_tx_version:bool
+    -> t
+    -> (Location.t * account) list
+    -> unit
 
   val get_at_index_exn : t -> int -> account
 

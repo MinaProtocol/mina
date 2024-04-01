@@ -103,7 +103,8 @@ end = struct
 
   let get_at_index_exn _t = failwith "get_at_index_exn: null ledgers are empty"
 
-  let set_batch _t = failwith "set_batch: null ledgers cannot be mutated"
+  let set_batch ?omit_set_verification_key_tx_version:_ _t =
+    failwith "set_batch: null ledgers cannot be mutated"
 
   let set _t = failwith "set: null ledgers cannot be mutated"
 
@@ -165,7 +166,7 @@ end = struct
   let set_all_accounts_rooted_at_exn _t =
     failwith "set_all_accounts_rooted_at_exn: null ledgers cannot be mutated"
 
-  let set_batch_accounts _t =
+  let set_batch_accounts ?omit_set_verification_key_tx_version:_ _t =
     failwith "set_batch_accounts: null ledgers cannot be mutated"
 
   let set_inner_hash_at_addr_exn _t =

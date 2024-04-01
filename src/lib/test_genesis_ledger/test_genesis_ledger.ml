@@ -10,6 +10,8 @@ include Genesis_ledger.Make (struct
   let directory = `Ephemeral
 
   let depth = Genesis_constants.Constraint_constants.compiled.ledger_depth
+
+  let omit_set_verification_key_tx_version = false
 end)
 
 [%%else]

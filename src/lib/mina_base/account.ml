@@ -360,7 +360,7 @@ let hash_zkapp_account_opt = function
 
 let delegate_opt = Option.value ~default:Public_key.Compressed.empty
 
-let to_input (t : t) =
+let to_input ?omit_set_verification_key_tx_version (t : t) =
   let open Random_oracle.Input.Chunked in
   let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
   Poly.Fields.fold ~init:[]
@@ -371,14 +371,16 @@ let to_input (t : t) =
     ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
     ~voting_for:(f State_hash.to_input) ~timing:(f Timing.to_input)
     ~zkapp:(f (Fn.compose field hash_zkapp_account_opt))
-    ~permissions:(f Permissions.to_input)
+    ~permissions:
+      (f @@ Permissions.to_input ?omit_set_verification_key_tx_version)
   |> List.reduce_exn ~f:append
 
 let crypto_hash_prefix = Hash_prefix.account
 
-let crypto_hash t =
+let crypto_hash ?omit_set_verification_key_tx_version t =
   Random_oracle.hash ~init:crypto_hash_prefix
-    (Random_oracle.pack_input (to_input t))
+    (Random_oracle.pack_input
+       (to_input ?omit_set_verification_key_tx_version t) )
 
 [%%ifdef consensus_mechanism]
 

@@ -58,7 +58,8 @@ module Hash = struct
   (* to prevent pre-image attack,
    * important impossible to create an account such that (merge a b = hash_account account) *)
 
-  let hash_account account =
+  let hash_account ?(omit_set_verification_key_tx_version = false) account =
+    assert (not omit_set_verification_key_tx_version) ;
     Md5.digest_string ("0" ^ Format.sprintf !"%{sexp: Account.t}" account)
 
   let merge ~height a b =
@@ -120,7 +121,9 @@ struct
 
   let set t ~key ~data = Bigstring_frozen.Table.set t.table ~key ~data
 
-  let set_batch t ?(remove_keys = []) ~key_data_pairs =
+  let set_batch ?(omit_set_verification_key_tx_version = false) t
+      ?(remove_keys = []) ~key_data_pairs =
+    assert (not omit_set_verification_key_tx_version) ;
     List.iter key_data_pairs ~f:(fun (key, data) -> set t ~key ~data) ;
     List.iter remove_keys ~f:(fun key ->
         Bigstring_frozen.Table.remove t.table key )

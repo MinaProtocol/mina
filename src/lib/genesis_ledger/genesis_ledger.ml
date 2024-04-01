@@ -132,7 +132,8 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
         |> List.mapi ~f:(fun i (_, acct) ->
                (Ledger.Addr.of_int_exn ~ledger_depth i, acct) )
       in
-      Ledger.set_batch_accounts ledger addrs_and_accounts ) ;
+      Ledger.set_batch_accounts ~omit_set_verification_key_tx_version ledger
+        addrs_and_accounts ) ;
     ledger
 
   include Utils
@@ -274,6 +275,8 @@ module Unit_test_ledger = Make (struct
   let directory = `Ephemeral
 
   let depth = Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
+
+  let omit_set_verification_key_tx_version = false
 end)
 
 let for_unit_tests : Packed.t = (module Unit_test_ledger)

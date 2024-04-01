@@ -61,6 +61,7 @@ let load_ledger (accounts : Runtime_config.Accounts.t) =
   let packed_patched =
     Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
       ~depth:migrating_from_ledger_depth
+      ~omit_set_verification_key_tx_version:true
       (lazy accounts_altered)
   in
   ( Lazy.force (Genesis_ledger.Packed.t packed)

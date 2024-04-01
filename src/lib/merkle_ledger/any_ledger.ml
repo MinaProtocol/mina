@@ -134,7 +134,8 @@ module Make_base (Inputs : Inputs_intf) :
 
     let get_at_index_exn (T ((module Base), t)) = Base.get_at_index_exn t
 
-    let set_batch (T ((module Base), t)) = Base.set_batch t
+    let set_batch ?omit_set_verification_key_tx_version (T ((module Base), t)) =
+      Base.set_batch ?omit_set_verification_key_tx_version t
 
     let set (T ((module Base), t)) = Base.set t
 
@@ -188,7 +189,9 @@ module Make_base (Inputs : Inputs_intf) :
     let set_all_accounts_rooted_at_exn (T ((module Base), t)) =
       Base.set_all_accounts_rooted_at_exn t
 
-    let set_batch_accounts (T ((module Base), t)) = Base.set_batch_accounts t
+    let set_batch_accounts ?omit_set_verification_key_tx_version
+        (T ((module Base), t)) =
+      Base.set_batch_accounts ?omit_set_verification_key_tx_version t
 
     let set_inner_hash_at_addr_exn (T ((module Base), t)) =
       Base.set_inner_hash_at_addr_exn t
