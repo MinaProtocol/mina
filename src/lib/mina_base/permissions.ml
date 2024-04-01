@@ -376,18 +376,15 @@ module Poly = struct
     end
   end]
 
-  let to_input ?(omit_set_verification_key_tx_version = false) controller
-      txn_version t =
+  let to_input controller txn_version t =
     let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
-    let handle_set_verification_key =
-      if omit_set_verification_key_tx_version then Fn.compose controller fst
-      else fun (c, v) ->
-        Random_oracle.Input.Chunked.append (controller c) (txn_version v)
-    in
     Stable.Latest.Fields.fold ~init:[] ~edit_state:(f controller)
       ~send:(f controller) ~set_delegate:(f controller)
       ~set_permissions:(f controller)
-      ~set_verification_key:(f handle_set_verification_key)
+      ~set_verification_key:
+        (f (fun (c, v) ->
+             Random_oracle.Input.Chunked.append (controller c) (txn_version v) )
+        )
       ~receive:(f controller) ~set_zkapp_uri:(f controller)
       ~edit_action_state:(f controller) ~set_token_symbol:(f controller)
       ~increment_nonce:(f controller) ~set_voting_for:(f controller)
@@ -577,9 +574,8 @@ let typ =
 
 [%%endif]
 
-let to_input ?omit_set_verification_key_tx_version (x : t) =
-  Poly.to_input ?omit_set_verification_key_tx_version Auth_required.to_input
-    Mina_numbers.Txn_version.to_input x
+let to_input (x : t) =
+  Poly.to_input Auth_required.to_input Mina_numbers.Txn_version.to_input x
 
 let user_default : t =
   { edit_state = Signature

@@ -100,7 +100,7 @@ module type Hash = sig
 
   val merge : height:int -> t -> t -> t
 
-  val hash_account : ?omit_set_verification_key_tx_version:bool -> account -> t
+  val hash_account : account -> t
 
   val empty_account : t
 end

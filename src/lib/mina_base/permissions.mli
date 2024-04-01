@@ -98,10 +98,7 @@ end]
 *)
 val gen : auth_tag:Control.Tag.t -> t Core_kernel.Quickcheck.Generator.t
 
-val to_input :
-     ?omit_set_verification_key_tx_version:bool
-  -> t
-  -> Field.t Random_oracle_input.Chunked.t
+val to_input : t -> Field.t Random_oracle_input.Chunked.t
 
 [%%ifdef consensus_mechanism]
 

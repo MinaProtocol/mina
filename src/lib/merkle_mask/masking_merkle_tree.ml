@@ -767,11 +767,9 @@ module Make (Inputs : Inputs_intf.S) = struct
             self_set_account t location account )
     end)
 
-    let set_batch_accounts ?omit_set_verification_key_tx_version t
-        addresses_and_accounts =
+    let set_batch_accounts t addresses_and_accounts =
       assert_is_attached t ;
-      set_batch_accounts ?omit_set_verification_key_tx_version t
-        addresses_and_accounts
+      set_batch_accounts t addresses_and_accounts
 
     (* set accounts in mask *)
     let set_all_accounts_rooted_at_exn t address (accounts : Account.t list) =

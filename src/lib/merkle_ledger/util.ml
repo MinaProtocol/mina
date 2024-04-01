@@ -59,16 +59,10 @@ module Make (Inputs : Inputs_intf) : sig
     Inputs.Base.t -> (Inputs.Location.t * Inputs.Hash.t) list -> unit
 
   val set_batch :
-       ?omit_set_verification_key_tx_version:bool
-    -> Inputs.Base.t
-    -> (Inputs.Location.t * Inputs.Account.t) list
-    -> unit
+    Inputs.Base.t -> (Inputs.Location.t * Inputs.Account.t) list -> unit
 
   val set_batch_accounts :
-       ?omit_set_verification_key_tx_version:bool
-    -> Inputs.Base.t
-    -> (Inputs.Location.Addr.t * Inputs.Account.t) list
-    -> unit
+    Inputs.Base.t -> (Inputs.Location.Addr.t * Inputs.Account.t) list -> unit
 
   val set_all_accounts_rooted_at_exn :
     Inputs.Base.t -> Inputs.Location.Addr.t -> Inputs.Account.t list -> unit
@@ -194,18 +188,16 @@ end = struct
 
   (* TODO: When we do batch on a database, we should add accounts, locations and hashes
      simulatenously for full atomicity. *)
-  let set_batch ?omit_set_verification_key_tx_version t locations_and_accounts =
+  let set_batch t locations_and_accounts =
     set_raw_addresses t locations_and_accounts ;
     Inputs.set_raw_account_batch t locations_and_accounts ;
     set_hash_batch t
     @@ List.map locations_and_accounts ~f:(fun (location, account) ->
            ( Inputs.location_of_hash_addr (Inputs.Location.to_path_exn location)
-           , Inputs.Hash.hash_account ?omit_set_verification_key_tx_version
-               account ) )
+           , Inputs.Hash.hash_account account ) )
 
-  let set_batch_accounts ?omit_set_verification_key_tx_version t
-      addresses_and_accounts =
-    set_batch ?omit_set_verification_key_tx_version t
+  let set_batch_accounts t addresses_and_accounts =
+    set_batch t
     @@ List.map addresses_and_accounts ~f:(fun (addr, account) ->
            (Inputs.location_of_account_addr addr, account) )
 

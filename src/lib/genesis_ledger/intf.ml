@@ -79,8 +79,6 @@ module type Ledger_input_intf = sig
   val directory : [ `Ephemeral | `New | `Path of string ]
 
   val depth : int
-
-  val omit_set_verification_key_tx_version : bool
 end
 
 module type S = sig

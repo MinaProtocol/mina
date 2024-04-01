@@ -269,8 +269,6 @@ module Ledger = struct
             let directory = `Path dirname
 
             let depth = constraint_constants.ledger_depth
-
-            let omit_set_verification_key_tx_version = false
           end) )
       | None ->
           ( module Genesis_ledger.Of_ledger (struct
@@ -423,8 +421,7 @@ module Ledger = struct
         (Lazy.map
            ~f:(Accounts.pad_to (Option.value ~default:0 config.num_accounts)) )
 
-  let packed_genesis_ledger_of_accounts
-      ?(omit_set_verification_key_tx_version = false) ~depth accounts :
+  let packed_genesis_ledger_of_accounts ~depth accounts :
       Genesis_ledger.Packed.t =
     ( module Genesis_ledger.Make (struct
       let accounts = accounts
@@ -432,9 +429,6 @@ module Ledger = struct
       let directory = `New
 
       let depth = depth
-
-      let omit_set_verification_key_tx_version =
-        omit_set_verification_key_tx_version
     end) )
 
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
