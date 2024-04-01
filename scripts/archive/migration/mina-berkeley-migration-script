@@ -744,7 +744,7 @@ function run_final_migration() {
         --input-file "$__replayer_checkpoint" \
         --checkpoint-interval "$__checkpoint_interval" \
         --checkpoint-file-prefix "$CHECKPOINT_PREFIX" \
-        --log-files "$__replayer_log"
+        --log-file "$__replayer_log"
 
     check_logs "$__berkely_migration_log" "$__replayer_log"
     set -e # exit immediately on errors
