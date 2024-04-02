@@ -2,10 +2,10 @@ let Prelude = ../External/Prelude.dhall
 let Text/concatSep = Prelude.Text.concatSep
 let Profiles = ./Profiles.dhall
 
-let Artifact : Type  = < Daemon | Archive | ArchiveMigration | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
+let Artifact : Type  = < Daemon | Archive | ArchiveMigration | VerifyPackagedForkConfig | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
 
 
-let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.ArchiveMigration , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
+let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.ArchiveMigration , Artifact.BatchTxn , Artifact.VerifyPackagedForkConfig , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
 
 let Main = [ Artifact.Daemon , Artifact.Archive , Artifact.Rosetta ]
 
@@ -17,6 +17,7 @@ let capitalName = \(artifact : Artifact) ->
     , Archive = "Archive"
     , ArchiveMigration = "ArchiveMigration"
     , TestExecutive = "TestExecutive"
+    , VerifyPackagedForkConfig = "VerifyPackagedForkConfig"
     , BatchTxn = "BatchTxn"
     , Rosetta = "Rosetta"
     , ZkappTestTransaction = "ZkappTestTransaction"
@@ -29,6 +30,7 @@ let lowerName = \(artifact : Artifact) ->
     , Archive = "archive"
     , ArchiveMigration = "archive_migration"
     , TestExecutive = "test_executive"
+    , VerifyPackagedForkConfig = "verify_packaged_fork_config"
     , BatchTxn = "batch_txn"
     , Rosetta = "rosetta"
     , ZkappTestTransaction = "zkapp_test_transaction"
@@ -41,6 +43,7 @@ let dockerName = \(artifact : Artifact) ->
     , Archive = "mina-archive"
     , TestExecutive = "mina-test-executive"
     , ArchiveMigration = "mina-archive-migration"
+    , VerifyPackagedForkConfig = "mina-verify-packaged-fork-config"
     , BatchTxn = "mina-batch-txn"
     , Rosetta = "mina-rosetta" 
     , ZkappTestTransaction = "mina-zkapp-test-transaction"
@@ -54,6 +57,7 @@ let toDebianName = \(artifact : Artifact) ->
     , Archive = "archive"
     , ArchiveMigration  = "archive_migration"
     , TestExecutive = "test_executive"
+    , VerifyPackagedForkConfig = "verify_packaged_fork_config"
     , BatchTxn = "batch_txn"
     , Rosetta = "" 
     , ZkappTestTransaction = "zkapp_test_transaction"
