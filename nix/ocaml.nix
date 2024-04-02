@@ -553,12 +553,18 @@ let
             buildInputs = builtins.attrValues deps;
             installPhase = ''
               mkdir -p $out/lib/ocaml/4.14.0/site-lib/stublibs $out/nix-support
-              echo 'export OCAMLPATH=$\{OCAMLPATH-}$\{OCAMLPATH:+:}'"$out/lib/ocaml/4.14.0/site-lib" > $out/nix-support/setup-hook
-              echo 'export CAML_LD_LIBRARY_PATH=$\{CAML_LD_LIBRARY_PATH-}$\{CAML_LD_LIBRARY_PATH:+:}'"$out/lib/ocaml/4.14.0/site-lib/stublibs" >> $out/nix-support/setup-hook
+              {
+                echo -n 'export OCAMLPATH=$'
+                echo -n '{OCAMLPATH-}$'
+                echo '{OCAMLPATH:+:}'"$out/lib/ocaml/4.14.0/site-lib"
+                echo -n 'export CAML_LD_LIBRARY_PATH=$'
+                echo -n '{CAML_LD_LIBRARY_PATH-}$'
+                echo '{CAML_LD_LIBRARY_PATH:+:}'"$out/lib/ocaml/4.14.0/site-lib/stublibs"
+              } > $out/nix-support/setup-hook
               for input in $buildInputs; do
                 [ ! -d "$input/lib/ocaml/4.14.0/site-lib" ] || {
                   find "$input/lib/ocaml/4.14.0/site-lib" -maxdepth 1 -mindepth 1 -not -name stublibs | while read d; do
-                    cp "$d" "$out/lib/ocaml/4.14.0/site-lib/"
+                    cp -R "$d" "$out/lib/ocaml/4.14.0/site-lib/"
                   done
                 }
                 [ ! -d "$input/lib/ocaml/4.14.0/site-lib/stublibs" ] || cp -R "$input/lib/ocaml/4.14.0/site-lib/stublibs"/* "$out/lib/ocaml/4.14.0/site-lib/stublibs/"
