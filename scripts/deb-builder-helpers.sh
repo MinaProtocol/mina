@@ -27,7 +27,7 @@ SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
 
 SUGGESTED_DEPS="jq, curl, wget"
 
-ARCHIVE_MIGRATION_DEPS="jq, mina-logproc, google-cloud-sdk"
+ARCHIVE_MIGRATION_DEPS="jq, google-cloud-sdk"
 
 TEST_EXECUTIVE_DEPS=", mina-logproc, python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, terraform, helm"
 
