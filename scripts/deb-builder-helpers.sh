@@ -34,19 +34,19 @@ TEST_EXECUTIVE_DEPS=", mina-logproc, python3, nodejs, yarn, google-cloud-sdk, ku
 case "${MINA_DEB_CODENAME}" in
   bookworm|jammy)
     DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
-    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, google-cloud-sdk, libjemalloc2"
+    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   bullseye|focal)
     DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
-    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, google-cloud-sdk, libjemalloc2"
+    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   buster)
     DAEMON_DEPS=", libffi6, libjemalloc2, libpq-dev, libprocps7, mina-logproc"
-    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, google-cloud-sdk, libjemalloc2"
+    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   stretch|bionic)
     DAEMON_DEPS=", libffi6, libjemalloc1, libpq-dev, libprocps6, mina-logproc"
-    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, google-cloud-sdk, libjemalloc1"
+    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc1"
     ;;
   *)
     echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1
