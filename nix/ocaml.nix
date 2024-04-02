@@ -17,7 +17,7 @@ let
 
   export = opam-nix.importOpam "${src}/opam.export";
   external-packages = pkgs.lib.getAttrs [ "sodium" "base58"
-    "h_list" "bitstring_lib" "snarky_signature" "snarky" "snarky_curve" "fold_lib" "group_map" "snarkette" "tuple_lib" "sponge" "snarky_bench" "interval_union" "ppx_snarky" "snarky_integer" "h_list.ppx" "ppx_optcomp" "prometheus" "rocks"
+    "h_list" "bitstring_lib" "snarky_signature" "snarky" "snarky_curve" "fold_lib" "group_map" "snarkette" "tuple_lib" "sponge" "snarky_bench" "interval_union" "ppx_snarky" "snarky_integer" "ppx_optcomp" "prometheus" "rocks"
     ]
     (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
@@ -508,9 +508,10 @@ let
             ) acc deps
           else acc;
         getDeps = name: self: builtins.attrValues (impl self name {});
+        base-ppx-names =
+          ["ppx_version" "ppx_mina" "ppx_register_event" "ppx_representatives" "ppx_to_enum" "ppx_annot" "interpolator_lib" "structured_log_events" "logproc_lib"];
         base-ppxs-overlay = self: super:
           let
-            names = ["ppx_version" "ppx_mina" "ppx_register_event" "ppx_representatives" "ppx_to_enum" "ppx_annot" "interpolator_lib" "structured_log_events"];
             customDeps = name:
               if name == "interpolator_lib" then (with self; [ppx_version ppx_deriving ppx_deriving_yojson])
               else if name == "structured_log_events" then (with self; [ppx_version ppx_deriving ppx_deriving_yojson angstrom])
@@ -529,8 +530,9 @@ let
                     ${s.configurePhase}
                     ${patchDune}
                   '';
-              })) (pkgs.lib.getAttrs names super);
-        base-ppxs =
+              })) (pkgs.lib.getAttrs base-ppx-names super);
+        # Attribute set containing derivations for all external libraries + local ppxs
+        base-prj =
           (opam-nix.buildOpamProject' {
             inherit pkgs repos opamCache;
             recursive = true;
@@ -540,7 +542,29 @@ let
             resolveArgs = { env = {
               DISABLE_CHECK_OPAM_SWITCH = "true";
             }; };
-          } base-ppxs-src deps );
+          } base-ppxs-src implicit-deps );
+        base =
+          let deps =
+            pkgs.lib.getAttrs (builtins.attrNames implicit-deps ++ base-ppx-names ++ builtins.attrNames pins) base-prj; in
+          builtins.trace (builtins.attrNames deps)
+          pkgs.stdenv.mkDerivation {
+            name = "mina-base-libs-${minaConfig.DUNE_PROFILE}";
+            phases = [ "installPhase" ];
+            buildInputs = builtins.attrValues deps;
+            installPhase = ''
+              mkdir -p $out/lib/ocaml/4.14.0/site-lib/stublibs $out/nix-support
+              echo 'export OCAMLPATH=$\{OCAMLPATH-}$\{OCAMLPATH:+:}'"$out/lib/ocaml/4.14.0/site-lib" > $out/nix-support/setup-hook
+              echo 'export CAML_LD_LIBRARY_PATH=$\{CAML_LD_LIBRARY_PATH-}$\{CAML_LD_LIBRARY_PATH:+:}'"$out/lib/ocaml/4.14.0/site-lib/stublibs" >> $out/nix-support/setup-hook
+              for input in $buildInputs; do
+                [ ! -d "$input/lib/ocaml/4.14.0/site-lib" ] || {
+                  find "$input/lib/ocaml/4.14.0/site-lib" -maxdepth 1 -mindepth 1 -not -name stublibs | while read d; do
+                    cp "$d" "$out/lib/ocaml/4.14.0/site-lib/"
+                  done
+                }
+                [ ! -d "$input/lib/ocaml/4.14.0/site-lib/stublibs" ] || cp -R "$input/lib/ocaml/4.14.0/site-lib/stublibs"/* "$out/lib/ocaml/4.14.0/site-lib/stublibs/"
+              done
+            '';
+          };
         # myOverlay = self: super:
         #   (pkgs.lib.concatMapAttrs (name: old:
         #     if ! builtins.hasAttr name depsMap && ! builtins.elem name ["cli"] then {}
@@ -595,7 +619,8 @@ let
         #         DISABLE_CHECK_OPAM_SWITCH = "true";
         #       }; };
         #   } src-with-opam-files deps );
-        in base-ppxs.ppx_mina;
+        in
+        base;
 
       devnet-pkg = self.mina-dev.overrideAttrs (s: {
         version = "devnet";
