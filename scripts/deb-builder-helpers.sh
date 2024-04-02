@@ -23,7 +23,7 @@ source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
 cd "${SCRIPTPATH}/../_build"
 
 # Set dependencies based on debian release
-SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, jq, wget, rocksdb-tools"
+SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
 
 SUGGESTED_DEPS="jq, curl, wget"
 
