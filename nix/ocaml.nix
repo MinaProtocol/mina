@@ -546,7 +546,6 @@ let
         base =
           let deps =
             pkgs.lib.getAttrs (builtins.attrNames implicit-deps ++ base-ppx-names ++ builtins.attrNames pins) base-prj; in
-          builtins.trace (builtins.attrNames deps)
           pkgs.stdenv.mkDerivation {
             name = "mina-base-libs-${minaConfig.DUNE_PROFILE}";
             phases = [ "installPhase" ];
@@ -578,10 +577,15 @@ let
               {
                 ${name} = old.overrideAttrs (s:
                 minaEnv // {
-                  buildInputs = s.buildInputs ++ getDeps name self ++ external-libs ++ [base];
+                  buildInputs = getDeps name self ++ external-libs ++ [base pkgs.sodium-static];
                   withFakeOpam = false;
                   inherit nixSupportPhase;
-                  nativeBuildInputs = s.nativeBuildInputs ++ external-libs ++ [pkgs.capnproto self.capnp self.rocks base];
+                  nativeBuildInputs = external-libs ++ [pkgs.capnproto base] ++ (with base-prj; [dune capnp]) ++
+                    (if name == "mina_init" then [base-prj.crunch] else []);
+                  NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
+                  preBuild = ''
+                    export LD_LIBRARY_PATH="${base-prj.ctypes}/lib/ocaml/${base-prj.ocaml.version}/site-lib/ctypes";
+                  '';
                   configurePhase =
                     ''
                       ${s.configurePhase}
@@ -616,7 +620,7 @@ let
         prj =
           (opam-nix.buildOpamProject' {
             inherit pkgs opamCache;
-            repos = [];
+            repos = [ inputs.opam-repository ];
             recursive = true;
             useOpamList = false;
             overlays = [ myOverlay ];
@@ -624,9 +628,9 @@ let
               DUNE_PROFILE="dev";
               DISABLE_CHECK_OPAM_SWITCH = "true";
             }; };
-          } rest-src {} );
+          } rest-src (getAttrs ["ocaml" "ocaml-base-compiler" "ocaml-compiler-libs" "ocaml-config" "ocaml-migrate-parsetree" "ocaml-options-vanilla" "ocaml-syntax-shims" "ocaml-version" "ocamlbuild" "ocamlfind"] implicit-deps) );
         in
-        base;
+        prj.cli;
 
       devnet-pkg = self.mina-dev.overrideAttrs (s: {
         version = "devnet";
