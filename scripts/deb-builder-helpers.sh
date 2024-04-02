@@ -368,6 +368,22 @@ build_archive_migration_deb () {
 }
 ##################################### END ARCHIVE MIGRATION PACKAGE ######################################
 
+##################################### VERIFY PACKAGED FORK CONFIG PACKAGE ##########################################
+build_verify_packaged_fork_config_deb () {
+
+  LEDGER_VALIDATION_DEB=mina-verify-packaged-fork-config${DEB_SUFFIX}
+
+  echo "------------------------------------------------------------"
+  echo "--- Building verify packaged fork config deb"
+
+  create_control_file "$LEDGER_VALIDATION_DEB" "${DEAMON_DEPS} ,${ARCHIVE_MIGRATION_DEPS} ,${SUGGESTED_DEPS}" 'Berkeley Fork Config Verification Tool' "mina-logproc, ${MINA_DEB_NAME}"
+
+  cp ../scripts/mina-verify-packaged-fork-config "${BUILDDIR}/usr/local/bin/mina-verify-packaged-fork-config"
+  
+  build_deb "$LEDGER_VALIDATION_DEB"
+}
+##################################### END VERIFY PACKAGED FORK CONFIG PACKAGE ######################################
+
 ##################################### ZKAPP TEST TXN #######################################
 build_zkapp_test_transaction_deb () {
   echo "------------------------------------------------------------"

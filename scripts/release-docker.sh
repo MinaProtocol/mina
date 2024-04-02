@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive' 'mina-archive-migration' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-test-executive' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
+VALID_SERVICES=('mina-archive' 'mina-archive-migration' 'mina-verify-packaged-fork-config' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-test-executive' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -103,6 +103,11 @@ mina-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
   DOCKER_CONTEXT="dockerfiles/"
   VERSION="${VERSION}-${NETWORK##*=}"
+  SERVICE=${SERVICE}${SERVICE_SUFFIX}
+  ;;
+mina-verify-packaged-fork-config)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-verify-packaged-fork-config"
+  DOCKER_CONTEXT="dockerfiles/"
   SERVICE=${SERVICE}${SERVICE_SUFFIX}
   ;;
 mina-toolchain)

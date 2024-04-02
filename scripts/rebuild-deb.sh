@@ -14,6 +14,7 @@ if [ $# -eq 0 ]
     build_keypair_deb
     build_archive_deb
     build_archive_migration_deb
+    build_verify_packaged_fork_config_deb
     build_batch_txn_deb
     build_daemon_deb
     build_test_executive_deb
