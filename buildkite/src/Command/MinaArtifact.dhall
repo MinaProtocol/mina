@@ -205,6 +205,15 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             step_key="batch-txn-${DebianVersions.lowerName debVersion}-docker-image"
           },
 
+        VerifyPackagedForkConfig = 
+          DockerImage.ReleaseSpec::{
+            deps=DebianVersions.dependsOn debVersion profile,
+            service="mina-verify-packaged-fork-config",
+            network="berkeley",
+            deb_codename="${DebianVersions.lowerName debVersion}",
+            step_key="verify-packaged-fork-config-${DebianVersions.lowerName debVersion}-docker-image"
+          },
+
         Archive = 
           DockerImage.ReleaseSpec::{
             deps=DebianVersions.dependsOn debVersion profile,
