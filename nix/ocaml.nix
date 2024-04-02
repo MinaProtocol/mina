@@ -160,21 +160,67 @@ let
 
   sourceInfo = inputs.self.sourceInfo or { };
 
-<<<<<<< HEAD
   # "System" dependencies required by all Mina packages
   external-libs = with pkgs;
     [ zlib bzip2 gmp openssl libffi ]
     ++ lib.optional (!(stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
-=======
-  # Only get the ocaml stuff, to reduce the amount of unnecessary rebuilds
-  filtered-src = with inputs.nix-filter.lib;
+  depsFiles =
+    let src =
+       builtins.filterSource
+        (path: type: type != "file" || builtins.elem (baseNameOf path) ["dune" "dune-project" "dump-dune-deps.sh"])
+          ../.;
+        in
+    pkgs.stdenv.mkDerivation {
+    name = "mina-deps-json";
+    inherit src;
+    nativeBuildInputs = [ pkgs.jq ];
+    phases = [ "unpackPhase" "buildPhase" "installPhase" ];
+    buildPhase = ''
+      ${pkgs.bash}/bin/bash ./nix/dump-dune-deps.sh > deps.json
+      packages=" $(tr "\n" " " <src/dune-project | grep -oE '\(\s*package\s*\(name\s\s*[^\)]*\)\)' \
+        | sed -r 's/\((name|package)//g' \
+        | sed -r 's/\s|\)//g' | tr "\n" " " ) "
+      <deps.json jq -r "to_entries | .[] | \"if [[ \\\"$packages\\\" =~ ' \" + .key + \" ' ]]; then cp -f ${./opam.template} \" + .value.path + \"/\" + .key + \".opam; fi\"" > gen-opam-files.sh
+    '';
+    installPhase = ''
+      mkdir -p $out
+      cp deps.json gen-opam-files.sh $out
+    '';
+  };
+  src-with-opam-files = pkgs.stdenv.mkDerivation {
+    name = "mina-src-with-opam";
+    src = filtered-src;
+    phases = [ "unpackPhase" "buildPhase" "installPhase" ];
+    buildPhase = ''
+      ${pkgs.bash}/bin/bash ${depsFiles}/gen-opam-files.sh
+
+      dune_files=$(grep -l dune.flags.inc $(find src/app src/lib -name dune -type f))
+      [[ "$dune_files" == "" ]] || \
+        ( sed -i -r 's%(\.\./)*dune\.flags\.inc%./dune.flags.inc%g' $dune_files && \
+        { for f in $dune_files; do cp src/dune*.inc $(dirname $f); done; } )
+      '';
+    installPhase = ''
+      cp -R . $out
+    '';
+  };
+  base-ppxs-src = with inputs.nix-filter.lib;
     filter {
-      root = ../.;
+      root = "${src-with-opam-files}/src/lib";
       include =
-        [ (inDirectory "src") "dune" "dune-project" "./nix/dump-dune-deps.sh" ];
-      exclude = [ (inDirectory "src/external") (inDirectory "src/nonconsensus") ];
+        [ (inDirectory "ppx_version") (inDirectory "ppx_mina")
+          (inDirectory "ppx_register_event") (inDirectory "ppx_representatives")
+          (inDirectory "ppx_to_enum") (inDirectory "ppx_annot")
+          (inDirectory "logproc_lib") (inDirectory "structured_log_events") ];
     };
->>>>>>> Remove unnecessary opam2nix invocations
+  # rest-src = with inputs.nix-filter.lib;
+  #   filter {
+  #     root = src-with-opam-files;
+  #     exclude =
+  #       [ (inDirectory "src/lib/ppx_version") (inDirectory "src/lib/ppx_mina")
+  #         (inDirectory "src/lib/ppx_register_event") (inDirectory "src/lib/ppx_representatives")
+  #         (inDirectory "src/lib/ppx_to_enum") (inDirectory "src/lib/ppx_annot")
+  #         (inDirectory "src/lib/logproc_lib") (inDirectory "src/lib/structured_log_events") ];
+  #   };
 
   overlay = self: super:
     let
@@ -353,6 +399,18 @@ let
         let
         # deps = builtins.removeAttrs export-installed (builtins.attrNames pins) // { base58 = "0.1.3"; };
         deps = extra-packages // implicit-deps ;
+        nixSupportPhase = ''
+           exportIfUnset() {
+             sed -Ee 's/^([^=]*)=(.*)$/\1="''${\1-\2}"/'
+           }
+           if [[ -d "$OCAMLFIND_DESTDIR" ]]; then
+             mkdir -p $out/nix-support
+             printf '%s%s\n' ${
+               escapeShellArg
+               "export OCAMLPATH=\${OCAMLPATH-}\${OCAMLPATH:+:}"
+             } "$OCAMLFIND_DESTDIR" >> $out/nix-support/setup-hook
+           fi
+         '';
         minaConfig =
           let src = with inputs.nix-filter.lib;
             filter {
@@ -418,13 +476,8 @@ let
           '';
         };
         src-with-opam-files = pkgs.stdenv.mkDerivation {
-<<<<<<< HEAD
-          name = "mina-dune-project";
-          inherit src;
-=======
           name = "mina-src-with-opam";
-          src = filtered-src;
->>>>>>> Remove unnecessary opam2nix invocations
+          inherit src;
           nativeBuildInputs = with self; [ dune ocaml pkgs.jq ];
           phases = [ "unpackPhase" "buildPhase" "installPhase" ];
           buildPhase = ''
@@ -444,86 +497,105 @@ let
         opamCache = pkgs.lib.concatMapAttrs (n: dep:
           {"${dep.path}/${n}.opam" = opamTemplate;}
         ) depsMap;
-        depsEl = name : (if builtins.hasAttr name depsMap then builtins.getAttr name depsMap else {deps=[];});
-        getDeps = names: self: builtins.attrValues (pkgs.lib.filterAttrs (n: _: builtins.elem n names) self);
         graphqlDependents = ["mina_init" "rosetta_app_lib" "batch_txn_tool" "integration_test_cloud_engine" "integration_test_lib" "generated_graphql_queries" "integration_test_local_engine"];
-        myOverlay = self: super:
-          let ppx_names = ["ppx_version" "ppx_mina" "ppx_register_event" "ppx_representatives" "ppx_to_enum" "ppx_annot"];
-          ppxs = builtins.attrValues (pkgs.lib.getAttrs ppx_names self) ++ [self.ppx_base self.ppx_optcomp self.ppx_bitstring];
-          customDeps = name:
-          if name == "interpolator_lib" then [self.ppx_version self.ppx_deriving self.ppx_deriving_yojson]
-          else if name == "structured_log_events" then [self.ppx_version self.ppx_deriving]
-          else if name == "ppx_register_event" then [self.structured_log_events]
-          else if name == "ppx_mina" then [self.structured_log_events]
-          else if name == "ppx_annot" then [self.ppx_version]
-          else [] ;
-          custom =
-            builtins.mapAttrs (name: old:
-              old.overrideAttrs (s: minaEnv // {
-              buildInputs = s.buildInputs ++ getDeps (depsEl name).deps self ++ external-libs ++ customDeps name;
-              nativeBuildInputs = s.nativeBuildInputs ++ external-libs;
-              configurePhase =
-                ''
-                  ${s.configurePhase}
-                  ${patchDune}
-                '';
-            })) (pkgs.lib.getAttrs (ppx_names ++ ["interpolator_lib" "structured_log_events"]) super);
+        impl = self: name: acc:
+          if builtins.hasAttr name depsMap then
+            let deps = (builtins.getAttr name depsMap).deps; in
+            pkgs.lib.foldl (acc: dep:
+              if builtins.hasAttr dep self && ! builtins.hasAttr dep acc then
+                impl self dep (acc // {"${dep}" = builtins.getAttr dep self;})
+              else acc
+            ) acc deps
+          else acc;
+        getDeps = name: self: builtins.attrValues (impl self name {});
+        base-ppxs-overlay = self: super:
+          let
+            names = ["ppx_version" "ppx_mina" "ppx_register_event" "ppx_representatives" "ppx_to_enum" "ppx_annot" "interpolator_lib" "structured_log_events"];
+            customDeps = name:
+              if name == "interpolator_lib" then (with self; [ppx_version ppx_deriving ppx_deriving_yojson])
+              else if name == "structured_log_events" then (with self; [ppx_version ppx_deriving ppx_deriving_yojson angstrom])
+              else if name == "ppx_register_event" then (with self; [structured_log_events ppx_version angstrom interpolator_lib])
+              else if name == "ppx_mina" then (with self; [structured_log_events ppx_version angstrom ppx_deriving interpolator_lib ocaml-migrate-parsetree ppx_deriving_yojson])
+              else if name == "ppx_annot" then [self.ppx_version]
+              else [] ;
           in
-          custom //
-          (pkgs.lib.concatMapAttrs (name: old:
-            if (builtins.hasAttr name custom || ! builtins.hasAttr name depsMap) && ! builtins.elem name ["cli"] then {}
-            else
-              {
-                ${name} = old.overrideAttrs (s:
-                minaEnv // {
-                  buildInputs = ppxs ++ s.buildInputs ++ getDeps (depsEl name).deps self ++ external-libs ++
-                    ( if builtins.elem name graphqlDependents then [self.graphql_ppx]
-                    else []);
-                  nativeBuildInputs = s.nativeBuildInputs ++ external-libs ++ [pkgs.capnproto self.capnp self.rocks];
-                  configurePhase =
-                    ''
-                      ${s.configurePhase}
-                      ${patchDune}
-                    '' +
-                    ( if builtins.elem name graphqlDependents then
-                      ''
-                        ${patchDuneGraphql self}
-                      ''
-                    else "") ;
-                });
-              }
-              ) super) //
-              { graphql-schema =
-                  pkgs.stdenv.mkDerivation {
-                    src =
-                      with inputs.nix-filter.lib;
-                      filter {
-                        root = ../src;
-                        include = [ "./graphql-ppx-config.inc" ];
-                      };
-                    name = "graphql-schema";
-                    phases = [ "unpackPhase" "installPhase" ];
-                    installPhase = ''
-                      mkdir -p $out
-                      cp graphql-ppx-config.inc $out/
-                      ${self.graphql_schema_dump}/bin/graphql_schema_dump > $out/graphql_schema.json
-                    '';
-                  };
-              }
-          ;
-       prj =
+            builtins.mapAttrs (name: old:
+              old.overrideAttrs (s: {
+                withFakeOpam = false;
+                buildInputs = s.buildInputs ++ getDeps name self ++ external-libs ++ customDeps name;
+                nativeBuildInputs = s.nativeBuildInputs ++ external-libs;
+                configurePhase =
+                  ''
+                    ${s.configurePhase}
+                    ${patchDune}
+                  '';
+              })) (pkgs.lib.getAttrs names super);
+        base-ppxs =
           (opam-nix.buildOpamProject' {
             inherit pkgs repos opamCache;
             recursive = true;
             defs = pins;
             useOpamList = false;
-            overlays = ocamlOverlays ++ [ myOverlay ];
+            overlays = ocamlOverlays ++ [ base-ppxs-overlay ];
             resolveArgs = { env = {
-              DUNE_PROFILE="dev";
-                DISABLE_CHECK_OPAM_SWITCH = "true";
-              }; };
-          } src-with-opam-files deps );
-        in prj.cli;
+              DISABLE_CHECK_OPAM_SWITCH = "true";
+            }; };
+          } base-ppxs-src deps );
+        # myOverlay = self: super:
+        #   (pkgs.lib.concatMapAttrs (name: old:
+        #     if ! builtins.hasAttr name depsMap && ! builtins.elem name ["cli"] then {}
+        #     else
+        #       {
+        #         ${name} = old.overrideAttrs (s:
+        #         minaEnv // {
+        #           buildInputs = s.buildInputs ++ getDeps name self ++ external-libs;
+        #           withFakeOpam = false;
+        #           inherit nixSupportPhase;
+        #           nativeBuildInputs = s.nativeBuildInputs ++ external-libs ++ [pkgs.capnproto self.capnp self.rocks];
+        #           configurePhase =
+        #             ''
+        #               ${s.configurePhase}
+        #               ${patchDune}
+        #             '' +
+        #             ( if builtins.elem name graphqlDependents then
+        #               ''
+        #                 ${patchDuneGraphql self}
+        #               ''
+        #             else "") ;
+        #         });
+        #       }
+        #       ) super) //
+        #       { graphql-schema =
+        #           pkgs.stdenv.mkDerivation {
+        #             src =
+        #               with inputs.nix-filter.lib;
+        #               filter {
+        #                 root = ../src;
+        #                 include = [ "./graphql-ppx-config.inc" ];
+        #               };
+        #             name = "graphql-schema";
+        #             phases = [ "unpackPhase" "installPhase" ];
+        #             installPhase = ''
+        #               mkdir -p $out
+        #               cp graphql-ppx-config.inc $out/
+        #               ${self.graphql_schema_dump}/bin/graphql_schema_dump > $out/graphql_schema.json
+        #             '';
+        #           };
+        #       }
+        #   ;
+        # prj =
+        #   (opam-nix.buildOpamProject' {
+        #     inherit pkgs repos opamCache;
+        #     recursive = true;
+        #     defs = pins;
+        #     useOpamList = false;
+        #     overlays = ocamlOverlays ++ [ myOverlay ];
+        #     resolveArgs = { env = {
+        #       DUNE_PROFILE="dev";
+        #         DISABLE_CHECK_OPAM_SWITCH = "true";
+        #       }; };
+        #   } src-with-opam-files deps );
+        in base-ppxs.ppx_mina;
 
       devnet-pkg = self.mina-dev.overrideAttrs (s: {
         version = "devnet";
