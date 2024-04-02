@@ -1,8 +1,8 @@
-let Package : Type  = < Daemon | DaemonDevnet | DaemonLightnet | Archive | ArchiveMigration | TestExecutive | BatchTxn | LogProc | ZkappTestTransaction | FunctionalTestSuite >
+let Package : Type  = < Daemon | DaemonDevnet | DaemonLightnet | Archive | ArchiveMigration | CreateLegacyGenesis| TestExecutive | BatchTxn | LogProc | ZkappTestTransaction | FunctionalTestSuite >
 
 let MainPackages = [ Package.Daemon , Package.DaemonDevnet , Package.Archive , Package.ArchiveMigration , Package.LogProc ]
 
-let AuxiliaryPackages = [ Package.DaemonLightnet , Package.TestExecutive , Package.BatchTxn , Package.ZkappTestTransaction , Package.FunctionalTestSuite ]
+let AuxiliaryPackages = [ Package.DaemonLightnet , Package.TestExecutive , Package.BatchTxn , Package.ZkappTestTransaction , Package.FunctionalTestSuite , Package.CreateLegacyGenesis ]
 
 
 let capitalName = \(package : Package) ->
@@ -12,6 +12,7 @@ let capitalName = \(package : Package) ->
     , DaemonLightnet = "DaemonLightnet"
     , Archive = "Archive"
     , ArchiveMigration = "ArchiveMigration"
+    , CreateLegacyGenesis = "CreateLegacyGenesis"
     , TestExecutive = "TestExecutive"
     , BatchTxn = "BatchTxn"
     , LogProc = "Logproc"
@@ -26,6 +27,7 @@ let lowerName = \(package : Package) ->
     , DaemonLightnet = "daemon_lightnet"
     , Archive = "archive"
     , ArchiveMigration = "archive_migration"
+    , CreateLegacyGenesis = "create_legacy_genesis"
     , TestExecutive = "test_executive"
     , BatchTxn = "batch_txn"
     , LogProc = "logproc"
@@ -40,6 +42,7 @@ let debianName = \(package : Package) ->
     , DaemonLightnet = "mina-berkeley-lightnet"
     , Archive = "mina-archive"
     , ArchiveMigration = "mina-archive-migration"
+    , CreateLegacyGenesis = "mina-create-legacy-genesis"
     , TestExecutive = "mina-test-executive"
     , BatchTxn = "mina-batch-txn"
     , LogProc = "mina-logproc" 
