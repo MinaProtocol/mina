@@ -69,6 +69,7 @@ RUN echo "Building image with version $deb_version from repo $deb_release $deb_c
   && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
   && apt-get install --quiet --yes --allow-downgrades "${MINA_DEB}=$deb_version" \
+  && apt-get install --quiet --yes --allow-downgrade "mina-create-legacy-ledger=1.4.0beta2-georgeee-port-runtime-genesis-ledger-to-compatible-9a494bf" \
   && rm -rf /var/lib/apt/lists/*
 
 
