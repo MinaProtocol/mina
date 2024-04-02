@@ -25,6 +25,10 @@ cd "${SCRIPTPATH}/../_build"
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, jq, wget, rocksdb-tools"
 
+SUGGESTED_DEPS="jq, curl, wget"
+
+ARCHIVE_MIGRATION_DEPS="jq, google-cloud-sdk"
+
 TEST_EXECUTIVE_DEPS=", mina-logproc, python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, terraform, helm"
 
 case "${MINA_DEB_CODENAME}" in
@@ -69,10 +73,11 @@ BUILDDIR="deb_build"
 create_control_file() {
 
   echo "------------------------------------------------------------"
-  echo "create_control_file inputs:"
+  echo "create_control_file inputs:" 
   echo "Package Name: ${1}"
   echo "Dependencies: ${2}"
   echo "Description: ${3}"
+  echo "Suggests: ${4}"
 
   # Make sure the directory exists
   mkdir -p "${BUILDDIR}/DEBIAN"
@@ -93,6 +98,7 @@ Architecture: amd64
 Maintainer: O(1)Labs <build@o1labs.org>
 Installed-Size:
 Depends: ${2}
+Suggests: ${4}
 Section: base
 Priority: optional
 Homepage: https://minaprotocol.com/
@@ -211,7 +217,7 @@ build_keypair_deb() {
     echo "------------------------------------------------------------"
     echo "--- Building generate keypair deb:"
 
-    create_control_file mina-generate-keypair "${SHARED_DEPS}" 'Utility to regenerate mina private public keys in new format'
+    create_control_file mina-generate-keypair "${SHARED_DEPS}" 'Utility to regenerate mina private public keys in new format' "${SUGGESTED_DEPS}"
 
     # Binaries
     cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
@@ -226,7 +232,7 @@ build_keypair_deb() {
 
 ##################################### LOGPROC PACKAGE #######################################
 build_logproc_deb() {
-  create_control_file mina-logproc "${SHARED_DEPS}" 'Utility for processing mina-daemon log output'
+  create_control_file mina-logproc "${SHARED_DEPS}" 'Utility for processing mina-daemon log output' "${SUGGESTED_DEPS}"
 
   # Binaries
   cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
@@ -237,7 +243,7 @@ build_logproc_deb() {
 
 ##################################### GENERATE TEST_EXECUTIVE PACKAGE #######################################
 build_test_executive_deb () {
-  create_control_file mina-test-executive "${SHARED_DEPS}${TEST_EXECUTIVE_DEPS}" 'Tool to run automated tests against a full mina testnet with multiple nodes.'
+  create_control_file mina-test-executive "${SHARED_DEPS}${TEST_EXECUTIVE_DEPS}" 'Tool to run automated tests against a full mina testnet with multiple nodes.' "${SUGGESTED_DEPS}"
 
   # Binaries
   cp ./default/src/app/test_executive/test_executive.exe "${BUILDDIR}/usr/local/bin/mina-test-executive"
@@ -249,7 +255,7 @@ build_test_executive_deb () {
 ##################################### GENERATE BATCH TXN TOOL PACKAGE #######################################
 build_batch_txn_deb() {
 
-  create_control_file mina-batch-txn "${SHARED_DEPS}" 'Load transaction tool against a mina node.'
+  create_control_file mina-batch-txn "${SHARED_DEPS}" 'Load transaction tool against a mina node.' "${SUGGESTED_DEPS}"
 
   # Binaries
   cp ./default/src/app/batch_txn_tool/batch_txn_tool.exe "${BUILDDIR}/usr/local/bin/mina-batch-txn"
@@ -260,7 +266,7 @@ build_batch_txn_deb() {
 
 ##################################### GENERATE TEST SUITE PACKAGE #######################################
 build_functional_test_suite_deb() {
-  create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.'
+  create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.' "${SUGGESTED_DEPS}"
 
   # Binaries
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
@@ -279,7 +285,7 @@ build_daemon_deb() {
     echo "------------------------------------------------------------"
     echo "--- Building mainnet deb without keys:"
 
-    create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
+    create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
     copy_common_daemon_configs mainnet mainnet 'mina-seed-lists/mainnet_seeds.txt'
 
@@ -308,7 +314,7 @@ build_daemon_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building Mina Berkeley testnet signatures deb without keys:"
 
-  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
+  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
 
@@ -325,14 +331,11 @@ build_archive_deb () {
   echo "--- Building archive deb"
 
 
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process Compatible with Mina Daemon' "${SUGGESTED_DEPS}"
 
   cp ./default/src/app/archive/archive.exe "${BUILDDIR}/usr/local/bin/mina-archive"
   cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
   cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
-  
-  cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
   
   mkdir -p "${BUILDDIR}/etc/mina/archive"
   cp ../scripts/archive/download-missing-blocks.sh "${BUILDDIR}/etc/mina/archive"
@@ -341,11 +344,12 @@ build_archive_deb () {
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-replayer"
   cp ./default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILDDIR}/usr/local/bin/mina-swap-bad-balances"
 
+
   build_deb "$ARCHIVE_DEB"
 
 }
 
-##################################### ARCHIVE PACKAGE ##########################################
+##################################### ARCHIVE MIGRATION PACKAGE ##########################################
 build_archive_migration_deb () {
 
   ARCHIVE_MIGRATION_DEB=mina-archive-migration${DEB_SUFFIX}
@@ -353,25 +357,23 @@ build_archive_migration_deb () {
   echo "------------------------------------------------------------"
   echo "--- Building archive migration deb"
 
-
-  create_control_file "$ARCHIVE_MIGRATION_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
+  create_control_file "$ARCHIVE_MIGRATION_DEB" "${ARCHIVE_DEPS} ,${ARCHIVE_MIGRATION_DEPS} ,${SUGGESTED_DEPS}" 'Berkeley Archive Migration And Verification Tools' "mina-logproc"
 
   cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
   cp ./default/src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-verifier"
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-migration-replayer"
-
+  cp ../scripts/archive/migration/mina-berkeley-migration-script "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-script"
+  
   build_deb "$ARCHIVE_MIGRATION_DEB"
-
 }
-##################################### END ARCHIVE PACKAGE ######################################
+##################################### END ARCHIVE MIGRATION PACKAGE ######################################
 
 ##################################### ZKAPP TEST TXN #######################################
 build_zkapp_test_transaction_deb () {
   echo "------------------------------------------------------------"
   echo "--- Building Mina Berkeley ZkApp test transaction tool:"
 
-  create_control_file mina-zkapp-test-transaction "${SHARED_DEPS}${DAEMON_DEPS}" 'Utility to generate ZkApp transactions in Mina GraphQL format'
+  create_control_file mina-zkapp-test-transaction "${SHARED_DEPS}${DAEMON_DEPS}" 'Utility to generate ZkApp transactions in Mina GraphQL format' "${SUGGESTED_DEPS}"
 
   # Binaries
   cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-test-transaction"

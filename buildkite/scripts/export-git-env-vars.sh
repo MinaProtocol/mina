@@ -49,7 +49,7 @@ else
 
   # Determine deb repo to use
   case $GITBRANCH in
-      berkeley|rampup|compatible|master|release*) # whitelist of branches that can be tagged
+      berkeley|rampup|compatible|master|release/*) # whitelist of branches that can be tagged
           case "${THIS_COMMIT_TAG}" in
             *alpha*) # any tag including the string `alpha`
               RELEASE=alpha ;;
@@ -59,15 +59,26 @@ else
               RELEASE=berkeley ;;
             *rampup*) # any tag including the string `rampup`
               RELEASE=rampup ;;
-            ?*) # Any other non-empty tag. ? matches a single character and * matches 0 or more characters.
-              RELEASE=stable ;;
+            *devnet*)
+              RELEASE=devnet ;;
+            ?*)
+              # if the tag is a version number sans any suffix, then it's a stable release
+              if grep -qP '^\d+\.\d+\.\d+$' <<< "${THIS_COMMIT_TAG}"; then
+                RELEASE=stable
+              else
+                RELEASE=unstable
+              fi ;;
             "") # No tag
-              RELEASE=unstable ;;
+              RELEASE="unstable" ;;
+              # real soon now:
+              # RELEASE="${GITHASH}" ;; # avoids deb-s3 concurrency issues between PRs
             *) # The above set of cases should be exhaustive, if they're not then still set RELEASE=unstable
               RELEASE=unstable
               echo "git tag --points-at HEAD may have failed, falling back to unstable. Value: \"$(git tag --points-at HEAD)\""
               ;;
           esac ;;
+      release-automation-testing/*) # whitelist of branches that can be tagged
+          RELEASE=prerelease ;;
       *)
           RELEASE=unstable ;;
   esac
@@ -83,7 +94,7 @@ fi
 
 # Determine the packages to build (mainnet y/N)
 case $GITBRANCH in
-    compatible|master|release/1*) # whitelist of branches that are "mainnet-like"
+    compatible|master|release-automation-testing/*|release/1*|release/3*) # whitelist of branches that are "mainnet-like"
       MINA_BUILD_MAINNET=true ;;
     *) # Other branches
       MINA_BUILD_MAINNET=false ;;
