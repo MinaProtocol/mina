@@ -693,9 +693,10 @@ module Zkapp_permissions = struct
     in
     ( match versions with
     | Ok [] ->
-        failwith
-          (sprintf "No transaction version exists for the permission, %s"
-             (Permissions.to_yojson perms |> Yojson.Safe.to_string) )
+        if txn_version > Mina_numbers.Txn_version.(to_int current) then
+          failwith
+            (sprintf "No transaction version exists for the permission, %s"
+               (Permissions.to_yojson perms |> Yojson.Safe.to_string) )
     | Ok _ ->
         ()
     | Error e ->
