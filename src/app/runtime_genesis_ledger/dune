@@ -7,6 +7,7 @@
    core_kernel
    async_kernel
    async
+   async_unix
    core
    result
    async.async_command
@@ -17,14 +18,9 @@
    logger
    cache_dir
    mina_base
+   precomputed_values
+   coda_genesis_ledger
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_let ppx_optcomp ppx_deriving_yojson)))
-
-(rule
- (targets genesis_filename.txt)
- (deps
-  (:< gen/gen.exe))
- (action
-  (run %{<})))
+ (preprocess (pps ppx_jane ppx_version ppx_let ppx_deriving_yojson ppx_coda)))
