@@ -64,7 +64,7 @@ let
       "-F${pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks -framework CoreFoundation";
 
     # todo: slimmed rocksdb
-    MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
+    MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
     GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
     # this is used to retrieve the path of the built static library
@@ -212,15 +212,15 @@ let
           (inDirectory "ppx_to_enum") (inDirectory "ppx_annot")
           (inDirectory "logproc_lib") (inDirectory "structured_log_events") ];
     };
-  # rest-src = with inputs.nix-filter.lib;
-  #   filter {
-  #     root = src-with-opam-files;
-  #     exclude =
-  #       [ (inDirectory "src/lib/ppx_version") (inDirectory "src/lib/ppx_mina")
-  #         (inDirectory "src/lib/ppx_register_event") (inDirectory "src/lib/ppx_representatives")
-  #         (inDirectory "src/lib/ppx_to_enum") (inDirectory "src/lib/ppx_annot")
-  #         (inDirectory "src/lib/logproc_lib") (inDirectory "src/lib/structured_log_events") ];
-  #   };
+  rest-src = with inputs.nix-filter.lib;
+    filter {
+      root = src-with-opam-files;
+      exclude =
+        [ (inDirectory "src/lib/ppx_version") (inDirectory "src/lib/ppx_mina")
+          (inDirectory "src/lib/ppx_register_event") (inDirectory "src/lib/ppx_representatives")
+          (inDirectory "src/lib/ppx_to_enum") (inDirectory "src/lib/ppx_annot")
+          (inDirectory "src/lib/logproc_lib") (inDirectory "src/lib/structured_log_events") ];
+    };
 
   overlay = self: super:
     let
@@ -571,60 +571,60 @@ let
               done
             '';
           };
-        # myOverlay = self: super:
-        #   (pkgs.lib.concatMapAttrs (name: old:
-        #     if ! builtins.hasAttr name depsMap && ! builtins.elem name ["cli"] then {}
-        #     else
-        #       {
-        #         ${name} = old.overrideAttrs (s:
-        #         minaEnv // {
-        #           buildInputs = s.buildInputs ++ getDeps name self ++ external-libs;
-        #           withFakeOpam = false;
-        #           inherit nixSupportPhase;
-        #           nativeBuildInputs = s.nativeBuildInputs ++ external-libs ++ [pkgs.capnproto self.capnp self.rocks];
-        #           configurePhase =
-        #             ''
-        #               ${s.configurePhase}
-        #               ${patchDune}
-        #             '' +
-        #             ( if builtins.elem name graphqlDependents then
-        #               ''
-        #                 ${patchDuneGraphql self}
-        #               ''
-        #             else "") ;
-        #         });
-        #       }
-        #       ) super) //
-        #       { graphql-schema =
-        #           pkgs.stdenv.mkDerivation {
-        #             src =
-        #               with inputs.nix-filter.lib;
-        #               filter {
-        #                 root = ../src;
-        #                 include = [ "./graphql-ppx-config.inc" ];
-        #               };
-        #             name = "graphql-schema";
-        #             phases = [ "unpackPhase" "installPhase" ];
-        #             installPhase = ''
-        #               mkdir -p $out
-        #               cp graphql-ppx-config.inc $out/
-        #               ${self.graphql_schema_dump}/bin/graphql_schema_dump > $out/graphql_schema.json
-        #             '';
-        #           };
-        #       }
-        #   ;
-        # prj =
-        #   (opam-nix.buildOpamProject' {
-        #     inherit pkgs repos opamCache;
-        #     recursive = true;
-        #     defs = pins;
-        #     useOpamList = false;
-        #     overlays = ocamlOverlays ++ [ myOverlay ];
-        #     resolveArgs = { env = {
-        #       DUNE_PROFILE="dev";
-        #         DISABLE_CHECK_OPAM_SWITCH = "true";
-        #       }; };
-        #   } src-with-opam-files deps );
+        myOverlay = self: super:
+          (pkgs.lib.concatMapAttrs (name: old:
+            if ! builtins.hasAttr name depsMap && ! builtins.elem name ["cli"] then {}
+            else
+              {
+                ${name} = old.overrideAttrs (s:
+                minaEnv // {
+                  buildInputs = s.buildInputs ++ getDeps name self ++ external-libs ++ [base];
+                  withFakeOpam = false;
+                  inherit nixSupportPhase;
+                  nativeBuildInputs = s.nativeBuildInputs ++ external-libs ++ [pkgs.capnproto self.capnp self.rocks base];
+                  configurePhase =
+                    ''
+                      ${s.configurePhase}
+                      ${patchDune}
+                    '' +
+                    ( if builtins.elem name graphqlDependents then
+                      ''
+                        ${patchDuneGraphql self}
+                      ''
+                    else "") ;
+                });
+              }
+              ) super) //
+              { graphql-schema =
+                  pkgs.stdenv.mkDerivation {
+                    src =
+                      with inputs.nix-filter.lib;
+                      filter {
+                        root = ../src;
+                        include = [ "./graphql-ppx-config.inc" ];
+                      };
+                    name = "graphql-schema";
+                    phases = [ "unpackPhase" "installPhase" ];
+                    installPhase = ''
+                      mkdir -p $out
+                      cp graphql-ppx-config.inc $out/
+                      ${self.graphql_schema_dump}/bin/graphql_schema_dump > $out/graphql_schema.json
+                    '';
+                  };
+              }
+          ;
+        prj =
+          (opam-nix.buildOpamProject' {
+            inherit pkgs opamCache;
+            repos = [];
+            recursive = true;
+            useOpamList = false;
+            overlays = [ myOverlay ];
+            resolveArgs = { env = {
+              DUNE_PROFILE="dev";
+              DISABLE_CHECK_OPAM_SWITCH = "true";
+            }; };
+          } rest-src {} );
         in
         base;
 
