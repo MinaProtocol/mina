@@ -79,7 +79,7 @@ export FORKING_FROM_CONFIG_JSON=${FORKING_FROM_CONFIG_JSON:-$(source_build_fallb
 export MINA_LIBP2P_PASS=''
 
 workdir=$3
-mkdir -p "$workdir/{ledgers{,-backup},keys}"
+mkdir -p "$workdir"/{ledgers{,-backup},keys}
 chmod 700 "$workdir/keys"
 
 fork_block_state_hash=$(jq -r '.proof.fork.state_hash' "$2")
