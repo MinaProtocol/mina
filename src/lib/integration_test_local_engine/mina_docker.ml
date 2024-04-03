@@ -50,24 +50,26 @@ module Network_config = struct
       ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
       =
     let _ = cli_inputs in
-    let { genesis_ledger
-        ; epoch_data
-        ; block_producers
-        ; snark_coordinator
-        ; snark_worker_fee
-        ; num_archive_nodes
-        ; log_precomputed_blocks
-        ; start_filtered_logs
-        ; proof_config
-        ; Test_config.k
-        ; delta
-        ; slots_per_epoch
-        ; slots_per_sub_window
-        ; txpool_max_size
-        ; slot_tx_end
-        ; slot_chain_end
-        ; _
-        } =
+    let ({ genesis_ledger
+         ; epoch_data
+         ; block_producers
+         ; snark_coordinator
+         ; snark_worker_fee
+         ; num_archive_nodes
+         ; log_precomputed_blocks (* ; num_plain_nodes *)
+         ; start_filtered_logs
+         ; proof_config
+         ; k
+         ; delta
+         ; slots_per_epoch
+         ; slots_per_sub_window
+         ; grace_period_slots
+         ; txpool_max_size
+         ; slot_tx_end
+         ; slot_chain_end
+         ; _
+         }
+          : Test_config.t ) =
       test_config
     in
     let git_commit = Mina_version.commit_id_short in
@@ -109,7 +111,12 @@ module Network_config = struct
     let add_accounts accounts_and_keypairs =
       List.map accounts_and_keypairs
         ~f:(fun
-             ( { Test_config.Test_account.balance; account_name; timing; _ }
+             ( { Test_config.Test_account.balance
+               ; account_name
+               ; timing
+               ; permissions
+               ; zkapp
+               }
              , (pk, sk) )
            ->
           let timing = runtime_timing_of_timing timing in
@@ -121,6 +128,13 @@ module Network_config = struct
             ; balance = Balance.of_mina_string_exn balance
             ; delegate = None
             ; timing
+            ; permissions =
+                Option.map
+                  ~f:Runtime_config.Accounts.Single.Permissions.of_permissions
+                  permissions
+            ; zkapp =
+                Option.map
+                  ~f:Runtime_config.Accounts.Single.Zkapp_account.of_zkapp zkapp
             }
           in
           (account_name, account) )
@@ -159,11 +173,11 @@ module Network_config = struct
             ; delta = Some delta
             ; slots_per_epoch = Some slots_per_epoch
             ; slots_per_sub_window = Some slots_per_sub_window
+            ; grace_period_slots = Some grace_period_slots
             ; genesis_state_timestamp =
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ()))
-            ; grace_period_slots = None
             }
-      ; proof = Some proof_config
+      ; proof = Some proof_config (* TODO: prebake ledger and only set hash *)
       ; ledger =
           Some
             { base =
@@ -174,8 +188,8 @@ module Network_config = struct
             ; num_accounts = None
             ; balances = []
             ; hash = None
-            ; name = None
             ; s3_data_hash = None
+            ; name = None
             }
       ; epoch_data =
           Option.map epoch_data ~f:(fun { staking = staking_ledger; next } ->
@@ -188,7 +202,9 @@ module Network_config = struct
                   (epoch_accounts : Test_config.Test_account.t list) =
                 let epoch_ledger_accounts =
                   List.map epoch_accounts
-                    ~f:(fun { account_name; balance; timing; _ } ->
+                    ~f:(fun
+                         { account_name; balance; timing; permissions; zkapp }
+                       ->
                       let balance = Balance.of_mina_string_exn balance in
                       let timing = runtime_timing_of_timing timing in
                       let genesis_account =
@@ -203,7 +219,20 @@ module Network_config = struct
                               "Epoch ledger account %s not in genesis ledger"
                               account_name ()
                       in
-                      { genesis_account with balance; timing } )
+                      { genesis_account with
+                        balance
+                      ; timing
+                      ; permissions =
+                          Option.map
+                            ~f:
+                              Runtime_config.Accounts.Single.Permissions
+                              .of_permissions permissions
+                      ; zkapp =
+                          Option.map
+                            ~f:
+                              Runtime_config.Accounts.Single.Zkapp_account
+                              .of_zkapp zkapp
+                      } )
                 in
                 ( { base =
                       Accounts (genesis_winner_account :: epoch_ledger_accounts)
@@ -211,8 +240,8 @@ module Network_config = struct
                   ; num_accounts = None
                   ; balances = []
                   ; hash = None
-                  ; name = None
                   ; s3_data_hash = None
+                  ; name = None
                   }
                   : Runtime_config.Ledger.t )
               in
