@@ -1,6 +1,6 @@
 {0 Wire-types library}
 
-This library contains the definitions of all types which are used to transmit
+This library contains the definitions of the types which are used to transmit
 values "over-the-wire" (over the network, between different processes, ...). It
 does {b not} declare or implement operations on these types, to keep the library
 as lightweight as possible.
@@ -13,10 +13,13 @@ which transpiles to JavaScript).
 {1 Architecture}
 
 This library is organized as a mirror of the codebase modules implementing
-actually operations on the types.
+actually operations on the types: to each type [X.Y.t] in the codebase
+corresponds a type [Mina_wire_types.X.Y.t] in this library. This includes
+versioned types, with a notable exception: the `Stable` module layer is always
+omitted in this library.
 
-For example, the type {!Currency.Amount.t} is defined in
-{!Mina_wire_types.Currency.Amount}.
+For example, the type {!Currency.Amount.Stable.V1.t} is equivalent to
+{!Mina_wire_types.Currency.Amount.V1.t}.
 
 Since types defined here and types defined in actual implementation modules are
 intended to be used interchangeably, modules implementing operations on these
@@ -42,18 +45,22 @@ type t = Mina_wire_types.Foo.t = Bar of int
 let add (Bar a) (Bar b) = Bar (a + b)
 ]}
 
+This only has to be done for types that are records or variants: simple type
+aliases do not need (and in fact cannot have) another type constraint.
+
 {2 Hidden types}
 
-It's a bit more complicated for types which are meant to be hidden from the
-code base: we have to use some machinery to "reveal" the type definition to the
-module meant to implement operations on that type.
+It is a bit more complicated for types which are meant to be hidden from the
+code base (either abstract or private types): we have to use some machinery to
+"reveal" the type definition to the module meant to implement operations on that
+type.
 
-To that end, each module [F.M] defining a hidden type `t` has a corresponding
-[F.Make.M] functor to reveal the type, to be used only by the actual
+To that end, each module [Mina_wire_types.M] defining a hidden type `t` has a corresponding
+[Mina_wire_types.M.Make] functor to reveal the type, to be used only by the actual
 implementation of [M.t].
 
-For example, {!Currency.Amount.t} can be implemented by using
-{!Currency.Make.Amount}. Every such functor has two arguments:
+For example, the types in {!Currency} can be implemented by using
+{!Mina_wire_types.Currency.Make}. Every [Make] functor has two arguments:
 - [Make_sig]: a functor constructing the expected signature of the final implementation
   module, from the abstract definition of [t],
 - [Make_str]: a functor implementing that module from the concrete definition of [t]. The
@@ -62,5 +69,18 @@ For example, {!Currency.Amount.t} can be implemented by using
 The result is the full implementation module with the correct, compatible type,
 which can then be included.
 
-For reference, see the implementation of {!Currency.Amount} in
-{i lib/currency/currency.ml}, which follows this pattern.
+{b To get started} with a practical example, see the implementation of {!Currency} in
+{i lib/currency/currency.ml(i)}, which follows this pattern. See also the
+corresponding {i currency.ml(i)} definitions in this library, which fully
+document the pattern used everywhere in this library.
+
+{2 Testing}
+
+To ensure this library and the codebase are consistent and can be used
+interchangeably, a test module in `test/type_equalities.ml` asserts that every
+main type of this library can be unified with its corresponding implementation
+type by the compiler.
+
+It's important to add these tests, as an inconsistency not
+caught by these tests can cause head-scratching errors in random places of the
+code base.

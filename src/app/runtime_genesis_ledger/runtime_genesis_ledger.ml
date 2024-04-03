@@ -1,9 +1,9 @@
 open Core
 open Async
-open Mina_base
+module Ledger = Mina_ledger.Ledger
 
 module Hashes = struct
-  type t = { hash : string } [@@deriving to_yojson]
+  type t = { s3_data_hash : string; hash : string } [@@deriving to_yojson]
 end
 
 module Hash_json = struct
@@ -14,7 +14,7 @@ module Hash_json = struct
 end
 
 let ledger_depth =
-              Genesis_constants.Constraint_constants.compiled
+  (Lazy.force Precomputed_values.compiled_inputs).constraint_constants
     .ledger_depth
 
 let logger = Logger.create ()
@@ -32,7 +32,7 @@ let load_ledger (accounts : Runtime_config.Accounts.t) =
   Lazy.force (Genesis_ledger.Packed.t packed)
 
 let generate_ledger_tarball ~genesis_dir ~ledger_name_prefix ledger =
-  let%map tar_path =
+  let%bind tar_path =
     Deferred.Or_error.ok_exn
     @@ Genesis_ledger_helper.Ledger.generate_tar ~genesis_dir ~logger
          ~ledger_name_prefix ledger
@@ -40,9 +40,10 @@ let generate_ledger_tarball ~genesis_dir ~ledger_name_prefix ledger =
   [%log info] "Generated ledger tar at %s" tar_path ;
   let hash =
     Mina_base.Ledger_hash.to_base58_check
-    @@ Ledger.merkle_root ledger
+    @@ Mina_ledger.Ledger.merkle_root ledger
   in
-  { Hashes.hash }
+  let%map s3_data_hash = Genesis_ledger_helper.sha3_hash tar_path in
+  { Hashes.s3_data_hash; hash }
 
 let generate_hash_json ~genesis_dir ledger staking_ledger next_ledger =
   let%bind ledger_hashes =
@@ -78,10 +79,13 @@ let is_dirty_proof = function
 
 let extract_accounts_exn = function
   | { Runtime_config.Ledger.base = Accounts accounts
-    ; num_accounts = None
     ; balances = []
-    (* ; add_genesis_winner = Some false *)
+    ; add_genesis_winner = Some false
     ; _
+    }
+  | { Runtime_config.Ledger.base = Accounts accounts
+    ; balances = []
+    ; add_genesis_winner = None
     } ->
       accounts
   | _ ->
