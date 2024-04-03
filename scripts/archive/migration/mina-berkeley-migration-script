@@ -478,11 +478,11 @@ function run_incremental_migration() {
     local __migrated_archive_uri=$3 
     local __genesis_ledger=$4
     local __blocks_bucket=$5
-    local __keep_precomputed_blocks=$5
-    local __stream_blocks=$6
-    local __network=$7
-    local __checkpoint_interval=$8
-    local __replayer_checkpoint=$9
+    local __keep_precomputed_blocks=$6
+    local __stream_blocks=$7
+    local __network=$8
+    local __checkpoint_interval=$9
+    local __replayer_checkpoint=${10}
 
     local __date=$(date '+%Y-%m-%d_%H%M')
     local __berkely_migration_log="berkeley_migration_$__date.log"
