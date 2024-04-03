@@ -47,8 +47,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Cache = Cache
   module Storables = Compile.Storables
 
-  exception Return_digest = Compile.Return_digest
-
   type chunking_data = Verify.Instance.chunking_data =
     { num_chunks : int; domain_size : int; zk_rows : int }
 
