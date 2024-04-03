@@ -13,8 +13,7 @@ If there is a new commit on develop branch,
 program will attempt to merge new changes to compatible branch
 '''
 branches = dict(
-    compatible = 'rampup',
-    rampup = 'berkeley',
+    compatible = 'berkeley',
     berkeley = 'develop'
 )
 
@@ -47,17 +46,21 @@ def tmp_branch_name(source_branch,target_branch):
     '''
         Method which will be used for naming temp branch (needed for checking merge ability)
     '''
-    return f"sync-{source_branch}-with-{target_branch}"
+    return f"fix-conflict-of-{source_branch}-and-{target_branch}"
 
 '''
 Specific settings for PR creation (if there is necessity to do it based on current repo situation).
 '''
 pr = {
-    "title_prefix": "[Branches auto sync failure] ",
+    "title_prefix": "[Fix me] Merge conflict between ",
     "assignees": ["dkijania"],
     "body_prefix": "This is auto-generated PR in order to solve merge conflicts between two branches.",
     "draft": 'false',
-    "labels": ["auto-sync"]
+    "labels": ["auto-sync"],
+    "alert_header": """
+# :exclamation: New Conflict detected :exclamation: 
+This PR conflicts with one of our main branches. As a result below Pull requests were created to aid you in resolving merge conflicts. Each temporary branch contains *cherry picked* changes from this PR. 
+"""
 }
 
 '''
