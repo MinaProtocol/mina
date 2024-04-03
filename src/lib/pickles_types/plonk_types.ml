@@ -1190,6 +1190,8 @@ module All_evals = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type ('f, 'f_multi) t =
         { evals : ('f * 'f, 'f_multi * 'f_multi) With_public_input.Stable.V1.t
@@ -1199,10 +1201,19 @@ module All_evals = struct
     end
   end]
 
+  type ('f, 'f_multi) t =
+    { evals : ('f_multi * 'f_multi, 'f_multi * 'f_multi) With_public_input.t
+    ; ft_eval1 : 'f
+    }
+  [@@deriving sexp, compare, yojson, hash, equal, hlist]
+
   module In_circuit = struct
     type ('f, 'f_multi, 'bool) t =
       { evals :
-          ('f * 'f, 'f_multi * 'f_multi, 'bool) With_public_input.In_circuit.t
+          ( 'f_multi * 'f_multi
+          , 'f_multi * 'f_multi
+          , 'bool )
+          With_public_input.In_circuit.t
       ; ft_eval1 : 'f
       }
     [@@deriving hlist]
@@ -1212,7 +1223,7 @@ module All_evals = struct
       : (b1, b2) t =
     { evals =
         With_public_input.map t.evals
-          ~f1:(Tuple_lib.Double.map ~f:f1)
+          ~f1:(Tuple_lib.Double.map ~f:f2)
           ~f2:(Tuple_lib.Double.map ~f:f2)
     ; ft_eval1 = f1 t.ft_eval1
     }
@@ -1225,7 +1236,7 @@ module All_evals = struct
     let evals =
       With_public_input.typ
         (module Impl)
-        feature_flags (tuple2 field field) (tuple2 single single)
+        feature_flags (tuple2 single single) (tuple2 single single)
         ~dummy:Impl.Field.Constant.([| zero |], [| zero |])
     in
     of_hlistable [ evals; Impl.Field.typ ] ~var_to_hlist:In_circuit.to_hlist

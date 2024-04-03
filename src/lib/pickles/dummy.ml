@@ -16,7 +16,7 @@ let evals =
     in
     let ex =
       { All_evals.With_public_input.evals = e
-      ; public_input = (Ro.tock (), Ro.tock ())
+      ; public_input = ([| Ro.tock () |], [| Ro.tock () |])
       }
     in
     { All_evals.ft_eval1 = Ro.tock (); evals = ex })

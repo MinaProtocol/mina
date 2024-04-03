@@ -313,14 +313,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
     Compile.compile_with_wrap_main_override_promise
 
   let compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
-      ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
+      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
       ~max_proofs_verified ~name ~constraint_constants ~choices () =
     compile_with_wrap_main_override_promise ?self ?cache ?storables ?proof_cache
-      ?disk_keys ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ~constraint_constants ~choices ()
+      ?disk_keys ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
+      ~branches ~max_proofs_verified ~name ~constraint_constants ~choices ()
 
   let compile ?self ?cache ?storables ?proof_cache ?disk_keys
-      ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
+      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
       ~max_proofs_verified ~name ~constraint_constants ~choices () =
     let choices ~self =
       let choices = choices ~self in
@@ -343,7 +343,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     in
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
-        ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
+        ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
         ~max_proofs_verified ~name ~constraint_constants ~choices ()
     in
     let rec adjust_provers :
@@ -360,7 +360,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     (self, cache_handle, proof_module, adjust_provers provers)
 
   let compile_async ?self ?cache ?storables ?proof_cache ?disk_keys
-      ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
+      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
       ~max_proofs_verified ~name ~constraint_constants ~choices () =
     let choices ~self =
       let choices = choices ~self in
@@ -388,7 +388,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     in
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
-        ?override_wrap_domain ~public_input ~auxiliary_typ ~branches
+        ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
         ~max_proofs_verified ~name ~constraint_constants ~choices ()
     in
     let rec adjust_provers :
@@ -1203,6 +1203,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Wrap_domains.Make (A) (A_value) (A) (A_value) (A) (A_value)
             in
             M.f full_signature prev_varss_n prev_varss_length ~feature_flags
+              ~num_chunks:1
               ~max_proofs_verified:(module Max_proofs_verified)
           in
           let module Branch_data = struct
@@ -1387,11 +1388,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 Requests.Wrap.create ()
               in
               let _, prev_vars_length = b.proofs_verified in
-              let step () =
+              let step ~zk_rows () =
                 let%bind.Promise step_pk = Lazy.force step_pk in
                 let%bind.Promise wrap_vk = Lazy.force wrap_vk in
                 S.f branch_data ~feature_flags ~prevs_length:prev_vars_length
-                  ~self ~public_input:(Input typ) ~proof_cache:None
+                  ~self ~public_input:(Input typ) ~zk_rows
+                  ~proof_cache:None
                   ~maxes:(module Maxes)
                   ~auxiliary_typ:Impls.Step.Typ.unit
                   ~step_domains:all_step_domains
@@ -1404,7 +1406,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               let%bind.Promise pairing_vk, _ = Lazy.force step_vk in
               let wrap =
                 let wrap_vk = Lazy.force wrap_vk in
-                let%bind.Promise proof, (), (), _ = step () in
+                let%bind.Promise proof, (), (), _ = step ~zk_rows:pairing_vk.zk_rows () in
                 let proof =
                   { proof with
                     statement =
@@ -1660,6 +1662,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ~endo:Endo.Step_inner_curve.base
                           ~mds:Tick_field_sponge.params.mds
                           ~srs_length_log2:Common.Max_degree.step_log2
+                          ~zk_rows:3
                           ~field_of_hex:(fun s ->
                             Kimchi_pasta.Pasta.Bigint256.of_hex_string s
                             |> Kimchi_pasta.Pasta.Fp.of_bigint )
@@ -1673,7 +1676,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           ~actual_proofs_verified:
                             (Nat.Add.create actual_proofs_verified)
                           { evals = proof.proof.openings.evals
-                          ; public_input = x_hat
+                          ; public_input =
+                              (let x1, x2 = x_hat in
+                               ([| x1 |], [| x2 |]) )
                           }
                           ~r ~xi ~zeta ~zetaw
                           ~old_bulletproof_challenges:prev_challenges
@@ -1869,7 +1874,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             ~to_option:Opt.to_option next_statement
                       ; prev_evals =
                           { Plonk_types.All_evals.evals =
-                              { public_input = x_hat
+                              { public_input =
+                                  (let x1, x2 = x_hat in
+                                   ([| x1 |], [| x2 |]) )
                               ; evals = proof.proof.openings.evals
                               }
                           ; ft_eval1 = proof.proof.openings.ft_eval1

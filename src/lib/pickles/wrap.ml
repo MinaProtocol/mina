@@ -33,7 +33,7 @@ let tick_rounds = Nat.to_int Tick.Rounds.n
 let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
     ~actual_proofs_verified:
       (module AB : Nat.Add.Intf with type n = actual_proofs_verified)
-    (e : _ Plonk_types.All_evals.With_public_input.t)
+    (e : (_ array * _ array, _) Plonk_types.All_evals.With_public_input.t)
     ~(old_bulletproof_challenges : (_, actual_proofs_verified) Vector.t) ~r
     ~plonk ~xi ~zeta ~zetaw =
   let combined_evals =
@@ -61,7 +61,7 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
     let v : Tick.Field.t array list =
       List.append
         (List.map (Vector.to_list challenge_polys) ~f:(fun f -> [| f pt |]))
-        ([| f e.public_input |] :: [| ft |] :: a)
+        (f e.public_input :: [| ft |] :: a)
     in
     let open Tick.Field in
     Pcs_batch.combine_split_evaluations ~xi ~init:Fn.id
@@ -77,7 +77,7 @@ module Deferred_values = Types.Wrap.Proof_state.Deferred_values
 type scalar_challenge_constant = Challenge.Constant.t Scalar_challenge.t
 
 type deferred_values_and_hints =
-  { x_hat_evals : Backend.Tick.Field.t * Backend.Tick.Field.t
+  { x_hat_evals : Backend.Tick.Field.t array * Backend.Tick.Field.t array
   ; sponge_digest_before_evaluations : Tick.Field.t
   ; deferred_values :
       ( ( Challenge.Constant.t
@@ -113,7 +113,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
         |> to_list)
       public_input proof
   in
-  let x_hat = O.(p_eval_1 o, p_eval_2 o) in
+  let x_hat = Option.value_exn proof.public_evals in
   let scalar_chal f =
     Scalar_challenge.map ~f:Challenge.Constant.of_tick_field (f o)
   in
@@ -195,7 +195,7 @@ let deferred_values (type n) ~(sgs : (Backend.Tick.Curve.Affine.t, n) Vector.t)
       (module Env_bool)
       (module Env_field)
       ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
-      ~srs_length_log2:Common.Max_degree.step_log2
+      ~zk_rows:step_vk.zk_rows ~srs_length_log2:Common.Max_degree.step_log2
       ~field_of_hex:(fun s ->
         Kimchi_pasta.Pasta.Bigint256.of_hex_string s
         |> Kimchi_pasta.Pasta.Fp.of_bigint )
