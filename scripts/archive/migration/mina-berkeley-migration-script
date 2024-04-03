@@ -209,7 +209,7 @@ function initial(){
 function check_log_for_error() {
     local __log=$1;
 
-    grep Error "$__log";
+    grep '"level":"Error"' "$__log";
     local __have_errors=$?;
 
     if [ $__have_errors -eq 0 ]; then 
