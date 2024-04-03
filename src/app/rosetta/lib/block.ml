@@ -186,6 +186,25 @@ module Internal_command_info = struct
                 ; coin_change = None
                 ; metadata = None
                 } )
+
+    let to_transaction ~coinbase_receiver info =
+      let open M.Let_syntax in
+      let%map operations = to_operations ~coinbase_receiver info in
+      { Transaction.transaction_identifier =
+          (* prepend the sequence number, secondary sequence number and kind to the transaction hash
+             duplicate hashes are possible in the archive database, with differing
+             "type" fields, which correspond to the "kind" here
+          *)
+          { Transaction_identifier.hash =
+              sprintf "%s:%s:%s:%s" (Kind.to_string info.kind)
+                (Int.to_string info.sequence_no)
+                (Int.to_string info.secondary_sequence_no)
+                info.hash
+          }
+      ; operations
+      ; metadata = None
+      ; related_transactions = []
+      }
   end
 
   let dummies =
@@ -208,6 +227,27 @@ module Internal_command_info = struct
       ; hash = "FEE_TRANSFER"
       }
     ]
+end
+
+module User_command_info = struct
+  include User_command_info
+
+  let to_transaction info =
+    { Transaction.transaction_identifier =
+        { Transaction_identifier.hash = info.hash }
+    ; operations = User_command_info.to_operations' info
+    ; metadata =
+        Option.bind info.memo ~f:(fun base58_check ->
+            try
+              let memo =
+                let open Mina_base.Signed_command_memo in
+                base58_check |> of_base58_check_exn |> to_string_hum
+              in
+              if String.is_empty memo then None
+              else Some (`Assoc [ ("memo", `String memo) ])
+            with _ -> None )
+    ; related_transactions = []
+    }
 end
 
 module Zkapp_account_update_info = struct
@@ -322,6 +362,16 @@ module Zkapp_command_info = struct
                 ; coin_change = None
                 ; metadata = None
                 } )
+
+    let to_transaction cmd =
+      let open M.Let_syntax in
+      let%map operations = to_operations cmd in
+      { Transaction.transaction_identifier =
+          { Transaction_identifier.hash = cmd.hash }
+      ; operations
+      ; metadata = None
+      ; related_transactions = []
+      }
   end
 
   let dummies =
@@ -638,13 +688,13 @@ module Sql = struct
         tup3 int Archive_lib.Processor.User_command.Signed_command.typ
           Extras.typ)
 
+    let fields =
+      String.concat ~sep:","
+      @@ List.map
+           ~f:(fun n -> "u." ^ n)
+           Archive_lib.Processor.User_command.Signed_command.Fields.names
+
     let query =
-      let fields =
-        String.concat ~sep:","
-        @@ List.map
-             ~f:(fun n -> "u." ^ n)
-             Archive_lib.Processor.User_command.Signed_command.Fields.names
-      in
       Caqti_request.collect
         Caqti_type.(tup2 int string)
         typ
@@ -1178,46 +1228,31 @@ module Specific = struct
         List.fold block_info.internal_info ~init:(M.return [])
           ~f:(fun macc info ->
             let%bind acc = macc in
-            let%map operations =
-              Internal_command_info_ops.to_operations ~coinbase_receiver info
-            in
             [%log debug]
               ~metadata:[ ("info", Internal_command_info.to_yojson info) ]
               "Block internal received $info" ;
-            { Transaction.transaction_identifier =
-                (* prepend the sequence number, secondary sequence number and kind to the transaction hash
-                   duplicate hashes are possible in the archive database, with differing
-                   "type" fields, which correspond to the "kind" here
-                *)
-                { Transaction_identifier.hash =
-                    sprintf "%s:%s:%s:%s"
-                      (Internal_command_info.Kind.to_string info.kind)
-                      (Int.to_string info.sequence_no)
-                      (Int.to_string info.secondary_sequence_no)
-                      info.hash
-                }
-            ; operations
-            ; metadata = None
-            ; related_transactions = []
-            }
-            :: acc )
+            let%map transaction =
+              Internal_command_info_ops.to_transaction ~coinbase_receiver info
+            in
+            transaction :: acc )
         |> M.map ~f:List.rev
+      in
+      let user_transactions =
+        List.map block_info.user_commands ~f:(fun info ->
+            [%log debug]
+              ~metadata:[ ("info", User_command_info.to_yojson info) ]
+              "Block user received $info" ;
+            User_command_info.to_transaction info )
       in
       let%map zkapp_command_transactions =
         List.fold block_info.zkapp_commands ~init:(M.return [])
           ~f:(fun acc cmd ->
             let%bind acc = acc in
-            let%map operations = Zkapp_command_info_ops.to_operations cmd in
             [%log debug]
               ~metadata:[ ("info", Zkapp_command_info.to_yojson cmd) ]
               "Block zkapp received $info" ;
-            { Transaction.transaction_identifier =
-                { Transaction_identifier.hash = cmd.hash }
-            ; operations
-            ; metadata = None
-            ; related_transactions = []
-            }
-            :: acc )
+            let%map transaction = Zkapp_command_info_ops.to_transaction cmd in
+            transaction :: acc )
         |> M.map ~f:List.rev
       in
       { Block_response.block =
@@ -1226,27 +1261,7 @@ module Specific = struct
             ; parent_block_identifier = block_info.parent_block_identifier
             ; timestamp = block_info.timestamp
             ; transactions =
-                internal_transactions
-                @ List.map block_info.user_commands ~f:(fun info ->
-                      [%log debug]
-                        ~metadata:[ ("info", User_command_info.to_yojson info) ]
-                        "Block user received $info" ;
-                      { Transaction.transaction_identifier =
-                          { Transaction_identifier.hash = info.hash }
-                      ; operations = User_command_info.to_operations' info
-                      ; metadata =
-                          Option.bind info.memo ~f:(fun base58_check ->
-                              try
-                                let memo =
-                                  let open Mina_base.Signed_command_memo in
-                                  base58_check |> of_base58_check_exn
-                                  |> to_string_hum
-                                in
-                                if String.is_empty memo then None
-                                else Some (`Assoc [ ("memo", `String memo) ])
-                              with _ -> None )
-                      ; related_transactions = []
-                      } )
+                internal_transactions @ user_transactions
                 @ zkapp_command_transactions
             ; metadata = Some (Block_info.creator_metadata block_info)
             }
