@@ -376,7 +376,7 @@ build_verify_packaged_fork_config_deb () {
   echo "------------------------------------------------------------"
   echo "--- Building verify packaged fork config deb"
 
-  create_control_file "$LEDGER_VALIDATION_DEB" "${DEAMON_DEPS} ,${ARCHIVE_MIGRATION_DEPS} ,${SUGGESTED_DEPS}" 'Berkeley Fork Config Verification Tool' "mina-logproc, ${MINA_DEB_NAME}"
+  create_control_file "$LEDGER_VALIDATION_DEB" "${DAEMON_DEPS} ,${ARCHIVE_MIGRATION_DEPS} ,${SUGGESTED_DEPS}" 'Berkeley Fork Config Verification Tool' "mina-logproc, ${MINA_DEB_NAME}"
 
   cp ../scripts/mina-verify-packaged-fork-config "${BUILDDIR}/usr/local/bin/mina-verify-packaged-fork-config"
   
