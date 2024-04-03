@@ -537,7 +537,6 @@ function final_help(){
     echo ""
     printf "  %-25s %s\n" "-h | --help" "show help";
     printf "  %-25s %s\n" "-r | --replayer-checkpoint" "[file] path to genesis ledger file";
-    printf "  %-25s %s\n" "-f | --fork-state-hash" "[hash] fork state hash";
     printf "  %-25s %s\n" "-s | --source-db" "[connection_str] connection string to database to be migrated";
     printf "  %-25s %s\n" "-t | --target-db" "[connection_str] connection string to database which will hold migrated data";
     printf "  %-25s %s\n" "-b | --blocks-bucket" "[string] name of precomputed blocks bucket. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
@@ -549,7 +548,7 @@ function final_help(){
     echo ""
     echo "Example:"
     echo ""
-    echo "  " $CLI_NAME final --replayer-checkpoint migration-replayer-checkpoint-1233.json --fork-state-hash 3NLnD1Yp4MS9LtMXikD1YyySZNVgCXA82b5eQVpmYZ5kyTo4Xsr7 --genesis-ledger "genesis_ledgers/mainnet.json" --source-db "postgres://postgres:pass@localhost:5432/archive_balances_migrated" --target-db "postgres://postgres:pass@localhost:5432/migrated" --blocks-batch-size 10 --blocks-bucket "mina_network_block_data" --network "mainnet" --fork-config fork_config.json 
+    echo "  " $CLI_NAME final --replayer-checkpoint migration-replayer-checkpoint-1233.json --genesis-ledger "genesis_ledgers/mainnet.json" --source-db "postgres://postgres:pass@localhost:5432/archive_balances_migrated" --target-db "postgres://postgres:pass@localhost:5432/migrated" --blocks-batch-size 10 --blocks-bucket "mina_network_block_data" --network "mainnet" --fork-config fork_config.json 
     echo ""
     echo "Notes:"
     echo "  1. After run migrated data will be filled with migrated blocks till last block in source db"
@@ -574,7 +573,6 @@ function final(){
     local __stream_blocks=true
     local __network='' 
     local __checkpoint_interval=1000
-    local __fork_state_hash=''
     local __fork_config=''
     
     while [ ${#} -gt 0 ]; do
@@ -585,10 +583,6 @@ function final(){
             ;;
             -g | --genesis-ledger )
                 __genesis_ledger=${2:?$error_message}
-                shift 2;
-            ;;
-            -f | --fork-state-hash )
-                __fork_state_hash=${2:?$error_message}
                 shift 2;
             ;;
             -fc | --fork-config )
@@ -662,12 +656,6 @@ function final(){
         echo "Genesis ledger not defined"
         exit 1
     fi
-    if [ -z "$__fork_state_hash" ]; then
-        echo ""
-        echo "Fork state hash not defined. Please refer to mina or o(1) Labs team announcements regarding fork block state hash"
-        echo "which is required to run final migration"
-        exit 1
-    fi
     if [ -z "$__fork_config" ]; then
         echo ""
         echo "Fork config file is not defined. Please refer to mina or o(1) Labs team announcements regarding fork block state hash"
@@ -694,7 +682,6 @@ function final(){
         "$__keep_precomputed_blocks" \
         "$__stream_blocks" \
         "$__network" \
-        "$__fork_state_hash" \
         "$__checkpoint_interval" \
         "$__replayer_checkpoint" \
         "$__fork_config"
@@ -709,12 +696,11 @@ function run_final_migration() {
     local __keep_precomputed_blocks=$6
     local __stream_blocks=$7
     local __network=$8
-    local __fork_state_hash=$9
-    local __checkpoint_interval=${10}
-    local __replayer_checkpoint=${11}
-    local __fork_config=${12}
+    local __checkpoint_interval=$9
+    local __replayer_checkpoint=${10}
+    local __fork_config=${11}
     
-    
+    local __fork_state_hash="$(jq -r .proof.fork.state_hash "$__fork_config")"
     local __date=$(date '+%Y-%m-%d_%H%M')
     local __berkely_migration_log="berkeley_migration_$__date.log"
     local __replayer_log="replayer_$__date.log"

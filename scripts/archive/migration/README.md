@@ -118,7 +118,7 @@ migration-checkpoint-597.json - is a last checkpoint from initial run
 #### Final migration
 
 ```
-./scripts/archive/migration/berkeley_migration.sh final -g  ../../umt_testing/o1labs-umt-pre-fork-run-1-ledger.json -s postgres://postgres:postgres@localhost:5432/umt_testing_final -t postgres://postgres:postgres@localhost:5432/migrated -b mina_network_block_data -bs 50 -n o1labs-umt-pre-fork-run-1 -r migration-checkpoint-2381.json -fc ../../umt_testing/fork-umt-02-29-2024.json -f 3NLnD1Yp4MS9LtMXikD1YyySZNVgCXA82b5eQVpmYZ5kyTo4Xsr7
+./scripts/archive/migration/berkeley_migration.sh final -g  ../../umt_testing/o1labs-umt-pre-fork-run-1-ledger.json -s postgres://postgres:postgres@localhost:5432/umt_testing_final -t postgres://postgres:postgres@localhost:5432/migrated -b mina_network_block_data -bs 50 -n o1labs-umt-pre-fork-run-1 -r migration-checkpoint-2381.json -fc ../../umt_testing/fork-umt-02-29-2024.json
 ```
 
 where `3NLnD1Yp4MS9LtMXikD1YyySZNVgCXA82b5eQVpmYZ5kyTo4Xsr7` was extracted from fork config file:
