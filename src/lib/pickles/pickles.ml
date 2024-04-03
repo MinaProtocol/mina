@@ -232,7 +232,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           ; wrap_index =
               Plonk_verification_key_evals.map wrap_key ~f:(fun x -> x.(0))
           ; max_proofs_verified =
-              Pickles_base.Proofs_verified.of_nat
+              Pickles_base.Proofs_verified.of_nat_exn
                 (Nat.Add.n d.max_proofs_verified)
           ; actual_wrap_domain_size
           }
