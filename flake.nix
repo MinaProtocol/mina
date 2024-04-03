@@ -64,16 +64,37 @@
           - use "${ref "git+https://github.com/minaprotocol/mina?submodules=1"}";
           - use non-flake commands like ${command "nix-build"} and ${command "nix-shell"}.
         '';
+      # Only get the ocaml stuff, to reduce the amount of unnecessary rebuilds
+      ocaml-src =
+        with inputs.nix-filter.lib;
+          filter {
+            root = ./.;
+            include =
+              [ (inDirectory "src") "dune" "dune-project"
+                "./graphql_schema.json" "opam.export" ];
+          };
+      ocaml-src-caqti-patched = pkgs:
+        pkgs.stdenv.mkDerivation ({
+          name = "mina-src-caqti-patched";
+          src = ocaml-src;
+          phases = [ "unpackPhase" "patchPhase" "installPhase" ];
+          patches = [ ./buildkite/scripts/caqti-upgrade-plus-archive-init-speedup.patch ];
+          installPhase = "cp -R . $out";
+        });
     in {
       overlays = {
         misc = import ./nix/misc.nix;
         rust = import ./nix/rust.nix;
         go = import ./nix/go.nix;
         javascript = import ./nix/javascript.nix;
-        ocaml = final: prev: {
+        ocaml = pkgs: prev: {
           ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
-            inherit inputs;
-            pkgs = final;
+            inherit inputs pkgs;
+            src = ocaml-src;
+          });
+          ocamlPackages_mina_caqti_patched = requireSubmodules (import ./nix/ocaml.nix {
+            inherit inputs pkgs;
+            src = ocaml-src-caqti-patched prev;
           });
         };
       };
@@ -288,7 +309,9 @@
         # Main user-facing binaries.
         packages = rec {
           inherit (ocamlPackages)
-            mina berkeley-migration devnet mainnet mina_tests mina-ocaml-format test_executive;
+            mina devnet mainnet mina_tests mina-ocaml-format test_executive;
+          devnet-caqti-patched = pkgs.ocamlPackages_mina_caqti_patched.devnet;
+          mainnet-caqti-patched = pkgs.ocamlPackages_mina_caqti_patched.mainnet;
           inherit (pkgs)
             libp2p_helper kimchi_bindings_stubs snarky_js leaderboard
             validation trace-tool zkapp-cli;

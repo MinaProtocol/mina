@@ -4,38 +4,11 @@ Date: Sat, 30 Mar 2024 22:44:15 -0400
 Subject: [PATCH] applied caqti+archive
 
 
-diff --git a/flake.lock b/flake.lock
-index c1271a6825..dff4183b0e 100644
---- a/flake.lock
-+++ b/flake.lock
-@@ -324,11 +324,11 @@
-     "opam-repository": {
-       "flake": false,
-       "locked": {
--        "lastModified": 1708601497,
--        "narHash": "sha256-mDYINTjOiYLN4wT5fGlWTvHFQdWkzY46XUuZWKgmJxY=",
-+        "lastModified": 1706815373,
-+        "narHash": "sha256-CiwJOt27w7ecb27gMddbVO1ATwWz+KB9upiGZ3TRHqU=",
-         "owner": "ocaml",
-         "repo": "opam-repository",
--        "rev": "90d8c520a4f0b035ac51e267a8b33739c5a78b5a",
-+        "rev": "c2acc9437350903c72eab1fabf1e1b6f74134667",
-         "type": "github"
-       },
-       "original": {
 diff --git a/opam.export b/opam.export
-index 655b623d35..d5a81b5465 100644
+index 655b623d35..130eb77140 100644
 --- a/opam.export
 +++ b/opam.export
-@@ -8,7 +8,6 @@ roots: [
-   "bitstring.4.1.0"
-   "camlp4.4.14+1"
-   "capnp.3.4.0"
--  "check_opam_switch.~dev"
-   "cohttp-async.5.0.0"
-   "core_extended.v0.14.0"
-   "extlib.1.7.8"
-@@ -69,11 +68,10 @@ installed: [
+@@ -69,9 +69,9 @@ installed: [
    "camlp4.4.14+1"
    "camomile.1.0.2"
    "capnp.3.4.0"
@@ -46,11 +19,9 @@ index 655b623d35..d5a81b5465 100644
 +  "caqti-async.2.0.1"
 +  "caqti-driver-postgresql.2.0.1"
    "charInfo_width.1.1.0"
--  "check_opam_switch.~dev"
+   "check_opam_switch.~dev"
    "cmdliner.1.0.3"
-   "cohttp.5.0.0"
-   "cohttp-async.5.0.0"
-@@ -138,6 +136,7 @@ installed: [
+@@ -138,6 +138,7 @@ installed: [
    "lmdb.1.0"
    "logs.0.7.0"
    "lwt.5.4.0"
@@ -58,68 +29,14 @@ index 655b623d35..d5a81b5465 100644
    "lwt_log.1.1.1"
    "lwt_react.1.1.2"
    "macaddr.5.0.1"
-@@ -266,7 +265,6 @@ installed: [
- pinned: [
-   "async_kernel.v0.14.0"
-   "capnp.3.4.0"
--  "check_opam_switch.~dev"
-   "graphql_ppx.1.2.2"
-   "rpc_parallel.v0.14.0"
- ]
-@@ -350,42 +348,6 @@ Cap'n Proto is a multi-language code generation framework designed for
-       "sha256=03aac06742f3d4ec8a189f0db65d46393b7497e8637ece15c39ff4ec01117b8b"
-   }
- }
--package "check_opam_switch" {
--  opam-version: "2.0"
--  version: "~dev"
--  synopsis:
--    "A tool to check that the current opam environment is up to date with an opam.export file"
--  description:
--    "A tool to check that the current opam environment is up to date with an opam.export file"
--  maintainer: "yves.stan.lecornec@tweag.io"
--  depends: [
--    "dune" {>= "3.3"}
--    "opam-core" {>= "2.0.0"}
--    "opam-format" {>= "2.0.0"}
--    "minicli" {>= "5.0.0"}
--    "odoc" {with-doc}
--  ]
--  build: [
--    ["dune" "subst"] {dev}
--    [
--      "dune"
--      "build"
--      "-p"
--      name
--      "-j"
--      jobs
--      "@install"
--      "@runtest" {with-test}
--      "@doc" {with-doc}
--    ]
--  ]
--  url {
--    src:
--      "https://github.com/tweag/check_opam_switch/archive/d0aa49884e0f9fd4bbb2cd1a32b798a12f84b603.tar.gz"
--    checksum:
--      "sha256=24ab29ea4aff9da9d649f0b577c5d4e27ce2bef51058e139965cc9be25494a46"
--  }
--}
- package "graphql_ppx" {
-   opam-version: "2.0"
-   version: "1.2.2"
-diff --git a/scripts/pin-external-packages.sh b/scripts/pin-external-packages.sh
-index 84e615b527..f531d8e43d 100755
---- a/scripts/pin-external-packages.sh
-+++ b/scripts/pin-external-packages.sh
-@@ -10,3 +10,5 @@ for pkg in $PACKAGES; do
-     echo "Pinning package" $pkg
-     opam pin -y add src/external/$pkg
- done
-+
-+opam pin add -y https://github.com/tweag/check_opam_switch.git#d0aa49884e0f9fd4bbb2cd1a32b798a12
-\ No newline at end of file
+@@ -155,6 +156,7 @@ installed: [
+   "mirage-crypto-rng.0.11.0"
+   "mirage-crypto-rng-async.0.11.0"
+   "mmap.1.1.0"
++  "mtime.2.0.0"
+   "num.1.1"
+   "ocaml.4.14.0"
+   "ocaml-base-compiler.4.14.0"
 diff --git a/src/app/archive/cli/archive_cli.ml b/src/app/archive/cli/archive_cli.ml
 index 0868f63e37..e4cf825b0e 100644
 --- a/src/app/archive/cli/archive_cli.ml
