@@ -1230,14 +1230,15 @@ module All_evals = struct
 
   let typ (type f)
       (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-      feature_flags =
+      ~num_chunks feature_flags =
     let open Impl.Typ in
-    let single = array ~length:1 field in
+    let single = array ~length:num_chunks field in
+    let dummy = Array.init num_chunks ~f:(fun _ -> Impl.Field.Constant.zero) in
     let evals =
       With_public_input.typ
         (module Impl)
         feature_flags (tuple2 single single) (tuple2 single single)
-        ~dummy:Impl.Field.Constant.([| zero |], [| zero |])
+        ~dummy:(dummy, dummy)
     in
     of_hlistable [ evals; Impl.Field.typ ] ~var_to_hlist:In_circuit.to_hlist
       ~var_of_hlist:In_circuit.of_hlist ~value_to_hlist:to_hlist

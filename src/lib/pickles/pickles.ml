@@ -49,6 +49,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   exception Return_digest = Compile.Return_digest
 
+  type chunking_data = Verify.Instance.chunking_data =
+    { num_chunks : int; domain_size : int; zk_rows : int }
+
   let verify_promise = Verify.verify
 
   let verify max_proofs_verified statement key proofs =
@@ -254,6 +257,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ; branches = Verification_key.Max_branches.n
         ; feature_flags =
             Plonk_types.(Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags)
+        ; num_chunks = 1
+        ; zk_rows = 3
         }
 
     module Proof = struct
@@ -297,7 +302,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     { constraints = 0 }
                 }
               in
-              Verify.Instance.T (max_proofs_verified, m, vk, x, p) )
+              Verify.Instance.T (max_proofs_verified, m, None, vk, x, p) )
           |> Verify.verify_heterogenous )
 
     let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred
@@ -1224,7 +1229,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           end in
           let proofs_verifieds = Vector.singleton 2 in
           let (T inner_step_data as step_data) =
-            Step_branch_data.create ~index:0 ~feature_flags
+            Step_branch_data.create ~index:0 ~feature_flags ~num_chunks:1
               ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
               ~branches:Branches.n ~self ~public_input:(Input typ)
               ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
@@ -1388,12 +1393,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 Requests.Wrap.create ()
               in
               let _, prev_vars_length = b.proofs_verified in
-              let step ~zk_rows () =
+              let step () =
                 let%bind.Promise step_pk = Lazy.force step_pk in
                 let%bind.Promise wrap_vk = Lazy.force wrap_vk in
                 S.f branch_data ~feature_flags ~prevs_length:prev_vars_length
-                  ~self ~public_input:(Input typ) ~zk_rows
-                  ~proof_cache:None
+                  ~self ~public_input:(Input typ) ~proof_cache:None
                   ~maxes:(module Maxes)
                   ~auxiliary_typ:Impls.Step.Typ.unit
                   ~step_domains:all_step_domains
@@ -1406,7 +1410,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               let%bind.Promise pairing_vk, _ = Lazy.force step_vk in
               let wrap =
                 let wrap_vk = Lazy.force wrap_vk in
-                let%bind.Promise proof, (), (), _ = step ~zk_rows:pairing_vk.zk_rows () in
+                let%bind.Promise proof, (), (), _ = step () in
                 let proof =
                   { proof with
                     statement =
@@ -1930,6 +1934,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 Lazy.map wrap_vk ~f:(Promise.map ~f:Verification_key.index)
             ; wrap_domains
             ; step_domains
+            ; num_chunks = 1
+            ; zk_rows = 3
             }
           in
           Types_map.add_exn self data ;
