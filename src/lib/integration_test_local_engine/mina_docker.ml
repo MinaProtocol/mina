@@ -333,6 +333,7 @@ module Network_config = struct
             Base_node_config.default ~peer:None
               ~runtime_config_path:
                 (Some Base_node_config.container_runtime_config_path)
+              ~start_filtered_logs
         }
       in
       Seed_config.create
@@ -385,6 +386,7 @@ module Network_config = struct
                 Base_node_config.default ~peer:None
                   ~runtime_config_path:
                     (Some Base_node_config.container_runtime_config_path)
+                  ~start_filtered_logs
             }
           in
           let archive_rest_port =
@@ -415,6 +417,7 @@ module Network_config = struct
                 Base_node_config.default ~peer:seed_config_peer
                   ~runtime_config_path:
                     (Some Base_node_config.container_runtime_config_path)
+                  ~start_filtered_logs
             }
           in
           Seed_config.create
@@ -462,6 +465,7 @@ module Network_config = struct
                 Base_node_config.default ~peer:seed_config_peer
                   ~runtime_config_path:
                     (Some Base_node_config.container_runtime_config_path)
+                  ~start_filtered_logs
             }
           in
           Block_producer_config.create ~service_name:node.node_name
@@ -512,6 +516,7 @@ module Network_config = struct
             ; proof_level = "full"
             ; base_config =
                 Base_node_config.default ~peer:None ~runtime_config_path:None
+                  ~start_filtered_logs:[]
             }
           in
           let worker_nodes =
@@ -535,6 +540,7 @@ module Network_config = struct
                 Base_node_config.default ~peer:seed_config_peer
                   ~runtime_config_path:
                     (Some Base_node_config.container_runtime_config_path)
+                  ~start_filtered_logs
             }
           in
           Some
