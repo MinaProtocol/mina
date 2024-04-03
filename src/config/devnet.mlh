@@ -26,7 +26,7 @@
 
 [%%define genesis_ledger "testnet_postake"]
 
-[%%define genesis_state_timestamp "2020-09-16 03:15:00-07:00"]
+[%%define genesis_state_timestamp "2021-09-24T00:00:00Z"]
 [%%define block_window_duration 180000]
 
 [%%define integration_tests false]
@@ -44,5 +44,6 @@
 (* 2*block_window_duration *)
 [%%define compaction_interval 360000]
 [%%define vrf_poll_interval 5000]
-[%%undef slot_tx_end]
-[%%undef slot_chain_end]
+
+[%%define slot_tx_end 445620]
+[%%define slot_chain_end 445720]
