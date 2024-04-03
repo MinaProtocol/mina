@@ -88,7 +88,7 @@ dune build "--profile=${DUNE_PROFILE}" src/app/replayer/replayer.exe
 
 cd _build
 
-PROJECT="mina-maintenance-replayer"
+PROJECT="mina-archive-maintenance"
 BUILD_DIR="deb_build"
 
 ###### replayer deb
@@ -116,10 +116,13 @@ cat "${BUILD_DIR}/DEBIAN/control"
 
 echo "------------------------------------------------------------"
 # Binaries
+rm -rf "${BUILD_DIR}/usr/local/bin"
 mkdir -p "${BUILD_DIR}/usr/local/bin"
 pwd
 ls
 cp ./default/src/app/replayer/replayer.exe "${BUILD_DIR}/usr/local/bin/mina-maintenance-replayer"
+cp ../scripts/archive/missing-blocks-guardian.sh "${BUILD_DIR}/usr/local/bin/mina-missing-blocks-guardian"
+
 chmod --recursive +rx "${BUILD_DIR}/usr/local/bin"
 
 # echo contents of deb
@@ -132,4 +135,4 @@ echo "------------------------------------------------------------"
 dpkg-deb --build "${BUILD_DIR}" ${PROJECT}_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
-git restore ..
+git reset --hard
