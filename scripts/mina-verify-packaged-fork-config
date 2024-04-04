@@ -102,7 +102,11 @@ fi
 
 echo "generating genesis ledgers ... (this may take a while)" >&2
 
-cp "$2" "$workdir/config.json"
+cp "$2" "$workdir/config_orig.json"
+
+# Patch against a bug in 1.4 which is fixed by PR #15462
+jq 'del(.ledger.num_accounts) | del(.ledger.name)' "$workdir/config_orig.json" > "$workdir/config.json" 
+
 "$MINA_LEGACY_GENESIS_EXE" --config-file "$workdir/config.json" --genesis-dir "$workdir/legacy_ledgers" --hash-output-file "$workdir/legacy_hashes.json"
 
 result=$(jq --slurpfile block "$workdir/precomputed_fork_block.json" \
