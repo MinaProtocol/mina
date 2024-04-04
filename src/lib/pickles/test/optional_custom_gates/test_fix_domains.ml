@@ -8,8 +8,11 @@
 
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
-let add_constraint c =
-  Pickles.Impls.Step.assert_ { basic = T c; annotation = None }
+open Pickles.Impls.Step
+
+let add_constraint c = assert_ { basic = T c; annotation = None }
+
+let add_plonk_constraint c = assert_ { basic = T c; annotation = None }
 
 let etyp_unit =
   Composition_types.Spec.ETyp.T
@@ -157,6 +160,134 @@ let test_fix_domains_with_fixed_lookup_tables () =
         log2_size = exp_output )
       table_sizes exp_output )
 
+let test_fix_domains_with_xor_table () =
+  (* The domain size does not depend on the circuit, only on the feature flags *)
+  let main () =
+    add_plonk_constraint (Raw { kind = Zero; values = [||]; coeffs = [||] })
+  in
+  (* Log2 value. XOR table size is 256 *)
+  let exp_output = 9 in
+  let feature_flags_s =
+    [ Pickles_types.Plonk_types.Features.{ none_bool with xor = true }
+    ; Pickles_types.Plonk_types.Features.
+        { none_bool with foreign_field_add = true; xor = true }
+    ]
+  in
+  assert (
+    List.for_all
+      (fun feature_flags ->
+        let domains =
+          Pickles__Fix_domains.domains ~feature_flags
+            (module Pickles.Impls.Step)
+            etyp_unit etyp_unit main
+        in
+        let log2_size = Pickles_base.Domain.log2_size domains.h in
+        log2_size = exp_output )
+      feature_flags_s )
+
+let test_fix_domains_with_range_check_table () =
+  (* The domain size does not depend on the circuit, only on the feature flags *)
+  let main () =
+    add_plonk_constraint (Raw { kind = Zero; values = [||]; coeffs = [||] })
+  in
+  (* Log2 value. Range check table size is 2^12 *)
+  let exp_output = 13 in
+  (* TODO: use QCheck to generate the different options *)
+  let feature_flags_s =
+    [ Pickles_types.Plonk_types.Features.{ none_bool with range_check0 = true }
+    ; Pickles_types.Plonk_types.Features.{ none_bool with range_check1 = true }
+    ; Pickles_types.Plonk_types.Features.
+        { none_bool with range_check0 = true; foreign_field_add = true }
+    ; Pickles_types.Plonk_types.Features.
+        { none_bool with range_check0 = true; range_check1 = true }
+    ; Pickles_types.Plonk_types.Features.
+        { none_bool with
+          range_check0 = true
+        ; range_check1 = true
+        ; foreign_field_add = true
+        }
+    ; Pickles_types.Plonk_types.Features.
+        { none_bool with foreign_field_mul = true }
+    ; Pickles_types.Plonk_types.Features.
+        { none_bool with foreign_field_mul = true; foreign_field_add = true }
+    ; Pickles_types.Plonk_types.Features.
+        { none_bool with
+          foreign_field_mul = true
+        ; range_check0 = true
+        ; range_check1 = true
+        }
+    ; Pickles_types.Plonk_types.Features.
+        { none_bool with
+          foreign_field_mul = true
+        ; foreign_field_add = true
+        ; range_check0 = true
+        ; range_check1 = true
+        }
+    ]
+  in
+  assert (
+    List.for_all
+      (fun feature_flags ->
+        let domains =
+          Pickles__Fix_domains.domains ~feature_flags
+            (module Pickles.Impls.Step)
+            etyp_unit etyp_unit main
+        in
+        let log2_size = Pickles_base.Domain.log2_size domains.h in
+        log2_size = exp_output )
+      feature_flags_s )
+
+let test_fix_domains_with_range_check_and_xor_table () =
+  (* The domain size does not depend on the circuit, only on the feature flags *)
+  let main () =
+    add_plonk_constraint (Raw { kind = Zero; values = [||]; coeffs = [||] })
+  in
+  let exp_output = 13 in
+  let feature_flags_s =
+    [ Pickles_types.Plonk_types.Features.
+        { none_bool with range_check0 = true; xor = true }
+    ; Pickles_types.Plonk_types.Features.
+        { none_bool with range_check1 = true; xor = true }
+    ; Pickles_types.Plonk_types.Features.
+        { none_bool with range_check0 = true; range_check1 = true; xor = true }
+    ; Pickles_types.Plonk_types.Features.
+        { none_bool with foreign_field_mul = true; xor = true }
+    ; Pickles_types.Plonk_types.Features.
+        { none_bool with
+          foreign_field_mul = true
+        ; range_check0 = true
+        ; range_check1 = true
+        ; xor = true
+        }
+    ; Pickles_types.Plonk_types.Features.
+        { none_bool with
+          foreign_field_mul = true
+        ; range_check0 = true
+        ; range_check1 = true
+        ; rot = true
+        }
+    ; Pickles_types.Plonk_types.Features.
+        { none_bool with
+          foreign_field_mul = true
+        ; range_check0 = true
+        ; range_check1 = true
+        ; rot = true
+        ; xor = true
+        }
+    ]
+  in
+  assert (
+    List.for_all
+      (fun feature_flags ->
+        let domains =
+          Pickles__Fix_domains.domains ~feature_flags
+            (module Pickles.Impls.Step)
+            etyp_unit etyp_unit main
+        in
+        let log2_size = Pickles_base.Domain.log2_size domains.h in
+        log2_size = exp_output )
+      feature_flags_s )
+
 let () =
   let open Alcotest in
   run "Test Pickles.Fix_domains with custom gates"
@@ -170,5 +301,10 @@ let () =
         ; test_case "With runtime table cfgs and fixed lookup tables sharing ID"
             `Quick
             test_fix_domains_with_runtime_table_cfgs_and_fixed_lookup_tables_sharing_id
+        ; test_case "With XOR table" `Quick test_fix_domains_with_xor_table
+        ; test_case "With range check table" `Quick
+            test_fix_domains_with_range_check_table
+        ; test_case "With range check and XOR tables" `Quick
+            test_fix_domains_with_range_check_and_xor_table
         ] )
     ]
