@@ -15,8 +15,6 @@ open Poly_types
 open Hlist
 open Backend
 
-exception Return_digest of Md5.t
-
 let verify_promise = Verify.verify
 
 open Kimchi_backend

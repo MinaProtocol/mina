@@ -5,8 +5,6 @@ open Async_kernel
 open Pickles_types
 open Hlist
 
-exception Return_digest of Md5.t
-
 val pad_messages_for_next_wrap_proof :
      (module Pickles_types.Hlist.Maxes.S
         with type length = 'max_proofs_verified
