@@ -79,6 +79,7 @@ let is_dirty_proof = function
 
 let extract_accounts_exn = function
   | { Runtime_config.Ledger.base = Accounts accounts
+    ; num_accounts = None
     ; balances = []
     ; hash = _
     ; name = None
