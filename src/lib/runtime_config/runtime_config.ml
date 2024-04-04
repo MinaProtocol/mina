@@ -1286,8 +1286,8 @@ let ledger_accounts (ledger : Mina_base.Ledger.Any_ledger.witness) =
 let ledger_of_accounts accounts =
   Ledger.
     { base = Accounts accounts
-    ; num_accounts = Some (List.length accounts)
-    ; balances = List.mapi accounts ~f:(fun i a -> (i, a.balance))
+    ; num_accounts = None
+    ; balances = []
     ; hash = None
     ; name = None
     ; add_genesis_winner = Some false
