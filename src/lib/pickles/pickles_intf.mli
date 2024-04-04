@@ -397,6 +397,7 @@ module type S = sig
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+    -> ?num_chunks:int
     -> public_input:
          ( 'var
          , 'value
@@ -452,6 +453,7 @@ module type S = sig
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+    -> ?num_chunks:int
     -> public_input:
          ( 'var
          , 'value
@@ -507,6 +509,7 @@ module type S = sig
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+    -> ?num_chunks:int
     -> public_input:
          ( 'var
          , 'value

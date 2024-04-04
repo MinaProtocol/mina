@@ -346,6 +346,7 @@ struct
       -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
       -> ?override_wrap_main:
            (max_proofs_verified, branches, prev_varss) wrap_main_generic
+      -> ?num_chunks:int
       -> branches:(module Nat.Intf with type n = branches)
       -> max_proofs_verified:
            (module Nat.Add.Intf with type n = max_proofs_verified)
@@ -380,7 +381,7 @@ struct
        ~storables:
          { step_storable; step_vk_storable; wrap_storable; wrap_vk_storable }
        ~proof_cache ?disk_keys ?override_wrap_domain ?override_wrap_main
-       ~branches:(module Branches) ~max_proofs_verified ~name
+       ?(num_chunks = 1) ~branches:(module Branches) ~max_proofs_verified ~name
        ~constraint_constants ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version = Snark_keys_header.header_version
@@ -454,7 +455,7 @@ struct
               (Auxiliary_value)
           in
           M.f full_signature prev_varss_n prev_varss_length ~max_proofs_verified
-            ~feature_flags
+            ~feature_flags ~num_chunks
       | Some override ->
           Common.wrap_domains
             ~proofs_verified:(Pickles_base.Proofs_verified.to_int override)
@@ -639,7 +640,7 @@ struct
       match override_wrap_main with
       | None ->
           let srs = Tick.Keypair.load_urs () in
-          Wrap_main.wrap_main ~feature_flags ~srs full_signature
+          Wrap_main.wrap_main ~num_chunks ~feature_flags ~srs full_signature
             prev_varss_length step_vks proofs_verifieds all_step_domains
             max_proofs_verified
       | Some { wrap_main; tweak_statement = _ } ->
@@ -751,7 +752,7 @@ struct
              Promise.t =
        fun (T b as branch_data) (step_pk, step_vk) ->
         let _, prev_vars_length = b.proofs_verified in
-        let step ~proof_cache ~maxes handler next_state =
+        let step ~zk_rows ~proof_cache ~maxes handler next_state =
           let%bind.Promise wrap_vk = Lazy.force wrap_vk in
           let%bind.Promise step_pk = Lazy.force step_pk in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
@@ -760,8 +761,8 @@ struct
               ((* TODO *) Plonk_verification_key_evals.map
                  ~f:(fun x -> [| x |])
                  wrap_vk.commitments )
-            ~public_input ~auxiliary_typ ~feature_flags ~proof_cache ~maxes
-            (fst step_pk) wrap_vk.index
+            ~public_input ~auxiliary_typ ~feature_flags ~zk_rows ~proof_cache
+            ~maxes (fst step_pk) wrap_vk.index
         in
         let wrap ?handler next_state =
           let%bind.Promise step_vk, _ = Lazy.force step_vk in
@@ -770,7 +771,9 @@ struct
                            , return_value
                            , auxiliary_value
                            , actual_wrap_domains ) =
-            step ~proof_cache handler ~maxes:(module Maxes) next_state
+            step ~zk_rows:step_vk.zk_rows ~proof_cache handler
+              ~maxes:(module Maxes)
+              next_state
           in
           let proof =
             { proof with
@@ -980,6 +983,7 @@ let compile_with_wrap_main_override_promise :
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> ?override_wrap_main:
          (max_proofs_verified, branches, prev_varss) wrap_main_generic
+    -> ?num_chunks:int
     -> public_input:
          ( var
          , value
@@ -1026,9 +1030,9 @@ let compile_with_wrap_main_override_promise :
     and the underlying Make(_).compile function which builds the circuits.
  *)
  fun ?self ?(cache = []) ?(storables = Storables.default) ?proof_cache
-     ?disk_keys ?override_wrap_domain ?override_wrap_main ~public_input
-     ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
-     ~choices () ->
+     ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks
+     ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
+     ~constraint_constants ~choices () ->
   let self =
     match self with
     | None ->
@@ -1095,8 +1099,9 @@ let compile_with_wrap_main_override_promise :
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
     M.compile ~self ~proof_cache ~cache ~storables ?disk_keys
-      ?override_wrap_domain ?override_wrap_main ~branches ~max_proofs_verified
-      ~name ~public_input ~auxiliary_typ ~constraint_constants
+      ?override_wrap_domain ?override_wrap_main ?num_chunks ~branches
+      ~max_proofs_verified ~name ~public_input ~auxiliary_typ
+      ~constraint_constants
       ~choices:(fun ~self -> conv_irs (choices ~self))
       ()
   in
