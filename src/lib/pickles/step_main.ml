@@ -278,10 +278,10 @@ let step_main :
     in
     let T = Max_proofs_verified.eq in
     let app_state = exists input_typ ~request:(fun () -> Req.App_state) in
-    let%map.Promise { Inductive_rule.previous_proof_statements
-                    ; public_output = ret_var
-                    ; auxiliary_output = auxiliary_var
-                    } =
+    let%bind.Promise { Inductive_rule.previous_proof_statements
+                     ; public_output = ret_var
+                     ; auxiliary_output = auxiliary_var
+                     } =
       (* Run the application logic of the rule on the predecessor statements *)
       with_label "rule_main" (fun () -> rule.main { public_input = app_state })
     in
@@ -300,46 +300,50 @@ let step_main :
         in
         (* Compute proof parts outside of the prover before requesting values.
         *)
-        exists Typ.unit ~request:(fun () ->
-            let previous_proof_statements =
-              let rec go :
-                  type prev_vars prev_values ns1 ns2.
-                     ( prev_vars
-                     , ns1 )
-                     H2.T(Inductive_rule.Previous_proof_statement).t
-                  -> (prev_vars, prev_values, ns1, ns2) H4.T(Tag).t
-                  -> ( prev_values
-                     , ns1 )
-                     H2.T(Inductive_rule.Previous_proof_statement.Constant).t =
-               fun previous_proof_statement tags ->
-                match (previous_proof_statement, tags) with
-                | [], [] ->
-                    []
-                | ( { public_input; proof; proof_must_verify } :: stmts
-                  , tag :: tags ) ->
-                    let public_input =
-                      (fun (type var value n m) (tag : (var, value, n, m) Tag.t)
-                           (var : var) : value ->
-                        let typ : (var, value) Typ.t =
-                          match Type_equal.Id.same_witness self.id tag.id with
-                          | Some T ->
-                              basic.public_input
-                          | None ->
-                              Types_map.public_input tag
-                        in
-                        As_prover.read typ var )
-                        tag public_input
-                    in
-                    { public_input
-                    ; proof = As_prover.Ref.get proof
-                    ; proof_must_verify =
-                        As_prover.read Boolean.typ proof_must_verify
-                    }
-                    :: go stmts tags
+        let%map.Promise () =
+          Async_promise.unit_request (fun () ->
+              let previous_proof_statements =
+                let rec go :
+                    type prev_vars prev_values ns1 ns2.
+                       ( prev_vars
+                       , ns1 )
+                       H2.T(Inductive_rule.Previous_proof_statement).t
+                    -> (prev_vars, prev_values, ns1, ns2) H4.T(Tag).t
+                    -> ( prev_values
+                       , ns1 )
+                       H2.T(Inductive_rule.Previous_proof_statement.Constant).t
+                    =
+                 fun previous_proof_statement tags ->
+                  match (previous_proof_statement, tags) with
+                  | [], [] ->
+                      []
+                  | ( { public_input; proof; proof_must_verify } :: stmts
+                    , tag :: tags ) ->
+                      let public_input =
+                        (fun (type var value n m)
+                             (tag : (var, value, n, m) Tag.t) (var : var) :
+                             value ->
+                          let typ : (var, value) Typ.t =
+                            match Type_equal.Id.same_witness self.id tag.id with
+                            | Some T ->
+                                basic.public_input
+                            | None ->
+                                Types_map.public_input tag
+                          in
+                          As_prover.read typ var )
+                          tag public_input
+                      in
+                      { public_input
+                      ; proof = As_prover.Ref.get proof
+                      ; proof_must_verify =
+                          As_prover.read Boolean.typ proof_must_verify
+                      }
+                      :: go stmts tags
+                in
+                go previous_proof_statements rule.prevs
               in
-              go previous_proof_statements rule.prevs
-            in
-            Req.Compute_prev_proof_parts previous_proof_statements ) ;
+              Req.Compute_prev_proof_parts previous_proof_statements )
+        in
         let dlog_plonk_index =
           let num_chunks = (* TODO *) 1 in
           exists
