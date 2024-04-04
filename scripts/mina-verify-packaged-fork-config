@@ -81,7 +81,7 @@ fi
 echo "generating genesis ledgers ... (this may take a while)" >&2
 
 cp "$1" "$workdir/config.json"
-sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "1"}/' "$workdir/config.json"
+sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "2"}/' "$workdir/config.json"
 "$MINA_GENESIS_EXE" --config-file "$workdir/config.json"  --genesis-dir "$workdir/ledgers"  --hash-output-file "$workdir/hashes.json"
 
 FORK_CONFIG_JSON="$1" \
@@ -98,7 +98,7 @@ function extract_ledgers() {
     json_prefix=$3
     "$MINA_EXE" daemon --libp2p-keypair "$workdir/keys/p2p" --config-file "$config_file" --seed --genesis-ledger-dir "$ledger_dir" &
     
-    while ! "$MINA_EXE" ledger export staged-ledger  | jq >"$json_prefix-staged.json"; do
+    while ! "$MINA_EXE" ledger export staged-ledger  | jq . >"$json_prefix-staged.json"; do
         sleep 1m
         if ! grep -qFx "$(cat ~/.mina-config/.mina-lock)" <(jobs -rp); then
             echo "daemon died before exporting ledgers" >&2
@@ -106,8 +106,8 @@ function extract_ledgers() {
         fi
     done
     
-    "$MINA_EXE" ledger export staking-epoch-ledger | jq > "$json_prefix-staking.json"
-    "$MINA_EXE" ledger export next-epoch-ledger | jq > "$json_prefix-next.json"
+    "$MINA_EXE" ledger export staking-epoch-ledger | jq . > "$json_prefix-staking.json"
+    "$MINA_EXE" ledger export next-epoch-ledger | jq . > "$json_prefix-next.json"
     
     "$MINA_EXE" client stop
 }

@@ -24,6 +24,7 @@
    uri
    integers
    async_unix
+   progress
    ;; local libraries
    mina_wire_types
    with_hash
@@ -60,6 +61,7 @@
    random_oracle
    codable
    ppx_version.runtime
+   cli_lib
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

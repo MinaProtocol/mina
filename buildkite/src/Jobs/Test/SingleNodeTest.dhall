@@ -53,8 +53,7 @@ Pipeline.build
   Pipeline.Config::{
     spec = 
       let unitDirtyWhen = [
-        S.strictlyStart (S.contains "src/lib"),
-        S.strictlyStart (S.contains "src/test"),
+        S.strictlyStart (S.contains "src"),
         S.strictly (S.contains "Makefile"),
         S.exactly "buildkite/src/Jobs/Test/SingleNodeTest" "dhall",
         S.exactly "buildkite/scripts/single-node-tests" "sh"
