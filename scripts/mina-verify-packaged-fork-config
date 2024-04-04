@@ -109,7 +109,7 @@ result=$(jq --slurpfile block "$workdir/precomputed_fork_block.json" \
   --slurpfile legacy_hashes "$workdir/legacy_hashes.json" -n '
   ($legacy_hashes[0].epoch_data.staking.hash == $block[0].protocol_state.body.consensus_state.staking_epoch_data.ledger.hash and
    $legacy_hashes[0].epoch_data.next.hash == $block[0].protocol_state.body.consensus_state.next_epoch_data.ledger.hash and
-   $legacy_hashes[0].ledger.hash == $block[0].protocol_state.body.consensus_state.blockchain_state.ledger_hash)')
+   $legacy_hashes[0].ledger.hash == $block[0].protocol_state.body.blockchain_state.staged_ledger_hash.non_snark.ledger_hash)')
 
 if [ "$result" != "true" ]; then
     echo "Hashes in config $2 don't match hashes from the precomputed block $PRECOMPUTED_FORK_BLOCK" >&2
