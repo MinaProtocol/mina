@@ -69,6 +69,7 @@ module Base_node_config = struct
     ; runtime_config_path : string option
     ; libp2p_key_path : string
     ; libp2p_secret : string
+    ; start_filtered_logs : string list
     }
   [@@deriving to_yojson]
 
@@ -121,7 +122,8 @@ module Base_node_config = struct
     ; target = container_entrypoint_path
     }
 
-  let default ?(runtime_config_path = None) ?(peer = None) =
+  let default ?(runtime_config_path = None) ?(peer = None)
+      ?(start_filtered_logs = []) =
     { runtime_config_path
     ; peer
     ; log_snark_work_gossip = true
@@ -134,6 +136,7 @@ module Base_node_config = struct
     ; external_port = PortManager.mina_internal_external_port |> Int.to_string
     ; libp2p_key_path = container_libp2p_key_path
     ; libp2p_secret = ""
+    ; start_filtered_logs
     }
 
   let to_docker_env_vars t =
@@ -175,6 +178,11 @@ module Base_node_config = struct
     let peer_args =
       match t.peer with Some peer -> [ "-peer"; peer ] | None -> []
     in
+    let start_filtered_logs_args =
+      List.concat
+        (List.map t.start_filtered_logs ~f:(fun log ->
+             [ "--start-filtered-logs"; log ] ) )
+    in
     let runtime_config_path =
       match t.runtime_config_path with
       | Some path ->
@@ -182,7 +190,8 @@ module Base_node_config = struct
       | None ->
           []
     in
-    List.concat [ base_args; runtime_config_path; peer_args ]
+    List.concat
+      [ base_args; runtime_config_path; peer_args; start_filtered_logs_args ]
 end
 
 module Block_producer_config = struct
