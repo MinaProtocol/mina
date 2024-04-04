@@ -2484,7 +2484,7 @@ module Queries = struct
           Runtime_config.make_fork_config ~staged_ledger ~global_slot
             ~state_hash ~staking_ledger ~staking_epoch_seed
             ~next_epoch_ledger:(Some next_epoch_ledger) ~next_epoch_seed
-            ~blockchain_length runtime_config
+            ~blockchain_length
         in
         let%map () =
           let open Async.Deferred.Infix in
