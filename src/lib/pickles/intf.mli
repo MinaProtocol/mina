@@ -2,7 +2,7 @@ open Core_kernel
 open Pickles_types
 module Sponge_lib = Sponge
 
-module Snarkable = struct
+module Snarkable : sig
   module type S1 = sig
     type _ t
 
@@ -122,7 +122,7 @@ module Snarkable = struct
   end
 end
 
-module Evals = struct
+module Evals : sig
   module type S = sig
     type n
 
@@ -134,16 +134,18 @@ module Evals = struct
   end
 end
 
-module Group (Impl : Snarky_backendless.Snark_intf.Run) = struct
-  open Impl
-
+(** Generic interface over a concrete implementation [Impl] of an elliptic
+    curve in Weierstrass form with [a] and [b]. In affine, the curve has the
+    equation form [y² = x³ + ax + b]. *)
+module Group (Impl : Snarky_backendless.Snark_intf.Run) : sig
   module type S = sig
     type t
 
+    (** Parameters of the elliptic curve *)
     module Params : sig
-      val a : Field.Constant.t
+      val a : Impl.Field.Constant.t
 
-      val b : Field.Constant.t
+      val b : Impl.Field.Constant.t
     end
 
     module Constant : sig
@@ -153,6 +155,7 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) = struct
 
       val negate : t -> t
 
+      (** The scalar field of the elliptic curve *)
       module Scalar : sig
         include Plonk_checks.Field_intf
 
@@ -163,52 +166,73 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) = struct
 
       val scale : t -> Scalar.t -> t
 
-      val to_affine_exn : t -> field * field
+      (** [to_affine_exn p] returns the affine coordinates [(x, y)] of the point
+          [p] *)
+      val to_affine_exn : t -> Impl.field * Impl.field
 
-      val of_affine : field * field -> t
+      (** [of_affine (x, y)] builds a point on the curve
+          TODO: check it is on the curve? Check it is in the prime subgroup?
+      *)
+      val of_affine : Impl.field * Impl.field -> t
     end
 
-    val typ_unchecked : (t, Constant.t, field) Snarky_backendless.Typ.t
+    (** Represent a point, but not necessarily on the curve and in the prime
+        subgroup *)
+    val typ_unchecked : (t, Constant.t, Impl.field) Snarky_backendless.Typ.t
 
-    val typ : (t, Constant.t, field) Snarky_backendless.Typ.t
+    (** Represent a point on the curve and in the prime subgroup *)
+    val typ : (t, Constant.t, Impl.field) Snarky_backendless.Typ.t
 
+    (** Add two points on the curve.
+        TODO: is the addition complete?
+    *)
     val ( + ) : t -> t -> t
 
+    (** Double the point *)
     val double : t -> t
 
-    val scale : t -> Boolean.var list -> t
+    (** [scalar g xs] computes the scalar multiplication of [g] with [xs], where
+        the scalar [xs] is given as a list of bits *)
+    val scale : t -> Impl.Boolean.var list -> t
 
-    val if_ : Boolean.var -> then_:t -> else_:t -> t
+    val if_ : Impl.Boolean.var -> then_:t -> else_:t -> t
 
+    (** [negate x] computes the opposite of [x] *)
     val negate : t -> t
 
-    val to_field_elements : t -> Field.t list
+    (** Return the affine coordinates of the point [t] *)
+    val to_field_elements : t -> Impl.Field.t list
 
+    (** MSM with precomputed scaled values *)
     module Scaling_precomputation : sig
+      (** Precomputed table *)
       type t
 
+      (** [create p] builds a table of scaled values of [p] which can be used to
+          compute MSM *)
       val create : Constant.t -> t
     end
 
     val constant : Constant.t -> t
 
+    (** MSM using a precomputed table *)
     val multiscale_known :
-      (Boolean.var list * Scaling_precomputation.t) array -> t
+      (Impl.Boolean.var list * Scaling_precomputation.t) array -> t
   end
 end
 
-module Sponge (Impl : Snarky_backendless.Snark_intf.Run) = struct
-  open Impl
-
+(** Hash functions that will be used for the Fiat Shamir transformation *)
+module Sponge (Impl : Snarky_backendless.Snark_intf.Run) : sig
   module type S =
     Sponge.Intf.Sponge
-      with module Field := Field
+      with module Field := Impl.Field
        and module State := Sponge.State
-       and type input := Field.t
-       and type digest := Field.t
-       and type t = Field.t Sponge.t
+       and type input := Impl.Field.t
+       and type digest := Impl.Field.t
+       and type t = Impl.Field.t Sponge.t
 end
 
+(** Basic interface representing inputs of a computation *)
 module type Inputs_base = sig
   module Impl : Snarky_backendless.Snark_intf.Run
 
@@ -217,6 +241,7 @@ module type Inputs_base = sig
 
     include Group(Impl).S with type t = Field.t * Field.t
 
+    (** A generator on the curve and in the prime subgroup *)
     val one : t
 
     val if_ : Boolean.var -> then_:t -> else_:t -> t
@@ -235,25 +260,38 @@ module type Inputs_base = sig
 
     val size : Import.B.t
 
+    (** The size in bits for the canonical representation of a field
+        element *)
     val size_in_bits : int
 
+    (** [to_bits x] returns the little endian representation of the canonical
+        representation of the field element [x] *)
     val to_bits : t -> bool list
 
+    (** [of_bits bs] builds an element of the field using the little endian
+        representation given by [bs] *)
     val of_bits : bool list -> t
 
+    (** [is_square y] returns [true] if there exists an element [x] in the same
+        field such that [x^2 = y], i.e [y] is a quadratic residue modulo [p] *)
     val is_square : t -> bool
 
     val print : t -> unit
   end
 
   module Generators : sig
+    (** Fixed generator of the group. It must be a point on the curve and in the
+        prime subgroup *)
     val h : Inner_curve.Constant.t Lazy.t
   end
 
+  (** Parameters for the sponge that will be used as a random oracle for the
+      Fiat Shamir transformation *)
   val sponge_params : Impl.Field.t Sponge_lib.Params.t
 end
 
-module Wrap_main_inputs = struct
+(** Interface for inputs for the outer computations *)
+module Wrap_main_inputs : sig
   module type S = sig
     include Inputs_base
 
@@ -267,7 +305,8 @@ module Wrap_main_inputs = struct
   end
 end
 
-module Step_main_inputs = struct
+(** Interface for inputs for the inner computations *)
+module Step_main_inputs : sig
   module type S = sig
     include Inputs_base
 
@@ -286,6 +325,7 @@ module Step_main_inputs = struct
   end
 end
 
+(** Represent a statement to be proven *)
 module type Statement = sig
   type field
 

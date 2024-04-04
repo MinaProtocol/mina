@@ -1,3 +1,7 @@
+(** The type of intermediate (step) and emitted (wrap) proofs that pickles
+    generates
+*)
+
 module Base : sig
   module Messages_for_next_proof_over_same_field =
     Reduced_messages_for_next_proof_over_same_field
@@ -54,7 +58,7 @@ module Base : sig
               Pickles_types.Plonk_types.All_evals.Stable.V1.t
           ; proof : Wrap_wire_proof.Stable.V1.t
           }
-        [@@deriving compare, sexp, yojson, hash, equal]
+        [@@deriving compare, sexp, hash, equal]
       end
     end]
 

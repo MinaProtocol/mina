@@ -14,9 +14,18 @@ crate-type = ["cdylib"]
 ################################# Dependencies ################################
 
 [dependencies]
-wasm-bindgen = { version = "0.2.78" }
+# Strictly enforcing 0.2.84. It seems that 0.2.87 generates unwanted behavior.
+# See https://github.com/MinaProtocol/mina/issues/14253
+wasm-bindgen = { version = "=0.2.87" }
 console_error_panic_hook = { version = "0.1.6" }
-web-sys = { version = "0.3.35", features = ["Window", "Document", "HtmlElement", "Text", "Node", "Element" ] }
+web-sys = { version = "0.3.35", features = [
+  "Window",
+  "Document",
+  "HtmlElement",
+  "Text",
+  "Node",
+  "Element",
+] }
 
 once_cell = "1.10.0"
 libc = { version = "0.2.0" }
@@ -44,12 +53,15 @@ rand = { version = "0.8.0" }
 rayon = { version = "1" }
 rmp-serde = "1.0.0"
 sprs = { version = "0.11.0" }
-spmc = {version = "0.3.0"}
+spmc = { version = "0.3.0" }
 serde = "1.0.130"
 serde_json = "1.0"
 serde_with = "2.0.1"
 serde-wasm-bindgen = "0.4"
 js-sys = "0.3"
+# Version for proc-macro2 needs to be 1.0.60+ to be compatible with newer rust versions
+# https://github.com/rust-lang/rust/issues/113152
+proc-macro2 = { version = "=1.0.60", features = ["default", "proc-macro"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.0"
@@ -66,7 +78,17 @@ wasm-opt = false
 #wasm-opt = ["-O4", "--enable-mutable-globals"]
 
 [build]
-rustflags = ["-C", "target-feature=+atomics,+bulk-memory", "-C", "link-arg=--no-check-features"]
+rustflags = [
+  "-C",
+  "target-feature=+atomics,+bulk-memory",
+  "-C",
+  "link-arg=--no-check-features",
+]
 
 [target.wasm32-unknown-unknown]
-rustflags = ["-C", "target-feature=+atomics,+bulk-memory", "-C", "link-arg=--no-check-features"]
+rustflags = [
+  "-C",
+  "target-feature=+atomics,+bulk-memory",
+  "-C",
+  "link-arg=--no-check-features",
+]

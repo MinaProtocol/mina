@@ -29,7 +29,7 @@ let pad_vector (type a) ~dummy (v : (a, _) Vector.t) =
 
 (* Specialized padding function. *)
 let pad_challenges (chalss : (_ Vector.t, _) Vector.t) =
-  pad_vector ~dummy:Dummy.Ipa.Wrap.challenges_computed chalss
+  pad_vector ~dummy:(Lazy.force Dummy.Ipa.Wrap.challenges_computed) chalss
 
 (* Specialized padding function. *)
 let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
@@ -37,12 +37,13 @@ let pad_accumulator (xs : (Tock.Proof.Challenge_polynomial.t, _) Vector.t) =
     ~dummy:
       { Tock.Proof.Challenge_polynomial.commitment =
           Lazy.force Dummy.Ipa.Wrap.sg
-      ; challenges = Vector.to_array Dummy.Ipa.Wrap.challenges_computed
+      ; challenges =
+          Vector.to_array (Lazy.force Dummy.Ipa.Wrap.challenges_computed)
       }
   |> Vector.to_list
 
 (* Hash the me only, padding first. *)
-let hash_messages_for_next_wrap_proof (type n) (max_proofs_verified : n Nat.t)
+let hash_messages_for_next_wrap_proof (type n) (_max_proofs_verified : n Nat.t)
     (t :
       ( Tick.Curve.Affine.t
       , (_, n) Vector.t )
@@ -83,7 +84,7 @@ module Checked = struct
     pad_vector
       ~dummy:
         (Vector.map ~f:Impls.Wrap.Field.constant
-           Dummy.Ipa.Wrap.challenges_computed )
+           (Lazy.force Dummy.Ipa.Wrap.challenges_computed) )
       chalss
 
   let pad_commitments (commitments : _ Vector.t) =
@@ -102,9 +103,10 @@ module Checked = struct
       let full_state s = (S.state s, s.sponge_state) in
       let sponge = S.create Tock_field_sponge.params in
       let s0 = full_state sponge in
-      Vector.iter ~f:(S.absorb sponge) Dummy.Ipa.Wrap.challenges_computed ;
+      let chals = Lazy.force Dummy.Ipa.Wrap.challenges_computed in
+      Vector.iter ~f:(S.absorb sponge) chals ;
       let s1 = full_state sponge in
-      Vector.iter ~f:(S.absorb sponge) Dummy.Ipa.Wrap.challenges_computed ;
+      Vector.iter ~f:(S.absorb sponge) chals ;
       let s2 = full_state sponge in
       [| s0; s1; s2 |] )
 

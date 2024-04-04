@@ -133,6 +133,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
               ~choices:(fun ~self:_ -> [ ring_sig_rule ring_member_pks ])
           in
           let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
+          let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk) in
           ( if debug_mode then
             Binable.to_string (module Side_loaded_verification_key.Stable.V2) vk
             |> Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet
@@ -233,7 +234,8 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                 ; use_full_commitment = false
                 ; authorization_kind = Proof (With_hash.hash vk)
                 }
-            ; authorization = Proof Mina_base.Proof.transaction_dummy
+            ; authorization =
+                Proof (Lazy.force Mina_base.Proof.transaction_dummy)
             }
           in
           let protocol_state = Zkapp_precondition.Protocol_state.accept in

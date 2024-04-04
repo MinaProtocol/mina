@@ -1744,6 +1744,8 @@ let%test_module _ =
 
     let `VK vk, `Prover _ = Lazy.force U.trivial_zkapp
 
+    let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
+
     let mk_ledger ~num_of_unused_keys () =
       let keys = List.init 5 ~f:(fun _ -> Keypair.create ()) in
       let zkapp_keys = List.init 5 ~f:(fun _ -> Keypair.create ()) in

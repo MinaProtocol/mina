@@ -36,8 +36,9 @@ let account : Mina_base.Account.t =
 let zkapp_command =
   let num_updates = 16 in
   let _ledger, zkapp_commands =
-    Snark_profiler_lib.create_ledger_and_zkapps ~min_num_updates:num_updates
-      ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        Snark_profiler_lib.create_ledger_and_zkapps ~min_num_updates:num_updates
+          ~num_proof_updates:num_updates ~max_num_updates:num_updates () )
   in
   List.hd_exn zkapp_commands
 
@@ -65,6 +66,7 @@ let verification_key =
     Transaction_snark.For_tests.create_trivial_snapp
       ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
   in
+  let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk) in
   With_hash.data vk
 
 let applied = Mina_base.Transaction_status.Applied
@@ -242,7 +244,7 @@ let scan_state_merge_node :
       let sok_msg : Mina_base.Sok_message.t =
         { fee = Currency.Fee.zero; prover = sample_pk_compressed }
       in
-      let proof = Mina_base.Proof.transaction_dummy in
+      let proof = Lazy.force Mina_base.Proof.transaction_dummy in
       let statement =
         let without_sok =
           Quickcheck.random_value ~seed:(`Deterministic "no sok left")
@@ -258,7 +260,7 @@ let scan_state_merge_node :
         { fee = Currency.Fee.zero; prover = sample_pk_compressed }
       in
       (* so the left, right proofs differ, don't want sharing *)
-      let proof = Mina_base.Proof.blockchain_dummy in
+      let proof = Lazy.force Mina_base.Proof.blockchain_dummy in
       let statement =
         let without_sok =
           Quickcheck.random_value ~seed:(`Deterministic "no sok right")

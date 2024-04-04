@@ -5,6 +5,9 @@ label and comments by MinaProtocol organization members containing exactly
 `!ci-build-me`. If your CI job has not started after adding the `ci-build-me`
 label, please comment on the pull request with `!ci-build-me` to attempt to
 re-trigger the script.
+If no CI jobs started, check that your membership to O(1) Labs/mina organisation
+is public. If your membership is private, the jobs will not started and
+`!ci-build-me` won't have an impact.
 
 If CI jobs are not running after applying both the `ci-build-me` label and
 comment, you may be able to find and fix the error in the script. The script

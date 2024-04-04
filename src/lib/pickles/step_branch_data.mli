@@ -1,16 +1,20 @@
 open Pickles_types
 
+(** The data obtained from "compiling" an inductive rule into a circuit. *)
 type ( 'a_var
      , 'a_value
      , 'ret_var
      , 'ret_value
      , 'auxiliary_var
      , 'auxiliary_value
+     (* type level nat *)
      , 'max_proofs_verified
      , 'branches
      , 'prev_vars
      , 'prev_values
+     (* type level nat *)
      , 'local_widths
+     (* type level nat *)
      , 'local_heights )
      t =
   | T :
@@ -19,7 +23,7 @@ type ( 'a_var
           * ('prev_vars, 'proofs_verified) Pickles_types.Hlist.Length.t
       ; index : int
       ; lte : ('proofs_verified, 'max_proofs_verified) Pickles_types.Nat.Lte.t
-      ; domains : Import.Domains.t
+      ; domains : Import.Domains.t Promise.t
       ; rule :
           ( 'prev_vars
           , 'prev_values
@@ -31,15 +35,20 @@ type ( 'a_var
           , 'ret_value
           , 'auxiliary_var
           , 'auxiliary_value )
-          Inductive_rule.t
+          Inductive_rule.Promise.t
+            (* Main functions to compute *)
       ; main :
-             step_domains:(Import.Domains.t, 'branches) Pickles_types.Vector.t
-          -> unit
-          -> ( (Unfinalized.t, 'max_proofs_verified) Pickles_types.Vector.t
-             , Impls.Step.Field.t
-             , (Impls.Step.Field.t, 'max_proofs_verified) Pickles_types.Vector.t
-             )
-             Import.Types.Step.Statement.t
+             step_domains:
+               (Import.Domains.t, 'branches) Pickles_types.Vector.t Promise.t
+          -> (   unit
+              -> ( (Unfinalized.t, 'max_proofs_verified) Pickles_types.Vector.t
+                 , Impls.Step.Field.t
+                 , ( Impls.Step.Field.t
+                   , 'max_proofs_verified )
+                   Pickles_types.Vector.t )
+                 Import.Types.Step.Statement.t
+                 Promise.t )
+             Promise.t
       ; requests :
           (module Requests.Step.S
              with type auxiliary_value = 'auxiliary_value
@@ -58,19 +67,27 @@ type ( 'a_var
          , 'ret_value
          , 'auxiliary_var
          , 'auxiliary_value
+         (* type level nat *)
          , 'max_proofs_verified
          , 'branches
          , 'prev_vars
          , 'prev_values
+         (* type level nat *)
          , 'local_widths
+         (* type level nat *)
          , 'local_heights )
          t
 
+(** Compile one rule into a value of type [t]
+    [create idx self wrap_domains feature_flags actual_feature_flags
+    max_proofs_verified branches public_input aux_typ var_to_field_elem
+    val_to_field_elem rule]
+*)
 val create :
      index:int
   -> self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
   -> wrap_domains:Import.Domains.t
-  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
+  -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
   -> actual_feature_flags:bool Plonk_types.Features.t
   -> max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
   -> proofs_verifieds:(int, 'branches) Pickles_types.Vector.t
@@ -86,6 +103,7 @@ val create :
   -> auxiliary_typ:('a, 'b) Impls.Step.Typ.t
   -> 'c
   -> 'd
+  -> chain_to:unit Promise.t
   -> ( 'e
      , 'f
      , 'g
@@ -96,7 +114,7 @@ val create :
      , 'ret_value
      , 'a
      , 'b )
-     Inductive_rule.t
+     Inductive_rule.Promise.t
   -> ( 'a_var
      , 'a_value
      , 'ret_var

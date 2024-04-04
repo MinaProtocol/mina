@@ -1,9 +1,15 @@
 use ark_poly::EvaluationDomain;
+use kimchi::circuits::lookup::runtime_tables::RuntimeTableCfg;
 
+use crate::arkworks::WasmPastaFq;
 use crate::gate_vector::fq::WasmGateVector;
 use crate::srs::fq::WasmFqSrs as WasmSrs;
+use crate::wasm_flat_vector::WasmFlatVector;
+use crate::wasm_vector::{fq::*, WasmVector};
+use kimchi::circuits::lookup::tables::LookupTable;
 use kimchi::circuits::{constraints::ConstraintSystem, gate::CircuitGate};
 use kimchi::linearization::expr_linearization;
+use kimchi::poly_commitment::evaluation_proof::OpeningProof;
 use kimchi::prover_index::ProverIndex;
 use mina_curves::pasta::{Fq, Pallas as GAffine, PallasParameters, Vesta as GAffineOther};
 use mina_poseidon::{constants::PlonkSpongeConstantsKimchi, sponge::DefaultFqSponge};
@@ -20,16 +26,79 @@ use wasm_bindgen::prelude::*;
 
 /// Boxed so that we don't store large proving indexes in the OCaml heap.
 #[wasm_bindgen]
-pub struct WasmPastaFqPlonkIndex(#[wasm_bindgen(skip)] pub Box<ProverIndex<GAffine>>);
+pub struct WasmPastaFqPlonkIndex(
+    #[wasm_bindgen(skip)] pub Box<ProverIndex<GAffine, OpeningProof<GAffine>>>,
+);
+
+#[wasm_bindgen]
+pub struct WasmPastaFqLookupTable {
+    #[wasm_bindgen(skip)]
+    pub id: i32,
+    #[wasm_bindgen(skip)]
+    pub data: WasmVecVecFq,
+}
+
+impl From<WasmPastaFqLookupTable> for LookupTable<Fq> {
+    fn from(wasm_lt: WasmPastaFqLookupTable) -> LookupTable<Fq> {
+        LookupTable {
+            id: wasm_lt.id.into(),
+            data: wasm_lt.data.0,
+        }
+    }
+}
+
+// JS constructor for js/bindings.js
+#[wasm_bindgen]
+impl WasmPastaFqLookupTable {
+    #[wasm_bindgen(constructor)]
+    pub fn new(id: i32, data: WasmVecVecFq) -> WasmPastaFqLookupTable {
+        WasmPastaFqLookupTable { id, data }
+    }
+}
+
+// Runtime table config
+
+#[wasm_bindgen]
+pub struct WasmPastaFqRuntimeTableCfg {
+    #[wasm_bindgen(skip)]
+    pub id: i32,
+    #[wasm_bindgen(skip)]
+    pub first_column: WasmFlatVector<WasmPastaFq>,
+}
+
+impl From<WasmPastaFqRuntimeTableCfg> for RuntimeTableCfg<Fq> {
+    fn from(wasm_rt_cfg: WasmPastaFqRuntimeTableCfg) -> Self {
+        Self {
+            id: wasm_rt_cfg.id,
+            first_column: wasm_rt_cfg
+                .first_column
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        }
+    }
+}
+
+// JS constructor for js/bindings.js
+#[wasm_bindgen]
+impl WasmPastaFqRuntimeTableCfg {
+    #[wasm_bindgen(constructor)]
+    pub fn new(id: i32, first_column: WasmFlatVector<WasmPastaFq>) -> Self {
+        Self { id, first_column }
+    }
+}
 
 //
 // CamlPastaFqPlonkIndex methods
 //
 
+// Change js/web/worker-spec.js accordingly
 #[wasm_bindgen]
 pub fn caml_pasta_fq_plonk_index_create(
     gates: &WasmGateVector,
     public_: i32,
+    lookup_tables: WasmVector<WasmPastaFqLookupTable>,
+    runtime_table_cfgs: WasmVector<WasmPastaFqRuntimeTableCfg>,
     prev_challenges: i32,
     srs: &WasmSrs,
 ) -> Result<WasmPastaFqPlonkIndex, JsError> {
@@ -46,10 +115,22 @@ pub fn caml_pasta_fq_plonk_index_create(
             })
             .collect();
 
+        let rust_runtime_table_cfgs: Vec<RuntimeTableCfg<Fq>> =
+            runtime_table_cfgs.into_iter().map(Into::into).collect();
+
+        let rust_lookup_tables: Vec<LookupTable<Fq>> =
+            lookup_tables.into_iter().map(Into::into).collect();
+
         // create constraint system
         let cs = match ConstraintSystem::<Fq>::create(gates)
             .public(public_ as usize)
             .prev_challenges(prev_challenges as usize)
+            .lookup(rust_lookup_tables)
+            .runtime(if rust_runtime_table_cfgs.is_empty() {
+                None
+            } else {
+                Some(rust_runtime_table_cfgs)
+            })
             .build()
         {
             Err(_) => {
@@ -68,7 +149,8 @@ pub fn caml_pasta_fq_plonk_index_create(
             ptr.add_lagrange_basis(cs.domain.d1);
         }
 
-        let mut index = ProverIndex::<GAffine>::create(cs, endo_q, srs.0.clone());
+        let mut index =
+            ProverIndex::<GAffine, OpeningProof<GAffine>>::create(cs, endo_q, srs.0.clone());
         // Compute and cache the verifier index digest
         index.compute_verifier_index_digest::<DefaultFqSponge<PallasParameters, PlonkSpongeConstantsKimchi>>();
 
@@ -108,6 +190,36 @@ pub fn caml_pasta_fq_plonk_index_domain_d8_size(index: &WasmPastaFqPlonkIndex) -
 }
 
 #[wasm_bindgen]
+pub fn caml_pasta_fq_plonk_index_decode(
+    bytes: &[u8],
+    srs: &WasmSrs,
+) -> Result<WasmPastaFqPlonkIndex, JsError> {
+    let mut deserializer = rmp_serde::Deserializer::new(bytes);
+    let mut index =
+        ProverIndex::<GAffine, OpeningProof<GAffine>>::deserialize(&mut deserializer)
+            .map_err(|e| JsError::new(&format!("caml_pasta_fq_plonk_index_decode: {}", e)))?;
+
+    index.srs = srs.0.clone();
+    let (linearization, powers_of_alpha) =
+        expr_linearization(Some(&index.cs.feature_flags), true, 3);
+    index.linearization = linearization;
+    index.powers_of_alpha = powers_of_alpha;
+
+    Ok(WasmPastaFqPlonkIndex(Box::new(index)))
+}
+
+#[wasm_bindgen]
+pub fn caml_pasta_fq_plonk_index_encode(index: &WasmPastaFqPlonkIndex) -> Result<Vec<u8>, JsError> {
+    let mut buffer = Vec::new();
+    let mut serializer = rmp_serde::Serializer::new(&mut buffer);
+    index
+        .0
+        .serialize(&mut serializer)
+        .map_err(|e| JsError::new(&format!("caml_pasta_fq_plonk_index_encode: {}", e)))?;
+    Ok(buffer)
+}
+
+#[wasm_bindgen]
 pub fn caml_pasta_fq_plonk_index_read(
     offset: Option<i32>,
     srs: &WasmSrs,
@@ -127,10 +239,12 @@ pub fn caml_pasta_fq_plonk_index_read(
     }
 
     // deserialize the index
-    let mut t = ProverIndex::<GAffine>::deserialize(&mut rmp_serde::Deserializer::new(r))
-        .map_err(|err| JsValue::from_str(&format!("caml_pasta_fq_plonk_index_read: {err}")))?;
+    let mut t = ProverIndex::<GAffine, OpeningProof<GAffine>>::deserialize(
+        &mut rmp_serde::Deserializer::new(r),
+    )
+    .map_err(|err| JsValue::from_str(&format!("caml_pasta_fq_plonk_index_read: {err}")))?;
     t.srs = srs.0.clone();
-    let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true);
+    let (linearization, powers_of_alpha) = expr_linearization(Some(&t.cs.feature_flags), true, 3);
     t.linearization = linearization;
     t.powers_of_alpha = powers_of_alpha;
 

@@ -8,6 +8,8 @@ let%test_module "Account update network id tests" =
   ( module struct
     let `VK vk, `Prover _ = Lazy.force U.trivial_zkapp
 
+    let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
+
     let%test_unit "zkapps failed to apply with a different network id" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 (Test_spec.mk_gen ~num_transactions:1 ())

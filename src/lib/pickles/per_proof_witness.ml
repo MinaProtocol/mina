@@ -62,11 +62,8 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       , Impl.Field.t Shifted_value.Type1.t
       , ( Impl.Field.t Pickles_types.Shifted_value.Type1.t
         , Impl.Boolean.var )
-        Plonk_types.Opt.t
-      , ( scalar_challenge
-          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
-        , Impl.Boolean.var )
-        Plonk_types.Opt.t
+        Opt.t
+      , (scalar_challenge, Impl.Boolean.var) Opt.t
       , Impl.Boolean.var
       , unit
       , Digest.Make(Impl).t
@@ -104,13 +101,11 @@ module No_app_state = struct
 end
 
 module Constant = struct
-  open Kimchi_backend
-
   type challenge = Challenge.Constant.t
 
   type scalar_challenge = challenge Scalar_challenge.t
 
-  type ('statement, 'max_proofs_verified, _) t =
+  type ('statement, 'max_proofs_verified) t =
     { app_state : 'statement
     ; wrap_proof : Wrap_proof.Constant.t
     ; proof_state :
@@ -118,9 +113,7 @@ module Constant = struct
         , scalar_challenge
         , Tick.Field.t Shifted_value.Type1.t
         , Tick.Field.t Shifted_value.Type1.t option
-        , scalar_challenge
-          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.Lookup.t
-          option
+        , scalar_challenge option
         , bool
         , unit
         , Digest.Constant.t
@@ -137,15 +130,13 @@ module Constant = struct
   [@@deriving hlist]
 
   module No_app_state = struct
-    type nonrec (_, 'max_proofs_verified, 'num_branches) t =
-      (unit, 'max_proofs_verified, 'num_branches) t
+    type nonrec (_, 'max_proofs_verified, _) t = (unit, 'max_proofs_verified) t
   end
 end
 
-let typ (type n avar aval m) ~feature_flags
+let typ (type n avar aval) ~feature_flags
     (statement : (avar, aval) Impls.Step.Typ.t) (max_proofs_verified : n Nat.t)
-    (branches : m Nat.t) :
-    ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Step.Typ.t =
+    =
   let module Sc = Scalar_challenge in
   let open Impls.Step in
   let open Step_main_inputs in
@@ -158,7 +149,6 @@ let typ (type n avar aval m) ~feature_flags
     ; Types.Wrap.Proof_state.In_circuit.typ
         (module Impl)
         ~challenge:Challenge.typ ~scalar_challenge:Challenge.typ ~feature_flags
-        ~dummy_scalar:(Shifted_value.Type1.Shifted_value Field.Constant.zero)
         ~dummy_scalar_challenge:(Sc.create Limb_vector.Challenge.Constant.zero)
         (Shifted_value.Type1.typ Field.typ)
         (Snarky_backendless.Typ.unit ())

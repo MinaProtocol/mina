@@ -316,7 +316,7 @@
             libp2p_helper kimchi_bindings_stubs snarky_js leaderboard
             validation trace-tool zkapp-cli;
           inherit (dockerImages)
-            mina-image-slim mina-image-full mina-archive-image-full;
+            mina-image-slim mina-image-full mina-archive-image-full mina-image-instr-full; 
           mina-deb = debianPackages.mina;
           default = mina;
         };

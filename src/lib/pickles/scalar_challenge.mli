@@ -29,7 +29,7 @@ module Make : functor
   (Impl : Snarky_backendless.Snark_intf.Run)
   (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t)
   (Challenge : Import.Challenge.S with module Impl := Impl)
-  (Endo : sig
+  (_ : sig
      val base : Impl.Field.Constant.t
 
      val scalar : G.Constant.Scalar.t
