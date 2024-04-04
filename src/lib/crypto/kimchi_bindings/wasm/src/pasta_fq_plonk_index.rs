@@ -40,10 +40,7 @@ pub struct WasmPastaFqLookupTable {
 
 impl From<WasmPastaFqLookupTable> for LookupTable<Fq> {
     fn from(wasm_lt: WasmPastaFqLookupTable) -> LookupTable<Fq> {
-        LookupTable {
-            id: wasm_lt.id.into(),
-            data: wasm_lt.data.0,
-        }
+        LookupTable::create(wasm_lt.id.into(), wasm_lt.data.0).unwrap()
     }
 }
 
