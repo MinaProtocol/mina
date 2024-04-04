@@ -137,7 +137,7 @@ let%test_module "Archive node unit tests" =
           match%map
             let open Deferred.Result.Let_syntax in
             let%bind user_command_id =
-              Processor.User_command.add_if_doesn't_exist conn
+              Processor.User_command.add_if_doesn't_exist conn ~logger
                 ~v1_transaction_hash:false user_command
             in
             let%map result =
@@ -197,7 +197,7 @@ let%test_module "Archive node unit tests" =
               match%map
                 let open Deferred.Result.Let_syntax in
                 let%bind user_command_id =
-                  Processor.User_command.add_if_doesn't_exist conn
+                  Processor.User_command.add_if_doesn't_exist conn ~logger
                     ~v1_transaction_hash:false user_command
                 in
                 let%map result =

@@ -1497,7 +1497,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                         let acct = Ledger.get_at_index_exn ledger index in
                         query_db ~f:(fun db ->
                             Processor.Accounts_accessed.add_if_doesn't_exist db
-                              last_block_id (index, acct) )
+                              last_block_id (index, acct) ~logger )
                         |> Deferred.ignore_m ) )
                   else (
                     check_ledger_hash_at_slot state_hash ledger_hash ;
