@@ -24,7 +24,7 @@ module Base = struct
           Types.Step.Statement.t
       ; index : int
       ; prev_evals : 'prev_evals
-      ; proof : Tick.Proof.t
+      ; proof : Tick.Proof.with_public_evals
       }
   end
 
