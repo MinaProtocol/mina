@@ -66,7 +66,7 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
       ---             , Cmd.run "FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hardfork_ledger_hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json"
       ---             , Cmd.run "ls hardfork_ledgers"
       ---             , Cmd.run "cat new_config.json"
-      ---             , Cmd.run "MINA_DEB_CODENAME=bullseye MINA_BUILD_MAINNET=1 RUNTIME_CONFIG_JSON=new_config.json LEDGER_TARBALLS=\"$(echo hardfork_ledgers/*.tar.gz)\" ./buildkite/scripts/build-hardfork-package.sh"
+      ---             , Cmd.run "MINA_DEB_CODENAME=bullseye MINA_BUILD_MAINNET=true RUNTIME_CONFIG_JSON=new_config.json LEDGER_TARBALLS=\"$(echo hardfork_ledgers/*.tar.gz)\" ./buildkite/scripts/build-hardfork-package.sh"
       ---           ]
       ---           , docker = Some Docker::{
       ---             image = ContainerImages.minaToolchain

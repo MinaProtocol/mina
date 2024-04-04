@@ -64,16 +64,25 @@
           - use "${ref "git+https://github.com/minaprotocol/mina?submodules=1"}";
           - use non-flake commands like ${command "nix-build"} and ${command "nix-shell"}.
         '';
+      # Only get the ocaml stuff, to reduce the amount of unnecessary rebuilds
+      ocaml-src =
+        with inputs.nix-filter.lib;
+          filter {
+            root = ./.;
+            include =
+              [ (inDirectory "src") "dune" "dune-project"
+                "./graphql_schema.json" "opam.export" ];
+          };
     in {
       overlays = {
         misc = import ./nix/misc.nix;
         rust = import ./nix/rust.nix;
         go = import ./nix/go.nix;
         javascript = import ./nix/javascript.nix;
-        ocaml = final: prev: {
+        ocaml = pkgs: prev: {
           ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
-            inherit inputs;
-            pkgs = final;
+            inherit inputs pkgs;
+            src = ocaml-src;
           });
         };
       };
@@ -288,7 +297,7 @@
         # Main user-facing binaries.
         packages = rec {
           inherit (ocamlPackages)
-            mina berkeley-migration devnet mainnet mina_tests mina-ocaml-format mina_client_sdk test_executive with-instrumentation;
+            mina devnet mainnet mina_tests mina-ocaml-format mina_client_sdk test_executive with-instrumentation;
           inherit (pkgs)
             libp2p_helper kimchi_bindings_stubs snarky_js leaderboard
             validation trace-tool zkapp-cli;
