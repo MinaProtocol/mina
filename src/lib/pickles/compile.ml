@@ -23,6 +23,9 @@ open Kimchi_backend
 module Proof_ = P.Base
 module Proof = P
 
+type chunking_data = Verify.Instance.chunking_data =
+  { num_chunks : int; domain_size : int; zk_rows : int }
+
 let pad_messages_for_next_wrap_proof
     (type local_max_proofs_verifieds max_local_max_proofs_verifieds
     max_proofs_verified )
@@ -506,7 +509,7 @@ struct
               Timer.clock __LOC__ ;
               let res =
                 Common.time "make step data" (fun () ->
-                    Step_branch_data.create ~index:!i ~feature_flags
+                    Step_branch_data.create ~index:!i ~feature_flags ~num_chunks
                       ~actual_feature_flags:rule.feature_flags
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~public_input ~auxiliary_typ
@@ -752,7 +755,7 @@ struct
              Promise.t =
        fun (T b as branch_data) (step_pk, step_vk) ->
         let _, prev_vars_length = b.proofs_verified in
-        let step ~zk_rows ~proof_cache ~maxes handler next_state =
+        let step ~proof_cache ~maxes handler next_state =
           let%bind.Promise wrap_vk = Lazy.force wrap_vk in
           let%bind.Promise step_pk = Lazy.force step_pk in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
@@ -761,8 +764,8 @@ struct
               ((* TODO *) Plonk_verification_key_evals.map
                  ~f:(fun x -> [| x |])
                  wrap_vk.commitments )
-            ~public_input ~auxiliary_typ ~feature_flags ~zk_rows ~proof_cache
-            ~maxes (fst step_pk) wrap_vk.index
+            ~public_input ~auxiliary_typ ~feature_flags ~proof_cache ~maxes
+            (fst step_pk) wrap_vk.index
         in
         let wrap ?handler next_state =
           let%bind.Promise step_vk, _ = Lazy.force step_vk in
@@ -771,9 +774,7 @@ struct
                            , return_value
                            , auxiliary_value
                            , actual_wrap_domains ) =
-            step ~zk_rows:step_vk.zk_rows ~proof_cache handler
-              ~maxes:(module Maxes)
-              next_state
+            step ~proof_cache handler ~maxes:(module Maxes) next_state
           in
           let proof =
             { proof with
@@ -867,6 +868,14 @@ struct
       ; wrap_domains
       ; step_domains
       ; feature_flags
+      ; num_chunks
+      ; zk_rows =
+          ( match num_chunks with
+          | 1 ->
+              3
+          | num_chunks ->
+              let permuts = 7 in
+              ((2 * (permuts + 1) * num_chunks) - 1 + permuts) / permuts )
       }
     in
     Timer.clock __LOC__ ;
@@ -917,6 +926,8 @@ module Side_loaded = struct
       ; branches = Verification_key.Max_branches.n
       ; feature_flags =
           Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
+      ; num_chunks = 1
+      ; zk_rows = 3
       }
 
   module Proof = struct
@@ -959,7 +970,7 @@ module Side_loaded = struct
                   { constraints = 0 }
               }
             in
-            Verify.Instance.T (max_proofs_verified, m, vk, x, p) )
+            Verify.Instance.T (max_proofs_verified, m, None, vk, x, p) )
         |> Verify.verify_heterogenous )
 
   let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred
@@ -1123,6 +1134,25 @@ let compile_with_wrap_main_override_promise :
       let (Typ typ) = typ in
       fun x -> fst (typ.value_to_fields x)
   end in
+  let chunking_data =
+    match num_chunks with
+    | None ->
+        Promise.return None
+    | Some num_chunks ->
+        let compiled = Types_map.lookup_compiled self.id in
+        let%map.Promise { Domains.h = Pow_2_roots_of_unity domain_size } =
+          compiled.step_domains
+          |> Vector.reduce_exn ~f:(fun d1 d2 ->
+                 let%map.Promise { Domains.h = Pow_2_roots_of_unity d1 } = d1
+                 and { Domains.h = Pow_2_roots_of_unity d2 } = d2 in
+                 { Domains.h = Pow_2_roots_of_unity (Int.max d1 d2) } )
+        in
+        Some
+          { Verify.Instance.num_chunks
+          ; domain_size
+          ; zk_rows = compiled.zk_rows
+          }
+  in
   let module P = struct
     type statement = value
 
@@ -1147,7 +1177,8 @@ let compile_with_wrap_main_override_promise :
 
     let verify_promise ts =
       let%bind.Promise verification_key = Lazy.force verification_key_promise in
-      verify_promise
+      let%bind.Promise chunking_data = chunking_data in
+      verify_promise ?chunking_data
         ( module struct
           include Max_proofs_verified
         end )

@@ -420,7 +420,9 @@ let%test_module "gate finalization" =
          for use in the circuit *)
       and evals =
         constant
-          (Plonk_types.All_evals.typ (module Impls.Step) full_features)
+          (Plonk_types.All_evals.typ ~num_chunks:1
+             (module Impls.Step)
+             full_features )
           { evals =
               { public_input = x_hat_evals; evals = proof.proof.openings.evals }
           ; ft_eval1 = proof.proof.openings.ft_eval1
@@ -453,7 +455,7 @@ let%test_module "gate finalization" =
                 (`Known
                   [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ]
                   )
-              ~sponge ~prev_challenges:[] deferred_values evals
+              ~zk_rows:3 ~sponge ~prev_challenges:[] deferred_values evals
           in
 
           (* Read the boolean result from the circuit and make it available

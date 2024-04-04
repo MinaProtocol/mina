@@ -32,7 +32,6 @@ module Make
     -> self:('a, 'b, 'c, 'd) Tag.t
     -> step_domains:
          (Import.Domains.t, 'self_branches) Pickles_types.Vector.t Promise.t
-    -> zk_rows:int
     -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
     -> self_dlog_plonk_index:
          Backend.Tick.Inner_curve.Affine.t array
