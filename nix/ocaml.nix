@@ -625,7 +625,7 @@ let
               }
           ;
         testOverlay = self: super:
-          let minaPkgs = filterLocalPkgs super;
+          let minaPkgs = builtins.removeAttrs (filterLocalPkgs super) ["archive" "graphql_wrapper" "best_tip_merger"];
               testPkgs = pkgs.lib.mapAttrs' (name: old:
                 { name = "test-${name}";
                   value = old.overrideAttrs (s: {
@@ -644,18 +644,20 @@ let
                       installPhase = "touch $out";
                   }); }
                 ) minaPkgs;
+              mkCombined = name: buildInputs:
+                pkgs.stdenv.mkDerivation {
+                  inherit name buildInputs;
+                  phases = [ "buildPhase" "installPhase" ];
+                  buildPhase = ''
+                    echo "Build inputs: $buildInputs"
+                  '';
+                  installPhase = ''
+                    touch $out
+                  '';
+                };
           in testPkgs // {
-            all = pkgs.stdenv.mkDerivation {
-              name = "mina-all-with-tests";
-              phases = [ "buildPhase" "installPhase" ];
-              buildInputs = builtins.attrValues minaPkgs ++ builtins.attrValues testPkgs;
-              buildPhase = ''
-                echo "Build inputs: $buildInputs"
-              '';
-              installPhase = ''
-                touch $out
-              '';
-            };
+            all = mkCombined "mina-all" (builtins.attrValues minaPkgs);
+            all-tested = mkCombined "mina-all-with-tests" (builtins.attrValues minaPkgs ++ builtins.attrValues testPkgs);
           };
         prj =
           (opam-nix.buildOpamProject' {
