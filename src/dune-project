@@ -296,3 +296,4 @@
 (package (name archive_lib))
 (package (name archive_cli))
 (package (name archive))
+(package (name zkapps_examples_empty_update))
