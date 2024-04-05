@@ -60,7 +60,6 @@
   file_system
   pickles
   pickles_types
-  backend
   kimchi_backend.pasta
   kimchi_backend.pasta.basic
   with_hash
