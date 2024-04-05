@@ -31,7 +31,6 @@
 (package (name consensus))
 (package (name crs))
 (package (name crypto_params))
-(package (name cstubs_applicative))
 (package (name currency))
 (package (name daemon_rpcs))
 (package (name data_hash_lib))
