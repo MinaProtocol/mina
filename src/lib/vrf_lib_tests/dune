@@ -24,7 +24,6 @@
    snarky.backendless
    bitstring_lib
    crypto_params
-   backend
    kimchi_backend
    kimchi_bindings
    kimchi_types
