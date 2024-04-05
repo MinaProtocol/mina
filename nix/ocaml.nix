@@ -171,22 +171,22 @@ let
           ../.;
         in
     pkgs.stdenv.mkDerivation {
-    name = "mina-deps-json";
-    inherit src;
-    nativeBuildInputs = [ pkgs.jq ];
-    phases = [ "unpackPhase" "buildPhase" "installPhase" ];
-    buildPhase = ''
-      ${pkgs.bash}/bin/bash ./nix/dump-dune-deps.sh > deps.json
-      packages=" $(tr "\n" " " <src/dune-project | grep -oE '\(\s*package\s*\(name\s\s*[^\)]*\)\)' \
-        | sed -r 's/\((name|package)//g' \
-        | sed -r 's/\s|\)//g' | tr "\n" " " ) "
-      <deps.json jq -r "to_entries | .[] | \"if [[ \\\"$packages\\\" =~ ' \" + .key + \" ' ]]; then cp -f ${./opam.template} \" + .value.path + \"/\" + .key + \".opam; fi\"" > gen-opam-files.sh
-    '';
-    installPhase = ''
-      mkdir -p $out
-      cp deps.json gen-opam-files.sh $out
-    '';
-  };
+      name = "mina-deps-json";
+      inherit src;
+      nativeBuildInputs = [ pkgs.jq ];
+      phases = [ "unpackPhase" "buildPhase" "installPhase" ];
+      buildPhase = ''
+        ${pkgs.bash}/bin/bash ./nix/dump-dune-deps.sh > deps.json
+        packages=" $(tr "\n" " " <src/dune-project | grep -oE '\(\s*package\s*\(name\s\s*[^\)]*\)\)' \
+          | sed -r 's/\((name|package)//g' \
+          | sed -r 's/\s|\)//g' | tr "\n" " " ) "
+        <deps.json jq -r "to_entries | .[] | \"if [[ \\\"$packages\\\" =~ ' \" + .key + \" ' ]]; then cp -f ${./opam.template} \" + .value.path + \"/\" + .key + \".opam; fi\"" > gen-opam-files.sh
+      '';
+      installPhase = ''
+        mkdir -p $out
+        cp deps.json gen-opam-files.sh $out
+      '';
+    };
   src-with-opam-files = pkgs.stdenv.mkDerivation {
     name = "mina-src-with-opam";
     src = filtered-src;
@@ -498,16 +498,16 @@ let
           {"${dep.path}/${n}.opam" = opamTemplate;}
         ) depsMap;
         graphqlDependents = ["mina_init" "rosetta_app_lib" "batch_txn_tool" "integration_test_cloud_engine" "integration_test_lib" "generated_graphql_queries" "integration_test_local_engine"];
-        impl = self: name: acc:
+        getDepsImpl = acc: self: name:
           if builtins.hasAttr name depsMap then
             let deps = (builtins.getAttr name depsMap).deps; in
             pkgs.lib.foldl (acc: dep:
               if builtins.hasAttr dep self && ! builtins.hasAttr dep acc then
-                impl self dep (acc // {"${dep}" = builtins.getAttr dep self;})
+                getDepsImpl (acc // {"${dep}" = builtins.getAttr dep self;}) self dep
               else acc
             ) acc deps
-          else acc;
-        getDeps = name: self: builtins.attrValues (impl self name {});
+          else acc ;
+        getDeps = getDepsImpl {};
         base-ppx-names =
           ["ppx_version" "ppx_mina" "ppx_register_event" "ppx_representatives" "ppx_to_enum" "ppx_annot" "interpolator_lib" "structured_log_events" "logproc_lib"];
         base-ppxs-overlay = self: super:
@@ -523,7 +523,7 @@ let
             builtins.mapAttrs (name: old:
               old.overrideAttrs (s: {
                 withFakeOpam = false;
-                buildInputs = s.buildInputs ++ getDeps name self ++ external-libs ++ customDeps name;
+                buildInputs = s.buildInputs ++ builtins.attrValues (getDeps self name) ++ external-libs ++ customDeps name;
                 nativeBuildInputs = s.nativeBuildInputs ++ external-libs;
                 configurePhase =
                   ''
@@ -570,36 +570,42 @@ let
               done
             '';
           };
+        filterLocalPkgs = pkgs.lib.filterAttrs (name: _:
+          builtins.hasAttr name depsMap || name == "cli" );
         minaOverlay = self: super:
-          (pkgs.lib.concatMapAttrs (name: old:
-            if ! builtins.hasAttr name depsMap && ! builtins.elem name ["cli"] then {}
-            else
-              {
-                ${name} = old.overrideAttrs (s:
-                minaEnv // {
-                  buildInputs = getDeps name self ++ external-libs ++ [base pkgs.sodium-static];
-                  withFakeOpam = false;
-                  inherit nixSupportPhase;
-                  nativeBuildInputs = external-libs ++ [pkgs.capnproto base] ++ (with base-prj; [dune capnp]) ++
-                    (if name == "mina_init" then [base-prj.crunch] else []);
-                  NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
-                  preBuild = ''
-                    export LD_LIBRARY_PATH="${base}/lib/ocaml/${base-prj.ocaml.version}/site-lib/ctypes";
-                  '';
-                  postBuild = ''find'';
-                  configurePhase =
+          (builtins.mapAttrs (name: old:
+            let deps = getDeps self name;
+                minaLibp2pEnv =
+                  if builtins.hasAttr "mina_net2" deps then
+                    { MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper"; }
+                  else {};
+             in old.overrideAttrs (s:
+              minaEnv // minaLibp2pEnv // {
+                buildInputs = builtins.attrValues deps ++ external-libs ++ [base pkgs.sodium-static];
+                withFakeOpam = false;
+                inherit nixSupportPhase;
+                nativeBuildInputs = external-libs ++ [pkgs.capnproto base] ++ (with base-prj; [dune capnp]) ++
+                  (if name == "mina_init" then [base-prj.crunch] else []);
+                NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
+                preBuild = ''
+                  export LD_LIBRARY_PATH="${base}/lib/ocaml/${base-prj.ocaml.version}/site-lib/ctypes";
+                '';
+                outputs = [ "out" "dev" ];
+                postInstall = ''
+                  cp -R _build/default "$dev"
+                '';
+                configurePhase =
+                  ''
+                    ${s.configurePhase}
+                    ${patchDune}
+                  '' +
+                  ( if builtins.elem name graphqlDependents then
                     ''
-                      ${s.configurePhase}
-                      ${patchDune}
-                    '' +
-                    ( if builtins.elem name graphqlDependents then
-                      ''
-                        ${patchDuneGraphql self}
-                      ''
-                    else "") ;
-                });
-              }
-              ) super) //
+                      ${patchDuneGraphql self}
+                    ''
+                  else "") ;
+              })
+          ) (filterLocalPkgs super)) //
               { graphql-schema =
                   pkgs.stdenv.mkDerivation {
                     src =
@@ -619,16 +625,38 @@ let
               }
           ;
         testOverlay = self: super:
-          let mina = buitlins.removeAttrs (minaOverlay self super) ["graphql-schema"];
-              mkTest = name: pkg:
-                { name = "nixtest-${name}";
-                  value = pkg // {
-                    preBuild = ''
-                      
+          let minaPkgs = filterLocalPkgs super;
+              testPkgs = pkgs.lib.mapAttrs' (name: old:
+                { name = "test-${name}";
+                  value = old.overrideAttrs (s: {
+                      MINA_LIBP2P_PASS = "naughty blue worm";
+                      MINA_PRIVKEY_PASS = "naughty blue worm";
+                      TZDIR = "${pkgs.tzdata}/share/zoneinfo";
+                      pname = "test-${name}";
+                      doCheck = true;
+                      outputs = [ "out" ];
+                      preFixupPhases = [];
+                      preBuild = s.preBuild + ''
+                        mkdir _build
+                        cp -R ${self."${name}".dev} _build/default
+                        chmod -Rf 777 _build
                       '';
-                  };
-                };
-           in pkgs.lib.mapAttrs' mkTest mina;
+                      installPhase = "touch $out";
+                  }); }
+                ) minaPkgs;
+          in testPkgs // {
+            all = pkgs.stdenv.mkDerivation {
+              name = "mina-all-with-tests";
+              phases = [ "buildPhase" "installPhase" ];
+              buildInputs = builtins.attrValues minaPkgs ++ builtins.attrValues testPkgs;
+              buildPhase = ''
+                echo "Build inputs: $buildInputs"
+              '';
+              installPhase = ''
+                touch $out
+              '';
+            };
+          };
         prj =
           (opam-nix.buildOpamProject' {
             inherit pkgs opamCache;
@@ -642,7 +670,7 @@ let
             }; };
           } rest-src (getAttrs ["ocaml" "ocaml-base-compiler" "ocaml-compiler-libs" "ocaml-config" "ocaml-migrate-parsetree" "ocaml-options-vanilla" "ocaml-syntax-shims" "ocaml-version" "ocamlbuild" "ocamlfind"] implicit-deps) );
         in
-        prj.cli;
+        prj;
 
       devnet-pkg = self.mina-dev.overrideAttrs (s: {
         version = "devnet";
