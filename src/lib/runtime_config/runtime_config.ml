@@ -1534,7 +1534,7 @@ let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
   in
   let hash =
     Option.some @@ Mina_base.Ledger_hash.to_base58_check
-    @@ Mina_base.Ledger.merkle_root staged_ledger
+    @@ Mina_ledger.Ledger.merkle_root staged_ledger
   in
   let fork =
     Fork_config.
