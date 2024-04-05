@@ -8,7 +8,6 @@ roots: [
   "bitstring.4.1.0"
   "camlp4.4.14+1"
   "capnp.3.4.0"
-  "check_opam_switch.~dev"
   "cohttp-async.5.0.0"
   "core_extended.v0.14.0"
   "extlib.1.7.8"
@@ -85,7 +84,6 @@ installed: [
   "conf-libffi.2.0.0"
   "conf-libssl.2"
   "conf-m4.1"
-  "conf-openssl.1"
   "conf-perl.1"
   "conf-pkg-config.1.1"
   "conf-postgresql.1"
@@ -180,7 +178,7 @@ installed: [
   "odoc-parser.1.0.0"
   "opam-core.2.1.2"
   "opam-depext.1.2.1"
-  "opam-file-format.2.1.4"
+  "opam-file-format.2.1.6"
   "opam-format.2.1.2"
   "optint.0.3.0"
   "ounit2.2.2.6"
@@ -448,6 +446,7 @@ Rpc_parallel offers an API to define various workers and protocols,
     "ppx_jane" {>= "v0.13" & < "v0.15"}
     "sexplib" {>= "v0.13" & < "v0.15"}
     "dune" {>= "2.0.0"}
+    "ctypes" {>= "0.17.1" & < "0.18"}
   ]
   build: ["dune" "build" "-p" name "-j" jobs]
   dev-repo: "git+https://github.com/janestreet/rpc_parallel.git"
