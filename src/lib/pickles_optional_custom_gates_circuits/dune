@@ -36,7 +36,6 @@
   sponge
   pickles
   pickles.pseudo
-  composition_types
   pickles.limb_vector
   pickles_base
   kimchi_backend
