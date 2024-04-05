@@ -46,7 +46,7 @@
 /src/lib/promise @MinaProtocol/protocol-eng-reviewers @MinaProtocol/product-eng-reviewers
 /src/lib/sha256_lib/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/signature_lib/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/snarky/ @MinaProtocol/crypto-eng-reviewers
+/src/lib/snarky @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky_blake2/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky_curves/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky_field_extensions/ @MinaProtocol/crypto-eng-reviewers
