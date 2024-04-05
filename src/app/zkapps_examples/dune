@@ -29,6 +29,7 @@
    sgn
    signature_lib
    tuple_lib
+   transaction_snark_tests ; hack for nix
    with_hash)
  (instrumentation (backend bisect_ppx))
  (preprocess

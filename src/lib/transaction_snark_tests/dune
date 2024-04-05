@@ -54,6 +54,7 @@
    mina_wire_types
    block_time
    zkapps_examples
+   zkapps_empty_update mina_generators precomputed_values ; hack for nix
    )
   (library_flags -linkall)
   (inline_tests (flags -verbose -show-counts))
