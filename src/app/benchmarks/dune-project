@@ -1,3 +1,0 @@
-(lang dune 3.3)
-(name benchmarks)
-(implicit_transitive_deps true)

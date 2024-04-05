@@ -1,7 +1,7 @@
 (library
- (name rosetta_signer)
+ (name signer)
  (public_name rosetta_signer)
- (modules rosetta_signer)
+ (modules signer_cli)
  (libraries
    ;;opam libraries
    async_kernel
@@ -39,7 +39,7 @@
 )
 
 (executable
- (package signer)
+ (package rosetta_signer)
  (name signer)
  (public_name signer)
  (modes native)
@@ -59,7 +59,7 @@
 )
 
 (executable
- (package signer)
+ (package rosetta_signer)
  (name signer_testnet_signatures)
  (public_name signer-testnet)
  (modes native)
@@ -79,7 +79,7 @@
 )
 
 (executable
- (package signer)
+ (package rosetta_signer)
  (name signer_mainnet_signatures)
  (public_name signer-mainnet)
  (modes native)

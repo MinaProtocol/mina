@@ -1,13 +1,13 @@
-open Core
-open Currency
-open Mina_base
-open Signature_lib
-open Mina_generators.Zkapp_command_generators
+let trivial_zkapp = Util.trivial_zkapp
 
 let%test_module _ =
   ( module struct
 
-    let `VK vk, `Prover _ = Lazy.force Util.trivial_zkapp
+    open Core
+    open Mina_base
+    open Signature_lib
+    open Mina_generators.Zkapp_command_generators
+    let `VK vk, `Prover _ = Lazy.force trivial_zkapp
 
     let mk_ledger ~num_of_unused_keys () =
       let keys = List.init 5 ~f:(fun _ -> Keypair.create ()) in
@@ -57,7 +57,7 @@ let%test_module _ =
       let ledger, fee_payer_keypair, keymap =
         mk_ledger ~num_of_unused_keys:3 ()
       in
-      let _ =
+      ignore @@
         Quickcheck.Generator.(
           generate
             (list_with_length 100
@@ -67,14 +67,12 @@ let%test_module _ =
                   ~generate_new_accounts:false ~ledger () ) )
             ~size:100
             ~random:(Splittable_random.State.create Random.State.default))
-      in
-      ()
 
     let%test_unit "generate zkapps with balance and fee range" =
       let ledger, fee_payer_keypair, keymap =
         mk_ledger ~num_of_unused_keys:3 ()
       in
-      let _ =
+      ignore @@
         Quickcheck.Generator.(
           generate
             (list_with_length 100
@@ -93,6 +91,4 @@ let%test_module _ =
                   ~generate_new_accounts:false ~ledger () ) )
             ~size:100
             ~random:(Splittable_random.State.create Random.State.default))
-      in
-      ()
   end )
