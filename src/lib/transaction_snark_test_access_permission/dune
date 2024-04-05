@@ -1,5 +1,6 @@
 (library
-  (name transaction_snark_tests_access_permission)
+  (public_name transaction_snark_test_access_permission)
+  (name transaction_snark_test_access_permission)
  (libraries
    ;; opam libraries
    async

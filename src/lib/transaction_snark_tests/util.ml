@@ -684,6 +684,56 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   | Ok _ ->
       assert (not expect_snark_failure)
 
+let insert_signatures pk_compressed sk
+    ({ fee_payer; account_updates; memo } : Zkapp_command.t) : Zkapp_command.t =
+  let transaction_commitment : Zkapp_command.Transaction_commitment.t =
+    (* TODO: This is a pain. *)
+    let account_updates_hash = Zkapp_command.Call_forest.hash account_updates in
+    Zkapp_command.Transaction_commitment.create ~account_updates_hash
+  in
+  let memo_hash = Signed_command_memo.hash memo in
+  let full_commitment =
+    Zkapp_command.Transaction_commitment.create_complete transaction_commitment
+      ~memo_hash
+      ~fee_payer_hash:
+        (Zkapp_command.Call_forest.Digest.Account_update.create
+           (Account_update.of_fee_payer fee_payer) )
+  in
+  let fee_payer =
+    match fee_payer with
+    | { body = { public_key; _ }; _ }
+      when Public_key.Compressed.equal public_key pk_compressed ->
+        { fee_payer with
+          authorization =
+            Schnorr.Chunked.sign sk
+              (Random_oracle.Input.Chunked.field full_commitment)
+        }
+    | fee_payer ->
+        fee_payer
+  in
+  let account_updates =
+    Zkapp_command.Call_forest.map account_updates ~f:(function
+      | ({ body = { public_key; use_full_commitment; _ }
+         ; authorization = Signature _
+         } as account_update :
+          Account_update.t )
+        when Public_key.Compressed.equal public_key pk_compressed ->
+          let commitment =
+            if use_full_commitment then full_commitment
+            else transaction_commitment
+          in
+          { account_update with
+            authorization =
+              Signature
+                (Schnorr.Chunked.sign sk
+                   (Random_oracle.Input.Chunked.field commitment) )
+          }
+      | account_update ->
+          account_update )
+  in
+  { fee_payer; account_updates; memo }
+
+
 let test_zkapp_command ?expected_failure ?(memo = Signed_command_memo.empty)
     ?(fee = Currency.Fee.(of_nanomina_int_exn 100)) ~fee_payer_pk ~signers
     ~initialize_ledger ~finalize_ledger zkapp_command =
@@ -701,7 +751,7 @@ let test_zkapp_command ?expected_failure ?(memo = Signed_command_memo.empty)
       ~init:
         ({ fee_payer; account_updates = zkapp_command; memo } : Zkapp_command.t)
       ~f:(fun zkapp_command (pk_compressed, sk) ->
-        Zkapps_examples.insert_signatures pk_compressed sk zkapp_command )
+        insert_signatures pk_compressed sk zkapp_command )
   in
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       let aux = initialize_ledger ledger in
