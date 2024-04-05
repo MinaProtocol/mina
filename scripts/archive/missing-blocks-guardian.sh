@@ -22,6 +22,7 @@ usage() {
     echo "    DB_NAME                 Database name"
     echo "    PGPASSWORD              Postgresql password"
     echo "    PRECOMPUTED_BLOCKS_URL  Url of the bucket with the precomputed blocks"
+    echo "    MINA_NETWORK            Mina network (used for precomputed blocks prefix)"
     echo ""
     echo "  Optional:"
     echo "    MISSING_BLOCKS_AUDITOR  Path to the missing-blocks-auditor exe (default: mina-missing-blocks-auditor)"
@@ -67,6 +68,11 @@ check_env_vars() {
       exit 1
   fi
   
+  if [ -z "$MINA_NETWORK" ]; then
+      echo $'[ERROR] The MINA_NETWORK environment variable is not set or is empty. Exiting the script'  
+      exit 1
+  fi
+
   if [ -z "$MISSING_BLOCKS_AUDITOR" ]; then
       echo -e "[INFO] The MISSING_BLOCKS_AUDITOR environment variable is not set or is empty. Defaulting to \033[31mmina-missing-block-auditor\e[m."
       MISSING_BLOCKS_AUDITOR=mina-missing-blocks-auditor
@@ -152,7 +158,12 @@ main() {
       echo "[INFO] Running in audit mode"
       PARENT="$($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq_parent_hash)"
       echo "[BOOTSTRAP] $($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq -rs .[].message)"
-      [[ "$PARENT" != "null" ]] && echo "Some blocks are missing" && exit 0
+      # Check exit code
+      if [ $? -ne 0 ]; then
+        echo $'[ERROR] mina-missing-blocks-auditor failed with exit code $?. The database remains unhealthy.\nFor more information about the error try running mina-missing-blocks-auditor separately.'
+        exit 1
+      fi
+      [[ "$PARENT" != "null" ]] && echo "[RESOLUTION] Some blocks are missing" && exit 0
       echo "[RESOLUTION] This Archive node is synced with no missing blocks back to genesis!"
       exit 0
       ;;
@@ -162,11 +173,18 @@ main() {
       SINGLE_RUN=true
       PARENT="$($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq_parent_hash)"
       echo "[BOOTSTRAP] $($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq -rs .[].message)"
+      # Check exit code
+      if [ $? -ne 0 ]; then
+        echo $'[ERROR] mina-missing-blocks-auditor failed with exit code $?. The database remains unhealthy.\nFor more information about the error try running mina-missing-blocks-auditor separately.'
+        exit 1
+      fi
       [[ "$PARENT" != "null" ]] && echo "[BOOTSTRAP] Some blocks are missing, moving to recovery logic..." && bootstrap $SINGLE_RUN
-      if [ $? -eq 0 ]; then
-        echo "[RESOLUTION] The bootstrap process finished successfuly, the Archive node should be synced with no missing blocks!"
+      # Check exit code
+      if [ $? -ne 0 ]; then
+        echo $'[ERROR] The bootstrap process failed with exit code $?. The database remains unhealthy.\n For more information about the error try running mina-missing-blocks-auditor separately.'
+        exit 1
       else
-        echo "[ERROR] The bootstrap process failed with exit code $?. The database remains unhealthy.\n For more information about the error try running $MISSING_BLOCKS_AUDITOR separately."
+        echo "[RESOLUTION] The bootstrap process finished successfuly, the Archive node is synced with no missing blocks to genesis!"
       fi
       exit 0
       ;; 
@@ -177,13 +195,19 @@ main() {
       while true; do # Test once every 10 minutes forever, take an hour off when bootstrap completes
         PARENT="$($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq_parent_hash)"
         echo "[BOOTSTRAP] $($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq -rs .[].message)"
+        # Check exit code
+        if [ $? -ne 0 ]; then
+          echo $'[ERROR] mina-missing-blocks-auditor failed with exit code $?. The database remains unhealthy.\nFor more information about the error try running mina-missing-blocks-auditor separately.'
+          exit 1
+        fi
         if [[ "$PARENT" != "null" ]]; then
           echo "[BOOTSTRAP] Some blocks are missing, moving to recovery logic..." && bootstrap $SINGLE_RUN
-          if [ $? -eq 1]; then
-            echo "[ERROR] The bootstrap process failed with exit code $?. The database remains unhealthy.\n For more information about the error try running $MISSING_BLOCKS_AUDITOR separately."
+          # Check exit code
+          if [ $? -ne 0 ]; then
+            echo $'[ERROR] The bootstrap process failed with exit code $?. The database remains unhealthy.\nFor more information about the error try running mina-missing-blocks-auditor separately.'
           fi
         else
-          echo "[INFO] Waiting for $((${TIMEOUT}/60)) minutes"
+          echo "[INFO] Database has no missing blocks to genesis for the moment! Waiting for $((${TIMEOUT}/60)) minutes."
           sleep $TIMEOUT # Wait for the daemon to catchup and start downloading new blocks
         fi
       done
