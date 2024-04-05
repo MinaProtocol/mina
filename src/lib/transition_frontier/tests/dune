@@ -31,7 +31,7 @@
    data_hash_lib
    block_time
    full_frontier
-   frontier_base
+   transition_frontier_base
    transition_frontier
    protocol_version
    yojson
