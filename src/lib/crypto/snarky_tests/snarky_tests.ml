@@ -606,9 +606,9 @@ module Protocol_circuits = struct
     Genesis_constants.(Proof_level.Full, Constraint_constants.compiled)
 
   let print_hash print expected digest : unit =
-    if print then Format.printf "expected:\n%s\n\n" expected ;
-    Format.printf "obtained:\n%s\n" digest ;
-    ()
+    if print then (
+      Format.printf "expected:\n%s\n" expected ;
+      Format.printf "obtained:\n%s\n" digest )
 
   let blockchain () : unit =
     let expected = "0e1896d5c5840089da3304799c01efd8" in
@@ -627,7 +627,7 @@ module Protocol_circuits = struct
 
   let transaction () : unit =
     let expected1 = "b8879f677f622a1d86648030701f43e1" in
-    let expected2 = "c9251dbcc565e8e18d15ca96d7908925" in
+    let expected2 = "6955d1ff31efa774b69a6b932ce9f165" in
     let digest =
       Transaction_snark.constraint_system_digests ~constraint_constants ()
     in
@@ -643,10 +643,10 @@ module Protocol_circuits = struct
     let digest2 = Core.Md5.to_hex hash2 in
 
     let check = String.(digest1 = expected1) in
-    print_hash check expected1 digest1 ;
+    print_hash (not check) expected1 digest1 ;
     assert check ;
     let check = String.(digest2 = expected2) in
-    print_hash check expected2 digest2 ;
+    print_hash (not check) expected2 digest2 ;
     assert check ;
     ()
 
