@@ -292,4 +292,5 @@
 (package (name transaction_logic_tests))
 (package (name rosetta-signer))
 (package (name mina_ledger_test_helpers))
+(package (name mina_base_test_helpers))
 
