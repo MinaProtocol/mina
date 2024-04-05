@@ -294,5 +294,4 @@
 (package (name mina_ledger_test_helpers))
 (package (name mina_base_test_helpers))
 (package (name transaction_snark_test_access_permission))
-(package (name zkapps_examples_empty_update))
 
