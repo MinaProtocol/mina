@@ -42,6 +42,5 @@
    random_oracle_input
    snark_params
    snarky.backendless
-   transaction_snark_tests
    splittable_random
 ))
