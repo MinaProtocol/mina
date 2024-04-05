@@ -288,4 +288,5 @@
 (package (name benchmarks))
 (package (name zkapp_test_transaction_lib))
 (package (name internal_tracing))
+(package (name test_type_equalities))
 

@@ -1,6 +1,6 @@
 (library
  (name archive_cli)
- (public_name archive.cli)
+ (public_name archive_cli)
  (libraries
    ;;opam libraries
    async_kernel

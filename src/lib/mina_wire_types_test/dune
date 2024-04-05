@@ -1,6 +1,8 @@
 (include_subdirs no)
 
 (test
+  (package test_type_equalities)
+  (public_name test_type_equalities)
   (name type_equalities)
   (libraries
     mina_wire_types
