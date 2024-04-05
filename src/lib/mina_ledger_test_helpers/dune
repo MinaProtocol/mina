@@ -1,5 +1,6 @@
 (library
  (name mina_ledger_test_helpers)
+ (public_name mina_ledger_test_helpers)
  (libraries
   ;; opam libraries
   base
