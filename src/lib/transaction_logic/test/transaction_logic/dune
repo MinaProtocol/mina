@@ -21,7 +21,7 @@
    kimchi_backend.pasta
    kimchi_backend.pasta.basic
    mina_base
-   mina_base_import
+   mina_base.import
    mina_base_test_helpers
    mina_transaction
    mina_transaction_logic
