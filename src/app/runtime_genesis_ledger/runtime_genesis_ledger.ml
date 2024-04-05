@@ -86,6 +86,7 @@ let extract_accounts_exn = function
   | { Runtime_config.Ledger.base = Accounts accounts
     ; balances = []
     ; add_genesis_winner = None
+    ; _
     } ->
       accounts
   | _ ->
