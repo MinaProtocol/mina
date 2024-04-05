@@ -545,6 +545,24 @@ module type S = sig
     -> bool Or_error.t
 
   module For_tests : sig
+    module Stack (Elt : sig
+      type t
+    end) : sig
+      type t = Elt.t list
+
+      val if_ : bool -> then_:t -> else_:t -> t
+
+      val empty : unit -> t
+
+      val is_empty : t -> bool
+
+      val pop_exn : t -> Elt.t * t
+
+      val pop : t -> (Elt.t * t) option
+
+      val push : Elt.t -> onto:t -> t
+    end
+
     val validate_timing_with_min_balance :
          account:Account.t
       -> txn_amount:Amount.t
@@ -2522,6 +2540,8 @@ module Make (L : Ledger_intf.S) :
     >>= Mina_stdlib.Result.List.map ~f:(apply_transaction_second_pass ledger)
 
   module For_tests = struct
+    module Stack = Inputs.Stack
+
     let validate_timing_with_min_balance = validate_timing_with_min_balance
 
     let validate_timing = validate_timing
@@ -2779,7 +2799,7 @@ module For_tests = struct
                 }
             ; authorization =
                 ( if use_full_commitment then Signature Signature.dummy
-                else Proof Mina_base.Proof.transaction_dummy )
+                else Proof (Lazy.force Mina_base.Proof.transaction_dummy) )
             }
           ; { body =
                 { public_key = receiver

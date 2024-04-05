@@ -46,7 +46,7 @@ Pipeline.build
           key = "hard-fork-test",
           target = Size.Small,
           docker = None Docker.Type,
-          timeout_in_minutes = Some 420
+          timeout_in_minutes = Some +420
         }
     ]
   }
