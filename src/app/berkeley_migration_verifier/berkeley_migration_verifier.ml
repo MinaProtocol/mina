@@ -11,6 +11,8 @@ module Check = struct
   let ok = Ok
 
   let err error = Error [ error ]
+
+  let of_bool = function true -> Ok | false -> Error [ "failed" ]
 end
 
 let exit_code = ref 0
@@ -20,6 +22,9 @@ module Test = struct
 
   let of_check check ~name ~idx ~prefix test_count =
     { check; name = sprintf "[%d/%d] %s) %s " idx test_count prefix name }
+
+  let of_bool b ~name ~idx ~prefix test_count =
+    of_check (Check.of_bool b) ~name ~idx ~prefix test_count
 
   let print_errors error_messages =
     if List.length error_messages > 10 then (
@@ -72,188 +77,112 @@ let no_pending_and_orphaned_blocks_in_migrated_db query_migrated_db ~height =
              blockchain height. However got %d vs %d"
             blocks_count height ) )
 
-let diff_files left right =
-  match%bind
-    Process.run ~prog:"diff" ~args:[ left; right ] ~accept_nonzero_exit:[ 1 ] ()
-  with
-  | Ok output ->
-      if String.is_empty output then return Check.ok
-      else
-        return
-          (Check.err
-             (sprintf
-                "Discrepancies found between files %s and %s. To reproduce \
-                 please run `diff %s %s`"
-                left right left right ) )
-  | Error error ->
-      return
-        (Check.err
-           (sprintf "Internal error when comparing files, due to %s"
-              (Error.to_string_hum error) ) )
-
-let all_accounts_referred_in_commands_are_recorded migrated_pool ~work_dir =
+let all_accounts_referred_in_commands_are_recorded migrated_pool =
   let query_migrated_db = Mina_caqti.query migrated_pool in
-  let user_and_internal_cmds =
-    Filename.concat work_dir "user_and_internal_cmds.csv"
-  in
-  let account_accessed = Filename.concat work_dir "account_accessed.csv" in
-
   let open Deferred.Let_syntax in
-  let%bind () =
+  let%bind expected =
     query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_user_and_internal_command_info_to_csv db
-          user_and_internal_cmds )
+        Sql.Berkeley.dump_user_and_internal_command_info db )
   in
 
-  let%bind () =
-    query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_accounts_accessed_to_csv db account_accessed )
+  let%map result =
+    query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_accounts_accessed db)
   in
-  diff_files user_and_internal_cmds account_accessed
+  List.equal Sql.Accounts_accessed.equal expected result
 
-let accounts_created_table_is_correct migrated_pool mainnet_pool ~work_dir =
+let accounts_created_table_is_correct migrated_pool mainnet_pool =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
-  let accounts_created_mainnet =
-    Filename.concat work_dir "accounts_created_mainnet.csv"
-  in
-  let accounts_created = Filename.concat work_dir "accounts_created.csv" in
-
   let open Deferred.Let_syntax in
-  let%bind () =
-    query_mainnet_db ~f:(fun db ->
-        Sql.Mainnet.dump_accounts_created_to_csv db accounts_created_mainnet )
+  let%bind expected =
+    query_mainnet_db ~f:(fun db -> Sql.Mainnet.dump_accounts_created db)
   in
-  let%bind () =
-    query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_accounts_created_to_csv db accounts_created )
+  let%map result =
+    query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_accounts_created db)
   in
-  diff_files accounts_created_mainnet accounts_created
+  List.equal Sql.Accounts_created.equal expected result
 
-let compare_hashes_till_height migrated_pool mainnet_pool ~height ~work_dir =
+let compare_hashes_till_height migrated_pool mainnet_pool ~height =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
-  let state_hashes_berk = Filename.concat work_dir "state_hashes_berk.csv" in
-  let state_hashes_main = Filename.concat work_dir "state_hashes_main.csv" in
-
   let open Deferred.Let_syntax in
-  let%bind () =
+  let%bind expected =
     query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_block_hashes_till_height db state_hashes_berk height )
+        Sql.Berkeley.dump_block_hashes_till_height db height )
   in
 
-  let%bind () =
+  let%map result =
     query_mainnet_db ~f:(fun db ->
-        Sql.Mainnet.dump_block_hashes_till_height db state_hashes_main height )
+        Sql.Mainnet.dump_block_hashes_till_height db height )
   in
+  List.equal Sql.State_hash_and_ledger_hash.equal expected result
 
-  diff_files state_hashes_berk state_hashes_main
-
-let compare_hashes migrated_pool mainnet_pool ~work_dir =
+let compare_hashes migrated_pool mainnet_pool =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
-  let state_hashes_berk = Filename.concat work_dir "state_hashes_berk.csv" in
-  let state_hashes_main = Filename.concat work_dir "state_hashes_main.csv" in
-
   let open Deferred.Let_syntax in
-  let%bind () =
-    query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_block_hashes db state_hashes_berk )
+  let%bind expected =
+    query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_block_hashes db)
   in
-
-  let%bind () =
-    query_mainnet_db ~f:(fun db ->
-        Sql.Mainnet.dump_block_hashes db state_hashes_main )
+  let%map result =
+    query_mainnet_db ~f:(fun db -> Sql.Mainnet.dump_block_hashes db)
   in
+  List.equal Sql.State_hash_and_ledger_hash.equal expected result
 
-  diff_files state_hashes_berk state_hashes_main
-
-let compare_user_commands_till_height migrated_pool mainnet_pool ~height
-    ~work_dir =
+let compare_user_commands_till_height migrated_pool mainnet_pool ~height =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
-  let user_commands_berk = Filename.concat work_dir "user_commands_berk.csv" in
-  let user_commands_main = Filename.concat work_dir "user_commands_main.csv" in
-
   let open Deferred.Let_syntax in
-  let%bind () =
+  let%bind expected =
     query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_user_commands_till_height db user_commands_berk height )
+        Sql.Berkeley.dump_user_commands_till_height db height )
   in
 
-  let%bind () =
+  let%map result =
     query_mainnet_db ~f:(fun db ->
-        Sql.Mainnet.dump_user_commands_till_height db user_commands_main height )
+        Sql.Mainnet.dump_user_commands_till_height db height )
   in
+  List.equal Sql.User_command.equal expected result
 
-  diff_files user_commands_berk user_commands_main
-
-let compare_internal_commands_till_height migrated_pool mainnet_pool ~height
-    ~work_dir =
+let compare_internal_commands_till_height migrated_pool mainnet_pool ~height =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
-  let internal_commands_berk =
-    Filename.concat work_dir "internal_commands_berk.csv"
-  in
-  let internal_commands_main =
-    Filename.concat work_dir "internal_commands_main.csv"
-  in
-
   let open Deferred.Let_syntax in
-  let%bind () =
+  let%bind expected =
     query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_internal_commands_till_height db
-          internal_commands_berk height )
+        Sql.Berkeley.dump_internal_commands_till_height db height )
   in
 
-  let%bind () =
+  let%map result =
     query_mainnet_db ~f:(fun db ->
-        Sql.Mainnet.dump_internal_commands_till_height db internal_commands_main
-          height )
+        Sql.Mainnet.dump_internal_commands_till_height db height )
   in
+  List.equal Sql.Internal_command.equal expected result
 
-  diff_files internal_commands_berk internal_commands_main
-
-let compare_user_commands migrated_pool mainnet_pool ~work_dir =
+let compare_user_commands migrated_pool mainnet_pool =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
-  let user_commands_berk = Filename.concat work_dir "user_commands_berk.csv" in
-  let user_commands_main = Filename.concat work_dir "user_commands_main.csv" in
-
   let open Deferred.Let_syntax in
-  let%bind () =
-    query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_user_commands db user_commands_berk )
+  let%bind expected =
+    query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_user_commands db)
   in
 
-  let%bind () =
-    query_mainnet_db ~f:(fun db ->
-        Sql.Mainnet.dump_user_commands db user_commands_main )
+  let%map result =
+    query_mainnet_db ~f:(fun db -> Sql.Mainnet.dump_user_commands db)
   in
+  List.equal Sql.User_command.equal expected result
 
-  diff_files user_commands_berk user_commands_main
-
-let compare_internal_commands migrated_pool mainnet_pool ~work_dir =
+let compare_internal_commands migrated_pool mainnet_pool =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
-  let internal_commands_berk =
-    Filename.concat work_dir "internal_commands_berk.csv"
-  in
-  let internal_commands_main =
-    Filename.concat work_dir "internal_commands_main.csv"
-  in
-
   let open Deferred.Let_syntax in
-  let%bind () =
-    query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_internal_commands db internal_commands_berk )
+  let%bind expected =
+    query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_internal_commands db)
   in
-
-  let%bind () =
-    query_mainnet_db ~f:(fun db ->
-        Sql.Mainnet.dump_internal_commands db internal_commands_main )
+  let%map result =
+    query_mainnet_db ~f:(fun db -> Sql.Mainnet.dump_internal_commands db)
   in
-  diff_files internal_commands_berk internal_commands_main
+  List.equal Sql.Internal_command.equal expected result
 
 let compare_ledger_hash ~migrated_replayer_output ~fork_genesis_config_file =
   let checkpoint_ledger_hash =
@@ -301,7 +230,6 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
       in
 
       let test_count = 6 in
-      let work_dir = Filename.temp_dir_name in
       let%bind check = migrated_db_is_connected query_migrated_db ~height in
       Test.of_check check ~name:"Migrated blocks are connected" ~idx:1
         ~prefix:"D3.1" test_count
@@ -315,9 +243,9 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
       |> Test.eval ;
 
       let%bind check =
-        all_accounts_referred_in_commands_are_recorded migrated_pool ~work_dir
+        all_accounts_referred_in_commands_are_recorded migrated_pool
       in
-      Test.of_check check
+      Test.of_bool check
         ~name:
           "All accounts referred in internal commands or transactions are \
            recorded in the accounts_accessed table."
@@ -325,26 +253,26 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
       |> Test.eval ;
 
       let%bind check =
-        compare_hashes_till_height migrated_pool mainnet_pool ~height ~work_dir
+        compare_hashes_till_height migrated_pool mainnet_pool ~height
       in
-      Test.of_check check
+      Test.of_bool check
         ~name:"All block hashes (state_hash, ledger_hashes) are equal" ~idx:4
         ~prefix:"D3.4" test_count
       |> Test.eval ;
 
       let%bind check =
         compare_user_commands_till_height migrated_pool mainnet_pool ~height
-          ~work_dir
       in
-      Test.of_check check ~name:"Verify user commands" ~idx:5 ~prefix:"D3.5"
+
+      Test.of_bool check ~name:"Verify user commands" ~idx:5 ~prefix:"D3.5"
         test_count
       |> Test.eval ;
 
       let%bind check =
         compare_internal_commands_till_height migrated_pool mainnet_pool ~height
-          ~work_dir
       in
-      Test.of_check check ~name:"Verify internal commands" ~idx:6 ~prefix:"D3.6"
+
+      Test.of_bool check ~name:"Verify internal commands" ~idx:6 ~prefix:"D3.6"
         test_count
       |> Test.eval ;
 
@@ -391,7 +319,6 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
       let query_migrated_db = Mina_caqti.query migrated_pool in
 
       let test_count = 8 in
-      let work_dir = Filename.temp_dir_name in
       let%bind check =
         migrated_db_is_connected query_migrated_db ~height:fork_height
       in
@@ -408,9 +335,9 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
       |> Test.eval ;
 
       let%bind check =
-        all_accounts_referred_in_commands_are_recorded migrated_pool ~work_dir
+        all_accounts_referred_in_commands_are_recorded migrated_pool
       in
-      Test.of_check check
+      Test.of_bool check
         ~name:
           "All accounts referred in internal commands or transactions are \
            recorded in the accounts_accessed table."
@@ -418,9 +345,9 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
       |> Test.eval ;
 
       let%bind check =
-        accounts_created_table_is_correct migrated_pool mainnet_pool ~work_dir
+        accounts_created_table_is_correct migrated_pool mainnet_pool
       in
-      Test.of_check check
+      Test.of_bool check
         ~name:
           "The content of accounts_created table is correct (by checking \
            against pre-migrated database)"
@@ -432,23 +359,19 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
               fork_state_hash )
       in
 
-      let%bind check = compare_hashes migrated_pool mainnet_pool ~work_dir in
-      Test.of_check check
+      let%bind check = compare_hashes migrated_pool mainnet_pool in
+      Test.of_bool check
         ~name:"All block hashes (state_hash, ledger_hashes) are equal" ~idx:5
         ~prefix:"D3.6" test_count
       |> Test.eval ;
 
-      let%bind check =
-        compare_user_commands migrated_pool mainnet_pool ~work_dir
-      in
-      Test.of_check check ~name:"Verify user commands" ~idx:6 ~prefix:"D3.7"
+      let%bind check = compare_user_commands migrated_pool mainnet_pool in
+      Test.of_bool check ~name:"Verify user commands" ~idx:6 ~prefix:"D3.7"
         test_count
       |> Test.eval ;
 
-      let%bind check =
-        compare_internal_commands migrated_pool mainnet_pool ~work_dir
-      in
-      Test.of_check check ~name:"Verify internal commands" ~idx:7 ~prefix:"D3.8"
+      let%bind check = compare_internal_commands migrated_pool mainnet_pool in
+      Test.of_bool check ~name:"Verify internal commands" ~idx:7 ~prefix:"D3.8"
         test_count
       |> Test.eval ;
 
