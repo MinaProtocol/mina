@@ -27,12 +27,13 @@ module Mainnet = struct
         WHERE receiver_account_creation_fee_paid IS NOT NULL
       ) 
       ORDER BY height, public_key |sql}
-    |> Caqti_request.find Caqti_type.unit Caqti_type.string
+    |> Caqti_request.collect Caqti_type.unit Caqti_type.string
 
   let dump_accounts_created_to_csv (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find (dump_accounts_created_to_csv_query) () in
-    Writer.with_file output_file ~f:(fun writer -> return @@ Writer.write writer res)
+    let%bind res = Conn.collect_list dump_accounts_created_to_csv_query () in
+    Writer.with_file output_file ~f:(fun writer ->
+        return @@ List.iter (Writer.write writer) res )
 
   let dump_state_and_ledger_hashes_to_csv_query =
     (* Workaround for replacing output file as caqti has an issue with using ? in place of FILE argument*)
@@ -57,10 +58,9 @@ module Mainnet = struct
   let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
       height =
     let open Deferred.Result.Let_syntax in
-    let%bind res =
-      Conn.find (dump_block_hashes_till_height_query ~height) ()
-    in
-    Writer.with_file output_file ~f:(fun writer -> return @@ Writer.write writer res)
+    let%bind res = Conn.find (dump_block_hashes_till_height_query ~height) () in
+    Writer.with_file output_file ~f:(fun writer ->
+        return @@ Writer.write writer res )
 
   let dump_block_hashes_query =
     dump_sql_to_csv_string
@@ -74,8 +74,9 @@ module Mainnet = struct
 
   let dump_block_hashes (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find (dump_block_hashes_query) () in
-    Writer.with_file output_file ~f:(fun writer -> return @@ Writer.write writer res)
+    let%bind res = Conn.find dump_block_hashes_query () in
+    Writer.with_file output_file ~f:(fun writer ->
+        return @@ Writer.write writer res )
 
   let dump_user_commands_till_height_query ~height =
     dump_sql_to_csv_string
@@ -104,7 +105,8 @@ module Mainnet = struct
     let%bind res =
       Conn.find (dump_user_commands_till_height_query ~height) ()
     in
-    Writer.with_file output_file ~f:(fun writer -> return @@ Writer.write writer res)
+    Writer.with_file output_file ~f:(fun writer ->
+        return @@ Writer.write writer res )
 
   let dump_internal_commands_till_height_query ~height =
     dump_sql_to_csv_string
@@ -131,11 +133,10 @@ module Mainnet = struct
       height =
     let open Deferred.Result.Let_syntax in
     let%bind res =
-      Conn.find
-        (dump_internal_commands_till_height_query ~height)
-        ()
+      Conn.find (dump_internal_commands_till_height_query ~height) ()
     in
-    Writer.with_file output_file ~f:(fun writer -> return @@ Writer.write writer res)
+    Writer.with_file output_file ~f:(fun writer ->
+        return @@ Writer.write writer res )
 
   let dump_user_commands_query =
     dump_sql_to_csv_string
@@ -158,8 +159,9 @@ module Mainnet = struct
 
   let dump_user_commands (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find (dump_user_commands_query) () in
-    Writer.with_file output_file ~f:(fun writer -> return @@ Writer.write writer res)
+    let%bind res = Conn.find dump_user_commands_query () in
+    Writer.with_file output_file ~f:(fun writer ->
+        return @@ Writer.write writer res )
 
   let dump_internal_commands_query =
     dump_sql_to_csv_string
@@ -183,8 +185,9 @@ module Mainnet = struct
 
   let dump_internal_commands (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find (dump_internal_commands_query) () in
-    Writer.with_file output_file ~f:(fun writer -> return @@ Writer.write writer res)
+    let%bind res = Conn.find dump_internal_commands_query () in
+    Writer.with_file output_file ~f:(fun writer ->
+        return @@ Writer.write writer res )
 
   let mark_chain_till_fork_block_as_canonical_query =
     Caqti_request.exec Caqti_type.string
@@ -229,8 +232,9 @@ module Berkeley = struct
 
   let dump_accounts_created_to_csv (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find (dump_accounts_created_to_csv_query) () in
-    Writer.with_file output_file ~f:(fun writer -> return @@ Writer.write writer res)
+    let%bind res = Conn.find dump_accounts_created_to_csv_query () in
+    Writer.with_file output_file ~f:(fun writer ->
+        return @@ Writer.write writer res )
 
   let height_query =
     Caqti_request.find Caqti_type.unit Caqti_type.int
@@ -293,7 +297,8 @@ module Berkeley = struct
     let%bind res =
       Conn.find (dump_user_commands_till_height_query ~height) ()
     in
-    Writer.with_file output_file ~f:(fun writer -> return @@ Writer.write writer res)
+    Writer.with_file output_file ~f:(fun writer ->
+        return @@ Writer.write writer res )
 
   let dump_internal_commands_till_height_query ~height =
     dump_sql_to_csv_string
@@ -320,11 +325,10 @@ module Berkeley = struct
       height =
     let open Deferred.Result.Let_syntax in
     let%bind res =
-      Conn.find
-        (dump_internal_commands_till_height_query ~height)
-        ()
+      Conn.find (dump_internal_commands_till_height_query ~height) ()
     in
-    Writer.with_file output_file ~f:(fun writer -> return @@ Writer.write writer res)
+    Writer.with_file output_file ~f:(fun writer ->
+        return @@ Writer.write writer res )
 
   let dump_user_commands_query =
     dump_sql_to_csv_string
@@ -347,8 +351,9 @@ module Berkeley = struct
 
   let dump_user_commands (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find (dump_user_commands_query) () in
-    Writer.with_file output_file ~f:(fun writer -> return @@ Writer.write writer res)
+    let%bind res = Conn.find dump_user_commands_query () in
+    Writer.with_file output_file ~f:(fun writer ->
+        return @@ Writer.write writer res )
 
   let dump_internal_commands_query =
     dump_sql_to_csv_string
@@ -371,8 +376,9 @@ module Berkeley = struct
 
   let dump_internal_commands (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find (dump_internal_commands_query) () in
-    Writer.with_file output_file ~f:(fun writer -> return @@ Writer.write writer res)
+    let%bind res = Conn.find dump_internal_commands_query () in
+    Writer.with_file output_file ~f:(fun writer ->
+        return @@ Writer.write writer res )
 
   let dump_account_accessed_to_csv_query =
     dump_sql_to_csv_string
@@ -386,8 +392,9 @@ module Berkeley = struct
 
   let dump_accounts_accessed_to_csv (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find (dump_account_accessed_to_csv_query) () in
-    Writer.with_file output_file ~f:(fun writer -> return @@ Writer.write writer res)
+    let%bind res = Conn.find dump_account_accessed_to_csv_query () in
+    Writer.with_file output_file ~f:(fun writer ->
+        return @@ Writer.write writer res )
 
   let dump_block_hashes_till_height_query ~height =
     dump_sql_to_csv_string
@@ -403,10 +410,9 @@ module Berkeley = struct
   let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
       height =
     let open Deferred.Result.Let_syntax in
-    let%bind res =
-      Conn.find (dump_block_hashes_till_height_query ~height) ()
-    in
-    Writer.with_file output_file ~f:(fun writer -> return @@ Writer.write writer res)
+    let%bind res = Conn.find (dump_block_hashes_till_height_query ~height) () in
+    Writer.with_file output_file ~f:(fun writer ->
+        return @@ Writer.write writer res )
 
   let dump_block_hashes_query =
     dump_sql_to_csv_string
@@ -420,8 +426,9 @@ module Berkeley = struct
 
   let dump_block_hashes (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find (dump_block_hashes_query) () in
-    Writer.with_file output_file ~f:(fun writer -> return @@ Writer.write writer res)
+    let%bind res = Conn.find dump_block_hashes_query () in
+    Writer.with_file output_file ~f:(fun writer ->
+        return @@ Writer.write writer res )
 
   let dump_user_and_internal_command_info_to_csv_query =
     dump_sql_to_csv_string
@@ -456,11 +463,10 @@ module Berkeley = struct
       output_file =
     let open Deferred.Result.Let_syntax in
     let%bind res =
-      Conn.find
-        (dump_user_and_internal_command_info_to_csv_query)
-        ()
+      Conn.find dump_user_and_internal_command_info_to_csv_query ()
     in
-    Writer.with_file output_file ~f:(fun writer -> return @@ Writer.write writer res)
+    Writer.with_file output_file ~f:(fun writer ->
+        return @@ Writer.write writer res )
 
   let get_account_accessed_count_query =
     Caqti_request.find Caqti_type.unit Caqti_type.int
