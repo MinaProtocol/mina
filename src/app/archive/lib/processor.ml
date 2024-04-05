@@ -593,27 +593,6 @@ module Protocol_versions = struct
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
       t
-
-  let find (module Conn : CONNECTION) ~transaction ~network ~patch =
-    Conn.find
-      (Caqti_request.find
-         Caqti_type.(tup3 int int int)
-         Caqti_type.int
-         (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()) )
-      (transaction, network, patch)
-
-  let find_txn_version (module Conn : CONNECTION) ~transaction =
-    Conn.collect_list
-      (Caqti_request.collect Caqti_type.int Caqti_type.int
-         {sql| SELECT id FROM protocol_versions WHERE transaction = ?
-        |sql} )
-      transaction
-
-  let load (module Conn : CONNECTION) id =
-    Conn.find
-      (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
-      id
 end
 
 module Zkapp_permissions = struct
@@ -685,23 +664,6 @@ module Zkapp_permissions = struct
   let table_name = "zkapp_permissions"
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (perms : Permissions.t) =
-    let txn_version =
-      Mina_numbers.Txn_version.to_int @@ snd perms.set_verification_key
-    in
-    let%bind versions =
-      Protocol_versions.find_txn_version (module Conn) ~transaction:txn_version
-    in
-    ( match versions with
-    | Ok [] ->
-        failwith
-          (sprintf "No transaction version exists for the permission, %s"
-             (Permissions.to_yojson perms |> Yojson.Safe.to_string) )
-    | Ok _ ->
-        ()
-    | Error e ->
-        failwith
-          (sprintf "fail to query protocol_versions table, see %s"
-             (Caqti_error.show e) ) ) ;
     let value =
       { edit_state = perms.edit_state
       ; send = perms.send
