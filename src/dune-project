@@ -297,3 +297,4 @@
 (package (name archive_cli))
 (package (name archive))
 (package (name zkapps_examples_empty_update))
+(package (name pickles_optional_custom_gates_circuits))

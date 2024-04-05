@@ -70,6 +70,7 @@
    mina_wire_types
    internal_tracing
    cache_dir
+   mina_ledger_test_helpers ; hack for nix
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

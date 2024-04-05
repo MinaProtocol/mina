@@ -29,7 +29,7 @@
    sgn
    signature_lib
    tuple_lib
-   transaction_snark_tests ; hack for nix
+   transaction_snark_tests merkle_list_verifier pickles_optional_custom_gates_circuits ; hack for nix
    with_hash)
  (instrumentation (backend bisect_ppx))
  (preprocess
