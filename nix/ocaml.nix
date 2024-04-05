@@ -551,26 +551,26 @@ let
             phases = [ "installPhase" ];
             buildInputs = builtins.attrValues deps;
             installPhase = ''
-              mkdir -p $out/lib/ocaml/4.14.0/site-lib/stublibs $out/nix-support
+              mkdir -p $out/lib/ocaml/${base-prj.ocaml.version}/site-lib/stublibs $out/nix-support
               {
                 echo -n 'export OCAMLPATH=$'
                 echo -n '{OCAMLPATH-}$'
-                echo '{OCAMLPATH:+:}'"$out/lib/ocaml/4.14.0/site-lib"
+                echo '{OCAMLPATH:+:}'"$out/lib/ocaml/${base-prj.ocaml.version}/site-lib"
                 echo -n 'export CAML_LD_LIBRARY_PATH=$'
                 echo -n '{CAML_LD_LIBRARY_PATH-}$'
-                echo '{CAML_LD_LIBRARY_PATH:+:}'"$out/lib/ocaml/4.14.0/site-lib/stublibs"
+                echo '{CAML_LD_LIBRARY_PATH:+:}'"$out/lib/ocaml/${base-prj.ocaml.version}/site-lib/stublibs"
               } > $out/nix-support/setup-hook
               for input in $buildInputs; do
-                [ ! -d "$input/lib/ocaml/4.14.0/site-lib" ] || {
-                  find "$input/lib/ocaml/4.14.0/site-lib" -maxdepth 1 -mindepth 1 -not -name stublibs | while read d; do
-                    cp -R "$d" "$out/lib/ocaml/4.14.0/site-lib/"
+                [ ! -d "$input/lib/ocaml/${base-prj.ocaml.version}/site-lib" ] || {
+                  find "$input/lib/ocaml/${base-prj.ocaml.version}/site-lib" -maxdepth 1 -mindepth 1 -not -name stublibs | while read d; do
+                    cp -R "$d" "$out/lib/ocaml/${base-prj.ocaml.version}/site-lib/"
                   done
                 }
-                [ ! -d "$input/lib/ocaml/4.14.0/site-lib/stublibs" ] || cp -R "$input/lib/ocaml/4.14.0/site-lib/stublibs"/* "$out/lib/ocaml/4.14.0/site-lib/stublibs/"
+                [ ! -d "$input/lib/ocaml/${base-prj.ocaml.version}/site-lib/stublibs" ] || cp -R "$input/lib/ocaml/${base-prj.ocaml.version}/site-lib/stublibs"/* "$out/lib/ocaml/${base-prj.ocaml.version}/site-lib/stublibs/"
               done
             '';
           };
-        myOverlay = self: super:
+        minaOverlay = self: super:
           (pkgs.lib.concatMapAttrs (name: old:
             if ! builtins.hasAttr name depsMap && ! builtins.elem name ["cli"] then {}
             else
@@ -584,8 +584,9 @@ let
                     (if name == "mina_init" then [base-prj.crunch] else []);
                   NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
                   preBuild = ''
-                    export LD_LIBRARY_PATH="${base-prj.ctypes}/lib/ocaml/${base-prj.ocaml.version}/site-lib/ctypes";
+                    export LD_LIBRARY_PATH="${base}/lib/ocaml/${base-prj.ocaml.version}/site-lib/ctypes";
                   '';
+                  postBuild = ''find'';
                   configurePhase =
                     ''
                       ${s.configurePhase}
@@ -617,13 +618,24 @@ let
                   };
               }
           ;
+        testOverlay = self: super:
+          let mina = buitlins.removeAttrs (minaOverlay self super) ["graphql-schema"];
+              mkTest = name: pkg:
+                { name = "nixtest-${name}";
+                  value = pkg // {
+                    preBuild = ''
+                      
+                      '';
+                  };
+                };
+           in pkgs.lib.mapAttrs' mkTest mina;
         prj =
           (opam-nix.buildOpamProject' {
             inherit pkgs opamCache;
             repos = [ inputs.opam-repository ];
             recursive = true;
             useOpamList = false;
-            overlays = [ myOverlay ];
+            overlays = [ minaOverlay testOverlay ];
             resolveArgs = { env = {
               DUNE_PROFILE="dev";
               DISABLE_CHECK_OPAM_SWITCH = "true";
