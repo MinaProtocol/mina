@@ -1,4 +1,5 @@
 (library
+ (public_name zkapps_examples_empty_update)
  (name zkapps_empty_update)
  (libraries
    ;; opam libraries

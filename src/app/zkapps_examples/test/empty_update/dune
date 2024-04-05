@@ -39,7 +39,7 @@
    transaction_snark
    transaction_snark_tests
    with_hash
-   zkapps_empty_update
+   zkapps_examples_empty_update
    zkapps_examples
    bounded_types
    )
