@@ -290,4 +290,5 @@
 (package (name internal_tracing))
 (package (name test_type_equalities))
 (package (name transaction_logic_tests))
+(package (name rosetta-signer))
 

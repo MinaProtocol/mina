@@ -1,7 +1,7 @@
 (library
- (name signer_cli)
- (public_name signer_cli)
- (modules signer_cli)
+ (name rosetta_signer)
+ (public_name rosetta_signer)
+ (modules rosetta_signer)
  (libraries
    ;;opam libraries
    async_kernel
@@ -44,7 +44,7 @@
  (public_name signer)
  (modes native)
  (modules signer)
- (libraries signer_cli async core_kernel base)
+ (libraries rosetta_signer async core_kernel base)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
@@ -64,7 +64,7 @@
  (public_name signer-testnet)
  (modes native)
  (modules signer_testnet_signatures)
- (libraries signer_cli async core_kernel base)
+ (libraries rosetta_signer async core_kernel base)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
@@ -84,7 +84,7 @@
  (public_name signer-mainnet)
  (modes native)
  (modules signer_mainnet_signatures)
- (libraries signer_cli async core_kernel base)
+ (libraries rosetta_signer async core_kernel base)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
