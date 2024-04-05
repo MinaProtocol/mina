@@ -1579,6 +1579,7 @@ let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
       ; num_accounts = None
       ; balances = []
       ; hash
+      ; s3_data_hash = None
       ; name = None
       ; add_genesis_winner = Some false
       }
