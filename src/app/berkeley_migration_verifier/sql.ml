@@ -53,14 +53,16 @@ module Mainnet = struct
            \            WHERE chain_status = 'canonical'\n\
            \            AND height <= %d ORDER BY height\n\
            \      " height )
-    |> Caqti_request.find Caqti_type.unit Caqti_type.string
+    |> Caqti_request.collect Caqti_type.unit Caqti_type.string
 
   let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
       height =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find (dump_block_hashes_till_height_query ~height) () in
+    let%bind res =
+      Conn.collect_list (dump_block_hashes_till_height_query ~height) ()
+    in
     Writer.with_file output_file ~f:(fun writer ->
-        return @@ Writer.write writer res )
+        return @@ List.iter (Writer.write writer) res )
 
   let dump_block_hashes_query =
     dump_sql_to_csv_string
@@ -70,13 +72,13 @@ module Mainnet = struct
         \            WHERE chain_status = 'canonical'\n\
         \            ORDER BY height\n\
         \      "
-    |> Caqti_request.find Caqti_type.unit Caqti_type.string
+    |> Caqti_request.collect Caqti_type.unit Caqti_type.string
 
   let dump_block_hashes (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find dump_block_hashes_query () in
+    let%bind res = Conn.collect_list dump_block_hashes_query () in
     Writer.with_file output_file ~f:(fun writer ->
-        return @@ Writer.write writer res )
+        return @@ List.iter (Writer.write writer) res )
 
   let dump_user_commands_till_height_query ~height =
     dump_sql_to_csv_string
@@ -97,16 +99,16 @@ module Mainnet = struct
            \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
             fee_payer_keys.id ORDER BY height, sequence_no\n\
            \      " height )
-    |> Caqti_request.find Caqti_type.unit Caqti_type.string
+    |> Caqti_request.collect Caqti_type.unit Caqti_type.string
 
   let dump_user_commands_till_height (module Conn : CONNECTION) output_file
       height =
     let open Deferred.Result.Let_syntax in
     let%bind res =
-      Conn.find (dump_user_commands_till_height_query ~height) ()
+      Conn.collect_list (dump_user_commands_till_height_query ~height) ()
     in
     Writer.with_file output_file ~f:(fun writer ->
-        return @@ Writer.write writer res )
+        return @@ List.iter (Writer.write writer) res )
 
   let dump_internal_commands_till_height_query ~height =
     dump_sql_to_csv_string
@@ -127,16 +129,16 @@ module Mainnet = struct
            \        ORDER BY height, sequence_no, secondary_sequence_no, type \n\
            \   \n\
            \          " height )
-    |> Caqti_request.find Caqti_type.unit Caqti_type.string
+    |> Caqti_request.collect Caqti_type.unit Caqti_type.string
 
   let dump_internal_commands_till_height (module Conn : CONNECTION) output_file
       height =
     let open Deferred.Result.Let_syntax in
     let%bind res =
-      Conn.find (dump_internal_commands_till_height_query ~height) ()
+      Conn.collect_list (dump_internal_commands_till_height_query ~height) ()
     in
     Writer.with_file output_file ~f:(fun writer ->
-        return @@ Writer.write writer res )
+        return @@ List.iter (Writer.write writer) res )
 
   let dump_user_commands_query =
     dump_sql_to_csv_string
@@ -155,13 +157,13 @@ module Mainnet = struct
         \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
          fee_payer_keys.id ORDER BY height, sequence_no\n\
         \      "
-    |> Caqti_request.find Caqti_type.unit Caqti_type.string
+    |> Caqti_request.collect Caqti_type.unit Caqti_type.string
 
   let dump_user_commands (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find dump_user_commands_query () in
+    let%bind res = Conn.collect_list dump_user_commands_query () in
     Writer.with_file output_file ~f:(fun writer ->
-        return @@ Writer.write writer res )
+        return @@ List.iter (Writer.write writer) res )
 
   let dump_internal_commands_query =
     dump_sql_to_csv_string
@@ -181,13 +183,13 @@ module Mainnet = struct
            \        ORDER BY height, sequence_no, secondary_sequence_no, type \n\
            \   \n\
            \          " )
-    |> Caqti_request.find Caqti_type.unit Caqti_type.string
+    |> Caqti_request.collect Caqti_type.unit Caqti_type.string
 
   let dump_internal_commands (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find dump_internal_commands_query () in
+    let%bind res = Conn.collect_list dump_internal_commands_query () in
     Writer.with_file output_file ~f:(fun writer ->
-        return @@ Writer.write writer res )
+        return @@ List.iter (Writer.write writer) res )
 
   let mark_chain_till_fork_block_as_canonical_query =
     Caqti_request.exec Caqti_type.string
@@ -228,13 +230,13 @@ module Berkeley = struct
       JOIN account_identifiers ON account_identifier_id = account_identifiers.id 
       JOIN public_keys         ON public_key_id         = public_keys.id
       ORDER BY height, public_key |sql}
-    |> Caqti_request.find Caqti_type.unit Caqti_type.string
+    |> Caqti_request.collect Caqti_type.unit Caqti_type.string
 
   let dump_accounts_created_to_csv (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find dump_accounts_created_to_csv_query () in
+    let%bind res = Conn.collect_list dump_accounts_created_to_csv_query () in
     Writer.with_file output_file ~f:(fun writer ->
-        return @@ Writer.write writer res )
+        return @@ List.iter (Writer.write writer) res )
 
   let height_query =
     Caqti_request.find Caqti_type.unit Caqti_type.int
@@ -289,16 +291,16 @@ module Berkeley = struct
            \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
             fee_payer_keys.id ORDER BY height, sequence_no\n\
            \     " height )
-    |> Caqti_request.find Caqti_type.unit Caqti_type.string
+    |> Caqti_request.collect Caqti_type.unit Caqti_type.string
 
   let dump_user_commands_till_height (module Conn : CONNECTION) output_file
       height =
     let open Deferred.Result.Let_syntax in
     let%bind res =
-      Conn.find (dump_user_commands_till_height_query ~height) ()
+      Conn.collect_list (dump_user_commands_till_height_query ~height) ()
     in
     Writer.with_file output_file ~f:(fun writer ->
-        return @@ Writer.write writer res )
+        return @@ List.iter (Writer.write writer) res )
 
   let dump_internal_commands_till_height_query ~height =
     dump_sql_to_csv_string
@@ -319,16 +321,16 @@ module Berkeley = struct
            \        ORDER BY height, sequence_no, secondary_sequence_no, \
             command_type \n\
            \      " height )
-    |> Caqti_request.find Caqti_type.unit Caqti_type.string
+    |> Caqti_request.collect Caqti_type.unit Caqti_type.string
 
   let dump_internal_commands_till_height (module Conn : CONNECTION) output_file
       height =
     let open Deferred.Result.Let_syntax in
     let%bind res =
-      Conn.find (dump_internal_commands_till_height_query ~height) ()
+      Conn.collect_list (dump_internal_commands_till_height_query ~height) ()
     in
     Writer.with_file output_file ~f:(fun writer ->
-        return @@ Writer.write writer res )
+        return @@ List.iter (Writer.write writer) res )
 
   let dump_user_commands_query =
     dump_sql_to_csv_string
@@ -347,13 +349,13 @@ module Berkeley = struct
         \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
          fee_payer_keys.id ORDER BY height, sequence_no\n\
         \     "
-    |> Caqti_request.find Caqti_type.unit Caqti_type.string
+    |> Caqti_request.collect Caqti_type.unit Caqti_type.string
 
   let dump_user_commands (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find dump_user_commands_query () in
+    let%bind res = Conn.collect_list dump_user_commands_query () in
     Writer.with_file output_file ~f:(fun writer ->
-        return @@ Writer.write writer res )
+        return @@ List.iter (Writer.write writer) res )
 
   let dump_internal_commands_query =
     dump_sql_to_csv_string
@@ -372,13 +374,13 @@ module Berkeley = struct
         \        ORDER BY height, sequence_no, secondary_sequence_no, \
          command_type \n\
         \      "
-    |> Caqti_request.find Caqti_type.unit Caqti_type.string
+    |> Caqti_request.collect Caqti_type.unit Caqti_type.string
 
   let dump_internal_commands (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find dump_internal_commands_query () in
+    let%bind res = Conn.collect_list dump_internal_commands_query () in
     Writer.with_file output_file ~f:(fun writer ->
-        return @@ Writer.write writer res )
+        return @@ List.iter (Writer.write writer) res )
 
   let dump_account_accessed_to_csv_query =
     dump_sql_to_csv_string
@@ -388,13 +390,13 @@ module Berkeley = struct
                  JOIN blocks ON block_id = blocks.id
                  WHERE height <> 1
                  ORDER BY block_id, id |sql}
-    |> Caqti_request.find Caqti_type.unit Caqti_type.string
+    |> Caqti_request.collect Caqti_type.unit Caqti_type.string
 
   let dump_accounts_accessed_to_csv (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find dump_account_accessed_to_csv_query () in
+    let%bind res = Conn.collect_list dump_account_accessed_to_csv_query () in
     Writer.with_file output_file ~f:(fun writer ->
-        return @@ Writer.write writer res )
+        return @@ List.iter (Writer.write writer) res )
 
   let dump_block_hashes_till_height_query ~height =
     dump_sql_to_csv_string
@@ -405,14 +407,16 @@ module Berkeley = struct
            \    AND height <= %d ORDER BY height\n\
            \ \n\
            \     " height )
-    |> Caqti_request.find Caqti_type.unit Caqti_type.string
+    |> Caqti_request.collect Caqti_type.unit Caqti_type.string
 
   let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
       height =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find (dump_block_hashes_till_height_query ~height) () in
+    let%bind res =
+      Conn.collect_list (dump_block_hashes_till_height_query ~height) ()
+    in
     Writer.with_file output_file ~f:(fun writer ->
-        return @@ Writer.write writer res )
+        return @@ List.iter (Writer.write writer) res )
 
   let dump_block_hashes_query =
     dump_sql_to_csv_string
@@ -422,13 +426,13 @@ module Berkeley = struct
         \      WHERE chain_status = 'canonical'\n\
         \      ORDER BY height\n\
         \      "
-    |> Caqti_request.find Caqti_type.unit Caqti_type.string
+    |> Caqti_request.collect Caqti_type.unit Caqti_type.string
 
   let dump_block_hashes (module Conn : CONNECTION) output_file =
     let open Deferred.Result.Let_syntax in
-    let%bind res = Conn.find dump_block_hashes_query () in
+    let%bind res = Conn.collect_list dump_block_hashes_query () in
     Writer.with_file output_file ~f:(fun writer ->
-        return @@ Writer.write writer res )
+        return @@ List.iter (Writer.write writer) res )
 
   let dump_user_and_internal_command_info_to_csv_query =
     dump_sql_to_csv_string
@@ -457,16 +461,16 @@ module Berkeley = struct
         INNER JOIN internal_commands ON id = internal_command_id
         INNER JOIN account_identifiers ON public_key_id = receiver_id
       ) ORDER BY block_id, id |sql}
-    |> Caqti_request.find Caqti_type.unit Caqti_type.string
+    |> Caqti_request.collect Caqti_type.unit Caqti_type.string
 
   let dump_user_and_internal_command_info_to_csv (module Conn : CONNECTION)
       output_file =
     let open Deferred.Result.Let_syntax in
     let%bind res =
-      Conn.find dump_user_and_internal_command_info_to_csv_query ()
+      Conn.collect_list dump_user_and_internal_command_info_to_csv_query ()
     in
     Writer.with_file output_file ~f:(fun writer ->
-        return @@ Writer.write writer res )
+        return @@ List.iter (Writer.write writer) res )
 
   let get_account_accessed_count_query =
     Caqti_request.find Caqti_type.unit Caqti_type.int
