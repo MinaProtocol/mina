@@ -14,5 +14,5 @@
    blake2
    snarky.backendless
    mina_stdlib
-   crypto_params ; hack for nix
+   crypto_params snark_params ; hack for nix
 ))

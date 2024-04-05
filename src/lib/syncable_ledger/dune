@@ -23,7 +23,7 @@
    direction
    error_json
    ppx_version.runtime
-   signature_lib bounded_types ; hack for nix
+   signature_lib bounded_types mina_base ; hack for nix
  )
  (preprocess
   (pps ppx_mina ppx_version ppx_jane ppx_compare ppx_deriving_yojson ppx_register_event))
