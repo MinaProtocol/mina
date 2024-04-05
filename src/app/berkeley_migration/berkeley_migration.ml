@@ -491,7 +491,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
         Precomputed_block.concrete_fetch_batch ~logger
           ~bucket:mina_network_blocks_bucket ~network
           (required_precomputed_blocks blocks)
-          ~precomputed_blocks_local_path
+          ~local_path:precomputed_blocks_local_path
       in
       let%bind prefetched_precomputed_blocks =
         if stream_precomputed_blocks then return Mina_base.State_hash.Map.empty
@@ -551,7 +551,10 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
         (* this will still run even if we are downloading precomputed blocks in batches, to handle any leftover blocks from prior runs *)
         if not keep_precomputed_blocks then (
           [%log info] "Deleting all precomputed blocks" ;
-          let%map () = Precomputed_block.delete_fetched ~network in
+          let%map () =
+            Precomputed_block.delete_fetched ~network
+              ~path:precomputed_blocks_local_path
+          in
           [%log info] "Done migrating mainnet blocks!" )
         else Deferred.unit
       in
@@ -624,4 +627,5 @@ let () =
          main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
            ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
            ~stream_precomputed_blocks ~keep_precomputed_blocks ~log_json
-           ~log_level ~log_filename ~file_log_level )))
+           ~log_level ~log_filename ~file_log_level
+           ~precomputed_blocks_local_path )))

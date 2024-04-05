@@ -220,7 +220,7 @@ let concrete_fetch_batch ~logger ~bucket ~network targets ~local_path =
       in
       don't_wait_for
         (let rec progress_loop () =
-           let%bind existing = list_directory ~network in
+           let%bind existing = list_directory ~network ~path:local_path in
            let downloaded_targets =
              Set.length (Set.inter missing_targets existing)
            in
@@ -290,6 +290,6 @@ let delete_fetched_concrete ~network targets : unit Deferred.t =
              failwithf "Could not delete fetched precomputed blocks, error %s"
                (Error.to_string_hum err) () )
 
-let delete_fetched ~network : unit Deferred.t =
-  let%bind block_ids = list_directory ~network in
+let delete_fetched ~network ~path : unit Deferred.t =
+  let%bind block_ids = list_directory ~network ~path in
   delete_fetched_concrete ~network (Set.to_list block_ids)
