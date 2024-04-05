@@ -9,7 +9,6 @@
    core_kernel
    async
    base
-   lib
    async_unix
    async.async_command
    ;;local libraries
@@ -18,6 +17,7 @@
    pickles
    rosetta_coding
    rosetta_lib
+   rosetta_app_lib
    string_sign
    signature_lib
    mina_base

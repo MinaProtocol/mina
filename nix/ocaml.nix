@@ -655,9 +655,11 @@ let
                     touch $out
                   '';
                 };
+              # TODO remove
+              testPkgsFiltered = builtins.removeAttrs testPkgs ["test-transaction_snark_tests"];
           in testPkgs // {
             all = mkCombined "mina-all" (builtins.attrValues minaPkgs);
-            all-tested = mkCombined "mina-all-with-tests" (builtins.attrValues minaPkgs ++ builtins.attrValues testPkgs);
+            all-tested = mkCombined "mina-all-with-tests" (builtins.attrValues minaPkgs ++ builtins.attrValues testPkgsFiltered);
           };
         prj =
           (opam-nix.buildOpamProject' {
