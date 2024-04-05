@@ -593,6 +593,27 @@ module Protocol_versions = struct
       ~table_name ~cols:(Fields.names, typ)
       (module Conn)
       t
+
+  let find (module Conn : CONNECTION) ~transaction ~network ~patch =
+    Conn.find
+      (Caqti_request.find
+         Caqti_type.(tup3 int int int)
+         Caqti_type.int
+         (Mina_caqti.select_cols ~select:"id" ~table_name ~cols:Fields.names ()) )
+      (transaction, network, patch)
+
+  let find_txn_version (module Conn : CONNECTION) ~transaction =
+    Conn.collect_list
+      (Caqti_request.collect Caqti_type.int Caqti_type.int
+         {sql| SELECT id FROM protocol_versions WHERE transaction = ?
+        |sql} )
+      transaction
+
+  let load (module Conn : CONNECTION) id =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+      id
 end
 
 module Zkapp_permissions = struct
