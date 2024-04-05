@@ -30,7 +30,7 @@
    consensus
    data_hash_lib
    block_time
-   full_frontier
+   transition_frontier_full_frontier
    transition_frontier_base
    transition_frontier
    protocol_version

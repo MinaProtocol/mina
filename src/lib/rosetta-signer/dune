@@ -1,5 +1,5 @@
 (library
- (name signer)
+ (name signer_cli)
  (public_name rosetta_signer)
  (modules signer_cli)
  (libraries
