@@ -592,54 +592,54 @@ let
           builtins.hasAttr name depsMap || name == "cli" );
         minaOverlay = self: super:
           pkgs.lib.concatMapAttrs (name: old:
-            let deps = getDeps self name;
-                minaLibp2pEnv =
-                  if builtins.hasAttr "mina_net2" deps || name == "mina_net2" then
-                    { MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper"; }
-                  else {};
-                graphqlConfigPhase =
-                  ( if builtins.elem name graphqlDependents then
-                    ''
-                      ${patchDuneGraphql self}
-                    ''
-                  else "");
-                mkAdditionalConfigPhase = profile:
-                  (if depsMap."${name}".dependsOnConfig then
-                    ''
-                      ${patchDune self."mina-config-${profile}"}
-                    '' else "");
-                new = old.overrideAttrs (s:
-                  minaEnv // minaLibp2pEnv // {
-                    inherit nixSupportPhase;
-                    buildInputs = builtins.attrValues deps ++ external-libs ++ [base pkgs.sodium-static];
-                    withFakeOpam = false;
-                    nativeBuildInputs = external-libs ++ [pkgs.capnproto base] ++ (with base-prj; [dune capnp]) ++
-                      (if name == "mina_init" then [base-prj.crunch] else []);
-                    NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
-                    preBuild = ''
-                      export LD_LIBRARY_PATH="${base}/lib/ocaml/${base-prj.ocaml.version}/site-lib/ctypes";
-                    '';
-                    outputs = [ "out" "dev" ];
-                    postInstall = ''
-                      cp -R _build/default "$dev"
-                    '';
-                    configurePhase =
-                      ''
-                        ${s.configurePhase}
-                        [ -f dune-project ] || echo '(lang dune 3.3)' > dune-project
-                      '' + graphqlConfigPhase;
-                  });
-                newDependent = profile: new.overrideAttrs(s: 
-                  { version = profile;
-                    configurePhase = s.configurePhase + mkAdditionalConfigPhase profile;
-                  });
-                  in
-                  if dependsOnConfig."${name}" then
-                    { "${name}" = newDependent "dev";
-                      "${name}-devnet" = newDependent "devnet";
-                      "${name}-mainnet" = newDependent "mainnet";
-                    } else {"${name}" = new;} 
-                  ) (filterLocalPkgs super) //
+            let
+              deps = getDeps self name;
+              minaLibp2pEnv =
+                if builtins.hasAttr "mina_net2" deps || name == "mina_net2" then
+                  { MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper"; }
+                else {};
+              graphqlConfigPhase =
+                if builtins.elem name graphqlDependents then
+                  ''
+                    ${patchDuneGraphql self}
+                  ''
+                else "";
+              mkAdditionalConfigPhase = profile:
+                if depsMap."${name}".dependsOnConfig then
+                  ''
+                    ${patchDune self."mina-config-${profile}"}
+                  '' else "";
+              new = old.overrideAttrs (s: minaEnv // minaLibp2pEnv // {
+                inherit nixSupportPhase;
+                buildInputs = builtins.attrValues deps ++ external-libs ++ [base pkgs.sodium-static];
+                withFakeOpam = false;
+                nativeBuildInputs = external-libs ++ [pkgs.capnproto base] ++ (with base-prj; [dune capnp]) ++
+                  (if name == "mina_init" then [base-prj.crunch] else []);
+                NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
+                preBuild = ''
+                  export LD_LIBRARY_PATH="${base}/lib/ocaml/${base-prj.ocaml.version}/site-lib/ctypes";
+                '';
+                outputs = [ "out" "dev" ];
+                postInstall = ''
+                  cp -R _build/default "$dev"
+                '';
+                configurePhase =
+                  ''
+                    ${s.configurePhase}
+                    [ -f dune-project ] || echo '(lang dune 3.3)' > dune-project
+                  '' + graphqlConfigPhase;
+              });
+              newDependent = profile: new.overrideAttrs(s: {
+                version = profile;
+                configurePhase = s.configurePhase + mkAdditionalConfigPhase profile;
+              });
+            in
+            if dependsOnConfig."${name}" then
+              { "${name}" = newDependent "dev";
+                "${name}-devnet" = newDependent "devnet";
+                "${name}-mainnet" = newDependent "mainnet";
+              } else {"${name}" = new;} 
+          ) (filterLocalPkgs super) //
               { graphql-schema = mkGraphqlSchema self;
                 mina-config-dev = mkMinaConfig "dev" base-prj;
                 mina-config-devnet = mkMinaConfig "devnet" base-prj;
