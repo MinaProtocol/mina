@@ -1,9 +1,3 @@
-From cb2463f19908e9c5531c7f80148e975060c954d9 Mon Sep 17 00:00:00 2001
-From: ember arlynx <ember.arlynx@o1labs.org>
-Date: Sat, 30 Mar 2024 22:44:15 -0400
-Subject: [PATCH] applied caqti+archive
-
-
 diff --git a/opam.export b/opam.export
 index 655b623d35..130eb77140 100644
 --- a/opam.export
@@ -77,10 +71,10 @@ index 571327de81..f9dca92cd7 100644
 +
 +DROP TABLE zkapp_verification_key_hashes;
 diff --git a/src/app/archive/lib/load_data.ml b/src/app/archive/lib/load_data.ml
-index 1ca76d1a0b..4b4faf66dd 100644
+index 1ca76d1a0b..90cda002a4 100644
 --- a/src/app/archive/lib/load_data.ml
 +++ b/src/app/archive/lib/load_data.ml
-@@ -91,9 +91,9 @@ let update_of_id pool update_id =
+@@ -91,9 +91,10 @@ let update_of_id pool update_id =
    let open Zkapp_basic in
    let query_db ~f = Mina_caqti.query ~f pool in
    let with_pool ~f arg =
@@ -88,11 +82,12 @@ index 1ca76d1a0b..4b4faf66dd 100644
 +    let open Mina_caqti in
      Pool.use
 -      (fun (module Conn : CONNECTION) -> f (module Conn : CONNECTION) arg)
-+      (fun (module Conn : Mina_caqti.CONNECTION) -> f (module Conn : Mina_caqti.CONNECTION) arg)
++      (fun (module Conn : Mina_caqti.CONNECTION) ->
++        f (module Conn : Mina_caqti.CONNECTION) arg )
        pool
    in
    let%bind { app_state_id
-@@ -636,9 +636,9 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
+@@ -636,9 +637,10 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
      (int * Account.t) Deferred.t =
    let query_db ~f = Mina_caqti.query ~f pool in
    let with_pool ~f arg =
@@ -100,7 +95,8 @@ index 1ca76d1a0b..4b4faf66dd 100644
 +    let open Mina_caqti in
      Pool.use
 -      (fun (module Conn : CONNECTION) -> f (module Conn : CONNECTION) arg)
-+      (fun (module Conn : Mina_caqti.CONNECTION) -> f (module Conn : Mina_caqti.CONNECTION) arg)
++      (fun (module Conn : Mina_caqti.CONNECTION) ->
++        f (module Conn : Mina_caqti.CONNECTION) arg )
        pool
    in
    let pk_of_id = pk_of_id pool in
@@ -173,7 +169,7 @@ index c69e1805d1..bf15430c54 100644
        pool
    with
 diff --git a/src/app/archive/lib/processor.ml b/src/app/archive/lib/processor.ml
-index 8b90db5952..313b424f55 100644
+index d4f0e9c585..274fb0839d 100644
 --- a/src/app/archive/lib/processor.ml
 +++ b/src/app/archive/lib/processor.ml
 @@ -21,7 +21,6 @@
@@ -521,8 +517,7 @@ index 8b90db5952..313b424f55 100644
 -      (module Conn)
 -      token_symbol
 +  type local_copy = (string, int) Hashtbl.t
- 
--  let load (module Conn : CONNECTION) id =
++
 +  let local_copies = Hashtbl.create (module String)
 +
 +  let load_copy =
@@ -534,7 +529,8 @@ index 8b90db5952..313b424f55 100644
 +      ~load_elt:(fun t_to_id (id, value) ->
 +        Hashtbl.add_exn t_to_id ~key:value ~data:id ;
 +        Deferred.unit )
-+
+ 
+-  let load (module Conn : CONNECTION) id =
 +  let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION) token_symbol =
 +    let%bind t_to_id = load_copy (module Conn) in
 +    let open Deferred.Result.Let_syntax in
@@ -3009,7 +3005,7 @@ index 0669b3d4b2..dae5863bc1 100644
                       | Error (`Response_rejected _ as err) ->
                           failwithf
 diff --git a/src/app/berkeley_migration/sql.ml b/src/app/berkeley_migration/sql.ml
-index 297081b7b3..4b677e43f3 100644
+index 297081b7b3..68a5c27e67 100644
 --- a/src/app/berkeley_migration/sql.ml
 +++ b/src/app/berkeley_migration/sql.ml
 @@ -1,7 +1,6 @@
@@ -3087,7 +3083,7 @@ index 297081b7b3..4b677e43f3 100644
             {sql| SELECT id, state_hash, parent_id, parent_hash, creator_id,
                          block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id,
                          next_epoch_data_id, ledger_hash, height, global_slot,
-@@ -116,23 +115,23 @@ module Mainnet = struct
+@@ -116,23 +115,24 @@ module Mainnet = struct
                   ORDER BY height ASC
           |sql} )
  
@@ -3108,7 +3104,8 @@ index 297081b7b3..4b677e43f3 100644
              height DESC LIMIT 1" )
  
 -    let get_subchain (module Conn : CONNECTION) ~start_block_id ~end_block_id =
-+    let get_subchain (module Conn : Mina_caqti.CONNECTION) ~start_block_id ~end_block_id =
++    let get_subchain (module Conn : Mina_caqti.CONNECTION) ~start_block_id
++        ~end_block_id =
        (* derive query from type `t` *)
        Conn.collect_list
 -        (Caqti_request.collect
@@ -3118,7 +3115,7 @@ index 297081b7b3..4b677e43f3 100644
             Caqti_type.int
             {sql| WITH RECURSIVE chain AS (
                      SELECT id, parent_id, height
-@@ -194,9 +193,9 @@ module Mainnet = struct
+@@ -194,9 +194,9 @@ module Mainnet = struct
        let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
        Caqti_type.custom ~encode ~decode (to_rep spec)
  
@@ -3130,7 +3127,7 @@ index 297081b7b3..4b677e43f3 100644
             {sql| SELECT block_id, user_command_id,
                 sequence_no,
                 status,failure_reason,
-@@ -233,9 +232,9 @@ module Mainnet = struct
+@@ -233,9 +233,9 @@ module Mainnet = struct
        let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
        Caqti_type.custom ~encode ~decode (to_rep spec)
  
@@ -3142,7 +3139,7 @@ index 297081b7b3..4b677e43f3 100644
             {sql| SELECT block_id, internal_command_id,
                   sequence_no, secondary_sequence_no,
                   receiver_account_creation_fee_paid,
-@@ -266,12 +265,12 @@ module Mainnet = struct
+@@ -266,12 +266,12 @@ module Mainnet = struct
        let decode ((typ, receiver_id, fee, token), hash) =
          Ok { typ; receiver_id; fee; token; hash }
        in
@@ -3158,7 +3155,7 @@ index 297081b7b3..4b677e43f3 100644
             {sql| SELECT type,receiver_id,fee,token,hash
                   FROM internal_commands
                   WHERE id = ?
-@@ -336,9 +335,9 @@ module Mainnet = struct
+@@ -336,9 +336,9 @@ module Mainnet = struct
        let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
        Caqti_type.custom ~encode ~decode (to_rep spec)
  
@@ -3170,7 +3167,7 @@ index 297081b7b3..4b677e43f3 100644
             {sql| SELECT type,fee_payer_id,source_id,receiver_id,
                   fee_token,token,
                   nonce,amount,fee,valid_until,memo,hash
-@@ -350,16 +349,16 @@ end
+@@ -350,16 +350,16 @@ end
  
  module Berkeley = struct
    module Block = struct
@@ -3191,7 +3188,7 @@ index 297081b7b3..4b677e43f3 100644
             {sql| SELECT height
                   FROM blocks
                   WHERE chain_status <> 'orphaned'
-@@ -367,9 +366,9 @@ module Berkeley = struct
+@@ -367,9 +367,9 @@ module Berkeley = struct
                   LIMIT 1
             |sql} )
  
@@ -3203,7 +3200,7 @@ index 297081b7b3..4b677e43f3 100644
             {sql| SELECT id
                   FROM blocks
                   WHERE height = 1
-@@ -386,9 +385,9 @@ module Berkeley = struct
+@@ -386,9 +386,9 @@ module Berkeley = struct
        let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
        Caqti_type.custom ~encode ~decode (to_rep spec)
  
@@ -3215,7 +3212,7 @@ index 297081b7b3..4b677e43f3 100644
             {sql| SELECT pk.value, t.value
                   FROM account_identifiers ai
                   INNER JOIN tokens t ON ai.token_id = t.id
-@@ -398,9 +397,9 @@ module Berkeley = struct
+@@ -398,9 +398,9 @@ module Berkeley = struct
    end
  
    module Accounts_accessed = struct
@@ -3228,10 +3225,10 @@ index 297081b7b3..4b677e43f3 100644
                   FROM accounts_accessed
                   WHERE block_id = $1
 diff --git a/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml b/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
-index f377d693fc..a97801e306 100644
+index 615a6b4aab..f624c19a5a 100644
 --- a/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
 +++ b/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
-@@ -284,10 +284,10 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
+@@ -213,10 +213,10 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
    let mainnet_pool =
@@ -3244,7 +3241,7 @@ index f377d693fc..a97801e306 100644
    in
  
    match (mainnet_pool, migrated_pool) with
-@@ -375,10 +375,10 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
+@@ -305,10 +305,10 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
    let mainnet_pool =
@@ -3258,112 +3255,125 @@ index f377d693fc..a97801e306 100644
  
    match (mainnet_pool, migrated_pool) with
 diff --git a/src/app/berkeley_migration_verifier/sql.ml b/src/app/berkeley_migration_verifier/sql.ml
-index ff6c92ec9b..c0e89348d2 100644
+index fd5407fcb6..ca655d4f45 100644
 --- a/src/app/berkeley_migration_verifier/sql.ml
 +++ b/src/app/berkeley_migration_verifier/sql.ml
-@@ -1,5 +1,3 @@
+@@ -1,5 +1,4 @@
+ open Async
 -open Caqti_async
--
- let dump_sql_to_csv output_file ~sql =
-   Printf.sprintf "COPY ( %s ) TO '%s' DELIMITER ',' CSV HEADER " sql output_file
  
-@@ -26,9 +24,9 @@ module Mainnet = struct
-         WHERE receiver_account_creation_fee_paid IS NOT NULL
+ module Accounts_created = struct
+   type t =
+@@ -68,7 +67,7 @@ end
+ 
+ module Mainnet = struct
+   let dump_accounts_created_query =
+-    Caqti_request.collect Caqti_type.unit Accounts_created.typ
++    Mina_caqti.collect_req Caqti_type.unit Accounts_created.typ
+       {sql|
+       ( SELECT height, value AS public_key, state_hash, receiver_account_creation_fee_paid AS creation_fee
+         FROM blocks_user_commands
+@@ -89,18 +88,18 @@ module Mainnet = struct
        ) 
        ORDER BY height, public_key |sql}
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
  
--  let dump_accounts_created_to_csv (module Conn : CONNECTION) output_file =
-+  let dump_accounts_created_to_csv (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_accounts_created_to_csv_query ~output_file) ()
+-  let dump_accounts_created (module Conn : CONNECTION) =
++  let dump_accounts_created (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_accounts_created_query ()
  
-   let dump_state_and_ledger_hashes_to_csv_query ~output_file =
-@@ -38,7 +36,7 @@ module Mainnet = struct
-         "  SELECT state_hash, ledger_hash FROM blocks\n\
-         \            WHERE chain_status = 'canonical'\n\
-         \          "
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_state_and_ledger_hashes_query =
+     (* Workaround for replacing output file as caqti has an issue with using ? in place of FILE argument*)
+-    Caqti_request.collect Caqti_type.unit State_hash_and_ledger_hash.typ
++    Mina_caqti.collect_req Caqti_type.unit State_hash_and_ledger_hash.typ
+       "  SELECT state_hash, ledger_hash FROM blocks\n\
+       \            WHERE chain_status = 'canonical'\n\
+       \          "
  
-   let dump_block_hashes_till_height_query ~output_file ~height =
-     dump_sql_to_csv output_file
-@@ -49,10 +47,10 @@ module Mainnet = struct
-            \            WHERE chain_status = 'canonical'\n\
-            \            AND height <= %d ORDER BY height\n\
-            \      " height )
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_block_hashes_till_height_query ~height =
+-    Caqti_request.collect Caqti_type.unit State_hash_and_ledger_hash.typ
++    Mina_caqti.collect_req Caqti_type.unit State_hash_and_ledger_hash.typ
+       (Printf.sprintf
+          "\n\
+          \      SELECT state_hash, ledger_hash FROM blocks\n\
+@@ -108,22 +107,23 @@ module Mainnet = struct
+          \            AND height <= %d ORDER BY height\n\
+          \      " height )
  
--  let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
--      height =
-+  let dump_block_hashes_till_height (module Conn : Mina_caqti.CONNECTION)
-+      output_file height =
-     Conn.exec (dump_block_hashes_till_height_query ~output_file ~height) ()
+-  let dump_block_hashes_till_height (module Conn : CONNECTION) height =
++  let dump_block_hashes_till_height (module Conn : Mina_caqti.CONNECTION) height
++      =
+     Conn.collect_list (dump_block_hashes_till_height_query ~height) ()
  
-   let dump_block_hashes_query ~output_file =
-@@ -63,9 +61,9 @@ module Mainnet = struct
-         \            WHERE chain_status = 'canonical'\n\
-         \            ORDER BY height\n\
-         \      "
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_block_hashes_query =
+-    Caqti_request.collect Caqti_type.unit State_hash_and_ledger_hash.typ
++    Mina_caqti.collect_req Caqti_type.unit State_hash_and_ledger_hash.typ
+       "\n\
+       \      SELECT state_hash, ledger_hash FROM blocks\n\
+       \            WHERE chain_status = 'canonical'\n\
+       \            ORDER BY height\n\
+       \      "
  
--  let dump_block_hashes (module Conn : CONNECTION) output_file =
-+  let dump_block_hashes (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_block_hashes_query ~output_file) ()
+-  let dump_block_hashes (module Conn : CONNECTION) =
++  let dump_block_hashes (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_block_hashes_query ()
  
-   let dump_user_commands_till_height_query ~output_file ~height =
-@@ -87,10 +85,10 @@ module Mainnet = struct
-            \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
-             fee_payer_keys.id ORDER BY height, sequence_no\n\
-            \      " height )
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_user_commands_till_height_query ~height =
+-    Caqti_request.collect Caqti_type.unit User_command.typ
++    Mina_caqti.collect_req Caqti_type.unit User_command.typ
+       (Printf.sprintf
+          "WITH user_command_ids AS\n\
+          \      ( SELECT height, sequence_no, user_command_id FROM \
+@@ -141,11 +141,12 @@ module Mainnet = struct
+           fee_payer_keys.id ORDER BY height, sequence_no\n\
+          \      " height )
  
--  let dump_user_commands_till_height (module Conn : CONNECTION) output_file
--      height =
+-  let dump_user_commands_till_height (module Conn : CONNECTION) height =
 +  let dump_user_commands_till_height (module Conn : Mina_caqti.CONNECTION)
-+      output_file height =
-     Conn.exec (dump_user_commands_till_height_query ~output_file ~height) ()
++      height =
+     Conn.collect_list (dump_user_commands_till_height_query ~height) ()
  
-   let dump_internal_commands_till_height_query ~output_file ~height =
-@@ -112,10 +110,10 @@ module Mainnet = struct
-            \        ORDER BY height, sequence_no, secondary_sequence_no, type \n\
-            \   \n\
-            \          " height )
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_internal_commands_till_height_query ~height =
+-    Caqti_request.collect Caqti_type.unit Internal_command.typ
++    Mina_caqti.collect_req Caqti_type.unit Internal_command.typ
+       (Printf.sprintf
+          "WITH internal_command_ids AS \n\
+          \        ( SELECT internal_command_id, height, sequence_no, \
+@@ -163,11 +164,12 @@ module Mainnet = struct
+          \   \n\
+          \          " height )
  
--  let dump_internal_commands_till_height (module Conn : CONNECTION) output_file
--      height =
+-  let dump_internal_commands_till_height (module Conn : CONNECTION) height =
 +  let dump_internal_commands_till_height (module Conn : Mina_caqti.CONNECTION)
-+      output_file height =
-     Conn.exec (dump_internal_commands_till_height_query ~output_file ~height) ()
++      height =
+     Conn.collect_list (dump_internal_commands_till_height_query ~height) ()
  
-   let dump_user_commands_query ~output_file =
-@@ -135,9 +133,9 @@ module Mainnet = struct
-         \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
-          fee_payer_keys.id ORDER BY height, sequence_no\n\
-         \      "
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_user_commands_query =
+-    Caqti_request.collect Caqti_type.unit User_command.typ
++    Mina_caqti.collect_req Caqti_type.unit User_command.typ
+       "WITH user_command_ids AS\n\
+       \      ( SELECT height, sequence_no, user_command_id FROM \
+        blocks_user_commands\n\
+@@ -183,11 +185,11 @@ module Mainnet = struct
+        fee_payer_keys.id ORDER BY height, sequence_no\n\
+       \      "
  
--  let dump_user_commands (module Conn : CONNECTION) output_file =
-+  let dump_user_commands (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_user_commands_query ~output_file) ()
+-  let dump_user_commands (module Conn : CONNECTION) =
++  let dump_user_commands (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_user_commands_query ()
  
-   let dump_internal_commands_query ~output_file =
-@@ -158,13 +156,13 @@ module Mainnet = struct
-            \        ORDER BY height, sequence_no, secondary_sequence_no, type \n\
-            \   \n\
-            \          " )
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_internal_commands_query =
+-    Caqti_request.collect Caqti_type.unit Internal_command.typ
++    Mina_caqti.collect_req Caqti_type.unit Internal_command.typ
+       (Printf.sprintf
+          "WITH internal_command_ids AS \n\
+          \        ( SELECT internal_command_id, height, sequence_no, \
+@@ -204,11 +206,11 @@ module Mainnet = struct
+          \   \n\
+          \          " )
  
--  let dump_internal_commands (module Conn : CONNECTION) output_file =
-+  let dump_internal_commands (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_internal_commands_query ~output_file) ()
+-  let dump_internal_commands (module Conn : CONNECTION) =
++  let dump_internal_commands (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_internal_commands_query ()
  
    let mark_chain_till_fork_block_as_canonical_query =
 -    Caqti_request.exec Caqti_type.string
@@ -3371,7 +3381,7 @@ index ff6c92ec9b..c0e89348d2 100644
        {sql|
        UPDATE blocks
      Set chain_status = 'canonical'
-@@ -186,8 +184,8 @@ module Mainnet = struct
+@@ -230,14 +232,14 @@ module Mainnet = struct
        )
        |sql}
  
@@ -3382,16 +3392,20 @@ index ff6c92ec9b..c0e89348d2 100644
      Conn.exec mark_chain_till_fork_block_as_canonical_query fork_state_hash
  end
  
-@@ -202,21 +200,22 @@ module Berkeley = struct
-       JOIN account_identifiers ON account_identifier_id = account_identifiers.id 
+ module Berkeley = struct
+   let dump_accounts_created_query =
+-    Caqti_request.collect Caqti_type.unit Accounts_created.typ
++    Mina_caqti.collect_req Caqti_type.unit Accounts_created.typ
+       {sql|
+       SELECT height, value AS public_key, state_hash, creation_fee
+       FROM accounts_created
+@@ -246,19 +248,20 @@ module Berkeley = struct
        JOIN public_keys         ON public_key_id         = public_keys.id
        ORDER BY height, public_key |sql}
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
  
--  let dump_accounts_created_to_csv (module Conn : CONNECTION) output_file =
-+  let dump_accounts_created_to_csv (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_accounts_created_to_csv_query ~output_file) ()
+-  let dump_accounts_created (module Conn : CONNECTION) =
++  let dump_accounts_created (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_accounts_created_query ()
  
    let height_query =
 -    Caqti_request.find Caqti_type.unit Caqti_type.int
@@ -3410,7 +3424,7 @@ index ff6c92ec9b..c0e89348d2 100644
        {sql|
          WITH RECURSIVE chain AS 
          (  
-@@ -230,16 +229,18 @@ module Berkeley = struct
+@@ -272,19 +275,21 @@ module Berkeley = struct
          ) SELECT count(*) FROM chain where chain_status = 'canonical';
        |sql}
  
@@ -3430,111 +3444,119 @@ index ff6c92ec9b..c0e89348d2 100644
 +  let blocks_count (module Conn : Mina_caqti.CONNECTION) =
 +    Conn.find blocks_count_query ()
  
-   let dump_user_commands_till_height_query ~output_file ~height =
-     dump_sql_to_csv output_file
-@@ -260,10 +261,10 @@ module Berkeley = struct
-            \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
-             fee_payer_keys.id ORDER BY height, sequence_no\n\
-            \     " height )
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_user_commands_till_height_query ~height =
+-    Caqti_request.collect Caqti_type.unit User_command.typ
++    Mina_caqti.collect_req Caqti_type.unit User_command.typ
+       (Printf.sprintf
+          "WITH user_command_ids AS\n\
+          \      ( SELECT height, sequence_no, user_command_id FROM \
+@@ -302,11 +307,12 @@ module Berkeley = struct
+           fee_payer_keys.id ORDER BY height, sequence_no\n\
+          \     " height )
  
--  let dump_user_commands_till_height (module Conn : CONNECTION) output_file
--      height =
+-  let dump_user_commands_till_height (module Conn : CONNECTION) height =
 +  let dump_user_commands_till_height (module Conn : Mina_caqti.CONNECTION)
-+      output_file height =
-     Conn.exec (dump_user_commands_till_height_query ~output_file ~height) ()
++      height =
+     Conn.collect_list (dump_user_commands_till_height_query ~height) ()
  
-   let dump_internal_commands_till_height_query ~output_file ~height =
-@@ -285,10 +286,10 @@ module Berkeley = struct
-            \        ORDER BY height, sequence_no, secondary_sequence_no, \
-             command_type \n\
-            \      " height )
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_internal_commands_till_height_query ~height =
+-    Caqti_request.collect Caqti_type.unit Internal_command.typ
++    Mina_caqti.collect_req Caqti_type.unit Internal_command.typ
+       (Printf.sprintf
+          "WITH internal_command_ids AS \n\
+          \        ( SELECT internal_command_id, height, sequence_no, \
+@@ -324,11 +330,12 @@ module Berkeley = struct
+           command_type \n\
+          \      " height )
  
--  let dump_internal_commands_till_height (module Conn : CONNECTION) output_file
--      height =
+-  let dump_internal_commands_till_height (module Conn : CONNECTION) height =
 +  let dump_internal_commands_till_height (module Conn : Mina_caqti.CONNECTION)
-+      output_file height =
-     Conn.exec (dump_internal_commands_till_height_query ~output_file ~height) ()
++      height =
+     Conn.collect_list (dump_internal_commands_till_height_query ~height) ()
  
-   let dump_user_commands_query ~output_file =
-@@ -308,9 +309,9 @@ module Berkeley = struct
-         \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
-          fee_payer_keys.id ORDER BY height, sequence_no\n\
-         \     "
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_user_commands_query =
+-    Caqti_request.collect Caqti_type.unit User_command.typ
++    Mina_caqti.collect_req Caqti_type.unit User_command.typ
+       "WITH user_command_ids AS\n\
+       \      ( SELECT height, sequence_no, user_command_id FROM \
+        blocks_user_commands\n\
+@@ -344,11 +351,11 @@ module Berkeley = struct
+        fee_payer_keys.id ORDER BY height, sequence_no\n\
+       \     "
  
--  let dump_user_commands (module Conn : CONNECTION) output_file =
-+  let dump_user_commands (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_user_commands_query ~output_file) ()
+-  let dump_user_commands (module Conn : CONNECTION) =
++  let dump_user_commands (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_user_commands_query ()
  
-   let dump_internal_commands_query ~output_file =
-@@ -330,9 +331,9 @@ module Berkeley = struct
-         \        ORDER BY height, sequence_no, secondary_sequence_no, \
-          command_type \n\
-         \      "
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_internal_commands_query =
+-    Caqti_request.collect Caqti_type.unit Internal_command.typ
++    Mina_caqti.collect_req Caqti_type.unit Internal_command.typ
+       "WITH internal_command_ids AS \n\
+       \        ( SELECT internal_command_id, height, sequence_no, \
+        secondary_sequence_no FROM blocks_internal_commands \n\
+@@ -364,22 +371,22 @@ module Berkeley = struct
+        command_type \n\
+       \      "
  
--  let dump_internal_commands (module Conn : CONNECTION) output_file =
-+  let dump_internal_commands (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_internal_commands_query ~output_file) ()
+-  let dump_internal_commands (module Conn : CONNECTION) =
++  let dump_internal_commands (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_internal_commands_query ()
  
-   let dump_account_accessed_to_csv_query ~output_file =
-@@ -343,9 +344,10 @@ module Berkeley = struct
+   let dump_accounts_accessed_query =
+-    Caqti_request.collect Caqti_type.unit Accounts_accessed.typ
++    Mina_caqti.collect_req Caqti_type.unit Accounts_accessed.typ
+       {sql| SELECT account_identifier_id AS id, block_id 
+                  FROM accounts_accessed
                   JOIN blocks ON block_id = blocks.id
                   WHERE height <> 1
                   ORDER BY block_id, id |sql}
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
  
--  let dump_accounts_accessed_to_csv (module Conn : CONNECTION) output_file =
-+  let dump_accounts_accessed_to_csv (module Conn : Mina_caqti.CONNECTION)
-+      output_file =
-     Conn.exec (dump_account_accessed_to_csv_query ~output_file) ()
+-  let dump_accounts_accessed (module Conn : CONNECTION) =
++  let dump_accounts_accessed (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_accounts_accessed_query ()
  
-   let dump_block_hashes_till_height_query ~output_file ~height =
-@@ -357,10 +359,10 @@ module Berkeley = struct
-            \    AND height <= %d ORDER BY height\n\
-            \ \n\
-            \     " height )
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_block_hashes_till_height_query ~height =
+-    Caqti_request.collect Caqti_type.unit State_hash_and_ledger_hash.typ
++    Mina_caqti.collect_req Caqti_type.unit State_hash_and_ledger_hash.typ
+       (Printf.sprintf
+          "SELECT state_hash, ledger_hash FROM blocks \n\
+          \    WHERE chain_status = 'canonical'\n\
+@@ -387,22 +394,23 @@ module Berkeley = struct
+          \ \n\
+          \     " height )
  
--  let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
--      height =
-+  let dump_block_hashes_till_height (module Conn : Mina_caqti.CONNECTION)
-+      output_file height =
-     Conn.exec (dump_block_hashes_till_height_query ~output_file ~height) ()
+-  let dump_block_hashes_till_height (module Conn : CONNECTION) height =
++  let dump_block_hashes_till_height (module Conn : Mina_caqti.CONNECTION) height
++      =
+     Conn.collect_list (dump_block_hashes_till_height_query ~height) ()
  
-   let dump_block_hashes_query ~output_file =
-@@ -371,9 +373,9 @@ module Berkeley = struct
-         \      WHERE chain_status = 'canonical'\n\
-         \      ORDER BY height\n\
-         \      "
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_block_hashes_query =
+-    Caqti_request.collect Caqti_type.unit State_hash_and_ledger_hash.typ
++    Mina_caqti.collect_req Caqti_type.unit State_hash_and_ledger_hash.typ
+       "\n\
+       \      SELECT state_hash, ledger_hash FROM blocks\n\
+       \      WHERE chain_status = 'canonical'\n\
+       \      ORDER BY height\n\
+       \      "
  
--  let dump_block_hashes (module Conn : CONNECTION) output_file =
-+  let dump_block_hashes (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_block_hashes_query ~output_file) ()
+-  let dump_block_hashes (module Conn : CONNECTION) =
++  let dump_block_hashes (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_block_hashes_query ()
  
-   let dump_user_and_internal_command_info_to_csv_query ~output_file =
-@@ -403,21 +405,21 @@ module Berkeley = struct
-         INNER JOIN internal_commands ON id = internal_command_id
+   let dump_user_and_internal_command_info_query =
+-    Caqti_request.collect Caqti_type.unit Accounts_accessed.typ
++    Mina_caqti.collect_req Caqti_type.unit Accounts_accessed.typ
+       {sql| 
+       ( 
+         WITH user_command_ids AS
+@@ -428,18 +436,19 @@ module Berkeley = struct
          INNER JOIN account_identifiers ON public_key_id = receiver_id
        ) ORDER BY block_id, id |sql}
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
  
--  let dump_user_and_internal_command_info_to_csv (module Conn : CONNECTION)
--      output_file =
-+  let dump_user_and_internal_command_info_to_csv
-+      (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_user_and_internal_command_info_to_csv_query ~output_file) ()
+-  let dump_user_and_internal_command_info (module Conn : CONNECTION) =
++  let dump_user_and_internal_command_info (module Conn : Mina_caqti.CONNECTION)
++      =
+     Conn.collect_list dump_user_and_internal_command_info_query ()
  
    let get_account_accessed_count_query =
 -    Caqti_request.find Caqti_type.unit Caqti_type.int
@@ -3551,7 +3573,7 @@ index ff6c92ec9b..c0e89348d2 100644
        {sql| 
          select count(distinct ids.account_identifier_id) FROM 
  
-@@ -439,6 +441,7 @@ module Berkeley = struct
+@@ -461,6 +470,7 @@ module Berkeley = struct
       
        |sql}
  
