@@ -246,13 +246,13 @@ let
       phases = [ "unpackPhase" "buildPhase" "installPhase" ];
       buildPhase = ''
         mkdir config
-        mv *.mlh config/
+        mv *.mlh dune config/
         echo '(lang dune 3.3)' > dune-project
         dune build config/config.mlh
       '';
       installPhase = ''
         cp -R _build/default/config $out
-        rm -Rf _build
+        rm -Rf _build config
         sed -i "s%/src/config/%$out/%g" $(find -name '*.mlh' -type f)
         mv * $out/
       '';
