@@ -558,7 +558,7 @@ let
           let deps =
             pkgs.lib.getAttrs (builtins.attrNames implicit-deps ++ base-ppx-names ++ builtins.attrNames pins) base-prj; in
           pkgs.stdenv.mkDerivation {
-            name = "mina-base-libs-${minaConfig.DUNE_PROFILE}";
+            name = "mina-base-libs";
             phases = [ "installPhase" ];
             buildInputs = builtins.attrValues deps;
             installPhase = ''
