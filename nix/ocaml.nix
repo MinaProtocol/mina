@@ -506,11 +506,11 @@ let
           else if depsEntry.dependsOnConfig then collected // {"${name}" = true;}
           else
             let internalDeps = builtins.filter (name: builtins.hasAttr name depsMap) depsEntry.deps;
-                collected_ = pkgs.lib.foldlAttrs computeDependsOnConfig collected
+                collected_ = pkgs.lib.attrsets.foldlAttrs computeDependsOnConfig collected
                               (pkgs.lib.getAttrs internalDeps depsMap);
              in collected_ //
                {"${name}" = pkgs.lib.any (x: x) (builtins.attrValues (pkgs.lib.getAttrs internalDeps collected_)); };
-        dependsOnConfig = pkgs.lib.foldlAttrs computeDependsOnConfig {} depsMap;
+        dependsOnConfig = pkgs.lib.attrsets.foldlAttrs computeDependsOnConfig {} depsMap;
         opamCache = pkgs.lib.concatMapAttrs (n: dep:
             {"${dep.path}/${n}.opam" = opamTemplate;}) depsMap;
         graphqlDependents = ["mina_init" "rosetta_app_lib" "batch_txn_tool" "integration_test_cloud_engine" "integration_test_lib" "generated_graphql_queries" "integration_test_local_engine"];
