@@ -18,6 +18,5 @@
    ppx_register_event
    ppx_to_enum
 )
- (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppxlib.metaquot ppx_optcomp)))

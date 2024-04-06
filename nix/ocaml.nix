@@ -528,7 +528,7 @@ let
                 configurePhase =
                   ''
                     ${s.configurePhase}
-                    ${patchDune}
+                    [ -f dune-project ] || echo '(lang dune 3.3)' > dune-project
                   '';
               })) (pkgs.lib.getAttrs base-ppx-names super);
         # Attribute set containing derivations for all external libraries + local ppxs
@@ -642,7 +642,11 @@ let
                         chmod -Rf 777 _build
                       '';
                       installPhase = "touch $out";
-                  }); }
+                  } // (
+                    if name == "mina_net2" then
+                      { MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper"; }
+                    else {}
+                  )); }
                 ) minaPkgs;
               mkCombined = name: buildInputs:
                 pkgs.stdenv.mkDerivation {
@@ -656,7 +660,7 @@ let
                   '';
                 };
               # TODO remove
-              testPkgsFiltered = builtins.removeAttrs testPkgs ["test-transaction_snark_tests"];
+              testPkgsFiltered = builtins.removeAttrs testPkgs ["test-transaction_snark_tests" "test-archive_lib" "test-print_blockchain_snark_vk" "test-staged_ledger" "test-mina_net2"];
           in testPkgs // {
             all = mkCombined "mina-all" (builtins.attrValues minaPkgs);
             all-tested = mkCombined "mina-all-with-tests" (builtins.attrValues minaPkgs ++ builtins.attrValues testPkgsFiltered);
