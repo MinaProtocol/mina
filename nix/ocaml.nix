@@ -56,7 +56,6 @@ let
     MINA_COMMIT_DATE = "<unknown>";
     MINA_BRANCH = "<unknown>";
 
-    DUNE_PROFILE = "dev";
     DISABLE_CHECK_OPAM_SWITCH = "true";
 
     NIX_LDFLAGS =
@@ -241,7 +240,8 @@ let
     pkgs.stdenv.mkDerivation {
       inherit DUNE_PROFILE;
       src = ../src/config;
-      name = "mina-config-${DUNE_PROFILE}";
+      pname = "mina-config";
+      version = "${DUNE_PROFILE}";
       nativeBuildInputs = with self; [ dune ocaml ];
       phases = [ "unpackPhase" "buildPhase" "installPhase" ];
       buildPhase = ''
@@ -303,6 +303,7 @@ let
         version = "dev";
         # Prevent unnecessary rebuilds on non-source changes
         inherit src;
+        DUNE_PROFILE = "dev";
 
         withFakeOpam = false;
 
@@ -500,18 +501,29 @@ let
         };
         opamTemplate = opam-nix.importOpam ./opam.template;
         depsMap = builtins.fromJSON (builtins.readFile "${depsFiles}/deps.json");
+        computeDependsOnConfig = collected: name: depsEntry:
+          if builtins.hasAttr name collected then builtins.getAttr name collected
+          else if depsEntry.dependsOnConfig then collected // {"${name}" = true;}
+          else
+            let internalDeps = builtins.filter (name: builtins.hasAttr name depsMap) depsEntry.deps;
+                collected_ = pkgs.lib.foldlAttrs computeDependsOnConfig collected
+                              (pkgs.lib.getAttrs internalDeps depsMap);
+             in collected_ //
+               {"${name}" = pkgs.lib.any (x: x) (builtins.attrValues (pkgs.lib.getAttrs internalDeps collected_)); };
+        dependsOnConfig = pkgs.lib.foldlAttrs computeDependsOnConfig {} depsMap;
         opamCache = pkgs.lib.concatMapAttrs (n: dep:
-          {"${dep.path}/${n}.opam" = opamTemplate;}
-        ) depsMap;
+            {"${dep.path}/${n}.opam" = opamTemplate;}) depsMap;
         graphqlDependents = ["mina_init" "rosetta_app_lib" "batch_txn_tool" "integration_test_cloud_engine" "integration_test_lib" "generated_graphql_queries" "integration_test_local_engine"];
-        getDepsImpl = acc: self: name:
+        getDepsImpl = acc: profile: self: name:
           if builtins.hasAttr name depsMap then
-            let deps = (builtins.getAttr name depsMap).deps; in
             pkgs.lib.foldl (acc: dep:
-              if builtins.hasAttr dep self && ! builtins.hasAttr dep acc then
-                getDepsImpl (acc // {"${dep}" = builtins.getAttr dep self;}) self dep
+              let dep' =
+                if ! (builtins.hasAttr dep dependsOnConfig) || dependsOnConfig."${dep}"
+                then "${dep}-${profile}" else dep; in
+              if builtins.hasAttr dep' self && ! builtins.hasAttr dep acc then
+                getDepsImpl (acc // {"${dep}" = self."${dep'}";}) profile self dep
               else acc
-            ) acc deps
+            ) acc depsMap."${name}".deps
           else acc ;
         getDeps = getDepsImpl {};
         base-ppx-names =
@@ -529,7 +541,7 @@ let
             builtins.mapAttrs (name: old:
               old.overrideAttrs (s: {
                 withFakeOpam = false;
-                buildInputs = s.buildInputs ++ builtins.attrValues (getDeps self name) ++ external-libs ++ customDeps name;
+                buildInputs = s.buildInputs ++ builtins.attrValues (getDeps "" self name) ++ external-libs ++ customDeps name;
                 nativeBuildInputs = s.nativeBuildInputs ++ external-libs;
                 configurePhase =
                   ''
@@ -579,49 +591,61 @@ let
         filterLocalPkgs = pkgs.lib.filterAttrs (name: _:
           builtins.hasAttr name depsMap || name == "cli" );
         minaOverlay = self: super:
-          (builtins.mapAttrs (name: old:
-            let deps = getDeps self name;
-                minaLibp2pEnv =
-                  if builtins.hasAttr "mina_net2" deps then
-                    { MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper"; }
-                  else {};
-             in old.overrideAttrs (s:
-              minaEnv // minaLibp2pEnv // {
-                buildInputs = builtins.attrValues deps ++ external-libs ++ [base pkgs.sodium-static];
-                withFakeOpam = false;
-                inherit nixSupportPhase;
-                nativeBuildInputs = external-libs ++ [pkgs.capnproto base] ++ (with base-prj; [dune capnp]) ++
-                  (if name == "mina_init" then [base-prj.crunch] else []);
-                NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
-                preBuild = ''
-                  export LD_LIBRARY_PATH="${base}/lib/ocaml/${base-prj.ocaml.version}/site-lib/ctypes";
-                '';
-                outputs = [ "out" "dev" ];
-                postInstall = ''
-                  cp -R _build/default "$dev"
-                '';
-                configurePhase =
-                  ''
-                    ${s.configurePhase}
-                    [ -f dune-project ] || echo '(lang dune 3.3)' > dune-project
-                  '' +
-                  ( if builtins.elem name graphqlDependents then
-                    ''
-                      ${patchDuneGraphql self}
-                    ''
-                  else "") +
-                  (if depsMap."${name}".dependsOnConfig then
-                    ''
-                      ${patchDune self}
-                    '' else "")
-                   ;
-              })
-          ) (filterLocalPkgs super)) //
+          let minaPkgs =
+            pkgs.lib.concatMapAttrs (name: old:
+              let deps = getDeps self name;
+                  minaLibp2pEnv =
+                    if builtins.hasAttr "mina_net2" deps || name == "mina_net2" then
+                      { MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper"; }
+                    else {};
+                  graphqlConfigPhase =
+                    ( if builtins.elem name graphqlDependents then
+                      ''
+                        ${patchDuneGraphql self}
+                      ''
+                    else "");
+                  mkAdditionalConfigPhase = profile:
+                    (if depsMap."${name}".dependsOnConfig then
+                      ''
+                        ${patchDune self."mina-config-${profile}"}
+                      '' else "");
+                  new = old.overrideAttrs (s:
+                    minaEnv // minaLibp2pEnv // {
+                      inherit nixSupportPhase;
+                      buildInputs = builtins.attrValues deps ++ external-libs ++ [base pkgs.sodium-static];
+                      withFakeOpam = false;
+                      nativeBuildInputs = external-libs ++ [pkgs.capnproto base] ++ (with base-prj; [dune capnp]) ++
+                        (if name == "mina_init" then [base-prj.crunch] else []);
+                      NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
+                      preBuild = ''
+                        export LD_LIBRARY_PATH="${base}/lib/ocaml/${base-prj.ocaml.version}/site-lib/ctypes";
+                      '';
+                      outputs = [ "out" "dev" ];
+                      postInstall = ''
+                        cp -R _build/default "$dev"
+                      '';
+                      configurePhase =
+                        ''
+                          ${s.configurePhase}
+                          [ -f dune-project ] || echo '(lang dune 3.3)' > dune-project
+                        '' + graphqlConfigPhase;
+                    });
+                  newDependent = profile: new.overrideAttrs(s: 
+                    { version = profile;
+                      configurePhase = s.configurePhase + mkAdditionalConfigPhase profile;
+                    });
+                    in
+                    if dependsOnConfig."${name}" then
+                      { "${name}" = newDependent "dev";
+                        "${name}-devnet" = newDependent "devnet";
+                        "${name}-mainnet" = newDependent "mainnet";
+                      } else {"${name}" = new;} 
+                    ) (filterLocalPkgs super); in
+            minaPkgsDev //
               { graphql-schema = mkGraphqlSchema self;
                 mina-config-dev = mkMinaConfig "dev" base-prj;
                 mina-config-devnet = mkMinaConfig "devnet" base-prj;
                 mina-config-mainnet = mkMinaConfig "mainnet" base-prj;
-                mina-config = self.mina-config-devnet;
               };
         testOverlay = self: super:
           let minaPkgs = builtins.removeAttrs (filterLocalPkgs super) ["archive" "graphql_wrapper" "best_tip_merger"];
