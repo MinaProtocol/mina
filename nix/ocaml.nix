@@ -107,10 +107,10 @@ let
     {
       # https://github.com/Drup/ocaml-lmdb/issues/41
       lmdb = super.lmdb.overrideAttrs
-        (_: oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
+        (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
 
       # Can't find sodium-static and ctypes
-      sodium = super.sodium.overrideAttrs (_: _: {
+      sodium = super.sodium.overrideAttrs (_: {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
         propagatedBuildInputs = [ pkgs.sodium-static ];
         preBuild = ''
@@ -120,18 +120,18 @@ let
 
       # Doesn't have an explicit dependency on ctypes-foreign
       ctypes = super.ctypes.overrideAttrs
-        (_: oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
+        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
 
       # Doesn't have an explicit dependency on ctypes
       rpc_parallel = super.rpc_parallel.overrideAttrs
-        (_: oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
+        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
 
-      check_opam_switch = super.check_opam_switch.overrideAttrs (_: oa: {
+      check_opam_switch = super.check_opam_switch.overrideAttrs (oa: {
         # So that opam in impure shell doesn't get shadowed by the fake one
         propagateInputs = false;
       });
 
-      rocks = super.rocks.overrideAttrs (_: s: {
+      rocks = super.rocks.overrideAttrs (s: {
         MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
         buildInputs = s.buildInputs ++ [ self.ctypes-foreign self.dune-configurator ];
         nativeBuildInputs = s.nativeBuildInputs ++ [
@@ -287,7 +287,7 @@ let
       # Useful for unit tests.
       runMinaCheck = { name ? "check", extraInputs ? [ ], extraArgs ? { } }:
         check:
-        self.mina-dev.overrideAttrs (_: oa:
+        self.mina-dev.overrideAttrs (oa:
           {
             pname = "mina-${name}";
             buildInputs = oa.buildInputs ++ extraInputs;
@@ -404,7 +404,7 @@ let
       mina = wrapMina self.mina-dev { };
 
       # Mina with additional instrumentation info.
-      with-instrumentation-dev = self.mina-dev.overrideAttrs (_: oa: {
+      with-instrumentation-dev = self.mina-dev.overrideAttrs (oa: {
         pname = "with-instrumentation";
         outputs = [ "out" ];
 
@@ -419,7 +419,7 @@ let
 
       with-instrumentation = wrapMina self.with-instrumentation-dev { };
 
-      mainnet-pkg = self.mina-dev.overrideAttrs (_: s: {
+      mainnet-pkg = self.mina-dev.overrideAttrs (s: {
         version = "mainnet";
         DUNE_PROFILE = "mainnet";
         # For compatibility with Docker build
@@ -539,7 +539,7 @@ let
               else [] ;
           in
             builtins.mapAttrs (name: old:
-              old.overrideAttrs (_: s: {
+              old.overrideAttrs (s: {
                 withFakeOpam = false;
                 buildInputs = s.buildInputs ++ builtins.attrValues (getDeps "" self name) ++ external-libs ++ customDeps name;
                 nativeBuildInputs = s.nativeBuildInputs ++ external-libs;
@@ -609,7 +609,7 @@ let
                   ''
                     ${patchDune self."mina-config-${profile}"}
                   '' else "";
-              new = old.overrideAttrs (_: s: minaEnv // minaLibp2pEnv // {
+              new = old.overrideAttrs (s: minaEnv // minaLibp2pEnv // {
                 inherit nixSupportPhase;
                 buildInputs = builtins.attrValues deps ++ external-libs ++ [base pkgs.sodium-static];
                 withFakeOpam = false;
@@ -629,7 +629,7 @@ let
                     [ -f dune-project ] || echo '(lang dune 3.3)' > dune-project
                   '' + graphqlConfigPhase;
               });
-              newDependent = profile: new.overrideAttrs(_: s: {
+              newDependent = profile: new.overrideAttrs(s: {
                 version = profile;
                 configurePhase = s.configurePhase + mkAdditionalConfigPhase profile;
               });
@@ -649,7 +649,7 @@ let
           let minaPkgs = builtins.removeAttrs (filterLocalPkgs super) ["archive" "graphql_wrapper" "best_tip_merger"];
               testPkgs = pkgs.lib.mapAttrs' (name: old:
                 { name = "test-${name}";
-                  value = old.overrideAttrs (_: s: {
+                  value = old.overrideAttrs (s: {
                       MINA_LIBP2P_PASS = "naughty blue worm";
                       MINA_PRIVKEY_PASS = "naughty blue worm";
                       TZDIR = "${pkgs.tzdata}/share/zoneinfo";
@@ -701,7 +701,7 @@ let
         in
         prj;
 
-      devnet-pkg = self.mina-dev.overrideAttrs (_: s: {
+      devnet-pkg = self.mina-dev.overrideAttrs (s: {
         version = "devnet";
         DUNE_PROFILE = "devnet";
         # For compatibility with Docker build
@@ -736,7 +736,7 @@ let
       '';
 
       # Integration test executive
-      test_executive-dev = self.mina-dev.overrideAttrs (_: oa: {
+      test_executive-dev = self.mina-dev.overrideAttrs (oa: {
         pname = "mina-test_executive";
         outputs = [ "out" ];
 
