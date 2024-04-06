@@ -255,14 +255,14 @@ let compare_internal_commands migrated_pool mainnet_pool ~work_dir =
   in
   diff_files internal_commands_berk internal_commands_main
 
-let compare_ledger_hash ~migrated_replayer_output ~fork_config_file =
+let compare_ledger_hash ~migrated_replayer_output ~fork_genesis_config_file =
   let checkpoint_ledger_hash =
     Yojson.Basic.from_file migrated_replayer_output
     |> member "genesis_ledger" |> member "hash" |> to_string
     |> Ledger_hash.of_base58_check_exn
   in
   let fork_ledger_hash =
-    Yojson.Basic.from_file fork_config_file
+    Yojson.Basic.from_file fork_genesis_config_file
     |> member "ledger" |> member "hash" |> to_string
     |> Ledger_hash.of_base58_check_exn
   in
@@ -353,24 +353,26 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
         Deferred.Or_error.errorf
           "Some tests failed. Please refer to above output for details"
 
-let fork_config_exn ~fork_config_file =
-  Yojson.Basic.from_file fork_config_file |> member "proof" |> member "fork"
+let fork_config_exn ~fork_genesis_config_file =
+  Yojson.Basic.from_file fork_genesis_config_file
+  |> member "proof" |> member "fork"
 
-let fork_block_state_hash_exn ~fork_config_file =
-  fork_config_exn ~fork_config_file |> member "state_hash" |> to_string
+let fork_block_state_hash_exn ~fork_genesis_config_file =
+  fork_config_exn ~fork_genesis_config_file |> member "state_hash" |> to_string
 
-let fork_block_height_exn ~fork_config_file =
-  fork_config_exn ~fork_config_file |> member "blockchain_length" |> to_int
+let fork_block_height_exn ~fork_genesis_config_file =
+  fork_config_exn ~fork_genesis_config_file
+  |> member "blockchain_length" |> to_int
 
 let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
-    ~migrated_replayer_output ~fork_config_file () =
+    ~migrated_replayer_output ~fork_genesis_config_file () =
   Async.printf
     "Running verifications for incremental migration between '%s' and '%s' \
      schemas. It may take a couple of minutes... \n"
     mainnet_archive_uri migrated_archive_uri ;
 
-  let fork_height = fork_block_height_exn ~fork_config_file in
-  let fork_state_hash = fork_block_state_hash_exn ~fork_config_file in
+  let fork_height = fork_block_height_exn ~fork_genesis_config_file in
+  let fork_state_hash = fork_block_state_hash_exn ~fork_genesis_config_file in
 
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
@@ -451,7 +453,7 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
       |> Test.eval ;
 
       let check =
-        compare_ledger_hash ~migrated_replayer_output ~fork_config_file
+        compare_ledger_hash ~migrated_replayer_output ~fork_genesis_config_file
       in
       Test.of_check check ~name:"Verify fork config vs migrated replayer output"
         ~idx:8 ~prefix:"A10.3" test_count
@@ -494,14 +496,15 @@ let post_fork_migration_command =
         ~aliases:[ "-migrated-replayer-output" ]
         Command.Param.(required string)
         ~doc:"Path Path to migrated replayer output"
-    and fork_config_file =
-      Command.Param.flag "--fork-config-file" ~aliases:[ "-fork-config-file" ]
+    and fork_genesis_config_file =
+      Command.Param.flag "--fork-genesis-config"
+        ~aliases:[ "-fork-genesis-config" ]
         Command.Param.(required string)
-        ~doc:"String Path to fork config file"
+        ~doc:"String Path to config file of the fork network"
     in
 
     post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
-      ~migrated_replayer_output ~fork_config_file)
+      ~migrated_replayer_output ~fork_genesis_config_file)
 
 let commands =
   [ ("pre-fork", incremental_migration_command)
