@@ -238,15 +238,9 @@ let
       '';
     };
   mkMinaConfig = DUNE_PROFILE: self:
-    let src = with inputs.nix-filter.lib;
-      filter {
-        root = ../src;
-        include =
-          [ (inDirectory "config") ];
-        };
-    in
     pkgs.stdenv.mkDerivation {
-      inherit src DUNE_PROFILE;
+      inherit DUNE_PROFILE;
+      src = ../src/config;
       name = "mina-config-${DUNE_PROFILE}";
       nativeBuildInputs = with self; [ dune ocaml ];
       phases = [ "unpackPhase" "buildPhase" "installPhase" ];
@@ -623,9 +617,9 @@ let
               })
           ) (filterLocalPkgs super)) //
               { graphql-schema = mkGraphqlSchema self;
-                mina-config-dev = mkMinaConfig "dev" self;
-                mina-config-devnet = mkMinaConfig "devnet" self;
-                mina-config-mainnet = mkMinaConfig "mainnet" self;
+                mina-config-dev = mkMinaConfig "dev" base-prj;
+                mina-config-devnet = mkMinaConfig "devnet" base-prj;
+                mina-config-mainnet = mkMinaConfig "mainnet" base-prj;
                 mina-config = self.mina-config-devnet;
               };
         testOverlay = self: super:
