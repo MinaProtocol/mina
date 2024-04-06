@@ -502,7 +502,7 @@ let
         opamTemplate = opam-nix.importOpam ./opam.template;
         depsMap = builtins.fromJSON (builtins.readFile "${depsFiles}/deps.json");
         computeDependsOnConfig = collected: name: depsEntry:
-          if builtins.hasAttr name collected then builtins.getAttr name collected
+          if builtins.hasAttr name collected then collected
           else if depsEntry.dependsOnConfig then collected // {"${name}" = true;}
           else
             let internalDeps = builtins.filter (name: builtins.hasAttr name depsMap) depsEntry.deps;
