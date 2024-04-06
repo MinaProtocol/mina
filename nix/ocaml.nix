@@ -249,13 +249,11 @@ let
         mv *.mlh dune config/
         echo '(lang dune 3.3)' > dune-project
         dune build config/config.mlh
-      '';
-      installPhase = ''
-        cp -R _build/default/config $out
+        cp -R _build/default/config/* ./
         rm -Rf _build config
         sed -i "s%/src/config/%$out/%g" $(find -name '*.mlh' -type f)
-        mv * $out/
       '';
+      installPhase = "cp -R . $out";
     };
 
   overlay = self: super:
