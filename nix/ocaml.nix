@@ -221,6 +221,45 @@ let
           (inDirectory "src/lib/ppx_to_enum") (inDirectory "src/lib/ppx_annot")
           (inDirectory "src/lib/logproc_lib") (inDirectory "src/lib/structured_log_events") ];
     };
+  mkGraphqlSchema = self:
+    pkgs.stdenv.mkDerivation {
+      src =
+        with inputs.nix-filter.lib;
+        filter {
+          root = ../src;
+          include = [ "./graphql-ppx-config.inc" ];
+        };
+      name = "graphql-schema";
+      phases = [ "unpackPhase" "installPhase" ];
+      installPhase = ''
+        mkdir -p $out
+        cp graphql-ppx-config.inc $out/
+        ${self.graphql_schema_dump}/bin/graphql_schema_dump > $out/graphql_schema.json
+      '';
+    };
+  mkMinaConfig = DUNE_PROFILE: self:
+    let src = with inputs.nix-filter.lib;
+      filter {
+        root = ../src;
+        include =
+          [ (inDirectory "config") ];
+        };
+    in
+    pkgs.stdenv.mkDerivation {
+      inherit src DUNE_PROFILE;
+      name = "mina-config-${DUNE_PROFILE}";
+      nativeBuildInputs = with self; [ dune ocaml ];
+      phases = [ "unpackPhase" "buildPhase" "installPhase" ];
+      buildPhase = ''
+        echo '(lang dune 3.3)' > dune-project
+        dune build config/config.mlh
+      '';
+      installPhase = ''
+        cp -R _build/default/config $out
+        cd $out
+        sed -i "s%/src/config/%$out/%g" $(find -name '*.mlh' -type f)
+      '';
+    };
 
   overlay = self: super:
     let
@@ -394,10 +433,7 @@ let
       mainnet = wrapMina self.mainnet-pkg { };
 
       experiment =
-        # let deps = builtins.removeAttrs export-installed (builtins.attrNames pins.section ++ builtins.attrNames external-packages); in
-        # let deps = builtins.removeAttrs export-installed ["check_opam_switch"] // { base58 = "0.1.3"; }; in
         let
-        # deps = builtins.removeAttrs export-installed (builtins.attrNames pins) // { base58 = "0.1.3"; };
         deps = extra-packages // implicit-deps ;
         nixSupportPhase = ''
            exportIfUnset() {
@@ -411,30 +447,6 @@ let
              } "$OCAMLFIND_DESTDIR" >> $out/nix-support/setup-hook
            fi
          '';
-        minaConfig =
-          let src = with inputs.nix-filter.lib;
-            filter {
-              root = ../src;
-              include =
-                [ (inDirectory "config") ];
-              };
-            DUNE_PROFILE = "devnet";
-          in
-          pkgs.stdenv.mkDerivation {
-            inherit src DUNE_PROFILE;
-            name = "mina-config-${DUNE_PROFILE}";
-            nativeBuildInputs = with self; [ dune ocaml ];
-            phases = [ "unpackPhase" "buildPhase" "installPhase" ];
-            buildPhase = ''
-              echo '(lang dune 3.3)' > dune-project
-              dune build config/config.mlh
-            '';
-            installPhase = ''
-              cp -R _build/default/config $out
-              cd $out
-              sed -i "s%/src/config/%$out/%g" $(find -name '*.mlh' -type f)
-            '';
-          };
         patchDuneGraphql = self: ''
           dune_files=$(find -name dune -type f)
           ( [[ "$dune_files" != "" ]] && grep -o graphql_schema.json $dune_files >/dev/null && \
@@ -444,12 +456,11 @@ let
             cp ${self.graphql-schema}/graphql-ppx-config.inc ./ && \
             sed -i -r 's%(\.\./)*graphql-ppx-config\.inc%./graphql-ppx-config.inc%g' $dune_files ) || true
           '';
-        patchDune = ''
-          [ -f dune-project ] || echo '(lang dune 3.3)' > dune-project
+        patchDune = self: ''
           dune_files=$(find -name dune -type f)
           ( [[ "$dune_files" != "" ]] && grep -oE config.mlh $dune_files >/dev/null && \
-            sed -i -r 's%(../)*config.mlh%${minaConfig}/config.mlh%g' $dune_files && \
-            sed -i 's~\[%%import "/src/config.mlh"\]~\[%%import "${minaConfig}/config.mlh"\]~g' \
+            sed -i -r 's%(../)*config.mlh%${self.mina-config}/config.mlh%g' $dune_files && \
+            sed -i 's~\[%%import "/src/config.mlh"\]~\[%%import "${self.mina-config}/config.mlh"\]~g' \
             $(find \( -name '*.ml' -or -name '*.mli' \) -type f) ) || true
           '';
         depsFiles =
@@ -597,33 +608,26 @@ let
                 configurePhase =
                   ''
                     ${s.configurePhase}
-                    ${patchDune}
+                    [ -f dune-project ] || echo '(lang dune 3.3)' > dune-project
                   '' +
                   ( if builtins.elem name graphqlDependents then
                     ''
                       ${patchDuneGraphql self}
                     ''
-                  else "") ;
+                  else "") +
+                  (if depsMap."${name}".dependsOnConfig then
+                    ''
+                      ${patchDune self}
+                    '' else "")
+                   ;
               })
           ) (filterLocalPkgs super)) //
-              { graphql-schema =
-                  pkgs.stdenv.mkDerivation {
-                    src =
-                      with inputs.nix-filter.lib;
-                      filter {
-                        root = ../src;
-                        include = [ "./graphql-ppx-config.inc" ];
-                      };
-                    name = "graphql-schema";
-                    phases = [ "unpackPhase" "installPhase" ];
-                    installPhase = ''
-                      mkdir -p $out
-                      cp graphql-ppx-config.inc $out/
-                      ${self.graphql_schema_dump}/bin/graphql_schema_dump > $out/graphql_schema.json
-                    '';
-                  };
-              }
-          ;
+              { graphql-schema = mkGraphqlSchema self;
+                mina-config-dev = mkMinaConfig "dev" self;
+                mina-config-devnet = mkMinaConfig "devnet" self;
+                mina-config-mainnet = mkMinaConfig "mainnet" self;
+                mina-config = self.mina-config-devnet;
+              };
         testOverlay = self: super:
           let minaPkgs = builtins.removeAttrs (filterLocalPkgs super) ["archive" "graphql_wrapper" "best_tip_merger"];
               testPkgs = pkgs.lib.mapAttrs' (name: old:

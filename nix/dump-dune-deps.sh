@@ -10,10 +10,14 @@ name_expr='\(\s*public_name\s\s*([^\)]*)\)'
   for name in "${names[@]}"; do
     deps="${depss[$ix]}"
     ix=$((ix+1))
-    echo "\"$name\":{\"deps\":[\"$deps\"],\"path\":\"$(dirname "$dune")\"}"
+    path=$(dirname "$dune")
+
+    dune_files=$(find "$path" -name dune -type f)
+    dependsOnConfig=$(( grep -oE config.mlh $dune_files >/dev/null && echo true ) || echo false)
+    echo "\"$name\":{\"deps\":[\"$deps\"],\"path\":\"$path\",\"dependsOnConfig\":$dependsOnConfig}"
   done
   # TODO extract it automatically
-  echo '"cli":{"deps":["mina_signature_kind","mina_cli_entrypoint"],"path":"src/app/cli"}'
-  echo '"test_type_equalities":{"deps":["mina_wire_types","currency","snark_params","signature_lib","mina_base","mina_base.import","mina_numbers","block_time","one_or_two","mina_transaction","mina_state","mina_transaction_logic","transaction_snark","transaction_snark_work","ledger_proof","network_pool","consensus","consensus.vrf","protocol_version","genesis_constants","mina_block","sgn","sgn_type","data_hash_lib","kimchi_backend.pasta","kimchi_backend.pasta.basic","kimchi_backend","pickles","pickles.backend","pickles_base","pasta_bindings","blake2","staged_ledger_diff","bounded_types"],"path":"src/lib/mina_wire_types_test"}'
+  echo '"cli":{"deps":["mina_signature_kind","mina_cli_entrypoint"],"path":"src/app/cli","dependsOnConfig":false}'
+  echo '"test_type_equalities":{"deps":["mina_wire_types","currency","snark_params","signature_lib","mina_base","mina_base.import","mina_numbers","block_time","one_or_two","mina_transaction","mina_state","mina_transaction_logic","transaction_snark","transaction_snark_work","ledger_proof","network_pool","consensus","consensus.vrf","protocol_version","genesis_constants","mina_block","sgn","sgn_type","data_hash_lib","kimchi_backend.pasta","kimchi_backend.pasta.basic","kimchi_backend","pickles","pickles.backend","pickles_base","pasta_bindings","blake2","staged_ledger_diff","bounded_types"],"path":"src/lib/mina_wire_types_test","dependsOnConfig":false}'
 done | tr "\n" "," | sed 's/^/{/g' | sed 's/,$/}/g'
 rm tmp_file
