@@ -628,8 +628,17 @@ let
                 mina-config-devnet = mkMinaConfig "devnet" base-prj;
                 mina-config-mainnet = mkMinaConfig "mainnet" base-prj;
               };
+        mkRuntest = name: pkg: dune:
+          pkgs.writeShellScriptBin "runtest-${name}" ''
+            mkdir -p ${name}/_build
+            cp -R ${pkg.src}/* ${name}/
+            cp -R ${pkg.dev} ${name}/_build/default
+            chmod -Rf 777 ${name}
+            echo '(lang dune 3.3)' > dune-project
+            ${dune} runtest ${name}
+          '';
         testOverlay = self: super:
-          let minaPkgs = builtins.removeAttrs (filterLocalPkgs super) ["archive" "graphql_wrapper" "best_tip_merger"];
+          let minaPkgs = builtins.removeAttrs (filterLocalPkgs super) ["best_tip_merger"];
               testPkgs = pkgs.lib.mapAttrs' (name: old:
                 { name = "test-${name}";
                   value = old.overrideAttrs (s: {
@@ -664,24 +673,20 @@ let
           in testPkgs // {
             all = mkCombined "mina-all" (builtins.attrValues minaPkgs);
             all-tested = mkCombined "mina-all-with-tests" (builtins.attrValues minaPkgs ++ builtins.attrValues testPkgsFiltered);
-            intg = pkgs.testers.runNixOSTest {
-              name = "blabla-test";
-
+            runtest-mina_net2 = mkRuntest "mina_net2" self.mina_net2 base-prj.dune;
+            vmtest-mina_net2 = pkgs.testers.runNixOSTest {
+              name = "vmtest-mina_net2";
               nodes.machine = { config, pkgs, ... }: {
-
-                users.users.alice = {
+                users.users.mina = {
                   isNormalUser = true;
                   extraGroups = [ "wheel" ];
-                  packages = [ self.graphql_schema_dump ];
+                  packages = [ self.runtest-mina_net2 ];
                 };
-
                 system.stateVersion = "23.05";
               };
-
               testScript = ''
                 machine.wait_for_unit("default.target")
-                machine.succeed("su -- alice -c 'which graphql_schema_dump'")
-                machine.fail("su -- root -c 'which graphql_schema_dump'")
+                machine.succeed("su -- mina -c 'runtest-mina_net2'")
               '';
             };
           };
