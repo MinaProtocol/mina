@@ -110,11 +110,9 @@ let%test_module "all-ipc test" =
       { trusted_peers = []; banned_peers = [ fake_peer ]; isolate = false }
 
     type addrs =
-      { a_addr : Multiaddr.t
-      ; a_peerid : string
+      { a_peerid : string
       ; b_addr : Multiaddr.t
       ; b_peerid : string
-      ; c_addr : Multiaddr.t
       ; c_peerid : string
       ; y_peerid : string
       }
@@ -611,13 +609,13 @@ let%test_module "all-ipc test" =
       in
       let c_pipe = Pipe.create () in
       (* Configuration *)
-      let%bind c, _, c_addr, c_shutdown =
+      let%bind c, _, _c_addr, c_shutdown =
         setup_node "carol" ~keypair:kp_c ~seed_peers:[ y_addr; a_addr; b_addr ]
           ~on_peer_connected:(on_connected c_pipe)
           ~on_peer_disconnected:(on_disconnected c_pipe)
       in
       let addrs =
-        { a_addr; b_addr; c_addr; a_peerid; b_peerid; c_peerid; y_peerid }
+        { b_addr; a_peerid; b_peerid; c_peerid; y_peerid }
       in
       [%log info] "Alice: $peerId" ~metadata:[ ("peerId", `String a_peerid) ] ;
       [%log info] "Bob: $peerId" ~metadata:[ ("peerId", `String b_peerid) ] ;
