@@ -1,5 +1,5 @@
 # A set defining OCaml parts&dependencies of Minaocamlnix
-{ inputs, src, ... }@args:
+{ inputs, mina-src, ... }@args:
 let
   foldlAttrs = f: init: set:
     pkgs.lib.lists.foldl'
@@ -18,10 +18,10 @@ let
     escapeShellArg;
 
   external-repo =
-    opam-nix.makeOpamRepoRec "${src}/src/external"; # Pin external packages
+    opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
   repos = [ external-repo inputs.opam-repository ];
 
-  export = opam-nix.importOpam "${src}/opam.export";
+  export = opam-nix.importOpam "${mina-src}/opam.export";
   external-packages = pkgs.lib.getAttrs [ "sodium" "base58"
     "h_list" "bitstring_lib" "snarky_signature" "snarky" "snarky_curve" "fold_lib" "group_map" "snarkette" "tuple_lib" "sponge" "snarky_bench" "interval_union" "ppx_snarky" "snarky_integer" "ppx_optcomp" "prometheus" "rocks"
     ]
@@ -98,11 +98,6 @@ let
       '';
     };
 
-  # "System" dependencies required by all Mina packages
-  external-libs = with pkgs;
-    [ zlib bzip2 gmp openssl libffi rocksdb511Stub ]
-    ++ lib.optional (!(stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
-
   # This is needed because
   # - lld package is not wrapped to pick up the correct linker flags
   # - bintools package also includes as which is incompatible with gcc
@@ -145,7 +140,7 @@ let
         ];
         configurePhase = ''
           ${s.configurePhase}
-          cp ${../src/dune.linker.inc} dune.linker.inc
+          cp ${mina-src}/src/dune.linker.inc dune.linker.inc
           sed -i -r 's%\.\./\.\./dune\.linker\.inc%dune.linker.inc%g' dune
           '';
         buildPhase = ''
@@ -173,7 +168,7 @@ let
     let src =
        builtins.filterSource
         (path: type: type != "file" || builtins.elem (baseNameOf path) ["dune" "dune-project" "dump-dune-deps.sh"])
-          ../.;
+          mina-src;
         in
     pkgs.stdenv.mkDerivation {
       name = "mina-deps-json";
@@ -194,7 +189,7 @@ let
     };
   src-with-opam-files = pkgs.stdenv.mkDerivation {
     name = "mina-src-with-opam";
-    src = filtered-src;
+    src = mina-src;
     phases = [ "unpackPhase" "buildPhase" "installPhase" ];
     buildPhase = ''
       ${pkgs.bash}/bin/bash ${depsFiles}/gen-opam-files.sh
@@ -231,7 +226,7 @@ let
       src =
         with inputs.nix-filter.lib;
         filter {
-          root = ../src;
+          root = "${mina-src}/src";
           include = [ "./graphql-ppx-config.inc" ];
         };
       name = "graphql-schema";
@@ -245,7 +240,7 @@ let
   mkMinaConfig = DUNE_PROFILE: self:
     pkgs.stdenv.mkDerivation {
       inherit DUNE_PROFILE;
-      src = ../src/config;
+      src = "${mina-src}/src/config";
       pname = "mina-config";
       version = "${DUNE_PROFILE}";
       nativeBuildInputs = with self; [ dune ocaml ];
@@ -308,7 +303,7 @@ let
         pname = "mina";
         version = "dev";
         # Prevent unnecessary rebuilds on non-source changes
-        inherit src;
+        src = mina-src;
         DUNE_PROFILE = "dev";
 
         withFakeOpam = false;
@@ -469,7 +464,7 @@ let
           let src =
              builtins.filterSource
               (path: type: type != "file" || builtins.elem (baseNameOf path) ["dune" "dune-project" "dump-dune-deps.sh"])
-                ../.;
+                mina-src;
               in
           pkgs.stdenv.mkDerivation {
           name = "mina-deps-json";
@@ -486,23 +481,6 @@ let
           installPhase = ''
             mkdir -p $out
             cp deps.json gen-opam-files.sh $out
-          '';
-        };
-        src-with-opam-files = pkgs.stdenv.mkDerivation {
-          name = "mina-src-with-opam";
-          inherit src;
-          nativeBuildInputs = with self; [ dune ocaml pkgs.jq ];
-          phases = [ "unpackPhase" "buildPhase" "installPhase" ];
-          buildPhase = ''
-            ${pkgs.bash}/bin/bash ${depsFiles}/gen-opam-files.sh
-
-            dune_files=$(grep -l dune.flags.inc $(find src/app src/lib -name dune -type f))
-            [[ "$dune_files" == "" ]] || \
-              ( sed -i -r 's%(\.\./)*dune\.flags\.inc%./dune.flags.inc%g' $dune_files && \
-              { for f in $dune_files; do cp src/dune*.inc $(dirname $f); done; } )
-            '';
-          installPhase = ''
-            cp -R . $out
           '';
         };
         opamTemplate = opam-nix.importOpam ./opam.template;
