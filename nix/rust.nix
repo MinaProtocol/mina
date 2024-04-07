@@ -178,7 +178,7 @@ in
       # Want to run after cargoSetupPostUnpackHook
       prePatch = ''
         chmod +w $NIX_BUILD_TOP/cargo-vendor-dir
-        ln -sf ${final.kimchi-rust-std-deps}/*/ $NIX_BUILD_TOP/cargo-vendor-dir
+        ln -sf ${final.kimchi-rust-std-deps}/*/ $NIX_BUILD_TOP/cargo-vendor-dir || true
         chmod -w $NIX_BUILD_TOP/cargo-vendor-dir
       '';
 
