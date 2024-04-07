@@ -227,7 +227,7 @@ let
         with inputs.nix-filter.lib;
         filter {
           root = "${mina-src}/src";
-          include = [ "./graphql-ppx-config.inc" ];
+          include = [ "graphql-ppx-config.inc" ];
         };
       name = "graphql-schema";
       phases = [ "unpackPhase" "installPhase" ];
