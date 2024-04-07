@@ -617,8 +617,9 @@ let
                       ''
                         ${patchDune self."mina-config-${profile}"}
                       '' else "";
-	        in old.overrideAttrs (_: minaEnv // minaLibp2pEnv // {
+                in old.overrideAttrs (_: minaEnv // minaLibp2pEnv // {
                   version = profile;
+                  pname = name;
                   inherit nixSupportPhase;
                   buildInputs = builtins.attrValues deps ++ external-libs ++ [base pkgs.sodium-static];
                   withFakeOpam = false;
@@ -667,11 +668,7 @@ let
                         chmod -Rf 777 _build
                       '';
                       installPhase = "touch $out";
-                  } // (
-                    if name == "mina_net2" then
-                      { MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper"; }
-                    else {}
-                  )); }
+                  } ); }
                 ) minaPkgs;
               mkCombined = name: buildInputs:
                 pkgs.stdenv.mkDerivation {
