@@ -17,6 +17,8 @@ let
     hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath optionalString
     escapeShellArg;
 
+  ocaml-utils = ["ocaml" "ocaml-base-compiler" "ocaml-compiler-libs" "ocaml-config" "ocaml-migrate-parsetree" "ocaml-options-vanilla" "ocaml-syntax-shims" "ocaml-version" "ocamlbuild" "ocamlfind"];
+
   external-repo =
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
   repos = [ external-repo inputs.opam-repository ];
@@ -628,15 +630,17 @@ let
                 mina-config-devnet = mkMinaConfig "devnet" base-prj;
                 mina-config-mainnet = mkMinaConfig "mainnet" base-prj;
               };
-        mkRuntest = name: pkg: dune:
-          pkgs.writeShellScriptBin "runtest-${name}" ''
-            mkdir -p ${name}/_build
-            cp -R ${pkg.src}/* ${name}/
-            cp -R ${pkg.dev} ${name}/_build/default
-            chmod -Rf 777 ${name}
+        mkRuntest = pkg:
+          (pkgs.writeShellScriptBin "runtest-${pkg.pname}" ''
+            mkdir -p _build
+            cp -R ${pkg.src}/* ./
+            cp -R ${pkg.dev} _build/default
+            chmod -Rf 777 .
             echo '(lang dune 3.3)' > dune-project
-            ${dune} runtest ${name}
-          '';
+            dune runtest .
+          '').overrideAttrs(s: {
+            buildInputs = pkg.buildInputs;
+          });
         testOverlay = self: super:
           let minaPkgs = builtins.removeAttrs (filterLocalPkgs super) ["best_tip_merger"];
               testPkgs = pkgs.lib.mapAttrs' (name: old:
@@ -673,7 +677,7 @@ let
           in testPkgs // {
             all = mkCombined "mina-all" (builtins.attrValues minaPkgs);
             all-tested = mkCombined "mina-all-with-tests" (builtins.attrValues minaPkgs ++ builtins.attrValues testPkgsFiltered);
-            runtest-mina_net2 = mkRuntest "mina_net2" self.mina_net2 base-prj.dune;
+            runtest-mina_net2 = mkRuntest self.mina_net2;
             vmtest-mina_net2 = pkgs.testers.runNixOSTest {
               name = "vmtest-mina_net2";
               nodes.machine = { config, pkgs, ... }: {
@@ -701,7 +705,7 @@ let
               DUNE_PROFILE="dev";
               DISABLE_CHECK_OPAM_SWITCH = "true";
             }; };
-          } rest-src (getAttrs ["ocaml" "ocaml-base-compiler" "ocaml-compiler-libs" "ocaml-config" "ocaml-migrate-parsetree" "ocaml-options-vanilla" "ocaml-syntax-shims" "ocaml-version" "ocamlbuild" "ocamlfind"] implicit-deps) );
+          } rest-src (getAttrs ocaml-utils implicit-deps) );
         in
         prj;
 
