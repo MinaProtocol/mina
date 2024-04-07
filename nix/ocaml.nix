@@ -162,7 +162,7 @@ let
 
   # "System" dependencies required by all Mina packages
   external-libs = with pkgs;
-    [ zlib bzip2 gmp openssl libffi ]
+    [ zlib bzip2 gmp openssl libffi rocksdb511Stub ]
     ++ lib.optional (!(stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
   depsFiles =
     let src =
