@@ -664,6 +664,26 @@ let
           in testPkgs // {
             all = mkCombined "mina-all" (builtins.attrValues minaPkgs);
             all-tested = mkCombined "mina-all-with-tests" (builtins.attrValues minaPkgs ++ builtins.attrValues testPkgsFiltered);
+            intg = pkgs.testers.runNixOSTest {
+              name = "blabla-test";
+
+              nodes.machine = { config, pkgs, ... }: {
+
+                users.users.alice = {
+                  isNormalUser = true;
+                  extraGroups = [ "wheel" ];
+                  packages = [ self.graphql_schema_dump ];
+                };
+
+                system.stateVersion = "23.05";
+              };
+
+              testScript = ''
+                machine.wait_for_unit("default.target")
+                machine.succeed("su -- alice -c 'which graphql_schema_dump'")
+                machine.fail("su -- root -c 'which graphql_schema_dump'")
+              '';
+            };
           };
         prj =
           (opam-nix.buildOpamProject' {
