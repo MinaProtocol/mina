@@ -4364,14 +4364,14 @@ module Queries = struct
               | `Bootstrapping ->
                   Deferred.Result.fail "Daemon is bootstrapping"
               | `Active breadcrumb -> (
-                  let target_height =
+                  let txn_stop_slot_opt =
                     match runtime_config.daemon with
                     | Some daemon ->
                         daemon.slot_tx_end
                     | None ->
                         None
                   in
-                  match target_height with
+                  match txn_stop_slot_opt with
                   | None ->
                       return breadcrumb
                   | Some txn_stop_slot ->
