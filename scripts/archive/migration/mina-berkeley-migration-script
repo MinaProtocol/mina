@@ -321,6 +321,7 @@ function incremental_help(){
     echo "Parameters:"
     echo ""
     printf "  %-25s %s\n" "-h | --help" "show help";
+    printf "  %-25s %s\n" "-g | --genesis-ledger" "[file] path to genesis ledger file";
     printf "  %-25s %s\n" "-r | --replayer-checkpoint" "[file] path to genesis ledger file";
     printf "  %-25s %s\n" "-s | --source-db" "[connection_str] connection string to database to be migrated";
     printf "  %-25s %s\n" "-t | --target-db" "[connection_str] connection string to database which will hold migrated data";
@@ -329,8 +330,8 @@ function incremental_help(){
     printf "  %-25s %s\n" "-n | --network" "[string] network name when determining precomputed blocks. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
     printf "  %-25s %s\n" "-d | --delete-blocks" "delete blocks after they are processed (saves space with -sb)"
     printf "  %-25s %s\n" "-p | --prefetch-blocks" "downloads all blocks at once instead of incrementally"
-    printf "  %-25s %s\n" "-p | --checkpoint-output-path" "[file] output folder for replayer checkpoints"
-    printf "  %-25s %s\n" "-p | --precomputed-blocks-local-path" "[file] on-disk precomputed blocks location"
+    printf "  %-25s %s\n" "-c | --checkpoint-output-path" "[file] output folder for replayer checkpoints"
+    printf "  %-25s %s\n" "-l | --precomputed-blocks-local-path" "[file] on-disk precomputed blocks location"
     echo ""
     echo "Example:"
     echo ""
@@ -572,6 +573,7 @@ function final_help(){
     echo "Parameters:"
     echo ""
     printf "  %-25s %s\n" "-h | --help" "show help";
+    printf "  %-25s %s\n" "-g | --genesis-ledger" "[file] path to genesis ledger file";
     printf "  %-25s %s\n" "-r | --replayer-checkpoint" "[file] path to genesis ledger file";
     printf "  %-25s %s\n" "-s | --source-db" "[connection_str] connection string to database to be migrated";
     printf "  %-25s %s\n" "-t | --target-db" "[connection_str] connection string to database which will hold migrated data";
@@ -581,8 +583,8 @@ function final_help(){
     printf "  %-25s %s\n" "-fc | --fork-genesis-config" "[file] Genesis config file for the fork network. It should be provied by MF or O(1)Labs team after fork block is announced";
     printf "  %-25s %s\n" "-d | --delete-blocks" "delete blocks after they are processed (saves space with -sb)"
     printf "  %-25s %s\n" "-p | --prefetch-blocks" "downloads all blocks at once instead of incrementally"
-    printf "  %-25s %s\n" "-p | --checkpoint-output-path" "[file] output folder for replayer checkpoints"
-    printf "  %-25s %s\n" "-p | --precomputed-blocks-local-path" "[file] on-disk precomputed blocks location"
+    printf "  %-25s %s\n" "-c | --checkpoint-output-path" "[file] output folder for replayer checkpoints"
+    printf "  %-25s %s\n" "-l | --precomputed-blocks-local-path" "[file] on-disk precomputed blocks location"
     echo ""
     echo "Example:"
     echo ""
