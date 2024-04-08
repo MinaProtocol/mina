@@ -588,16 +588,12 @@ let
               new = profile:
                 let
                   deps = getDeps profile self name;
-                  minaLibp2pEnv =
-                    if builtins.hasAttr "mina_net2" deps || name == "mina_net2" then
-                      { MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper"; }
-                    else {};
                   profilePostConfigure =
                     if depsMap."${name}".dependsOnConfig then
                       ''
                         ${patchDune self."mina-config-${profile}"}
                       '' else "";
-                in old.overrideAttrs (_: minaEnv // minaLibp2pEnv // {
+                in old.overrideAttrs (_: minaEnv // {
                   version = profile;
                   pname = name;
                   inherit nixSupportPhase;
@@ -630,17 +626,54 @@ let
                 mina-config-devnet = mkMinaConfig "devnet" base-prj;
                 mina-config-mainnet = mkMinaConfig "mainnet" base-prj;
               };
-        mkRuntest = pkg:
-          (pkgs.writeShellScriptBin "runtest-${pkg.pname}" ''
+        mkRuntest = self: name: preBuild:
+          let deps = builtins.attrValues (getDeps "dev" self name) ++ [base];
+              pkg = self."${name}";
+           in
+          (pkgs.writeShellScriptBin "runtest-${name}" ''
             mkdir -p _build
             cp -R ${pkg.src}/* ./
             cp -R ${pkg.dev} _build/default
             chmod -Rf 777 .
             echo '(lang dune 3.3)' > dune-project
-            dune runtest .
-          '').overrideAttrs(s: {
-            buildInputs = pkg.buildInputs;
-          });
+            export LIBRARY_PATH="$LIBRARY_PATH:${base}/lib/ocaml/${base-prj.ocaml.version}/site-lib/ctypes";
+            export LIBRARY_PATH="$LIBRARY_PATH:${pkgs.lib.concatMapStringsSep ":" (p: "${p.out}/lib") pkg.nativeBuildInputs}"
+            export LD_LIBRARY_PATH="${base}/lib/ocaml/${base-prj.ocaml.version}/site-lib/ctypes";
+            export PATH="$PATH:${pkgs.lib.concatMapStringsSep ":" (p: "${p.out}/bin") (pkg.nativeBuildInputs ++ [pkgs.gcc])}"
+            export PATH="$PATH:${pkgs.lib.concatMapStringsSep ":" (p: "${p.out}/bin") (builtins.attrValues (pkgs.lib.getAttrs ocaml-utils base-prj))}"
+            export OCAMLPATH="${pkgs.lib.concatMapStringsSep ":" (p: "${p.out}/lib/ocaml/${base-prj.ocaml.version}/site-lib") deps}"
+            ${preBuild}
+            echo "Running test for ${name}"
+            dune runtest -j8 .
+          '');
+        mkVmTest = self: name: pkgs.testers.runNixOSTest {
+          name = "vmtest-${name}";
+          nodes.machine = { config, pkgs, ... }: {
+            security.pam.loginLimits = [{
+              domain = "*";
+              type = "soft";
+              item = "nofile";
+              value = "65536";
+            }];
+            users.users.mina = {
+              isNormalUser = true;
+              home = "/home/mina";
+              extraGroups = [ "wheel" ];
+              packages = [ self."runtest-${name}" pkgs.bash ];
+            };
+            system.stateVersion = "23.05";
+            virtualisation = {
+              graphics = false;
+              cores = 8;
+              memorySize = 16384;
+              diskSize = 4096;
+            };
+          };
+          testScript = ''
+            machine.wait_for_unit("default.target")
+            machine.succeed("cd /home/mina && su -- mina -c 'runtest-${name}'")
+          '';
+        };
         testOverlay = self: super:
           let minaPkgs = builtins.removeAttrs (filterLocalPkgs super) ["best_tip_merger"];
               testPkgs = pkgs.lib.mapAttrs' (name: old:
@@ -677,22 +710,14 @@ let
           in testPkgs // {
             all = mkCombined "mina-all" (builtins.attrValues minaPkgs);
             all-tested = mkCombined "mina-all-with-tests" (builtins.attrValues minaPkgs ++ builtins.attrValues testPkgsFiltered);
-            runtest-mina_net2 = mkRuntest self.mina_net2;
-            vmtest-mina_net2 = pkgs.testers.runNixOSTest {
-              name = "vmtest-mina_net2";
-              nodes.machine = { config, pkgs, ... }: {
-                users.users.mina = {
-                  isNormalUser = true;
-                  extraGroups = [ "wheel" ];
-                  packages = [ self.runtest-mina_net2 ];
-                };
-                system.stateVersion = "23.05";
-              };
-              testScript = ''
-                machine.wait_for_unit("default.target")
-                machine.succeed("su -- mina -c 'runtest-mina_net2'")
-              '';
-            };
+            runtest-mina_net2 = mkRuntest self "mina_net2" ''
+              export MINA_LIBP2P_HELPER_PATH="${pkgs.libp2p_helper}/bin/libp2p_helper"
+            '';
+            vmtest-mina_net2 = mkVmTest self "mina_net2";
+            runtest-staged_ledger = mkRuntest self "staged_ledger" ''
+              ${patchDune self.mina-config-dev}
+            '';
+            vmtest-staged_ledger = mkVmTest self "staged_ledger";
           };
         prj =
           (opam-nix.buildOpamProject' {
