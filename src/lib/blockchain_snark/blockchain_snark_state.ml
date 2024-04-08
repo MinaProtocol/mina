@@ -224,7 +224,7 @@ let%snarkydef_ step ~(logger : Logger.t)
     in
     let%bind previous_state_hash =
       match constraint_constants.fork with
-      | Some { previous_state_hash = fork_prev; _ } ->
+      | Some { state_hash = fork_prev; _ } ->
           State_hash.if_ is_base_case
             ~then_:(State_hash.var_of_t fork_prev)
             ~else_:t.previous_state_hash

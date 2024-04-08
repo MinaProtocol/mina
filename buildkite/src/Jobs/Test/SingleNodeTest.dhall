@@ -32,7 +32,7 @@ let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
 
-let dependsOn = DebianVersions.dependsOn DebianVersions.DebVersion.Bullseye Profiles.Type.Standard
+let dependsOn = DebianVersions.dependsOn DebianVersions.DebVersion.Bullseye Profiles.Type.Lightnet
 
 
 let buildTestCmd : Size -> Command.Type = \(cmd_target : Size) ->
@@ -53,8 +53,7 @@ Pipeline.build
   Pipeline.Config::{
     spec = 
       let unitDirtyWhen = [
-        S.strictlyStart (S.contains "src/lib"),
-        S.strictlyStart (S.contains "src/test"),
+        S.strictlyStart (S.contains "src"),
         S.strictly (S.contains "Makefile"),
         S.exactly "buildkite/src/Jobs/Test/SingleNodeTest" "dhall",
         S.exactly "buildkite/scripts/single-node-tests" "sh"

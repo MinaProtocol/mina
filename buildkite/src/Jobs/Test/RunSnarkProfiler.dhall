@@ -45,7 +45,7 @@ Pipeline.build
   Pipeline.Config::{
     spec =
       let lintDirtyWhen = [
-        S.strictlyStart (S.contains "src/lib"),
+        S.strictlyStart (S.contains "src"),
         S.exactly "buildkite/src/Jobs/Test/RunSnarkProfiler" "dhall",
         S.exactly "buildkite/scripts/run-snark-transaction-profiler" "sh",
         S.exactly "scripts/snark_transaction_profiler" "py"

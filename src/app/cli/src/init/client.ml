@@ -2232,6 +2232,23 @@ let thread_graph =
                   (humanize_graphql_error ~graphql_endpoint e) ) ;
              exit 1 ) )
 
+let signature_kind =
+  Command.basic
+    ~summary:"Print the signature kind that this binary is compiled with"
+    (let%map.Command () = Command.Param.return () in
+     fun () ->
+       let signature_kind_string =
+         match Mina_signature_kind.t with
+         | Mainnet ->
+             "mainnet"
+         | Testnet ->
+             "testnet"
+         | Other_network s ->
+             (* Prefix string to disambiguate *)
+             "other network: " ^ s
+       in
+       Core.print_endline signature_kind_string )
+
 let itn_create_accounts =
   Command.async ~summary:"Fund new accounts for incentivized testnet"
     (let open Command.Param in
@@ -2379,6 +2396,7 @@ let advanced =
     ; ("runtime-config", runtime_config)
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
     ; ("thread-graph", thread_graph)
+    ; ("print-signature-kind", signature_kind)
     ]
   in
   let cmds =
