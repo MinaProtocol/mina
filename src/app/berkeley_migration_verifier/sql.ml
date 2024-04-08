@@ -1,13 +1,86 @@
+open Core
+open Async
 open Caqti_async
 
-let dump_sql_to_csv output_file ~sql =
-  Printf.sprintf "COPY ( %s ) TO '%s' DELIMITER ',' CSV HEADER " sql output_file
+module Accounts_created = struct
+  type t =
+    { height : string
+    ; public_key : string
+    ; state_hash : string
+    ; creation_fee : string
+    }
+  [@@deriving hlist, equal, yojson]
+
+  let list_to_yojson xs : Yojson.Safe.t = `List (List.map xs ~f:to_yojson)
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ string; string; string; string ]
+end
+
+module State_hash_and_ledger_hash = struct
+  type t = { state_hash : string; ledger_hash : string }
+  [@@deriving hlist, equal, yojson]
+
+  let list_to_yojson xs : Yojson.Safe.t = `List (List.map xs ~f:to_yojson)
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ string; string ]
+end
+
+module User_command = struct
+  type t =
+    { receiver : string
+    ; fee_payer : string
+    ; nonce : string
+    ; amount : string
+    ; fee : string
+    ; valid_until : string
+    ; memo : string
+    ; hash : string
+    }
+  [@@deriving hlist, equal, yojson]
+
+  let list_to_yojson xs : Yojson.Safe.t = `List (List.map xs ~f:to_yojson)
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.
+        [ string; string; string; string; string; string; string; string ]
+end
+
+module Internal_command = struct
+  type t =
+    { receiver : string
+    ; fee : string
+    ; sequence_no : string
+    ; secondary_sequence_no : string
+    ; hash : string
+    }
+  [@@deriving hlist, equal, yojson]
+
+  let list_to_yojson xs : Yojson.Safe.t = `List (List.map xs ~f:to_yojson)
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ string; string; string; string; string ]
+end
+
+module Accounts_accessed = struct
+  type t = { id : string; block_id : string } [@@deriving hlist, equal, yojson]
+
+  let list_to_yojson xs : Yojson.Safe.t = `List (List.map xs ~f:to_yojson)
+
+  let typ =
+    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+      Caqti_type.[ string; string ]
+end
 
 module Mainnet = struct
-  let dump_accounts_created_to_csv_query ~output_file =
-    dump_sql_to_csv output_file
-      ~sql:
-        {sql|
+  let dump_accounts_created_query =
+    Caqti_request.collect Caqti_type.unit Accounts_created.typ
+      {sql|
       ( SELECT height, value AS public_key, state_hash, receiver_account_creation_fee_paid AS creation_fee
         FROM blocks_user_commands
         JOIN blocks          ON block_id = blocks.id AND chain_status = 'canonical'
@@ -26,142 +99,124 @@ module Mainnet = struct
         WHERE receiver_account_creation_fee_paid IS NOT NULL
       ) 
       ORDER BY height, public_key |sql}
-    |> Caqti_request.exec Caqti_type.unit
 
-  let dump_accounts_created_to_csv (module Conn : CONNECTION) output_file =
-    Conn.exec (dump_accounts_created_to_csv_query ~output_file) ()
+  let dump_accounts_created (module Conn : CONNECTION) =
+    Conn.collect_list dump_accounts_created_query ()
 
-  let dump_state_and_ledger_hashes_to_csv_query ~output_file =
+  let dump_state_and_ledger_hashes_query =
     (* Workaround for replacing output file as caqti has an issue with using ? in place of FILE argument*)
-    dump_sql_to_csv output_file
-      ~sql:
-        "  SELECT state_hash, ledger_hash FROM blocks\n\
-        \            WHERE chain_status = 'canonical'\n\
-        \          "
-    |> Caqti_request.exec Caqti_type.unit
+    Caqti_request.collect Caqti_type.unit State_hash_and_ledger_hash.typ
+      "  SELECT state_hash, ledger_hash FROM blocks\n\
+      \            WHERE chain_status = 'canonical'\n\
+      \          "
 
-  let dump_block_hashes_till_height_query ~output_file ~height =
-    dump_sql_to_csv output_file
-      ~sql:
-        (Printf.sprintf
-           "\n\
-           \      SELECT state_hash, ledger_hash FROM blocks\n\
-           \            WHERE chain_status = 'canonical'\n\
-           \            AND height <= %d ORDER BY height\n\
-           \      " height )
-    |> Caqti_request.exec Caqti_type.unit
+  let dump_block_hashes_till_height_query ~height =
+    Caqti_request.collect Caqti_type.unit State_hash_and_ledger_hash.typ
+      (Printf.sprintf
+         "\n\
+         \      SELECT state_hash, ledger_hash FROM blocks\n\
+         \            WHERE chain_status = 'canonical'\n\
+         \            AND height <= %d ORDER BY height\n\
+         \      " height )
 
-  let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
-      height =
-    Conn.exec (dump_block_hashes_till_height_query ~output_file ~height) ()
+  let dump_block_hashes_till_height (module Conn : CONNECTION) height =
+    Conn.collect_list (dump_block_hashes_till_height_query ~height) ()
 
-  let dump_block_hashes_query ~output_file =
-    dump_sql_to_csv output_file
-      ~sql:
-        "\n\
-        \      SELECT state_hash, ledger_hash FROM blocks\n\
-        \            WHERE chain_status = 'canonical'\n\
-        \            ORDER BY height\n\
-        \      "
-    |> Caqti_request.exec Caqti_type.unit
+  let dump_block_hashes_query =
+    Caqti_request.collect Caqti_type.unit State_hash_and_ledger_hash.typ
+      "\n\
+      \      SELECT state_hash, ledger_hash FROM blocks\n\
+      \            WHERE chain_status = 'canonical'\n\
+      \            ORDER BY height\n\
+      \      "
 
-  let dump_block_hashes (module Conn : CONNECTION) output_file =
-    Conn.exec (dump_block_hashes_query ~output_file) ()
+  let dump_block_hashes (module Conn : CONNECTION) =
+    Conn.collect_list dump_block_hashes_query ()
 
-  let dump_user_commands_till_height_query ~output_file ~height =
-    dump_sql_to_csv output_file
-      ~sql:
-        (Printf.sprintf
-           "WITH user_command_ids AS\n\
-           \      ( SELECT height, sequence_no, user_command_id FROM \
-            blocks_user_commands\n\
-           \        INNER JOIN blocks ON blocks.id = block_id\n\
-           \        WHERE chain_status = 'canonical'\n\
-           \        AND height <= %d\n\
-           \      )\n\
-           \      SELECT receiver_keys.value, fee_payer_keys.value, nonce, \
-            amount, fee, valid_until, memo, hash FROM user_commands\n\
-           \      INNER JOIN user_command_ids ON user_command_id = id\n\
-           \      INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
-            receiver_keys.id\n\
-           \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
-            fee_payer_keys.id ORDER BY height, sequence_no\n\
-           \      " height )
-    |> Caqti_request.exec Caqti_type.unit
+  let dump_user_commands_till_height_query ~height =
+    Caqti_request.collect Caqti_type.unit User_command.typ
+      (Printf.sprintf
+         "WITH user_command_ids AS\n\
+         \      ( SELECT height, sequence_no, user_command_id FROM \
+          blocks_user_commands\n\
+         \        INNER JOIN blocks ON blocks.id = block_id\n\
+         \        WHERE chain_status = 'canonical'\n\
+         \        AND height <= %d\n\
+         \      )\n\
+         \      SELECT receiver_keys.value, fee_payer_keys.value, nonce, \
+          amount, fee, valid_until, memo, hash FROM user_commands\n\
+         \      INNER JOIN user_command_ids ON user_command_id = id\n\
+         \      INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
+          receiver_keys.id\n\
+         \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
+          fee_payer_keys.id ORDER BY height, sequence_no\n\
+         \      " height )
 
-  let dump_user_commands_till_height (module Conn : CONNECTION) output_file
-      height =
-    Conn.exec (dump_user_commands_till_height_query ~output_file ~height) ()
+  let dump_user_commands_till_height (module Conn : CONNECTION) height =
+    Conn.collect_list (dump_user_commands_till_height_query ~height) ()
 
-  let dump_internal_commands_till_height_query ~output_file ~height =
-    dump_sql_to_csv output_file
-      ~sql:
-        (Printf.sprintf
-           "WITH internal_command_ids AS \n\
-           \        ( SELECT internal_command_id, height, sequence_no, \
-            secondary_sequence_no FROM blocks_internal_commands \n\
-           \          INNER JOIN blocks ON blocks.id = block_id \n\
-           \          WHERE chain_status = 'canonical'\n\
-           \          AND height <= %d\n\
-           \        ) \n\
-           \        SELECT receiver_keys.value, fee, sequence_no, \
-            secondary_sequence_no, hash FROM internal_commands \n\
-           \        INNER JOIN internal_command_ids ON internal_command_id = id\n\
-           \        INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
-            receiver_keys.id\n\
-           \        ORDER BY height, sequence_no, secondary_sequence_no, type \n\
-           \   \n\
-           \          " height )
-    |> Caqti_request.exec Caqti_type.unit
+  let dump_internal_commands_till_height_query ~height =
+    Caqti_request.collect Caqti_type.unit Internal_command.typ
+      (Printf.sprintf
+         "WITH internal_command_ids AS \n\
+         \        ( SELECT internal_command_id, height, sequence_no, \
+          secondary_sequence_no FROM blocks_internal_commands \n\
+         \          INNER JOIN blocks ON blocks.id = block_id \n\
+         \          WHERE chain_status = 'canonical'\n\
+         \          AND height <= %d\n\
+         \        ) \n\
+         \        SELECT receiver_keys.value, fee, sequence_no, \
+          secondary_sequence_no, hash FROM internal_commands \n\
+         \        INNER JOIN internal_command_ids ON internal_command_id = id\n\
+         \        INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
+          receiver_keys.id\n\
+         \        ORDER BY height, sequence_no, secondary_sequence_no, type \n\
+         \   \n\
+         \          " height )
 
-  let dump_internal_commands_till_height (module Conn : CONNECTION) output_file
-      height =
-    Conn.exec (dump_internal_commands_till_height_query ~output_file ~height) ()
+  let dump_internal_commands_till_height (module Conn : CONNECTION) height =
+    Conn.collect_list (dump_internal_commands_till_height_query ~height) ()
 
-  let dump_user_commands_query ~output_file =
-    dump_sql_to_csv output_file
-      ~sql:
-        "WITH user_command_ids AS\n\
-        \      ( SELECT height, sequence_no, user_command_id FROM \
-         blocks_user_commands\n\
-        \        INNER JOIN blocks ON blocks.id = block_id\n\
-        \        WHERE chain_status = 'canonical'\n\
-        \      )\n\
-        \      SELECT receiver_keys.value, fee_payer_keys.value, nonce, \
-         amount, fee, valid_until, memo, hash FROM user_commands\n\
-        \      INNER JOIN user_command_ids ON user_command_id = id\n\
-        \      INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
-         receiver_keys.id\n\
-        \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
-         fee_payer_keys.id ORDER BY height, sequence_no\n\
-        \      "
-    |> Caqti_request.exec Caqti_type.unit
+  let dump_user_commands_query =
+    Caqti_request.collect Caqti_type.unit User_command.typ
+      "WITH user_command_ids AS\n\
+      \      ( SELECT height, sequence_no, user_command_id FROM \
+       blocks_user_commands\n\
+      \        INNER JOIN blocks ON blocks.id = block_id\n\
+      \        WHERE chain_status = 'canonical'\n\
+      \      )\n\
+      \      SELECT receiver_keys.value, fee_payer_keys.value, nonce, amount, \
+       fee, valid_until, memo, hash FROM user_commands\n\
+      \      INNER JOIN user_command_ids ON user_command_id = id\n\
+      \      INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
+       receiver_keys.id\n\
+      \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
+       fee_payer_keys.id ORDER BY height, sequence_no\n\
+      \      "
 
-  let dump_user_commands (module Conn : CONNECTION) output_file =
-    Conn.exec (dump_user_commands_query ~output_file) ()
+  let dump_user_commands (module Conn : CONNECTION) =
+    Conn.collect_list dump_user_commands_query ()
 
-  let dump_internal_commands_query ~output_file =
-    dump_sql_to_csv output_file
-      ~sql:
-        (Printf.sprintf
-           "WITH internal_command_ids AS \n\
-           \        ( SELECT internal_command_id, height, sequence_no, \
-            secondary_sequence_no FROM blocks_internal_commands \n\
-           \          INNER JOIN blocks ON blocks.id = block_id \n\
-           \          WHERE chain_status = 'canonical'\n\
-           \        ) \n\
-           \        SELECT receiver_keys.value, fee, sequence_no, \
-            secondary_sequence_no, hash FROM internal_commands \n\
-           \        INNER JOIN internal_command_ids ON internal_command_id = id\n\
-           \        INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
-            receiver_keys.id\n\
-           \        ORDER BY height, sequence_no, secondary_sequence_no, type \n\
-           \   \n\
-           \          " )
-    |> Caqti_request.exec Caqti_type.unit
+  let dump_internal_commands_query =
+    Caqti_request.collect Caqti_type.unit Internal_command.typ
+      (Printf.sprintf
+         "WITH internal_command_ids AS \n\
+         \        ( SELECT internal_command_id, height, sequence_no, \
+          secondary_sequence_no FROM blocks_internal_commands \n\
+         \          INNER JOIN blocks ON blocks.id = block_id \n\
+         \          WHERE chain_status = 'canonical'\n\
+         \        ) \n\
+         \        SELECT receiver_keys.value, fee, sequence_no, \
+          secondary_sequence_no, hash FROM internal_commands \n\
+         \        INNER JOIN internal_command_ids ON internal_command_id = id\n\
+         \        INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
+          receiver_keys.id\n\
+         \        ORDER BY height, sequence_no, secondary_sequence_no, type \n\
+         \   \n\
+         \          " )
 
-  let dump_internal_commands (module Conn : CONNECTION) output_file =
-    Conn.exec (dump_internal_commands_query ~output_file) ()
+  let dump_internal_commands (module Conn : CONNECTION) =
+    Conn.collect_list dump_internal_commands_query ()
 
   let mark_chain_till_fork_block_as_canonical_query =
     Caqti_request.exec Caqti_type.string
@@ -192,20 +247,18 @@ module Mainnet = struct
 end
 
 module Berkeley = struct
-  let dump_accounts_created_to_csv_query ~output_file =
-    dump_sql_to_csv output_file
-      ~sql:
-        {sql|
+  let dump_accounts_created_query =
+    Caqti_request.collect Caqti_type.unit Accounts_created.typ
+      {sql|
       SELECT height, value AS public_key, state_hash, creation_fee
       FROM accounts_created
       JOIN blocks              ON block_id              = blocks.id
       JOIN account_identifiers ON account_identifier_id = account_identifiers.id 
       JOIN public_keys         ON public_key_id         = public_keys.id
       ORDER BY height, public_key |sql}
-    |> Caqti_request.exec Caqti_type.unit
 
-  let dump_accounts_created_to_csv (module Conn : CONNECTION) output_file =
-    Conn.exec (dump_accounts_created_to_csv_query ~output_file) ()
+  let dump_accounts_created (module Conn : CONNECTION) =
+    Conn.collect_list dump_accounts_created_query ()
 
   let height_query =
     Caqti_request.find Caqti_type.unit Caqti_type.int
@@ -241,145 +294,127 @@ module Berkeley = struct
 
   let blocks_count (module Conn : CONNECTION) = Conn.find blocks_count_query ()
 
-  let dump_user_commands_till_height_query ~output_file ~height =
-    dump_sql_to_csv output_file
-      ~sql:
-        (Printf.sprintf
-           "WITH user_command_ids AS\n\
-           \      ( SELECT height, sequence_no, user_command_id FROM \
-            blocks_user_commands\n\
-           \        INNER JOIN blocks ON blocks.id = block_id\n\
-           \        WHERE chain_status = 'canonical'\n\
-           \        AND height <= %d\n\
-           \      )\n\
-           \      SELECT receiver_keys.value, fee_payer_keys.value, nonce, \
-            amount, fee, valid_until, memo, hash FROM user_commands\n\
-           \      INNER JOIN user_command_ids ON user_command_id = id\n\
-           \      INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
-            receiver_keys.id\n\
-           \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
-            fee_payer_keys.id ORDER BY height, sequence_no\n\
-           \     " height )
-    |> Caqti_request.exec Caqti_type.unit
+  let dump_user_commands_till_height_query ~height =
+    Caqti_request.collect Caqti_type.unit User_command.typ
+      (Printf.sprintf
+         "WITH user_command_ids AS\n\
+         \      ( SELECT height, sequence_no, user_command_id FROM \
+          blocks_user_commands\n\
+         \        INNER JOIN blocks ON blocks.id = block_id\n\
+         \        WHERE chain_status = 'canonical'\n\
+         \        AND height <= %d\n\
+         \      )\n\
+         \      SELECT receiver_keys.value, fee_payer_keys.value, nonce, \
+          amount, fee, valid_until, memo, hash FROM user_commands\n\
+         \      INNER JOIN user_command_ids ON user_command_id = id\n\
+         \      INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
+          receiver_keys.id\n\
+         \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
+          fee_payer_keys.id ORDER BY height, sequence_no\n\
+         \     " height )
 
-  let dump_user_commands_till_height (module Conn : CONNECTION) output_file
-      height =
-    Conn.exec (dump_user_commands_till_height_query ~output_file ~height) ()
+  let dump_user_commands_till_height (module Conn : CONNECTION) height =
+    Conn.collect_list (dump_user_commands_till_height_query ~height) ()
 
-  let dump_internal_commands_till_height_query ~output_file ~height =
-    dump_sql_to_csv output_file
-      ~sql:
-        (Printf.sprintf
-           "WITH internal_command_ids AS \n\
-           \        ( SELECT internal_command_id, height, sequence_no, \
-            secondary_sequence_no FROM blocks_internal_commands \n\
-           \          INNER JOIN blocks ON blocks.id = block_id \n\
-           \          WHERE chain_status = 'canonical'\n\
-           \          AND height <= %d\n\
-           \        ) \n\
-           \        SELECT receiver_keys.value, fee, sequence_no, \
-            secondary_sequence_no, hash FROM internal_commands \n\
-           \        INNER JOIN internal_command_ids ON internal_command_id = id\n\
-           \        INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
-            receiver_keys.id\n\
-           \        ORDER BY height, sequence_no, secondary_sequence_no, \
-            command_type \n\
-           \      " height )
-    |> Caqti_request.exec Caqti_type.unit
+  let dump_internal_commands_till_height_query ~height =
+    Caqti_request.collect Caqti_type.unit Internal_command.typ
+      (Printf.sprintf
+         "WITH internal_command_ids AS \n\
+         \        ( SELECT internal_command_id, height, sequence_no, \
+          secondary_sequence_no FROM blocks_internal_commands \n\
+         \          INNER JOIN blocks ON blocks.id = block_id \n\
+         \          WHERE chain_status = 'canonical'\n\
+         \          AND height <= %d\n\
+         \        ) \n\
+         \        SELECT receiver_keys.value, fee, sequence_no, \
+          secondary_sequence_no, hash FROM internal_commands \n\
+         \        INNER JOIN internal_command_ids ON internal_command_id = id\n\
+         \        INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
+          receiver_keys.id\n\
+         \        ORDER BY height, sequence_no, secondary_sequence_no, \
+          command_type \n\
+         \      " height )
 
-  let dump_internal_commands_till_height (module Conn : CONNECTION) output_file
-      height =
-    Conn.exec (dump_internal_commands_till_height_query ~output_file ~height) ()
+  let dump_internal_commands_till_height (module Conn : CONNECTION) height =
+    Conn.collect_list (dump_internal_commands_till_height_query ~height) ()
 
-  let dump_user_commands_query ~output_file =
-    dump_sql_to_csv output_file
-      ~sql:
-        "WITH user_command_ids AS\n\
-        \      ( SELECT height, sequence_no, user_command_id FROM \
-         blocks_user_commands\n\
-        \        INNER JOIN blocks ON blocks.id = block_id\n\
-        \        WHERE chain_status = 'canonical'\n\
-        \      )\n\
-        \      SELECT receiver_keys.value, fee_payer_keys.value, nonce, \
-         amount, fee, valid_until, memo, hash FROM user_commands\n\
-        \      INNER JOIN user_command_ids ON user_command_id = id\n\
-        \      INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
-         receiver_keys.id\n\
-        \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
-         fee_payer_keys.id ORDER BY height, sequence_no\n\
-        \     "
-    |> Caqti_request.exec Caqti_type.unit
+  let dump_user_commands_query =
+    Caqti_request.collect Caqti_type.unit User_command.typ
+      "WITH user_command_ids AS\n\
+      \      ( SELECT height, sequence_no, user_command_id FROM \
+       blocks_user_commands\n\
+      \        INNER JOIN blocks ON blocks.id = block_id\n\
+      \        WHERE chain_status = 'canonical'\n\
+      \      )\n\
+      \      SELECT receiver_keys.value, fee_payer_keys.value, nonce, amount, \
+       fee, valid_until, memo, hash FROM user_commands\n\
+      \      INNER JOIN user_command_ids ON user_command_id = id\n\
+      \      INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
+       receiver_keys.id\n\
+      \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
+       fee_payer_keys.id ORDER BY height, sequence_no\n\
+      \     "
 
-  let dump_user_commands (module Conn : CONNECTION) output_file =
-    Conn.exec (dump_user_commands_query ~output_file) ()
+  let dump_user_commands (module Conn : CONNECTION) =
+    Conn.collect_list dump_user_commands_query ()
 
-  let dump_internal_commands_query ~output_file =
-    dump_sql_to_csv output_file
-      ~sql:
-        "WITH internal_command_ids AS \n\
-        \        ( SELECT internal_command_id, height, sequence_no, \
-         secondary_sequence_no FROM blocks_internal_commands \n\
-        \          INNER JOIN blocks ON blocks.id = block_id \n\
-        \          WHERE chain_status = 'canonical'\n\
-        \        ) \n\
-        \        SELECT receiver_keys.value, fee, sequence_no, \
-         secondary_sequence_no, hash FROM internal_commands \n\
-        \        INNER JOIN internal_command_ids ON internal_command_id = id\n\
-        \        INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
-         receiver_keys.id\n\
-        \        ORDER BY height, sequence_no, secondary_sequence_no, \
-         command_type \n\
-        \      "
-    |> Caqti_request.exec Caqti_type.unit
+  let dump_internal_commands_query =
+    Caqti_request.collect Caqti_type.unit Internal_command.typ
+      "WITH internal_command_ids AS \n\
+      \        ( SELECT internal_command_id, height, sequence_no, \
+       secondary_sequence_no FROM blocks_internal_commands \n\
+      \          INNER JOIN blocks ON blocks.id = block_id \n\
+      \          WHERE chain_status = 'canonical'\n\
+      \        ) \n\
+      \        SELECT receiver_keys.value, fee, sequence_no, \
+       secondary_sequence_no, hash FROM internal_commands \n\
+      \        INNER JOIN internal_command_ids ON internal_command_id = id\n\
+      \        INNER JOIN public_keys AS receiver_keys  ON receiver_id  = \
+       receiver_keys.id\n\
+      \        ORDER BY height, sequence_no, secondary_sequence_no, \
+       command_type \n\
+      \      "
 
-  let dump_internal_commands (module Conn : CONNECTION) output_file =
-    Conn.exec (dump_internal_commands_query ~output_file) ()
+  let dump_internal_commands (module Conn : CONNECTION) =
+    Conn.collect_list dump_internal_commands_query ()
 
-  let dump_account_accessed_to_csv_query ~output_file =
-    dump_sql_to_csv output_file
-      ~sql:
-        {sql| SELECT account_identifier_id AS id, block_id 
+  let dump_accounts_accessed_query =
+    Caqti_request.collect Caqti_type.unit Accounts_accessed.typ
+      {sql| SELECT account_identifier_id AS id, block_id 
                  FROM accounts_accessed
                  JOIN blocks ON block_id = blocks.id
                  WHERE height <> 1
                  ORDER BY block_id, id |sql}
-    |> Caqti_request.exec Caqti_type.unit
 
-  let dump_accounts_accessed_to_csv (module Conn : CONNECTION) output_file =
-    Conn.exec (dump_account_accessed_to_csv_query ~output_file) ()
+  let dump_accounts_accessed (module Conn : CONNECTION) =
+    Conn.collect_list dump_accounts_accessed_query ()
 
-  let dump_block_hashes_till_height_query ~output_file ~height =
-    dump_sql_to_csv output_file
-      ~sql:
-        (Printf.sprintf
-           "SELECT state_hash, ledger_hash FROM blocks \n\
-           \    WHERE chain_status = 'canonical'\n\
-           \    AND height <= %d ORDER BY height\n\
-           \ \n\
-           \     " height )
-    |> Caqti_request.exec Caqti_type.unit
+  let dump_block_hashes_till_height_query ~height =
+    Caqti_request.collect Caqti_type.unit State_hash_and_ledger_hash.typ
+      (Printf.sprintf
+         "SELECT state_hash, ledger_hash FROM blocks \n\
+         \    WHERE chain_status = 'canonical'\n\
+         \    AND height <= %d ORDER BY height\n\
+         \ \n\
+         \     " height )
 
-  let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
-      height =
-    Conn.exec (dump_block_hashes_till_height_query ~output_file ~height) ()
+  let dump_block_hashes_till_height (module Conn : CONNECTION) height =
+    Conn.collect_list (dump_block_hashes_till_height_query ~height) ()
 
-  let dump_block_hashes_query ~output_file =
-    dump_sql_to_csv output_file
-      ~sql:
-        "\n\
-        \      SELECT state_hash, ledger_hash FROM blocks\n\
-        \      WHERE chain_status = 'canonical'\n\
-        \      ORDER BY height\n\
-        \      "
-    |> Caqti_request.exec Caqti_type.unit
+  let dump_block_hashes_query =
+    Caqti_request.collect Caqti_type.unit State_hash_and_ledger_hash.typ
+      "\n\
+      \      SELECT state_hash, ledger_hash FROM blocks\n\
+      \      WHERE chain_status = 'canonical'\n\
+      \      ORDER BY height\n\
+      \      "
 
-  let dump_block_hashes (module Conn : CONNECTION) output_file =
-    Conn.exec (dump_block_hashes_query ~output_file) ()
+  let dump_block_hashes (module Conn : CONNECTION) =
+    Conn.collect_list dump_block_hashes_query ()
 
-  let dump_user_and_internal_command_info_to_csv_query ~output_file =
-    dump_sql_to_csv output_file
-      ~sql:
-        {sql| 
+  let dump_user_and_internal_command_info_query =
+    Caqti_request.collect Caqti_type.unit Accounts_accessed.typ
+      {sql| 
       ( 
         WITH user_command_ids AS
         ( SELECT user_command_id, block_id, status FROM blocks_user_commands
@@ -403,11 +438,9 @@ module Berkeley = struct
         INNER JOIN internal_commands ON id = internal_command_id
         INNER JOIN account_identifiers ON public_key_id = receiver_id
       ) ORDER BY block_id, id |sql}
-    |> Caqti_request.exec Caqti_type.unit
 
-  let dump_user_and_internal_command_info_to_csv (module Conn : CONNECTION)
-      output_file =
-    Conn.exec (dump_user_and_internal_command_info_to_csv_query ~output_file) ()
+  let dump_user_and_internal_command_info (module Conn : CONNECTION) =
+    Conn.collect_list dump_user_and_internal_command_info_query ()
 
   let get_account_accessed_count_query =
     Caqti_request.find Caqti_type.unit Caqti_type.int
