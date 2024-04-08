@@ -64,15 +64,6 @@
           - use "${ref "git+https://github.com/minaprotocol/mina?submodules=1"}";
           - use non-flake commands like ${command "nix-build"} and ${command "nix-shell"}.
         '';
-      # Only get the ocaml stuff, to reduce the amount of unnecessary rebuilds
-      mina-src =
-        with inputs.nix-filter.lib;
-          filter {
-            root = ./.;
-            include =
-              [ (inDirectory "src") "dune" "dune-project" "./nix/dump-dune-deps.sh" "opam.export" ];
-            exclude = [ (inDirectory "src/external") (inDirectory "src/nonconsensus") ];
-          };
     in {
       overlays = {
         misc = import ./nix/misc.nix;
@@ -81,7 +72,7 @@
         javascript = import ./nix/javascript.nix;
         ocaml = pkgs: prev: {
           ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
-            inherit inputs pkgs mina-src;
+            inherit inputs pkgs;
           });
         };
       };

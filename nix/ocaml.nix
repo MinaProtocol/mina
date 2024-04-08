@@ -1,5 +1,5 @@
 # A set defining OCaml parts&dependencies of Minaocamlnix
-{ inputs, mina-src, ... }@args:
+{ inputs, ... }@args:
 let
   foldlAttrs = f: init: set:
     pkgs.lib.lists.foldl'
@@ -23,7 +23,16 @@ let
     opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
   repos = [ external-repo inputs.opam-repository ];
 
-  export = opam-nix.importOpam "${mina-src}/opam.export";
+  # Only get the ocaml stuff, to reduce the amount of unnecessary rebuilds
+  mina-src =
+    with inputs.nix-filter.lib;
+      filter {
+        root = ../.;
+        include =
+          [ (inDirectory "src") "dune" "dune-project" ];
+        exclude = [ (inDirectory "src/external") (inDirectory "src/nonconsensus") ];
+      };
+  export = opam-nix.importOpam ../opam.export;
   external-packages = pkgs.lib.getAttrs [ "sodium" "base58"
     "h_list" "bitstring_lib" "snarky_signature" "snarky" "snarky_curve" "fold_lib" "group_map" "snarkette" "tuple_lib" "sponge" "snarky_bench" "interval_union" "ppx_snarky" "snarky_integer" "ppx_optcomp" "prometheus" "rocks"
     ]
@@ -142,7 +151,7 @@ let
         ];
         configurePhase = ''
           ${s.configurePhase}
-          cp ${mina-src}/src/dune.linker.inc dune.linker.inc
+          cp ${../src/dune.linker.inc} dune.linker.inc
           sed -i -r 's%\.\./\.\./dune\.linker\.inc%dune.linker.inc%g' dune
           '';
         buildPhase = ''
@@ -169,8 +178,8 @@ let
   depsFiles =
     let src =
        builtins.filterSource
-        (path: type: type != "file" || builtins.elem (baseNameOf path) ["dune" "dune-project" "dump-dune-deps.sh"])
-          mina-src;
+        (path: type: type != "file" || builtins.elem (baseNameOf path) ["dune" "dune-project"])
+          ../.;
         in
     pkgs.stdenv.mkDerivation {
       name = "mina-deps-json";
@@ -178,7 +187,7 @@ let
       nativeBuildInputs = [ pkgs.jq ];
       phases = [ "unpackPhase" "buildPhase" "installPhase" ];
       buildPhase = ''
-        ${pkgs.bash}/bin/bash ./nix/dump-dune-deps.sh > deps.json
+        ${pkgs.bash}/bin/bash ${../nix/dump-dune-deps.sh} > deps.json
         packages=" $(tr "\n" " " <src/dune-project | grep -oE '\(\s*package\s*\(name\s\s*[^\)]*\)\)' \
           | sed -r 's/\((name|package)//g' \
           | sed -r 's/\s|\)//g' | tr "\n" " " ) "
@@ -225,24 +234,18 @@ let
     };
   mkGraphqlSchema = self:
     pkgs.stdenv.mkDerivation {
-      src =
-        with inputs.nix-filter.lib;
-        filter {
-          root = "${mina-src}/src";
-          include = [ "graphql-ppx-config.inc" ];
-        };
       name = "graphql-schema";
-      phases = [ "unpackPhase" "installPhase" ];
+      phases = [ "installPhase" ];
       installPhase = ''
         mkdir -p $out
-        cp graphql-ppx-config.inc $out/
+        cp ${../src/graphql-ppx-config.inc} $out/
         ${self.graphql_schema_dump}/bin/graphql_schema_dump > $out/graphql_schema.json
       '';
     };
   mkMinaConfig = DUNE_PROFILE: self:
     pkgs.stdenv.mkDerivation {
       inherit DUNE_PROFILE;
-      src = "${mina-src}/src/config";
+      src = "../src/config";
       pname = "mina-config";
       version = "${DUNE_PROFILE}";
       nativeBuildInputs = with self; [ dune ocaml ];
@@ -258,6 +261,18 @@ let
       '';
       installPhase = "cp -R . $out";
     };
+  nixSupportPhase = ''
+     exportIfUnset() {
+       sed -Ee 's/^([^=]*)=(.*)$/\1="''${\1-\2}"/'
+     }
+     if [[ -d "$OCAMLFIND_DESTDIR" ]]; then
+       mkdir -p $out/nix-support
+       printf '%s%s\n' ${
+         escapeShellArg
+         "export OCAMLPATH=\${OCAMLPATH-}\${OCAMLPATH:+:}"
+       } "$OCAMLFIND_DESTDIR" >> $out/nix-support/setup-hook
+     fi
+   '';
 
   overlay = self: super:
     let
@@ -434,18 +449,6 @@ let
       experiment =
         let
         deps = extra-packages // implicit-deps ;
-        nixSupportPhase = ''
-           exportIfUnset() {
-             sed -Ee 's/^([^=]*)=(.*)$/\1="''${\1-\2}"/'
-           }
-           if [[ -d "$OCAMLFIND_DESTDIR" ]]; then
-             mkdir -p $out/nix-support
-             printf '%s%s\n' ${
-               escapeShellArg
-               "export OCAMLPATH=\${OCAMLPATH-}\${OCAMLPATH:+:}"
-             } "$OCAMLFIND_DESTDIR" >> $out/nix-support/setup-hook
-           fi
-         '';
         patchDuneGraphql = schema: ''
           dune_files=$(find -name dune -type f)
           ( [[ "$dune_files" != "" ]] && grep -o graphql_schema.json $dune_files >/dev/null && \
@@ -462,29 +465,6 @@ let
             sed -i 's~\[%%import "/src/config.mlh"\]~\[%%import "${config}/config.mlh"\]~g' \
             $(find \( -name '*.ml' -or -name '*.mli' \) -type f) ) || true
           '';
-        depsFiles =
-          let src =
-             builtins.filterSource
-              (path: type: type != "file" || builtins.elem (baseNameOf path) ["dune" "dune-project" "dump-dune-deps.sh"])
-                mina-src;
-              in
-          pkgs.stdenv.mkDerivation {
-          name = "mina-deps-json";
-          inherit src;
-          nativeBuildInputs = with self; [ dune ocaml pkgs.jq ];
-          phases = [ "unpackPhase" "buildPhase" "installPhase" ];
-          buildPhase = ''
-            ${pkgs.bash}/bin/bash ./nix/dump-dune-deps.sh > deps.json
-            packages=" $(tr "\n" " " <src/dune-project | grep -oE '\(\s*package\s*\(name\s\s*[^\)]*\)\)' \
-              | sed -r 's/\((name|package)//g' \
-              | sed -r 's/\s|\)//g' | tr "\n" " " ) "
-            <deps.json jq -r "to_entries | .[] | \"if [[ \\\"$packages\\\" =~ ' \" + .key + \" ' ]]; then cp -f ${./opam.template} \" + .value.path + \"/\" + .key + \".opam; fi\"" > gen-opam-files.sh
-          '';
-          installPhase = ''
-            mkdir -p $out
-            cp deps.json gen-opam-files.sh $out
-          '';
-        };
         opamTemplate = opam-nix.importOpam ./opam.template;
         depsMap = builtins.fromJSON (builtins.readFile "${depsFiles}/deps.json");
         computeDependsOnConfig = collected: name: depsEntry:
