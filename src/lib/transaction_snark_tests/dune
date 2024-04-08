@@ -53,7 +53,7 @@
    staged_ledger_diff
    mina_wire_types
    block_time
-   mina_generators precomputed_values genesis_proof ; hack for nix
+   mina_generators precomputed_values coda_genesis_proof ; hack for nix
    )
   (library_flags -linkall)
   (inline_tests (flags -verbose -show-counts))
