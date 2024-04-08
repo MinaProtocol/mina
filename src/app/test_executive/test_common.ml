@@ -415,10 +415,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   (* [logs] is a string containing the entire replayer output *)
   let check_replayer_logs ~logger logs =
-    let log_level_substring level = sprintf {|"level":"%s"|} level in
-    let error_log_substring = log_level_substring "Error" in
-    let fatal_log_substring = log_level_substring "Fatal" in
-    let info_log_substring = log_level_substring "Info" in
+    let error_log_substring = "Error" in
+    let fatal_log_substring = "Fatal" in
+    let info_log_substring = "Info" in
     let split_logs = String.split logs ~on:'\n' in
     let error_logs =
       split_logs
