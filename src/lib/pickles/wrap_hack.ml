@@ -141,34 +141,4 @@ module Checked = struct
       (Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof
        .to_field_elements ~g1:Inner_curve.to_field_elements t ) ;
     Sponge.squeeze_field sponge
-
-  (* Check that the pre-absorbing technique works. I.e., that it's consistent with
-     the actual definition of hash_messages_for_next_wrap_proof. *)
-  let%test_unit "hash_messages_for_next_wrap_proof correct" =
-    let open Impls.Wrap in
-    let test (type n) (n : n Nat.t) =
-      let messages_for_next_wrap_proof :
-          _ Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t =
-        let g = Wrap_main_inputs.Inner_curve.Constant.random () in
-        { Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof
-          .challenge_polynomial_commitment = g
-        ; old_bulletproof_challenges =
-            Vector.init n ~f:(fun _ ->
-                Vector.init Tock.Rounds.n ~f:(fun _ -> Tock.Field.random ()) )
-        }
-      in
-      Internal_Basic.Test.test_equal ~sexp_of_t:Field.Constant.sexp_of_t
-        ~equal:Field.Constant.equal
-        (Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.typ
-           Wrap_main_inputs.Inner_curve.typ
-           (Vector.typ Field.typ Backend.Tock.Rounds.n)
-           ~length:n )
-        Field.typ
-        (fun t -> make_checked (fun () -> hash_messages_for_next_wrap_proof n t))
-        (fun t ->
-          hash_constant_messages_for_next_wrap_proof n t
-          |> Digest.Constant.to_bits |> Impls.Wrap.Field.Constant.project )
-        messages_for_next_wrap_proof
-    in
-    test Nat.N0.n ; test Nat.N1.n ; test Nat.N2.n
 end

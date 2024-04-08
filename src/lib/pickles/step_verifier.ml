@@ -682,38 +682,6 @@ struct
       in
       domain ~max:(Domain.log2_size max_domains.h)
 
-  let%test_module "side loaded domains" =
-    ( module struct
-      let run k =
-        let y =
-          run_and_check (fun () ->
-              let y = k () in
-              fun () -> As_prover.read_var y )
-          |> Or_error.ok_exn
-        in
-        y
-
-      let%test_unit "side loaded domains" =
-        let open Side_loaded_verification_key in
-        let domains = [ { Domains.h = 10 }; { h = 15 } ] in
-        let pt = Field.Constant.random () in
-        List.iter domains ~f:(fun ds ->
-            let d_unchecked =
-              Plonk_checks.domain
-                (module Field.Constant)
-                (Pow_2_roots_of_unity ds.h) ~shifts:Common.tick_shifts
-                ~domain_generator:Backend.Tick.Field.domain_generator
-            in
-            let checked_domain () =
-              side_loaded_domain ~log2_size:(Field.of_int ds.h)
-            in
-            [%test_eq: Field.Constant.t]
-              (d_unchecked#vanishing_polynomial pt)
-              (run (fun () ->
-                   (checked_domain ())#vanishing_polynomial (Field.constant pt) )
-              ) )
-    end )
-
   (* module Split_evaluations = struct
        open Plonk_types
 
@@ -799,9 +767,6 @@ struct
   let _shift2 =
     Shifted_value.Type2.Shift.(
       map ~f:Field.constant (create (module Field.Constant)))
-
-  let%test_unit "endo scalar" =
-    SC.test (module Impl) ~endo:Endo.Wrap_inner_curve.scalar
 
   module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
 
@@ -1260,3 +1225,7 @@ struct
 end
 
 include Make (Step_main_inputs)
+
+module For_tests_only = struct
+  let side_loaded_domain = side_loaded_domain
+end
