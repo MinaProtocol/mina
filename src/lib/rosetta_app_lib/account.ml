@@ -198,8 +198,8 @@ module Sql = struct
     let balance_info : Balance_info.t = { liquid_balance; total_balance } in
     Deferred.Result.return (balance_info, nonce)
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_query
-      ~address ~token_id =
+  let run (module Conn : Caqti_async.CONNECTION) ~block_query ~address ~token_id
+      =
     let open Deferred.Result.Let_syntax in
     (* First find the block referenced by the block identifier. Then
        find the latest block no later than it that has a user or
@@ -299,9 +299,7 @@ module Balance = struct
           (fun ~block_query ~address ~token_id ->
             with_db (fun ~db ->
                 let (module Conn : Caqti_async.CONNECTION) = db in
-                Sql.run
-                  (module Conn)
-                  ~block_query ~address ~token_id
+                Sql.run (module Conn) ~block_query ~address ~token_id
                 |> Errors.Lift.wrap )
             |> Deferred.Result.map_error ~f:(function `App e -> e) )
       ; validate_network_choice = Network.Validate_choice.Real.validate

@@ -677,7 +677,8 @@ let%test_unit "schnorr checked + unchecked" =
   let gen_legacy =
     let open Quickcheck.Let_syntax in
     let%map pk = Private_key.gen and msg = Tick.Field.gen in
-    (pk, Random_oracle.Input.Legacy.field_elements [| msg |]) in
+    (pk, Random_oracle.Input.Legacy.field_elements [| msg |])
+  in
   Quickcheck.test ~trials:5 gen_legacy ~f:(fun (pk, msg) ->
       let s = Legacy.sign pk msg in
       let pubkey = Tick.Inner_curve.(scale one pk) in
