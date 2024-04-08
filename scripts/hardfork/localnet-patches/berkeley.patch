@@ -1,0 +1,239 @@
+From 6a234e647cc7fcbb8e29dc1ce7264b89b93d034f Mon Sep 17 00:00:00 2001
+From: ember arlynx <ember.arlynx@o1labs.org>
+Date: Wed, 27 Mar 2024 23:21:59 -0400
+Subject: [PATCH] this combines two patches from georgee
+
+From 4b7d18c23f5cd22c2e3e2d979a7fafe8df4b1d93 Mon Sep 17 00:00:00 2001
+From: georgeee <george.agapov@gmail.com>
+Date: Wed, 7 Feb 2024 11:35:27 +0100
+Subject: [PATCH 2/3] Propagate logging settings to snark worker
+
+From b417566203405ae0aca76cbbfbf5faf4f71395ef Mon Sep 17 00:00:00 2001
+From: georgeee <george.agapov@gmail.com>
+Date: Fri, 16 Feb 2024 19:39:22 +0100
+Subject: [PATCH 3/3] Cache loaded caches in Ledger.load
+
+Problem: when load of a ledger file is attempted twice, error comes from
+Rocksdb locking mechanism
+
+Solution: use simple cache map when loading epoch ledgers, using
+previously loaded ledgers.
+
+diff --git a/src/app/cli/src/cli_entrypoint/mina_cli_entrypoint.ml b/src/app/cli/src/cli_entrypoint/mina_cli_entrypoint.ml
+index 3349abd2e6..4cd717e25c 100644
+--- a/src/app/cli/src/cli_entrypoint/mina_cli_entrypoint.ml
++++ b/src/app/cli/src/cli_entrypoint/mina_cli_entrypoint.ml
+@@ -1368,9 +1368,10 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
+           let%map mina =
+             Mina_lib.create ~wallets
+               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
+-                 ~chain_id ~is_seed ~super_catchup:(not no_super_catchup)
+-                 ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
+-                 ~gossip_net_params ~proposed_protocol_version_opt
++                 ~file_log_level ~log_level ~log_json ~chain_id ~is_seed
++                 ~super_catchup:(not no_super_catchup) ~disable_node_status
++                 ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
++                 ~proposed_protocol_version_opt
+                  ~work_selection_method:
+                    (Cli_lib.Arg_type.work_selection_method_to_module
+                       work_selection_method )
+diff --git a/src/lib/genesis_ledger_helper/genesis_ledger_helper.ml b/src/lib/genesis_ledger_helper/genesis_ledger_helper.ml
+index 20b64dcbf1..22fe459be9 100644
+--- a/src/lib/genesis_ledger_helper/genesis_ledger_helper.ml
++++ b/src/lib/genesis_ledger_helper/genesis_ledger_helper.ml
+@@ -433,8 +433,9 @@ module Ledger = struct
+     end) )
+ 
+   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
+-      ?(ledger_name_prefix = "genesis_ledger") ?overwrite_version
+-      (config : Runtime_config.Ledger.t) =
++      ?(ledger_cache = String.Map.empty) ?overwrite_version
++      ?(ledger_name_prefix = "genesis_ledger") (config : Runtime_config.Ledger.t)
++      =
+     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
+         let padded_accounts_opt =
+           padded_accounts_from_runtime_config_opt ~logger ~proof_level
+@@ -446,6 +447,9 @@ module Ledger = struct
+             ~ledger_name_prefix config
+         in
+         match tar_path with
++        | Some tar_path when Map.mem ledger_cache tar_path ->
++            Deferred.Result.return
++              (Map.find_exn ledger_cache tar_path, config, tar_path)
+         | Some tar_path -> (
+             match%map
+               load_from_tar ~genesis_dir ~logger ~constraint_constants
+@@ -574,6 +578,7 @@ end
+ 
+ module Epoch_data = struct
+   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
++      ?(ledger_cache = String.Map.empty)
+       (config : Runtime_config.Epoch_data.t option) =
+     let open Deferred.Or_error.Let_syntax in
+     match config with
+@@ -581,13 +586,13 @@ module Epoch_data = struct
+         Deferred.Or_error.return (None, None)
+     | Some config ->
+         let ledger_name_prefix = "epoch_ledger" in
+-        let load_ledger ledger =
++        let load_ledger ~ledger_cache ledger =
+           Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+-            ~ledger_name_prefix ledger
++            ~ledger_name_prefix ~ledger_cache ledger
+         in
+-        let%bind staking, staking_config =
++        let%bind staking, staking_config, ledger_cache =
+           let%map staking_ledger, config', ledger_file =
+-            load_ledger config.staking.ledger
++            load_ledger ~ledger_cache config.staking.ledger
+           in
+           [%log trace] "Loaded staking epoch ledger from $ledger_file"
+             ~metadata:[ ("ledger_file", `String ledger_file) ] ;
+@@ -595,7 +600,9 @@ module Epoch_data = struct
+                 Genesis_ledger.Packed.t staking_ledger
+             ; seed = Epoch_seed.of_base58_check_exn config.staking.seed
+             }
+-          , { config.staking with ledger = config' } )
++          , { config.staking with ledger = config' }
++          , Map.add ledger_cache ~key:ledger_file ~data:staking_ledger
++            |> function `Duplicate -> ledger_cache | `Ok m -> m )
+         in
+         let%map next, next_config =
+           match config.next with
+@@ -605,7 +612,9 @@ module Epoch_data = struct
+                  epoch ledger" ;
+               Deferred.Or_error.return (None, None)
+           | Some { ledger; seed } ->
+-              let%map next_ledger, config'', ledger_file = load_ledger ledger in
++              let%map next_ledger, config'', ledger_file =
++                load_ledger ~ledger_cache ledger
++              in
+               [%log trace] "Loaded next epoch ledger from $ledger_file"
+                 ~metadata:[ ("ledger_file", `String ledger_file) ] ;
+               ( Some
+diff --git a/src/lib/mina_lib/config.ml b/src/lib/mina_lib/config.ml
+index 22d622d98b..1dce50970b 100644
+--- a/src/lib/mina_lib/config.ml
++++ b/src/lib/mina_lib/config.ml
+@@ -61,5 +61,8 @@ type t =
+   ; uptime_send_node_commit : bool [@default false]
+   ; stop_time : int
+   ; graphql_control_port : int option [@default None]
++  ; file_log_level : Logger.Level.t [@default Logger.Level.Info]
++  ; log_level : Logger.Level.t [@default Logger.Level.Info]
++  ; log_json : bool [@default false]
+   }
+ [@@deriving make]
+diff --git a/src/lib/mina_lib/mina_lib.ml b/src/lib/mina_lib/mina_lib.ml
+index 2f192f3835..cb25cae041 100644
+--- a/src/lib/mina_lib/mina_lib.ml
++++ b/src/lib/mina_lib/mina_lib.ml
+@@ -177,7 +177,8 @@ let log_snark_coordinator_warning (config : Config.t) snark_worker =
+         ()
+ 
+ module Snark_worker = struct
+-  let run_process ~logger ~proof_level pids client_port kill_ivar num_threads =
++  let run_process ~logger ~proof_level ~conf_dir ~file_log_level ~log_json
++      ~log_level pids client_port kill_ivar num_threads =
+     let env =
+       Option.map
+         ~f:(fun num -> `Extend [ ("RAYON_NUM_THREADS", string_of_int num) ])
+@@ -191,7 +192,8 @@ module Snark_worker = struct
+           :: Snark_worker.arguments ~proof_level
+                ~daemon_address:
+                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
+-               ~shutdown_on_disconnect:false )
++               ~shutdown_on_disconnect:false ~conf_dir ~file_log_level ~log_json
++               ~log_level )
+     in
+     Child_processes.Termination.register_process pids snark_worker_process
+       Snark_worker ;
+@@ -261,9 +263,11 @@ module Snark_worker = struct
+         log_snark_worker_warning t ;
+         let%map snark_worker_process =
+           run_process ~logger:t.config.logger
+-            ~proof_level:t.config.precomputed_values.proof_level t.config.pids
+-            t.config.gossip_net_params.addrs_and_ports.client_port kill_ivar
+-            t.config.snark_worker_config.num_threads
++            ~proof_level:t.config.precomputed_values.proof_level
++            ~conf_dir:t.config.conf_dir ~log_level:t.config.log_level
++            ~log_json:t.config.log_json ~file_log_level:t.config.file_log_level
++            t.config.pids t.config.gossip_net_params.addrs_and_ports.client_port
++            kill_ivar t.config.snark_worker_config.num_threads
+         in
+         [%log' debug t.config.logger]
+           ~metadata:
+diff --git a/src/lib/snark_worker/functor.ml b/src/lib/snark_worker/functor.ml
+index 20ad043775..860fb3f318 100644
+--- a/src/lib/snark_worker/functor.ml
++++ b/src/lib/snark_worker/functor.ml
+@@ -361,20 +361,23 @@ module Make (Inputs : Intf.Inputs_intf) :
+           (optional bool)
+           ~doc:
+             "true|false Shutdown when disconnected from daemon (default:true)"
++      and log_json = Cli_lib.Flag.Log.json
++      and log_level = Cli_lib.Flag.Log.level
++      and file_log_level = Cli_lib.Flag.Log.file_log_level
+       and conf_dir = Cli_lib.Flag.conf_dir in
+       fun () ->
+         let logger =
+           Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
+         in
++        Cli_lib.Stdout_log.setup log_json log_level ;
+         Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
+-            let logrotate_max_size = 1024 * 10 in
+-            let logrotate_num_rotate = 1 in
+-            Logger.Consumer_registry.register ~id:Logger.Logger_id.snark_worker
+-              ~processor:(Logger.Processor.raw ())
++            let max_size = 1024 * 1024 * 10 in
++            Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
++              ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
+               ~transport:
+                 (Logger_file_system.dumb_logrotate ~directory:conf_dir
+-                   ~log_filename:"mina-snark-worker.log"
+-                   ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ) ;
++                   ~log_filename:"mina-snark-worker.log" ~max_size
++                   ~num_rotate:10 ) ) ;
+         Signal.handle [ Signal.term ] ~f:(fun _signal ->
+             [%log info]
+               !"Received signal to terminate. Aborting snark worker process" ;
+@@ -388,12 +391,20 @@ module Make (Inputs : Intf.Inputs_intf) :
+           ~logger ~proof_level daemon_port
+           (Option.value ~default:true shutdown_on_disconnect))
+ 
+-  let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect =
+-    [ "-daemon-address"
++  let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect ~conf_dir
++      ~log_json ~log_level ~file_log_level =
++    [ "--daemon-address"
+     ; Host_and_port.to_string daemon_address
+-    ; "-proof-level"
++    ; "--proof-level"
+     ; Genesis_constants.Proof_level.to_string proof_level
+-    ; "-shutdown-on-disconnect"
++    ; "--shutdown-on-disconnect"
+     ; Bool.to_string shutdown_on_disconnect
++    ; "--config-directory"
++    ; conf_dir
++    ; "--file-log-level"
++    ; Logger.Level.show file_log_level
++    ; "--log-level"
++    ; Logger.Level.show log_level
+     ]
++    @ if log_json then [ "--log_json" ] else []
+ end
+diff --git a/src/lib/snark_worker/intf.ml b/src/lib/snark_worker/intf.ml
+index e36b146ab0..c71b22656a 100644
+--- a/src/lib/snark_worker/intf.ml
++++ b/src/lib/snark_worker/intf.ml
+@@ -160,6 +160,10 @@ module type S0 = sig
+        proof_level:Genesis_constants.Proof_level.t
+     -> daemon_address:Host_and_port.t
+     -> shutdown_on_disconnect:bool
++    -> conf_dir:string
++    -> log_json:bool
++    -> log_level:Logger.Level.t
++    -> file_log_level:Logger.Level.t
+     -> string list
+ end
+ 
