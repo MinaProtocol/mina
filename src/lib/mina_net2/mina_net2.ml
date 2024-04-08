@@ -258,9 +258,7 @@ let listening_addrs t =
 
 let open_protocol t ~on_handler_error ~protocol f =
   let open Deferred.Or_error.Let_syntax in
-  let protocol_handler =
-    { closed = false; on_handler_error; handler = f }
-  in
+  let protocol_handler = { closed = false; on_handler_error; handler = f } in
   if Hashtbl.mem t.protocol_handlers protocol then
     Deferred.Or_error.errorf "already handling protocol %s" protocol
   else

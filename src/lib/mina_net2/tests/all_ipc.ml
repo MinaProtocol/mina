@@ -614,9 +614,7 @@ let%test_module "all-ipc test" =
           ~on_peer_connected:(on_connected c_pipe)
           ~on_peer_disconnected:(on_disconnected c_pipe)
       in
-      let addrs =
-        { b_addr; a_peerid; b_peerid; c_peerid; y_peerid }
-      in
+      let addrs = { b_addr; a_peerid; b_peerid; c_peerid; y_peerid } in
       [%log info] "Alice: $peerId" ~metadata:[ ("peerId", `String a_peerid) ] ;
       [%log info] "Bob: $peerId" ~metadata:[ ("peerId", `String b_peerid) ] ;
       [%log info] "Carol: $peerId" ~metadata:[ ("peerId", `String c_peerid) ] ;
