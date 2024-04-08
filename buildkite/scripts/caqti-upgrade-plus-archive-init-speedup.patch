@@ -1,9 +1,3 @@
-From cb2463f19908e9c5531c7f80148e975060c954d9 Mon Sep 17 00:00:00 2001
-From: ember arlynx <ember.arlynx@o1labs.org>
-Date: Sat, 30 Mar 2024 22:44:15 -0400
-Subject: [PATCH] applied caqti+archive
-
-
 diff --git a/opam.export b/opam.export
 index 655b623d35..130eb77140 100644
 --- a/opam.export
@@ -173,7 +167,7 @@ index c69e1805d1..bf15430c54 100644
        pool
    with
 diff --git a/src/app/archive/lib/processor.ml b/src/app/archive/lib/processor.ml
-index 8b90db5952..313b424f55 100644
+index d4f0e9c585..274fb0839d 100644
 --- a/src/app/archive/lib/processor.ml
 +++ b/src/app/archive/lib/processor.ml
 @@ -21,7 +21,6 @@
@@ -521,8 +515,7 @@ index 8b90db5952..313b424f55 100644
 -      (module Conn)
 -      token_symbol
 +  type local_copy = (string, int) Hashtbl.t
- 
--  let load (module Conn : CONNECTION) id =
++
 +  let local_copies = Hashtbl.create (module String)
 +
 +  let load_copy =
@@ -534,7 +527,8 @@ index 8b90db5952..313b424f55 100644
 +      ~load_elt:(fun t_to_id (id, value) ->
 +        Hashtbl.add_exn t_to_id ~key:value ~data:id ;
 +        Deferred.unit )
-+
+ 
+-  let load (module Conn : CONNECTION) id =
 +  let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION) token_symbol =
 +    let%bind t_to_id = load_copy (module Conn) in
 +    let open Deferred.Result.Let_syntax in
@@ -979,7 +973,7 @@ index 8b90db5952..313b424f55 100644
  
    let typ =
      Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-@@ -682,14 +931,58 @@ module Zkapp_permissions = struct
+@@ -682,9 +931,51 @@ module Zkapp_permissions = struct
        ; auth_required_typ
        ]
  
@@ -1029,18 +1023,10 @@ index 8b90db5952..313b424f55 100644
 +
 +  let add_if_doesn't_exist (module Conn : Mina_caqti.CONNECTION)
 +      (perms : Permissions.t) =
-     let txn_version =
-       Mina_numbers.Txn_version.to_int @@ snd perms.set_verification_key
-     in
-     let%bind versions =
--      Protocol_versions.find_txn_version (module Conn) ~transaction:txn_version
-+      Protocol_versions.find_by_txn_version
-+        (module Conn)
-+        ~transaction:txn_version
-     in
-     ( match versions with
-     | Ok [] ->
-@@ -720,16 +1013,21 @@ module Zkapp_permissions = struct
+     let value =
+       { edit_state = perms.edit_state
+       ; send = perms.send
+@@ -703,16 +994,21 @@ module Zkapp_permissions = struct
        ; set_timing = perms.set_timing
        }
      in
@@ -1071,7 +1057,7 @@ index 8b90db5952..313b424f55 100644
  end
  
  module Zkapp_timing_info = struct
-@@ -748,7 +1046,7 @@ module Zkapp_timing_info = struct
+@@ -731,7 +1027,7 @@ module Zkapp_timing_info = struct
  
    let table_name = "zkapp_timing_info"
  
@@ -1080,7 +1066,7 @@ index 8b90db5952..313b424f55 100644
        (timing_info : Account_update.Update.Timing_info.t) =
      let initial_minimum_balance =
        Currency.Balance.to_string timing_info.initial_minimum_balance
-@@ -778,9 +1076,9 @@ module Zkapp_timing_info = struct
+@@ -761,9 +1057,9 @@ module Zkapp_timing_info = struct
        (module Conn)
        value
  
@@ -1092,7 +1078,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -792,16 +1090,16 @@ module Zkapp_uri = struct
+@@ -775,16 +1071,16 @@ module Zkapp_uri = struct
  
    let table_name = "zkapp_uris"
  
@@ -1112,7 +1098,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "value" ]) )
        id
  end
-@@ -834,7 +1132,7 @@ module Zkapp_updates = struct
+@@ -817,7 +1113,7 @@ module Zkapp_updates = struct
  
    let table_name = "zkapp_updates"
  
@@ -1121,7 +1107,7 @@ index 8b90db5952..313b424f55 100644
        (update : Account_update.Update.t) =
      let open Deferred.Result.Let_syntax in
      let%bind app_state_id =
-@@ -892,9 +1190,9 @@ module Zkapp_updates = struct
+@@ -875,9 +1171,9 @@ module Zkapp_updates = struct
        (module Conn)
        value
  
@@ -1133,7 +1119,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -909,7 +1207,7 @@ module Zkapp_balance_bounds = struct
+@@ -892,7 +1188,7 @@ module Zkapp_balance_bounds = struct
  
    let table_name = "zkapp_balance_bounds"
  
@@ -1142,7 +1128,7 @@ index 8b90db5952..313b424f55 100644
        (balance_bounds :
          Currency.Balance.t Mina_base.Zkapp_precondition.Closed_interval.t ) =
      let balance_lower_bound = Currency.Balance.to_string balance_bounds.lower in
-@@ -920,9 +1218,9 @@ module Zkapp_balance_bounds = struct
+@@ -903,9 +1199,9 @@ module Zkapp_balance_bounds = struct
        (module Conn)
        value
  
@@ -1154,7 +1140,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -937,7 +1235,7 @@ module Zkapp_nonce_bounds = struct
+@@ -920,7 +1216,7 @@ module Zkapp_nonce_bounds = struct
  
    let table_name = "zkapp_nonce_bounds"
  
@@ -1163,7 +1149,7 @@ index 8b90db5952..313b424f55 100644
        (nonce_bounds :
          Mina_numbers.Account_nonce.t
          Mina_base.Zkapp_precondition.Closed_interval.t ) =
-@@ -949,9 +1247,9 @@ module Zkapp_nonce_bounds = struct
+@@ -932,9 +1228,9 @@ module Zkapp_nonce_bounds = struct
        (module Conn)
        value
  
@@ -1175,7 +1161,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -984,7 +1282,7 @@ module Zkapp_account_precondition = struct
+@@ -967,7 +1263,7 @@ module Zkapp_account_precondition = struct
  
    let table_name = "zkapp_account_precondition"
  
@@ -1184,7 +1170,7 @@ index 8b90db5952..313b424f55 100644
        (acct : Zkapp_precondition.Account.t) =
      let open Deferred.Result.Let_syntax in
      let%bind balance_id =
-@@ -1033,9 +1331,9 @@ module Zkapp_account_precondition = struct
+@@ -1016,9 +1312,9 @@ module Zkapp_account_precondition = struct
        (module Conn)
        value
  
@@ -1196,7 +1182,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -1050,7 +1348,7 @@ module Zkapp_token_id_bounds = struct
+@@ -1033,7 +1329,7 @@ module Zkapp_token_id_bounds = struct
  
    let table_name = "zkapp_token_id_bounds"
  
@@ -1205,7 +1191,7 @@ index 8b90db5952..313b424f55 100644
        (token_id_bounds :
          Token_id.t Mina_base.Zkapp_precondition.Closed_interval.t ) =
      let token_id_lower_bound = token_id_bounds.lower |> Token_id.to_string in
-@@ -1061,9 +1359,9 @@ module Zkapp_token_id_bounds = struct
+@@ -1044,9 +1340,9 @@ module Zkapp_token_id_bounds = struct
        (module Conn)
        value
  
@@ -1217,7 +1203,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -1078,7 +1376,7 @@ module Zkapp_timestamp_bounds = struct
+@@ -1061,7 +1357,7 @@ module Zkapp_timestamp_bounds = struct
  
    let table_name = "zkapp_timestamp_bounds"
  
@@ -1226,7 +1212,7 @@ index 8b90db5952..313b424f55 100644
        (timestamp_bounds :
          Block_time.t Mina_base.Zkapp_precondition.Closed_interval.t ) =
      let timestamp_lower_bound =
-@@ -1093,9 +1391,9 @@ module Zkapp_timestamp_bounds = struct
+@@ -1076,9 +1372,9 @@ module Zkapp_timestamp_bounds = struct
        (module Conn)
        value
  
@@ -1238,7 +1224,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -1110,7 +1408,7 @@ module Zkapp_length_bounds = struct
+@@ -1093,7 +1389,7 @@ module Zkapp_length_bounds = struct
  
    let table_name = "zkapp_length_bounds"
  
@@ -1247,7 +1233,7 @@ index 8b90db5952..313b424f55 100644
        (length_bounds :
          Unsigned.uint32 Mina_base.Zkapp_precondition.Closed_interval.t ) =
      let length_lower_bound = Unsigned.UInt32.to_int64 length_bounds.lower in
-@@ -1121,9 +1419,9 @@ module Zkapp_length_bounds = struct
+@@ -1104,9 +1400,9 @@ module Zkapp_length_bounds = struct
        (module Conn)
        value
  
@@ -1259,7 +1245,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -1138,7 +1436,7 @@ module Zkapp_amount_bounds = struct
+@@ -1121,7 +1417,7 @@ module Zkapp_amount_bounds = struct
  
    let table_name = "zkapp_amount_bounds"
  
@@ -1268,7 +1254,7 @@ index 8b90db5952..313b424f55 100644
        (amount_bounds :
          Currency.Amount.t Mina_base.Zkapp_precondition.Closed_interval.t ) =
      let amount_lower_bound = Currency.Amount.to_string amount_bounds.lower in
-@@ -1149,9 +1447,9 @@ module Zkapp_amount_bounds = struct
+@@ -1132,9 +1428,9 @@ module Zkapp_amount_bounds = struct
        (module Conn)
        value
  
@@ -1280,7 +1266,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -1166,7 +1464,7 @@ module Zkapp_global_slot_bounds = struct
+@@ -1149,7 +1445,7 @@ module Zkapp_global_slot_bounds = struct
  
    let table_name = "zkapp_global_slot_bounds"
  
@@ -1289,7 +1275,7 @@ index 8b90db5952..313b424f55 100644
        (global_slot_bounds :
          Mina_numbers.Global_slot_since_genesis.t
          Mina_base.Zkapp_precondition.Closed_interval.t ) =
-@@ -1184,38 +1482,104 @@ module Zkapp_global_slot_bounds = struct
+@@ -1167,38 +1463,104 @@ module Zkapp_global_slot_bounds = struct
        (module Conn)
        value
  
@@ -1407,7 +1393,7 @@ index 8b90db5952..313b424f55 100644
           {sql| SELECT account_identifier_id, initial_minimum_balance,
                        cliff_time, cliff_amount,
                        vesting_period, vesting_increment
-@@ -1224,10 +1588,10 @@ module Timing_info = struct
+@@ -1207,10 +1569,10 @@ module Timing_info = struct
           |sql} )
        account_identifier_id
  
@@ -1420,7 +1406,7 @@ index 8b90db5952..313b424f55 100644
           {sql| SELECT account_identifier_id, initial_minimum_balance,
                        cliff_time, cliff_amount,
                        vesting_period, vesting_increment
-@@ -1236,8 +1600,9 @@ module Timing_info = struct
+@@ -1219,8 +1581,9 @@ module Timing_info = struct
           |sql} )
        account_identifier_id
  
@@ -1432,7 +1418,7 @@ index 8b90db5952..313b424f55 100644
      let open Deferred.Result.Let_syntax in
      let slot_to_int64 x =
        Mina_numbers.Global_slot_since_genesis.to_uint32 x
-@@ -1268,65 +1633,46 @@ module Timing_info = struct
+@@ -1251,65 +1614,46 @@ module Timing_info = struct
            ; vesting_increment = zero
            }
      in
@@ -1514,7 +1500,7 @@ index 8b90db5952..313b424f55 100644
             "SELECT id FROM snarked_ledger_hashes WHERE value = ?" )
          hash
      with
-@@ -1334,13 +1680,13 @@ module Snarked_ledger_hash = struct
+@@ -1317,13 +1661,13 @@ module Snarked_ledger_hash = struct
          return id
      | None ->
          Conn.find
@@ -1531,7 +1517,7 @@ index 8b90db5952..313b424f55 100644
           "SELECT value FROM snarked_ledger_hashes WHERE id = ?" )
        id
  end
-@@ -1355,7 +1701,7 @@ module Zkapp_epoch_ledger = struct
+@@ -1338,7 +1682,7 @@ module Zkapp_epoch_ledger = struct
  
    let table_name = "zkapp_epoch_ledger"
  
@@ -1540,7 +1526,7 @@ index 8b90db5952..313b424f55 100644
        (epoch_ledger : _ Epoch_ledger.Poly.t) =
      let open Deferred.Result.Let_syntax in
      let%bind hash_id =
-@@ -1374,9 +1720,9 @@ module Zkapp_epoch_ledger = struct
+@@ -1357,9 +1701,9 @@ module Zkapp_epoch_ledger = struct
        (module Conn)
        value
  
@@ -1552,7 +1538,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -1398,7 +1744,7 @@ module Zkapp_epoch_data = struct
+@@ -1381,7 +1725,7 @@ module Zkapp_epoch_data = struct
  
    let table_name = "zkapp_epoch_data"
  
@@ -1561,7 +1547,7 @@ index 8b90db5952..313b424f55 100644
        (epoch_data : Mina_base.Zkapp_precondition.Protocol_state.Epoch_data.t) =
      let open Deferred.Result.Let_syntax in
      let%bind epoch_ledger_id =
-@@ -1434,9 +1780,9 @@ module Zkapp_epoch_data = struct
+@@ -1417,9 +1761,9 @@ module Zkapp_epoch_data = struct
        (module Conn)
        value
  
@@ -1573,7 +1559,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -1460,7 +1806,7 @@ module Zkapp_network_precondition = struct
+@@ -1443,7 +1787,7 @@ module Zkapp_network_precondition = struct
  
    let table_name = "zkapp_network_precondition"
  
@@ -1582,7 +1568,7 @@ index 8b90db5952..313b424f55 100644
        (ps : Mina_base.Zkapp_precondition.Protocol_state.t) =
      let open Deferred.Result.Let_syntax in
      let%bind snarked_ledger_hash_id =
-@@ -1509,9 +1855,9 @@ module Zkapp_network_precondition = struct
+@@ -1492,9 +1836,9 @@ module Zkapp_network_precondition = struct
        (module Conn)
        value
  
@@ -1594,7 +1580,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -1545,7 +1891,7 @@ module Zkapp_events = struct
+@@ -1528,7 +1872,7 @@ module Zkapp_events = struct
       7. use "M'" and the list of list of field_ids to compute the list of field_array_ids
       8. insert the list of field_arrays
    *)
@@ -1603,7 +1589,7 @@ index 8b90db5952..313b424f55 100644
        (events : Account_update.Body.Events'.t) =
      let open Deferred.Result.Let_syntax in
      let%bind field_array_id_list =
-@@ -1601,9 +1947,9 @@ module Zkapp_events = struct
+@@ -1584,9 +1928,9 @@ module Zkapp_events = struct
        (module Conn)
        field_array_id_list
  
@@ -1615,7 +1601,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:[ "element_ids" ]) )
        id
  end
-@@ -1652,7 +1998,7 @@ module Zkapp_account_update_body = struct
+@@ -1635,7 +1979,7 @@ module Zkapp_account_update_body = struct
  
    let table_name = "zkapp_account_update_body"
  
@@ -1624,7 +1610,7 @@ index 8b90db5952..313b424f55 100644
        (body : Account_update.Body.Simple.t) =
      let open Deferred.Result.Let_syntax in
      let account_identifier = Account_id.create body.public_key body.token_id in
-@@ -1753,9 +2099,9 @@ module Zkapp_account_update_body = struct
+@@ -1736,9 +2080,9 @@ module Zkapp_account_update_body = struct
        (module Conn)
        value
  
@@ -1636,7 +1622,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -1768,7 +2114,7 @@ module Zkapp_account_update = struct
+@@ -1751,7 +2095,7 @@ module Zkapp_account_update = struct
  
    let table_name = "zkapp_account_update"
  
@@ -1645,7 +1631,7 @@ index 8b90db5952..313b424f55 100644
        (account_update : Account_update.Simple.t) =
      let open Deferred.Result.Let_syntax in
      let%bind body_id =
-@@ -1784,9 +2130,9 @@ module Zkapp_account_update = struct
+@@ -1767,9 +2111,9 @@ module Zkapp_account_update = struct
        (module Conn)
        value
  
@@ -1657,7 +1643,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -1806,7 +2152,7 @@ module Zkapp_fee_payer_body = struct
+@@ -1789,7 +2133,7 @@ module Zkapp_fee_payer_body = struct
  
    let table_name = "zkapp_fee_payer_body"
  
@@ -1666,7 +1652,7 @@ index 8b90db5952..313b424f55 100644
        (body : Account_update.Body.Fee_payer.t) =
      let open Deferred.Result.Let_syntax in
      let%bind public_key_id =
-@@ -1828,9 +2174,9 @@ module Zkapp_fee_payer_body = struct
+@@ -1811,9 +2155,9 @@ module Zkapp_fee_payer_body = struct
        (module Conn)
        value
  
@@ -1678,7 +1664,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -1857,7 +2203,7 @@ module Epoch_data = struct
+@@ -1840,7 +2184,7 @@ module Epoch_data = struct
  
    let table_name = "epoch_data"
  
@@ -1687,7 +1673,7 @@ index 8b90db5952..313b424f55 100644
        (t : Mina_base.Epoch_data.Value.t) =
      let open Deferred.Result.Let_syntax in
      let Mina_base.Epoch_ledger.Poly.{ hash; total_currency } =
-@@ -1885,9 +2231,9 @@ module Epoch_data = struct
+@@ -1868,9 +2212,9 @@ module Epoch_data = struct
        ; epoch_length
        }
  
@@ -1699,7 +1685,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -1925,22 +2271,22 @@ module User_command = struct
+@@ -1908,22 +2252,22 @@ module User_command = struct
  
      let table_name = "user_commands"
  
@@ -1728,7 +1714,7 @@ index 8b90db5952..313b424f55 100644
          (t : Signed_command.t) =
        let open Deferred.Result.Let_syntax in
        let%bind fee_payer_id =
-@@ -1953,8 +2299,9 @@ module User_command = struct
+@@ -1936,8 +2280,9 @@ module User_command = struct
        in
        { fee_payer_id; receiver_id }
  
@@ -1740,7 +1726,7 @@ index 8b90db5952..313b424f55 100644
        let open Deferred.Result.Let_syntax in
        let transaction_hash = Transaction_hash.hash_command (Signed_command t) in
        match%bind find (module Conn) ~transaction_hash ~v1_transaction_hash with
-@@ -1978,7 +2325,7 @@ module User_command = struct
+@@ -1961,7 +2306,7 @@ module User_command = struct
            in
            (* TODO: Converting these uint64s to int64 can overflow; see #5419 *)
            Conn.find
@@ -1749,7 +1735,7 @@ index 8b90db5952..313b424f55 100644
                 (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                    ~tannot:(function
                      | "command_type" -> Some "user_command_type" | _ -> None )
-@@ -2005,7 +2352,7 @@ module User_command = struct
+@@ -1988,7 +2333,7 @@ module User_command = struct
                  |> txn_hash_to_base58_check ~v1_transaction_hash
              }
  
@@ -1758,7 +1744,7 @@ index 8b90db5952..313b424f55 100644
          ?(v1_transaction_hash = false) (user_cmd : Extensional.User_command.t) =
        let open Deferred.Result.Let_syntax in
        match%bind
-@@ -2025,7 +2372,7 @@ module User_command = struct
+@@ -2008,7 +2353,7 @@ module User_command = struct
              Public_key.add_if_doesn't_exist (module Conn) user_cmd.receiver
            in
            Conn.find
@@ -1767,7 +1753,7 @@ index 8b90db5952..313b424f55 100644
                 (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                    ~tannot:(function
                      | "command_type" -> Some "user_command_type" | _ -> None )
-@@ -2063,21 +2410,22 @@ module User_command = struct
+@@ -2046,21 +2391,22 @@ module User_command = struct
  
      let table_name = "zkapp_commands"
  
@@ -1795,7 +1781,7 @@ index 8b90db5952..313b424f55 100644
        let open Deferred.Result.Let_syntax in
        let zkapp_command = Zkapp_command.to_simple ps in
        let%bind zkapp_fee_payer_body_id =
-@@ -2146,11 +2494,12 @@ module Internal_command = struct
+@@ -2129,11 +2475,12 @@ module Internal_command = struct
  
    let table_name = "internal_commands"
  
@@ -1812,7 +1798,7 @@ index 8b90db5952..313b424f55 100644
           Caqti_type.int
           (Mina_caqti.select_cols ~select:"id" ~table_name
              ~tannot:(function
-@@ -2159,13 +2508,13 @@ module Internal_command = struct
+@@ -2142,13 +2489,13 @@ module Internal_command = struct
        ( txn_hash_to_base58_check ~v1_transaction_hash transaction_hash
        , command_type )
  
@@ -1829,7 +1815,7 @@ index 8b90db5952..313b424f55 100644
        ?(v1_transaction_hash = false)
        (internal_cmd : Extensional.Internal_command.t) =
      let open Deferred.Result.Let_syntax in
-@@ -2182,7 +2531,7 @@ module Internal_command = struct
+@@ -2165,7 +2512,7 @@ module Internal_command = struct
            Public_key.add_if_doesn't_exist (module Conn) internal_cmd.receiver
          in
          Conn.find
@@ -1838,7 +1824,7 @@ index 8b90db5952..313b424f55 100644
               (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                  ~tannot:(function
                    | "command_type" -> Some "internal_command_type" | _ -> None
-@@ -2227,10 +2576,10 @@ module Fee_transfer = struct
+@@ -2210,10 +2557,10 @@ module Fee_transfer = struct
        in
        Ok { kind; receiver_id; fee; hash }
      in
@@ -1851,7 +1837,7 @@ index 8b90db5952..313b424f55 100644
        ?(v1_transaction_hash = false) (t : Fee_transfer.Single.t)
        (kind : [ `Normal | `Via_coinbase ]) =
      let open Deferred.Result.Let_syntax in
-@@ -2249,7 +2598,7 @@ module Fee_transfer = struct
+@@ -2232,7 +2579,7 @@ module Fee_transfer = struct
            Public_key.add_if_doesn't_exist (module Conn) pk
          in
          Conn.find
@@ -1860,7 +1846,7 @@ index 8b90db5952..313b424f55 100644
               {sql| INSERT INTO internal_commands
                      (command_type, receiver_id, fee, hash)
                     VALUES (?::internal_command_type, ?, ?, ?)
-@@ -2277,10 +2626,10 @@ module Coinbase = struct
+@@ -2260,10 +2607,10 @@ module Coinbase = struct
      let decode (_, receiver_id, amount, hash) =
        Ok { receiver_id; amount; hash }
      in
@@ -1873,7 +1859,7 @@ index 8b90db5952..313b424f55 100644
        ?(v1_transaction_hash = false) (t : Coinbase.t) =
      let open Deferred.Result.Let_syntax in
      let transaction_hash = Transaction_hash.hash_coinbase t in
-@@ -2298,7 +2647,7 @@ module Coinbase = struct
+@@ -2281,7 +2628,7 @@ module Coinbase = struct
            Public_key.add_if_doesn't_exist (module Conn) pk
          in
          Conn.find
@@ -1882,7 +1868,7 @@ index 8b90db5952..313b424f55 100644
               {sql| INSERT INTO internal_commands
                      (command_type, receiver_id, fee, hash)
                     VALUES (?::internal_command_type, ?, ?, ?)
-@@ -2330,14 +2679,14 @@ module Block_and_internal_command = struct
+@@ -2313,14 +2660,14 @@ module Block_and_internal_command = struct
      Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
        Caqti_type.[ int; int; int; int; string; option string ]
  
@@ -1900,7 +1886,7 @@ index 8b90db5952..313b424f55 100644
           {sql| INSERT INTO blocks_internal_commands
                   (block_id,
                   internal_command_id,
-@@ -2355,11 +2704,11 @@ module Block_and_internal_command = struct
+@@ -2338,11 +2685,11 @@ module Block_and_internal_command = struct
        ; failure_reason
        }
  
@@ -1915,7 +1901,7 @@ index 8b90db5952..313b424f55 100644
           Caqti_type.string
           {sql| SELECT 'exists' FROM blocks_internal_commands
                 WHERE block_id = $1
-@@ -2369,7 +2718,7 @@ module Block_and_internal_command = struct
+@@ -2352,7 +2699,7 @@ module Block_and_internal_command = struct
           |sql} )
        (block_id, internal_command_id, sequence_no, secondary_sequence_no)
  
@@ -1924,7 +1910,7 @@ index 8b90db5952..313b424f55 100644
        ~internal_command_id ~sequence_no ~secondary_sequence_no ~status
        ~failure_reason =
      let open Deferred.Result.Let_syntax in
-@@ -2386,12 +2735,12 @@ module Block_and_internal_command = struct
+@@ -2369,12 +2716,12 @@ module Block_and_internal_command = struct
            ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
            ~status ~failure_reason
  
@@ -1940,7 +1926,7 @@ index 8b90db5952..313b424f55 100644
           typ
           (sprintf
              {sql| SELECT %s FROM blocks_internal_commands
-@@ -2420,13 +2769,13 @@ module Block_and_signed_command = struct
+@@ -2403,13 +2750,13 @@ module Block_and_signed_command = struct
  
    let table_name = "blocks_user_commands"
  
@@ -1957,7 +1943,7 @@ index 8b90db5952..313b424f55 100644
           {sql| INSERT INTO blocks_user_commands
                   (block_id,
                   user_command_id,
-@@ -2437,8 +2786,8 @@ module Block_and_signed_command = struct
+@@ -2420,8 +2767,8 @@ module Block_and_signed_command = struct
           |sql} )
        { block_id; user_command_id; sequence_no; status; failure_reason }
  
@@ -1968,7 +1954,7 @@ index 8b90db5952..313b424f55 100644
      let status_str, failure_reason =
        match status with
        | Applied ->
-@@ -2451,13 +2800,13 @@ module Block_and_signed_command = struct
+@@ -2434,13 +2781,13 @@ module Block_and_signed_command = struct
        (module Conn)
        ~block_id ~user_command_id ~sequence_no ~status:status_str ~failure_reason
  
@@ -1986,7 +1972,7 @@ index 8b90db5952..313b424f55 100644
             Caqti_type.string
             {sql| SELECT 'exists' FROM blocks_user_commands
                   WHERE block_id = $1
-@@ -2473,11 +2822,12 @@ module Block_and_signed_command = struct
+@@ -2456,11 +2803,12 @@ module Block_and_signed_command = struct
            (module Conn)
            ~block_id ~user_command_id ~sequence_no ~status ~failure_reason
  
@@ -2002,7 +1988,7 @@ index 8b90db5952..313b424f55 100644
           typ
           (sprintf
              {sql| SELECT %s FROM blocks_user_commands
-@@ -2498,7 +2848,8 @@ module Zkapp_account_update_failures = struct
+@@ -2481,7 +2829,8 @@ module Zkapp_account_update_failures = struct
  
    let table_name = "zkapp_account_update_failures"
  
@@ -2012,7 +1998,7 @@ index 8b90db5952..313b424f55 100644
      let failures =
        List.map failures ~f:Transaction_status.Failure.to_string |> Array.of_list
      in
-@@ -2509,9 +2860,9 @@ module Zkapp_account_update_failures = struct
+@@ -2492,9 +2841,9 @@ module Zkapp_account_update_failures = struct
        (module Conn)
        { index; failures }
  
@@ -2024,7 +2010,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name
              ~cols:[ "index"; "failures" ] ) )
        id
-@@ -2533,7 +2884,7 @@ module Block_and_zkapp_command = struct
+@@ -2516,7 +2865,7 @@ module Block_and_zkapp_command = struct
      Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
        Caqti_type.[ int; int; int; string; option Mina_caqti.array_int_typ ]
  
@@ -2033,7 +2019,7 @@ index 8b90db5952..313b424f55 100644
        ~zkapp_command_id ~sequence_no ~status
        ~(failure_reasons : Transaction_status.Failure.Collection.Display.t option)
        =
-@@ -2554,8 +2905,7 @@ module Block_and_zkapp_command = struct
+@@ -2537,8 +2886,7 @@ module Block_and_zkapp_command = struct
      in
      Mina_caqti.select_insert_into_cols
        ~select:
@@ -2043,7 +2029,7 @@ index 8b90db5952..313b424f55 100644
        ~table_name
        ~cols:
          ( [ "block_id"
-@@ -2575,21 +2925,22 @@ module Block_and_zkapp_command = struct
+@@ -2558,21 +2906,22 @@ module Block_and_zkapp_command = struct
        (module Conn)
        { block_id; zkapp_command_id; sequence_no; status; failure_reasons_ids }
  
@@ -2071,7 +2057,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols ~table_name ~select:comma_cols
              ~cols:[ "block_id" ] () ) )
        block_id
-@@ -2613,7 +2964,7 @@ module Zkapp_account = struct
+@@ -2596,7 +2945,7 @@ module Zkapp_account = struct
  
    let table_name = "zkapp_accounts"
  
@@ -2080,7 +2066,7 @@ index 8b90db5952..313b424f55 100644
      let open Deferred.Result.Let_syntax in
      let ({ app_state
           ; verification_key
-@@ -2659,9 +3010,9 @@ module Zkapp_account = struct
+@@ -2642,9 +2991,9 @@ module Zkapp_account = struct
        ; zkapp_uri_id
        }
  
@@ -2092,7 +2078,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
        id
  end
-@@ -2702,11 +3053,31 @@ module Accounts_accessed = struct
+@@ -2685,11 +3034,31 @@ module Accounts_accessed = struct
  
    let table_name = "accounts_accessed"
  
@@ -2127,7 +2113,7 @@ index 8b90db5952..313b424f55 100644
           typ
           (sprintf
              {sql| SELECT %s
-@@ -2717,72 +3088,71 @@ module Accounts_accessed = struct
+@@ -2700,72 +3069,71 @@ module Accounts_accessed = struct
              comma_cols table_name ) )
        (block_id, account_identifier_id)
  
@@ -2257,7 +2243,7 @@ index 8b90db5952..313b424f55 100644
        (accounts : (int * Account.t) list) =
      let%map results =
        Deferred.List.map accounts ~f:(fun account ->
-@@ -2790,10 +3160,10 @@ module Accounts_accessed = struct
+@@ -2773,10 +3141,10 @@ module Accounts_accessed = struct
      in
      Result.all results
  
@@ -2270,7 +2256,7 @@ index 8b90db5952..313b424f55 100644
           (Mina_caqti.select_cols ~select:comma_cols ~table_name
              ~cols:[ "block_id" ] () ) )
        block_id
-@@ -2810,30 +3180,30 @@ module Accounts_created = struct
+@@ -2793,30 +3161,30 @@ module Accounts_created = struct
  
    let table_name = "accounts_created"
  
@@ -2308,7 +2294,7 @@ index 8b90db5952..313b424f55 100644
           {sql| SELECT block_id, account_identifier_id, creation_fee
                 FROM accounts_created
                 WHERE block_id = ?
-@@ -2899,18 +3269,19 @@ module Block = struct
+@@ -2882,18 +3250,19 @@ module Block = struct
           "SELECT id FROM blocks WHERE state_hash = ?" )
        (State_hash.to_base58_check state_hash)
  
@@ -2334,7 +2320,7 @@ index 8b90db5952..313b424f55 100644
        ~constraint_constants ~protocol_state ~staged_ledger_diff
        ~protocol_version ~proposed_protocol_version ~hash ~v1_transaction_hash =
      let open Deferred.Result.Let_syntax in
-@@ -3011,7 +3382,7 @@ module Block = struct
+@@ -2994,7 +3363,7 @@ module Block = struct
          let blockchain_state = Protocol_state.blockchain_state protocol_state in
          let%bind block_id =
            Conn.find
@@ -2343,7 +2329,7 @@ index 8b90db5952..313b424f55 100644
                 (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                    ~tannot:(function
                      | "chain_status" ->
-@@ -3331,7 +3702,7 @@ module Block = struct
+@@ -3314,7 +3683,7 @@ module Block = struct
  
    (* NB: this batching logic an lead to partial writes; it is acceptable to be used with the
       migration tool, but not acceptable to be used with the archive node in its current form *)
@@ -2352,7 +2338,7 @@ index 8b90db5952..313b424f55 100644
        ?(v1_transaction_hash = false) (blocks : Extensional.Block.t list) =
      let open Deferred.Result.Let_syntax in
      (* zkapps are currently unsupported in the batch implementation of this function *)
-@@ -3393,9 +3764,7 @@ module Block = struct
+@@ -3376,9 +3745,7 @@ module Block = struct
      in
  
      (* we don't need to specify all types here, just the ones that sql may infer incorrectly *)
@@ -2363,7 +2349,7 @@ index 8b90db5952..313b424f55 100644
        | Bool ->
            Some "BOOL"
        | Int ->
-@@ -3408,39 +3777,36 @@ module Block = struct
+@@ -3391,39 +3758,36 @@ module Block = struct
            Some "BIGINT"
        | Float ->
            Some "FLOAT"
@@ -2422,7 +2408,7 @@ index 8b90db5952..313b424f55 100644
        match typ with
        | Bool ->
            Bool.to_string value
-@@ -3468,45 +3834,30 @@ module Block = struct
+@@ -3451,45 +3815,30 @@ module Block = struct
            (* we are ignoring the enum annotation in this context because it's not always valid to apply *)
            (* NOTE: we assume enum values do not contain special characters (eg "'") *)
            "'" ^ value ^ "'"
@@ -2490,7 +2476,7 @@ index 8b90db5952..313b424f55 100644
      in
      let render_row (type a) (typ : a Caqti_type.t) (value : a) : string =
        "(" ^ String.concat ~sep:"," (render_type typ value) ^ ")"
-@@ -3557,8 +3908,8 @@ module Block = struct
+@@ -3540,8 +3889,8 @@ module Block = struct
          in
          let%map entries =
            Conn.collect_list
@@ -2501,7 +2487,7 @@ index 8b90db5952..313b424f55 100644
                 query )
              ()
          in
-@@ -3576,7 +3927,7 @@ module Block = struct
+@@ -3559,7 +3908,7 @@ module Block = struct
            String.concat ~sep:"," @@ List.map ~f:(render_row typ) values
          in
          Conn.collect_list
@@ -2510,7 +2496,7 @@ index 8b90db5952..313b424f55 100644
               (sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table
                  fields_sql values_sql ) )
            () )
-@@ -3928,7 +4279,7 @@ module Block = struct
+@@ -3911,7 +4260,7 @@ module Block = struct
        let ids_sql = String.concat ~sep:"," ids in
        let parent_ids_sql = String.concat ~sep:"," parent_ids in
        Conn.exec
@@ -2519,7 +2505,7 @@ index 8b90db5952..313b424f55 100644
             (sprintf
                "UPDATE %s AS b SET parent_id = data.parent_id FROM (SELECT \
                 unnest(array[%s]) as id, unnest(array[%s]) as parent_id) AS \
-@@ -4079,7 +4430,7 @@ module Block = struct
+@@ -4062,7 +4411,7 @@ module Block = struct
  
      return ()
  
@@ -2528,7 +2514,7 @@ index 8b90db5952..313b424f55 100644
        ?(v1_transaction_hash = false) (block : Extensional.Block.t) =
      let open Deferred.Result.Let_syntax in
      let%bind block_id =
-@@ -4138,7 +4489,7 @@ module Block = struct
+@@ -4121,7 +4470,7 @@ module Block = struct
                  Some id )
            in
            Conn.find
@@ -2537,7 +2523,7 @@ index 8b90db5952..313b424f55 100644
                 (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                    ~tannot:(function
                      | "sub_window_densities" ->
-@@ -4296,18 +4647,19 @@ module Block = struct
+@@ -4279,18 +4628,19 @@ module Block = struct
      in
      return block_id
  
@@ -2561,7 +2547,7 @@ index 8b90db5952..313b424f55 100644
      (* derive query from type `t` *)
      let concat = String.concat ~sep:"," in
      let columns_with_id = concat ("id" :: Fields.names) in
-@@ -4316,8 +4668,8 @@ module Block = struct
+@@ -4299,8 +4649,8 @@ module Block = struct
      in
      let columns = concat Fields.names in
      Conn.collect_list
@@ -2572,7 +2558,7 @@ index 8b90db5952..313b424f55 100644
           typ
           (sprintf
              {sql| WITH RECURSIVE chain AS (
-@@ -4341,39 +4693,42 @@ module Block = struct
+@@ -4324,39 +4674,42 @@ module Block = struct
              columns_with_id b_columns_with_id columns ) )
        (end_block_id, start_block_id)
  
@@ -2629,7 +2615,7 @@ index 8b90db5952..313b424f55 100644
           {sql| UPDATE blocks SET chain_status='orphaned'
                 WHERE height = $2
                 AND state_hash <> $1
-@@ -4381,7 +4736,7 @@ module Block = struct
+@@ -4364,7 +4717,7 @@ module Block = struct
        (state_hash, height)
  
    (* update chain_status for blocks now known to be canonical or orphaned *)
@@ -2638,7 +2624,7 @@ index 8b90db5952..313b424f55 100644
      let open Deferred.Result.Let_syntax in
      match%bind get_highest_canonical_block_opt (module Conn) () with
      | None ->
-@@ -4453,7 +4808,7 @@ module Block = struct
+@@ -4436,7 +4789,7 @@ module Block = struct
            Deferred.Result.return ()
  
    let delete_if_older_than ?height ?num_blocks ?timestamp
@@ -2647,7 +2633,7 @@ index 8b90db5952..313b424f55 100644
      let open Deferred.Result.Let_syntax in
      let%bind height =
        match (height, num_blocks) with
-@@ -4462,7 +4817,7 @@ module Block = struct
+@@ -4445,7 +4798,7 @@ module Block = struct
        | None, Some num_blocks -> (
            match%map
              Conn.find_opt
@@ -2656,7 +2642,7 @@ index 8b90db5952..313b424f55 100644
                   "SELECT MAX(height) FROM blocks" )
                ()
            with
-@@ -4478,8 +4833,8 @@ module Block = struct
+@@ -4461,8 +4814,8 @@ module Block = struct
        let%bind () =
          (* Delete user commands from old blocks. *)
          Conn.exec
@@ -2667,7 +2653,7 @@ index 8b90db5952..313b424f55 100644
               "DELETE FROM user_commands\n\
                WHERE id IN\n\
                (SELECT user_command_id FROM blocks_user_commands\n\
-@@ -4490,8 +4845,8 @@ module Block = struct
+@@ -4473,8 +4826,8 @@ module Block = struct
        let%bind () =
          (* Delete old blocks. *)
          Conn.exec
@@ -2678,7 +2664,7 @@ index 8b90db5952..313b424f55 100644
               "DELETE FROM blocks WHERE blocks.height < ? OR blocks.timestamp < \
                ?" )
            (height, timestamp)
-@@ -4499,7 +4854,7 @@ module Block = struct
+@@ -4482,7 +4835,7 @@ module Block = struct
        let%bind () =
          (* Delete orphaned internal commands. *)
          Conn.exec
@@ -2687,7 +2673,7 @@ index 8b90db5952..313b424f55 100644
               "DELETE FROM internal_commands\n\
                WHERE id NOT IN\n\
                (SELECT internal_commands.id FROM internal_commands\n\
-@@ -4510,7 +4865,7 @@ module Block = struct
+@@ -4493,7 +4846,7 @@ module Block = struct
        let%bind () =
          (* Delete orphaned snarked ledger hashes. *)
          Conn.exec
@@ -2696,7 +2682,7 @@ index 8b90db5952..313b424f55 100644
               "DELETE FROM snarked_ledger_hashes\n\
                WHERE id NOT IN\n\
                (SELECT snarked_ledger_hash_id FROM blocks)" )
-@@ -4519,7 +4874,7 @@ module Block = struct
+@@ -4502,7 +4855,7 @@ module Block = struct
        let%bind () =
          (* Delete orphaned public keys. *)
          Conn.exec
@@ -2705,7 +2691,7 @@ index 8b90db5952..313b424f55 100644
               "DELETE FROM public_keys\n\
                WHERE id NOT IN (SELECT fee_payer_id FROM user_commands)\n\
                AND id NOT IN (SELECT source_id FROM user_commands)\n\
-@@ -4569,8 +4924,8 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
+@@ -4552,8 +4905,8 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
              ()
          | Some acct_id ->
              Token_owners.add_if_doesn't_exist token_id acct_id ) ;
@@ -2716,7 +2702,7 @@ index 8b90db5952..313b424f55 100644
          let%bind res =
            let open Deferred.Result.Let_syntax in
            let%bind () = Conn.start () in
-@@ -4581,7 +4936,7 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
+@@ -4564,7 +4917,7 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
              O1trace.thread "archive_processor.add_block"
              @@ fun () ->
              Metrics.time ~label:"add_block"
@@ -2725,7 +2711,7 @@ index 8b90db5952..313b424f55 100644
            in
            (* if an existing block has a parent hash that's for the block just added,
               set its parent id
-@@ -4636,8 +4991,8 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
+@@ -4619,8 +4972,8 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
                      ] ;
                  let%bind.Deferred.Result () = Conn.start () in
                  match%bind
@@ -2736,7 +2722,7 @@ index 8b90db5952..313b424f55 100644
                        Accounts_accessed.add_accounts_if_don't_exist
                          (module Conn)
                          block_id accounts_accessed )
-@@ -4662,8 +5017,8 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
+@@ -4645,8 +4998,8 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
                            , `Int (List.length accounts_accessed) )
                          ] ;
                      match%bind
@@ -2747,7 +2733,7 @@ index 8b90db5952..313b424f55 100644
                            Accounts_created.add_accounts_created_if_don't_exist
                              (module Conn)
                              block_id accounts_created )
-@@ -4800,8 +5155,8 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
+@@ -4783,8 +5136,8 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
              With_hash.{ data = block; hash = the_hash }
            in
            let add_accounts () =
@@ -2758,7 +2744,7 @@ index 8b90db5952..313b424f55 100644
                  let%bind.Deferred.Result genesis_block_id =
                    Block.add_if_doesn't_exist
                      (module Conn)
-@@ -4944,7 +5299,7 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
+@@ -4927,7 +5280,7 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
            Strict_pipe.Writer.write extensional_block_writer extensional_block )
      ]
    in
@@ -3236,10 +3222,10 @@ index 297081b7b3..4b677e43f3 100644
                   FROM accounts_accessed
                   WHERE block_id = $1
 diff --git a/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml b/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
-index f377d693fc..a97801e306 100644
+index 26e337e0bc..1360cda252 100644
 --- a/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
 +++ b/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
-@@ -284,10 +284,10 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
+@@ -273,10 +273,10 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
    let mainnet_pool =
@@ -3252,7 +3238,7 @@ index f377d693fc..a97801e306 100644
    in
  
    match (mainnet_pool, migrated_pool) with
-@@ -375,10 +375,10 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
+@@ -365,10 +365,10 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
    let mainnet_pool =
@@ -3266,112 +3252,123 @@ index f377d693fc..a97801e306 100644
  
    match (mainnet_pool, migrated_pool) with
 diff --git a/src/app/berkeley_migration_verifier/sql.ml b/src/app/berkeley_migration_verifier/sql.ml
-index ff6c92ec9b..c0e89348d2 100644
+index 40b6b3f114..627350987a 100644
 --- a/src/app/berkeley_migration_verifier/sql.ml
 +++ b/src/app/berkeley_migration_verifier/sql.ml
-@@ -1,5 +1,3 @@
+@@ -1,6 +1,5 @@
+ open Core
+ open Async
 -open Caqti_async
--
- let dump_sql_to_csv output_file ~sql =
-   Printf.sprintf "COPY ( %s ) TO '%s' DELIMITER ',' CSV HEADER " sql output_file
  
-@@ -26,9 +24,9 @@ module Mainnet = struct
-         WHERE receiver_account_creation_fee_paid IS NOT NULL
+ module Accounts_created = struct
+   type t =
+@@ -79,7 +78,7 @@ end
+ 
+ module Mainnet = struct
+   let dump_accounts_created_query =
+-    Caqti_request.collect Caqti_type.unit Accounts_created.typ
++    Mina_caqti.collect_req Caqti_type.unit Accounts_created.typ
+       {sql|
+       ( SELECT height, value AS public_key, state_hash, receiver_account_creation_fee_paid AS creation_fee
+         FROM blocks_user_commands
+@@ -100,18 +99,18 @@ module Mainnet = struct
        ) 
        ORDER BY height, public_key |sql}
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
  
--  let dump_accounts_created_to_csv (module Conn : CONNECTION) output_file =
-+  let dump_accounts_created_to_csv (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_accounts_created_to_csv_query ~output_file) ()
+-  let dump_accounts_created (module Conn : CONNECTION) =
++  let dump_accounts_created (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_accounts_created_query ()
  
-   let dump_state_and_ledger_hashes_to_csv_query ~output_file =
-@@ -38,7 +36,7 @@ module Mainnet = struct
-         "  SELECT state_hash, ledger_hash FROM blocks\n\
-         \            WHERE chain_status = 'canonical'\n\
-         \          "
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_state_and_ledger_hashes_query =
+     (* Workaround for replacing output file as caqti has an issue with using ? in place of FILE argument*)
+-    Caqti_request.collect Caqti_type.unit State_hash_and_ledger_hash.typ
++    Mina_caqti.collect_req Caqti_type.unit State_hash_and_ledger_hash.typ
+       "  SELECT state_hash, ledger_hash FROM blocks\n\
+       \            WHERE chain_status = 'canonical'\n\
+       \          "
  
-   let dump_block_hashes_till_height_query ~output_file ~height =
-     dump_sql_to_csv output_file
-@@ -49,10 +47,10 @@ module Mainnet = struct
-            \            WHERE chain_status = 'canonical'\n\
-            \            AND height <= %d ORDER BY height\n\
-            \      " height )
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_block_hashes_till_height_query ~height =
+-    Caqti_request.collect Caqti_type.unit State_hash_and_ledger_hash.typ
++    Mina_caqti.collect_req Caqti_type.unit State_hash_and_ledger_hash.typ
+       (Printf.sprintf
+          "\n\
+          \      SELECT state_hash, ledger_hash FROM blocks\n\
+@@ -119,22 +118,22 @@ module Mainnet = struct
+          \            AND height <= %d ORDER BY height\n\
+          \      " height )
  
--  let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
--      height =
-+  let dump_block_hashes_till_height (module Conn : Mina_caqti.CONNECTION)
-+      output_file height =
-     Conn.exec (dump_block_hashes_till_height_query ~output_file ~height) ()
+-  let dump_block_hashes_till_height (module Conn : CONNECTION) height =
++  let dump_block_hashes_till_height (module Conn : Mina_caqti.CONNECTION) height =
+     Conn.collect_list (dump_block_hashes_till_height_query ~height) ()
  
-   let dump_block_hashes_query ~output_file =
-@@ -63,9 +61,9 @@ module Mainnet = struct
-         \            WHERE chain_status = 'canonical'\n\
-         \            ORDER BY height\n\
-         \      "
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_block_hashes_query =
+-    Caqti_request.collect Caqti_type.unit State_hash_and_ledger_hash.typ
++    Mina_caqti.collect_req Caqti_type.unit State_hash_and_ledger_hash.typ
+       "\n\
+       \      SELECT state_hash, ledger_hash FROM blocks\n\
+       \            WHERE chain_status = 'canonical'\n\
+       \            ORDER BY height\n\
+       \      "
  
--  let dump_block_hashes (module Conn : CONNECTION) output_file =
-+  let dump_block_hashes (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_block_hashes_query ~output_file) ()
+-  let dump_block_hashes (module Conn : CONNECTION) =
++  let dump_block_hashes (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_block_hashes_query ()
  
-   let dump_user_commands_till_height_query ~output_file ~height =
-@@ -87,10 +85,10 @@ module Mainnet = struct
-            \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
-             fee_payer_keys.id ORDER BY height, sequence_no\n\
-            \      " height )
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_user_commands_till_height_query ~height =
+-    Caqti_request.collect Caqti_type.unit User_command.typ
++    Mina_caqti.collect_req Caqti_type.unit User_command.typ
+       (Printf.sprintf
+          "WITH user_command_ids AS\n\
+          \      ( SELECT height, sequence_no, user_command_id FROM \
+@@ -152,11 +151,11 @@ module Mainnet = struct
+           fee_payer_keys.id ORDER BY height, sequence_no\n\
+          \      " height )
  
--  let dump_user_commands_till_height (module Conn : CONNECTION) output_file
--      height =
-+  let dump_user_commands_till_height (module Conn : Mina_caqti.CONNECTION)
-+      output_file height =
-     Conn.exec (dump_user_commands_till_height_query ~output_file ~height) ()
+-  let dump_user_commands_till_height (module Conn : CONNECTION) height =
++  let dump_user_commands_till_height (module Conn : Mina_caqti.CONNECTION) height =
+     Conn.collect_list (dump_user_commands_till_height_query ~height) ()
  
-   let dump_internal_commands_till_height_query ~output_file ~height =
-@@ -112,10 +110,10 @@ module Mainnet = struct
-            \        ORDER BY height, sequence_no, secondary_sequence_no, type \n\
-            \   \n\
-            \          " height )
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_internal_commands_till_height_query ~height =
+-    Caqti_request.collect Caqti_type.unit Internal_command.typ
++    Mina_caqti.collect_req Caqti_type.unit Internal_command.typ
+       (Printf.sprintf
+          "WITH internal_command_ids AS \n\
+          \        ( SELECT internal_command_id, height, sequence_no, \
+@@ -174,11 +173,11 @@ module Mainnet = struct
+          \   \n\
+          \          " height )
  
--  let dump_internal_commands_till_height (module Conn : CONNECTION) output_file
--      height =
-+  let dump_internal_commands_till_height (module Conn : Mina_caqti.CONNECTION)
-+      output_file height =
-     Conn.exec (dump_internal_commands_till_height_query ~output_file ~height) ()
+-  let dump_internal_commands_till_height (module Conn : CONNECTION) height =
++  let dump_internal_commands_till_height (module Conn : Mina_caqti.CONNECTION) height =
+     Conn.collect_list (dump_internal_commands_till_height_query ~height) ()
  
-   let dump_user_commands_query ~output_file =
-@@ -135,9 +133,9 @@ module Mainnet = struct
-         \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
-          fee_payer_keys.id ORDER BY height, sequence_no\n\
-         \      "
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_user_commands_query =
+-    Caqti_request.collect Caqti_type.unit User_command.typ
++    Mina_caqti.collect_req Caqti_type.unit User_command.typ
+       "WITH user_command_ids AS\n\
+       \      ( SELECT height, sequence_no, user_command_id FROM \
+        blocks_user_commands\n\
+@@ -194,11 +193,11 @@ module Mainnet = struct
+        fee_payer_keys.id ORDER BY height, sequence_no\n\
+       \      "
  
--  let dump_user_commands (module Conn : CONNECTION) output_file =
-+  let dump_user_commands (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_user_commands_query ~output_file) ()
+-  let dump_user_commands (module Conn : CONNECTION) =
++  let dump_user_commands (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_user_commands_query ()
  
-   let dump_internal_commands_query ~output_file =
-@@ -158,13 +156,13 @@ module Mainnet = struct
-            \        ORDER BY height, sequence_no, secondary_sequence_no, type \n\
-            \   \n\
-            \          " )
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_internal_commands_query =
+-    Caqti_request.collect Caqti_type.unit Internal_command.typ
++    Mina_caqti.collect_req Caqti_type.unit Internal_command.typ
+       (Printf.sprintf
+          "WITH internal_command_ids AS \n\
+          \        ( SELECT internal_command_id, height, sequence_no, \
+@@ -215,11 +214,11 @@ module Mainnet = struct
+          \   \n\
+          \          " )
  
--  let dump_internal_commands (module Conn : CONNECTION) output_file =
-+  let dump_internal_commands (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_internal_commands_query ~output_file) ()
+-  let dump_internal_commands (module Conn : CONNECTION) =
++  let dump_internal_commands (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_internal_commands_query ()
  
    let mark_chain_till_fork_block_as_canonical_query =
 -    Caqti_request.exec Caqti_type.string
@@ -3379,7 +3376,7 @@ index ff6c92ec9b..c0e89348d2 100644
        {sql|
        UPDATE blocks
      Set chain_status = 'canonical'
-@@ -186,8 +184,8 @@ module Mainnet = struct
+@@ -241,14 +240,14 @@ module Mainnet = struct
        )
        |sql}
  
@@ -3390,16 +3387,20 @@ index ff6c92ec9b..c0e89348d2 100644
      Conn.exec mark_chain_till_fork_block_as_canonical_query fork_state_hash
  end
  
-@@ -202,21 +200,22 @@ module Berkeley = struct
-       JOIN account_identifiers ON account_identifier_id = account_identifiers.id 
+ module Berkeley = struct
+   let dump_accounts_created_query =
+-    Caqti_request.collect Caqti_type.unit Accounts_created.typ
++    Mina_caqti.collect_req Caqti_type.unit Accounts_created.typ
+       {sql|
+       SELECT height, value AS public_key, state_hash, creation_fee
+       FROM accounts_created
+@@ -257,19 +256,20 @@ module Berkeley = struct
        JOIN public_keys         ON public_key_id         = public_keys.id
        ORDER BY height, public_key |sql}
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
  
--  let dump_accounts_created_to_csv (module Conn : CONNECTION) output_file =
-+  let dump_accounts_created_to_csv (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_accounts_created_to_csv_query ~output_file) ()
+-  let dump_accounts_created (module Conn : CONNECTION) =
++  let dump_accounts_created (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_accounts_created_query ()
  
    let height_query =
 -    Caqti_request.find Caqti_type.unit Caqti_type.int
@@ -3418,7 +3419,7 @@ index ff6c92ec9b..c0e89348d2 100644
        {sql|
          WITH RECURSIVE chain AS 
          (  
-@@ -230,16 +229,18 @@ module Berkeley = struct
+@@ -283,19 +283,21 @@ module Berkeley = struct
          ) SELECT count(*) FROM chain where chain_status = 'canonical';
        |sql}
  
@@ -3438,111 +3439,115 @@ index ff6c92ec9b..c0e89348d2 100644
 +  let blocks_count (module Conn : Mina_caqti.CONNECTION) =
 +    Conn.find blocks_count_query ()
  
-   let dump_user_commands_till_height_query ~output_file ~height =
-     dump_sql_to_csv output_file
-@@ -260,10 +261,10 @@ module Berkeley = struct
-            \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
-             fee_payer_keys.id ORDER BY height, sequence_no\n\
-            \     " height )
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_user_commands_till_height_query ~height =
+-    Caqti_request.collect Caqti_type.unit User_command.typ
++    Mina_caqti.collect_req Caqti_type.unit User_command.typ
+       (Printf.sprintf
+          "WITH user_command_ids AS\n\
+          \      ( SELECT height, sequence_no, user_command_id FROM \
+@@ -313,11 +315,11 @@ module Berkeley = struct
+           fee_payer_keys.id ORDER BY height, sequence_no\n\
+          \     " height )
  
--  let dump_user_commands_till_height (module Conn : CONNECTION) output_file
--      height =
-+  let dump_user_commands_till_height (module Conn : Mina_caqti.CONNECTION)
-+      output_file height =
-     Conn.exec (dump_user_commands_till_height_query ~output_file ~height) ()
+-  let dump_user_commands_till_height (module Conn : CONNECTION) height =
++  let dump_user_commands_till_height (module Conn : Mina_caqti.CONNECTION) height =
+     Conn.collect_list (dump_user_commands_till_height_query ~height) ()
  
-   let dump_internal_commands_till_height_query ~output_file ~height =
-@@ -285,10 +286,10 @@ module Berkeley = struct
-            \        ORDER BY height, sequence_no, secondary_sequence_no, \
-             command_type \n\
-            \      " height )
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_internal_commands_till_height_query ~height =
+-    Caqti_request.collect Caqti_type.unit Internal_command.typ
++    Mina_caqti.collect_req Caqti_type.unit Internal_command.typ
+       (Printf.sprintf
+          "WITH internal_command_ids AS \n\
+          \        ( SELECT internal_command_id, height, sequence_no, \
+@@ -335,11 +337,11 @@ module Berkeley = struct
+           command_type \n\
+          \      " height )
  
--  let dump_internal_commands_till_height (module Conn : CONNECTION) output_file
--      height =
-+  let dump_internal_commands_till_height (module Conn : Mina_caqti.CONNECTION)
-+      output_file height =
-     Conn.exec (dump_internal_commands_till_height_query ~output_file ~height) ()
+-  let dump_internal_commands_till_height (module Conn : CONNECTION) height =
++  let dump_internal_commands_till_height (module Conn : Mina_caqti.CONNECTION) height =
+     Conn.collect_list (dump_internal_commands_till_height_query ~height) ()
  
-   let dump_user_commands_query ~output_file =
-@@ -308,9 +309,9 @@ module Berkeley = struct
-         \      INNER JOIN public_keys AS fee_payer_keys ON fee_payer_id = \
-          fee_payer_keys.id ORDER BY height, sequence_no\n\
-         \     "
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_user_commands_query =
+-    Caqti_request.collect Caqti_type.unit User_command.typ
++    Mina_caqti.collect_req Caqti_type.unit User_command.typ
+       "WITH user_command_ids AS\n\
+       \      ( SELECT height, sequence_no, user_command_id FROM \
+        blocks_user_commands\n\
+@@ -355,11 +357,11 @@ module Berkeley = struct
+        fee_payer_keys.id ORDER BY height, sequence_no\n\
+       \     "
  
--  let dump_user_commands (module Conn : CONNECTION) output_file =
-+  let dump_user_commands (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_user_commands_query ~output_file) ()
+-  let dump_user_commands (module Conn : CONNECTION) =
++  let dump_user_commands (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_user_commands_query ()
  
-   let dump_internal_commands_query ~output_file =
-@@ -330,9 +331,9 @@ module Berkeley = struct
-         \        ORDER BY height, sequence_no, secondary_sequence_no, \
-          command_type \n\
-         \      "
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_internal_commands_query =
+-    Caqti_request.collect Caqti_type.unit Internal_command.typ
++    Mina_caqti.collect_req Caqti_type.unit Internal_command.typ
+       "WITH internal_command_ids AS \n\
+       \        ( SELECT internal_command_id, height, sequence_no, \
+        secondary_sequence_no FROM blocks_internal_commands \n\
+@@ -375,22 +377,22 @@ module Berkeley = struct
+        command_type \n\
+       \      "
  
--  let dump_internal_commands (module Conn : CONNECTION) output_file =
-+  let dump_internal_commands (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_internal_commands_query ~output_file) ()
+-  let dump_internal_commands (module Conn : CONNECTION) =
++  let dump_internal_commands (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_internal_commands_query ()
  
-   let dump_account_accessed_to_csv_query ~output_file =
-@@ -343,9 +344,10 @@ module Berkeley = struct
+   let dump_accounts_accessed_query =
+-    Caqti_request.collect Caqti_type.unit Accounts_accessed.typ
++    Mina_caqti.collect_req Caqti_type.unit Accounts_accessed.typ
+       {sql| SELECT account_identifier_id AS id, block_id 
+                  FROM accounts_accessed
                   JOIN blocks ON block_id = blocks.id
                   WHERE height <> 1
                   ORDER BY block_id, id |sql}
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
  
--  let dump_accounts_accessed_to_csv (module Conn : CONNECTION) output_file =
-+  let dump_accounts_accessed_to_csv (module Conn : Mina_caqti.CONNECTION)
-+      output_file =
-     Conn.exec (dump_account_accessed_to_csv_query ~output_file) ()
+-  let dump_accounts_accessed (module Conn : CONNECTION) =
++  let dump_accounts_accessed (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_accounts_accessed_query ()
  
-   let dump_block_hashes_till_height_query ~output_file ~height =
-@@ -357,10 +359,10 @@ module Berkeley = struct
-            \    AND height <= %d ORDER BY height\n\
-            \ \n\
-            \     " height )
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_block_hashes_till_height_query ~height =
+-    Caqti_request.collect Caqti_type.unit State_hash_and_ledger_hash.typ
++    Mina_caqti.collect_req Caqti_type.unit State_hash_and_ledger_hash.typ
+       (Printf.sprintf
+          "SELECT state_hash, ledger_hash FROM blocks \n\
+          \    WHERE chain_status = 'canonical'\n\
+@@ -398,22 +400,22 @@ module Berkeley = struct
+          \ \n\
+          \     " height )
  
--  let dump_block_hashes_till_height (module Conn : CONNECTION) output_file
--      height =
-+  let dump_block_hashes_till_height (module Conn : Mina_caqti.CONNECTION)
-+      output_file height =
-     Conn.exec (dump_block_hashes_till_height_query ~output_file ~height) ()
+-  let dump_block_hashes_till_height (module Conn : CONNECTION) height =
++  let dump_block_hashes_till_height (module Conn : Mina_caqti.CONNECTION) height =
+     Conn.collect_list (dump_block_hashes_till_height_query ~height) ()
  
-   let dump_block_hashes_query ~output_file =
-@@ -371,9 +373,9 @@ module Berkeley = struct
-         \      WHERE chain_status = 'canonical'\n\
-         \      ORDER BY height\n\
-         \      "
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
+   let dump_block_hashes_query =
+-    Caqti_request.collect Caqti_type.unit State_hash_and_ledger_hash.typ
++    Mina_caqti.collect_req Caqti_type.unit State_hash_and_ledger_hash.typ
+       "\n\
+       \      SELECT state_hash, ledger_hash FROM blocks\n\
+       \      WHERE chain_status = 'canonical'\n\
+       \      ORDER BY height\n\
+       \      "
  
--  let dump_block_hashes (module Conn : CONNECTION) output_file =
-+  let dump_block_hashes (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_block_hashes_query ~output_file) ()
+-  let dump_block_hashes (module Conn : CONNECTION) =
++  let dump_block_hashes (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_block_hashes_query ()
  
-   let dump_user_and_internal_command_info_to_csv_query ~output_file =
-@@ -403,21 +405,21 @@ module Berkeley = struct
-         INNER JOIN internal_commands ON id = internal_command_id
+   let dump_user_and_internal_command_info_query =
+-    Caqti_request.collect Caqti_type.unit Accounts_accessed.typ
++    Mina_caqti.collect_req Caqti_type.unit Accounts_accessed.typ
+       {sql| 
+       ( 
+         WITH user_command_ids AS
+@@ -439,18 +441,18 @@ module Berkeley = struct
          INNER JOIN account_identifiers ON public_key_id = receiver_id
        ) ORDER BY block_id, id |sql}
--    |> Caqti_request.exec Caqti_type.unit
-+    |> Mina_caqti.exec_req Caqti_type.unit
  
--  let dump_user_and_internal_command_info_to_csv (module Conn : CONNECTION)
--      output_file =
-+  let dump_user_and_internal_command_info_to_csv
-+      (module Conn : Mina_caqti.CONNECTION) output_file =
-     Conn.exec (dump_user_and_internal_command_info_to_csv_query ~output_file) ()
+-  let dump_user_and_internal_command_info (module Conn : CONNECTION) =
++  let dump_user_and_internal_command_info (module Conn : Mina_caqti.CONNECTION) =
+     Conn.collect_list dump_user_and_internal_command_info_query ()
  
    let get_account_accessed_count_query =
 -    Caqti_request.find Caqti_type.unit Caqti_type.int
@@ -3559,7 +3564,7 @@ index ff6c92ec9b..c0e89348d2 100644
        {sql| 
          select count(distinct ids.account_identifier_id) FROM 
  
-@@ -439,6 +441,7 @@ module Berkeley = struct
+@@ -472,6 +474,7 @@ module Berkeley = struct
       
        |sql}
  
