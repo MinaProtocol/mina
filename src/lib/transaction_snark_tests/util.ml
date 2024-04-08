@@ -733,7 +733,6 @@ let insert_signatures pk_compressed sk
   in
   { fee_payer; account_updates; memo }
 
-
 let test_zkapp_command ?expected_failure ?(memo = Signed_command_memo.empty)
     ?(fee = Currency.Fee.(of_nanomina_int_exn 100)) ~fee_payer_pk ~signers
     ~initialize_ledger ~finalize_ledger zkapp_command =

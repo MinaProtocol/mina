@@ -2,11 +2,11 @@ let trivial_zkapp = Util.trivial_zkapp
 
 let%test_module _ =
   ( module struct
-
     open Core
     open Mina_base
     open Signature_lib
     open Mina_generators.Zkapp_command_generators
+
     let `VK vk, `Prover _ = Lazy.force trivial_zkapp
 
     let mk_ledger ~num_of_unused_keys () =
@@ -57,38 +57,39 @@ let%test_module _ =
       let ledger, fee_payer_keypair, keymap =
         mk_ledger ~num_of_unused_keys:3 ()
       in
-      ignore @@
-        Quickcheck.Generator.(
-          generate
-            (list_with_length 100
-               (gen_zkapp_command_from ~fee_payer_keypair ~keymap
-                  ~no_token_accounts:true
-                  ~account_state_tbl:(Account_id.Table.create ())
-                  ~generate_new_accounts:false ~ledger () ) )
-            ~size:100
-            ~random:(Splittable_random.State.create Random.State.default))
+      ignore
+      @@ Quickcheck.Generator.(
+           generate
+             (list_with_length 100
+                (gen_zkapp_command_from ~fee_payer_keypair ~keymap
+                   ~no_token_accounts:true
+                   ~account_state_tbl:(Account_id.Table.create ())
+                   ~generate_new_accounts:false ~ledger () ) )
+             ~size:100
+             ~random:(Splittable_random.State.create Random.State.default))
 
     let%test_unit "generate zkapps with balance and fee range" =
       let ledger, fee_payer_keypair, keymap =
         mk_ledger ~num_of_unused_keys:3 ()
       in
-      ignore @@
-        Quickcheck.Generator.(
-          generate
-            (list_with_length 100
-               (gen_zkapp_command_from ~no_account_precondition:true
-                  ~fee_payer_keypair ~keymap ~no_token_accounts:true
-                  ~fee_range:
-                    Currency.Fee.(of_mina_string_exn "2", of_mina_string_exn "4")
-                  ~balance_change_range:
-                    Currency.Amount.
-                      { min_balance_change = of_mina_string_exn "0"
-                      ; max_balance_change = of_mina_string_exn "0.00001"
-                      ; min_new_zkapp_balance = of_mina_string_exn "50"
-                      ; max_new_zkapp_balance = of_mina_string_exn "100"
-                      }
-                  ~account_state_tbl:(Account_id.Table.create ())
-                  ~generate_new_accounts:false ~ledger () ) )
-            ~size:100
-            ~random:(Splittable_random.State.create Random.State.default))
+      ignore
+      @@ Quickcheck.Generator.(
+           generate
+             (list_with_length 100
+                (gen_zkapp_command_from ~no_account_precondition:true
+                   ~fee_payer_keypair ~keymap ~no_token_accounts:true
+                   ~fee_range:
+                     Currency.Fee.
+                       (of_mina_string_exn "2", of_mina_string_exn "4")
+                   ~balance_change_range:
+                     Currency.Amount.
+                       { min_balance_change = of_mina_string_exn "0"
+                       ; max_balance_change = of_mina_string_exn "0.00001"
+                       ; min_new_zkapp_balance = of_mina_string_exn "50"
+                       ; max_new_zkapp_balance = of_mina_string_exn "100"
+                       }
+                   ~account_state_tbl:(Account_id.Table.create ())
+                   ~generate_new_accounts:false ~ledger () ) )
+             ~size:100
+             ~random:(Splittable_random.State.create Random.State.default))
   end )
