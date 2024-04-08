@@ -69,10 +69,12 @@ let schema =
     schema
       [ io_field "string_error" ~typ:int
           ~args:Arg.[]
-          ~resolve:(fun _ () -> Error (Field_error.String "error string"))
+          ~resolve:(fun { ctx = (); _ } () ->
+            Error (Field_error.String "error string") )
       ; io_field "extensions_error" ~typ:int
           ~args:Arg.[]
-          ~resolve:(fun _ () -> Error (Field_error.Extension ("custom", "json")))
+          ~resolve:(fun { ctx = (); _ } () ->
+            Error (Field_error.Extension ("custom", "json")) )
       ])
 
 let%test "message without extensions" =

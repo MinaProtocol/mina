@@ -235,17 +235,23 @@ let
   mkGraphqlSchema = self:
     pkgs.stdenv.mkDerivation {
       name = "graphql-schema";
-      phases = [ "installPhase" ];
+      src =
+        with inputs.nix-filter.lib;
+          filter {
+            root = ../src;
+            include = [ "graphql-ppx-config.inc" ];
+          };
+      phases = [ "unpackPhase" "installPhase" ];
       installPhase = ''
         mkdir -p $out
-        cp ${../src/graphql-ppx-config.inc} $out/
+        cp graphql-ppx-config.inc $out/
         ${self.graphql_schema_dump}/bin/graphql_schema_dump > $out/graphql_schema.json
       '';
     };
   mkMinaConfig = DUNE_PROFILE: self:
     pkgs.stdenv.mkDerivation {
       inherit DUNE_PROFILE;
-      src = "../src/config";
+      src = ../src/config;
       pname = "mina-config";
       version = "${DUNE_PROFILE}";
       nativeBuildInputs = with self; [ dune ocaml ];
@@ -479,7 +485,8 @@ let
         dependsOnConfig = foldlAttrs computeDependsOnConfig {} depsMap;
         opamCache = pkgs.lib.concatMapAttrs (n: dep:
             {"${dep.path}/${n}.opam" = opamTemplate;}) depsMap;
-        graphqlDependents = ["mina_init" "rosetta_app_lib" "batch_txn_tool" "integration_test_cloud_engine" "integration_test_lib" "generated_graphql_queries" "integration_test_local_engine"];
+        graphqlDependents = ["mina_init" "rosetta_app_lib" "batch_txn_tool" "integration_test_cloud_engine"
+                             "integration_test_lib" "generated_graphql_queries" "integration_test_local_engine"];
         getDepsImpl = acc: profile: self: name:
           if builtins.hasAttr name depsMap then
             pkgs.lib.foldl (acc: dep:
@@ -555,7 +562,7 @@ let
             '';
           };
         filterLocalPkgs = pkgs.lib.filterAttrs (name: _:
-          builtins.hasAttr name depsMap || name == "cli" );
+          builtins.hasAttr name depsMap || name == "cli" || name == "archive");
         minaOverlay = self: super:
           pkgs.lib.concatMapAttrs (name: old:
             let
@@ -597,8 +604,8 @@ let
             in
             if dependsOnConfig."${name}" then
               { "${name}" = new "dev";
-                "${name}-devnet" = new "devnet";
-                "${name}-mainnet" = new "mainnet";
+                "${name}_devnet" = new "devnet";
+                "${name}_mainnet" = new "mainnet";
               } else {"${name}" = new "base";}
           ) (filterLocalPkgs super) //
               { graphql-schema = mkGraphqlSchema self;
@@ -645,7 +652,7 @@ let
             virtualisation = {
               graphics = false;
               cores = 8;
-              memorySize = 16384;
+              memorySize = 16384; # TODO Lower the requirement
               diskSize = 4096;
             };
           };
@@ -656,6 +663,10 @@ let
         };
         testOverlay = self: super:
           let minaPkgs = builtins.removeAttrs (filterLocalPkgs super) ["best_tip_merger"];
+              minaLibp2pEnv = name: inputs:
+                if builtins.any (p: p.name == "mina_net2-dev") inputs then {
+                  MINA_LIBP2P_HELPER_PATH="${pkgs.libp2p_helper}/bin/libp2p_helper";
+                } else {};
               testPkgs = pkgs.lib.mapAttrs' (name: old:
                 { name = "test-${name}";
                   value = old.overrideAttrs (s: {
@@ -672,7 +683,7 @@ let
                         chmod -Rf 777 _build
                       '';
                       installPhase = "touch $out";
-                  } ); }
+                  } // minaLibp2pEnv name s.buildInputs ); }
                 ) minaPkgs;
               mkCombined = name: buildInputs:
                 pkgs.stdenv.mkDerivation {
@@ -689,7 +700,7 @@ let
               testPkgsFiltered = builtins.removeAttrs testPkgs ["test-archive_lib" "test-staged_ledger" "test-mina_net2"];
           in testPkgs // {
             all = mkCombined "mina-all" (builtins.attrValues minaPkgs);
-            all-tested = mkCombined "mina-all-with-tests" (builtins.attrValues minaPkgs ++ builtins.attrValues testPkgsFiltered);
+            all-tested = mkCombined "mina-all-with-tests" (builtins.attrValues minaPkgs ++ builtins.attrValues testPkgsFiltered ++ [self.vmtest-mina_net2 self.vmtest-staged_ledger]);
             runtest-mina_net2 = mkRuntest self "mina_net2" ''
               export MINA_LIBP2P_HELPER_PATH="${pkgs.libp2p_helper}/bin/libp2p_helper"
             '';
