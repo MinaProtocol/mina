@@ -12,7 +12,22 @@ module Check = struct
 
   let err error = Error [ error ]
 
-  let of_bool = function true -> Ok | false -> Error [ "failed" ]
+  let comparison_failed ~left ~right ~left_content ~right_content =
+    let left_file = Filename.(concat temp_dir_name "left.json")
+    and right_file = Filename.(concat temp_dir_name "right.json") in
+    let%map () =
+      Deferred.all_unit
+        [ Writer.with_file left_file ~f:(fun w ->
+              return @@ Writer.write w @@ Yojson.Safe.pretty_to_string left )
+        ; Writer.with_file right_file ~f:(fun w ->
+              return @@ Writer.write w @@ Yojson.Safe.pretty_to_string right )
+        ]
+    in
+    err
+    @@ sprintf
+         "Discrepancies found between %s and %s. To reproduce please run `diff \
+          %s %s`."
+         left_content right_content left_file right_file
 end
 
 let exit_code = ref 0
@@ -22,9 +37,6 @@ module Test = struct
 
   let of_check check ~name ~idx ~prefix test_count =
     { check; name = sprintf "[%d/%d] %s) %s " idx test_count prefix name }
-
-  let of_bool b ~name ~idx ~prefix test_count =
-    of_check (Check.of_bool b) ~name ~idx ~prefix test_count
 
   let print_errors error_messages =
     if List.length error_messages > 10 then (
@@ -80,109 +92,157 @@ let no_pending_and_orphaned_blocks_in_migrated_db query_migrated_db ~height =
 let all_accounts_referred_in_commands_are_recorded migrated_pool =
   let query_migrated_db = Mina_caqti.query migrated_pool in
   let open Deferred.Let_syntax in
-  let%bind expected =
+  let%bind left =
     query_migrated_db ~f:(fun db ->
         Sql.Berkeley.dump_user_and_internal_command_info db )
   in
 
-  let%map result =
+  let%bind right =
     query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_accounts_accessed db)
   in
-  List.equal Sql.Accounts_accessed.equal expected result
+  if List.equal Sql.Accounts_accessed.equal left right then return Check.ok
+  else
+    Check.comparison_failed
+      ~left:(Sql.Accounts_accessed.list_to_yojson left)
+      ~right:(Sql.Accounts_accessed.list_to_yojson right)
+      ~left_content:"Berkeley.user_and_internal_command"
+      ~right_content:"Berkeley.accounts_accessed"
 
 let accounts_created_table_is_correct migrated_pool mainnet_pool =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
   let open Deferred.Let_syntax in
-  let%bind expected =
+  let%bind left =
     query_mainnet_db ~f:(fun db -> Sql.Mainnet.dump_accounts_created db)
   in
-  let%map result =
+  let%bind right =
     query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_accounts_created db)
   in
-  List.equal Sql.Accounts_created.equal expected result
+  if List.equal Sql.Accounts_created.equal left right then return Check.ok
+  else
+    Check.comparison_failed
+      ~left:(Sql.Accounts_created.list_to_yojson left)
+      ~right:(Sql.Accounts_created.list_to_yojson right)
+      ~left_content:"Mainnet.accounts_created"
+      ~right_content:"Berkeley.accounts_created"
 
 let compare_hashes_till_height migrated_pool mainnet_pool ~height =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
   let open Deferred.Let_syntax in
-  let%bind expected =
+  let%bind left =
+    query_mainnet_db ~f:(fun db ->
+        Sql.Mainnet.dump_block_hashes_till_height db height )
+  in
+  let%bind right =
     query_migrated_db ~f:(fun db ->
         Sql.Berkeley.dump_block_hashes_till_height db height )
   in
 
-  let%map result =
-    query_mainnet_db ~f:(fun db ->
-        Sql.Mainnet.dump_block_hashes_till_height db height )
-  in
-  List.equal Sql.State_hash_and_ledger_hash.equal expected result
+  if List.equal Sql.State_hash_and_ledger_hash.equal left right then
+    return Check.ok
+  else
+    Check.comparison_failed
+      ~left:(Sql.State_hash_and_ledger_hash.list_to_yojson left)
+      ~right:(Sql.State_hash_and_ledger_hash.list_to_yojson right)
+      ~left_content:"Mainnet.state_hashes_and_ledger_hashes"
+      ~right_content:"Berkeley.state_hashes_and_ledger_hashes"
 
 let compare_hashes migrated_pool mainnet_pool =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
   let open Deferred.Let_syntax in
-  let%bind expected =
-    query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_block_hashes db)
-  in
-  let%map result =
+  let%bind left =
     query_mainnet_db ~f:(fun db -> Sql.Mainnet.dump_block_hashes db)
   in
-  List.equal Sql.State_hash_and_ledger_hash.equal expected result
+  let%bind right =
+    query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_block_hashes db)
+  in
+
+  if List.equal Sql.State_hash_and_ledger_hash.equal left right then
+    return Check.ok
+  else
+    Check.comparison_failed
+      ~left:(Sql.State_hash_and_ledger_hash.list_to_yojson left)
+      ~right:(Sql.State_hash_and_ledger_hash.list_to_yojson right)
+      ~left_content:"Mainnet.state_hashes_and_ledger_hashes"
+      ~right_content:"Berkeley.state_hashes_and_ledger_hashes"
 
 let compare_user_commands_till_height migrated_pool mainnet_pool ~height =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
   let open Deferred.Let_syntax in
-  let%bind expected =
-    query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_user_commands_till_height db height )
-  in
-
-  let%map result =
+  let%bind left =
     query_mainnet_db ~f:(fun db ->
         Sql.Mainnet.dump_user_commands_till_height db height )
   in
-  List.equal Sql.User_command.equal expected result
+  let%bind right =
+    query_migrated_db ~f:(fun db ->
+        Sql.Berkeley.dump_user_commands_till_height db height )
+  in
+  if List.equal Sql.User_command.equal left right then return Check.ok
+  else
+    Check.comparison_failed
+      ~left:(Sql.User_command.list_to_yojson left)
+      ~right:(Sql.User_command.list_to_yojson right)
+      ~left_content:"Mainnet.user_command"
+      ~right_content:"Berkeley.user_command"
 
 let compare_internal_commands_till_height migrated_pool mainnet_pool ~height =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
   let open Deferred.Let_syntax in
-  let%bind expected =
-    query_migrated_db ~f:(fun db ->
-        Sql.Berkeley.dump_internal_commands_till_height db height )
-  in
-
-  let%map result =
+  let%bind left =
     query_mainnet_db ~f:(fun db ->
         Sql.Mainnet.dump_internal_commands_till_height db height )
   in
-  List.equal Sql.Internal_command.equal expected result
+  let%bind right =
+    query_migrated_db ~f:(fun db ->
+        Sql.Berkeley.dump_internal_commands_till_height db height )
+  in
+  if List.equal Sql.Internal_command.equal left right then return Check.ok
+  else
+    Check.comparison_failed
+      ~left:(Sql.Internal_command.list_to_yojson left)
+      ~right:(Sql.Internal_command.list_to_yojson right)
+      ~left_content:"Mainnet.internal_command"
+      ~right_content:"Berkeley.internal_command"
 
 let compare_user_commands migrated_pool mainnet_pool =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
   let open Deferred.Let_syntax in
-  let%bind expected =
-    query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_user_commands db)
-  in
-
-  let%map result =
+  let%bind left =
     query_mainnet_db ~f:(fun db -> Sql.Mainnet.dump_user_commands db)
   in
-  List.equal Sql.User_command.equal expected result
+  let%bind right =
+    query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_user_commands db)
+  in
+  if List.equal Sql.User_command.equal left right then return Check.ok
+  else
+    Check.comparison_failed
+      ~left:(Sql.User_command.list_to_yojson left)
+      ~right:(Sql.User_command.list_to_yojson right)
+      ~left_content:"Mainnet.user_command"
+      ~right_content:"Berkeley.user_command"
 
 let compare_internal_commands migrated_pool mainnet_pool =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
   let query_migrated_db = Mina_caqti.query migrated_pool in
   let open Deferred.Let_syntax in
-  let%bind expected =
-    query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_internal_commands db)
-  in
-  let%map result =
+  let%bind left =
     query_mainnet_db ~f:(fun db -> Sql.Mainnet.dump_internal_commands db)
   in
-  List.equal Sql.Internal_command.equal expected result
+  let%bind right =
+    query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_internal_commands db)
+  in
+  if List.equal Sql.Internal_command.equal left right then return Check.ok
+  else
+    Check.comparison_failed
+      ~left:(Sql.Internal_command.list_to_yojson left)
+      ~right:(Sql.Internal_command.list_to_yojson right)
+      ~left_content:"Mainnet.internal_command"
+      ~right_content:"Berkeley.internal_command"
 
 let compare_ledger_hash ~migrated_replayer_output ~fork_genesis_config_file =
   let checkpoint_ledger_hash =
@@ -245,7 +305,7 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
       let%bind check =
         all_accounts_referred_in_commands_are_recorded migrated_pool
       in
-      Test.of_bool check
+      Test.of_check check
         ~name:
           "All accounts referred in internal commands or transactions are \
            recorded in the accounts_accessed table."
@@ -255,7 +315,7 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
       let%bind check =
         compare_hashes_till_height migrated_pool mainnet_pool ~height
       in
-      Test.of_bool check
+      Test.of_check check
         ~name:"All block hashes (state_hash, ledger_hashes) are equal" ~idx:4
         ~prefix:"D3.4" test_count
       |> Test.eval ;
@@ -264,7 +324,7 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
         compare_user_commands_till_height migrated_pool mainnet_pool ~height
       in
 
-      Test.of_bool check ~name:"Verify user commands" ~idx:5 ~prefix:"D3.5"
+      Test.of_check check ~name:"Verify user commands" ~idx:5 ~prefix:"D3.5"
         test_count
       |> Test.eval ;
 
@@ -272,7 +332,7 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
         compare_internal_commands_till_height migrated_pool mainnet_pool ~height
       in
 
-      Test.of_bool check ~name:"Verify internal commands" ~idx:6 ~prefix:"D3.6"
+      Test.of_check check ~name:"Verify internal commands" ~idx:6 ~prefix:"D3.6"
         test_count
       |> Test.eval ;
 
@@ -337,7 +397,7 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
       let%bind check =
         all_accounts_referred_in_commands_are_recorded migrated_pool
       in
-      Test.of_bool check
+      Test.of_check check
         ~name:
           "All accounts referred in internal commands or transactions are \
            recorded in the accounts_accessed table."
@@ -347,7 +407,7 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
       let%bind check =
         accounts_created_table_is_correct migrated_pool mainnet_pool
       in
-      Test.of_bool check
+      Test.of_check check
         ~name:
           "The content of accounts_created table is correct (by checking \
            against pre-migrated database)"
@@ -360,18 +420,18 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
       in
 
       let%bind check = compare_hashes migrated_pool mainnet_pool in
-      Test.of_bool check
+      Test.of_check check
         ~name:"All block hashes (state_hash, ledger_hashes) are equal" ~idx:5
         ~prefix:"D3.6" test_count
       |> Test.eval ;
 
       let%bind check = compare_user_commands migrated_pool mainnet_pool in
-      Test.of_bool check ~name:"Verify user commands" ~idx:6 ~prefix:"D3.7"
+      Test.of_check check ~name:"Verify user commands" ~idx:6 ~prefix:"D3.7"
         test_count
       |> Test.eval ;
 
       let%bind check = compare_internal_commands migrated_pool mainnet_pool in
-      Test.of_bool check ~name:"Verify internal commands" ~idx:7 ~prefix:"D3.8"
+      Test.of_check check ~name:"Verify internal commands" ~idx:7 ~prefix:"D3.8"
         test_count
       |> Test.eval ;
 

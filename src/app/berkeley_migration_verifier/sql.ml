@@ -1,14 +1,17 @@
+open Core
 open Async
 open Caqti_async
 
 module Accounts_created = struct
   type t =
-    { height : String.t
-    ; public_key : String.t
-    ; state_hash : String.t
-    ; creation_fee : String.t
+    { height : string
+    ; public_key : string
+    ; state_hash : string
+    ; creation_fee : string
     }
-  [@@deriving hlist, equal]
+  [@@deriving hlist, equal, yojson]
+
+  let list_to_yojson xs : Yojson.Safe.t = `List (List.map xs ~f:to_yojson)
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -16,8 +19,10 @@ module Accounts_created = struct
 end
 
 module State_hash_and_ledger_hash = struct
-  type t = { state_hash : String.t; ledger_hash : String.t }
-  [@@deriving hlist, equal]
+  type t = { state_hash : string; ledger_hash : string }
+  [@@deriving hlist, equal, yojson]
+
+  let list_to_yojson xs : Yojson.Safe.t = `List (List.map xs ~f:to_yojson)
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -26,16 +31,18 @@ end
 
 module User_command = struct
   type t =
-    { receiver : String.t
-    ; fee_payer : String.t
-    ; nonce : String.t
-    ; amount : String.t
-    ; fee : String.t
-    ; valid_until : String.t
-    ; memo : String.t
-    ; hash : String.t
+    { receiver : string
+    ; fee_payer : string
+    ; nonce : string
+    ; amount : string
+    ; fee : string
+    ; valid_until : string
+    ; memo : string
+    ; hash : string
     }
-  [@@deriving hlist, equal]
+  [@@deriving hlist, equal, yojson]
+
+  let list_to_yojson xs : Yojson.Safe.t = `List (List.map xs ~f:to_yojson)
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -45,13 +52,15 @@ end
 
 module Internal_command = struct
   type t =
-    { receiver : String.t
-    ; fee : String.t
-    ; sequence_no : String.t
-    ; secondary_sequence_no : String.t
-    ; hash : String.t
+    { receiver : string
+    ; fee : string
+    ; sequence_no : string
+    ; secondary_sequence_no : string
+    ; hash : string
     }
-  [@@deriving hlist, equal]
+  [@@deriving hlist, equal, yojson]
+
+  let list_to_yojson xs : Yojson.Safe.t = `List (List.map xs ~f:to_yojson)
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -59,7 +68,9 @@ module Internal_command = struct
 end
 
 module Accounts_accessed = struct
-  type t = { id : String.t; block_id : String.t } [@@deriving hlist, equal]
+  type t = { id : string; block_id : string } [@@deriving hlist, equal, yojson]
+
+  let list_to_yojson xs : Yojson.Safe.t = `List (List.map xs ~f:to_yojson)
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
