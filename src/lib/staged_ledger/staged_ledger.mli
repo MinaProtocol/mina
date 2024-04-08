@@ -260,8 +260,6 @@ module Application_state : sig
     ; total_space_remaining : int
     }
 
-  val init : ?zkapp_limit:int -> total_limit:int -> t
-
   val try_applying_txn :
        ?logger:Logger.t
     -> apply:(User_command.t Transaction.t_ -> ('a, Error.t) Result.t)

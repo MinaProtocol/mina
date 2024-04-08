@@ -2025,12 +2025,12 @@ module T = struct
       ; total_space_remaining : int
       }
 
-    let init ?zkapp_limit ~total_limit =
+    let init ~zkapp_cmd_limit ~total_cmd_limit =
       { valid_seq = Sequence.empty
       ; invalid = []
       ; skipped_by_fee_payer = Account_id.Map.empty
-      ; zkapp_space_remaining = zkapp_limit
-      ; total_space_remaining = total_limit
+      ; zkapp_space_remaining = zkapp_cmd_limit
+      ; total_space_remaining = total_cmd_limit
       }
 
     let txn_key = function
@@ -2207,8 +2207,8 @@ module T = struct
             let valid_on_this_ledger, invalid_on_this_ledger =
               Sequence.fold_until transactions_by_fee
                 ~init:
-                  (Application_state.init ?zkapp_limit:zkapp_cmd_limit
-                     ~total_limit:(Scan_state.free_space t.scan_state) )
+                  (Application_state.init ~zkapp_cmd_limit
+                     ~total_cmd_limit:(Scan_state.free_space t.scan_state) )
                 ~f:(Application_state.try_applying_txn ~apply ~logger)
                 ~finish:(fun state -> (state.valid_seq, state.invalid))
             in
