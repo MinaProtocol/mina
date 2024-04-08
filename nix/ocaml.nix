@@ -279,6 +279,13 @@ let
        } "$OCAMLFIND_DESTDIR" >> $out/nix-support/setup-hook
      fi
    '';
+  
+  sqlSchemaFiles =
+    with inputs.nix-filter.lib;
+      filter {
+        root = ../src/app/archive;
+        include = [ (matchesExt "sql") ];
+      };
 
   overlay = self: super:
     let
@@ -663,10 +670,20 @@ let
         };
         testOverlay = self: super:
           let minaPkgs = builtins.removeAttrs (filterLocalPkgs super) ["best_tip_merger"];
-              minaLibp2pEnv = name: inputs:
+              minaLibp2pEnv = inputs:
                 if builtins.any (p: p.name == "mina_net2-dev") inputs then {
                   MINA_LIBP2P_HELPER_PATH="${pkgs.libp2p_helper}/bin/libp2p_helper";
                 } else {};
+              sqlInputs = name:
+                if name == "archive_lib"
+                then [pkgs.ephemeralpg] else [];
+              sqlPreBuild = name:
+                if name == "archive_lib" then ''
+                  export MINA_TEST_POSTGRES="$(pg_tmp -w 1200)"
+                  pushd ${sqlSchemaFiles}
+                  psql "$MINA_TEST_POSTGRES" < create_schema.sql
+                  popd
+                '' else "";
               testPkgs = pkgs.lib.mapAttrs' (name: old:
                 { name = "test-${name}";
                   value = old.overrideAttrs (s: {
@@ -681,10 +698,12 @@ let
                         mkdir _build
                         cp -R ${self."${name}".dev} _build/default
                         chmod -Rf 777 _build
-                      '';
+                      '' + sqlPreBuild;
+                      buildInputs = s.buildInputs ++ sqlInputs name;
                       installPhase = "touch $out";
-                  } // minaLibp2pEnv name s.buildInputs ); }
-                ) minaPkgs;
+                  } // minaLibp2pEnv s.buildInputs // sqlEnv name s.buildInputs ); })
+                # Filtering out packages that are tested via vmtests
+                (builtins.removeAttrs minaPkgs ["staged_ledger" "mina_net2"]);
               mkCombined = name: buildInputs:
                 pkgs.stdenv.mkDerivation {
                   inherit name buildInputs;
@@ -696,11 +715,11 @@ let
                     touch $out
                   '';
                 };
-              # TODO remove
-              testPkgsFiltered = builtins.removeAttrs testPkgs ["test-archive_lib" "test-staged_ledger" "test-mina_net2"];
           in testPkgs // {
             all = mkCombined "mina-all" (builtins.attrValues minaPkgs);
-            all-tested = mkCombined "mina-all-with-tests" (builtins.attrValues minaPkgs ++ builtins.attrValues testPkgsFiltered ++ [self.vmtest-mina_net2 self.vmtest-staged_ledger]);
+            all-tested = mkCombined "mina-all-with-tests"
+              (builtins.attrValues minaPkgs ++ builtins.attrValues testPkgs ++
+                [self.vmtest-mina_net2 self.vmtest-staged_ledger]);
             runtest-mina_net2 = mkRuntest self "mina_net2" ''
               export MINA_LIBP2P_HELPER_PATH="${pkgs.libp2p_helper}/bin/libp2p_helper"
             '';
