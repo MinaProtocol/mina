@@ -76,14 +76,14 @@ locals {
 }
 
 module "berkeley" {
-  providers = { google.gke = google.google-us-central1 }
+  providers = { google.gke = google.google-us-east1 }
   source    = "../../modules/o1-testnet"
 
   artifact_path = abspath(path.module)
 
-  cluster_name   = "coda-infra-central1"
-  cluster_region = "us-central1"
-  k8s_context    = "gke_o1labs-192920_us-central1_coda-infra-central1"
+  cluster_name   = "coda-infra-east"
+  cluster_region = "us-east1"
+  k8s_context    = "gke_o1labs-192920_us-east1_coda-infra-east"
   testnet_name   = local.testnet_name
 
   mina_image                  = local.mina_image
