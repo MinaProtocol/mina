@@ -13,16 +13,10 @@ module Check = struct
   let err error = Error [ error ]
 
   let comparison_failed ~left ~right ~left_content ~right_content =
-    let left_file = Filename.(concat temp_dir_name "left.json")
-    and right_file = Filename.(concat temp_dir_name "right.json") in
-    let%map () =
-      Deferred.all_unit
-        [ Writer.with_file left_file ~f:(fun w ->
-              return @@ Writer.write w @@ Yojson.Safe.pretty_to_string left_content )
-        ; Writer.with_file right_file ~f:(fun w ->
-              return @@ Writer.write w @@ Yojson.Safe.pretty_to_string right_content )
-        ]
-    in
+    let left_file = Filename.(concat temp_dir_name @@ left ^ ".json")
+    and right_file = Filename.(concat temp_dir_name @@ right ^ ".json") in
+    Yojson.Safe.to_file left_file left_content ;
+    Yojson.Safe.to_file right_file right_content ;
     err
     @@ sprintf
          "Discrepancies found between %s and %s. To reproduce please run `diff \
@@ -97,10 +91,10 @@ let all_accounts_referred_in_commands_are_recorded migrated_pool =
         Sql.Berkeley.dump_user_and_internal_command_info db )
   in
 
-  let%bind right =
+  let%map right =
     query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_accounts_accessed db)
   in
-  if List.equal Sql.Accounts_accessed.equal left right then return Check.ok
+  if List.equal Sql.Accounts_accessed.equal left right then Check.ok
   else
     Check.comparison_failed
       ~left_content:(Sql.Accounts_accessed.list_to_yojson left)
@@ -115,16 +109,15 @@ let accounts_created_table_is_correct migrated_pool mainnet_pool =
   let%bind left =
     query_mainnet_db ~f:(fun db -> Sql.Mainnet.dump_accounts_created db)
   in
-  let%bind right =
+  let%map right =
     query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_accounts_created db)
   in
-  if List.equal Sql.Accounts_created.equal left right then return Check.ok
+  if List.equal Sql.Accounts_created.equal left right then Check.ok
   else
     Check.comparison_failed
       ~left_content:(Sql.Accounts_created.list_to_yojson left)
       ~right_content:(Sql.Accounts_created.list_to_yojson right)
-      ~left:"Mainnet.accounts_created"
-      ~right:"Berkeley.accounts_created"
+      ~left:"Mainnet.accounts_created" ~right:"Berkeley.accounts_created"
 
 let compare_hashes_till_height migrated_pool mainnet_pool ~height =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
@@ -134,13 +127,11 @@ let compare_hashes_till_height migrated_pool mainnet_pool ~height =
     query_mainnet_db ~f:(fun db ->
         Sql.Mainnet.dump_block_hashes_till_height db height )
   in
-  let%bind right =
+  let%map right =
     query_migrated_db ~f:(fun db ->
         Sql.Berkeley.dump_block_hashes_till_height db height )
   in
-
-  if List.equal Sql.State_hash_and_ledger_hash.equal left right then
-    return Check.ok
+  if List.equal Sql.State_hash_and_ledger_hash.equal left right then Check.ok
   else
     Check.comparison_failed
       ~left_content:(Sql.State_hash_and_ledger_hash.list_to_yojson left)
@@ -155,12 +146,11 @@ let compare_hashes migrated_pool mainnet_pool =
   let%bind left =
     query_mainnet_db ~f:(fun db -> Sql.Mainnet.dump_block_hashes db)
   in
-  let%bind right =
+  let%map right =
     query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_block_hashes db)
   in
 
-  if List.equal Sql.State_hash_and_ledger_hash.equal left right then
-    return Check.ok
+  if List.equal Sql.State_hash_and_ledger_hash.equal left right then Check.ok
   else
     Check.comparison_failed
       ~left_content:(Sql.State_hash_and_ledger_hash.list_to_yojson left)
@@ -176,17 +166,16 @@ let compare_user_commands_till_height migrated_pool mainnet_pool ~height =
     query_mainnet_db ~f:(fun db ->
         Sql.Mainnet.dump_user_commands_till_height db height )
   in
-  let%bind right =
+  let%map right =
     query_migrated_db ~f:(fun db ->
         Sql.Berkeley.dump_user_commands_till_height db height )
   in
-  if List.equal Sql.User_command.equal left right then return Check.ok
+  if List.equal Sql.User_command.equal left right then Check.ok
   else
     Check.comparison_failed
       ~left_content:(Sql.User_command.list_to_yojson left)
       ~right_content:(Sql.User_command.list_to_yojson right)
-      ~left:"Mainnet.user_command"
-      ~right:"Berkeley.user_command"
+      ~left:"Mainnet.user_command" ~right:"Berkeley.user_command"
 
 let compare_internal_commands_till_height migrated_pool mainnet_pool ~height =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
@@ -196,17 +185,16 @@ let compare_internal_commands_till_height migrated_pool mainnet_pool ~height =
     query_mainnet_db ~f:(fun db ->
         Sql.Mainnet.dump_internal_commands_till_height db height )
   in
-  let%bind right =
+  let%map right =
     query_migrated_db ~f:(fun db ->
         Sql.Berkeley.dump_internal_commands_till_height db height )
   in
-  if List.equal Sql.Internal_command.equal left right then return Check.ok
+  if List.equal Sql.Internal_command.equal left right then Check.ok
   else
     Check.comparison_failed
       ~left_content:(Sql.Internal_command.list_to_yojson left)
       ~right_content:(Sql.Internal_command.list_to_yojson right)
-      ~left:"Mainnet.internal_command"
-      ~right:"Berkeley.internal_command"
+      ~left:"Mainnet.internal_command" ~right:"Berkeley.internal_command"
 
 let compare_user_commands migrated_pool mainnet_pool =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
@@ -215,16 +203,15 @@ let compare_user_commands migrated_pool mainnet_pool =
   let%bind left =
     query_mainnet_db ~f:(fun db -> Sql.Mainnet.dump_user_commands db)
   in
-  let%bind right =
+  let%map right =
     query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_user_commands db)
   in
-  if List.equal Sql.User_command.equal left right then return Check.ok
+  if List.equal Sql.User_command.equal left right then Check.ok
   else
     Check.comparison_failed
       ~left_content:(Sql.User_command.list_to_yojson left)
       ~right_content:(Sql.User_command.list_to_yojson right)
-      ~left:"Mainnet.user_command"
-      ~right:"Berkeley.user_command"
+      ~left:"Mainnet.user_command" ~right:"Berkeley.user_command"
 
 let compare_internal_commands migrated_pool mainnet_pool =
   let query_mainnet_db = Mina_caqti.query mainnet_pool in
@@ -233,16 +220,15 @@ let compare_internal_commands migrated_pool mainnet_pool =
   let%bind left =
     query_mainnet_db ~f:(fun db -> Sql.Mainnet.dump_internal_commands db)
   in
-  let%bind right =
+  let%map right =
     query_migrated_db ~f:(fun db -> Sql.Berkeley.dump_internal_commands db)
   in
-  if List.equal Sql.Internal_command.equal left right then return Check.ok
+  if List.equal Sql.Internal_command.equal left right then Check.ok
   else
     Check.comparison_failed
       ~left_content:(Sql.Internal_command.list_to_yojson left)
       ~right_content:(Sql.Internal_command.list_to_yojson right)
-      ~left:"Mainnet.internal_command"
-      ~right:"Berkeley.internal_command"
+      ~left:"Mainnet.internal_command" ~right:"Berkeley.internal_command"
 
 let compare_ledger_hash ~migrated_replayer_output ~fork_genesis_config_file =
   let checkpoint_ledger_hash =
