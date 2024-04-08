@@ -22,8 +22,7 @@ Pipeline.build
     { spec =
       JobSpec::
         { dirtyWhen =
-          [ S.strictlyStart (S.contains "src/lib")
-          , S.strictly (S.contains "Makefile")
+          [ S.strictlyStart (S.contains "src")
           , S.strictlyStart (S.contains "buildkite/src/Jobs/Test/ArchiveNodeUnitTest")
           ]
         , path = "Test"
