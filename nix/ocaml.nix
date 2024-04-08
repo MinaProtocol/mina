@@ -284,7 +284,7 @@ let
     with inputs.nix-filter.lib;
       filter {
         root = ../src/app/archive;
-        include = [ (matchesExt "sql") ];
+        include = [ (matchExt "sql") ];
       };
 
   overlay = self: super:
@@ -676,12 +676,12 @@ let
                 } else {};
               sqlInputs = name:
                 if name == "archive_lib"
-                then [pkgs.ephemeralpg] else [];
+                then with pkgs; [postgresql ephemeralpg] else [];
               sqlPreBuild = name:
                 if name == "archive_lib" then ''
                   export MINA_TEST_POSTGRES="$(pg_tmp -w 1200)"
                   pushd ${sqlSchemaFiles}
-                  psql "$MINA_TEST_POSTGRES" < create_schema.sql
+                  psql "$MINA_TEST_POSTGRES" < create_schema.sql >/dev/null
                   popd
                 '' else "";
               testPkgs = pkgs.lib.mapAttrs' (name: old:
@@ -698,10 +698,10 @@ let
                         mkdir _build
                         cp -R ${self."${name}".dev} _build/default
                         chmod -Rf 777 _build
-                      '' + sqlPreBuild;
-                      buildInputs = s.buildInputs ++ sqlInputs name;
+                      '' + sqlPreBuild name;
+                      nativeBuildInputs = s.nativeBuildInputs ++ sqlInputs name;
                       installPhase = "touch $out";
-                  } // minaLibp2pEnv s.buildInputs // sqlEnv name s.buildInputs ); })
+                  } // minaLibp2pEnv s.buildInputs ); })
                 # Filtering out packages that are tested via vmtests
                 (builtins.removeAttrs minaPkgs ["staged_ledger" "mina_net2"]);
               mkCombined = name: buildInputs:
