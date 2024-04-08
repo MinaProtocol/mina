@@ -16,7 +16,7 @@ let tags: Filter -> List Tag.Type = \(filter: Filter) ->
     , ToolchainsOnly = [ Tag.Type.Toolchain ]
     , AllTests = [ Tag.Type.Lint, Tag.Type.Release, Tag.Type.Test, Tag.Type.Hardfork ]
     , Release = [ Tag.Type.Release ]
-    , HardforkPackageGeneration = [ Tag.Type.Release, Tag.Type.Hardfork ]
+    , HardforkPackageGeneration = [ Tag.Type.Hardfork ]
   } filter
 
 let show: Filter -> Text = \(filter: Filter) -> 
