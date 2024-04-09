@@ -67,7 +67,7 @@ for file in hardfork_ledgers/*; do
     oldhash=$(openssl dgst -r -sha3-256 "$file" | awk '{print $1}')
     aws s3 cp "s3://snark-keys.o1test.net/$filename" "$file"
     newhash=$(openssl dgst -r -sha3-256 "$file" | awk '{print $1}')
-    sed -i 's/$oldhash/$newhash/g' new_config.json 
+    sed -i "s/$oldhash/$newhash/g" new_config.json 
   else
     aws s3 cp --acl public-read "$file" s3://snark-keys.o1test.net/
   fi
