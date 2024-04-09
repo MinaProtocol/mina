@@ -130,12 +130,17 @@ GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$PACKAGED_DAEMON_C
 
 echo "exporting ledgers from running node ... (this may take a while)" >&2
 
+override_file="$workdir/override-genesis-timestamp.json"
+echo "{\"genesis\":{\"genesis_state_timestamp\":\"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}}" > "$override_file"
+
 # export the packaged ledgers in a way where we know which one is which
 function extract_ledgers() {
     config_file=$1
     ledger_dir=$2
     json_prefix=$3
-    "$MINA_EXE" daemon --libp2p-keypair "$workdir/keys/p2p" --config-file "$config_file" --seed --genesis-ledger-dir "$ledger_dir" &
+    "$MINA_EXE" daemon --libp2p-keypair "$workdir/keys/p2p" \
+      --config-file "$config_file" --config-file "$override_file" \
+      --seed --genesis-ledger-dir "$ledger_dir" &
 
     while ! "$MINA_EXE" ledger export staged-ledger  | jq . 2>/dev/null >"$json_prefix-staged.json"; do
         sleep 1m
