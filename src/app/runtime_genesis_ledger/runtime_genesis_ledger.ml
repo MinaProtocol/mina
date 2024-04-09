@@ -80,8 +80,9 @@ let extract_accounts_exn = function
   | { Runtime_config.Ledger.base = Accounts accounts
     ; num_accounts = None
     ; balances = []
-    (* ; add_genesis_winner = Some false *)
-    ; _
+    ; hash = _
+    ; name = None
+    ; add_genesis_winner = Some false
     } ->
       accounts
   | _ ->
