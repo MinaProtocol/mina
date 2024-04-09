@@ -252,7 +252,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
             | Some kp ->
                 return kp
             | None ->
-                Mina_net2.generate_random_keypair net2
+                let%map kp = Mina_net2.generate_random_keypair net2 in
+                config.keypair <- Some kp ;
+                kp
           in
           let my_peer_id = Keypair.to_peer_id me |> Peer.Id.to_string in
           Logger.append_to_global_metadata
