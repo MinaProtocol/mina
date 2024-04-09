@@ -369,7 +369,7 @@ let setup_daemon logger =
          work in a block (default: true)"
       (optional bool)
   and libp2p_keypair =
-    flag "--libp2p-keypair" ~aliases:[ "libp2p-keypair" ] (required string)
+    flag "--libp2p-keypair" ~aliases:[ "libp2p-keypair" ] (optional string)
       ~doc:
         "KEYFILE Keypair (generated from `mina libp2p generate-keypair`) to \
          use with libp2p discovery"
@@ -679,23 +679,28 @@ let setup_daemon logger =
         in
         let%bind libp2p_keypair =
           let libp2p_keypair_old_format =
-            match Mina_net2.Keypair.of_string libp2p_keypair with
-            | Ok kp ->
-                Some kp
-            | Error _ ->
-                if String.contains libp2p_keypair ',' then
-                  [%log warn]
-                    "I think -libp2p-keypair is in the old format, but I \
-                     failed to parse it! Using it as a path..." ;
-                None
+            Option.bind libp2p_keypair ~f:(fun libp2p_keypair ->
+                match Mina_net2.Keypair.of_string libp2p_keypair with
+                | Ok kp ->
+                    Some kp
+                | Error _ ->
+                    if String.contains libp2p_keypair ',' then
+                      [%log warn]
+                        "I think -libp2p-keypair is in the old format, but I \
+                         failed to parse it! Using it as a path..." ;
+                    None )
           in
-          Option.value_map
-            ~default:(fun () ->
-              Secrets.Libp2p_keypair.Terminal_stdin.read_exn
-                ~should_prompt_user:false ~which:"libp2p keypair" libp2p_keypair
-              )
-            ~f:(Fn.compose const Deferred.return)
-            libp2p_keypair_old_format ()
+          match libp2p_keypair_old_format with
+          | Some kp ->
+              return (Some kp)
+          | None -> (
+              match libp2p_keypair with
+              | None ->
+                  return None
+              | Some s ->
+                  Secrets.Libp2p_keypair.Terminal_stdin.read_exn
+                    ~should_prompt_user:false ~which:"libp2p keypair" s
+                  |> Deferred.map ~f:Option.some )
         in
         let%bind () =
           let version_filename = conf_dir ^/ "mina.version" in
