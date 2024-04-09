@@ -21,6 +21,7 @@ let Libp2p = ./Libp2pHelperBuild.dhall
 let DockerImage = ./DockerImage.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
 let Profiles = ../Constants/Profiles.dhall
+let BuildFlags = ../Constants/BuildFlags.dhall
 let Artifacts = ../Constants/Artifacts.dhall
 let Toolchain = ../Constants/Toolchain.dhall
 
@@ -111,6 +112,7 @@ let MinaBuildSpec = {
     artifacts: List Artifacts.Type,
     debVersion : DebianVersions.DebVersion,
     profile: Profiles.Type,
+    buildFlags: BuildFlags.Type,
     toolchainSelectMode: Toolchain.SelectionMode,
     mode: PipelineMode.Type
   },
@@ -119,6 +121,7 @@ let MinaBuildSpec = {
     artifacts = Artifacts.AllButTests,
     debVersion = DebianVersions.DebVersion.Bullseye,
     profile = Profiles.Type.Standard,
+    buildFlags = BuildFlags.Type.Standard,
     toolchainSelectMode = Toolchain.SelectionMode.ByDebian,
     mode = PipelineMode.Type.PullRequest
   }
@@ -130,14 +133,16 @@ let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type =
         Libp2p.step spec.debVersion,
         Command.build
           Command.Config::{
-            commands = Toolchain.select spec.toolchainSelectMode spec.debVersion [
-              "DUNE_PROFILE=${Profiles.duneProfile spec.profile}",
-              "AWS_ACCESS_KEY_ID",
-              "AWS_SECRET_ACCESS_KEY",
-              "MINA_BRANCH=$BUILDKITE_BRANCH",
-              "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
-              "MINA_DEB_CODENAME=${DebianVersions.lowerName spec.debVersion}"
-            ] "./buildkite/scripts/build-release.sh ${Artifacts.toDebianNames spec.artifacts}",
+            commands = ( Toolchain.select spec.toolchainSelectMode spec.debVersion [
+                "DUNE_PROFILE=${Profiles.duneProfile spec.profile}",
+                "AWS_ACCESS_KEY_ID",
+                "AWS_SECRET_ACCESS_KEY",
+                "MINA_BRANCH=$BUILDKITE_BRANCH",
+                "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
+                "MINA_DEB_CODENAME=${DebianVersions.lowerName spec.debVersion}"
+              ] 
+              # BuildFlags.buildEnvs spec.buildFlags )
+            "./buildkite/scripts/build-release.sh ${Artifacts.toDebianNames spec.artifacts}",
             label = "Build Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile}",
             key = "build-deb-pkg",
             target = Size.XLarge,
