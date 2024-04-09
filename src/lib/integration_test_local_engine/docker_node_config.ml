@@ -431,7 +431,7 @@ module Postgres_config = struct
     }
   [@@deriving to_yojson]
 
-  let postgres_image = "postgres:15-bullseye"
+  let postgres_image = "postgres:16.2-bullseye"
 
   let postgres_script =
     ( "postgres_entrypoint.sh"
