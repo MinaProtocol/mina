@@ -48,8 +48,6 @@ let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
   in
   Blake2.to_hex b2
 
-[%%inject "daemon_expiry", daemon_expiry]
-
 [%%if plugins]
 
 let plugin_flag =
@@ -655,20 +653,6 @@ let setup_daemon logger =
         let%bind () =
           Mina_lib.Conf_dir.check_and_set_lockfile ~logger conf_dir
         in
-        if not @@ String.equal daemon_expiry "never" then (
-          [%log info] "Daemon will expire at $exp"
-            ~metadata:[ ("exp", `String daemon_expiry) ] ;
-          let tm =
-            (* same approach as in Genesis_constants.genesis_state_timestamp *)
-            let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
-            Core.Time.of_string_gen
-              ~if_no_timezone:(`Use_this_one default_timezone) daemon_expiry
-          in
-          Clock.run_at tm
-            (fun () ->
-              [%log info] "Daemon has expired, shutting down" ;
-              Core.exit 0 )
-            () ) ;
         [%log info] "Booting may take several seconds, please wait" ;
         let wallets_disk_location = conf_dir ^/ "wallets" in
         let%bind wallets =
