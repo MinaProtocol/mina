@@ -1,6 +1,6 @@
 (executable
  (name deserialize_proof)
- (libraries pickles))
+ (libraries core_kernel pickles))
 
 (rule
  (deps deserialize_proof.exe)
