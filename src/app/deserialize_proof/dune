@@ -1,0 +1,9 @@
+(executable
+ (name deserialize_proof)
+ (libraries pickles))
+
+(rule
+ (deps deserialize_proof.exe)
+ (alias runtest)
+ (action
+  (run %{deps})))
