@@ -330,7 +330,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
     (ics : Sql.Internal_command.t list) :
     (Mina_transaction.Transaction.t option * Sql.Internal_command.t list)
     Deferred.t =
-  [%log info]
+  [%log spam]
     "Converting internal command (%s) with global slot since genesis %Ld, \
      sequence number %d, and secondary sequence number %d to transaction"
     ic.typ ic.global_slot_since_genesis ic.sequence_no ic.secondary_sequence_no ;
@@ -351,7 +351,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
       (* combining situation 2
          two fee transfer commands with same global slot since genesis, sequence number
       *)
-      [%log info]
+      [%log spam]
         "Combining two fee transfers at global slot since genesis %Ld with \
          sequence number %d"
         ic.global_slot_since_genesis ic.sequence_no ;
@@ -406,7 +406,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
 
 let user_command_to_transaction ~logger ~pool (cmd : Sql.User_command.t) :
     Mina_transaction.Transaction.t Deferred.t =
-  [%log info]
+  [%log spam]
     "Converting user command (%s) with nonce %Ld, global slot since genesis \
      %Ld, and sequence number %d to transaction"
     cmd.typ cmd.nonce cmd.global_slot_since_genesis cmd.sequence_no ;
@@ -532,7 +532,7 @@ let zkapp_command_to_transaction ~logger ~pool (cmd : Sql.Zkapp_command.t) :
     ({ body; authorization = Signature.dummy } : Account_update.Fee_payer.t)
   in
   let nonce_str = Mina_numbers.Account_nonce.to_string fee_payer.body.nonce in
-  [%log info]
+  [%log spam]
     "Converting zkApp command with fee payer nonce %s, global slot since \
      genesis %Ld, and sequence number %d to transaction"
     nonce_str cmd.global_slot_since_genesis cmd.sequence_no ;
@@ -616,7 +616,7 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
     let checkpoint_file =
       sprintf "replayer-checkpoint-%Ld.json" start_slot_since_genesis
     in
-    [%log info] "Writing checkpoint file"
+    [%log debug] "Writing checkpoint file"
       ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
     Out_channel.with_file checkpoint_file ~f:(fun oc ->
         Out_channel.output_string oc replayer_checkpoint ) )
@@ -1016,7 +1016,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                     ] ;
                 if continue_on_error then incr error_count
                 else Core_kernel.exit 1 ) ) ;
-          [%log info]
+          [%log spam]
             "Verifying accounts accessed in block with global slot since \
              genesis %Ld"
             last_global_slot_since_genesis ;
@@ -1122,7 +1122,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
               let rec count_txns ~signed_count ~zkapp_count ~fee_transfer_count
                   ~coinbase_count = function
                 | [] ->
-                    [%log info]
+                    [%log spam]
                       "Replaying transactions in block with state hash \
                        $state_hash"
                       ~metadata:
@@ -1246,13 +1246,13 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                 Frozen_ledger_hash.equal snarked_hash
                   (First_pass_ledger_hashes.get_last_snarked_hash ())
               then
-                [%log info]
+                [%log spam]
                   "Snarked ledger hash same as in the preceding block, not \
                    checking it again"
               else if
               Frozen_ledger_hash.equal snarked_hash genesis_snarked_ledger_hash
             then
-                [%log info] "Snarked ledger hash is genesis snarked ledger hash"
+                [%log spam] "Snarked ledger hash is genesis snarked ledger hash"
               else
                 match First_pass_ledger_hashes.find snarked_hash with
                 | None ->
@@ -1279,7 +1279,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                     First_pass_ledger_hashes.set_last_snarked_hash snarked_hash ;
                     First_pass_ledger_hashes.flush_older_than n ) ;
               if List.is_empty block_txns then (
-                [%log info]
+                [%log spam]
                   "No transactions to run for block with state hash $state_hash"
                   ~metadata:
                     [ ("state_hash", State_hash.to_yojson state_hash)

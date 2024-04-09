@@ -1,51 +1,50 @@
 {
-  "target_epoch_ledgers_state_hash": "3NKsyvrS5sw6LSq4BaNBnn5cXxFR4adRADyL21J1S8ZxrJPmAxcD",
   "genesis_ledger": {
     "name": "release",
     "num_accounts": 250,
     "accounts": [
-      {
-        "pk": "B62qigMsAY8wRpqt62fTTbZ8jJM15g2wk67sZQtoJuaytPzQ9yrohE3",
-        "sk": null,
-        "balance": "5.000000000",
-        "delegate": null
-      },
-      {
-        "pk": "B62qjsvgtDNVNinsUkephsGY2n81MKMuEpSfX4ACr7DxV9CfruDPRWz",
-        "sk": null,
-        "balance": "65500.000000000",
-        "delegate": "B62qkaVP4fyb2MmtpHHNJR5LKuALwag7BSSwahiqNqQmsWY8gMPc397"
-      },
-      {
-        "pk": "B62qkaVP4fyb2MmtpHHNJR5LKuALwag7BSSwahiqNqQmsWY8gMPc397",
-        "sk": null,
-        "delegate": null,
-        "balance": "500.000000000"
-      },
-      {
-        "pk": "B62qottYaFZ9TGcxQS1GNNGTTH3gHXMBajNsPznxA3ySkSZ9ZFA6U7e",
-        "sk": null,
-        "balance": "11550000.000000000",
-        "delegate": "B62qkBb2C54LdCSxhMVgdbyYUbb6E9psGrUg5xeqWPe2vFAgQGEQPZH"
-      },
-      {
-        "pk": "B62qkBb2C54LdCSxhMVgdbyYUbb6E9psGrUg5xeqWPe2vFAgQGEQPZH",
-        "sk": null,
-        "balance": "0.000000000",
-        "delegate": null
-      },
-      {
-        "pk": "B62qkM1Tq15y3L3T37ERuZKmkX9XexAi1G5Jta8bHz52e2XEgnjm4H6",
-        "sk": null,
-        "balance": "11550000.000000000",
-        "delegate": "B62qowNMGN25wkMR8RdwACKorCgqTtxK5h2egm6sWXbNNeZGEgpUtoa"
-      },
-      {
-        "pk": "B62qowNMGN25wkMR8RdwACKorCgqTtxK5h2egm6sWXbNNeZGEgpUtoa",
-        "sk": null,
-        "balance": "0.000000000",
-        "delegate": null
-      }
+     {
+      "pk": "B62qo5raDfFWM6oaooevrgMxMXmp3NnxMGbus3yubqaexzNodKDmock",
+      "sk": null,
+      "balance": "5.000000000",
+      "delegate": null
+     },
+     {
+      "pk": "B62qpXKjMPqNsUBPeAGhpjao8BE8FqdYdk8zS2RwxaEBadByS3nbfD1",
+      "sk": null,
+      "balance": "65500.000000000",
+      "delegate": "B62qov6t5ahQQMdoanV8tgeS8ddpqsL5MCntfh8qzr1aNqGsgnhhvV5"
+     },
+     {
+      "pk": "B62qov6t5ahQQMdoanV8tgeS8ddpqsL5MCntfh8qzr1aNqGsgnhhvV5",
+      "sk": null,
+      "delegate": null,
+      "balance": "500.000000000"
+     },
+     {
+      "pk": "B62qmYXqVz13eCpiHEEbvkWDU7jQAwfuf6zv4HLfiRthmLMZMQDXLPi",
+      "sk": null,
+      "balance": "11550000.000000000",
+      "delegate": "B62qr7HhRDB6Me7FFXme5MFcoqRa452etDR4mNgT9Zi6U73R238ytmz"
+     },
+     {
+      "pk": "B62qr7HhRDB6Me7FFXme5MFcoqRa452etDR4mNgT9Zi6U73R238ytmz",
+      "sk": null,
+      "balance": "0.000000000",
+      "delegate": null
+     },
+     {
+      "pk": "B62qkXPw6LbqeY3kaEYHrc6MeP6Wi7wcDc5fzbegn5yRoj2UvyCoe7M",
+      "sk": null,
+      "balance": "11550000.000000000",
+      "delegate": "B62qmQsYKF97qxFVUuwHdmJySUM6F6qNnNYvxfrvYDPdLPzBspCPYLS"
+     },
+     {
+      "pk": "B62qmQsYKF97qxFVUuwHdmJySUM6F6qNnNYvxfrvYDPdLPzBspCPYLS",
+      "sk": null,
+      "balance": "0.000000000",
+      "delegate": null
+     }
     ]
-  }
+   }
 }

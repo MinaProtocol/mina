@@ -11,7 +11,6 @@
 /LICENSE @aneesharaines
 /README.md @MinaProtocol/product-eng-reviewers
 /README-dev.md @MinaProtocol/protocol-eng-reviewers
-/graphql_schema.json @MinaProtocol/product-eng-reviewers
 
 /src/external/ @bkase @psteckler @aneesharaines @mrmr1993
 
@@ -30,7 +29,6 @@
 /src/lib/ @MinaProtocol/protocol-eng-reviewers
 
 /src/lib/blake2/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/mina_graphql @MinaProtocol/product-eng-reviewers
 /src/lib/mina_numbers/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/crs/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/crypto_params/ @MinaProtocol/crypto-eng-reviewers
@@ -46,7 +44,7 @@
 /src/lib/promise @MinaProtocol/protocol-eng-reviewers @MinaProtocol/product-eng-reviewers
 /src/lib/sha256_lib/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/signature_lib/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/snarky/ @MinaProtocol/crypto-eng-reviewers
+/src/lib/snarky @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky_blake2/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky_curves/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky_field_extensions/ @MinaProtocol/crypto-eng-reviewers

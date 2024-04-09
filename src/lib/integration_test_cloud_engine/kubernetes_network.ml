@@ -196,6 +196,7 @@ module Node = struct
         ; dest
         ; "--output-file"
         ; "/dev/null"
+        ; "--log-json"
         ; "--continue-on-error"
         ]
 

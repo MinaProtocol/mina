@@ -840,6 +840,10 @@ struct
         , _ )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
+    Plonk_types.Evals.In_circuit.validate_feature_flags ~true_:Boolean.true_
+      ~false_:Boolean.false_ ~or_:Boolean.( ||| )
+      ~assert_equal:Boolean.Assert.( = ) ~feature_flags:plonk.feature_flags
+      evals.evals ;
     let actual_width_mask = branch_data.proofs_verified_mask in
     let T = Proofs_verified.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)

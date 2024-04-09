@@ -149,7 +149,7 @@ let wrap_main
              ; messages_for_next_wrap_proof =
                  messages_for_next_wrap_proof_digest
              }
-         ; messages_for_next_step_proof = _
+         ; messages_for_next_step_proof
          } :
           ( _
           , _
@@ -446,6 +446,8 @@ let wrap_main
                     ; old_bulletproof_challenges = chals
                     } )
             in
+            Field.Assert.equal messages_for_next_step_proof
+              prev_proof_state.messages_for_next_step_proof ;
             { Types.Step.Statement.messages_for_next_wrap_proof =
                 prev_messages_for_next_wrap_proof
             ; proof_state = prev_proof_state
