@@ -244,7 +244,9 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       with
       | Ok (Ok net2) -> (
           let open Mina_net2 in
-          (* Make an ephemeral keypair for this session TODO: persist in the config dir *)
+          (* Make an ephemeral keypair for this session.
+             TODO(15495): persist in the config dir.
+          *)
           let%bind me =
             match config.keypair with
             | Some kp ->
