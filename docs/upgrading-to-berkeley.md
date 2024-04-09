@@ -20,7 +20,7 @@ If you installed mina from a package, skip to the [next section](#verifying-pack
 
 
 ```sh
-sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "1"}/' fork_config.json
+sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "2"}/' fork_config.json
 
 mkdir -p ~/.mina-config/genesis
 mina-create-genesis --config-file fork_config.json --genesis-dir ~/.mina-config/genesis --hash-output-file ~/.mina-config/genesis_hashes.json
