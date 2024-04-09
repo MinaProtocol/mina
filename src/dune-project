@@ -100,6 +100,7 @@
 (package (name merkle_list_verifier))
 (package (name merkle_mask))
 (package (name migrate_balances_table))
+(package (name mina_automation))
 (package (name mina_base))
 (package (name mina_block))
 (package (name mina_caqti))

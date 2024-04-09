@@ -1,0 +1,20 @@
+{
+  "executor": "bash",
+  "paths": {
+    "mainnet_genesis_ledger": "/etc/mina/test/genesis_ledgers/mainnet.json",
+    "mainnet_genesis_block": "/etc/mina/test/hardfork/test_data/mainnet_migration/genesis_data_only.sql",
+    "create_schema_script": "/workdir/src/app/archive/create_schema.sql",
+    "zkapp_tables_script": "workdir/src/app/archive/zkapp_tables.sql",
+    "random_data_ledger": "/etc/mina/test/hardfork/test_data/random_migration/genesis_ledger.json",
+    "random_data_dump": "/etc/mina/test/hardfork/test_data/random_migration/dump.sql",
+    "working_dir": "/workdir/hardfork_tests"
+  },  
+  "reference": {
+    "docker": "gcr.io/o1labs-192920/mina-archive:1.4.0beta2-dkijania-dump-blocks-comp-a6082ee-buster"
+  },
+  "db" : {
+    "password" : "postgres",
+    "user" : "postgres",
+    "port" : 5555
+  }
+}

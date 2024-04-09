@@ -21,9 +21,9 @@ let lowerName = \(docker : Docker) ->
     , Focal = "focal"
   } docker
 
-let dependsOn = \(docker : Docker) -> \(profile : Profiles.Type) -> \(binary: Text) -> 
+let dependsOnKey = \(key : Text) -> \(docker : Docker) -> \(profile : Profiles.Type) -> \(binary: Text) -> 
   let profileSuffix = Profiles.toSuffixUppercase profile in
-  let prefix = "MinaArtifact" in 
+  let prefix = key in 
   let suffix = "docker-image" in
   merge {
     Bookworm = [{ name = "${prefix}${profileSuffix}", key = "${binary}-${lowerName docker}-${suffix}" }]
@@ -33,6 +33,8 @@ let dependsOn = \(docker : Docker) -> \(profile : Profiles.Type) -> \(binary: Te
     , Focal = [{ name = "${prefix}${capitalName docker}${profileSuffix}", key = "${binary}-${lowerName docker}-${suffix}" }]
   } docker
 
+let dependsOn = \(docker : Docker) -> \(profile : Profiles.Type) -> \(binary: Text) -> 
+  dependsOnKey "MinaArtifact" docker profile binary
 in
 
 {
@@ -40,4 +42,5 @@ in
   , capitalName = capitalName
   , lowerName = lowerName
   , dependsOn = dependsOn
+  , dependsOnKey = dependsOnKey
 }

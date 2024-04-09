@@ -262,8 +262,14 @@ build_batch_txn_deb() {
 build_functional_test_suite_deb() {
   create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.'
 
+  mkdir -p "${BUILDDIR}/etc/mina/tests/hardfork/test_data"
+  mkdir -p "${BUILDDIR}/etc/mina/tests/hardfork/archive_migration_tests/"
+
   # Binaries
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
+  cp ./default/src/test/hardfork/archive_migration_tests/archive_migration_tests.exe "${BUILDDIR}/usr/local/bin/mina-archive-migration-tests"
+  cp -r ../src/test/hardfork/archive_migration_tests/*.json ${BUILDDIR}/etc/mina/tests/hardfork/archive_migration_tests/
+  cp -r ../src/test/hardfork/test_data/* ${BUILDDIR}/etc/mina/tests/hardfork/test_data/
 
   build_deb mina-test-suite
 
