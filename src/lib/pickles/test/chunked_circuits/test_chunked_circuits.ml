@@ -89,7 +89,12 @@ let test () =
       | _ ->
           respond Unhandled
   end in
-  let _tag, _cache_handle, recursive_proof, Pickles.Provers.[ recursive_prove ]
+  (* force vk creation  *)
+  let _vk =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        Pickles.Side_loaded.Verification_key.of_compiled tag )
+  in
+  let tag2, _cache_handle, recursive_proof, Pickles.Provers.[ recursive_prove ]
       =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
@@ -119,6 +124,11 @@ let test () =
           }
         ] )
       ()
+  in
+  (* force vk creation  *)
+  let _vk =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        Pickles.Side_loaded.Verification_key.of_compiled tag2 )
   in
   let module Proof = (val proof) in
   let module Recursive_proof = (val recursive_proof) in
