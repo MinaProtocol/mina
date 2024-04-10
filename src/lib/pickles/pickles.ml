@@ -349,7 +349,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
         ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-        ~max_proofs_verified ~name ~constraint_constants ?commits ~choices ()
+        ~max_proofs_verified ~name ?constraint_constants ?commits ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
