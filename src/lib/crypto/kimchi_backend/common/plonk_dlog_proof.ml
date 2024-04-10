@@ -504,7 +504,8 @@ module Make (Inputs : Inputs_intf) = struct
   let to_backend_with_public_evals chal_polys primary_input t =
     to_backend_with_public_evals' chal_polys (List.to_array primary_input) t
 
-  let create ?message pk ~primary ~auxiliary =
+  (* Extract challenges and commitments from the (optional) message *)
+  let extract_challenges_and_commitments ~message =
     let chal_polys =
       match (message : message option) with Some s -> s | None -> []
     in
@@ -518,29 +519,17 @@ module Make (Inputs : Inputs_intf) = struct
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
           G.Affine.to_backend (Finite commitment) )
     in
-    let res =
-      Backend.create pk ~primary ~auxiliary ~prev_chals:challenges
-        ~prev_comms:commitments
-    in
+    (challenges, commitments)
+
+  let create ?message pk ~primary ~auxiliary =
+    let prev_chals, prev_comms = extract_challenges_and_commitments ~message in
+    let res = Backend.create pk ~primary ~auxiliary ~prev_chals ~prev_comms in
     of_backend_with_public_evals res
 
   let create_async ?message pk ~primary ~auxiliary =
-    let chal_polys =
-      match (message : message option) with Some s -> s | None -> []
-    in
-    let challenges =
-      List.map chal_polys ~f:(fun { Challenge_polynomial.challenges; _ } ->
-          challenges )
-      |> Array.concat
-    in
-    let commitments =
-      Array.of_list_map chal_polys
-        ~f:(fun { Challenge_polynomial.commitment; _ } ->
-          G.Affine.to_backend (Finite commitment) )
-    in
+    let prev_chals, prev_comms = extract_challenges_and_commitments ~message in
     let%map.Promise res =
-      Backend.create_async pk ~primary ~auxiliary ~prev_chals:challenges
-        ~prev_comms:commitments
+      Backend.create_async pk ~primary ~auxiliary ~prev_chals ~prev_comms
     in
     of_backend_with_public_evals res
 

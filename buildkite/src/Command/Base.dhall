@@ -105,7 +105,7 @@ let Config =
       , soft_fail : Optional B/SoftFail
       , skip: Optional B/Skip
       , `if` : Optional B/If
-      , timeout_in_minutes : Optional Natural
+      , timeout_in_minutes : Optional Integer
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
@@ -115,11 +115,11 @@ let Config =
     , artifact_paths = [] : List SelectFiles.Type
     , env = [] : List TaggedKey.Type
     , retries = [] : List Retry.Type
-    , flake_retry_limit = Some 4
+    , flake_retry_limit = Some 0
     , soft_fail = None B/SoftFail
     , skip = None B/Skip
     , `if` = None B/If
-    , timeout_in_minutes = None Natural
+    , timeout_in_minutes = None Integer
     }
   }
 
@@ -157,6 +157,7 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                      else Some (B/ArtifactPaths.String (SelectFiles.compile c.artifact_paths)),
     key = Some c.key,
     label = Some c.label,
+    timeout_in_minutes = c.timeout_in_minutes,
     retry =
           Some {
               -- we only consider automatic retries
@@ -189,6 +190,8 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                       Retry::{ exit_status = ExitStatus.Code -1, limit = Some 4 },
                       -- infra error
                       Retry::{ exit_status = ExitStatus.Code +255, limit = Some 4 },
+                      -- common/flake error
+                      Retry::{ exit_status = ExitStatus.Code +1, limit = c.flake_retry_limit },
                       -- apt-get update race condition error
                       Retry::{ exit_status = ExitStatus.Code +100, limit = Some 4 },
                       -- Git checkout error

@@ -87,7 +87,7 @@ if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
 then
   echo "---- Built all packages including mainnet, devnet, and the sidecar"
 else
-  echo "---- Not a mainnet-like branch, only built berkeley and beyond packages"  
+  echo "---- Not a mainnet-like branch, only built berkeley and beyond packages"
 fi
 
 ls -lh mina*.deb

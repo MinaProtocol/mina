@@ -15,13 +15,14 @@ open Poly_types
 open Hlist
 open Backend
 
-exception Return_digest of Md5.t
-
 let verify_promise = Verify.verify
 
 open Kimchi_backend
 module Proof_ = P.Base
 module Proof = P
+
+type chunking_data = Verify.Instance.chunking_data =
+  { num_chunks : int; domain_size : int; zk_rows : int }
 
 let pad_messages_for_next_wrap_proof
     (type local_max_proofs_verifieds max_local_max_proofs_verifieds
@@ -346,11 +347,13 @@ struct
       -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
       -> ?override_wrap_main:
            (max_proofs_verified, branches, prev_varss) wrap_main_generic
+      -> ?num_chunks:int
       -> branches:(module Nat.Intf with type n = branches)
       -> max_proofs_verified:
            (module Nat.Add.Intf with type n = max_proofs_verified)
       -> name:string
-      -> constraint_constants:Snark_keys_header.Constraint_constants.t
+      -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
+      -> ?commits:Snark_keys_header.Commits.With_date.t
       -> public_input:
            ( var
            , value
@@ -380,18 +383,40 @@ struct
        ~storables:
          { step_storable; step_vk_storable; wrap_storable; wrap_vk_storable }
        ~proof_cache ?disk_keys ?override_wrap_domain ?override_wrap_main
-       ~branches:(module Branches) ~max_proofs_verified ~name
-       ~constraint_constants ~public_input ~auxiliary_typ ~choices () ->
+       ?(num_chunks = 1) ~branches:(module Branches) ~max_proofs_verified ~name
+       ?constraint_constants ?commits ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
+      let constraint_constants : Snark_keys_header.Constraint_constants.t =
+        match constraint_constants with
+        | Some constraint_constants ->
+            constraint_constants
+        | None ->
+            { sub_windows_per_window = 0
+            ; ledger_depth = 0
+            ; work_delay = 0
+            ; block_window_duration_ms = 0
+            ; transaction_capacity = Log_2 0
+            ; pending_coinbase_depth = 0
+            ; coinbase_amount = Unsigned.UInt64.of_int 0
+            ; supercharged_coinbase_factor = 0
+            ; account_creation_fee = Unsigned.UInt64.of_int 0
+            ; fork = None
+            }
+      in
+      let (commits, commit_date) : Snark_keys_header.Commits.t * string =
+        match commits with
+        | Some { commits; commit_date } ->
+            (commits, commit_date)
+        | None ->
+            ( { mina = "[NOT SPECIFIED]"; marlin = "[NOT SPECIFIED]" }
+            , "[UNKNOWN]" )
+      in
       { Snark_keys_header.header_version = Snark_keys_header.header_version
       ; kind
       ; constraint_constants
-      ; commits =
-          { mina = Mina_version.commit_id
-          ; marlin = Mina_version.marlin_commit_id
-          }
+      ; commits
       ; length = (* This is a dummy, it gets filled in on read/write. *) 0
-      ; commit_date = Mina_version.commit_date
+      ; commit_date
       ; constraint_system_hash
       ; identifying_hash =
           (* TODO: Proper identifying hash. *)
@@ -454,7 +479,7 @@ struct
               (Auxiliary_value)
           in
           M.f full_signature prev_varss_n prev_varss_length ~max_proofs_verified
-            ~feature_flags
+            ~feature_flags ~num_chunks
       | Some override ->
           Common.wrap_domains
             ~proofs_verified:(Pickles_base.Proofs_verified.to_int override)
@@ -505,7 +530,7 @@ struct
               Timer.clock __LOC__ ;
               let res =
                 Common.time "make step data" (fun () ->
-                    Step_branch_data.create ~index:!i ~feature_flags
+                    Step_branch_data.create ~index:!i ~feature_flags ~num_chunks
                       ~actual_feature_flags:rule.feature_flags
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~public_input ~auxiliary_typ
@@ -639,7 +664,7 @@ struct
       match override_wrap_main with
       | None ->
           let srs = Tick.Keypair.load_urs () in
-          Wrap_main.wrap_main ~feature_flags ~srs full_signature
+          Wrap_main.wrap_main ~num_chunks ~feature_flags ~srs full_signature
             prev_varss_length step_vks proofs_verifieds all_step_domains
             max_proofs_verified
       | Some { wrap_main; tweak_statement = _ } ->
@@ -864,6 +889,14 @@ struct
       ; wrap_domains
       ; step_domains
       ; feature_flags
+      ; num_chunks
+      ; zk_rows =
+          ( match num_chunks with
+          | 1 ->
+              3
+          | num_chunks ->
+              let permuts = 7 in
+              ((2 * (permuts + 1) * num_chunks) - 1 + permuts) / permuts )
       }
     in
     Timer.clock __LOC__ ;
@@ -892,7 +925,7 @@ module Side_loaded = struct
         ; wrap_index =
             Plonk_verification_key_evals.map wrap_key ~f:(fun x -> x.(0))
         ; max_proofs_verified =
-            Pickles_base.Proofs_verified.of_nat
+            Pickles_base.Proofs_verified.of_nat_exn
               (Nat.Add.n d.max_proofs_verified)
         ; actual_wrap_domain_size
         }
@@ -914,6 +947,8 @@ module Side_loaded = struct
       ; branches = Verification_key.Max_branches.n
       ; feature_flags =
           Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
+      ; num_chunks = 1
+      ; zk_rows = 3
       }
 
   module Proof = struct
@@ -956,7 +991,7 @@ module Side_loaded = struct
                   { constraints = 0 }
               }
             in
-            Verify.Instance.T (max_proofs_verified, m, vk, x, p) )
+            Verify.Instance.T (max_proofs_verified, m, None, vk, x, p) )
         |> Verify.verify_heterogenous )
 
   let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred
@@ -980,6 +1015,7 @@ let compile_with_wrap_main_override_promise :
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
     -> ?override_wrap_main:
          (max_proofs_verified, branches, prev_varss) wrap_main_generic
+    -> ?num_chunks:int
     -> public_input:
          ( var
          , value
@@ -993,7 +1029,8 @@ let compile_with_wrap_main_override_promise :
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = max_proofs_verified)
     -> name:string
-    -> constraint_constants:Snark_keys_header.Constraint_constants.t
+    -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
+    -> ?commits:Snark_keys_header.Commits.With_date.t
     -> choices:
          (   self:(var, value, max_proofs_verified, branches) Tag.t
           -> ( prev_varss
@@ -1026,9 +1063,9 @@ let compile_with_wrap_main_override_promise :
     and the underlying Make(_).compile function which builds the circuits.
  *)
  fun ?self ?(cache = []) ?(storables = Storables.default) ?proof_cache
-     ?disk_keys ?override_wrap_domain ?override_wrap_main ~public_input
-     ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
-     ~choices () ->
+     ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks
+     ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
+     ?constraint_constants ?commits ~choices () ->
   let self =
     match self with
     | None ->
@@ -1095,8 +1132,9 @@ let compile_with_wrap_main_override_promise :
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
     M.compile ~self ~proof_cache ~cache ~storables ?disk_keys
-      ?override_wrap_domain ?override_wrap_main ~branches ~max_proofs_verified
-      ~name ~public_input ~auxiliary_typ ~constraint_constants
+      ?override_wrap_domain ?override_wrap_main ?num_chunks ~branches
+      ~max_proofs_verified ~name ~public_input ~auxiliary_typ
+      ?constraint_constants ?commits
       ~choices:(fun ~self -> conv_irs (choices ~self))
       ()
   in
@@ -1118,6 +1156,27 @@ let compile_with_wrap_main_override_promise :
       let (Typ typ) = typ in
       fun x -> fst (typ.value_to_fields x)
   end in
+  let chunking_data =
+    match num_chunks with
+    | None ->
+        Promise.return None
+    | Some num_chunks ->
+        let compiled = Types_map.lookup_compiled self.id in
+        let%map.Promise domains = promise_all compiled.step_domains in
+        let { h = Pow_2_roots_of_unity domain_size } =
+          domains
+          |> Vector.reduce_exn
+               ~f:(fun
+                    { h = Pow_2_roots_of_unity d1 }
+                    { h = Pow_2_roots_of_unity d2 }
+                  -> { h = Pow_2_roots_of_unity (Int.max d1 d2) } )
+        in
+        Some
+          { Verify.Instance.num_chunks
+          ; domain_size
+          ; zk_rows = compiled.zk_rows
+          }
+  in
   let module P = struct
     type statement = value
 
@@ -1141,8 +1200,9 @@ let compile_with_wrap_main_override_promise :
     let verification_key = Lazy.map ~f:Promise.to_deferred wrap_vk
 
     let verify_promise ts =
+      let%bind.Promise chunking_data = chunking_data in
       let%bind.Promise verification_key = Lazy.force verification_key_promise in
-      verify_promise
+      verify_promise ?chunking_data
         ( module struct
           include Max_proofs_verified
         end )
@@ -1271,19 +1331,6 @@ end) =
 struct
   open Impls.Step
 
-  let constraint_constants : Snark_keys_header.Constraint_constants.t =
-    { sub_windows_per_window = 0
-    ; ledger_depth = 0
-    ; work_delay = 0
-    ; block_window_duration_ms = 0
-    ; transaction_capacity = Log_2 0
-    ; pending_coinbase_depth = 0
-    ; coinbase_amount = Unsigned.UInt64.of_int 0
-    ; supercharged_coinbase_factor = 0
-    ; account_creation_fee = Unsigned.UInt64.of_int 0
-    ; fork = None
-    }
-
   let rule self : _ Inductive_rule.Promise.t =
     { identifier = "main"
     ; prevs = [ self; self ]
@@ -1321,19 +1368,6 @@ struct
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
       ~name:"blockchain-snark"
-      ~constraint_constants:
-        (* Dummy values *)
-        { sub_windows_per_window = 0
-        ; ledger_depth = 0
-        ; work_delay = 0
-        ; block_window_duration_ms = 0
-        ; transaction_capacity = Log_2 0
-        ; pending_coinbase_depth = 0
-        ; coinbase_amount = Unsigned.UInt64.of_int 0
-        ; supercharged_coinbase_factor = 0
-        ; account_creation_fee = Unsigned.UInt64.of_int 0
-        ; fork = None
-        }
       ~choices:(fun ~self -> [ rule self ])
 
   module Proof = (val p)
@@ -1372,7 +1406,7 @@ struct
             ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
             ~branches:(module Nat.N1)
             ~max_proofs_verified:(module Nat.N2)
-            ~name:"recurse-on-bad" ~constraint_constants
+            ~name:"recurse-on-bad"
             ~choices:(fun ~self:_ ->
               [ { identifier = "main"
                 ; feature_flags = Plonk_types.Features.none_bool

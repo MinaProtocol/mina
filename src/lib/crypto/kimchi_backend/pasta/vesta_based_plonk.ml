@@ -86,8 +86,8 @@ module Proof = Plonk_dlog_proof.Make (struct
     let batch_verify vks ts =
       Promise.run_in_thread (fun () -> batch_verify vks ts)
 
-    let create_aux ~f:create (pk : Keypair.t) primary auxiliary prev_chals
-        prev_comms =
+    let create_aux ~f:backend_create (pk : Keypair.t) primary auxiliary
+        prev_chals prev_comms =
       (* external values contains [1, primary..., auxiliary ] *)
       let external_values i =
         let open Field.Vector in
@@ -110,17 +110,19 @@ module Proof = Plonk_dlog_proof.Make (struct
             done ;
             witness )
       in
-      create pk.index witness_cols runtime_tables prev_chals prev_comms
+      backend_create pk.index witness_cols runtime_tables prev_chals prev_comms
 
     let create_async (pk : Keypair.t) ~primary ~auxiliary ~prev_chals
         ~prev_comms =
       create_aux pk primary auxiliary prev_chals prev_comms
-        ~f:(fun pk auxiliary_input runtime_tables prev_challenges prev_sgs ->
+        ~f:(fun index witness runtime_tables prev_chals prev_sgs ->
           Promise.run_in_thread (fun () ->
-              create pk auxiliary_input runtime_tables prev_challenges prev_sgs ) )
+              Kimchi_bindings.Protocol.Proof.Fp.create index witness
+                runtime_tables prev_chals prev_sgs ) )
 
     let create (pk : Keypair.t) ~primary ~auxiliary ~prev_chals ~prev_comms =
-      create_aux pk primary auxiliary prev_chals prev_comms ~f:create
+      create_aux pk primary auxiliary prev_chals prev_comms
+        ~f:Kimchi_bindings.Protocol.Proof.Fp.create
   end
 
   module Verifier_index = Kimchi_bindings.Protocol.VerifierIndex.Fp

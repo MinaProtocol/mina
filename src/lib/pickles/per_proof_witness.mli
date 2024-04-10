@@ -113,6 +113,7 @@ end
 
 val typ :
      feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
+  -> num_chunks:int
   -> ('avar, 'aval) Impl.Typ.t
   -> 'n Pickles_types.Nat.t
   -> (('avar, 'n, _) t, ('aval, 'n) Constant.t) Impl.Typ.t

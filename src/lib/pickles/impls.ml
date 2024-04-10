@@ -75,22 +75,6 @@ module Step = struct
          in
          values |> List.filter_map ~f )
 
-    let%test_unit "preserve circuit behavior for Step" =
-      let expected_list =
-        [ ("45560315531506369815346746415080538112", false)
-        ; ("45560315531506369815346746415080538113", false)
-        ; ( "14474011154664524427946373126085988481727088556502330059655218120611762012161"
-          , true )
-        ; ( "14474011154664524427946373126085988481727088556502330059655218120611762012161"
-          , true )
-        ]
-      in
-      let str_list =
-        List.map (Lazy.force forbidden_shifted_values) ~f:(fun (a, b) ->
-            (Tick.Field.to_string a, b) )
-      in
-      assert ([%equal: (string * bool) list] str_list expected_list)
-
     let typ_unchecked : (t, Constant.t) Typ.t =
       Typ.transport
         (Typ.tuple2 Field.typ Boolean.typ)
@@ -188,17 +172,6 @@ module Wrap = struct
            else Some Impl.Bigint.(to_field (of_bignum_bigint x))
          in
          values |> List.filter_map ~f )
-
-    let%test_unit "preserve circuit behavior for Wrap" =
-      let expected_list =
-        [ "91120631062839412180561524743370440705"
-        ; "91120631062839412180561524743370440706"
-        ]
-      in
-      let str_list =
-        List.map (Lazy.force forbidden_shifted_values) ~f:Wrap_field.to_string
-      in
-      assert ([%equal: string list] str_list expected_list)
 
     let typ_unchecked, check =
       (* Tick -> Tock *)

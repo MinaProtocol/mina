@@ -18,7 +18,7 @@ The following table lists the configurable parameters of the `block-producer` ch
 Parameter | Description
 --- | ---
 `testnetName` | Mina protocol testnet name to deploy to
-`coda.seedPeers` | peers to bootstrap the the archive node's Mina daemon
+`coda.seedPeers` | peers to bootstrap the archive node's Mina daemon
 
 ### Optional Settings
 

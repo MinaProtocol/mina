@@ -497,6 +497,11 @@ let setup_daemon logger =
       ~aliases:[ "log-precomputed-blocks" ]
       (optional_with_default false bool)
       ~doc:"true|false Include precomputed blocks in the log (default: false)"
+  and start_filtered_logs =
+    flag "--start-filtered-logs" (listed string)
+      ~doc:
+        "LOG-FILTER Include filtered logs for the given filter. May be passed \
+         multiple times"
   and block_reward_threshold =
     flag "--minimum-block-reward" ~aliases:[ "minimum-block-reward" ]
       ~doc:
@@ -1412,10 +1417,11 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~work_reassignment_wait ~archive_process_location
                  ~log_block_creation ~precomputed_values ~start_time
                  ?precomputed_blocks_path ~log_precomputed_blocks
-                 ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
-                 ~node_status_url ~graphql_control_port:itn_graphql_port
-                 ~simplified_node_stats () )
+                 ~start_filtered_logs ~upload_blocks_to_gcloud
+                 ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
+                 ~uptime_send_node_commit ~stop_time ~node_status_url
+                 ~graphql_control_port:itn_graphql_port ~simplified_node_stats
+                 () )
           in
           { mina
           ; client_trustlist
@@ -1794,6 +1800,52 @@ let internal_commands logger =
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
                  failwith "early EOF while reading sexp" ) ) )
+  ; ( "run-snark-worker-single"
+    , Command.async
+        ~summary:"Run snark-worker on a sexp provided on a single line of stdin"
+        (let open Command.Let_syntax in
+        let%map_open filename =
+          flag "--file" (required string)
+            ~doc:"File containing the s-expression of the snark work to execute"
+        in
+        fun () ->
+          let open Deferred.Let_syntax in
+          let logger = Logger.create () in
+          Parallel.init_master () ;
+          match%bind
+            Reader.with_file filename ~f:(fun reader ->
+                [%log info] "Created reader for %s" filename ;
+                Reader.read_sexp reader )
+          with
+          | `Ok sexp -> (
+              let%bind worker_state =
+                Snark_worker.Prod.Inputs.Worker_state.create
+                  ~proof_level:Genesis_constants.Proof_level.compiled
+                  ~constraint_constants:
+                    Genesis_constants.Constraint_constants.compiled ()
+              in
+              let sok_message =
+                { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
+                ; prover = Quickcheck.random_value Public_key.Compressed.gen
+                }
+              in
+              let spec =
+                [%of_sexp:
+                  ( Transaction_witness.t
+                  , Ledger_proof.t )
+                  Snark_work_lib.Work.Single.Spec.t] sexp
+              in
+              match%map
+                Snark_worker.Prod.Inputs.perform_single worker_state
+                  ~message:sok_message spec
+              with
+              | Ok _ ->
+                  [%log info] "Successfully worked"
+              | Error err ->
+                  [%log error] "Work didn't work: $err"
+                    ~metadata:[ ("err", Error_json.error_to_yojson err) ] )
+          | `Eof ->
+              failwith "early EOF while reading sexp") )
   ; ( "run-verifier"
     , Command.async
         ~summary:"Run verifier on a proof provided on a single line of stdin"

@@ -39,6 +39,7 @@ module "kubernetes_testnet" {
   archive_configs = local.archive_node_configs
 
   log_precomputed_blocks = var.log_precomputed_blocks
+  start_filtered_logs = var.start_filtered_logs
   log_txn_pool_gossip = true
 
   archive_node_count   = var.archive_node_count

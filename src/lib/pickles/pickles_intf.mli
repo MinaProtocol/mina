@@ -17,8 +17,7 @@ module type S = sig
   module Common = Common
   module Proof_cache = Proof_cache
   module Cache = Cache
-
-  exception Return_digest of Md5.t
+  module Ro = Ro
 
   module type Statement_intf = sig
     type field
@@ -257,8 +256,12 @@ module type S = sig
     include module type of Make (Id)
   end
 
+  type chunking_data = Verify.Instance.chunking_data =
+    { num_chunks : int; domain_size : int; zk_rows : int }
+
   val verify_promise :
-       (module Nat.Intf with type n = 'n)
+       ?chunking_data:chunking_data
+    -> (module Nat.Intf with type n = 'n)
     -> (module Statement_value_intf with type t = 'a)
     -> Verification_key.t
     -> ('a * ('n, 'n) Proof.t) list
@@ -397,6 +400,7 @@ module type S = sig
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+    -> ?num_chunks:int
     -> public_input:
          ( 'var
          , 'value
@@ -410,7 +414,8 @@ module type S = sig
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = 'max_proofs_verified)
     -> name:string
-    -> constraint_constants:Snark_keys_header.Constraint_constants.t
+    -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
+    -> ?commits:Snark_keys_header.Commits.With_date.t
     -> choices:
          (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
           -> ( 'prev_varss
@@ -452,6 +457,7 @@ module type S = sig
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+    -> ?num_chunks:int
     -> public_input:
          ( 'var
          , 'value
@@ -465,7 +471,8 @@ module type S = sig
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = 'max_proofs_verified)
     -> name:string
-    -> constraint_constants:Snark_keys_header.Constraint_constants.t
+    -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
+    -> ?commits:Snark_keys_header.Commits.With_date.t
     -> choices:
          (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
           -> ( 'prev_varss
@@ -507,6 +514,7 @@ module type S = sig
          (Cache.Step.Key.Verification.t, 'branches) Vector.t
          * Cache.Wrap.Key.Verification.t
     -> ?override_wrap_domain:Pickles_base.Proofs_verified.t
+    -> ?num_chunks:int
     -> public_input:
          ( 'var
          , 'value
@@ -520,7 +528,8 @@ module type S = sig
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = 'max_proofs_verified)
     -> name:string
-    -> constraint_constants:Snark_keys_header.Constraint_constants.t
+    -> ?constraint_constants:Snark_keys_header.Constraint_constants.t
+    -> ?commits:Snark_keys_header.Commits.With_date.t
     -> choices:
          (   self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
           -> ( 'prev_varss

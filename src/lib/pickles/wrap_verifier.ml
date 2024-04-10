@@ -186,7 +186,8 @@ struct
 
   module One_hot_vector = One_hot_vector.Make (Impl)
 
-  type ('a, 'a_opt) index' = ('a, 'a_opt) Plonk_verification_key_evals.Step.t
+  type ('comm, 'comm_opt) index' =
+    ('comm, 'comm_opt) Plonk_verification_key_evals.Step.t
 
   (* Mask out the given vector of indices with the given one-hot vector *)
   let choose_key :
@@ -316,19 +317,23 @@ struct
         , (domains : (Domains.t, n) Vector.t) ) srs i =
     Vector.map domains ~f:(fun d ->
         let d = Int.pow 2 (Domain.log2_size d.h) in
-        match[@warning "-4"]
+        let chunks =
           (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i)
             .unshifted
-        with
-        | [| Finite g |] ->
-            let g = Inner_curve.Constant.of_affine g in
-            Inner_curve.constant g
-        | _ ->
-            assert false )
+        in
+        Array.map chunks ~f:(function
+          | Finite g ->
+              let g = Inner_curve.Constant.of_affine g in
+              Inner_curve.constant g
+          | Infinity ->
+              (* Point at infinity should be impossible in the SRS *)
+              assert false ) )
     |> Vector.map2
          (which_branch :> (Boolean.var, n) Vector.t)
-         ~f:(fun b (x, y) -> Field.((b :> t) * x, (b :> t) * y))
-    |> Vector.reduce_exn ~f:(Double.map2 ~f:Field.( + ))
+         ~f:(fun b pts ->
+           Array.map pts ~f:(fun (x, y) -> Field.((b :> t) * x, (b :> t) * y))
+           )
+    |> Vector.reduce_exn ~f:(Array.map2_exn ~f:(Double.map2 ~f:Field.( + )))
 
   let scaled_lagrange (type n) c
       ~domain:
@@ -336,24 +341,29 @@ struct
         , (domains : (Domains.t, n) Vector.t) ) srs i =
     Vector.map domains ~f:(fun d ->
         let d = Int.pow 2 (Domain.log2_size d.h) in
-        match[@warning "-4"]
+        let chunks =
           (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i)
             .unshifted
-        with
-        | [| Finite g |] ->
-            let g = Inner_curve.Constant.of_affine g in
-            Inner_curve.Constant.scale g c |> Inner_curve.constant
-        | _ ->
-            assert false )
+        in
+        Array.map chunks ~f:(function
+          | Finite g ->
+              let g = Inner_curve.Constant.of_affine g in
+              Inner_curve.Constant.scale g c |> Inner_curve.constant
+          | Infinity ->
+              (* Point at infinity should be impossible in the SRS *)
+              assert false ) )
     |> Vector.map2
          (which_branch :> (Boolean.var, n) Vector.t)
-         ~f:(fun b (x, y) -> Field.((b :> t) * x, (b :> t) * y))
-    |> Vector.reduce_exn ~f:(Double.map2 ~f:Field.( + ))
+         ~f:(fun b pts ->
+           Array.map pts ~f:(fun (x, y) -> Field.((b :> t) * x, (b :> t) * y))
+           )
+    |> Vector.reduce_exn ~f:(Array.map2_exn ~f:(Double.map2 ~f:Field.( + )))
 
   let lagrange_with_correction (type n) ~input_length
       ~domain:
         ( (which_branch : n One_hot_vector.t)
-        , (domains : (Domains.t, n) Vector.t) ) srs i : Inner_curve.t Double.t =
+        , (domains : (Domains.t, n) Vector.t) ) srs i :
+      Inner_curve.t Double.t array =
     with_label __LOC__ (fun () ->
         let actual_shift =
           (* TODO: num_bits should maybe be input_length - 1. *)
@@ -364,18 +374,19 @@ struct
         in
         let base_and_correction (h : Domain.t) =
           let d = Int.pow 2 (Domain.log2_size h) in
-          match[@warning "-4"]
+          let chunks =
             (Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs d i)
               .unshifted
-          with
-          | [| Finite g |] ->
-              let open Inner_curve.Constant in
-              let g = of_affine g in
-              ( Inner_curve.constant g
-              , Inner_curve.constant (negate (pow2pow g actual_shift)) )
-          | xs ->
-              failwithf "expected commitment to have length 1. got %d"
-                (Array.length xs) ()
+          in
+          Array.map chunks ~f:(function
+            | Finite g ->
+                let open Inner_curve.Constant in
+                let g = of_affine g in
+                ( Inner_curve.constant g
+                , Inner_curve.constant (negate (pow2pow g actual_shift)) )
+            | Infinity ->
+                (* Point at infinity should be impossible in the SRS *)
+                assert false )
         in
         match domains with
         | [] ->
@@ -389,11 +400,16 @@ struct
               |> Vector.map2
                    (which_branch :> (Boolean.var, n) Vector.t)
                    ~f:(fun b pr ->
-                     Double.map pr ~f:(fun (x, y) ->
-                         Field.((b :> t) * x, (b :> t) * y) ) )
+                     Array.map pr
+                       ~f:
+                         (Double.map ~f:(fun (x, y) ->
+                              Field.((b :> t) * x, (b :> t) * y) ) ) )
               |> Vector.reduce_exn
-                   ~f:(Double.map2 ~f:(Double.map2 ~f:Field.( + )))
-              |> Double.map ~f:(Double.map ~f:(Util.seal (module Impl))) )
+                   ~f:
+                     (Array.map2_exn
+                        ~f:(Double.map2 ~f:(Double.map2 ~f:Field.( + ))) )
+              |> Array.map
+                   ~f:(Double.map ~f:(Double.map ~f:(Util.seal (module Impl)))) )
 
   let _h_precomp =
     Lazy.map ~f:Inner_curve.Scaling_precomputation.create Generators.h
@@ -860,38 +876,69 @@ struct
                       (List.filter_map terms ~f:(function
                         | `Cond_add _ ->
                             None
-                        | `Add_with_correction (_, (_, corr)) ->
-                            Some corr ) )
-                      ~f:(Ops.add_fast ?check_finite:None) )
+                        | `Add_with_correction (_, chunks) ->
+                            Some (Array.map ~f:snd chunks) ) )
+                      ~f:(Array.map2_exn ~f:(Ops.add_fast ?check_finite:None)) )
               in
               with_label __LOC__ (fun () ->
                   let init =
                     List.fold
                       (List.filter_map ~f:Fn.id constant_part)
                       ~init:correction
-                      ~f:(Ops.add_fast ?check_finite:None)
+                      ~f:(Array.map2_exn ~f:(Ops.add_fast ?check_finite:None))
                   in
                   List.fold terms ~init ~f:(fun acc term ->
                       match term with
                       | `Cond_add (b, g) ->
                           with_label __LOC__ (fun () ->
-                              Inner_curve.if_ b ~then_:(Ops.add_fast g acc)
-                                ~else_:acc )
-                      | `Add_with_correction ((x, num_bits), (g, _)) ->
-                          Ops.add_fast acc
-                            (Ops.scale_fast2'
-                               (module Other_field.With_top_bit0)
-                               g x ~num_bits ) ) ) )
-          |> Inner_curve.negate
+                              Array.map2_exn acc g ~f:(fun acc g ->
+                                  Inner_curve.if_ b ~then_:(Ops.add_fast g acc)
+                                    ~else_:acc ) )
+                      | `Add_with_correction ((x, num_bits), chunks) ->
+                          Array.map2_exn acc chunks ~f:(fun acc (g, _) ->
+                              Ops.add_fast acc
+                                (Ops.scale_fast2'
+                                   (module Other_field.With_top_bit0)
+                                   g x ~num_bits ) ) ) ) )
+          |> Array.map ~f:Inner_curve.negate
         in
         let x_hat =
           with_label "x_hat blinding" (fun () ->
-              Ops.add_fast x_hat
-                (Inner_curve.constant (Lazy.force Generators.h)) )
+              Array.map x_hat ~f:(fun x_hat ->
+                  Ops.add_fast x_hat
+                    (Inner_curve.constant (Lazy.force Generators.h)) ) )
         in
-        absorb sponge PC (Boolean.true_, x_hat) ;
+        Array.iter x_hat ~f:(fun x_hat ->
+            absorb sponge PC (Boolean.true_, x_hat) ) ;
         let w_comm = messages.w_comm in
         Vector.iter ~f:absorb_g w_comm ;
+        let runtime_comm =
+          match messages.lookup with
+          | Nothing
+          | Maybe (_, { runtime = Nothing; _ })
+          | Just { runtime = Nothing; _ } ->
+              Pickles_types.Opt.Nothing
+          | Maybe (b_lookup, { runtime = Maybe (b_runtime, runtime); _ }) ->
+              let b = Boolean.( &&& ) b_lookup b_runtime in
+              Pickles_types.Opt.Maybe (b, runtime)
+          | Maybe (b, { runtime = Just runtime; _ })
+          | Just { runtime = Maybe (b, runtime); _ } ->
+              Pickles_types.Opt.Maybe (b, runtime)
+          | Just { runtime = Just runtime; _ } ->
+              Pickles_types.Opt.Just runtime
+        in
+        let absorb_runtime_tables () =
+          match runtime_comm with
+          | Nothing ->
+              ()
+          | Maybe (b, runtime) ->
+              let z = Array.map runtime ~f:(fun z -> (b, z)) in
+              absorb sponge Without_degree_bound z
+          | Just runtime ->
+              let z = Array.map runtime ~f:(fun z -> (Boolean.true_, z)) in
+              absorb sponge Without_degree_bound z
+        in
+        absorb_runtime_tables () ;
         let joint_combiner =
           let compute_joint_combiner (l : _ Messages.Lookup.In_circuit.t) =
             let absorb_sorted_1 sponge =
@@ -1204,11 +1251,10 @@ struct
               Common.ft_comm
                 ~add:(Ops.add_fast ?check_finite:None)
                 ~scale:scale_fast ~negate:Inner_curve.negate
-                ~endoscale:(Scalar_challenge.endo ?num_bits:None)
                 ~verification_key:
                   (Plonk_verification_key_evals.Step.forget_optional_commitments
                      m )
-                ~plonk ~alpha ~t_comm )
+                ~plonk ~t_comm )
         in
         let bulletproof_challenges =
           (* This sponge needs to be initialized with (some derivative of)
@@ -1225,7 +1271,7 @@ struct
           let _len_4, len_4_add = Nat.N6.add Plonk_types.Lookup_sorted.n in
           let len_5, len_5_add =
             (* NB: Using explicit 11 because we can't get add on len_4 *)
-            Nat.N11.add Nat.N7.n
+            Nat.N11.add Nat.N8.n
           in
           let len_6, len_6_add = Nat.N45.add len_5 in
           let num_commitments_without_degree_bound = len_6 in
@@ -1246,7 +1292,7 @@ struct
                 Pickles_types.Opt.Maybe (keep, [| p |]) )
             |> append_chain
                  (snd (Max_proofs_verified.add len_6))
-                 ( [ [| x_hat |]
+                 ( [ x_hat
                    ; [| ft_comm |]
                    ; z_comm
                    ; m.generic_comm
@@ -1275,6 +1321,7 @@ struct
                            [ Pickles_types.Opt.map messages.lookup ~f:(fun l ->
                                  l.aggreg )
                            ; lookup_table_comm
+                           ; runtime_comm
                            ; m.runtime_tables_selector
                            ; m.lookup_selector_xor
                            ; m.lookup_selector_lookup
@@ -1372,9 +1419,6 @@ struct
     Shifted_value.Type2.Shift.(
       map ~f:Field.constant (create (module Field.Constant)))
 
-  let%test_unit "endo scalar" =
-    SC.test (module Impl) ~endo:Endo.Step_inner_curve.scalar
-
   let map_plonk_to_field plonk =
     Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
       ~f:(Util.seal (module Impl))
@@ -1430,8 +1474,8 @@ struct
       in
       Sponge.absorb sponge challenge_digest ;
       Sponge.absorb sponge ft_eval1 ;
-      Sponge.absorb sponge (fst evals.public_input) ;
-      Sponge.absorb sponge (snd evals.public_input) ;
+      Array.iter ~f:(Sponge.absorb sponge) (fst evals.public_input) ;
+      Array.iter ~f:(Sponge.absorb sponge) (snd evals.public_input) ;
       let xs = Evals.In_circuit.to_absorption_sequence evals.evals in
       (* This is a hacky, but much more efficient, version of the opt sponge.
          This uses the assumption that the sponge 'absorption state' will align
@@ -1519,7 +1563,7 @@ struct
       Plonk_checks.scalars_env
         (module Env_bool)
         (module Env_field)
-        ~srs_length_log2:Common.Max_degree.wrap_log2
+        ~srs_length_log2:Common.Max_degree.wrap_log2 ~zk_rows:3
         ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
         ~mds:sponge_params.mds
         ~field_of_hex:(fun s ->
@@ -1571,7 +1615,7 @@ struct
               in
               let v =
                 List.append sg_evals
-                  ( [| Pickles_types.Opt.just x_hat |]
+                  ( Array.map ~f:Pickles_types.Opt.just x_hat
                   :: [| Pickles_types.Opt.just ft |]
                   :: a )
               in

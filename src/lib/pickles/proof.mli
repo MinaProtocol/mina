@@ -21,18 +21,17 @@ module Base : sig
           Import.Types.Step.Statement.t
       ; index : int
       ; prev_evals : 'prev_evals
-      ; proof : Backend.Tick.Proof.t
+      ; proof : Backend.Tick.Proof.with_public_evals
       }
   end
 
   module Wrap : sig
     [%%versioned:
     module Stable : sig
+      [@@@no_toplevel_latest_type]
+
       module V2 : sig
         type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
-              ( 'messages_for_next_wrap_proof
-              , 'messages_for_next_step_proof )
-              Mina_wire_types.Pickles.Concrete_.Proof.Base.Wrap.V2.t =
           { statement :
               ( Limb_vector.Constant.Hex64.Stable.V1.t
                 Pickles_types.Vector.Vector_2.Stable.V1.t
@@ -63,9 +62,13 @@ module Base : sig
     end]
 
     type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
-          ( 'messages_for_next_wrap_proof
-          , 'messages_for_next_step_proof )
-          Stable.Latest.t =
+          (* NB: This should be on the *serialized type*. However, the actual
+             serialized type [Repr.t] is hidden by this module, so this alias is
+             effectively junk anyway..
+          *)
+      ( 'messages_for_next_wrap_proof
+      , 'messages_for_next_step_proof )
+      Mina_wire_types.Pickles.Concrete_.Proof.Base.Wrap.V2.t =
       { statement :
           ( Import.Challenge.Constant.t
           , Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -135,7 +138,7 @@ module Make (W : Pickles_types.Nat.Intf) (MLMB : Pickles_types.Nat.Intf) : sig
           Import.Step_bp_vec.t
           Max_proofs_verified_at_most.t )
         Base.Messages_for_next_proof_over_same_field.Step.t )
-      Base.Wrap.t
+      Base.Wrap.Stable.V2.t
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 

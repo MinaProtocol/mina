@@ -73,14 +73,6 @@
               [ (inDirectory "src") "dune" "dune-project"
                 "./graphql_schema.json" "opam.export" ];
           };
-      ocaml-src-caqti-patched = pkgs:
-        pkgs.stdenv.mkDerivation ({
-          name = "mina-src-caqti-patched";
-          src = ocaml-src;
-          phases = [ "unpackPhase" "patchPhase" "installPhase" ];
-          patches = [ ./buildkite/scripts/caqti-upgrade-plus-archive-init-speedup.patch ];
-          installPhase = "cp -R . $out";
-        });
     in {
       overlays = {
         misc = import ./nix/misc.nix;
@@ -91,10 +83,6 @@
           ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
             inherit inputs pkgs;
             src = ocaml-src;
-          });
-          ocamlPackages_mina_caqti_patched = requireSubmodules (import ./nix/ocaml.nix {
-            inherit inputs pkgs;
-            src = ocaml-src-caqti-patched prev;
           });
         };
       };
