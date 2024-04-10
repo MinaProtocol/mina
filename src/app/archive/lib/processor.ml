@@ -4750,28 +4750,10 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
                 failwithf "Could not get precomputed values, error: %s"
                   (Error.to_string_hum err) ()
           in
-          (* code modeled on replayer ledger initialization *)
-          let%bind padded_accounts =
-            match
-              Genesis_ledger_helper.Ledger
-              .padded_accounts_from_runtime_config_opt ~logger ~proof_level
-                runtime_config_ledger ~ledger_name_prefix:"genesis_ledger"
-            with
-            | None ->
-                [%log fatal]
-                  "Could not load accounts from runtime config ledger" ;
-                exit 1
-            | Some accounts ->
-                return accounts
-          in
           let constraint_constants =
-            Genesis_constants.Constraint_constants.compiled
+            Genesis_constants.Constraint_constants.compiled 
           in
-          let packed_ledger =
-            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-              ~depth:constraint_constants.ledger_depth padded_accounts
-          in
-          let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
+          let ledger = Precomputed_values.genesis_ledger precomputed_values |> Lazy.force in
           let%bind account_ids =
             let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
             Account_id.Set.to_list account_id_set
