@@ -86,7 +86,7 @@ let
             --set MINA_LIBP2P_HELPER_PATH ${pkgs.libp2p_helper}/bin/libp2p_helper \
             --set MINA_COMMIT_SHA1 ${escapeShellArg commit_sha1} \
             --set MINA_COMMIT_DATE ${escapeShellArg commit_date} \
-            --set MINA_BRANCH "''${MINA_BRANCH-<unknown due to nix build>}"
+            --set MINA_BRANCH "''${MINA_BRANCH-"<unknown due to nix build>"}"
         done
       '') package.outputs);
 

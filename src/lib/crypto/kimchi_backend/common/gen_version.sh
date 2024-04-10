@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
+
 set -e -o pipefail
 if [ -z ${MARLIN_REPO_SHA+x} ]; then
+    # we are nested 7 directories deep (_build/<context>/src/lib/crypto/kimchi_backend/common)
+    git_root=$(git rev-parse --show-toplevel || echo ../../../../../../..)
+
     # Check for the existence of the 'mina' submodule
-    git_root=$(git rev-parse --show-toplevel)
     mina_submodule=$(git submodule status | grep "mina" || true)
 
+    base_dir=
     if [[ -n "$mina_submodule" ]]; then
-        marlin_submodule_dir=$(git -C "$git_root/src/mina" submodule status | grep proof-systems | sed 's/^[-\ ]//g' | cut -d ' ' -f 2)
-        marlin_repo_sha=$(git -C "$git_root/src/mina/$marlin_submodule_dir" rev-parse --short=8 --verify HEAD)
-    else
-        marlin_submodule_dir=$(git submodule status | grep proof-systems | sed 's/^[-\ ]//g' | cut -d ' ' -f 2)
-        marlin_repo_sha=$(git -C "$marlin_submodule_dir" rev-parse --short=8 --verify HEAD)
+        base_dir=src/mina/
     fi
+    CARGO_LOCK="$git_root/${base_dir}src/lib/crypto/kimchi_bindings/stubs/Cargo.lock"
+    PAT='git\+https://github\.com/o1-labs/proof-systems\.git\?rev=........'
+
+    marlin_repo_sha=$(grep -m 1 -oE "$PAT" "$CARGO_LOCK" | grep -oE '[^=]*$')
 else
     marlin_repo_sha=$(cut -b -8 <<< "$MARLIN_REPO_SHA")
 fi
