@@ -138,7 +138,7 @@ module Make (W : Pickles_types.Nat.Intf) (MLMB : Pickles_types.Nat.Intf) : sig
           Import.Step_bp_vec.t
           Max_proofs_verified_at_most.t )
         Base.Messages_for_next_proof_over_same_field.Step.t )
-      Base.Wrap.t
+      Base.Wrap.Stable.V2.t
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 
