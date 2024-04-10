@@ -1159,11 +1159,12 @@ let compile_with_wrap_main_override_promise :
   let chunking_data =
     match num_chunks with
     | None ->
-        None
+        Promise.return None
     | Some num_chunks ->
         let compiled = Types_map.lookup_compiled self.id in
+        let%map.Promise domains = promise_all compiled.step_domains in
         let { h = Pow_2_roots_of_unity domain_size } =
-          compiled.step_domains
+          domains
           |> Vector.reduce_exn
                ~f:(fun
                     { h = Pow_2_roots_of_unity d1 }
@@ -1199,6 +1200,7 @@ let compile_with_wrap_main_override_promise :
     let verification_key = Lazy.map ~f:Promise.to_deferred wrap_vk
 
     let verify_promise ts =
+      let%bind.Promise chunking_data = chunking_data in
       let%bind.Promise verification_key = Lazy.force verification_key_promise in
       verify_promise ?chunking_data
         ( module struct

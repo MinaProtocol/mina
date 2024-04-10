@@ -176,12 +176,7 @@ let test_fix_domains_with_xor_table () =
   assert (
     List.for_all
       (fun feature_flags ->
-        let domains =
-          Pickles__Fix_domains.domains ~feature_flags
-            (module Pickles.Impls.Step)
-            etyp_unit etyp_unit main
-        in
-        let log2_size = Pickles_base.Domain.log2_size domains.h in
+        let log2_size = log2_size ~feature_flags main in
         log2_size = exp_output )
       feature_flags_s )
 
@@ -228,12 +223,7 @@ let test_fix_domains_with_range_check_table () =
   assert (
     List.for_all
       (fun feature_flags ->
-        let domains =
-          Pickles__Fix_domains.domains ~feature_flags
-            (module Pickles.Impls.Step)
-            etyp_unit etyp_unit main
-        in
-        let log2_size = Pickles_base.Domain.log2_size domains.h in
+        let log2_size = log2_size ~feature_flags main in
         log2_size = exp_output )
       feature_flags_s )
 
@@ -279,12 +269,7 @@ let test_fix_domains_with_range_check_and_xor_table () =
   assert (
     List.for_all
       (fun feature_flags ->
-        let domains =
-          Pickles__Fix_domains.domains ~feature_flags
-            (module Pickles.Impls.Step)
-            etyp_unit etyp_unit main
-        in
-        let log2_size = Pickles_base.Domain.log2_size domains.h in
+        let log2_size = log2_size ~feature_flags main in
         log2_size = exp_output )
       feature_flags_s )
 
