@@ -32,6 +32,6 @@ in Pipeline.build Pipeline.Config::{
     mode = PipelineMode.Type.Stable
   },
   steps = [
-    TestExecutive.executeLocal "payment" dependsOn,
+    TestExecutive.executeLocal "payment" dependsOn
   ]
 }

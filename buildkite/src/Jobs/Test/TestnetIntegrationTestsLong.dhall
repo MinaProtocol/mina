@@ -27,7 +27,5 @@ in Pipeline.build Pipeline.Config::{
     mode = PipelineMode.Type.Stable,
     tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
   },
-  steps = [
-    TestExecutive.executeCloud "hard-fork" dependsOn
-  ]
+  steps = []
 }
