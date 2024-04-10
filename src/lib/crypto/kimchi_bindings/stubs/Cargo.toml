@@ -31,12 +31,12 @@ ark-ec = { version = "0.3.0", features = ["parallel"] }
 ark-poly = { version = "0.3.0", features = ["parallel"] }
 
 # proof-systems
-poly-commitment = { path = "../../proof-systems/poly-commitment", features = ["ocaml_types"] }
-groupmap = { path = "../../proof-systems/groupmap" }
-mina-curves = { path = "../../proof-systems/curves" }
-o1-utils = { path = "../../proof-systems/utils" }
-mina-poseidon = { path = "../../proof-systems/poseidon" }
-kimchi = { path = "../../proof-systems/kimchi", features = ["ocaml_types"] }
+poly-commitment = { git = "https://github.com/o1-labs/proof-systems.git", rev = "6682dfdd4599c3ba7a6ec60d9b14f667ef33f449", features = ["ocaml_types"] }
+groupmap = { git = "https://github.com/o1-labs/proof-systems.git", rev = "6682dfdd4599c3ba7a6ec60d9b14f667ef33f449" }
+mina-curves = { git = "https://github.com/o1-labs/proof-systems.git", rev = "6682dfdd4599c3ba7a6ec60d9b14f667ef33f449" }
+o1-utils = { git = "https://github.com/o1-labs/proof-systems.git", rev = "6682dfdd4599c3ba7a6ec60d9b14f667ef33f449" }
+mina-poseidon = { git = "https://github.com/o1-labs/proof-systems.git", rev = "6682dfdd4599c3ba7a6ec60d9b14f667ef33f449" }
+kimchi = { git = "https://github.com/o1-labs/proof-systems.git", rev = "6682dfdd4599c3ba7a6ec60d9b14f667ef33f449", features = ["ocaml_types"] }
 
 # ocaml-specific
 ocaml = { version = "0.22.2", features = ["no-caml-startup"] }

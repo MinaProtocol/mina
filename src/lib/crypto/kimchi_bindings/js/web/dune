@@ -21,8 +21,7 @@
   ../../wasm/Cargo.toml
   ../../wasm/Cargo.lock
   (source_tree ../../wasm/src)
-  (source_tree ../../wasm/.cargo/config)
-  (source_tree ../../../proof-systems))
+  (source_tree ../../wasm/.cargo/config))
  (locks /cargo-lock) ; lock for rustup
  (action
   (progn

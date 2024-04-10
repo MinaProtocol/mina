@@ -459,6 +459,7 @@ dependencies = [
 [[package]]
 name = "groupmap"
 version = "0.1.0"
+source = "git+https://github.com/o1-labs/proof-systems.git?rev=6682dfdd4599c3ba7a6ec60d9b14f667ef33f449#6682dfdd4599c3ba7a6ec60d9b14f667ef33f449"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -544,6 +545,7 @@ dependencies = [
 [[package]]
 name = "internal-tracing"
 version = "0.1.0"
+source = "git+https://github.com/o1-labs/proof-systems.git?rev=6682dfdd4599c3ba7a6ec60d9b14f667ef33f449#6682dfdd4599c3ba7a6ec60d9b14f667ef33f449"
 
 [[package]]
 name = "itertools"
@@ -572,6 +574,7 @@ dependencies = [
 [[package]]
 name = "kimchi"
 version = "0.1.0"
+source = "git+https://github.com/o1-labs/proof-systems.git?rev=6682dfdd4599c3ba7a6ec60d9b14f667ef33f449#6682dfdd4599c3ba7a6ec60d9b14f667ef33f449"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -651,6 +654,7 @@ dependencies = [
 [[package]]
 name = "mina-curves"
 version = "0.1.0"
+source = "git+https://github.com/o1-labs/proof-systems.git?rev=6682dfdd4599c3ba7a6ec60d9b14f667ef33f449#6682dfdd4599c3ba7a6ec60d9b14f667ef33f449"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -659,6 +663,7 @@ dependencies = [
 [[package]]
 name = "mina-poseidon"
 version = "0.1.0"
+source = "git+https://github.com/o1-labs/proof-systems.git?rev=6682dfdd4599c3ba7a6ec60d9b14f667ef33f449#6682dfdd4599c3ba7a6ec60d9b14f667ef33f449"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -761,6 +766,7 @@ dependencies = [
 [[package]]
 name = "o1-utils"
 version = "0.1.0"
+source = "git+https://github.com/o1-labs/proof-systems.git?rev=6682dfdd4599c3ba7a6ec60d9b14f667ef33f449#6682dfdd4599c3ba7a6ec60d9b14f667ef33f449"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -844,6 +850,7 @@ dependencies = [
 [[package]]
 name = "poly-commitment"
 version = "0.1.0"
+source = "git+https://github.com/o1-labs/proof-systems.git?rev=6682dfdd4599c3ba7a6ec60d9b14f667ef33f449#6682dfdd4599c3ba7a6ec60d9b14f667ef33f449"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -1252,6 +1259,7 @@ dependencies = [
 [[package]]
 name = "turshi"
 version = "0.1.0"
+source = "git+https://github.com/o1-labs/proof-systems.git?rev=6682dfdd4599c3ba7a6ec60d9b14f667ef33f449#6682dfdd4599c3ba7a6ec60d9b14f667ef33f449"
 dependencies = [
  "ark-ff",
  "hex",

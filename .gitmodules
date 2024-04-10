@@ -1,3 +1,0 @@
-[submodule "src/lib/crypto/proof-systems"]
-	path = src/lib/crypto/proof-systems
-	url = https://github.com/o1-labs/proof-systems.git

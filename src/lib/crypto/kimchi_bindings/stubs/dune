@@ -55,7 +55,6 @@
   Cargo.toml
   rust-toolchain.toml
   (source_tree src)
-  (source_tree ../../proof-systems)
   (env_var MARLIN_PLONK_STUBS))
  (locks /cargo-lock) ;; lock for rustup
  (action
@@ -153,7 +152,6 @@
   Cargo.toml
   rust-toolchain.toml
   (source_tree src)
-  (source_tree ../../proof-systems)
   (env_var MARLIN_PLONK_STUBS))
  (locks /cargo-lock) ;; lock for rustup
  (action
