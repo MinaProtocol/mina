@@ -373,6 +373,35 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       (vk_proof, vk_impossible)
     in
+    let%bind zkapp_command_upgrade_version =
+      let snapp_update =
+        { Account_update.Update.dummy with
+          permissions = Zkapp_basic.Set_or_keep.Set Permissions.user_default
+        }
+      in
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let amount = Currency.Amount.of_mina_int_exn 10 in
+      let memo = Signed_command_memo.create_from_string_exn "update vk proof" in
+      let (spec : Transaction_snark.For_tests.Update_states_spec.t) =
+        { sender = (vk_proof.keypair, Account.Nonce.zero)
+        ; fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount
+        ; zkapp_account_keypairs = [ vk_proof.keypair ]
+        ; memo
+        ; new_zkapp_account = false
+        ; snapp_update
+        ; current_auth = Signature
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; actions = []
+        ; preconditions = None
+        }
+      in
+      Malleable_error.lift
+      @@ Transaction_snark.For_tests.update_states ~constraint_constants spec
+    in
     let (zkapp_command_spec
           : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
       let amount = Currency.Amount.of_mina_int_exn 1 in
@@ -748,6 +777,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Wait for zkapp to update verification key to be included in \
          transition frontier"
       @@ wait_for_zkapp zkapp_command_update_vk_impossible
+    in
+    let%bind () =
+      section_hard
+        "send a zkapp to upgrade permission's version to current version"
+      @@ send_zkapp ~logger
+           (Network.Node.get_ingress_uri node_a)
+           zkapp_command_upgrade_version
+    in
+    let%bind () =
+      section_hard
+        "Wait for zkapp to upgrade perimission's version to be included in \
+         transition frontier"
+      @@ wait_for_zkapp zkapp_command_upgrade_version
     in
     section_hard "running replayer"
       (let%bind logs =
