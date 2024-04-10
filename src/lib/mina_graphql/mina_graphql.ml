@@ -2381,14 +2381,14 @@ module Queries = struct
               | `Bootstrapping ->
                   Deferred.Result.fail "Daemon is bootstrapping"
               | `Active breadcrumb -> (
-                  let target_height =
+                  let txn_stop_slot_opt =
                     match runtime_config.daemon with
                     | Some daemon ->
                         daemon.slot_tx_end
                     | None ->
                         None
                   in
-                  match target_height with
+                  match txn_stop_slot_opt with
                   | None ->
                       return breadcrumb
                   | Some txn_stop_slot ->
@@ -2484,7 +2484,7 @@ module Queries = struct
           Runtime_config.make_fork_config ~staged_ledger ~global_slot
             ~state_hash ~staking_ledger ~staking_epoch_seed
             ~next_epoch_ledger:(Some next_epoch_ledger) ~next_epoch_seed
-            ~blockchain_length runtime_config
+            ~blockchain_length
         in
         let%map () =
           let open Async.Deferred.Infix in
