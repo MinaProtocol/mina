@@ -448,6 +448,27 @@ let dummy_constraints () =
         (Kimchi_backend_common.Scalar_challenge.create x)
       : Field.t * Field.t )
 
+let exists_deferred ?request:req ?compute typ =
+  let open Snark_params.Tick.Run in
+  let open Async_kernel in
+  (* Set up a full Ivar, in case we are generating the constraint system. *)
+  let deferred = ref (Ivar.create_full ()) in
+  (* Request or compute the [Deferred.t] value. *)
+  let requested = exists ?request:req ?compute (Typ.Internal.ref ()) in
+  as_prover (fun () ->
+      (* If we are generating the witness, create a new Ivar.. *)
+      deferred := Ivar.create () ;
+      (* ..and fill it when the value we want to read resolves. *)
+      Deferred.upon (As_prover.Ref.get requested) (fun _ ->
+          Ivar.fill !deferred () ) ) ;
+  (* Await the [Deferred.t] if we're generating the witness, otherwise we
+     immediately bind over the filled Ivar and continue.
+  *)
+  Deferred.map (Ivar.read !deferred) ~f:(fun () ->
+      (* Retrieve the value by peeking in the known-resolved deferred. *)
+      exists typ ~compute:(fun () ->
+          Option.value_exn @@ Deferred.peek @@ As_prover.Ref.get requested ) )
+
 type return_type =
   { account_update : Account_update.Body.t
   ; account_update_digest : Zkapp_command.Digest.Account_update.t
@@ -591,7 +612,7 @@ let compile :
            , Zkapp_statement.t
            , return_type Prover_value.t * auxiliary_var
            , return_type * auxiliary_value )
-           H4_6.T(Pickles.Inductive_rule).t = function
+           H4_6.T(Pickles.Inductive_rule.Deferred).t = function
       | [] ->
           []
       | { identifier; prevs; main; feature_flags } :: choices ->
@@ -600,8 +621,8 @@ let compile :
           ; feature_flags
           ; main =
               (fun { Pickles.Inductive_rule.public_input = () } ->
-                let vk_hash =
-                  exists Field.typ ~compute:(fun () ->
+                let%map.Deferred vk_hash =
+                  exists_deferred Field.typ ~compute:(fun () ->
                       Lazy.force @@ Option.value_exn !vk_hash )
                 in
                 let { Pickles.Inductive_rule.previous_proof_statements
@@ -613,7 +634,7 @@ let compile :
                 let public_output, account_update_tree =
                   to_account_update account_update_under_construction
                 in
-                { previous_proof_statements
+                { Pickles.Inductive_rule.previous_proof_statements
                 ; public_output
                 ; auxiliary_output = (account_update_tree, auxiliary_output)
                 } )
@@ -623,7 +644,7 @@ let compile :
     go (choices ~self)
   in
   let tag, cache_handle, proof, provers =
-    Pickles.compile () ?self ?cache ?proof_cache ?disk_keys
+    Pickles.compile_async () ?self ?cache ?proof_cache ?disk_keys
       ?override_wrap_domain ~public_input:(Output Zkapp_statement.typ)
       ~auxiliary_typ:Typ.(Prover_value.typ () * auxiliary_typ)
       ~branches ~max_proofs_verified ~name ~constraint_constants ~choices
@@ -632,7 +653,7 @@ let compile :
     vk_hash :=
       Some
         ( lazy
-          ( Zkapp_account.digest_vk
+          ( Deferred.map ~f:Zkapp_account.digest_vk
           @@ Pickles.Side_loaded.Verification_key.of_compiled tag ) )
   in
   let provers =

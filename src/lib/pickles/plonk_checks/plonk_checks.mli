@@ -57,6 +57,11 @@ type 'f field = (module Field_intf with type t = 'f)
 
 val lookup_tables_used : Opt.Flag.t Plonk_types.Features.t -> Opt.Flag.t
 
+val expand_feature_flags :
+     (module Bool_intf with type t = 'boolean)
+  -> 'boolean Plonk_types.Features.t
+  -> 'boolean Lazy.t Plonk_types.Features.Full.t
+
 val domain :
      't field
   -> shifts:(log2_size:int -> 't array)

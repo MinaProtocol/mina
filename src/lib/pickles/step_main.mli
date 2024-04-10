@@ -39,6 +39,9 @@ val step_main :
        , 'max_proofs_verified
        , 'self_branches )
        Types_map.Compiled.basic
+  -> known_wrap_keys:
+       'local_branches
+       Pickles_types.Hlist.H1.T(Types_map.For_step.Optional_wrap_key).t
   -> self:('var, 'value, 'max_proofs_verified, 'self_branches) Tag.t
   -> ( 'prev_vars
      , 'prev_values
@@ -50,10 +53,11 @@ val step_main :
      , 'ret_value
      , 'auxiliary_var
      , 'auxiliary_value )
-     Inductive_rule.t
+     Inductive_rule.Promise.t
   -> (   unit
       -> ( (Unfinalized.t, 'max_proofs_verified) Pickles_types.Vector.t
          , Impls.Step.Field.t
          , (Impls.Step.Field.t, 'max_proofs_verified) Pickles_types.Vector.t )
-         Import.Types.Step.Statement.t )
+         Import.Types.Step.Statement.t
+         Promise.t )
      Core_kernel.Staged.t

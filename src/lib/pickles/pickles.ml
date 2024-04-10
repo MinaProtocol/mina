@@ -221,21 +221,25 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let to_input (t : t) =
         to_input ~field_of_int:Impls.Step.Field.Constant.of_int t
 
-      let of_compiled tag : t =
+      let of_compiled_promise tag : t Promise.t =
         let d = Types_map.lookup_compiled tag.Tag.id in
+        let%bind.Promise wrap_key = Lazy.force d.wrap_key in
+        let%map.Promise wrap_vk = Lazy.force d.wrap_vk in
         let actual_wrap_domain_size =
           Common.actual_wrap_domain_size
-            ~log_2_domain_size:(Lazy.force d.wrap_vk).domain.log_size_of_group
+            ~log_2_domain_size:wrap_vk.domain.log_size_of_group
         in
-        { wrap_vk = Some (Lazy.force d.wrap_vk)
-        ; wrap_index =
-            Plonk_verification_key_evals.map (Lazy.force d.wrap_key)
-              ~f:(fun x -> x.(0))
-        ; max_proofs_verified =
-            Pickles_base.Proofs_verified.of_nat_exn
-              (Nat.Add.n d.max_proofs_verified)
-        ; actual_wrap_domain_size
-        }
+        ( { wrap_vk = Some wrap_vk
+          ; wrap_index =
+              Plonk_verification_key_evals.map wrap_key ~f:(fun x -> x.(0))
+          ; max_proofs_verified =
+              Pickles_base.Proofs_verified.of_nat_exn
+                (Nat.Add.n d.max_proofs_verified)
+          ; actual_wrap_domain_size
+          }
+          : t )
+
+      let of_compiled tag = of_compiled_promise tag |> Promise.to_deferred
 
       module Max_width = Width.Max
     end
@@ -323,6 +327,70 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let compile ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
       ~max_proofs_verified ~name ?constraint_constants ?commits ~choices () =
+    let choices ~self =
+      let choices = choices ~self in
+      let rec go :
+          type a b c d e f g h i j.
+             (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule).t
+          -> (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Promise).t =
+        function
+        | [] ->
+            []
+        | { identifier; prevs; main; feature_flags } :: rest ->
+            { identifier
+            ; prevs
+            ; main = (fun x -> Promise.return (main x))
+            ; feature_flags
+            }
+            :: go rest
+      in
+      go choices
+    in
+    let self, cache_handle, proof_module, provers =
+      compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
+        ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
+        ~max_proofs_verified ~name ~constraint_constants ?commits ~choices ()
+    in
+    let rec adjust_provers :
+        type a1 a2 a3 s1 s2_inner.
+           (a1, a2, a3, s1, s2_inner Promise.t) H3_2.T(Prover).t
+        -> (a1, a2, a3, s1, s2_inner Deferred.t) H3_2.T(Prover).t = function
+      | [] ->
+          []
+      | prover :: tl ->
+          (fun ?handler public_input ->
+            Promise.to_deferred (prover ?handler public_input) )
+          :: adjust_provers tl
+    in
+    (self, cache_handle, proof_module, adjust_provers provers)
+
+  let compile_async ?self ?cache ?storables ?proof_cache ?disk_keys
+      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
+      ~max_proofs_verified ~name ~constraint_constants ?commits ~choices () =
+    let choices ~self =
+      let choices = choices ~self in
+      let rec go :
+          type a b c d e f g h i j.
+             (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Deferred).t
+          -> (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Promise).t =
+        function
+        | [] ->
+            []
+        | { identifier; prevs; main; feature_flags } :: rest ->
+            { identifier
+            ; prevs
+            ; main =
+                (fun x ->
+                  Promise.create (fun callback ->
+                      Deferred.don't_wait_for
+                        (let%map res = main x in
+                         callback res ) ) )
+            ; feature_flags
+            }
+            :: go rest
+      in
+      go choices
+    in
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
         ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
@@ -399,10 +467,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (fun { public_input = self } ->
                           dummy_constraints () ;
                           Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements = []
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -436,10 +505,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     ; main =
                         (fun _ ->
                           dummy_constraints () ;
-                          { previous_proof_statements = []
-                          ; public_output = Field.zero
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements = []
+                            ; public_output = Field.zero
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -500,15 +570,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           let proof_must_verify = Boolean.not is_base_case in
                           let self_correct = Field.(equal (one + prev) self) in
                           Boolean.Assert.any [ self_correct; is_base_case ] ;
-                          { previous_proof_statements =
-                              [ { public_input = prev
-                                ; proof
-                                ; proof_must_verify
-                                }
-                              ]
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements =
+                                [ { public_input = prev
+                                  ; proof
+                                  ; proof_must_verify
+                                  }
+                                ]
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -604,19 +675,20 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           let proof_must_verify = Boolean.not is_base_case in
                           let self_correct = Field.(equal (one + prev) self) in
                           Boolean.Assert.any [ self_correct; is_base_case ] ;
-                          { previous_proof_statements =
-                              [ { public_input = no_recursive_input
-                                ; proof = no_recursive_proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ; { public_input = prev
-                                ; proof = prev_proof
-                                ; proof_must_verify
-                                }
-                              ]
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements =
+                                [ { public_input = no_recursive_input
+                                  ; proof = no_recursive_proof
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ; { public_input = prev
+                                  ; proof = prev_proof
+                                  ; proof_must_verify
+                                  }
+                                ]
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -727,19 +799,20 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             Field.(
                               if_ is_base_case ~then_:zero ~else_:(one + prev))
                           in
-                          { previous_proof_statements =
-                              [ { public_input = no_recursive_input
-                                ; proof = no_recursive_proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ; { public_input = prev
-                                ; proof = prev_proof
-                                ; proof_must_verify
-                                }
-                              ]
-                          ; public_output = self
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements =
+                                [ { public_input = no_recursive_input
+                                  ; proof = no_recursive_proof
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ; { public_input = prev
+                                  ; proof = prev_proof
+                                  ; proof_must_verify
+                                  }
+                                ]
+                            ; public_output = self
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -803,10 +876,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     ; main =
                         (fun { public_input = x } ->
                           dummy_constraints () ;
-                          { previous_proof_statements = []
-                          ; public_output = Field.(add one) x
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements = []
+                            ; public_output = Field.(add one) x
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -854,10 +928,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           Step_main_inputs.Sponge.absorb sponge
                             (`Field blinding_value) ;
                           let result = Step_main_inputs.Sponge.squeeze sponge in
-                          { previous_proof_statements = []
-                          ; public_output = result
-                          ; auxiliary_output = blinding_value
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements = []
+                            ; public_output = result
+                            ; auxiliary_output = blinding_value
+                            } )
                     }
                   ] ) )
 
@@ -922,7 +997,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let tagname = "" in
         Tag.create ~kind:Compiled tagname
 
-      let rule : _ Inductive_rule.t =
+      let rule : _ Inductive_rule.Promise.t =
         let open Impls.Step in
         { identifier = "main"
         ; prevs = [ tag; tag ]
@@ -932,24 +1007,26 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 As_prover.Ref.create (fun () ->
                     Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15 )
               in
-              { previous_proof_statements =
-                  [ { public_input = ()
-                    ; proof = dummy_proof
-                    ; proof_must_verify = Boolean.false_
-                    }
-                  ; { public_input = ()
-                    ; proof = dummy_proof
-                    ; proof_must_verify = Boolean.false_
-                    }
-                  ]
-              ; public_output = ()
-              ; auxiliary_output = ()
-              } )
+              Promise.return
+                { Inductive_rule.previous_proof_statements =
+                    [ { public_input = ()
+                      ; proof = dummy_proof
+                      ; proof_must_verify = Boolean.false_
+                      }
+                    ; { public_input = ()
+                      ; proof = dummy_proof
+                      ; proof_must_verify = Boolean.false_
+                      }
+                    ]
+                ; public_output = ()
+                ; auxiliary_output = ()
+                } )
         ; feature_flags = Plonk_types.Features.none_bool
         }
 
       module M = struct
-        module IR = Inductive_rule.T (A) (A_value) (A) (A_value) (A) (A_value)
+        module IR =
+          Inductive_rule.Promise.T (A) (A_value) (A) (A_value) (A) (A_value)
 
         let max_local_max_proofs_verifieds ~self (type n)
             (module Max_proofs_verified : Nat.Intf with type n = n) branches
@@ -990,8 +1067,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         module Lazy_keys = struct
           type t =
-            (Impls.Step.Proving_key.t * Dirty.t) Lazy.t
-            * (Kimchi_bindings.Protocol.VerifierIndex.Fp.t * Dirty.t) Lazy.t
+            (Impls.Step.Proving_key.t * Dirty.t) Promise.t Lazy.t
+            * (Kimchi_bindings.Protocol.VerifierIndex.Fp.t * Dirty.t) Promise.t
+              Lazy.t
 
           (* TODO Think this is right.. *)
         end
@@ -1061,25 +1139,45 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
               ~branches:Branches.n ~self ~public_input:(Input typ)
               ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
-              rule ~wrap_domains ~proofs_verifieds
+              rule ~wrap_domains ~proofs_verifieds ~chain_to:(Promise.return ())
+            (* TODO? *)
           in
           let step_domains = Vector.singleton inner_step_data.domains in
+          let all_step_domains =
+            let%map.Promise () =
+              (* Wait for promises to resolve. *)
+              Vector.fold ~init:(Promise.return ()) step_domains
+                ~f:(fun acc step_domain ->
+                  let%bind.Promise _ = step_domain in
+                  acc )
+            in
+            Vector.map
+              ~f:(fun x -> Option.value_exn @@ Promise.peek x)
+              step_domains
+          in
+
           let step_keypair =
             let etyp =
               Impls.Step.input ~proofs_verified:Max_proofs_verified.n
                 ~wrap_rounds:Tock.Rounds.n
             in
-            let (T (typ, _conv, conv_inv)) = etyp in
-            let main () () =
-              let res = inner_step_data.main ~step_domains () in
-              Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
-            in
             let open Impls.Step in
             let k_p =
               lazy
-                (let cs =
-                   constraint_system ~input_typ:Typ.unit ~return_typ:typ main
+                (let (T (typ, _conv, conv_inv)) = etyp in
+                 let%bind.Promise main =
+                   inner_step_data.main ~step_domains:all_step_domains
                  in
+                 let main () () =
+                   let%map.Promise res = main () in
+                   Impls.Step.with_label "conv_inv" (fun () -> conv_inv res)
+                 in
+                 let constraint_builder =
+                   Impl.constraint_system_manual ~input_typ:Typ.unit
+                     ~return_typ:typ
+                 in
+                 let%map.Promise res = constraint_builder.run_circuit main in
+                 let cs = constraint_builder.finish_computation res in
                  let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
                  ( Type_equal.Id.uid self.id
                  , snark_keys_header
@@ -1092,7 +1190,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             in
             let k_v =
               lazy
-                (let id, _header, index, cs = Lazy.force k_p in
+                (let%map.Promise id, _header, index, cs = Lazy.force k_p in
                  let digest = R1CS_constraint_system.digest cs in
                  ( id
                  , snark_keys_header
@@ -1107,14 +1205,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ~prev_challenges:
                 (Nat.to_int (fst inner_step_data.proofs_verified))
               [] k_p k_v
-              (Snarky_backendless.Typ.unit ())
-              typ main
           in
           let step_vks =
             lazy
-              (Vector.map [ step_keypair ] ~f:(fun (_, vk) ->
-                   Tick.Keypair.vk_commitments (fst (Lazy.force vk)) ) )
+              (let _, lazy_step_vk = step_keypair in
+               let%map.Promise step_vk, _ = Lazy.force lazy_step_vk in
+               Vector.singleton @@ Tick.Keypair.vk_commitments step_vk )
           in
+
           let wrap_main _ =
             let module SC' = SC in
             let open Impls.Wrap in
@@ -1178,11 +1276,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let r =
               Common.time "wrap read or generate " (fun () ->
                   Cache.Wrap.read_or_generate ~prev_challenges:2 []
-                    disk_key_prover disk_key_verifier typ Typ.unit main )
+                    (Lazy.map ~f:Promise.return disk_key_prover)
+                    (Lazy.map ~f:Promise.return disk_key_verifier) )
             in
             (r, disk_key_verifier)
           in
-          let wrap_vk = Lazy.map wrap_vk ~f:fst in
+          let wrap_vk = Lazy.map wrap_vk ~f:(Promise.map ~f:fst) in
           let module S = Step.Make (A) (A_value) (Max_proofs_verified) in
           let prover =
             let f :
@@ -1200,24 +1299,24 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 Requests.Wrap.create ()
               in
               let _, prev_vars_length = b.proofs_verified in
-              let step =
-                let wrap_vk = Lazy.force wrap_vk in
-                S.f branch_data () ~feature_flags ~prevs_length:prev_vars_length
-                  ~self ~public_input:(Input typ)
-                  ~auxiliary_typ:Impls.Step.Typ.unit ~step_domains
+              let step () =
+                let%bind.Promise step_pk = Lazy.force step_pk in
+                let%bind.Promise wrap_vk = Lazy.force wrap_vk in
+                S.f branch_data ~feature_flags ~prevs_length:prev_vars_length
+                  ~self ~public_input:(Input typ) ~proof_cache:None
+                  ~maxes:(module Maxes)
+                  ~auxiliary_typ:Impls.Step.Typ.unit
+                  ~step_domains:all_step_domains
                   ~self_dlog_plonk_index:
                     ((* TODO *) Plonk_verification_key_evals.map
                        ~f:(fun x -> [| x |])
                        wrap_vk.commitments )
-                  (fst (Lazy.force step_pk))
-                  wrap_vk.index
+                  () (fst step_pk) wrap_vk.index
               in
-              let pairing_vk = fst (Lazy.force step_vk) in
+              let%bind.Promise pairing_vk, _ = Lazy.force step_vk in
               let wrap =
                 let wrap_vk = Lazy.force wrap_vk in
-                let%bind.Promise proof, (), (), _ =
-                  step ~proof_cache:None ~maxes:(module Maxes)
-                in
+                let%bind.Promise proof, (), (), _ = step () in
                 let proof =
                   { proof with
                     statement =
@@ -1370,7 +1469,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         public_input proof
                     in
                     let x_hat = O.(p_eval_1 o, p_eval_2 o) in
-                    let step_vk, _ = Lazy.force step_vk in
+                    let%bind.Promise step_vk, _ = Lazy.force step_vk in
                     let next_statement : _ Types.Wrap.Statement.In_circuit.t =
                       let scalar_chal f =
                         Scalar_challenge.map ~f:Challenge.Constant.of_tick_field
@@ -1695,6 +1794,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       }
                       : _ P.Base.Wrap.t )
                   in
+                  let%bind.Promise wrap_pk = Lazy.force wrap_pk in
+                  let%bind.Promise wrap_vk = wrap_vk in
                   wrap ~max_proofs_verified:Max_proofs_verified.n
                     full_signature.maxes
                     ~dlog_plonk_index:
@@ -1704,8 +1805,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     wrap_main A_value.to_field_elements ~pairing_vk
                     ~step_domains:b.domains
                     ~pairing_plonk_indices:(Lazy.force step_vks) ~wrap_domains
-                    (fst (Lazy.force wrap_pk))
-                    proof
+                    (fst wrap_pk) proof
                 in
                 Proof.T
                   { proof with
@@ -1729,12 +1829,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ; max_proofs_verified = (module Max_proofs_verified)
             ; public_input = typ
             ; wrap_key =
-                Lazy.map wrap_vk ~f:(fun x ->
-                    (* TODO *)
-                    Plonk_verification_key_evals.map
-                      ~f:(fun x -> [| x |])
-                      (Verification_key.commitments x) )
-            ; wrap_vk = Lazy.map wrap_vk ~f:Verification_key.index
+                Lazy.map wrap_vk
+                  ~f:
+                    (Promise.map ~f:(fun x ->
+                         (* TODO *)
+                         Plonk_verification_key_evals.map
+                           ~f:(fun x -> [| x |])
+                           (Verification_key.commitments x) ) )
+            ; wrap_vk =
+                Lazy.map wrap_vk ~f:(Promise.map ~f:Verification_key.index)
             ; wrap_domains
             ; step_domains
             ; num_chunks = 1
@@ -1756,11 +1859,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let verification_key = wrap_vk
 
         let verify ts =
+          let%bind.Promise verification_key = Lazy.force verification_key in
           verify_promise
             (module Max_proofs_verified)
             (module A_value)
-            (Lazy.force verification_key)
-            ts
+            verification_key ts
 
         let _statement (T p : t) =
           p.statement.messages_for_next_step_proof.app_state
@@ -1809,19 +1912,20 @@ module Make_str (_ : Wire_types.Concrete) = struct
                             exists (Typ.Internal.ref ()) ~request:(fun () ->
                                 Proof )
                           in
-                          { previous_proof_statements =
-                              [ { public_input = ()
-                                ; proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ; { public_input = ()
-                                ; proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ]
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements =
+                                [ { public_input = ()
+                                  ; proof
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ; { public_input = ()
+                                  ; proof
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ]
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -1934,10 +2038,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (fun { public_input = self } ->
                           dummy_constraints () ;
                           Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements = []
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -1972,10 +2077,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (fun { public_input = self } ->
                           dummy_constraints () ;
                           Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements = []
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -2011,10 +2117,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (fun { public_input = self } ->
                           dummy_constraints () ;
                           Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements = []
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -2095,15 +2202,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           let is_base_case = Field.equal Field.zero self in
                           let self_correct = Field.(equal (one + prev) self) in
                           Boolean.Assert.any [ self_correct; is_base_case ] ;
-                          { previous_proof_statements =
-                              [ { public_input = prev
-                                ; proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ]
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements =
+                                [ { public_input = prev
+                                  ; proof
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ]
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -2113,13 +2221,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let (), (), b1 =
             Common.time "b1" (fun () ->
                 Promise.block_on_async_exn (fun () ->
+                    let%bind.Promise vk =
+                      Side_loaded.Verification_key.of_compiled_promise
+                        No_recursion.tag
+                    in
                     step
                       ~handler:
                         (handler No_recursion.example_input
                            (Side_loaded.Proof.of_proof
                               No_recursion.example_proof )
-                           (Side_loaded.Verification_key.of_compiled
-                              No_recursion.tag ) )
+                           vk )
                       Field.Constant.one ) )
           in
           Or_error.ok_exn
@@ -2131,13 +2242,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let (), (), b2 =
             Common.time "b2" (fun () ->
                 Promise.block_on_async_exn (fun () ->
+                    let%bind.Promise vk =
+                      Side_loaded.Verification_key.of_compiled_promise
+                        Fake_1_recursion.tag
+                    in
                     step
                       ~handler:
                         (handler Fake_1_recursion.example_input
                            (Side_loaded.Proof.of_proof
                               Fake_1_recursion.example_proof )
-                           (Side_loaded.Verification_key.of_compiled
-                              Fake_1_recursion.tag ) )
+                           vk )
                       Field.Constant.one ) )
           in
           Or_error.ok_exn
@@ -2149,13 +2263,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let (), (), b3 =
             Common.time "b3" (fun () ->
                 Promise.block_on_async_exn (fun () ->
+                    let%bind.Promise vk =
+                      Side_loaded.Verification_key.of_compiled_promise
+                        Fake_2_recursion.tag
+                    in
                     step
                       ~handler:
                         (handler Fake_2_recursion.example_input
                            (Side_loaded.Proof.of_proof
                               Fake_2_recursion.example_proof )
-                           (Side_loaded.Verification_key.of_compiled
-                              Fake_2_recursion.tag ) )
+                           vk )
                       Field.Constant.one ) )
           in
           Or_error.ok_exn
@@ -2230,10 +2347,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (fun { public_input = self } ->
                           dummy_constraints () ;
                           Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements = []
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -2268,10 +2386,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (fun { public_input = self } ->
                           dummy_constraints () ;
                           Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements = []
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -2307,10 +2426,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         (fun { public_input = self } ->
                           dummy_constraints () ;
                           Field.Assert.equal self Field.zero ;
-                          { previous_proof_statements = []
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements = []
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -2394,15 +2514,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           let is_base_case = Field.equal Field.zero self in
                           let self_correct = Field.(equal (one + prev) self) in
                           Boolean.Assert.any [ self_correct; is_base_case ] ;
-                          { previous_proof_statements =
-                              [ { public_input = prev
-                                ; proof
-                                ; proof_must_verify = Boolean.true_
-                                }
-                              ]
-                          ; public_output = ()
-                          ; auxiliary_output = ()
-                          } )
+                          Promise.return
+                            { Inductive_rule.previous_proof_statements =
+                                [ { public_input = prev
+                                  ; proof
+                                  ; proof_must_verify = Boolean.true_
+                                  }
+                                ]
+                            ; public_output = ()
+                            ; auxiliary_output = ()
+                            } )
                     }
                   ] ) )
 
@@ -2412,13 +2533,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let (), (), b1 =
             Common.time "b1" (fun () ->
                 Promise.block_on_async_exn (fun () ->
+                    let%bind.Promise vk =
+                      Side_loaded.Verification_key.of_compiled_promise
+                        No_recursion.tag
+                    in
                     step
                       ~handler:
                         (handler No_recursion.example_input
                            (Side_loaded.Proof.of_proof
                               No_recursion.example_proof )
-                           (Side_loaded.Verification_key.of_compiled
-                              No_recursion.tag ) )
+                           vk )
                       Field.Constant.one ) )
           in
           Or_error.ok_exn
@@ -2430,13 +2554,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let (), (), b2 =
             Common.time "b2" (fun () ->
                 Promise.block_on_async_exn (fun () ->
+                    let%bind.Promise vk =
+                      Side_loaded.Verification_key.of_compiled_promise
+                        Fake_1_recursion.tag
+                    in
                     step
                       ~handler:
                         (handler Fake_1_recursion.example_input
                            (Side_loaded.Proof.of_proof
                               Fake_1_recursion.example_proof )
-                           (Side_loaded.Verification_key.of_compiled
-                              Fake_1_recursion.tag ) )
+                           vk )
                       Field.Constant.one ) )
           in
           Or_error.ok_exn
@@ -2448,13 +2575,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let (), (), b3 =
             Common.time "b3" (fun () ->
                 Promise.block_on_async_exn (fun () ->
+                    let%bind.Promise vk =
+                      Side_loaded.Verification_key.of_compiled_promise
+                        Fake_2_recursion.tag
+                    in
                     step
                       ~handler:
                         (handler Fake_2_recursion.example_input
                            (Side_loaded.Proof.of_proof
                               Fake_2_recursion.example_proof )
-                           (Side_loaded.Verification_key.of_compiled
-                              Fake_2_recursion.tag ) )
+                           vk )
                       Field.Constant.one ) )
           in
           Or_error.ok_exn

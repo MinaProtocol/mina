@@ -66,6 +66,7 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
               else Permissions.user_default )
             spec
         in
+        let%bind zkapp_command = zkapp_command in
         let%bind () = after wait_span in
         Deferred.repeat_until_finished ()
         @@ fun () ->
@@ -178,6 +179,7 @@ let send_zkapps ~fee_payer_array ~constraint_constants ~tm_end ~scheduler_tbl
   let `VK vk, `Prover prover =
     Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
   in
+  let%bind.Deferred vk = vk in
   let account_queue = Queue.create () in
   let num_fee_payers = Array.length fee_payer_array in
   Deferred.repeat_until_finished (init_tm_next, init_counter)
