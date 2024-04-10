@@ -43,6 +43,21 @@ roots: [
   "sexp_diff_kernel.v0.14.0"
   "utop.2.9.1"
   "yojson.1.7.0"
+
+  "h_list.dev"
+  "bitstring_lib.dev"
+  "snarky_signature.dev"
+  "snarky.dev"
+  "snarky_curve.dev"
+  "fold_lib.dev"
+  "group_map.dev"
+  "snarkette.dev"
+  "tuple_lib.dev"
+  "sponge.dev"
+  "snarky_bench.dev"
+  "interval_union.dev"
+  "ppx_snarky.dev"
+  "snarky_integer.dev"
 ]
 installed: [
   "alcotest.1.1.0"
@@ -273,6 +288,21 @@ installed: [
   "zarith.1.7"
   "zarith_stubs_js.v0.14.1"
   "zed.3.1.0"
+
+  "h_list.dev"
+  "bitstring_lib.dev"
+  "snarky_signature.dev"
+  "snarky.dev"
+  "snarky_curve.dev"
+  "fold_lib.dev"
+  "group_map.dev"
+  "snarkette.dev"
+  "tuple_lib.dev"
+  "sponge.dev"
+  "snarky_bench.dev"
+  "interval_union.dev"
+  "ppx_snarky.dev"
+  "snarky_integer.dev"
 ]
 pinned: [
   "async_kernel.v0.14.0"
@@ -284,6 +314,21 @@ pinned: [
   "prometheus.v0.6.0"
   "rpc_parallel.v0.14.0"
   "sodium.dev"
+
+  "h_list.dev"
+  "bitstring_lib.dev"
+  "snarky_signature.dev"
+  "snarky.dev"
+  "snarky_curve.dev"
+  "fold_lib.dev"
+  "group_map.dev"
+  "snarkette.dev"
+  "tuple_lib.dev"
+  "sponge.dev"
+  "snarky_bench.dev"
+  "interval_union.dev"
+  "ppx_snarky.dev"
+  "snarky_integer.dev"
 ]
 package "async_kernel" {
   opam-version: "2.0"
@@ -586,5 +631,473 @@ package "sodium" {
       "https://github.com/o1-labs/ocaml-sodium/archive/adde9fd4db38eb65bb96ba1c71e6af4b5cdbae51.tar.gz"
     checksum:
       "sha256=b9285a5ff051ef142f27199150f720f92aa1401e1caffed5f4232aab42ed93ff"
+  }
+}
+
+package "h_list"{
+  opam-version: "1.2"
+  name: "h_list"
+  maintainer: "opensource@o1labs.org"
+  authors: ["O(1) Labs, LLC <opensource@o1labs.org>"]
+  homepage: "https://github.com/o1labs/snarky"
+  bug-reports: "https://github.com/o1labs/snarky/issues"
+  dev-repo: "git+https://github.com/o1labs/snarky.git"
+  license: "MIT"
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+  ]
+  depends: [
+    "dune"                {build & >= "2.0"}
+    "ppxlib"              {>= "0.25.0"}
+    "base"                {>= "v0.14.3"}
+  ]
+  descr: "
+  Heterogeneous lists
+  "
+  
+  version: "dev"
+  url {
+    src:
+      "https://github.com/o1-labs/snarky/archive/1341cdc7bc5ca72f5b9339f8280eb1379f2a8a20.tar.gz"
+    checksum:
+      "sha256=f0bc92decbda5bb68e4a0116d34226e78dbc252e6ff4e6f91d7b3d6a80ae3665"
+  }
+}
+
+package "bitstring_lib"{
+  opam-version: "1.2"
+  name: "bitstring_lib"
+  maintainer: "opensource@o1labs.org"
+  authors: ["O(1) Labs, LLC <opensource@o1labs.org>"]
+  homepage: "https://github.com/o1labs/snarky"
+  bug-reports: "https://github.com/o1labs/snarky/issues"
+  dev-repo: "git+https://github.com/o1labs/snarky.git"
+  license: "MIT"
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+  ]
+  depends: [
+    "ocaml" {>= "4.07.0"}
+    "core" {>= "v0.14" & < "v0.15" }
+    "tuple_lib"
+    "ppx_deriving"
+    "ppx_jane"
+    "bisect_ppx"
+    "dune"                {build & >= "2.0"}
+  ]
+  descr: "
+  A helper library for bitstrings in snarky
+  "
+  version: "dev"
+  url {
+    src:
+      "https://github.com/o1-labs/snarky/archive/1341cdc7bc5ca72f5b9339f8280eb1379f2a8a20.tar.gz"
+    checksum:
+      "sha256=f0bc92decbda5bb68e4a0116d34226e78dbc252e6ff4e6f91d7b3d6a80ae3665"
+  }
+}
+
+package "snarky_signature"{
+  opam-version: "1.2"
+  name: "snarky_signature"
+  maintainer: "opensource@o1labs.org"
+  authors: ["O(1) Labs, LLC <opensource@o1labs.org>"]
+  homepage: "https://github.com/o1labs/snarky"
+  bug-reports: "https://github.com/o1labs/snarky/issues"
+  dev-repo: "git+https://github.com/o1labs/snarky.git"
+  license: "MIT"
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+  ]
+  depends: [
+    "ocaml" {>= "4.07.0"}
+    "core_kernel" {>= "v0.14" & < "v0.15" }
+    "ppx_deriving"
+    "ppx_jane"
+    "bisect_ppx"
+    "dune"                {build & >= "2.0"}
+    "snarky"
+  ]
+  descr: "
+  A library for signatures in snarky
+  "
+  version: "dev"
+  url {
+    src:
+      "https://github.com/o1-labs/snarky/archive/1341cdc7bc5ca72f5b9339f8280eb1379f2a8a20.tar.gz"
+    checksum:
+      "sha256=f0bc92decbda5bb68e4a0116d34226e78dbc252e6ff4e6f91d7b3d6a80ae3665"
+  }
+}
+
+package "snarky"{
+  opam-version: "1.2"
+  name: "snarky"
+  maintainer: "opensource@o1labs.org"
+  authors: ["O(1) Labs, LLC <opensource@o1labs.org>"]
+  homepage: "https://github.com/o1labs/snarky"
+  bug-reports: "https://github.com/o1labs/snarky/issues"
+  dev-repo: "git+https://github.com/o1labs/snarky.git"
+  license: "MIT"
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+  ]
+  depends: [
+    "ocaml" {>= "4.07.0"}
+    "core_kernel" {>= "v0.14" & < "v0.15" }
+    "h_list"
+    "fold_lib"
+    "tuple_lib"
+    "bitstring_lib"
+    "interval_union"
+    "bignum"
+    "base64"
+    "yojson" {>= "1.7.0" & < "1.8.0"}
+    "ppx_snarky"
+    "ppx_jane" {>= "v0.14"}
+    "ppx_deriving" {>= "5.0"}
+    "bisect_ppx" {>= "2.0.0"}
+    "dune"                {build & >= "2.0"}
+  ]
+  depopts: [
+    "snarky_cuda"
+  ]
+  descr: "
+  A snarks DSL
+  "
+  
+  version: "dev"
+  url {
+    src:
+      "https://github.com/o1-labs/snarky/archive/1341cdc7bc5ca72f5b9339f8280eb1379f2a8a20.tar.gz"
+    checksum:
+      "sha256=f0bc92decbda5bb68e4a0116d34226e78dbc252e6ff4e6f91d7b3d6a80ae3665"
+  }
+}
+
+package "snarky_curve"{
+  opam-version: "1.2"
+  name: "snarky_curve"
+  maintainer: "opensource@o1labs.org"
+  authors: ["O(1) Labs, LLC <opensource@o1labs.org>"]
+  homepage: "https://github.com/o1labs/snarky"
+  bug-reports: "https://github.com/o1labs/snarky/issues"
+  dev-repo: "git+https://github.com/o1labs/snarky.git"
+  license: "MIT"
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+  ]
+  depends: [
+    "ocaml" {>= "4.07.0"}
+    "core_kernel" {>= "v0.14" & < "v0.15" }
+    "ppx_deriving"
+    "ppx_jane"
+    "bisect_ppx"
+    "dune"                {build & >= "2.0"}
+    "snarky"
+    "group_map"
+    "digestif"
+  ]
+  descr: "
+  A library for elliptic curves in snarky
+  "
+  version: "dev"
+  url {
+    src:
+      "https://github.com/o1-labs/snarky/archive/1341cdc7bc5ca72f5b9339f8280eb1379f2a8a20.tar.gz"
+    checksum:
+      "sha256=f0bc92decbda5bb68e4a0116d34226e78dbc252e6ff4e6f91d7b3d6a80ae3665"
+  }
+}
+
+package "fold_lib"{
+  opam-version: "1.2"
+  name: "fold_lib"
+  maintainer: "opensource@o1labs.org"
+  authors: ["O(1) Labs, LLC <opensource@o1labs.org>"]
+  homepage: "https://github.com/o1labs/snarky"
+  bug-reports: "https://github.com/o1labs/snarky/issues"
+  dev-repo: "git+https://github.com/o1labs/snarky.git"
+  license: "MIT"
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+  ]
+  depends: [
+    "ocaml" {>= "4.07.0"}
+    "core" {>= "v0.14" & < "v0.15" }
+    "ppx_deriving"
+    "ppx_jane"
+    "bisect_ppx"
+    "dune"                {build & >= "2.0"}
+  ]
+  descr: "
+  A library for treating folds as a first-class data structure and a monad
+  "
+  version: "dev"
+  url {
+    src:
+      "https://github.com/o1-labs/snarky/archive/1341cdc7bc5ca72f5b9339f8280eb1379f2a8a20.tar.gz"
+    checksum:
+      "sha256=f0bc92decbda5bb68e4a0116d34226e78dbc252e6ff4e6f91d7b3d6a80ae3665"
+  }
+}
+
+package "group_map"{
+  opam-version: "1.2"
+  name: "group_map"
+  maintainer: "opensource@o1labs.org"
+  authors: ["O(1) Labs, LLC <opensource@o1labs.org>"]
+  homepage: "https://github.com/o1labs/snarky"
+  bug-reports: "https://github.com/o1labs/snarky/issues"
+  dev-repo: "git+https://github.com/o1labs/snarky.git"
+  license: "MIT"
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+  ]
+  depends: [
+    "ocaml" {>= "4.07.0"}
+    "core_kernel" {>= "v0.14" & < "v0.15" }
+    "snarkette"
+  ]
+  descr: "
+  Map from finite field elements to elliptic curves points over the finite field
+  "
+  version: "dev"
+  url {
+    src:
+      "https://github.com/o1-labs/snarky/archive/1341cdc7bc5ca72f5b9339f8280eb1379f2a8a20.tar.gz"
+    checksum:
+      "sha256=f0bc92decbda5bb68e4a0116d34226e78dbc252e6ff4e6f91d7b3d6a80ae3665"
+  }
+}
+
+package "snarkette"{
+  opam-version: "1.2"
+  name: "snarkette"
+  maintainer: "opensource@o1labs.org"
+  authors: ["O(1) Labs, LLC <opensource@o1labs.org>"]
+  homepage: "https://github.com/o1labs/snarky"
+  bug-reports: "https://github.com/o1labs/snarky/issues"
+  dev-repo: "git+https://github.com/o1labs/snarky.git"
+  license: "MIT"
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+  ]
+  depends: [
+    "ocaml" {>= "4.07.0"}
+    "core_kernel" {>= "v0.14" & < "v0.15" }
+    "tuple_lib"
+    "fold_lib"
+    "ppx_deriving"
+    "ppx_jane"
+    "bisect_ppx"
+    "dune"                {build & >= "2.0"}
+    "ppx_deriving_yojson"
+    "bignum"
+  ]
+  descr: "
+  A portable cryptography library
+  "
+  version: "dev"
+  url {
+    src:
+      "https://github.com/o1-labs/snarky/archive/1341cdc7bc5ca72f5b9339f8280eb1379f2a8a20.tar.gz"
+    checksum:
+      "sha256=f0bc92decbda5bb68e4a0116d34226e78dbc252e6ff4e6f91d7b3d6a80ae3665"
+  }
+}
+
+package "tuple_lib"{
+  opam-version: "1.2"
+  name: "tuple_lib"
+  maintainer: "opensource@o1labs.org"
+  authors: ["O(1) Labs, LLC <opensource@o1labs.org>"]
+  homepage: "https://github.com/o1labs/snarky"
+  bug-reports: "https://github.com/o1labs/snarky/issues"
+  dev-repo: "git+https://github.com/o1labs/snarky.git"
+  license: "MIT"
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+  ]
+  depends: [
+    "ocaml" {>= "4.07.0"}
+    "core_kernel" {>= "v0.14" & < "v0.15" }
+    "ppx_deriving"
+    "ppx_jane"
+    "bisect_ppx"
+    "dune"                {build & >= "2.0"}
+  ]
+  descr: "
+  A tiny library with names and a useful getter for tuples
+  "
+  version: "dev"
+  url {
+    src:
+      "https://github.com/o1-labs/snarky/archive/1341cdc7bc5ca72f5b9339f8280eb1379f2a8a20.tar.gz"
+    checksum:
+      "sha256=f0bc92decbda5bb68e4a0116d34226e78dbc252e6ff4e6f91d7b3d6a80ae3665"
+  }
+}
+
+package "sponge"{
+  opam-version: "1.2"
+  name: "sponge"
+  maintainer: "opensource@o1labs.org"
+  authors: ["O(1) Labs, LLC <opensource@o1labs.org>"]
+  homepage: "https://github.com/o1labs/snarky"
+  bug-reports: "https://github.com/o1labs/snarky/issues"
+  dev-repo: "git+https://github.com/o1labs/snarky.git"
+  license: "MIT"
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+  ]
+  depends: [
+    "ocaml" {>= "4.07.0"}
+    "core_kernel" {>= "v0.14" & < "v0.15" }
+    "snarky"
+    "ppx_deriving"
+    "ppx_jane"
+    "bisect_ppx"
+    "dune"                {build & >= "2.0"}
+  ]
+  descr: "
+  A library implementing the arithmetic sponge construction and several sponge-based hash functions
+  "
+  version: "dev"
+  url {
+    src:
+      "https://github.com/o1-labs/snarky/archive/1341cdc7bc5ca72f5b9339f8280eb1379f2a8a20.tar.gz"
+    checksum:
+      "sha256=f0bc92decbda5bb68e4a0116d34226e78dbc252e6ff4e6f91d7b3d6a80ae3665"
+  }
+}
+
+package "snarky_bench"{
+  opam-version: "1.2"
+  name: "snarky_bench"
+  maintainer: "opensource@o1labs.org"
+  authors: ["O(1) Labs, LLC <opensource@o1labs.org>"]
+  homepage: "https://github.com/o1labs/snarky"
+  bug-reports: "https://github.com/o1labs/snarky/issues"
+  dev-repo: "git+https://github.com/o1labs/snarky.git"
+  license: "MIT"
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+  ]
+  depends: [
+    "ocaml" {>= "4.07.0"}
+    "core" {>= "v0.14" & < "v0.15" }
+    "snarky"
+    "ppx_jane"
+    "ppx_bench"
+    "dune"                {build & >= "2.0"}
+  ]
+  descr: "
+  Benchmark runner for snarky
+  "
+  version: "dev"
+  url {
+    src:
+      "https://github.com/o1-labs/snarky/archive/1341cdc7bc5ca72f5b9339f8280eb1379f2a8a20.tar.gz"
+    checksum:
+      "sha256=f0bc92decbda5bb68e4a0116d34226e78dbc252e6ff4e6f91d7b3d6a80ae3665"
+  }
+}
+
+package "interval_union"{
+  opam-version: "1.2"
+  name: "interval_union"
+  maintainer: "opensource@o1labs.org"
+  authors: ["O(1) Labs, LLC <opensource@o1labs.org>"]
+  homepage: "https://github.com/o1labs/snarky"
+  bug-reports: "https://github.com/o1labs/snarky/issues"
+  dev-repo: "git+https://github.com/o1labs/snarky.git"
+  license: "MIT"
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+  ]
+  depends: [
+    "ocaml" {>= "4.07.0"}
+    "core_kernel" {>= "v0.14" & < "v0.15" }
+    "ppx_deriving"
+    "ppx_jane"
+    "bisect_ppx"
+    "dune"                {build & >= "2.0"}
+  ]
+  descr: "
+  A helper library for manipulating intervals -- pairs of integers -- in snarky
+  "
+  version: "dev"
+  url {
+    src:
+      "https://github.com/o1-labs/snarky/archive/1341cdc7bc5ca72f5b9339f8280eb1379f2a8a20.tar.gz"
+    checksum:
+      "sha256=f0bc92decbda5bb68e4a0116d34226e78dbc252e6ff4e6f91d7b3d6a80ae3665"
+  }
+}
+
+package "ppx_snarky"{
+  opam-version: "1.2"
+  name: "ppx_snarky"
+  maintainer: "opensource@o1labs.org"
+  authors: ["O(1) Labs, LLC <opensource@o1labs.org>"]
+  homepage: "https://github.com/o1labs/snarky"
+  bug-reports: "https://github.com/o1labs/snarky/issues"
+  dev-repo: "git+https://github.com/o1labs/snarky.git"
+  license: "MIT"
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+  ]
+  depends: [
+    "ocaml" {>= "4.07.0"}
+    "core" {>= "v0.14" & < "v0.15" }
+    "ppxlib"
+    "ppx_tools"
+    "ppx_sexp_conv"
+    "dune"                {build & >= "2.0"}
+  ]
+  descr: "
+  A rewiter for Snarky
+  "
+  
+  version: "dev"
+  url {
+    src:
+      "https://github.com/o1-labs/snarky/archive/1341cdc7bc5ca72f5b9339f8280eb1379f2a8a20.tar.gz"
+    checksum:
+      "sha256=f0bc92decbda5bb68e4a0116d34226e78dbc252e6ff4e6f91d7b3d6a80ae3665"
+  }
+}
+
+package "snarky_integer"{
+  opam-version: "1.2"
+  name: "snarky_integer"
+  maintainer: "opensource@o1labs.org"
+  authors: ["O(1) Labs, LLC <opensource@o1labs.org>"]
+  homepage: "https://github.com/o1labs/snarky"
+  bug-reports: "https://github.com/o1labs/snarky/issues"
+  dev-repo: "git+https://github.com/o1labs/snarky.git"
+  license: "MIT"
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+  ]
+  depends: [
+    "ocaml" {>= "4.07.0"}
+    "core_kernel" {>= "v0.14" & < "v0.15" }
+    "ppx_deriving"
+    "ppx_jane"
+    "bisect_ppx"
+    "dune"                {build & >= "2.0"}
+    "snarky"
+  ]
+  descr: "
+  A library for integers in snarky
+  "
+  version: "dev"
+  url {
+    src:
+      "https://github.com/o1-labs/snarky/archive/1341cdc7bc5ca72f5b9339f8280eb1379f2a8a20.tar.gz"
+    checksum:
+      "sha256=f0bc92decbda5bb68e4a0116d34226e78dbc252e6ff4e6f91d7b3d6a80ae3665"
   }
 }
