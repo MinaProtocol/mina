@@ -4751,9 +4751,11 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
                   (Error.to_string_hum err) ()
           in
           let constraint_constants =
-            Genesis_constants.Constraint_constants.compiled 
+            Genesis_constants.Constraint_constants.compiled
           in
-          let ledger = Precomputed_values.genesis_ledger precomputed_values |> Lazy.force in
+          let ledger =
+            Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
+          in
           let%bind account_ids =
             let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
             Account_id.Set.to_list account_id_set
