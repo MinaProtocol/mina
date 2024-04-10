@@ -3,6 +3,7 @@ roots: [
   "alcotest.1.1.0"
   "angstrom.0.15.0"
   "async_ssl.v0.14.0"
+  "base58.0.1.0"
   "bignum.v0.14.0"
   "bisect_ppx.2.8.1"
   "bitstring.4.1.0"
@@ -272,6 +273,7 @@ installed: [
 ]
 pinned: [
   "async_kernel.v0.14.0"
+  "base58.0.1.0"
   "capnp.3.4.0"
   "check_opam_switch.~dev"
   "graphql_ppx.1.2.2"
@@ -532,5 +534,28 @@ package "prometheus" {
       "https://github.com/MinaProtocol/prometheus/archive/f899ec0ad67b404dc541d0276481f6542a4eabbb.tar.gz"
     checksum:
       "sha256=8489c605f8cbbdb0cc5a4e43b93fe3090f769a5c423588cf3f9d48499732a7e9"
+  }
+}
+
+package "base58" {
+  opam-version: "0.1"
+  name: "base58"
+  version: "0.1.0"
+  build: [
+    [make "lib.byte" "lib.native"]   
+  ]
+  install: [
+    [make "lib.install" ]
+  ]
+  remove:  [make "lib.uninstall"]
+  depends: [
+    "ocamlfind"  {build}
+    "ocamlbuild" {build}
+  ]
+  url {
+    src:
+      "https://github.com/mransan/base58/archive/7fc85731e775f41d687586894468c86e4e2b25ee.tar.gz"
+    checksum:
+      "sha256=6d6260845c247268385dc9e7f288d5d117c1e02abbb02b46fb7cd5f2be7fb073"
   }
 }
