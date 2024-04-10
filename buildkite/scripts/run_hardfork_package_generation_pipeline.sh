@@ -1,1 +1,0 @@
-echo '(./buildkite/src/Entrypoints/HardforkPackageGeneration.dhall)' | dhall-to-yaml --quoted 
