@@ -16,12 +16,11 @@ let
   repos = [ external-repo inputs.opam-repository ];
 
   export = opam-nix.importOpam "${src}/opam.export";
-  external-packages = pkgs.lib.getAttrs [ "sodium" "base58" ]
-    (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
+  # Dependencies required by every Mina package:
   # Packages which are `installed` in the export.
   # These are all the transitive ocaml dependencies of Mina.
-  export-installed = opam-nix.opamListToQuery export.installed;
+  implicit-deps = opam-nix.opamListToQuery export.installed;
 
   # Extra packages which are not in opam.export but useful for development, such as an LSP server.
   extra-packages = with implicit-deps; {
@@ -40,9 +39,6 @@ let
     stdune = "3.5.0";
     xdg = dune;
   };
-
-  # Dependencies required by every Mina package
-  implicit-deps = export-installed // external-packages;
 
   # Pins from opam.export
   pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package;
