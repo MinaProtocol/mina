@@ -37,6 +37,7 @@ roots: [
   "prometheus.v0.6.0"
   "qcheck.0.20"
   "qcheck-alcotest.0.20"
+  "sodium.dev"
   "re2.v0.14.0"
   "rpc_parallel.v0.14.0"
   "sexp_diff_kernel.v0.14.0"
@@ -241,6 +242,7 @@ installed: [
   "sexp_diff_kernel.v0.14.0"
   "sexplib.v0.14.0"
   "sexplib0.v0.14.0"
+  "sodium.dev"
   "spawn.v0.13.0"
   "splittable_random.v0.14.0"
   "stdint.0.7.0"
@@ -280,6 +282,7 @@ pinned: [
   "ppx_optcomp.v0.14.0"
   "prometheus.v0.6.0"
   "rpc_parallel.v0.14.0"
+  "sodium.dev"
 ]
 package "async_kernel" {
   opam-version: "2.0"
@@ -557,5 +560,31 @@ package "base58" {
       "https://github.com/mransan/base58/archive/7fc85731e775f41d687586894468c86e4e2b25ee.tar.gz"
     checksum:
       "sha256=6d6260845c247268385dc9e7f288d5d117c1e02abbb02b46fb7cd5f2be7fb073"
+  }
+}
+
+package "sodium" {
+  opam-version: "1.2"
+  name: "sodium"
+  version: "dev"
+  build: [
+    [make] { os != "freebsd" }
+  ]
+  install: [
+    [make "PREFIX=%{prefix}%" "install"]
+  ]
+  remove: [["ocamlfind" "remove" "sodium"]]
+  depends: [
+    "base-bigarray"
+    "base-bytes"
+    "ocamlfind" {build}
+    "ocamlbuild" {build}
+    "ctypes" {>= "0.6.0"}
+  ]
+  url {
+    src:
+      "https://github.com/o1-labs/ocaml-sodium/archive/adde9fd4db38eb65bb96ba1c71e6af4b5cdbae51.tar.gz"
+    checksum:
+      "sha256=b9285a5ff051ef142f27199150f720f92aa1401e1caffed5f4232aab42ed93ff"
   }
 }
