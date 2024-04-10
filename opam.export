@@ -33,7 +33,7 @@ roots: [
   "ppx_deriving_yojson.3.6.1"
   "ppx_optcomp.v0.14.0"
   "progress.0.2.2"
-  "prometheus.1.1"
+  "prometheus.v0.6.0"
   "qcheck.0.20"
   "qcheck-alcotest.0.20"
   "re2.v0.14.0"
@@ -223,7 +223,7 @@ installed: [
   "ppx_variants_conv.v0.14.2"
   "ppxlib.0.25.0"
   "progress.0.2.2"
-  "prometheus.1.1"
+  "prometheus.v0.6.0"
   "protocol_version_header.v0.14.0"
   "ptime.0.8.5"
   "qcheck.0.20"
@@ -276,8 +276,9 @@ pinned: [
   "capnp.3.4.0"
   "check_opam_switch.~dev"
   "graphql_ppx.1.2.2"
-  "rpc_parallel.v0.14.0"
   "ppx_optcomp.v0.14.0"
+  "prometheus.v0.6.0"
+  "rpc_parallel.v0.14.0"
 ]
 package "async_kernel" {
   opam-version: "2.0"
@@ -489,5 +490,47 @@ package "ppx_optcomp" {
       "https://github.com/MinaProtocol/ppx_optcomp/archive/2dfcf8104b1afee1a9ed0393d1f9f734c707e5c5.tar.gz"
     checksum:
       "sha256=081fd023e0d904c5a3490e7fa6bce80685d0ac43f45a3276b2c5addd0441afec"
+  }
+}
+
+package "prometheus" {
+  opam-version: "2.0"
+  version: "v0.6.0"
+  synopsis: "Client library for Prometheus monitoring"
+  maintainer: "talex5@gmail.com"
+  authors: ["Thomas Leonard" "David Scott"]
+  license: "Apache-2.0"
+  homepage: "https://github.com/mirage/prometheus"
+  doc: "https://mirage.github.io/prometheus/"
+  bug-reports: "https://github.com/mirage/prometheus/issues"
+  depends: [
+    "ocaml" {>= "4.01.0"}
+    "dune"
+    "astring"
+    "asetmap"
+    "fmt"
+    "re"
+    "lwt" {>= "2.5.0"}
+    "alcotest" {with-test}
+  ]
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+    ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+  ]
+  dev-repo: "git+https://github.com/mirage/prometheus.git"
+  description: """
+  To run services reliably, it is useful if they can report various metrics
+  (for example, heap size, queue lengths, number of warnings logged, etc).
+
+  A monitoring service can be configured to collect this data regularly.
+  The data can be graphed to help understand the performance of the service over time,
+  or to help debug problems quickly.
+  It can also be used to send alerts if a service is down or behaving poorly.
+  """
+  url {
+    src:
+      "https://github.com/MinaProtocol/prometheus/archive/f899ec0ad67b404dc541d0276481f6542a4eabbb.tar.gz"
+    checksum:
+      "sha256=8489c605f8cbbdb0cc5a4e43b93fe3090f769a5c423588cf3f9d48499732a7e9"
   }
 }
