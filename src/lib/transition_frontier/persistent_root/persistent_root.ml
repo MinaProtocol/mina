@@ -217,7 +217,7 @@ module Instance = struct
             }
         else (
           Ledger.Db.close snarked_ledger ;
-          Error `Snarked_ledger_mismatch )
+          Error (`Snarked_ledger_mismatch potential_snarked_ledger_hash))
     | Some snarked_ledger ->
         Ok
           { snarked_ledger

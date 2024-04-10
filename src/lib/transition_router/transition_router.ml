@@ -289,7 +289,7 @@ let load_frontier ~context:(module Context : CONTEXT) ~verifier
       None
   | Error (`Failure e) ->
       failwith ("failed to initialize transition frontier: " ^ e)
-  | Error `Snarked_ledger_mismatch ->
+  | Error (`Snarked_ledger_mismatch _) ->
       [%log warn] "Persistent database is out of sync with snarked_ledger" ;
       None
 

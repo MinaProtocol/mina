@@ -72,7 +72,7 @@ val load :
      , [ `Failure of string
        | `Bootstrap_required
        | `Persistent_frontier_malformed
-       | `Snarked_ledger_mismatch ] )
+       | `Snarked_ledger_mismatch of Frozen_ledger_hash.t ] )
      Deferred.Result.t
 
 val close : loc:string -> t -> unit Deferred.t
@@ -127,7 +127,7 @@ module For_tests : sig
        , [ `Failure of string
          | `Bootstrap_required
          | `Persistent_frontier_malformed
-         | `Snarked_ledger_mismatch ] )
+         | `Snarked_ledger_mismatch of Frozen_ledger_hash.t ] )
        Deferred.Result.t
 
   val gen_genesis_breadcrumb :

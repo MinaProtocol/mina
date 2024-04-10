@@ -594,7 +594,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                          code)"
                   | Error `Persistent_frontier_malformed ->
                       fail "persistent frontier was malformed"
-                  | Error `Snarked_ledger_mismatch ->
+                  | Error (`Snarked_ledger_mismatch _) ->
                       fail
                         "this should not happen, because we just reset the \
                          snarked_ledger"

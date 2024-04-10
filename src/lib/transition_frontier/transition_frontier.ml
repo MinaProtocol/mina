@@ -198,7 +198,7 @@ let rec load_with_max_length :
     -> ( t
        , [> `Bootstrap_required
          | `Persistent_frontier_malformed
-         | `Snarked_ledger_mismatch
+         | `Snarked_ledger_mismatch of Frozen_ledger_hash.t
          | `Failure of string ] )
        Deferred.Result.t =
  fun ~context:(module Context : CONTEXT) ~max_length
@@ -216,12 +216,13 @@ let rec load_with_max_length :
       Persistent_root.load_from_disk_exn persistent_root ~snarked_ledger_hash
         ~logger
     with
-    | Error _err as err_result ->
+    | Error (`Snarked_ledger_mismatch actual_hash) as err_result ->
         (* _err has type [> `Snarked_ledger_mismatch ] *)
         [%log warn] "Persisted frontier failed to load"
           ~metadata:
             [ ("error", `String "SNARKed ledger mismatch on load from disk")
             ; ("expected_snarked_ledger_hash", snarked_ledger_hash_json)
+            ; ("actual_snarked_ledger_hash", Frozen_ledger_hash.to_yojson actual_hash)
             ] ;
         [%str_log debug] Persisted_frontier_dropped ;
         let%map () =
@@ -248,7 +249,7 @@ let rec load_with_max_length :
                   [%str_log info] Bootstrap_required ;
                   "Bootstrap required"
               (* next two cases aren't reachable, needed for types to work out *)
-              | `Snarked_ledger_mismatch | `Persistent_frontier_malformed ->
+              | `Snarked_ledger_mismatch _ | `Persistent_frontier_malformed ->
                   failwith "Unexpected failure on loading transition frontier"
             in
             [%log warn] "Persisted frontier failed to load"
@@ -802,7 +803,7 @@ module For_tests = struct
           fail "bootstrap required"
       | Error `Persistent_frontier_malformed ->
           fail "persistent frontier malformed"
-      | Error `Snarked_ledger_mismatch ->
+      | Error (`Snarked_ledger_mismatch _) ->
           fail "persistent frontier is out of sync with snarked ledger"
       | Error (`Failure msg) ->
           fail msg
