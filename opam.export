@@ -31,6 +31,7 @@ roots: [
   "ppx_bitstring.4.1.0"
   "ppx_deriving.5.2.1"
   "ppx_deriving_yojson.3.6.1"
+  "ppx_optcomp.v0.14.0"
   "progress.0.2.2"
   "prometheus.1.1"
   "qcheck.0.20"
@@ -208,7 +209,7 @@ installed: [
   "ppx_js_style.v0.14.1"
   "ppx_let.v0.14.0"
   "ppx_module_timer.v0.14.0"
-  "ppx_optcomp.v0.14.3"
+  "ppx_optcomp.v0.14.0"
   "ppx_optional.v0.14.0"
   "ppx_pipebang.v0.14.0"
   "ppx_sexp_conv.v0.14.3"
@@ -275,6 +276,7 @@ pinned: [
   "check_opam_switch.~dev"
   "graphql_ppx.1.2.2"
   "rpc_parallel.v0.14.0"
+  "ppx_optcomp.v0.14.0"
 ]
 package "async_kernel" {
   opam-version: "2.0"
@@ -456,5 +458,36 @@ Rpc_parallel offers an API to define various workers and protocols,
       "https://github.com/MinaProtocol/rpc_parallel/archive/39d6eec98705d5cc1f3ed8479ef19b1a1e0ee70e.tar.gz"
     checksum:
       "sha256=2b6c758433c5fd12b4971380147be96f0ce5d239932fc7f6df1d84f306bcbd2a"
+  }
+}
+package "ppx_optcomp" {
+  opam-version: "2.0"
+  version: "v0.14.0"
+  maintainer: "opensource@janestreet.com"
+  authors: ["Jane Street Group, LLC <opensource@janestreet.com>"]
+  homepage: "https://github.com/janestreet/ppx_optcomp"
+  bug-reports: "https://github.com/janestreet/ppx_optcomp/issues"
+  dev-repo: "git+https://github.com/janestreet/ppx_optcomp.git"
+  doc: "https://ocaml.janestreet.com/ocaml-core/latest/doc/ppx_optcomp/index.html"
+  license: "MIT"
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+  ]
+  depends: [
+    "ocaml"  {>= "4.04.2"}
+    "base"   {>= "v0.14" & < "v0.15"}
+    "stdio"  {>= "v0.14" & < "v0.15"}
+    "dune"   {>= "2.0.0"}
+    "ppxlib" {>= "0.18.0"}
+  ]
+  synopsis: "Optional compilation for OCaml"
+  description: "
+  Part of the Jane Street's PPX rewriters collection.
+  "
+  url {
+    src:
+      "https://github.com/MinaProtocol/ppx_optcomp/archive/2dfcf8104b1afee1a9ed0393d1f9f734c707e5c5.tar.gz"
+    checksum:
+      "sha256=081fd023e0d904c5a3490e7fa6bce80685d0ac43f45a3276b2c5addd0441afec"
   }
 }
