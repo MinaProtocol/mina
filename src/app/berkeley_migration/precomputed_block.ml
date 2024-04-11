@@ -191,8 +191,8 @@ let parse_filename filename =
   in
   (network, height, state_hash)
 
-let list_directory ~network =
-  let%map filenames = Sys.readdir "." in
+let list_directory ~network ~path =
+  let%map filenames = Sys.readdir path in
   Array.to_list filenames
   |> List.filter_map ~f:(fun filename ->
          let%bind.Option filename_network, height, state_hash =
@@ -202,8 +202,8 @@ let list_directory ~network =
          else None )
   |> Id.Set.of_list
 
-let concrete_fetch_batch ~logger ~bucket ~network targets =
-  let%bind existing_targets = list_directory ~network in
+let concrete_fetch_batch ~logger ~bucket ~network targets ~local_path =
+  let%bind existing_targets = list_directory ~network ~path:local_path in
   [%log info] "Found %d individually downloaded precomputed blocks"
     (Set.length existing_targets) ;
   let missing_targets = Set.diff (Id.Set.of_list targets) existing_targets in
@@ -227,7 +227,7 @@ let concrete_fetch_batch ~logger ~bucket ~network targets =
            (bar ~data:`Latest ~total:num_missing_targets "Downloading blocks")
            (fun f ->
              let rec progress_loop () =
-               let%bind existing = list_directory ~network in
+               let%bind existing = list_directory ~network ~path:local_path in
                let downloaded_targets =
                  Set.length (Set.inter missing_targets existing)
                in
@@ -303,6 +303,6 @@ let delete_fetched_concrete ~network targets : unit Deferred.t =
               failwithf "Could not delete fetched precomputed blocks, error %s"
                 (Error.to_string_hum err) () ) )
 
-let delete_fetched ~network : unit Deferred.t =
-  let%bind block_ids = list_directory ~network in
+let delete_fetched ~network ~path : unit Deferred.t =
+  let%bind block_ids = list_directory ~network ~path in
   delete_fetched_concrete ~network (Set.to_list block_ids)

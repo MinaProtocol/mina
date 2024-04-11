@@ -337,8 +337,9 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
 
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
     ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
-    ~stream_precomputed_blocks ~keep_precomputed_blocks ~log_json ~log_level
-    ~file_log_level ~log_filename () =
+    ~stream_precomputed_blocks ~keep_precomputed_blocks
+    ~precomputed_blocks_local_path ~log_json ~log_level ~file_log_level
+    ~log_filename () =
   Cli_lib.Stdout_log.setup log_json log_level ;
   Option.iter log_filename ~f:(fun log_filename ->
       Logger.Consumer_registry.register ~id:"default"
@@ -498,6 +499,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
         Precomputed_block.concrete_fetch_batch ~logger
           ~bucket:mina_network_blocks_bucket ~network
           (required_precomputed_blocks blocks)
+          ~local_path:precomputed_blocks_local_path
       in
       let%bind prefetched_precomputed_blocks =
         if stream_precomputed_blocks then return Mina_base.State_hash.Map.empty
@@ -574,7 +576,10 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
         (* this will still run even if we are downloading precomputed blocks in batches, to handle any leftover blocks from prior runs *)
         if not keep_precomputed_blocks then (
           [%log info] "Deleting all precomputed blocks" ;
-          let%map () = Precomputed_block.delete_fetched ~network in
+          let%map () =
+            Precomputed_block.delete_fetched ~network
+              ~path:precomputed_blocks_local_path
+          in
           [%log info] "Done migrating mainnet blocks!" )
         else Deferred.unit
       in
@@ -635,6 +640,11 @@ let () =
              ~doc:
                "Keep the precomputed blocks on-disk after the migration is \
                 complete"
+         and precomputed_blocks_local_path =
+           Param.flag "--precomputed-blocks-local-path"
+             ~aliases:[ "-precomputed-blocks-local-path" ]
+             Param.(required string)
+             ~doc:"PATH the precomputed blocks on-disk location"
          and log_json = Cli_lib.Flag.Log.json
          and log_level = Cli_lib.Flag.Log.level
          and file_log_level = Cli_lib.Flag.Log.file_log_level
@@ -642,4 +652,5 @@ let () =
          main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
            ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
            ~stream_precomputed_blocks ~keep_precomputed_blocks ~log_json
-           ~log_level ~log_filename ~file_log_level )))
+           ~log_level ~log_filename ~file_log_level
+           ~precomputed_blocks_local_path )))
