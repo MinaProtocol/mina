@@ -238,7 +238,7 @@ module Transport = struct
 
     let create () = ()
 
-    let transport () s = Progress.interject_with (fun () -> print_endline s)
+    let transport () = print_endline
   end
 
   let stdout () = T ((module Stdout), Stdout.create ())
@@ -442,9 +442,6 @@ module Structured = struct
     -> unit
 
   let log t ~level ~module_ ~location ?(metadata = []) event =
-    let module_ =
-      String.substr_replace_first ~pattern:"Dune__exe__" ~with_:"" module_
-    in
     let message, event_id, str_metadata = Structured_log_events.log event in
     let event_id = Some event_id in
     let metadata = str_metadata @ metadata in

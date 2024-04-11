@@ -16,7 +16,7 @@ RED='\033[0;31m'
 # global variable
 ################################################################################
 declare -r CLI_VERSION='1.0.0';
-declare -r CLI_NAME="$0";
+declare -r CLI_NAME='berkeley_migration.sh';
 declare -r PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 
 CHECKPOINT_PREFIX=migration
@@ -30,6 +30,7 @@ function check_required() {
 check_required mina-berkeley-migration
 check_required mina-berkeley-migration-verifier
 check_required mina-migration-replayer
+check_required mina-logproc
 check_required jq
 check_required gsutil
 

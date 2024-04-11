@@ -75,8 +75,6 @@ module Log : sig
   val file_log_level : Logger.Level.t Command.Param.t
 
   val file_log_rotations : int Command.Param.t
-
-  val file : string option Command.Param.t
 end
 
 type signed_command_common =
