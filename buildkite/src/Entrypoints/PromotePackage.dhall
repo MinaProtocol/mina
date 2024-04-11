@@ -40,7 +40,7 @@ let promote_artifacts =
             , codename = codename
             , from_channel = from_channel
             , to_channel = to_channel
-            , step_key = "promote-debian-${Package.lowerName debian}-from-${DebianChannel.lowerName from_channel}-to-${DebianChannel.lowerName to_channel}"
+            , step_key = "promote-debian-${Package.lowerName debian}-${DebianVersions.lowerName codename}-from-${DebianChannel.lowerName from_channel}-to-${DebianChannel.lowerName to_channel}"
           }
         )
         codenames
@@ -74,7 +74,7 @@ let promote_artifacts =
               , version = version
               , codename = codename
               , new_tag = new_version
-              , step_key = "add-tag-to-${Artifact.lowerName docker}-docker"
+              , step_key = "add-tag-to-${Artifact.lowerName docker}-${DebianVersions.lowerName codename}-docker"
           }
         )
         codenames
