@@ -240,7 +240,7 @@ module User_command = struct
         ]
 
   let query =
-    Caqti_request.collect Mina_caqti.array_int_typ typ
+    Caqti_request.collect Caqti_type.int typ
       {sql| SELECT command_type,fee_payer_id, source_id,receiver_id,fee,amount,valid_until,memo,nonce,
                    blocks.id,blocks.height,blocks.global_slot_since_genesis,
                    sequence_no,status
@@ -255,12 +255,12 @@ module User_command = struct
 
             ON blocks.id = buc.block_id
 
-            WHERE uc.id = ANY($1)
+            WHERE uc.id = $1
 
        |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) user_cmd_ids =
-    Conn.collect_list query (List.to_array user_cmd_ids)
+  let run (module Conn : Caqti_async.CONNECTION) user_cmd_id =
+    Conn.collect_list query user_cmd_id
 end
 
 module Zkapp_command_ids = struct
@@ -348,13 +348,13 @@ module Internal_command = struct
   *)
   let query =
     Caqti_request.collect
-      Caqti_type.(tup2 int64 Mina_caqti.array_int_typ)
+      Caqti_type.(tup2 int64 int)
       typ
       {sql| SELECT command_type,receiver_id,fee,
                    b.id,b.height,b.global_slot_since_genesis,
                    sequence_no,secondary_sequence_no
 
-            FROM (SELECT * FROM internal_commands WHERE id = ANY($2)) AS ic
+            FROM (SELECT * FROM internal_commands WHERE id = $2) AS ic
 
             INNER JOIN blocks_internal_commands AS bic
 
@@ -371,8 +371,8 @@ module Internal_command = struct
             WHERE b.global_slot_since_genesis >= $1
        |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~start_slot ~internal_cmd_ids =
-    Conn.collect_list query (start_slot, List.to_array internal_cmd_ids)
+  let run (module Conn : Caqti_async.CONNECTION) ~start_slot ~internal_cmd_id =
+    Conn.collect_list query (start_slot, internal_cmd_id)
 end
 
 module Public_key = struct

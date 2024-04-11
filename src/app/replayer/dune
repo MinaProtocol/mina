@@ -24,7 +24,6 @@
    uri
    integers
    async_unix
-   progress
    ;; local libraries
    mina_wire_types
    with_hash

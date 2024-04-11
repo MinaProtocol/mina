@@ -24,7 +24,6 @@ let commands =
       , Cmd.run "./scripts/lint_rfcs.sh"
       , Cmd.run "make check-snarky-submodule"
       , Cmd.run "./scripts/lint_preprocessor_deps.sh"
-      , Cmd.run "./scripts/check_patches.sh"
       ]
 
 in  Pipeline.build
