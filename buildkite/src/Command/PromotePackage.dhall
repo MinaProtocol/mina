@@ -58,6 +58,7 @@ let PromoteDockerSpec = {
     name: Artifact.Type,
     version: Text,
     profile: Profiles.Type,
+    codename: DebianVersions.DebVersion,
     new_tag: Text,
     step_key: Text,
     `if`: Optional B/If
@@ -69,6 +70,7 @@ let PromoteDockerSpec = {
     new_tag = "",
     step_key = "promote-docker",
     profile = Profiles.Type.Standard,
+    codename = DebianVersions.DebVersion.Bullseye,
     `if` = None B/If
   }
 }
@@ -80,7 +82,7 @@ let promoteDebianStep = \(spec : PromoteDebianSpec.Type) ->
         commands = Toolchain.runner DebianVersions.DebVersion.Bullseye [
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY"
-        ] "./buildkite/scripts/promote-deb.sh --package ${Package.debianName spec.package}${Profiles.toLabelSegment spec.profile} --version ${spec.version} --new-version ${spec.new_version} --architecture ${spec.architecture} --codename ${DebianVersions.lowerName spec.codename} --from-component ${DebianChannel.lowerName spec.from_channel} --to-component ${DebianChannel.lowerName spec.to_channel}",
+        ] "./buildkite/scripts/promote-deb.sh --package ${Package.debianName spec.package}${Profiles.toLabelSegment spec.profile} --version ${spec.version}  --new-version ${spec.new_version}  --architecture ${spec.architecture}  --codename ${DebianVersions.lowerName spec.codename}  --from-component ${DebianChannel.lowerName spec.from_channel}  --to-component ${DebianChannel.lowerName spec.to_channel}",
         label = "Debian: ${spec.step_key}",
         key = spec.step_key,
         target = Size.XLarge,
@@ -92,7 +94,7 @@ let promoteDockerStep = \(spec : PromoteDockerSpec.Type) ->
     Command.build
       Command.Config::{
         commands = [ 
-          Cmd.run "./buildkite/scripts/promote-docker.sh --name ${Artifact.dockerName spec.name}${Profiles.toLabelSegment spec.profile} --version ${spec.version} --tag ${spec.new_tag}"
+          Cmd.run "./buildkite/scripts/promote-docker.sh --name ${Artifact.dockerName spec.name}${Profiles.toLabelSegment spec.profile}  --version ${spec.version} --tag ${spec.new_tag}"
         ],
         label = "Docker: ${spec.step_key}",
         key = spec.step_key,

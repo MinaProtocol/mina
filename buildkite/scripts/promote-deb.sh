@@ -12,6 +12,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -c|--codename) CODENAME="$2"; shift;;
   -s|--from-component) FROM_COMPONENT="$2"; shift;;
   -t|--to-component) TO_COMPONENT="$2"; shift;;
+  --new-name) NEW_NAME="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -23,6 +24,7 @@ function usage() {
   echo "  -p, --package          The Package name (mina-logproc, mina-archive etc.)"
   echo "  --version              The Debian version"
   echo "  --new-version          The Debian version"
+  echo "  --new-name             The New Debian name"
   echo "  -a, --architecture     The Debian package architecture (amd64 etc.)"
   echo "  -s, --from-component   The source channel in which package currently resides"
   echo "  -t, --to-component     The target channel for package (unstable, alpha, beta etc.)"
@@ -36,6 +38,7 @@ if [[ -z "$PACKAGE" ]]; then usage "Package is not set!"; fi;
 if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
 if [[ -z "$ARCH" ]]; then usage "Architecture is not set!"; fi;
 if [[ -z "$CODENAME" ]]; then usage "Codename is not set!"; fi;
+if [[ -z "$NEW_NAME" ]]; then NEW_NAME=$DEB; fi;
 if [[ -z "$FROM_COMPONENT" ]]; then usage "Source component is not set!"; fi;
 if [[ -z "$TO_COMPONENT" ]]; then usage "Target component is not set!"; fi;
 
@@ -58,5 +61,8 @@ else
     --new-release $TO_COMPONENT \
     --old-release $FROM_COMPONENT \
     --old-version $VERSION \
-    --new-version $NEW_VERSION
+    --new-version $NEW_VERSION \
+    --suite $FROM_COMPONENT \
+    --new-suite $TO_COMPONENT \
+    --new-name $NEW_NAME
 fi

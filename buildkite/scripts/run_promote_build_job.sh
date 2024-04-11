@@ -27,15 +27,16 @@ function usage() {
   if [[ -n "$1" ]]; then
     echo -e "${RED}☞  $1${CLEAR}\n";
   fi
-  echo "  DEBIANS             The comma delimitered debian names. For example: 'Daemon,Archive' "
-  echo "  DOCKERS             The comma delimitered docker names. For example: 'Daemon,Archive' "
-  echo "  CODENAME            The Debian codename (Bullseye, Buster etc.)"
-  echo "  VERSION             The Docker or Debian version"
-  echo "  NEW_VERSION         The new Debian version or new Docker tag"
-  echo "  PROFILE             The Docker and Debian profile (Standard, Lightnet)"
-  echo "  FROM_CHANNEL        The Docker name (mina-berkeley, mina-archive etc.)"
-  echo "  TO_CHANNEL          The Docker version"
-  echo "  PUBLISH             The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io"
+  echo "  DEBIANS                     The comma delimitered debian names. For example: 'Daemon,Archive' "
+  echo "  DOCKERS                     The comma delimitered docker names. For example: 'Daemon,Archive' "
+  echo "  CODENAMES                   The Debian codenames (Bullseye, Buster etc.)"
+  echo "  FROM_VERSION                The Source Docker or Debian version "
+  echo "  NEW_VERSION                 The new Debian version or new Docker tag"
+  echo "  REMOVE_PROFILE_FROM_NAME    Should we remove profile suffix from debian name"
+  echo "  PROFILE                     The Docker and Debian profile (Standard, Lightnet)"
+  echo "  FROM_CHANNEL                Source debian channel"
+  echo "  TO_CHANNEL                  Target debian channel"
+  echo "  PUBLISH                     The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io"
   echo ""
   exit 1
 }
@@ -46,11 +47,12 @@ DHALL_DEBIANS="([] : List (./buildkite/src/Constants/DebianPackage.dhall).Type)"
 
 
 if [[ -n "$DEBIANS" ]]; then 
-    if [[ -z "$CODENAME" ]]; then usage "Codename is not set!"; fi;
+    if [[ -z "$CODENAMES" ]]; then usage "Codenames is not set!"; fi;
     if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
+    if [[ -z "$REMOVE_PROFILE_FROM_NAME" ]]; then REMOVE_PROFILE_FROM_NAME=0; fi;
     if [[ -z "$FROM_CHANNEL" ]]; then usage "'From channel' arg is not set!"; fi;
     if [[ -z "$TO_CHANNEL" ]]; then usage "'To channel' arg is not set!"; fi;
-    if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
+    if [[ -z "$FROM_VERSION" ]]; then usage "Version is not set!"; fi;
     if [[ -z "$NEW_VERSION" ]]; then NEW_VERSION=$VERSION; fi;
     
 
@@ -78,4 +80,12 @@ if [[ -n "$DOCKERS" ]]; then
   DHALL_DOCKERS="[${DHALL_DOCKERS:1}]"
 fi
 
-echo '(./buildkite/src/Entrypoints/PromotePackage.dhall).promote_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${VERSION}"'" "'"${NEW_VERSION}"'" "amd64" (./buildkite/src/Constants/Profiles.dhall).Type.'"${PROFILE}"' (./buildkite/src/Constants/DebianVersions.dhall).DebVersion.'"${CODENAME}"' (./buildkite/src/Constants/DebianChannel.dhall).Type.'"${FROM_CHANNEL}"' (./buildkite/src/Constants/DebianChannel.dhall).Type.'"${TO_CHANNEL}"' "'"${TAG}"'" ' | dhall-to-yaml --quoted 
+local __codenames=(${CODENAMES//,/ })
+DHALL_CODENAMES=""
+  for i in "${__codenames[@]}"; do
+    DHALL_CODENAMES="${DHALL_CODENAMES}, (./buildkite/src/Constants/DebianVersions.dhall).DebVersion.${i}"
+  done
+  DHALL_CODENAMES="[${DHALL_CODENAMES:1}]"
+
+
+echo '(./buildkite/src/Entrypoints/PromotePackage.dhall).promote_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${FROM_VERSION}"'" "'"${NEW_VERSION}"'" "amd64" (./buildkite/src/Constants/Profiles.dhall).Type.'"${PROFILE}"' '"${DHALL_CODENAMES}"' (./buildkite/src/Constants/DebianChannel.dhall).Type.'"${FROM_CHANNEL}"' (./buildkite/src/Constants/DebianChannel.dhall).Type.'"${TO_CHANNEL}"' "'"${TAG}"'" ' | dhall-to-yaml --quoted 
