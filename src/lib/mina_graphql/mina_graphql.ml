@@ -2396,10 +2396,11 @@ module Queries = struct
                         let global_slot =
                           Mina_state.Protocol_state.consensus_state
                             protocol_state
-                          |> Consensus.Data.Consensus_state.curr_global_slot
+                          |> Consensus.Data.Consensus_state
+                             .global_slot_since_genesis
                         in
                         if
-                          Mina_numbers.Global_slot_since_hard_fork.( < )
+                          Mina_numbers.Global_slot_since_genesis.( < )
                             global_slot stop_slot
                         then return breadcrumb
                         else
