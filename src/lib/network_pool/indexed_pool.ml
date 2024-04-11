@@ -26,7 +26,7 @@ module Config = struct
     { constraint_constants : Genesis_constants.Constraint_constants.t
     ; consensus_constants : Consensus.Constants.t
     ; time_controller : Block_time.Controller.t
-    ; slot_tx_end : Mina_numbers.Global_slot_since_hard_fork.t option
+    ; slot_tx_end : Mina_numbers.Global_slot_since_genesis.t option
     }
   [@@deriving sexp_of, equal, compare]
 end
@@ -906,16 +906,29 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
     let open Command_error in
     let open M.Let_syntax in
     let current_global_slot =
-      Consensus.Data.Consensus_time.(
-        to_global_slot
-          (of_time_exn ~constants:consensus_constants
-             (Block_time.now time_controller) ))
+      let global_slots_since_hard_fork =
+        let global_slot_since_hard_fork =
+          Consensus.Data.Consensus_time.(
+            to_global_slot
+              (of_time_exn ~constants:consensus_constants
+                 (Block_time.now time_controller) ))
+        in
+        Option.value_exn
+        @@ Global_slot_since_hard_fork.(diff global_slot_since_hard_fork zero)
+      in
+      Global_slot_since_genesis.add
+        ( match constraint_constants.fork with
+        | None ->
+            Global_slot_since_genesis.zero
+        | Some { global_slot_since_genesis; _ } ->
+            global_slot_since_genesis )
+        global_slots_since_hard_fork
     in
     let%bind () =
       M.of_result
       @@ Result.ok_if_true ~error:After_slot_tx_end
       @@ Option.value_map slot_tx_end ~default:true ~f:(fun slot_tx_end' ->
-             Global_slot_since_hard_fork.(current_global_slot < slot_tx_end') )
+             Global_slot_since_genesis.(current_global_slot < slot_tx_end') )
     in
     let unchecked_cmd = Transaction_hash.User_command.of_checked cmd in
     let unchecked = Transaction_hash.User_command.data unchecked_cmd in
@@ -1169,15 +1182,28 @@ let add_from_backtrack :
        } as t ) cmd ->
   let open Result.Let_syntax in
   let current_global_slot =
-    Consensus.Data.Consensus_time.(
-      to_global_slot
-        (of_time_exn ~constants:consensus_constants
-           (Block_time.now time_controller) ))
+    let global_slots_since_hard_fork =
+      let global_slot_since_hard_fork =
+        Consensus.Data.Consensus_time.(
+          to_global_slot
+            (of_time_exn ~constants:consensus_constants
+               (Block_time.now time_controller) ))
+      in
+      Option.value_exn
+      @@ Global_slot_since_hard_fork.(diff global_slot_since_hard_fork zero)
+    in
+    Global_slot_since_genesis.add
+      ( match constraint_constants.fork with
+      | None ->
+          Global_slot_since_genesis.zero
+      | Some { global_slot_since_genesis; _ } ->
+          global_slot_since_genesis )
+      global_slots_since_hard_fork
   in
   let%bind () =
     Result.ok_if_true ~error:Command_error.After_slot_tx_end
     @@ Option.value_map slot_tx_end ~default:true ~f:(fun slot_tx_end' ->
-           Global_slot_since_hard_fork.(current_global_slot < slot_tx_end') )
+           Global_slot_since_genesis.(current_global_slot < slot_tx_end') )
   in
   let unchecked =
     Transaction_hash.User_command_with_valid_signature.command cmd

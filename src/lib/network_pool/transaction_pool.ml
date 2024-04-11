@@ -288,7 +288,7 @@ struct
               *)
         ; verifier : (Verifier.t[@sexp.opaque])
         ; genesis_constants : Genesis_constants.t
-        ; slot_tx_end : Mina_numbers.Global_slot_since_hard_fork.t option
+        ; slot_tx_end : Mina_numbers.Global_slot_since_genesis.t option
         }
       [@@deriving sexp_of]
 
@@ -3127,13 +3127,9 @@ let%test_module _ =
 
     let%test_unit "transactions added before slot_tx_end are accepted" =
       Thread_safe.block_on_async_exn (fun () ->
-          let curr_slot =
-            Mina_numbers.(
-              Global_slot_since_hard_fork.of_uint32
-              @@ Global_slot_since_genesis.to_uint32 @@ current_global_slot ())
-          in
+          let curr_slot = current_global_slot () in
           let slot_tx_end =
-            Mina_numbers.Global_slot_since_hard_fork.(succ @@ succ curr_slot)
+            Mina_numbers.Global_slot_since_genesis.(succ @@ succ curr_slot)
           in
           let%bind t = setup_test ~slot_tx_end () in
           assert_pool_txs t [] ;
@@ -3141,26 +3137,18 @@ let%test_module _ =
 
     let%test_unit "transactions added at slot_tx_end are rejected" =
       Thread_safe.block_on_async_exn (fun () ->
-          let curr_slot =
-            Mina_numbers.(
-              Global_slot_since_hard_fork.of_uint32
-              @@ Global_slot_since_genesis.to_uint32 @@ current_global_slot ())
-          in
+          let curr_slot = current_global_slot () in
           let%bind t = setup_test ~slot_tx_end:curr_slot () in
           assert_pool_txs t [] ;
           add_commands t independent_cmds >>| assert_pool_apply [] )
 
     let%test_unit "transactions added after slot_tx_end are rejected" =
       Thread_safe.block_on_async_exn (fun () ->
-          let curr_slot =
-            Mina_numbers.(
-              Global_slot_since_hard_fork.of_uint32
-              @@ Global_slot_since_genesis.to_uint32 @@ current_global_slot ())
-          in
+          let curr_slot = current_global_slot () in
           let slot_tx_end =
             Option.value_exn
             @@ Mina_numbers.(
-                 Global_slot_since_hard_fork.(
+                 Global_slot_since_genesis.(
                    sub curr_slot @@ Global_slot_span.of_int 1))
           in
           let%bind t = setup_test ~slot_tx_end () in

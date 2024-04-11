@@ -116,10 +116,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Time.Span.of_ms @@ float_of_int (num_slots * window_ms))
     in
     let slot_tx_end =
-      Mina_numbers.Global_slot_since_hard_fork.of_int slot_tx_end
+      Mina_numbers.Global_slot_since_genesis.of_int slot_tx_end
     in
     let slot_chain_end =
-      Mina_numbers.Global_slot_since_hard_fork.of_int slot_chain_end
+      Mina_numbers.Global_slot_since_genesis.of_int slot_chain_end
     in
     let%bind () =
       section_hard "spawn transaction sending"
@@ -160,8 +160,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "blocks produced before slot_tx_end"
         ( ok_if_true "only empty blocks were produced before slot_tx_end"
         @@ List.exists blocks ~f:(fun block ->
-               Mina_numbers.Global_slot_since_hard_fork.(
-                 block.slot < slot_tx_end)
+               Mina_numbers.Global_slot_since_genesis.(
+                 block.slot_since_genesis < slot_tx_end)
                && ( block.command_transaction_count <> 0
                   || block.snark_work_count <> 0
                   || Currency.Amount.(block.coinbase <> zero) ) ) )
@@ -173,13 +173,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                Printf.sprintf
                  "non-empty block after slot_tx_end. block slot since genesis: \
                   %s, txn count: %d, snark work count: %d, coinbase: %s"
-                 (Mina_numbers.Global_slot_since_hard_fork.to_string block.slot)
+                 (Mina_numbers.Global_slot_since_genesis.to_string
+                    block.slot_since_genesis )
                  block.command_transaction_count block.snark_work_count
                  (Currency.Amount.to_string block.coinbase)
              in
              ok_if_true msg
-               ( Mina_numbers.Global_slot_since_hard_fork.(
-                   block.slot < slot_tx_end)
+               ( Mina_numbers.Global_slot_since_genesis.(
+                   block.slot_since_genesis < slot_tx_end)
                || block.command_transaction_count = 0
                   && block.snark_work_count = 0
                   && Currency.Amount.(block.coinbase = zero) ) ) )
@@ -188,13 +189,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "blocks produced before slot_chain_end"
         ( ok_if_true "no block produced before slot_chain_end"
         @@ List.exists blocks ~f:(fun block ->
-               Mina_numbers.Global_slot_since_hard_fork.(
-                 block.slot < slot_chain_end) ) )
+               Mina_numbers.Global_slot_since_genesis.(
+                 block.slot_since_genesis < slot_chain_end) ) )
     in
     section "no blocks produced after slot_chain_end"
       ( ok_if_true "blocks produced after slot_chain_end"
       @@ not
       @@ List.exists blocks ~f:(fun block ->
-             Mina_numbers.Global_slot_since_hard_fork.(
-               block.slot >= slot_chain_end) ) )
+             Mina_numbers.Global_slot_since_genesis.(
+               block.slot_since_genesis >= slot_chain_end) ) )
 end
