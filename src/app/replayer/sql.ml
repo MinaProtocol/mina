@@ -347,14 +347,12 @@ module Internal_command = struct
      the call to Staged_ledger.apply in Block_producer
   *)
   let query =
-    Caqti_request.collect
-      Caqti_type.(tup2 int64 Mina_caqti.array_int_typ)
-      typ
+    Caqti_request.collect Mina_caqti.array_int_typ typ
       {sql| SELECT command_type,receiver_id,fee,
                    b.id,b.height,b.global_slot_since_genesis,
                    sequence_no,secondary_sequence_no
 
-            FROM (SELECT * FROM internal_commands WHERE id = ANY($2)) AS ic
+            FROM internal_commands AS ic
 
             INNER JOIN blocks_internal_commands AS bic
 
@@ -364,15 +362,11 @@ module Internal_command = struct
 
             ON b.id = bic.block_id
 
-            INNER JOIN blocks as parent
-
-            ON parent.id = b.parent_id
-
-            WHERE b.global_slot_since_genesis >= $1
+            WHERE ic.id = ANY($1)
        |sql}
 
-  let run (module Conn : Caqti_async.CONNECTION) ~start_slot ~internal_cmd_ids =
-    Conn.collect_list query (start_slot, List.to_array internal_cmd_ids)
+  let run (module Conn : Caqti_async.CONNECTION) ~internal_cmd_ids =
+    Conn.collect_list query (List.to_array internal_cmd_ids)
 end
 
 module Public_key = struct

@@ -840,10 +840,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                 let open Deferred.Let_syntax in
                 match%map
                   Caqti_async.Pool.use
-                    (fun db ->
-                      Sql.Internal_command.run db
-                        ~start_slot:input.start_slot_since_genesis
-                        ~internal_cmd_ids:ids )
+                    (fun db -> Sql.Internal_command.run db ~internal_cmd_ids:ids)
                     pool
                 with
                 | Ok [] ->
