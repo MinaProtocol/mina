@@ -33,19 +33,19 @@ TEST_EXECUTIVE_DEPS=", mina-logproc, python3, nodejs, yarn, google-cloud-sdk, ku
 
 case "${MINA_DEB_CODENAME}" in
   bookworm|jammy)
-    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc, mina-create-legacy-genesis"
+    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   bullseye|focal)
-    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8, mina-logproc, mina-create-legacy-genesis"
+    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   buster)
-    DAEMON_DEPS=", libffi6, libjemalloc2, libpq-dev, libprocps7, mina-logproc, mina-create-legacy-genesis"
+    DAEMON_DEPS=", libffi6, libjemalloc2, libpq-dev, libprocps7, mina-logproc"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   stretch|bionic)
-    DAEMON_DEPS=", libffi6, libjemalloc1, libpq-dev, libprocps6, mina-logproc, mina-create-legacy-genesis"
+    DAEMON_DEPS=", libffi6, libjemalloc1, libpq-dev, libprocps6, mina-logproc"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc1"
     ;;
   *)
@@ -285,7 +285,7 @@ build_daemon_deb() {
     echo "------------------------------------------------------------"
     echo "--- Building mainnet deb without keys:"
 
-    create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+    create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}, mina-create-legacy-genesis" 'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
     copy_common_daemon_configs mainnet mainnet 'mina-seed-lists/mainnet_seeds.txt'
 
@@ -301,7 +301,7 @@ build_daemon_deb() {
     echo "------------------------------------------------------------"
     echo "--- Building testnet signatures deb without keys:"
 
-    copy_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network'
+    copy_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}, mina-create-legacy-genesis" 'Mina Protocol Client and Daemon for the Devnet Network'
 
     copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
 
@@ -314,7 +314,7 @@ build_daemon_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building Mina Berkeley testnet signatures deb without keys:"
 
-  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}, mina-create-legacy-genesis" 'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
 
