@@ -31,6 +31,10 @@ echo "--- Download and extract previous network config"
 curl -o config.json.gz $CONFIG_JSON_GZ_URL
 gunzip config.json.gz
 
+# Patch against a bug in 1.4 which is fixed by PR #15462
+mv config.json config_orig.json
+jq 'del(.ledger.num_accounts) | del(.ledger.name)' config_orig.json > config.json 
+
 echo "--- Migrate accounts to new network format"
 # TODO: At this stage, we need to migrate the json accounts into the new network's format.
 #       For now, this is hard-coded to the mainnet -> berkeley migration, but we need to select
@@ -63,7 +67,7 @@ for file in hardfork_ledgers/*; do
     oldhash=$(openssl dgst -r -sha3-256 "$file" | awk '{print $1}')
     aws s3 cp "s3://snark-keys.o1test.net/$filename" "$file"
     newhash=$(openssl dgst -r -sha3-256 "$file" | awk '{print $1}')
-    sed -i 's/$oldhash/$newhash/g' new_config.json 
+    sed -i "s/$oldhash/$newhash/g" new_config.json 
   else
     aws s3 cp --acl public-read "$file" s3://snark-keys.o1test.net/
   fi
