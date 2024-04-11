@@ -156,10 +156,18 @@ function extract_ledgers() {
     "$MINA_EXE" client stop
 }
 
-extract_ledgers "$PACKAGED_DAEMON_CONFIG" "$GENESIS_LEDGER_DIR" "$workdir/packaged"
-mv -t "$workdir/ledgers-backup" /var/lib/coda/*.tar.gz
+mkdir -p "$workdir/ledgers-downloaded"
+
+mv -t "$workdir/ledgers-backup" "$GENESIS_LEDGER_DIR"/*.tar.gz
+if [ -z ${NO_TEST_LEDGER_DOWNLOAD+z} ]; then
+    # We removed all *.tar.gz from GENESIS_LEDGER_DIR (in case it's one of default paths)
+    # and expect Mina node to be able to download these from S3
+    extract_ledgers "$PACKAGED_DAEMON_CONFIG" "$workdir/ledgers-downloaded" "$workdir/downloaded"
+    rm -Rf /tmp/coda_cache_dir/*.tar.gz /tmp/s3_cache_dir/*.tar.gz
+fi
 extract_ledgers "$workdir/config-substituted.json" "$workdir/ledgers" "$workdir/reference"
-mv -t /var/lib/coda "$workdir/ledgers-backup"/*
+mv -t "$GENESIS_LEDGER_DIR" "$workdir/ledgers-backup"/*
+extract_ledgers "$PACKAGED_DAEMON_CONFIG" "$GENESIS_LEDGER_DIR" "$workdir/packaged"
 
 echo "Performing final comparisons..." >&2
 error=0
@@ -182,6 +190,12 @@ for file in "$workdir"/packaged-*.json; do
     if ! cmp "$file" "$workdir/reference-$name.json"; then
         echo "Error: $file does not match reference" >&2
         error=1
+    fi
+    if [ -z ${NO_TEST_LEDGER_DOWNLOAD+z} ]; then
+        if ! cmp "$file" "$workdir/downloaded-$name.json"; then
+            echo "Error: $file does not match downloaded" >&2
+            error=1
+        fi
     fi
 done
 
