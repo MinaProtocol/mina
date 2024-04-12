@@ -67,6 +67,10 @@ let
           export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
         '';
       };
+
+      rocksdb_stubs = super.rocksdb_stubs.overrideAttrs {
+        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
+      };
     };
 
   scope = opam-nix.applyOverlays (opam-nix.__overlays ++ [ implicit-deps-overlay ])

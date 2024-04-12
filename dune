@@ -1,6 +1,4 @@
 (rule
- (target graphql_schema.json)
+ (targets graphql_schema.json)
  (mode promote)
- (deps
-  (:< src/app/graphql_schema_dump/graphql_schema_dump.exe))
- (action (with-stdout-to %{target} (run %{<}))))
+ (action (with-stdout-to graphql_schema.json (run %{exe:src/app/graphql_schema_dump/graphql_schema_dump.exe}))))

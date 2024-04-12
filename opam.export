@@ -39,6 +39,8 @@ roots: [
   "qcheck-alcotest.0.20"
   "sodium.dev"
   "re2.v0.14.0"
+  "rocks.0.1"
+  "rocksdb_stubs.5.17.2"
   "rpc_parallel.v0.14.0"
   "sexp_diff_kernel.v0.14.0"
   "utop.2.9.1"
@@ -236,6 +238,8 @@ installed: [
   "react.1.2.1"
   "res.5.0.1"
   "result.1.5"
+  "rocks.0.1"
+  "rocksdb_stubs.5.17.2"
   "rpc_parallel.v0.14.0"
   "rresult.0.6.0"
   "seq.base"
@@ -281,6 +285,8 @@ pinned: [
   "graphql_ppx.1.2.2"
   "ppx_optcomp.v0.14.0"
   "prometheus.v0.6.0"
+  "rocks.0.1"
+  "rocksdb_stubs.5.17.2"
   "rpc_parallel.v0.14.0"
   "sodium.dev"
 ]
@@ -586,5 +592,48 @@ package "sodium" {
       "https://github.com/o1-labs/ocaml-sodium/archive/adde9fd4db38eb65bb96ba1c71e6af4b5cdbae51.tar.gz"
     checksum:
       "sha256=b9285a5ff051ef142f27199150f720f92aa1401e1caffed5f4232aab42ed93ff"
+  }
+}
+package "rocksdb_stubs" {
+  opam-version: "2.0"
+  version: "5.17.2"
+  # Contents of extra source: 'stublibs: ["librocksdb_stubs.a"]'
+  extra-source "rocksdb_stubs.install" {
+    src: "https://gist.githubusercontent.com/georgeee/80966c56448bd9a6f453a0ffa3c10f60/raw/23024b7ef940f84cf95523d77da7d27b4c3ccdc8/rocksdb_stubs.install"
+    checksum: "sha256=c6450141e1d8b4ad2034a6704fc8902e50f9ac28c66a490c2b460e7a23f63b7a"
+  }
+  build: [
+    [ "bash" "-c"
+      "if [ -e ${MINA_ROCKSDB-/usr/local/lib/librocksdb_coda.a} ]; then cp ${MINA_ROCKSDB-/usr/local/lib/librocksdb_coda.a} librocksdb.a; chmod 666 librocksdb.a; else ROCKSDB_DISABLE_SNAPPY=1 ROCKSDB_DISABLE_GFLAGS=1 ROCKSDB_DISABLE_LZ4=1 ROCKSDB_DISABLE_ZSTD=1 ROCKSDB_DISABLE_NUMA=1 ROCKSDB_DISABLE_TBB=1 ROCKSDB_DISABLE_JEMALLOC=1 ROCKSDB_DISABLE_TCMALLOC=1 ROCKSDB_DISABLE_BACKTRACE=1 PORTABLE=1 FORCE_SSE42=1 DISABLE_WARNING_AS_ERROR=1 make static_lib -j2; fi"
+    ]
+    ["strip" "-S" "librocksdb.a"]
+    ["mv" "librocksdb.a" "librocksdb_stubs.a"]
+  ]
+  url {
+    src:
+      "https://github.com/facebook/rocksdb/archive/refs/tags/v5.17.2.tar.gz"
+    checksum:
+      "sha256=101f05858650a810c90e4872338222a1a3bf3b24de7b7d74466814e6a95c2d28"
+  }
+}
+package "rocks" {
+  opam-version: "2.0"
+  version: "0.1"
+  build: [
+    ["dune" "build" "-p" name "-j" jobs]
+  ]
+  depends: [
+    "ocamlfind" {build}
+    "ocamlbuild" {build}
+    "ctypes" {>= "0.4.0"}
+    "ctypes-foreign" {>= "0.4.0"}
+    "rocksdb_stubs"
+    "core"
+  ]
+  url {
+    src:
+      "https://github.com/o1-labs/orocksdb/archive/c626daa0d4d3e6d095e20e51171b0e2e69b24d73.tar.gz"
+    checksum:
+      "sha256=06d7cdfc6202a9b8411d55778a4308d59bd3f38641b8757e9874bfca87a9a736"
   }
 }
