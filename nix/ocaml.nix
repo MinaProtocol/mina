@@ -116,9 +116,9 @@ let
         '';
       });
 
-      # Doesn't have an explicit dependency on ctypes
-      rpc_parallel = super.rpc_parallel.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
+      rocksdb_stubs = super.rocksdb_stubs.overrideAttrs (_:{
+        MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
+      });
 
       # Some "core" Mina executables, without the version info.
       mina-dev = pkgs.stdenv.mkDerivation ({

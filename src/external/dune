@@ -1,3 +1,0 @@
-(dirs :standard \ async_kernel)
-
-(vendored_dirs ocaml-rocksdb)

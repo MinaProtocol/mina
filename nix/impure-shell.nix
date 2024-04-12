@@ -23,6 +23,7 @@ pkgs.mkShell {
     rosetta-cli
   ];
   OPAMSWITCH = "mina";
+  MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
   shellHook = ''
     eval $(opam env)
     if ! opam switch list --short 2>&1 | grep -w mina 2>&1 > /dev/null; then
