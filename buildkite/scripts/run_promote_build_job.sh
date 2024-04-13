@@ -34,6 +34,7 @@ function usage() {
   echo "  NEW_VERSION                 The new Debian version or new Docker tag"
   echo "  REMOVE_PROFILE_FROM_NAME    Should we remove profile suffix from debian name"
   echo "  PROFILE                     The Docker and Debian profile (Standard, Lightnet)"
+  echo "  NETWORK                     The Docker and Debian network (Devnet, Mainnet, Berkeley)"
   echo "  FROM_CHANNEL                Source debian channel"
   echo "  TO_CHANNEL                  Target debian channel"
   echo "  PUBLISH                     The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io"
@@ -49,6 +50,7 @@ DHALL_DEBIANS="([] : List (./buildkite/src/Constants/DebianPackage.dhall).Type)"
 if [[ -n "$DEBIANS" ]]; then 
     if [[ -z "$CODENAMES" ]]; then usage "Codenames is not set!"; fi;
     if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
+    if [[ -z "$NETWORK" ]]; then NETWORK="Berkeley"; fi;
     if [[ -z "$REMOVE_PROFILE_FROM_NAME" ]]; then REMOVE_PROFILE_FROM_NAME=0; fi;
     if [[ -z "$FROM_CHANNEL" ]]; then usage "'From channel' arg is not set!"; fi;
     if [[ -z "$TO_CHANNEL" ]]; then usage "'To channel' arg is not set!"; fi;
@@ -87,5 +89,9 @@ DHALL_CODENAMES=""
   done
   DHALL_CODENAMES="[${DHALL_CODENAMES:1}]"
 
-
-echo '(./buildkite/src/Entrypoints/PromotePackage.dhall).promote_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${FROM_VERSION}"'" "'"${NEW_VERSION}"'" "amd64" (./buildkite/src/Constants/Profiles.dhall).Type.'"${PROFILE}"' '"${DHALL_CODENAMES}"' (./buildkite/src/Constants/DebianChannel.dhall).Type.'"${FROM_CHANNEL}"' (./buildkite/src/Constants/DebianChannel.dhall).Type.'"${TO_CHANNEL}"' "'"${TAG}"'" ' | dhall-to-yaml --quoted 
+if [[ "${REMOVE_PROFILE_FROM_NAME}" -eq 0 ]]; then 
+  REMOVE_PROFILE_FROM_NAME="False"
+else 
+  REMOVE_PROFILE_FROM_NAME="True"
+fi 
+echo '(./buildkite/src/Entrypoints/PromotePackage.dhall).promote_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${FROM_VERSION}"'" "'"${NEW_VERSION}"'" "amd64" (./buildkite/src/Constants/Profiles.dhall).Type.'"${PROFILE}"' (./buildkite/src/Constants/Network.dhall).Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' (./buildkite/src/Constants/DebianChannel.dhall).Type.'"${FROM_CHANNEL}"' (./buildkite/src/Constants/DebianChannel.dhall).Type.'"${TO_CHANNEL}"' "'"${TAG}"'" '${REMOVE_PROFILE_FROM_NAME}'  ' | dhall-to-yaml --quoted 

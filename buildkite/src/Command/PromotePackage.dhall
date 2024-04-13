@@ -6,6 +6,7 @@ let Optional/toList = Prelude.Optional.toList
 let Optional/map = Prelude.Optional.map
 let List/map = Prelude.List.map
 let Package = ../Constants/DebianPackage.dhall
+let Network = ../Constants/Network.dhall
 let PipelineMode = ../Pipeline/Mode.dhall
 let PipelineTag = ../Pipeline/Tag.dhall
 let Pipeline = ../Pipeline/Dsl.dhall
@@ -30,10 +31,12 @@ let PromoteDebianSpec = {
     version: Text,
     new_version: Text,
     architecture: Text,
+    network: Network.Type,
     codename: DebianVersions.DebVersion,
     from_channel: DebianChannel.Type,
     to_channel: DebianChannel.Type,
     profile: Profiles.Type,
+    remove_profile_from_name: Bool,
     step_key: Text,
     `if`: Optional B/If
   },
@@ -43,10 +46,12 @@ let PromoteDebianSpec = {
     version = "",
     new_version = "",
     architecture = "amd64",
+    network = Network.Type.Berkeley,
     codename = DebianVersions.DebVersion.Bullseye,
     from_channel = DebianChannel.Type.Unstable,
     to_channel = DebianChannel.Type.Nightly,
     profile = Profiles.Type.Standard,
+    remove_profile_from_name = False,
     step_key = "promote-debian-package",
     `if` = None B/If
   }
@@ -77,12 +82,15 @@ let PromoteDockerSpec = {
 
 
 let promoteDebianStep = \(spec : PromoteDebianSpec.Type) ->
+    let package_name : Text = Package.debianName spec.package spec.profile spec.network
+    let new_name = if spec.remove_profile_from_name then "--new-name ${Package.debianName spec.package Profiles.Type.Standard spec.network}" else ""
+    in 
     Command.build
       Command.Config::{
         commands = Toolchain.runner DebianVersions.DebVersion.Bullseye [
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY"
-        ] "./buildkite/scripts/promote-deb.sh --package ${Package.debianName spec.package spec.profile} --version ${spec.version}  --new-version ${spec.new_version}  --architecture ${spec.architecture}  --codename ${DebianVersions.lowerName spec.codename}  --from-component ${DebianChannel.lowerName spec.from_channel}  --to-component ${DebianChannel.lowerName spec.to_channel}",
+        ] "./buildkite/scripts/promote-deb.sh --package ${package_name} --version ${spec.version}  --new-version ${spec.new_version}  --architecture ${spec.architecture}  --codename ${DebianVersions.lowerName spec.codename}  --from-component ${DebianChannel.lowerName spec.from_channel}  --to-component ${DebianChannel.lowerName spec.to_channel} ${new_name}",
         label = "Debian: ${spec.step_key}",
         key = spec.step_key,
         target = Size.XLarge,

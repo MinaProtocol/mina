@@ -1,15 +1,16 @@
-let Package : Type  = < Daemon | DaemonDevnet | DaemonLightnet | Archive | ArchiveMigration | ArchiveMaintenance | TestExecutive | BatchTxn | LogProc | ZkappTestTransaction | FunctionalTestSuite >
+let Network = ./Network.dhall
+let Profile = ./Profiles.dhall
 
-let MainPackages = [ Package.Daemon , Package.DaemonDevnet , Package.Archive , Package.ArchiveMigration , Package.LogProc ]
+let Package : Type  = < Daemon |  Archive | ArchiveMigration | ArchiveMaintenance | TestExecutive | BatchTxn | LogProc | ZkappTestTransaction | FunctionalTestSuite >
 
-let AuxiliaryPackages = [ Package.DaemonLightnet , Package.TestExecutive , Package.BatchTxn , Package.ZkappTestTransaction , Package.FunctionalTestSuite , Package.ArchiveMaintenance ]
+let MainPackages = [ Package.Daemon , Package.Archive , Package.ArchiveMigration , Package.LogProc ]
+
+let AuxiliaryPackages = [  Package.TestExecutive , Package.BatchTxn , Package.ZkappTestTransaction , Package.FunctionalTestSuite , Package.ArchiveMaintenance ]
 
 
 let capitalName = \(package : Package) ->
   merge {
     Daemon = "Daemon"
-    , DaemonDevnet = "DaemonDevnet"
-    , DaemonLightnet = "DaemonLightnet"
     , Archive = "Archive"
     , ArchiveMaintenance = "ArchiveMaintenance" 
     , ArchiveMigration = "ArchiveMigration"
@@ -23,8 +24,6 @@ let capitalName = \(package : Package) ->
 let lowerName = \(package : Package) ->
   merge {
     Daemon = "daemon"
-    , DaemonDevnet = "daemon_devnet"
-    , DaemonLightnet = "daemon_lightnet"
     , Archive = "archive"
     , ArchiveMaintenance = "archive_maintenance" 
     , ArchiveMigration = "archive_migration"
@@ -35,11 +34,9 @@ let lowerName = \(package : Package) ->
     , FunctionalTestSuite = "functional_test_suite"
   } package
 
-let debianName = \(package : Package) ->
+let debianName = \(package : Package) -> \(profile : Profile.Type) -> \(network : Network.Type) ->
   merge {
-    Daemon = "mina-berkeley"
-    , DaemonDevnet = "mina-devnet"
-    , DaemonLightnet = "mina-berkeley-lightnet"
+    Daemon = "mina-${Network.lowerName network}${Profile.toLabelSegment profile}"
     , Archive = "mina-archive"
     , ArchiveMigration = "mina-archive-migration"
     , ArchiveMaintenance = "mina-archive-maintenance" 

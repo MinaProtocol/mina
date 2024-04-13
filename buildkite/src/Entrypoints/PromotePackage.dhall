@@ -6,6 +6,7 @@ let Package =  ../Constants/DebianPackage.dhall
 let Profile =  ../Constants/Profiles.dhall
 let Artifact =  ../Constants/Artifacts.dhall
 let DebianChannel = ../Constants/DebianChannel.dhall
+let Network = ../Constants/Network.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
 let Pipeline = ../Pipeline/Dsl.dhall
 let PipelineMode = ../Pipeline/Mode.dhall
@@ -17,10 +18,12 @@ let promote_artifacts =
   \(new_version: Text ) ->
   \(architecture: Text ) ->
   \(profile: Profile.Type) ->
+  \(network: Network.Type) ->
   \(codenames: List DebianVersions.DebVersion ) ->
   \(from_channel: DebianChannel.Type ) ->
   \(to_channel: DebianChannel.Type ) ->
   \(tag: Text ) ->
+  \(remove_profile_from_name: Bool) ->
 
   let debians_spec =
       List/map 
@@ -37,9 +40,11 @@ let promote_artifacts =
             , version = version
             , new_version = new_version
             , architecture = architecture
+            , network = network
             , codename = codename
             , from_channel = from_channel
             , to_channel = to_channel
+            , remove_profile_from_name = remove_profile_from_name
             , step_key = "promote-debian-${Package.lowerName debian}-${DebianVersions.lowerName codename}-from-${DebianChannel.lowerName from_channel}-to-${DebianChannel.lowerName to_channel}"
           }
         )
