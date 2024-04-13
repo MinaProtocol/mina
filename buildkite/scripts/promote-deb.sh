@@ -59,8 +59,8 @@ else
     --deb $PACKAGE  \
     --codename $CODENAME \
     --new-release $TO_COMPONENT \
-    --old-release $FROM_COMPONENT \
-    --old-version $VERSION \
+    --release $FROM_COMPONENT \
+    --version $VERSION \
     --new-version $NEW_VERSION \
     --suite $FROM_COMPONENT \
     --new-suite $TO_COMPONENT \
