@@ -47,7 +47,7 @@ if [[ -z "$SUITE" ]]; then NEW_SUITE=$SUITE; fi;
 
 
 function rebuild_deb() {
-  rm "${DEB}_${VERSION}.deb"
+  rm -f "${DEB}_${VERSION}.deb"
   rm -rf "${NEW_NAME}_${NEW_VERSION}"
     
   wget https://s3.us-west-2.amazonaws.com/packages.o1test.net/pool/${CODENAME}/m/mi/${DEB}_${VERSION}.deb
