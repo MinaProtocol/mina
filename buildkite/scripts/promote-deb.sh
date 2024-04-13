@@ -24,7 +24,7 @@ function usage() {
   echo "  -p, --package          The Package name (mina-logproc, mina-archive etc.)"
   echo "  --version              The Debian version"
   echo "  --new-version          The Debian version"
-  echo "  --new-name             The New Debian name"
+  echo "  --new-name             The New Package name"
   echo "  -a, --architecture     The Debian package architecture (amd64 etc.)"
   echo "  -s, --from-component   The source channel in which package currently resides"
   echo "  -t, --to-component     The target channel for package (unstable, alpha, beta etc.)"
@@ -38,7 +38,7 @@ if [[ -z "$PACKAGE" ]]; then usage "Package is not set!"; fi;
 if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
 if [[ -z "$ARCH" ]]; then usage "Architecture is not set!"; fi;
 if [[ -z "$CODENAME" ]]; then usage "Codename is not set!"; fi;
-if [[ -z "$NEW_NAME" ]]; then NEW_NAME=$DEB; fi;
+if [[ -z "$NEW_NAME" ]]; then NEW_NAME=$PACKAGE; fi;
 if [[ -z "$FROM_COMPONENT" ]]; then usage "Source component is not set!"; fi;
 if [[ -z "$TO_COMPONENT" ]]; then usage "Target component is not set!"; fi;
 
