@@ -685,23 +685,6 @@ module Zkapp_permissions = struct
   let table_name = "zkapp_permissions"
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (perms : Permissions.t) =
-    let txn_version =
-      Mina_numbers.Txn_version.to_int @@ snd perms.set_verification_key
-    in
-    let%bind versions =
-      Protocol_versions.find_txn_version (module Conn) ~transaction:txn_version
-    in
-    ( match versions with
-    | Ok [] ->
-        failwith
-          (sprintf "No transaction version exists for the permission, %s"
-             (Permissions.to_yojson perms |> Yojson.Safe.to_string) )
-    | Ok _ ->
-        ()
-    | Error e ->
-        failwith
-          (sprintf "fail to query protocol_versions table, see %s"
-             (Caqti_error.show e) ) ) ;
     let value =
       { edit_state = perms.edit_state
       ; send = perms.send
@@ -4748,151 +4731,119 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
   | None ->
       Deferred.unit
   | Some runtime_config -> (
-      match runtime_config.ledger with
-      | None ->
-          [%log fatal] "Runtime config does not contain a ledger" ;
-          failwith
-            "Runtime config does not contain a ledger, could not add genesis \
-             accounts"
-      | Some runtime_config_ledger -> (
-          let proof_level = Genesis_constants.Proof_level.compiled in
-          let%bind precomputed_values =
-            match%map
-              Genesis_ledger_helper.init_from_config_file ~logger
-                ~proof_level:(Some proof_level) runtime_config
-            with
-            | Ok (precomputed_values, _) ->
-                precomputed_values
-            | Error err ->
-                failwithf "Could not get precomputed values, error: %s"
-                  (Error.to_string_hum err) ()
-          in
-          (* code modeled on replayer ledger initialization *)
-          let%bind padded_accounts =
-            match
-              Genesis_ledger_helper.Ledger
-              .padded_accounts_from_runtime_config_opt ~logger ~proof_level
-                runtime_config_ledger ~ledger_name_prefix:"genesis_ledger"
-            with
-            | None ->
-                [%log fatal]
-                  "Could not load accounts from runtime config ledger" ;
-                exit 1
-            | Some accounts ->
-                return accounts
-          in
-          let constraint_constants =
-            Genesis_constants.Constraint_constants.compiled
-          in
-          let packed_ledger =
-            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-              ~depth:constraint_constants.ledger_depth padded_accounts
-          in
-          let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
-          let%bind account_ids =
-            let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
-            Account_id.Set.to_list account_id_set
-          in
-          let genesis_block =
-            let With_hash.{ data = block; hash = the_hash }, _ =
-              Mina_block.genesis ~precomputed_values
+      let proof_level = Genesis_constants.Proof_level.compiled in
+      let%bind precomputed_values =
+        match%map
+          Genesis_ledger_helper.init_from_config_file ~logger
+            ~proof_level:(Some proof_level) runtime_config
+        with
+        | Ok (precomputed_values, _) ->
+            precomputed_values
+        | Error err ->
+            failwithf "Could not get precomputed values, error: %s"
+              (Error.to_string_hum err) ()
+      in
+      let constraint_constants =
+        Genesis_constants.Constraint_constants.compiled
+      in
+      let ledger =
+        Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
+      in
+      let%bind account_ids =
+        let%map account_id_set = Mina_ledger.Ledger.accounts ledger in
+        Account_id.Set.to_list account_id_set
+      in
+      let genesis_block =
+        let With_hash.{ data = block; hash = the_hash }, _ =
+          Mina_block.genesis ~precomputed_values
+        in
+        With_hash.{ data = block; hash = the_hash }
+      in
+      let add_accounts () =
+        Caqti_async.Pool.use
+          (fun (module Conn : CONNECTION) ->
+            let%bind.Deferred.Result genesis_block_id =
+              Block.add_if_doesn't_exist
+                (module Conn)
+                ~constraint_constants genesis_block
             in
-            With_hash.{ data = block; hash = the_hash }
-          in
-          let add_accounts () =
-            Caqti_async.Pool.use
-              (fun (module Conn : CONNECTION) ->
-                let%bind.Deferred.Result genesis_block_id =
-                  Block.add_if_doesn't_exist
-                    (module Conn)
-                    ~constraint_constants genesis_block
-                in
-                let%bind.Deferred.Result { ledger_hash; _ } =
-                  Block.load (module Conn) ~id:genesis_block_id
-                in
-                let db_ledger_hash =
-                  Ledger_hash.of_base58_check_exn ledger_hash
-                in
-                let actual_ledger_hash =
-                  Mina_ledger.Ledger.merkle_root ledger
-                in
-                if Ledger_hash.equal db_ledger_hash actual_ledger_hash then
-                  [%log info]
-                    "Archived genesis block ledger hash equals actual genesis \
-                     ledger hash"
-                    ~metadata:
-                      [ ("ledger_hash", Ledger_hash.to_yojson actual_ledger_hash)
-                      ]
-                else (
-                  [%log error]
-                    "Archived genesis block ledger hash different than actual \
-                     genesis ledger hash"
-                    ~metadata:
-                      [ ( "archived_ledger_hash"
-                        , Ledger_hash.to_yojson db_ledger_hash )
-                      ; ( "actual_ledger_hash"
-                        , Ledger_hash.to_yojson actual_ledger_hash )
-                      ] ;
-                  exit 1 ) ;
-                let%bind.Deferred.Result () = Conn.start () in
-                let open Deferred.Let_syntax in
-                let%bind () =
-                  Deferred.List.iter account_ids ~f:(fun acct_id ->
-                      match
-                        Mina_ledger.Ledger.location_of_account ledger acct_id
+            let%bind.Deferred.Result { ledger_hash; _ } =
+              Block.load (module Conn) ~id:genesis_block_id
+            in
+            let db_ledger_hash = Ledger_hash.of_base58_check_exn ledger_hash in
+            let actual_ledger_hash = Mina_ledger.Ledger.merkle_root ledger in
+            if Ledger_hash.equal db_ledger_hash actual_ledger_hash then
+              [%log info]
+                "Archived genesis block ledger hash equals actual genesis \
+                 ledger hash"
+                ~metadata:
+                  [ ("ledger_hash", Ledger_hash.to_yojson actual_ledger_hash) ]
+            else (
+              [%log error]
+                "Archived genesis block ledger hash different than actual \
+                 genesis ledger hash"
+                ~metadata:
+                  [ ( "archived_ledger_hash"
+                    , Ledger_hash.to_yojson db_ledger_hash )
+                  ; ( "actual_ledger_hash"
+                    , Ledger_hash.to_yojson actual_ledger_hash )
+                  ] ;
+              exit 1 ) ;
+            let%bind.Deferred.Result () = Conn.start () in
+            let open Deferred.Let_syntax in
+            let%bind () =
+              Deferred.List.iter account_ids ~f:(fun acct_id ->
+                  match
+                    Mina_ledger.Ledger.location_of_account ledger acct_id
+                  with
+                  | None ->
+                      [%log error] "Could not get location for account"
+                        ~metadata:
+                          [ ("account_id", Account_id.to_yojson acct_id) ] ;
+                      failwith "Could not get location for genesis account"
+                  | Some loc -> (
+                      let index =
+                        Mina_ledger.Ledger.index_of_account_exn ledger acct_id
+                      in
+                      let acct =
+                        match Mina_ledger.Ledger.get ledger loc with
+                        | None ->
+                            [%log error]
+                              "Could not get account, given a location"
+                              ~metadata:
+                                [ ("account_id", Account_id.to_yojson acct_id) ] ;
+                            failwith
+                              "Could not get genesis account, given a location"
+                        | Some acct ->
+                            acct
+                      in
+                      match%bind
+                        Accounts_accessed.add_if_doesn't_exist
+                          (module Conn)
+                          genesis_block_id (index, acct)
                       with
-                      | None ->
-                          [%log error] "Could not get location for account"
+                      | Ok _ ->
+                          return ()
+                      | Error err ->
+                          [%log error] "Could not add genesis account"
                             ~metadata:
-                              [ ("account_id", Account_id.to_yojson acct_id) ] ;
-                          failwith "Could not get location for genesis account"
-                      | Some loc -> (
-                          let index =
-                            Mina_ledger.Ledger.index_of_account_exn ledger
-                              acct_id
-                          in
-                          let acct =
-                            match Mina_ledger.Ledger.get ledger loc with
-                            | None ->
-                                [%log error]
-                                  "Could not get account, given a location"
-                                  ~metadata:
-                                    [ ( "account_id"
-                                      , Account_id.to_yojson acct_id )
-                                    ] ;
-                                failwith
-                                  "Could not get genesis account, given a \
-                                   location"
-                            | Some acct ->
-                                acct
-                          in
-                          match%bind
-                            Accounts_accessed.add_if_doesn't_exist
-                              (module Conn)
-                              genesis_block_id (index, acct)
-                          with
-                          | Ok _ ->
-                              return ()
-                          | Error err ->
-                              [%log error] "Could not add genesis account"
-                                ~metadata:
-                                  [ ("account_id", Account_id.to_yojson acct_id)
-                                  ; ("error", `String (Caqti_error.show err))
-                                  ] ;
-                              failwith "Could not add add genesis account" ) )
-                in
-                Conn.commit () )
-              pool
-          in
-          match%map
-            retry ~f:add_accounts ~logger ~error_str:"add_genesis_accounts" 3
-          with
-          | Error e ->
-              [%log warn] "genesis accounts could not be added"
-                ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
-              failwith "Failed to add genesis accounts"
-          | Ok () ->
-              () ) )
+                              [ ("account_id", Account_id.to_yojson acct_id)
+                              ; ("error", `String (Caqti_error.show err))
+                              ] ;
+                          failwith "Could not add add genesis account" ) )
+            in
+            Conn.commit () )
+          pool
+      in
+      match%map
+        retry ~f:add_accounts ~logger ~error_str:"add_genesis_accounts" 3
+      with
+      | Error e ->
+          [%log warn] "genesis accounts could not be added"
+            ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
+          failwith "Failed to add genesis accounts"
+      | Ok () ->
+          () )
 
 let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
     pool =

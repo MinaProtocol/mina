@@ -220,63 +220,81 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
           Step_bp_vec.t
           Max_proofs_verified_at_most.t )
         Base.Messages_for_next_proof_over_same_field.Step.t )
-      Base.Wrap.t
+      Base.Wrap.Stable.V2.t
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 
   type nonrec t = (W.n, MLMB.n) t
 
-  let to_repr (T t) : Repr.t =
+  let to_repr (T { statement; prev_evals; proof }) : Repr.t =
     let lte =
       Nat.lte_exn
         (Vector.length
-           t.statement.messages_for_next_step_proof
+           statement.messages_for_next_step_proof
              .challenge_polynomial_commitments )
         W.n
     in
-    { t with
-      statement =
-        { t.statement with
-          messages_for_next_step_proof =
-            { t.statement.messages_for_next_step_proof with
-              challenge_polynomial_commitments =
-                At_most.of_vector
-                  t.statement.messages_for_next_step_proof
-                    .challenge_polynomial_commitments lte
-            ; old_bulletproof_challenges =
-                At_most.of_vector
-                  t.statement.messages_for_next_step_proof
-                    .old_bulletproof_challenges lte
-            }
-        }
-    }
+    let statement =
+      { statement with
+        messages_for_next_step_proof =
+          { statement.messages_for_next_step_proof with
+            challenge_polynomial_commitments =
+              At_most.of_vector
+                statement.messages_for_next_step_proof
+                  .challenge_polynomial_commitments lte
+          ; old_bulletproof_challenges =
+              At_most.of_vector
+                statement.messages_for_next_step_proof
+                  .old_bulletproof_challenges lte
+          }
+      }
+    in
+    let prev_evals : _ Plonk_types.All_evals.Stable.V1.t =
+      { evals =
+          { prev_evals.evals with
+            public_input =
+              (let x1, x2 = prev_evals.evals.public_input in
+               (x1.(0), x2.(0)) )
+          }
+      ; ft_eval1 = prev_evals.ft_eval1
+      }
+    in
+    { statement; prev_evals; proof }
 
-  let of_repr (r : Repr.t) : t =
+  let of_repr ({ statement; prev_evals; proof } : Repr.t) : t =
     let (Vector.T challenge_polynomial_commitments) =
       At_most.to_vector
-        r.statement.messages_for_next_step_proof
-          .challenge_polynomial_commitments
+        statement.messages_for_next_step_proof.challenge_polynomial_commitments
     in
     let (Vector.T old_bulletproof_challenges) =
       At_most.to_vector
-        r.statement.messages_for_next_step_proof.old_bulletproof_challenges
+        statement.messages_for_next_step_proof.old_bulletproof_challenges
     in
     let T =
       Nat.eq_exn
         (Vector.length challenge_polynomial_commitments)
         (Vector.length old_bulletproof_challenges)
     in
-    T
-      { r with
-        statement =
-          { r.statement with
-            messages_for_next_step_proof =
-              { r.statement.messages_for_next_step_proof with
-                challenge_polynomial_commitments
-              ; old_bulletproof_challenges
-              }
+    let statement =
+      { statement with
+        messages_for_next_step_proof =
+          { statement.messages_for_next_step_proof with
+            challenge_polynomial_commitments
+          ; old_bulletproof_challenges
           }
       }
+    in
+    let prev_evals : _ Plonk_types.All_evals.t =
+      { evals =
+          { public_input =
+              (let x1, x2 = prev_evals.evals.public_input in
+               ([| x1 |], [| x2 |]) )
+          ; evals = prev_evals.evals.evals
+          }
+      ; ft_eval1 = prev_evals.ft_eval1
+      }
+    in
+    T { statement; prev_evals; proof }
 
   let compare t1 t2 = Repr.compare (to_repr t1) (to_repr t2)
 
@@ -356,44 +374,6 @@ module Proofs_verified_2 = struct
     end]
 
     include T.Repr
-
-    let to_binable
-        ({ statement
-         ; prev_evals = { evals = { public_input; evals }; ft_eval1 }
-         ; proof
-         } :
-          t ) : Stable.Latest.t =
-      { statement
-      ; prev_evals =
-          { evals =
-              { public_input =
-                  (let x1, x2 = public_input in
-                   (x1.(0), x2.(0)) )
-              ; evals
-              }
-          ; ft_eval1
-          }
-      ; proof
-      }
-
-    let of_binable
-        ({ statement
-         ; prev_evals = { evals = { public_input; evals }; ft_eval1 }
-         ; proof
-         } :
-          Stable.Latest.t ) : t =
-      { statement
-      ; prev_evals =
-          { evals =
-              { public_input =
-                  (let x1, x2 = public_input in
-                   ([| x1 |], [| x2 |]) )
-              ; evals
-              }
-          ; ft_eval1
-          }
-      ; proof
-      }
   end
 
   [%%versioned_binable
@@ -413,9 +393,9 @@ module Proofs_verified_2 = struct
           (struct
             type nonrec t = t
 
-            let to_binable x = Repr.to_binable (to_repr x)
+            let to_binable x = to_repr x
 
-            let of_binable x = of_repr (Repr.of_binable x)
+            let of_binable x = of_repr x
           end)
     end
   end]
@@ -461,44 +441,6 @@ module Proofs_verified_max = struct
     end]
 
     include T.Repr
-
-    let to_binable
-        ({ statement
-         ; prev_evals = { evals = { public_input; evals }; ft_eval1 }
-         ; proof
-         } :
-          t ) : Stable.Latest.t =
-      { statement
-      ; prev_evals =
-          { evals =
-              { public_input =
-                  (let x1, x2 = public_input in
-                   (x1.(0), x2.(0)) )
-              ; evals
-              }
-          ; ft_eval1
-          }
-      ; proof
-      }
-
-    let of_binable
-        ({ statement
-         ; prev_evals = { evals = { public_input; evals }; ft_eval1 }
-         ; proof
-         } :
-          Stable.Latest.t ) : t =
-      { statement
-      ; prev_evals =
-          { evals =
-              { public_input =
-                  (let x1, x2 = public_input in
-                   ([| x1 |], [| x2 |]) )
-              ; evals
-              }
-          ; ft_eval1
-          }
-      ; proof
-      }
   end
 
   [%%versioned_binable
@@ -518,9 +460,9 @@ module Proofs_verified_max = struct
           (struct
             type nonrec t = t
 
-            let to_binable x = Repr.to_binable (to_repr x)
+            let to_binable x = to_repr x
 
-            let of_binable x = of_repr (Repr.of_binable x)
+            let of_binable x = of_repr x
           end)
     end
   end]

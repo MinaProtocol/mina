@@ -38,7 +38,7 @@ echo "--- Building mainnet deb with hard-fork ledger:"
 
 source scripts/deb-builder-helpers.sh
 
-create_control_file "${NETWORK_TAG}" "${SHARED_DEPS}${DAEMON_DEPS}" "${CONTROL_FILE_DESCRIPTION}"
+create_control_file "${NETWORK_TAG}" "${SHARED_DEPS}${DAEMON_DEPS}" "${CONTROL_FILE_DESCRIPTION}" "${SUGGESTED_DEPS}"
 copy_common_daemon_configs "${NETWORK_NAME}" "${SIGNATURE_KIND}" "${SEEDS_LIST}"
 
 # Copy the overridden runtime config file to the config file location
@@ -49,7 +49,7 @@ done
 
 build_deb "${NETWORK_TAG}"
 build_logproc_deb
-$BUILD_KEYPAIR_DEB && MINA_BUILD_MAINNET=1 build_keypair_deb
+$BUILD_KEYPAIR_DEB && MINA_BUILD_MAINNET=true build_keypair_deb
 build_archive_deb
 build_batch_txn_deb
 build_test_executive_deb

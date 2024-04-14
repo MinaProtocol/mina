@@ -1,6 +1,9 @@
-let Prelude = ../External/Prelude.dhall
+let Prelude = ../External/Prelude.dhal
+
 
 let Channel : Type = < Unstable | Nightly | Itn | Umt | Devnet | Alpha | Beta | Experimental | Stable >
+
+
 
 let capitalName = \(channel : Channel) ->
   merge {

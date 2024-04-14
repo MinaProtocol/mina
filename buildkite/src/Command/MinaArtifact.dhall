@@ -66,7 +66,7 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
       ---             , Cmd.run "FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hardfork_ledger_hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json"
       ---             , Cmd.run "ls hardfork_ledgers"
       ---             , Cmd.run "cat new_config.json"
-      ---             , Cmd.run "MINA_DEB_CODENAME=bullseye MINA_BUILD_MAINNET=1 RUNTIME_CONFIG_JSON=new_config.json LEDGER_TARBALLS=\"$(echo hardfork_ledgers/*.tar.gz)\" ./buildkite/scripts/build-hardfork-package.sh"
+      ---             , Cmd.run "MINA_DEB_CODENAME=bullseye MINA_BUILD_MAINNET=true RUNTIME_CONFIG_JSON=new_config.json LEDGER_TARBALLS=\"$(echo hardfork_ledgers/*.tar.gz)\" ./buildkite/scripts/build-hardfork-package.sh"
       ---           ]
       ---           , docker = Some Docker::{
       ---             image = ContainerImages.minaToolchain
@@ -136,7 +136,21 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
                 Cmd.runInDocker Cmd.Docker::{ 
                   image = "gcr.io/o1labs-192920/mina-daemon:\${BUILDKITE_COMMIT:0:7}-${DebianVersions.lowerName debVersion}-${network}"
                 , extraEnv = [ "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL",  "NETWORK_NAME=\$NETWORK_NAME" ]
-                } "curl \$CONFIG_JSON_GZ_URL > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config config.json /workdir/verification"
+                -- an account with this balance seems present in many ledgers?
+                } "curl \$CONFIG_JSON_GZ_URL > config.json.gz && gunzip config.json.gz && sed -e '0,/20.000001/{s/20.000001/20.01/}' -i config.json && ! (mina-verify-packaged-fork-config \$NETWORK_NAME config.json /workdir/verification)"
+            ]
+            , label = "Assert corrupted packaged artifacts are unverifiable"
+            , key = "assert-unverify-corrupted-packaged-artifacts"
+            , target = Size.XLarge
+            , depends_on = [{ name = pipelineName, key = "daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image" }]
+            , `if` = None B/If
+            }
+        , Command.build Command.Config::{
+            commands = [
+                Cmd.runInDocker Cmd.Docker::{
+                  image = "gcr.io/o1labs-192920/mina-daemon:\${BUILDKITE_COMMIT:0:7}-${DebianVersions.lowerName debVersion}-${network}"
+                , extraEnv = [ "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL",  "NETWORK_NAME=\$NETWORK_NAME" ]
+                } "curl \$CONFIG_JSON_GZ_URL > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config \$NETWORK_NAME config.json /workdir/verification"
             ]
             , label = "Verify packaged artifacts"
             , key = "verify-packaged-artifacts"
