@@ -11,9 +11,7 @@ let
     hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath optionalString
     escapeShellArg;
 
-  external-repo =
-    opam-nix.makeOpamRepoRec "${src}/src/external"; # Pin external packages
-  repos = [ external-repo inputs.opam-repository ];
+  repos = [ inputs.opam-repository ];
 
   export = opam-nix.importOpam "${src}/opam.export";
 
