@@ -386,23 +386,34 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
             [%log info]
               "Mark the chain leads to target state hash %s to be canonical"
               state_hash ;
-            let%bind fork_id =
+            let%bind fork_id, fork_height =
               query_mainnet_db ~f:(fun db ->
                   Sql.Mainnet.Block.id_from_state_hash db state_hash )
             in
-            let%bind highest_canonical_block_id =
+            let%bind highest_canonical_block_id, canonical_height =
               query_mainnet_db ~f:(fun db ->
                   Sql.Mainnet.Block.get_highest_canonical_block db () )
             in
-            let%bind subchain_blocks =
-              query_mainnet_db ~f:(fun db ->
-                  Sql.Mainnet.Block.get_subchain db
-                    ~start_block_id:highest_canonical_block_id
-                    ~end_block_id:fork_id )
-            in
-            Deferred.List.iter subchain_blocks ~f:(fun id ->
+
+            if fork_height >= canonical_height then
+              let%bind subchain_blocks =
                 query_mainnet_db ~f:(fun db ->
-                    Sql.Mainnet.Block.mark_as_canonical db id ) )
+                    Sql.Mainnet.Block.get_subchain db
+                      ~start_block_id:highest_canonical_block_id
+                      ~end_block_id:fork_id )
+              in
+              Deferred.List.iter subchain_blocks ~f:(fun id ->
+                  query_mainnet_db ~f:(fun db ->
+                      Sql.Mainnet.Block.mark_as_canonical db id ) )
+            else
+              let%bind subchain_blocks =
+                query_mainnet_db ~f:(fun db ->
+                    Sql.Mainnet.Block.get_subchain db ~start_block_id:fork_id
+                      ~end_block_id:highest_canonical_block_id )
+              in
+              Deferred.List.iter subchain_blocks ~f:(fun id ->
+                  query_mainnet_db ~f:(fun db ->
+                      Sql.Mainnet.Block.mark_as_pending db id ) )
       in
       (* The batch insertion functionality for blocks can lead to partial writes at the moment as
          it is not properly wrapped in a transaction. We handle the partial write edge case here at
