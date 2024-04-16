@@ -68,7 +68,8 @@ module Input = struct
                     |> added_transitions_of_yojson |> Result.ok_or_failwith
                   in
                   let acc' =
-                    List.fold ~init:acc added_transitions ~f:(fun acc'' tr ->
+                    List.fold ~init:acc added_transitions
+                      ~f:(fun ({ seen_state_hashes; _ } as acc'') tr ->
                         let new_node =
                           { Node.state = tr
                           ; peer_ids = String.Set.singleton peer_id
@@ -79,23 +80,22 @@ module Input = struct
                             tr.protocol_state
                         in
                         let new_state_hash = tr.state_hash in
+
+                        if not (Set.mem seen_state_hashes parent_hash) then
+                          (*Assuming the logs are in order, if the parent hash was not already seen then it is the root*)
+                          Hashtbl.update t.init_states new_state_hash
+                            ~f:(function
+                            | None ->
+                                new_node
+                            | Some node ->
+                                { state = node.state
+                                ; peer_ids = Set.add node.peer_ids peer_id
+                                } ) ;
+
                         let seen_state_hashes =
-                          let seen_state_hashes =
-                            Set.add acc''.seen_state_hashes new_state_hash
-                          in
-                          if Set.mem acc''.seen_state_hashes parent_hash |> not
-                          then
-                            (*Assuming the logs are in order, if the parent hash was not already seen then it is the root*)
-                            Hashtbl.update t.init_states new_state_hash
-                              ~f:(function
-                              | None ->
-                                  new_node
-                              | Some node ->
-                                  { state = node.state
-                                  ; peer_ids = Set.add node.peer_ids peer_id
-                                  } ) ;
-                          seen_state_hashes
+                          Set.add seen_state_hashes new_state_hash
                         in
+
                         Hashtbl.update t.all_states parent_hash ~f:(function
                           | None ->
                               State_hash.Map.singleton new_state_hash new_node
