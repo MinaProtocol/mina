@@ -137,7 +137,8 @@ module Input = struct
     res
 end
 
-(*Output is a rose tree and consists of all the forks seen from an initial state; Multiple rose trees is there are logs with different initial states*)
+(*Output is a rose tree and consists of all the forks seen from an initial
+  state; Multiple rose trees is there are logs with different initial states*)
 module Output = struct
   type node =
     | Root of { state : State_hash.t; peer_ids : String.Set.t }
