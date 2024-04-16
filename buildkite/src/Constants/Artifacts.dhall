@@ -1,6 +1,9 @@
 let Prelude = ../External/Prelude.dhall
 let Text/concatSep = Prelude.Text.concatSep
 let Profiles = ./Profiles.dhall
+let DebianVersions = ./DebianVersions.dhall
+let Network = ./Network.dhall
+
 
 let Artifact : Type  = < Daemon | Archive | ArchiveMigration | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite | ArchiveMaintenance >
 
@@ -49,7 +52,6 @@ let dockerName = \(artifact : Artifact) ->
     , FunctionalTestSuite = "mina-test-suite"
   } artifact
 
-
 let toDebianName = \(artifact : Artifact) ->
   merge {
     Daemon = "daemon"
@@ -71,6 +73,23 @@ let toDebianNames = \(artifacts : List Artifact) ->
         artifacts
     in      
     Text/concatSep " " text
+
+let dockerTag = \(artifact: Artifact) 
+  -> \(version: Text) 
+  -> \(codename: DebianVersions.DebVersion) 
+  -> \(profile: Profiles.Type) 
+  -> \(network: Network.Type) 
+  -> merge {
+    Daemon ="${version}-${DebianVersions.lowerName codename}-${Network.lowerName network}${Profiles.toLabelSegment profile}"
+    , Archive = "${version}"
+    , ArchiveMigration  = "${version}"
+    , ArchiveMaintenance = "${version}"
+    , TestExecutive = "${version}"
+    , BatchTxn = "${version}"
+    , Rosetta = "${version}" 
+    , ZkappTestTransaction = "${version}"
+    , FunctionalTestSuite = "${version}"
+  } artifact
 in
 
 {
@@ -80,6 +99,7 @@ in
   , toDebianName = toDebianName
   , toDebianNames = toDebianNames
   , dockerName = dockerName
+  , dockerTag = dockerTag
   , All = All 
   , AllButTests = AllButTests 
   , Main = Main
