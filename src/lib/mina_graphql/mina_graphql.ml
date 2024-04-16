@@ -2382,27 +2382,12 @@ module Queries = struct
                   Deferred.Result.fail "Daemon is bootstrapping"
               | `Active breadcrumb -> (
                   let txn_stop_slot_opt =
-                    match runtime_config.daemon with
-                    | Some daemon ->
-                        daemon.slot_tx_end
-                    | None ->
-                        None
+                    Runtime_config.slot_tx_end_or_default runtime_config
                   in
                   match txn_stop_slot_opt with
                   | None ->
                       return breadcrumb
-                  | Some txn_stop_slot ->
-                      (* NB: Here we use the correct notion of the stop slot: we
-                         want to stop at an offset from genesis. This is
-                         inconsistent with the uses across the rest of the code
-                         -- the stop slot is being used as since hard-fork
-                         instead, which is the incorrect version -- but I refuse
-                         to propagate that error to here.
-                      *)
-                      let stop_slot =
-                        Mina_numbers.Global_slot_since_genesis.of_int
-                          txn_stop_slot
-                      in
+                  | Some stop_slot ->
                       let rec find_block_older_than_stop_slot breadcrumb =
                         let protocol_state =
                           Transition_frontier.Breadcrumb.protocol_state
@@ -2411,11 +2396,10 @@ module Queries = struct
                         let global_slot =
                           Mina_state.Protocol_state.consensus_state
                             protocol_state
-                          |> Consensus.Data.Consensus_state
-                             .global_slot_since_genesis
+                          |> Consensus.Data.Consensus_state.curr_global_slot
                         in
                         if
-                          Mina_numbers.Global_slot_since_genesis.( < )
+                          Mina_numbers.Global_slot_since_hard_fork.( < )
                             global_slot stop_slot
                         then return breadcrumb
                         else
