@@ -167,7 +167,7 @@ index c69e1805d1..bf15430c54 100644
        pool
    with
 diff --git a/src/app/archive/lib/processor.ml b/src/app/archive/lib/processor.ml
-index d4f0e9c585..274fb0839d 100644
+index 5c09ed7362..b62f745213 100644
 --- a/src/app/archive/lib/processor.ml
 +++ b/src/app/archive/lib/processor.ml
 @@ -21,7 +21,6 @@
@@ -2733,18 +2733,18 @@ index d4f0e9c585..274fb0839d 100644
                            Accounts_created.add_accounts_created_if_don't_exist
                              (module Conn)
                              block_id accounts_created )
-@@ -4783,8 +5136,8 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
-             With_hash.{ data = block; hash = the_hash }
-           in
-           let add_accounts () =
--            Caqti_async.Pool.use
--              (fun (module Conn : CONNECTION) ->
-+            Mina_caqti.Pool.use
-+              (fun (module Conn : Mina_caqti.CONNECTION) ->
-                 let%bind.Deferred.Result genesis_block_id =
-                   Block.add_if_doesn't_exist
-                     (module Conn)
-@@ -4927,7 +5280,7 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
+@@ -4760,8 +5113,8 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
+         With_hash.{ data = block; hash = the_hash }
+       in
+       let add_accounts () =
+-        Caqti_async.Pool.use
+-          (fun (module Conn : CONNECTION) ->
++        Mina_caqti.Pool.use
++          (fun (module Conn : Mina_caqti.CONNECTION) ->
+             let%bind.Deferred.Result genesis_block_id =
+               Block.add_if_doesn't_exist
+                 (module Conn)
+@@ -4895,7 +5248,7 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
            Strict_pipe.Writer.write extensional_block_writer extensional_block )
      ]
    in
@@ -3222,10 +3222,10 @@ index 297081b7b3..4b677e43f3 100644
                   FROM accounts_accessed
                   WHERE block_id = $1
 diff --git a/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml b/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
-index 26e337e0bc..1360cda252 100644
+index 25137a4c42..685c8cdf53 100644
 --- a/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
 +++ b/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
-@@ -273,10 +273,10 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
+@@ -259,10 +259,10 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
    let mainnet_pool =
@@ -3238,7 +3238,7 @@ index 26e337e0bc..1360cda252 100644
    in
  
    match (mainnet_pool, migrated_pool) with
-@@ -365,10 +365,10 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
+@@ -351,10 +351,10 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
    let mainnet_pool =
@@ -5851,7 +5851,7 @@ index b1e49d9bcb..d70a04fcba 100644
        return v
    | Error msg ->
 diff --git a/src/lib/runtime_config/runtime_config.ml b/src/lib/runtime_config/runtime_config.ml
-index d032bc6785..106c2d39e9 100644
+index a71ec6c5f8..711415c4bc 100644
 --- a/src/lib/runtime_config/runtime_config.ml
 +++ b/src/lib/runtime_config/runtime_config.ml
 @@ -50,9 +50,13 @@ let result_opt ~f x =
