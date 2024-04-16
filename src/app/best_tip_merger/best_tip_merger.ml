@@ -254,31 +254,26 @@ module Graph_node = struct
 
   type t = { state : state; peers : int } [@@deriving yojson, equal, hash]
 
-  type display = { state : string; length : string; slot : string; peers : int }
+  type display = { name : string; length : string; slot : string; peers : int }
   [@@deriving yojson]
 
-  let name (t : t) =
-    match t.state with
-    | Root s ->
-        State_hash.to_base58_check s |> Fn.flip String.suffix 7
-    | Node s ->
-        State_hash.to_base58_check s.current |> Fn.flip String.suffix 7
+  let state_hash { state; _ } =
+    match state with Root s -> s | Node s -> s.current
 
-  let display (t : t) =
-    let state = name t in
+  let name t =
+    state_hash t |> State_hash.to_base58_check |> Fn.flip String.suffix 7
+
+  let compare t t' = State_hash.compare (state_hash t) (state_hash t')
+
+  let display ({ state; peers } as t) =
     let length, slot =
-      match t.state with
+      match state with
       | Root _ ->
-          ("NA", "NA")
+          ("NA", "NA") (* This could very well be 0, 0*)
       | Node s ->
-          ( Mina_numbers.Length.to_string s.length
-          , Mina_numbers.Global_slot_since_genesis.to_string s.slot )
+          (Mina_numbers.Length.to_string s.length, Global_slot.to_string s.slot)
     in
-    { state; slot; length; peers = t.peers }
-
-  let compare (t : t) (t' : t) =
-    let state_hash = function Root s -> s | Node s -> s.current in
-    State_hash.compare (state_hash t.state) (state_hash t'.state)
+    { name = name t; slot; length; peers }
 end
 
 module Visualization = struct
