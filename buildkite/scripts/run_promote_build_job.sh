@@ -23,6 +23,16 @@
 #
 # Below method is kept for documentaion purposes
 
+
+DEBIAN_DHALL_DEF="(./buildkite/src/Constants/DebianPackage.dhall)"
+DOCKER_DHALL_DEF="(./buildkite/src/Constants/Artifacts.dhall)"
+DEBIAN_VERSION_DHALL_DEF="(./buildkite/src/Constants/DebianVersions.dhall)"
+PROMOTE_PACKAGE_DHALL_DEF="(./buildkite/src/Entrypoints/PromotePackage.dhall)"
+PROFILES_DHALL_DEF="(./buildkite/src/Constants/Profiles.dhall)"
+NETWORK_DHALL_DEF="(./buildkite/src/Constants/Network.dhall)"
+DEBIAN_CHANNEL_DHALL_DEF="(./buildkite/src/Constants/DebianChannel.dhall)"
+
+
 function usage() {
   if [[ -n "$1" ]]; then
     echo -e "${RED}☞  $1${CLEAR}\n";
@@ -44,8 +54,7 @@ function usage() {
 
 if [ -z "$DEBIANS" ] && [ -z "$DOCKERS"]; then usage "No Debians nor Dockers defined for promoting!"; fi;
 
-DHALL_DEBIANS="([] : List (./buildkite/src/Constants/DebianPackage.dhall).Type)"
-
+DHALL_DEBIANS="([] : List $DEBIAN_DHALL_DEF.Type)"
 
 if [[ -n "$DEBIANS" ]]; then 
     if [[ -z "$CODENAMES" ]]; then usage "Codenames is not set!"; fi;
@@ -59,15 +68,14 @@ if [[ -n "$DEBIANS" ]]; then
     
 
   arr_of_debians=(${DEBIANS//,/ })
-  DHALL_DEBIANS=""
   for i in "${arr_of_debians[@]}"; do
-    DHALL_DEBIANS="${DHALL_DEBIANS}, (./buildkite/src/Constants/DebianPackage.dhall).Type.${i}"
+    DHALL_DEBIANS="${DHALL_DEBIANS}, $DEBIAN_DHALL_DEF.Type.${i}"
   done
   DHALL_DEBIANS="[${DHALL_DEBIANS:1}]"
 fi
 
 
-DHALL_DOCKERS="([] : List (./buildkite/src/Constants/Artifacts.dhall).Type)"
+DHALL_DOCKERS="([] : List $DOCKER_DHALL_DEF.Type)"
 
 if [[ -n "$DOCKERS" ]]; then 
     if [[ -z "$NEW_VERSION" ]]; then usage "New Tag is not set!"; fi;
@@ -77,7 +85,7 @@ if [[ -n "$DOCKERS" ]]; then
   arr_of_dockers=(${DOCKERS//,/ })
   DHALL_DOCKERS=""
   for i in "${arr_of_dockers[@]}"; do
-    DHALL_DOCKERS="${DHALL_DOCKERS}, (./buildkite/src/Constants/Artifacts.dhall).Type.${i}"
+    DHALL_DOCKERS="${DHALL_DOCKERS}, $DOCKER_DHALL_DEF.Type.${i}"
   done
   DHALL_DOCKERS="[${DHALL_DOCKERS:1}]"
 fi
@@ -85,7 +93,7 @@ fi
 local __codenames=(${CODENAMES//,/ })
 DHALL_CODENAMES=""
   for i in "${__codenames[@]}"; do
-    DHALL_CODENAMES="${DHALL_CODENAMES}, (./buildkite/src/Constants/DebianVersions.dhall).DebVersion.${i}"
+    DHALL_CODENAMES="${DHALL_CODENAMES}, $DEBIAN_VERSION_DHALL_DEF.DebVersion.${i}"
   done
   DHALL_CODENAMES="[${DHALL_CODENAMES:1}]"
 
@@ -94,4 +102,4 @@ if [[ "${REMOVE_PROFILE_FROM_NAME}" -eq 0 ]]; then
 else 
   REMOVE_PROFILE_FROM_NAME="True"
 fi 
-echo '(./buildkite/src/Entrypoints/PromotePackage.dhall).promote_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${FROM_VERSION}"'" "'"${NEW_VERSION}"'" "amd64" (./buildkite/src/Constants/Profiles.dhall).Type.'"${PROFILE}"' (./buildkite/src/Constants/Network.dhall).Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' (./buildkite/src/Constants/DebianChannel.dhall).Type.'"${FROM_CHANNEL}"' (./buildkite/src/Constants/DebianChannel.dhall).Type.'"${TO_CHANNEL}"' "'"${TAG}"'" '${REMOVE_PROFILE_FROM_NAME}'  ' | dhall-to-yaml --quoted 
+echo $PROMOTE_PACKAGE_DHALL_DEF'.promote_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${FROM_VERSION}"'" "'"${NEW_VERSION}"'" "amd64" '$PROFILES_DHALL_DEF'.Type.'"${PROFILE}"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${FROM_CHANNEL}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${TO_CHANNEL}"' "'"${TAG}"'" '${REMOVE_PROFILE_FROM_NAME}'  ' | dhall-to-yaml --quoted 
