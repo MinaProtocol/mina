@@ -79,17 +79,19 @@ let dockerTag = \(artifact: Artifact)
   -> \(codename: DebianVersions.DebVersion) 
   -> \(profile: Profiles.Type) 
   -> \(network: Network.Type) 
-  -> merge {
-    Daemon ="${version}-${DebianVersions.lowerName codename}-${Network.lowerName network}${Profiles.toLabelSegment profile}"
-    , Archive = "${version}"
-    , ArchiveMigration  = "${version}"
-    , ArchiveMaintenance = "${version}"
-    , TestExecutive = "${version}"
-    , BatchTxn = "${version}"
-    , Rosetta = "${version}" 
-    , ZkappTestTransaction = "${version}"
-    , FunctionalTestSuite = "${version}"
-  } artifact
+  -> 
+    let version_and_codename = "${version}-${DebianVersions.lowerName codename}"
+    merge {
+      Daemon ="${version_and_codename}${Profiles.toLabelSegment profile}"
+      , Archive = "${version_and_codename}"
+      , ArchiveMigration  = "${version_and_codename}"
+      , ArchiveMaintenance = "${version_and_codename}"
+      , TestExecutive = "${version_and_codename}"
+      , BatchTxn = "${version_and_codename}"
+      , Rosetta = "${version_and_codename}" 
+      , ZkappTestTransaction = "${version_and_codename}"
+      , FunctionalTestSuite = "${version_and_codename}"
+    } artifact
 in
 
 {
