@@ -99,10 +99,13 @@ let promoteDebianStep = \(spec : PromoteDebianSpec.Type) ->
       }
 
 let promoteDockerStep = \(spec : PromoteDockerSpec.Type) ->
+    let version = "${spec.version}-${DebianVersions.lowerName spec.codename}${Profiles.toLabelSegment spec.profile}"
+    let new_tag = "${spec.new_tag}-${DebianVersions.lowerName spec.codename}"
+    in
     Command.build
       Command.Config::{
         commands = [ 
-          Cmd.run "./buildkite/scripts/promote-docker.sh --name ${Artifact.dockerName spec.name}${Profiles.toLabelSegment spec.profile}  --version ${spec.version} --tag ${spec.new_tag}"
+          Cmd.run "./buildkite/scripts/promote-docker.sh --name ${Artifact.dockerName spec.name} --version ${version} --tag ${new_tag}"
         ],
         label = "Docker: ${spec.step_key}",
         key = spec.step_key,
