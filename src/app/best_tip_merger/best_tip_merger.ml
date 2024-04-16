@@ -1,8 +1,13 @@
-(* Accumulates the best tip history from mina-best-tip.log files and consolidates it into a rose tree representation*)
+(* Accumulates the best tip history from mina-best-tip.log files and
+   consolidates it into a rose tree representation *)
 
 open Core
 open Async
 open Mina_base
+
+(** One step further and we have a functorized application where we could want
+    to use Mina_numbers.Global_slot_since_genesis instead. *)
+module Global_slot = Mina_numbers.Global_slot_since_hard_fork
 
 module Node = struct
   module T = struct
@@ -205,7 +210,7 @@ module Compact_display = struct
         { current : State_hash.t
         ; parent : State_hash.t
         ; blockchain_length : Mina_numbers.Length.t
-        ; global_slot : Mina_numbers.Global_slot_since_genesis.t
+        ; global_slot : Global_slot.t
         }
   [@@deriving yojson]
 
@@ -243,7 +248,7 @@ module Graph_node = struct
     | Node of
         { current : State_hash.t
         ; length : Mina_numbers.Length.t
-        ; slot : Mina_numbers.Global_slot_since_genesis.t
+        ; slot : Global_slot.t
         }
   [@@deriving yojson, equal, hash]
 
