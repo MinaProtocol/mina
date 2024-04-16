@@ -544,6 +544,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                in
                if stream_precomputed_blocks && not keep_precomputed_blocks then
                  Precomputed_block.delete_fetched_concrete ~network
+                   ~local_path:precomputed_blocks_local_path
                    (required_precomputed_blocks blocks)
                else return () )
       in
@@ -618,12 +619,15 @@ let () =
          and precomputed_blocks_local_path =
            Param.flag "--precomputed-blocks-local-path"
              ~aliases:[ "-precomputed-blocks-local-path" ]
-             Param.(required string)
+             Param.(optional string)
              ~doc:"PATH the precomputed blocks on-disk location"
          and log_json = Cli_lib.Flag.Log.json
          and log_level = Cli_lib.Flag.Log.level
          and file_log_level = Cli_lib.Flag.Log.file_log_level
          and log_filename = Cli_lib.Flag.Log.file in
+         let precomputed_blocks_local_path =
+           Option.value precomputed_blocks_local_path ~default:"."
+         in
          main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
            ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
            ~stream_precomputed_blocks ~keep_precomputed_blocks ~log_json
