@@ -3573,36 +3573,6 @@ index 40b6b3f114..627350987a 100644
 +      =
      Conn.find get_account_id_accessed_in_commands_query ()
  end
-diff --git a/src/app/best_tip_merger/best_tip_merger.ml b/src/app/best_tip_merger/best_tip_merger.ml
-index 5682f29ec5..90f418c153 100644
---- a/src/app/best_tip_merger/best_tip_merger.ml
-+++ b/src/app/best_tip_merger/best_tip_merger.ml
-@@ -205,7 +205,7 @@ module Compact_display = struct
-         { current : State_hash.t
-         ; parent : State_hash.t
-         ; blockchain_length : Mina_numbers.Length.t
--        ; global_slot : Mina_numbers.Global_slot_since_genesis.t
-+        ; global_slot : Mina_numbers.Global_slot_since_hard_fork.t
-         }
-   [@@deriving yojson]
- 
-@@ -243,7 +243,7 @@ module Graph_node = struct
-     | Node of
-         { current : State_hash.t
-         ; length : Mina_numbers.Length.t
--        ; slot : Mina_numbers.Global_slot_since_genesis.t
-+        ; slot : Mina_numbers.Global_slot_since_hard_fork.t
-         }
-   [@@deriving yojson, equal, hash]
- 
-@@ -267,7 +267,7 @@ module Graph_node = struct
-           ("NA", "NA")
-       | Node s ->
-           ( Mina_numbers.Length.to_string s.length
--          , Mina_numbers.Global_slot_since_genesis.to_string s.slot )
-+          , Mina_numbers.Global_slot_since_hard_fork.to_string s.slot )
-     in
-     { state; slot; length; peers = t.peers }
  
 diff --git a/src/app/delegation_compliance/delegation_compliance.ml b/src/app/delegation_compliance/delegation_compliance.ml
 index 8a0e92a6c5..d91071a33c 100644
