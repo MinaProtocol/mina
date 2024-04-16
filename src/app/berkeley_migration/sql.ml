@@ -79,8 +79,9 @@ module Mainnet = struct
 
     let id_from_state_hash (module Conn : CONNECTION) state_hash =
       Conn.find
-        (Caqti_request.find Caqti_type.string Caqti_type.int
-           {sql| SELECT id
+        (Caqti_request.find Caqti_type.string
+           Caqti_type.(tup2 int int)
+           {sql| SELECT id, height
                  FROM blocks
                  WHERE state_hash = ?
          |sql} )
@@ -122,11 +123,18 @@ module Mainnet = struct
            "UPDATE blocks SET chain_status='canonical' WHERE id = ?" )
         id
 
+    let mark_as_pending (module Conn : CONNECTION) id =
+      Conn.exec
+        (Caqti_request.exec Caqti_type.int
+           "UPDATE blocks SET chain_status = 'pending' where id = ?" )
+        id
+
     let get_highest_canonical_block (module Conn : CONNECTION) =
       Conn.find
-        (Caqti_request.find Caqti_type.unit Caqti_type.int
-           "SELECT id FROM blocks WHERE chain_status='canonical' ORDER BY \
-            height DESC LIMIT 1" )
+        (Caqti_request.find Caqti_type.unit
+           Caqti_type.(tup2 int int)
+           "SELECT id, height FROM blocks WHERE chain_status='canonical' ORDER \
+            BY height DESC LIMIT 1" )
 
     let get_subchain (module Conn : CONNECTION) ~start_block_id ~end_block_id =
       (* derive query from type `t` *)
