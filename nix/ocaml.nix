@@ -158,7 +158,7 @@ let
         ] ++ ocaml-libs;
 
         # todo: slimmed rocksdb
-        MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
+        MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
         # this is used to retrieve the path of the built static library
