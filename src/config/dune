@@ -1,25 +1,5 @@
-(* -*- tuareg -*- *)
-
-let rec find_all_files ~banlist_exts dirname basename =
-  let ext =
-    try String.split_on_char '.' basename |> List.rev |> List.hd with _ -> ""
-  in
-  if List.exists (String.equal ext) banlist_exts then []
-  else
-    let fullname = Filename.concat dirname basename in
-    if Sys.is_directory fullname then
-      Sys.readdir fullname |> Array.to_list
-      |> List.map (find_all_files ~banlist_exts fullname)
-      |> List.concat
-    else [fullname]
-
-let () =
-  let config_deps =
-    find_all_files ~banlist_exts:["un~"] "." "" |> String.concat " "
-  in
-  Jbuild_plugin.V1.send
-  @@ "(rule\n\
-     \  (targets config.mlh)\n\
-     \  (mode fallback)\n\
-     \  (deps %{profile}.mlh " ^ config_deps ^ ")\n
-     \  (action (copy %{profile}.mlh config.mlh)))"
+(rule
+  (targets config.mlh)
+  (mode fallback)
+  (deps (source_tree .))
+  (action (copy %{profile}.mlh config.mlh)))
