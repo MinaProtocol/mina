@@ -20,6 +20,7 @@ declare -r CLI_NAME="$0";
 declare -r PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 
 CHECKPOINT_PREFIX=migration
+CHECKPOINT_INTERVAL=1000
 
 ################################################################################
 # functions
@@ -87,6 +88,7 @@ function initial_help(){
     printf "  %-25s %s\n" "-n | --network" "[string] network name when determining precomputed blocks. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
     printf "  %-25s %s\n" "-d | --delete-blocks" "[flag] delete blocks after they are processed (saves space with -sb)"
     printf "  %-25s %s\n" "-p | --prefetch-blocks" "[flag] downloads all blocks at once instead of incrementally"
+    printf "  %-25s %s\n" "-i | --checkpoint-interval" "[int] replayer checkpoint interval. Default: 1000"
     printf "  %-25s %s\n" "-c | --checkpoint-output-path" "[file] output folder for replayer checkpoints"
     printf "  %-25s %s\n" "-l | --precomputed-blocks-local-path" "[file] on-disk precomputed blocks location"
     echo ""
@@ -119,7 +121,8 @@ function initial(){
     local __network='' 
     local __checkpoint_output_path='.'
     local __precomputed_blocks_local_path='.'
-    
+    local __checkpoint_interval=$CHECKPOINT_INTERVAL
+
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
         case $1 in
@@ -160,6 +163,10 @@ function initial(){
             ;;
             -c | --checkpoint-output-path )
                 __checkpoint_output_path=${2:?$error_message}
+                shift 2;
+            ;;
+            -i | --checkpoint-interval )
+                __checkpoint_interval=${2:?$error_message}
                 shift 2;
             ;;
             -l | --precomputed-blocks-local-path )
@@ -217,7 +224,8 @@ function initial(){
         "$__stream_blocks" \
         "$__network" \
         "$__checkpoint_output_path" \
-        "$__precomputed_blocks_local_path"
+        "$__precomputed_blocks_local_path" \
+        "$__checkpoint_interval"
 }
 
 function check_log_for_error() {
@@ -263,6 +271,7 @@ function run_initial_migration() {
     local __network=$8
     local __checkpoint_output_path=$9
     local __precomputed_blocks_local_path=${10}
+    local __checkpoint_interval=${11}
     
     local __date=$(date '+%Y-%m-%d_%H_%M_%S')
     local __berkely_migration_log="berkeley_migration_$__date.log"
@@ -295,7 +304,7 @@ function run_initial_migration() {
         --migration-mode \
         --archive-uri "$__migrated_archive_uri" \
         --input-file "$__config_file" \
-        --checkpoint-interval 1000 \
+        --checkpoint-interval "$__checkpoint_interval" \
         --checkpoint-file-prefix "$CHECKPOINT_PREFIX" \
         --checkpoint-output-folder "$__checkpoint_output_path" \
         --log-file "$__replayer_log"
@@ -331,6 +340,7 @@ function incremental_help(){
     printf "  %-25s %s\n" "-d | --delete-blocks" "delete blocks after they are processed (saves space with -sb)"
     printf "  %-25s %s\n" "-p | --prefetch-blocks" "downloads all blocks at once instead of incrementally"
     printf "  %-25s %s\n" "-c | --checkpoint-output-path" "[file] output folder for replayer checkpoints"
+    printf "  %-25s %s\n" "-i | --checkpoint-interval" "[int] replayer checkpoint interval. Default: 1000"
     printf "  %-25s %s\n" "-l | --precomputed-blocks-local-path" "[file] on-disk precomputed blocks location"
     echo ""
     echo "Example:"
@@ -388,7 +398,7 @@ function incremental(){
     local __keep_precomputed_blocks=true
     local __stream_blocks=true
     local __network=''
-    local __checkpoint_interval=1000
+    local __checkpoint_interval=$CHECKPOINT_INTERVAL
     local __checkpoint_output_path='.'
     local __precomputed_blocks_local_path='.'
 
@@ -584,6 +594,7 @@ function final_help(){
     printf "  %-25s %s\n" "-d | --delete-blocks" "delete blocks after they are processed (saves space with -sb)"
     printf "  %-25s %s\n" "-p | --prefetch-blocks" "downloads all blocks at once instead of incrementally"
     printf "  %-25s %s\n" "-c | --checkpoint-output-path" "[file] output folder for replayer checkpoints"
+    printf "  %-25s %s\n" "-i | --checkpoint-interval" "[int] replayer checkpoint interval. Default: 1000"
     printf "  %-25s %s\n" "-l | --precomputed-blocks-local-path" "[file] on-disk precomputed blocks location"
     echo ""
     echo "Example:"
@@ -612,7 +623,7 @@ function final(){
     local __keep_precomputed_blocks=true
     local __stream_blocks=true
     local __network='' 
-    local __checkpoint_interval=1000
+    local __checkpoint_interval=$CHECKPOINT_INTERVAL
     local __fork_genesis_config=''
     local __checkpoint_output_path='.'
     local __precomputed_blocks_local_path='.'
