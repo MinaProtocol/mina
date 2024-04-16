@@ -45,7 +45,7 @@ let
   implicit-deps = export-installed // external-packages;
 
   # Pins from opam.export
-  pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package;
+  pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package.section;
 
   scope = opam-nix.applyOverlays opam-nix.__overlays
     (opam-nix.defsToScope pkgs { }
@@ -111,6 +111,10 @@ let
       lmdb = super.lmdb.overrideAttrs
         (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
 
+      # Doesn't have an explicit dependency on ctypes-foreign
+      ctypes = super.ctypes.overrideAttrs
+        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
+
       # Can't find sodium-static and ctypes
       sodium = super.sodium.overrideAttrs (_: {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
@@ -119,10 +123,6 @@ let
           export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
         '';
       });
-
-      # Doesn't have an explicit dependency on ctypes
-      rpc_parallel = super.rpc_parallel.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
 
       # Some "core" Mina executables, without the version info.
       mina-dev = pkgs.stdenv.mkDerivation ({
@@ -174,9 +174,9 @@ let
 
         configurePhase = ''
           export MINA_ROOT="$PWD"
-          export -f patchShebangs stopNest isScript
+          export -f patchShebangs isScript
           fd . --type executable -x bash -c "patchShebangs {}"
-          export -n patchShebangs stopNest isScript
+          export -n patchShebangs isScript
           # Get the mina version at runtime, from the wrapper script. Used to prevent rebuilding everything every time commit info changes.
           sed -i "s/default_implementation [^)]*/default_implementation $MINA_VERSION_IMPLEMENTATION/" src/lib/mina_version/dune
         '';

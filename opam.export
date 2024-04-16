@@ -85,7 +85,6 @@ installed: [
   "conf-libffi.2.0.0"
   "conf-libssl.2"
   "conf-m4.1"
-  "conf-openssl.1"
   "conf-perl.1"
   "conf-pkg-config.1.1"
   "conf-postgresql.1"
@@ -448,6 +447,7 @@ Rpc_parallel offers an API to define various workers and protocols,
     "ppx_jane" {>= "v0.13" & < "v0.15"}
     "sexplib" {>= "v0.13" & < "v0.15"}
     "dune" {>= "2.0.0"}
+    "ctypes"
   ]
   build: ["dune" "build" "-p" name "-j" jobs]
   dev-repo: "git+https://github.com/janestreet/rpc_parallel.git"
