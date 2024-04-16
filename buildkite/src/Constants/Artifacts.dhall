@@ -83,7 +83,7 @@ let dockerTag = \(artifact: Artifact)
     let version_and_codename = "${version}-${DebianVersions.lowerName codename}"
     in
     merge {
-      Daemon ="${version_and_codename}${Profiles.toLabelSegment profile}"
+      Daemon ="${version_and_codename}-${Network.lowerName network}${Profiles.toLabelSegment profile}"
       , Archive = "${version_and_codename}"
       , ArchiveMigration  = "${version_and_codename}"
       , ArchiveMaintenance = "${version_and_codename}"
