@@ -52,19 +52,19 @@ function usage() {
   exit 1
 }
 
-if [ -z "$DEBIANS" ] && [ -z "$DOCKERS"]; then usage "No Debians nor Dockers defined for promoting!"; fi;
+if [ -z "$DEBIANS" ] && [ -z "$DOCKERS" ]; then usage "No Debians nor Dockers defined for promoting!"; exit 1; fi;
 
 DHALL_DEBIANS="([] : List $DEBIAN_DHALL_DEF.Type)"
 
 if [[ -n "$DEBIANS" ]]; then 
-    if [[ -z "$CODENAMES" ]]; then usage "Codenames is not set!"; fi;
-    if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
-    if [[ -z "$NETWORK" ]]; then NETWORK="Berkeley"; fi;
+    if [[ -z "$CODENAMES" ]]; then usage "Codenames is not set!"; exit 1; fi;
+    if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; exit 1;  fi;
+    if [[ -z "$NETWORK" ]]; then NETWORK="Berkeley"; exit 1; fi;
     if [[ -z "$REMOVE_PROFILE_FROM_NAME" ]]; then REMOVE_PROFILE_FROM_NAME=0; fi;
-    if [[ -z "$FROM_CHANNEL" ]]; then usage "'From channel' arg is not set!"; fi;
-    if [[ -z "$TO_CHANNEL" ]]; then usage "'To channel' arg is not set!"; fi;
-    if [[ -z "$FROM_VERSION" ]]; then usage "Version is not set!"; fi;
-    if [[ -z "$NEW_VERSION" ]]; then NEW_VERSION=$VERSION; fi;
+    if [[ -z "$FROM_CHANNEL" ]]; then usage "'From channel' arg is not set!"; exit 1;  fi;
+    if [[ -z "$TO_CHANNEL" ]]; then usage "'To channel' arg is not set!"; exit 1; fi;
+    if [[ -z "$FROM_VERSION" ]]; then usage "Version is not set!"; exit 1; fi;
+    if [[ -z "$NEW_VERSION" ]]; then NEW_VERSION=$FROM_VERSION; fi;
     
 
   arr_of_debians=(${DEBIANS//,/ })
@@ -79,7 +79,7 @@ DHALL_DOCKERS="([] : List $DOCKER_DHALL_DEF.Type)"
 
 if [[ -n "$DOCKERS" ]]; then 
     if [[ -z "$NEW_VERSION" ]]; then usage "New Tag is not set!"; fi;
-    if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
+    if [[ -z "$FROM_VERSION" ]]; then usage "Version is not set!"; fi;
     if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
   
   arr_of_dockers=(${DOCKERS//,/ })
@@ -90,9 +90,9 @@ if [[ -n "$DOCKERS" ]]; then
   DHALL_DOCKERS="[${DHALL_DOCKERS:1}]"
 fi
 
-local __codenames=(${CODENAMES//,/ })
+CODENAMES=(${CODENAMES//,/ })
 DHALL_CODENAMES=""
-  for i in "${__codenames[@]}"; do
+  for i in "${CODENAMES[@]}"; do
     DHALL_CODENAMES="${DHALL_CODENAMES}, $DEBIAN_VERSION_DHALL_DEF.DebVersion.${i}"
   done
   DHALL_CODENAMES="[${DHALL_CODENAMES:1}]"
