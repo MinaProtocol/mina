@@ -1,8 +1,13 @@
-(* Accumulates the best tip history from mina-best-tip.log files and consolidates it into a rose tree representation*)
+(* Accumulates the best tip history from mina-best-tip.log files and
+   consolidates it into a rose tree representation *)
 
 open Core
 open Async
 open Mina_base
+
+(** One step further and we have a functorized application where we could want
+    to use Mina_numbers.Global_slot_since_genesis instead. *)
+module Global_slot = Mina_numbers.Global_slot_since_hard_fork
 
 module Node = struct
   module T = struct
@@ -63,7 +68,8 @@ module Input = struct
                     |> added_transitions_of_yojson |> Result.ok_or_failwith
                   in
                   let acc' =
-                    List.fold ~init:acc added_transitions ~f:(fun acc'' tr ->
+                    List.fold ~init:acc added_transitions
+                      ~f:(fun ({ seen_state_hashes; _ } as acc'') tr ->
                         let new_node =
                           { Node.state = tr
                           ; peer_ids = String.Set.singleton peer_id
@@ -74,23 +80,22 @@ module Input = struct
                             tr.protocol_state
                         in
                         let new_state_hash = tr.state_hash in
+
+                        if not (Set.mem seen_state_hashes parent_hash) then
+                          (*Assuming the logs are in order, if the parent hash was not already seen then it is the root*)
+                          Hashtbl.update t.init_states new_state_hash
+                            ~f:(function
+                            | None ->
+                                new_node
+                            | Some node ->
+                                { state = node.state
+                                ; peer_ids = Set.add node.peer_ids peer_id
+                                } ) ;
+
                         let seen_state_hashes =
-                          let seen_state_hashes =
-                            Set.add acc''.seen_state_hashes new_state_hash
-                          in
-                          if Set.mem acc''.seen_state_hashes parent_hash |> not
-                          then
-                            (*Assuming the logs are in order, if the parent hash was not already seen then it is the root*)
-                            Hashtbl.update t.init_states new_state_hash
-                              ~f:(function
-                              | None ->
-                                  new_node
-                              | Some node ->
-                                  { state = node.state
-                                  ; peer_ids = Set.add node.peer_ids peer_id
-                                  } ) ;
-                          seen_state_hashes
+                          Set.add seen_state_hashes new_state_hash
                         in
+
                         Hashtbl.update t.all_states parent_hash ~f:(function
                           | None ->
                               State_hash.Map.singleton new_state_hash new_node
@@ -132,7 +137,8 @@ module Input = struct
     res
 end
 
-(*Output is a rose tree and consists of all the forks seen from an initial state; Multiple rose trees is there are logs with different initial states*)
+(*Output is a rose tree and consists of all the forks seen from an initial
+  state; Multiple rose trees is there are logs with different initial states*)
 module Output = struct
   type node =
     | Root of { state : State_hash.t; peer_ids : String.Set.t }
@@ -205,7 +211,7 @@ module Compact_display = struct
         { current : State_hash.t
         ; parent : State_hash.t
         ; blockchain_length : Mina_numbers.Length.t
-        ; global_slot : Mina_numbers.Global_slot_since_genesis.t
+        ; global_slot : Global_slot.t
         }
   [@@deriving yojson]
 
@@ -243,37 +249,32 @@ module Graph_node = struct
     | Node of
         { current : State_hash.t
         ; length : Mina_numbers.Length.t
-        ; slot : Mina_numbers.Global_slot_since_genesis.t
+        ; slot : Global_slot.t
         }
   [@@deriving yojson, equal, hash]
 
   type t = { state : state; peers : int } [@@deriving yojson, equal, hash]
 
-  type display = { state : string; length : string; slot : string; peers : int }
+  type display = { name : string; length : string; slot : string; peers : int }
   [@@deriving yojson]
 
-  let name (t : t) =
-    match t.state with
-    | Root s ->
-        State_hash.to_base58_check s |> Fn.flip String.suffix 7
-    | Node s ->
-        State_hash.to_base58_check s.current |> Fn.flip String.suffix 7
+  let state_hash { state; _ } =
+    match state with Root s -> s | Node s -> s.current
 
-  let display (t : t) =
-    let state = name t in
+  let name t =
+    state_hash t |> State_hash.to_base58_check |> Fn.flip String.suffix 7
+
+  let compare t t' = State_hash.compare (state_hash t) (state_hash t')
+
+  let display ({ state; peers } as t) =
     let length, slot =
-      match t.state with
+      match state with
       | Root _ ->
-          ("NA", "NA")
+          ("NA", "NA") (* This could very well be 0, 0*)
       | Node s ->
-          ( Mina_numbers.Length.to_string s.length
-          , Mina_numbers.Global_slot_since_genesis.to_string s.slot )
+          (Mina_numbers.Length.to_string s.length, Global_slot.to_string s.slot)
     in
-    { state; slot; length; peers = t.peers }
-
-  let compare (t : t) (t' : t) =
-    let state_hash = function Root s -> s | Node s -> s.current in
-    State_hash.compare (state_hash t.state) (state_hash t'.state)
+    { name = name t; slot; length; peers }
 end
 
 module Visualization = struct
