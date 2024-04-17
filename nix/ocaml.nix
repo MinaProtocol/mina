@@ -21,7 +21,8 @@ let
 
   # Packages which are `installed` in the export.
   # These are all the transitive ocaml dependencies of Mina.
-  export-installed = opam-nix.opamListToQuery export.installed;
+  export-installed = builtins.removeAttrs
+    (opam-nix.opamListToQuery export.installed) ["check_opam_switch"];
 
   # Extra packages which are not in opam.export but useful for development, such as an LSP server.
   extra-packages = with implicit-deps; {
@@ -45,7 +46,8 @@ let
   implicit-deps = export-installed // external-packages;
 
   # Pins from opam.export
-  pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package.section;
+  pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg)
+    (builtins.removeAttrs export.package.section ["check_opam_switch"]);
 
   scope = opam-nix.applyOverlays opam-nix.__overlays
     (opam-nix.defsToScope pkgs { }
