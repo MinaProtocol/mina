@@ -163,11 +163,11 @@ copy_common_daemon_configs() {
   mkdir -p "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   mkdir -p "${BUILDDIR}/etc/mina/rosetta/archive"
   mkdir -p "${BUILDDIR}/etc/mina/rosetta/genesis_ledgers"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/scripts"
 
   # --- Copy artifacts
-  cp ../src/app/rosetta/*.conf "${BUILDDIR}/etc/mina/rosetta"
-  cp ../src/app/rosetta/*.sh "${BUILDDIR}/etc/mina/rosetta"
-  cp ../scripts/archive/download-missing-blocks.sh "${BUILDDIR}/etc/mina/rosetta"
+  cp ../src/app/rosetta/scripts/* "${BUILDDIR}/etc/mina/rosetta/scripts"
+  cp ../scripts/archive/download-missing-blocks.sh "${BUILDDIR}/etc/mina/rosetta/scripts"
 
   cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
