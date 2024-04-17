@@ -1,27 +1,29 @@
 #!/bin/bash
 
-# This script is supposed to be executed from pipeline without arguments. In order to control
-# Input parameters pipeline should defined env variables like below:
+# Usage (in buildkite definition)
+
 # steps:
 #  - commands:
 #      - "./buildkite/scripts/run_promote_build_job.sh | buildkite-agent pipeline upload"
-#    label: ":pipeline: run promote build job"
+#    label: ":pipeline: run promote dockers build job"
 #    agents:
 #       size: "generic"
-#   plugins:
+#    plugins:
 #      "docker#v3.5.0":
 #        environment:
 #          - BUILDKITE_AGENT_ACCESS_TOKEN
-#          - "PACKAGES=LogProc"
-#          - "VERSION=2.0.0berkeley-rc1-develop-91bf5d2"
-#          - "CODENAME=Bullseye"
+#          - "DOCKERS=Archive,Daemon"
+#          - "REMOVE_PROFILE_FROM_NAME=1"
+#          - "PROFILE=Hardfork"
+#          - "NETWORK=Devnet"
+#          - "FROM_VERSION=3.0.0devnet-tooling-dkijania-hardfork-package-gen-in-nightly-b37f50e"
+#          - "NEW_VERSION=3.0.0fake-ddb6fc4"
+#          - "CODENAMES=Focal,Buster,Bullseye"
 #          - "FROM_CHANNEL=Unstable"
-#          - "TO_CHANNEL=Nightly"
+#          - "TO_CHANNEL=Experimental"
 #        image: codaprotocol/ci-toolchain-base:v3
 #        mount-buildkite-agent: true
 #        propagate-environment: true
-#
-# Below method is kept for documentaion purposes
 
 
 DEBIAN_DHALL_DEF="(./buildkite/src/Constants/DebianPackage.dhall)"
