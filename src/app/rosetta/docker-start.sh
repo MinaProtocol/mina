@@ -51,6 +51,7 @@ POSTGRES_DBNAME=${POSTGRES_DBNAME:=archive}
 POSTGRES_DATA_DIR=${POSTGRES_DATA_DIR:=/data/postgresql}
 PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${POSTGRES_DBNAME}
 DUMP_TIME=${DUMP_TIME:=0000}
+ARCHIVE_GENESIS_INIT=${ARCHIVE_GENESIS_INIT:=0}
 
 # Genesis Ledger
 if [ -n "$MINA_GENESIS_LEDGER_URL" ]; then
@@ -79,12 +80,12 @@ done
 
 # Archive
 echo "========================= STARTING ARCHIVE NODE on PORT ${MINA_ARCHIVE_PORT} ==========================="
-mina-archive run \
-  --postgres-uri "${PG_CONN}" \
-  --config-file ${MINA_CONFIG_FILE} \
-  --log-level ${LOG_LEVEL} \
-  --log-json \
-  --server-port ${MINA_ARCHIVE_PORT} &
+MINA_ARCHIVE_FLAGS="--postgres-uri "${PG_CONN}" --log-level ${LOG_LEVEL} --log-json --server-port ${MINA_ARCHIVE_PORT}"
+# check if ARCHIVE_GENESIS_INIT is not set to 0
+if [ "$ARCHIVE_GENESIS_INIT" != "0" ]; then
+  MINA_ARCHIVE_FLAGS="$MINA_ARCHIVE_FLAGS --config-file ${MINA_CONFIG_FILE}"
+fi
+mina-archive run ${MINA_ARCHIVE_FLAGS} &
 
 # wait for it to settle
 sleep 10
