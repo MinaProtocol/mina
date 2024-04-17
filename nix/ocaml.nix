@@ -49,7 +49,31 @@ let
   pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg)
     (builtins.removeAttrs export.package.section ["check_opam_switch"]);
 
-  scope = opam-nix.applyOverlays opam-nix.__overlays
+  implicit-deps-overlay = self: super:
+    (if pkgs.stdenv.isDarwin then {
+      async_ssl = super.async_ssl.overrideAttrs
+        { NIX_CFLAGS_COMPILE = "-Wno-implicit-function-declaration -Wno-incompatible-function-pointer-types"; };
+    } else {}) //
+    {
+      # https://github.com/Drup/ocaml-lmdb/issues/41
+      lmdb = super.lmdb.overrideAttrs
+        (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
+
+      # Doesn't have an explicit dependency on ctypes-foreign
+      ctypes = super.ctypes.overrideAttrs
+        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
+
+      # Can't find sodium-static and ctypes
+      sodium = super.sodium.overrideAttrs (_: {
+        NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
+        propagatedBuildInputs = [ pkgs.sodium-static ];
+        preBuild = ''
+          export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
+        '';
+      });
+    };
+
+  scope = opam-nix.applyOverlays (opam-nix.__overlays ++ [ implicit-deps-overlay ])
     (opam-nix.defsToScope pkgs { }
       ((opam-nix.queryToDefs repos (extra-packages // implicit-deps)) // pins));
 
@@ -108,24 +132,8 @@ let
             outputs = [ "out" ];
             installPhase = "touch $out";
           } // extraArgs);
-    in {
-      # https://github.com/Drup/ocaml-lmdb/issues/41
-      lmdb = super.lmdb.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
-
-      # Doesn't have an explicit dependency on ctypes-foreign
-      ctypes = super.ctypes.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
-
-      # Can't find sodium-static and ctypes
-      sodium = super.sodium.overrideAttrs (_: {
-        NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
-        propagatedBuildInputs = [ pkgs.sodium-static ];
-        preBuild = ''
-          export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
-        '';
-      });
-
+    in 
+    {
       # Some "core" Mina executables, without the version info.
       mina-dev = pkgs.stdenv.mkDerivation ({
         pname = "mina";
