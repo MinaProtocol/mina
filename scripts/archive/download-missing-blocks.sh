@@ -55,7 +55,7 @@ while [ ${#} -gt 0 ]; do
         shift 2;
       ;;
       -b | --archive-blocks )
-        ARCHIVE_BLOCKS_APP=${2:?$error_message}
+        ARCHIVE_BLOCKS=${2:?$error_message}
         shift 2;
       ;;
       -m | --missing-blocks-auditor )
@@ -63,7 +63,7 @@ while [ ${#} -gt 0 ]; do
         shift 2;
       ;;
       -c | --blocks-bucket )
-        BLOCKS_BUCKET=${2:?$error_message}
+        BLOCK_BUCKET=${2:?$error_message}
         shift 2;
       ;;
       * )
@@ -85,13 +85,13 @@ function jq_parent_hash() {
 }
 
 function populate_db() {
-   $ARCHIVE_BLOCKS_APP --precomputed --archive-uri "$1" "$2" | jq -rs '"[BOOTSTRAP] Populated database with block: \(.[-1].message)"'
+   $ARCHIVE_BLOCKS --precomputed --archive-uri "$1" "$2" | jq -rs '"[BOOTSTRAP] Populated database with block: \(.[-1].message)"'
    rm "$2"
 }
 
 function download_block() {
     echo "Downloading $1 block"
-    curl -sO "${BLOCKS_BUCKET}/${1}"
+    curl -sO "${BLOCK_BUCKET}/${1}"
 }
 
 HASH='map(select(.metadata.parent_hash != null and .metadata.parent_height != null)) | .[0].metadata.parent_hash'
@@ -99,7 +99,7 @@ HASH='map(select(.metadata.parent_hash != null and .metadata.parent_height != nu
 function bootstrap() {
   echo "[BOOTSTRAP] Top 10 blocks before bootstrapping the archiveDB:"
   psql "${PG_CONN}" -c "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
-  echo "[BOOTSTRAP] Restoring blocks individually from ${BLOCKS_BUCKET}..."
+  echo "[BOOTSTRAP] Restoring blocks individually from ${BLOCK_BUCKET}..."
 
   until [[ "$PARENT" == "null" ]] ; do
     PARENT_FILE="${MINA_NETWORK}-$($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq_parent_json)"
