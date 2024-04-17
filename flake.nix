@@ -262,7 +262,7 @@
     } // utils.lib.eachDefaultSystem (system:
       let
 	rocksdbOverlay = pkgs: prev:
-          if builtins.elem system [ "aarch64-darwin" "x86_64-darwin" ] then
+          if prev.stdenv.isDarwin then
             { rocksdb-mina = pkgs.rocksdb; }
           else { rocksdb-mina = pkgs.rocksdb511; };
 
