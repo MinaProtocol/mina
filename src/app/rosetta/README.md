@@ -56,7 +56,7 @@ The container includes 4 scripts in `/etc/mina/rosetta` that run a different set
   and the tip of the chain and will fill in those gaps by walking back the
   linked list of blocks in the canonical chain and importing them one at a time.
   This can also be used to connect to other networks and has several
-  configuration parameters. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/src/app/rosetta/scripts/docker-start.sh)
+  configuration parameters. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/11513e679fae11e3cd0d3a91dd242628fd712ff5/src/app/rosetta/scripts/docker-start.sh)
   for more information about what you can configure and how.
 * `docker-devnet-start.sh` connects the Mina node to our
   [Devnet](https://docs.minaprotocol.com/node-operators/connecting-to-devnet)
