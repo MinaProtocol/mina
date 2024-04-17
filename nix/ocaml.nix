@@ -160,7 +160,7 @@ let
         ] ++ ocaml-libs;
 
         # todo: slimmed rocksdb
-        MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
+        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
         # this is used to retrieve the path of the built static library
@@ -280,7 +280,7 @@ let
         version = "mainnet";
         DUNE_PROFILE = "mainnet";
         # For compatibility with Docker build
-        MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
+        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
       });
 
       mainnet = wrapMina self.mainnet-pkg { };
@@ -289,7 +289,7 @@ let
         version = "devnet";
         DUNE_PROFILE = "devnet";
         # For compatibility with Docker build
-        MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
+        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
       });
 
       devnet = wrapMina self.devnet-pkg { };

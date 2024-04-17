@@ -261,6 +261,11 @@
         };
     } // utils.lib.eachDefaultSystem (system:
       let
+	rocksdbOverlay = pkgs: prev:
+          if builtins.elem system [ "aarch64-darwin" "x86_64-darwin" ] then
+            { rockdb-mina = pkgs.rocksdb; }
+          else { rocksdb-mina = pkgs.rocksdb511; };
+
         # nixpkgs with all relevant overlays applied
         pkgs = nixpkgs.legacyPackages.${system}.extend
           (nixpkgs.lib.composeManyExtensions ([
@@ -274,7 +279,7 @@
                   nodejs = pkgs.nodejs-16_x;
                 };
             })
-          ] ++ builtins.attrValues self.overlays));
+          ] ++ builtins.attrValues self.overlays ++ [ rocksdbOverlay ] ));
 
         checks = import ./nix/checks.nix inputs pkgs;
 
