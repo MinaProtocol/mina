@@ -12,7 +12,7 @@ MINA_NETWORK=devnet
 PG_CONN=postgres://postgres@127.0.0.1:5432/archive_balances_migrated
 ARCHIVE_BLOCKS=mina-archive-blocks
 MISSING_BLOCKS_AUDITOR=mina-missing-blocks-auditor
-BLOCK_BUCKET="https://storage.googleapis.com/mina_network_block_data"
+BLOCKS_BUCKET="https://storage.googleapis.com/mina_network_block_data"
 CLI_NAME=./download-missing-blocks.sh
 
 
@@ -28,7 +28,7 @@ function help(){
   printf "  %-25s %s\n" "-a | --archive-uri" "[connection_str] connection string to database to be patched. Default: $PG_CONN ";
   printf "  %-25s %s\n" "-b | --archive-blocks path" "[fie] archive blocks app for archiving blocks path . Default: $ARCHIVE_BLOCKS ";
   printf "  %-25s %s\n" "-m | --missing-blocks-auditor" "[file] missing auditor app path. Default: $MISSING_BLOCKS_AUDITOR ";
-  printf "  %-25s %s\n" "-c | --blocks-bucket" "[string] name of precomputed blocks bucket. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json. Default: $BLOCK_BUCKET";  
+  printf "  %-25s %s\n" "-c | --blocks-bucket" "[string] name of precomputed blocks bucket. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json. Default: $BLOCKS_BUCKET";  
   echo "Example:"
   echo ""
   echo "  " $CLI_NAME --network devnet --archive-uri postgres://postgres:pass@localhost:5432/archive_balances_migrated
@@ -63,7 +63,7 @@ while [ ${#} -gt 0 ]; do
         shift 2;
       ;;
       -c | --blocks-bucket )
-        BLOCK_BUCKET=${2:?$error_message}
+        BLOCKS_BUCKET=${2:?$error_message}
         shift 2;
       ;;
       * )
@@ -91,14 +91,14 @@ function populate_db() {
 
 function download_block() {
     echo "Downloading $1 block"
-    curl -sO "${BLOCK_BUCKET}/${1}"
+    curl -sO "${BLOCKS_BUCKET}/${1}"
 }
 
 # Bootstrap finds every missing state hash in the database and imports them from the o1labs bucket of .json blocks
 function bootstrap() {
   echo "[BOOTSTRAP] Top 10 blocks before bootstrapping the archiveDB:"
   psql "${PG_CONN}" -c "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
-  echo "[BOOTSTRAP] Restoring blocks individually from ${BLOCK_BUCKET}..."
+  echo "[BOOTSTRAP] Restoring blocks individually from ${BLOCKS_BUCKET}..."
 
   set +o pipefail
   until [[ "$PARENT" == "null" ]] ; do
