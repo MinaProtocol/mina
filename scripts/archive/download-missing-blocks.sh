@@ -100,12 +100,14 @@ function bootstrap() {
   psql "${PG_CONN}" -c "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
   echo "[BOOTSTRAP] Restoring blocks individually from ${BLOCK_BUCKET}..."
 
+  set +o pipefail
   until [[ "$PARENT" == "null" ]] ; do
     PARENT_FILE="${MINA_NETWORK}-$($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq_parent_json)"
     download_block "${PARENT_FILE}"
     populate_db "$PG_CONN" "$PARENT_FILE"
     PARENT="$($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq_parent_hash)"
   done
+  set -o pipefail
 
   echo "[BOOTSTRAP] Top 10 blocks in bootstrapped archiveDB:"
   psql "${PG_CONN}" -c "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
@@ -117,6 +119,7 @@ function bootstrap() {
 
 # Wait until there is a block missing
 PARENT=null
+set +o pipefail
 while true; do # Test once every 10 minutes forever, take an hour off when bootstrap completes
   PARENT="$($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq_parent_hash)"
   echo $PARENT
@@ -124,4 +127,4 @@ while true; do # Test once every 10 minutes forever, take an hour off when boots
   [[ "$PARENT" != "null" ]] && echo "[BOOSTRAP] Some blocks are missing, moving to recovery logic..." && bootstrap
   sleep 600 # Wait for the daemon to catchup and start downloading new blocks
 done
-
+set -o pipefail
