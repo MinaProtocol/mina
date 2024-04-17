@@ -263,7 +263,7 @@
       let
 	rocksdbOverlay = pkgs: prev:
           if builtins.elem system [ "aarch64-darwin" "x86_64-darwin" ] then
-            { rockdb-mina = pkgs.rocksdb; }
+            { rocksdb-mina = pkgs.rocksdb; }
           else { rocksdb-mina = pkgs.rocksdb511; };
 
         # nixpkgs with all relevant overlays applied
