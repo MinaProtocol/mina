@@ -110,7 +110,7 @@ function bootstrap() {
 
   echo "[BOOTSTRAP] Top 10 blocks in bootstrapped archiveDB:"
   psql "${PG_CONN}" -c "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
-  echo "[BOOTSTRAP] This rosetta node is synced with no missing blocks back to genesis!"
+  echo "[BOOTSTRAP] This archive node is synced with no missing blocks back to genesis!"
 
   echo "[BOOTSTRAP] Checking again in 60 minutes..."
   sleep 3000
@@ -125,4 +125,4 @@ while true; do # Test once every 10 minutes forever, take an hour off when boots
   [[ "$PARENT" != "null" ]] && echo "[BOOSTRAP] Some blocks are missing, moving to recovery logic..." && bootstrap
   sleep 600 # Wait for the daemon to catchup and start downloading new blocks
 done
-echo "[BOOTSTRAP] This rosetta node is synced with no missing blocks back to genesis!"
+
