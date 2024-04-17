@@ -58,7 +58,7 @@ let serialize_report report =
 let send_node_error_report ~logger ~url report =
   let json = serialize_report report in
   let json_string = Yojson.Safe.to_string json in
-  (* TODO: move length check to to send_node_error_data *)
+  (* TODO: move length check to send_node_error_data *)
   if String.length json_string > max_report_bytes then (
     [%log error]
       "Could not send error report because generated error exceeded max report \

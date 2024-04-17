@@ -319,7 +319,7 @@ val result_row :
  *     external_checks       := Context to track required external checks
  *     left_input            := Multiplicand foreign field element
  *     right_input           := Multiplicand foreign field element
- *     foreign_field_modulus := Must be less than than max foreign field modulus
+ *     foreign_field_modulus := Must be less than max foreign field modulus
  *
  *   Outputs:
  *     Inserts the ForeignFieldMul gate, followed by Zero gate into the circuit
