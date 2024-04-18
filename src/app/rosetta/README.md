@@ -56,7 +56,7 @@ The container includes 3 scripts in `/etc/mina/rosetta/scripts` that run a diffe
   and the tip of the chain and will fill in those gaps by walking back the
   linked list of blocks in the canonical chain and importing them one at a time.
   After this initial bootstrap, it will query once every 60 minutes for missing
-  blocks and import them as needed. This script is the most useful for connecting
+  blocks and import them as needed. This script is most useful for connecting
   to a real network and is the default script used when running the container.
   This can also be used to connect to other networks and has several
   configuration parameters. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/11513e679fae11e3cd0d3a91dd242628fd712ff5/src/app/rosetta/scripts/docker-start.sh)
