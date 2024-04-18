@@ -68,7 +68,7 @@ let version_of_versioned_module_name name =
          https://ocaml.janestreet.com/ocaml-core/latest/doc/core/index.html
          https://ocaml.janestreet.com/ocaml-core/latest/doc/core_kernel/index.html
 
-       add to this list as needed; but more items slows things down
+   add to this list as needed; but more items slows things down
 *)
 let jane_street_library_modules = [ "Uuid" ]
 

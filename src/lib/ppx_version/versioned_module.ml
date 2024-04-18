@@ -1053,9 +1053,60 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
       match t_stri.pstr_desc with
       | Pstr_type (_, [ ty_decl ]) ->
           let register_contained_types =
-            let modls = get_contained_versioned_modules ty_decl in
+            let contained_modls =
+              match version_option with
+              | No_version_option | Rpc ->
+                  get_contained_versioned_modules ty_decl
+              | Binable -> (
+                  (* the type "contains" the versioned type used to serialize it *)
+                  try
+                    let include_binable_str =
+                      find_include_binable_stri modl_stri
+                    in
+                    match include_binable_str.pstr_desc with
+                    | Pstr_include
+                        { pincl_mod =
+                            { pmod_desc =
+                                Pmod_apply
+                                  ( { pmod_desc =
+                                        Pmod_apply
+                                          ( _
+                                          , { pmod_desc =
+                                                Pmod_ident { txt = modl; _ }
+                                            ; _
+                                            } )
+                                    ; _
+                                    }
+                                  , _ )
+                            ; _
+                            }
+                        ; _
+                        } -> (
+                        match modl with
+                        | Ldot (Ldot (_, "Stable"), _) ->
+                            (* assume not a Jane St stable module, those won't have `path_to_type`
+                               if that does happen, compile will fail, will need to add a check for
+                               those modules
+                            *)
+                            [ Longident.name modl ]
+                        | _ ->
+                            (* some uses of Binable.Of_binable... rely on unversioned modules for serialization,
+                               like Bigint
+                            *)
+                            [] )
+                    | _ ->
+                        (* we just found the include, this case should be unreachable *)
+                        assert false
+                  with _ ->
+                    (* some %%versioned_binable uses don't use Binable.Of_binable... functors,
+                       so that `find_include_binable_stri` raises
+
+                       review indicates those don't mention versioned types for serialization
+                    *)
+                    [] )
+            in
             let contained_type_paths =
-              List.map modls ~f:(fun modl ->
+              List.map contained_modls ~f:(fun modl ->
                   sprintf "%s.path_to_type" modl |> evar )
               |> elist
             in
