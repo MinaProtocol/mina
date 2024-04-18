@@ -84,6 +84,7 @@ let extract_accounts_exn = function
     ; hash = _
     ; name = None
     ; add_genesis_winner = Some false
+    ; s3_data_hash = _
     } ->
       accounts
   | _ ->
