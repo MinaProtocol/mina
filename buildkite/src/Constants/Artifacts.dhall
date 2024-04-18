@@ -5,9 +5,9 @@ let DebianVersions = ./DebianVersions.dhall
 let Network = ./Network.dhall
 
 
-let Artifact : Type  = < Daemon | Archive | ArchiveMigration | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite | ArchiveMaintenance >
+let Artifact : Type  = < Daemon | Archive | ArchiveMigration | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
 
-let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.ArchiveMigration , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ,  Artifact.ArchiveMaintenance ]
+let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.ArchiveMigration , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
 
 let Main = [ Artifact.Daemon , Artifact.Archive , Artifact.Rosetta ]
 
@@ -18,7 +18,6 @@ let capitalName = \(artifact : Artifact) ->
     Daemon = "Daemon"
     , Archive = "Archive"
     , ArchiveMigration = "ArchiveMigration"
-    , ArchiveMaintenance = "ArchiveMaintenance"
     , TestExecutive = "TestExecutive"
     , BatchTxn = "BatchTxn"
     , Rosetta = "Rosetta"
@@ -31,7 +30,6 @@ let lowerName = \(artifact : Artifact) ->
     Daemon = "daemon"
     , Archive = "archive"
     , ArchiveMigration = "archive_migration"
-    , ArchiveMaintenance = "archive_maintenance"
     , TestExecutive = "test_executive"
     , BatchTxn = "batch_txn"
     , Rosetta = "rosetta"
@@ -45,7 +43,6 @@ let dockerName = \(artifact : Artifact) ->
     , Archive = "mina-archive"
     , TestExecutive = "mina-test-executive"
     , ArchiveMigration = "mina-archive-migration"
-    , ArchiveMaintenance = "mina-archive-maintenance"
     , BatchTxn = "mina-batch-txn"
     , Rosetta = "mina-rosetta" 
     , ZkappTestTransaction = "mina-zkapp-test-transaction"
@@ -57,7 +54,6 @@ let toDebianName = \(artifact : Artifact) ->
     Daemon = "daemon"
     , Archive = "archive"
     , ArchiveMigration  = "archive_migration"
-    , ArchiveMaintenance = ""
     , TestExecutive = "test_executive"
     , BatchTxn = "batch_txn"
     , Rosetta = "" 
@@ -86,7 +82,6 @@ let dockerTag = \(artifact: Artifact)
       Daemon ="${version_and_codename}-${Network.lowerName network}${Profiles.toLabelSegment profile}"
       , Archive = "${version_and_codename}"
       , ArchiveMigration  = "${version_and_codename}"
-      , ArchiveMaintenance = "${version_and_codename}"
       , TestExecutive = "${version_and_codename}"
       , BatchTxn = "${version_and_codename}"
       , Rosetta = "${version_and_codename}" 
