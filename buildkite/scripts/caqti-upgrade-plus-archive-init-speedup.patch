@@ -167,7 +167,7 @@ index c69e1805d1..bf15430c54 100644
        pool
    with
 diff --git a/src/app/archive/lib/processor.ml b/src/app/archive/lib/processor.ml
-index 5c09ed7362..b62f745213 100644
+index bec5544e41..fd99cc96e1 100644
 --- a/src/app/archive/lib/processor.ml
 +++ b/src/app/archive/lib/processor.ml
 @@ -21,7 +21,6 @@
@@ -2496,7 +2496,7 @@ index 5c09ed7362..b62f745213 100644
               (sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table
                  fields_sql values_sql ) )
            () )
-@@ -3911,7 +4260,7 @@ module Block = struct
+@@ -4050,7 +4399,7 @@ module Block = struct
        let ids_sql = String.concat ~sep:"," ids in
        let parent_ids_sql = String.concat ~sep:"," parent_ids in
        Conn.exec
@@ -2505,8 +2505,8 @@ index 5c09ed7362..b62f745213 100644
             (sprintf
                "UPDATE %s AS b SET parent_id = data.parent_id FROM (SELECT \
                 unnest(array[%s]) as id, unnest(array[%s]) as parent_id) AS \
-@@ -4062,7 +4411,7 @@ module Block = struct
- 
+@@ -4060,7 +4409,7 @@ module Block = struct
+     in
      return ()
  
 -  let add_from_extensional (module Conn : CONNECTION)
@@ -2514,7 +2514,7 @@ index 5c09ed7362..b62f745213 100644
        ?(v1_transaction_hash = false) (block : Extensional.Block.t) =
      let open Deferred.Result.Let_syntax in
      let%bind block_id =
-@@ -4121,7 +4470,7 @@ module Block = struct
+@@ -4119,7 +4468,7 @@ module Block = struct
                  Some id )
            in
            Conn.find
@@ -2523,7 +2523,7 @@ index 5c09ed7362..b62f745213 100644
                 (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                    ~tannot:(function
                      | "sub_window_densities" ->
-@@ -4279,18 +4628,19 @@ module Block = struct
+@@ -4277,18 +4626,19 @@ module Block = struct
      in
      return block_id
  
@@ -2547,7 +2547,7 @@ index 5c09ed7362..b62f745213 100644
      (* derive query from type `t` *)
      let concat = String.concat ~sep:"," in
      let columns_with_id = concat ("id" :: Fields.names) in
-@@ -4299,8 +4649,8 @@ module Block = struct
+@@ -4297,8 +4647,8 @@ module Block = struct
      in
      let columns = concat Fields.names in
      Conn.collect_list
@@ -2558,7 +2558,7 @@ index 5c09ed7362..b62f745213 100644
           typ
           (sprintf
              {sql| WITH RECURSIVE chain AS (
-@@ -4324,39 +4674,42 @@ module Block = struct
+@@ -4322,39 +4672,42 @@ module Block = struct
              columns_with_id b_columns_with_id columns ) )
        (end_block_id, start_block_id)
  
@@ -2615,7 +2615,7 @@ index 5c09ed7362..b62f745213 100644
           {sql| UPDATE blocks SET chain_status='orphaned'
                 WHERE height = $2
                 AND state_hash <> $1
-@@ -4364,7 +4717,7 @@ module Block = struct
+@@ -4362,7 +4715,7 @@ module Block = struct
        (state_hash, height)
  
    (* update chain_status for blocks now known to be canonical or orphaned *)
@@ -2624,7 +2624,7 @@ index 5c09ed7362..b62f745213 100644
      let open Deferred.Result.Let_syntax in
      match%bind get_highest_canonical_block_opt (module Conn) () with
      | None ->
-@@ -4436,7 +4789,7 @@ module Block = struct
+@@ -4434,7 +4787,7 @@ module Block = struct
            Deferred.Result.return ()
  
    let delete_if_older_than ?height ?num_blocks ?timestamp
@@ -2633,7 +2633,7 @@ index 5c09ed7362..b62f745213 100644
      let open Deferred.Result.Let_syntax in
      let%bind height =
        match (height, num_blocks) with
-@@ -4445,7 +4798,7 @@ module Block = struct
+@@ -4443,7 +4796,7 @@ module Block = struct
        | None, Some num_blocks -> (
            match%map
              Conn.find_opt
@@ -2642,7 +2642,7 @@ index 5c09ed7362..b62f745213 100644
                   "SELECT MAX(height) FROM blocks" )
                ()
            with
-@@ -4461,8 +4814,8 @@ module Block = struct
+@@ -4459,8 +4812,8 @@ module Block = struct
        let%bind () =
          (* Delete user commands from old blocks. *)
          Conn.exec
@@ -2653,7 +2653,7 @@ index 5c09ed7362..b62f745213 100644
               "DELETE FROM user_commands\n\
                WHERE id IN\n\
                (SELECT user_command_id FROM blocks_user_commands\n\
-@@ -4473,8 +4826,8 @@ module Block = struct
+@@ -4471,8 +4824,8 @@ module Block = struct
        let%bind () =
          (* Delete old blocks. *)
          Conn.exec
@@ -2664,7 +2664,7 @@ index 5c09ed7362..b62f745213 100644
               "DELETE FROM blocks WHERE blocks.height < ? OR blocks.timestamp < \
                ?" )
            (height, timestamp)
-@@ -4482,7 +4835,7 @@ module Block = struct
+@@ -4480,7 +4833,7 @@ module Block = struct
        let%bind () =
          (* Delete orphaned internal commands. *)
          Conn.exec
@@ -2673,7 +2673,7 @@ index 5c09ed7362..b62f745213 100644
               "DELETE FROM internal_commands\n\
                WHERE id NOT IN\n\
                (SELECT internal_commands.id FROM internal_commands\n\
-@@ -4493,7 +4846,7 @@ module Block = struct
+@@ -4491,7 +4844,7 @@ module Block = struct
        let%bind () =
          (* Delete orphaned snarked ledger hashes. *)
          Conn.exec
@@ -2682,7 +2682,7 @@ index 5c09ed7362..b62f745213 100644
               "DELETE FROM snarked_ledger_hashes\n\
                WHERE id NOT IN\n\
                (SELECT snarked_ledger_hash_id FROM blocks)" )
-@@ -4502,7 +4855,7 @@ module Block = struct
+@@ -4500,7 +4853,7 @@ module Block = struct
        let%bind () =
          (* Delete orphaned public keys. *)
          Conn.exec
@@ -2691,7 +2691,7 @@ index 5c09ed7362..b62f745213 100644
               "DELETE FROM public_keys\n\
                WHERE id NOT IN (SELECT fee_payer_id FROM user_commands)\n\
                AND id NOT IN (SELECT source_id FROM user_commands)\n\
-@@ -4552,8 +4905,8 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
+@@ -4550,8 +4903,8 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
              ()
          | Some acct_id ->
              Token_owners.add_if_doesn't_exist token_id acct_id ) ;
@@ -2702,7 +2702,7 @@ index 5c09ed7362..b62f745213 100644
          let%bind res =
            let open Deferred.Result.Let_syntax in
            let%bind () = Conn.start () in
-@@ -4564,7 +4917,7 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
+@@ -4562,7 +4915,7 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
              O1trace.thread "archive_processor.add_block"
              @@ fun () ->
              Metrics.time ~label:"add_block"
@@ -2711,7 +2711,7 @@ index 5c09ed7362..b62f745213 100644
            in
            (* if an existing block has a parent hash that's for the block just added,
               set its parent id
-@@ -4619,8 +4972,8 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
+@@ -4617,8 +4970,8 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
                      ] ;
                  let%bind.Deferred.Result () = Conn.start () in
                  match%bind
@@ -2722,7 +2722,7 @@ index 5c09ed7362..b62f745213 100644
                        Accounts_accessed.add_accounts_if_don't_exist
                          (module Conn)
                          block_id accounts_accessed )
-@@ -4645,8 +4998,8 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
+@@ -4643,8 +4996,8 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
                            , `Int (List.length accounts_accessed) )
                          ] ;
                      match%bind
@@ -2733,7 +2733,7 @@ index 5c09ed7362..b62f745213 100644
                            Accounts_created.add_accounts_created_if_don't_exist
                              (module Conn)
                              block_id accounts_created )
-@@ -4760,8 +5113,8 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
+@@ -4758,8 +5111,8 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
          With_hash.{ data = block; hash = the_hash }
        in
        let add_accounts () =
@@ -2744,7 +2744,7 @@ index 5c09ed7362..b62f745213 100644
              let%bind.Deferred.Result genesis_block_id =
                Block.add_if_doesn't_exist
                  (module Conn)
-@@ -4895,7 +5248,7 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
+@@ -4893,7 +5246,7 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
            Strict_pipe.Writer.write extensional_block_writer extensional_block )
      ]
    in
@@ -2894,7 +2894,7 @@ index 670f44c8e1..01d4912c28 100644
                ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
                ~last_block_id:zkc.block_id internal_cmds user_cmds zkcs
 diff --git a/src/app/berkeley_migration/berkeley_migration.ml b/src/app/berkeley_migration/berkeley_migration.ml
-index 0669b3d4b2..dae5863bc1 100644
+index f9689b8fb2..bfa01f1985 100644
 --- a/src/app/berkeley_migration/berkeley_migration.ml
 +++ b/src/app/berkeley_migration/berkeley_migration.ml
 @@ -2,7 +2,6 @@
@@ -2947,7 +2947,7 @@ index 0669b3d4b2..dae5863bc1 100644
                 (sprintf "SELECT id, value FROM %s WHERE id IN (%s)"
                    Sql.Mainnet.Public_key.table_name
                    ( String.concat ~sep:","
-@@ -340,10 +339,10 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -341,10 +340,10 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
    let mainnet_pool =
@@ -2960,7 +2960,7 @@ index 0669b3d4b2..dae5863bc1 100644
    in
    match (mainnet_pool, migrated_pool) with
    | Error e, _ | _, Error e ->
-@@ -409,9 +408,9 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -410,9 +409,9 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
           startup in order to be able to resume gracefully in the event of an unfortunate crash. *)
        let%bind () =
          let%bind garbage_block_ids =
@@ -2972,7 +2972,7 @@ index 0669b3d4b2..dae5863bc1 100644
                     (sprintf
                        "DELETE FROM %s WHERE parent_id IS NULL AND height > 1 \
                         RETURNING id"
-@@ -425,17 +424,17 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -426,17 +425,17 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
              @@ List.map garbage_block_ids ~f:Int.to_string
            in
            let%bind () =
@@ -2994,7 +2994,7 @@ index 0669b3d4b2..dae5863bc1 100644
                     (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
                        Archive_lib.Processor.Block_and_internal_command
                        .table_name garbage_block_ids_sql ) )
-@@ -533,7 +532,6 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -535,7 +534,6 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                       | Error (`Encode_failed _ as err)
                       | Error (`Encode_rejected _ as err)
                       | Error (`Request_failed _ as err)
