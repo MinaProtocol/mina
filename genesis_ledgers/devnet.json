@@ -12,18 +12,18 @@
   "ledger": {
     "add_genesis_winner": false,
     "hash": "jy1wjiJgTkzXr7yL8r5x4ikaNJuikibsRMnkjdH6uqGCsDmR2sf",
-    "s3_data_hash": "2c35c7d89fdf62a8eebea52dc6cd10732d6e66982b83ee9c2a5a139c3ea6725f"
+    "s3_data_hash": "e2609d4d6a09656577468145a29c89bdc5f857b1b04a0b64c2d0e9f92937d909"
   },
   "epoch_data": {
     "staking": {
       "seed": "2vbdR3vZUxh8NFnsnrefko7YCiLUKNPUbQpqSQAFXFijtTjd3531",
       "hash": "jxvdSnpgWjjERJFdcYNxChJ9F39v4tGrNSzDcaQXuXeJnicrYEP",
-      "s3_data_hash": "bd029a9961544815b1b25357a989025e7fde5b630b8ecdf57156006fff2977ab"
+      "s3_data_hash": "84a349f6dd12c76b694b283975885994bcfb9117c3f41fa941e0229da3ce2a33"
     },
     "next": {
       "seed": "2vaduyGw7uST2rT1HmvSxjrkZX26XnFvu4NJvCebMmLzoWaQtdGT",
       "hash": "jxjmYHK1tnGy5S6CDaLDTRrDbw17DmtEd6Jnw3L86QSsLm15w5g",
-      "s3_data_hash": "3040c0cf28ff6290ae9c2bbe504b5012aa92d491e1e0ae0ce0cb1f4627719b9e"
+      "s3_data_hash": "094ceb7c580ef53be0bf2385698fd8d2faebf91fdd8542c076df649aa261b94e"
     }
   }
 }
