@@ -70,6 +70,7 @@ if [[ -n "$DEBIANS" ]]; then
     
 
   arr_of_debians=(${DEBIANS//,/ })
+  DHALL_DEBIANS=""
   for i in "${arr_of_debians[@]}"; do
     DHALL_DEBIANS="${DHALL_DEBIANS}, $DEBIAN_DHALL_DEF.Type.${i}"
   done
