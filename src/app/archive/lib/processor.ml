@@ -3920,6 +3920,10 @@ module Block = struct
         ()
     in
 
+    let logger = Logger.create () in 
+    [%log info]
+      "populating blocks_user_commands table now!!!!" ;
+
     let%bind user_cmd_ids =
       let compare_by_hash (a : User_command.Signed_command.t)
           (b : User_command.Signed_command.t) =
