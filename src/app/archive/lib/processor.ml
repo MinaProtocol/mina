@@ -3920,8 +3920,6 @@ module Block = struct
                 ~table:User_command.Signed_command.table_name
                 ~fields:User_command.Signed_command.Fields.names )
     in
-    let logger = Logger.create () in
-    [%log info] "Populating blocks_user_commands next" ;
     let%bind () =
       let joins =
         List.bind missing_blocks ~f:(fun block ->
