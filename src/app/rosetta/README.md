@@ -67,11 +67,11 @@ For example, to run the `docker-start.sh` and connect to a network:
 ```bash
 docker run -it --rm --name rosetta \
     --entrypoint=./docker-start.sh \
-    -p 10101:10101 -p 3081:3081 -p 3085:3085 -p 3086:3086 -p 3087:3087 \
+    -p 8302:8302 -p 3081:3081 -p 3085:3085 -p 3086:3086 -p 3087:3087 \
     <DOCKER_IMAGE>
 ```
 
-* Port 10101 is the default P2P port and must be exposed to the open internet
+* Port 8302 is the default P2P port and must be exposed to the open internet
 * The daemon listens to client requests on port 3081
 * The GraphQL API runs on port 3085 (accessible via `localhost:3085/graphql`)
 * Archive node runs on port 3086

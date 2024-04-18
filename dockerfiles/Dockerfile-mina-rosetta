@@ -9,7 +9,7 @@ ARG psql_version=15
 # Golang version number used to detemine tarball name
 ARG GO_VERSION=1.19.11
 
-ARG MINA_DAEMON_PORT=10101
+ARG MINA_DAEMON_PORT=8302
 ARG MINA_CONFIG_DIR=/data/.mina-config
 # Sample public key for use in dev profile / demo mode genesis block
 ARG PK=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p
