@@ -78,23 +78,16 @@ in
       toolchain = rustChannelFromToolchainFileOf
         ../src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml;
       rust_platform = rustPlatformFor toolchain.rust;
+      lock = ../src/lib/crypto/kimchi_bindings/stubs/Cargo.lock;
     in
     rust_platform.buildRustPackage {
       pname = "kimchi_bindings_stubs";
       version = "0.1.0";
-      src = final.lib.sourceByRegex ../src [
-        "^lib(/crypto(/kimchi_bindings(/stubs(/.*)?)?)?)?$"
-        "^lib(/crypto(/proof-systems(/.*)?)?)?$"
-      ];
-      sourceRoot = "source/lib/crypto/kimchi_bindings/stubs";
+      src = ../src/lib/crypto/kimchi_bindings/stubs;
       nativeBuildInputs = [ final.ocamlPackages_mina.ocaml ];
       buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
-      cargoLock =
-        let fixupLockFile = path: builtins.readFile path;
-        in {
-          lockFileContents =
-            fixupLockFile ../src/lib/crypto/kimchi_bindings/stubs/Cargo.lock;
-        };
+      cargoLock.lockFile = lock;
+      cargoLock.outputHashes = narHashesFromCargoLock lock;
       # FIXME: tests fail
       doCheck = false;
     };
@@ -164,11 +157,7 @@ in
     rustPlatform.buildRustPackage {
       pname = "plonk_wasm";
       version = "0.1.0";
-      src = final.lib.sourceByRegex ../src [
-        "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
-        "^lib(/crypto(/proof-systems(/.*)?)?)?$"
-      ];
-      sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
+      src = ../src/lib/crypto/kimchi_bindings/wasm ;
       nativeBuildInputs = [ final.wasm-pack wasm-bindgen-cli ];
       buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
       cargoLock.lockFile = lock;

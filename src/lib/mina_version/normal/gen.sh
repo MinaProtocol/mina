@@ -13,16 +13,15 @@ pushd "$root" > /dev/null
   commit_date="${MINA_COMMIT_DATE-$(git show HEAD -s --format="%cI" || echo "<unknown>")}"
 
   mina_submodule=$(git submodule status | grep "mina" || true)
+  base_dir=
   if [[ -n "$mina_submodule" ]]; then
-    pushd src/mina/src/lib/crypto/proof-systems > /dev/null
-  else
-    pushd src/lib/crypto/proof-systems > /dev/null
+    base_dir=src/mina/
   fi
-    marlin_commit_id="${MARLIN_COMMIT_ID-$(git rev-parse --verify HEAD || echo "<unknown>")}"
-    marlin_commit_id_short="$(printf '%s' "$marlin_commit_id" | cut -c1-8)"
-    if [[ -e .git ]] && ! git diff --quiet; then marlin_commit_id="[DIRTY]$marlin_commit_id"; fi
-    marlin_commit_date="${MARLIN_COMMIT_DATE-$(git show HEAD -s --format="%cI" || echo "<unknown>")}"
-  popd > /dev/null
+  CARGO_LOCK="${base_dir}src/lib/crypto/kimchi_bindings/stubs/Cargo.lock"
+  PAT='git\+https://github\.com/o1-labs/proof-systems\.git\?rev=[a-f0-9]*'
+
+  marlin_commit_id="${MARLIN_COMMIT_ID-$(grep -m 1 -oE "$PAT" "$CARGO_LOCK" | grep -oE '[^=]*$')}"
+  marlin_commit_id_short="$(printf '%s' "$marlin_commit_id" | cut -c1-8)"
 popd > /dev/null
 
 {
@@ -33,7 +32,6 @@ popd > /dev/null
 
     printf 'let marlin_commit_id = "%s"\n' "$marlin_commit_id"
     printf 'let marlin_commit_id_short = "%s"\n' "$marlin_commit_id_short"
-    printf 'let marlin_commit_date = "%s"\n' "$marlin_commit_date"
 
     printf 'let print_version () = Core_kernel.printf "Commit %%s on branch %%s\\n%%!" commit_id branch\n'
 } > "$1"

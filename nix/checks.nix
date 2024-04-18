@@ -19,7 +19,6 @@ inputs: pkgs: {
     bash ${../scripts/lint_rfcs.sh}
     touch $out
   '';
-  # todo: ./scripts/check-snarky-submodule.sh # submodule issue
   lint-preprocessor-deps = pkgs.runCommand "lint-preprocessor-deps" {
     meta.checkDescription = "preprocessor deps";
   } ''

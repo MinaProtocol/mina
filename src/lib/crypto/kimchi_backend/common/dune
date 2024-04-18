@@ -49,7 +49,6 @@
  (targets version.ml)
  (deps
   (:< gen_version.sh)
-  (source_tree ../../proof-systems)
   (sandbox none))
  (action
   (run %{<} %{targets})))
