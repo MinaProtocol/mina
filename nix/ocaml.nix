@@ -11,7 +11,7 @@ let
     hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath optionalString
     escapeShellArg;
 
-  repos = [ inputs.opam-repository ];
+  repos = with inputs; [ o1-opam-repository opam-repository ];
 
   export = opam-nix.importOpam "${src}/opam.export";
 
@@ -38,10 +38,6 @@ let
     stdune = "3.5.0";
     xdg = dune;
   };
-
-  # Pins from opam.export
-  pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg)
-    (builtins.removeAttrs export.package.section ["check_opam_switch"]);
 
   implicit-deps-overlay = self: super:
     (if pkgs.stdenv.isDarwin then {
@@ -73,7 +69,7 @@ let
 
   scope = opam-nix.applyOverlays (opam-nix.__overlays ++ [ implicit-deps-overlay ])
     (opam-nix.defsToScope pkgs { }
-      ((opam-nix.queryToDefs repos (extra-packages // implicit-deps)) // pins));
+      (opam-nix.queryToDefs repos (extra-packages // implicit-deps)));
 
   installedPackageNames =
     map (x: (opam-nix.splitNameVer x).name) (builtins.attrNames implicit-deps);

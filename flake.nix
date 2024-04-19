@@ -21,6 +21,9 @@
   inputs.opam-nix.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.inputs.opam-repository.follows = "opam-repository";
 
+  inputs.o1-opam-repository.url = "github:o1-labs/opam-repository";
+  inputs.o1-opam-repository.flake = false;
+
   inputs.opam-repository.url = "github:ocaml/opam-repository";
   inputs.opam-repository.flake = false;
 

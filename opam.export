@@ -3,20 +3,20 @@ roots: [
   "alcotest.1.1.0"
   "angstrom.0.15.0"
   "async_ssl.v0.14.0"
-  "base58.0.1.0"
+  "base58.0.1.0-mina"
   "bignum.v0.14.0"
   "bisect_ppx.2.8.1"
   "bitstring.4.1.0"
   "camlp4.4.14+1"
-  "capnp.3.4.0"
-  "check_opam_switch.~dev"
+  "capnp.3.4.0-mina"
+  "check_opam_switch.~dev-mina"
   "cohttp-async.5.0.0"
   "core_extended.v0.14.0"
   "extlib.1.7.8"
   "graphql-async.0.13.0"
   "graphql-cohttp.0.13.0"
   "graphql-lwt.0.13.0"
-  "graphql_ppx.1.2.2"
+  "graphql_ppx.1.2.2-mina"
   "js_of_ocaml.4.0.0"
   "js_of_ocaml-ppx.4.0.0"
   "js_of_ocaml-toplevel.4.0.0"
@@ -32,16 +32,16 @@ roots: [
   "ppx_bitstring.4.1.0"
   "ppx_deriving.5.2.1"
   "ppx_deriving_yojson.3.6.1"
-  "ppx_optcomp.v0.14.0"
+  "ppx_optcomp.v0.14.0-mina"
   "progress.0.2.2"
-  "prometheus.v0.6.0"
+  "prometheus.v0.6.0-mina"
   "qcheck.0.20"
   "qcheck-alcotest.0.20"
-  "sodium.dev"
+  "sodium.dev-mina"
   "re2.v0.14.0"
-  "rocks.0.1"
-  "rocksdb_stubs.5.17.2"
-  "rpc_parallel.v0.14.0"
+  "rocks.0.1-mina"
+  "rocksdb_stubs.5.17.2-mina"
+  "rpc_parallel.v0.14.0-mina"
   "sexp_diff_kernel.v0.14.0"
   "utop.2.9.1"
   "yojson.1.7.0"
@@ -52,7 +52,7 @@ installed: [
   "asetmap.0.8.1"
   "astring.0.8.5"
   "async.v0.14.0"
-  "async_kernel.v0.14.0"
+  "async_kernel.v0.14.0-mina"
   "async_rpc_kernel.v0.14.0"
   "async_ssl.v0.14.0"
   "async_unix.v0.14.0"
@@ -61,7 +61,7 @@ installed: [
   "base-bytes.base"
   "base-threads.base"
   "base-unix.base"
-  "base58.0.1.0"
+  "base58.0.1.0-mina"
   "base64.3.4.0"
   "base_bigstring.v0.14.0"
   "base_quickcheck.v0.14.1"
@@ -74,12 +74,12 @@ installed: [
   "bitstring.4.1.0"
   "camlp4.4.14+1"
   "camomile.1.0.2"
-  "capnp.3.4.0"
+  "capnp.3.4.0-mina"
   "caqti.1.5.0"
   "caqti-async.1.3.0"
   "caqti-driver-postgresql.1.5.1"
   "charInfo_width.1.1.0"
-  "check_opam_switch.~dev"
+  "check_opam_switch.~dev-mina"
   "cmdliner.1.0.3"
   "cohttp.5.0.0"
   "cohttp-async.5.0.0"
@@ -127,7 +127,7 @@ installed: [
   "graphql-cohttp.0.13.0"
   "graphql-lwt.0.13.0"
   "graphql_parser.0.12.2"
-  "graphql_ppx.1.2.2"
+  "graphql_ppx.1.2.2-mina"
   "incremental.v0.14.0"
   "integers.0.4.0"
   "ipaddr.5.0.1"
@@ -213,7 +213,7 @@ installed: [
   "ppx_js_style.v0.14.1"
   "ppx_let.v0.14.0"
   "ppx_module_timer.v0.14.0"
-  "ppx_optcomp.v0.14.0"
+  "ppx_optcomp.v0.14.0-mina"
   "ppx_optional.v0.14.0"
   "ppx_pipebang.v0.14.0"
   "ppx_sexp_conv.v0.14.3"
@@ -226,7 +226,7 @@ installed: [
   "ppx_variants_conv.v0.14.2"
   "ppxlib.0.25.0"
   "progress.0.2.2"
-  "prometheus.v0.6.0"
+  "prometheus.v0.6.0-mina"
   "protocol_version_header.v0.14.0"
   "ptime.0.8.5"
   "qcheck.0.20"
@@ -238,15 +238,15 @@ installed: [
   "react.1.2.1"
   "res.5.0.1"
   "result.1.5"
-  "rocks.0.1"
-  "rocksdb_stubs.5.17.2"
-  "rpc_parallel.v0.14.0"
+  "rocks.0.1-mina"
+  "rocksdb_stubs.5.17.2-mina"
+  "rpc_parallel.v0.14.0-mina"
   "rresult.0.6.0"
   "seq.base"
   "sexp_diff_kernel.v0.14.0"
   "sexplib.v0.14.0"
   "sexplib0.v0.14.0"
-  "sodium.dev"
+  "sodium.dev-mina"
   "spawn.v0.13.0"
   "splittable_random.v0.14.0"
   "stdint.0.7.0"
@@ -277,363 +277,3 @@ installed: [
   "zarith_stubs_js.v0.14.1"
   "zed.3.1.0"
 ]
-pinned: [
-  "async_kernel.v0.14.0"
-  "base58.0.1.0"
-  "capnp.3.4.0"
-  "check_opam_switch.~dev"
-  "graphql_ppx.1.2.2"
-  "ppx_optcomp.v0.14.0"
-  "prometheus.v0.6.0"
-  "rocks.0.1"
-  "rocksdb_stubs.5.17.2"
-  "rpc_parallel.v0.14.0"
-  "sodium.dev"
-]
-package "async_kernel" {
-  opam-version: "2.0"
-  version: "v0.14.0"
-  synopsis: "Monadic concurrency library"
-  description: """\
-Part of Jane Street's Core library
-  The Core suite of libraries is an industrial strength alternative to
-  OCaml's standard library that was developed by Jane Street, the
-  largest industrial user of OCaml."""
-  maintainer: "opensource@janestreet.com"
-  authors: "Jane Street Group, LLC <opensource@janestreet.com>"
-  license: "MIT"
-  homepage: "https://github.com/janestreet/async_kernel"
-  doc:
-    "https://ocaml.janestreet.com/ocaml-core/latest/doc/async_kernel/index.html"
-  bug-reports: "https://github.com/janestreet/async_kernel/issues"
-  depends: [
-    "ocaml" {>= "4.08.0"}
-    "core_kernel" {>= "v0.13" & < "v0.15"}
-    "ppx_jane" {>= "v0.13" & < "v0.15"}
-    "dune" {>= "2.0.0"}
-  ]
-  build: ["dune" "build" "-p" name "-j" jobs]
-  dev-repo: "git+https://github.com/janestreet/async_kernel.git"
-  url {
-    src:
-      "https://github.com/MinaProtocol/async_kernel/archive/bf02e69c129b6ffec97cc5b7a5d85125802968bb.tar.gz"
-    checksum:
-      "sha256=ae824169495106fa9099aa53c0367e58651de426f70653897b3e1168c9a7edb6"
-  }
-}
-package "capnp" {
-  opam-version: "2.0"
-  version: "3.4.0"
-  synopsis:
-    "OCaml code generation plugin for the Cap'n Proto serialization framework"
-  description: """\
-Cap'n Proto is a multi-language code generation framework designed for
-  high performance through the use of lazy parsing and arena allocation.
-  This package provides a plugin for the Cap'n Proto compiler which enables
-  OCaml code generation, as well as corresponding runtime library support."""
-  maintainer: "Paul Pelzl <pelzlpj@gmail.com>"
-  authors: "Paul Pelzl <pelzlpj@gmail.com>"
-  license: "BSD-2-Clause"
-  homepage: "https://github.com/capnproto/capnp-ocaml"
-  bug-reports: "https://github.com/capnproto/capnp-ocaml/issues"
-  depends: [
-    "ocaml" {>= "4.03.0"}
-    "dune" {>= "1.0"}
-    "result"
-    "base" {>= "v0.11"}
-    "stdio"
-    "base_quickcheck" {with-test}
-    "ocplib-endian" {>= "0.7"}
-    "res"
-    "stdint" {>= "0.5.1"}
-    "ounit" {with-test}
-    "conf-capnproto" {with-test}
-  ]
-  build: [
-    ["dune" "build" "-p" name "-j" jobs]
-    [
-      "dune"
-      "build"
-      "-p"
-      name
-      "-j"
-      jobs
-      "@runtest"
-      "@src/benchmark/benchmarks"
-    ] {with-test}
-  ]
-  dev-repo: "git+https://github.com/capnproto/capnp-ocaml.git"
-  url {
-    src:
-      "https://github.com/o1-labs/capnp-ocaml/archive/6f4913503cc971ab34df9bf9d4c65778fe05eb8f.tar.gz"
-    checksum:
-      "sha256=03aac06742f3d4ec8a189f0db65d46393b7497e8637ece15c39ff4ec01117b8b"
-  }
-}
-package "check_opam_switch" {
-  opam-version: "2.0"
-  version: "~dev"
-  synopsis:
-    "A tool to check that the current opam environment is up to date with an opam.export file"
-  description:
-    "A tool to check that the current opam environment is up to date with an opam.export file"
-  maintainer: "yves.stan.lecornec@tweag.io"
-  depends: [
-    "dune" {>= "3.3"}
-    "opam-core" {>= "2.0.0"}
-    "opam-format" {>= "2.0.0"}
-    "minicli" {>= "5.0.0"}
-    "odoc" {with-doc}
-  ]
-  build: [
-    ["dune" "subst"] {dev}
-    [
-      "dune"
-      "build"
-      "-p"
-      name
-      "-j"
-      jobs
-      "@install"
-      "@runtest" {with-test}
-      "@doc" {with-doc}
-    ]
-  ]
-  url {
-    src:
-      "https://github.com/tweag/check_opam_switch/archive/d0aa49884e0f9fd4bbb2cd1a32b798a12f84b603.tar.gz"
-    checksum:
-      "sha256=24ab29ea4aff9da9d649f0b577c5d4e27ce2bef51058e139965cc9be25494a46"
-  }
-}
-package "graphql_ppx" {
-  opam-version: "2.0"
-  version: "1.2.2"
-  synopsis: "GraphQL PPX rewriter for ReScript/ReasonML"
-  description:
-    "GraphQL language primitives for ReScript/ReasonML written in ReasonML"
-  maintainer: "Jaap Frolich <jfrolich@gmail.com>"
-  authors: [
-    "Jaap Frolich <jfrolich@gmail.com>"
-    "Tomasz Cichocinski <tomaszcichocinski@gmail.com>"
-  ]
-  license: "MIT"
-  homepage: "https://github.com/reasonml-community/graphql-ppx"
-  bug-reports: "https://github.com/reasonml-community/graphql-ppx/issues"
-  depends: [
-    "dune" {>= "2.5"}
-    "ocaml" {>= "4.06"}
-    "ppxlib" {>= "0.21.0"}
-    "result" {>= "1.5"}
-  ]
-  build: [
-    ["dune" "build" "-p" name "-j" jobs]
-    ["dune" "runtest" "-p" name "-j" jobs] {with-test}
-  ]
-  dev-repo: "git+https://github.com/o1-labs/graphql_ppx.git"
-  url {
-    src:
-      "https://github.com/o1-labs/graphql_ppx/archive/f3ba4f7622240a2299f622b0c1d910f734579c25.tar.gz"
-    checksum:
-      "sha256=8aff33988218c99a95a91fb04ef703a3b8cde0676b7a90ee72478959829867d8"
-  }
-}
-package "rpc_parallel" {
-  opam-version: "2.0"
-  version: "v0.14.0"
-  synopsis: "Type-safe parallel library built on top of Async_rpc"
-  description: """\
-Rpc_parallel offers an API to define various workers and protocols,
-  spawn workers as separate processes, and communicate with them using
-  Async Rpc."""
-  maintainer: "opensource@janestreet.com"
-  authors: "Jane Street Group, LLC <opensource@janestreet.com>"
-  license: "MIT"
-  homepage: "https://github.com/janestreet/rpc_parallel"
-  doc:
-    "https://ocaml.janestreet.com/ocaml-core/latest/doc/rpc_parallel/index.html"
-  bug-reports: "https://github.com/janestreet/rpc_parallel/issues"
-  depends: [
-    "ocaml" {>= "4.08.0"}
-    "async" {>= "v0.13" & < "v0.15"}
-    "core" {>= "v0.13" & < "v0.15"}
-    "core_kernel" {>= "v0.13" & < "v0.15"}
-    "ppx_jane" {>= "v0.13" & < "v0.15"}
-    "sexplib" {>= "v0.13" & < "v0.15"}
-    "dune" {>= "2.0.0"}
-    "ctypes"
-  ]
-  build: ["dune" "build" "-p" name "-j" jobs]
-  dev-repo: "git+https://github.com/janestreet/rpc_parallel.git"
-  url {
-    src:
-      "https://github.com/MinaProtocol/rpc_parallel/archive/39d6eec98705d5cc1f3ed8479ef19b1a1e0ee70e.tar.gz"
-    checksum:
-      "sha256=2b6c758433c5fd12b4971380147be96f0ce5d239932fc7f6df1d84f306bcbd2a"
-  }
-}
-package "ppx_optcomp" {
-  opam-version: "2.0"
-  version: "v0.14.0"
-  maintainer: "opensource@janestreet.com"
-  authors: ["Jane Street Group, LLC <opensource@janestreet.com>"]
-  homepage: "https://github.com/janestreet/ppx_optcomp"
-  bug-reports: "https://github.com/janestreet/ppx_optcomp/issues"
-  dev-repo: "git+https://github.com/janestreet/ppx_optcomp.git"
-  doc: "https://ocaml.janestreet.com/ocaml-core/latest/doc/ppx_optcomp/index.html"
-  license: "MIT"
-  build: [
-    ["dune" "build" "-p" name "-j" jobs]
-  ]
-  depends: [
-    "ocaml"  {>= "4.04.2"}
-    "base"   {>= "v0.14" & < "v0.15"}
-    "stdio"  {>= "v0.14" & < "v0.15"}
-    "dune"   {>= "2.0.0"}
-    "ppxlib" {>= "0.18.0"}
-  ]
-  synopsis: "Optional compilation for OCaml"
-  description: "
-  Part of the Jane Street's PPX rewriters collection.
-  "
-  url {
-    src:
-      "https://github.com/MinaProtocol/ppx_optcomp/archive/2dfcf8104b1afee1a9ed0393d1f9f734c707e5c5.tar.gz"
-    checksum:
-      "sha256=081fd023e0d904c5a3490e7fa6bce80685d0ac43f45a3276b2c5addd0441afec"
-  }
-}
-
-package "prometheus" {
-  opam-version: "2.0"
-  version: "v0.6.0"
-  synopsis: "Client library for Prometheus monitoring"
-  maintainer: "talex5@gmail.com"
-  authors: ["Thomas Leonard" "David Scott"]
-  license: "Apache-2.0"
-  homepage: "https://github.com/mirage/prometheus"
-  doc: "https://mirage.github.io/prometheus/"
-  bug-reports: "https://github.com/mirage/prometheus/issues"
-  depends: [
-    "ocaml" {>= "4.01.0"}
-    "dune"
-    "astring"
-    "asetmap"
-    "fmt"
-    "re"
-    "lwt" {>= "2.5.0"}
-    "alcotest" {with-test}
-  ]
-  build: [
-    ["dune" "build" "-p" name "-j" jobs]
-    ["dune" "runtest" "-p" name "-j" jobs] {with-test}
-  ]
-  dev-repo: "git+https://github.com/mirage/prometheus.git"
-  description: """
-  To run services reliably, it is useful if they can report various metrics
-  (for example, heap size, queue lengths, number of warnings logged, etc).
-
-  A monitoring service can be configured to collect this data regularly.
-  The data can be graphed to help understand the performance of the service over time,
-  or to help debug problems quickly.
-  It can also be used to send alerts if a service is down or behaving poorly.
-  """
-  url {
-    src:
-      "https://github.com/MinaProtocol/prometheus/archive/f899ec0ad67b404dc541d0276481f6542a4eabbb.tar.gz"
-    checksum:
-      "sha256=8489c605f8cbbdb0cc5a4e43b93fe3090f769a5c423588cf3f9d48499732a7e9"
-  }
-}
-
-package "base58" {
-  opam-version: "0.1"
-  name: "base58"
-  version: "0.1.0"
-  build: [
-    [make "lib.byte" "lib.native"]   
-  ]
-  install: [
-    [make "lib.install" ]
-  ]
-  remove:  [make "lib.uninstall"]
-  depends: [
-    "ocamlfind"  {build}
-    "ocamlbuild" {build}
-  ]
-  url {
-    src:
-      "https://github.com/mransan/base58/archive/7fc85731e775f41d687586894468c86e4e2b25ee.tar.gz"
-    checksum:
-      "sha256=6d6260845c247268385dc9e7f288d5d117c1e02abbb02b46fb7cd5f2be7fb073"
-  }
-}
-
-package "sodium" {
-  opam-version: "1.2"
-  name: "sodium"
-  version: "dev"
-  build: [
-    [make] { os != "freebsd" }
-  ]
-  install: [
-    [make "PREFIX=%{prefix}%" "install"]
-  ]
-  remove: [["ocamlfind" "remove" "sodium"]]
-  depends: [
-    "base-bigarray"
-    "base-bytes"
-    "ocamlfind" {build}
-    "ocamlbuild" {build}
-    "ctypes" {>= "0.6.0"}
-  ]
-  url {
-    src:
-      "https://github.com/o1-labs/ocaml-sodium/archive/adde9fd4db38eb65bb96ba1c71e6af4b5cdbae51.tar.gz"
-    checksum:
-      "sha256=b9285a5ff051ef142f27199150f720f92aa1401e1caffed5f4232aab42ed93ff"
-  }
-}
-package "rocksdb_stubs" {
-  opam-version: "2.0"
-  version: "5.17.2"
-  # Contents of extra source: 'stublibs: ["librocksdb_stubs.a"]'
-  extra-source "rocksdb_stubs.install" {
-    src: "https://gist.githubusercontent.com/georgeee/80966c56448bd9a6f453a0ffa3c10f60/raw/23024b7ef940f84cf95523d77da7d27b4c3ccdc8/rocksdb_stubs.install"
-    checksum: "sha256=c6450141e1d8b4ad2034a6704fc8902e50f9ac28c66a490c2b460e7a23f63b7a"
-  }
-  build: [
-    [ "bash" "-c"
-      "if [ -e ${MINA_ROCKSDB-/usr/local/lib/librocksdb_coda.a} ]; then cp ${MINA_ROCKSDB-/usr/local/lib/librocksdb_coda.a} librocksdb.a; chmod 666 librocksdb.a; else ROCKSDB_DISABLE_SNAPPY=1 ROCKSDB_DISABLE_GFLAGS=1 ROCKSDB_DISABLE_LZ4=1 ROCKSDB_DISABLE_ZSTD=1 ROCKSDB_DISABLE_NUMA=1 ROCKSDB_DISABLE_TBB=1 ROCKSDB_DISABLE_JEMALLOC=1 ROCKSDB_DISABLE_TCMALLOC=1 ROCKSDB_DISABLE_BACKTRACE=1 PORTABLE=1 FORCE_SSE42=1 DISABLE_WARNING_AS_ERROR=1 make static_lib -j2; fi"
-    ]
-    ["strip" "-S" "librocksdb.a"]
-    ["mv" "librocksdb.a" "librocksdb_stubs.a"]
-  ]
-  url {
-    src:
-      "https://github.com/facebook/rocksdb/archive/refs/tags/v5.17.2.tar.gz"
-    checksum:
-      "sha256=101f05858650a810c90e4872338222a1a3bf3b24de7b7d74466814e6a95c2d28"
-  }
-}
-package "rocks" {
-  opam-version: "2.0"
-  version: "0.1"
-  build: [
-    ["dune" "build" "-p" name "-j" jobs]
-  ]
-  depends: [
-    "ocamlfind" {build}
-    "ocamlbuild" {build}
-    "ctypes" {>= "0.4.0"}
-    "ctypes-foreign" {>= "0.4.0"}
-    "rocksdb_stubs"
-    "core"
-  ]
-  url {
-    src:
-      "https://github.com/o1-labs/orocksdb/archive/c626daa0d4d3e6d095e20e51171b0e2e69b24d73.tar.gz"
-    checksum:
-      "sha256=06d7cdfc6202a9b8411d55778a4308d59bd3f38641b8757e9874bfca87a9a736"
-  }
-}
