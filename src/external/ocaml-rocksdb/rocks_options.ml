@@ -85,12 +85,6 @@ module BlockBasedTableOptions =
     let set_block_cache =
       create_setter "set_block_cache" Cache.t
 
-    (* extern void rocksdb_block_based_options_set_block_cache_compressed( *)
-    (*     rocksdb_block_based_table_options_t* options, *)
-    (*     rocksdb_cache_t* block_cache_compressed); *)
-    let set_block_cache_compressed =
-      create_setter "set_block_cache_compressed" Cache.t
-
     (* extern void rocksdb_block_based_options_set_whole_key_filtering( *)
     (*     rocksdb_block_based_table_options_t*, unsigned char); *)
     let set_whole_key_filtering =
