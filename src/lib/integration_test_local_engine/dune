@@ -48,7 +48,7 @@
   genesis_constants
   genesis_ledger_helper
   logger
-  mina_base_import
+  mina_base.import
   signature_lib
   currency
   mina_version
