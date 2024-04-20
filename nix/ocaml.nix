@@ -18,8 +18,9 @@ let
   # Dependencies required by every Mina package:
   # Packages which are `installed` in the export.
   # These are all the transitive ocaml dependencies of Mina.
-  implicit-deps = builtins.removeAttrs
-    (opam-nix.opamListToQuery export.installed) ["check_opam_switch"];
+  implicit-deps =
+    builtins.removeAttrs (opam-nix.opamListToQuery export.installed)
+    [ "check_opam_switch" ];
 
   # Extra packages which are not in opam.export but useful for development, such as an LSP server.
   extra-packages = with implicit-deps; {
@@ -41,33 +42,36 @@ let
 
   implicit-deps-overlay = self: super:
     (if pkgs.stdenv.isDarwin then {
-      async_ssl = super.async_ssl.overrideAttrs
-        { NIX_CFLAGS_COMPILE = "-Wno-implicit-function-declaration -Wno-incompatible-function-pointer-types"; };
-    } else {}) //
-    {
-      # https://github.com/Drup/ocaml-lmdb/issues/41
-      lmdb = super.lmdb.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
+      async_ssl = super.async_ssl.overrideAttrs {
+        NIX_CFLAGS_COMPILE =
+          "-Wno-implicit-function-declaration -Wno-incompatible-function-pointer-types";
+      };
+    } else
+      { }) // {
+        # https://github.com/Drup/ocaml-lmdb/issues/41
+        lmdb = super.lmdb.overrideAttrs
+          (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
 
-      # Doesn't have an explicit dependency on ctypes-foreign
-      ctypes = super.ctypes.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
+        # Doesn't have an explicit dependency on ctypes-foreign
+        ctypes = super.ctypes.overrideAttrs
+          (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
 
-      # Can't find sodium-static and ctypes
-      sodium = super.sodium.overrideAttrs {
-        NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
-        propagatedBuildInputs = [ pkgs.sodium-static ];
-        preBuild = ''
-          export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
-        '';
+        # Can't find sodium-static and ctypes
+        sodium = super.sodium.overrideAttrs {
+          NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
+          propagatedBuildInputs = [ pkgs.sodium-static ];
+          preBuild = ''
+            export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
+          '';
+        };
+
+        rocksdb_stubs = super.rocksdb_stubs.overrideAttrs {
+          MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
+        };
       };
 
-      rocksdb_stubs = super.rocksdb_stubs.overrideAttrs {
-        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
-      };
-    };
-
-  scope = opam-nix.applyOverlays (opam-nix.__overlays ++ [ implicit-deps-overlay ])
+  scope =
+    opam-nix.applyOverlays (opam-nix.__overlays ++ [ implicit-deps-overlay ])
     (opam-nix.defsToScope pkgs { }
       (opam-nix.queryToDefs repos (extra-packages // implicit-deps)));
 
@@ -95,9 +99,10 @@ let
       # Also passes the version information to the executable.
       wrapMina = let
         commit_sha1 = inputs.self.sourceInfo.rev or "<dirty>";
-        commit_date = inputs.flockenzeit.lib.RFC-5322 inputs.self.sourceInfo.lastModified or 0;
+        commit_date = inputs.flockenzeit.lib.RFC-5322
+          inputs.self.sourceInfo.lastModified or 0;
       in package:
-      { deps ? [ pkgs.gnutar pkgs.gzip ], }:
+      { deps ? [ pkgs.gnutar pkgs.gzip ] }:
       pkgs.runCommand "${package.name}-release" {
         buildInputs = [ pkgs.makeBinaryWrapper pkgs.xorg.lndir ];
         outputs = package.outputs;
@@ -116,7 +121,7 @@ let
 
       # Derivation which has all Mina's dependencies in it, and creates an empty output if the command succeds.
       # Useful for unit tests.
-      runMinaCheck = { name ? "check", extraInputs ? [ ], extraArgs ? { } }:
+      runMinaCheck = { name ? "check", extraInputs ? [ ], extraArgs ? { }, }:
         check:
         self.mina-dev.overrideAttrs (oa:
           {
@@ -126,8 +131,7 @@ let
             outputs = [ "out" ];
             installPhase = "touch $out";
           } // extraArgs);
-    in 
-    {
+    in {
       # Some "core" Mina executables, without the version info.
       mina-dev = pkgs.stdenv.mkDerivation ({
         pname = "mina";
@@ -246,7 +250,9 @@ let
           cp src/app/replayer/replayer.exe $berkeley_migration/bin/mina-migration-replayer
           cp src/app/berkeley_migration/berkeley_migration.exe $berkeley_migration/bin/mina-berkeley-migration
           cp src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe $berkeley_migration/bin/mina-berkeley-migration-verifier
-          cp ${../scripts/archive/migration/mina-berkeley-migration-script} $berkeley_migration/bin/mina-berkeley-migration-script
+          cp ${
+            ../scripts/archive/migration/mina-berkeley-migration-script
+          } $berkeley_migration/bin/mina-berkeley-migration-script
           cp src/app/swap_bad_balances/swap_bad_balances.exe $archive/bin/mina-swap-bad-balances
           cp -R _doc/_html $out/share/doc/html
           # cp src/lib/mina_base/sample_keypairs.json $sample/share/mina
