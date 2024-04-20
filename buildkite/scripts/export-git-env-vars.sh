@@ -33,7 +33,7 @@ fi
 case $GITBRANCH in
     master)
         RELEASE=stable ;;
-    compatible|testing-hard-fork-internal|release*) # whitelist of branches that can be tagged
+    compatible|testing-hard-fork-internal*|release*) # whitelist of branches that can be tagged
         case "${THIS_COMMIT_TAG}" in
           *umt*) # any tag including the string `umt`
             RELEASE=umt ;;
