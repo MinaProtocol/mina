@@ -41,7 +41,7 @@
   data_hash_lib
   hash_prefixes
   fields_derivers
-  fields_derivers_zkapps
+  fields_derivers.zkapps
   genesis_constants
   mina_numbers
   mina_signature_kind
