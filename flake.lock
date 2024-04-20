@@ -1,5 +1,51 @@
 {
   "nodes": {
+    "describe-dune": {
+      "inputs": {
+        "flake-utils": [
+          "utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1721075915,
+        "narHash": "sha256-pj6C9Y9FP1VKLTtQFAJuaUbxxXvvIZ+kRN3K/9O5Rts=",
+        "owner": "o1-labs",
+        "repo": "describe-dune",
+        "rev": "9aba48884359f9828a3ca68a7b91bf06c0ab8d16",
+        "type": "github"
+      },
+      "original": {
+        "owner": "o1-labs",
+        "repo": "describe-dune",
+        "type": "github"
+      }
+    },
+    "dune-nix": {
+      "inputs": {
+        "flake-utils": [
+          "utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1722325092,
+        "narHash": "sha256-xH6agZYx4TAjdGb5VfDuHcBjuW1VRJmAFtC9bnNTa8k=",
+        "owner": "o1-labs",
+        "repo": "dune-nix",
+        "rev": "f3f459223cab3dc81e74407a85c6e6f464cc9b4f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "o1-labs",
+        "repo": "dune-nix",
+        "type": "github"
+      }
+    },
     "flake-buildkite-pipeline": {
       "inputs": {
         "nixpkgs-lib": "nixpkgs-lib"
@@ -376,6 +422,8 @@
     },
     "root": {
       "inputs": {
+        "describe-dune": "describe-dune",
+        "dune-nix": "dune-nix",
         "flake-buildkite-pipeline": "flake-buildkite-pipeline",
         "flake-compat": "flake-compat",
         "flockenzeit": "flockenzeit",
