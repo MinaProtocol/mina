@@ -1,5 +1,25 @@
 {
   "nodes": {
+    "describe-dune": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1713860739,
+        "narHash": "sha256-UM/lshnZ1/PVokjb5mT/vQ+QELRUCH7Nc/bYwHOyrIY=",
+        "owner": "o1-labs",
+        "repo": "describe-dune",
+        "rev": "baefefdb7340417d585b4d177e019e0689207959",
+        "type": "github"
+      },
+      "original": {
+        "owner": "o1-labs",
+        "repo": "describe-dune",
+        "type": "github"
+      }
+    },
     "flake-buildkite-pipeline": {
       "inputs": {
         "nixpkgs-lib": "nixpkgs-lib"
@@ -376,6 +396,7 @@
     },
     "root": {
       "inputs": {
+        "describe-dune": "describe-dune",
         "flake-buildkite-pipeline": "flake-buildkite-pipeline",
         "flake-compat": "flake-compat",
         "flockenzeit": "flockenzeit",
