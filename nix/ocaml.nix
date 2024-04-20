@@ -1,5 +1,5 @@
 # A set defining OCaml parts&dependencies of Minaocamlnix
-{ inputs, src, ... }@args:
+{ inputs, ... }@args:
 let
   opam-nix = inputs.opam-nix.lib.${pkgs.system};
 
@@ -13,7 +13,7 @@ let
 
   repos = with inputs; [ o1-opam-repository opam-repository ];
 
-  export = opam-nix.importOpam "${src}/opam.export";
+  export = opam-nix.importOpam ../opam.export;
 
   # Dependencies required by every Mina package:
   # Packages which are `installed` in the export.
@@ -131,8 +131,18 @@ let
       mina-dev = pkgs.stdenv.mkDerivation ({
         pname = "mina";
         version = "dev";
-        # Prevent unnecessary rebuilds on non-source changes
-        inherit src;
+        # Only get the ocaml stuff, to reduce the amount of unnecessary rebuilds
+        src = with inputs.nix-filter.lib;
+          filter {
+            root = ./..;
+            include = [
+              (inDirectory "src")
+              "dune"
+              "dune-project"
+              "./graphql_schema.json"
+              "opam.export"
+            ];
+          };
 
         withFakeOpam = false;
 
