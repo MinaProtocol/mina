@@ -549,7 +549,7 @@ let get_ledger t state_hash_opt =
       Deferred.return
       @@ Or_error.error_string "state hash not found in transition frontier"
 
-let get_snarked_ledger t state_hash_opt =
+let get_snarked_ledger_full t state_hash_opt =
   let open Deferred.Or_error.Let_syntax in
   let%bind state_hash =
     Option.value_map state_hash_opt ~f:Deferred.Or_error.return
@@ -636,10 +636,8 @@ let get_snarked_ledger t state_hash_opt =
         |> Mina_state.Blockchain_state.snarked_ledger_hash
       in
       let merkle_root = Ledger.merkle_root ledger in
-      if Frozen_ledger_hash.equal snarked_ledger_hash merkle_root then (
-        let%map.Deferred res = Ledger.to_list ledger in
-        ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ ledger ;
-        Ok res )
+      if Frozen_ledger_hash.equal snarked_ledger_hash merkle_root then
+        return ledger
       else
         Deferred.Or_error.errorf
           "Expected snarked ledger hash %s but got %s for state hash %s"
@@ -649,6 +647,13 @@ let get_snarked_ledger t state_hash_opt =
   | None ->
       Deferred.Or_error.error_string
         "get_snarked_ledger: state hash not found in transition frontier"
+
+let get_snarked_ledger t state_hash_opt =
+  let open Deferred.Or_error.Let_syntax in
+  let%bind ledger = get_snarked_ledger_full t state_hash_opt in
+  let%map.Deferred res = Ledger.to_list ledger in
+  ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ ledger ;
+  Ok res
 
 let get_account t aid =
   let open Participating_state.Let_syntax in
@@ -923,7 +928,7 @@ let staking_ledger t =
   Consensus.Hooks.get_epoch_ledger ~constants:consensus_constants
     ~consensus_state ~local_state
 
-let next_epoch_ledger ?(unsafe_always_return_ledger_as_if_finalized = false) t =
+let next_epoch_ledger t =
   let open Option.Let_syntax in
   let%map frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
@@ -941,7 +946,6 @@ let next_epoch_ledger ?(unsafe_always_return_ledger_as_if_finalized = false) t =
   if
     Mina_numbers.Length.(
       equal root_epoch best_tip_epoch || equal best_tip_epoch zero)
-    || unsafe_always_return_ledger_as_if_finalized
   then
     (*root is in the same epoch as the best tip and so the next epoch ledger in the local state will be updated by Proof_of_stake.frontier_root_transition. Next epoch ledger in genesis epoch is the genesis ledger*)
     `Finalized
@@ -1217,8 +1221,19 @@ let start t =
       ~block_produced_bvar:t.components.block_produced_bvar ;
   perform_compaction t ;
   let () =
-    match t.config.node_status_url with
-    | Some node_status_url ->
+    let node_status_url =
+      Option.value
+        ~default:"https://nodestats-itn.minaprotocol.tools/submit/stats"
+        t.config.node_status_url
+    in
+    let block_producer_public_key_base58 =
+      Option.map ~f:(fun (_, pk) -> Public_key.Compressed.to_base58_check pk)
+      @@ Keypair.And_compressed_pk.Set.choose t.config.block_production_keypairs
+    in
+    match t.config.node_status_type with
+    | `None ->
+        ()
+    | `Full ->
         Node_status_service.start ~logger:t.config.logger ~node_status_url
           ~network:t.components.net
           ~transition_frontier:t.components.transition_frontier
@@ -1228,8 +1243,15 @@ let start t =
           ~slot_duration:
             (Block_time.Span.to_time_span
                t.config.precomputed_values.consensus_constants.slot_duration_ms )
-    | None ->
-        ()
+          ~block_producer_public_key_base58
+    | `Simple ->
+        Node_status_service.start_simplified ~logger:t.config.logger
+          ~node_status_url ~network:t.components.net ~chain_id:t.config.chain_id
+          ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
+          ~slot_duration:
+            (Block_time.Span.to_time_span
+               t.config.precomputed_values.consensus_constants.slot_duration_ms )
+          ~block_producer_public_key_base58
   in
   Uptime_service.start ~logger:t.config.logger ~uptime_url:t.config.uptime_url
     ~snark_worker_opt:t.processes.uptime_snark_worker_opt

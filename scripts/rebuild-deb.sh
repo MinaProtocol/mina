@@ -192,7 +192,7 @@ for f in /tmp/coda_cache_dir/genesis*; do
 done
 
 #copy config.json
-cp '../genesis_ledgers/mainnet.json' "${BUILDDIR}/var/lib/coda/mainnet.json"
+cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/mainnet.json"
 cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
 # The default configuration:
 cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
@@ -270,6 +270,51 @@ ls -lh mina*.deb
 
 ##################################### END GENERATE MINA DEVNET PACKAGE #######################################
 
+##################################### GENERATE MINA CREATE LEGACY GENESIS PACKAGE #######################################
+
+echo "------------------------------------------------------------"
+echo "Building runtime genesis ledger :"
+
+rm -rf "${BUILDDIR}"
+mkdir -p "${BUILDDIR}/DEBIAN"
+cat << EOF > "${BUILDDIR}/DEBIAN/control"
+Package: mina-create-legacy-genesis
+Version: ${MINA_DEB_VERSION}
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: ${SHARED_DEPS}${DAEMON_DEPS}
+Suggests: postgresql
+License: Apache-2.0
+Homepage: https://minaprotocol.com/
+Maintainer: o(1)Labs <build@o1labs.org>
+Description: Mina Client and Daemon
+ Mina Protocol Client and Daemon
+ Built from ${GITHASH} by ${BUILD_URL}
+EOF
+
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILDDIR}/DEBIAN/control"
+
+echo "------------------------------------------------------------"
+# Binaries
+mkdir -p "${BUILDDIR}/usr/local/bin"
+cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-legacy-genesis"
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILDDIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-create-legacy-genesis_${MINA_DEB_VERSION}.deb
+ls -lh mina*.deb
+
+##################################### END GENERATE MINA MAINNET PACKAGE #######################################
+
+
 # TODO: Find a way to package keys properly without blocking/locking in CI
 # TODO: Keys should be their own package, which this 'non-noprovingkeys' deb depends on
 # For now, deleting keys in /tmp/ so that the complicated logic below for moving them short-circuits and both packages are built without keys
@@ -316,6 +361,6 @@ done
 #remove build dir to prevent running out of space on the host machine
 rm -rf "${BUILDDIR}"
 
-# Build mina block producer sidecar 
+# Build mina block producer sidecar
 ../automation/services/mina-bp-stats/sidecar/build.sh
 ls -lh mina*.deb

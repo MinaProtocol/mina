@@ -56,6 +56,7 @@ type t =
   ; upload_blocks_to_gcloud : bool
   ; block_reward_threshold : Currency.Amount.t option [@default None]
   ; node_status_url : string option [@default None]
+  ; node_status_type : [ `Simple | `Full | `None ] [@default `Simple]
   ; uptime_url : Uri.t option [@default None]
   ; uptime_submitter_keypair : Keypair.t option [@default None]
   ; stop_time : int

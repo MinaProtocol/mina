@@ -41,8 +41,11 @@ case $GITBRANCH in
             RELEASE=alpha ;;
           *beta*) # any tag including the string `beta`
             RELEASE=beta ;;
+          *devnet*)
+            RELEASE=devnet ;;
           ?*) # Any other non-empty tag. ? matches a single character and * matches 0 or more characters.
-            RELEASE=stable ;;
+            #RELEASE=stable ;;
+            RELEASE=unstable ;;
           "") # No tag
             RELEASE=unstable ;;
           *) # The above set of cases should be exhaustive, if they're not then still set RELEASE=unstable

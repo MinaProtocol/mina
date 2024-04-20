@@ -307,6 +307,31 @@ let cache_fee_transfer_via_coinbase pool (internal_cmd : Sql.Internal_command.t)
   | _ ->
       Deferred.unit
 
+let create_or_append_repair_script ~logger ~output_repair_script_opt
+    ~(balance_info : Archive_lib.Processor.Balance.t) nonce =
+  match output_repair_script_opt with
+  | None ->
+      ()
+  | Some output_repair_script_opt ->
+      [%log debug] "Persisting nonce repair to repair script" ;
+
+      let sql =
+        sprintf
+          "UPDATE balances SET nonce = %Ld\n\
+          \      WHERE balance = %Ld\n\
+          \      AND block_height = %Ld\n\
+          \      AND block_sequence_no = %d\n\
+          \      AND block_secondary_sequence_no = %d;" nonce
+          balance_info.balance balance_info.block_height
+          balance_info.block_sequence_no
+          balance_info.block_secondary_sequence_no
+      in
+
+      Out_channel.with_file ~append:true output_repair_script_opt
+        ~f:(fun outc ->
+          Out_channel.output_string outc sql ;
+          Out_channel.newline outc )
+
 (* balance_block_data come from a loaded internal or user command, which
     includes data from the blocks table and
     - for internal commands, the tables internal_commands and blocks_internals_commands
@@ -314,8 +339,8 @@ let cache_fee_transfer_via_coinbase pool (internal_cmd : Sql.Internal_command.t)
    we compare those against the same-named values in the balances row
 *)
 let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
-    ~balance_block_data ~set_nonces ~repair_nonces ~continue_on_error :
-    unit Deferred.t =
+    ~balance_block_data ~set_nonces ~repair_nonces ~continue_on_error
+    ~output_repair_script_opt : unit Deferred.t =
   let%bind pk = pk_of_pk_id pool pk_id in
   let%bind balance_info = balance_info_of_id pool ~id:balance_id in
   let token = token_int64 |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64 in
@@ -405,6 +430,10 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
         let nonce =
           Account.Nonce.to_uint32 ledger_nonce |> Unsigned.UInt32.to_int64
         in
+
+        create_or_append_repair_script ~logger ~output_repair_script_opt
+          ~balance_info nonce ;
+
         query_db pool
           ~f:(fun db -> Sql.Balances.insert_nonce db ~id:balance_id ~nonce)
           ~item:"chain from state hash" )
@@ -414,8 +443,7 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
             [ ("balance_id", `Int balance_id)
             ; ("nonce", `String (Account.Nonce.to_string ledger_nonce))
             ] ;
-        return
-        @@ if continue_on_error then incr error_count else Core_kernel.exit 1 )
+        Deferred.unit )
   | Some nonce ->
       let db_nonce =
         nonce |> Unsigned.UInt32.of_int64 |> Account.Nonce.of_uint32
@@ -432,6 +460,10 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
           let correct_nonce =
             ledger_nonce |> Account.Nonce.to_uint32 |> Unsigned.UInt32.to_int64
           in
+
+          create_or_append_repair_script ~logger ~output_repair_script_opt
+            ~balance_info correct_nonce ;
+
           query_db pool
             ~f:(fun db ->
               Sql.Balances.insert_nonce db ~id:balance_id ~nonce:correct_nonce
@@ -443,10 +475,9 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
               [ ("who", `String who)
               ; ("ledger_nonce", Account.Nonce.to_yojson ledger_nonce)
               ; ("database_nonce", Account.Nonce.to_yojson db_nonce)
+              ; ("balance_id", `Int balance_id)
               ] ;
-          return
-          @@ if continue_on_error then incr error_count else Core_kernel.exit 1
-          )
+          Deferred.unit )
       else Deferred.unit
 
 let account_creation_fee_uint64 =
@@ -576,7 +607,7 @@ let verify_account_creation_fee ~logger ~pool ~receiver_account_creation_fee
         if continue_on_error then incr error_count else Core_kernel.exit 1
 
 let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
-    ~set_nonces ~repair_nonces ~continue_on_error =
+    ~set_nonces ~repair_nonces ~continue_on_error ~output_repair_script_opt =
   [%log info]
     "Applying internal command (%s) with global slot since genesis %Ld, \
      sequence number %d, and secondary sequence number %d"
@@ -619,7 +650,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       | Ok _undo ->
           verify_balance ~logger ~pool ~ledger ~who:"fee transfer receiver"
             ~balance_id ~pk_id ~token_int64 ~balance_block_data ~set_nonces
-            ~repair_nonces ~continue_on_error
+            ~repair_nonces ~continue_on_error ~output_repair_script_opt
       | Error err ->
           fail_on_error err )
   | "coinbase" -> (
@@ -657,7 +688,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       | Ok _undo ->
           verify_balance ~logger ~pool ~ledger ~who:"coinbase receiver"
             ~balance_id ~pk_id ~token_int64 ~balance_block_data ~set_nonces
-            ~repair_nonces ~continue_on_error
+            ~repair_nonces ~continue_on_error ~output_repair_script_opt
       | Error err ->
           fail_on_error err )
   | "fee_transfer_via_coinbase" ->
@@ -669,7 +700,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
         verify_balance ~logger ~pool ~ledger
           ~who:"fee_transfer_via_coinbase receiver" ~balance_id ~pk_id
           ~token_int64 ~balance_block_data ~set_nonces ~repair_nonces
-          ~continue_on_error
+          ~continue_on_error ~output_repair_script_opt
       in
       (* the actual application is in the "coinbase" case *)
       Deferred.unit
@@ -677,7 +708,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
       failwithf "Unknown internal command \"%s\"" cmd.type_ ()
 
 let apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces ~repair_nonces
-    ~continue_on_error (cmd1 : Sql.Internal_command.t)
+    ~output_repair_script_opt ~continue_on_error (cmd1 : Sql.Internal_command.t)
     (cmd2 : Sql.Internal_command.t) =
   [%log info] "Applying combined fee transfers with sequence number %d"
     cmd1.sequence_no ;
@@ -714,13 +745,13 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces ~repair_nonces
         verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (1)"
           ~balance_id:cmd1.receiver_balance ~pk_id:cmd1.receiver_id
           ~token_int64:cmd1.token ~balance_block_data ~set_nonces ~repair_nonces
-          ~continue_on_error
+          ~continue_on_error ~output_repair_script_opt
       in
       let balance_block_data = internal_command_to_balance_block_data cmd2 in
       verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (2)"
         ~balance_id:cmd2.receiver_balance ~pk_id:cmd2.receiver_id
         ~token_int64:cmd2.token ~balance_block_data ~set_nonces ~repair_nonces
-        ~continue_on_error
+        ~continue_on_error ~output_repair_script_opt
   | Error err ->
       Error.tag_arg err "Error applying combined fee transfer"
         ("sequence number", cmd1.sequence_no)
@@ -786,7 +817,7 @@ let body_of_sql_user_cmd pool
       failwithf "Invalid user command type: %s" type_ ()
 
 let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
-    ~set_nonces ~repair_nonces ~continue_on_error =
+    ~set_nonces ~repair_nonces ~continue_on_error ~output_repair_script_opt =
   [%log info]
     "Applying user command (%s) with nonce %Ld, global slot since genesis %Ld, \
      and sequence number %d"
@@ -849,7 +880,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
         | Some balance_id ->
             verify_balance ~logger ~pool ~ledger ~who:"source" ~balance_id
               ~pk_id:cmd.source_id ~token_int64 ~balance_block_data ~set_nonces
-              ~repair_nonces ~continue_on_error
+              ~repair_nonces ~continue_on_error ~output_repair_script_opt
         | None ->
             return ()
       in
@@ -859,13 +890,14 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
             verify_balance ~logger ~pool ~ledger ~who:"receiver" ~balance_id
               ~pk_id:cmd.receiver_id ~token_int64 ~balance_block_data
               ~set_nonces ~repair_nonces ~continue_on_error
+              ~output_repair_script_opt
         | None ->
             return ()
       in
       verify_balance ~logger ~pool ~ledger ~who:"fee payer"
         ~balance_id:cmd.fee_payer_balance ~pk_id:cmd.fee_payer_id
         ~token_int64:cmd.fee_token ~balance_block_data ~set_nonces
-        ~repair_nonces ~continue_on_error
+        ~repair_nonces ~continue_on_error ~output_repair_script_opt
   | Error err ->
       Error.tag_arg err "User command failed on replay"
         ( ("global slot_since_genesis", cmd.global_slot_since_genesis)
@@ -942,7 +974,7 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
     Deferred.unit )
 
 let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
-    ~checkpoint_interval ~continue_on_error () =
+    ~checkpoint_interval ~continue_on_error ~output_repair_script_opt () =
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -1212,6 +1244,76 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             ~next_epoch_ledger
         in
         let log_ledger_hash_after_last_slot () =
+          (* See PR #9782. *)
+          let state_hashes_to_avoid =
+            (* devnet *)
+            [ "3NKNU4WceYUjnQbxaUAmcHQzhGhC8ZxkYKqDKojKMpVjoj9WQZM6"
+            ; "3NKvaxewhJ9e1GWvFFT83p4MA2MPFChFoQTmdJ2zeBNX9rLorGFH"
+            ; "3NKNDWt8f1vVeFdBN8FCyHnAwnc5oXR18UvqriW2tQtHABTgX2tu"
+            ; "3NLR1VaGKs36byogm4atXtiNVre3TtWrrg1Btt3HxGZ2mEBEN5hg"
+            ; "3NL3fHu5bAqBNMmQ1Jh3HPZq7xX67WKFyAEUs2FFHJeiYxbEiq69"
+            ; "3NLuEU1bJ462uzkJpQXDCo2DcpkkJLbK9kXgwpCYHDuofXo7Smrr"
+            ; "3NK9ZYikzJDzXK7CPjyr7jo1S4ZGfKUKa18uTZd96X7YVcQihW1W"
+            ; "3NK6PXGHsrRo8iYzWx43rtnyN2ynmZ7enWU7CMWH6oTUi5CRck7c"
+            ; "3NKNrQG3DvyxDAuhudq7UhYRQ4GL7suKHcfQ3q7nUDXS1NjHyuZE"
+            ; "3NKcbRVyPHeBoWiK8AHXVVYxswv5c4kpmECRS3LTbAVCHzrxbzuH"
+            ; "3NKoxfcbnSkFSkFaMpmpgfVFqQmrwR6xkfpCHePLPh5uYKQLdpJt"
+            ; "3NKVfBD1kXDJ8ZM3xhR5TFZXBRAs5UanSewxQRpXFmoxGxDddkP5"
+            ; "3NKuotwHEdKRBK1yuDNkVUXqCnz5dPpS1xL4UJWghrAUB3t9pRQg"
+            ; "3NKou5o9gJpcKBp8LnkUQgFBBQFZB6z7GD88pWDdwgVkfV8HmQTW"
+            ; "3NKaqDsxAAFMvvxw22PLDkFaQyeHqioxhvb6BcpzbB3i8uaQdta7"
+            ; "3NKCDffYzX5VMH3eH3G8CU6Ba6FndrevGBaJ9NCU7U6nv3iv2bpN"
+            ; "3NL9sVkyZLLHFEvGPzr4ihYPzzZ3W3GixxjofeZib8qbe8hE4jUg"
+            ; "3NLWggBpXBZxaV2R1DaJrL51uS6NshyDejbPn1gpWhp4E9t1cvPU"
+            ; "3NL2cRDQkXEwnv33jTY5UKxLpyUpxKhcnwq7hQcfdDwc9QqXg5K9"
+            ; "3NKvh8kXNtaJAhuC6Eqa8K4r2whzLuN5G7F8M14GTB1tcFKERp3z"
+            ; "3NKVo2E1TGfb2pQ3jv84m7tVid4d6AHnKbDMZLWcrPxWwQJTYiQg"
+            ; "3NL8d9RgUbDXjy92eH6ZVFc1ozn3darQx8u9EViMiCqrv5Ywe42x"
+            ; "3NLGBF3yXbnQQxophx4YZfdXGcTt11KjC7jv8qaf3b8B8tZdrCBh"
+            ; "3NKAbgwCDsdW6m18FSj8mBE2SpdMd7gopc5NMqGHxkqqLykMZrCR"
+            ; "3NKFtTCSqVqKdbm6unoCiQWnKnozwYsiey5aPegV5xMR2MNR9kjZ"
+            ; "3NKEyaQdmFtYWx2swLjkcpBeQGsfo8riNH6Kbdr9myWUQrZkbqjV"
+            ; "3NK7jasQXuACjzJ5mBPNr13Y6Yt8vD6piLc1waFBU4Jte8WzEZ4h"
+            ; "3NLPbRNQi6JFbh7DW9ibPgRhUnExwGaMpiuGJdEQ6Na47kWcP3PW"
+            ; "3NK4EUku6d9fmU3P1t7NnoxsN4sg699JSskJZ4nJs1mWSHs1CL4v"
+            ; "3NLDE8xKUvKMiSpLSd9uvnQaRiXYW6MWw7UXpFD2wbq4WeKRAnKM"
+            ; "3NLZYyohgxGFE3hw6o6tfvXnZLoG6gyzr67WNGPFfpugHtoXaFGq" (*mainnet*)
+            ; "3NKCedb2xxrgiaBFKVpxAJ9Kp7Tu1JG4qCUppJmt3c1RULQYQtrZ"
+            ; "3NKjb8G3Sc4Z5hLckDy2Wg8soZmdghenyAYDuHVF5uNV36Td9DZt"
+            ; "3NKKrhT3QX5tUS18kyGkYnjfNCCppgjy9zcZrmtMeNynEce47zpj"
+            ; "3NKzdd7UjWLygUvgKfJwd3MVj3PD1GnXDHHGoTLyXinVvSoFRyX5"
+            ; "3NKpPvE3NfGnbqRU4U6fDCMdUi9c54kphuDY4jniJuHZ62MyPWmr"
+            ; "3NLP9qXSUAo9b8XjLZ8YpvdvEJ1g4TUdeznBH5kDAFv6kYYCGY51"
+            ; "3NLLEfqqPdWHDtM7nw4S27uejcLZQ5D7N3BzmCNR5acYSaGuJ4pH"
+            ; "3NKJoVQRihbwMUTDJKv4patDDMF8xGrvAaxQ9d2QJovJFegSuEQV"
+            ; "3NKQ8W6L77xjPbz9sPNp357gfJ6a5LMD8K8kwGnW5jyULcCbd5Su"
+            ; "3NLYL2dmLyGd889rwF5EmdjWE2BBGCZcHAwJA8MotiPVDiXLvktw"
+            ; "3NLhmVdQvxpQLNvyehAXZKDsVrkgjb812VfpbgKqBRWSLa9c1kAA"
+            ; "3NKX71ifBPJCZFDLdeLmhY97Zc8Y3xt2JZTFLgqtTnv53JvRcbzx"
+            ; "3NLUhVLiWav4kBszLKZ6oDNC2BkbeX2cftsUGb6egeixjvqu3qqt"
+            ; "3NKtmu2j6UJ9oggDJbtY6UDzZrMgDF8CH5A5xs3GyQUqMq4nS1ZN"
+            ; "3NKJbfqrRzsjDC3FkSv5tsKQ7yp1xxYsXcs6arsoj18MKhcMVNeA"
+            ; "3NKy6JUgC8r6ZGCKcQxPmKu9pN8xv5mGqVEiC1z1dLuVYhc2KEvV"
+            ; "3NLi5AWq9YCT2XrB5vxkC5Psxrjv3JjHmK5DX87duztbCcL2oJkD"
+            ; "3NKm5VGDQXtekWf3erWfjcHciGzjAWB4u7WNE7gAHGYjvkFbF5xj"
+            ; "3NLnTnSMFayzpAahTgyL9mY1og2HDJjcg9kpKsQT5iQcPJ7FtJtJ"
+            ; "3NKGm1K6T9pV7ygFqtScugMQB7EhDozsiz8Fe9LAYG2yx8yYie6p"
+            ; "3NKj4YqZq1RCMDK3YM1gRtFZ2fspR1sNbRjQw4GA6Ut2Ar16jEYF"
+            ; "3NLC7zugGno2Emt3w2DRJx6LdRzmoiW4F9PuAYurLQFmWFqEer1V"
+            ; "3NKAKrhJrvFJtgMvr72ZXTaWPFisgDaND3AxZoPR6gAff5qDuKcq"
+            ; "3NKDaz4DVLp4bQ5FJiXjEQPWmwgzvXAfCLY3w8d5NjzJZNVXnF6Q"
+            ; "3NLKV4BUZwzpYvqcByRhJoKyME6Q5KEcrHPVY21XPfXsbPp486eu"
+            ; "3NLbwy3BrF7gxEPF9WPoJPeED9NUC2RXdDnoJf6GvRwzksJThnM9"
+            ; "3NKfHZ5DJkL3jjzstrfTCjHczMrPzvBsgPQ66trR9yqkE9dHJ7AD"
+            ; "3NKUaab3R1mcG9caqyUUntpjvYD7VYUJ7rWjTCbgxzob3miG3WHK"
+            ; "3NL2aQWNi6JadvfmwkyJVCtd9MjVwDCbvY1bfHbwCm1nJrDwSV2A"
+            ; "3NK7ANsW4LQ62Hk8DJNEF36yyccoECJKmdeAyaf96WmksR2TyM3C"
+            ; "3NKa82y8gNUe8ePYjq7jEh38vyWVLEteHynK686D8qaebeHpmfsS"
+            ; "3NLcmRzkBdmFKqhpKEbw33A7GAd1EG7dg6CVwUhC4RKDTBZGnYDQ"
+            ; "3NLHTdvTPXxUn8YFy4z59NxDcX9DYhthFtv8aPNMmpm2pYuA6Tf6"
+            ]
+          in
+
           match get_slot_hashes last_global_slot_since_genesis with
           | None ->
               if
@@ -1226,7 +1328,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                   "Missing ledger hash information for last global slot, which \
                    is not the start slot" ;
                 Core.exit 1 )
-          | Some (_state_hash, expected_ledger_hash) ->
+          | Some (state_hash, expected_ledger_hash) ->
               if
                 Ledger_hash.equal
                   (Ledger.merkle_root ledger)
@@ -1238,6 +1340,18 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
                   ~metadata:
                     [ ("ledger_hash", json_ledger_hash_of_ledger ledger) ]
                   last_global_slot_since_genesis
+              else if
+                List.mem state_hashes_to_avoid
+                  (State_hash.to_base58_check state_hash)
+                  ~equal:String.equal
+              then
+                [%log info]
+                  ~metadata:
+                    [ ( "state_hash"
+                      , `String (State_hash.to_base58_check state_hash) )
+                    ]
+                  "This block has an inconsistent ledger hash due to a known \
+                   historical issue."
               else (
                 [%log error]
                   "Applied all commands at global slot since genesis %Ld, \
@@ -1306,6 +1420,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               let%bind () =
                 apply_combined_fee_transfer ~logger ~pool ~ledger ~set_nonces
                   ~repair_nonces ~continue_on_error ic ic2
+                  ~output_repair_script_opt
               in
               apply_commands ics2 user_cmds
                 ~last_global_slot_since_genesis:ic.global_slot_since_genesis
@@ -1317,7 +1432,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
               in
               let%bind () =
                 run_internal_command ~logger ~pool ~ledger ~set_nonces
-                  ~repair_nonces ~continue_on_error ic
+                  ~repair_nonces ~continue_on_error ic ~output_repair_script_opt
               in
               apply_commands ics user_cmds
                 ~last_global_slot_since_genesis:ic.global_slot_since_genesis
@@ -1344,7 +1459,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             in
             let%bind () =
               run_user_command ~logger ~pool ~ledger ~set_nonces ~repair_nonces
-                ~continue_on_error uc
+                ~continue_on_error uc ~output_repair_script_opt
             in
             apply_commands [] ucs
               ~last_global_slot_since_genesis:uc.global_slot_since_genesis
@@ -1356,7 +1471,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~set_nonces ~repair_nonces
             in
             let%bind () =
               run_user_command ~logger ~pool ~ledger ~set_nonces ~repair_nonces
-                ~continue_on_error uc
+                ~continue_on_error uc ~output_repair_script_opt
             in
             apply_commands internal_cmds ucs
               ~last_global_slot_since_genesis:uc.global_slot_since_genesis
@@ -1466,6 +1581,13 @@ let () =
          and repair_nonces =
            Param.flag "--repair-nonces"
              ~doc:"Repair incorrect nonces in archive database" Param.no_arg
+         and output_repair_script_opt =
+           Param.flag "--dump-repair-script"
+             ~doc:
+               "file Output sql script which will contain all updates to \
+                nonces made during replayer run. Works only when using \
+                --repair-nonces or --set-nonces args"
+             Param.(optional string)
          and continue_on_error =
            Param.flag "--continue-on-error"
              ~doc:"Continue processing after errors" Param.no_arg
@@ -1474,5 +1596,13 @@ let () =
              ~doc:"NN Write checkpoint file every NN slots"
              Param.(optional int)
          in
+         if
+           Option.is_some output_repair_script_opt
+           && not (repair_nonces || set_nonces)
+         then (
+           eprintf
+             "--dump-repair-script requires --repair-nonces or --set-nonces" ;
+           exit 1 ) ;
          main ~input_file ~output_file_opt ~archive_uri ~set_nonces
-           ~repair_nonces ~checkpoint_interval ~continue_on_error )))
+           ~repair_nonces ~checkpoint_interval ~continue_on_error
+           ~output_repair_script_opt )))
