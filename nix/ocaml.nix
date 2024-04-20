@@ -68,6 +68,12 @@ let
         rocksdb_stubs = super.rocksdb_stubs.overrideAttrs {
           MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
         };
+
+        # This is needed because
+        # - lld package is not wrapped to pick up the correct linker flags
+        # - bintools package also includes as which is incompatible with gcc
+        lld_wrapped = pkgs.writeShellScriptBin "ld.lld"
+          ''${pkgs.llvmPackages.bintools}/bin/ld.lld "$@"'';
       };
 
   scope =
@@ -85,15 +91,238 @@ let
     [ zlib bzip2 gmp openssl libffi ]
     ++ lib.optional (!(stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
 
+  dune-description = pkgs.stdenv.mkDerivation {
+    pname = "dune-description";
+    version = "dev";
+    src = pkgs.lib.sources.sourceFilesBySuffices ../src [
+      "dune"
+      "dune-project"
+      ".inc"
+      ".opam"
+    ];
+    phases = [ "unpackPhase" "buildPhase" ];
+    buildPhase = ''
+      files=$(ls)
+      mkdir src
+      mv $files src
+      cp ${../dune} dune
+      cp ${../dune-project} dune-project
+      ${
+        inputs.describe-dune.defaultPackage.${pkgs.system}
+      }/bin/describe-dune > $out
+    '';
+  };
+
+  duneDescLoaded = builtins.fromJSON (builtins.readFile dune-description);
+  duneOutFiles = builtins.foldl' (acc0: el:
+    let
+      extendAcc = acc: file:
+        acc // {
+          "${file}" = if acc ? "${file}" then
+            builtins.throw
+            "File ${file} is defined as output of many dune files"
+          else
+            el.src;
+        };
+      extendAccExe = acc: unit:
+        if unit.type == "exe" then
+          extendAcc acc "${el.src}/${unit.name}.exe"
+        else
+          acc;
+      acc1 = builtins.foldl' extendAcc acc0 el.file_outs;
+    in builtins.foldl' extendAccExe acc1 el.units) { } duneDescLoaded;
+
+  collectLibLocs = attrName:
+    let
+      extendAcc = src: acc: name:
+        acc // {
+          "${name}" = if acc ? "${name}" then
+            builtins.throw
+            "Library with ${attrName} ${name} is defined in multiple dune files"
+          else
+            src;
+        };
+      extendAccLib = src: acc: unit:
+        if unit.type == "lib" && unit ? "${attrName}" then
+          extendAcc src acc unit."${attrName}"
+        else
+          acc;
+      foldF = acc0: el: builtins.foldl' (extendAccLib el.src) acc0 el.units;
+    in builtins.foldl' foldF { };
+
+  publicLibLocs = collectLibLocs "public_name" duneDescLoaded;
+
+  libLocs = collectLibLocs "name" duneDescLoaded // publicLibLocs;
+
+  mkPkgCfg =
+    desc:
+    let
+      # Optimization, should work even without (but slower and with far more unnecessary rebuilds)
+      src =
+        if desc.src == "."
+          then with pkgs.lib.fileset; (toSource {root=./..; fileset=union ../graphql_schema.json ../dune;})
+        else if desc.src == "src"
+          then with pkgs.lib.fileset; (toSource {root=../src; fileset=union ../src/dune-project ../src/dune;})
+        else if desc.src == "src/lib/snarky"
+          then with pkgs.lib.fileset; (toSource {root=../src/lib/snarky; fileset=union ../src/lib/snarky/dune-project ../src/lib/snarky/dune;})
+        else ../. + "/${desc.src}";
+      subdirs = if builtins.elem desc.src ["." "src" "src/lib/snarky"] then [] else desc.subdirs;
+
+      internalLibs = builtins.concatMap (unit: if unit.type != "lib" then [] else if unit ? "public_name" then [unit.public_name unit.name] else [unit.name]) desc.units;
+      deps' = builtins.filter (d: ! builtins.elem d internalLibs) desc.deps;
+      defImplLibs = builtins.concatMap (unit: if unit ? "default_implementation" then [unit.default_implementation] else []) desc.units;
+      implement = builtins.concatMap (unit: if unit ? "implements" then [unit.implements] else []) desc.units;
+      def_impls = builtins.attrValues (pkgs.lib.getAttrs defImplLibs libLocs);
+      out_file_deps = builtins.concatMap
+        (fd: if duneOutFiles ? "${fd}" then [ duneOutFiles."${fd}" ] else [ ])
+        desc.file_deps ++ (if desc.src == "src/lib/signature_kind" then ["src"] else if desc.src == "src/lib/logger" then ["src/lib/bounded_types" "src/lib/mina_compile_config" "src/lib/itn_logger"] else []);
+      lib_deps = builtins.attrValues
+        (pkgs.lib.getAttrs (builtins.filter (e: libLocs ? "${e}") (deps' ++ implement) )
+          libLocs);
+    in {
+      deps = pkgs.lib.unique (lib_deps ++ out_file_deps ++ def_impls);
+      inherit (desc) file_deps;
+      inherit subdirs out_file_deps src def_impls;
+      targets = (if desc.units == [ ] then [ ] else [ desc.src ])
+        ++ desc.file_outs;
+    };
+
+  pkgCfgMap = builtins.listToAttrs
+    (builtins.map (desc: pkgs.lib.nameValuePair desc.src (mkPkgCfg desc))
+      duneDescLoaded);
+
+  # TODO Rewrite recursive dep calculation: compute map for every dependency
+  recursiveDeps =
+    let
+      deps = loc: pkgCfgMap."${loc}".deps;
+      impl = acc: loc:
+        if acc ? "${loc}" then
+          acc
+        else
+          builtins.foldl' impl (acc // { "${loc}" = ""; })
+          (deps loc);
+    in
+    initLoc:
+    builtins.foldl' impl { } (deps initLoc);
+
+  base-libs =
+    let deps = pkgs.lib.getAttrs (builtins.attrNames implicit-deps) scope;
+    in pkgs.stdenv.mkDerivation {
+      name = "mina-base-libs";
+      phases = [ "installPhase" ];
+      buildInputs = builtins.attrValues deps;
+      installPhase = ''
+        mkdir -p $out/lib/ocaml/${scope.ocaml.version}/site-lib/stublibs $out/nix-support $out/bin
+        {
+          echo -n 'export OCAMLPATH=$'
+          echo -n '{OCAMLPATH-}$'
+          echo '{OCAMLPATH:+:}'"$out/lib/ocaml/${scope.ocaml.version}/site-lib"
+          echo -n 'export CAML_LD_LIBRARY_PATH=$'
+          echo -n '{CAML_LD_LIBRARY_PATH-}$'
+          echo '{CAML_LD_LIBRARY_PATH:+:}'"$out/lib/ocaml/${scope.ocaml.version}/site-lib/stublibs"
+        } > $out/nix-support/setup-hook
+        for input in $buildInputs; do
+          [ ! -d "$input/lib/ocaml/${scope.ocaml.version}/site-lib" ] || {
+            find "$input/lib/ocaml/${scope.ocaml.version}/site-lib" -maxdepth 1 -mindepth 1 -not -name stublibs | while read d; do
+              cp -R "$d" "$out/lib/ocaml/${scope.ocaml.version}/site-lib/"
+            done
+          }
+          [ ! -d "$input/lib/ocaml/${scope.ocaml.version}/site-lib/stublibs" ] || cp -R "$input/lib/ocaml/${scope.ocaml.version}/site-lib/stublibs"/* "$out/lib/ocaml/${scope.ocaml.version}/site-lib/stublibs/"
+          [ ! -d "$input/bin" ] || cp -R $input/bin/* $out/bin
+        done
+      '';
+    };
+
+  quote = builtins.replaceStrings [ "." "/" ] [ "__" "-" ];
+
+  buildDunePkg = let
+    copyDirs' = prefix: path: drv:
+      ''"${builtins.dirOf "${prefix}/${path}"}" "${builtins.baseNameOf "${prefix}/${path}"}" "${drv}"'' ;
+    copyFileDep' = f:
+      if builtins.pathExists ../${f} then
+        [(copyDirs' "." f ../${f})] else [];
+    copyBuildDirs' = copyDirs' "_build/default";
+    copySrcDirs' = path: cfg: copyDirs' "." path cfg.src;
+    copyAllBuildDirs' = def_impls: devDeps: pkgs.lib.mapAttrsToList copyBuildDirs' (builtins.removeAttrs devDeps def_impls);
+    copyAllSrcDirs'   = cfgSubMap: pkgs.lib.mapAttrsToList copySrcDirs' cfgSubMap;
+    subdirsToDelete' = topPath: deps: path: cfg: builtins.concatMap (f: let r = "${path}/${f}"; in if pkgs.lib.any (d: d == r || pkgs.lib.hasPrefix "${r}/" d) ([topPath]++deps) then [] else [r]) cfg.subdirs;
+  in path: {file_deps, targets, src, def_impls, ... }@cfg: devDeps:
+  let
+    quotedPath = quote path;
+    file_deps' = pkgs.lib.unique (file_deps ++ builtins.concatLists (pkgs.lib.mapAttrsToList (p: _: pkgCfgMap."${p}".file_deps) devDeps)); 
+    cfgSubMap = builtins.intersectAttrs devDeps pkgCfgMap;
+    depNames = builtins.attrNames cfgSubMap;
+    allDirs' = copyAllBuildDirs' def_impls devDeps ++ copyAllSrcDirs' cfgSubMap ++ [(copySrcDirs' path cfg)] ++
+    builtins.concatMap copyFileDep' file_deps';
+    allDirs = builtins.sort (s: t: s < t) allDirs';
+    subdirsToDelete = pkgs.lib.unique (subdirsToDelete' path depNames path cfg ++ builtins.concatLists (pkgs.lib.mapAttrsToList (subdirsToDelete' path depNames) cfgSubMap));
+    # If path being copied contains dune-inhabitated subdirs,
+    # it isn't enough to just link dependencies from other derivations
+    # because in some cases we may want to create a subdir in the directory corresponding
+    # to that dependency.
+    #
+    # Hence what we do is the following: we create a directory for the path and recursively 
+    # link all regular files with symlinks, while recreating the dependency tree
+    initFS = ''
+      set -euo pipefail
+      chmod +w .
+      inputs=( ${builtins.concatStringsSep " " allDirs} )
+      for i in {0..${toString (builtins.length allDirs - 1)}}; do
+        j=$((i*3))
+        dir="''${inputs[$j]}"
+        file="$dir/''${inputs[$((j+1))]}"
+        drv="''${inputs[$((j+2))]}"
+        mkdir -p "$dir"
+        cp -RLTu "$drv" "$file"
+        [ ! -d "$file" ] || chmod -R +w "$file"
+      done
+    '' + (if subdirsToDelete == [] then "" else ''
+      toDelete=( ${pkgs.lib.concatMapStringsSep " " (f: ''"${f}"'') subdirsToDelete} )
+      rm -Rf "''${toDelete[@]}"
+      [ ! -d _build/default ] || ( cd _build/default && rm -Rf "''${toDelete[@]}" )
+      '');
+   initFSDrv = pkgs.writeShellScriptBin "init-fs-${quotedPath}" initFS;
+  in
+  # TODO check logs. Seems like we're not copying all of the _build dirs correctly (in case of sources it might simply not be a factor to worry about)
+  # (^ unlikely though, sorting should alleviate the concern most of the time)
+  [ { name = "init-fs-${quotedPath}"; value = initFSDrv; }
+    { name = quotedPath; value =
+    pkgs.stdenv.mkDerivation {
+    pname = quotedPath;
+    version = "dev";
+    GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
+    MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
+    PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
+    PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
+    DUNE_PROFILE = "dev";
+    MINA_COMMIT_SHA1 = inputs.self.sourceInfo.rev or "<dirty>";
+    buildInputs = [ base-libs ] ++ external-libs;
+    nativeBuildInputs = [ base-libs initFSDrv pkgs.capnproto ];
+    dontUnpack = true;
+    patchPhase = '' init-fs-${quotedPath} '';
+    buildPhase = ''
+      dune build ${builtins.concatStringsSep " " targets}
+    '';
+    installPhase = ''
+      find _build/default \( -type l -o \( -type d -empty \) \) -delete
+      cp -R _build/default/${path} $out
+    '';
+  }; }];
+
+  minaPkgs = self:
+    builtins.listToAttrs (builtins.concatLists (
+    pkgs.lib.attrsets.mapAttrsToList (path: cfg:
+      let
+        deps = builtins.attrNames (recursiveDeps path);
+        depMap = builtins.listToAttrs (builtins.map (d: {
+          name = d;
+          value = self."${quote d}";
+        }) (builtins.filter (p: path != p) deps));
+      in buildDunePkg path cfg depMap) pkgCfgMap));
+
   overlay = self: super:
     let
       ocaml-libs = builtins.attrValues (getAttrs installedPackageNames self);
-
-      # This is needed because
-      # - lld package is not wrapped to pick up the correct linker flags
-      # - bintools package also includes as which is incompatible with gcc
-      lld_wrapped = pkgs.writeShellScriptBin "ld.lld"
-        ''${pkgs.llvmPackages.bintools}/bin/ld.lld "$@"'';
 
       # Make a script wrapper around a binary, setting all the necessary environment variables and adding necessary tools to PATH.
       # Also passes the version information to the executable.
@@ -165,7 +394,7 @@ let
           self.dune
           self.ocamlfind
           self.odoc
-          lld_wrapped
+          self.lld_wrapped
           pkgs.capnproto
           pkgs.removeReferencesTo
           pkgs.fd
@@ -346,5 +575,7 @@ let
       });
 
       test_executive = wrapMina self.test_executive-dev { };
+
+      experiment = minaPkgs self.experiment // { inherit dune-description; };
     };
 in scope.overrideScope' overlay
