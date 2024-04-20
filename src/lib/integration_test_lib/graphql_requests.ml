@@ -192,6 +192,29 @@ module Graphql = struct
       }
     }
   |}]
+
+  module Best_chain_for_slot_end_test =
+  [%graphql
+  {|
+      query ($max_length: Int) @encoders(module: "Encoders") {
+        bestChain(maxLength: $max_length) {
+          stateHash
+          commandTransactionCount
+          protocolState {
+            consensusState {
+              slot
+              slotSinceGenesis
+            }
+          }
+          transactions {
+            coinbase
+          }
+          snarkJobs {
+            workIds
+          }
+        }
+      }
+    |}]
 end
 
 (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
@@ -712,3 +735,40 @@ let get_filtered_log_entries ~last_log_index_seen node_uri =
   else
     Deferred.Or_error.error_string
       "Node is not currently capturing structured log messages"
+
+type best_chain_block_for_slot_end_test =
+  { state_hash : string
+  ; command_transaction_count : int
+  ; coinbase : int
+  ; snark_work_count : int
+  ; slot : Unsigned.uint32
+  ; slot_since_genesis : Unsigned.uint32
+  }
+
+let get_best_chain_for_slot_end_test ?max_length ~logger node_uri =
+  let open Deferred.Or_error.Let_syntax in
+  let query_obj =
+    Graphql.Best_chain_for_slot_end_test.(make @@ makeVariables ?max_length ())
+  in
+  let%bind result =
+    exec_graphql_request ~logger ~retry_delay_sec:10.0 ~node_uri
+      ~query_name:"GetBlockSlot" query_obj
+  in
+  match result.bestChain with
+  | None | Some [||] ->
+      Deferred.Or_error.error_string "failed to get best chains"
+  | Some chain ->
+      return
+      @@ List.map (Array.to_list chain) ~f:(fun block ->
+             { state_hash = block.stateHash
+             ; command_transaction_count = block.commandTransactionCount
+             ; coinbase = Unsigned.UInt64.to_int block.transactions.coinbase
+             ; snark_work_count = block.snarkJobs |> Array.length
+             ; slot = block.protocolState.consensusState.slot
+             ; slot_since_genesis =
+                 block.protocolState.consensusState.slotSinceGenesis
+             } )
+
+let must_get_best_chain_for_slot_end_test ?max_length ~logger node_uri =
+  get_best_chain_for_slot_end_test ?max_length ~logger node_uri
+  |> Deferred.bind ~f:Malleable_error.or_hard_error
