@@ -647,13 +647,7 @@ let setup_daemon logger =
             (Internal_tracing.For_logger.json_lines_rotate_transport
                ~directory:(conf_dir ^ "/internal-tracing")
                () ) ;
-        let version_metadata =
-          [ ("commit", `String Mina_version.commit_id)
-          ; ("branch", `String Mina_version.branch)
-          ; ("commit_date", `String Mina_version.commit_date)
-          ; ("marlin_commit", `String Mina_version.marlin_commit_id)
-          ]
-        in
+        let version_metadata = [ ("commit", `String Mina_version.commit_id) ] in
         [%log info]
           "Mina daemon is booting up; built with commit $commit on branch \
            $branch"
@@ -2068,9 +2062,7 @@ let print_version_help coda_exe version =
   in
   List.iter lines ~f:(Core.printf "%s\n%!")
 
-let print_version_info () =
-  Core.printf "Commit %s on branch %s\n" Mina_version.commit_id
-    Mina_version.branch
+let print_version_info () = Core.printf "Commit %s\n" Mina_version.commit_id
 
 let () =
   Random.self_init () ;
