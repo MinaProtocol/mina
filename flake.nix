@@ -21,6 +21,14 @@
   inputs.opam-nix.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.inputs.opam-repository.follows = "opam-repository";
 
+  inputs.dune-nix.url = "github:o1-labs/dune-nix";
+  inputs.dune-nix.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.dune-nix.inputs.flake-utils.follows = "utils";
+
+  inputs.describe-dune.url = "github:o1-labs/describe-dune";
+  inputs.describe-dune.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.describe-dune.inputs.flake-utils.follows = "utils";
+
   inputs.o1-opam-repository.url = "github:o1-labs/opam-repository";
   inputs.o1-opam-repository.flake = false;
 
@@ -83,9 +91,8 @@
         go = import ./nix/go.nix;
         javascript = import ./nix/javascript.nix;
         ocaml = pkgs: prev: {
-          ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
-            inherit inputs pkgs;
-          });
+          ocamlPackages_mina =
+            requireSubmodules (import ./nix/ocaml.nix { inherit inputs pkgs; });
         };
       };
 
@@ -307,6 +314,10 @@
           inherit (ocamlPackages)
             mina devnet mainnet mina_tests mina-ocaml-format mina_client_sdk
             test_executive with-instrumentation;
+          # Granular nix
+          inherit (ocamlPackages)
+            src exes all default all-tested pkgs all-exes files tested info
+            dune-description base-libs;
           inherit (pkgs)
             libp2p_helper kimchi_bindings_stubs snarky_js leaderboard validation
             trace-tool zkapp-cli;
@@ -314,7 +325,6 @@
             mina-image-slim mina-image-full mina-archive-image-full
             mina-image-instr-full;
           mina-deb = debianPackages.mina;
-          default = mina;
         };
 
         # Pure dev shell, from which you can build Mina yourself manually, or hack on it.
