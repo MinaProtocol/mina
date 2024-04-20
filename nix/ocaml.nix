@@ -101,7 +101,6 @@ let
       # Also passes the version information to the executable.
       wrapMina = let
         commit_sha1 = inputs.self.sourceInfo.rev or "<dirty>";
-        commit_date = inputs.flockenzeit.lib.RFC-5322 inputs.self.sourceInfo.lastModified or 0;
       in package:
       { deps ? [ pkgs.gnutar pkgs.gzip ], }:
       pkgs.runCommand "${package.name}-release" {
@@ -114,9 +113,7 @@ let
           wrapProgram "$i" \
             --prefix PATH : ${makeBinPath deps} \
             --set MINA_LIBP2P_HELPER_PATH ${pkgs.libp2p_helper}/bin/libp2p_helper \
-            --set MINA_COMMIT_SHA1 ${escapeShellArg commit_sha1} \
-            --set MINA_COMMIT_DATE ${escapeShellArg commit_date} \
-            --set MINA_BRANCH "''${MINA_BRANCH-<unknown due to nix build>}"
+            --set MINA_COMMIT_SHA1 ${escapeShellArg commit_sha1}
         done
       '') package.outputs);
 
