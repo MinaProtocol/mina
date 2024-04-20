@@ -1,4 +1,4 @@
-{ rpmDebUtils, ocamlPackages_mina }: {
+{ rpmDebUtils, ocamlPackages_mina, }: {
   # FIXME: This package basically just wraps some nix store paths in the .deb format.
   # It works, but has some problems.
   # In particular, if there's already Nix installed on the target system, it won't work.
