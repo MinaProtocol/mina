@@ -1,5 +1,4 @@
 inputs: pkgs: {
-
   # todo: Fast
   lint-codeowners = pkgs.stdenv.mkDerivation {
     # todo: filter source
