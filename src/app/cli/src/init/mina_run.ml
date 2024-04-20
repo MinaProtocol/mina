@@ -127,7 +127,6 @@ let summary exn_json =
     ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
     ; ("Exception", exn_json)
     ; ("Command", `String daemon_command)
-    ; ("Coda_branch", `String Mina_version.branch)
     ; ("Coda_commit", `String Mina_version.commit_id)
     ]
 
