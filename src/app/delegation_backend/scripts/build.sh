@@ -6,19 +6,22 @@ if [[ "$OUT" == "" ]]; then
   OUT="$PWD/result"
 fi
 
-ref_signer="$PWD/../../external/c-reference-signer"
 
-mkdir -p "$OUT"/{headers,bin}
-rm -f "$OUT"/libmina_signer.so # Otherwise re-building without clean causes permissions issue
-if [[ "$LIB_MINA_SIGNER" == "" ]]; then
+mkdir -p "$OUT"/bin
+rm -Rf "$OUT/c-reference-signer" "$OUT/headers" "$OUT"/libmina_signer.so # Otherwise re-building without clean causes permissions issue
+if [[ "$PKG_MINA_SIGNER" == "" ]]; then
   # No nix
-  cp -R "$ref_signer" "$OUT"
+
+  # Hack to avoid one extra submodule
+  git clone -b v1.0.0 --depth 1 https://github.com/MinaProtocol/c-reference-signer.git "$OUT/c-reference-signer"
   make -C "$OUT/c-reference-signer" clean libmina_signer.so
   cp "$OUT/c-reference-signer/libmina_signer.so" "$OUT"
+  mkdir -p "$OUT/headers"
+  cp "$ref_signer"/*.h "$OUT/headers"
 else
-  cp "$LIB_MINA_SIGNER" "$OUT"/libmina_signer.so
+  ln -s "$PKG_MINA_SIGNER"/lib/libmina_signer.so "$OUT"/libmina_signer.so
+  ln -s "$PKG_MINA_SIGNER"/headers "$OUT"/headers
 fi
-cp "$ref_signer"/*.h "$OUT/headers"
 
 case "$1" in
   test)
