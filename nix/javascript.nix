@@ -55,7 +55,8 @@ in {
     };
     doCheck = true;
     preInstall = "npm prune";
-    dontNpmPrune = true; # running npm prune --production removes husky which seems actually needed
+    dontNpmPrune =
+      true; # running npm prune --production removes husky which seems actually needed
     postInstall = ''
       ln -s $out/src/bin/index.js $out/bin/zk
       ln -s $out/src/bin/index.js $out/bin/zkapp
