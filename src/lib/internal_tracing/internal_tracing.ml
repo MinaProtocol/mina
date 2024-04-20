@@ -35,10 +35,7 @@ let enable_tracing ~logger () =
   enabled := true ;
   [%log internal] "@internal_tracing_enabled" ;
   [%log internal] "@mina_node_metadata"
-    ~metadata:
-      [ ("version", `String Mina_version.commit_id)
-      ; ("branch", `String Mina_version.branch)
-      ]
+    ~metadata:[ ("version", `String Mina_version.commit_id) ]
 
 let register_toggle_callback (f : bool -> unit Async_kernel.Deferred.t) =
   toggle_callbacks := !toggle_callbacks @ [ f ]
