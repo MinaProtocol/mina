@@ -63,7 +63,7 @@ index c69e1805d1..aac3552028 100644
             SELECT COUNT( * ) FROM blocks
             WHERE parent_id IS NULL
 diff --git a/src/app/archive/lib/processor.ml b/src/app/archive/lib/processor.ml
-index d4f0e9c585..a954162791 100644
+index bec5544e41..be30438975 100644
 --- a/src/app/archive/lib/processor.ml
 +++ b/src/app/archive/lib/processor.ml
 @@ -29,6 +29,7 @@ open Mina_block
@@ -1015,7 +1015,7 @@ index d4f0e9c585..a954162791 100644
               (sprintf "INSERT INTO %s (%s) VALUES %s RETURNING id" table
                  fields_sql values_sql ) )
            () )
-@@ -3911,7 +3891,7 @@ module Block = struct
+@@ -4050,7 +4030,7 @@ module Block = struct
        let ids_sql = String.concat ~sep:"," ids in
        let parent_ids_sql = String.concat ~sep:"," parent_ids in
        Conn.exec
@@ -1024,7 +1024,7 @@ index d4f0e9c585..a954162791 100644
             (sprintf
                "UPDATE %s AS b SET parent_id = data.parent_id FROM (SELECT \
                 unnest(array[%s]) as id, unnest(array[%s]) as parent_id) AS \
-@@ -4121,7 +4101,7 @@ module Block = struct
+@@ -4119,7 +4099,7 @@ module Block = struct
                  Some id )
            in
            Conn.find
@@ -1033,7 +1033,7 @@ index d4f0e9c585..a954162791 100644
                 (Mina_caqti.insert_into_cols ~returning:"id" ~table_name
                    ~tannot:(function
                      | "sub_window_densities" ->
-@@ -4282,8 +4262,8 @@ module Block = struct
+@@ -4280,8 +4260,8 @@ module Block = struct
    let set_parent_id_if_null (module Conn : CONNECTION) ~parent_hash
        ~(parent_id : int) =
      Conn.exec
@@ -1044,7 +1044,7 @@ index d4f0e9c585..a954162791 100644
           {sql| UPDATE blocks SET parent_id = ?
                 WHERE parent_hash = ?
                 AND parent_id IS NULL
-@@ -4299,8 +4279,8 @@ module Block = struct
+@@ -4297,8 +4277,8 @@ module Block = struct
      in
      let columns = concat Fields.names in
      Conn.collect_list
@@ -1055,7 +1055,7 @@ index d4f0e9c585..a954162791 100644
           typ
           (sprintf
              {sql| WITH RECURSIVE chain AS (
-@@ -4326,37 +4306,37 @@ module Block = struct
+@@ -4324,37 +4304,37 @@ module Block = struct
  
    let get_highest_canonical_block_opt (module Conn : CONNECTION) =
      Conn.find_opt
@@ -1102,7 +1102,7 @@ index d4f0e9c585..a954162791 100644
           {sql| UPDATE blocks SET chain_status='orphaned'
                 WHERE height = $2
                 AND state_hash <> $1
-@@ -4445,7 +4425,7 @@ module Block = struct
+@@ -4443,7 +4423,7 @@ module Block = struct
        | None, Some num_blocks -> (
            match%map
              Conn.find_opt
@@ -1111,7 +1111,7 @@ index d4f0e9c585..a954162791 100644
                   "SELECT MAX(height) FROM blocks" )
                ()
            with
-@@ -4461,8 +4441,8 @@ module Block = struct
+@@ -4459,8 +4439,8 @@ module Block = struct
        let%bind () =
          (* Delete user commands from old blocks. *)
          Conn.exec
@@ -1122,7 +1122,7 @@ index d4f0e9c585..a954162791 100644
               "DELETE FROM user_commands\n\
                WHERE id IN\n\
                (SELECT user_command_id FROM blocks_user_commands\n\
-@@ -4473,8 +4453,8 @@ module Block = struct
+@@ -4471,8 +4451,8 @@ module Block = struct
        let%bind () =
          (* Delete old blocks. *)
          Conn.exec
@@ -1133,7 +1133,7 @@ index d4f0e9c585..a954162791 100644
               "DELETE FROM blocks WHERE blocks.height < ? OR blocks.timestamp < \
                ?" )
            (height, timestamp)
-@@ -4482,7 +4462,7 @@ module Block = struct
+@@ -4480,7 +4460,7 @@ module Block = struct
        let%bind () =
          (* Delete orphaned internal commands. *)
          Conn.exec
@@ -1142,7 +1142,7 @@ index d4f0e9c585..a954162791 100644
               "DELETE FROM internal_commands\n\
                WHERE id NOT IN\n\
                (SELECT internal_commands.id FROM internal_commands\n\
-@@ -4493,7 +4473,7 @@ module Block = struct
+@@ -4491,7 +4471,7 @@ module Block = struct
        let%bind () =
          (* Delete orphaned snarked ledger hashes. *)
          Conn.exec
@@ -1151,7 +1151,7 @@ index d4f0e9c585..a954162791 100644
               "DELETE FROM snarked_ledger_hashes\n\
                WHERE id NOT IN\n\
                (SELECT snarked_ledger_hash_id FROM blocks)" )
-@@ -4502,7 +4482,7 @@ module Block = struct
+@@ -4500,7 +4480,7 @@ module Block = struct
        let%bind () =
          (* Delete orphaned public keys. *)
          Conn.exec
@@ -1160,7 +1160,7 @@ index d4f0e9c585..a954162791 100644
               "DELETE FROM public_keys\n\
                WHERE id NOT IN (SELECT fee_payer_id FROM user_commands)\n\
                AND id NOT IN (SELECT source_id FROM user_commands)\n\
-@@ -4927,7 +4907,13 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
+@@ -4893,7 +4873,13 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
            Strict_pipe.Writer.write extensional_block_writer extensional_block )
      ]
    in
@@ -1195,7 +1195,7 @@ index 670f44c8e1..a32ef59e4d 100644
        [%log fatal]
          ~metadata:[ ("error", `String (Caqti_error.show e)) ]
 diff --git a/src/app/berkeley_migration/berkeley_migration.ml b/src/app/berkeley_migration/berkeley_migration.ml
-index 0669b3d4b2..4e9f30da21 100644
+index f9689b8fb2..87477dda56 100644
 --- a/src/app/berkeley_migration/berkeley_migration.ml
 +++ b/src/app/berkeley_migration/berkeley_migration.ml
 @@ -69,8 +69,8 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
@@ -1231,7 +1231,7 @@ index 0669b3d4b2..4e9f30da21 100644
                 (sprintf "SELECT id, value FROM %s WHERE id IN (%s)"
                    Sql.Mainnet.Public_key.table_name
                    ( String.concat ~sep:","
-@@ -339,11 +339,15 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -340,11 +340,15 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
    let logger = Logger.create () in
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
@@ -1249,7 +1249,7 @@ index 0669b3d4b2..4e9f30da21 100644
    in
    match (mainnet_pool, migrated_pool) with
    | Error e, _ | _, Error e ->
-@@ -411,7 +415,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -412,7 +416,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
          let%bind garbage_block_ids =
            query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
                Conn.collect_list
@@ -1258,7 +1258,7 @@ index 0669b3d4b2..4e9f30da21 100644
                     (sprintf
                        "DELETE FROM %s WHERE parent_id IS NULL AND height > 1 \
                         RETURNING id"
-@@ -427,7 +431,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -428,7 +432,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
            let%bind () =
              query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
                  Conn.exec
@@ -1267,7 +1267,7 @@ index 0669b3d4b2..4e9f30da21 100644
                       (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
                          Archive_lib.Processor.Block_and_signed_command
                          .table_name garbage_block_ids_sql ) )
-@@ -435,7 +439,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -436,7 +440,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
            in
            query_migrated_db ~f:(fun (module Conn : CONNECTION) ->
                Conn.exec
@@ -1276,7 +1276,7 @@ index 0669b3d4b2..4e9f30da21 100644
                     (sprintf "DELETE FROM %s WHERE block_id IN (%s)"
                        Archive_lib.Processor.Block_and_internal_command
                        .table_name garbage_block_ids_sql ) )
-@@ -533,7 +537,6 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+@@ -535,7 +539,6 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
                       | Error (`Encode_failed _ as err)
                       | Error (`Encode_rejected _ as err)
                       | Error (`Request_failed _ as err)
@@ -1455,10 +1455,10 @@ index 297081b7b3..0bdddcfdaa 100644
                   FROM accounts_accessed
                   WHERE block_id = $1
 diff --git a/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml b/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
-index 26e337e0bc..29c2059c57 100644
+index 25137a4c42..b9be001df4 100644
 --- a/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
 +++ b/src/app/berkeley_migration_verifier/berkeley_migration_verifier.ml
-@@ -273,10 +273,18 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
+@@ -259,10 +259,18 @@ let pre_fork_validations ~mainnet_archive_uri ~migrated_archive_uri () =
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
    let mainnet_pool =
@@ -1479,7 +1479,7 @@ index 26e337e0bc..29c2059c57 100644
    in
  
    match (mainnet_pool, migrated_pool) with
-@@ -364,11 +372,15 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
+@@ -350,11 +358,15 @@ let post_fork_validations ~mainnet_archive_uri ~migrated_archive_uri
  
    let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
    let migrated_archive_uri = Uri.of_string migrated_archive_uri in
