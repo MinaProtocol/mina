@@ -76,18 +76,6 @@
               command "nix-shell"
             }.
           '';
-      # Only get the ocaml stuff, to reduce the amount of unnecessary rebuilds
-      ocaml-src = with inputs.nix-filter.lib;
-        filter {
-          root = ./.;
-          include = [
-            (inDirectory "src")
-            "dune"
-            "dune-project"
-            "./graphql_schema.json"
-            "opam.export"
-          ];
-        };
     in {
       overlays = {
         misc = import ./nix/misc.nix;
@@ -97,7 +85,6 @@
         ocaml = pkgs: prev: {
           ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
             inherit inputs pkgs;
-            src = ocaml-src;
           });
         };
       };
