@@ -21,6 +21,9 @@
   inputs.opam-nix.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.inputs.opam-repository.follows = "opam-repository";
 
+  inputs.describe-dune.url = "github:o1-labs/describe-dune";
+  inputs.describe-dune.inputs.nixpkgs.follows = "nixpkgs";
+
   inputs.o1-opam-repository.url = "github:o1-labs/opam-repository";
   inputs.o1-opam-repository.flake = false;
 
@@ -83,9 +86,8 @@
         go = import ./nix/go.nix;
         javascript = import ./nix/javascript.nix;
         ocaml = pkgs: prev: {
-          ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
-            inherit inputs pkgs;
-          });
+          ocamlPackages_mina =
+            requireSubmodules (import ./nix/ocaml.nix { inherit inputs pkgs; });
         };
       };
 
@@ -305,8 +307,8 @@
         # Main user-facing binaries.
         packages = rec {
           inherit (ocamlPackages)
-            mina devnet mainnet mina_tests mina-ocaml-format mina_client_sdk
-            test_executive with-instrumentation;
+            mina experiment devnet mainnet mina_tests mina-ocaml-format
+            mina_client_sdk test_executive with-instrumentation;
           inherit (pkgs)
             libp2p_helper kimchi_bindings_stubs snarky_js leaderboard validation
             trace-tool zkapp-cli;
