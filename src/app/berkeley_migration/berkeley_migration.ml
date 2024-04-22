@@ -611,16 +611,15 @@ let () =
              ~doc:
                "Keep the precomputed blocks on-disk after the migration is \
                 complete"
-         and precomputed_blocks_local_path =
-           Param.flag "--precomputed-blocks-local-path"
-             ~aliases:[ "-precomputed-blocks-local-path" ]
-             Param.(optional string)
-             ~doc:"PATH the precomputed blocks on-disk location"
          and log_json = Cli_lib.Flag.Log.json
          and log_level = Cli_lib.Flag.Log.level
          and file_log_level = Cli_lib.Flag.Log.file_log_level
-         and log_filename = Cli_lib.Flag.Log.file in
-         let precomputed_blocks_local_path =
+         and precomputed_blocks_local_path =
+          Param.flag "--precomputed-blocks-local-path"
+            ~aliases:[ "-precomputed-blocks-local-path" ]
+            Param.(optional string)
+            ~doc:"PATH the precomputed blocks on-disk location"
+        let precomputed_blocks_local_path =
            Option.value precomputed_blocks_local_path ~default:"."
          in
          main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
