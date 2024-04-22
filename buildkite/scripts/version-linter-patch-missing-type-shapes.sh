@@ -7,9 +7,6 @@ if [[ $# -ne 1 ]]; then
     exit 1
 fi
 
-# Don't prompt for answers during apt-get install
-export DEBIAN_FRONTEND=noninteractive
-
 git config --global --add safe.directory /workdir
 
 source buildkite/scripts/handle-fork.sh
