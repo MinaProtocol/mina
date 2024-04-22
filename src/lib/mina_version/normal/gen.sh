@@ -2,12 +2,16 @@
 set -euo pipefail
 
 # we are nested 6 directories deep (_build/<context>/src/lib/mina_version/normal)
-root="${MINA_ROOT-$(git rev-parse --show-toplevel || echo ../../../../../..)}"
-
-pushd "$root" > /dev/null
+if [ -z ${MINA_COMMIT_SHA1+x} ]; then
+  root="${MINA_ROOT-$(git rev-parse --show-toplevel || echo ../../../../../..)}"
+  pushd "$root" > /dev/null
   id="${MINA_COMMIT_SHA1-$(git rev-parse --verify HEAD || echo "<unknown>")}"
-  id_short="$(printf "%s" "$id" | cut -c1-8)"
-popd > /dev/null
+  popd > /dev/null
+else
+  id="${MINA_COMMIT_SHA1}"
+fi
+
+id_short="$(printf "%s" "$id" | cut -c1-8)"
 
 {
     printf 'let commit_id = "%s"\n' "$id"
