@@ -12,7 +12,7 @@ Application for validating migrated archive schema content. Performed checks rel
 Basic usage :
 
 ```
-mina-berkeley-migration-verifier --mainnet-archive-uri postgres://postgres:postgres@localhost:5432/source_archive --migrated-archive-uri postgres://postgres:postgres@localhost:5432/archive_migrated --migrated-replayer-output  migrated_replayer.json --fork-config-file fork_config_fixed.json 
+mina-berkeley-migration-verifier --mainnet-archive-uri postgres://postgres:postgres@localhost:5432/source_archive --migrated-archive-uri postgres://postgres:postgres@localhost:5432/archive_migrated --migrated-replayer-output  migrated_replayer.json --fork-genesis-config fork_config_fixed.json 
 ```
 
 where:
@@ -20,7 +20,7 @@ where:
 - **mainnet-archive-uri** is a connection string to original schema
 - **migrated-archive-uri** is a connection string to already migrated schema
 - **migrated-replayer-output** is an output for replayer on migrated schema
-- **fork-config-file** is a state dump with forked ledger
+- **fork-genesis-config** is a genesis config for the fork network
 
 ### Dependencies
 

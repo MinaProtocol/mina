@@ -28,7 +28,6 @@ kimchi_backend/
 │   ├── bigint.ml
 │   ├── curve.ml
 │   ├── dlog_plonk_based_keypair.ml
-│   ├── dlog_urs.ml
 │   ├── endoscale_round.ml
 │   ├── field.ml
 │   ├── intf.ml
