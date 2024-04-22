@@ -1,9 +1,11 @@
 let Prelude = ../External/Prelude.dhall
 let Text/concatSep = Prelude.Text.concatSep
 let Profiles = ./Profiles.dhall
+let DebianVersions = ./DebianVersions.dhall
+let Network = ./Network.dhall
+
 
 let Artifact : Type  = < Daemon | Archive | ArchiveMigration | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
-
 
 let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.ArchiveMigration , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
 
@@ -47,7 +49,6 @@ let dockerName = \(artifact : Artifact) ->
     , FunctionalTestSuite = "mina-test-suite"
   } artifact
 
-
 let toDebianName = \(artifact : Artifact) ->
   merge {
     Daemon = "daemon"
@@ -68,6 +69,25 @@ let toDebianNames = \(artifacts : List Artifact) ->
         artifacts
     in      
     Text/concatSep " " text
+
+let dockerTag = \(artifact: Artifact) 
+  -> \(version: Text) 
+  -> \(codename: DebianVersions.DebVersion) 
+  -> \(profile: Profiles.Type) 
+  -> \(network: Network.Type) 
+  -> 
+    let version_and_codename = "${version}-${DebianVersions.lowerName codename}"
+    in
+    merge {
+      Daemon ="${version_and_codename}-${Network.lowerName network}${Profiles.toLabelSegment profile}"
+      , Archive = "${version_and_codename}"
+      , ArchiveMigration  = "${version_and_codename}"
+      , TestExecutive = "${version_and_codename}"
+      , BatchTxn = "${version_and_codename}"
+      , Rosetta = "${version_and_codename}" 
+      , ZkappTestTransaction = "${version_and_codename}"
+      , FunctionalTestSuite = "${version_and_codename}"
+    } artifact
 in
 
 {
@@ -77,6 +97,7 @@ in
   , toDebianName = toDebianName
   , toDebianNames = toDebianNames
   , dockerName = dockerName
+  , dockerTag = dockerTag
   , All = All 
   , AllButTests = AllButTests 
   , Main = Main
