@@ -12,7 +12,7 @@ INPUT_ARGS="$@"
 declare -a VERBOSE_LOG_FILES=('mina-stderr.log' '.mina-config/mina-prover.log' '.mina-config/mina-verifier.log')
 
 # Attempt to execute or source custom entrypoint scripts accordingly
-for script in /entrypoint.d/* /entrypoint.d/.*; do
+for script in /entrypoint.d/*; do
   if [[ "$( basename "${script}")" == *mina-env ]]; then
     source "${script}"
   elif [[ -f "${script}" ]] && [[ ! -x "${script}" ]]; then

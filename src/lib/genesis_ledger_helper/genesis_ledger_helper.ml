@@ -6,9 +6,6 @@ include Genesis_ledger_helper_lib
 
 type exn += Genesis_state_initialization_error
 
-let s3_bucket_prefix =
-  "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net"
-
 module Tar = struct
   let create ~root ~directory ~file () =
     match%map
@@ -59,30 +56,33 @@ let file_exists ?follow_symlinks filename =
   | _ ->
       false
 
-let assert_filehash_equal ~file ~hash ~logger =
+let sha3_hash ledger_file =
   let st = ref (Digestif.SHA3_256.init ()) in
-  match%bind
-    Reader.with_file file ~f:(fun rdr ->
+  match%map
+    Reader.with_file ledger_file ~f:(fun rdr ->
         Reader.read_one_chunk_at_a_time rdr ~handle_chunk:(fun buf ~pos ~len ->
             st := Digestif.SHA3_256.feed_bigstring !st buf ~off:pos ~len ;
             Deferred.return `Continue ) )
   with
   | `Eof ->
-      let computed_hash = Digestif.SHA3_256.(get !st |> to_hex) in
-      if not (String.equal computed_hash hash) then (
-        let%map () = Unix.rename ~src:file ~dst:(file ^ ".incorrect-hash") in
-        [%log error]
-          "Verification failure: downloaded $file and expected SHA3-256 = \
-           $hash but it had $computed_hash"
-          ~metadata:
-            [ ("path", `String file)
-            ; ("expected_hash", `String hash)
-            ; ("computed_hash", `String computed_hash)
-            ] ;
-        failwith "Tarball hash mismatch" )
-      else Deferred.unit
+      Digestif.SHA3_256.(get !st |> to_hex)
   | _ ->
       failwith "impossible: `Stop not used"
+
+let assert_filehash_equal ~file ~hash ~logger =
+  let%bind computed_hash = sha3_hash file in
+  if String.equal computed_hash hash then Deferred.unit
+  else
+    let%map () = Unix.rename ~src:file ~dst:(file ^ ".incorrect-hash") in
+    [%log error]
+      "Verification failure: downloaded $file and expected SHA3-256 = $hash \
+       but it had $computed_hash"
+      ~metadata:
+        [ ("path", `String file)
+        ; ("expected_hash", `String hash)
+        ; ("computed_hash", `String computed_hash)
+        ] ;
+    failwith "Tarball hash mismatch"
 
 module Ledger = struct
   let hash_filename hash ~ledger_name_prefix =
@@ -112,7 +112,8 @@ module Ledger = struct
         ; List.to_string balances ~f:(fun (i, balance) ->
               sprintf "%i %s" i (Currency.Balance.to_string balance) )
         ; (* Distinguish ledgers when the hash function is different. *)
-          Snark_params.Tick.Field.to_string Mina_base.Account.empty_digest
+          Snark_params.Tick.Field.to_string
+            (Lazy.force Mina_base.Account.empty_digest)
         ; (* Distinguish ledgers when the account record layout has changed. *)
           Bin_prot.Writer.to_string Mina_base.Account.Stable.Latest.bin_writer_t
             Mina_base.Account.empty
@@ -149,7 +150,7 @@ module Ledger = struct
     let load_from_s3 filename =
       match config.s3_data_hash with
       | Some s3_hash -> (
-          let s3_path = s3_bucket_prefix ^/ filename in
+          let s3_path = Cache_dir.s3_keys_bucket_prefix ^/ filename in
           let local_path = Cache_dir.s3_install_path ^/ filename in
           match%bind Cache_dir.load_from_s3 s3_path local_path ~logger with
           | Ok () ->
@@ -234,32 +235,10 @@ module Ledger = struct
       Tar.filename_without_extension @@ Filename.basename filename
     in
     let dirname = genesis_dir ^/ dirname in
-    (* remove dir if it exists *)
-    let%bind () =
-      if%bind file_exists ~follow_symlinks:true dirname then (
-        [%log trace] "Genesis ledger dir $path already exists, removing"
-          ~metadata:[ ("path", `String dirname) ] ;
-        let rec remove_dir dir =
-          let%bind files = Sys.ls_dir dir in
-          let%bind () =
-            Deferred.List.iter files ~f:(fun file ->
-                let file = dir ^/ file in
-                remove file )
-          in
-          Unix.rmdir dir
-        and remove file =
-          match%bind Sys.is_directory file with
-          | `Yes ->
-              remove_dir file
-          | _ ->
-              Unix.unlink file
-        in
-        remove dirname )
-      else Deferred.unit
+    let%bind () = File_system.create_dir ~clear_if_exists:true dirname in
+    let%map.Deferred.Or_error () =
+      Tar.extract ~root:dirname ~file:filename ()
     in
-    let%bind () = Unix.mkdir ~p:() dirname in
-    let open Deferred.Or_error.Let_syntax in
-    let%map () = Tar.extract ~root:dirname ~file:filename () in
     let (packed : Genesis_ledger.Packed.t) =
       match accounts with
       | Some accounts ->
@@ -313,7 +292,7 @@ module Ledger = struct
     Mina_ledger.Ledger.commit ledger ;
     let dirname = Option.value_exn (Mina_ledger.Ledger.get_directory ledger) in
     let root_hash =
-      State_hash.to_base58_check @@ Mina_ledger.Ledger.merkle_root ledger
+      Ledger_hash.to_base58_check @@ Mina_ledger.Ledger.merkle_root ledger
     in
     let%bind () = Unix.mkdir ~p:() genesis_dir in
     let tar_path = genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix in
@@ -325,12 +304,35 @@ module Ledger = struct
         ; ("path", `String tar_path)
         ; ("dir", `String dirname)
         ] ;
-    let open Deferred.Or_error.Let_syntax in
-    let%map () = Tar.create ~root:dirname ~file:tar_path ~directory:"." () in
+    let%map.Deferred.Or_error () =
+      Tar.create ~root:dirname ~file:tar_path ~directory:"." ()
+    in
     tar_path
 
   let padded_accounts_from_runtime_config_opt ~logger ~proof_level
-      ~ledger_name_prefix (config : Runtime_config.Ledger.t) =
+      ~ledger_name_prefix ?overwrite_version (config : Runtime_config.Ledger.t)
+      =
+    let patch_accounts_version accounts_with_keys =
+      match overwrite_version with
+      | Some version ->
+          List.map accounts_with_keys ~f:(fun (key, account) ->
+              let patched_account =
+                Mina_base.Account.Poly.
+                  { account with
+                    permissions =
+                      Mina_base.Permissions.Poly.
+                        { account.permissions with
+                          set_verification_key =
+                            ( fst account.permissions.set_verification_key
+                            , version )
+                        }
+                  }
+              in
+              (key, patched_account) )
+      | None ->
+          accounts_with_keys
+    in
+
     let add_genesis_winner_account accounts =
       (* We allow configurations to explicitly override adding the genesis
          winner, so that we can guarantee a certain ledger layout for
@@ -367,7 +369,10 @@ module Ledger = struct
       | Hash ->
           None
       | Accounts accounts ->
-          Some (lazy (add_genesis_winner_account (Accounts.to_full accounts)))
+          Some
+            ( lazy
+              (patch_accounts_version
+                 (add_genesis_winner_account (Accounts.to_full accounts)) ) )
       | Named name -> (
           match Genesis_ledger.fetch_ledger name with
           | Some (module M) ->
@@ -408,17 +413,12 @@ module Ledger = struct
     end) )
 
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      ?(ledger_name_prefix = "genesis_ledger") (config : Runtime_config.Ledger.t)
-      =
-    [%log trace] "Load requested for $name $config"
-      ~metadata:
-        [ ("name", `String ledger_name_prefix)
-        ; ("config", Runtime_config.Ledger.to_yojson config)
-        ] ;
+      ?(ledger_name_prefix = "genesis_ledger") ?overwrite_version
+      (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
         let padded_accounts_opt =
           padded_accounts_from_runtime_config_opt ~logger ~proof_level
-            ~ledger_name_prefix config
+            ~ledger_name_prefix ?overwrite_version config
         in
         let open Deferred.Let_syntax in
         let%bind tar_path =
@@ -430,7 +430,7 @@ module Ledger = struct
             match%map
               load_from_tar ~genesis_dir ~logger ~constraint_constants
                 ~expected_merkle_root:
-                  (Option.map config.hash ~f:State_hash.of_base58_check_exn)
+                  (Option.map config.hash ~f:Ledger_hash.of_base58_check_exn)
                 ?accounts:padded_accounts_opt ~ledger_name_prefix tar_path
             with
             | Ok ledger ->
@@ -493,7 +493,7 @@ module Ledger = struct
                   { config with
                     hash =
                       Some
-                        ( State_hash.to_base58_check
+                        ( Ledger_hash.to_base58_check
                         @@ Mina_ledger.Ledger.merkle_root ledger )
                   }
                 in
@@ -532,11 +532,11 @@ module Ledger = struct
                         ; ("named_tar_path", `String link_name)
                         ] ;
                     Ok (packed, config, link_name)
-                | Ok tar_path, None ->
+                | Ok tar_path, _ ->
                     return (Ok (packed, config, tar_path))
                 | Error err, _ ->
                     let root_hash =
-                      State_hash.to_base58_check
+                      Ledger_hash.to_base58_check
                       @@ Mina_ledger.Ledger.merkle_root ledger
                     in
                     let tar_path =
@@ -948,7 +948,7 @@ let print_config ~logger config =
     ~metadata
 
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~proof_level (config : Runtime_config.t) =
+    ~proof_level ?overwrite_version (config : Runtime_config.t) =
   print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
   let genesis_constants = Genesis_constants.compiled in
@@ -1008,6 +1008,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   let%bind genesis_ledger, ledger_config, ledger_file =
     Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+      ?overwrite_version
       (Option.value config.ledger
          ~default:
            { base = Named Mina_compile_config.genesis_ledger
@@ -1042,12 +1043,13 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   (proof_inputs, config)
 
-let init_from_config_file ?genesis_dir ~logger ~proof_level
+let init_from_config_file ?genesis_dir ~logger ~proof_level ?overwrite_version
     (config : Runtime_config.t) :
     (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
   let%map inputs, config =
-    inputs_from_config_file ?genesis_dir ~logger ~proof_level config
+    inputs_from_config_file ?genesis_dir ~logger ~proof_level ?overwrite_version
+      config
   in
   let values = Genesis_proof.create_values_no_proof inputs in
   (values, config)

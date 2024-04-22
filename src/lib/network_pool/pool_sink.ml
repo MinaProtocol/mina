@@ -158,7 +158,7 @@ module Base
               | None ->
                   let diff = Envelope.Incoming.data env' in
                   [%log error]
-                    !"Validation timed out on %s $diff"
+                    !"Validation timed out on %s"
                     Diff.label
                     ~metadata:[ ("diff", `String (Diff.summary diff)) ]
               | Some _ ->

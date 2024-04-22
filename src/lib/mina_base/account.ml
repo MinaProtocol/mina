@@ -627,7 +627,7 @@ let empty =
   ; zkapp = None
   }
 
-let empty_digest = digest empty
+let empty_digest = lazy (digest empty)
 
 let create account_id balance =
   let public_key = Account_id.public_key account_id in
@@ -703,7 +703,7 @@ let cliff_time Poly.{ timing; _ } =
 let cliff_amount Poly.{ timing; _ } =
   match timing with Timing.Untimed -> None | Timed t -> Some t.cliff_amount
 
-let vesting_increment Poly.{ timing } =
+let vesting_increment Poly.{ timing; _ } =
   match timing with
   | Timing.Untimed ->
       None

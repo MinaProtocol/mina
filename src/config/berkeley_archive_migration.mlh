@@ -7,7 +7,7 @@
 [%%import "/src/config/txpool_size.mlh"]
 [%%import "/src/config/account_creation_fee/realistic.mlh"]
 [%%import "/src/config/amount_defaults/realistic.mlh"]
-[%%import "/src/config/protocol_version/version1.mlh"]
+[%%import "/src/config/protocol_version/version2.mlh"]
 [%%import "/src/config/supercharged_coinbase_factor/one.mlh"]
 
 (* custom consensus parameters for the mainnet release *)
@@ -40,7 +40,6 @@
 
 [%%define print_versioned_types false]
 
-[%%define daemon_expiry "2024-12-10 14:00:00-07:00"]
 [%%define test_full_epoch false]
 [%%import "/src/config/fork.mlh"]
 [%%import "/src/config/features/mainnet.mlh"]

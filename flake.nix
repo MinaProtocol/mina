@@ -7,11 +7,12 @@
     extra-trusted-public-keys = [
       "nix-cache.minaprotocol.org:fdcuDzmnM0Kbf7yU4yywBuUEJWClySc1WIF6t6Mm8h4="
       "nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c="
+      "mina-nix-cache-1:djtioLfv2oxuK2lqPUgmZbf8bY8sK/BnYZCU2iU5Q10="
     ];
   };
 
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable-small";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-23.11-small";
 
   inputs.mix-to-nix.url = "github:serokell/mix-to-nix";
   inputs.nix-npm-buildPackage.url = "github:serokell/nix-npm-buildpackage";
@@ -63,16 +64,25 @@
           - use "${ref "git+https://github.com/minaprotocol/mina?submodules=1"}";
           - use non-flake commands like ${command "nix-build"} and ${command "nix-shell"}.
         '';
+      # Only get the ocaml stuff, to reduce the amount of unnecessary rebuilds
+      ocaml-src =
+        with inputs.nix-filter.lib;
+          filter {
+            root = ./.;
+            include =
+              [ (inDirectory "src") "dune" "dune-project"
+                "./graphql_schema.json" "opam.export" ];
+          };
     in {
       overlays = {
         misc = import ./nix/misc.nix;
         rust = import ./nix/rust.nix;
         go = import ./nix/go.nix;
         javascript = import ./nix/javascript.nix;
-        ocaml = final: prev: {
+        ocaml = pkgs: prev: {
           ocamlPackages_mina = requireSubmodules (import ./nix/ocaml.nix {
-            inherit inputs;
-            pkgs = final;
+            inherit inputs pkgs;
+            src = ocaml-src;
           });
         };
       };
@@ -251,6 +261,11 @@
         };
     } // utils.lib.eachDefaultSystem (system:
       let
+	rocksdbOverlay = pkgs: prev:
+          if prev.stdenv.isDarwin then
+            { rocksdb-mina = pkgs.rocksdb; }
+          else { rocksdb-mina = pkgs.rocksdb511; };
+
         # nixpkgs with all relevant overlays applied
         pkgs = nixpkgs.legacyPackages.${system}.extend
           (nixpkgs.lib.composeManyExtensions ([
@@ -264,7 +279,7 @@
                   nodejs = pkgs.nodejs-16_x;
                 };
             })
-          ] ++ builtins.attrValues self.overlays));
+          ] ++ builtins.attrValues self.overlays ++ [ rocksdbOverlay ] ));
 
         checks = import ./nix/checks.nix inputs pkgs;
 
@@ -287,12 +302,12 @@
         # Main user-facing binaries.
         packages = rec {
           inherit (ocamlPackages)
-            mina mina_tests mina-ocaml-format test_executive;
+            mina devnet mainnet mina_tests mina-ocaml-format mina_client_sdk test_executive with-instrumentation;
           inherit (pkgs)
             libp2p_helper kimchi_bindings_stubs snarky_js leaderboard
             validation trace-tool zkapp-cli;
           inherit (dockerImages)
-            mina-image-slim mina-image-full mina-archive-image-full;
+            mina-image-slim mina-image-full mina-archive-image-full mina-image-instr-full; 
           mina-deb = debianPackages.mina;
           default = mina;
         };

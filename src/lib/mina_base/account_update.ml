@@ -89,7 +89,6 @@ module Authorization_kind = struct
 
     let deriver obj =
       let open Fields_derivers_zkapps in
-      let open Fields in
       let ( !. ) = ( !. ) ~t_fields_annots in
       let verification_key_hash =
         needs_custom_js ~js_type:field ~name:"VerificationKeyHash" field
@@ -908,8 +907,8 @@ module Update = struct
                    } ) )
       ; Set_or_keep.typ ~dummy:Permissions.empty Permissions.typ
       ; Set_or_keep.optional_typ
-          (Data_as_hash.optional_typ ~hash:Zkapp_account.hash_zkapp_uri
-             ~non_preimage:(Zkapp_account.hash_zkapp_uri_opt None)
+          (Data_as_hash.lazy_optional_typ ~hash:Zkapp_account.hash_zkapp_uri
+             ~non_preimage:(lazy (Zkapp_account.hash_zkapp_uri_opt None))
              ~dummy_value:"" )
           ~to_option:Fn.id ~of_option:Fn.id
       ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
@@ -977,7 +976,6 @@ module Account_precondition = struct
     (* we used to have 3 constructors, Full, Nonce, and Accept for the type t
        nowadays, the generator creates these 3 different kinds of values, but all mapped to t
     *)
-    let open Zkapp_basic in
     Quickcheck.Generator.variant3 Zkapp_precondition.Account.gen
       Account.Nonce.gen Unit.quickcheck_generator
     |> Quickcheck.Generator.map ~f:(function
@@ -1429,21 +1427,7 @@ module Body = struct
     }
 
   let to_fee_payer_exn (t : t) : Fee_payer.t =
-    let { public_key
-        ; token_id = _
-        ; update = _
-        ; balance_change
-        ; increment_nonce = _
-        ; events = _
-        ; actions = _
-        ; call_data = _
-        ; preconditions
-        ; use_full_commitment = _
-        ; may_use_token = _
-        ; authorization_kind = _
-        } =
-      t
-    in
+    let { public_key; preconditions; balance_change; _ } = t in
     let fee =
       Currency.Fee.of_uint64
         (balance_change.magnitude |> Currency.Amount.to_uint64)
@@ -1645,6 +1629,36 @@ module Body = struct
     ; may_use_token
     ; authorization_kind
     }
+
+  let gen_with_events_and_actions =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map public_key = Public_key.Compressed.gen
+    and token_id = Token_id.gen
+    and update = Update.gen ()
+    and balance_change = Currency.Amount.Signed.gen
+    and increment_nonce = Quickcheck.Generator.bool
+    and events = return [ [| Field.zero |]; [| Field.zero |] ]
+    and actions = return [ [| Field.zero |]; [| Field.zero |] ]
+    and call_data = Field.gen
+    and preconditions = Preconditions.gen
+    and use_full_commitment = Quickcheck.Generator.bool
+    and implicit_account_creation_fee = Quickcheck.Generator.bool
+    and may_use_token = May_use_token.gen
+    and authorization_kind = Authorization_kind.gen in
+    { public_key
+    ; token_id
+    ; update
+    ; balance_change
+    ; increment_nonce
+    ; events
+    ; actions
+    ; call_data
+    ; preconditions
+    ; use_full_commitment
+    ; implicit_account_creation_fee
+    ; may_use_token
+    ; authorization_kind
+    }
 end
 
 module T = struct
@@ -1709,6 +1723,12 @@ module T = struct
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%map body = Body.gen and authorization = Control.gen_with_dummies in
+    { body; authorization }
+
+  let gen_with_events_and_actions : t Quickcheck.Generator.t =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map body = Body.gen_with_events_and_actions
+    and authorization = Control.gen_with_dummies in
     { body; authorization }
 
   let quickcheck_generator : t Quickcheck.Generator.t = gen

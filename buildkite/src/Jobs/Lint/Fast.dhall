@@ -24,6 +24,7 @@ let commands =
       , Cmd.run "./scripts/lint_rfcs.sh"
       , Cmd.run "make check-snarky-submodule"
       , Cmd.run "./scripts/lint_preprocessor_deps.sh"
+      , Cmd.run "./scripts/check_patches.sh"
       ]
 
 in  Pipeline.build
@@ -33,6 +34,7 @@ in  Pipeline.build
             S.strictly (S.contains "Makefile"),
             S.strictlyStart (S.contains "src/"),
             S.strictlyStart (S.contains "rfcs/"),
+            S.exactly_noext "CODEOWNERS",
             S.exactly "scripts/check-snarky-submodule" "sh"
           ]
         , path = "Lint"

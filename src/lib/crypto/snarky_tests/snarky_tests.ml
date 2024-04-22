@@ -627,7 +627,7 @@ module Protocol_circuits = struct
 
   let transaction () : unit =
     let expected1 = "b8879f677f622a1d86648030701f43e1" in
-    let expected2 = "c17f6cef52fc6c73d389c0128e41a924" in
+    let expected2 = "740db2397b0b01806a48f061a2e2b063" in
     let digest =
       Transaction_snark.constraint_system_digests ~constraint_constants ()
     in
@@ -663,8 +663,6 @@ let api_tests =
   ; ("compile imperative API", `Quick, get_hash_of_circuit)
   ; ("compile monadic API", `Quick, MonadicAPI.get_hash_of_circuit)
   ]
-
-(* run tests *)
 
 let () =
   let range_checks =

@@ -1034,13 +1034,13 @@ let pending_snark_work =
                  (Array.map
                     ~f:(fun bundle ->
                       Array.map bundle.workBundle ~f:(fun w ->
-                          let f = w.fee_excess in
+                          let fee_excess_left = w.fee_excess.feeExcessLeft in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id = w.work_id
                           ; fee_excess =
                               Currency.Amount.Signed.of_fee
-                                (to_signed_fee_exn f.sign
-                                   (Currency.Amount.to_fee f.fee_magnitude) )
+                                (to_signed_fee_exn fee_excess_left.sign
+                                   fee_excess_left.feeMagnitude )
                           ; supply_increase = w.supply_increase
                           ; source_first_pass_ledger_hash =
                               w.source_first_pass_ledger_hash
@@ -1512,7 +1512,7 @@ let create_account =
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             response.createAccount.public_key
+             response.createAccount.account.public_key
          in
          printf "\n😄 Added new account!\nPublic key: %s\n" pk_string ) )
 
@@ -1529,7 +1529,7 @@ let create_hd_account =
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             response.createHDAccount.public_key
+             response.createHDAccount.account.public_key
          in
          printf "\n😄 created HD account with HD-index %s!\nPublic key: %s\n"
            (Mina_numbers.Hd_index.to_string hd_index)
@@ -1563,7 +1563,7 @@ let unlock_account =
              in
              let pk_string =
                Public_key.Compressed.to_base58_check
-                 response.unlockAccount.public_key
+                 response.unlockAccount.account.public_key
              in
              printf "\n🔓 Unlocked account!\nPublic key: %s\n" pk_string
          | Error e ->
@@ -2232,6 +2232,23 @@ let thread_graph =
                   (humanize_graphql_error ~graphql_endpoint e) ) ;
              exit 1 ) )
 
+let signature_kind =
+  Command.basic
+    ~summary:"Print the signature kind that this binary is compiled with"
+    (let%map.Command () = Command.Param.return () in
+     fun () ->
+       let signature_kind_string =
+         match Mina_signature_kind.t with
+         | Mainnet ->
+             "mainnet"
+         | Testnet ->
+             "testnet"
+         | Other_network s ->
+             (* Prefix string to disambiguate *)
+             "other network: " ^ s
+       in
+       Core.print_endline signature_kind_string )
+
 let itn_create_accounts =
   Command.async ~summary:"Fund new accounts for incentivized testnet"
     (let open Command.Param in
@@ -2379,6 +2396,7 @@ let advanced =
     ; ("runtime-config", runtime_config)
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
     ; ("thread-graph", thread_graph)
+    ; ("print-signature-kind", signature_kind)
     ]
   in
   let cmds =

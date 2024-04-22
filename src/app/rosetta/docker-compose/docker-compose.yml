@@ -1,0 +1,49 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres
+    environment:
+      - POSTGRES_DB
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+    volumes:
+      - './postgres-data:/var/lib/postgresql/data'
+  archive:
+    image: ${MINA_ARCHIVE_IMAGE}
+    command: >-
+      mina-archive run
+        --postgres-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/$POSTGRES_DB
+        --server-port ${MINA_ARCHIVE_PORT}
+    depends_on:
+      - postgres
+  daemon:
+    image: ${MINA_DAEMON_IMAGE}
+    environment:
+      - MINA_LIBP2P_PASS
+    ports:
+      - '${MINA_REST_PORT}:${MINA_REST_PORT}'
+      - '${MINA_CLIENT_PORT}:${MINA_CLIENT_PORT}'
+      - '${MINA_P2P_PORT}:${MINA_P2P_PORT}'
+    entrypoint: >-
+      mina daemon
+        --archive-address archive:${MINA_ARCHIVE_PORT}
+        --config-file /data/config.json
+        --rest-port ${MINA_REST_PORT}
+        --client-port ${MINA_CLIENT_PORT}
+        --external-port ${MINA_P2P_PORT}
+        --libp2p-keypair /keys/libp2p_key
+        --peer-list-url ${MINA_PEERLIST_URL}
+    volumes:
+      - './daemon-data:/data'
+      - './keys:/keys'
+    depends_on:
+      - archive
+  rosetta:
+    image: ${MINA_DAEMON_IMAGE}
+    entrypoint: >-
+      /etc/mina/rosetta/docker-standalone-start.sh
+        --archive-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/$POSTGRES_DB
+        --graphql-uri http://daemon:${MINA_REST_PORT}/graphql
+    # depends_on:
+    #   - daemon
+    #   - postgres

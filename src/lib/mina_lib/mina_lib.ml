@@ -667,7 +667,7 @@ let get_ledger t state_hash_opt =
       Deferred.return
       @@ Or_error.error_string "state hash not found in transition frontier"
 
-let get_snarked_ledger t state_hash_opt =
+let get_snarked_ledger_full t state_hash_opt =
   let open Deferred.Or_error.Let_syntax in
   let%bind state_hash =
     Option.value_map state_hash_opt ~f:Deferred.Or_error.return
@@ -742,10 +742,8 @@ let get_snarked_ledger t state_hash_opt =
         |> Mina_state.Blockchain_state.snarked_ledger_hash
       in
       let merkle_root = Ledger.merkle_root ledger in
-      if Frozen_ledger_hash.equal snarked_ledger_hash merkle_root then (
-        let%map.Deferred res = Ledger.to_list ledger in
-        ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ ledger ;
-        Ok res )
+      if Frozen_ledger_hash.equal snarked_ledger_hash merkle_root then
+        return ledger
       else
         Deferred.Or_error.errorf
           "Expected snarked ledger hash %s but got %s for state hash %s"
@@ -755,6 +753,13 @@ let get_snarked_ledger t state_hash_opt =
   | None ->
       Deferred.Or_error.error_string
         "get_snarked_ledger: state hash not found in transition frontier"
+
+let get_snarked_ledger t state_hash_opt =
+  let open Deferred.Or_error.Let_syntax in
+  let%bind ledger = get_snarked_ledger_full t state_hash_opt in
+  let%map.Deferred res = Ledger.to_list ledger in
+  ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ ledger ;
+  Ok res
 
 let get_account t aid =
   let open Participating_state.Let_syntax in
@@ -828,84 +833,7 @@ let staged_ledger_ledger_proof t =
 
 let validated_transitions t = t.pipes.validated_transitions_reader
 
-module Root_diff = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type t =
-        { commands : User_command.Stable.V2.t With_status.Stable.V2.t list
-        ; root_length : int
-        }
-
-      let to_latest = Fn.id
-    end
-  end]
-end
-
 let initialization_finish_signal t = t.initialization_finish_signal
-
-(* TODO: this is a bad pattern for two reasons:
- *   - uses an abstraction leak to patch new functionality instead of making a new extension
- *   - every call to this function will create a new, unique pipe with it's own thread for transfering
- *     items from the identity extension with no route for termination
- *)
-let root_diff t =
-  let root_diff_reader, root_diff_writer =
-    Strict_pipe.create ~name:"root diff"
-      (Buffered (`Capacity 30, `Overflow Crash))
-  in
-  O1trace.background_thread "read_root_diffs" (fun () ->
-      let open Root_diff.Stable.Latest in
-      let length_of_breadcrumb b =
-        Transition_frontier.Breadcrumb.consensus_state b
-        |> Consensus.Data.Consensus_state.blockchain_length
-        |> Mina_numbers.Length.to_uint32 |> Unsigned.UInt32.to_int
-      in
-      Broadcast_pipe.Reader.iter t.components.transition_frontier ~f:(function
-        | None ->
-            Deferred.unit
-        | Some frontier ->
-            let root = Transition_frontier.root frontier in
-            Strict_pipe.Writer.write root_diff_writer
-              { commands =
-                  List.map
-                    ( Transition_frontier.Breadcrumb.validated_transition root
-                    |> Mina_block.Validated.valid_commands )
-                    ~f:(With_status.map ~f:User_command.forget_check)
-              ; root_length = length_of_breadcrumb root
-              } ;
-            Broadcast_pipe.Reader.iter
-              Transition_frontier.(
-                Extensions.(get_view_pipe (extensions frontier) Identity))
-              ~f:
-                (Deferred.List.iter ~f:(function
-                  | Transition_frontier.Diff.Full.With_mutant.E (New_node _, _)
-                    ->
-                      Deferred.unit
-                  | Transition_frontier.Diff.Full.With_mutant.E
-                      (Best_tip_changed _, _) ->
-                      Deferred.unit
-                  | Transition_frontier.Diff.Full.With_mutant.E
-                      (Root_transitioned { new_root; _ }, _) ->
-                      let root_hash =
-                        (Transition_frontier.Root_data.Limited.hashes new_root)
-                          .state_hash
-                      in
-                      let new_root_breadcrumb =
-                        Transition_frontier.(find_exn frontier root_hash)
-                      in
-                      Strict_pipe.Writer.write root_diff_writer
-                        { commands =
-                            Transition_frontier.Breadcrumb.validated_transition
-                              new_root_breadcrumb
-                            |> Mina_block.Validated.valid_commands
-                            |> List.map
-                                 ~f:
-                                   (With_status.map ~f:User_command.forget_check)
-                        ; root_length = length_of_breadcrumb new_root_breadcrumb
-                        } ;
-                      Deferred.unit ) ) ) ) ;
-  root_diff_reader
 
 let dump_tf t =
   peek_frontier t.components.transition_frontier
@@ -1399,15 +1327,33 @@ let start t =
   let () =
     match t.config.node_status_url with
     | Some node_status_url ->
-        Node_status_service.start ~logger:t.config.logger ~node_status_url
-          ~network:t.components.net
-          ~transition_frontier:t.components.transition_frontier
-          ~sync_status:t.sync_status ~chain_id:t.config.chain_id
-          ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
-          ~start_time:t.config.start_time
-          ~slot_duration:
-            (Block_time.Span.to_time_span
-               t.config.precomputed_values.consensus_constants.slot_duration_ms )
+        if t.config.simplified_node_stats then
+          let block_producer_public_key_base58 =
+            Option.map ~f:(fun (_, pk) ->
+                Public_key.Compressed.to_base58_check pk )
+            @@ Keypair.And_compressed_pk.Set.choose
+                 t.config.block_production_keypairs
+          in
+          Node_status_service.start_simplified ~logger:t.config.logger
+            ~node_status_url ~network:t.components.net
+            ~chain_id:t.config.chain_id
+            ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
+            ~slot_duration:
+              (Block_time.Span.to_time_span
+                 t.config.precomputed_values.consensus_constants
+                   .slot_duration_ms )
+            ~block_producer_public_key_base58
+        else
+          Node_status_service.start ~logger:t.config.logger ~node_status_url
+            ~network:t.components.net
+            ~transition_frontier:t.components.transition_frontier
+            ~sync_status:t.sync_status ~chain_id:t.config.chain_id
+            ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
+            ~start_time:t.config.start_time
+            ~slot_duration:
+              (Block_time.Span.to_time_span
+                 t.config.precomputed_values.consensus_constants
+                   .slot_duration_ms )
     | None ->
         ()
   in
@@ -1482,6 +1428,32 @@ module type Itn_settable = sig
   val set_itn_logger_data : t -> daemon_port:int -> unit Deferred.Or_error.t
 end
 
+let start_filtered_log
+    in_memory_reverse_structured_log_messages_for_integration_test
+    (structured_log_ids : string list) =
+  let handle str =
+    let idx, old_messages, started =
+      !in_memory_reverse_structured_log_messages_for_integration_test
+    in
+    in_memory_reverse_structured_log_messages_for_integration_test :=
+      (idx + 1, str :: old_messages, started)
+  in
+  let _, _, started =
+    !in_memory_reverse_structured_log_messages_for_integration_test
+  in
+  if started then Or_error.error_string "Already initialized"
+  else (
+    in_memory_reverse_structured_log_messages_for_integration_test :=
+      (0, [], true) ;
+    let event_set =
+      Structured_log_events.Set.of_list
+      @@ List.map ~f:Structured_log_events.id_of_string structured_log_ids
+    in
+    Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
+      ~processor:(Logger.Processor.raw_structured_log_events event_set)
+      ~transport:(Logger.Transport.raw handle) ;
+    Ok () )
+
 let create ?wallets (config : Config.t) =
   let module Context = (val context config) in
   let catchup_mode = if config.super_catchup then `Super else `Normal in
@@ -1505,6 +1477,15 @@ let create ?wallets (config : Config.t) =
         else Deferred.unit
       in
       O1trace.thread "mina_lib" (fun () ->
+          let in_memory_reverse_structured_log_messages_for_integration_test =
+            ref (0, [], false)
+          in
+          if not (List.is_empty config.start_filtered_logs) then
+            (* Start the filtered logs, if requested. *)
+            Or_error.ok_exn
+            @@ start_filtered_log
+                 in_memory_reverse_structured_log_messages_for_integration_test
+                 config.start_filtered_logs ;
           let%bind prover =
             Monitor.try_with ~here:[%here]
               ~rest:
@@ -2297,8 +2278,7 @@ let create ?wallets (config : Config.t) =
             ; sync_status
             ; precomputed_block_writer
             ; block_production_status = ref `Free
-            ; in_memory_reverse_structured_log_messages_for_integration_test =
-                ref (0, [], false)
+            ; in_memory_reverse_structured_log_messages_for_integration_test
             ; vrf_evaluation_state =
                 Block_producer.Vrf_evaluation_state.create ()
             } ) )
@@ -2311,28 +2291,9 @@ let runtime_config { config = { precomputed_values; _ }; _ } =
 let start_filtered_log
     ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)
     (structured_log_ids : string list) =
-  let handle str =
-    let idx, old_messages, started =
-      !in_memory_reverse_structured_log_messages_for_integration_test
-    in
-    in_memory_reverse_structured_log_messages_for_integration_test :=
-      (idx + 1, str :: old_messages, started)
-  in
-  let _, _, started =
-    !in_memory_reverse_structured_log_messages_for_integration_test
-  in
-  if started then Or_error.error_string "Already initialized"
-  else (
-    in_memory_reverse_structured_log_messages_for_integration_test :=
-      (0, [], true) ;
-    let event_set =
-      Structured_log_events.Set.of_list
-      @@ List.map ~f:Structured_log_events.id_of_string structured_log_ids
-    in
-    Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
-      ~processor:(Logger.Processor.raw_structured_log_events event_set)
-      ~transport:(Logger.Transport.raw handle) ;
-    Ok () )
+  start_filtered_log
+    in_memory_reverse_structured_log_messages_for_integration_test
+    structured_log_ids
 
 let get_filtered_log_entries
     ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)

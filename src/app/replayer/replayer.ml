@@ -143,7 +143,7 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
     { base = Accounts accounts
     ; num_accounts = None
     ; balances = []
-    ; hash = None
+    ; hash = Some (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
     ; s3_data_hash = None
     ; name = None
     ; add_genesis_winner = Some true
@@ -329,7 +329,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
     (ics : Sql.Internal_command.t list) :
     (Mina_transaction.Transaction.t option * Sql.Internal_command.t list)
     Deferred.t =
-  [%log info]
+  [%log spam]
     "Converting internal command (%s) with global slot since genesis %Ld, \
      sequence number %d, and secondary sequence number %d to transaction"
     ic.typ ic.global_slot_since_genesis ic.sequence_no ic.secondary_sequence_no ;
@@ -350,7 +350,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
       (* combining situation 2
          two fee transfer commands with same global slot since genesis, sequence number
       *)
-      [%log info]
+      [%log spam]
         "Combining two fee transfers at global slot since genesis %Ld with \
          sequence number %d"
         ic.global_slot_since_genesis ic.sequence_no ;
@@ -385,7 +385,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
               , ic.secondary_sequence_no )
           in
           if Option.is_some fee_transfer then
-            [%log info]
+            [%log spam]
               "Coinbase transaction at global slot since genesis %Ld, sequence \
                number %d, and secondary sequence number %d contains a fee \
                transfer"
@@ -405,7 +405,7 @@ let internal_cmds_to_transaction ~logger ~pool (ic : Sql.Internal_command.t)
 
 let user_command_to_transaction ~logger ~pool (cmd : Sql.User_command.t) :
     Mina_transaction.Transaction.t Deferred.t =
-  [%log info]
+  [%log spam]
     "Converting user command (%s) with nonce %Ld, global slot since genesis \
      %Ld, and sequence number %d to transaction"
     cmd.typ cmd.nonce cmd.global_slot_since_genesis cmd.sequence_no ;
@@ -531,7 +531,7 @@ let zkapp_command_to_transaction ~logger ~pool (cmd : Sql.Zkapp_command.t) :
     ({ body; authorization = Signature.dummy } : Account_update.Fee_payer.t)
   in
   let nonce_str = Mina_numbers.Account_nonce.to_string fee_payer.body.nonce in
-  [%log info]
+  [%log spam]
     "Converting zkApp command with fee payer nonce %s, global slot since \
      genesis %Ld, and sequence number %d to transaction"
     nonce_str cmd.global_slot_since_genesis cmd.sequence_no ;
@@ -547,7 +547,7 @@ let zkapp_command_to_transaction ~logger ~pool (cmd : Sql.Zkapp_command.t) :
         let (authorization : Control.t) =
           match body.authorization_kind with
           | Proof _ ->
-              Proof Proof.transaction_dummy
+              Proof (Lazy.force Proof.transaction_dummy)
           | Signature ->
               Signature Signature.dummy
           | None_given ->
@@ -572,7 +572,7 @@ let find_canonical_chain ~logger pool slot =
   let find_state_hash_chain state_hash =
     match%map query_db ~f:(fun db -> Sql.Block.get_chain db state_hash) with
     | [] ->
-        [%log info] "Block with state hash %s is not along canonical chain"
+        [%log spam] "Block with state hash %s is not along canonical chain"
           state_hash ;
         None
     | _ ->
@@ -594,7 +594,7 @@ let try_slot ~logger pool slot =
     | None ->
         go ~slot:(Int64.pred slot) ~tries_left:(tries_left - 1)
     | Some state_hash ->
-        [%log info]
+        [%log spam]
           "Found possible canonical chain to target state hash %s at slot %Ld"
           state_hash slot ;
         return state_hash
@@ -638,9 +638,17 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
         [ ("max_canonical_slot", `String (Int64.to_string max_canonical_slot)) ] ;
     Deferred.unit )
 
+let migrating_from_version = Mina_numbers.Txn_version.of_int 2
+
 let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
     ~continue_on_error ~checkpoint_interval ~checkpoint_output_folder_opt
-    ~checkpoint_file_prefix () =
+    ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level ~log_filename
+    ~file_log_level () =
+  Cli_lib.Stdout_log.setup log_json log_level ;
+  Option.iter log_filename ~f:(fun log_filename ->
+      Logger.Consumer_registry.register ~id:"default"
+        ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
+        ~transport:(Logger_file_system.evergrowing ~log_filename) ) ;
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -665,22 +673,23 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
          except that we don't consider loading from a tar file
       *)
       let query_db = Mina_caqti.query pool in
-      let%bind padded_accounts =
-        match
-          Genesis_ledger_helper.Ledger.padded_accounts_from_runtime_config_opt
-            ~logger ~proof_level input.genesis_ledger
-            ~ledger_name_prefix:"genesis_ledger"
+      let%bind packed_ledger =
+        match%bind
+          Genesis_ledger_helper.Ledger.load ~proof_level
+            ~genesis_dir:
+              (Option.value ~default:Cache_dir.autogen_path genesis_dir_opt)
+            ~logger ~constraint_constants
+            ?overwrite_version:
+              (if migration_mode then Some migrating_from_version else None)
+            input.genesis_ledger
         with
-        | None ->
+        | Error e ->
             [%log fatal]
-              "Could not load accounts from input runtime genesis ledger" ;
+              "Could not load accounts from input runtime genesis ledger %s"
+              (Error.to_string_hum e) ;
             exit 1
-        | Some accounts ->
-            return accounts
-      in
-      let packed_ledger =
-        Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-          ~depth:constraint_constants.ledger_depth padded_accounts
+        | Ok (packed_ledger, _, _) ->
+            return packed_ledger
       in
       let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
       let epoch_ledgers_state_hash_opt =
@@ -823,25 +832,37 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
         (List.length zkapp_cmd_ids) ;
       [%log info] "Loading internal commands" ;
       let%bind unsorted_internal_cmds_list =
-        Deferred.List.map internal_cmd_ids ~f:(fun id ->
-            let open Deferred.Let_syntax in
-            match%map
-              Caqti_async.Pool.use
-                (fun db ->
-                  Sql.Internal_command.run db
-                    ~start_slot:input.start_slot_since_genesis
-                    ~internal_cmd_id:id )
-                pool
-            with
-            | Ok [] ->
-                failwithf "Could not find any internal commands with id: %d" id
-                  ()
-            | Ok internal_cmds ->
-                internal_cmds
-            | Error msg ->
-                failwithf
-                  "Error querying for internal commands with id %d, error %s" id
-                  (Caqti_error.show msg) () )
+        Progress.with_reporter
+          Progress.Line.(list [ const "Loading internal commands"; spinner () ])
+          (fun progress ->
+            Deferred.List.map (List.chunks_of ~length:400 internal_cmd_ids)
+              ~f:(fun ids ->
+                let open Deferred.Let_syntax in
+                match%map
+                  Caqti_async.Pool.use
+                    (fun db ->
+                      Sql.Internal_command.run db
+                        ~start_slot:input.start_slot_since_genesis
+                        ~internal_cmd_ids:ids )
+                    pool
+                with
+                | Ok [] ->
+                    [%log error]
+                      "Expected at least one internal command to match"
+                      ~metadata:
+                        [ ("ids", `List (List.map ~f:(fun id -> `Int id) ids)) ] ;
+                    failwith "Database inconsistency"
+                | Ok internal_cmds ->
+                    progress (List.length internal_cmds) ;
+                    internal_cmds
+                | Error msg ->
+                    [%log error]
+                      "Database error querying for internal commands: $error"
+                      ~metadata:
+                        [ ("error", `String (Caqti_error.show msg))
+                        ; ("ids", `List (List.map ~f:(fun id -> `Int id) ids))
+                        ] ;
+                    failwith "Database error" ) )
       in
       let unsorted_internal_cmds = List.concat unsorted_internal_cmds_list in
       (* filter out internal commands in blocks not along chain from target state hash *)
@@ -878,21 +899,41 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
         Deferred.List.iter sorted_internal_cmds
           ~f:(cache_fee_transfer_via_coinbase pool)
       in
-      [%log info] "Loading user commands" ;
+      let total = List.length user_cmd_ids in
       let%bind (unsorted_user_cmds_list : Sql.User_command.t list list) =
-        Deferred.List.map user_cmd_ids ~f:(fun id ->
-            let open Deferred.Let_syntax in
-            match%map
-              Caqti_async.Pool.use (fun db -> Sql.User_command.run db id) pool
-            with
-            | Ok [] ->
-                failwithf "Expected at least one user command with id %d" id ()
-            | Ok user_cmds ->
-                user_cmds
-            | Error msg ->
-                failwithf
-                  "Error querying for user commands with id %d, error %s" id
-                  (Caqti_error.show msg) () )
+        Progress.with_reporter
+          Progress.Line.(
+            list
+              [ const "Loading user commands"
+              ; spinner ()
+              ; bar total
+              ; count_to total
+              ])
+          (fun progress ->
+            Deferred.List.map (List.chunks_of ~length:400 user_cmd_ids)
+              ~f:(fun ids ->
+                let open Deferred.Let_syntax in
+                match%map
+                  Caqti_async.Pool.use
+                    (fun db -> Sql.User_command.run db ids)
+                    pool
+                with
+                | Ok [] ->
+                    [%log error] "Expected at least one user command to match"
+                      ~metadata:
+                        [ ("ids", `List (List.map ~f:(fun id -> `Int id) ids)) ] ;
+                    failwith "Database inconsistency"
+                | Ok user_cmds ->
+                    progress (List.length user_cmds) ;
+                    user_cmds
+                | Error msg ->
+                    [%log error]
+                      "Database error querying for user commands: $error"
+                      ~metadata:
+                        [ ("error", `String (Caqti_error.show msg))
+                        ; ("ids", `List (List.map ~f:(fun id -> `Int id) ids))
+                        ] ;
+                    failwith "Database error" ) )
       in
       let unsorted_user_cmds = List.concat unsorted_user_cmds_list in
       (* filter out user commands in blocks not along chain from target state hash *)
@@ -900,8 +941,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
         List.filter unsorted_user_cmds ~f:(fun cmd ->
             Int.Set.mem block_ids cmd.block_id )
       in
-      [%log info] "Will replay %d user commands"
-        (List.length filtered_user_cmds) ;
+      let total = List.length filtered_user_cmds in
       let sorted_user_cmds =
         List.sort filtered_user_cmds ~compare:(fun uc1 uc2 ->
             let tuple (uc : Sql.User_command.t) =
@@ -909,21 +949,32 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
             in
             [%compare: int64 * int] (tuple uc1) (tuple uc2) )
       in
-      [%log info] "Loading zkApp commands" ;
       let%bind unsorted_zkapp_cmds_list =
-        Deferred.List.map zkapp_cmd_ids ~f:(fun id ->
-            let open Deferred.Let_syntax in
-            match%map
-              Caqti_async.Pool.use (fun db -> Sql.Zkapp_command.run db id) pool
-            with
-            | Ok [] ->
-                failwithf "Expected at least one zkApp command with id %d" id ()
-            | Ok zkapp_cmds ->
-                zkapp_cmds
-            | Error msg ->
-                failwithf
-                  "Error querying for zkApp commands with id %d, error %s" id
-                  (Caqti_error.show msg) () )
+        Progress.with_reporter
+          Progress.Line.(
+            list
+              [ const "Loading zkApp commands"
+              ; spinner ()
+              ; bar total
+              ; count_to total
+              ])
+          (fun progress ->
+            Deferred.List.map zkapp_cmd_ids ~f:(fun id ->
+                let open Deferred.Let_syntax in
+                match%map
+                  Caqti_async.Pool.use
+                    (fun db -> Sql.Zkapp_command.run db id)
+                    pool
+                with
+                | Ok [] ->
+                    failwithf "Expected at least one zkApp command with id %d"
+                      id ()
+                | Ok zkapp_cmds ->
+                    progress 1 ; zkapp_cmds
+                | Error msg ->
+                    failwithf
+                      "Error querying for zkApp commands with id %d, error %s"
+                      id (Caqti_error.show msg) () ) )
       in
       let unsorted_zkapp_cmds = List.concat unsorted_zkapp_cmds_list in
       let filtered_zkapp_cmds =
@@ -979,6 +1030,75 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                 failwith "Expected a checkpoint interval" )
       in
       let found_snarked_ledger_hash = ref false in
+      (* See PR #9782. *)
+      let state_hashes_to_avoid =
+        (* devnet *)
+        [ "3NKNU4WceYUjnQbxaUAmcHQzhGhC8ZxkYKqDKojKMpVjoj9WQZM6"
+        ; "3NKvaxewhJ9e1GWvFFT83p4MA2MPFChFoQTmdJ2zeBNX9rLorGFH"
+        ; "3NKNDWt8f1vVeFdBN8FCyHnAwnc5oXR18UvqriW2tQtHABTgX2tu"
+        ; "3NLR1VaGKs36byogm4atXtiNVre3TtWrrg1Btt3HxGZ2mEBEN5hg"
+        ; "3NL3fHu5bAqBNMmQ1Jh3HPZq7xX67WKFyAEUs2FFHJeiYxbEiq69"
+        ; "3NLuEU1bJ462uzkJpQXDCo2DcpkkJLbK9kXgwpCYHDuofXo7Smrr"
+        ; "3NK9ZYikzJDzXK7CPjyr7jo1S4ZGfKUKa18uTZd96X7YVcQihW1W"
+        ; "3NK6PXGHsrRo8iYzWx43rtnyN2ynmZ7enWU7CMWH6oTUi5CRck7c"
+        ; "3NKNrQG3DvyxDAuhudq7UhYRQ4GL7suKHcfQ3q7nUDXS1NjHyuZE"
+        ; "3NKcbRVyPHeBoWiK8AHXVVYxswv5c4kpmECRS3LTbAVCHzrxbzuH"
+        ; "3NKoxfcbnSkFSkFaMpmpgfVFqQmrwR6xkfpCHePLPh5uYKQLdpJt"
+        ; "3NKVfBD1kXDJ8ZM3xhR5TFZXBRAs5UanSewxQRpXFmoxGxDddkP5"
+        ; "3NKuotwHEdKRBK1yuDNkVUXqCnz5dPpS1xL4UJWghrAUB3t9pRQg"
+        ; "3NKou5o9gJpcKBp8LnkUQgFBBQFZB6z7GD88pWDdwgVkfV8HmQTW"
+        ; "3NKaqDsxAAFMvvxw22PLDkFaQyeHqioxhvb6BcpzbB3i8uaQdta7"
+        ; "3NKCDffYzX5VMH3eH3G8CU6Ba6FndrevGBaJ9NCU7U6nv3iv2bpN"
+        ; "3NL9sVkyZLLHFEvGPzr4ihYPzzZ3W3GixxjofeZib8qbe8hE4jUg"
+        ; "3NLWggBpXBZxaV2R1DaJrL51uS6NshyDejbPn1gpWhp4E9t1cvPU"
+        ; "3NL2cRDQkXEwnv33jTY5UKxLpyUpxKhcnwq7hQcfdDwc9QqXg5K9"
+        ; "3NKvh8kXNtaJAhuC6Eqa8K4r2whzLuN5G7F8M14GTB1tcFKERp3z"
+        ; "3NKVo2E1TGfb2pQ3jv84m7tVid4d6AHnKbDMZLWcrPxWwQJTYiQg"
+        ; "3NL8d9RgUbDXjy92eH6ZVFc1ozn3darQx8u9EViMiCqrv5Ywe42x"
+        ; "3NLGBF3yXbnQQxophx4YZfdXGcTt11KjC7jv8qaf3b8B8tZdrCBh"
+        ; "3NKAbgwCDsdW6m18FSj8mBE2SpdMd7gopc5NMqGHxkqqLykMZrCR"
+        ; "3NKFtTCSqVqKdbm6unoCiQWnKnozwYsiey5aPegV5xMR2MNR9kjZ"
+        ; "3NKEyaQdmFtYWx2swLjkcpBeQGsfo8riNH6Kbdr9myWUQrZkbqjV"
+        ; "3NK7jasQXuACjzJ5mBPNr13Y6Yt8vD6piLc1waFBU4Jte8WzEZ4h"
+        ; "3NLPbRNQi6JFbh7DW9ibPgRhUnExwGaMpiuGJdEQ6Na47kWcP3PW"
+        ; "3NK4EUku6d9fmU3P1t7NnoxsN4sg699JSskJZ4nJs1mWSHs1CL4v"
+        ; "3NLDE8xKUvKMiSpLSd9uvnQaRiXYW6MWw7UXpFD2wbq4WeKRAnKM"
+        ; "3NLZYyohgxGFE3hw6o6tfvXnZLoG6gyzr67WNGPFfpugHtoXaFGq" (*mainnet*)
+        ; "3NKCedb2xxrgiaBFKVpxAJ9Kp7Tu1JG4qCUppJmt3c1RULQYQtrZ"
+        ; "3NKjb8G3Sc4Z5hLckDy2Wg8soZmdghenyAYDuHVF5uNV36Td9DZt"
+        ; "3NKKrhT3QX5tUS18kyGkYnjfNCCppgjy9zcZrmtMeNynEce47zpj"
+        ; "3NKzdd7UjWLygUvgKfJwd3MVj3PD1GnXDHHGoTLyXinVvSoFRyX5"
+        ; "3NKpPvE3NfGnbqRU4U6fDCMdUi9c54kphuDY4jniJuHZ62MyPWmr"
+        ; "3NLP9qXSUAo9b8XjLZ8YpvdvEJ1g4TUdeznBH5kDAFv6kYYCGY51"
+        ; "3NLLEfqqPdWHDtM7nw4S27uejcLZQ5D7N3BzmCNR5acYSaGuJ4pH"
+        ; "3NKJoVQRihbwMUTDJKv4patDDMF8xGrvAaxQ9d2QJovJFegSuEQV"
+        ; "3NKQ8W6L77xjPbz9sPNp357gfJ6a5LMD8K8kwGnW5jyULcCbd5Su"
+        ; "3NLYL2dmLyGd889rwF5EmdjWE2BBGCZcHAwJA8MotiPVDiXLvktw"
+        ; "3NLhmVdQvxpQLNvyehAXZKDsVrkgjb812VfpbgKqBRWSLa9c1kAA"
+        ; "3NKX71ifBPJCZFDLdeLmhY97Zc8Y3xt2JZTFLgqtTnv53JvRcbzx"
+        ; "3NLUhVLiWav4kBszLKZ6oDNC2BkbeX2cftsUGb6egeixjvqu3qqt"
+        ; "3NKtmu2j6UJ9oggDJbtY6UDzZrMgDF8CH5A5xs3GyQUqMq4nS1ZN"
+        ; "3NKJbfqrRzsjDC3FkSv5tsKQ7yp1xxYsXcs6arsoj18MKhcMVNeA"
+        ; "3NKy6JUgC8r6ZGCKcQxPmKu9pN8xv5mGqVEiC1z1dLuVYhc2KEvV"
+        ; "3NLi5AWq9YCT2XrB5vxkC5Psxrjv3JjHmK5DX87duztbCcL2oJkD"
+        ; "3NKm5VGDQXtekWf3erWfjcHciGzjAWB4u7WNE7gAHGYjvkFbF5xj"
+        ; "3NLnTnSMFayzpAahTgyL9mY1og2HDJjcg9kpKsQT5iQcPJ7FtJtJ"
+        ; "3NKGm1K6T9pV7ygFqtScugMQB7EhDozsiz8Fe9LAYG2yx8yYie6p"
+        ; "3NKj4YqZq1RCMDK3YM1gRtFZ2fspR1sNbRjQw4GA6Ut2Ar16jEYF"
+        ; "3NLC7zugGno2Emt3w2DRJx6LdRzmoiW4F9PuAYurLQFmWFqEer1V"
+        ; "3NKAKrhJrvFJtgMvr72ZXTaWPFisgDaND3AxZoPR6gAff5qDuKcq"
+        ; "3NKDaz4DVLp4bQ5FJiXjEQPWmwgzvXAfCLY3w8d5NjzJZNVXnF6Q"
+        ; "3NLKV4BUZwzpYvqcByRhJoKyME6Q5KEcrHPVY21XPfXsbPp486eu"
+        ; "3NLbwy3BrF7gxEPF9WPoJPeED9NUC2RXdDnoJf6GvRwzksJThnM9"
+        ; "3NKfHZ5DJkL3jjzstrfTCjHczMrPzvBsgPQ66trR9yqkE9dHJ7AD"
+        ; "3NKUaab3R1mcG9caqyUUntpjvYD7VYUJ7rWjTCbgxzob3miG3WHK"
+        ; "3NL2aQWNi6JadvfmwkyJVCtd9MjVwDCbvY1bfHbwCm1nJrDwSV2A"
+        ; "3NK7ANsW4LQ62Hk8DJNEF36yyccoECJKmdeAyaf96WmksR2TyM3C"
+        ; "3NKa82y8gNUe8ePYjq7jEh38vyWVLEteHynK686D8qaebeHpmfsS"
+        ; "3NLcmRzkBdmFKqhpKEbw33A7GAd1EG7dg6CVwUhC4RKDTBZGnYDQ"
+        ; "3NLHTdvTPXxUn8YFy4z59NxDcX9DYhthFtv8aPNMmpm2pYuA6Tf6"
+        ]
+      in
       (* apply commands in global slot, sequence order *)
       let rec apply_commands ~last_global_slot_since_genesis ~last_block_id
           ~(block_txns : Mina_transaction.Transaction.t list)
@@ -998,6 +1118,17 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                 ; ("block_id", `Int last_block_id)
                 ]
               last_global_slot_since_genesis
+          else if
+            List.mem state_hashes_to_avoid
+              (State_hash.to_base58_check state_hash)
+              ~equal:String.equal
+          then
+            [%log info]
+              ~metadata:
+                [ ("state_hash", `String (State_hash.to_base58_check state_hash))
+                ]
+              "This block has an inconsistent ledger hash due to a known \
+               historical issue."
           else (
             [%log error]
               "Applied all commands at global slot since genesis %Ld, ledger \
@@ -1013,7 +1144,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
             if continue_on_error then incr error_count else Core_kernel.exit 1 )
         in
         let check_account_accessed state_hash =
-          [%log info] "Checking accounts accessed in block just processed"
+          [%log spam] "Checking accounts accessed in block just processed"
             ~metadata:
               [ ("state_hash", State_hash.to_yojson state_hash)
               ; ( "global_slot_since_genesis"
@@ -1028,7 +1159,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
             query_db ~f:(fun db ->
                 Processor.Accounts_created.all_from_block db last_block_id )
           in
-          [%log info]
+          [%log spam]
             "Verifying that accounts created are also deemed accessed in block \
              with global slot since genesis %Ld"
             last_global_slot_since_genesis ;
@@ -1052,7 +1183,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                     ] ;
                 if continue_on_error then incr error_count
                 else Core_kernel.exit 1 ) ) ;
-          [%log info]
+          [%log spam]
             "Verifying accounts accessed in block with global slot since \
              genesis %Ld"
             last_global_slot_since_genesis ;
@@ -1113,7 +1244,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                 "Missing state hash information for current global slot" ;
               Core.exit 1
           | Some (state_hash, _ledger_hash, _snarked_hash) ->
-              [%log info]
+              [%log spam]
                 ~metadata:
                   [ ( "state_hash"
                     , `String (State_hash.to_base58_check state_hash) )
@@ -1161,7 +1292,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
               let rec count_txns ~signed_count ~zkapp_count ~fee_transfer_count
                   ~coinbase_count = function
                 | [] ->
-                    [%log info]
+                    [%log spam]
                       "Replaying transactions in block with state hash \
                        $state_hash"
                       ~metadata:
@@ -1290,20 +1421,20 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                 apply_transaction_phases (List.rev block_txns)
               in
               ( if migration_mode then
-                [%log info]
+                [%log spam]
                   "We are doing migration, so the snarked_ledger_hash in \
                    global_slot_hashes_tbl is irrelevant"
               else if
               Frozen_ledger_hash.equal snarked_hash
                 (First_pass_ledger_hashes.get_last_snarked_hash ())
             then
-                [%log info]
+                [%log spam]
                   "Snarked ledger hash same as in the preceding block, not \
                    checking it again"
               else if
               Frozen_ledger_hash.equal snarked_hash genesis_snarked_ledger_hash
             then
-                [%log info] "Snarked ledger hash is genesis snarked ledger hash"
+                [%log spam] "Snarked ledger hash is genesis snarked ledger hash"
               else
                 match First_pass_ledger_hashes.find snarked_hash with
                 | None ->
@@ -1324,13 +1455,13 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                     if continue_on_error then incr error_count
                     else Core_kernel.exit 1
                 | Some (_hash, n) ->
-                    [%log info]
+                    [%log spam]
                       "Found snarked ledger hash among first-pass ledger hashes" ;
                     found_snarked_ledger_hash := true ;
                     First_pass_ledger_hashes.set_last_snarked_hash snarked_hash ;
                     First_pass_ledger_hashes.flush_older_than n ) ;
               if List.is_empty block_txns then (
-                [%log info]
+                [%log spam]
                   "No transactions to run for block with state hash $state_hash"
                   ~metadata:
                     [ ("state_hash", State_hash.to_yojson state_hash)
@@ -1343,11 +1474,34 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
               else
                 let%bind transactions_applied = run_transactions () in
                 let%bind () =
-                  if migration_mode then
+                  if migration_mode then (
                     let accounts_created =
                       List.concat_map transactions_applied
                         ~f:Ledger.Transaction_applied.new_accounts
                     in
+                    let locations =
+                      Ledger.location_of_account_batch ledger accounts_created
+                      |> List.map ~f:(fun (_, loc) -> Option.value_exn loc)
+                    in
+                    let accounts =
+                      Ledger.get_batch ledger locations
+                      |> List.map ~f:(fun (loc, account_opt) ->
+                             let account = account_opt |> Option.value_exn in
+                             ( loc
+                             , Mina_base.Account.Poly.
+                                 { account with
+                                   permissions =
+                                     Mina_base.Permissions.Poly.
+                                       { account.permissions with
+                                         set_verification_key =
+                                           ( fst
+                                               account.permissions
+                                                 .set_verification_key
+                                           , migrating_from_version )
+                                       }
+                                 } ) )
+                    in
+                    Ledger.set_batch ledger accounts ;
                     let accounts_accessed =
                       List.concat_map transactions_applied
                         ~f:(fun txn_applied ->
@@ -1385,8 +1539,8 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                         let acct = Ledger.get_at_index_exn ledger index in
                         query_db ~f:(fun db ->
                             Processor.Accounts_accessed.add_if_doesn't_exist db
-                              last_block_id ~logger (index, acct) )
-                        |> Deferred.ignore_m )
+                              last_block_id (index, acct) )
+                        |> Deferred.ignore_m ) )
                   else (
                     check_ledger_hash_at_slot state_hash ledger_hash ;
                     Deferred.unit )
@@ -1706,11 +1860,19 @@ let () =
            Param.flag "--checkpoint-output-folder"
              ~doc:"file Folder containing the resulting checkpoints"
              Param.(optional string)
+         and genesis_dir_opt =
+           Param.flag "--genesis-ledger-dir"
+             ~doc:"DIR Directory that contains the genesis ledger"
+             Param.(optional string)
          and checkpoint_file_prefix =
            Param.flag "--checkpoint-file-prefix"
              ~doc:"string Checkpoint file prefix (default: 'replayer')"
              Param.(optional_with_default "replayer" string)
-         in
+         and log_json = Cli_lib.Flag.Log.json
+         and log_level = Cli_lib.Flag.Log.level
+         and file_log_level = Cli_lib.Flag.Log.file_log_level
+         and log_filename = Cli_lib.Flag.Log.file in
          main ~input_file ~output_file_opt ~migration_mode ~archive_uri
            ~checkpoint_interval ~continue_on_error ~checkpoint_output_folder_opt
-           ~checkpoint_file_prefix )))
+           ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level
+           ~file_log_level ~log_filename )))

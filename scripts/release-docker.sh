@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-test-executive' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
+VALID_SERVICES=('mina-archive' 'mina-archive-migration' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-test-executive' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -59,7 +59,7 @@ case "${DEB_CODENAME##*=}" in
 esac
 IMAGE="--build-arg image=${IMAGE}"
 
-# Determine profile for mina name. To preserve backward compatibility standard profile is default. 
+# Determine profile for mina name. To preserve backward compatibility standard profile is default.
 case "${DEB_PROFILE}" in
   standard)
     DOCKER_DEB_PROFILE=""
@@ -87,6 +87,11 @@ if [[ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then
 case "${SERVICE}" in
 mina-archive)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
+  DOCKER_CONTEXT="dockerfiles/"
+  SERVICE=${SERVICE}${SERVICE_SUFFIX}
+  ;;
+mina-archive-migration)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive-migration"
   DOCKER_CONTEXT="dockerfiles/"
   SERVICE=${SERVICE}${SERVICE_SUFFIX}
   ;;
@@ -162,7 +167,7 @@ else
 fi
 
 if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
-  
+
   # push to GCR
   docker push "${TAG}"
 
@@ -170,15 +175,4 @@ if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
   docker tag "${TAG}" "${HASHTAG}"
   docker push "${HASHTAG}"
 
-  echo "Release Env Var: ${DEB_RELEASE}"
-  echo "Release: ${DEB_RELEASE##*=}"
-
-  if [[ "${DEB_RELEASE##*=}" = "unstable" ]]; then
-    echo "Release is unstable: not pushing to docker hub"
-  else
-    echo "Release is public (alpha, beta, berkeley, or stable): pushing image to docker hub"
-    # tag and push to dockerhub
-    docker tag "${TAG}" "minaprotocol/${SERVICE}:${VERSION}"
-    docker push "minaprotocol/${SERVICE}:${VERSION}"
-  fi
 fi

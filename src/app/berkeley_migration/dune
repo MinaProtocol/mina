@@ -19,6 +19,7 @@
    base.caml
    async.async_command
    integers
+   progress
    ;; local libraries
    bounded_types
    logger
@@ -43,7 +44,8 @@
    signature_lib
    unsigned_extended
    with_hash
- )
+   cli_lib
+   )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_mina ppx_let ppx_hash ppx_compare ppx_sexp_conv h_list.ppx)))
+ (preprocess (pps ppx_version ppx_mina h_list.ppx ppx_jane)))
