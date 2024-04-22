@@ -215,7 +215,8 @@ let concrete_fetch_batch ~logger ~bucket ~network targets ~local_path =
     else
       let gsutil_input = String.concat ~sep:"\n" block_uris_to_download in
       let gsutil_process =
-        Process.run ~prog:"gsutil" ~args:[ "-m"; "cp"; "-I"; "." ]
+        Process.run ~prog:"gsutil"
+          ~args:[ "-m"; "cp"; "-I"; local_path ]
           ~stdin:gsutil_input ()
       in
       don't_wait_for
@@ -248,13 +249,14 @@ let concrete_fetch_batch ~logger ~bucket ~network targets ~local_path =
       let _, state_hash = target in
       let%map contents =
         Throttle.enqueue file_throttle (fun () ->
-            Reader.file_contents (Id.filename ~network target) )
+            Reader.file_contents
+              (sprintf "%s/%s" local_path (Id.filename ~network target)) )
       in
       let block = of_yojson (Yojson.Safe.from_string contents) in
       (state_hash, block) )
   >>| Mina_base.State_hash.Map.of_alist_exn
 
-let delete_fetched_concrete ~network targets : unit Deferred.t =
+let delete_fetched_concrete ~local_path ~network targets : unit Deferred.t =
   (* not perfect, but this is a reasonably portable default *)
   let max_args_size = (*16kb*) 16 * 1024 in
   (* break a list up into chunks using a fold operation *)
@@ -276,7 +278,8 @@ let delete_fetched_concrete ~network targets : unit Deferred.t =
     in
     List.rev (loop list init [] [])
   in
-  List.map targets ~f:(Id.filename ~network)
+  List.map targets ~f:(fun target ->
+      sprintf "%s/%s" local_path (Id.filename ~network target) )
   |> chunk_using ~init:0 ~f:(fun accumulated_size block_id ->
          let arg_size = String.length block_id in
          let size_with_new_arg = accumulated_size + String.length block_id in
@@ -292,4 +295,4 @@ let delete_fetched_concrete ~network targets : unit Deferred.t =
 
 let delete_fetched ~network ~path : unit Deferred.t =
   let%bind block_ids = list_directory ~network ~path in
-  delete_fetched_concrete ~network (Set.to_list block_ids)
+  delete_fetched_concrete ~local_path:path ~network (Set.to_list block_ids)
