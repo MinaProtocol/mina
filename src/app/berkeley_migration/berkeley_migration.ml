@@ -618,8 +618,8 @@ let () =
           Param.flag "--precomputed-blocks-local-path"
             ~aliases:[ "-precomputed-blocks-local-path" ]
             Param.(optional string)
-            ~doc:"PATH the precomputed blocks on-disk location"
-        let precomputed_blocks_local_path =
+            ~doc:"PATH the precomputed blocks on-disk location" in
+         let precomputed_blocks_local_path =
            Option.value precomputed_blocks_local_path ~default:"."
          in
          main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
