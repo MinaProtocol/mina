@@ -12,4 +12,4 @@
    (sandbox none)
    (:< gen.sh)
    (universe))
- (action (run %{<} %{targets})))
+ (action (run bash %{<} %{targets})))
