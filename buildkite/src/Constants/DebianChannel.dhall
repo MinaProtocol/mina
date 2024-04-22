@@ -1,6 +1,6 @@
 let Prelude = ../External/Prelude.dhall
 
-let Channel : Type = < Unstable | Nightly | Itn | Umt | Alpha | Beta | Stable >
+let Channel : Type = < Unstable | Nightly | Itn | Umt | Devnet | Alpha | Beta | Experimental | Stable >
 
 let capitalName = \(channel : Channel) ->
   merge {
@@ -8,9 +8,11 @@ let capitalName = \(channel : Channel) ->
     , Nightly = "Nightly"
     , Itn = "Itn"
     , Umt = "Umt"
+    , Devnet = "Devnet"
     , Alpha = "Alpha"
     , Beta = "Beta"
     , Stable = "Stable"
+    , Experimental = "Experimental"
   } channel
 
 let lowerName = \(channel : Channel) ->
@@ -19,9 +21,11 @@ let lowerName = \(channel : Channel) ->
     , Nightly = "nightly"
     , Itn = "itn"
     , Umt = "umt"
+    , Devnet = "devnet"
     , Alpha = "alpha"
     , Beta = "beta"
     , Stable = "stable"
+    , Experimental = "experimental"
   } channel
 
 in
