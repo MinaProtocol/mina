@@ -28,6 +28,7 @@ let buildTestCmd : Text -> Size -> List Command.TaggedKey.Type -> Command.Type =
             Cmd.Docker::{
               image = (../../Constants/ContainerImages.dhall).ubuntu2004
             } "buildkite/scripts/dump-mina-type-shapes.sh",
+        Cmd.run "gsutil cp *-type_shape.txt $MINA_TYPE_SHAPE gs://mina-type-shapes",
         Cmd.runInDocker
           Cmd.Docker::{
               image = (../../Constants/ContainerImages.dhall).ubuntu2004
