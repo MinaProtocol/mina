@@ -2,7 +2,11 @@ open Core
 open Async
 
 (* If OCamlformat ever breaks on any files add their paths here *)
-let trustlist = []
+let trustlist =
+  [ "lib/crypto/kimchi_bindings/stubs/kimchi_bindings.ml"
+  ; "lib/crypto/kimchi_bindings/stubs/kimchi_types.ml"
+  ; "lib/crypto/kimchi_bindings/stubs/pasta_bindings.ml"
+  ; "lib/pickles/plonk_checks/scalars.ml" ]
 
 let dirs_trustlist =
   [ ".git"
