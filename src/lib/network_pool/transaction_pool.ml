@@ -308,27 +308,6 @@ struct
 
     module Batcher = Batcher.Transaction_pool
 
-    module Lru_cache = struct
-      let max_size = 2048
-
-      module T = struct
-        type t = User_command.t list [@@deriving hash]
-      end
-
-      module Q = Hash_queue.Make (Int)
-
-      type t = unit Q.t
-
-      let add t h =
-        if not (Q.mem t h) then (
-          if Q.length t >= max_size then ignore (Q.dequeue_front t : 'a option) ;
-          Q.enqueue_back_exn t h () ;
-          `Already_mem false )
-        else (
-          ignore (Q.lookup_and_move_to_back t h : unit option) ;
-          `Already_mem true )
-    end
-
     module Mutex = struct
       open Async
 
