@@ -51,8 +51,8 @@ let spec_to_envs : Spec.Type -> List Text =
   \(spec: Spec.Type ) -> 
   
   [
-    "TESTNET_NAME=${Network.lowerName spec.network}",
-    "NETWORK_NAME=${Network.lowerName spec.network}-${spec.suffix}",
+    "NETWORK_NAME=${Network.lowerName spec.network}",
+    "TESTNET_NAME=${Network.lowerName spec.network}-${spec.suffix}",
     "CONFIG_JSON_GZ_URL=${spec.config_json_gz_url}"
   ]
   
