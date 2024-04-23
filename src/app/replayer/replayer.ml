@@ -642,13 +642,8 @@ let migrating_from_version = Mina_numbers.Txn_version.of_int 2
 
 let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
     ~continue_on_error ~checkpoint_interval ~checkpoint_output_folder_opt
-    ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level ~log_filename
-    ~file_log_level () =
+    ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level () =
   Cli_lib.Stdout_log.setup log_json log_level ;
-  Option.iter log_filename ~f:(fun log_filename ->
-      Logger.Consumer_registry.register ~id:"default"
-        ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
-        ~transport:(Logger_file_system.evergrowing ~log_filename) ) ;
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -832,37 +827,25 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
         (List.length zkapp_cmd_ids) ;
       [%log info] "Loading internal commands" ;
       let%bind unsorted_internal_cmds_list =
-        Progress.with_reporter
-          Progress.Line.(list [ const "Loading internal commands"; spinner () ])
-          (fun progress ->
-            Deferred.List.map (List.chunks_of ~length:400 internal_cmd_ids)
-              ~f:(fun ids ->
-                let open Deferred.Let_syntax in
-                match%map
-                  Caqti_async.Pool.use
-                    (fun db ->
-                      Sql.Internal_command.run db
-                        ~start_slot:input.start_slot_since_genesis
-                        ~internal_cmd_ids:ids )
-                    pool
-                with
-                | Ok [] ->
-                    [%log error]
-                      "Expected at least one internal command to match"
-                      ~metadata:
-                        [ ("ids", `List (List.map ~f:(fun id -> `Int id) ids)) ] ;
-                    failwith "Database inconsistency"
-                | Ok internal_cmds ->
-                    progress (List.length internal_cmds) ;
-                    internal_cmds
-                | Error msg ->
-                    [%log error]
-                      "Database error querying for internal commands: $error"
-                      ~metadata:
-                        [ ("error", `String (Caqti_error.show msg))
-                        ; ("ids", `List (List.map ~f:(fun id -> `Int id) ids))
-                        ] ;
-                    failwith "Database error" ) )
+        Deferred.List.map internal_cmd_ids ~f:(fun id ->
+            let open Deferred.Let_syntax in
+            match%map
+              Caqti_async.Pool.use
+                (fun db ->
+                  Sql.Internal_command.run db
+                    ~start_slot:input.start_slot_since_genesis
+                    ~internal_cmd_id:id )
+                pool
+            with
+            | Ok [] ->
+                failwithf "Could not find any internal commands with id: %d" id
+                  ()
+            | Ok internal_cmds ->
+                internal_cmds
+            | Error msg ->
+                failwithf
+                  "Error querying for internal commands with id %d, error %s" id
+                  (Caqti_error.show msg) () )
       in
       let unsorted_internal_cmds = List.concat unsorted_internal_cmds_list in
       (* filter out internal commands in blocks not along chain from target state hash *)
@@ -899,41 +882,21 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
         Deferred.List.iter sorted_internal_cmds
           ~f:(cache_fee_transfer_via_coinbase pool)
       in
-      let total = List.length user_cmd_ids in
+      [%log info] "Loading user commands" ;
       let%bind (unsorted_user_cmds_list : Sql.User_command.t list list) =
-        Progress.with_reporter
-          Progress.Line.(
-            list
-              [ const "Loading user commands"
-              ; spinner ()
-              ; bar total
-              ; count_to total
-              ])
-          (fun progress ->
-            Deferred.List.map (List.chunks_of ~length:400 user_cmd_ids)
-              ~f:(fun ids ->
-                let open Deferred.Let_syntax in
-                match%map
-                  Caqti_async.Pool.use
-                    (fun db -> Sql.User_command.run db ids)
-                    pool
-                with
-                | Ok [] ->
-                    [%log error] "Expected at least one user command to match"
-                      ~metadata:
-                        [ ("ids", `List (List.map ~f:(fun id -> `Int id) ids)) ] ;
-                    failwith "Database inconsistency"
-                | Ok user_cmds ->
-                    progress (List.length user_cmds) ;
-                    user_cmds
-                | Error msg ->
-                    [%log error]
-                      "Database error querying for user commands: $error"
-                      ~metadata:
-                        [ ("error", `String (Caqti_error.show msg))
-                        ; ("ids", `List (List.map ~f:(fun id -> `Int id) ids))
-                        ] ;
-                    failwith "Database error" ) )
+        Deferred.List.map user_cmd_ids ~f:(fun id ->
+            let open Deferred.Let_syntax in
+            match%map
+              Caqti_async.Pool.use (fun db -> Sql.User_command.run db id) pool
+            with
+            | Ok [] ->
+                failwithf "Expected at least one user command with id %d" id ()
+            | Ok user_cmds ->
+                user_cmds
+            | Error msg ->
+                failwithf
+                  "Error querying for user commands with id %d, error %s" id
+                  (Caqti_error.show msg) () )
       in
       let unsorted_user_cmds = List.concat unsorted_user_cmds_list in
       (* filter out user commands in blocks not along chain from target state hash *)
@@ -941,7 +904,8 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
         List.filter unsorted_user_cmds ~f:(fun cmd ->
             Int.Set.mem block_ids cmd.block_id )
       in
-      let total = List.length filtered_user_cmds in
+      [%log info] "Will replay %d user commands"
+        (List.length filtered_user_cmds) ;
       let sorted_user_cmds =
         List.sort filtered_user_cmds ~compare:(fun uc1 uc2 ->
             let tuple (uc : Sql.User_command.t) =
@@ -949,32 +913,21 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
             in
             [%compare: int64 * int] (tuple uc1) (tuple uc2) )
       in
+      [%log info] "Loading zkApp commands" ;
       let%bind unsorted_zkapp_cmds_list =
-        Progress.with_reporter
-          Progress.Line.(
-            list
-              [ const "Loading zkApp commands"
-              ; spinner ()
-              ; bar total
-              ; count_to total
-              ])
-          (fun progress ->
-            Deferred.List.map zkapp_cmd_ids ~f:(fun id ->
-                let open Deferred.Let_syntax in
-                match%map
-                  Caqti_async.Pool.use
-                    (fun db -> Sql.Zkapp_command.run db id)
-                    pool
-                with
-                | Ok [] ->
-                    failwithf "Expected at least one zkApp command with id %d"
-                      id ()
-                | Ok zkapp_cmds ->
-                    progress 1 ; zkapp_cmds
-                | Error msg ->
-                    failwithf
-                      "Error querying for zkApp commands with id %d, error %s"
-                      id (Caqti_error.show msg) () ) )
+        Deferred.List.map zkapp_cmd_ids ~f:(fun id ->
+            let open Deferred.Let_syntax in
+            match%map
+              Caqti_async.Pool.use (fun db -> Sql.Zkapp_command.run db id) pool
+            with
+            | Ok [] ->
+                failwithf "Expected at least one zkApp command with id %d" id ()
+            | Ok zkapp_cmds ->
+                zkapp_cmds
+            | Error msg ->
+                failwithf
+                  "Error querying for zkApp commands with id %d, error %s" id
+                  (Caqti_error.show msg) () )
       in
       let unsorted_zkapp_cmds = List.concat unsorted_zkapp_cmds_list in
       let filtered_zkapp_cmds =
@@ -1869,10 +1822,7 @@ let () =
              ~doc:"string Checkpoint file prefix (default: 'replayer')"
              Param.(optional_with_default "replayer" string)
          and log_json = Cli_lib.Flag.Log.json
-         and log_level = Cli_lib.Flag.Log.level
-         and file_log_level = Cli_lib.Flag.Log.file_log_level
-         and log_filename = Cli_lib.Flag.Log.file in
+         and log_level = Cli_lib.Flag.Log.level in
          main ~input_file ~output_file_opt ~migration_mode ~archive_uri
            ~checkpoint_interval ~continue_on_error ~checkpoint_output_folder_opt
-           ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level
-           ~file_log_level ~log_filename )))
+           ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level )))
