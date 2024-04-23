@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -eo pipefail
+set -xeo pipefail
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
@@ -31,8 +31,9 @@ FORK_MINA_EXE="$3"
 FORK_RUNTIME_GENESIS_LEDGER_EXE="$4"
 
 stop_nodes(){
-  "$1" client stop-daemon --daemon-port 10301
-  "$1" client stop-daemon --daemon-port 10311
+    echo "Stopping nodes"
+    "$1" client stop-daemon --daemon-port 10301
+    "$1" client stop-daemon --daemon-port 10311
 }
 
 # 1. Node is started
@@ -103,8 +104,10 @@ fi
 expected_fork_data="{\"fork\":{\"blockchain_length\":$latest_height,\"global_slot_since_genesis\":$latest_ne_slot,\"state_hash\":\"$latest_shash\"},\"next_seed\":\"${latest_ne[$IX_NEXT_EPOCH_SEED]}\",\"staking_seed\":\"${latest_ne[$IX_CUR_EPOCH_SEED]}\"}"
 
 # 4. Check that no new blocks are created
+echo "sleep 1m"
 sleep 1m
 height1=$(get_height 10303)
+echo "sleep 5m"
 sleep 5m
 height2=$(get_height 10303)
 if [[ $(( height2 - height1 )) -gt 0 ]]; then
@@ -112,6 +115,8 @@ if [[ $(( height2 - height1 )) -gt 0 ]]; then
   stop_nodes "$MAIN_MINA_EXE"
   exit 3
 fi
+
+echo "Getting fork config from 10313"
 
 # 6. Transition root is extracted into a new runtime config
 get_fork_config 10313 > localnet/fork_config.json
@@ -122,9 +127,11 @@ while [[ "$(stat -c %s localnet/fork_config.json)" == 0 ]] || [[ "$(head -c 4 lo
   get_fork_config 10313 > localnet/fork_config.json
 done
 
+
 # 7. Runtime config is converted with a script to have only ledger hashes in the config
 stop_nodes "$MAIN_MINA_EXE"
 
+echo "Generating fork data"
 fork_data="$(jq -cS '{fork:.proof.fork,next_seed:.epoch_data.next.seed,staking_seed:.epoch_data.staking.seed}' localnet/fork_config.json)"
 if [[ "$fork_data" != "$expected_fork_data" ]]; then
   echo "Assertion failed: unexpected fork data" >&2
