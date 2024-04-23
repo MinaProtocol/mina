@@ -146,12 +146,12 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       ~key:(Location.serialize ~ledger_depth:depth location)
       ~data:bin
 
-  let set_raw_batch { kvdb; depth; _ } locations_bins =
+  let set_raw_batch { kvdb; depth; _ } ?remove_keys locations_bins =
     let serialize_location (loc, bin) =
       (Location.serialize ~ledger_depth:depth loc, bin)
     in
     let serialized = List.map locations_bins ~f:serialize_location in
-    Kvdb.set_batch kvdb ~key_data_pairs:serialized
+    Kvdb.set_batch kvdb ~key_data_pairs:serialized ?remove_keys ()
 
   let set_bin mdb location bin_size bin_write v =
     let buf = Bigstring.create (bin_size v) in
@@ -231,6 +231,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       Kvdb.set_batch mdb.kvdb
         ~key_data_pairs:
           (set_batch_create ~ledger_depth:mdb.depth keys_to_locations)
+        ()
 
     let last_location_key () =
       Location.build_generic (Bigstring.of_string "last_account_location")
@@ -413,6 +414,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     let _add_batch mdb pks_to_tokens =
       Kvdb.set_batch mdb.kvdb
         ~key_data_pairs:(add_batch_create mdb pks_to_tokens)
+        ()
   end
 
   let location_of_account t key =
@@ -488,7 +490,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
            @ Account_location.set_batch_create ~ledger_depth:mdb.depth
                key_to_location_list )
       in
-      Kvdb.set_batch mdb.kvdb ~remove_keys:[] ~key_data_pairs:batched_changes
+      Kvdb.set_batch mdb.kvdb ~remove_keys:[] ~key_data_pairs:batched_changes ()
 
     let set_raw_account_batch mdb
         (addresses_and_accounts : (location * Account.t) list) =
@@ -501,7 +503,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
               (Account_id.derive_token_id ~owner:aid, aid) )
       in
       Kvdb.set_batch mdb.kvdb ~remove_keys:[]
-        ~key_data_pairs:token_owner_changes
+        ~key_data_pairs:token_owner_changes ()
   end)
 
   let set_hash mdb location new_hash =
