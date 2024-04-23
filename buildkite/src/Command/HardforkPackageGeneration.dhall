@@ -92,7 +92,7 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
           dirtyWhen = [ S.everything ]
         , path = "Release"
         , name = pipelineName
-        , tags = [ PipelineTag.Type.Release, PipelineTag.Type.Hardfork ]
+        , tags = [ PipelineTag.Type.Release, PipelineTag.Type.Hardfork, PipelineTag.Type.Long ]
         , mode = PipelineMode.Type.Stable
         }
       , steps =
