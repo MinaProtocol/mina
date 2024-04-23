@@ -31,7 +31,7 @@ let buildTestCmd : Text -> Size -> List Command.TaggedKey.Type -> Command.Type =
         Cmd.run "gsutil cp *-type_shape.txt $MINA_TYPE_SHAPE gs://mina-type-shapes",
         Cmd.runInDocker
             Cmd.Docker::{
-              image = (../Constants/ContainerImages.dhall).minaToolchainBullseye
+              image = (../../Constants/ContainerImages.dhall).minaToolchainBullseye
             } "buildkite/scripts/version-linter-patch-missing-type-shapes.sh ${release_branch}",
         Cmd.runInDocker
           Cmd.Docker::{
