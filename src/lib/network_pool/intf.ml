@@ -42,11 +42,7 @@ module type Resource_pool_base_intf = sig
 end
 
 module Verification_error = struct
-  type t =
-    | Fee_higher
-    | Fee_equal
-    | Invalid of Error.t
-    | Failure of Error.t
+  type t = Fee_higher | Fee_equal | Invalid of Error.t | Failure of Error.t
 
   let to_error = function
     | Fee_equal ->
