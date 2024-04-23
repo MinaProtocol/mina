@@ -613,12 +613,12 @@ let () =
                 complete"
          and log_json = Cli_lib.Flag.Log.json
          and log_level = Cli_lib.Flag.Log.level
-         and file_log_level = Cli_lib.Flag.Log.file_log_level
          and precomputed_blocks_local_path =
-          Param.flag "--precomputed-blocks-local-path"
-            ~aliases:[ "-precomputed-blocks-local-path" ]
-            Param.(optional string)
-            ~doc:"PATH the precomputed blocks on-disk location" in
+           Param.flag "--precomputed-blocks-local-path"
+             ~aliases:[ "-precomputed-blocks-local-path" ]
+             Param.(optional string)
+             ~doc:"PATH the precomputed blocks on-disk location"
+         in
          let precomputed_blocks_local_path =
            Option.value precomputed_blocks_local_path ~default:"."
          in
