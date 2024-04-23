@@ -252,7 +252,6 @@ let
           cp src/app/replayer/replayer.exe $berkeley_migration/bin/mina-migration-replayer
           cp src/app/berkeley_migration/berkeley_migration.exe $berkeley_migration/bin/mina-berkeley-migration
           cp src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe $berkeley_migration/bin/mina-berkeley-migration-verifier
-          cp ${../scripts/archive/migration/mina-berkeley-migration-script} $berkeley_migration/bin/mina-berkeley-migration-script
           cp src/app/swap_bad_balances/swap_bad_balances.exe $archive/bin/mina-swap-bad-balances
           cp -R _doc/_html $out/share/doc/html
           # cp src/lib/mina_base/sample_keypairs.json $sample/share/mina
