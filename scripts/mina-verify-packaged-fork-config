@@ -39,9 +39,10 @@ EOF
 fi
 
 source_build_fallback() {
-    if [ ! -x $(command -v "$1") ]; then
+    v=$(command -v "$1")
+    if [ ! -x "$v" ]; then
         if [ ! -x "$2" ]; then
-            echo "Error: program not found installed($1) or from source tree($2)" >&2
+            echo "Error: program not found in PATH (as $1) or relative to cwd (as $2)" >&2
             exit 1
         else
             echo "$2"
