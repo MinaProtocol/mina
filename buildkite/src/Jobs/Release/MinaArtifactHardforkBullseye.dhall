@@ -4,4 +4,4 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-in  Pipeline.build (HardforkPackageGeneration.pipeline DebianVersions.DebVersion.Bullseye)
+in  Pipeline.build (HardforkPackageGeneration.pipeline HardforkPackageGeneration.Spec::{=} )

@@ -4,4 +4,6 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-in  Pipeline.build (HardforkPackageGeneration.pipeline DebianVersions.DebVersion.Focal)
+in  Pipeline.build (HardforkPackageGeneration.pipeline HardforkPackageGeneration.Spec::{
+    codename = DebianVersions.DebVersion.Focal
+})
