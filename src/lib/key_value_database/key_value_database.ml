@@ -59,7 +59,11 @@ module Intf = struct
     val remove : t -> key:key -> unit M.t
 
     val set_batch :
-      t -> ?remove_keys:key list -> update_pairs:(key * value) list -> unit M.t
+         t
+      -> ?remove_keys:key list
+      -> update_pairs:(key * value) list
+      -> unit
+      -> unit M.t
 
     val to_alist : t -> (key * value) list M.t
   end
@@ -109,7 +113,7 @@ module Make_mock
     let keys = Key.Table.keys t in
     List.random_element keys
 
-  let set_batch t ?(remove_keys = []) ~update_pairs =
+  let set_batch t ?(remove_keys = []) ~update_pairs () =
     List.iter update_pairs ~f:(fun (key, data) -> set t ~key ~data) ;
     List.iter remove_keys ~f:(fun key -> remove t ~key)
 

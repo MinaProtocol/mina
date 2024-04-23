@@ -27,7 +27,7 @@ module Make (Key : Binable.S) (Value : Binable.S) :
       ~key:(Binable.to_bigstring (module Key) key)
       ~data:(Binable.to_bigstring (module Value) data)
 
-  let[@warning "-16"] set_batch t ?(remove_keys = []) ~update_pairs =
+  let set_batch t ?(remove_keys = []) ~update_pairs () =
     let key_data_pairs =
       List.map update_pairs ~f:(fun (key, data) ->
           ( Binable.to_bigstring (module Key) key
@@ -36,7 +36,7 @@ module Make (Key : Binable.S) (Value : Binable.S) :
     let remove_keys =
       List.map remove_keys ~f:(Binable.to_bigstring (module Key))
     in
-    Database.set_batch t ~remove_keys ~key_data_pairs
+    Database.set_batch t ~remove_keys ~key_data_pairs ()
 
   let remove t ~key =
     Database.remove t ~key:(Binable.to_bigstring (module Key) key)

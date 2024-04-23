@@ -181,6 +181,7 @@ module type Key_value_database = sig
     -> ?remove_keys:Bigstring.t list
     -> key_data_pairs:(Bigstring.t * Bigstring.t) list
     -> unit
+    -> unit
 
   (** An association list, sorted by key *)
   val to_alist : t -> (Bigstring.t * Bigstring.t) list
