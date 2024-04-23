@@ -42,7 +42,12 @@ module type Resource_pool_base_intf = sig
 end
 
 module Verification_error = struct
-  type t = Fee_higher | Fee_equal | Invalid of Error.t | Failure of Error.t
+  type t =
+    | Fee_higher
+    | Fee_equal
+    | Recently_seen
+    | Invalid of Error.t
+    | Failure of Error.t
 
   let to_error = function
     | Fee_equal ->
@@ -53,8 +58,12 @@ module Verification_error = struct
         Error.tag err ~tag:"invalid"
     | Failure err ->
         Error.tag err ~tag:"failure"
+    | Recently_seen ->
+        Error.of_string "recently seen"
 
   let to_short_string = function
+    | Recently_seen ->
+        "recently_seen"
     | Fee_equal ->
         "fee_equal"
     | Fee_higher ->
