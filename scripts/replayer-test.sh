@@ -4,7 +4,7 @@
 
 REPLAYER_DIR=src/app/replayer
 REPLAYER_APP=_build/default/src/app/replayer/replayer.exe
-PG_CONN=PG_CONN=postgres://postgres:postgres@localhost:5433/archive
+PG_CONN=postgres://postgres:postgres@localhost:5433/archive
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -d|--dir) REPLAYER_DIR="$2"; shift;;
