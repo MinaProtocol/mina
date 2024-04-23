@@ -65,7 +65,7 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
   let module Blockchain_state = Mina_state.Blockchain_state in
   let module Consensus_state = Consensus.Data.Consensus_state in
   let query_mainnet_db ~f = Mina_caqti.query ~f mainnet_pool in
-  [%log debug] "Fetching transaction sequence from prior database" ;
+  [%log info] "Fetching transaction sequence from prior database" ;
   let%bind block_user_cmds =
     query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
         Conn.collect_list
@@ -174,7 +174,7 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
         in
         Map.add_multi acc ~key:join.block_id ~data:ext_cmd )
   in
-  [%log debug] "Done fetching transaction sequence from prior database" ;
+  [%log info] "Done fetching transaction sequence from prior database" ;
   return
     (List.map blocks ~f:(fun block ->
          let state_hash =
@@ -252,11 +252,11 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
   [%log info] "Populating original genesis ledger balances" ;
   (* inlined from Archive_lib.Processor.add_genesis_accounts to avoid
      recomputing values from runtime config *)
-  [%log info] "Loading genesis ledger" ;
+  [%log info] "Creating genesis ledger" ;
   let ledger =
     Lazy.force @@ Precomputed_values.genesis_ledger precomputed_values
   in
-  [%log info] "Done!" ;
+  [%log info] "Created genesis ledger" ;
   let%bind genesis_block_id =
     query_migrated_db ~f:(fun db -> Sql.Berkeley.Block.genesis_block_id db ())
   in
@@ -290,61 +290,48 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
       ~compare:(fun (_id_1, index_1) (_id_2, index_2) ->
         compare index_1 index_2 )
   in
-  let total = List.length account_ids_to_migrate in
+  [%log info] "Migrating %d accounts" (List.length account_ids_to_migrate) ;
   let%map () =
-    Progress.with_reporter
-      Progress.Line.(
-        list
-          [ const "Migrating accounts"; spinner (); bar total; count_to total ])
-      (fun progress ->
-        Deferred.List.iter account_ids_to_migrate ~f:(fun (acct_id, index) ->
-            match Mina_ledger.Ledger.location_of_account ledger acct_id with
-            | None ->
-                [%log error] "Could not get location for account"
-                  ~metadata:
-                    [ ("account_id", Mina_base.Account_id.to_yojson acct_id) ] ;
-                failwith "Could not get location for genesis account"
-            | Some loc ->
-                let acct =
-                  match Mina_ledger.Ledger.get ledger loc with
-                  | None ->
-                      [%log error] "Could not get account, given a location"
-                        ~metadata:
-                          [ ( "account_id"
-                            , Mina_base.Account_id.to_yojson acct_id )
-                          ] ;
-                      failwith "Could not get genesis account, given a location"
-                  | Some acct ->
-                      acct
-                in
-                query_migrated_db ~f:(fun db ->
-                    match%map
-                      Archive_lib.Processor.Accounts_accessed
-                      .add_if_doesn't_exist db genesis_block_id (index, acct)
-                    with
-                    | Ok _ ->
-                        progress 1 ; Ok ()
-                    | Error err ->
-                        [%log error] "Could not add genesis account"
-                          ~metadata:
-                            [ ( "account_id"
-                              , Mina_base.Account_id.to_yojson acct_id )
-                            ; ("error", `String (Caqti_error.show err))
-                            ] ;
-                        failwith "Could not add add genesis account" ) ) )
+    Deferred.List.iter account_ids_to_migrate ~f:(fun (acct_id, index) ->
+        match Mina_ledger.Ledger.location_of_account ledger acct_id with
+        | None ->
+            [%log error] "Could not get location for account"
+              ~metadata:
+                [ ("account_id", Mina_base.Account_id.to_yojson acct_id) ] ;
+            failwith "Could not get location for genesis account"
+        | Some loc ->
+            let acct =
+              match Mina_ledger.Ledger.get ledger loc with
+              | None ->
+                  [%log error] "Could not get account, given a location"
+                    ~metadata:
+                      [ ("account_id", Mina_base.Account_id.to_yojson acct_id) ] ;
+                  failwith "Could not get genesis account, given a location"
+              | Some acct ->
+                  acct
+            in
+            query_migrated_db ~f:(fun db ->
+                match%map
+                  Archive_lib.Processor.Accounts_accessed.add_if_doesn't_exist
+                    db genesis_block_id (index, acct)
+                with
+                | Ok _ ->
+                    Ok ()
+                | Error err ->
+                    [%log error] "Could not add genesis account"
+                      ~metadata:
+                        [ ("account_id", Mina_base.Account_id.to_yojson acct_id)
+                        ; ("error", `String (Caqti_error.show err))
+                        ] ;
+                    failwith "Could not add add genesis account" ) )
   in
   [%log info] "Done populating original genesis ledger balances!"
 
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
     ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
     ~stream_precomputed_blocks ~keep_precomputed_blocks
-    ~precomputed_blocks_local_path ~log_json ~log_level ~file_log_level
-    ~log_filename () =
+    ~precomputed_blocks_local_path ~log_json ~log_level () =
   Cli_lib.Stdout_log.setup log_json log_level ;
-  Option.iter log_filename ~f:(fun log_filename ->
-      Logger.Consumer_registry.register ~id:"default"
-        ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
-        ~transport:(Logger_file_system.evergrowing ~log_filename) ) ;
   let logger = Logger.create () in
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
@@ -624,20 +611,18 @@ let () =
              ~doc:
                "Keep the precomputed blocks on-disk after the migration is \
                 complete"
+         and log_json = Cli_lib.Flag.Log.json
+         and log_level = Cli_lib.Flag.Log.level
          and precomputed_blocks_local_path =
            Param.flag "--precomputed-blocks-local-path"
              ~aliases:[ "-precomputed-blocks-local-path" ]
              Param.(optional string)
              ~doc:"PATH the precomputed blocks on-disk location"
-         and log_json = Cli_lib.Flag.Log.json
-         and log_level = Cli_lib.Flag.Log.level
-         and file_log_level = Cli_lib.Flag.Log.file_log_level
-         and log_filename = Cli_lib.Flag.Log.file in
+         in
          let precomputed_blocks_local_path =
            Option.value precomputed_blocks_local_path ~default:"."
          in
          main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
            ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
            ~stream_precomputed_blocks ~keep_precomputed_blocks ~log_json
-           ~log_level ~log_filename ~file_log_level
-           ~precomputed_blocks_local_path )))
+           ~log_level ~precomputed_blocks_local_path )))

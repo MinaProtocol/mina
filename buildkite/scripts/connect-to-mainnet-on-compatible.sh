@@ -3,7 +3,7 @@
 set -eo pipefail
 
 case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
-    compatible|release-automation-testing/*|release/*)
+    compatible|release/*)
       ;;
     *) 
       echo "Not pulling against compatible or not in release branch. Therefore, not running the connect test"
