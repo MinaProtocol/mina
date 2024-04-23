@@ -434,7 +434,6 @@ struct
 
     type t =
       { mutable pool : Indexed_pool.t
-      ; recently_seen : (Lru_cache.t[@sexp.opaque])
       ; locally_generated_uncommitted :
           ( Transaction_hash.User_command_with_valid_signature.t
           , Time.t * [ `Batch of int ] )
@@ -855,7 +854,6 @@ struct
         ; logger
         ; batcher = Batcher.create config.verifier
         ; best_tip_diff_relay = None
-        ; recently_seen = Lru_cache.Q.create ()
         ; best_tip_ledger = None
         ; verification_key_table = Vk_refcount_table.create ()
         }
@@ -1106,20 +1104,7 @@ struct
           , Intf.Verification_error.t )
           Deferred.Result.t =
         let open Deferred.Result.Let_syntax in
-        let is_sender_local =
-          Envelope.Sender.(equal Local) (Envelope.Incoming.sender diff)
-        in
         let open Intf.Verification_error in
-        let%bind () =
-          (* TODO: we should probably remove this -- the libp2p gossip cache should cover this already (#11704) *)
-          let (`Already_mem already_mem) =
-            Lru_cache.add t.recently_seen (Lru_cache.T.hash diff.data)
-          in
-          Deferred.return
-          @@ Result.ok_if_true
-               ((not already_mem) || is_sender_local)
-               ~error:Recently_seen
-        in
         let%bind () =
           let well_formedness_errors =
             List.fold (Envelope.Incoming.data diff) ~init:[]
