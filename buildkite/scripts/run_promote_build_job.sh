@@ -60,8 +60,8 @@ DHALL_DEBIANS="([] : List $DEBIAN_DHALL_DEF.Type)"
 
 if [[ -n "$DEBIANS" ]]; then 
     if [[ -z "$CODENAMES" ]]; then usage "Codenames is not set!"; exit 1; fi;
-    if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; exit 1;  fi;
-    if [[ -z "$NETWORK" ]]; then NETWORK="Berkeley"; exit 1; fi;
+    if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
+    if [[ -z "$NETWORK" ]]; then NETWORK="Berkeley"; fi;
     if [[ -z "$REMOVE_PROFILE_FROM_NAME" ]]; then REMOVE_PROFILE_FROM_NAME=0; fi;
     if [[ -z "$FROM_CHANNEL" ]]; then usage "'From channel' arg is not set!"; exit 1;  fi;
     if [[ -z "$TO_CHANNEL" ]]; then usage "'To channel' arg is not set!"; exit 1; fi;
