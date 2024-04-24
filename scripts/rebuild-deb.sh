@@ -252,6 +252,7 @@ EOF
   sudo cp ./default/src/app/rosetta/rosetta_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
 
   # Switch the default configuration to devnet.json:
+  mkdir -p "${BUILDDIR}/var/lib/coda"
   sudo cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
 
   # Overwrite the mina.service with a new default PEERS_URL
