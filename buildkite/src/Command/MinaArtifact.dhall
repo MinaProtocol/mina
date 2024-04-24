@@ -23,14 +23,14 @@ let build_daemon_docker_step : Profiles.Type -> DebianVersions.DebVersion -> Doc
 
     merge {
       Devnet = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
+          deps=DebianVersions.dependsOn debVersion profile,
           service="mina-daemon",
           network="devnet",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="daemon-devnet-${DebianVersions.lowerName debVersion}-profile-${Profiles.lowerName profile}-docker-image"
         },
       Mainnet = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
+          deps=DebianVersions.dependsOn debVersion profile,
           service="mina-daemon",
           network="mainnet",
           deb_codename="${DebianVersions.lowerName debVersion}",
@@ -80,7 +80,7 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type -> Pipeline.Config.Typ
 
         -- test_executive image
         let testExecutiveSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
+          deps=DebianVersions.dependsOn debVersion profile,
           service="mina-test-executive",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="test-executive-${DebianVersions.lowerName debVersion}-profile-${Profiles.lowerName profile}-docker-image"
@@ -90,7 +90,7 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type -> Pipeline.Config.Typ
 
         -- archive image
         let archiveSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
+          deps=DebianVersions.dependsOn debVersion profile,
           service="mina-archive",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="archive-${DebianVersions.lowerName debVersion}-profile-${Profiles.lowerName profile}-docker-image"
@@ -100,7 +100,7 @@ let pipeline : DebianVersions.DebVersion -> Profiles.Type -> Pipeline.Config.Typ
 
         -- archive maintenance image
         let archiveSpec = DockerImage.ReleaseSpec::{
-          deps=DebianVersions.dependsOn debVersion,
+          deps=DebianVersions.dependsOn debVersion profile,
           service="mina-archive-maintenance",
           deb_codename="${DebianVersions.lowerName debVersion}",
           step_key="archive-maintenance-${DebianVersions.lowerName debVersion}-profile-${Profiles.lowerName profile}-docker-image"
