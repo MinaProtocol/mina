@@ -1,11 +1,11 @@
-(tests
- (names test_graphql_scalars)
+(test
+ (name test_pickles)
  (flags
   (:standard -warn-error +a)
   -open Core_kernel
-  -open Pickles_unix
+  -open Pickles_graphql
   )
- (package pickles)
+ (package graphql_lib)
  (preprocess (pps ppx_jane))
  (libraries
    ; opam libraries
@@ -19,5 +19,5 @@
   pasta_bindings
   pickles
   pickles.backend  
-  pickles.unix)
+  graphql_lib.pickles)
  (action (run %{test})))

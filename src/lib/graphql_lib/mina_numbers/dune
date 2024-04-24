@@ -1,6 +1,6 @@
 (library
- (name mina_transaction_unix)
- (public_name mina_transaction.unix)
+ (name mina_numbers_graphql)
+ (public_name graphql_lib.mina_numbers)
  (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
@@ -13,10 +13,9 @@
    ppx_inline_test.config
    ;; local libraries
    graphql_basic_scalars
-   mina_transaction
-   mina_base
-   genesis_constants
+   mina_numbers
  )
  (preprocess (pps ppx_jane ppx_version))
- (instrumentation (backend bisect_ppx))
- (synopsis "Utils that depends on the unix library"))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis "Definitions required for graphql implementation"))
