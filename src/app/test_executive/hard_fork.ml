@@ -522,14 +522,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           { zkapp_command_spec with
             preconditions =
               Some
-                { network = Zkapp_precondition.Protocol_state.accept
+                { network =
+                    { Zkapp_precondition.Protocol_state.accept with
+                      global_slot_since_genesis =
+                        Check
+                          { upper = Global_slot_since_genesis.of_int 400000
+                          ; lower = Global_slot_since_genesis.zero
+                          }
+                    }
                 ; account = Zkapp_precondition.Account.accept
-                ; valid_while =
-                    Check
-                      Zkapp_precondition.Closed_interval.
-                        { lower = Global_slot_since_genesis.zero
-                        ; upper = Global_slot_since_genesis.of_int 400000
-                        }
+                ; valid_while = Ignore
                 }
           }
       in
@@ -549,18 +551,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           { zkapp_command_spec with
             preconditions =
               Some
-                { network = Zkapp_precondition.Protocol_state.accept
+                { network =
+                    { Zkapp_precondition.Protocol_state.accept with
+                      global_slot_since_genesis =
+                        Check
+                          { upper =
+                              Global_slot_since_genesis.of_int
+                                ( Global_slot_since_hard_fork.to_int
+                                    global_slot_since_hard_fork
+                                + 500000 - 5 )
+                          ; lower = Global_slot_since_genesis.zero
+                          }
+                    }
                 ; account = Zkapp_precondition.Account.accept
-                ; valid_while =
-                    Check
-                      Zkapp_precondition.Closed_interval.
-                        { lower = Global_slot_since_genesis.zero
-                        ; upper =
-                            Global_slot_since_genesis.of_int
-                              ( Global_slot_since_hard_fork.to_int
-                                  global_slot_since_hard_fork
-                              + 500000 - 5 )
-                        }
+                ; valid_while = Ignore
                 }
           }
       in
