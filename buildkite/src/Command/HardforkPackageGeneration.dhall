@@ -113,7 +113,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
                 }
               ]
             , service = "mina-daemon"
-            , network = network
+            , network = network_name
             , deb_codename = "${DebianVersions.lowerName debVersion}"
             , deb_profile = "${Profiles.lowerName profile}"
             , step_key = "daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
@@ -151,7 +151,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
                 }
               ]
             , service = "mina-archive"
-            , network = network
+            , network = network_name
             , deb_codename = "${DebianVersions.lowerName debVersion}"
             , deb_profile = "${Profiles.lowerName profile}"
             , step_key = "archive-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
@@ -164,7 +164,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
                 }
               ]
             , service = "mina-rosetta"
-            , network = network
+            , network = network_name
             , deb_codename = "${DebianVersions.lowerName debVersion}"
             , step_key = "rosetta-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
             }
