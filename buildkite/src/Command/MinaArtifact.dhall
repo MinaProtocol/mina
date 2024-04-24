@@ -41,7 +41,7 @@ let pipeline : DebianVersions.DebVersion -> Text -> Pipeline.Config.Type =
               -- add zexe standardization preprocessing step (see: https://github.com/MinaProtocol/mina/pull/5777)
               "PREPROCESSOR=./scripts/zexe-standardize.sh"
             ] "./buildkite/scripts/build-artifact.sh",
-            label = "Build Mina for ${DebianVersions.capitalName debVersion}",
+            label = "Build Mina for ${DebianVersions.capitalName debVersion} with profile ${profile}",
             key = "build-deb-pkg",
             target = Size.XLarge,
             retries = [
@@ -57,7 +57,7 @@ let pipeline : DebianVersions.DebVersion -> Text -> Pipeline.Config.Type =
           service="mina-daemon",
           network="devnet",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="daemon-devnet-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="daemon-devnet-${DebianVersions.lowerName debVersion}-profile-${profile}-docker-image"
         }
         in
         DockerImage.generateStep daemonDevnetSpec,
@@ -68,7 +68,7 @@ let pipeline : DebianVersions.DebVersion -> Text -> Pipeline.Config.Type =
           service="mina-daemon",
           network="mainnet",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="daemon-mainnet-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="daemon-mainnet-${DebianVersions.lowerName debVersion}-profile-${profile}-docker-image"
         }
         in
         DockerImage.generateStep daemonMainnetSpec,
@@ -78,7 +78,7 @@ let pipeline : DebianVersions.DebVersion -> Text -> Pipeline.Config.Type =
           deps=DebianVersions.dependsOn debVersion,
           service="mina-test-executive",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="test-executive-${DebianVersions.lowerName debVersion}-profile-${profile}-docker-image"
         }
         in
         DockerImage.generateStep testExecutiveSpec,
@@ -88,7 +88,7 @@ let pipeline : DebianVersions.DebVersion -> Text -> Pipeline.Config.Type =
           deps=DebianVersions.dependsOn debVersion,
           service="mina-archive",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="archive-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="archive-${DebianVersions.lowerName debVersion}-profile-${profile}-docker-image"
         }
         in
         DockerImage.generateStep archiveSpec,
@@ -98,7 +98,7 @@ let pipeline : DebianVersions.DebVersion -> Text -> Pipeline.Config.Type =
           deps=DebianVersions.dependsOn debVersion,
           service="mina-archive-maintenance",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="archive-maintenance-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="archive-maintenance-${DebianVersions.lowerName debVersion}-profile-${profile}-docker-image"
         }
         in
         DockerImage.generateStep archiveSpec,
@@ -108,7 +108,7 @@ let pipeline : DebianVersions.DebVersion -> Text -> Pipeline.Config.Type =
           service="mina-rosetta",
           extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --no-cache",
           deb_codename="${DebianVersions.lowerName debVersion}",
-          step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
+          step_key="rosetta-${DebianVersions.lowerName debVersion}-profile-${profile}-docker-image"
         }
         in
         DockerImage.generateStep rosettaSpec
