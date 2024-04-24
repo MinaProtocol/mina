@@ -75,7 +75,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
       let pipelineName = "MinaArtifactHardfork${DebianVersions.capitalName spec.codename}${Profiles.toSuffixUppercase profile}"
       let generateLedgersJobKey = "generate-ledger-tars-from-config"
       let debVersion = spec.codename
-      let image = image = "gcr.io/o1labs-192920/mina-daemon:\${BUILDKITE_COMMIT:0:7}-${DebianVersions.lowerName debVersion}-${network_name}"
+      let image = "gcr.io/o1labs-192920/mina-daemon:\${BUILDKITE_COMMIT:0:7}-${DebianVersions.lowerName debVersion}-${network_name}"
       
       in
   
