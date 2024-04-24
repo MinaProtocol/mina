@@ -129,7 +129,7 @@ ls -lh mina*.deb
 ##################################### END LOGPROC PACKAGE #######################################
 
 ##################################### GENERATE MINA MAINNET PACKAGE #######################################
-if [[ "${DUNE_PROFILE}" -eq "mainnet" ]]; then 
+if [[ "${DUNE_PROFILE}" == "mainnet" ]]; then 
 
   ###### deb without the proving keys
   echo "------------------------------------------------------------"
@@ -219,7 +219,7 @@ fi
 ##################################### END GENERATE MINA MAINNET PACKAGE #######################################
 
 ##################################### GENERATE MINA DEVNET PACKAGE #######################################
-if [[ "${DUNE_PROFILE}" -eq "devnet" ]]; then 
+if [[ "${DUNE_PROFILE}" == "devnet" ]]; then 
   ###### deb with testnet signatures
   echo "------------------------------------------------------------"
   echo "Building testnet signatures deb without keys:"
