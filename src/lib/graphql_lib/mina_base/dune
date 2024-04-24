@@ -1,6 +1,6 @@
 (library
- (name mina_base_unix)
- (public_name mina_base.unix)
+ (name mina_base_graphql)
+ (public_name graphql_lib.mina_base)
  (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
@@ -23,4 +23,4 @@
  )
  (preprocess (pps ppx_jane ppx_version))
  (instrumentation (backend bisect_ppx))
- (synopsis "Utils that depends on the unix library"))
+ (synopsis "Definitions required for graphql implementation"))
