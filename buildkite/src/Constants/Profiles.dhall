@@ -5,7 +5,7 @@ let Profile : Type = < Devnet | Mainnet >
 let capitalName = \(profile : Profile) ->
   merge {
     Devnet = "Devnet"
-    , Mainnet = "Lightnet"
+    , Mainnet = "Mainnet"
   } profile
 
 let lowerName = \(profile : Profile) ->
