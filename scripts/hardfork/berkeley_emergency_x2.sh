@@ -21,31 +21,19 @@ set -exo pipefail
 
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
 
-if [[ ! -L berkeley2-devnet ]]; then
-  berkeley2_branch="rb/berkeley2"
-  if [[ $# == 0 ]]; then
-    berkeley2_build=$(mktemp -d)
-    git clone -b $berkeley2_branch --single-branch "https://github.com/MinaProtocol/mina.git" "$berkeley2_build"
-    cd "$berkeley2_build"
-  else
-    git checkout -f $1
-    git checkout -f $berkeley2_branch
-    git checkout -f $1 -- scripts/hardfork
-    berkeley2_build="$INIT_DIR"
-  fi
-  
-  git submodule sync --recursive
-  git submodule update --init --recursive
-  git apply "$SCRIPT_DIR"/localnet-patches/berkeley.patch
-  nix "${NIX_OPTS[@]}" build "$berkeley2_build?submodules=1#devnet" --out-link "$INIT_DIR/berkeley2-devnet"
-  nix "${NIX_OPTS[@]}" build "$berkeley2_build?submodules=1#devnet.genesis" --out-link "$INIT_DIR/berkeley2-devnet"
-  git apply -R "$SCRIPT_DIR"/localnet-patches/berkeley.patch
-  if [[ $# == 0 ]]; then
-    cd -
-    rm -Rf "$berkeley2_build"
-  fi
-fi
+INIT_DIR="$PWD"
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
+SRC_NAME="berkeley"
+SRC_BRANCH=$(git symbolic-ref --short HEAD)
+SRC_DEVNET="$INIT_DIR/$SRC_NAME-devnet"
+
+DST_NAME="berkeley2"
+DST_BRANCH="rb/berkeley2"
+DST_DEVNET="$INIT_DIR/$DST_NAME-devnet"
+
+
+echo "Building source network $SRC_NAME ..."
 if [[ $# -gt 0 ]]; then
   # Branch is specified, this is a CI run
   git checkout -f $1
@@ -53,8 +41,34 @@ if [[ $# -gt 0 ]]; then
   git submodule update --init --recursive
 fi
 git apply "$SCRIPT_DIR"/localnet-patches/berkeley.patch
-nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet" --out-link "$INIT_DIR/fork-devnet"
-nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet.genesis" --out-link "$INIT_DIR/fork-devnet"
+nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet" --out-link "$SRC_DEVNET"
+nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet.genesis" --out-link "$SRC_DEVNET"
 git apply -R "$SCRIPT_DIR"/localnet-patches/berkeley.patch
+
+echo "Building destination network $DST_NAME ..."
+if [[ ! -L dst-devnet ]]; then
+  if [[ $# == 0 ]]; then
+    dst_build=$(mktemp -d)
+    git clone -b $DST_BRANCH --single-branch "https://github.com/MinaProtocol/mina.git" "$dst_build"
+    cd "$dst_build"
+  else
+    git checkout -f $1
+    git checkout -f $DST_BRANCH
+    git checkout -f $1 -- scripts/hardfork
+    dst_build="$INIT_DIR"
+  fi
+  
+  git submodule sync --recursive
+  git submodule update --init --recursive
+  git apply "$SCRIPT_DIR"/localnet-patches/berkeley.patch
+  nix "${NIX_OPTS[@]}" build "$dst_build?submodules=1#devnet" --out-link "$DST_DEVNET"
+  nix "${NIX_OPTS[@]}" build "$dst_build?submodules=1#devnet.genesis" --out-link "$DST_DEVNET"
+  git apply -R "$SCRIPT_DIR"/localnet-patches/berkeley.patch
+  if [[ $# == 0 ]]; then
+    cd -
+    rm -Rf "$dst_build"
+  fi
+fi
+
 
 # ./scripts/hardfork/run-localnet.sh -m fork-devnet/bin/mina -d 10 -i 30 -s 30 -c localnet/config.json --genesis-ledger-dir localnet/hf_ledgers
