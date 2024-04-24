@@ -28,7 +28,7 @@ let pipeline : DebianVersions.DebVersion -> Text -> Pipeline.Config.Type =
           name = "MinaArtifact${DebianVersions.capitalName debVersion}-${profile}"
         },
       steps = [
-        Libp2p.step debVersion,
+        Libp2p.step debVersion profile,
         Command.build
           Command.Config::{
             commands = DebianVersions.toolchainRunner debVersion [
