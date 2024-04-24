@@ -59,13 +59,13 @@ let toolchainImage = \(debVersion : DebVersion) ->
 
 let dependsOn = \(debVersion : DebVersion) -> \(profile: Profiles.Type) ->
   merge {
-    Bookworm = [{ name = "MinaArtifactBookworm${Profiles.captialName profile}", key = "build-deb-pkg" }]
-    , Bullseye = [{ name = "MinaArtifactBullseye${Profiles.captialName profile}", key = "build-deb-pkg" }]
-    , Buster = [{ name = "MinaArtifactBuster${Profiles.captialName profile}", key = "build-deb-pkg" }]
-    , Stretch = [{ name = "MinaArtifactStretch${Profiles.captialName profile}", key = "build-deb-pkg" }]
-    , Jammy = [{ name = "MinaArtifactJammy${Profiles.captialName profile}", key = "build-deb-pkg" }]
-    , Focal = [{ name = "MinaArtifactFocal${Profiles.captialName profile}", key = "build-deb-pkg" }]
-    , Bionic = [{ name = "MinaArtifactBionic${Profiles.captialName profile}", key = "build-deb-pkg" }]
+    Bookworm = [{ name = "MinaArtifactBookworm${Profiles.capitalName profile}", key = "build-deb-pkg" }]
+    , Bullseye = [{ name = "MinaArtifactBullseye${Profiles.capitalName profile}", key = "build-deb-pkg" }]
+    , Buster = [{ name = "MinaArtifactBuster${Profiles.capitalName profile}", key = "build-deb-pkg" }]
+    , Stretch = [{ name = "MinaArtifactStretch${Profiles.capitalName profile}", key = "build-deb-pkg" }]
+    , Jammy = [{ name = "MinaArtifactJammy${Profiles.capitalName profile}", key = "build-deb-pkg" }]
+    , Focal = [{ name = "MinaArtifactFocal${Profiles.capitalName profile}", key = "build-deb-pkg" }]
+    , Bionic = [{ name = "MinaArtifactBionic${Profiles.capitalName profile}", key = "build-deb-pkg" }]
   } debVersion
 
 -- Most debian builds are only used for public releases
