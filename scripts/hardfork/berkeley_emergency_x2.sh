@@ -46,7 +46,7 @@ nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet.genesis" --out-link "$
 git apply -R "$SCRIPT_DIR"/localnet-patches/berkeley.patch
 
 echo "Building destination network $DST_NAME ..."
-if [[ ! -L dst-devnet ]]; then
+if [[ ! -L ${DST_DEVNET} ]]; then
   if [[ $# == 0 ]]; then
     dst_build=$(mktemp -d)
     git clone -b $DST_BRANCH --single-branch "https://github.com/MinaProtocol/mina.git" "$dst_build"
@@ -70,5 +70,10 @@ if [[ ! -L dst-devnet ]]; then
   fi
 fi
 
+SRC_TX_COUNT="30"
+export SRC_TX_COUNT
 
-# ./scripts/hardfork/run-localnet.sh -m fork-devnet/bin/mina -d 10 -i 30 -s 30 -c localnet/config.json --genesis-ledger-dir localnet/hf_ledgers
+echo "Running HF emergency test scenario (after $SRC_TX_COUNT transactions)"
+
+echo "MAIN_SLOT=30 $SCRIPT_DIR/test2.sh $SRC_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger} $DST_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger}"
+
