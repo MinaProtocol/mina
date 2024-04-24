@@ -1,6 +1,6 @@
 (library
- (name currency_unix)
- (public_name currency.unix)
+ (name consensus_graphql)
+ (public_name graphql_lib.consensus)
  (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
@@ -13,8 +13,13 @@
    ppx_inline_test.config
    ;; local libraries
    graphql_basic_scalars
-   currency
+   consensus
+   consensus.vrf
+   graphql_lib.currency
+   graphql_lib.mina_base
+   graphql_lib.mina_numbers
+   graphql_lib.signature_lib
  )
  (preprocess (pps ppx_jane ppx_version))
  (instrumentation (backend bisect_ppx))
- (synopsis "Unix specific utils for currency types"))
+ (synopsis "Definitions required for graphql implementation"))
