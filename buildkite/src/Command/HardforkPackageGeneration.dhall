@@ -75,6 +75,8 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
       let pipelineName = "MinaArtifactHardfork${DebianVersions.capitalName spec.codename}${Profiles.toSuffixUppercase profile}"
       let generateLedgersJobKey = "generate-ledger-tars-from-config"
       let debVersion = spec.codename
+      let image = image = "gcr.io/o1labs-192920/mina-daemon:\${BUILDKITE_COMMIT:0:7}-${DebianVersions.lowerName debVersion}-${network_name}"
+      
       in
   
       Pipeline.Config::{
@@ -121,7 +123,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
         , Command.build Command.Config::{
             commands = [
                 Cmd.runInDocker Cmd.Docker::{ 
-                  image = "gcr.io/o1labs-192920/mina-daemon:\${BUILDKITE_COMMIT:0:7}-${DebianVersions.lowerName debVersion}-${network}"
+                  image = image
                 -- an account with this balance seems present in many ledgers?
                 } "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed -e '0,/20.000001/{s/20.000001/20.01/}' -i config.json && ! (mina-verify-packaged-fork-config ${network} config.json /workdir/verification)"
             ]
@@ -134,7 +136,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
         , Command.build Command.Config::{
             commands = [
                 Cmd.runInDocker Cmd.Docker::{
-                  image = "gcr.io/o1labs-192920/mina-daemon:\${BUILDKITE_COMMIT:0:7}-${DebianVersions.lowerName debVersion}-${network}"
+                  image = image
                 } "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config ${network_name} config.json /workdir/verification"
             ]
             , label = "Verify packaged artifacts"
