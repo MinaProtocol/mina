@@ -357,11 +357,12 @@ module Itn = struct
               |> Unsigned.UInt16.of_int )
         ; field "peerId"
             ~args:Arg.[]
-            ~doc:"Peer id" ~typ:(non_null string)
+            ~doc:"Peer id" ~typ:string
             ~resolve:(fun { ctx = (_ : bool), mina; _ } _ ->
               Mina_lib.config mina
               |> fun Mina_lib.Config.{ gossip_net_params; _ } ->
-              Mina_net2.Keypair.to_peer_id gossip_net_params.keypair )
+              Option.map ~f:Mina_net2.Keypair.to_peer_id
+                gossip_net_params.keypair )
         ; field "isBlockProducer"
             ~args:Arg.[]
             ~doc:"Is the node a block producer" ~typ:(non_null bool)

@@ -28,7 +28,7 @@
    currency
    mina_ledger
    signature_lib
-   mina_base_import
+   mina_base.import
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_here ppx_custom_printf ppx_version ppx_mina ppx_let ppx_deriving_yojson ppx_sexp_conv ppx_optcomp))

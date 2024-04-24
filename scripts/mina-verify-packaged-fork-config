@@ -130,12 +130,17 @@ GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$PACKAGED_DAEMON_C
 
 echo "exporting ledgers from running node ... (this may take a while)" >&2
 
+override_file="$workdir/override-genesis-timestamp.json"
+echo "{\"genesis\":{\"genesis_state_timestamp\":\"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}}" > "$override_file"
+
 # export the packaged ledgers in a way where we know which one is which
 function extract_ledgers() {
     config_file=$1
     ledger_dir=$2
     json_prefix=$3
-    "$MINA_EXE" daemon --libp2p-keypair "$workdir/keys/p2p" --config-file "$config_file" --seed --genesis-ledger-dir "$ledger_dir" &
+    "$MINA_EXE" daemon --libp2p-keypair "$workdir/keys/p2p" \
+      --config-file "$config_file" --config-file "$override_file" \
+      --seed --genesis-ledger-dir "$ledger_dir" &
 
     while ! "$MINA_EXE" ledger export staged-ledger  | jq . 2>/dev/null >"$json_prefix-staged.json"; do
         sleep 1m
@@ -151,10 +156,18 @@ function extract_ledgers() {
     "$MINA_EXE" client stop
 }
 
-extract_ledgers "$PACKAGED_DAEMON_CONFIG" "$GENESIS_LEDGER_DIR" "$workdir/packaged"
-mv -t "$workdir/ledgers-backup" /var/lib/coda/*.tar.gz
+mkdir -p "$workdir/ledgers-downloaded"
+
+mv -t "$workdir/ledgers-backup" "$GENESIS_LEDGER_DIR"/*.tar.gz
+if [ -z ${NO_TEST_LEDGER_DOWNLOAD+z} ]; then
+    # We removed all *.tar.gz from GENESIS_LEDGER_DIR (in case it's one of default paths)
+    # and expect Mina node to be able to download these from S3
+    extract_ledgers "$PACKAGED_DAEMON_CONFIG" "$workdir/ledgers-downloaded" "$workdir/downloaded"
+    rm -Rf /tmp/coda_cache_dir/*.tar.gz /tmp/s3_cache_dir/*.tar.gz
+fi
 extract_ledgers "$workdir/config-substituted.json" "$workdir/ledgers" "$workdir/reference"
-mv -t /var/lib/coda "$workdir/ledgers-backup"/*
+mv -t "$GENESIS_LEDGER_DIR" "$workdir/ledgers-backup"/*
+extract_ledgers "$PACKAGED_DAEMON_CONFIG" "$GENESIS_LEDGER_DIR" "$workdir/packaged"
 
 echo "Performing final comparisons..." >&2
 error=0
@@ -177,6 +190,12 @@ for file in "$workdir"/packaged-*.json; do
     if ! cmp "$file" "$workdir/reference-$name.json"; then
         echo "Error: $file does not match reference" >&2
         error=1
+    fi
+    if [ -z ${NO_TEST_LEDGER_DOWNLOAD+z} ]; then
+        if ! cmp "$file" "$workdir/downloaded-$name.json"; then
+            echo "Error: $file does not match downloaded" >&2
+            error=1
+        fi
     fi
 done
 

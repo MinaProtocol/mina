@@ -248,11 +248,11 @@
     "nixpkgs-mozilla": {
       "flake": false,
       "locked": {
-        "lastModified": 1664789696,
-        "narHash": "sha256-UGWJHQShiwLCr4/DysMVFrYdYYHcOqAOVsWNUu+l6YU=",
+        "lastModified": 1704373101,
+        "narHash": "sha256-+gi59LRWRQmwROrmE1E2b3mtocwueCQqZ60CwLG+gbg=",
         "owner": "mozilla",
         "repo": "nixpkgs-mozilla",
-        "rev": "80627b282705101e7b38e19ca6e8df105031b072",
+        "rev": "9b11a87c0cc54e308fa83aac5b4ee1816d5418a2",
         "type": "github"
       },
       "original": {
@@ -263,16 +263,16 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1670837426,
-        "narHash": "sha256-VGm7k7R+zxZa5oZXGT/79SUlihzFxeWVcPmIn0k1y+8=",
+        "lastModified": 1713180868,
+        "narHash": "sha256-5CSnPSCEWeUmrFiLuYIQIPQzPrpCB8x3VhE+oXLRO3k=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "f277f5a27a877f9ceaaeecc8161c9f6d3b7f4f7c",
+        "rev": "140546acf30a8212a03a88ded8506413fa3b5d21",
         "type": "github"
       },
       "original": {
         "owner": "nixos",
-        "ref": "nixos-unstable-small",
+        "ref": "nixos-23.11-small",
         "repo": "nixpkgs",
         "type": "github"
       }
@@ -292,11 +292,11 @@
         "opam2json": "opam2json"
       },
       "locked": {
-        "lastModified": 1670004517,
-        "narHash": "sha256-7SffiN2S9pVfOoBCcEdY/iJe28p/eiRqVLXG7/8Jb3I=",
+        "lastModified": 1712645768,
+        "narHash": "sha256-9dUh8nElGtC74Q4gIDV6DM0FKgF1oXh0PUkCxdbp+sg=",
         "owner": "tweag",
         "repo": "opam-nix",
-        "rev": "b12b7fcd6f9ea0a8a939c05c68a95525f0d80af6",
+        "rev": "464863fba44c7ecc50bd1a2967274482a2c33daf",
         "type": "github"
       },
       "original": {
@@ -345,11 +345,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1665671715,
-        "narHash": "sha256-7f75C6fIkiLzfkwLpJxlQIKf+YORGsXGV8Dr2LDDi+A=",
+        "lastModified": 1671540003,
+        "narHash": "sha256-5pXfbUfpVABtKbii6aaI2EdAZTjHJ2QntEf0QD2O5AM=",
         "owner": "tweag",
         "repo": "opam2json",
-        "rev": "32fa2dcd993a27f9e75ee46fb8b78a7cd5d05113",
+        "rev": "819d291ea95e271b0e6027679de6abb4d4f7f680",
         "type": "github"
       },
       "original": {

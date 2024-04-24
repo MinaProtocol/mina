@@ -65,7 +65,7 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
   let module Blockchain_state = Mina_state.Blockchain_state in
   let module Consensus_state = Consensus.Data.Consensus_state in
   let query_mainnet_db ~f = Mina_caqti.query ~f mainnet_pool in
-  [%log debug] "Fetching transaction sequence from prior database" ;
+  [%log info] "Fetching transaction sequence from prior database" ;
   let%bind block_user_cmds =
     query_mainnet_db ~f:(fun (module Conn : CONNECTION) ->
         Conn.collect_list
@@ -174,7 +174,7 @@ let mainnet_block_to_extensional_batch ~logger ~mainnet_pool ~precomputed_blocks
         in
         Map.add_multi acc ~key:join.block_id ~data:ext_cmd )
   in
-  [%log debug] "Done fetching transaction sequence from prior database" ;
+  [%log info] "Done fetching transaction sequence from prior database" ;
   return
     (List.map blocks ~f:(fun block ->
          let state_hash =
@@ -252,11 +252,11 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
   [%log info] "Populating original genesis ledger balances" ;
   (* inlined from Archive_lib.Processor.add_genesis_accounts to avoid
      recomputing values from runtime config *)
-  [%log info] "Loading genesis ledger" ;
+  [%log info] "Creating genesis ledger" ;
   let ledger =
     Lazy.force @@ Precomputed_values.genesis_ledger precomputed_values
   in
-  [%log info] "Done!" ;
+  [%log info] "Created genesis ledger" ;
   let%bind genesis_block_id =
     query_migrated_db ~f:(fun db -> Sql.Berkeley.Block.genesis_block_id db ())
   in
@@ -290,60 +290,48 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
       ~compare:(fun (_id_1, index_1) (_id_2, index_2) ->
         compare index_1 index_2 )
   in
-  let total = List.length account_ids_to_migrate in
+  [%log info] "Migrating %d accounts" (List.length account_ids_to_migrate) ;
   let%map () =
-    Progress.with_reporter
-      Progress.Line.(
-        list
-          [ const "Migrating accounts"; spinner (); bar total; count_to total ])
-      (fun progress ->
-        Deferred.List.iter account_ids_to_migrate ~f:(fun (acct_id, index) ->
-            match Mina_ledger.Ledger.location_of_account ledger acct_id with
-            | None ->
-                [%log error] "Could not get location for account"
-                  ~metadata:
-                    [ ("account_id", Mina_base.Account_id.to_yojson acct_id) ] ;
-                failwith "Could not get location for genesis account"
-            | Some loc ->
-                let acct =
-                  match Mina_ledger.Ledger.get ledger loc with
-                  | None ->
-                      [%log error] "Could not get account, given a location"
-                        ~metadata:
-                          [ ( "account_id"
-                            , Mina_base.Account_id.to_yojson acct_id )
-                          ] ;
-                      failwith "Could not get genesis account, given a location"
-                  | Some acct ->
-                      acct
-                in
-                query_migrated_db ~f:(fun db ->
-                    match%map
-                      Archive_lib.Processor.Accounts_accessed
-                      .add_if_doesn't_exist db genesis_block_id (index, acct)
-                    with
-                    | Ok _ ->
-                        progress 1 ; Ok ()
-                    | Error err ->
-                        [%log error] "Could not add genesis account"
-                          ~metadata:
-                            [ ( "account_id"
-                              , Mina_base.Account_id.to_yojson acct_id )
-                            ; ("error", `String (Caqti_error.show err))
-                            ] ;
-                        failwith "Could not add add genesis account" ) ) )
+    Deferred.List.iter account_ids_to_migrate ~f:(fun (acct_id, index) ->
+        match Mina_ledger.Ledger.location_of_account ledger acct_id with
+        | None ->
+            [%log error] "Could not get location for account"
+              ~metadata:
+                [ ("account_id", Mina_base.Account_id.to_yojson acct_id) ] ;
+            failwith "Could not get location for genesis account"
+        | Some loc ->
+            let acct =
+              match Mina_ledger.Ledger.get ledger loc with
+              | None ->
+                  [%log error] "Could not get account, given a location"
+                    ~metadata:
+                      [ ("account_id", Mina_base.Account_id.to_yojson acct_id) ] ;
+                  failwith "Could not get genesis account, given a location"
+              | Some acct ->
+                  acct
+            in
+            query_migrated_db ~f:(fun db ->
+                match%map
+                  Archive_lib.Processor.Accounts_accessed.add_if_doesn't_exist
+                    db genesis_block_id (index, acct)
+                with
+                | Ok _ ->
+                    Ok ()
+                | Error err ->
+                    [%log error] "Could not add genesis account"
+                      ~metadata:
+                        [ ("account_id", Mina_base.Account_id.to_yojson acct_id)
+                        ; ("error", `String (Caqti_error.show err))
+                        ] ;
+                    failwith "Could not add add genesis account" ) )
   in
   [%log info] "Done populating original genesis ledger balances!"
 
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
     ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
-    ~stream_precomputed_blocks ~keep_precomputed_blocks ~log_json ~log_level
-    ~file_log_level ~log_filename () =
+    ~stream_precomputed_blocks ~keep_precomputed_blocks
+    ~precomputed_blocks_local_path ~log_json ~log_level () =
   Cli_lib.Stdout_log.setup log_json log_level ;
-  Option.iter log_filename ~f:(fun log_filename ->
-      Logger.Consumer_registry.register ~id:"default"
-        ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
-        ~transport:(Logger_file_system.evergrowing ~log_filename) ) ;
   let logger = Logger.create () in
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
@@ -498,6 +486,7 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
         Precomputed_block.concrete_fetch_batch ~logger
           ~bucket:mina_network_blocks_bucket ~network
           (required_precomputed_blocks blocks)
+          ~local_path:precomputed_blocks_local_path
       in
       let%bind prefetched_precomputed_blocks =
         if stream_precomputed_blocks then return Mina_base.State_hash.Map.empty
@@ -505,76 +494,63 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
           [%log info] "Prefetching all required precomputed blocks" ;
           fetch_precomputed_blocks_for mainnet_blocks_to_migrate )
       in
-      (* 3 * because we want to report download, migration, and reupload separately *)
-      let total_reports_expected = 3 * List.length mainnet_blocks_to_migrate in
+      [%log info] "Migrating mainnet blocks" ;
       let%bind () =
-        Progress.with_reporter
-          Progress.Line.(
-            list
-              [ const "Migrating blocks"
-              ; spinner ()
-              ; bar total_reports_expected
-              ; eta total_reports_expected
-              ; percentage_of total_reports_expected
-              ])
-          (fun f ->
-            List.chunks_of ~length:batch_size mainnet_blocks_to_migrate
-            |> Deferred.List.iter ~f:(fun (blocks : Sql.Mainnet.Block.t list) ->
-                   [%log debug]
-                     "Migrating %d blocks starting at height %Ld (%s..%s)"
-                     (List.length blocks) (List.hd_exn blocks).height
-                     (List.hd_exn blocks).state_hash
-                     (List.last_exn blocks).state_hash ;
-                   let%bind precomputed_blocks =
-                     if stream_precomputed_blocks then (
-                       [%log debug] "Fetching batch of precomputed blocks" ;
-                       fetch_precomputed_blocks_for blocks )
-                     else return prefetched_precomputed_blocks
-                   in
-                   f (Map.length precomputed_blocks) ;
-                   [%log debug] "Converting blocks to extensional format..." ;
-                   let%bind extensional_blocks =
-                     mainnet_block_to_extensional_batch ~logger ~mainnet_pool
-                       ~genesis_block ~precomputed_blocks blocks
-                   in
-                   f (List.length extensional_blocks) ;
-                   [%log debug] "Adding blocks to migrated database..." ;
-                   let%bind () =
-                     query_migrated_db ~f:(fun db ->
-                         match%map
-                           Archive_lib.Processor.Block
-                           .add_from_extensional_batch db extensional_blocks
-                             ~v1_transaction_hash:true
-                         with
-                         | Ok _id ->
-                             f (List.length extensional_blocks) ;
-                             Ok ()
-                         | Error (`Congested _) ->
-                             failwith
-                               "Could not archive extensional block batch: \
-                                congested"
-                         | Error (`Decode_rejected _ as err)
-                         | Error (`Encode_failed _ as err)
-                         | Error (`Encode_rejected _ as err)
-                         | Error (`Request_failed _ as err)
-                         | Error (`Request_rejected _ as err)
-                         | Error (`Response_failed _ as err)
-                         | Error (`Response_rejected _ as err) ->
-                             failwithf
-                               "Could not archive extensional block batch: %s"
-                               (Caqti_error.show err) () )
-                   in
-                   if stream_precomputed_blocks && not keep_precomputed_blocks
-                   then
-                     Precomputed_block.delete_fetched_concrete ~network
-                       (required_precomputed_blocks blocks)
-                   else return () ) )
+        List.chunks_of ~length:batch_size mainnet_blocks_to_migrate
+        |> Deferred.List.iter ~f:(fun (blocks : Sql.Mainnet.Block.t list) ->
+               [%log info] "Migrating %d blocks starting at height %Ld (%s..%s)"
+                 (List.length blocks) (List.hd_exn blocks).height
+                 (List.hd_exn blocks).state_hash
+                 (List.last_exn blocks).state_hash ;
+               let%bind precomputed_blocks =
+                 if stream_precomputed_blocks then (
+                   [%log info] "Fetching batch of precomputed blocks" ;
+                   fetch_precomputed_blocks_for blocks )
+                 else return prefetched_precomputed_blocks
+               in
+               [%log info] "Converting blocks to extensional format..." ;
+               let%bind extensional_blocks =
+                 mainnet_block_to_extensional_batch ~logger ~mainnet_pool
+                   ~genesis_block ~precomputed_blocks blocks
+               in
+               [%log info] "Adding blocks to migrated database..." ;
+               let%bind () =
+                 query_migrated_db ~f:(fun db ->
+                     match%map
+                       Archive_lib.Processor.Block.add_from_extensional_batch db
+                         extensional_blocks ~v1_transaction_hash:true
+                     with
+                     | Ok _id ->
+                         Ok ()
+                     | Error (`Congested _) ->
+                         failwith
+                           "Could not archive extensional block batch: \
+                            congested"
+                     | Error (`Decode_rejected _ as err)
+                     | Error (`Encode_failed _ as err)
+                     | Error (`Encode_rejected _ as err)
+                     | Error (`Request_failed _ as err)
+                     | Error (`Request_rejected _ as err)
+                     | Error (`Response_failed _ as err)
+                     | Error (`Response_rejected _ as err) ->
+                         failwithf
+                           "Could not archive extensional block batch: %s"
+                           (Caqti_error.show err) () )
+               in
+               if stream_precomputed_blocks && not keep_precomputed_blocks then
+                 Precomputed_block.delete_fetched_concrete ~network
+                   ~local_path:precomputed_blocks_local_path
+                   (required_precomputed_blocks blocks)
+               else return () )
       in
       let%bind () =
         (* this will still run even if we are downloading precomputed blocks in batches, to handle any leftover blocks from prior runs *)
         if not keep_precomputed_blocks then (
           [%log info] "Deleting all precomputed blocks" ;
-          let%map () = Precomputed_block.delete_fetched ~network in
+          let%map () =
+            Precomputed_block.delete_fetched ~network
+              ~path:precomputed_blocks_local_path
+          in
           [%log info] "Done migrating mainnet blocks!" )
         else Deferred.unit
       in
@@ -637,9 +613,16 @@ let () =
                 complete"
          and log_json = Cli_lib.Flag.Log.json
          and log_level = Cli_lib.Flag.Log.level
-         and file_log_level = Cli_lib.Flag.Log.file_log_level
-         and log_filename = Cli_lib.Flag.Log.file in
+         and precomputed_blocks_local_path =
+           Param.flag "--precomputed-blocks-local-path"
+             ~aliases:[ "-precomputed-blocks-local-path" ]
+             Param.(optional string)
+             ~doc:"PATH the precomputed blocks on-disk location"
+         in
+         let precomputed_blocks_local_path =
+           Option.value precomputed_blocks_local_path ~default:"."
+         in
          main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
            ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
            ~stream_precomputed_blocks ~keep_precomputed_blocks ~log_json
-           ~log_level ~log_filename ~file_log_level )))
+           ~log_level ~precomputed_blocks_local_path )))

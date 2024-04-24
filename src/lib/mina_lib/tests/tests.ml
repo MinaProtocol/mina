@@ -229,7 +229,7 @@ let%test_module "Epoch ledger sync tests" =
           ; max_connections = Cli_lib.Default.max_connections
           ; validation_queue_size = Cli_lib.Default.validation_queue_size
           ; isolate = false
-          ; keypair = libp2p_keypair
+          ; keypair = Some libp2p_keypair
           ; all_peers_seen_metric = false
           ; known_private_ip_nets = []
           ; time_controller

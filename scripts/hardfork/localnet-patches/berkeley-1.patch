@@ -1,29 +1,21 @@
-From 6a234e647cc7fcbb8e29dc1ce7264b89b93d034f Mon Sep 17 00:00:00 2001
-From: ember arlynx <ember.arlynx@o1labs.org>
-Date: Wed, 27 Mar 2024 23:21:59 -0400
-Subject: [PATCH] this combines two patches from georgee
-
 From 4b7d18c23f5cd22c2e3e2d979a7fafe8df4b1d93 Mon Sep 17 00:00:00 2001
 From: georgeee <george.agapov@gmail.com>
 Date: Wed, 7 Feb 2024 11:35:27 +0100
 Subject: [PATCH 2/3] Propagate logging settings to snark worker
 
-From b417566203405ae0aca76cbbfbf5faf4f71395ef Mon Sep 17 00:00:00 2001
-From: georgeee <george.agapov@gmail.com>
-Date: Fri, 16 Feb 2024 19:39:22 +0100
-Subject: [PATCH 3/3] Cache loaded caches in Ledger.load
-
-Problem: when load of a ledger file is attempted twice, error comes from
-Rocksdb locking mechanism
-
-Solution: use simple cache map when loading epoch ledgers, using
-previously loaded ledgers.
+---
+ .../src/cli_entrypoint/mina_cli_entrypoint.ml |  7 +++--
+ src/lib/mina_lib/config.ml                    |  3 ++
+ src/lib/mina_lib/mina_lib.ml                  | 14 ++++++---
+ src/lib/snark_worker/functor.ml               | 31 +++++++++++++------
+ src/lib/snark_worker/intf.ml                  |  4 +++
+ 5 files changed, 41 insertions(+), 18 deletions(-)
 
 diff --git a/src/app/cli/src/cli_entrypoint/mina_cli_entrypoint.ml b/src/app/cli/src/cli_entrypoint/mina_cli_entrypoint.ml
-index 3349abd2e6..4cd717e25c 100644
+index 92729756e5..88e30c7b4f 100644
 --- a/src/app/cli/src/cli_entrypoint/mina_cli_entrypoint.ml
 +++ b/src/app/cli/src/cli_entrypoint/mina_cli_entrypoint.ml
-@@ -1368,9 +1368,10 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
+@@ -1364,9 +1364,10 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
            let%map mina =
              Mina_lib.create ~wallets
                (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
@@ -37,85 +29,11 @@ index 3349abd2e6..4cd717e25c 100644
                   ~work_selection_method:
                     (Cli_lib.Arg_type.work_selection_method_to_module
                        work_selection_method )
-diff --git a/src/lib/genesis_ledger_helper/genesis_ledger_helper.ml b/src/lib/genesis_ledger_helper/genesis_ledger_helper.ml
-index 20b64dcbf1..22fe459be9 100644
---- a/src/lib/genesis_ledger_helper/genesis_ledger_helper.ml
-+++ b/src/lib/genesis_ledger_helper/genesis_ledger_helper.ml
-@@ -433,8 +433,9 @@ module Ledger = struct
-     end) )
- 
-   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
--      ?(ledger_name_prefix = "genesis_ledger") ?overwrite_version
--      (config : Runtime_config.Ledger.t) =
-+      ?(ledger_cache = String.Map.empty) ?overwrite_version
-+      ?(ledger_name_prefix = "genesis_ledger") (config : Runtime_config.Ledger.t)
-+      =
-     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
-         let padded_accounts_opt =
-           padded_accounts_from_runtime_config_opt ~logger ~proof_level
-@@ -446,6 +447,9 @@ module Ledger = struct
-             ~ledger_name_prefix config
-         in
-         match tar_path with
-+        | Some tar_path when Map.mem ledger_cache tar_path ->
-+            Deferred.Result.return
-+              (Map.find_exn ledger_cache tar_path, config, tar_path)
-         | Some tar_path -> (
-             match%map
-               load_from_tar ~genesis_dir ~logger ~constraint_constants
-@@ -574,6 +578,7 @@ end
- 
- module Epoch_data = struct
-   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
-+      ?(ledger_cache = String.Map.empty)
-       (config : Runtime_config.Epoch_data.t option) =
-     let open Deferred.Or_error.Let_syntax in
-     match config with
-@@ -581,13 +586,13 @@ module Epoch_data = struct
-         Deferred.Or_error.return (None, None)
-     | Some config ->
-         let ledger_name_prefix = "epoch_ledger" in
--        let load_ledger ledger =
-+        let load_ledger ~ledger_cache ledger =
-           Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
--            ~ledger_name_prefix ledger
-+            ~ledger_name_prefix ~ledger_cache ledger
-         in
--        let%bind staking, staking_config =
-+        let%bind staking, staking_config, ledger_cache =
-           let%map staking_ledger, config', ledger_file =
--            load_ledger config.staking.ledger
-+            load_ledger ~ledger_cache config.staking.ledger
-           in
-           [%log trace] "Loaded staking epoch ledger from $ledger_file"
-             ~metadata:[ ("ledger_file", `String ledger_file) ] ;
-@@ -595,7 +600,9 @@ module Epoch_data = struct
-                 Genesis_ledger.Packed.t staking_ledger
-             ; seed = Epoch_seed.of_base58_check_exn config.staking.seed
-             }
--          , { config.staking with ledger = config' } )
-+          , { config.staking with ledger = config' }
-+          , Map.add ledger_cache ~key:ledger_file ~data:staking_ledger
-+            |> function `Duplicate -> ledger_cache | `Ok m -> m )
-         in
-         let%map next, next_config =
-           match config.next with
-@@ -605,7 +612,9 @@ module Epoch_data = struct
-                  epoch ledger" ;
-               Deferred.Or_error.return (None, None)
-           | Some { ledger; seed } ->
--              let%map next_ledger, config'', ledger_file = load_ledger ledger in
-+              let%map next_ledger, config'', ledger_file =
-+                load_ledger ~ledger_cache ledger
-+              in
-               [%log trace] "Loaded next epoch ledger from $ledger_file"
-                 ~metadata:[ ("ledger_file", `String ledger_file) ] ;
-               ( Some
 diff --git a/src/lib/mina_lib/config.ml b/src/lib/mina_lib/config.ml
-index 22d622d98b..1dce50970b 100644
+index 330d8c2a0b..6d35f16747 100644
 --- a/src/lib/mina_lib/config.ml
 +++ b/src/lib/mina_lib/config.ml
-@@ -61,5 +61,8 @@ type t =
+@@ -60,5 +60,8 @@ type t =
    ; uptime_send_node_commit : bool [@default false]
    ; stop_time : int
    ; graphql_control_port : int option [@default None]
@@ -125,7 +43,7 @@ index 22d622d98b..1dce50970b 100644
    }
  [@@deriving make]
 diff --git a/src/lib/mina_lib/mina_lib.ml b/src/lib/mina_lib/mina_lib.ml
-index 2f192f3835..cb25cae041 100644
+index 51554522f3..2b2d6b86ce 100644
 --- a/src/lib/mina_lib/mina_lib.ml
 +++ b/src/lib/mina_lib/mina_lib.ml
 @@ -177,7 +177,8 @@ let log_snark_coordinator_warning (config : Config.t) snark_worker =
@@ -237,3 +155,6 @@ index e36b146ab0..c71b22656a 100644
      -> string list
  end
  
+-- 
+2.18.1
+

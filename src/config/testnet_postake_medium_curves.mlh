@@ -39,7 +39,6 @@
 
 [%%define print_versioned_types false]
 
-[%%define daemon_expiry "2024-12-10 14:00:00-07:00"]
 [%%define test_full_epoch false]
 [%%import "/src/config/fork.mlh"]
 [%%import "/src/config/features/public_testnet.mlh"]

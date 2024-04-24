@@ -1,18 +1,18 @@
 ## Berkeley Migration script
 
-Migration Script which simplify migration process by wrapping all 3 phases and 2 steps per each phase into single script. We try to make it as verbose as possible and give user a hints why some parameter is needed and how to obtain it
+Migration Script simplifies the migration process by wrapping all 3 phases and 2 steps per each phase into single script. We try to make it as verbose as possible and give the user a hints why some parameters are needed and how to obtain them.
 
 ### Usage
 
 Script has 3 subcommands
 
-- initial - for running first phase of migration where migrated db is an empty schema
-- incremental - for running second phase of migration where incrementally we migrated current mainnet
-- final - for migrating data till fork point
+- initial - for running the first phase of migration, where the migrated database is an empty schema
+- incremental - for running the second phase of migration, where incrementally we migrated the current mainnet
+- final - for migrating data to the fork point
 
 ### Dependencies 
 
-Script is very verbose and inform when any of below dependency is missing. For documentation purposes we list them here:
+The script is very verbose and informs when any of the below dependencies are missing. For documentation purposes, we list them here:
 
 #### General
 
@@ -31,12 +31,12 @@ All mina related apps can be either downloaded in debian or docker. Advanced use
 
 ### Testing 
 
-The best approach to learn about the tool is to start testing it. Below we present end to end testing cycle for migration script based on umt data
+The best approach to learn about the tool is to start testing it. Below, we present the end-to-end testing cycle for migration script based on umt data
 
 #### Data preparation
 
 Test data is available in one of o1labs bucket : `gs://umt-migration-historical-data`.
-Since berkeley migration script supports all berkeley migration phases. We need to have 3 dumps which represents all 3 stages. Beside that we need a ledger file and precomputed blocks (which are stored in different bucket). Below steps required before testing script:
+Since berkeley migration script supports all Berkeley migration phases. We need to have 3 dumps that represent all 3 stages. Besides that, we need a ledger file and precomputed blocks (which are stored in different buckets). Below are the steps required before testing the script:
 
 1. Download and import initial dump:
 ```
@@ -100,25 +100,25 @@ Since berkeley migration script supports all berkeley migration phases. We need 
 #### Initial migration
 
 ```
-./scripts/archive/migration/berkeley_migration.sh initial -g  ../../umt_testing/o1labs-umt-pre-fork-run-1-ledger.json -s postgres://postgres:postgres@localhost:5432/umt_testing_initial -t postgres://postgres:postgres@localhost:5432/migrated -b mina_network_block_data -bs 1000 -n o1labs-umt-pre-fork-run-1
+mina-berkeley-migration-script initial -g  ../../umt_testing/o1labs-umt-pre-fork-run-1-ledger.json -s postgres://postgres:postgres@localhost:5432/umt_testing_initial -t postgres://postgres:postgres@localhost:5432/migrated -b mina_network_block_data -bs 1000 -n o1labs-umt-pre-fork-run-1
 ```
 
-this command should output migration-replayer-XXX.json which should be used in next run
+This command should output migration-replayer-XXX.json which should be used in the next run
 
 #### Incremental migration
 
 ```
-./scripts/archive/migration/berkeley_migration.sh incremental -g  ../../umt_testing/o1labs-umt-pre-fork-run-1-ledger.json -s postgres://postgres:postgres@localhost:5432/umt_testing_increment -t postgres://postgres:postgres@localhost:5432/migrated -b mina_network_block_data -bs 50 -n o1labs-umt-pre-fork-run-1 -r migration-checkpoint-597.json
+mina-berkeley-migration-script incremental -g  ../../umt_testing/o1labs-umt-pre-fork-run-1-ledger.json -s postgres://postgres:postgres@localhost:5432/umt_testing_increment -t postgres://postgres:postgres@localhost:5432/migrated -b mina_network_block_data -bs 50 -n o1labs-umt-pre-fork-run-1 -r migration-checkpoint-597.json
 ```
 
 where:
 
-migration-checkpoint-597.json - is a last checkpoint from initial run
+migration-checkpoint-597.json - is the last checkpoint from initial run
 
 #### Final migration
 
 ```
-./scripts/archive/migration/berkeley_migration.sh final -g  ../../umt_testing/o1labs-umt-pre-fork-run-1-ledger.json -s postgres://postgres:postgres@localhost:5432/umt_testing_final -t postgres://postgres:postgres@localhost:5432/migrated -b mina_network_block_data -bs 50 -n o1labs-umt-pre-fork-run-1 -r migration-checkpoint-2381.json -fc ../../umt_testing/fork-umt-02-29-2024.json -f 3NLnD1Yp4MS9LtMXikD1YyySZNVgCXA82b5eQVpmYZ5kyTo4Xsr7
+mina-berkeley-migration-script final -g  ../../umt_testing/o1labs-umt-pre-fork-run-1-ledger.json -s postgres://postgres:postgres@localhost:5432/umt_testing_final -t postgres://postgres:postgres@localhost:5432/migrated -b mina_network_block_data -bs 50 -n o1labs-umt-pre-fork-run-1 -r migration-checkpoint-2381.json -fc ../../umt_testing/fork-umt-02-29-2024.json
 ```
 
 where `3NLnD1Yp4MS9LtMXikD1YyySZNVgCXA82b5eQVpmYZ5kyTo4Xsr7` was extracted from fork config file:
@@ -133,4 +133,4 @@ where `3NLnD1Yp4MS9LtMXikD1YyySZNVgCXA82b5eQVpmYZ5kyTo4Xsr7` was extracted from 
     }
   },
 ```
-and `migration-checkpoint-2381.json` was last checkpoint from incremental run
+and `migration-checkpoint-2381.json` was the last checkpoint from the incremental run
