@@ -402,24 +402,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Malleable_error.lift
       @@ Transaction_snark.For_tests.update_states ~constraint_constants spec
     in
-    let (zkapp_command_spec
-          : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
-      let amount = Currency.Amount.of_mina_int_exn 1 in
-      let memo = Signed_command_memo.empty in
-      { sender = (zkapp_account_keypair, Account.Nonce.zero)
-      ; fee = Currency.Fee.of_nanomina_int_exn 1_000_000
-      ; fee_payer = None
-      ; receivers = [ (receiver_pub_key, amount) ]
-      ; amount
-      ; zkapp_account_keypairs = []
-      ; memo
-      ; new_zkapp_account = false
-      ; snapp_update = Account_update.Update.dummy
-      ; call_data = Snark_params.Tick.Field.zero
-      ; events = []
-      ; actions = []
-      ; preconditions = None
-      }
+    let zkapp_payment =
+      let (zkapp_command_spec
+            : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
+        let amount = Currency.Amount.of_mina_int_exn 1 in
+        let memo = Signed_command_memo.empty in
+        { sender = (zkapp_account_keypair, Account.Nonce.zero)
+        ; fee = Currency.Fee.of_nanomina_int_exn 1_000_000
+        ; fee_payer = None
+        ; receivers = [ (receiver_pub_key, amount) ]
+        ; amount
+        ; zkapp_account_keypairs = []
+        ; memo
+        ; new_zkapp_account = false
+        ; snapp_update = Account_update.Update.dummy
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; actions = []
+        ; preconditions = None
+        }
+      in
+      Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
     in
     let wait_for_zkapp zkapp_command =
       let with_timeout =
@@ -518,20 +521,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let%bind () =
       let zkapp_txn_expired_before_fork =
-        Transaction_snark.For_tests.multiple_transfers
-          { zkapp_command_spec with
-            preconditions =
-              Some
-                { network = Zkapp_precondition.Protocol_state.accept
-                ; account = Zkapp_precondition.Account.accept
-                ; valid_while =
-                    Check
-                      Zkapp_precondition.Closed_interval.
-                        { lower = Global_slot_since_genesis.zero
-                        ; upper = Global_slot_since_genesis.of_int 400000
-                        }
+        { zkapp_payment with
+          fee_payer =
+            { zkapp_payment.fee_payer with
+              body =
+                { zkapp_payment.fee_payer.body with
+                  valid_until = Some (Global_slot_since_genesis.of_int 400000)
                 }
-          }
+            }
+        }
       in
       section_hard "send a zkapp command that's expired before the fork"
       @@ send_invalid_zkapp ~logger
@@ -545,24 +543,20 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           (Network.Node.get_ingress_uri node_b)
       in
       let zkapp_txn_expired_before_fork =
-        Transaction_snark.For_tests.multiple_transfers
-          { zkapp_command_spec with
-            preconditions =
-              Some
-                { network = Zkapp_precondition.Protocol_state.accept
-                ; account = Zkapp_precondition.Account.accept
-                ; valid_while =
-                    Check
-                      Zkapp_precondition.Closed_interval.
-                        { lower = Global_slot_since_genesis.zero
-                        ; upper =
-                            Global_slot_since_genesis.of_int
-                              ( Global_slot_since_hard_fork.to_int
-                                  global_slot_since_hard_fork
-                              + 500000 - 5 )
-                        }
+        { zkapp_payment with
+          fee_payer =
+            { zkapp_payment.fee_payer with
+              body =
+                { zkapp_payment.fee_payer.body with
+                  valid_until =
+                    Some
+                      ( Global_slot_since_genesis.of_int
+                      @@ Global_slot_since_hard_fork.to_int
+                           global_slot_since_hard_fork
+                         + 500000 - 5 )
                 }
-          }
+            }
+        }
       in
 
       section_hard "send a zkapp command that's expired after the fork"
