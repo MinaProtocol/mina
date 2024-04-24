@@ -46,7 +46,7 @@ docker pull ${GCR_REPO}/${NAME}:${VERSION}
 if [[ "$PUBLISH" -eq 1 ]]; then
   TARGET_REPO=docker.io/minaprotocol
   docker tag ${GCR_REPO}/${NAME}:${VERSION} ${TARGET_REPO}/${NAME}:${TAG}
-  docker push "${TARGET_REPO}/${NAME}:${TAG}"
+  echo "For security reasons only printing: docker push ${TARGET_REPO}/${NAME}:${TAG}"
 else 
   TARGET_REPO=$GCR_REPO
   echo "retagging ${GCR_REPO}/${NAME}:${VERSION} as ${TARGET_REPO}/${NAME}:${TAG}"
