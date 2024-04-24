@@ -137,7 +137,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
             commands = [
                 Cmd.runInDocker Cmd.Docker::{
                   image = image
-                } "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config ${network_name} config.json /workdir/verification"
+                } "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config ${network} config.json /workdir/verification"
             ]
             , label = "Verify packaged artifacts"
             , key = "verify-packaged-artifacts"
