@@ -3,4 +3,4 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 in
 
-Pipeline.build ArtifactPipelines.focal
+Pipeline.build ArtifactPipelines.bullseyeDevnet

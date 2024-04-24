@@ -16,20 +16,23 @@ let DebianVersions = ../Constants/DebianVersions.dhall
 
 in
 
-let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion : DebianVersions.DebVersion) ->
+let pipeline : DebianVersions.DebVersion -> Text -> Pipeline.Config.Type = 
+  \(debVersion : DebianVersions.DebVersion) ->
+  \(profile: Text) ->
+
     Pipeline.Config::{
       spec =
         JobSpec::{
           dirtyWhen = DebianVersions.dirtyWhen debVersion,
           path = "Release",
-          name = "MinaArtifact${DebianVersions.capitalName debVersion}"
+          name = "MinaArtifact${DebianVersions.capitalName debVersion}-${profile}"
         },
       steps = [
         Libp2p.step debVersion,
         Command.build
           Command.Config::{
             commands = DebianVersions.toolchainRunner debVersion [
-              "DUNE_PROFILE=devnet",
+              "DUNE_PROFILE=${profile}",
               "AWS_ACCESS_KEY_ID",
               "AWS_SECRET_ACCESS_KEY",
               "MINA_BRANCH=$BUILDKITE_BRANCH",
@@ -115,9 +118,15 @@ let pipeline : DebianVersions.DebVersion -> Pipeline.Config.Type = \(debVersion 
 
 in
 {
-  bullseye  = pipeline DebianVersions.DebVersion.Bullseye
-  , buster  = pipeline DebianVersions.DebVersion.Buster
-  , stretch = pipeline DebianVersions.DebVersion.Stretch
-  , focal   = pipeline DebianVersions.DebVersion.Focal
-  , bionic  = pipeline DebianVersions.DebVersion.Bionic
+  bullseyeDevnet  = pipeline DebianVersions.DebVersion.Bullseye "devnet"
+  , busterDevnet  = pipeline DebianVersions.DebVersion.Buster "devnet"
+  , stretchDevnet = pipeline DebianVersions.DebVersion.Stretch "devnet"
+  , focalDevnet   = pipeline DebianVersions.DebVersion.Focal "devnet"
+  , bionicDevnet  = pipeline DebianVersions.DebVersion.Bionic "devnet"
+  , bullseyeMainnet  = pipeline DebianVersions.DebVersion.Bullseye "mainnet"
+  , busterMainnet  = pipeline DebianVersions.DebVersion.Buster "mainnet"
+  , stretchMainnet = pipeline DebianVersions.DebVersion.Stretch "mainnet"
+  , focalMainnet   = pipeline DebianVersions.DebVersion.Focal "mainnet"
+  , bionicMainnet  = pipeline DebianVersions.DebVersion.Bionic "mainnet"
+
 }
