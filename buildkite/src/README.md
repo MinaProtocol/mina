@@ -142,26 +142,66 @@ steps:
         propagate-environment: true
 ```
 
+Above definition one need to paste into steps edit box for given pipeline and then run from branch which contains this README.md (presumably develop). 
+
 All list of available parameters: 
 
-- DEBIANS - The comma delimitered debian names. For example: `Daemon,Archive`
+- DEBIANS - The comma delimitered debian names. For example: `Daemon,Archive`. All available names are located in `buildkite/src/Constans/DebianPackage.dhall` files. Only CamelCase format is supported
 
-- DOCKERS - The comma delimitered docker names. For example: `Daemon,Archive`
+- DOCKERS - The comma delimitered docker names. For example: `Daemon,Archive`. All available names are located in `buildkite/src/Constans/Artifacts.dhall` files. Only CamelCase format is supported 
 
-- CODENAMES - The Debian codenames `Bullseye,Buster,Focal`
+- CODENAMES - The Debian codenames `Bullseye,Buster,Focal`. All available names are located in `buildkite/src/Constans/DebianVersions.dhall`. Only CamelCase format is supported
 
 - FROM_VERSION - The Source Docker or Debian version
 
 - NEW_VERSION - The new Debian version or new Docker tag
 
-- REMOVE_PROFILE_FROM_NAME - Should we remove profile suffix from debian name. For example 
+- REMOVE_PROFILE_FROM_NAME - Should we remove profile suffix from debian name. For example from package name "mina-devnet-hardfork" it will generate name "mina-devnet"
 
-- PROFILE                     The Docker and Debian profile (Standard, Lightnet)"
+- PROFILE                     The Docker and Debian profile (Standard, Lightnet)". All available profiles are located in `buildkite/src/Constants/Profiles.dhall` file. Only CamelCase format is supported
 
-- NETWORK                     The Docker and Debian network (Devnet, Mainnet, Berkeley)"
+- NETWORK                     The Docker and Debian network (Devnet, Mainnet, Berkeley). All available profiles are located in `buildkite/src/Constants/Network.dhall` file. Only CamelCase format is supported
 
-- FROM_CHANNEL                Source debian channel"
+- FROM_CHANNEL                Source debian channel. By default: Unstable. All available channels  are located in `buildkite/src/Constants/DebianChannel.dhall` file. Only CamelCase format is supported
 
-- TO_CHANNEL                  Target debian channel"
+- TO_CHANNEL                  Target debian channel. By default: Unstable. All available profiles are located in `buildkite/src/Constants/DebianChannel.dhall` file. Only CamelCase format is supported
 
 - PUBLISH                     The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io
+
+
+#### Examples 
+
+Below examples focus only on environment variables values. We are omitting full pipeline setup.
+
+##### Promoting Hardfork packages
+
+We would like to promote all hardfork packages (archive node, daemon, rosetta) from unstable debian channel and gcr to devnet debian channel and dockerhub. We also want easy upgrade from old deamon debian to new one (we would like user experience to be smooth and only required command to update on user side should be `apt-get update mina-daemon`). That is why we want to strip `-hardfork` suffix from debian package. 
+Pipeline with create 6 jobs for each Docker and Debian component separately.
+
+```
+  - "DOCKERS=Archive,Daemon,Rosetta"
+  - "DEBIANS=Archive,Daemon,LogProc"
+  - "REMOVE_PROFILE_FROM_NAME=1"
+  - "PROFILE=Hardfork"
+  - "NETWORK=Devnet"
+  - "FROM_VERSION=3.0.0devnet-tooling-dkijania-hardfork-package-gen-in-nightly-b37f50e"
+  - "NEW_VERSION=3.0.0-ddb6fc4"
+  - "PUBLISH"=1
+  - "CODENAMES=Focal,Buster,Bullseye"
+  - "FROM_CHANNEL=Unstable"
+  - "TO_CHANNEL=Devnet"
+    
+```
+
+#### Promoting dockers form gcr to dockerhub
+
+We want only to move dockers from gcr to dockerhub without changing version. Current implementation of pipeline is not user friendly so we need to still define `FROM_VERSION` and `TO_VERSION`. They should be equal.
+
+```
+  - "DOCKERS=Archive,Daemon,Rosetta"
+  - "NETWORK=Devnet"
+  - "FROM_VERSION=3.0.0-dc6bf78"
+  - "NEW_VERSION=3.0.0-dc6bf78"
+  - "CODENAMES=Focal,Buster,Bullseye"
+  - "PUBLISH=1"
+```

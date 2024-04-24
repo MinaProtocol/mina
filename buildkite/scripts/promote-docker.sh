@@ -1,4 +1,5 @@
 #!/bin/bash
+
 set -eo pipefail
 
 CLEAR='\033[0m'
@@ -8,7 +9,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -n|--name) NAME="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
   -t|--tag) TAG="$2"; shift;;
-  -p|--publish) PUBLISH=1; shift;;
+  -p|--publish) PUBLISH=1 ;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -33,7 +34,7 @@ if [[ -z "$TAG" ]]; then usage "Tag is not set!"; fi;
 # check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     echo "WARNING: AWS_ACCESS_KEY_ID not set, promote commands won't run"
-    exit 0
+#    exit 0
 fi
 
 GCR_REPO=gcr.io/o1labs-192920
@@ -45,7 +46,7 @@ docker pull ${GCR_REPO}/${NAME}:${VERSION}
 if [[ "$PUBLISH" -eq 1 ]]; then
   TARGET_REPO=docker.io/minaprotocol
   docker tag ${GCR_REPO}/${NAME}:${VERSION} ${TARGET_REPO}/${NAME}:${TAG}
-  echo "For security reasons only printing: docker push ${TARGET_REPO}/${NAME}:${TAG}"
+  docker push "${TARGET_REPO}/${NAME}:${TAG}"
 else 
   TARGET_REPO=$GCR_REPO
   echo "retagging ${GCR_REPO}/${NAME}:${VERSION} as ${TARGET_REPO}/${NAME}:${TAG}"

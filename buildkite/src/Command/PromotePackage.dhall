@@ -67,7 +67,8 @@ let PromoteDockerSpec = {
     new_tag: Text,
     network: Network.Type,
     step_key: Text,
-    `if`: Optional B/If
+    `if`: Optional B/If,
+    publish: Bool
   },
   default = {
     deps = [] : List Command.TaggedKey.Type,
@@ -78,7 +79,8 @@ let PromoteDockerSpec = {
     profile = Profiles.Type.Standard,
     network = Network.Type.Berkeley,
     codename = DebianVersions.DebVersion.Bullseye,
-    `if` = None B/If
+    `if` = None B/If,
+    publish = False
   }
 }
 
@@ -103,11 +105,12 @@ let promoteDebianStep = \(spec : PromoteDebianSpec.Type) ->
 let promoteDockerStep = \(spec : PromoteDockerSpec.Type) ->
     let old_tag = Artifact.dockerTag spec.name spec.version spec.codename spec.profile spec.network
     let new_tag = "${spec.new_tag}-${DebianVersions.lowerName spec.codename}"
+    let publish = if spec.publish then "-p" else ""
     in
     Command.build
       Command.Config::{
         commands = [ 
-          Cmd.run "./buildkite/scripts/promote-docker.sh --name ${Artifact.dockerName spec.name} --version ${old_tag} --tag ${new_tag}"
+          Cmd.run "./buildkite/scripts/promote-docker.sh --name ${Artifact.dockerName spec.name} --version ${old_tag} --tag ${new_tag} ${publish}"
         ],
         label = "Docker: ${spec.step_key}",
         key = spec.step_key,
