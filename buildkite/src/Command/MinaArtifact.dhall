@@ -105,6 +105,8 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
                   debVersion
                   [ "NETWORK_NAME=\$NETWORK_NAME"
                   , "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL"
+                  , "DUNE_PROFILE=\$DUNE_PROFILE"
+                  , "FORKING_FROM_CONFIG_JSON=\$FORKING_FROM_CONFIG_JSON"
                   , "AWS_ACCESS_KEY_ID"
                   , "AWS_SECRET_ACCESS_KEY"
                   , "MINA_BRANCH=\$BUILDKITE_BRANCH"
@@ -135,7 +137,12 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
             commands = [
                 Cmd.runInDocker Cmd.Docker::{ 
                   image = "gcr.io/o1labs-192920/mina-daemon:\${BUILDKITE_COMMIT:0:7}-${DebianVersions.lowerName debVersion}-${network}"
-                , extraEnv = [ "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL",  "NETWORK_NAME=\$NETWORK_NAME" ]
+                , extraEnv =
+                    [ "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL"
+                    , "NETWORK_NAME=\$NETWORK_NAME" 
+                    , "DUNE_PROFILE=\$DUNE_PROFILE"
+                    , "FORKING_FROM_CONFIG_JSON=\$FORKING_FROM_CONFIG_JSON"
+                    ]
                 -- an account with this balance seems present in many ledgers?
                 } "curl \$CONFIG_JSON_GZ_URL > config.json.gz && gunzip config.json.gz && sed -e '0,/20.000001/{s/20.000001/20.01/}' -i config.json && ! (mina-verify-packaged-fork-config \$NETWORK_NAME config.json /workdir/verification)"
             ]
@@ -149,7 +156,12 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
             commands = [
                 Cmd.runInDocker Cmd.Docker::{
                   image = "gcr.io/o1labs-192920/mina-daemon:\${BUILDKITE_COMMIT:0:7}-${DebianVersions.lowerName debVersion}-${network}"
-                , extraEnv = [ "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL",  "NETWORK_NAME=\$NETWORK_NAME" ]
+                , extraEnv =
+                    [ "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL"
+                    , "NETWORK_NAME=\$NETWORK_NAME" 
+                    , "DUNE_PROFILE=\$DUNE_PROFILE"
+                    , "FORKING_FROM_CONFIG_JSON=\$FORKING_FROM_CONFIG_JSON"
+                    ]
                 } "curl \$CONFIG_JSON_GZ_URL > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config \$NETWORK_NAME config.json /workdir/verification"
             ]
             , label = "Verify packaged artifacts"
