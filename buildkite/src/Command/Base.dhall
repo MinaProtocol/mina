@@ -127,7 +127,8 @@ let targetToAgent = \(target : Size) ->
           Medium = toMap { size = "generic" },
           Small = toMap { size = "generic" },
           Integration = toMap { size = "integration" },
-          QA = toMap { size = "qa" }
+          QA = toMap { size = "qa" },
+          Hardfork = toMap {size = "hardfork"}
         }
         target
 

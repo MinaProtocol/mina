@@ -116,7 +116,7 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
                   "./buildkite/scripts/build-hardfork-package.sh"
             , label = "Build Mina Hardfork Package for ${DebianVersions.capitalName debVersion}"
             , key = generateLedgersJobKey
-            , target = Size.XLarge
+            , target = Size.Hardfork
             }
         , DockerImage.generateStep
             DockerImage.ReleaseSpec::{
@@ -141,7 +141,7 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
             ]
             , label = "Assert corrupted packaged artifacts are unverifiable"
             , key = "assert-unverify-corrupted-packaged-artifacts"
-            , target = Size.XLarge
+            , target = Size.Hardfork
             , depends_on = [{ name = pipelineName, key = "daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image" }]
             , `if` = None B/If
             }
@@ -154,7 +154,7 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
             ]
             , label = "Verify packaged artifacts"
             , key = "verify-packaged-artifacts"
-            , target = Size.XLarge
+            , target = Size.Hardfork
             , depends_on = [{ name = pipelineName, key = "daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image" }]
             , `if` = None B/If
             }
