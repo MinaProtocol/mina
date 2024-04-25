@@ -81,18 +81,6 @@ let commands: PipelineFilter.Type -> PipelineMode.Type -> List Cmd.Type  =  \(fi
           else
             echo "Skipping ${job.name} because this is a PR buildkite run"
           fi
-        '',
-        PackageGeneration = ''
-          if [ "${targetMode}" == "PackageGeneration" ]; then
-            if [ "${isIncluded}" == "True" ]; then
-              echo "Triggering ${job.name} because this is a package generation run"
-              ${Cmd.format trigger}
-            else
-              echo "Skipping ${job.name} because this is a ${filter} stage"
-            fi
-          else
-            echo "Skipping ${job.name} because this is a package generation run"
-          fi
         ''
       }
       in Cmd.quietly (merge pipelineHandlers job.mode)
