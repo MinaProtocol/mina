@@ -1586,13 +1586,13 @@ let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
     ~proof:(Proof_keys.make ~fork ()) ()
 
 let slot_tx_end_or_default, slot_chain_end_or_default =
-  let f compile get_runtime t =
-    Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
-    @@ Option.value_map t.daemon ~default:compile ~f:(fun daemon ->
-           Option.merge compile ~f:(fun _c r -> r) @@ get_runtime daemon )
+  let f get_runtime t =
+    let open Option.Let_syntax in
+    let%bind daemon = t.daemon in
+    let%map slot = get_runtime daemon in
+    Mina_numbers.Global_slot_since_hard_fork.of_int slot
   in
-  ( f Mina_compile_config.slot_tx_end (fun d -> d.slot_tx_end)
-  , f Mina_compile_config.slot_chain_end (fun d -> d.slot_chain_end) )
+  (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
 
 module Test_configs = struct
   let bootstrap =
