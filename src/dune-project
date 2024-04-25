@@ -74,6 +74,7 @@
 (package (name integration_test_local_engine))
 (package (name integration_test_lib))
 (package (name internal_tracing))
+(package (name internal_tracing_context_logger))
 (package (name interpolator_lib))
 (package (name interruptible))
 (package (name itn_crypto))
