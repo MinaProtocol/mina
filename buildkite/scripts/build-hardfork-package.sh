@@ -47,7 +47,7 @@ echo "--- Migrate accounts to new network format"
 # NB: we use sed here instead of jq, because jq is extremely slow at processing this file
 sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "2"}/' config.json
 
-case "${NETWORK_NAME}" in
+case "${DUNE_PROFILE}" in
   mainnet)
     MINA_BUILD_MAINNET=true ./buildkite/scripts/build-artifact.sh
     ;;
