@@ -9,7 +9,7 @@ LEDGER_TARBALLS=$(realpath -s $LEDGER_TARBALLS)
 NETWORK_TAG="mina-${NETWORK_NAME}-hardfork"
 
 case "${NETWORK_NAME}" in 
-  mainnet)
+  mainnet|mainnet-pre-hf-dry-run)
     SIGNATURE_KIND=mainnet
     SEEDS_LIST=mina-seed-lists/mainnet_seeds.txt
     CONTROL_FILE_DESCRIPTION='Mina Protocol Client and Daemon'
