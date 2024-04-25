@@ -16,11 +16,7 @@ release_branch=${REMOTE}/$1
 
 RELEASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 --no-merges $release_branch)
 
-
-BASE_BRANCH_TYPE=$(gsutil ls gs://mina-type-shapes/$BUILDKITE_COMMIT || 0)
-RELEASE_BRANCH_TYPE=$(gsutil ls gs://mina-type-shapes/$RELEASE_BRANCH_COMMIT || 0)
-
-if [ "$BASE_BRANCH_TYPE" == 0 ]; then
+if ! $(gsutil ls gs://mina-type-shapes/$BUILDKITE_COMMIT 2>/dev/null); then
     git checkout $BASE_BRANCH_COMMIT
     eval $(opam config env)
     export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
@@ -31,8 +27,7 @@ if [ "$BASE_BRANCH_TYPE" == 0 ]; then
     gsutil cp ${BASE_BRANCH_COMMIT}_type-shapes.txt gs://mina-type-shapes
 fi
 
-
-if [ "$RELEASE_BRANCH_TYPE" == 0 ]; then
+if ! $(gsutil ls gs://mina-type-shapes/$RELEASE_BRANCH_COMMIT 2>/dev/null); then
     git checkout $RELEASE_BRANCH_COMMIT
     eval $(opam config env)
     export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
