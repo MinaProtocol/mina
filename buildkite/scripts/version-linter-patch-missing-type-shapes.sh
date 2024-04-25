@@ -12,14 +12,12 @@ git config --global --add safe.directory /workdir
 source buildkite/scripts/handle-fork.sh
 source buildkite/scripts/export-git-env-vars.sh
 
-base_branch=${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
 release_branch=${REMOTE}/$1
 
-BASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 --no-merges $base_branch)
 RELEASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 --no-merges $release_branch)
 
 
-BASE_BRANCH_TYPE=$(gsutil ls gs://mina-type-shapes/$BASE_BRANCH_COMMIT || 0)
+BASE_BRANCH_TYPE=$(gsutil ls gs://mina-type-shapes/$BUILDKITE_COMMIT || 0)
 RELEASE_BRANCH_TYPE=$(gsutil ls gs://mina-type-shapes/$RELEASE_BRANCH_COMMIT || 0)
 
 if [ "$BASE_BRANCH_TYPE" == 0 ]; then

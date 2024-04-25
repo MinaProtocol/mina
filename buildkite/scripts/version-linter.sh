@@ -21,9 +21,16 @@ source buildkite/scripts/export-git-env-vars.sh
 
 pip3 install sexpdata==1.0.0
 
-base_branch=${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
 pr_branch=origin/${BUILDKITE_BRANCH}
 release_branch=${REMOTE}/$1
+
+if [[ -n "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ]]; then
+    base_branch=${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
+else 
+    # If we ran pipeline from buildkite directly some envs are not set like BUILDKITE_PULL_REQUEST_BASE_BRANCH
+    # In this case we are using release branch
+    base_branch=${release_branch}
+fi
 
 echo "--- Run Python version linter with branches: ${pr_branch} ${base_branch} ${release_branch}"
 ./scripts/version-linter.py ${pr_branch} ${base_branch} ${release_branch}
