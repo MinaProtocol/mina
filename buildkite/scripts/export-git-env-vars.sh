@@ -58,7 +58,7 @@ export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 
 
 # Determine the packages to build (mainnet y/N)
 case $GITBRANCH in
-    compatible|master|release-automation-testing/*|release/1*|release/3*) # whitelist of branches that are "mainnet-like"
+    compatible|master|release/1*) # whitelist of branches that are "mainnet-like"
       MINA_BUILD_MAINNET=true ;;
     *) # Other branches
       MINA_BUILD_MAINNET=false ;;

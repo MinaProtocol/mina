@@ -21,7 +21,8 @@ let
 
   # Packages which are `installed` in the export.
   # These are all the transitive ocaml dependencies of Mina.
-  export-installed = opam-nix.opamListToQuery export.installed;
+  export-installed = builtins.removeAttrs
+    (opam-nix.opamListToQuery export.installed) ["check_opam_switch"];
 
   # Extra packages which are not in opam.export but useful for development, such as an LSP server.
   extra-packages = with implicit-deps; {
@@ -45,9 +46,34 @@ let
   implicit-deps = export-installed // external-packages;
 
   # Pins from opam.export
-  pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package;
+  pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg)
+    (builtins.removeAttrs export.package.section ["check_opam_switch"]);
 
-  scope = opam-nix.applyOverlays opam-nix.__overlays
+  implicit-deps-overlay = self: super:
+    (if pkgs.stdenv.isDarwin then {
+      async_ssl = super.async_ssl.overrideAttrs
+        { NIX_CFLAGS_COMPILE = "-Wno-implicit-function-declaration -Wno-incompatible-function-pointer-types"; };
+    } else {}) //
+    {
+      # https://github.com/Drup/ocaml-lmdb/issues/41
+      lmdb = super.lmdb.overrideAttrs
+        (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
+
+      # Doesn't have an explicit dependency on ctypes-foreign
+      ctypes = super.ctypes.overrideAttrs
+        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
+
+      # Can't find sodium-static and ctypes
+      sodium = super.sodium.overrideAttrs (_: {
+        NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
+        propagatedBuildInputs = [ pkgs.sodium-static ];
+        preBuild = ''
+          export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
+        '';
+      });
+    };
+
+  scope = opam-nix.applyOverlays (opam-nix.__overlays ++ [ implicit-deps-overlay ])
     (opam-nix.defsToScope pkgs { }
       ((opam-nix.queryToDefs repos (extra-packages // implicit-deps)) // pins));
 
@@ -106,24 +132,8 @@ let
             outputs = [ "out" ];
             installPhase = "touch $out";
           } // extraArgs);
-    in {
-      # https://github.com/Drup/ocaml-lmdb/issues/41
-      lmdb = super.lmdb.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
-
-      # Can't find sodium-static and ctypes
-      sodium = super.sodium.overrideAttrs (_: {
-        NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
-        propagatedBuildInputs = [ pkgs.sodium-static ];
-        preBuild = ''
-          export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
-        '';
-      });
-
-      # Doesn't have an explicit dependency on ctypes
-      rpc_parallel = super.rpc_parallel.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
-
+    in 
+    {
       # Some "core" Mina executables, without the version info.
       mina-dev = pkgs.stdenv.mkDerivation ({
         pname = "mina";
@@ -158,7 +168,7 @@ let
         ] ++ ocaml-libs;
 
         # todo: slimmed rocksdb
-        MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
+        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
         # this is used to retrieve the path of the built static library
@@ -174,9 +184,9 @@ let
 
         configurePhase = ''
           export MINA_ROOT="$PWD"
-          export -f patchShebangs stopNest isScript
+          export -f patchShebangs isScript
           fd . --type executable -x bash -c "patchShebangs {}"
-          export -n patchShebangs stopNest isScript
+          export -n patchShebangs isScript
           # Get the mina version at runtime, from the wrapper script. Used to prevent rebuilding everything every time commit info changes.
           sed -i "s/default_implementation [^)]*/default_implementation $MINA_VERSION_IMPLEMENTATION/" src/lib/mina_version/dune
         '';
@@ -242,7 +252,6 @@ let
           cp src/app/replayer/replayer.exe $berkeley_migration/bin/mina-migration-replayer
           cp src/app/berkeley_migration/berkeley_migration.exe $berkeley_migration/bin/mina-berkeley-migration
           cp src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe $berkeley_migration/bin/mina-berkeley-migration-verifier
-          cp ${../scripts/archive/migration/mina-berkeley-migration-script} $berkeley_migration/bin/mina-berkeley-migration-script
           cp src/app/swap_bad_balances/swap_bad_balances.exe $archive/bin/mina-swap-bad-balances
           cp -R _doc/_html $out/share/doc/html
           # cp src/lib/mina_base/sample_keypairs.json $sample/share/mina
@@ -278,7 +287,7 @@ let
         version = "mainnet";
         DUNE_PROFILE = "mainnet";
         # For compatibility with Docker build
-        MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
+        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
       });
 
       mainnet = wrapMina self.mainnet-pkg { };
@@ -287,7 +296,7 @@ let
         version = "devnet";
         DUNE_PROFILE = "devnet";
         # For compatibility with Docker build
-        MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
+        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
       });
 
       devnet = wrapMina self.devnet-pkg { };
