@@ -255,6 +255,8 @@ EOF
   mkdir -p "${BUILDDIR}/var/lib/coda"
   sudo cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
 
+
+  mkdir -p "${BUILDDIR}/usr/lib/systemd/user"
   # Overwrite the mina.service with a new default PEERS_URL
   rm -f "${BUILDDIR}/usr/lib/systemd/user/mina.service"
   sed s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/seed-lists/devnet_seeds.txt% ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
