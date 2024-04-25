@@ -237,8 +237,8 @@ License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
 Description: Mina Client and Daemon
-Mina Protocol Client and Daemon
-Built from ${GITHASH} by ${BUILD_URL}
+ Mina Protocol Client and Daemon
+ Built from ${GITHASH} by ${BUILD_URL}
 EOF
 
   echo "------------------------------------------------------------"
