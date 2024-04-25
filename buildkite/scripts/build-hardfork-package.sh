@@ -4,24 +4,29 @@ set -eo pipefail
 
 ([ -z ${CONFIG_JSON_GZ_URL+x} ] || [ -z ${NETWORK_NAME+x} ] || [ -z ${MINA_DEB_CODENAME+x} ]) && echo "required env vars were not provided" && exit 1
 
-# Set the DUNE_PROFILE from the NETWORK_NAME. For now, these are 1-1, but in the future, this may need to be a case statement
-case "${NETWORK_NAME}" in
-  mainnet)
-    DUNE_PROFILE=mainnet
-    ;;
-  devnet|berkeley)
-    DUNE_PROFILE=devnet
-    ;;
-  *)
-    echo "unrecognized network name: ${NETWORK_NAME}"
-    exit 1
-    ;;
-esac
-export DUNE_PROFILE
+if [ -z ${DUNE_PROFILE+x} ]; then
+  # Set the DUNE_PROFILE from the NETWORK_NAME. For now, these are 1-1,
+  # but in the future, this may need to be a case statement
+  case "${NETWORK_NAME}" in
+    mainnet)
+      DUNE_PROFILE=mainnet
+      ;;
+    devnet|berkeley)
+      DUNE_PROFILE=devnet
+      ;;
+    *)
+      echo "unrecognized network name: ${NETWORK_NAME}"
+      exit 1
+      ;;
+  esac
+  export DUNE_PROFILE
+fi
 
-# Set the base network config for ./scripts/hardfork/create_runtime_config.sh
-export FORKING_FROM_CONFIG_JSON="genesis_ledgers/${NETWORK_NAME}.json"
-[ ! -f "${FORKING_FROM_CONFIG_JSON}" ] && echo "${NETWORK_NAME} is not a known network name; check for existing network configs in 'genesis_ledgers/'" && exit 1
+if [ -z ${FORKING_FROM_CONFIG_JSON+x} ]; then
+  # Set the base network config for ./scripts/hardfork/create_runtime_config.sh
+  export FORKING_FROM_CONFIG_JSON="genesis_ledgers/${NETWORK_NAME}.json"
+fi
+[ ! -f "${FORKING_FROM_CONFIG_JSON}" ] && echo "genesis ledger ${FORKING_FROM_CONFIG_JSON} was not found" && exit 1
 
 source ~/.profile
 
