@@ -50,8 +50,8 @@
    pickles.backend
    snark_params
    pickles
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    mina_transaction_logic
  )
  (instrumentation (backend bisect_ppx))

@@ -29,15 +29,15 @@
   base.caml
   ;; local libraries
   mina_wire_types
-  kimchi_backend.pasta
-  kimchi_backend.pasta.basic
+  kimchi_pasta
+  kimchi_pasta.basic
   snarky.backendless
   pickles_types
   pickles.limb_vector
   kimchi_backend
   pickles_base
   pickles.backend
-  kimchi_backend.common
+  kimchi_backend_common
   ppx_version.runtime
   )
  )

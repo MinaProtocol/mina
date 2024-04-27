@@ -31,7 +31,7 @@
    random_oracle_input
    pickles
    snarky.backendless
-   kimchi_backend.common
+   kimchi_backend_common
    ppx_version.runtime
  )
  (preprocessor_deps ../../config.mlh)

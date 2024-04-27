@@ -35,8 +35,8 @@
    transaction_protocol_state
    coda_genesis_ledger
    pickles_types
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    cache_dir
    data_hash_lib
    mina_numbers

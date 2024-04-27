@@ -20,8 +20,8 @@
    genesis_constants
    data_hash_lib
    kimchi_backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    mina_ledger
    merkle_ledger
    mina_base

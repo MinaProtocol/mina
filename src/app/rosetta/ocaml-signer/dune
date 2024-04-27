@@ -13,8 +13,8 @@
    async_unix
    async.async_command
    ;;local libraries
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    pickles
    rosetta_coding
    rosetta_lib

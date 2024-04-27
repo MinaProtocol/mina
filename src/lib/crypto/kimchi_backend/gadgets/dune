@@ -12,8 +12,8 @@
   ppx_inline_test.config
   zarith
   ;; local libraries
-  kimchi_backend.common
-  kimchi_backend.pasta
+  kimchi_backend_common
+  kimchi_pasta
   kimchi_gadgets_test_runner
   mina_stdlib
   snarky.backendless))

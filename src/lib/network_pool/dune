@@ -75,8 +75,8 @@
    random_oracle_input
    kimchi_backend
    kimchi_backend_common
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    genesis_ledger
    staged_ledger_diff
    mina_wire_types
