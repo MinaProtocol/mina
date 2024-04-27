@@ -50,8 +50,8 @@
    pickles.backend
    snark_params
    pickles
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    internal_tracing
    transition_frontier_extensions
    staged_ledger_diff
