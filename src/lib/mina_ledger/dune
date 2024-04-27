@@ -36,8 +36,8 @@
    currency
    genesis_constants
    kimchi_backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    merkle_mask
    merkle_ledger
    mina_base
