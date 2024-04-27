@@ -34,8 +34,8 @@
    sgn
    mina_transaction_logic
    block_time
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    mina_wire_types
  )
  (preprocess
