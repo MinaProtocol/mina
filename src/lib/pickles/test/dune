@@ -15,9 +15,9 @@
   sexplib0
   ; Mina libraries
   kimchi_backend
-  kimchi_backend.common
-  kimchi_backend.pasta
-  kimchi_backend.pasta.basic
+  kimchi_backend_common
+  kimchi_pasta
+  kimchi_pasta.basic
   kimchi_bindings
   kimchi_types
   pasta_bindings

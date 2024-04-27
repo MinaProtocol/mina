@@ -51,8 +51,8 @@
    sgn_type
    currency
    mina_numbers
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    mina_wire_types
    internal_tracing
  )
