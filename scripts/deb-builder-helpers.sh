@@ -58,8 +58,11 @@ case "${DUNE_PROFILE}" in
     MINA_DEB_NAME="mina-berkeley"
     DEB_SUFFIX=""
    ;;
+  mainnet)
+    MINA_DEB_NAME="mina-berkeley"
+    DEB_SUFFIX=""
+   ;;
   *)
-
     # use dune profile as suffix but replace underscore to dashes so deb builder won't complain
     _SUFFIX=${DUNE_PROFILE//_/-}
     MINA_DEB_NAME="mina-berkeley-${_SUFFIX}"
