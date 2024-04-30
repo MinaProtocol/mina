@@ -5,7 +5,7 @@ let Profiles = ./Profiles.dhall
 let Artifact : Type  = < Daemon | CreateConfig | Archive | ArchiveMigration | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
 
 
-let AllButTests = [ Artifact.Daemon Artifact.CreateConfig , Artifact.Archive , Artifact.ArchiveMigration , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
+let AllButTests = [ Artifact.Daemon, Artifact.CreateConfig , Artifact.Archive , Artifact.ArchiveMigration , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
 
 let Main = [ Artifact.Daemon , Artifact.Archive , Artifact.Rosetta ]
 

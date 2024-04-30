@@ -270,7 +270,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             deb_codename="${DebianVersions.lowerName debVersion}",
             step_key="create-config-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
             network="berkeley"
-          },
+          }
       } artifact
 in 
 
