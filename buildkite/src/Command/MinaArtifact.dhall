@@ -124,16 +124,13 @@ let MinaBuildSpec = {
   }
 }
 
-let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type = 
-  \(spec: MinaBuildSpec.Type) ->
-    let steps = [
-        Libp2p.step spec.debVersion,
-        Command.build
+
+let build_artifacts  = 
+  \(spec: MinaBuildSpec.Type) -> 
+  Command.build
           Command.Config::{
             commands = Toolchain.select spec.toolchainSelectMode spec.debVersion [
               "DUNE_PROFILE=${Profiles.duneProfile spec.profile}",
-              "AWS_ACCESS_KEY_ID",
-              "AWS_SECRET_ACCESS_KEY",
               "MINA_BRANCH=$BUILDKITE_BRANCH",
               "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
               "MINA_DEB_CODENAME=${DebianVersions.lowerName spec.debVersion}"
@@ -147,6 +144,43 @@ let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type =
                 limit = Some 2
               } ] -- libp2p error
           }
+
+let publish_to_debian_repo = 
+   \(spec: MinaBuildSpec.Type) -> 
+   Command.build
+          Command.Config::{
+            commands = Toolchain.select spec.toolchainSelectMode spec.debVersion [
+              "AWS_ACCESS_KEY_ID",
+              "AWS_SECRET_ACCESS_KEY",
+              "MINA_DEB_CODENAME=${DebianVersions.lowerName spec.debVersion}"
+            ] "./buildkite/scripts/publish-deb.sh",
+            label = "Publish Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile}",
+            key = "publish-deb-pkg",
+            target = Size.Small
+          }
+
+let upload_to_s3 = 
+   \(spec: MinaBuildSpec.Type) -> 
+        Command.build
+          Command.Config::{
+            commands = Toolchain.select spec.toolchainSelectMode spec.debVersion [
+              "AWS_ACCESS_KEY_ID",
+              "AWS_SECRET_ACCESS_KEY",
+              "MINA_DEB_CODENAME=${DebianVersions.lowerName spec.debVersion}"
+            ] "./buildkite/scripts/upload-deb.sh $MINA_DEB_CODENAME",
+            label = "Upload Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile} to s3",
+            key = "upload-to-s3-deb-pkg",
+            target = Size.Small
+          }
+
+
+let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type = 
+  \(spec: MinaBuildSpec.Type) ->
+    let steps = [
+        Libp2p.step spec.debVersion,
+        (build_artifacts spec),
+        (publish_to_debian_repo spec),
+        (upload_to_s3 spec)
       ] # (List/map
             Artifacts.Type
             Command.Type
@@ -163,7 +197,8 @@ let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type =
           tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ],
           mode = spec.mode
         },
-      steps = steps    }
+      steps = steps
+    }
 
 in
 {
