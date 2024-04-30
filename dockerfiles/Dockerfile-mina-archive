@@ -5,6 +5,7 @@ FROM ${image}
 ARG deb_version
 ARG deb_codename=bullseye
 ARG deb_release=unstable
+ARG deb_repo="http://packages.o1test.net"
 ARG deb_profile
 
 # if --build-arg deb_profile is defined, add hypen at beginning.
@@ -56,7 +57,7 @@ ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
 
 # archive-node package
-RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+RUN echo "deb [trusted=yes] ${deb_repo}} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
   && apt-get install --quiet --yes "${MINA_DEB}=$deb_version" \
   && rm -rf /var/lib/apt/lists/*

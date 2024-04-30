@@ -4,6 +4,7 @@ FROM ${image}
 ARG deb_version
 ARG deb_release=unstable
 ARG deb_codename=bullseye
+ARG deb_repo="http://packages.o1test.net"
 ARG MINA_BRANCH
 ARG MINA_REPO=https://github.com/MinaProtocol/mina
 
@@ -68,7 +69,7 @@ RUN curl -sL https://deb.nodesource.com/setup_20.x | sudo -E bash - \
 
 # Mina mina test executive package
 RUN echo "Installing mina-test-executive onto image with version $deb_version from repo $deb_release $deb_codename " \
-  && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+  && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --yes \
   && apt-get install --yes --allow-downgrades "mina-test-executive=$deb_version"
 

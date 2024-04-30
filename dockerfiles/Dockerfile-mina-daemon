@@ -5,6 +5,7 @@ ARG deb_version
 ARG deb_release=unstable
 ARG deb_codename=bullseye
 ARG network=mainnet
+ARG deb_repo="http://packages.o1test.net"
 ARG deb_profile
 
 # if --build-arg deb_profile is defined, add hypen at beginning.
@@ -66,7 +67,7 @@ ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 # Mina daemon package
 # jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
-  && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+  && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
   && apt-get install --quiet --yes --allow-downgrades "${MINA_DEB}=$deb_version" \
   && apt-get install --quiet --yes --allow-downgrades "mina-create-legacy-genesis=1.4.0beta2-compatible-97f7d8c" \

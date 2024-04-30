@@ -3,6 +3,7 @@ FROM ${image} AS production
 ARG deb_codename=bullseye
 ARG deb_version
 ARG deb_release=unstable
+ARG deb_repo="http://packages.o1test.net"
 ARG network=mainnet
 
 ARG psql_version=13
@@ -70,7 +71,7 @@ RUN locale-gen en_US.UTF-8
 
 # jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename " \
-  && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+  && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
   && apt-get install --quiet --yes --allow-downgrades -o Dpkg::Options::="--force-overwrite" "mina-test-suite=$deb_version" "mina-$network=$deb_version" \ 
   && rm -rf /var/lib/apt/lists/*
