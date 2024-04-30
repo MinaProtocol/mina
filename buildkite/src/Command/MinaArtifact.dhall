@@ -30,10 +30,12 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
   \(artifact : Artifacts.Type) ->
   \(debVersion : DebianVersions.DebVersion) ->
   \(profile : Profiles.Type) ->
+  let step_dep_name = "upload"
+  in
   merge {
         Daemon = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
+            deps=DebianVersions.dependsOnStep debVersion profile step_dep_name,
             service="mina-daemon",
             network="berkeley",
             deb_codename="${DebianVersions.lowerName debVersion}",
@@ -43,7 +45,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
 
         TestExecutive = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
+            deps=DebianVersions.dependsOnStep debVersion profile step_dep_name,
             service="mina-test-executive",
             deb_codename="${DebianVersions.lowerName debVersion}",
             step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image"
@@ -51,7 +53,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
 
         BatchTxn = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
+            deps=DebianVersions.dependsOnStep debVersion profile step_dep_name,
             service="mina-batch-txn",
             network="berkeley",
             deb_codename="${DebianVersions.lowerName debVersion}",
@@ -60,7 +62,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
 
         Archive = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
+            deps=DebianVersions.dependsOnStep debVersion profile step_dep_name,
             service="mina-archive",
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_profile="${Profiles.lowerName profile}",
@@ -69,7 +71,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
 
         ArchiveMigration = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
+            deps=DebianVersions.dependsOnStep debVersion profile step_dep_name,
             service="mina-archive-migration",
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_profile="${Profiles.lowerName profile}",
@@ -78,7 +80,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
           
         Rosetta = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
+            deps=DebianVersions.dependsOnStep debVersion profile step_dep_name,
             service="mina-rosetta",
             network="berkeley",
             deb_codename="${DebianVersions.lowerName debVersion}",
@@ -87,7 +89,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
 
         ZkappTestTransaction = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
+            deps=DebianVersions.dependsOnStep debVersion profile step_dep_name,
             service="mina-zkapp-test-transaction",
             deb_codename="${DebianVersions.lowerName debVersion}",
             step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
@@ -95,7 +97,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
         
         FunctionalTestSuite = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
+            deps=DebianVersions.dependsOnStep debVersion profile step_dep_name,
             service="mina-test-suite",
             deb_codename="${DebianVersions.lowerName debVersion}",
             step_key="test-suite-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
@@ -156,7 +158,7 @@ let publish_to_debian_repo =
             ] "./buildkite/scripts/publish-deb.sh",
             label = "Publish Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile}",
             key = "publish-deb-pkg",
-            depends_on = DebianVersions.dependsOn spec.debVersion spec.profile,
+            depends_on = DebianVersions.dependsOnStep spec.debVersion spec.profile "build",
             target = Size.Small
           }
 
@@ -171,7 +173,7 @@ let upload_to_s3 =
             ] "./buildkite/scripts/upload-deb.sh $MINA_DEB_CODENAME",
             label = "Upload Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile} to s3",
             key = "upload-to-s3-deb-pkg",
-            depends_on = DebianVersions.dependsOn spec.debVersion spec.profile,
+            depends_on = DebianVersions.dependsOnStep spec.debVersion spec.profile "build",
             target = Size.Small
           }
 

@@ -23,16 +23,21 @@ let lowerName = \(debVersion : DebVersion) ->
     , Focal = "focal"
   } debVersion
 
-let dependsOn = \(debVersion : DebVersion) -> \(profile : Profiles.Type) ->
+let dependsOnStep = \(debVersion : DebVersion) -> \(profile : Profiles.Type) -> \(step : Text )->
   let profileSuffix = Profiles.toSuffixUppercase profile in
   let prefix = "MinaArtifact" in
   merge {
-    Bookworm = [{ name = "${prefix}${profileSuffix}", key = "upload-deb-pkg" }]
-    , Bullseye = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "upload-deb-pkg" }]
-    , Buster = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "upload-deb-pkg" }]
-    , Jammy = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "upload-deb-pkg" }]
-    , Focal = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "upload-deb-pkg" }]
+    Bookworm = [{ name = "${prefix}${profileSuffix}", key = "${step}" }]
+    , Bullseye = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "${step}" }]
+    , Buster = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "${step}" }]
+    , Jammy = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "${step}" }]
+    , Focal = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "${step}" }]
   } debVersion
+
+
+
+let dependsOn = \(debVersion : DebVersion) -> \(profile : Profiles.Type) ->
+  dependsOnStep debVersion profile "publish"
 
 -- Most debian builds are only used for public releases
 -- so they don't need to be triggered by dirtyWhen on every change
@@ -87,5 +92,6 @@ in
   , capitalName = capitalName
   , lowerName = lowerName
   , dependsOn = dependsOn
+  , dependsOnStep = dependsOnStep
   , dirtyWhen = dirtyWhen
 }
