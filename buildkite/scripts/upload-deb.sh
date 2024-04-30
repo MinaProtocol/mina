@@ -7,7 +7,6 @@ if [[ $# -ne 1 ]]; then
 fi
 
 CODENAME=$1
-BUILDKITE_ARTIFACT_UPLOAD_DESTINATION="${BUILDKITE_ARTIFACT_UPLOAD_DESTINATION}/${BUILDKITE_JOB_ID}/${CODENAME}"
 BUILD_FOLDER=_build
 
 if [ -d "$BUILD_FOLDER" ]; then
@@ -18,7 +17,5 @@ else
 fi
 
 for entry in mina-*.deb; do
-   buildkite-agent artifact upload $entry 
+   buildkite/scripts/upload-deb.sh $entry $CODENAME/debs
 done
-
-cd ../
