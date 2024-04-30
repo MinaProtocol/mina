@@ -266,9 +266,9 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
         CreateConfig = 
           DockerImage.ReleaseSpec::{
             deps=DebianVersions.dependsOn debVersion profile,
-            service="mina-create-config",
+            service="mina-create-genesis",
             deb_codename="${DebianVersions.lowerName debVersion}",
-            step_key="create-config-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
+            step_key="create-genesis-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
             network="berkeley"
           }
       } artifact
