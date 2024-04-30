@@ -162,29 +162,12 @@ let publish_to_debian_repo =
             target = Size.Small
           }
 
-let upload_to_s3 = 
-   \(spec: MinaBuildSpec.Type) -> 
-        Command.build
-          Command.Config::{
-            commands = Toolchain.select spec.toolchainSelectMode spec.debVersion [
-              "AWS_ACCESS_KEY_ID",
-              "AWS_SECRET_ACCESS_KEY",
-              "MINA_DEB_CODENAME=${DebianVersions.lowerName spec.debVersion}"
-            ] "./buildkite/scripts/upload-deb.sh $MINA_DEB_CODENAME",
-            label = "Upload Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile} to s3",
-            key = "upload-to-s3-deb-pkg",
-            depends_on = DebianVersions.dependsOnStep spec.debVersion spec.profile "build",
-            target = Size.Small
-          }
-
-
 let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type = 
   \(spec: MinaBuildSpec.Type) ->
     let steps = [
         Libp2p.step spec.debVersion,
         (build_artifacts spec),
         (publish_to_debian_repo spec),
-        (upload_to_s3 spec)
       ] # (List/map
             Artifacts.Type
             Command.Type
