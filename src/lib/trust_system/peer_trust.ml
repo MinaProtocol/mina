@@ -196,14 +196,15 @@ module Make0 (Inputs : Input_intf) = struct
     let simple_new = Record_inst.to_peer_status new_record in
     let action_fmt, action_metadata = Action.to_log action in
     let log_trust_change () =
-      let verb =
-        if Float.(simple_new.trust > simple_old.trust) then "Increasing"
-        else "Decreasing"
-      in
-      [%log debug]
-        ~metadata:([ ("sender_id", Peer_id.to_yojson peer) ] @ action_metadata)
-        "%s trust for peer $sender_id due to %s. New trust is %f." verb
-        action_fmt simple_new.trust
+      if Float.(simple_new.trust <> simple_old.trust) then
+        let verb =
+          if Float.(simple_new.trust > simple_old.trust) then "Increasing"
+          else "Decreasing"
+        in
+        [%log debug]
+          ~metadata:([ ("sender_id", Peer_id.to_yojson peer) ] @ action_metadata)
+          "%s trust for peer $sender_id due to %s. New trust is %f." verb
+          action_fmt simple_new.trust
     in
     let%map () =
       match (simple_old.banned, simple_new.banned) with
