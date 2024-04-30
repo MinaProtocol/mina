@@ -167,7 +167,7 @@ let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type =
     let steps = [
         Libp2p.step spec.debVersion,
         (build_artifacts spec),
-        (publish_to_debian_repo spec),
+        (publish_to_debian_repo spec)
       ] # (List/map
             Artifacts.Type
             Command.Type
