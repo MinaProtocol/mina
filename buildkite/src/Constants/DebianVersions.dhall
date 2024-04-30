@@ -27,11 +27,11 @@ let dependsOnStep = \(debVersion : DebVersion) -> \(profile : Profiles.Type) -> 
   let profileSuffix = Profiles.toSuffixUppercase profile in
   let prefix = "MinaArtifact" in
   merge {
-    Bookworm = [{ name = "${prefix}${profileSuffix}", key = "${step}" }]
-    , Bullseye = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "${step}" }]
-    , Buster = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "${step}" }]
-    , Jammy = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "${step}" }]
-    , Focal = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "${step}" }]
+    Bookworm = [{ name = "${prefix}${profileSuffix}", key = "${step}-deb-pkg" }]
+    , Bullseye = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "${step}-deb-pkg" }]
+    , Buster = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "${step}-deb-pkg" }]
+    , Jammy = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "${step}-deb-pkg" }]
+    , Focal = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "${step}-deb-pkg" }]
   } debVersion
 
 
