@@ -2,10 +2,10 @@ let Prelude = ../External/Prelude.dhall
 let Text/concatSep = Prelude.Text.concatSep
 let Profiles = ./Profiles.dhall
 
-let Artifact : Type  = < Daemon | Archive | ArchiveMigration | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
+let Artifact : Type  = < Daemon | CreateConfig | Archive | ArchiveMigration | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
 
 
-let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.ArchiveMigration , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
+let AllButTests = [ Artifact.Daemon Artifact.CreateConfig , Artifact.Archive , Artifact.ArchiveMigration , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
 
 let Main = [ Artifact.Daemon , Artifact.Archive , Artifact.Rosetta ]
 
@@ -14,6 +14,7 @@ let All = AllButTests # [ Artifact.FunctionalTestSuite ]
 let capitalName = \(artifact : Artifact) ->
   merge {
     Daemon = "Daemon"
+    , CreateConfig = "CreateConfig"
     , Archive = "Archive"
     , ArchiveMigration = "ArchiveMigration"
     , TestExecutive = "TestExecutive"
@@ -26,6 +27,7 @@ let capitalName = \(artifact : Artifact) ->
 let lowerName = \(artifact : Artifact) ->
   merge {
     Daemon = "daemon"
+    , CreateConfig = "create_config"
     , Archive = "archive"
     , ArchiveMigration = "archive_migration"
     , TestExecutive = "test_executive"
@@ -38,6 +40,7 @@ let lowerName = \(artifact : Artifact) ->
 let dockerName = \(artifact : Artifact) ->
   merge {
     Daemon = "mina-daemon"
+    , CreateConfig = "mina-create-config"
     , Archive = "mina-archive"
     , TestExecutive = "mina-test-executive"
     , ArchiveMigration = "mina-archive-migration"
@@ -51,6 +54,7 @@ let dockerName = \(artifact : Artifact) ->
 let toDebianName = \(artifact : Artifact) ->
   merge {
     Daemon = "daemon"
+    , CreateConfig = "create_config"
     , Archive = "archive"
     , ArchiveMigration  = "archive_migration"
     , TestExecutive = "test_executive"
