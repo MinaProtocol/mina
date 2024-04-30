@@ -156,6 +156,7 @@ let publish_to_debian_repo =
             ] "./buildkite/scripts/publish-deb.sh",
             label = "Publish Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile}",
             key = "publish-deb-pkg",
+            depends_on = DebianVersions.dependsOn spec.debVersion spec.profile,
             target = Size.Small
           }
 
@@ -170,6 +171,7 @@ let upload_to_s3 =
             ] "./buildkite/scripts/upload-deb.sh $MINA_DEB_CODENAME",
             label = "Upload Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile} to s3",
             key = "upload-to-s3-deb-pkg",
+            depends_on = DebianVersions.dependsOn spec.debVersion spec.profile,
             target = Size.Small
           }
 
