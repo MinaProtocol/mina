@@ -17,4 +17,6 @@ echo "--- Prepare debian packages"
 ./scripts/rebuild-deb.sh $@
 
 echo "--- Git diff after build is complete:"
-#git diff --exit-code -- .
+git diff --exit-code -- .
+
+ls /workdir
