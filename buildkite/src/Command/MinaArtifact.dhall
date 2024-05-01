@@ -101,7 +101,7 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
         [ Command.build Command.Config::{
             commands = [
               Cmd.runInDocker Cmd.Docker::{
-                image = "gcr.io/o1labs-192920/mina-daemon:3.0.0devnet-berkeley-c1c9de7-bullseye-berkeley"
+                image = "\\\${MINA_DAEMON_DOCKER_IMAGE}"
               , extraEnv = [ "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL" ]
               } "./buildkite/scripts/generate-genesis-config.sh"
             ] 
