@@ -106,7 +106,7 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
               } "./buildkite/scripts/generate-genesis-config.sh"
             ] 
             , label = "Generate hardfork genesis config"
-            , key = generateLedgersJobKey 
+            , key = "generate-genesis-config"
             , target = Size.Large
             }          
         , Command.build
