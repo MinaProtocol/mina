@@ -33,19 +33,23 @@ TEST_EXECUTIVE_DEPS=", mina-logproc, python3, nodejs, yarn, google-cloud-sdk, ku
 
 case "${MINA_DEB_CODENAME}" in
   bookworm|jammy)
-    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc, mina-create-genesis"
+    MINA_CREATE_GENESIS_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
+    DAEMON_DEPS="$MINA_CREATE_GENESIS_DEPS, mina-create-genesis"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   bullseye|focal)
-    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8, mina-logproc, mina-create-genesis"
+    MINA_CREATE_GENESIS_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
+    DAEMON_DEPS="$MINA_CREATE_GENESIS_DEPS, mina-create-genesis"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   buster)
-    DAEMON_DEPS=", libffi6, libjemalloc2, libpq-dev, libprocps7, mina-logproc, mina-create-genesis"
+    MINA_CREATE_GENESIS_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
+    DAEMON_DEPS="$MINA_CREATE_GENESIS_DEPS, mina-create-genesis"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   stretch|bionic)
-    DAEMON_DEPS=", libffi6, libjemalloc1, libpq-dev, libprocps6, mina-logproc, mina-create-genesis"
+    MINA_CREATE_GENESIS_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
+    DAEMON_DEPS="$MINA_CREATE_GENESIS_DEPS, mina-create-genesis"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc1"
     ;;
   *)
@@ -241,7 +245,7 @@ build_logproc_deb() {
 
 ##################################### CREATE GENESIS PACKAGE #######################################
 build_create_genesis_deb() {
-  create_control_file mina-create-genesis "${SHARED_DEPS}, mina-logproc" 'Utility for create mina genesis config' "${SUGGESTED_DEPS}"
+  create_control_file mina-create-genesis "${SHARED_DEPS}${MINA_CREATE_GENESIS_DEPS}" 'Utility for create mina genesis config' "${SUGGESTED_DEPS}"
 
   # Binaries
   cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
