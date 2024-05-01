@@ -42,9 +42,14 @@ echo "--- Migrate accounts to new network format"
 # NB: we use sed here instead of jq, because jq is extremely slow at processing this file
 sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "2"}/' config.json
 
-dune build "--profile=${DUNE_PROFILE}" \
-  src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-  src/app/logproc/logproc.exe
+case "${NETWORK_NAME}" in
+  mainnet)
+    MINA_BUILD_MAINNET=true ./buildkite/scripts/build-artifact.sh
+    ;;
+  *)
+    ./buildkite/scripts/build-artifact.sh
+    ;;
+esac
 
 echo "--- Generate hardfork ledger tarballs"
 mkdir hardfork_ledgers
@@ -55,15 +60,6 @@ FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hardfork_ledger_hashes.json scri
 
 echo "--- New genesis config"
 cat new_config.json
-
-case "${NETWORK_NAME}" in
-  mainnet)
-    MINA_BUILD_MAINNET=true ./buildkite/scripts/build-artifact.sh
-    ;;
-  *)
-    ./buildkite/scripts/build-artifact.sh
-    ;;
-esac
 
 existing_files=$(aws s3 ls s3://snark-keys.o1test.net/ | awk '{print $4}')
 for file in hardfork_ledgers/*; do
