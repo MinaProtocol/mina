@@ -17,5 +17,5 @@ else
 fi
 
 for entry in mina-*.deb; do
-   buildkite/scripts/upload-deb.sh $entry $CODENAME/debs
+  buildkite/scripts/cache-artifact.sh $entry $CODENAME/debs
 done
