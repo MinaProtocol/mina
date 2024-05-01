@@ -102,7 +102,13 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
             commands = [
               Cmd.runInDocker Cmd.Docker::{
                 image = "\\\${MINA_DAEMON_DOCKER_IMAGE}"
-              , extraEnv = [ "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL" ]
+              , extraEnv = [ "NETWORK_NAME=\$NETWORK_NAME"
+                           , "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL"
+                           , "AWS_ACCESS_KEY_ID"
+                           , "AWS_SECRET_ACCESS_KEY"
+                           , "TESTNET_NAME=\$NETWORK_NAME-hardfork"
+                           , "GENESIS_TIMESTAMP=\$GENESIS_TIMESTAMP"
+                           ]
               } "./buildkite/scripts/generate-genesis-config.sh"
             ] 
             , label = "Generate hardfork genesis config"
