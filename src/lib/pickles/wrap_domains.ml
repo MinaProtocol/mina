@@ -1,6 +1,5 @@
 open Core_kernel
 open Pickles_types
-open Import
 open Poly_types
 
 (* Compute the domains corresponding to wrap_main *)
@@ -19,7 +18,8 @@ struct
       ~num_chunks ~max_proofs_verified =
     let num_choices = Hlist.Length.to_nat choices_length in
     let dummy_step_domains =
-      Vector.init num_choices ~f:(fun _ -> Fix_domains.rough_domains)
+      Promise.return
+      @@ Vector.init num_choices ~f:(fun _ -> Fix_domains.rough_domains)
     in
     let dummy_step_widths =
       Vector.init num_choices ~f:(fun _ ->
@@ -27,13 +27,14 @@ struct
     in
     let dummy_step_keys =
       lazy
-        (Vector.init num_choices ~f:(fun _ ->
-             let num_chunks = (* TODO *) 1 in
-             let g =
-               Array.init num_chunks ~f:(fun _ ->
-                   Backend.Tock.Inner_curve.(to_affine_exn one) )
-             in
-             Verification_key.dummy_step_commitments g ) )
+        (Promise.return
+           (Vector.init num_choices ~f:(fun _ ->
+                let num_chunks = (* TODO *) 1 in
+                let g =
+                  Array.init num_chunks ~f:(fun _ ->
+                      Backend.Tock.Inner_curve.(to_affine_exn one) )
+                in
+                Verification_key.dummy_step_commitments g ) ) )
     in
     Timer.clock __LOC__ ;
     let srs = Backend.Tick.Keypair.load_urs () in
@@ -43,27 +44,19 @@ struct
         max_proofs_verified
     in
     Timer.clock __LOC__ ;
+    let%bind.Promise main = Lazy.force main in
     let t =
       Fix_domains.domains
         (module Impls.Wrap)
         (Impls.Wrap.input ~feature_flags ())
         (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
-        main
+        (fun input -> Promise.return (main input))
     in
     Timer.clock __LOC__ ; t
 
   let f full_signature num_choices choices_length ~feature_flags ~num_chunks
       ~max_proofs_verified =
-    let res =
-      Common.wrap_domains
-        ~proofs_verified:(Nat.to_int (Nat.Add.n max_proofs_verified))
-    in
-    ( if debug then
-      let res' =
-        f_debug full_signature num_choices choices_length ~feature_flags
-          ~num_chunks ~max_proofs_verified
-      in
-      [%test_eq: Domains.t] res res' ) ;
-    res
+    Common.wrap_domains
+      ~proofs_verified:(Nat.to_int (Nat.Add.n max_proofs_verified))
 end
 [@@warning "-60"]

@@ -9,7 +9,8 @@ let run ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_updates
   let print n msg = printf !"[%i] %s\n%!" n msg in
   if use_zkapps then (
     let ledger, transactions =
-      create_ledger_and_zkapps ?min_num_updates ~max_num_updates ()
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          create_ledger_and_zkapps ?min_num_updates ~max_num_updates () )
     in
     Parallel.init_master () ;
     let verifier =

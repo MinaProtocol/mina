@@ -161,6 +161,8 @@ let step_main :
          , max_proofs_verified
          , self_branches )
          Types_map.Compiled.basic
+    -> known_wrap_keys:
+         local_branches H1.T(Types_map.For_step.Optional_wrap_key).t
     -> self:(var, value, max_proofs_verified, self_branches) Tag.t
     -> ( prev_vars
        , prev_values
@@ -172,16 +174,18 @@ let step_main :
        , ret_value
        , auxiliary_var
        , auxiliary_value )
-       Inductive_rule.t
+       Inductive_rule.Promise.t
     -> (   unit
         -> ( (Unfinalized.t, max_proofs_verified) Vector.t
            , Field.t
            , (Field.t, max_proofs_verified) Vector.t )
-           Types.Step.Statement.t )
+           Types.Step.Statement.t
+           Promise.t )
        Staged.t =
  fun (module Req) max_proofs_verified ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length
-     ~proofs_verified ~lte ~public_input ~auxiliary_typ ~basic ~self rule ->
+     ~proofs_verified ~lte ~public_input ~auxiliary_typ ~basic ~known_wrap_keys
+     ~self rule ->
   let module Typ_with_max_proofs_verified = struct
     type ('var, 'value, 'local_max_proofs_verified, 'local_branches) t =
       ( ( 'var
@@ -272,24 +276,22 @@ let step_main :
     | Input_and_output (input_typ, output_typ) ->
         (input_typ, output_typ)
   in
-  let main () : _ Types.Step.Statement.t =
+  let main () : _ Types.Step.Statement.t Promise.t =
     let open Impls.Step in
     let logger = Internal_tracing_context_logger.get () in
+    let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
+                                         with type n = max_proofs_verified )
+    in
+    let T = Max_proofs_verified.eq in
+    let app_state = exists input_typ ~request:(fun () -> Req.App_state) in
+    let%bind.Promise { Inductive_rule.previous_proof_statements
+                     ; public_output = ret_var
+                     ; auxiliary_output = auxiliary_var
+                     } =
+      (* Run the application logic of the rule on the predecessor statements *)
+      with_label "rule_main" (fun () -> rule.main { public_input = app_state })
+    in
     with_label "step_main" (fun () ->
-        let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
-                                             with type n = max_proofs_verified
-                                         )
-        in
-        let T = Max_proofs_verified.eq in
-        let app_state = exists input_typ ~request:(fun () -> Req.App_state) in
-        let { Inductive_rule.previous_proof_statements
-            ; public_output = ret_var
-            ; auxiliary_output = auxiliary_var
-            } =
-          (* Run the application logic of the rule on the predecessor statements *)
-          with_label "rule_main" (fun () ->
-              rule.main { public_input = app_state } )
-        in
         let () =
           exists Typ.unit ~request:(fun () ->
               let ret_value = As_prover.read output_typ ret_var in
@@ -304,46 +306,50 @@ let step_main :
         in
         (* Compute proof parts outside of the prover before requesting values.
         *)
-        exists Typ.unit ~request:(fun () ->
-            let previous_proof_statements =
-              let rec go :
-                  type prev_vars prev_values ns1 ns2.
-                     ( prev_vars
-                     , ns1 )
-                     H2.T(Inductive_rule.Previous_proof_statement).t
-                  -> (prev_vars, prev_values, ns1, ns2) H4.T(Tag).t
-                  -> ( prev_values
-                     , ns1 )
-                     H2.T(Inductive_rule.Previous_proof_statement.Constant).t =
-               fun previous_proof_statement tags ->
-                match (previous_proof_statement, tags) with
-                | [], [] ->
-                    []
-                | ( { public_input; proof; proof_must_verify } :: stmts
-                  , tag :: tags ) ->
-                    let public_input =
-                      (fun (type var value n m) (tag : (var, value, n, m) Tag.t)
-                           (var : var) : value ->
-                        let typ : (var, value) Typ.t =
-                          match Type_equal.Id.same_witness self.id tag.id with
-                          | Some T ->
-                              basic.public_input
-                          | None ->
-                              Types_map.public_input tag
-                        in
-                        As_prover.read typ var )
-                        tag public_input
-                    in
-                    { public_input
-                    ; proof = As_prover.Ref.get proof
-                    ; proof_must_verify =
-                        As_prover.read Boolean.typ proof_must_verify
-                    }
-                    :: go stmts tags
+        let%map.Promise () =
+          Async_promise.unit_request (fun () ->
+              let previous_proof_statements =
+                let rec go :
+                    type prev_vars prev_values ns1 ns2.
+                       ( prev_vars
+                       , ns1 )
+                       H2.T(Inductive_rule.Previous_proof_statement).t
+                    -> (prev_vars, prev_values, ns1, ns2) H4.T(Tag).t
+                    -> ( prev_values
+                       , ns1 )
+                       H2.T(Inductive_rule.Previous_proof_statement.Constant).t
+                    =
+                 fun previous_proof_statement tags ->
+                  match (previous_proof_statement, tags) with
+                  | [], [] ->
+                      []
+                  | ( { public_input; proof; proof_must_verify } :: stmts
+                    , tag :: tags ) ->
+                      let public_input =
+                        (fun (type var value n m)
+                             (tag : (var, value, n, m) Tag.t) (var : var) :
+                             value ->
+                          let typ : (var, value) Typ.t =
+                            match Type_equal.Id.same_witness self.id tag.id with
+                            | Some T ->
+                                basic.public_input
+                            | None ->
+                                Types_map.public_input tag
+                          in
+                          As_prover.read typ var )
+                          tag public_input
+                      in
+                      { public_input
+                      ; proof = As_prover.Ref.get proof
+                      ; proof_must_verify =
+                          As_prover.read Boolean.typ proof_must_verify
+                      }
+                      :: go stmts tags
+                in
+                go previous_proof_statements rule.prevs
               in
-              go previous_proof_statements rule.prevs
-            in
-            Req.Compute_prev_proof_parts previous_proof_statements ) ;
+              Req.Compute_prev_proof_parts previous_proof_statements )
+        in
         let dlog_plonk_index =
           let num_chunks = (* TODO *) 1 in
           exists
@@ -495,28 +501,34 @@ let step_main :
                     ; zk_rows = basic.zk_rows
                     }
                   in
-                  let module M =
-                    H4.Map (Tag) (Types_map.For_step)
-                      (struct
-                        let f :
-                            type a1 a2 n m.
-                               (a1, a2, n, m) Tag.t
-                            -> (a1, a2, n, m) Types_map.For_step.t =
-                         fun tag ->
+                  let rec go :
+                      type a1 a2 n m.
+                         (a1, a2, n, m) H4.T(Tag).t
+                      -> m H1.T(Types_map.For_step.Optional_wrap_key).t
+                      -> (a1, a2, n, m) H4.T(Types_map.For_step).t =
+                   fun tags optional_wrap_keys ->
+                    match (tags, optional_wrap_keys) with
+                    | [], [] ->
+                        []
+                    | tag :: tags, optional_wrap_key :: optional_wrap_keys ->
+                        let data =
                           match Type_equal.Id.same_witness self.id tag.id with
-                          | Some T ->
-                              self_data
                           | None -> (
                               match tag.kind with
                               | Compiled ->
-                                  Types_map.For_step.of_compiled
+                                  Types_map.For_step
+                                  .of_compiled_with_known_wrap_key
+                                    (Option.value_exn optional_wrap_key)
                                     (Types_map.lookup_compiled tag.id)
                               | Side_loaded ->
                                   Types_map.For_step.of_side_loaded
                                     (Types_map.lookup_side_loaded tag.id) )
-                      end)
+                          | Some T ->
+                              self_data
+                        in
+                        data :: go tags optional_wrap_keys
                   in
-                  M.f rule.prevs
+                  go rule.prevs known_wrap_keys
                 in
                 go proof_witnesses datas messages_for_next_wrap_proofs
                   unfinalized_proofs previous_proof_statements proofs_verified

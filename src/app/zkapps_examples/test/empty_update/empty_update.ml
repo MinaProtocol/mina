@@ -28,7 +28,9 @@ let tag, _, p_module, Pickles.Provers.[ prover ] =
 
 module P = (val p_module)
 
-let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
+let vk =
+  Async.Thread_safe.block_on_async_exn (fun () ->
+      Pickles.Side_loaded.Verification_key.of_compiled tag )
 
 let account_update, () = Async.Thread_safe.block_on_async_exn prover
 

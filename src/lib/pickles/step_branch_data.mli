@@ -23,7 +23,7 @@ type ( 'a_var
           * ('prev_vars, 'proofs_verified) Pickles_types.Hlist.Length.t
       ; index : int
       ; lte : ('proofs_verified, 'max_proofs_verified) Pickles_types.Nat.Lte.t
-      ; domains : Import.Domains.t
+      ; domains : Import.Domains.t Promise.t
       ; rule :
           ( 'prev_vars
           , 'prev_values
@@ -35,16 +35,20 @@ type ( 'a_var
           , 'ret_value
           , 'auxiliary_var
           , 'auxiliary_value )
-          Inductive_rule.t
+          Inductive_rule.Promise.t
             (* Main functions to compute *)
       ; main :
-             step_domains:(Import.Domains.t, 'branches) Pickles_types.Vector.t
-          -> unit
-          -> ( (Unfinalized.t, 'max_proofs_verified) Pickles_types.Vector.t
-             , Impls.Step.Field.t
-             , (Impls.Step.Field.t, 'max_proofs_verified) Pickles_types.Vector.t
-             )
-             Import.Types.Step.Statement.t
+             step_domains:
+               (Import.Domains.t, 'branches) Pickles_types.Vector.t Promise.t
+          -> (   unit
+              -> ( (Unfinalized.t, 'max_proofs_verified) Pickles_types.Vector.t
+                 , Impls.Step.Field.t
+                 , ( Impls.Step.Field.t
+                   , 'max_proofs_verified )
+                   Pickles_types.Vector.t )
+                 Import.Types.Step.Statement.t
+                 Promise.t )
+             Promise.t
       ; requests :
           (module Requests.Step.S
              with type auxiliary_value = 'auxiliary_value
@@ -100,6 +104,7 @@ val create :
   -> auxiliary_typ:('a, 'b) Impls.Step.Typ.t
   -> 'c
   -> 'd
+  -> chain_to:unit Promise.t
   -> ( 'e
      , 'f
      , 'g
@@ -110,7 +115,7 @@ val create :
      , 'ret_value
      , 'a
      , 'b )
-     Inductive_rule.t
+     Inductive_rule.Promise.t
   -> ( 'a_var
      , 'a_value
      , 'ret_var

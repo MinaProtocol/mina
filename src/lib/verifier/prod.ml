@@ -53,7 +53,8 @@ module Worker_state = struct
     val verify_transaction_snarks :
       (Transaction_snark.t * Sok_message.t) list -> unit Or_error.t Deferred.t
 
-    val get_blockchain_verification_key : unit -> Pickles.Verification_key.t
+    val get_blockchain_verification_key :
+      unit -> Pickles.Verification_key.t Deferred.t
 
     val toggle_internal_tracing : bool -> unit
 
@@ -314,7 +315,7 @@ module Worker = struct
 
       let get_blockchain_verification_key (w : Worker_state.t) () =
         let (module M) = Worker_state.get w in
-        Deferred.return (M.get_blockchain_verification_key ())
+        M.get_blockchain_verification_key ()
 
       let toggle_internal_tracing (w : Worker_state.t) enabled =
         let (module M) = Worker_state.get w in

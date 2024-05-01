@@ -648,17 +648,7 @@ module Plonk_constraint = struct
             List.reduce_exn ~f:add
               [ mul cl vl; mul cr vr; mul co vo; mul m (mul vl vr); c ]
           in
-          if not (equal zero res) then (
-            eprintf
-              !"%{sexp:t} * %{sexp:t}\n\
-                + %{sexp:t} * %{sexp:t}\n\
-                + %{sexp:t} * %{sexp:t}\n\
-                + %{sexp:t} * %{sexp:t}\n\
-                + %{sexp:t}\n\
-                = %{sexp:t}%!"
-              cl vl cr vr co vo m (mul vl vr) c res ;
-            false )
-          else true
+          equal zero res
       | _ ->
           true
   end
