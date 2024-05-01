@@ -16,8 +16,12 @@ echo " Includes mina daemon, archive-node, rosetta, generate keypair for berkele
 echo "--- Prepare debian packages"
 ./scripts/rebuild-deb.sh $@
 
+ls -al
+
 echo "--- Copy debians to s3"
-./buildkite/scripts/upload-deb.sh $MINA_DEB_CODENAME
+for entry in *.deb; do
+  source ./buildkite/scripts/cache-artifact.sh $entry ${MINA_DEB_CODENAME}/debs
+done 
 
 echo "--- Git diff after build is complete:"
 git diff --exit-code -- .

@@ -50,8 +50,8 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
 
     let commands : List Cmd.Type =
     [
-      Cmd.run "./buildkite/scripts/download-artifact-from-cache.sh ${spec.deb_codename} .",
-      Cmd.run "./buildkite/scripts/aptly/start.sh ${spec.deb_codename} *.deb",
+      Cmd.run "source ./buildkite/scripts/download-artifact-from-cache.sh ${spec.deb_codename} .",
+      Cmd.run "source ./buildkite/scripts/aptly/start.sh ${spec.deb_codename} *.deb",
       Cmd.run (
           "export MINA_DEB_CODENAME=${spec.deb_codename} && source ./buildkite/scripts/export-git-env-vars.sh && ./scripts/release-docker.sh " ++
               "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-repo $APTLY_LISTEN --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --deb-profile ${spec.deb_profile} --repo ${spec.repo} --extra-args \\\"${spec.extra_args}\\\""
