@@ -43,12 +43,12 @@ case "${MINA_DEB_CODENAME}" in
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   buster)
-    MINA_CREATE_GENESIS_DEPS=", libffi6, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
+    MINA_CREATE_GENESIS_DEPS=", libffi6, libjemalloc2, libpq-dev, libprocps7, mina-logproc"
     DAEMON_DEPS="$MINA_CREATE_GENESIS_DEPS, mina-create-genesis"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   stretch|bionic)
-    MINA_CREATE_GENESIS_DEPS=", libffi6, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
+    MINA_CREATE_GENESIS_DEPS=", libffi6, libjemalloc2, libpq-dev, libprocps6, mina-logproc"
     DAEMON_DEPS="$MINA_CREATE_GENESIS_DEPS, mina-create-genesis"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc1"
     ;;
