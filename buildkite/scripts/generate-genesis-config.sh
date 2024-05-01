@@ -27,4 +27,5 @@ echo "--- Create hardfork config"
 FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hardfork_ledger_hashes.json mina-hf-create-runtime-config > new_config.json
 
 echo "--- New genesis config"
+jq 'del(.ledger.s3_data_hash, .epoch_data.staking.s3_data_hash, .epoch_data.next.s3_data_hash)' new_config.json
 cat new_config.json
