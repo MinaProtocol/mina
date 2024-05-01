@@ -98,7 +98,18 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
         , mode = PipelineMode.Type.PackageGeneration
         }
       , steps =
-        [ Command.build
+        [ Command.build Command.Config::{
+            commands = [
+              Cmd.runInDocker Cmd.Docker::{
+                image = "gcr.io/o1labs-192920/mina-daemon:3.0.0devnet-berkeley-c1c9de7-bullseye-berkeley"
+              , extraEnv = [ "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL" ]
+              } "./buildkite/scripts/generate-genesis-config.sh"
+            ] 
+            , label = "Generate hardfork genesis config"
+            , key = generateLedgersJobKey 
+            , target = Size.Large
+            }          
+        , Command.build
             Command.Config::{
               commands =
                 Toolchain.runner
