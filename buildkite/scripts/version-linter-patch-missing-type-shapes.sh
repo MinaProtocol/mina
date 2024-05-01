@@ -19,7 +19,7 @@ RELEASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 --no-merges $relea
 
 if ! $(gsutil ls gs://mina-type-shapes/$BUILDKITE_COMMIT 2>/dev/null); then
     git checkout $BUILDKITE_COMMIT
-    eval $(opam config env)
+    source ~/.profile
     export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
     export GO=/usr/lib/go/bin/go
     make -C src/app/libp2p_helper
@@ -30,7 +30,7 @@ fi
 
 if ! $(gsutil ls gs://mina-type-shapes/$RELEASE_BRANCH_COMMIT 2>/dev/null); then
     git checkout $RELEASE_BRANCH_COMMIT
-    eval $(opam config env)
+    source ~/.profile
     export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
     export GO=/usr/lib/go/bin/go
     make -C src/app/libp2p_helper
