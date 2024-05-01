@@ -100,6 +100,15 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             deb_codename="${DebianVersions.lowerName debVersion}",
             step_key="test-suite-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
             network="berkeley"
+          },
+
+        CreateGenesis = 
+          DockerImage.ReleaseSpec::{
+            deps=DebianVersions.dependsOn debVersion profile,
+            service="mina-create-genesis",
+            deb_codename="${DebianVersions.lowerName debVersion}",
+            step_key="create-genesis-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
+            network="berkeley"
           }
       } artifact
 in 

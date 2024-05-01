@@ -5,9 +5,9 @@ let DebianVersions = ./DebianVersions.dhall
 let Network = ./Network.dhall
 
 
-let Artifact : Type  = < Daemon | Archive | ArchiveMigration | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
+let Artifact : Type  = < Daemon | CreateGenesis | Archive | ArchiveMigration | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
 
-let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.ArchiveMigration , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
+let AllButTests = [ Artifact.Daemon , Artifact.CreateGenesis , Artifact.Archive , Artifact.ArchiveMigration , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
 
 let Main = [ Artifact.Daemon , Artifact.Archive , Artifact.Rosetta ]
 
@@ -16,6 +16,7 @@ let All = AllButTests # [ Artifact.FunctionalTestSuite ]
 let capitalName = \(artifact : Artifact) ->
   merge {
     Daemon = "Daemon"
+    , CreateGenesis = "CreateGenesis"
     , Archive = "Archive"
     , ArchiveMigration = "ArchiveMigration"
     , TestExecutive = "TestExecutive"
@@ -28,6 +29,7 @@ let capitalName = \(artifact : Artifact) ->
 let lowerName = \(artifact : Artifact) ->
   merge {
     Daemon = "daemon"
+    , CreateGenesis = "create_genesis"
     , Archive = "archive"
     , ArchiveMigration = "archive_migration"
     , TestExecutive = "test_executive"
@@ -40,6 +42,7 @@ let lowerName = \(artifact : Artifact) ->
 let dockerName = \(artifact : Artifact) ->
   merge {
     Daemon = "mina-daemon"
+    , CreateGenesis = "mina-create-genesis"
     , Archive = "mina-archive"
     , TestExecutive = "mina-test-executive"
     , ArchiveMigration = "mina-archive-migration"
@@ -52,6 +55,7 @@ let dockerName = \(artifact : Artifact) ->
 let toDebianName = \(artifact : Artifact) ->
   merge {
     Daemon = "daemon"
+    , CreateGenesis = "create_genesis"
     , Archive = "archive"
     , ArchiveMigration  = "archive_migration"
     , TestExecutive = "test_executive"

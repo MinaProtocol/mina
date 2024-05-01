@@ -12,7 +12,7 @@ in
 Pipeline.build 
     (ArtifactPipelines.pipeline 
         ArtifactPipelines.MinaBuildSpec::{
-            artifacts = [ Artifacts.Type.Daemon , Artifacts.Type.Archive , Artifacts.Type.BatchTxn , Artifacts.Type.TestExecutive , Artifacts.Type.Rosetta , Artifacts.Type.ZkappTestTransaction ],
+            artifacts = [ Artifacts.Type.Daemon , Artifacts.Type.CreateGenesis, Artifacts.Type.Archive , Artifacts.Type.BatchTxn , Artifacts.Type.TestExecutive , Artifacts.Type.Rosetta , Artifacts.Type.ZkappTestTransaction ],
             debVersion = DebianVersions.DebVersion.Buster
         }
     )

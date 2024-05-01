@@ -19,6 +19,7 @@ if [ $# -eq 0 ]
     build_test_executive_deb
     build_functional_test_suite_deb
     build_zkapp_test_transaction_deb
+    build_create_genesis_deb
 
   else 
     for i in "$@"; do
