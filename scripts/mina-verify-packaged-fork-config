@@ -39,9 +39,10 @@ EOF
 fi
 
 source_build_fallback() {
-    if [ ! -e "$1" ]; then
-        if [ ! -e "$2" ]; then
-            echo "Error: did not find useable $1 or $2" >&2
+    v=$(command -v "$1")
+    if [ ! -x "$v" ]; then
+        if [ ! -x "$2" ]; then
+            echo "Error: program not found in PATH (as $1) or relative to cwd (as $2)" >&2
             exit 1
         else
             echo "$2"
@@ -51,11 +52,11 @@ source_build_fallback() {
     fi
 }
 
-MINA_EXE=${MINA_EXE:-$(source_build_fallback "$(command -v mina)" ./_build/default/src/app/cli/src/mina.exe)}
-MINA_GENESIS_EXE=${MINA_GENESIS_EXE:-$(source_build_fallback "$(command -v mina-create-genesis)" ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe)}
-MINA_LEGACY_GENESIS_EXE=${MINA_LEGACY_GENESIS_EXE:-$(source_build_fallback "$(command -v mina-create-legacy-genesis)" ./runtime_genesis_ledger_of_mainnet.exe)}
-CREATE_RUNTIME_CONFIG=${CREATE_RUNTIME_CONFIG:-$(source_build_fallback "$(command -v mina-hf-create-runtime-config)" ./scripts/hardfork/create_runtime_config.sh)}
-GSUTIL=${GSUTIL:-$(source_build_fallback "$(command -v gsutil)" false)}
+MINA_EXE=${MINA_EXE:-$(source_build_fallback mina ./_build/default/src/app/cli/src/mina.exe)}
+MINA_GENESIS_EXE=${MINA_GENESIS_EXE:-$(source_build_fallback mina-create-genesis ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe)}
+MINA_LEGACY_GENESIS_EXE=${MINA_LEGACY_GENESIS_EXE:-$(source_build_fallback mina-create-legacy-genesis ./runtime_genesis_ledger_of_mainnet.exe)}
+CREATE_RUNTIME_CONFIG=${CREATE_RUNTIME_CONFIG:-$(source_build_fallback mina-hf-create-runtime-config ./scripts/hardfork/create_runtime_config.sh)}
+GSUTIL=${GSUTIL:-$(source_build_fallback gsutil false)}
 
 if [[ -e "$PRECOMPUTED_FORK_BLOCK"  && ! -x "$GSUTIL" ]]; then
     echo "Error: gsutil is required when PRECOMPUTED_FORK_BLOCK is nonexistent path"
