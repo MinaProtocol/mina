@@ -55,6 +55,7 @@
   Cargo.toml
   rust-toolchain.toml
   (source_tree src)
+  (source_tree kimchi-stubs-vendors)
   (source_tree .cargo)
   (source_tree ../../proof-systems)
   (env_var MARLIN_PLONK_STUBS))
@@ -154,6 +155,7 @@
   Cargo.toml
   rust-toolchain.toml
   (source_tree src)
+  (source_tree kimchi-stubs-vendors)
   (source_tree .cargo)
   (source_tree ../../proof-systems)
   (env_var MARLIN_PLONK_STUBS))
