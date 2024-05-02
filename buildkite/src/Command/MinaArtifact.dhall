@@ -131,12 +131,15 @@ let build_artifacts  =
   \(spec: MinaBuildSpec.Type) -> 
   Command.build
           Command.Config::{
-            commands = Toolchain.select spec.toolchainSelectMode spec.debVersion [
-              "DUNE_PROFILE=${Profiles.duneProfile spec.profile}",
-              "MINA_BRANCH=$BUILDKITE_BRANCH",
-              "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
-              "MINA_DEB_CODENAME=${DebianVersions.lowerName spec.debVersion}"
-            ] "./buildkite/scripts/build-release.sh ${Artifacts.toDebianNames spec.artifacts}",
+            commands = (
+              (Toolchain.select spec.toolchainSelectMode spec.debVersion [
+                "DUNE_PROFILE=${Profiles.duneProfile spec.profile}",
+                "MINA_BRANCH=$BUILDKITE_BRANCH",
+                "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
+                "MINA_DEB_CODENAME=${DebianVersions.lowerName spec.debVersion}"
+              ] "./buildkite/scripts/build-release.sh ${Artifacts.toDebianNames spec.artifacts}")
+              #
+              [Cmd.run "./buildkite/scripts/upload-deb-to-gs.sh ${DebianVersions.lowerName spec.debVersion}"]),
             label = "Build Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile}",
             key = "build-deb-pkg",
             target = Size.XLarge,
