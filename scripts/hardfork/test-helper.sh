@@ -15,7 +15,13 @@ get_height()
 }
 
 get_fork_config()
-{ graphql "$1" 'fork_config' | jq '.data.fork_config'
+{
+    # when there are at least 2 arguments, assume the second indicates the block height
+    if [[ $# -gt 1 ]]; then
+        graphql "$1" "fork_config(height: $2)" | jq '.data.fork_config'
+    else
+        graphql "$1" 'fork_config' | jq '.data.fork_config'
+    fi
 }
 
 blocks_with_user_commands()
