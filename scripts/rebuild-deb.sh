@@ -90,4 +90,10 @@ else
   echo "---- Not a mainnet-like branch, only built berkeley and beyond packages"
 fi
 
+echo "pwd"
+
+pwd
+
+echo "deb"
+
 ls -lh mina*.deb
