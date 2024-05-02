@@ -11,6 +11,7 @@ let Size = ./Size.dhall
 let Cmd = ../Lib/Cmds.dhall
 
 let DockerLogin = ../Command/DockerLogin/Type.dhall
+let DebianRepo = ../Constants/DebianRepo.dhall
 
 
 let ReleaseSpec = {
@@ -25,6 +26,7 @@ let ReleaseSpec = {
     deb_release: Text,
     deb_version: Text,
     deb_profile: Text,
+    deb_repo: DebianRepo.Type,
     extra_args: Text,
     step_key: Text,
     `if`: Optional B/If
@@ -40,6 +42,7 @@ let ReleaseSpec = {
     deb_profile = "devnet",
     deb_release = "\\\${MINA_DEB_RELEASE}",
     deb_version = "\\\${MINA_DEB_VERSION}",
+    deb_repo = DebianRepo.Type.PackagesO1Test,
     extra_args = "",
     step_key = "daemon-standard-docker-image",
     `if` = None B/If
@@ -47,19 +50,43 @@ let ReleaseSpec = {
 }
 
 let generateStep = \(spec : ReleaseSpec.Type) ->
+    let build_docker_cmd = 
+        Cmd.run (
+          "export MINA_DEB_CODENAME=${spec.deb_codename} && source ./buildkite/scripts/export-git-env-vars.sh && ./scripts/release-docker.sh " ++
+              "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-repo ${DebianRepo.address spec.deb_repo} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --deb-profile ${spec.deb_profile} --repo ${spec.repo} --extra-args \\\"${spec.extra_args}\\\""
+        )
+    
+    in
 
-    let commands : List Cmd.Type =
+    let local_apt_commands : List Cmd.Type =
     [
       Cmd.run "source ./buildkite/scripts/download-artifact-from-cache.sh _build ${spec.deb_codename} -r",
-      Cmd.run "source ./buildkite/scripts/aptly/start.sh ${spec.deb_codename} _build/*.deb",
-      Cmd.run (
-          "export MINA_DEB_CODENAME=${spec.deb_codename} && source ./buildkite/scripts/export-git-env-vars.sh && ./scripts/release-docker.sh " ++
-              "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-repo $APTLY_LISTEN --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --deb-profile ${spec.deb_profile} --repo ${spec.repo} --extra-args \\\"${spec.extra_args}\\\""
-        ),
-      Cmd.run "kill $APTLY_PID"
+      Cmd.run "source ./buildkite/scripts/aptly/start.sh ${spec.deb_codename} _build/*.deb"
     ]
 
     in
+
+    let kill_apt_command = Cmd.run "kill $APTLY_PID"
+
+    in
+
+    let commands = merge {
+      PackagesO1Test = 
+        [
+          build_docker_cmd
+        ],
+
+      Local = 
+        local_apt_commands
+        # 
+        [
+          build_docker_cmd,
+          kill_apt_command
+        ]
+
+    } spec.deb_repo
+
+    in 
 
     Command.build
       Command.Config::{
