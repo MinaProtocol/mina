@@ -276,8 +276,10 @@ module Sql = struct
            | _ ->
                "" )
     in
-    let block_filter = gen_filter
-        [ [ [ (block_height_field, values_for_filter `Block_height) ] ] ] in
+    let block_filter =
+      gen_filter
+        [ [ [ (block_height_field, values_for_filter `Block_height) ] ] ]
+    in
     let filters =
       gen_filter
         [ [ [ (txn_hash_field, values_for_filter `Txn_hash) ] ]
@@ -292,8 +294,10 @@ module Sql = struct
         ]
     in
     let filters' =
-    Option.value_map op_type_filters ~default:filters ~f:(fun op_type_filter ->
-          [%string "%{filters} %{op_1} (%{op_type_filter})"] ) in
+      Option.value_map op_type_filters ~default:filters
+        ~f:(fun op_type_filter ->
+          [%string "%{filters} %{op_1} (%{op_type_filter})"] )
+    in
     [%string "%{block_filter} AND (%{filters'})"]
 
   module Block_extras = struct
