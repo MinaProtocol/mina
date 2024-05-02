@@ -103,8 +103,8 @@ let promoteDebianStep = \(spec : PromoteDebianSpec.Type) ->
       }
 
 let promoteDockerStep = \(spec : PromoteDockerSpec.Type) ->
-    let old_tag = Artifact.dockerTag spec.name spec.version spec.codename spec.profile spec.network
-    let new_tag = Artifact.dockerTag spec.name spec.new_tag spec.codename spec.profile spec.network
+    let old_tag = Artifact.dockerTag spec.name spec.version spec.codename spec.profile spec.network False
+    let new_tag = Artifact.dockerTag spec.name spec.new_tag spec.codename spec.profile spec.network spec.remove_profile_from_name
     let publish = if spec.publish then "-p" else ""
     in
     Command.build
