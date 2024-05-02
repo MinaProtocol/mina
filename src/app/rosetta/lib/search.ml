@@ -686,7 +686,7 @@ module Sql = struct
         ; "coinbase_receiver_pk.value as coinbase_receiver"
         ]
 
-    let query ~offset ~limit op_type operator =
+    let query_string ~offset ~limit op_type operator =
       let fields = String.concat ~sep:"," [ "id_count.total_count"; fields ] in
       let op_type_filters =
         Option.map op_type ~f:(function
@@ -771,7 +771,9 @@ module Sql = struct
     let run (module Conn : Caqti_async.CONNECTION) ~offset ~limit input =
       let open Deferred.Result.Let_syntax in
       let params = Params.of_query input in
-      let query = query ~offset ~limit input.filter.op_type input.operator in
+      let query =
+        query_string ~offset ~limit input.filter.op_type input.operator
+      in
       print_endline query ;
       match%map
         Conn.collect_list
@@ -1024,35 +1026,7 @@ module Sql = struct
       Deferred.return
       @@ Result.List.map raw_user_commands ~f:User_commands.to_info
     in
-    let zkapp_commands =
-      Zkapp_commands.to_command_infos raw_zkapp_commands
-      (* match raw_zkapp_commands with
-         | [] ->
-             []
-         | cmd' :: _ ->
-             let cmd, account_updates, result =
-               List.fold raw_zkapp_commands ~init:(cmd', [], [])
-                 ~f:(fun (prev, account_updates, commands) cmd ->
-                   let account_update_info =
-                     Zkapp_commands.to_account_update_info cmd
-                   in
-                   if Int.equal prev.id cmd.id then
-                     (cmd, account_update_info :: account_updates, commands)
-                   else
-                     let command_info =
-                       Zkapp_commands.to_command_info account_updates prev
-                     in
-                     [%log debug] "Found zkapp command $cmd"
-                       ~metadata:
-                         [ ("cmd", Zkapp_command_info.to_yojson command_info) ] ;
-                     (cmd, [ account_update_info ], command_info :: commands) )
-             in
-             let command_info =
-               Zkapp_commands.to_command_info account_updates cmd
-             in
-             List.rev @@ (command_info :: result)
-      *)
-    in
+    let zkapp_commands = Zkapp_commands.to_command_infos raw_zkapp_commands in
     { total_count =
         Int64.(
           user_commands_count + internal_commands_count + zkapp_commands_count)
@@ -1061,80 +1035,6 @@ module Sql = struct
     ; zkapp_commands
     }
 end
-
-(* module Mock_sql = struct
-     module Token_id = Amount_of.Token_id.T (Result)
-     module Transactions_info_ops = Transactions_info.T (Result)
-
-     let filter_by_transaction_hash (txn : Transactions_info.t) filter =
-       Option.value_map filter.Transaction_query.Filter.transaction_hash
-         ~default:true ~f:(String.equal txn.Transaction.transaction_identifier.hash)
-
-     let filter_by_account_identifier txn filter =
-       let open Result.Let_syntax in
-       Option.value_map filter.Transaction_query.Filter.account_identifier
-         ~default:(Result.return true) ~f:(fun { address; token_id } ->
-           let address' = address in
-           let token_id' = token_id in
-           let operations = txn.Transaction.operations in
-         let rec filter_ops {Operation.account;_} =
-           Option.value_map account ~default:(Result.return false) ~f:(fun { address; metadata; _ } ->
-             match%map Token_id.decode metadata with
-             None -> false
-             | Some token_id ->
-               String.(address = address' && token_id = token_id') )
-         in
-         List.fold_result operations ~init:false ~f:(fun acc op ->
-           if acc then Result.return true
-           else
-             filter_ops op ))
-
-     let filter_by_op_status txn filter =
-       Option.value_map filter.Transaction_query.Filter.op_status ~default:true
-         ~f:(fun status -> List.exists txn.Transaction.operations ~f:(fun op ->
-               Option.value_map op.status ~default:false ~f:(String.equal status)) )
-
-     let filter_by_op_type txn filter =
-       Option.value_map filter.Transaction_query.Filter.op_type ~default:true
-         ~f:(fun _type -> List.exists txn.Transaction.operations ~f:(fun op ->
-         String.equal _type op._type) )
-
-     let filter_by_success txn filter =
-       Option.value_map filter.Transaction_query.Filter.success ~default:true
-       ~f:(fun success -> List.exists txn.Transaction.operations ~f:(fun op ->
-         Option.value_map op.status ~default:false ~f:(fun status ->
-         Bool.equal success @@ String.equal status "applied" ) ) )
-
-     let filter_by_address txn filter =
-       Option.value_map filter.Transaction_query.Filter.address ~default:true
-         ~f:(fun address -> List.exists txn.Transaction.operations ~f:(fun op ->
-           Option.value_map op.account ~default:false ~f:(fun account ->
-             String.equal address account.address) ))
-
-     let filters operation filter (txn : Transaction.t)  =
-       let open Result.Let_syntax in
-       let%map account_identifier_filter = filter_by_account_identifier txn filter in
-       let op = match operation with None | Some `And -> (&&) | Some `Or -> (||) in
-       op
-         (filter_by_transaction_hash txn filter)
-         (op
-            account_identifier_filter
-            (op
-               (filter_by_op_status txn filter)
-               (op
-                  (filter_by_op_type txn filter)
-                  (op (filter_by_success txn filter)
-                     (filter_by_address txn filter) ) ) ))
-
-     let run query =
-       let open Result.Let_syntax in
-       let%bind transactions =
-          Transactions_info_ops.to_transactions ~coinbase_receiver:(Some (`Pk "coinbase")) Transactions_info.dummy in
-       List.fold_result transactions ~init:[] ~f:(fun acc txn ->
-         let open Result.Let_syntax in
-         let%map keep = filters query.Transaction_query.operator query.filter txn.transaction in
-         if keep then txn :: acc else acc )
-   end *)
 
 module Specific = struct
   module Env = struct
