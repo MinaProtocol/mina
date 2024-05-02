@@ -299,11 +299,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Signed_command.sign_payload sender.private_key payload
       |> Signature.Raw.encode
     in
+    let zkapp_account_keypair = Signature_lib.Keypair.create () in
     let zkapp_command_create_accounts =
       (* construct a Zkapp_command.t *)
-      let zkapp_keypairs =
-        List.init 3 ~f:(fun _ -> Signature_lib.Keypair.create ())
-      in
       let constraint_constants = Network.constraint_constants network in
       let amount = Currency.Amount.of_mina_int_exn 10 in
       let nonce = Account.Nonce.zero in
@@ -317,7 +315,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; fee
         ; fee_payer = None
         ; amount
-        ; zkapp_account_keypairs = zkapp_keypairs
+        ; zkapp_account_keypairs = [ zkapp_account_keypair ]
         ; memo
         ; new_zkapp_account = true
         ; snapp_update = Account_update.Update.dummy
@@ -328,7 +326,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Transaction_snark.For_tests.deploy_snapp ~constraint_constants
         zkapp_command_spec
     in
-
     let%bind zkapp_command_update_vk_proof, zkapp_command_update_vk_impossible =
       let snapp_update =
         { Account_update.Update.dummy with
@@ -375,6 +372,57 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              spec_impossible
       in
       (vk_proof, vk_impossible)
+    in
+    let%bind zkapp_command_upgrade_version =
+      let snapp_update =
+        { Account_update.Update.dummy with
+          permissions = Zkapp_basic.Set_or_keep.Set Permissions.user_default
+        }
+      in
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let amount = Currency.Amount.of_mina_int_exn 10 in
+      let memo = Signed_command_memo.create_from_string_exn "update vk proof" in
+      let (spec : Transaction_snark.For_tests.Update_states_spec.t) =
+        { sender = (vk_proof.keypair, Account.Nonce.zero)
+        ; fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount
+        ; zkapp_account_keypairs = [ vk_proof.keypair ]
+        ; memo
+        ; new_zkapp_account = false
+        ; snapp_update
+        ; current_auth = Signature
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; actions = []
+        ; preconditions = None
+        }
+      in
+      Malleable_error.lift
+      @@ Transaction_snark.For_tests.update_states ~constraint_constants spec
+    in
+    let zkapp_payment =
+      let (zkapp_command_spec
+            : Transaction_snark.For_tests.Multiple_transfers_spec.t ) =
+        let amount = Currency.Amount.of_mina_int_exn 1 in
+        let memo = Signed_command_memo.empty in
+        { sender = (zkapp_account_keypair, Account.Nonce.zero)
+        ; fee = Currency.Fee.of_nanomina_int_exn 1_000_000
+        ; fee_payer = None
+        ; receivers = [ (receiver_pub_key, amount) ]
+        ; amount
+        ; zkapp_account_keypairs = []
+        ; memo
+        ; new_zkapp_account = false
+        ; snapp_update = Account_update.Update.dummy
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; actions = []
+        ; preconditions = None
+        }
+      in
+      Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
     in
     let wait_for_zkapp zkapp_command =
       let with_timeout =
@@ -470,6 +518,124 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Wait for zkapp to create accounts to be included in transition \
          frontier"
         (wait_for_zkapp zkapp_command_create_accounts)
+    in
+    let%bind () =
+      let zkapp_txn_expired_before_fork =
+        { zkapp_payment with
+          fee_payer =
+            { zkapp_payment.fee_payer with
+              body =
+                { zkapp_payment.fee_payer.body with
+                  valid_until = Some (Global_slot_since_genesis.of_int 400000)
+                }
+            }
+        }
+      in
+      section_hard "send a zkapp command that's expired before the fork"
+      @@ send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node_b)
+           zkapp_txn_expired_before_fork "Expired"
+    in
+    let%bind () =
+      let%bind global_slot_since_hard_fork =
+        Integration_test_lib.Graphql_requests
+        .must_get_global_slot_since_hard_fork ~logger
+          (Network.Node.get_ingress_uri node_b)
+      in
+      let zkapp_txn_expired_before_fork =
+        { zkapp_payment with
+          fee_payer =
+            { zkapp_payment.fee_payer with
+              body =
+                { zkapp_payment.fee_payer.body with
+                  valid_until =
+                    Some
+                      ( Global_slot_since_genesis.of_int
+                      @@ Global_slot_since_hard_fork.to_int
+                           global_slot_since_hard_fork
+                         + 500000 - 5 )
+                }
+            }
+        }
+      in
+
+      section_hard "send a zkapp command that's expired after the fork"
+      @@ send_invalid_zkapp ~logger
+           (Network.Node.get_ingress_uri node_b)
+           zkapp_txn_expired_before_fork "Expired"
+    in
+    let%bind () =
+      let nonce = Mina_numbers.Account_nonce.succ sender_current_nonce in
+      let valid_until = Mina_numbers.Global_slot_since_genesis.of_int 400000 in
+      let memo_string = "" in
+      let memo = Signed_command_memo.create_from_string_exn memo_string in
+      let payload =
+        let payment_payload =
+          { Payment_payload.Poly.receiver_pk = receiver_pub_key; amount }
+        in
+        let body = Signed_command_payload.Body.Payment payment_payload in
+        let common =
+          { Signed_command_payload.Common.Poly.fee
+          ; fee_payer_pk = sender_pub_key
+          ; nonce
+          ; valid_until
+          ; memo
+          }
+        in
+        { Signed_command_payload.Poly.common; body }
+      in
+      let raw_signature =
+        Signed_command.sign_payload sender.private_key payload
+        |> Signature.Raw.encode
+      in
+      section_hard "send a payment that's expired before the fork"
+      @@ send_invalid_payment ~logger ~sender_pub_key ~receiver_pub_key ~amount
+           ~fee ~nonce ~memo:memo_string ~valid_until ~raw_signature
+           ~expected_failure:
+             Network_pool.Transaction_pool.Diff_versioned.Diff_error.(
+               to_string_name Expired)
+           (Network.Node.get_ingress_uri node_b)
+    in
+    let%bind () =
+      let%bind global_slot_since_hard_fork =
+        Integration_test_lib.Graphql_requests
+        .must_get_global_slot_since_hard_fork ~logger
+          (Network.Node.get_ingress_uri node_b)
+      in
+      let nonce = Mina_numbers.Account_nonce.succ sender_current_nonce in
+      let valid_until =
+        Mina_numbers.Global_slot_since_genesis.of_int
+          ( Global_slot_since_hard_fork.to_int global_slot_since_hard_fork
+          + 500000 - 5 )
+      in
+      let memo_string = "" in
+      let memo = Signed_command_memo.create_from_string_exn memo_string in
+      let payload =
+        let payment_payload =
+          { Payment_payload.Poly.receiver_pk = receiver_pub_key; amount }
+        in
+        let body = Signed_command_payload.Body.Payment payment_payload in
+        let common =
+          { Signed_command_payload.Common.Poly.fee
+          ; fee_payer_pk = sender_pub_key
+          ; nonce
+          ; valid_until
+          ; memo
+          }
+        in
+        { Signed_command_payload.Poly.common; body }
+      in
+      let raw_signature =
+        Signed_command.sign_payload sender.private_key payload
+        |> Signature.Raw.encode
+      in
+      section_hard "send a payment that's expired after the fork"
+      @@ send_invalid_payment ~logger ~sender_pub_key ~receiver_pub_key ~amount
+           ~fee ~nonce ~memo:memo_string ~valid_until ~raw_signature
+           ~expected_failure:
+             Network_pool.Transaction_pool.Diff_versioned.Diff_error.(
+               to_string_name Expired)
+           (Network.Node.get_ingress_uri node_b)
     in
     let%bind () =
       section_hard "send out txns to fill up the snark ledger"
@@ -605,6 +771,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         "Wait for zkapp to update verification key to be included in \
          transition frontier"
       @@ wait_for_zkapp zkapp_command_update_vk_impossible
+    in
+    let%bind () =
+      section_hard
+        "send a zkapp to upgrade permission's version to current version"
+      @@ send_zkapp ~logger
+           (Network.Node.get_ingress_uri node_a)
+           zkapp_command_upgrade_version
+    in
+    let%bind () =
+      section_hard
+        "Wait for zkapp to upgrade perimission's version to be included in \
+         transition frontier"
+      @@ wait_for_zkapp zkapp_command_upgrade_version
     in
     section_hard "running replayer"
       (let%bind logs =
