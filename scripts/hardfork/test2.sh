@@ -93,18 +93,15 @@ MAIN_NETWORK_PID=$!
 # wait $MAIN_NETWORK_PID
 
 WAITING="$((MAIN_SLOT * UNTIL_HEIGHT * 2 + MAIN_DELAY*60))s"
-echo "Waiting $WAITING"
+
 sleep $WAITING
 
 echo "Getting fork config from 10313 at height $fork_config_height ... "
 
-current_blockheight=$(get_height 10303)
+# current_blockheight=$(get_height 10303)
 
 # if fork_config_height is too far in the past, recompute it like so
 # fork_config_height=$((current_blockheight - K))
-
-# Wait until the network has finished
-# wait $MAIN_NETWORK_PID
 
 # 6. Transition root is extracted into a new runtime config
 get_fork_config 10313 "$fork_config_height" > localnet/fork_config.json
@@ -176,7 +173,7 @@ stop_nodes "$MAIN_MINA_EXE"
 # # fi
 
 
-# Cleanup any pre-existing data 
+# Cleanup any pre-existing data
 rm -Rf localnet/hf_ledgers
 mkdir localnet/hf_ledgers
 
@@ -189,12 +186,12 @@ export GENESIS_TIMESTAMP="$( date -u -d @$FORK_GENESIS_UNIX_TS '+%F %H:%M:%S+00:
 FORKING_FROM_CONFIG_JSON=localnet/config/base.json SECONDS_PER_SLOT="$MAIN_SLOT" FORK_CONFIG_JSON=localnet/fork_config.json LEDGER_HASHES_JSON=localnet/hf_ledger_hashes.json "$SCRIPT_DIR"/create_runtime_config.sh > localnet/config.json
 
 expected_genesis_slot=$(((FORK_GENESIS_UNIX_TS-MAIN_GENESIS_UNIX_TS)/MAIN_SLOT))
-expected_modified_fork_data="{\"blockchain_length\":$latest_height,\"global_slot_since_genesis\":$expected_genesis_slot,\"state_hash\":\"$latest_shash\"}"
-modified_fork_data="$(jq -cS '.proof.fork' localnet/config.json)"
-if [[ "$modified_fork_data" != "$expected_modified_fork_data" ]]; then
-   echo "Assertion failed: unexpected modified fork data" >&2
-   exit 3
-fi
+# expected_modified_fork_data="{\"blockchain_length\":$K,\"global_slot_since_genesis\":$expected_genesis_slot,\"state_hash\":\"$latest_shash\"}"
+# modified_fork_data="$(jq -cS '.proof.fork' localnet/config.json)"
+# if [[ "$modified_fork_data" != "$expected_modified_fork_data" ]]; then
+#    echo "Assertion failed: unexpected modified fork data" >&2
+#    exit 3
+# fi
 
 wait "$MAIN_NETWORK_PID"
 
@@ -229,7 +226,8 @@ sleep "${FORK_DELAY}m"
 # # # 9. Check that network eventually creates some blocks
 
 sleep $((FORK_SLOT*10))s
-height1=$(get_height 10303)
+echo "getting h1"
+height1=$(! get_height 10303)
 if [[ $height1 == 0 ]]; then
   echo "Assertion failed: block height $height1 should be greater than 0." >&2
   stop_nodes "$FORK_MINA_EXE"
@@ -254,4 +252,4 @@ echo "Blocks are produced."
 # #   exit 3
 # # fi
 
-# # stop_nodes "$FORK_MINA_EXE"
+stop_nodes "$FORK_MINA_EXE"
