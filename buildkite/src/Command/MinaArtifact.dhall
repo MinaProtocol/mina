@@ -30,7 +30,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
   \(artifact : Artifacts.Type) ->
   \(debVersion : DebianVersions.DebVersion) ->
   \(profile : Profiles.Type) ->
-  let step_dep_name = "upload"
+  let step_dep_name = "build"
   in
   merge {
         Daemon = 
