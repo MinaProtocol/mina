@@ -159,9 +159,6 @@ TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}"
 GITHASH=$(git rev-parse --short=7 HEAD)
 HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}"
 
-if [[ "${}" = "http://localhost" ]]
-
-
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
