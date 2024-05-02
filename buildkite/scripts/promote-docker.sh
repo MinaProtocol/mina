@@ -34,7 +34,7 @@ if [[ -z "$TAG" ]]; then usage "Tag is not set!"; fi;
 # check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     echo "WARNING: AWS_ACCESS_KEY_ID not set, promote commands won't run"
-#    exit 0
+    exit 0
 fi
 
 GCR_REPO=gcr.io/o1labs-192920
