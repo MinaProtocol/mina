@@ -1,3 +1,5 @@
+#!/bin/bash
+
 apt install -y aptly
 
 DISTRIBUTION=$1
@@ -7,13 +9,12 @@ REPO="$DISTRIBUTION-$COMPONENT"
 
 rm -rf ~/.aptly
 
-aptly repo create --compontent $COMPONENT --distribution $DISTRIBUTION  $REPO
+aptly repo create -component $COMPONENT -distribution $DISTRIBUTION  $REPO
 
 aptly repo add $REPO $DEBS
 
+aptly snapshot create $COMPONENT from repo $REPO
+
 aptly publish snapshot -distribution=$DISTRIBUTION -skip-signing $COMPONENT
 
-export APTLY_LISTEN="aptly_${BUILDKITE_JOB_ID}:10000"
-export APTLY_PID=$!
-
-aptly serve -listen $APTLY_LISTEN &
+nohup aptly serve -listen localhost:8080 &

@@ -61,12 +61,12 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
     let local_apt_commands : List Cmd.Type =
     [
       Cmd.run "source ./buildkite/scripts/download-artifact-from-cache.sh _build ${spec.deb_codename} -r",
-      Cmd.run "source ./buildkite/scripts/aptly/start.sh ${spec.deb_codename} _build/*.deb"
+      Cmd.run "source ./buildkite/scripts/aptly/start.sh ${spec.deb_codename} _build"
     ]
 
     in
 
-    let kill_apt_command = Cmd.run "kill $APTLY_PID"
+    let kill_apt_command = Cmd.run "pkill aptly"
 
     in
 
