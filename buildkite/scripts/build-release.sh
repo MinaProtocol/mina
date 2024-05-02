@@ -19,7 +19,7 @@ echo "--- Prepare debian packages"
 ls -al
 
 echo "--- Copy debians to s3"
-for entry in *.deb; do
+for entry in _build/*.deb; do
   source ./buildkite/scripts/cache-artifact.sh $entry ${MINA_DEB_CODENAME}/debs
 done 
 
