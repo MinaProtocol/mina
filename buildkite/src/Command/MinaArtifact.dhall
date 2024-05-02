@@ -98,7 +98,24 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
         , mode = PipelineMode.Type.PackageGeneration
         }
       , steps =
-        [ Command.build
+        [ Command.build Command.Config::{
+            commands = [
+              Cmd.runInDocker Cmd.Docker::{
+                image = "\\\${MINA_DAEMON_DOCKER_IMAGE:-gcr.io/o1labs-192920/mina-daemon@sha256:6da66879aacab050a6955c84347f587e43044987b04b9de4522a942f770cc5e7}"
+              , extraEnv = [ "NETWORK_NAME=\$NETWORK_NAME"
+                           , "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL"
+                           , "AWS_ACCESS_KEY_ID"
+                           , "AWS_SECRET_ACCESS_KEY"
+                           , "TESTNET_NAME=\$NETWORK_NAME-hardfork"
+                           , "GENESIS_TIMESTAMP=\$GENESIS_TIMESTAMP"
+                           ]
+              } "./buildkite/scripts/generate-genesis-config.sh"
+            ] 
+            , label = "Generate hardfork genesis config"
+            , key = "generate-genesis-config"
+            , target = Size.Large
+            }          
+        , Command.build
             Command.Config::{
               commands =
                 Toolchain.runner
@@ -135,9 +152,9 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
             commands = [
                 Cmd.runInDocker Cmd.Docker::{ 
                   image = "gcr.io/o1labs-192920/mina-daemon:\${BUILDKITE_COMMIT:0:7}-${DebianVersions.lowerName debVersion}-${network}"
-                , extraEnv = [ "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL",  "NETWORK_NAME=\$NETWORK_NAME" ]
+                , extraEnv = [ "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL",  "NETWORK_NAME=\$NETWORK_NAME", "PRECOMPUTED_BLOCK_GS_PREFIX=\$PRECOMPUTED_BLOCK_GS_PREFIX" ]
                 -- an account with this balance seems present in many ledgers?
-                } "curl \$CONFIG_JSON_GZ_URL > config.json.gz && gunzip config.json.gz && sed -e '0,/20.000001/{s/20.000001/20.01/}' -i config.json && ! (mina-verify-packaged-fork-config \$NETWORK_NAME config.json /workdir/verification)"
+                } "curl \$CONFIG_JSON_GZ_URL > config.json.gz && gunzip config.json.gz && sed -e '0,/20.000001/{s/20.000001/20.01/}' -i config.json && ! (mina-verify-packaged-fork-config \$NETWORK_NAME config.json /workdir/verification {PRECOMPUTED_BLOCK_GS_PREFIX:-})"
             ]
             , label = "Assert corrupted packaged artifacts are unverifiable"
             , key = "assert-unverify-corrupted-packaged-artifacts"
@@ -149,8 +166,8 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
             commands = [
                 Cmd.runInDocker Cmd.Docker::{
                   image = "gcr.io/o1labs-192920/mina-daemon:\${BUILDKITE_COMMIT:0:7}-${DebianVersions.lowerName debVersion}-${network}"
-                , extraEnv = [ "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL",  "NETWORK_NAME=\$NETWORK_NAME" ]
-                } "curl \$CONFIG_JSON_GZ_URL > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config \$NETWORK_NAME config.json /workdir/verification"
+                , extraEnv = [ "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL",  "NETWORK_NAME=\$NETWORK_NAME", "PRECOMPUTED_BLOCK_GS_PREFIX=\$PRECOMPUTED_BLOCK_GS_PREFIX" ]
+                } "curl \$CONFIG_JSON_GZ_URL > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config \$NETWORK_NAME config.json /workdir/verification \${PRECOMPUTED_BLOCK_GS_PREFIX:-}"
             ]
             , label = "Verify packaged artifacts"
             , key = "verify-packaged-artifacts"
