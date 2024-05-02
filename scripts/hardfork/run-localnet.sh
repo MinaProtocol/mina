@@ -246,15 +246,18 @@ while kill -0 $sw_pid 2>/dev/null; do
       && i=$((i+1)) && echo "Sent tx #$i" || echo "Failed to send tx #$i"
     sleep "$TX_INTERVAL"
     # Exit loop when the chain has reached the desired height
-    h=$(get_height 10303)
-    echo "height at payment ${i} is ${h}"
-    if [[ $UNTIL_HEIGHT -gt 0 && $h -gt $UNTIL_HEIGHT ]]; then
+    # Avoid failing this call when the node has been stopped by the caller
+    h=$(get_height 10303 || true)
+
+    # if get_height has failed, assume the node has been stopped and break execution
+    if [[ "$h" == "true" || $UNTIL_HEIGHT -gt 0 && $h -gt $UNTIL_HEIGHT ]]; then
         break
     fi
   done
   # Really, do exit loop when the chain has reached the desired height
-  h=$(get_height 10303)
-  if [[ $UNTIL_HEIGHT -gt 0 && $h -gt $UNTIL_HEIGHT ]]; then
+  # Avoid failing this call when the node has been stopped by the caller
+  h=$(get_height 10303 || true)
+  if [[ "$h" == "true"  || $UNTIL_HEIGHT -gt 0 && $h -gt $UNTIL_HEIGHT ]]; then
       break
   fi
 done
