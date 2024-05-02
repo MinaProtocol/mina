@@ -34,16 +34,18 @@ DST_DEVNET="$INIT_DIR/$DST_NAME-devnet"
 
 
 echo "Building source network $SRC_NAME ..."
-if [[ $# -gt 0 ]]; then
-  # Branch is specified, this is a CI run
-  git checkout -f $1
-  git submodule sync --recursive
-  git submodule update --init --recursive
+if [[ ! -L ${SRC_DEVNET} ]]; then
+    if [[ $# -gt 0 ]]; then
+        # Branch is specified, this is a CI run
+        git checkout -f $1
+        git submodule sync --recursive
+        git submodule update --init --recursive
+    fi
+    git apply "$SCRIPT_DIR"/localnet-patches/berkeley.patch
+    nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet" --out-link "$SRC_DEVNET"
+    nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet.genesis" --out-link "$SRC_DEVNET"
+    git apply -R "$SCRIPT_DIR"/localnet-patches/berkeley.patch
 fi
-git apply "$SCRIPT_DIR"/localnet-patches/berkeley.patch
-nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet" --out-link "$SRC_DEVNET"
-nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet.genesis" --out-link "$SRC_DEVNET"
-git apply -R "$SCRIPT_DIR"/localnet-patches/berkeley.patch
 
 echo "Building destination network $DST_NAME ..."
 if [[ ! -L ${DST_DEVNET} ]]; then
@@ -75,5 +77,6 @@ export SRC_TX_COUNT
 
 echo "Running HF emergency test scenario (after $SRC_TX_COUNT transactions)"
 
-echo "MAIN_SLOT=30 $SCRIPT_DIR/test2.sh $SRC_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger} $DST_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger}"
-
+env MAIN_SLOT=30 \
+    MAIN_DELAY=20 \
+    $SCRIPT_DIR/test2.sh $SRC_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger} $DST_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger}
