@@ -610,7 +610,7 @@ module Sql = struct
         [%string
           {sql|
             SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no)
-              i.id as command_id, b.id as block_id
+              %{fields}
             FROM internal_commands i
             INNER JOIN blocks_internal_commands bic
               ON bic.internal_command_id = i.id
