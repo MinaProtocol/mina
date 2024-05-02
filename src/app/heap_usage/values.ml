@@ -34,26 +34,28 @@ let account : Mina_base.Account.t =
 
 (* beefy zkapp command with all proof updates *)
 let zkapp_command =
-  let num_updates = 16 in
-  let _ledger, zkapp_commands =
-    Async.Thread_safe.block_on_async_exn (fun () ->
-        Snark_profiler_lib.create_ledger_and_zkapps ~min_num_updates:num_updates
-          ~num_proof_updates:num_updates ~max_num_updates:num_updates () )
-  in
-  List.hd_exn zkapp_commands
+  lazy
+    (let num_updates = 16 in
+     let%map.Async.Deferred _ledger, zkapp_commands =
+       Snark_profiler_lib.create_ledger_and_zkapps ~min_num_updates:num_updates
+         ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
+     in
+     List.hd_exn zkapp_commands )
 
 let zkapp_proof =
-  List.fold_until
-    (Mina_base.Zkapp_command.all_account_updates_list zkapp_command)
-    ~init:None
-    ~f:(fun _acc a ->
-      match a.Mina_base.Account_update.authorization with
-      | Proof proof ->
-          Stop (Some proof)
-      | _ ->
-          Continue None )
-    ~finish:Fn.id
-  |> Option.value_exn
+  lazy
+    (let%map.Async.Deferred zkapp_command = Lazy.force zkapp_command in
+     List.fold_until
+       (Mina_base.Zkapp_command.all_account_updates_list zkapp_command)
+       ~init:None
+       ~f:(fun _acc a ->
+         match a.Mina_base.Account_update.authorization with
+         | Proof proof ->
+             Stop (Some proof)
+         | _ ->
+             Continue None )
+       ~finish:Fn.id
+     |> Option.value_exn )
 
 let dummy_proof =
   Pickles.Proof.dummy Pickles_types.Nat.N2.n Pickles_types.Nat.N2.n
@@ -62,12 +64,14 @@ let dummy_proof =
 let dummy_vk = Mina_base.Side_loaded_verification_key.dummy
 
 let verification_key =
-  let `VK vk, `Prover _ =
-    Transaction_snark.For_tests.create_trivial_snapp
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
-  in
-  let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk) in
-  With_hash.data vk
+  lazy
+    (let `VK vk, `Prover _ =
+       Transaction_snark.For_tests.create_trivial_snapp
+         ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+         ()
+     in
+     let%map.Async.Deferred vk = vk in
+     With_hash.data vk )
 
 let applied = Mina_base.Transaction_status.Applied
 
@@ -204,33 +208,36 @@ let scan_state_base_node_payment =
   mk_scan_state_base_node varying
 
 let scan_state_base_node_zkapp =
-  let varying : Mina_transaction_logic.Transaction_applied.Varying.t =
-    let zkapp_command_applied :
-        Mina_transaction_logic.Transaction_applied.Zkapp_command_applied.t =
-      let accounts =
-        (* fudge: the `accounts` calculation is more complex; see `apply_zkapp_command_unchecked_aux`
-           also, we're using the same account repeatedly
-        *)
-        let accessed =
-          Mina_base.Zkapp_command.account_access_statuses zkapp_command applied
-          |> List.filter_map ~f:(fun (acct_id, accessed) ->
-                 match accessed with
-                 | `Accessed ->
-                     Some acct_id
-                 | `Not_accessed ->
-                     None )
-        in
-        List.map accessed ~f:(fun acct_id -> (acct_id, Some account))
-      in
-      let command =
-        Mina_base.With_status.{ data = zkapp_command; status = applied }
-      in
-      let new_accounts = [] in
-      { accounts; command; new_accounts }
-    in
-    Command (Zkapp_command zkapp_command_applied)
-  in
-  mk_scan_state_base_node varying
+  lazy
+    (let%map.Async.Deferred zkapp_command = Lazy.force zkapp_command in
+     let varying : Mina_transaction_logic.Transaction_applied.Varying.t =
+       let zkapp_command_applied :
+           Mina_transaction_logic.Transaction_applied.Zkapp_command_applied.t =
+         let accounts =
+           (* fudge: the `accounts` calculation is more complex; see `apply_zkapp_command_unchecked_aux`
+              also, we're using the same account repeatedly
+           *)
+           let accessed =
+             Mina_base.Zkapp_command.account_access_statuses zkapp_command
+               applied
+             |> List.filter_map ~f:(fun (acct_id, accessed) ->
+                    match accessed with
+                    | `Accessed ->
+                        Some acct_id
+                    | `Not_accessed ->
+                        None )
+           in
+           List.map accessed ~f:(fun acct_id -> (acct_id, Some account))
+         in
+         let command =
+           Mina_base.With_status.{ data = zkapp_command; status = applied }
+         in
+         let new_accounts = [] in
+         { accounts; command; new_accounts }
+       in
+       Command (Zkapp_command zkapp_command_applied)
+     in
+     mk_scan_state_base_node varying )
 
 let scan_state_merge_node :
     Transaction_snark_scan_state.Ledger_proof_with_sok_message.t
