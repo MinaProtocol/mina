@@ -68,7 +68,8 @@ let PromoteDockerSpec = {
     network: Network.Type,
     step_key: Text,
     `if`: Optional B/If,
-    publish: Bool
+    publish: Bool,
+    remove_profile_from_name: Bool
   },
   default = {
     deps = [] : List Command.TaggedKey.Type,
@@ -80,7 +81,8 @@ let PromoteDockerSpec = {
     network = Network.Type.Berkeley,
     codename = DebianVersions.DebVersion.Bullseye,
     `if` = None B/If,
-    publish = False
+    publish = False,
+    remove_profile_from_name = False
   }
 }
 
