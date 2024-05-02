@@ -42,7 +42,13 @@ GENESIS_LEDGER_DIR=${GENESIS_LEDGER_DIR:-}
 # Slot duration (a.k.a. block window duration), seconds
 SLOT=${SLOT:-30}
 
+# K set to 10 since it used to be the default value for mainnet to berkeley transition
 K=${K:-10}
+
+# Run chain until it reaches the given height
+#
+# 0 means "run forever" (another external element will probably terminate the chain under certain conditions)
+UNTIL_HEIGHT=${UNTIL_HEIGHT:-0}
 
 echo "Creates a quick-epoch-turnaround configuration in localnet/ and launches two Mina nodes" >&2
 echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-s|--slot $SLOT] [-b|--berkeley] [-c|--config ./config.json] [--slot-tx-end 100] [--slot-chain-end 130] [--genesis-ledger-dir ./genesis]" >&2
@@ -228,7 +234,6 @@ echo "Starting payments at $(date)"
 
 h=0
 i=0
-
 while kill -0 $sw_pid 2>/dev/null; do
   # shuf's exit code is masked by `true` because we do not expect
   # all of the output to be read
@@ -240,22 +245,19 @@ while kill -0 $sw_pid 2>/dev/null; do
       --amount 0.1 --memo "payment_$i" --rest-server 10313 2>/dev/null \
       && i=$((i+1)) && echo "Sent tx #$i" || echo "Failed to send tx #$i"
     sleep "$TX_INTERVAL"
-
+    # Exit loop when the chain has reached the desired height
     h=$(get_height 10303)
     echo "height at payment ${i} is ${h}"
-    if [[ $h -gt $UNTIL_HEIGHT ]]; then
-        echo "Break 1"
+    if [[ $UNTIL_HEIGHT -gt 0 && $h -gt $UNTIL_HEIGHT ]]; then
         break
     fi
   done
-
+  # Really, do exit loop when the chain has reached the desired height
   h=$(get_height 10303)
-  if [[ $h -gt $UNTIL_HEIGHT ]]; then
-      echo "Break 2"
+  if [[ $UNTIL_HEIGHT -gt 0 && $h -gt $UNTIL_HEIGHT ]]; then
       break
   fi
 done
-
 
 echo "Finished at $(date)"
 
