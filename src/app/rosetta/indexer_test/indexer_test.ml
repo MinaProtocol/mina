@@ -33,11 +33,40 @@ let with_db pool f =
 
 module Ops = Lib.Search.Transactions_info.T (Deferred.Result)
 
-let run_user_commands = Lib.Search.Sql.User_commands.run
+type internal_command
 
-let run_internal_commands = Lib.Search.Sql.Internal_commands.run
+type user_command
 
-let run_zkapp_commands = Lib.Search.Sql.Zkapp_commands.run
+type zkapp_command
+
+type _ command_t =
+  | Internal_command :
+      Lib.Search.Sql.Internal_commands.t
+      -> internal_command command_t
+  | User_command : Lib.Search.Sql.User_commands.t -> user_command command_t
+  | Zkapp_command : Lib.Search.Sql.Zkapp_commands.t -> zkapp_command command_t
+
+type _ info_t =
+  | Internal_command_info :
+      Lib.Search.Internal_command_info.t
+      -> internal_command info_t
+  | User_command_info : Lib.Search.User_command_info.t -> user_command info_t
+  | Zkapp_command_info : Lib.Search.Zkapp_command_info.t -> zkapp_command info_t
+
+let run_user_commands db ~offset ~limit query =
+  Deferred.Result.map ~f:(fun (c, commands) ->
+      (c, List.map commands ~f:(fun command -> User_command command)) )
+  @@ Lib.Search.Sql.User_commands.run db ~offset ~limit query
+
+let run_internal_commands db ~offset ~limit query =
+  Deferred.Result.map ~f:(fun (c, commands) ->
+      (c, List.map commands ~f:(fun command -> Internal_command command)) )
+  @@ Lib.Search.Sql.Internal_commands.run db ~offset ~limit query
+
+let run_zkapp_commands db ~offset ~limit query =
+  Deferred.Result.map ~f:(fun (c, commands) ->
+      (c, List.map commands ~f:(fun command -> Zkapp_command command)) )
+  @@ Lib.Search.Sql.Zkapp_commands.run db ~offset ~limit query
 
 module Test_values = struct
   module T = struct
@@ -258,7 +287,9 @@ module Test_values = struct
         { Lib.Search.Transaction_query.Filter.address; token_id }
       in
       let%bind op_status' = op_status_generator in
-      let op_status = Rosetta_lib.Operation_statuses.name op_status' in
+      let op_status =
+        match op_status' with `Failed -> "failed" | `Success -> "applied"
+      in
       let%bind success = success_generator in
       let%bind (`Pk address) = address_generator in
       let%map op_type = op_type_generator in
@@ -266,6 +297,34 @@ module Test_values = struct
         ~account_identifier ~op_status ~success ~address ~op_type ()
   end
 end
+
+let hash_of_info (type a) : a info_t -> string = function
+  | Internal_command_info info ->
+      info.Lib.Search.Internal_command_info.info.hash
+  | User_command_info info ->
+      info.Lib.Search.User_command_info.info.hash
+  | Zkapp_command_info info ->
+      info.Lib.Search.Zkapp_command_info.info.hash
+
+let to_info' (type a) : a command_t -> a info_t = function
+  | Internal_command command ->
+      Internal_command_info
+        ( ok_or_failwith Rosetta_lib.Errors.show
+        @@ Lib.Search.Sql.Internal_commands.to_info command )
+  | User_command command ->
+      User_command_info
+        ( ok_or_failwith Rosetta_lib.Errors.show
+        @@ Lib.Search.Sql.User_commands.to_info command )
+  | Zkapp_command command ->
+      failwith "Zkapp command not supported"
+
+let to_info (type a) : a command_t list -> a info_t list = function
+  | Zkapp_command _ :: _ as commands ->
+      List.map ~f:(fun info -> Zkapp_command_info info)
+      @@ Lib.Search.Sql.Zkapp_commands.to_command_infos
+      @@ List.map commands ~f:(function Zkapp_command command -> command)
+  | commands ->
+      List.map commands ~f:to_info'
 
 module Make (T : sig
   type t
@@ -294,21 +353,32 @@ end) (I : sig
   val trials : int
 end) =
 struct
+  type t = T.t
+
+  let of_info (type a) : a info_t -> t list Deferred.t = function
+    | Internal_command_info info ->
+        I.of_internal_command_info info
+    | User_command_info info ->
+        I.of_user_command_info info
+    | Zkapp_command_info info ->
+        I.of_zkapp_command_info info
+
   let trials = I.trials
 
-  let check_condition ~of_info ~hash_of_info value infos =
+  let check = I.check
+
+  let check_condition value infos =
     let open Deferred.Let_syntax in
     let open Alcotest in
-        let%map result =
-          Deferred.List.find infos ~f:(fun info ->
-              let%map v = of_info info in
-              not (List.exists v ~f:(I.check value)) )
-        in
-        Option.value_map result ~default:() ~f:(fun info ->
-            failwith
-              [%string "hash: %{hash_of_info info}\nno value matches filter"] )
+    let%map result =
+      Deferred.List.find infos ~f:(fun info ->
+          let%map v = of_info info in
+          not (List.exists v ~f:(I.check value)) )
+    in
+    Option.value_map result ~default:() ~f:(fun info ->
+        failwith [%string "hash: %{hash_of_info info}\nno value matches filter"] )
 
-  let test table ~pool:{ pool; _ } ~hash_of_info commands_to_infos of_info run =
+  let test table ~pool:{ pool; _ } run =
     let open Deferred.Let_syntax in
     let%bind generator = with_db pool (T.deferred_generator table) in
     Quickcheck.async_test ~trials generator ~f:(fun value ->
@@ -317,36 +387,17 @@ struct
           with_db pool (fun db -> run db ~offset:None ~limit:None query)
         in
         let open Alcotest in
-        let infos = commands_to_infos commands in
+        let infos = to_info commands in
         check int64 "total_count = len (commands)" total_count
           (Int64.of_int (List.length infos)) ;
-        check_condition ~of_info ~hash_of_info value infos )
+        check_condition value infos )
 
-  let test_user_command pool =
-    let commands_to_infos commands =
-      List.map commands ~f:(fun command ->
-          ok_or_failwith Rosetta_lib.Errors.show
-          @@ Lib.Search.Sql.User_commands.to_info command )
-    in
-    test `User_commands ~pool
-      ~hash_of_info:(fun info -> info.Lib.Search.User_command_info.info.hash)
-      commands_to_infos I.of_user_command_info run_user_commands
+  let test_user_command pool = test `User_commands ~pool run_user_commands
 
   let test_internal_command pool =
-    let commands_to_infos commands =
-      List.map commands ~f:(fun command ->
-          ok_or_failwith Rosetta_lib.Errors.show
-          @@ Lib.Search.Sql.Internal_commands.to_info command )
-    in
-    test `Internal_commands ~pool
-      ~hash_of_info:(fun info -> info.Lib.Search.Internal_command_info.info.hash)
-      commands_to_infos I.of_internal_command_info run_internal_commands
+    test `Internal_commands ~pool run_internal_commands
 
-  let test_zkapp_command pool =
-    test `Zkapp_commands ~pool
-      ~hash_of_info:(fun info -> info.Lib.Search.Zkapp_command_info.info.hash)
-      Lib.Search.Sql.Zkapp_commands.to_command_infos I.of_zkapp_command_info
-      run_zkapp_commands
+  let test_zkapp_command pool = test `Zkapp_commands ~pool run_zkapp_commands
 
   let test_suite =
     let open Alcotest_async in
@@ -777,36 +828,6 @@ module Offset_limit = struct
       ; test_case ~timeout:(sec 200.) "Limit" `Slow @@ test_limit
       ] )
 end
-
- (* module Operator = struct
-     type t = Lib.Search.Transaction_query.Filter.t
-
-     let deferred_generator = Test_values.Filter.deferred_generator
-
-     let test pool =
-        let open Deferred.Let_syntax in
-        let%bind generator = with_db pool deferred_generator in
-        Quickcheck.async_test ~trials:50 generator ~f:(fun value ->
-            let query = Lib.Search.Transaction_query.make ~filter:value () in
-            let%bind total_count, commands =
-              with_db pool (fun db -> run_user_commands db ~offset:None ~limit:None query)
-            in
-            let open Alcotest in
-            let infos = List.map commands ~f:(fun command ->
-                ok_or_failwith Rosetta_lib.Errors.show
-                @@ Lib.Search.Sql.User_commands.to_info command )
-            in
-            check int64 "total_count = len (commands)" total_count
-              (Int64.of_int (List.length infos)) ;
-            let%map result =
-              Deferred.List.find infos ~f:(fun info ->
-                  let%map v = Account_identifier.of_user_command_info info in
-                  not (List.exists v ~f:(Account_identifier.check value.Lib.Search.Transaction_query.Filter.account_identifier)) )
-            in
-            Option.value_map result ~default:() ~f:(fun info ->
-                failwith
-                  [%string "hash: %{info.Lib.Search.User_command_info.info.hash}\nno value matches filter"] ) )
-   end  *)
 
 let () =
   Async.Thread_safe.block_on_async_exn (fun () ->
