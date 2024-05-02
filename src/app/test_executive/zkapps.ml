@@ -178,10 +178,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; authorization_kind = Signature
         }
       in
-      return
-      @@ Async.Thread_safe.block_on_async_exn (fun () ->
-             Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-               zkapp_command_spec )
+      Malleable_error.lift
+      @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+           zkapp_command_spec
     in
     let%bind.Deferred zkapp_command_update_permissions, permissions_updated =
       (* construct a Zkapp_command.t, similar to zkapp_test_transaction update-permissions *)

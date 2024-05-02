@@ -299,7 +299,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Signed_command.sign_payload sender.private_key payload
       |> Signature.Raw.encode
     in
-    let zkapp_command_create_accounts =
+    let%bind.Async.Deferred zkapp_command_create_accounts =
       (* construct a Zkapp_command.t *)
       let zkapp_keypairs =
         List.init 3 ~f:(fun _ -> Signature_lib.Keypair.create ())
@@ -325,9 +325,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; authorization_kind = Signature
         }
       in
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-            zkapp_command_spec )
+      Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+        zkapp_command_spec
     in
 
     let%bind zkapp_command_update_vk_proof, zkapp_command_update_vk_impossible =

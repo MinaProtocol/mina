@@ -138,11 +138,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ; authorization_kind = Signature
              }
            in
-           return
-           @@ Async.Thread_safe.block_on_async_exn (fun () ->
-                  Transaction_snark.For_tests.deploy_snapp
-                    ~constraint_constants:(Network.constraint_constants network)
-                    parties_spec )
+           Malleable_error.lift
+           @@ Transaction_snark.For_tests.deploy_snapp
+                ~constraint_constants:(Network.constraint_constants network)
+                parties_spec
          in
          let%bind () =
            send_zkapp ~logger

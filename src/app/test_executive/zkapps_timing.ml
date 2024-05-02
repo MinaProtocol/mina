@@ -59,10 +59,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ; private_key = fee_payer_sk
       }
     in
-    let ( zkapp_command_create_account_with_timing
-        , timing_account_id
-        , timing_update
-        , timed_account_keypair ) =
+    let%bind.Async.Deferred ( zkapp_command_create_account_with_timing
+                            , timing_account_id
+                            , timing_update
+                            , timed_account_keypair ) =
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 10 in
@@ -104,10 +104,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
           Token_id.default
       in
-
-      ( Async.Thread_safe.block_on_async_exn (fun () ->
-            Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-              zkapp_command_spec )
+      let%map.Async.Deferred deploy_zkapp =
+        Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+          zkapp_command_spec
+      in
+      ( deploy_zkapp
       , timing_account_id
       , zkapp_command_spec.snapp_update
       , zkapp_keypair )
@@ -150,17 +151,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; authorization_kind = Signature
         }
       in
-      return
-      @@ Async.Thread_safe.block_on_async_exn (fun () ->
-             Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-               zkapp_command_spec )
+      Malleable_error.lift
+      @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+           zkapp_command_spec
     in
     (* Create a timed account that with initial liquid balance being 0, and vesting 1 mina at each slot.
        This account would be used to test the edge case of vesting. See `zkapp_command_transfer_from_third_timed_account`
     *)
-    let ( zkapp_command_create_third_account_with_timing
-        , third_timed_account_id
-        , third_timed_account_keypair ) =
+    let%bind.Async.Deferred ( zkapp_command_create_third_account_with_timing
+                            , third_timed_account_id
+                            , third_timed_account_keypair ) =
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 100 in
@@ -202,13 +202,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
           Token_id.default
       in
-      ( Async.Thread_safe.block_on_async_exn (fun () ->
-            Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-              zkapp_command_spec )
-      , timing_account_id
-      , zkapp_keypair )
+      let%map.Async.Deferred deploy_zkapp =
+        Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+          zkapp_command_spec
+      in
+      (deploy_zkapp, timing_account_id, zkapp_keypair)
     in
-    let zkapp_command_with_zero_vesting_period =
+    let%bind.Async.Deferred zkapp_command_with_zero_vesting_period =
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 10 in
@@ -245,9 +245,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; authorization_kind = Signature
         }
       in
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-            zkapp_command_spec )
+      Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+        zkapp_command_spec
     in
     let%bind zkapp_command_transfer_from_timed_account =
       let open Mina_base in

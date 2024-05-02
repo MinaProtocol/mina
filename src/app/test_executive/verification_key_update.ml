@@ -203,7 +203,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (* TODO: This is a pain. *)
       { body = body vk; authorization = Signature Signature.dummy }
     in
-    let zkapp_command_create_accounts =
+    let%bind zkapp_command_create_accounts =
       let memo =
         Signed_command_memo.create_from_string_exn "Zkapp create account"
       in
@@ -220,8 +220,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; authorization_kind = Signature
         }
       in
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec )
+      Malleable_error.lift
+      @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
     in
     let call_forest_to_zkapp ~call_forest ~nonce : Zkapp_command.t =
       let memo = Signed_command_memo.empty in
