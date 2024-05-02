@@ -5,8 +5,6 @@ let
 
   inherit (args) pkgs;
 
-  inherit (builtins) filterSource path;
-
   inherit (pkgs.lib)
     hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath optionalString
     escapeShellArg;
@@ -198,8 +196,7 @@ let
   # Mapping lib2Pkg: lib -> pkg (from library name to package)
   # Mapping pubNames: lib's name -> lib's public_name (if such exists)
   # Mapping exes: .exe path -> { package, name }
-  # Mapping src2FileDeps: src -> [ file path ] (mapping from dune's directory to
-  #                                             its file dependencies)
+  # Mapping srcInfo: src -> entry from dune description w/o units
   # Mapping fileOuts2Src: file path -> src (mapping from output of some dune's rule
   #                                         to directory that contains dune file)
   info = let
@@ -216,17 +213,17 @@ let
       "Unit with package ${pkg} name ${name} is defined in multiple dune files"
       name;
     handleFileDepMaps = el:
-      { fileOuts2Src, src2FileDeps, ... }@acc:
+      { fileOuts2Src, srcInfo, ... }@acc:
       let
         fileOuts2Src' = builtins.foldl' (acc': out:
           extendAccImpl "Output ${out} appears twice in dune files" out el.src
           acc') fileOuts2Src el.file_outs;
-        src2FileDeps' =
+        srcInfo' =
           extendAccImpl "Source ${el.src} appears twice in dune description"
-          el.src el.file_deps src2FileDeps;
+          el.src (builtins.removeAttrs el [ "units" "src" ]) srcInfo;
       in acc // {
         fileOuts2Src = fileOuts2Src';
-        src2FileDeps = src2FileDeps';
+        srcInfo = srcInfo';
       };
     extendAccLib = src:
       { packages, lib2Pkg, pubNames, exes, ... }@acc:
@@ -286,7 +283,7 @@ let
     lib2Pkg = { };
     pubNames = { };
     exes = { };
-    src2FileDeps = { };
+    srcInfo = { };
     fileOuts2Src = { };
   } duneDescLoaded;
 
@@ -322,14 +319,10 @@ let
     ++ impl (directDeps.libs or { }) "lib";
 
   allUnitKeys = allUnits:
-    builtins.concatLists (pkgs.lib.mapAttrsToList (package: units:
-      builtins.map (name: {
-        type = "exe";
-        inherit name package;
-      }) (builtins.attrNames units.exe) ++ builtins.map (name: {
-        type = "lib";
-        inherit name package;
-      }) (builtins.attrNames units.lib)) allUnits);
+    builtins.concatLists (pkgs.lib.mapAttrsToList (package: units0:
+      builtins.concatLists (pkgs.lib.mapAttrsToList (type: units:
+        builtins.map (name: { inherit type name package; })
+        (builtins.attrNames units)) units0)) allUnits);
 
   directFileDeps = dfArgs: src:
     let
@@ -353,10 +346,18 @@ let
           }
         else
           acc;
-    in builtins.foldl' handleDirectDep {
-      exes = { };
-      files = { };
-    } info.src2FileDeps."${src}";
+      empty = {
+        exes = { };
+        files = { };
+      };
+      file_deps = info.srcInfo."${src}".file_deps;
+      deps = builtins.foldl' handleDirectDep empty file_deps;
+      duneDirs = builtins.concatMap (fd:
+        if builtins.baseNameOf fd == "dune" then
+          [ (builtins.dirOf fd) ]
+        else
+          [ ]) file_deps;
+    in deps // { files = builtins.removeAttrs deps.files duneDirs; };
 
   depByKey = { files, units }:
     { type, ... }@key:
@@ -375,6 +376,10 @@ let
         let subdeps = depByKey acc2 key;
         in pkgs.lib.recursiveUpdate (subdeps.exes or { }) acc') directDeps.exes
         directKeys;
+      files = builtins.foldl' (acc': key:
+        let subdeps = depByKey acc2 key;
+        in pkgs.lib.recursiveUpdate (subdeps.files or { }) acc')
+        directDeps.files directKeys;
       libsAndPkgs = builtins.foldl' (acc': key:
         if key.type == "lib" then
           let
@@ -389,10 +394,7 @@ let
             libs = directDeps.libs or { };
             pkgs = directDeps.pkgs or { };
           } directKeys;
-      depMap = libsAndPkgs // {
-        inherit exes;
-        inherit (directDeps) files;
-      };
+      depMap = libsAndPkgs // { inherit exes files; };
       promote_ = pkg: libs:
         let
           pkgDef = info.packages."${pkg}";
@@ -405,25 +407,38 @@ let
       depMap' = executePromote depMap promoted;
     in setAttrByPath' depMap' acc2 path;
 
-  directLibDeps = { deps, ... }@unit:
-    let
-      deps0 = deps ++ (if unit ? implements then [ unit.implements ] else [ ]);
-      deps1 = builtins.map
-        (d: let d' = info.pubNames."${d}" or ""; in if d' == "" then d else d')
-        deps0;
-      mkDep = name: {
-        inherit name;
-        type = "lib";
-        package = info.lib2Pkg."${name}";
-      };
-      libs = builtins.foldl' (acc: name:
+  directLibDeps = let
+    toPubName = d:
+      let d' = info.pubNames."${d}" or "";
+      in if d' == "" then d else d';
+    implementsDep = unit:
+      if unit ? "implements" then [ unit.implements ] else [ ];
+    defImplDeps = unit:
+      if unit ? "default_implementation" then
+        let
+          defImplLib = toPubName unit.default_implementation;
+          defImplPkg = info.lib2Pkg."${defImplLib}";
+        in builtins.map toPubName
+        info.packages."${defImplPkg}".lib."${defImplLib}".deps
+      else
+        [ ];
+    mkDep = name: {
+      inherit name;
+      type = "lib";
+      package = info.lib2Pkg."${name}";
+    };
+    libs = deps:
+      builtins.foldl' (acc: name:
         if info.lib2Pkg ? "${name}" then
           pkgs.lib.recursiveUpdate acc {
             "${info.lib2Pkg."${name}"}"."${name}" = { };
           }
         else
-          acc) { } deps1;
-    in { inherit libs; };
+          acc) { } deps;
+  in unit: {
+    libs = libs (defImplDeps unit ++ implementsDep unit
+      ++ builtins.map toPubName unit.deps);
+  };
 
   computeDeps = { files, units }@acc:
     { type, ... }@self:
@@ -504,37 +519,41 @@ let
         ];
         kicksNoCycle = type': pkg': name':
           !(allNotPromoted.units
+            ? "${pkg'}"."${type'}"."${name'}".pkgs."${pkg}");
+        multi = cycleCheck: type': pkg': names:
+          pkgs.lib.all (cycleCheck type' pkg') (builtins.attrNames names);
+        libKicksNoCycle = type': pkg': name':
+          !(allNotPromoted.units
             ? "${pkg'}"."${type'}"."${name'}".libs."${pkg}"."${name}"
             || allNotPromoted.units
             ? "${pkg'}"."${type'}"."${name'}".pkgs."${pkg}");
-        kicksNoCycleMulti = type': pkg': names:
-          pkgs.lib.all (kicksNoCycle type' pkg') (builtins.attrNames names);
-        decisionToPromote = if type == "exe" then
-          !(depTransExes ? "${pkg}"."${name}")
-        else if type == "lib" then
+        goodToPromote = cycleCheck:
           builtins.foldl' (a: b: a && b) true [
             # Check that $depPkg package's libraries do not have $pkg.$name as a dependency
-            (pkgs.lib.all (kicksNoCycle "lib" depPkg) depLibs')
+            (pkgs.lib.all (cycleCheck "lib" depPkg) depLibs')
             # Check that $depPkg package's tests do not have $pkg.$name as a dependency
-            (pkgs.lib.all (kicksNoCycle "test" depPkg) depTests)
+            (pkgs.lib.all (cycleCheck "test" depPkg) depTests)
             # Check that $depPkg package's executables (or transitive executable dependencies)
             # do not have $pkg.$name as a dependency
-            (attrAll (kicksNoCycleMulti "exe") depTransExes)
-          ]
-        else # type is test, so no dependency can exist
-          true;
+            (attrAll (multi cycleCheck "exe") depTransExes)
+          ];
+        decisionToPromote = if type == "exe" then
+          !(depTransExes ? "${pkg}"."${name}") && goodToPromote kicksNoCycle
+        else if type == "lib" then
+          goodToPromote libKicksNoCycle
+        else
+          goodToPromote kicksNoCycle;
       in if decisionToPromote then [ depPkg ] else [ ];
 
-  allDeps = {
-    inherit (allDepsNotFullyPromoted) files;
-    units = pkgs.lib.mapAttrs (pkg:
-      pkgs.lib.mapAttrs (type:
-        pkgs.lib.mapAttrs (name: depMap:
-          let
-            promoted = builtins.concatLists (pkgs.lib.mapAttrsToList
-              (promote allDepsNotFullyPromoted pkg type name) depMap.libs);
-          in executePromote depMap promoted))) allDepsNotFullyPromoted.units;
-  };
+  allDeps = attrFold (acc0: pkg:
+    attrFold (acc1: type:
+      attrFold (acc2: name: depMap:
+        let
+          promoted = builtins.concatLists
+            (pkgs.lib.mapAttrsToList (promote acc2 pkg type name) depMap.libs);
+          depMap' = executePromote depMap promoted;
+        in setAttrByPath' depMap' acc2 [ "units" pkg type name ]) acc1) acc0)
+    allDepsNotFullyPromoted allDepsNotFullyPromoted.units;
 
   separatedLibs = attrFold (acc0: pkg: units0:
     attrFold (acc1: type: units1:
@@ -548,14 +567,365 @@ let
         else
           acc2) acc1 units1) acc0 units0) { } allDeps.units;
 
-  #     GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
-  #     MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
-  #     PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
-  #     PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
-  #     DUNE_PROFILE = "dev";
-  #     MINA_COMMIT_SHA1 = inputs.self.sourceInfo.rev or "<dirty>";
-  #     buildInputs = [ base-libs ] ++ external-libs;
-  #     nativeBuildInputs = [ base-libs initFSDrv pkgs.capnproto ];
+  # fileFilter type: object
+  #
+  # If contains ".", this value is an object describing that files
+  # in the directory need to be considered
+  #
+  # If not provided, only children are traversed
+
+  mergeFiltersDo = filters:
+    if builtins.length filters == 1 then
+      builtins.head filters
+    else
+      let
+        dots =
+          builtins.concatMap (f: if f ? "." then [ f."." ] else [ ]) filters;
+      in if dots == [ ] then
+        mergeFilters filters
+      else
+        let someDot = builtins.head dots;
+        in if builtins.any (d: someDot != d) dots then
+          throw
+          "Merging of filters with directories defined at the same level differently is not supported"
+        else
+        # We overwrite dot so that there is no recursive call
+        # to mergeFilters on fields of "." (laziness helps)
+          mergeFilters filters // { "." = someDot; };
+
+  mergeFilters = v: pkgs.lib.zipAttrsWith (_: mergeFiltersDo) v;
+
+  dotIncludeAll = { type = 2; };
+
+  # Creates a filter from filepath
+  # Assumes that filepath contains no dots
+  mkFilter = dot: filepath:
+    if filepath == "." then {
+      "." = dot;
+    } else
+      pkgs.lib.setAttrByPath (pkgs.lib.splitString "/" filepath ++ [ "." ]) dot;
+
+  hasExt = fname: ext: pkgs.lib.hasSuffix ("." + ext) fname;
+  withinPath = fpath: exc: pkgs.lib.take (builtins.length exc) fpath == exc;
+
+  checkDot = filetype: isParent: path: dot:
+    let
+      type = dot.type or 1000;
+      filename = pkgs.lib.last path;
+    in if type == 0 || type == 1 then
+      (type == 1 || isParent) && ((type == 1 && filetype == "directory")
+        || builtins.any (hasExt filename) dot.ext)
+      && !builtins.any (withinPath path) (dot.exclude or [ ])
+    else
+      type == 2;
+
+  checkAncestors = filetype: filepath: filter:
+    let
+      latestDotInfo = builtins.foldl' ({ path, dot, obj, dotPath }:
+        el:
+        if obj ? "${el}" then
+          let
+            path' = path ++ [ el ];
+            obj' = obj."${el}";
+          in if obj' ? "." then {
+            path = path';
+            obj = obj';
+            dot = obj'.".";
+            dotPath = path';
+          } else {
+            path = path';
+            obj = obj';
+            inherit dot dotPath;
+          }
+        else {
+          inherit path dot dotPath;
+          obj = { };
+        }) {
+          path = [ ];
+          dotPath = [ ];
+          obj = filter;
+          dot = { };
+        } filepath;
+      rootDot = filter."." or { };
+      init = pkgs.lib.init filepath;
+    in if init == [ ] then
+      checkDot filetype true filepath rootDot
+    else if latestDotInfo.dot != { } then
+      checkDot filetype (latestDotInfo.dotPath == init)
+      (pkgs.lib.drop (builtins.length latestDotInfo.dotPath) filepath)
+      latestDotInfo.dot
+    else
+      checkDot filetype false filepath rootDot;
+
+  filterToPath = pathParams: filterMap:
+    builtins.path (pathParams // {
+      filter = ps: t:
+        # Strip derivation prefix (if present) and split path string to list of components
+        let
+          ps' = if pkgs.lib.hasPrefix "${builtins.storeDir}/" ps then
+            pkgs.lib.tail (pkgs.lib.splitString "/"
+              (pkgs.lib.removePrefix "${builtins.storeDir}/" ps))
+          else
+            pkgs.lib.splitString "/" ps;
+        in pkgs.lib.hasAttrByPath ps' filterMap
+        || checkAncestors t ps' filterMap;
+    });
+
+  # filteringMap:
+  # - include as a whole (both dir and file) 2
+  # - include files recursively with extension from list 1
+  #   - allow exclusion
+  # - include files with extension from list 0
+  #
+  # if trying to include something that is excluded:
+  # * remove exclusion if it is full match
+  # * error as unimplemented otherwise, to avoid more complex algebra
+
+  commonEnv = { DUNE_PROFILE = "dev"; };
+  commonBuildInputs = [ base-libs ] ++ external-libs;
+  commonNativeBuildInputs = [ ];
+
+  packageDepsImpl = update: field: pkg:
+    (attrFold (acc0: _: attrFold (acc: _: v: update acc v."${field}") acc0) { }
+      allDeps.units."${pkg}");
+
+  packageDeps = packageDepsImpl (a: b: a // b);
+  packageDepsMulti = packageDepsImpl pkgs.lib.recursiveUpdate;
+
+  genPatch = self: fileDeps: exeDeps:
+    let
+      traverseExes = f:
+        builtins.concatLists (pkgs.lib.mapAttrsToList (pkg: nameMap:
+          builtins.map (name: f pkg name info.packages."${pkg}".exe."${name}")
+          (builtins.attrNames nameMap)) exeDeps);
+      exes = traverseExes (pkg: name:
+        { src, ... }:
+        "'${
+          self.all-exes."${pkg}"."${name}"
+        }/bin/${name}' '${src}/${name}.exe'");
+      # TODO if exe is public, try to promote to package dependency and use as such
+    in {
+      fileDeps = builtins.map (dep: self.files."${quote dep}")
+        (builtins.attrNames fileDeps);
+      patchPhase = ''
+        for fileDep in $fileDeps; do
+          cp --no-preserve=mode,ownership -RLTu $fileDep ./
+        done '' + (if exes == [ ] then
+          ""
+        else
+          "\n" + ''
+            exesArr=( ${builtins.concatStringsSep " " exes} )
+            for i in {0..${builtins.toString (builtins.length exes - 1)}}; do
+              src="''${exesArr[$i*2]}"
+              dst="''${exesArr[$i*2+1]}"
+              install -D "$src" "$dst"
+            done
+          '');
+    };
+
+  # Make separate libs a separately-built derivation instead of `rm -Rf` hack
+  genPackage = self: pkg: pkgDef:
+    # For separated libs we need to include packages of separated libs into value
+    # for argument --only-packages so that dune considers these stanzas as well
+    let sepPackages = separatedPackages pkg;
+    in if sepPackages != [ ] then
+      throw "Package ${pkg} has separated lib dependency to packages ${
+        builtins.concatStringsSep ", " sepPackages
+      }"
+    else
+      pkgs.stdenv.mkDerivation ({
+        pname = pkg;
+        version = "dev";
+        src = self.src.pkgs."${pkg}";
+        buildInputs = commonBuildInputs;
+        nativeBuildInputs = commonNativeBuildInputs;
+        OCAMLPATH = pkgs.lib.concatMapStringsSep ":"
+          (depPkg: "${self.pkgs."${depPkg}"}/install/default/lib")
+          (builtins.attrNames (packageDeps "pkgs" pkg));
+        buildPhase = ''
+          dune build @install --only-packages=$pname -j $NIX_BUILD_CORES --root=. --build-dir=_build
+        '';
+        installPhase = ''
+          mv _build $out
+        '';
+      } // genPatch self (packageDeps "files" pkg)
+        (packageDepsMulti "exes" pkg));
+
+  genExe = self: pkg: name: exeDef:
+    let
+      sepPackages =
+        builtins.attrNames (separatedLibs."${pkg}".exe."${name}" or { });
+    in if sepPackages != [ ] then
+      throw
+      "Executable ${exeDef.src}/${name}.exe has separated lib dependency to packages ${
+        builtins.concatStringsSep ", " sepPackages
+      }"
+    else
+      let deps = field: allDeps.units."${pkg}".exe."${name}"."${field}";
+      in pkgs.stdenv.mkDerivation ({
+        pname = "${name}.exe";
+        version = "dev";
+        src = self.src.all-exes."${pkg}"."${name}";
+        buildInputs = commonBuildInputs;
+        nativeBuildInputs = commonNativeBuildInputs;
+        OCAMLPATH = pkgs.lib.concatMapStringsSep ":"
+          (depPkg: "${self.pkgs."${depPkg}"}/install/default/lib")
+          (builtins.attrNames (deps "pkgs"));
+        buildPhase = ''
+          dune build -j $NIX_BUILD_CORES --root=. --build-dir=_build "${exeDef.src}/${name}.exe"
+        '';
+        installPhase = ''
+          mkdir -p $out/bin
+          mv "_build/default/${exeDef.src}/${name}.exe" $out/bin/${name}
+        '';
+      } // genPatch self (deps "files") (deps "exes"));
+
+  genFile = self: pname: src:
+    let deps = field: allDeps.files."${src}"."${field}";
+    in pkgs.stdenv.mkDerivation ({
+      inherit pname;
+      version = "dev";
+      src = self.src.files."${pname}";
+      buildInputs = commonBuildInputs;
+      nativeBuildInputs = commonNativeBuildInputs;
+      buildPhase = ''
+        dune build ${
+          builtins.concatStringsSep " " info.srcInfo."${src}".file_outs
+        }
+      '';
+      installPhase = ''
+        rm -Rf _build/default/.dune
+        mv _build/default $out
+      '';
+    } // genPatch self (deps "files") (deps "exes"));
+
+  duneAndFileDepsFilters = src:
+    let
+      duneFile = if src == "." then "dune" else "${src}/dune";
+      notAnOutput = dep:
+        !(info.fileOuts2Src ? "${dep}" || info.exes ? "${dep}");
+      srcFiles = [ duneFile ]
+        ++ builtins.filter notAnOutput info.srcInfo."${src}".file_deps;
+    in builtins.map (mkFilter dotIncludeAll) srcFiles;
+
+  unitFilters = src: duneSubdirs: includeSubdirs:
+    { with_standard, include, exclude }:
+    let
+      srcPrefix = if src == "." then "" else "${src}/";
+      mapModuleFiles = f: a:
+        builtins.map (mkFilter dotIncludeAll) [
+          "${srcPrefix}${a}.ml"
+          "${srcPrefix}${a}.mli"
+        ];
+      srcParts = if src == "." then [ ] else pkgs.lib.splitString "/" src;
+      exclude' =
+        # Commented out because although dune doesn't need the module,
+        # it still wants it to be present in filesystem
+        # builtins.concatMap (a: [ [ "${a}.ml" ] [ "${a}.mli" ] ]) exclude ++
+        builtins.map (pkgs.lib.splitString "/") duneSubdirs;
+    in builtins.concatMap (mapModuleFiles (mkFilter dotIncludeAll)) include
+    ++ (if with_standard then
+      [
+        (mkFilter {
+          type = if includeSubdirs then 1 else 0;
+          ext = [ "ml" "mli" ];
+          exclude = exclude';
+        } src)
+      ]
+    else
+      [ ]);
+
+  unitSourceFilters = { src, ... }@unit:
+    duneAndFileDepsFilters src
+    ++ unitFilters src (info.srcInfo."${src}".subdirs or [ ])
+    ((info.srcInfo."${src}".include_subdirs or "no") != "no") ({
+      with_standard = true;
+      include = [ ];
+      exclude = [ ];
+    } // (unit.modules or { }));
+
+  # Commented out code for inclusion of separated libs, idea didn't work
+  #
+  # unitSourceFiltersWithExtra = extraLibs: unit:
+  #   let
+  #     extraUnits = builtins.concatLists (pkgs.lib.mapAttrsToList
+  #       (pkg: libs: pkgs.lib.attrVals libs info.packages."${pkg}".lib)
+  #       extraLibs);
+  #   in builtins.concatMap unitSourceFilters ([ unit ] ++ extraUnits);
+
+  separatedPackages = pkg:
+    builtins.attrNames (attrFold (acc0: type:
+      attrFold (acc1: name: _:
+        acc1 // (separatedLibs."${pkg}"."${type}"."${name}" or { })) acc0) { }
+      info.packages."${pkg}");
+
+  # Only sources, without dependencies built by other derivations
+  genPackageSrc = pkg: pkgDef:
+    let
+      filters = builtins.concatLists (builtins.concatLists
+        (pkgs.lib.mapAttrsToList (type:
+          pkgs.lib.mapAttrsToList (name:
+            # Commented out code for inclusion of separated libs, idea didn't work
+            # unitSourceFiltersWithExtra (separatedLibs."${pkg}"."${type}"."${name}" or { })
+            unitSourceFilters)) pkgDef));
+    in filterToPath {
+      path = ./..;
+      name = "source-${pkg}";
+    } (mergeFilters filters);
+  genExeSrc = pkg: name: exeDef:
+    filterToPath {
+      path = ./..;
+      name = "source-${name}-exe";
+    } (mergeFilters
+      ( # Commented out code for inclusion of separated libs, idea didn't work
+        # unitSourceFiltersWithExtra (separatedLibs."${pkg}".exe."${name}" or { })
+        unitSourceFilters exeDef));
+  genFileSrc = name: src:
+    filterToPath {
+      path = ./..;
+      inherit name;
+    } (mergeFilters (duneAndFileDepsFilters src));
+
+  mkOutputs = genPackage: genExe: genFile: {
+    pkgs = builtins.mapAttrs genPackage info.packages;
+    all-exes =
+      builtins.mapAttrs (pkg: { exe, ... }: builtins.mapAttrs (genExe pkg) exe)
+      (pkgs.lib.filterAttrs (_: v: v ? "exe") info.packages);
+    files = pkgs.lib.mapAttrs' (k: _:
+      let name = quote k;
+      in {
+        inherit name;
+        value = genFile name k;
+      }) allDeps.files;
+  };
+
+  minaPkgs = self:
+    let
+      super = mkOutputs (genPackage self) (genExe self) (genFile self) // {
+        src = mkOutputs genPackageSrc genExeSrc genFileSrc;
+      };
+      marlinPlonkStubs = {
+        MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
+      };
+    in pkgs.lib.recursiveUpdate super {
+      pkgs.mina_version = super.pkgs.mina_version.overrideAttrs {
+        MINA_COMMIT_SHA1 = inputs.self.sourceInfo.rev or "<dirty>";
+      };
+      pkgs.kimchi_bindings =
+        super.pkgs.kimchi_bindings.overrideAttrs marlinPlonkStubs;
+      pkgs.kimchi_types =
+        super.pkgs.kimchi_types.overrideAttrs marlinPlonkStubs;
+      pkgs.pasta_bindings =
+        super.pkgs.pasta_bindings.overrideAttrs marlinPlonkStubs;
+      pkgs.libp2p_ipc = super.pkgs.libp2p_ipc.overrideAttrs (s: {
+        GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
+        nativeBuildInputs = s.nativeBuildInputs ++ [ pkgs.capnproto ];
+      });
+      pkgs.bindings_js = super.pkgs.bindings_js.overrideAttrs {
+        PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
+        PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
+      };
+    };
 
   overlay = self: super:
     let
@@ -815,17 +1185,17 @@ let
 
       test_executive = wrapMina self.test_executive-dev { };
 
-      experiment = # minaPkgs self.experiment //
-        {
-          inherit dune-description;
-          file-deps =
-            pkgs.writeText "file-deps.json" (builtins.toJSON info.src2FileDeps);
-          exes = pkgs.writeText "exes.json" (builtins.toJSON info.exes);
-          packages =
-            pkgs.writeText "packages.json" (builtins.toJSON info.packages);
-          separated-libs = pkgs.writeText "separated-libs.json"
-            (builtins.toJSON separatedLibs);
-          all-deps = pkgs.writeText "all-deps.json" (allDepsToJSON allDeps);
-        };
+      experiment = minaPkgs self.experiment // {
+        inherit dune-description;
+        src-info =
+          pkgs.writeText "src-info.json" (builtins.toJSON info.srcInfo);
+        exes = pkgs.writeText "exes.json" (builtins.toJSON info.exes);
+        packages =
+          pkgs.writeText "packages.json" (builtins.toJSON info.packages);
+        separated-libs =
+          pkgs.writeText "separated-libs.json" (builtins.toJSON separatedLibs);
+        all-deps = pkgs.writeText "all-deps.json" (allDepsToJSON allDeps);
+      };
+
     };
 in scope.overrideScope' overlay
