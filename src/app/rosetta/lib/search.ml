@@ -276,11 +276,11 @@ module Sql = struct
            | _ ->
                "" )
     in
+    let block_filter = gen_filter
+        [ [ [ (block_height_field, values_for_filter `Block_height) ] ] ] in
     let filters =
       gen_filter
-        [ [ [ (block_height_field, values_for_filter `Block_height) ] ]
-          (* FIXME: block height condition should be alone and joined with AND *)
-        ; [ [ (txn_hash_field, values_for_filter `Txn_hash) ] ]
+        [ [ [ (txn_hash_field, values_for_filter `Txn_hash) ] ]
         ; List.map account_identifier_fields ~f:(fun (address, token) ->
               [ (address, values_for_filter `Account_identifier_pk)
               ; (token, values_for_filter `Account_identifier_token)
@@ -291,9 +291,10 @@ module Sql = struct
               [ (address, values_for_filter `Address) ] )
         ]
     in
-    (* FIXME:  *)
+    let filters' =
     Option.value_map op_type_filters ~default:filters ~f:(fun op_type_filter ->
-        [%string "%{filters} %{op_1} (%{op_type_filter})"] )
+          [%string "%{filters} %{op_1} (%{op_type_filter})"] ) in
+    [%string "%{block_filter} AND (%{filters'})"]
 
   module Block_extras = struct
     type t = { block_hash : string; block_height : int64 }
