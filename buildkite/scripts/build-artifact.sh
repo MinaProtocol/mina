@@ -2,6 +2,14 @@
 
 set -eo pipefail
 
+export GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
+[[ -n "$BUILDKITE_BRANCH" ]] && export GITBRANCH="$BUILDKITE_BRANCH"
+
+curl "https://media.githubusercontent.com/media/MinaProtocol/mina/$GITBRANCH/genesis_ledgers/mainnet.json" > genesis_ledgers/mainnet.json
+curl "https://media.githubusercontent.com/media/MinaProtocol/mina/$GITBRANCH/genesis_ledgers/devnet.json" > genesis_ledgers/devnet.json
+
+sha256sum genesis_ledgers/{dev,main}net.json
+
 # execute pre-processing steps like zexe-standardize.sh if set
 if [ -n "${PREPROCESSOR}" ]; then echo "--- Executing preprocessor" && ${PREPROCESSOR}; fi
 
