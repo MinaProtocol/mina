@@ -2,8 +2,8 @@
 
 set -eo pipefail
 
-if [ $# -lt 2 ]; then
-    echo "Usage: $0 <network-name> <fork-config.json> <working-dir>"
+if [ $# -lt 3 ]; then
+    echo "Usage: $0 <network-name> <fork-config.json> <working-dir> <optional: precomputed block prefix>"
     cat <<EOF
 This script is used to validate that an installed package is correct
 according to an exported fork_config.json file.
@@ -89,7 +89,11 @@ fork_block_length=$(jq -r '.proof.fork.blockchain_length' "$2")
 # Put the fork block where we want it, fetch it from gcloud if necessary
 if [ ! -e "$PRECOMPUTED_FORK_BLOCK" ]; then
     if [ "$PRECOMPUTED_FORK_BLOCK" = "" ]; then
-        PRECOMPUTED_FORK_BLOCK="gs://mina_network_block_data/$1-$fork_block_length-$fork_block_state_hash.json"
+        prefix=$4
+        if [ "$prefix" = "" ]; then
+            prefix="gs://mina_network_block_data/$1"
+        fi
+        PRECOMPUTED_FORK_BLOCK="$prefix-$fork_block_length-$fork_block_state_hash.json"
     fi
     "$GSUTIL" cp "$PRECOMPUTED_FORK_BLOCK" "$workdir/precomputed_fork_block.json"
 else
