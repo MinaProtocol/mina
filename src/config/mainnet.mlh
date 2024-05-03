@@ -12,12 +12,12 @@
 
 (* custom consensus parameters for the mainnet release *)
 [%%define consensus_mechanism "proof_of_stake"]
-[%%define k 290]
+[%%define k 21]
 [%%define delta 0]
-[%%define slots_per_epoch 7140]
+[%%define slots_per_epoch 516]
 [%%define slots_per_sub_window 7]
 [%%define sub_windows_per_window 11]
-[%%define grace_period_slots 2160]
+[%%define grace_period_slots 156]
 
 [%%define record_async_backtraces false]
 [%%define time_offsets true]
