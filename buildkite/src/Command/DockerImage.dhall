@@ -52,7 +52,7 @@ let ReleaseSpec = {
 let generateStep = \(spec : ReleaseSpec.Type) ->
     let build_docker_cmd = 
         Cmd.run (
-          "export MINA_DEB_CODENAME=${spec.deb_codename} && source ./buildkite/scripts/export-git-env-vars.sh && ./scripts/release-docker.sh " ++
+          "echo 'build_docker' && export MINA_DEB_CODENAME=${spec.deb_codename} && source ./buildkite/scripts/export-git-env-vars.sh && ./scripts/release-docker.sh " ++
               "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-repo ${DebianRepo.address spec.deb_repo} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --deb-profile ${spec.deb_profile} --repo ${spec.repo} --extra-args \\\"${spec.extra_args}\\\""
         )
     
@@ -60,8 +60,8 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
 
     let local_apt_commands : List Cmd.Type =
     [
-      Cmd.run "source ./buildkite/scripts/download-artifact-from-cache.sh _build ${spec.deb_codename} -r",
-      Cmd.run "source ./buildkite/scripts/aptly/start.sh ${spec.deb_codename} _build"
+      Cmd.run "export MINA_DEB_CODENAME=${spec.deb_codename} && source ./buildkite/scripts/download-artifact-from-cache.sh _build ${spec.deb_codename} -r",
+      Cmd.run "export MINA_DEB_CODENAME=${spec.deb_codename} && source ./buildkite/scripts/aptly/start.sh ${spec.deb_codename} _build"
     ]
 
     in
