@@ -50,38 +50,27 @@ let ReleaseSpec = {
 }
 
 let generateStep = \(spec : ReleaseSpec.Type) ->
-    let build_docker_cmd = 
-        Cmd.run (
-          "echo 'build_docker' && export MINA_DEB_CODENAME=${spec.deb_codename} && source ./buildkite/scripts/export-git-env-vars.sh && ./scripts/release-docker.sh " ++
-              "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-repo ${DebianRepo.address spec.deb_repo} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --deb-profile ${spec.deb_profile} --repo ${spec.repo} --extra-args \\\"${spec.extra_args}\\\""
-        )
     
-    in
-
-    let local_apt_commands : List Cmd.Type =
-    [
-      Cmd.run "export MINA_DEB_CODENAME=${spec.deb_codename} && source ./buildkite/scripts/download-artifact-from-cache.sh _build ${spec.deb_codename} -r",
-      Cmd.run "export MINA_DEB_CODENAME=${spec.deb_codename} && source ./buildkite/scripts/aptly/start.sh ${spec.deb_codename} _build"
-    ]
-
-    in
-
-    let kill_apt_command = Cmd.run "pkill aptly"
-
-    in
-
     let commands = merge {
       PackagesO1Test = 
         [
-          build_docker_cmd
+          Cmd.run (
+          "export MINA_DEB_CODENAME=${spec.deb_codename} && source ./buildkite/scripts/export-git-env-vars.sh && ./scripts/release-docker.sh " ++
+              "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-repo ${DebianRepo.address spec.deb_repo} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --deb-profile ${spec.deb_profile} --repo ${spec.repo} --extra-args \\\"${spec.extra_args}\\\""
+        )
         ],
 
       Local = 
-        local_apt_commands
-        # 
         [
-          build_docker_cmd,
-          kill_apt_command
+          Cmd.run (
+            "export MINA_DEB_CODENAME=${spec.deb_codename}" ++
+            " && source ./buildkite/scripts/export-git-env-vars.sh" ++
+            " && source ./buildkite/scripts/download-artifact-from-cache.sh _build ${spec.deb_codename} -r " ++
+            " && source ./buildkite/scripts/aptly/start.sh ${spec.deb_codename} _build" ++
+            " && ./scripts/release-docker.sh " ++
+              "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-repo ${DebianRepo.address spec.deb_repo} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --deb-profile ${spec.deb_profile} --repo ${spec.repo} --extra-args \\\"${spec.extra_args}\\\"" ++
+            " && pkill aptly"
+          )
         ]
 
     } spec.deb_repo
