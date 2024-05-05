@@ -89,6 +89,7 @@ let
     [ zlib bzip2 gmp openssl libffi ]
     ++ lib.optional (!(stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
 
+  # TODO fix propagated build inputs
   base-libs =
     let deps = pkgs.lib.getAttrs (builtins.attrNames implicit-deps) scope;
     in pkgs.stdenv.mkDerivation {
@@ -924,6 +925,12 @@ let
       pkgs.bindings_js = super.pkgs.bindings_js.overrideAttrs {
         PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
         PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
+      };
+      all-exes.__src-app-graphql_schema_dump__.graphql_schema_dump = super.all-exes.__src-app-graphql_schema_dump__.graphql_schema_dump.overrideAttrs {
+        nativeBuildInputs = commonNativeBuildInputs ++ [ pkgs.sodium-static ];
+      };
+      pkgs.cli = super.pkgs.cli.overrideAttrs {
+        nativeBuildInputs = commonNativeBuildInputs ++ [ pkgs.sodium-static ];
       };
     };
 
