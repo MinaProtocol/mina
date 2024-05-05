@@ -128,6 +128,8 @@
  (name pasta_bindings_backend_native)
  (modules pasta_bindings_backend)
  (foreign_archives wires_15_stubs)
+ (no_dynlink) ; needed for "granular" nix compilation, otherwise
+              ; dune insists on finding a .so library when installing
  (c_library_flags :standard "-lpthread")
  (libraries bounded_types)
  (instrumentation
