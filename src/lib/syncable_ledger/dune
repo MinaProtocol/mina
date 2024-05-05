@@ -1,7 +1,6 @@
 (library
  (name syncable_ledger)
  (public_name syncable_ledger)
- (modules syncable_ledger)
  (library_flags -linkall)
  (flags :standard -short-paths)
  (libraries
@@ -28,41 +27,3 @@
   (pps ppx_mina ppx_version ppx_jane ppx_compare ppx_deriving_yojson ppx_register_event))
  (instrumentation (backend bisect_ppx))
  (synopsis "Synchronization of Merkle-tree backed ledgers"))
-
-(library
- (name test)
- (modules test)
- (inline_tests (flags -verbose -show-counts))
- (libraries
-   ;; opam libraries
-   result
-   base.base_internalhash_types
-   bin_prot.shape
-   async_unix
-   async_kernel
-   core_kernel
-   core
-   async
-   sexplib0
-   ppx_inline_test.config
-   base.caml
-   ;; local libraries
-   mina_numbers
-   mina_base
-   merkle_address
-   logger
-   pipe_lib
-   merkle_ledger_tests
-   merkle_ledger
-   syncable_ledger
-   network_peer
-   trust_system
-   currency
-   data_hash_lib
-   mina_base.import
-   signature_lib
-   bounded_types
-   )
- (preprocess
-  (pps ppx_version ppx_jane ppx_compare ppx_deriving_yojson))
- (instrumentation (backend bisect_ppx)))
