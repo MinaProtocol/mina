@@ -1,21 +1,17 @@
 #!/usr/bin/env bash
 
-# This scripts builds compatible and current branch with nix
+# This scripts builds 2x the current branch with nix 
+#
 # It handles two cases differently:
 # - When given an $1 argument, it treats itself as being run in
 #   Buildkite CI and $1 to be "fork" branch that needs to be built
 # - When it isn't given any arguments, it asusmes it is being
 #   executed locally and builds code in $PWD as the fork branch
 #
-# When run locally, `compatible` branch is built in a temporary folder
-# (and fetched clean from Mina's repository). When run in CI,
-# `compatible` branch of git repo in $PWD is used to being the
-# compatible executable.
-#
 # In either case at the end of its execution this script leaves
 # current dir at the fork branch (in case of local run, it never
-# switches the branch with git) and nix builds put to `compatible-devnet`
-# and `fork-devnet` symlinks (located in $PWD).
+# switches the branch with git) and nix builds put to `berkeley-devnet`
+# and `berkeley2-devnet` symlinks (located in $PWD).
 
 set -exo pipefail
 
