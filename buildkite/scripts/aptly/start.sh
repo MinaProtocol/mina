@@ -17,6 +17,4 @@ aptly snapshot create $COMPONENT from repo $REPO
 
 aptly publish snapshot -distribution=$DISTRIBUTION -skip-signing $COMPONENT
 
-nohup aptly serve -listen localhost:8080 &
-
-echo "finish start sh"
+aptly serve -listen localhost:8080 &
