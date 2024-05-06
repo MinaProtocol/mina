@@ -1092,7 +1092,6 @@ module Specific = struct
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~graphql_uri
       in
-      (* TODO: get this value *)
       let%bind transactions_info = env.db_transactions query in
       let%bind internal_transactions =
         List.fold transactions_info.internal_commands ~init:(M.return [])
@@ -1124,7 +1123,14 @@ module Specific = struct
             transaction :: acc )
         |> M.map ~f:List.rev
       in
-      { Search_transactions_response.next_offset = None
+      let next_offset =
+        Option.bind query.limit ~f:(fun limit ->
+            let offset = Option.value query.offset ~default:0L in
+            let next_offset = Int64.(offset + limit) in
+            if Int64.(next_offset >= transactions_info.total_count) then None
+            else Some next_offset )
+      in
+      { Search_transactions_response.next_offset
       ; total_count = transactions_info.total_count
       ; transactions =
           internal_transactions @ user_transactions @ zkapp_transactions
