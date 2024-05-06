@@ -253,8 +253,7 @@ module Sql = struct
       | `Address ->
           ("=", 7, None)
     in
-    let op_1, op_2, null_cmp = sql_operators_from_query_operator operator in
-    let gen_filter l =
+    let gen_filter (op_1, op_2, null_cmp) l =
       String.concat ~sep:[%string " %{op_1} "]
       @@ List.map l ~f:(function
            | ((_, (_, n, _)) :: _) :: _ as field_n_l ->
@@ -278,8 +277,11 @@ module Sql = struct
     in
     let block_filter =
       gen_filter
+        (sql_operators_from_query_operator (Some `And))
         [ [ [ (block_height_field, values_for_filter `Block_height) ] ] ]
     in
+    let ((op_1, _, _) as ops) = sql_operators_from_query_operator operator in
+    let gen_filter = gen_filter ops in
     let filters =
       gen_filter
         [ [ [ (txn_hash_field, values_for_filter `Txn_hash) ] ]
@@ -779,7 +781,6 @@ module Sql = struct
       let query =
         query_string ~offset ~limit input.filter.op_type input.operator
       in
-      print_endline query ;
       match%map
         Conn.collect_list
           (Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ) query)
