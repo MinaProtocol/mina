@@ -58,8 +58,6 @@ BLOCK_HEIGHT_BUFFER_SIZE="200"
 fork_config_height=$((UNTIL_HEIGHT - FINALITY_HEIGHT))
 K=$((fork_config_height + BLOCK_HEIGHT_BUFFER_SIZE))
 
-echo "k=$K"
-
 if [[ $FINALITY_HEIGHT -ge $UNTIL_HEIGHT  || $FINALITY_HEIGHT -lt 0 ]]; then
     echo "FINALITY_HEIGHT (value: ${FINALITY_HEIGHT}) must be positive and \
     strictly smaller than UNTIL_HEIGHT (value: ${UNTIL_HEIGHT}). Check your arguments."
@@ -224,6 +222,8 @@ sleep "${FORK_DELAY}m"
 # # fi
 
 # # # 9. Check that network eventually creates some blocks
+
+
 
 sleep $((FORK_SLOT*10))s
 echo "getting h1"
