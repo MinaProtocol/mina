@@ -1222,7 +1222,8 @@ let setup_daemon logger =
           if enable_tracing then Mina_tracing.start conf_dir |> don't_wait_for ;
           let%bind () =
             if enable_internal_tracing then
-              Internal_tracing.toggle ~logger `Enabled
+              Internal_tracing.toggle ~commit_id:Mina_version.commit_id ~logger
+                `Enabled
             else Deferred.unit
           in
           let seed_peer_list_url =
@@ -1375,7 +1376,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
             Option.iter itn_max_logs ~f:Itn_logger.set_queue_bound ;
           let start_time = Time.now () in
           let%map mina =
-            Mina_lib.create ~wallets
+            Mina_lib.create ~commit_id:Mina_version.commit_id ~wallets
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                  ~chain_id ~is_seed ~super_catchup:(not no_super_catchup)
                  ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
@@ -1469,7 +1470,7 @@ let daemon logger =
          (* Immediately disable updating the time offset. *)
          Block_time.Controller.disable_setting_offset () ;
          let%bind coda = setup_daemon () in
-         let%bind () = Mina_lib.start coda in
+         let%bind () = Mina_lib.start ~commit_id:Mina_version.commit_id coda in
          [%log info] "Daemon ready. Clients can now connect" ;
          Async.never () ) )
 
@@ -1518,7 +1519,10 @@ let replay_blocks logger =
                    None )
          in
          let%bind coda = setup_daemon () in
-         let%bind () = Mina_lib.start_with_precomputed_blocks coda blocks in
+         let%bind () =
+           Mina_lib.start_with_precomputed_blocks
+             ~commit_id:Mina_version.commit_id coda blocks
+         in
          [%log info]
            "Daemon is ready, replayed precomputed blocks. Clients can now \
             connect" ;
@@ -1774,7 +1778,7 @@ let internal_commands logger =
                  let%bind conf_dir = Unix.mkdtemp "/tmp/mina-prover" in
                  [%log info] "Prover state being logged to %s" conf_dir ;
                  let%bind prover =
-                   Prover.create ~logger
+                   Prover.create ~commit_id:Mina_version.commit_id ~logger
                      ~proof_level:Genesis_constants.Proof_level.compiled
                      ~constraint_constants:
                        Genesis_constants.Constraint_constants.compiled
@@ -1918,7 +1922,7 @@ let internal_commands logger =
                         failwithf "Could not parse JSON: %s" err () ) )
           in
           let%bind verifier =
-            Verifier.create ~logger
+            Verifier.create ~commit_id:Mina_version.commit_id ~logger
               ~proof_level:Genesis_constants.Proof_level.compiled
               ~constraint_constants:
                 Genesis_constants.Constraint_constants.compiled
@@ -2016,7 +2020,8 @@ let internal_commands logger =
             (* We create a prover process (unnecessarily) here, to have a more
                realistic test.
             *)
-            Prover.create ~logger ~pids ~conf_dir ~proof_level
+            Prover.create ~commit_id:Mina_version.commit_id ~logger ~pids
+              ~conf_dir ~proof_level
               ~constraint_constants:precomputed_values.constraint_constants ()
           in
           match%bind

@@ -14,7 +14,6 @@
   ;; local libraries
   logger
   mina_base
-  mina_version
   mina_numbers
   internal_tracing.context_call
   internal_tracing_context_logger

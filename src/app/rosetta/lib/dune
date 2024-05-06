@@ -50,7 +50,9 @@
   genesis_constants
   hex
   mina_numbers
-  mina_transaction)
+  mina_transaction
+  mina_version
+ )
  (preprocessor_deps
   ../../../config.mlh
   ../../../graphql-ppx-config.inc
