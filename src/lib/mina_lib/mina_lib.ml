@@ -1522,7 +1522,7 @@ let rec wait_until_3_minutes_before_genesis ~logger ~genesis_timestamp () =
   if Time.(( >= ) (now ())) genesis_timestamp then return ()
   else
     let max_sleep_delay = Time.Span.of_min 3. in
-    let time_until_genesis = Time.diff (Time.now ()) continue_at_timestamp in
+    let time_until_genesis = Time.diff continue_at_timestamp (Time.now ()) in
     let sleep_delay =
       Time.Span.(min max_sleep_delay (time_until_genesis - Time.Span.of_min 3.))
     in
