@@ -693,6 +693,26 @@ let
   packageDeps = packageDepsImpl (a: b: a // b);
   packageDepsMulti = packageDepsImpl pkgs.lib.recursiveUpdate;
 
+  packagesDotGraph = let
+    sep = "\n  ";
+    nonTransitiveDeps = pkg:
+      let
+        allDeps = packageDeps "pkgs" pkg;
+        transitiveDeps =
+          builtins.foldl' (acc: depPkg: acc // packageDeps "pkgs" depPkg) { }
+          (builtins.attrNames allDeps);
+      in builtins.attrNames
+      (builtins.removeAttrs allDeps (builtins.attrNames transitiveDeps));
+    escape = builtins.replaceStrings [ "-" ] [ "_" ];
+    genEdges = pkg:
+      pkgs.lib.concatMapStringsSep sep (dep: "${escape pkg} -> ${escape dep}")
+      (nonTransitiveDeps pkg);
+  in "digraph packages {\n  "
+  + pkgs.lib.concatMapStringsSep sep genEdges (builtins.attrNames allDeps.units)
+  + ''
+
+    }'';
+
   genPatch = self: fileDeps: exeDeps:
     let
       traverseExes = f:
@@ -926,9 +946,10 @@ let
         PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
         PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
       };
-      all-exes.__src-app-graphql_schema_dump__.graphql_schema_dump = super.all-exes.__src-app-graphql_schema_dump__.graphql_schema_dump.overrideAttrs {
-        nativeBuildInputs = commonNativeBuildInputs ++ [ pkgs.sodium-static ];
-      };
+      all-exes.__src-app-graphql_schema_dump__.graphql_schema_dump =
+        super.all-exes.__src-app-graphql_schema_dump__.graphql_schema_dump.overrideAttrs {
+          nativeBuildInputs = commonNativeBuildInputs ++ [ pkgs.sodium-static ];
+        };
       pkgs.cli = super.pkgs.cli.overrideAttrs {
         nativeBuildInputs = commonNativeBuildInputs ++ [ pkgs.sodium-static ];
       };
@@ -1200,6 +1221,7 @@ let
         separated-libs =
           pkgs.writeText "separated-libs.json" (builtins.toJSON separatedLibs);
         all-deps = pkgs.writeText "all-deps.json" (allDepsToJSON allDeps);
+        package-deps-graph = pkgs.writeText "packages.dot" packagesDotGraph;
       };
 
     };
