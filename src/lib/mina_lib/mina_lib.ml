@@ -1523,9 +1523,7 @@ let rec wait_until_3_minutes_before_genesis ~logger ~genesis_timestamp () =
   else
     let max_sleep_delay = Time.Span.of_min 3. in
     let time_until_genesis = Time.diff continue_at_timestamp (Time.now ()) in
-    let sleep_delay =
-      Time.Span.(min max_sleep_delay (time_until_genesis - Time.Span.of_min 3.))
-    in
+    let sleep_delay = Time.Span.min max_sleep_delay time_until_genesis in
     let timer =
       (* Start the timer ASAP, but don't wait for it until we've logged for the
          user.
