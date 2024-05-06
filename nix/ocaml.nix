@@ -750,15 +750,19 @@ let
           '');
     };
 
-  ocamlPath = self: pkgs.lib.concatMapStringsSep ":"
-          (depPkg: "${self.pkgs."${depPkg}"}/install/default/lib");
-  camlLdPath = self: pkgDeps: pkgs.lib.concatStringsSep ":" (builtins.concatMap
-          (depPkg:
-            let
-              stublibs =
-                "${self.pkgs."${depPkg}"}/install/default/lib/stublibs";
-            in if builtins.pathExists stublibs then [ stublibs ] else [ ])
-          pkgDeps);
+  installNixSupport = ''
+    mkdir -p $out/nix-support
+    {
+      echo -n 'export OCAMLPATH=$'
+      echo -n '{OCAMLPATH-}$'
+      echo '{OCAMLPATH:+:}'"$out/install/default/lib"
+      if [[ -d $out/install/default/lib/stublibs ]]; then
+        echo -n 'export CAML_LD_LIBRARY_PATH=$'
+        echo -n '{CAML_LD_LIBRARY_PATH-}$'
+        echo '{CAML_LD_LIBRARY_PATH:+:}'"$out/install/default/lib/stublibs"
+      fi
+    } > $out/nix-support/setup-hook
+  '';
 
   # Make separate libs a separately-built derivation instead of `rm -Rf` hack
   genPackage = self: pkg: pkgDef:
@@ -770,20 +774,19 @@ let
         builtins.concatStringsSep ", " sepPackages
       }"
     else
-    let pkgDeps = builtins.attrNames (packageDeps "pkgs" pkg); in
-      pkgs.stdenv.mkDerivation ({
+      let pkgDeps = builtins.attrNames (packageDeps "pkgs" pkg);
+      in pkgs.stdenv.mkDerivation ({
         pname = pkg;
         version = "dev";
         src = self.src.pkgs."${pkg}";
         buildInputs = commonBuildInputs ++ pkgs.lib.attrVals pkgDeps self.pkgs;
         nativeBuildInputs = commonNativeBuildInputs;
-        OCAMLPATH = ocamlPath self pkgDeps;
-        CAML_LD_LIBRARY_PATH = camlLdPath self pkgDeps;
         buildPhase = ''
           dune build @install --only-packages=$pname -j $NIX_BUILD_CORES --root=. --build-dir=_build
         '';
         installPhase = ''
           mv _build $out
+          ${installNixSupport}
         '';
       } // genPatch self (packageDeps "files" pkg)
         (packageDepsMulti "exes" pkg));
@@ -798,7 +801,8 @@ let
         builtins.concatStringsSep ", " sepPackages
       }"
     else
-      let deps = field: allDeps.units."${pkg}".exe."${name}"."${field}";
+      let
+        deps = field: allDeps.units."${pkg}".exe."${name}"."${field}";
         pkgDeps = builtins.attrNames (deps "pkgs");
       in pkgs.stdenv.mkDerivation ({
         pname = "${name}.exe";
@@ -806,14 +810,13 @@ let
         src = self.src.all-exes."${pkg}"."${name}";
         buildInputs = commonBuildInputs ++ pkgs.lib.attrVals pkgDeps self.pkgs;
         nativeBuildInputs = commonNativeBuildInputs;
-        OCAMLPATH = ocamlPath self pkgDeps;
-        CAML_LD_LIBRARY_PATH = camlLdPath self pkgDeps;
         buildPhase = ''
           dune build -j $NIX_BUILD_CORES --root=. --build-dir=_build "${exeDef.src}/${name}.exe"
         '';
         installPhase = ''
           mkdir -p $out/bin
           mv "_build/default/${exeDef.src}/${name}.exe" $out/bin/${name}
+          ${installNixSupport}
         '';
       } // genPatch self (deps "files") (deps "exes"));
 
