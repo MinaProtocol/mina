@@ -603,41 +603,51 @@ let setup_daemon logger =
         Stdout_log.setup log_json log_level ;
         (* 512MB logrotate max size = 1GB max filesystem usage *)
         let logrotate_max_size = 1024 * 1024 * 10 in
-        Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
+        Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+          ~id:Logger.Logger_id.mina
           ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina.log" ~max_size:logrotate_max_size
-               ~num_rotate:file_log_rotations ) ;
+               ~num_rotate:file_log_rotations )
+          () ;
         let best_tip_diff_log_size = 1024 * 1024 * 5 in
-        Logger.Consumer_registry.register ~id:Logger.Logger_id.best_tip_diff
+        Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+          ~id:Logger.Logger_id.best_tip_diff
           ~processor:(Logger.Processor.raw ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-best-tip.log"
-               ~max_size:best_tip_diff_log_size ~num_rotate:1 ) ;
+               ~max_size:best_tip_diff_log_size ~num_rotate:1 )
+          () ;
         let rejected_blocks_log_size = 1024 * 1024 * 5 in
-        Logger.Consumer_registry.register ~id:Logger.Logger_id.rejected_blocks
+        Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+          ~id:Logger.Logger_id.rejected_blocks
           ~processor:(Logger.Processor.raw ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-rejected-blocks.log"
-               ~max_size:rejected_blocks_log_size ~num_rotate:50 ) ;
-        Logger.Consumer_registry.register ~id:Logger.Logger_id.oversized_logs
+               ~max_size:rejected_blocks_log_size ~num_rotate:50 )
+          () ;
+        Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+          ~id:Logger.Logger_id.oversized_logs
           ~processor:(Logger.Processor.raw ())
           ~transport:
             (Logger_file_system.dumb_logrotate ~directory:conf_dir
                ~log_filename:"mina-oversized-logs.log"
-               ~max_size:logrotate_max_size ~num_rotate:20 ) ;
+               ~max_size:logrotate_max_size ~num_rotate:20 )
+          () ;
         (* Consumer for `[%log internal]` logging used for internal tracing *)
         Itn_logger.set_message_postprocessor
           Internal_tracing.For_itn_logger.post_process_message ;
-        Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
+        Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+          ~id:Logger.Logger_id.mina
           ~processor:Internal_tracing.For_logger.processor
           ~transport:
             (Internal_tracing.For_logger.json_lines_rotate_transport
                ~directory:(conf_dir ^ "/internal-tracing")
-               () ) ;
+               () )
+          () ;
         let version_metadata = [ ("commit", `String Mina_version.commit_id) ] in
         [%log info]
           "Mina daemon is booting up; built with commit $commit on branch \
@@ -1688,7 +1698,8 @@ let snark_hashes =
         else List.iter hashes ~f:print]
 
 let internal_commands logger =
-  [ (Snark_worker.Intf.command_name, Snark_worker.command)
+  [ ( Snark_worker.Intf.command_name
+    , Snark_worker.command ~commit_id:Mina_version.commit_id )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
     , Command.async
