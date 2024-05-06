@@ -646,9 +646,11 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
     ~file_log_level () =
   Cli_lib.Stdout_log.setup log_json log_level ;
   Option.iter log_filename ~f:(fun log_filename ->
-      Logger.Consumer_registry.register ~id:"default"
+      Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+        ~id:"default"
         ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
-        ~transport:(Logger_file_system.evergrowing ~log_filename) ) ;
+        ~transport:(Logger_file_system.evergrowing ~log_filename)
+        () ) ;
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
