@@ -62,6 +62,7 @@
    codable
    ppx_version.runtime
    cli_lib
+   mina_version
  )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))

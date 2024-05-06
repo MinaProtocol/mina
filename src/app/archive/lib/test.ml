@@ -21,7 +21,7 @@ let%test_module "Archive node unit tests" =
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+            ~commit_id:"not specified" () )
 
     module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
 
