@@ -2383,7 +2383,7 @@ let%test_module "staged ledger tests" =
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+            ~commit_id:"not specified" () )
 
     let find_vk ledger =
       Zkapp_command.Verifiable.load_vk_from_ledger ~get:(Ledger.get ledger)
@@ -5164,7 +5164,7 @@ let%test_module "staged ledger tests" =
                           ~constraint_constants ~conf_dir:None
                           ~pids:
                             (Child_processes.Termination.create_pid_table ())
-                          ()
+                          ~commit_id:"not specified" ()
                       in
                       match%map
                         Sl.apply ~constraint_constants ~global_slot !sl

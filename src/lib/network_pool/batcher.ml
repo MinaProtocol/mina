@@ -501,7 +501,7 @@ module Snark_pool = struct
             Verifier.create ~logger ~proof_level ~constraint_constants
               ~conf_dir:None
               ~pids:(Child_processes.Termination.create_pid_table ())
-              () )
+              ~commit_id:"not specified" () )
 
       let gen_proofs =
         let open Quickcheck.Generator.Let_syntax in
