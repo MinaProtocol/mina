@@ -79,4 +79,4 @@ echo "Running HF emergency test scenario (after $SRC_TX_COUNT transactions)"
 
 env MAIN_SLOT=30 \
     MAIN_DELAY=20 \
-    $SCRIPT_DIR/test2.sh $SRC_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger} $DST_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger}
+    $SCRIPT_DIR/test_b2b_ehf.sh $SRC_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger} $DST_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger}

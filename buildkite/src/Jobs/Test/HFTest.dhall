@@ -54,7 +54,7 @@ Pipeline.build
             Cmd.runInDocker Cmd.Docker::{
               image = ContainerImages.nixos,
               privileged = True
-            } "./scripts/hardfork/berkeley_emergency_x2.sh $BUILDKITE_BRANCH"
+            } "./scripts/hardfork/berkeley2berkeley_ehf_setup_and_test.sh $BUILDKITE_BRANCH"
           ],
           label = "berkeley-to-berkeley emergency hard fork test",
           key = "b2b-x2-hard-fork-test",
