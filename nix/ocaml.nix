@@ -109,12 +109,18 @@ let
         for input in $buildInputs; do
           [ ! -d "$input/lib/ocaml/${scope.ocaml.version}/site-lib" ] || {
             find "$input/lib/ocaml/${scope.ocaml.version}/site-lib" -maxdepth 1 -mindepth 1 -not -name stublibs | while read d; do
-              cp -R "$d" "$out/lib/ocaml/${scope.ocaml.version}/site-lib/"
+              ln -s "$d" "$out/lib/ocaml/${scope.ocaml.version}/site-lib/"
             done
           }
-          [ ! -d "$input/lib/ocaml/${scope.ocaml.version}/site-lib/stublibs" ] || cp -R "$input/lib/ocaml/${scope.ocaml.version}/site-lib/stublibs"/* "$out/lib/ocaml/${scope.ocaml.version}/site-lib/stublibs/"
-          [ ! -d "$input/bin" ] || cp -R $input/bin/* $out/bin
+          [ ! -d "$input/lib/ocaml/${scope.ocaml.version}/site-lib/stublibs" ] || cp -Rs "$input/lib/ocaml/${scope.ocaml.version}/site-lib/stublibs"/* "$out/lib/ocaml/${scope.ocaml.version}/site-lib/stublibs/"
+          [ ! -d "$input/bin" ] || cp -Rs $input/bin/* $out/bin
+          [ ! -f "$input/nix-support/propagated-build-inputs" ] || { cat "$input/nix-support/propagated-build-inputs" | sed -r 's/\s//g'; echo ""; } >> $out/nix-support/propagated-build-inputs.draft
+          echo $input >> $out/nix-support/propagated-build-inputs.ref
         done
+        sort $out/nix-support/propagated-build-inputs.draft | uniq | grep -vE '^$' > $out/nix-support/propagated-build-inputs.draft.unique
+        sort $out/nix-support/propagated-build-inputs.ref | uniq | grep -vE '^$' > $out/nix-support/propagated-build-inputs.ref.unique
+        comm -2 -3 $out/nix-support/propagated-build-inputs.{draft,ref}.unique > $out/nix-support/propagated-build-inputs
+        rm $out/nix-support/propagated-build-inputs.*
       '';
     };
 
@@ -744,6 +750,16 @@ let
           '');
     };
 
+  ocamlPath = self: pkgs.lib.concatMapStringsSep ":"
+          (depPkg: "${self.pkgs."${depPkg}"}/install/default/lib");
+  camlLdPath = self: pkgDeps: pkgs.lib.concatStringsSep ":" (builtins.concatMap
+          (depPkg:
+            let
+              stublibs =
+                "${self.pkgs."${depPkg}"}/install/default/lib/stublibs";
+            in if builtins.pathExists stublibs then [ stublibs ] else [ ])
+          pkgDeps);
+
   # Make separate libs a separately-built derivation instead of `rm -Rf` hack
   genPackage = self: pkg: pkgDef:
     # For separated libs we need to include packages of separated libs into value
@@ -754,15 +770,15 @@ let
         builtins.concatStringsSep ", " sepPackages
       }"
     else
+    let pkgDeps = builtins.attrNames (packageDeps "pkgs" pkg); in
       pkgs.stdenv.mkDerivation ({
         pname = pkg;
         version = "dev";
         src = self.src.pkgs."${pkg}";
-        buildInputs = commonBuildInputs;
+        buildInputs = commonBuildInputs ++ pkgs.lib.attrVals pkgDeps self.pkgs;
         nativeBuildInputs = commonNativeBuildInputs;
-        OCAMLPATH = pkgs.lib.concatMapStringsSep ":"
-          (depPkg: "${self.pkgs."${depPkg}"}/install/default/lib")
-          (builtins.attrNames (packageDeps "pkgs" pkg));
+        OCAMLPATH = ocamlPath self pkgDeps;
+        CAML_LD_LIBRARY_PATH = camlLdPath self pkgDeps;
         buildPhase = ''
           dune build @install --only-packages=$pname -j $NIX_BUILD_CORES --root=. --build-dir=_build
         '';
@@ -783,15 +799,15 @@ let
       }"
     else
       let deps = field: allDeps.units."${pkg}".exe."${name}"."${field}";
+        pkgDeps = builtins.attrNames (deps "pkgs");
       in pkgs.stdenv.mkDerivation ({
         pname = "${name}.exe";
         version = "dev";
         src = self.src.all-exes."${pkg}"."${name}";
-        buildInputs = commonBuildInputs;
+        buildInputs = commonBuildInputs ++ pkgs.lib.attrVals pkgDeps self.pkgs;
         nativeBuildInputs = commonNativeBuildInputs;
-        OCAMLPATH = pkgs.lib.concatMapStringsSep ":"
-          (depPkg: "${self.pkgs."${depPkg}"}/install/default/lib")
-          (builtins.attrNames (deps "pkgs"));
+        OCAMLPATH = ocamlPath self pkgDeps;
+        CAML_LD_LIBRARY_PATH = camlLdPath self pkgDeps;
         buildPhase = ''
           dune build -j $NIX_BUILD_CORES --root=. --build-dir=_build "${exeDef.src}/${name}.exe"
         '';
@@ -945,13 +961,6 @@ let
       pkgs.bindings_js = super.pkgs.bindings_js.overrideAttrs {
         PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
         PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
-      };
-      all-exes.__src-app-graphql_schema_dump__.graphql_schema_dump =
-        super.all-exes.__src-app-graphql_schema_dump__.graphql_schema_dump.overrideAttrs {
-          nativeBuildInputs = commonNativeBuildInputs ++ [ pkgs.sodium-static ];
-        };
-      pkgs.cli = super.pkgs.cli.overrideAttrs {
-        nativeBuildInputs = commonNativeBuildInputs ++ [ pkgs.sodium-static ];
       };
     };
 
@@ -1224,6 +1233,7 @@ let
           pkgs.writeText "separated-libs.json" (builtins.toJSON separatedLibs);
         all-deps = pkgs.writeText "all-deps.json" (allDepsToJSON allDeps);
         package-deps-graph = pkgs.writeText "packages.dot" packagesDotGraph;
+        inherit base-libs;
       };
 
     };
