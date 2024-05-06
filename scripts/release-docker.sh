@@ -5,7 +5,7 @@
 # This is needed as opposed to trusting the structure of the each project to be consistent for every deployable.
 
 set -eo pipefail
-set +x
+set -x
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
