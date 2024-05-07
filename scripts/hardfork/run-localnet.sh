@@ -2,9 +2,29 @@
 
 set -eo pipefail
 
+LOG_FILE=${LOG_FILE:-}
+
+if [[ "$LOG_FILE" == "" ]]; then
+    echo "no log file specified"
+    exit 2
+else
+    # erase contents from file
+    : > $LOG_FILE
+fi
+
+log_status () {
+    echo "[$(date -Iseconds)] $1" >> $LOG_FILE
+}
+
+log_status "starting"
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+# script should be run from mina root directory.
+source "$SCRIPT_DIR"/test-helper.sh
+
 export MINA_LIBP2P_PASS=
 export MINA_PRIVKEY_PASS=
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 # Interval at which to send transactions
 TX_INTERVAL=${TX_INTERVAL:-30s}
@@ -36,6 +56,16 @@ GENESIS_LEDGER_DIR=${GENESIS_LEDGER_DIR:-}
 
 # Slot duration (a.k.a. block window duration), seconds
 SLOT=${SLOT:-30}
+
+# K set to 10 since it used to be the default value for mainnet to berkeley transition
+K=${K:-10}
+
+# Run chain until it reaches the given height
+#
+# 0 means "run forever" (another external element will probably terminate the chain under certain conditions)
+UNTIL_HEIGHT=${UNTIL_HEIGHT:-0}
+
+
 
 echo "Creates a quick-epoch-turnaround configuration in localnet/ and launches two Mina nodes" >&2
 echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-s|--slot $SLOT] [-b|--berkeley] [-c|--config ./config.json] [--slot-tx-end 100] [--slot-chain-end 130] [--genesis-ledger-dir ./genesis]" >&2
@@ -76,6 +106,9 @@ if [[ "$CONF_SUFFIX" != "" ]] && [[ "$CUSTOM_CONF" != "" ]]; then
   echo "Can't use both --berkeley and --config options" >&2
   exit 1
 fi
+
+
+log_status "setup"
 
 # Check mina command exists
 command -v "$MINA_EXE" >/dev/null || { echo "No 'mina' executable found"; exit 1; }
@@ -130,7 +163,7 @@ jq "$update_config_expr" > $CONF_DIR/base.json << EOF
 {
   "genesis": {
     "slots_per_epoch": 48,
-    "k": 10,
+    "k": ${K},
     "grace_period_slots": 3
   },
   "proof": {
@@ -171,6 +204,8 @@ fi
 # Clean runtime directories
 rm -Rf localnet/runtime_1 localnet/runtime_2
 
+log_status "launching nodes"
+
 "$MINA_EXE" daemon "${COMMON_ARGS[@]}" \
   --peer "/ip4/127.0.0.1/tcp/10312/p2p/$(cat $CONF_DIR/libp2p_2.peerid)" \
   "${NODE_ARGS_1[@]}" \
@@ -193,16 +228,40 @@ sw_pid=$!
 
 echo "Snark worker PID: $sw_pid"
 
+log_status "importing accounts"
+
+MAX_TRIES=${MAX_TRIES:-30}
+SLEEP_INTERVAL=${SLEEP_INTERVAL:-1m}
+i=0
 while ! "$MINA_EXE" accounts import --privkey-path "$PWD/$CONF_DIR/bp" --rest-server 10313 2>/dev/null; do
-  sleep 1m
+  sleep $SLEEP_INTERVAL
+  i=$((i+1))
+  log_status "importing accounts ($i/$MAX_TRIES)"
+  if [[ $i -gt $MAX_TRIES ]]; then
+      echo "Could not succeed importing accounts"
+      exit 3
+  fi
 done
 
+log_status "exporting ledger"
+
+i=0
 # Export staged ledger
 # Will succeed after bootstrap is over
 while ! "$MINA_EXE" ledger export staged-ledger --daemon-port 10311 > localnet/exported_staged_ledger.json; do
-  sleep 1m
+  sleep $SLEEP_INTERVAL
+  i=$((i+1))
+  log_status "exporting ledger ($i/$MAX_TRIES)"
+
+  if [[ $i -gt $MAX_TRIES ]]; then
+      echo "Could not succeed exporting staged ledger"
+      exit 3
+  fi
 done
 
+log_status "starting payments"
+
+h=0
 i=0
 while kill -0 $sw_pid 2>/dev/null; do
   # shuf's exit code is masked by `true` because we do not expect
@@ -211,11 +270,29 @@ while kill -0 $sw_pid 2>/dev/null; do
     if ! kill -0 $sw_pid 2>/dev/null; then
       break
     fi
-    "$MINA_EXE" client send-payment --sender "$(cat $CONF_DIR/bp.pub)" --receiver "$acc" \
+      "$MINA_EXE" client send-payment --sender "$(cat $CONF_DIR/bp.pub)" --receiver "$acc" \
       --amount 0.1 --memo "payment_$i" --rest-server 10313 2>/dev/null \
       && i=$((i+1)) && echo "Sent tx #$i" || echo "Failed to send tx #$i"
     sleep "$TX_INTERVAL"
+    # Exit loop when the chain has reached the desired height
+    # Avoid failing this call when the node has been stopped by the caller
+    h=$(get_height 10303 || true)
+
+    log_status "in_progress = $h"
+
+    # if get_height has failed, assume the node has been stopped and break execution
+    if [[ "$h" == "true" || $UNTIL_HEIGHT -gt 0 && $h -gt $UNTIL_HEIGHT ]]; then
+        break
+    fi
   done
+  # Really, do exit loop when the chain has reached the desired height
+  # Avoid failing this call when the node has been stopped by the caller
+  h=$(get_height 10303 || true)
+  if [[ "$h" == "true"  || $UNTIL_HEIGHT -gt 0 && $h -gt $UNTIL_HEIGHT ]]; then
+      break
+  fi
 done
+
+echo "Finished at $(date)"
 
 wait

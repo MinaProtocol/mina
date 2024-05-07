@@ -212,12 +212,14 @@ let path_map ?max_length t breadcrumb ~f =
     | Some count when count <= 0 ->
         acc
     | _ ->
-        let count_opt = Option.map ~f:(fun x -> x - 1) count_opt in
-        let elem = f b in
-        let parent_hash = Breadcrumb.parent_hash b in
         if State_hash.equal (Breadcrumb.state_hash b) t.root then acc
-        else if State_hash.equal parent_hash t.root then elem :: acc
-        else find_path (find_exn t parent_hash) count_opt (elem :: acc)
+        else
+          let acc' = f b :: acc in
+          let parent_hash = Breadcrumb.parent_hash b in
+          if State_hash.equal parent_hash t.root then acc'
+          else
+            let count_opt = Option.map ~f:(fun x -> x - 1) count_opt in
+            find_path (find_exn t parent_hash) count_opt acc'
   in
   find_path breadcrumb max_length []
 
