@@ -786,7 +786,7 @@ let
       packageArg = if info.pseudoPackages ? "${pkg}" then
         info.pseudoPackages."${pkg}"
       else
-        "@install --only-packages=$pname";
+        "@install --only-packages=${pkg}";
     in if sepPackages != [ ] then
       throw "Package ${pkg} has separated lib dependency to packages ${
         builtins.concatStringsSep ", " sepPackages
