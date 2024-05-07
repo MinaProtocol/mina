@@ -199,13 +199,15 @@ let
 
   quote = builtins.replaceStrings [ "." "/" ] [ "__" "-" ];
 
-  # Mapping packages: package -> { lib: {public_name|name -> loc}, exe: {..}, test: {..} }
+  # Mapping packages: pkg -> { lib: {public_name|name -> loc}, exe: {..}, test: {..} }
   # Mapping lib2Pkg: lib -> pkg (from library name to package)
   # Mapping pubNames: lib's name -> lib's public_name (if such exists)
   # Mapping exes: .exe path -> { package, name }
   # Mapping srcInfo: src -> entry from dune description w/o units
   # Mapping fileOuts2Src: file path -> src (mapping from output of some dune's rule
   #                                         to directory that contains dune file)
+  # Mapping pseudoPackages: pkg -> src (for packages which names were artifically generated
+  #                                     to hold units that have no package defined)
   info = let
     extendAccDef = defVal: name: val: acc:
       acc // {
@@ -233,7 +235,7 @@ let
         srcInfo = srcInfo';
       };
     extendAccLib = src:
-      { packages, lib2Pkg, pubNames, exes, ... }@acc:
+      { packages, lib2Pkg, pubNames, exes, pseudoPackages, ... }@acc:
       unit:
       let
         pkg = if unit ? "package" then
@@ -242,6 +244,8 @@ let
           builtins.head (pkgs.lib.splitString "." unit.public_name)
         else
           "__${quote src}__";
+        isPseudoPkg = !(unit ? "package")
+          && !(unit ? "public_name" && unit.type == "lib");
         name = if unit ? "public_name" then unit.public_name else unit.name;
         unitInfo = unit // { inherit src; };
         packages' = if packages ? "${pkg}" then
@@ -276,11 +280,16 @@ let
           } exes
         else
           exes;
+        pseudoPackages' = if isPseudoPkg then
+          pseudoPackages // { "${pkg}" = src; }
+        else
+          pseudoPackages;
       in acc // {
         packages = packages';
         lib2Pkg = lib2Pkg';
         pubNames = pubNames';
         exes = exes';
+        pseudoPackages = pseudoPackages';
       };
     foldF = acc0: el:
       handleFileDepMaps el
@@ -292,6 +301,7 @@ let
     exes = { };
     srcInfo = { };
     fileOuts2Src = { };
+    pseudoPackages = { };
   } duneDescLoaded;
 
   executePromote = { pkgs, libs, ... }@deps:
@@ -725,29 +735,34 @@ let
         builtins.concatLists (pkgs.lib.mapAttrsToList (pkg: nameMap:
           builtins.map (name: f pkg name info.packages."${pkg}".exe."${name}")
           (builtins.attrNames nameMap)) exeDeps);
-      exes = traverseExes (pkg: name:
-        { src, ... }:
-        "'${
-          self.all-exes."${pkg}"."${name}"
-        }/bin/${name}' '${src}/${name}.exe'");
+      exes = traverseExes (pkg: key:
+        { src, name, ... }:
+        let exeDrv = self.all-exes."${pkg}"."${key}";
+        in "'${exeDrv}/bin/${key}' '${src}/${name}.exe'");
       # TODO if exe is public, try to promote to package dependency and use as such
+      installExes = if exes == [ ] then
+        ""
+      else ''
+        exesArr=( ${builtins.concatStringsSep " " exes} )
+        for i in {0..${builtins.toString (builtins.length exes - 1)}}; do
+          src="''${exesArr[$i*2]}"
+          dst="''${exesArr[$i*2+1]}"
+          install -D "$src" "$dst"
+        done
+      '';
     in {
       fileDeps = builtins.map (dep: self.files."${quote dep}")
         (builtins.attrNames fileDeps);
       patchPhase = ''
+        runHook prePatch
+
         for fileDep in $fileDeps; do
           cp --no-preserve=mode,ownership -RLTu $fileDep ./
-        done '' + (if exes == [ ] then
-          ""
-        else
-          "\n" + ''
-            exesArr=( ${builtins.concatStringsSep " " exes} )
-            for i in {0..${builtins.toString (builtins.length exes - 1)}}; do
-              src="''${exesArr[$i*2]}"
-              dst="''${exesArr[$i*2+1]}"
-              install -D "$src" "$dst"
-            done
-          '');
+        done
+        ${installExes}
+
+        runHook postPatch
+      '';
     };
 
   installNixSupport = ''
@@ -766,30 +781,61 @@ let
 
   # Make separate libs a separately-built derivation instead of `rm -Rf` hack
   genPackage = self: pkg: pkgDef:
-    # For separated libs we need to include packages of separated libs into value
-    # for argument --only-packages so that dune considers these stanzas as well
-    let sepPackages = separatedPackages pkg;
+    let
+      sepPackages = separatedPackages pkg;
+      packageArg = if info.pseudoPackages ? "${pkg}" then
+        info.pseudoPackages."${pkg}"
+      else
+        "@install --only-packages=$pname";
     in if sepPackages != [ ] then
       throw "Package ${pkg} has separated lib dependency to packages ${
         builtins.concatStringsSep ", " sepPackages
       }"
     else
       let pkgDeps = builtins.attrNames (packageDeps "pkgs" pkg);
-      in pkgs.stdenv.mkDerivation ({
-        pname = pkg;
-        version = "dev";
-        src = self.src.pkgs."${pkg}";
-        buildInputs = commonBuildInputs ++ pkgs.lib.attrVals pkgDeps self.pkgs;
-        nativeBuildInputs = commonNativeBuildInputs;
-        buildPhase = ''
-          dune build @install --only-packages=$pname -j $NIX_BUILD_CORES --root=. --build-dir=_build
-        '';
-        installPhase = ''
-          mv _build $out
-          ${installNixSupport}
-        '';
-      } // genPatch self (packageDeps "files" pkg)
+      in pkgs.stdenv.mkDerivation (final:
+        {
+          pname = pkg;
+          version = "dev";
+          src = self.src.pkgs."${pkg}";
+          dontCheck = true;
+          buildInputs = commonBuildInputs
+            ++ pkgs.lib.attrVals pkgDeps self.pkgs;
+          nativeBuildInputs = commonNativeBuildInputs;
+          buildPhase = ''
+            runHook preBuild
+
+            dune build \
+              ${if final.dontCheck then "" else " @runtest "} \
+              ${packageArg} \
+              -j $NIX_BUILD_CORES --root=. --build-dir=_build
+
+            runHook postBuild
+          '';
+          installPhase = ''
+            runHook preInstall
+
+            mv _build $out
+            ${installNixSupport}
+
+            runHook postInstall
+          '';
+        } // genPatch self (packageDeps "files" pkg)
         (packageDepsMulti "exes" pkg));
+
+  genTestedPackage = self: pkg: _:
+    let drv = self.pkgs."${pkg}";
+    in drv.overrideAttrs {
+      pname = "test-${pkg}";
+      # For detached units (with no package) there is no need to rely on pre-built
+      # libraries/executables because detached units can not be a dependency of other
+      # packages, hence no use to introduce indirection
+      ${if info.pseudoPackages ? "${pkg}" then null else "preBuild"} = ''
+        cp --no-preserve=mode,ownership -RL ${drv} _build
+      '';
+      installPhase = "touch $out";
+      dontCheck = false;
+    };
 
   genExe = self: pkg: name: exeDef:
     let
@@ -807,7 +853,6 @@ let
       installPhase = ''
         mkdir -p $out/bin
         mv "_build/default/${exeDef.src}/${exeDef.name}.exe" $out/bin/${name}
-        ${installNixSupport}
       '';
     } // genPatch self (deps "files") (deps "exes"));
 
@@ -902,22 +947,22 @@ let
       name = "source-${pkg}";
     } (mergeFilters filters);
   genExeSrc = pkg: name: exeDef:
-    let sepLibs = builtins.mapAttrs (_: builtins.attrNames) (allDeps.units."${pkg}".exe."${name}".libs or { });
-    in
-    filterToPath {
+    let
+      sepLibs = builtins.mapAttrs (_: builtins.attrNames)
+        (allDeps.units."${pkg}".exe."${name}".libs or { });
+    in filterToPath {
       path = ./..;
       name = "source-${name}-exe";
-    } (mergeFilters
-      (unitSourceFiltersWithExtra sepLibs
-        exeDef));
+    } (mergeFilters (unitSourceFiltersWithExtra sepLibs exeDef));
   genFileSrc = name: src:
     filterToPath {
       path = ./..;
       inherit name;
     } (mergeFilters (duneAndFileDepsFilters src));
 
-  mkOutputs = genPackage: genExe: genFile: {
+  mkOutputs = genPackage: genTestedPackage: genExe: genFile: {
     pkgs = builtins.mapAttrs genPackage info.packages;
+    tested = builtins.mapAttrs genTestedPackage info.packages;
     all-exes =
       builtins.mapAttrs (pkg: { exe, ... }: builtins.mapAttrs (genExe pkg) exe)
       (pkgs.lib.filterAttrs (_: v: v ? "exe") info.packages);
@@ -931,9 +976,18 @@ let
 
   minaPkgs = self:
     let
-      super = mkOutputs (genPackage self) (genExe self) (genFile self) // {
-        src = mkOutputs genPackageSrc genExeSrc genFileSrc;
-      };
+      super = mkOutputs (genPackage self) (genTestedPackage self) (genExe self)
+        (genFile self) // {
+          src = mkOutputs genPackageSrc genPackageSrc genExeSrc genFileSrc;
+          exes = builtins.foldl' (acc:
+            { package, name }:
+            acc // {
+              "${name}" = if acc ? "${name}" then
+                throw "Executable with name ${name} defined more than once"
+              else
+                self.all-exes."${package}"."${name}";
+            }) { } (builtins.attrValues info.exes);
+        };
       marlinPlonkStubs = {
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
       };
@@ -1219,7 +1273,7 @@ let
         inherit dune-description;
         src-info =
           pkgs.writeText "src-info.json" (builtins.toJSON info.srcInfo);
-        exes = pkgs.writeText "exes.json" (builtins.toJSON info.exes);
+        exe-info = pkgs.writeText "exes.json" (builtins.toJSON info.exes);
         packages =
           pkgs.writeText "packages.json" (builtins.toJSON info.packages);
         separated-libs =
