@@ -113,14 +113,6 @@ FORKING_FROM_CONFIG_JSON=localnet/config/base.json \
     LEDGER_HASHES_JSON=localnet/hf_ledger_hashes.json \
     "$SCRIPT_DIR"/create_runtime_config.sh > localnet/config.json
 
-# expected_genesis_slot=$(((FORK_GENESIS_UNIX_TS-MAIN_GENESIS_UNIX_TS)/MAIN_SLOT))
-# # expected_modified_fork_data="{\"blockchain_length\":$K,\"global_slot_since_genesis\":$expected_genesis_slot,\"state_hash\":\"$latest_shash\"}"
-# # modified_fork_data="$(jq -cS '.proof.fork' localnet/config.json)"
-# # if [[ "$modified_fork_data" != "$expected_modified_fork_data" ]]; then
-# #    echo "Assertion failed: unexpected modified fork data" >&2
-# #    exit 3
-# # fi
-
 # wait "$MAIN_NETWORK_PID"
 
 # # # echo "Config for the fork is correct, starting a new network"
