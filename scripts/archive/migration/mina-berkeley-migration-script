@@ -848,7 +848,7 @@ function run_final_migration() {
 
     # sort by https://stackoverflow.com/questions/60311787/how-to-sort-by-numbers-that-are-part-of-a-filename-in-bash
     
-    migrated_replayer_output=$(find_most_recent_checkpoint $CHECKPOINT_PREFIX-checkpoint*.json)
+    migrated_replayer_output=$(find_most_recent_checkpoint $__checkpoint_prefix-checkpoint*.json)
 
     echo "Running validations for final migration: "
     echo "   mainnet-archive-uri: '$__mainnet_archive_uri'"
