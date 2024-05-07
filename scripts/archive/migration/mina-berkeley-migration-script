@@ -773,6 +773,23 @@ function final(){
         "$__checkpoint_prefix"
 }
 
+function find_most_recent_checkpoint() {
+    
+    FILTER=$1
+    declare -A checkpoints
+
+    for i in $FILTER ; do
+      SLOT=$(cat $i | jq .start_slot_since_genesis)
+      checkpoints["$SLOT"]="$i"
+    done
+
+    for k in "${!checkpoints[@]}"
+    do
+        echo $k ',' ${checkpoints["$k"]}
+    done |
+    sort -rn | head -n 1 | cut -d',' -f2 | xargs
+}
+
 function run_final_migration() {
     local __batch_size=$1
     local __mainnet_archive_uri=$2
@@ -830,7 +847,14 @@ function run_final_migration() {
     check_new_replayer_checkpoints_for_incremental "$__checkpoint_prefix"
 
     # sort by https://stackoverflow.com/questions/60311787/how-to-sort-by-numbers-that-are-part-of-a-filename-in-bash
-    local migrated_replayer_output=$(find . -maxdepth 1 -name "${__checkpoint_prefix}-checkpoint*.json"  | sort -Vrt - -k3,3 | head -n 1)
+    
+    migrated_replayer_output=$(find_most_recent_checkpoint $CHECKPOINT_PREFIX-checkpoint*.json)
+
+    echo "Running validations for final migration: "
+    echo "   mainnet-archive-uri: '$__mainnet_archive_uri'"
+    echo "   migrated-archive-uri: '$__migrated_archive_uri'"
+    echo "   fork-genesis-config: '$__fork_genesis_config'"
+    echo "   migrated-replayer-output: '$migrated_replayer_output'"
 
     mina-berkeley-migration-verifier post-fork \
         --mainnet-archive-uri "$__mainnet_archive_uri" \
