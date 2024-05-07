@@ -974,6 +974,18 @@ let
       }) allDeps.files;
   };
 
+  mkCombined = name: buildInputs:
+    pkgs.stdenv.mkDerivation {
+      inherit name buildInputs;
+      phases = [ "buildPhase" "installPhase" ];
+      buildPhase = ''
+        echo "Build inputs: $buildInputs"
+      '';
+      installPhase = ''
+        touch $out
+      '';
+    };
+
   minaPkgs = self:
     let
       super = mkOutputs (genPackage self) (genTestedPackage self) (genExe self)
@@ -981,12 +993,19 @@ let
           src = mkOutputs genPackageSrc genPackageSrc genExeSrc genFileSrc;
           exes = builtins.foldl' (acc:
             { package, name }:
+            # TODO for exes within packages, use package derivation
             acc // {
               "${name}" = if acc ? "${name}" then
                 throw "Executable with name ${name} defined more than once"
               else
                 self.all-exes."${package}"."${name}";
             }) { } (builtins.attrValues info.exes);
+          all = mkCombined "all"
+            (pkgs.lib.mapAttrsToList (pkg: _: self.pkgs."${pkg}")
+              info.packages);
+          all-tested = mkCombined "all-tested"
+            (pkgs.lib.mapAttrsToList (pkg: _: self.tested."${pkg}")
+              info.packages);
         };
       marlinPlonkStubs = {
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
