@@ -18,6 +18,7 @@ MAIN_SLOT="${MAIN_SLOT:-90}"
 FORK_SLOT="${FORK_SLOT:-90}"
 
 # Delay before genesis slot in minutes to be used for both version
+# These should be the same for this mainent to mainnet test
 MAIN_DELAY="${MAIN_DELAY:-20}"
 FORK_DELAY="${FORK_DELAY:-20}"
 
@@ -41,68 +42,79 @@ stop_nodes(){
 # Block height until which to run this experiment.
 # This should be big enough to achieve good probabilistic finality
 UNTIL_HEIGHT="${UNTIL_HEIGHT:-10}"
-FINALITY_HEIGHT="${FINALITY_HEIGHT:-5}"
+FORK_CONFIG_HEIGHT="${FORK_CONFIG_HEIGHT:-5}"
 
+# Check that height parameters have sound values
 if [[ $FINALITY_HEIGHT -ge $UNTIL_HEIGHT  || $FINALITY_HEIGHT -lt 0 ]]; then
     echo "FINALITY_HEIGHT (value: ${FINALITY_HEIGHT}) must be positive and \
     strictly smaller than UNTIL_HEIGHT (value: ${UNTIL_HEIGHT}). Check your arguments."
     exit 3
 fi
 
-env UNTIL_HEIGHT=${UNTIL_HEIGHT} K=${K} "$SCRIPT_DIR"/run-localnet.sh -m "$MAIN_MINA_EXE" -i "$MAIN_SLOT" \
+# Ensure we have the necessary configuration to get the fork config That is, we
+# need to have enough reachable block depth (K) for the node wrt to the other
+# height parameters.
+#
+# Here we compute the absolute minimal value that we need with a block height buffer
+# (just in case the chain progresses while we make the query).
+k_lower_bound=$((UNTIL_HEIGHT - FORK_CONFIG_HEIGHT + 5))
+
+if [[ $k_lower_bound -gt $K ]]; then
+    echo "K parameter needs to be at least $k_lower_bound (UNTIL_HEIGHT - FORK_CONFIG_HEIGHT)"
+    exit 3
+fi
+
+# Define the polling interval time
+STATUS_POLLING_IVAL=${STATUS_POLLING_IVAL:-"1m"}
+status_file=$(mktemp)
+
+echo "status file: $status_file"
+
+env UNTIL_HEIGHT=${UNTIL_HEIGHT} STATUS_FILE=${status_file} K=${K} "$SCRIPT_DIR"/run-localnet.sh -m "$MAIN_MINA_EXE" -i "$MAIN_SLOT" \
   -s "$MAIN_SLOT" &
 
+j=0
+while [[ $(cat $status_file | grep "in_progress" | cut -d':' -f 2) -lt ${UNTIL_HEIGHT}  ]]; do
+    j=$((j+1))
+    echo "$j: $(cat $status_file)"
+    sleep ${STATUS_POLLING_IVAL}
+done
 
-WAITING="$((MAIN_SLOT * UNTIL_HEIGHT + MAIN_DELAY*60))s"
-
-sleep 1200s
-
-# # 2. Check that there are many blocks >50% of slots occupied from slot 0 to slot
-# # $BEST_CHAIN_QUERY_FROM and that there are some user commands in blocks corresponding to slots
-# blockHeight=$(get_height 10303)
-# echo "Block height is $blockHeight at slot $BEST_CHAIN_QUERY_FROM."
-
-# if [[ $((2*blockHeight)) -lt $BEST_CHAIN_QUERY_FROM ]]; then
-#   echo "Assertion failed: slot occupancy is below 50%" >&2
-#   stop_nodes "$MAIN_MINA_EXE"
-#   exit 3
-# fi
-
-
-echo "Getting fork config from 10313 at height 5 ... "
+echo "Getting fork config from 10313 at height ${FORK_CONFIG_HEIGHT} ... "
 
 # current_blockheight=$(get_height 10303)
 
 # if fork_config_height is too far in the past, recompute it like so
 # fork_config_height=$((current_blockheight - K))
 
-# 6. Transition root is extracted into a new runtime config
-get_fork_config 10313 5 > localnet/fork_config.json
+# Transition root is extracted into a new runtime config
+get_fork_config 10313 $FORK_CONFIG_HEIGHT > localnet/fork_config.json
 
-# while [[ "$(stat -c %s localnet/fork_config.json)" == 0 ]] || [[ "$(head -c 4 localnet/fork_config.json)" == "null" ]]; do
-#   echo "Failed to fetch fork config" >&2
-#   sleep 1
-#   get_fork_config 10313 $fork_config_height > localnet/fork_config.json
-# done
+while [[ "$(stat -c %s localnet/fork_config.json)" == 0 ]] || [[ "$(head -c 4 localnet/fork_config.json)" == "null" ]]; do
+  echo "Failed to fetch fork config" >&2
+  sleep 1
+  get_fork_config 10313 $FORK_CONFIG_HEIGHT > localnet/fork_config.json
+done
 
-# # # 7. Runtime config is converted with a script to have only ledger hashes in the config
-# stop_nodes "$MAIN_MINA_EXE"
+# Now we can stop the nodes
+stop_nodes "$MAIN_MINA_EXE"
 
-# # Cleanup any pre-existing data
-# rm -Rf localnet/hf_ledgers
-# mkdir localnet/hf_ledgers
+# Cleanup any pre-existing data
+rm -Rf localnet/hf_ledgers
+mkdir localnet/hf_ledgers
 
-# "$FORK_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/hf_ledgers --hash-output-file localnet/hf_ledger_hashes.json
+#  Runtime config is converted with a script to have only ledger hashes in the config
+"$FORK_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/hf_ledgers --hash-output-file localnet/hf_ledger_hashes.json
 
-# NOW_UNIX_TS=$(date +%s)
-# FORK_GENESIS_UNIX_TS=$((NOW_UNIX_TS - NOW_UNIX_TS%60 + FORK_DELAY*60))
-# export GENESIS_TIMESTAMP="$( date -u -d @$FORK_GENESIS_UNIX_TS '+%F %H:%M:%S+00:00' )"
+NOW_UNIX_TS=$(date +%s)
+FORK_GENESIS_UNIX_TS=$((NOW_UNIX_TS - NOW_UNIX_TS%60 + FORK_DELAY*60))
+export GENESIS_TIMESTAMP="$( date -u -d @$FORK_GENESIS_UNIX_TS '+%F %H:%M:%S+00:00' )"
 
-# FORKING_FROM_CONFIG_JSON=localnet/config/base.json \
-#     SECONDS_PER_SLOT="$MAIN_SLOT" \
-#     FORK_CONFIG_JSON=localnet/fork_config.json \
-#     LEDGER_HASHES_JSON=localnet/hf_ledger_hashes.json \
-#     "$SCRIPT_DIR"/create_runtime_config.sh > localnet/config.json
+FORKING_FROM_CONFIG_JSON=localnet/config/base.json \
+    SECONDS_PER_SLOT="$MAIN_SLOT" \
+    FORK_CONFIG_JSON=localnet/fork_config.json \
+    LEDGER_HASHES_JSON=localnet/hf_ledger_hashes.json \
+    "$SCRIPT_DIR"/create_runtime_config.sh > localnet/config.json
 
 # expected_genesis_slot=$(((FORK_GENESIS_UNIX_TS-MAIN_GENESIS_UNIX_TS)/MAIN_SLOT))
 # # expected_modified_fork_data="{\"blockchain_length\":$K,\"global_slot_since_genesis\":$expected_genesis_slot,\"state_hash\":\"$latest_shash\"}"
@@ -116,9 +128,21 @@ get_fork_config 10313 5 > localnet/fork_config.json
 
 # # # echo "Config for the fork is correct, starting a new network"
 
-# # # 8. Node is shutdown and restarted with mina-fork and the config from previous step
-# "$SCRIPT_DIR"/run-localnet.sh -m "$FORK_MINA_EXE" -d "$FORK_DELAY" -i "$FORK_SLOT" \
-#    -s "$FORK_SLOT" -c localnet/config.json --genesis-ledger-dir localnet/hf_ledgers &
+echo "waiting" > ${status_file}
+
+# # 8. Node is shutdown and restarted with mina-fork and the config from previous step
+env UNTIL_HEIGHT=${UNTIL_HEIGHT} STATUS_FILE=${status_file} \
+    "$SCRIPT_DIR"/run-localnet.sh -m "$FORK_MINA_EXE" -d "$FORK_DELAY" -i "$FORK_SLOT" \
+   -s "$FORK_SLOT" -c localnet/config.json --genesis-ledger-dir localnet/hf_ledgers &
+
+
+j=0
+while true; do
+    j=$((j+1))
+    echo "$j: $(cat $status_file)"
+    sleep 1m
+done
+
 
 # sleep "${FORK_DELAY}m"
 
