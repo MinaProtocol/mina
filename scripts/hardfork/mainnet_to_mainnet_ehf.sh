@@ -87,4 +87,4 @@ export SRC_TX_COUNT
 
 echo "Running HF emergency test scenario (after $SRC_TX_COUNT transactions)"
 
-env UNTIL_HEIGHT=50 K=30 $SCRIPT_DIR/test_m2m_ehf.sh $SRC_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger} $DST_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger}
+env UNTIL_HEIGHT=10 K=30 $SCRIPT_DIR/test_m2m_ehf.sh $SRC_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger} $DST_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger}
