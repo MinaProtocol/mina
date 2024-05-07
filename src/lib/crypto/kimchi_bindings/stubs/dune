@@ -1,10 +1,11 @@
 ;; src/ contains no dune-related files
+;; kimchi-stubs-vendors contains the vendors for Kimchi stubs
 
-(data_only_dirs src)
+(data_only_dirs src kimchi-stubs-vendors)
 
 ;; Ignore target if it exists locally
 
-(dirs :standard \ target)
+(dirs :standard .cargo \ target)
 
 ;; we first create a `dune-build-root` file that contains the dune workspace root
 
