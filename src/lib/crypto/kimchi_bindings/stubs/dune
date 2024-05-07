@@ -69,7 +69,7 @@
     (setenv
      RUSTFLAGS
      %{read:rustflags.sexp}
-     (run cargo build --release --frozen)))
+     (run cargo build --release --locked)))
    (run
     cp
     %{read:dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a
@@ -168,7 +168,7 @@
    (setenv
     CARGO_TARGET_DIR
     "%{read:dune-build-root}/cargo_kimchi_bindgen"
-    (run cargo run %{targets} --frozen))
+    (run cargo run %{targets} --locked))
    (run ocamlformat -i %{targets}))))
 
 ;; this is used by nix
