@@ -2,18 +2,21 @@
 
 set -eo pipefail
 
-STATUS_FILE=${STATUS_FILE:-}
+LOG_FILE=${LOG_FILE:-}
 
-if [[ "$STATUS_FILE" == "" ]]; then
-    echo "no status file given"
+if [[ "$LOG_FILE" == "" ]]; then
+    echo "no log file specified"
     exit 2
+else
+    # erase contents from file
+    : > $LOG_FILE
 fi
 
-set_status () {
-    echo "$1" > $STATUS_FILE
+log_status () {
+    echo "[$(date -Iseconds)] $1" >> $LOG_FILE
 }
 
-set_status "starting"
+log_status "starting"
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
@@ -105,7 +108,7 @@ if [[ "$CONF_SUFFIX" != "" ]] && [[ "$CUSTOM_CONF" != "" ]]; then
 fi
 
 
-set_status "setup"
+log_status "setup"
 
 # Check mina command exists
 command -v "$MINA_EXE" >/dev/null || { echo "No 'mina' executable found"; exit 1; }
@@ -201,7 +204,7 @@ fi
 # Clean runtime directories
 rm -Rf localnet/runtime_1 localnet/runtime_2
 
-set_status "launching nodes"
+log_status "launching nodes"
 
 "$MINA_EXE" daemon "${COMMON_ARGS[@]}" \
   --peer "/ip4/127.0.0.1/tcp/10312/p2p/$(cat $CONF_DIR/libp2p_2.peerid)" \
@@ -225,7 +228,7 @@ sw_pid=$!
 
 echo "Snark worker PID: $sw_pid"
 
-set_status "importing accounts"
+log_status "importing accounts"
 
 MAX_TRIES=${MAX_TRIES:-30}
 SLEEP_INTERVAL=${SLEEP_INTERVAL:-1m}
@@ -233,13 +236,14 @@ i=0
 while ! "$MINA_EXE" accounts import --privkey-path "$PWD/$CONF_DIR/bp" --rest-server 10313 2>/dev/null; do
   sleep $SLEEP_INTERVAL
   i=$((i+1))
+  log_status "importing accounts ($i/$MAX_TRIES)"
   if [[ $i -gt $MAX_TRIES ]]; then
       echo "Could not succeed importing accounts"
       exit 3
   fi
 done
 
-set_status "exporting ledger"
+log_status "exporting ledger"
 
 i=0
 # Export staged ledger
@@ -247,13 +251,15 @@ i=0
 while ! "$MINA_EXE" ledger export staged-ledger --daemon-port 10311 > localnet/exported_staged_ledger.json; do
   sleep $SLEEP_INTERVAL
   i=$((i+1))
+  log_status "exporting ledger ($i/$MAX_TRIES)"
+
   if [[ $i -gt $MAX_TRIES ]]; then
       echo "Could not succeed exporting staged ledger"
       exit 3
   fi
 done
 
-echo "Starting payments at $(date)"
+log_status "starting payments"
 
 h=0
 i=0
@@ -272,7 +278,7 @@ while kill -0 $sw_pid 2>/dev/null; do
     # Avoid failing this call when the node has been stopped by the caller
     h=$(get_height 10303 || true)
 
-    set_status "in_progress : $h"
+    log_status "in_progress = $h"
 
     # if get_height has failed, assume the node has been stopped and break execution
     if [[ "$h" == "true" || $UNTIL_HEIGHT -gt 0 && $h -gt $UNTIL_HEIGHT ]]; then
