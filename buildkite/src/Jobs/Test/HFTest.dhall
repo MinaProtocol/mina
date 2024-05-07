@@ -61,6 +61,20 @@ Pipeline.build
           target = Size.Small,
           docker = None Docker.Type,
           timeout_in_minutes = Some 420
+        },
+      Command.build
+        Command.Config::{
+          commands = [
+            Cmd.runInDocker Cmd.Docker::{
+              image = ContainerImages.nixos,
+              privileged = True
+            } "./scripts/hardfork/mainnet_to_mainnet_ehf.sh  $BUILDKITE_BRANCH"
+          ],
+          label = "hard fork test",
+          key = "hard-fork-test",
+          target = Size.Small,
+          docker = None Docker.Type,
+          timeout_in_minutes = Some 420
         }
     ]
   }
