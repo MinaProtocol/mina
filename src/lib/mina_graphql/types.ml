@@ -2011,6 +2011,19 @@ let block :
           ~args:Arg.[]
           ~resolve:(fun _ { With_hash.data; With_hash.hash; _ } ->
             (data.protocol_state, hash) )
+      ; io_field "snarkLedger" ~typ:(non_null json)
+          ~args:Arg.[]
+          ~resolve:(fun { ctx = mina; _ } { With_hash.hash; _ } ->
+            Mina_lib.get_snarked_ledger mina (Some hash)
+            |> Deferred.Result.map ~f:(fun accounts ->
+                   let json_ls =
+                     List.map
+                       ~f:(fun acc ->
+                         acc |> Account.to_yojson |> Yojson.Safe.to_basic )
+                       accounts
+                   in
+                   `List json_ls )
+            |> Deferred.Result.map_error ~f:Error.to_string_hum )
       ; field "protocolStateProof"
           ~typ:(non_null protocol_state_proof)
           ~doc:"Snark proof of blockchain state"

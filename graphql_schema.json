@@ -9891,16 +9891,6 @@
         },
         {
           "kind": "SCALAR",
-          "name": "JSON",
-          "description": "Arbitrary JSON",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "SCALAR",
           "name": "PrecomputedBlockProof",
           "description": "Base-64 encoded proof",
           "fields": null,
@@ -9937,6 +9927,16 @@
           ],
           "inputFields": null,
           "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "JSON",
+          "description": "Arbitrary JSON",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
           "enumValues": null,
           "possibleTypes": null
         },
@@ -11512,6 +11512,22 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "ProtocolState",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "snarkLedger",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "JSON",
                   "ofType": null
                 }
               },
