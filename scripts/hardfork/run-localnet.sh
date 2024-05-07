@@ -1,7 +1,19 @@
 #!/usr/bin/env bash
 
-set -xeo pipefail
+set -eo pipefail
 
+STATUS_FILE=${STATUS_FILE:-}
+
+if [[ "$STATUS_FILE" == "" ]]; then
+    echo "no status file given"
+    exit 2
+fi
+
+set_status () {
+    echo "$1" > $STATUS_FILE
+}
+
+set_status "starting"
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
@@ -50,6 +62,8 @@ K=${K:-10}
 # 0 means "run forever" (another external element will probably terminate the chain under certain conditions)
 UNTIL_HEIGHT=${UNTIL_HEIGHT:-0}
 
+
+
 echo "Creates a quick-epoch-turnaround configuration in localnet/ and launches two Mina nodes" >&2
 echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-s|--slot $SLOT] [-b|--berkeley] [-c|--config ./config.json] [--slot-tx-end 100] [--slot-chain-end 130] [--genesis-ledger-dir ./genesis]" >&2
 echo "Consider reading script's code for information on optional arguments" >&2
@@ -89,6 +103,9 @@ if [[ "$CONF_SUFFIX" != "" ]] && [[ "$CUSTOM_CONF" != "" ]]; then
   echo "Can't use both --berkeley and --config options" >&2
   exit 1
 fi
+
+
+set_status "setup"
 
 # Check mina command exists
 command -v "$MINA_EXE" >/dev/null || { echo "No 'mina' executable found"; exit 1; }
@@ -184,6 +201,8 @@ fi
 # Clean runtime directories
 rm -Rf localnet/runtime_1 localnet/runtime_2
 
+set_status "launching nodes"
+
 "$MINA_EXE" daemon "${COMMON_ARGS[@]}" \
   --peer "/ip4/127.0.0.1/tcp/10312/p2p/$(cat $CONF_DIR/libp2p_2.peerid)" \
   "${NODE_ARGS_1[@]}" \
@@ -206,6 +225,8 @@ sw_pid=$!
 
 echo "Snark worker PID: $sw_pid"
 
+set_status "importing accounts"
+
 MAX_TRIES=${MAX_TRIES:-30}
 SLEEP_INTERVAL=${SLEEP_INTERVAL:-1m}
 i=0
@@ -217,6 +238,8 @@ while ! "$MINA_EXE" accounts import --privkey-path "$PWD/$CONF_DIR/bp" --rest-se
       exit 3
   fi
 done
+
+set_status "exporting ledger"
 
 i=0
 # Export staged ledger
@@ -248,6 +271,8 @@ while kill -0 $sw_pid 2>/dev/null; do
     # Exit loop when the chain has reached the desired height
     # Avoid failing this call when the node has been stopped by the caller
     h=$(get_height 10303 || true)
+
+    set_status "in_progress : $h"
 
     # if get_height has failed, assume the node has been stopped and break execution
     if [[ "$h" == "true" || $UNTIL_HEIGHT -gt 0 && $h -gt $UNTIL_HEIGHT ]]; then
