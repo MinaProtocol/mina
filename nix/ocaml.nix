@@ -664,6 +664,16 @@ let
     else
       checkDot filetype false filepath rootDot;
 
+  # filteringMap:
+  # - include as a whole (both dir and file) 2
+  # - include files recursively with extension from list 1
+  #   - allow exclusion
+  # - include files with extension from list 0
+  #
+  # if trying to include something that is excluded:
+  # * remove exclusion if it is full match
+  # * error as unimplemented otherwise, to avoid more complex algebra
+
   filterToPath = pathParams: filterMap:
     builtins.path (pathParams // {
       filter = ps: t:
@@ -677,16 +687,6 @@ let
         in pkgs.lib.hasAttrByPath ps' filterMap
         || checkAncestors t ps' filterMap;
     });
-
-  # filteringMap:
-  # - include as a whole (both dir and file) 2
-  # - include files recursively with extension from list 1
-  #   - allow exclusion
-  # - include files with extension from list 0
-  #
-  # if trying to include something that is excluded:
-  # * remove exclusion if it is full match
-  # * error as unimplemented otherwise, to avoid more complex algebra
 
   commonEnv = { DUNE_PROFILE = "dev"; };
   commonBuildInputs = [ base-libs ] ++ external-libs;
@@ -793,32 +793,23 @@ let
 
   genExe = self: pkg: name: exeDef:
     let
-      sepPackages =
-        builtins.attrNames (separatedLibs."${pkg}".exe."${name}" or { });
-    in if sepPackages != [ ] then
-      throw
-      "Executable ${exeDef.src}/${name}.exe has separated lib dependency to packages ${
-        builtins.concatStringsSep ", " sepPackages
-      }"
-    else
-      let
-        deps = field: allDeps.units."${pkg}".exe."${name}"."${field}";
-        pkgDeps = builtins.attrNames (deps "pkgs");
-      in pkgs.stdenv.mkDerivation ({
-        pname = "${name}.exe";
-        version = "dev";
-        src = self.src.all-exes."${pkg}"."${name}";
-        buildInputs = commonBuildInputs ++ pkgs.lib.attrVals pkgDeps self.pkgs;
-        nativeBuildInputs = commonNativeBuildInputs;
-        buildPhase = ''
-          dune build -j $NIX_BUILD_CORES --root=. --build-dir=_build "${exeDef.src}/${name}.exe"
-        '';
-        installPhase = ''
-          mkdir -p $out/bin
-          mv "_build/default/${exeDef.src}/${name}.exe" $out/bin/${name}
-          ${installNixSupport}
-        '';
-      } // genPatch self (deps "files") (deps "exes"));
+      deps = field: allDeps.units."${pkg}".exe."${name}"."${field}";
+      pkgDeps = builtins.attrNames (deps "pkgs");
+    in pkgs.stdenv.mkDerivation ({
+      pname = "${name}.exe";
+      version = "dev";
+      src = self.src.all-exes."${pkg}"."${name}";
+      buildInputs = commonBuildInputs ++ pkgs.lib.attrVals pkgDeps self.pkgs;
+      nativeBuildInputs = commonNativeBuildInputs;
+      buildPhase = ''
+        dune build -j $NIX_BUILD_CORES --root=. --build-dir=_build "${exeDef.src}/${exeDef.name}.exe"
+      '';
+      installPhase = ''
+        mkdir -p $out/bin
+        mv "_build/default/${exeDef.src}/${exeDef.name}.exe" $out/bin/${name}
+        ${installNixSupport}
+      '';
+    } // genPatch self (deps "files") (deps "exes"));
 
   genFile = self: pname: src:
     let deps = field: allDeps.files."${src}"."${field}";
@@ -884,14 +875,12 @@ let
       exclude = [ ];
     } // (unit.modules or { }));
 
-  # Commented out code for inclusion of separated libs, idea didn't work
-  #
-  # unitSourceFiltersWithExtra = extraLibs: unit:
-  #   let
-  #     extraUnits = builtins.concatLists (pkgs.lib.mapAttrsToList
-  #       (pkg: libs: pkgs.lib.attrVals libs info.packages."${pkg}".lib)
-  #       extraLibs);
-  #   in builtins.concatMap unitSourceFilters ([ unit ] ++ extraUnits);
+  unitSourceFiltersWithExtra = extraLibs: unit:
+    let
+      extraUnits = builtins.concatLists (pkgs.lib.mapAttrsToList
+        (pkg: libs: pkgs.lib.attrVals libs info.packages."${pkg}".lib)
+        extraLibs);
+    in builtins.concatMap unitSourceFilters ([ unit ] ++ extraUnits);
 
   separatedPackages = pkg:
     builtins.attrNames (attrFold (acc0: type:
@@ -913,13 +902,14 @@ let
       name = "source-${pkg}";
     } (mergeFilters filters);
   genExeSrc = pkg: name: exeDef:
+    let sepLibs = builtins.mapAttrs (_: builtins.attrNames) (allDeps.units."${pkg}".exe."${name}".libs or { });
+    in
     filterToPath {
       path = ./..;
       name = "source-${name}-exe";
     } (mergeFilters
-      ( # Commented out code for inclusion of separated libs, idea didn't work
-        # unitSourceFiltersWithExtra (separatedLibs."${pkg}".exe."${name}" or { })
-        unitSourceFilters exeDef));
+      (unitSourceFiltersWithExtra sepLibs
+        exeDef));
   genFileSrc = name: src:
     filterToPath {
       path = ./..;
