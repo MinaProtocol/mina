@@ -73,14 +73,27 @@ end
 module Sql = struct
   module Block = struct
     module Extras = struct
-      let creator (creator, _) = `Pk creator
+      type t = { creator : string; winner : string } [@@deriving hlist]
 
-      let winner (_, winner) = `Pk winner
+      let creator { creator; _ } = `Pk creator
 
-      let typ = Caqti_type.(tup2 string string)
+      let winner { winner; _ } = `Pk winner
+
+      let typ =
+        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+          Caqti_type.[ string; string ]
     end
 
-    let typ = Caqti_type.(tup3 int Archive_lib.Processor.Block.typ Extras.typ)
+    type t =
+      { block_id : int
+      ; raw_block : Archive_lib.Processor.Block.t
+      ; block_extras : Extras.t
+      }
+    [@@deriving hlist]
+
+    let typ =
+      Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+        Caqti_type.[ int; Archive_lib.Processor.Block.typ; Extras.typ ]
 
     let block_fields ?prefix () =
       let names = Archive_lib.Processor.Block.Fields.names in
@@ -288,19 +301,13 @@ module Sql = struct
         ; failure_reason : string option
         ; account_creation_fee_paid : int64 option
         }
-      [@@deriving hlist]
+      [@@deriving hlist, fields]
 
       let fee_payer t = `Pk t.fee_payer
 
       let source t = `Pk t.source
 
       let receiver t = `Pk t.receiver
-
-      let status t = t.status
-
-      let failure_reason t = t.failure_reason
-
-      let account_creation_fee_paid t = t.account_creation_fee_paid
 
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -384,20 +391,32 @@ module Sql = struct
 
   module Internal_commands = struct
     module Extras = struct
-      let receiver (_, x, _, _) = `Pk x
+      type t =
+        { receiver_account_creation_fee_paid : int64 option
+        ; receiver : string
+        ; sequence_no : int
+        ; secondary_sequence_no : int
+        }
+      [@@deriving hlist, fields]
 
-      let receiver_account_creation_fee_paid (fee, _, _, _) = fee
+      let receiver t = `Pk t.receiver
 
-      let sequence_no (_, _, seq_no, _) = seq_no
-
-      let secondary_sequence_no (_, _, _, secondary_seq_no) = secondary_seq_no
-
-      let typ = Caqti_type.(tup4 (option int64) string int int)
+      let typ =
+        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+          Caqti_type.[ option int64; string; int; int ]
     end
 
+    type t =
+      { internal_command_id : int
+      ; raw_internal_command : Archive_lib.Processor.Internal_command.t
+      ; internal_command_extras : Extras.t
+      }
+    [@@deriving hlist]
+
     let typ =
-      Caqti_type.(
-        tup3 int Archive_lib.Processor.Internal_command.typ Extras.typ)
+      Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+        Caqti_type.
+          [ int; Archive_lib.Processor.Internal_command.typ; Extras.typ ]
 
     let query =
       let fields =
@@ -467,15 +486,9 @@ module Sql = struct
         ; status : string
         ; failure_reasons : string array option
         }
-      [@@deriving hlist]
-
-      let memo t = t.memo
-
-      let hash t = t.hash
+      [@@deriving hlist, fields]
 
       let fee_payer t = `Pk t.fee_payer
-
-      let fee t = t.fee
 
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -492,7 +505,12 @@ module Sql = struct
             ]
     end
 
-    let typ = Caqti_type.(tup2 int Extras.typ)
+    type t = { zkapp_command_id : int; zkapp_command_extras : Extras.t }
+    [@@deriving hlist]
+
+    let typ =
+      Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+        Caqti_type.[ int; Extras.typ ]
 
     let query =
       Caqti_request.collect Caqti_type.int typ
@@ -597,7 +615,7 @@ module Sql = struct
       with
       | None ->
           M.fail (Errors.create @@ `Block_missing (Block_query.to_string input))
-      | Some (block_id, raw_block, block_extras) ->
+      | Some { block_id; raw_block; block_extras } ->
           M.return (block_id, raw_block, block_extras)
     in
     let%bind raw_parent_block =
@@ -613,7 +631,7 @@ module Sql = struct
               M.fail
                 ( Errors.create ~context:"Parent block"
                 @@ `Block_missing (sprintf "parent_id = %d" parent_id) )
-          | Some (_, raw_parent_block, _) ->
+          | Some { raw_block = raw_parent_block; _ } ->
               M.return raw_parent_block )
     in
     let%bind raw_user_commands =
@@ -629,7 +647,13 @@ module Sql = struct
       |> Errors.Lift.sql ~context:"Finding zkapp commands within block"
     in
     let%bind internal_commands =
-      M.List.map raw_internal_commands ~f:(fun (_, ic, extras) ->
+      M.List.map raw_internal_commands
+        ~f:(fun
+             { Internal_commands.raw_internal_command = ic
+             ; internal_command_extras = extras
+             ; _
+             }
+           ->
           let%map kind =
             match ic.Archive_lib.Processor.Internal_command.command_type with
             | "fee_transfer" ->
@@ -723,7 +747,12 @@ module Sql = struct
           } )
     in
     let%map zkapp_commands =
-      M.List.map raw_zkapp_commands ~f:(fun (cmd_id, cmd) ->
+      M.List.map raw_zkapp_commands
+        ~f:(fun
+             { Zkapp_commands.zkapp_command_id = cmd_id
+             ; zkapp_command_extras = cmd
+             }
+           ->
           (* TODO: check if this holds *)
           let token = Mina_base.Token_id.(to_string default) in
           let%bind raw_zkapp_account_update =
