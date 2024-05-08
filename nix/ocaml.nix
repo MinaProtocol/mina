@@ -1054,6 +1054,14 @@ let
         PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
         PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
       };
+      files.src-lib-crypto-kimchi_bindings-js-node_js =
+        super.files.src-lib-crypto-kimchi_bindings-js-node_js.overrideAttrs {
+          PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
+        };
+      files.src-lib-crypto-kimchi_bindings-js-web =
+        super.files.src-lib-crypto-kimchi_bindings-js-web.overrideAttrs {
+          PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
+        };
       pkgs.__src-lib-ppx_mina-tests__ =
         customTest super "__src-lib-ppx_mina-tests__";
       pkgs.__src-lib-ppx_version-test__ =
