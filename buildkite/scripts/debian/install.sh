@@ -7,7 +7,9 @@ if [ -z $MINA_DEB_CODENAME ]; then
     exit -1
 fi
 
+
 LOCAL_DEB_FOLDER=_build
+mkdir -p $LOCAL_DEB_FOLDER
 source ./buildkite/scripts/export-git-env-vars.sh
 
 # Download required debians from bucket locally

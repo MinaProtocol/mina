@@ -37,7 +37,7 @@ let dependsOnStep = \(debVersion : DebVersion) -> \(profile : Profiles.Type) -> 
 
 
 let dependsOn = \(debVersion : DebVersion) -> \(profile : Profiles.Type) ->
-  dependsOnStep debVersion profile "publish"
+  dependsOnStep debVersion profile "build"
 
 -- Most debian builds are only used for public releases
 -- so they don't need to be triggered by dirtyWhen on every change
