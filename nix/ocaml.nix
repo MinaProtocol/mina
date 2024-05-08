@@ -986,6 +986,20 @@ let
       '';
     };
 
+  customTest = super: pkg:
+    let src = info.pseudoPackages."${pkg}"; in
+      super.pkgs."${pkg}".overrideAttrs {
+        pname = "test-${pkg}";
+        installPhase = "touch $out";
+        dontCheck = false;
+        buildPhase = ''
+          runHook preBuild
+          cp ${../${src}/Makefile} ${src}/Makefile
+          make -C ${src} VERBOSE=1
+          runHook postBuild
+        '';
+      };
+
   minaPkgs = self:
     let
       super = mkOutputs (genPackage self) (genTestedPackage self) (genExe self)
@@ -1028,6 +1042,8 @@ let
         PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
         PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
       };
+      pkgs.__src-lib-ppx_mina-tests__ = customTest super "__src-lib-ppx_mina-tests__";
+      pkgs.__src-lib-ppx_version-test__ = customTest super "__src-lib-ppx_version-test__";
     };
 
   overlay = self: super:
