@@ -4979,7 +4979,7 @@ index 40caaf5af1..160e213187 100644
      Conn.find query_parent_state_hash epoch_ledgers_state_hash
  end
 diff --git a/src/app/rosetta/lib/account.ml b/src/app/rosetta/lib/account.ml
-index acfd8bfcba..81599bbef6 100644
+index 0b2265c206..7a999e2bd6 100644
 --- a/src/app/rosetta/lib/account.ml
 +++ b/src/app/rosetta/lib/account.ml
 @@ -36,9 +36,9 @@ module Sql = struct
@@ -5030,9 +5030,9 @@ index acfd8bfcba..81599bbef6 100644
      let balance_info : Balance_info.t = { liquid_balance; total_balance } in
      Deferred.Result.return (balance_info, nonce)
  
--  let run (module Conn : Caqti_async.CONNECTION) ~block_query
-+  let run (module Conn : Mina_caqti.CONNECTION) ~block_query
-       ~address ~token_id =
+-  let run (module Conn : Caqti_async.CONNECTION) ~block_query ~address ~token_id
++  let run (module Conn : Mina_caqti.CONNECTION) ~block_query ~address ~token_id
+       =
      let open Deferred.Result.Let_syntax in
      (* First find the block referenced by the block identifier. Then
 @@ -298,7 +298,7 @@ module Balance = struct
@@ -5041,27 +5041,14 @@ index acfd8bfcba..81599bbef6 100644
              with_db (fun ~db ->
 -                let (module Conn : Caqti_async.CONNECTION) = db in
 +                let (module Conn : Mina_caqti.CONNECTION) = db in
-                 Sql.run
-                   (module Conn)
-                   ~block_query ~address ~token_id
+                 Sql.run (module Conn) ~block_query ~address ~token_id
+                 |> Errors.Lift.wrap )
+             |> Deferred.Result.map_error ~f:(function `App e -> e) )
 diff --git a/src/app/rosetta/lib/block.ml b/src/app/rosetta/lib/block.ml
-index 4c1a06ecaa..4cd284ce54 100644
+index b6cf0ea4d0..b56bd1eb40 100644
 --- a/src/app/rosetta/lib/block.ml
 +++ b/src/app/rosetta/lib/block.ml
-@@ -390,10 +390,10 @@ module Sql = struct
- 
-       let winner (_, winner) = `Pk winner
- 
--      let typ = Caqti_type.(tup2 string string)
-+      let typ = Caqti_type.(t2 string string)
-     end
- 
--    let typ = Caqti_type.(tup3 int Archive_lib.Processor.Block.typ Extras.typ)
-+    let typ = Caqti_type.(t3 int Archive_lib.Processor.Block.typ Extras.typ)
- 
-     let block_fields ?prefix () =
-       let names = Archive_lib.Processor.Block.Fields.names in
-@@ -404,7 +404,7 @@ module Sql = struct
+@@ -104,7 +104,7 @@ module Sql = struct
        String.concat ~sep:"," fields
  
      let query_count_canonical_at_height =
@@ -5070,7 +5057,7 @@ index 4c1a06ecaa..4cd284ce54 100644
          {sql| SELECT COUNT(*) FROM blocks
                WHERE height = ?
                AND chain_status = 'canonical'
-@@ -412,7 +412,7 @@ module Sql = struct
+@@ -112,7 +112,7 @@ module Sql = struct
  
      let query_height_canonical =
        let c_fields = block_fields ~prefix:"c." () in
@@ -5079,7 +5066,7 @@ index 4c1a06ecaa..4cd284ce54 100644
          (* The archive database will only reconcile the canonical columns for
           * blocks older than k + epsilon
           *)
-@@ -436,7 +436,7 @@ module Sql = struct
+@@ -135,7 +135,7 @@ module Sql = struct
        let fields = block_fields () in
        let b_fields = block_fields ~prefix:"b." () in
        let c_fields = block_fields ~prefix:"c." () in
@@ -5088,20 +5075,16 @@ index 4c1a06ecaa..4cd284ce54 100644
          (* According to the clarification of the Rosetta spec here
           * https://community.rosetta-api.org/t/querying-block-by-just-its-index/84/3 ,
           * it is important to select only the block on the canonical chain for a
-@@ -482,9 +482,9 @@ module Sql = struct
+@@ -180,7 +180,7 @@ module Sql = struct
  
      let query_hash =
        let b_fields = block_fields ~prefix:"b." () in
 -      Caqti_request.find_opt Caqti_type.string typ
--        (sprintf
--           {|
 +      Mina_caqti.find_opt_req Caqti_type.string typ
-+      (sprintf
-+        {|
+         [%string
+           {|
           SELECT b.id,
-                 %s,
-                 pk.value as creator,
-@@ -500,8 +500,8 @@ module Sql = struct
+@@ -197,8 +197,8 @@ module Sql = struct
  
      let query_both =
        let b_fields = block_fields ~prefix:"b." () in
@@ -5110,37 +5093,29 @@ index 4c1a06ecaa..4cd284ce54 100644
 +      Mina_caqti.find_opt_req
 +        Caqti_type.(t2 string int64)
          typ
-         (sprintf
-            {|
-@@ -521,9 +521,9 @@ module Sql = struct
+         [%string
+           {|
+@@ -217,7 +217,7 @@ module Sql = struct
  
      let query_by_id =
        let b_fields = block_fields ~prefix:"b." () in
 -      Caqti_request.find_opt Caqti_type.int typ
--        (sprintf
--           {|
 +      Mina_caqti.find_opt_req Caqti_type.int typ
-+      (sprintf
-+        {|
+         [%string
+           {|
           SELECT b.id,
-                 %s,
-                 pk.value as creator,
-@@ -539,9 +539,9 @@ module Sql = struct
+@@ -234,7 +234,7 @@ module Sql = struct
  
      let query_best =
        let b_fields = block_fields ~prefix:"b." () in
 -      Caqti_request.find_opt Caqti_type.unit typ
--        (sprintf
--           {|
 +      Mina_caqti.find_opt_req Caqti_type.unit typ
-+      (sprintf
-+        {|
+         [%string
+           {|
           SELECT b.id,
-                 %s,
-                 pk.value as creator,
-@@ -557,10 +557,10 @@ module Sql = struct
-         |}
-            b_fields )
+@@ -251,10 +251,10 @@ module Sql = struct
+          LIMIT 1
+         |}]
  
 -    let run_by_id (module Conn : Caqti_async.CONNECTION) id =
 +    let run_by_id (module Conn : Mina_caqti.CONNECTION) id =
@@ -5151,7 +5126,7 @@ index 4c1a06ecaa..4cd284ce54 100644
          =
        let open Deferred.Result.Let_syntax in
        let%map num_canonical_at_height =
-@@ -568,7 +568,7 @@ module Sql = struct
+@@ -262,7 +262,7 @@ module Sql = struct
        in
        Int64.( > ) num_canonical_at_height Int64.zero
  
@@ -5160,7 +5135,7 @@ index 4c1a06ecaa..4cd284ce54 100644
        | Some (`This (`Height h)) ->
            let open Deferred.Result.Let_syntax in
            let%bind has_canonical_height =
-@@ -578,7 +578,7 @@ module Sql = struct
+@@ -272,7 +272,7 @@ module Sql = struct
            else
              let%bind max_height =
                Conn.find
@@ -5169,150 +5144,70 @@ index 4c1a06ecaa..4cd284ce54 100644
                     {sql| SELECT MAX(height) FROM blocks |sql} )
                  ()
              in
-@@ -635,21 +635,16 @@ module Sql = struct
+@@ -323,8 +323,7 @@ module Sql = struct
  
      let typ =
        Caqti_type.(
 -        tup3 int Archive_lib.Processor.User_command.Signed_command.typ
-+        t3 int Archive_lib.Processor.User_command.Signed_command.typ
-           Extras.typ)
+-          Extras.typ)
++        t3 int Archive_lib.Processor.User_command.Signed_command.typ Extras.typ)
+ 
+     let fields =
+       String.concat ~sep:","
+@@ -333,8 +332,8 @@ module Sql = struct
+            Archive_lib.Processor.User_command.Signed_command.Fields.names
  
      let query =
-       let fields =
--        String.concat ~sep:","
--        @@ List.map
--             ~f:(fun n -> "u." ^ n)
--             Archive_lib.Processor.User_command.Signed_command.Fields.names
--      in
 -      Caqti_request.collect
 -        Caqti_type.(tup2 int string)
--        typ
--        (sprintf
--           {|
-+        String.concat ~sep:"," @@ List.map ~f:(fun n -> "u." ^ n)
-+          Archive_lib.Processor.User_command.Signed_command.Fields.names in
-+      Mina_caqti.collect_req Caqti_type.(t2 int string) typ
-+      (sprintf
-+        {|
-          SELECT u.id,
-                 %s,
-                 pk_payer.value as fee_payer,
-@@ -698,7 +693,7 @@ module Sql = struct
-         |}
-            fields )
++      Mina_caqti.collect_req
++        Caqti_type.(t2 int string)
+         typ
+         [%string
+           {|
+@@ -385,7 +384,7 @@ module Sql = struct
+            AND (t.value = ? OR t.id IS NULL)
+         |}]
  
 -    let run (module Conn : Caqti_async.CONNECTION) id =
 +    let run (module Conn : Mina_caqti.CONNECTION) id =
        Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
    end
  
-@@ -712,25 +707,20 @@ module Sql = struct
+@@ -539,9 +538,9 @@ module Sql = struct
+             ON ic_coinbase_receiver.receiver_id = coinbase_receiver_pk.id
+     |sql}]
  
-       let secondary_sequence_no (_, _, _, secondary_seq_no) = secondary_seq_no
+-    let run (module Conn : Caqti_async.CONNECTION) id =
++    let run (module Conn : Mina_caqti.CONNECTION) id =
+       Conn.collect_list
+-        (Caqti_request.collect Caqti_type.(tup2 int string) typ query)
++        (Mina_caqti.collect_req Caqti_type.(t2 int string) typ query)
+         (id, Mina_base.Token_id.(to_string default))
  
--      let typ = Caqti_type.(tup4 (option int64) string int int)
-+      let typ = Caqti_type.(t4 (option int64) string int int)
-     end
- 
-     let typ =
-       Caqti_type.(
--        tup3 int Archive_lib.Processor.Internal_command.typ Extras.typ)
-+        t3 int Archive_lib.Processor.Internal_command.typ Extras.typ)
+     let to_info t =
+@@ -682,9 +681,9 @@ module Sql = struct
+       |}]
  
      let query =
-       let fields =
--        String.concat ~sep:","
--        @@ List.map
--             ~f:(fun n -> "i." ^ n)
--             Archive_lib.Processor.Internal_command.Fields.names
--      in
--      Caqti_request.collect
--        Caqti_type.(tup2 int string)
--        typ
--        (sprintf
--           {|
-+        String.concat ~sep:"," @@ List.map ~f:(fun n -> "i." ^ n)
-+          Archive_lib.Processor.Internal_command.Fields.names in
-+      Mina_caqti.collect_req Caqti_type.(t2 int string) typ
-+      (sprintf
-+        {|
-          SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no)
-            i.id,
-            %s,
-@@ -771,7 +761,7 @@ module Sql = struct
-       |}
-            fields )
+-      Caqti_request.collect Caqti_type.(tup2 int string) typ query_string
++      Mina_caqti.collect_req Caqti_type.(t2 int string) typ query_string
  
 -    let run (module Conn : Caqti_async.CONNECTION) id =
 +    let run (module Conn : Mina_caqti.CONNECTION) id =
        Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
-   end
  
-@@ -813,10 +803,10 @@ module Sql = struct
-             ]
-     end
- 
--    let typ = Caqti_type.(tup2 int Extras.typ)
-+    let typ = Caqti_type.(t2 int Extras.typ)
- 
-     let query =
--      Caqti_request.collect Caqti_type.int typ
-+      Mina_caqti.collect_req Caqti_type.int typ
-         {| 
-          SELECT zc.id,
-                 zc.memo,
-@@ -840,7 +830,7 @@ module Sql = struct
-          WHERE bzc.block_id = ?
-       |}
- 
--    let run (module Conn : Caqti_async.CONNECTION) id =
-+    let run (module Conn : Mina_caqti.CONNECTION) id =
-       Conn.collect_list query id
-   end
- 
-@@ -857,20 +847,15 @@ module Sql = struct
- 
-     let typ =
-       Caqti_type.(
--        tup2 Archive_lib.Processor.Zkapp_account_update_body.typ Extras.typ)
-+        t2 Archive_lib.Processor.Zkapp_account_update_body.typ Extras.typ)
- 
-     let query =
-       let fields =
--        String.concat ~sep:","
--        @@ List.map
--             ~f:(fun n -> "zaub." ^ n)
--             Archive_lib.Processor.Zkapp_account_update_body.Fields.names
--      in
--      Caqti_request.collect
--        Caqti_type.(tup3 int string int)
--        typ
--        (sprintf
--           {|
-+        String.concat ~sep:"," @@ List.map ~f:(fun n -> "zaub." ^ n)
-+          Archive_lib.Processor.Zkapp_account_update_body.Fields.names in
-+      Mina_caqti.collect_req Caqti_type.(t3 int string int) typ
-+      (sprintf
-+        {|
-          SELECT %s,
-                 pk.value as account,
-                 bzc.status
-@@ -893,12 +878,12 @@ module Sql = struct
-     |}
-            fields )
- 
--    let run (module Conn : Caqti_async.CONNECTION) command_id block_id =
-+    let run (module Conn : Mina_caqti.CONNECTION) command_id block_id =
-       Conn.collect_list query
-         (command_id, Mina_base.Token_id.(to_string default), block_id)
+     module Make_common (M : sig
+@@ -797,7 +796,7 @@ module Sql = struct
+     end)
    end
  
 -  let run (module Conn : Caqti_async.CONNECTION) input =
 +  let run (module Conn : Mina_caqti.CONNECTION) input =
-     let module M = struct
-       include Deferred.Result
+     let module Result = struct
+       include Result
  
-@@ -1131,12 +1116,12 @@ module Specific = struct
+@@ -955,12 +954,12 @@ module Specific = struct
      module Mock = T (Result)
  
      let real :
@@ -5328,21 +5223,19 @@ index 4c1a06ecaa..4cd284ce54 100644
        ; validate_network_choice = Network.Validate_choice.Real.validate
        }
 diff --git a/src/app/rosetta/lib/construction.ml b/src/app/rosetta/lib/construction.ml
-index 90297f8b17..318bc7ff7a 100644
+index 90297f8b17..91ff6dc674 100644
 --- a/src/app/rosetta/lib/construction.ml
 +++ b/src/app/rosetta/lib/construction.ml
-@@ -866,7 +866,9 @@ module Submit = struct
+@@ -866,7 +866,7 @@ module Submit = struct
          Caqti_type.custom ~encode ~decode (to_rep spec)
  
        let query =
 -        Caqti_request.find_opt params_typ Caqti_type.string
-+        Mina_caqti.find_opt_req
-+          params_typ
-+          Caqti_type.string
++        Mina_caqti.find_opt_req params_typ Caqti_type.string
            {sql| SELECT uc.id FROM user_commands uc
                  INNER JOIN public_keys AS pks ON pks.id = uc.source_id
                  INNER JOIN public_keys AS pkr ON pkr.id = uc.receiver_id
-@@ -876,7 +878,7 @@ module Submit = struct
+@@ -876,7 +876,7 @@ module Submit = struct
                  AND uc.amount = $4
                  AND uc.fee = $5 |sql}
  
@@ -5351,7 +5244,7 @@ index 90297f8b17..318bc7ff7a 100644
            ~amount ~fee =
          let open Unsigned_extended in
          Conn.find_opt query
-@@ -924,7 +926,7 @@ module Submit = struct
+@@ -924,7 +924,7 @@ module Submit = struct
      module Mock = T (Result)
  
      let real :
@@ -5361,39 +5254,32 @@ index 90297f8b17..318bc7ff7a 100644
          -> ( 'gql_payment
             , 'gql_delegation
 diff --git a/src/app/rosetta/lib/network.ml b/src/app/rosetta/lib/network.ml
-index 420d3569ac..65abac7842 100644
+index 420d3569ac..157fc50002 100644
 --- a/src/app/rosetta/lib/network.ml
 +++ b/src/app/rosetta/lib/network.ml
-@@ -75,10 +75,9 @@ end
+@@ -75,8 +75,8 @@ end
  
  module Sql = struct
    let oldest_block_query =
 -    Caqti_request.find Caqti_type.unit
 -      Caqti_type.(tup2 int64 string)
--      "SELECT height, state_hash FROM blocks ORDER BY timestamp ASC, \
--       state_hash ASC LIMIT 1"
 +    Mina_caqti.find_req Caqti_type.unit
 +      Caqti_type.(t2 int64 string)
-+      "SELECT height, state_hash FROM blocks ORDER BY timestamp ASC, state_hash ASC LIMIT 1"
+       "SELECT height, state_hash FROM blocks ORDER BY timestamp ASC, \
+        state_hash ASC LIMIT 1"
  
-   let max_height_delta =
-     match Sys.getenv "MINA_ROSETTA_MAX_HEIGHT_DELTA" with
-@@ -88,10 +87,10 @@ module Sql = struct
+@@ -88,8 +88,8 @@ module Sql = struct
          0L
  
    let latest_block_query =
 -    Caqti_request.find Caqti_type.unit
 -      Caqti_type.(tup3 int64 string int64)
--      (sprintf
--         {sql| SELECT height, state_hash, timestamp FROM blocks b
-+    Mina_caqti.find_req
-+      Caqti_type.unit
++    Mina_caqti.find_req Caqti_type.unit
 +      Caqti_type.(t3 int64 string int64)
-+      (sprintf {sql| SELECT height, state_hash, timestamp FROM blocks b
+       (sprintf
+          {sql| SELECT height, state_hash, timestamp FROM blocks b
                       WHERE height = (select MAX(height) - %Ld FROM blocks)
-                      ORDER BY timestamp ASC, state_hash ASC
-                      LIMIT 1
-@@ -218,9 +217,9 @@ module Status = struct
+@@ -218,9 +218,9 @@ module Status = struct
      let oldest_block_ref = ref None
  
      let real :
@@ -5434,7 +5320,7 @@ index 15065b1fa3..1dda81f8e9 100644
 +let run_lock_count (module Conn : Mina_caqti.CONNECTION) =
    Conn.find query_lock_count
 diff --git a/src/app/rosetta/lib/rosetta.ml b/src/app/rosetta/lib/rosetta.ml
-index c1e675b34a..c1b616a71e 100644
+index 135235db65..459befd8ec 100644
 --- a/src/app/rosetta/lib/rosetta.ml
 +++ b/src/app/rosetta/lib/rosetta.ml
 @@ -4,7 +4,7 @@ open Rosetta_lib
@@ -5455,7 +5341,7 @@ index c1e675b34a..c1b616a71e 100644
      |> Deferred.Result.map_error ~f:(function
           | `App e ->
               `App e
-@@ -62,7 +62,7 @@ let pg_log_data ~logger ~pool : unit Deferred.t =
+@@ -65,7 +65,7 @@ let pg_log_data ~logger ~pool : unit Deferred.t =
    match%bind Lazy.force pool with
    | Ok pool ->
        let get_logs () : (unit, _) Deferred.Result.t =
@@ -5464,15 +5350,95 @@ index c1e675b34a..c1b616a71e 100644
            (fun db ->
              let open Deferred.Result.Let_syntax in
              let%bind num_conns = Pg_data.run_connection_count db () in
-@@ -187,7 +187,7 @@ let command =
+@@ -190,7 +190,14 @@ let command =
                "MINA_ROSETTA_MAX_DB_POOL_SIZE not set or invalid. Please set \
                 this to a number (try 64 or 128)"
          in
 -        match Caqti_async.connect_pool ~max_size:max_pool_size archive_uri with
-+        match Mina_caqti.connect_pool ~max_size:max_pool_size archive_uri with
++        match
++          Mina_caqti.connect_pool
++            ~pool_config:
++              Caqti_pool_config.(
++                merge_left (default_from_env ())
++                  (create ~max_size:max_pool_size ()))
++            archive_uri
++        with
          | Error e ->
              [%log error]
                ~metadata:[ ("error", `String (Caqti_error.show e)) ]
+diff --git a/src/app/rosetta/lib/search.ml b/src/app/rosetta/lib/search.ml
+index a4d16f4921..97f6eea093 100644
+--- a/src/app/rosetta/lib/search.ml
++++ b/src/app/rosetta/lib/search.ml
+@@ -418,8 +418,8 @@ module Sql = struct
+       in
+       let offset = offset_sql offset in
+       let limit = limit_sql limit in
+-      Caqti_request.collect Params.typ
+-        Caqti_type.(tup2 int64 typ)
++      Mina_caqti.collect_req Params.typ
++        Caqti_type.(t2 int64 typ)
+         [%string
+           {sql|
+           WITH filtered_ids AS (
+@@ -523,7 +523,7 @@ module Sql = struct
+           ORDER BY u.id, CASE WHEN b.chain_status = 'canonical' THEN 1 WHEN b.chain_status = 'orphaned' THEN 2 END
+         |sql}]
+ 
+-    let run (module Conn : Caqti_async.CONNECTION) ~offset ~limit input =
++    let run (module Conn : Mina_caqti.CONNECTION) ~offset ~limit input =
+       let open Deferred.Result.Let_syntax in
+       let params = Params.of_query input in
+       match%map
+@@ -775,7 +775,7 @@ module Sql = struct
+             ORDER BY i.id, i.hash, i.command_type, bic.block_id, bic.sequence_no, bic.secondary_sequence_no
+           |sql}]
+ 
+-    let run (module Conn : Caqti_async.CONNECTION) ~offset ~limit input =
++    let run (module Conn : Mina_caqti.CONNECTION) ~offset ~limit input =
+       let open Deferred.Result.Let_syntax in
+       let params = Params.of_query input in
+       let query =
+@@ -783,7 +783,7 @@ module Sql = struct
+       in
+       match%map
+         Conn.collect_list
+-          (Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ) query)
++          (Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ) query)
+           params
+       with
+       | [] ->
+@@ -939,10 +939,10 @@ module Sql = struct
+           ~address_fields:[ "pk_fee_payer.value"; "pk_update_body.value" ]
+           ~op_type_filters operator
+       in
+-      Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ)
++      Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ)
+       @@ query_string ~offset ~limit ~filters
+ 
+-    let run (module Conn : Caqti_async.CONNECTION) ~offset ~limit input =
++    let run (module Conn : Mina_caqti.CONNECTION) ~offset ~limit input =
+       let open Deferred.Result.Let_syntax in
+       let params = Params.of_query input in
+       match%map
+@@ -981,7 +981,7 @@ module Sql = struct
+     end)
+   end
+ 
+-  let run (module Conn : Caqti_async.CONNECTION) query =
++  let run (module Conn : Mina_caqti.CONNECTION) query =
+     let module Result = struct
+       include Result
+ 
+@@ -1062,7 +1062,7 @@ module Specific = struct
+     (* But for tests, we want things to go fast *)
+     module Mock = T (Result)
+ 
+-    let real : db:(module Caqti_async.CONNECTION) -> 'gql Real.t =
++    let real : db:(module Mina_caqti.CONNECTION) -> 'gql Real.t =
+      fun ~db ->
+       { db_transactions = Sql.run db
+       ; validate_network_choice = Network.Validate_choice.Real.validate
 diff --git a/src/app/swap_bad_balances/sql.ml b/src/app/swap_bad_balances/sql.ml
 index 82ec136a10..bd85672b7e 100644
 --- a/src/app/swap_bad_balances/sql.ml
