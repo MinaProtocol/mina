@@ -31,14 +31,14 @@ module Internal_command_info = struct
     ; sequence_no : int
     ; secondary_sequence_no : int
     ; hash : string
+    ; coinbase_receiver : [ `Pk of string ] option
     }
   [@@deriving to_yojson]
 
   module T (M : Monad_fail.S) = struct
     module Op_build = Op.T (M)
 
-    let to_operations ~coinbase_receiver (t : t) :
-        (Operation.t list, Errors.t) M.t =
+    let to_operations (t : t) : (Operation.t list, Errors.t) M.t =
       (* We choose to represent the dec-side of fee transfers from txns from the
        * canonical user command that created them so we are able consistently
        * produce more balance changing operations in the mempool or a block.
@@ -111,7 +111,7 @@ module Internal_command_info = struct
           | `Fee_payer_dec ->
               let open M.Let_syntax in
               let%map coinbase_receiver =
-                match coinbase_receiver with
+                match t.coinbase_receiver with
                 | Some r ->
                     M.return r
                 | None ->
@@ -151,9 +151,9 @@ module Internal_command_info = struct
                 ; metadata = None
                 } )
 
-    let to_transaction ~coinbase_receiver info =
+    let to_transaction info =
       let open M.Let_syntax in
-      let%map operations = to_operations ~coinbase_receiver info in
+      let%map operations = to_operations info in
       { Transaction.transaction_identifier =
           (* prepend the sequence number, secondary sequence number and kind to the transaction hash
              duplicate hashes are possible in the archive database, with differing
@@ -180,6 +180,7 @@ module Internal_command_info = struct
       ; sequence_no = 1
       ; secondary_sequence_no = 0
       ; hash = "COINBASE_1"
+      ; coinbase_receiver = None
       }
     ; { kind = `Fee_transfer
       ; receiver = `Pk "Alice"
@@ -189,6 +190,7 @@ module Internal_command_info = struct
       ; sequence_no = 1
       ; secondary_sequence_no = 0
       ; hash = "FEE_TRANSFER"
+      ; coinbase_receiver = None
       }
     ]
 end
@@ -212,6 +214,10 @@ module User_command_info = struct
             with _ -> None )
     ; related_transactions = []
     }
+
+  module T (M : Monad_fail.S) = struct
+    let to_transaction info = M.return @@ to_transaction info
+  end
 end
 
 module Zkapp_account_update_info = struct
