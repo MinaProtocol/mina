@@ -795,7 +795,9 @@ let
         builtins.concatStringsSep ", " sepPackages
       }"
     else
-      let pkgDeps = builtins.attrNames (packageDeps "pkgs" pkg);
+      let
+        pkgDeps = builtins.filter (d: !(info.pseudoPackages ? "${d}"))
+          (builtins.attrNames (packageDeps "pkgs" pkg));
       in pkgs.stdenv.mkDerivation (final:
         {
           pname = pkg;
@@ -842,8 +844,9 @@ let
 
   genExe = self: pkg: name: exeDef:
     let
-      deps = field: allDeps.units."${pkg}".exe."${name}"."${field}";
-      pkgDeps = builtins.attrNames (deps "pkgs");
+      deps = field: allDeps.units."${pkg}".exe."${name}"."${field}" or { };
+      pkgDeps = builtins.filter (d: !(info.pseudoPackages ? "${d}"))
+        (builtins.attrNames (deps "pkgs"));
     in pkgs.stdenv.mkDerivation ({
       pname = "${name}.exe";
       version = "dev";
@@ -939,20 +942,26 @@ let
   # Only sources, without dependencies built by other derivations
   genPackageSrc = pkg: pkgDef:
     let
+      pseudoPkgDeps = builtins.filter (d: info.pseudoPackages ? "${d}")
+        (builtins.attrNames (packageDeps "pkgs" pkg));
+      sepLibs = builtins.mapAttrs (_: { lib, ... }: builtins.attrNames lib)
+        (pkgs.lib.getAttrs pseudoPkgDeps info.packages);
       filters = builtins.concatLists (builtins.concatLists
-        (pkgs.lib.mapAttrsToList (type:
-          pkgs.lib.mapAttrsToList (name:
-            # Commented out code for inclusion of separated libs, idea didn't work
-            # unitSourceFiltersWithExtra (separatedLibs."${pkg}"."${type}"."${name}" or { })
-            unitSourceFilters)) pkgDef));
+        (pkgs.lib.mapAttrsToList
+          (_: pkgs.lib.mapAttrsToList (_: unitSourceFiltersWithExtra sepLibs))
+          pkgDef));
     in filterToPath {
       path = ./..;
       name = "source-${pkg}";
     } (mergeFilters filters);
   genExeSrc = pkg: name: exeDef:
     let
-      sepLibs = builtins.mapAttrs (_: builtins.attrNames)
-        (allDeps.units."${pkg}".exe."${name}".libs or { });
+      deps = field: allDeps.units."${pkg}".exe."${name}"."${field}" or { };
+      pseudoPkgDeps = builtins.filter (d: info.pseudoPackages ? "${d}")
+        (builtins.attrNames (deps "pkgs"));
+      sepLibs = builtins.mapAttrs (_: builtins.attrNames) ((deps "libs")
+        // builtins.mapAttrs (_: { lib, ... }: lib)
+        (pkgs.lib.getAttrs pseudoPkgDeps info.packages));
     in filterToPath {
       path = ./..;
       name = "source-${name}-exe";
