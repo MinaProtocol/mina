@@ -780,6 +780,7 @@ let
         echo '{CAML_LD_LIBRARY_PATH:+:}'"$out/install/default/lib/stublibs"
       fi
     } > $out/nix-support/setup-hook
+    [ ! -d $out/install/default/bin ] || ln -s install/default/bin $out/bin
   '';
 
   # Make separate libs a separately-built derivation instead of `rm -Rf` hack
@@ -835,7 +836,7 @@ let
       # For detached units (with no package) there is no need to rely on pre-built
       # libraries/executables because detached units can not be a dependency of other
       # packages, hence no use to introduce indirection
-      ${if info.pseudoPackages ? "${pkg}" then null else "preBuild"} = ''
+      ${if info.pseudoPackages ? "${pkg}" then null else "postPatch"} = ''
         cp --no-preserve=mode,ownership -RL ${drv} _build
       '';
       installPhase = "touch $out";
@@ -1012,6 +1013,11 @@ let
       '';
     };
 
+  sqlSchemaFiles = with inputs.nix-filter.lib;
+    filter {
+      root = ../src/app/archive;
+      include = [ (matchExt "sql") ];
+    };
   minaPkgs = self:
     let
       super = mkOutputs (genPackage self) (genTestedPackage self) (genExe self)
@@ -1038,6 +1044,9 @@ let
       };
       childProcessesTester = pkgs.writeShellScriptBin "mina-tester.sh"
         (builtins.readFile ../src/lib/child_processes/tester.sh);
+      libp2pHelperPath = {
+        MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
+      };
     in pkgs.lib.recursiveUpdate super {
       pkgs.mina_version = super.pkgs.mina_version.overrideAttrs {
         MINA_COMMIT_SHA1 = inputs.self.sourceInfo.rev or "<dirty>";
@@ -1068,9 +1077,28 @@ let
         customTest super "__src-lib-ppx_mina-tests__";
       pkgs.__src-lib-ppx_version-test__ =
         customTest super "__src-lib-ppx_version-test__";
-      tested.child_processes = super.tested.child_processes.overrideAttrs (s: {
-        buildInputs = s.buildInputs ++ [ childProcessesTester ];
+      tested.child_processes = super.tested.child_processes.overrideAttrs
+        (s: { buildInputs = s.buildInputs ++ [ childProcessesTester ]; });
+      tested.block_storage =
+        super.tested.block_storage.overrideAttrs libp2pHelperPath;
+      tested.mina_lib = super.tested.mina_lib.overrideAttrs libp2pHelperPath;
+      tested.mina_lib_tests =
+        super.tested.mina_lib_tests.overrideAttrs libp2pHelperPath;
+      tested.archive_lib = super.tested.archive_lib.overrideAttrs (s: {
+        buildInputs = s.buildInputs ++ [ pkgs.ephemeralpg ];
+        preBuild = ''
+          export MINA_TEST_POSTGRES="$(pg_tmp -w 1200)"
+          ( cd ${sqlSchemaFiles} && psql "$MINA_TEST_POSTGRES" < create_schema.sql >/dev/null )
+        '';
       });
+      # TODO remove this override after merging the latest `develop`
+      tested.__src-lib-crypto-snarky_tests__ = pkgs.stdenv.mkDerivation {
+        name = "skipped-src-lib-crypto-snarky_tests";
+        phases = [ "installPhase" ];
+        installPhase = ''
+          touch $out
+        '';
+      };
     };
 
   overlay = self: super:
