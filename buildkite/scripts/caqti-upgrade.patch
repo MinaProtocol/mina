@@ -2660,7 +2660,7 @@ index 40caaf5af1..54c32b7274 100644
  
              INNER JOIN
 diff --git a/src/app/rosetta/lib/account.ml b/src/app/rosetta/lib/account.ml
-index acfd8bfcba..18b94265ed 100644
+index 0b2265c206..d9243fbecb 100644
 --- a/src/app/rosetta/lib/account.ml
 +++ b/src/app/rosetta/lib/account.ml
 @@ -36,9 +36,9 @@ module Sql = struct
@@ -2690,23 +2690,10 @@ index acfd8bfcba..18b94265ed 100644
                  SELECT b.height,b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce,timing_id
  
 diff --git a/src/app/rosetta/lib/block.ml b/src/app/rosetta/lib/block.ml
-index 4c1a06ecaa..a83bde8cb0 100644
+index b6cf0ea4d0..b6108d049a 100644
 --- a/src/app/rosetta/lib/block.ml
 +++ b/src/app/rosetta/lib/block.ml
-@@ -390,10 +390,10 @@ module Sql = struct
- 
-       let winner (_, winner) = `Pk winner
- 
--      let typ = Caqti_type.(tup2 string string)
-+      let typ = Caqti_type.(t2 string string)
-     end
- 
--    let typ = Caqti_type.(tup3 int Archive_lib.Processor.Block.typ Extras.typ)
-+    let typ = Caqti_type.(t3 int Archive_lib.Processor.Block.typ Extras.typ)
- 
-     let block_fields ?prefix () =
-       let names = Archive_lib.Processor.Block.Fields.names in
-@@ -404,7 +404,7 @@ module Sql = struct
+@@ -104,7 +104,7 @@ module Sql = struct
        String.concat ~sep:"," fields
  
      let query_count_canonical_at_height =
@@ -2715,7 +2702,7 @@ index 4c1a06ecaa..a83bde8cb0 100644
          {sql| SELECT COUNT(*) FROM blocks
                WHERE height = ?
                AND chain_status = 'canonical'
-@@ -412,7 +412,7 @@ module Sql = struct
+@@ -112,7 +112,7 @@ module Sql = struct
  
      let query_height_canonical =
        let c_fields = block_fields ~prefix:"c." () in
@@ -2724,7 +2711,7 @@ index 4c1a06ecaa..a83bde8cb0 100644
          (* The archive database will only reconcile the canonical columns for
           * blocks older than k + epsilon
           *)
-@@ -436,7 +436,7 @@ module Sql = struct
+@@ -135,7 +135,7 @@ module Sql = struct
        let fields = block_fields () in
        let b_fields = block_fields ~prefix:"b." () in
        let c_fields = block_fields ~prefix:"c." () in
@@ -2733,20 +2720,16 @@ index 4c1a06ecaa..a83bde8cb0 100644
          (* According to the clarification of the Rosetta spec here
           * https://community.rosetta-api.org/t/querying-block-by-just-its-index/84/3 ,
           * it is important to select only the block on the canonical chain for a
-@@ -482,9 +482,9 @@ module Sql = struct
+@@ -180,7 +180,7 @@ module Sql = struct
  
      let query_hash =
        let b_fields = block_fields ~prefix:"b." () in
 -      Caqti_request.find_opt Caqti_type.string typ
--        (sprintf
--           {|
 +      Mina_caqti.find_opt_req Caqti_type.string typ
-+      (sprintf
-+        {|
+         [%string
+           {|
           SELECT b.id,
-                 %s,
-                 pk.value as creator,
-@@ -500,8 +500,8 @@ module Sql = struct
+@@ -197,8 +197,8 @@ module Sql = struct
  
      let query_both =
        let b_fields = block_fields ~prefix:"b." () in
@@ -2755,35 +2738,27 @@ index 4c1a06ecaa..a83bde8cb0 100644
 +      Mina_caqti.find_opt_req
 +        Caqti_type.(t2 string int64)
          typ
-         (sprintf
-            {|
-@@ -521,9 +521,9 @@ module Sql = struct
+         [%string
+           {|
+@@ -217,7 +217,7 @@ module Sql = struct
  
      let query_by_id =
        let b_fields = block_fields ~prefix:"b." () in
 -      Caqti_request.find_opt Caqti_type.int typ
--        (sprintf
--           {|
 +      Mina_caqti.find_opt_req Caqti_type.int typ
-+      (sprintf
-+        {|
+         [%string
+           {|
           SELECT b.id,
-                 %s,
-                 pk.value as creator,
-@@ -539,9 +539,9 @@ module Sql = struct
+@@ -234,7 +234,7 @@ module Sql = struct
  
      let query_best =
        let b_fields = block_fields ~prefix:"b." () in
 -      Caqti_request.find_opt Caqti_type.unit typ
--        (sprintf
--           {|
 +      Mina_caqti.find_opt_req Caqti_type.unit typ
-+      (sprintf
-+        {|
+         [%string
+           {|
           SELECT b.id,
-                 %s,
-                 pk.value as creator,
-@@ -578,7 +578,7 @@ module Sql = struct
+@@ -272,7 +272,7 @@ module Sql = struct
            else
              let%bind max_height =
                Conn.find
@@ -2792,155 +2767,84 @@ index 4c1a06ecaa..a83bde8cb0 100644
                     {sql| SELECT MAX(height) FROM blocks |sql} )
                  ()
              in
-@@ -635,21 +635,16 @@ module Sql = struct
+@@ -323,8 +323,7 @@ module Sql = struct
  
      let typ =
        Caqti_type.(
 -        tup3 int Archive_lib.Processor.User_command.Signed_command.typ
-+        t3 int Archive_lib.Processor.User_command.Signed_command.typ
-           Extras.typ)
+-          Extras.typ)
++        t3 int Archive_lib.Processor.User_command.Signed_command.typ Extras.typ)
+ 
+     let fields =
+       String.concat ~sep:","
+@@ -333,8 +332,8 @@ module Sql = struct
+            Archive_lib.Processor.User_command.Signed_command.Fields.names
  
      let query =
-       let fields =
--        String.concat ~sep:","
--        @@ List.map
--             ~f:(fun n -> "u." ^ n)
--             Archive_lib.Processor.User_command.Signed_command.Fields.names
--      in
 -      Caqti_request.collect
 -        Caqti_type.(tup2 int string)
--        typ
--        (sprintf
--           {|
-+        String.concat ~sep:"," @@ List.map ~f:(fun n -> "u." ^ n)
-+          Archive_lib.Processor.User_command.Signed_command.Fields.names in
-+      Mina_caqti.collect_req Caqti_type.(t2 int string) typ
-+      (sprintf
-+        {|
-          SELECT u.id,
-                 %s,
-                 pk_payer.value as fee_payer,
-@@ -712,25 +707,20 @@ module Sql = struct
++      Mina_caqti.collect_req
++        Caqti_type.(t2 int string)
+         typ
+         [%string
+           {|
+@@ -541,7 +540,7 @@ module Sql = struct
  
-       let secondary_sequence_no (_, _, _, secondary_seq_no) = secondary_seq_no
+     let run (module Conn : Caqti_async.CONNECTION) id =
+       Conn.collect_list
+-        (Caqti_request.collect Caqti_type.(tup2 int string) typ query)
++        (Mina_caqti.collect_req Caqti_type.(t2 int string) typ query)
+         (id, Mina_base.Token_id.(to_string default))
  
--      let typ = Caqti_type.(tup4 (option int64) string int int)
-+      let typ = Caqti_type.(t4 (option int64) string int int)
-     end
- 
-     let typ =
-       Caqti_type.(
--        tup3 int Archive_lib.Processor.Internal_command.typ Extras.typ)
-+        t3 int Archive_lib.Processor.Internal_command.typ Extras.typ)
+     let to_info t =
+@@ -682,7 +681,7 @@ module Sql = struct
+       |}]
  
      let query =
-       let fields =
--        String.concat ~sep:","
--        @@ List.map
--             ~f:(fun n -> "i." ^ n)
--             Archive_lib.Processor.Internal_command.Fields.names
--      in
--      Caqti_request.collect
--        Caqti_type.(tup2 int string)
--        typ
--        (sprintf
--           {|
-+        String.concat ~sep:"," @@ List.map ~f:(fun n -> "i." ^ n)
-+          Archive_lib.Processor.Internal_command.Fields.names in
-+      Mina_caqti.collect_req Caqti_type.(t2 int string) typ
-+      (sprintf
-+        {|
-          SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no)
-            i.id,
-            %s,
-@@ -813,10 +803,10 @@ module Sql = struct
-             ]
-     end
+-      Caqti_request.collect Caqti_type.(tup2 int string) typ query_string
++      Mina_caqti.collect_req Caqti_type.(t2 int string) typ query_string
  
--    let typ = Caqti_type.(tup2 int Extras.typ)
-+    let typ = Caqti_type.(t2 int Extras.typ)
- 
-     let query =
--      Caqti_request.collect Caqti_type.int typ
-+      Mina_caqti.collect_req Caqti_type.int typ
-         {| 
-          SELECT zc.id,
-                 zc.memo,
-@@ -857,20 +847,15 @@ module Sql = struct
- 
-     let typ =
-       Caqti_type.(
--        tup2 Archive_lib.Processor.Zkapp_account_update_body.typ Extras.typ)
-+        t2 Archive_lib.Processor.Zkapp_account_update_body.typ Extras.typ)
- 
-     let query =
-       let fields =
--        String.concat ~sep:","
--        @@ List.map
--             ~f:(fun n -> "zaub." ^ n)
--             Archive_lib.Processor.Zkapp_account_update_body.Fields.names
--      in
--      Caqti_request.collect
--        Caqti_type.(tup3 int string int)
--        typ
--        (sprintf
--           {|
-+        String.concat ~sep:"," @@ List.map ~f:(fun n -> "zaub." ^ n)
-+          Archive_lib.Processor.Zkapp_account_update_body.Fields.names in
-+      Mina_caqti.collect_req Caqti_type.(t3 int string int) typ
-+      (sprintf
-+        {|
-          SELECT %s,
-                 pk.value as account,
-                 bzc.status
+     let run (module Conn : Caqti_async.CONNECTION) id =
+       Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
 diff --git a/src/app/rosetta/lib/construction.ml b/src/app/rosetta/lib/construction.ml
-index 90297f8b17..af035097f8 100644
+index 90297f8b17..753f4e1f88 100644
 --- a/src/app/rosetta/lib/construction.ml
 +++ b/src/app/rosetta/lib/construction.ml
-@@ -866,7 +866,9 @@ module Submit = struct
+@@ -866,7 +866,7 @@ module Submit = struct
          Caqti_type.custom ~encode ~decode (to_rep spec)
  
        let query =
 -        Caqti_request.find_opt params_typ Caqti_type.string
-+        Mina_caqti.find_opt_req
-+          params_typ
-+          Caqti_type.string
++        Mina_caqti.find_opt_req params_typ Caqti_type.string
            {sql| SELECT uc.id FROM user_commands uc
                  INNER JOIN public_keys AS pks ON pks.id = uc.source_id
                  INNER JOIN public_keys AS pkr ON pkr.id = uc.receiver_id
 diff --git a/src/app/rosetta/lib/network.ml b/src/app/rosetta/lib/network.ml
-index 420d3569ac..01a963e7af 100644
+index 420d3569ac..f7a5a8a247 100644
 --- a/src/app/rosetta/lib/network.ml
 +++ b/src/app/rosetta/lib/network.ml
-@@ -75,10 +75,9 @@ end
+@@ -75,8 +75,8 @@ end
  
  module Sql = struct
    let oldest_block_query =
 -    Caqti_request.find Caqti_type.unit
 -      Caqti_type.(tup2 int64 string)
--      "SELECT height, state_hash FROM blocks ORDER BY timestamp ASC, \
--       state_hash ASC LIMIT 1"
 +    Mina_caqti.find_req Caqti_type.unit
 +      Caqti_type.(t2 int64 string)
-+      "SELECT height, state_hash FROM blocks ORDER BY timestamp ASC, state_hash ASC LIMIT 1"
+       "SELECT height, state_hash FROM blocks ORDER BY timestamp ASC, \
+        state_hash ASC LIMIT 1"
  
-   let max_height_delta =
-     match Sys.getenv "MINA_ROSETTA_MAX_HEIGHT_DELTA" with
-@@ -88,10 +87,10 @@ module Sql = struct
+@@ -88,8 +88,8 @@ module Sql = struct
          0L
  
    let latest_block_query =
 -    Caqti_request.find Caqti_type.unit
 -      Caqti_type.(tup3 int64 string int64)
--      (sprintf
--         {sql| SELECT height, state_hash, timestamp FROM blocks b
-+    Mina_caqti.find_req
-+      Caqti_type.unit
++    Mina_caqti.find_req Caqti_type.unit
 +      Caqti_type.(t3 int64 string int64)
-+      (sprintf {sql| SELECT height, state_hash, timestamp FROM blocks b
+       (sprintf
+          {sql| SELECT height, state_hash, timestamp FROM blocks b
                       WHERE height = (select MAX(height) - %Ld FROM blocks)
-                      ORDER BY timestamp ASC, state_hash ASC
-                      LIMIT 1
 diff --git a/src/app/rosetta/lib/pg_data.ml b/src/app/rosetta/lib/pg_data.ml
 index 15065b1fa3..699b661aa4 100644
 --- a/src/app/rosetta/lib/pg_data.ml
@@ -2964,21 +2868,58 @@ index 15065b1fa3..699b661aa4 100644
                WHERE mode = 'SIReadLock'
          |sql}
 diff --git a/src/app/rosetta/lib/rosetta.ml b/src/app/rosetta/lib/rosetta.ml
-index c1e675b34a..965e68e2a7 100644
+index 135235db65..07b14fb095 100644
 --- a/src/app/rosetta/lib/rosetta.ml
 +++ b/src/app/rosetta/lib/rosetta.ml
-@@ -187,7 +187,10 @@ let command =
+@@ -190,7 +190,14 @@ let command =
                "MINA_ROSETTA_MAX_DB_POOL_SIZE not set or invalid. Please set \
                 this to a number (try 64 or 128)"
          in
 -        match Caqti_async.connect_pool ~max_size:max_pool_size archive_uri with
-+        match Caqti_async.connect_pool       ~pool_config:
-+        Caqti_pool_config.(
-+          merge_left (default_from_env ()) (create ~max_size:max_pool_size ()))
-+ archive_uri with
++        match
++          Caqti_async.connect_pool
++            ~pool_config:
++              Caqti_pool_config.(
++                merge_left (default_from_env ())
++                  (create ~max_size:max_pool_size ()))
++            archive_uri
++        with
          | Error e ->
              [%log error]
                ~metadata:[ ("error", `String (Caqti_error.show e)) ]
+diff --git a/src/app/rosetta/lib/search.ml b/src/app/rosetta/lib/search.ml
+index a4d16f4921..31e44a46aa 100644
+--- a/src/app/rosetta/lib/search.ml
++++ b/src/app/rosetta/lib/search.ml
+@@ -418,8 +418,8 @@ module Sql = struct
+       in
+       let offset = offset_sql offset in
+       let limit = limit_sql limit in
+-      Caqti_request.collect Params.typ
+-        Caqti_type.(tup2 int64 typ)
++      Mina_caqti.collect_req Params.typ
++        Caqti_type.(t2 int64 typ)
+         [%string
+           {sql|
+           WITH filtered_ids AS (
+@@ -783,7 +783,7 @@ module Sql = struct
+       in
+       match%map
+         Conn.collect_list
+-          (Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ) query)
++          (Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ) query)
+           params
+       with
+       | [] ->
+@@ -939,7 +939,7 @@ module Sql = struct
+           ~address_fields:[ "pk_fee_payer.value"; "pk_update_body.value" ]
+           ~op_type_filters operator
+       in
+-      Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ)
++      Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ)
+       @@ query_string ~offset ~limit ~filters
+ 
+     let run (module Conn : Caqti_async.CONNECTION) ~offset ~limit input =
 diff --git a/src/app/swap_bad_balances/sql.ml b/src/app/swap_bad_balances/sql.ml
 index 82ec136a10..d8d6172857 100644
 --- a/src/app/swap_bad_balances/sql.ml
