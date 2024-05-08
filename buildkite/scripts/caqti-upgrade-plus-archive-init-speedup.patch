@@ -5350,19 +5350,12 @@ index 135235db65..459befd8ec 100644
            (fun db ->
              let open Deferred.Result.Let_syntax in
              let%bind num_conns = Pg_data.run_connection_count db () in
-@@ -190,7 +190,14 @@ let command =
+@@ -190,7 +190,7 @@ let command =
                "MINA_ROSETTA_MAX_DB_POOL_SIZE not set or invalid. Please set \
                 this to a number (try 64 or 128)"
          in
 -        match Caqti_async.connect_pool ~max_size:max_pool_size archive_uri with
-+        match
-+          Mina_caqti.connect_pool
-+            ~pool_config:
-+              Caqti_pool_config.(
-+                merge_left (default_from_env ())
-+                  (create ~max_size:max_pool_size ()))
-+            archive_uri
-+        with
++        match Mina_caqti.connect_pool ~max_size:max_pool_size archive_uri with
          | Error e ->
              [%log error]
                ~metadata:[ ("error", `String (Caqti_error.show e)) ]
