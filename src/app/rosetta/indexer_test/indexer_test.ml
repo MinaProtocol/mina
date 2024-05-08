@@ -256,46 +256,6 @@ module Test_values = struct
       in
       Int64.gen_incl 1L max_height
   end
-
-  module Offset_limit = struct
-    type t = { offset : int; limit : int } [@@deriving make]
-
-    let offset_generator = Int.gen_incl 1 100
-
-    let limit_generator = Int.gen_incl 1 50
-  end
-
-  module Filter = struct
-    type t = Lib.Search.Transaction_query.Filter.t
-
-    let deferred_generator kind db =
-      let open Deferred.Result.Let_syntax in
-      let%bind txn_hash_generator = Txn_hash.deferred_generator kind db in
-      let%bind account_identifier_generator =
-        Account_identifier.deferred_generator kind db
-      in
-      let%bind op_status_generator = Op_status.deferred_generator kind db in
-      let%bind success_generator = Success.deferred_generator kind db in
-      let%bind address_generator = Address.deferred_generator kind db in
-      let%map op_type_generator = Op_type.deferred_generator kind db in
-      let open Quickcheck.Generator.Let_syntax in
-      let%bind transaction_hash = txn_hash_generator in
-      let%bind account_identifier =
-        let%map `Pk address, `Token_id token_id =
-          account_identifier_generator
-        in
-        { Lib.Search.Transaction_query.Filter.address; token_id }
-      in
-      let%bind op_status' = op_status_generator in
-      let op_status =
-        match op_status' with `Failed -> "failed" | `Success -> "applied"
-      in
-      let%bind success = success_generator in
-      let%bind (`Pk address) = address_generator in
-      let%map op_type = op_type_generator in
-      Lib.Search.Transaction_query.Filter.make ~transaction_hash
-        ~account_identifier ~op_status ~success ~address ~op_type ()
-  end
 end
 
 let hash_of_info (type a) : a info_t -> string = function
@@ -315,7 +275,7 @@ let to_info' (type a) : a command_t -> a info_t = function
       User_command_info
         ( ok_or_failwith Rosetta_lib.Errors.show
         @@ Lib.Search.Sql.User_commands.to_info command )
-  | Zkapp_command command ->
+  | Zkapp_command _ ->
       failwith "Zkapp command not supported"
 
 let to_info (type a) : a command_t list -> a info_t list = function
@@ -369,11 +329,10 @@ struct
 
   let check_condition value infos =
     let open Deferred.Let_syntax in
-    let open Alcotest in
     let%map result =
       Deferred.List.find infos ~f:(fun info ->
           let%map v = of_info info in
-          not (List.exists v ~f:(I.check value)) )
+          not (List.exists v ~f:(check value)) )
     in
     Option.value_map result ~default:() ~f:(fun info ->
         failwith [%string "hash: %{hash_of_info info}\nno value matches filter"] )
@@ -576,9 +535,7 @@ module Op_status =
                   `Failed )
           ]
 
-      let of_internal_command_info { Lib.Search.Internal_command_info.info; _ }
-          =
-        Deferred.return [ `Success ]
+      let of_internal_command_info _ = Deferred.return [ `Success ]
 
       let of_zkapp_command_info { Lib.Search.Zkapp_command_info.info; _ } =
         Deferred.return
@@ -611,9 +568,7 @@ module Success =
                   false )
           ]
 
-      let of_internal_command_info { Lib.Search.Internal_command_info.info; _ }
-          =
-        Deferred.return [ true ]
+      let of_internal_command_info _ = Deferred.return [ true ]
 
       let of_zkapp_command_info { Lib.Search.Zkapp_command_info.info; _ } =
         Deferred.return
@@ -676,7 +631,7 @@ module Op_type =
           ()
 
       let of_operations =
-        List.map ~f:(fun { Rosetta_models.Operation._type } ->
+        List.map ~f:(fun { Rosetta_models.Operation._type; _ } ->
             Rosetta_lib.Operation_types.of_name_exn _type )
 
       let of_user_command_info { Lib.Search.User_command_info.info; _ } =
@@ -736,7 +691,7 @@ module Max_block =
     end)
 
 module Offset_limit = struct
-  type t = { offset : int; limit : int } [@@deriving make]
+  type t = { offset : int; limit : int }
 
   let offset_generator = Int.gen_incl 1 100
 
