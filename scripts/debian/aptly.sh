@@ -184,9 +184,6 @@ function install_help(){
 }
 
 function install(){
-    if [[ ${#} == 0 ]]; then
-        install_help;
-    fi
 
     while [ ${#} -gt 0 ]; do
         case $1 in
