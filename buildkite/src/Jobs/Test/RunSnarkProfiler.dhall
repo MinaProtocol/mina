@@ -24,9 +24,9 @@ in
 let buildTestCmd : Size -> List Command.TaggedKey.Type -> Command.Type = \(cmd_target : Size) -> \(dependsOn : List Command.TaggedKey.Type) ->
   Command.build
     Command.Config::{
-      commands = [
+      commands = 
         RunInToolchain.runInToolchain ([] : List Text) "buildkite/scripts/run-snark-transaction-profiler.sh"
-      ],
+      ,
       label = "Snark Transaction Profiler",
       key = "snark-transaction-profiler",
       target = cmd_target,
