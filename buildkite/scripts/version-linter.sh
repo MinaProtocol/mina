@@ -34,6 +34,7 @@ echo "--- Install Mina"
 source buildkite/scripts/export-git-env-vars.sh
 TESTNET_NAME="berkeley"
 DEBS="mina-${TESTNET_NAME}"
+USE_SUDO="1"
 source buildkite/scripts/debian/install.sh 
 
 

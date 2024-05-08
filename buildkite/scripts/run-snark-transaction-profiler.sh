@@ -14,6 +14,7 @@ git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh
 
 DEBS="mina-${TESTNET_NAME}"
+USE_SUDO="1"
 source buildkite/scripts/debian/install.sh 
 
 K=1

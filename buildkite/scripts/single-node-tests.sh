@@ -13,6 +13,7 @@ git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh
 
 DEBS="mina-test-suite,mina-berkeley-lightnet"
+USE_SUDO="1"
 source buildkite/scripts/debian/install.sh 
 
 export MINA_LIBP2P_PASS="naughty blue worm"
