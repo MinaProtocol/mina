@@ -14,7 +14,7 @@
   ;; local libraries
   genesis_constants
   mina_base
-  mina_base_test_helpers
+  mina_base.test_helpers
   mina_generators
   mina_ledger
   mina_ledger_test_helpers
