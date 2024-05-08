@@ -75,5 +75,6 @@
    ppx_custom_printf
    h_list.ppx
    graphql_ppx
+   ppx_string
    --
    %{read-lines:../../../graphql-ppx-config.inc})))

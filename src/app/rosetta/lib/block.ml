@@ -103,10 +103,10 @@ module Sql = struct
         (* The archive database will only reconcile the canonical columns for
          * blocks older than k + epsilon
          *)
-        (sprintf
-           {|
+        [%string
+          {|
          SELECT c.id,
-                %s,
+                %{c_fields},
                 pk.value as creator,
                 bw.value as winner
          FROM blocks c
@@ -116,8 +116,7 @@ module Sql = struct
            ON bw.id = c.block_winner_id
          WHERE c.height = ?
            AND c.chain_status = 'canonical'
-        |}
-           c_fields )
+        |}]
 
     let query_height_pending =
       let fields = block_fields () in
@@ -136,10 +135,10 @@ module Sql = struct
          * + epsilon)
          * requests since recursive queries stress PostgreSQL.
          *)
-        (sprintf
-           {|
+        [%string
+          {|
          WITH RECURSIVE chain AS (
-           (SELECT id, %s
+           (SELECT id, %{fields}
            FROM blocks
            WHERE height = (select MAX(height) from blocks)
            ORDER BY timestamp ASC, state_hash ASC
@@ -147,7 +146,7 @@ module Sql = struct
 
          UNION ALL
 
-           SELECT b.id, %s
+           SELECT b.id, %{b_fields}
            FROM blocks b
            INNER JOIN chain
              ON b.id = chain.parent_id
@@ -155,7 +154,7 @@ module Sql = struct
              AND chain.chain_status <> 'canonical')
 
          SELECT c.id,
-                %s,
+                %{c_fields},
                 pk.value as creator,
                 bw.value as winner
          FROM chain c
@@ -164,16 +163,15 @@ module Sql = struct
          INNER JOIN public_keys bw
            ON bw.id = c.block_winner_id
          WHERE c.height = ?
-       |}
-           fields b_fields c_fields )
+       |}]
 
     let query_hash =
       let b_fields = block_fields ~prefix:"b." () in
       Caqti_request.find_opt Caqti_type.string typ
-        (sprintf
-           {|
+        [%string
+          {|
          SELECT b.id,
-                %s,
+                %{b_fields},
                 pk.value as creator,
                 bw.value as winner
          FROM blocks b
@@ -182,18 +180,17 @@ module Sql = struct
          INNER JOIN public_keys bw
          ON bw.id = b.block_winner_id
          WHERE b.state_hash = ?
-        |}
-           b_fields )
+        |}]
 
     let query_both =
       let b_fields = block_fields ~prefix:"b." () in
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         typ
-        (sprintf
-           {|
+        [%string
+          {|
          SELECT b.id,
-                %s,
+                %{b_fields},
                 pk.value as creator,
                 bw.value as winner
          FROM blocks b
@@ -203,16 +200,15 @@ module Sql = struct
            ON bw.id = b.block_winner_id
          WHERE b.state_hash = ?
            AND b.height = ?
-        |}
-           b_fields )
+        |}]
 
     let query_by_id =
       let b_fields = block_fields ~prefix:"b." () in
       Caqti_request.find_opt Caqti_type.int typ
-        (sprintf
-           {|
+        [%string
+          {|
          SELECT b.id,
-                %s,
+                %{b_fields},
                 pk.value as creator,
                 bw.value as winner
          FROM blocks b
@@ -221,16 +217,15 @@ module Sql = struct
          INNER JOIN public_keys bw
            ON bw.id = b.block_winner_id
          WHERE b.id = ?
-        |}
-           b_fields )
+        |}]
 
     let query_best =
       let b_fields = block_fields ~prefix:"b." () in
       Caqti_request.find_opt Caqti_type.unit typ
-        (sprintf
-           {|
+        [%string
+          {|
          SELECT b.id,
-                %s,
+                %{b_fields},
                 pk.value as creator,
                 bw.value as winner
          FROM blocks b
@@ -241,8 +236,7 @@ module Sql = struct
          WHERE b.height = (select MAX(b.height) from blocks b)
          ORDER BY timestamp ASC, state_hash ASC
          LIMIT 1
-        |}
-           b_fields )
+        |}]
 
     let run_by_id (module Conn : Caqti_async.CONNECTION) id =
       Conn.find_opt query_by_id id
@@ -335,10 +329,10 @@ module Sql = struct
       Caqti_request.collect
         Caqti_type.(tup2 int string)
         typ
-        (sprintf
-           {|
+        [%string
+          {|
          SELECT u.id,
-                %s,
+                %{fields},
                 pk_payer.value as fee_payer,
                 pk_source.value as source,
                 pk_receiver.value as receiver,
@@ -382,8 +376,7 @@ module Sql = struct
            ON t.id = ai_receiver.token_id
          WHERE buc.block_id = ?
            AND (t.value = ? OR t.id IS NULL)
-        |}
-           fields )
+        |}]
 
     let run (module Conn : Caqti_async.CONNECTION) id =
       Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
@@ -416,11 +409,11 @@ module Sql = struct
       Caqti_request.collect
         Caqti_type.(tup2 int string)
         typ
-        (sprintf
-           {|
+        [%string
+          {|
          SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no)
            i.id,
-           %s,
+           %{fields},
            ac.creation_fee,
            pk.value as receiver,
            bic.sequence_no,
@@ -455,8 +448,7 @@ module Sql = struct
            ON t.id = ai.token_id
          WHERE bic.block_id = ?
           AND t.value = ?
-      |}
-           fields )
+      |}]
 
     let run (module Conn : Caqti_async.CONNECTION) id =
       Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
@@ -556,9 +548,9 @@ module Sql = struct
       Caqti_request.collect
         Caqti_type.(tup3 int string int)
         typ
-        (sprintf
-           {|
-         SELECT %s,
+        [%string
+          {|
+         SELECT %{fields},
                 pk.value as account,
                 bzc.status
          FROM zkapp_commands zc
@@ -577,8 +569,7 @@ module Sql = struct
          WHERE zc.id = ?
            AND t.value = ?
            AND bzc.block_id = ?
-    |}
-           fields )
+    |}]
 
     let run (module Conn : Caqti_async.CONNECTION) command_id block_id =
       Conn.collect_list query
