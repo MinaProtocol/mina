@@ -620,8 +620,7 @@ module Sql = struct
 
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-          Caqti_type.
-            [ Archive_lib.Processor.Zkapp_account_update_body.typ; Extras.typ ]
+          [ Archive_lib.Processor.Zkapp_account_update_body.typ; Extras.typ ]
     end
 
     type t =
@@ -731,11 +730,7 @@ module Sql = struct
     end
 
     let to_account_update_info
-        { zkapp_command = cmd
-        ; zkapp_command_extras = cmd_extras
-        ; zkapp_account_update
-        ; _
-        } =
+        { zkapp_command_extras = cmd_extras; zkapp_account_update; _ } =
       Option.map zkapp_account_update
         ~f:(fun { body = upd; extras = upd_extras } ->
           (* TODO: check if this holds *)

@@ -201,7 +201,7 @@ module Sql = struct
       in
       custom_type ~to_hlist ~of_hlist spec
 
-    let of_query { max_block; offset; limit; Transaction_query.filter; _ } =
+    let of_query { max_block; Transaction_query.filter; _ } =
       let account_address, account_token_id =
         Option.value_map filter.Transaction_query.Filter.account_identifier
           ~default:(None, None) ~f:(fun { address; token_id } ->
@@ -826,7 +826,7 @@ module Sql = struct
 
     let typ =
       Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-        Caqti_type.[ Rosetta_lib_block.Sql.Zkapp_commands.typ; Extras.typ ]
+        [ Rosetta_lib_block.Sql.Zkapp_commands.typ; Extras.typ ]
 
     let filtered_ids_cte_string ~filters =
       [%string
