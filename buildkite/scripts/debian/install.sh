@@ -5,9 +5,7 @@ if [ -z $MINA_DEB_CODENAME ]; then
     exit -1
 fi
 
-
 LOCAL_DEB_FOLDER=_build
-
 source ./buildkite/scripts/export-git-env-vars.sh
 
 # Download required debians from bucket locally
@@ -24,7 +22,7 @@ else
       ;;
       mina-create-legacy-genesis)
         # Download locally static debians (for example mina-legacy-create-genesis )
-        gsutil -m cp "gs://buildkite_k8s/coda/shared/debs/$MINA_DEB_CODENAME/$i*" $LOCAL_DEB_FOLDER
+        wget -m cp "gs://buildkite_k8s/coda/shared/debs/$MINA_DEB_CODENAME/$i*" $LOCAL_DEB_FOLDER
       ;;
     esac
     source ./buildkite/scripts/download-artifact-from-cache.sh "${i}_*" $MINA_DEB_CODENAME/_build "" "_build"
@@ -32,8 +30,13 @@ else
 fi
 
 # Install aptly
-apt-get update 
-apt-get install aptly
+if [ -n $USE_SUDO ]; then
+  sudo apt-get update 
+  sudo apt-get install aptly
+else
+  apt-get update 
+  apt-get install aptly
+fi
 
 # Start aptly
 source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians _build --component unstable --clean --background
@@ -41,8 +44,15 @@ source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians _
 # Install debians
 echo "Installing mina packages: $DEBS"
 echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | sudo tee /etc/apt/sources.list.d/mina.list
-sudo apt-get update --yes
-sudo apt-get install --yes --allow-downgrades "${arr_of_debs[@]}"
+
+if [ -n $USE_SUDO ]; then
+  sudo apt-get update --yes
+  sudo apt-get install --yes --allow-downgrades "${arr_of_debs[@]}"
+else
+  apt-get update --yes
+  apt-get install --yes --allow-downgrades "${arr_of_debs[@]}"
+fi
+
 
 
 # Cleaning up

@@ -13,7 +13,7 @@ TESTNET_NAME="berkeley"
 git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh
 
-DEBS="mina-${TESTNET_VERSION_NAME}"
+DEBS="mina-${TESTNET_NAME}"
 source buildkite/scripts/debian/install.sh 
 
 MINA_COMMIT_SHA1=$(git log -n 1 --format=%h --abbrev=7 --no-merges)

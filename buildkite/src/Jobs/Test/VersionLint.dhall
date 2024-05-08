@@ -24,15 +24,9 @@ let buildTestCmd : Text -> Size -> List Command.TaggedKey.Type -> Command.Type =
   Command.build
     Command.Config::{
       commands =  [
-        Cmd.runInDocker
-            Cmd.Docker::{
-              image = (../../Constants/ContainerImages.dhall).ubuntu2004
-            } "buildkite/scripts/dump-mina-type-shapes.sh",
+        RunInToolchain.runInToolchain ([] : List Text) "buildkite/scripts/dump-mina-type-shapes.sh",
         Cmd.run "gsutil cp $(git log -n 1 --format=%h --abbrev=7 --no-merges)-type_shape.txt $MINA_TYPE_SHAPE gs://mina-type-shapes",
-        Cmd.runInDocker
-            Cmd.Docker::{
-              image = (../../Constants/ContainerImages.dhall).ubuntu2004
-            } "buildkite/scripts/version-linter.sh ${release_branch}"
+        RunInToolchain.runInToolchain ([] : List Text) "buildkite/scripts/version-linter.sh ${release_branch}"
       ],
       label = "Versioned type linter",
       key = "version-linter",
