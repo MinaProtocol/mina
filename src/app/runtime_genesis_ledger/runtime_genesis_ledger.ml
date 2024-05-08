@@ -79,13 +79,12 @@ let is_dirty_proof = function
 
 let extract_accounts_exn = function
   | { Runtime_config.Ledger.base = Accounts accounts
+    ; num_accounts = None
     ; balances = []
+    ; hash = _
+    ; name = None
     ; add_genesis_winner = Some false
-    ; _
-    }
-  | { Runtime_config.Ledger.base = Accounts accounts
-    ; balances = []
-    ; add_genesis_winner = None
+    ; s3_data_hash = _
     } ->
       accounts
   | _ ->

@@ -16,6 +16,6 @@ Pipeline.build
             artifacts = [ Artifacts.Type.ArchiveMigration ],
             prefix = "MinaArtifactMigration",
             debVersion = DebianVersions.DebVersion.Focal,
-            toolchainSelectMode = (Toolchain.SelectionMode.Custom ContainerImages.minaCaqtiToolchain )
+            toolchainSelectMode = (Toolchain.SelectionMode.ByDebian )
         }
     )

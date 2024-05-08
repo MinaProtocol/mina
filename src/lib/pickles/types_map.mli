@@ -11,10 +11,12 @@ module Basic : sig
     ; branches : 'n2 Pickles_types.Nat.t
     ; wrap_domains : Import.Domains.t
     ; wrap_key :
-        Backend.Tick.Inner_curve.Affine.t
+        Backend.Tick.Inner_curve.Affine.t array
         Pickles_types.Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+    ; num_chunks : int
+    ; zk_rows : int
     }
 end
 
@@ -35,8 +37,10 @@ module Side_loaded : sig
       { max_proofs_verified :
           (module Pickles_types.Nat.Add.Intf with type n = 'n1)
       ; public_input : ('var, 'value) Impls.Step.Typ.t
-      ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+      ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
       ; branches : 'n2 Pickles_types.Nat.t
+      ; num_chunks : int
+      ; zk_rows : int
       }
   end
 
@@ -58,7 +62,9 @@ module Compiled : sig
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; wrap_domains : Import.Domains.t
     ; step_domains : (Import.Domains.t, 'branches) Pickles_types.Vector.t
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+    ; num_chunks : int
+    ; zk_rows : int
     }
 
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
@@ -69,13 +75,15 @@ module Compiled : sig
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; wrap_key :
-        Backend.Tick.Inner_curve.Affine.t
+        Backend.Tick.Inner_curve.Affine.t array
         Pickles_types.Plonk_verification_key_evals.t
         Lazy.t
     ; wrap_vk : Impls.Wrap.Verification_key.t Lazy.t
     ; wrap_domains : Import.Domains.t
     ; step_domains : (Import.Domains.t, 'branches) Pickles_types.Vector.t
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+    ; num_chunks : int
+    ; zk_rows : int
     }
 end
 
@@ -88,7 +96,8 @@ module For_step : sig
         [ `Known of (Impls.Step.Field.t, 'branches) Pickles_types.Vector.t
         | `Side_loaded ]
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; wrap_key : inner_curve_var Pickles_types.Plonk_verification_key_evals.t
+    ; wrap_key :
+        inner_curve_var array Pickles_types.Plonk_verification_key_evals.t
     ; wrap_domain :
         [ `Known of Import.Domain.t
         | `Side_loaded of
@@ -96,7 +105,9 @@ module For_step : sig
     ; step_domains :
         [ `Known of (Import.Domains.t, 'branches) Pickles_types.Vector.t
         | `Side_loaded ]
-    ; feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t
+    ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
+    ; num_chunks : int
+    ; zk_rows : int
     }
 
   val of_side_loaded : ('a, 'b, 'c, 'd) Side_loaded.t -> ('a, 'b, 'c, 'd) t
@@ -126,7 +137,9 @@ val max_proofs_verified :
      ('a, 'b, 'n1, 'c) Tag.t
   -> (module Pickles_types.Nat.Add.Intf with type n = 'n1)
 
-val feature_flags : _ Tag.t -> Plonk_types.Opt.Flag.t Plonk_types.Features.t
+val feature_flags : _ Tag.t -> Opt.Flag.t Plonk_types.Features.Full.t
+
+val num_chunks : _ Tag.t -> int
 
 val add_exn :
   ('var, 'value, 'c, 'd) Tag.t -> ('var, 'value, 'c, 'd) Compiled.t -> unit

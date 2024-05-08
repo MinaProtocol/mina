@@ -1,7 +1,6 @@
 open Core_kernel
 open Pickles_types
 open Hlist
-open Common
 open Import
 
 (* The data obtained from "compiling" an inductive rule into a circuit. *)
@@ -71,11 +70,10 @@ type ( 'a_var
 
 (* Compile an inductive rule. *)
 let create
-    (type branches max_proofs_verified local_signature local_branches var value
-    a_var a_value ret_var ret_value prev_vars prev_values ) ~index
-    ~(self : (var, value, max_proofs_verified, branches) Tag.t) ~wrap_domains
-    ~(feature_flags : Plonk_types.Opt.Flag.t Plonk_types.Features.t)
-    ~(actual_feature_flags : bool Plonk_types.Features.t)
+    (type branches max_proofs_verified var value a_var a_value ret_var ret_value)
+    ~index ~(self : (var, value, max_proofs_verified, branches) Tag.t)
+    ~wrap_domains ~(feature_flags : Opt.Flag.t Plonk_types.Features.Full.t)
+    ~num_chunks ~(actual_feature_flags : bool Plonk_types.Features.t)
     ~(max_proofs_verified : max_proofs_verified Nat.t)
     ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
     ~(public_input :
@@ -85,8 +83,8 @@ let create
        , a_value
        , ret_var
        , ret_value )
-       Inductive_rule.public_input ) ~auxiliary_typ var_to_field_elements
-    value_to_field_elements (rule : _ Inductive_rule.t) =
+       Inductive_rule.public_input ) ~auxiliary_typ _var_to_field_elements
+    _value_to_field_elements (rule : _ Inductive_rule.t) =
   Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
   let (T (self_width, proofs_verified)) = HT.length rule.prevs in
@@ -143,6 +141,14 @@ let create
         ; wrap_domains
         ; step_domains
         ; feature_flags
+        ; num_chunks
+        ; zk_rows =
+            ( match num_chunks with
+            | 1 ->
+                3
+            | num_chunks ->
+                let permuts = 7 in
+                ((2 * (permuts + 1) * num_chunks) - 1 + permuts) / permuts )
         }
       ~public_input ~auxiliary_typ ~self_branches:branches ~proofs_verified
       ~local_signature:widths ~local_signature_length ~local_branches:heights
@@ -158,10 +164,10 @@ let create
     in
     let etyp =
       Impls.Step.input ~proofs_verified:max_proofs_verified
-        ~wrap_rounds:Backend.Tock.Rounds.n ~feature_flags
+        ~wrap_rounds:Backend.Tock.Rounds.n
       (* TODO *)
     in
-    Fix_domains.domains
+    Fix_domains.domains ~feature_flags:actual_feature_flags
       (module Impls.Step)
       (T (Snarky_backendless.Typ.unit (), Fn.id, Fn.id))
       etyp main

@@ -62,4 +62,5 @@
    transition_handler
    snark_worker
    one_or_two
+   error_json
 ))

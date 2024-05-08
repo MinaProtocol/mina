@@ -155,7 +155,7 @@ groups:
     for: 1h
     labels:
       testnet: "{{ $labels.testnet }}"
-      severity: critical
+      severity: warning
     annotations:
       summary: "{{ $labels.testnet }} slot fill rate is critically low"
       description: "Lower fill rate of {{ $value }} than expected on network {{ $labels.testnet }}."
@@ -216,7 +216,7 @@ groups:
     expr: min by (testnet) ((time() - 1609459200) - Coda_Transaction_pool_useful_transactions_received_time_sec ${rule_filter}) >= 2 * 180
     labels:
       testnet: "{{ $labels.testnet }}"
-      severity: critical
+      severity: warning
     annotations:
       summary: "{{ $labels.testnet }}: no new transactions seen for 2 slots."
       description: "No node has received transactions in their transaction pool in the last 2 slots (6 minutes) on network {{ $labels.testnet }}."
@@ -254,25 +254,6 @@ groups:
       summary: "One or more {{ $labels.testnet }} nodes are stuck at an old block height (Observed block height did not increase in the last 30m)"
       description: "{{ $value }} blocks have been validated on network {{ $labels.testnet }} in the last hour (according to some node)."
       runbook: "https://www.notion.so/minaprotocol/FewBlocksPerHour-47a6356f093242d988b0d9527ce23478"
-
-  - alert: StuckInBootstrap
-    expr: count by (testnet) (increase(Coda_Runtime_process_uptime_ms_total{syncStatus = "BOOTSTRAP"}[2h]) >= 7200000) > 0
-    for: ${alert_evaluation_duration}
-    labels:
-      testnet: "{{ $labels.testnet }}"
-      severity: critical 
-    annotations:
-      summary: "One or more {{ $labels.testnet }} nodes are stuck at bootstrap for more than 2 hours"
-
-  - alert: StuckInCatchup 
-    expr: count by (testnet) (increase(Coda_Runtime_process_uptime_ms_total{syncStatus = "CATCHUP"}[2h]) >= 7200000) > 0
-    for: ${alert_evaluation_duration}
-    labels:
-      testnet: "{{ $labels.testnet }}"
-      severity: critical 
-    annotations:
-      summary: "One or more {{ $labels.testnet }} nodes are stuck at catchup for more than 2 hours"
-
 
 - name: Warnings
   rules:
@@ -550,7 +531,7 @@ groups:
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
-      severity: critical
+      severity: warning
     annotations:
       summary: "{{ $labels.testnet }} min density is critically low"
       description: "Critically low min density of {{ $value }} on network {{ $labels.testnet }}."
@@ -561,7 +542,7 @@ groups:
     for: 1h
     labels:
       testnet: "{{ $labels.testnet }}"
-      severity: critical
+      severity: warning
     annotations:
       summary: "{{ $labels.testnet }} slot fill rate is critically low"
       description: "Lower fill rate of {{ $value }} than expected on network {{ $labels.testnet }}."
@@ -622,7 +603,7 @@ groups:
     expr: min by (testnet) ((time() - 1609459200) - Coda_Transaction_pool_useful_transactions_received_time_sec {${berkeley_testnet},${synced_status_filter}} ) >= 2 * 180
     labels:
       testnet: "{{ $labels.testnet }}"
-      severity: critical
+      severity: warning
     annotations:
       summary: "{{ $labels.testnet }}: no new transactions seen for 2 slots."
       description: "No node has received transactions in their transaction pool in the last 2 slots (6 minutes) on network {{ $labels.testnet }}."
@@ -638,7 +619,25 @@ groups:
       summary: "One or more {{ $labels.testnet }} nodes are stuck at an old block height (Observed block height did not increase in the last 30m)"
       description: "{{ $value }} blocks have been validated on network {{ $labels.testnet }} in the last hour (according to some node)."
       runbook: "https://www.notion.so/minaprotocol/FewBlocksPerHour-47a6356f093242d988b0d9527ce23478"
- 
+
+  - alert: StuckInBootstrap
+    expr: max by (testnet) (increase(Coda_Runtime_process_uptime_ms_total{${berkeley_testnet},syncStatus = "BOOTSTRAP"}[2h])) >= 6000000
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "One or more {{ $labels.testnet }} nodes are stuck at bootstrap for more than 100 mins within the recent 2 hours"
+
+  - alert: StuckInCatchup
+    expr: max by (testnet) (increase(Coda_Runtime_process_uptime_ms_total{${berkeley_testnet},syncStatus = "CATCHUP"}[2h])) >= 6000000
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "One or more {{ $labels.testnet }} nodes are stuck at catchup for more than 100 mins within the recent 2 hours"
+
   - alert: HighBlockGossipLatency
     expr: max by (testnet) (max_over_time(Coda_Block_latency_gossip_time {${berkeley_testnet},${synced_status_filter}}  [${alert_timeframe}])) > 200
     for: ${alert_evaluation_duration}

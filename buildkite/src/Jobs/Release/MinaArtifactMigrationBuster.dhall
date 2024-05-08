@@ -15,7 +15,6 @@ Pipeline.build
         ArtifactPipelines.MinaBuildSpec::{
             artifacts = [ Artifacts.Type.ArchiveMigration ],
             prefix = "MinaArtifactMigration",
-            debVersion = DebianVersions.DebVersion.Buster,
-            toolchainSelectMode = (Toolchain.SelectionMode.Custom ContainerImages.minaCaqtiToolchainBuster )
+            debVersion = DebianVersions.DebVersion.Buster
         }
     )

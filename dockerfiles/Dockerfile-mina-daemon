@@ -69,6 +69,7 @@ RUN echo "Building image with version $deb_version from repo $deb_release $deb_c
   && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
   && apt-get install --quiet --yes --allow-downgrades "${MINA_DEB}=$deb_version" \
+  && apt-get install --quiet --yes --allow-downgrades "mina-create-legacy-genesis=1.4.0beta2-compatible-97f7d8c" \
   && rm -rf /var/lib/apt/lists/*
 
 

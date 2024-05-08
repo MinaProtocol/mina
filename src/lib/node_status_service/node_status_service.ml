@@ -71,7 +71,6 @@ type node_status_data =
   ; libp2p_output_bandwidth : float
   ; libp2p_cpu_usage : float
   ; commit_hash : string
-  ; git_branch : string
   ; chain_id : string
   ; peer_id : string
   ; ip_address : string
@@ -91,7 +90,6 @@ module Simplified = struct
   type t =
     { max_observed_block_height : int
     ; commit_hash : string
-    ; git_branch : string
     ; chain_id : string
     ; peer_id : string
     ; peer_count : int
@@ -259,7 +257,6 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~chain_id
             ; libp2p_output_bandwidth
             ; libp2p_cpu_usage
             ; commit_hash = Mina_version.commit_id
-            ; git_branch = Mina_version.branch
             ; chain_id
             ; peer_id =
                 (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
@@ -433,7 +430,6 @@ let start_simplified ~logger ~node_status_url ~chain_id ~network
        { Simplified.max_observed_block_height =
            !Mina_metrics.Transition_frontier.max_blocklength_observed
        ; commit_hash = Mina_version.commit_id
-       ; git_branch = Mina_version.branch
        ; chain_id
        ; peer_id = (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
        ; peer_count = List.length peers

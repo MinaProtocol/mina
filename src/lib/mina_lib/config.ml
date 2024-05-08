@@ -52,6 +52,7 @@ type t =
   ; start_time : Time.t
   ; precomputed_blocks_path : string option
   ; log_precomputed_blocks : bool
+  ; start_filtered_logs : string list
   ; upload_blocks_to_gcloud : bool
   ; block_reward_threshold : Currency.Amount.t option [@default None]
   ; node_status_url : string option [@default None]

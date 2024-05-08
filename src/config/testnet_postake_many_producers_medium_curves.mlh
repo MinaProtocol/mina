@@ -28,7 +28,6 @@
 
 [%%define print_versioned_types false]
 
-[%%define daemon_expiry "never"]
 [%%define test_full_epoch false]
 [%%import "/src/config/fork.mlh"]
 [%%import "/src/config/features/dev.mlh"]

@@ -1,9 +1,9 @@
 open Core
 
-let log_perm = 0o644
-
 module Dumb_logrotate = struct
   open Core.Unix
+
+  let log_perm = 0o644
 
   type t =
     { directory : string
@@ -67,20 +67,6 @@ let dumb_logrotate ~directory ~log_filename ~max_size ~num_rotate =
   Logger.Transport.create
     (module Dumb_logrotate)
     (Dumb_logrotate.create ~directory ~log_filename ~max_size ~num_rotate)
-
-let evergrowing ~log_filename =
-  let open Unix in
-  Logger.Transport.create
-    ( module struct
-      type t = File_descr.t
-
-      let transport t str =
-        let str = str ^ "\n" in
-        let len = String.length str in
-        if write t ~buf:(Bytes.of_string str) ~len <> len then
-          printf "unexpected error writing to log"
-    end )
-    (openfile ~perm:log_perm ~mode:[ O_RDWR; O_APPEND; O_CREAT ] log_filename)
 
 let time_pretty_to_string timestamp =
   Time.format timestamp "%Y-%m-%d %H:%M:%S UTC" ~zone:Time.Zone.utc

@@ -375,7 +375,8 @@ let%test_module "multisig_account" =
                     ; may_use_token = No
                     ; authorization_kind = Proof (With_hash.hash vk)
                     }
-                ; authorization = Proof Mina_base.Proof.transaction_dummy
+                ; authorization =
+                    Proof (Lazy.force Mina_base.Proof.transaction_dummy)
                 }
               in
               let memo = Signed_command_memo.empty in
