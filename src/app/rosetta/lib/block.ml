@@ -400,6 +400,14 @@ module Sql = struct
           }
         [@@deriving hlist, fields]
 
+        let fields =
+          String.concat ~sep:","
+            [ "ac.creation_fee"
+            ; "pk.value as receiver"
+            ; "bic.sequence_no"
+            ; "bic.secondary_sequence_no"
+            ]
+
         let receiver t = `Pk t.receiver
 
         let typ =
@@ -419,22 +427,19 @@ module Sql = struct
           Caqti_type.
             [ int; Archive_lib.Processor.Internal_command.typ; Extras.typ ]
 
-      let fields =
+      let fields' =
         String.concat ~sep:","
         @@ List.map
              ~f:(fun n -> "i." ^ n)
              Archive_lib.Processor.Internal_command.Fields.names
 
+      let fields = String.concat ~sep:"," [ "i.id"; fields'; Extras.fields ]
+
       let query =
         [%string
           {|
          SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no)
-           i.id,
-           %{fields},
-           ac.creation_fee,
-           pk.value as receiver,
-           bic.sequence_no,
-           bic.secondary_sequence_no
+           %{fields}
          FROM internal_commands i
          INNER JOIN blocks_internal_commands bic
            ON bic.internal_command_id = i.id
@@ -509,6 +514,10 @@ module Sql = struct
     type t = { command : Cte.t; coinbase_receiver : string option }
     [@@deriving hlist]
 
+    let fields =
+      String.concat ~sep:","
+        [ "ic.*"; "coinbase_receiver_pk.value as coinbase_receiver" ]
+
     let coinbase_receiver t =
       Option.map t.coinbase_receiver ~f:(fun pk -> `Pk pk)
 
@@ -517,10 +526,6 @@ module Sql = struct
         Caqti_type.[ Cte.typ; option string ]
 
     let query =
-      let fields =
-        String.concat ~sep:","
-          [ "ic.*"; "coinbase_receiver_pk.value as coinbase_receiver" ]
-      in
       [%string
         {sql|
           WITH internal_commands_cte AS (
