@@ -24,12 +24,16 @@ else
       ;;
       mina-create-legacy-genesis)
         # Download locally static debians (for example mina-legacy-create-genesis )
-        gsutil -m cp "gs://buildkite_k8s/coda/shared/debs/$i*" $LOCAL_DEB_FOLDER
+        gsutil -m cp "gs://buildkite_k8s/coda/shared/debs/$MINA_DEB_CODENAME/$i*" $LOCAL_DEB_FOLDER
       ;;
     esac
     source ./buildkite/scripts/download-artifact-from-cache.sh "${i}_*" $MINA_DEB_CODENAME/_build "" "_build"
   done
 fi
+
+# Install aptly
+apt-get update 
+apt-get install aptly
 
 # Start aptly
 source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians _build --component unstable --clean --background

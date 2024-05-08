@@ -172,37 +172,6 @@ function stop(){
     fi
 }
 
-function install_help(){
-    echo Installs aptly locally
-    echo ""
-    echo "     $CLI_NAME install"
-    echo ""
-    echo ""
-    echo "Example: $0  install "
-    echo ""
-    exit 0
-}
-
-function install(){
-
-    while [ ${#} -gt 0 ]; do
-        case $1 in
-            -h | --help )
-                install_help;
-            ;;
-            * )
-                echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
-                echo "";
-                install_help;
-            ;;
-        esac
-    done
-    
-    apt-get update
-    apt-get install aptly
-}
-
-
 function main_help(){
     echo Script for robust debian packages installation in CI
     echo ""
@@ -212,7 +181,6 @@ function main_help(){
     echo ""
     printf "  %-23s %s\n" "help" "show help menu and commands";
     printf "  %-23s %s\n" "start" "start aptly deamon serving debian packages";
-    printf "  %-23s %s\n" "install" "install aptly on local machine";
     printf "  %-23s %s\n" "stop" "stops and clean up aptly installation";
     echo ""
     exit "${1:-0}";
@@ -227,7 +195,7 @@ function main(){
         help )
             main_help 0;
         ;;
-        start | install | stop )
+        start | stop )
             $1 "${@:2}";
         ;;
         * )
