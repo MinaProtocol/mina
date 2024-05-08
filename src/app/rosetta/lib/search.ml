@@ -675,6 +675,13 @@ module Sql = struct
       }
     [@@deriving hlist]
 
+    let fields =
+      String.concat ~sep:","
+        [ Rosetta_lib_block.Sql.Internal_commands.Cte.fields
+        ; Extras.fields
+        ; "coinbase_receiver_pk.value as coinbase_receiver"
+        ]
+
     let coinbase_receiver t =
       Option.map ~f:(fun pk -> `Pk pk) t.coinbase_receiver
 
@@ -685,13 +692,6 @@ module Sql = struct
           ; Extras.typ
           ; option string
           ]
-
-    let fields =
-      String.concat ~sep:","
-        [ Rosetta_lib_block.Sql.Internal_commands.Cte.fields
-        ; Extras.fields
-        ; "coinbase_receiver_pk.value as coinbase_receiver"
-        ]
 
     let query_string ~offset ~limit op_type operator =
       let fields = String.concat ~sep:"," [ "id_count.total_count"; fields ] in
