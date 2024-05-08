@@ -1036,6 +1036,8 @@ let
       marlinPlonkStubs = {
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
       };
+      childProcessesTester = pkgs.writeShellScriptBin "mina-tester.sh"
+        (builtins.readFile ../src/lib/child_processes/tester.sh);
     in pkgs.lib.recursiveUpdate super {
       pkgs.mina_version = super.pkgs.mina_version.overrideAttrs {
         MINA_COMMIT_SHA1 = inputs.self.sourceInfo.rev or "<dirty>";
@@ -1066,8 +1068,9 @@ let
         customTest super "__src-lib-ppx_mina-tests__";
       pkgs.__src-lib-ppx_version-test__ =
         customTest super "__src-lib-ppx_version-test__";
-      # tested.ledger_catchup = super.pkgs.ledger_catchup.overrideAttrs
-      #   (s: { buildInputs = s.buildInputs ++ [ pkgs.tzdata ]; });
+      tested.child_processes = super.tested.child_processes.overrideAttrs (s: {
+        buildInputs = s.buildInputs ++ [ childProcessesTester ];
+      });
     };
 
   overlay = self: super:
