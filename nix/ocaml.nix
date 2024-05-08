@@ -1013,6 +1013,47 @@ let
       '';
     };
 
+  canonicalizePath = ps:
+    let
+      p = pkgs.lib.splitString "/" ps;
+      p' = builtins.foldl' (acc: el:
+        if el == "." then
+          acc
+        else if acc == [ ] then
+          [ el ]
+        else if el == ".." && pkgs.lib.last acc != ".." then
+          pkgs.lib.init acc
+        else
+          acc ++ [ el ]) [ ] p;
+    in pkgs.lib.concatStringsSep "/" p';
+  fixupSymlinksInSource = pkgName: src: root:
+    let
+      depListDrv = pkgs.stdenv.mkDerivation {
+        inherit src;
+        name = "${pkgName}-symlink-targets";
+        phases = [ "unpackPhase" "installPhase" ];
+        installPhase = ''
+          find -type l -exec bash -c 'echo "$(dirname {})/$(readlink {})"' ';' > $out
+          find \( -type f -o -type l \) >> $out
+        '';
+      };
+      fileListTxt = builtins.readFile depListDrv;
+      fileList =
+        builtins.map canonicalizePath (pkgs.lib.splitString "\n" fileListTxt);
+      filters = builtins.map (mkFilter dotIncludeAll) fileList;
+    in filterToPath {
+      path = root;
+      name = "source-${pkgName}-with-correct-symlinks";
+    } (mergeFilters filters);
+
+  nonConsensusPkgs = builtins.filter (s:
+    pkgs.lib.hasSuffix "_nonconsensus" s
+    || pkgs.lib.hasPrefix "__src-nonconsensus-" s)
+    (builtins.attrNames info.packages);
+  nonConsensusSrcOverrides = super:
+    pkgs.lib.genAttrs nonConsensusPkgs
+    (pkg: fixupSymlinksInSource pkg super."${pkg}" ../.);
+
   sqlSchemaFiles = with inputs.nix-filter.lib;
     filter {
       root = ../src/app/archive;
@@ -1020,7 +1061,7 @@ let
     };
   minaPkgs = self:
     let
-      super = mkOutputs (genPackage self) (genTestedPackage self) (genExe self)
+      super0 = mkOutputs (genPackage self) (genTestedPackage self) (genExe self)
         (genFile self) // {
           src = mkOutputs genPackageSrc genPackageSrc genExeSrc genFileSrc;
           exes = builtins.foldl' (acc:
@@ -1039,6 +1080,9 @@ let
             (pkgs.lib.mapAttrsToList (pkg: _: self.tested."${pkg}")
               info.packages);
         };
+      super = pkgs.lib.recursiveUpdate super0 {
+        src.pkgs = nonConsensusSrcOverrides super0.src.pkgs;
+      };
       marlinPlonkStubs = {
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
       };
