@@ -12,8 +12,8 @@ TESTNET_NAME="${TESTNET_NAME:-berkeley}"
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
 
-apt-get update
-apt-get install -y git apt-transport-https ca-certificates tzdata curl python3 python3-pip wget
+sudo apt-get update
+sudo apt-get install -y git apt-transport-https ca-certificates tzdata curl python3 python3-pip wget
 
 git config --global --add safe.directory /workdir
 
@@ -32,11 +32,10 @@ echo "--- Run Python version linter with branches: ${pr_branch} ${base_branch} $
 
 echo "--- Install Mina"
 source buildkite/scripts/export-git-env-vars.sh
-TESTNET_NAME="berkeley"
+
 DEBS="mina-${TESTNET_NAME}"
 USE_SUDO="1"
 source buildkite/scripts/debian/install.sh 
-
 
 echo "--- Audit type shapes"
 mina internal audit-type-shapes

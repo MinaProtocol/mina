@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -x
+
 if [ -z $MINA_DEB_CODENAME ]; then 
     echo "MINA_DEB_CODENAME env var is not defined"
     exit -1

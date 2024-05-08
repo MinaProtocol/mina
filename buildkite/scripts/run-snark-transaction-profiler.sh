@@ -5,8 +5,8 @@ set -eo pipefail
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
 
-apt-get update
-apt-get install -y git apt-transport-https ca-certificates tzdata curl python3
+sudo apt-get update
+sudo apt-get install -y git apt-transport-https ca-certificates tzdata curl python3
 
 TESTNET_NAME="berkeley"
 
