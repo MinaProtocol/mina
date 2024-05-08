@@ -80,6 +80,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
           Cmd.run (
             exportMinaDebCmd ++
             " && apt update && apt install aptly" ++
+            " && " ++ exportMinaDebCmd ++
             " && ./buildkite/scripts/debian/start_local_repo.sh" ++
             " && " ++ buildDockerCmd ++ 
             " && ./scripts/debian/aptly.sh stop"
