@@ -76,5 +76,6 @@
    h_list.ppx
    graphql_ppx
    ppx_string
+   ppx_fields_conv
    --
    %{read-lines:../../../graphql-ppx-config.inc})))
