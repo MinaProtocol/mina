@@ -72,6 +72,9 @@ let
         # - bintools package also includes as which is incompatible with gcc
         lld_wrapped = pkgs.writeShellScriptBin "ld.lld"
           ''${pkgs.llvmPackages.bintools}/bin/ld.lld "$@"'';
+
+        core =
+          super.core.overrideAttrs { propagatedBuildInputs = [ pkgs.tzdata ]; };
       };
 
   scope =
@@ -987,18 +990,18 @@ let
     };
 
   customTest = super: pkg:
-    let src = info.pseudoPackages."${pkg}"; in
-      super.pkgs."${pkg}".overrideAttrs {
-        pname = "test-${pkg}";
-        installPhase = "touch $out";
-        dontCheck = false;
-        buildPhase = ''
-          runHook preBuild
-          cp ${../${src}/Makefile} ${src}/Makefile
-          make -C ${src} VERBOSE=1
-          runHook postBuild
-        '';
-      };
+    let src = info.pseudoPackages."${pkg}";
+    in super.pkgs."${pkg}".overrideAttrs {
+      pname = "test-${pkg}";
+      installPhase = "touch $out";
+      dontCheck = false;
+      buildPhase = ''
+        runHook preBuild
+        cp ${../${src}/Makefile} ${src}/Makefile
+        make -C ${src} VERBOSE=1
+        runHook postBuild
+      '';
+    };
 
   minaPkgs = self:
     let
@@ -1042,8 +1045,12 @@ let
         PLONK_WASM_NODEJS = "${pkgs.plonk_wasm}/nodejs";
         PLONK_WASM_WEB = "${pkgs.plonk_wasm}/web";
       };
-      pkgs.__src-lib-ppx_mina-tests__ = customTest super "__src-lib-ppx_mina-tests__";
-      pkgs.__src-lib-ppx_version-test__ = customTest super "__src-lib-ppx_version-test__";
+      pkgs.__src-lib-ppx_mina-tests__ =
+        customTest super "__src-lib-ppx_mina-tests__";
+      pkgs.__src-lib-ppx_version-test__ =
+        customTest super "__src-lib-ppx_version-test__";
+      # tested.ledger_catchup = super.pkgs.ledger_catchup.overrideAttrs
+      #   (s: { buildInputs = s.buildInputs ++ [ pkgs.tzdata ]; });
     };
 
   overlay = self: super:
