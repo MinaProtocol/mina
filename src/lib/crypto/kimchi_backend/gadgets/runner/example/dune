@@ -43,5 +43,5 @@
    promise
    kimchi_backend_common
    ppx_version.runtime
-   kimchi_gadgets_test_runner
+   kimchi_backend.gadgets_test_runner
 ))

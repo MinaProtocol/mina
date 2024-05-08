@@ -21,7 +21,7 @@
    transaction_snark
    snark_params
    data_hash_lib
-   genesis_proof
+   coda_genesis_proof
    bounded_types
    mina_ledger
    mina_base

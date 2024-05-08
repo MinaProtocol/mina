@@ -26,7 +26,7 @@
    archive_lib
    block_time
    consensus
-   consensus_vrf
+   consensus.vrf
    currency
    genesis_constants
    genesis_ledger_helper
@@ -45,6 +45,7 @@
    unsigned_extended
    with_hash
    cli_lib
+   mina_version
    )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
