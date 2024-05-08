@@ -25,7 +25,7 @@
    archive_lib
    block_time
    consensus
-   consensus_vrf
+   consensus.vrf
    currency
    genesis_constants
    genesis_ledger_helper
