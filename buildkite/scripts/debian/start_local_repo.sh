@@ -8,7 +8,7 @@ fi
 LOCAL_DEB_FOLDER=_build
 
 set -eou pipefail
-set +x
+set -x
 
 
 apt-get update 
