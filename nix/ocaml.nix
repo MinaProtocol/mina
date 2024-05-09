@@ -106,7 +106,7 @@ let
         for i in $(find -L "${placeholder output}/bin" -type f); do
           wrapProgram "$i" \
             --prefix PATH : ${makeBinPath deps} \
-            --set MINA_LIBP2P_HELPER_PATH ${pkgs.libp2p_helper}/bin/libp2p_helper \
+            --set MINA_LIBP2P_HELPER_PATH ${pkgs.libp2p_helper}/bin/mina-libp2p_helper \
             --set MINA_COMMIT_SHA1 ${escapeShellArg commit_sha1}
         done
       '') package.outputs);
@@ -251,7 +251,7 @@ let
           remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$mainnet/bin/*,$testnet/bin*,$genesis/bin/*,$generate_keypair/bin/*}
         '';
         shellHook =
-          "export MINA_LIBP2P_HELPER_PATH=${pkgs.libp2p_helper}/bin/libp2p_helper";
+          "export MINA_LIBP2P_HELPER_PATH=${pkgs.libp2p_helper}/bin/mina-libp2p_helper";
       } // optionalAttrs pkgs.stdenv.isDarwin {
         OCAMLPARAM = "_,cclib=-lc++";
       });
@@ -297,7 +297,7 @@ let
       mina_tests = runMinaCheck {
         name = "tests";
         extraArgs = {
-          MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
+          MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/mina-libp2p_helper";
           MINA_LIBP2P_PASS = "naughty blue worm";
           MINA_PRIVKEY_PASS = "naughty blue worm";
           TZDIR = "${pkgs.tzdata}/share/zoneinfo";
