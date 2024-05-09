@@ -1,40 +1,40 @@
 let Prelude = ../External/Prelude.dhall
 
-let BuildFlags : Type = < Standard | Instrumented >
+let BuildFlags : Type = < None | Instrumented >
 
 let capitalName = \(buildFlags : BuildFlags) ->
   merge {
-    Standard = "Standard"
+    None = "None"
     , Instrumented = "Instrumented"
   } buildFlags
 
 let lowerName = \(buildFlags : BuildFlags) ->
   merge {
-    Standard = "standard"
+    None = "none"
     , Instrumented = "instrumented"
   } buildFlags
 
 let buildEnvs = \(buildFlags : BuildFlags) ->
   merge {
-    Standard = ([] : List Text )
+    None = ([] : List Text )
     , Instrumented = ["DUNE_INSTRUMENT_WITH=bisect_ppx"]
   } buildFlags
 
 let toSuffixUppercase = \(buildFlags : BuildFlags) ->
   merge {
-    Standard = ""
+    None = ""
     , Instrumented = "Instrumented"
   } buildFlags
 
 let toSuffixLowercase = \(buildFlags : BuildFlags) ->
   merge {
-    Standard = ""
+    None = ""
     , Instrumented = "instrumented"
   } buildFlags
 
 let toLabelSegment = \(buildFlags : BuildFlags) ->
   merge {
-    Standard = ""
+    None = ""
     , Instrumented = "-instrumented"
   } buildFlags
 
