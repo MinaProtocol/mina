@@ -31,7 +31,7 @@ in  Pipeline.build
         Command.build
           Command.Config::{
             commands = [
-              Cmd.run "./scripts/archive/emergency_hg/runner.sh"
+              Cmd.run "./scripts/archive/emergency_hf/runner.sh"
             ],
             label = "Emergency HF test",
             key = "emergency-hf-test",
