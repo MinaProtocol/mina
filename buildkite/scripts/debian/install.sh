@@ -51,10 +51,10 @@ echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | sud
 
 if [ -n $USE_SUDO ]; then
   sudo apt-get update --yes
-  sudo apt-get install --yes --allow-downgrades "${arr_of_debs[@]}"
+  sudo apt-get install --yes --allow-downgrades "${debs[@]}"
 else
   apt-get update --yes
-  apt-get install --yes --allow-downgrades "${arr_of_debs[@]}"
+  apt-get install --yes --allow-downgrades "${debs[@]}"
 fi
 
 
