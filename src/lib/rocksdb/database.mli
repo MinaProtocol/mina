@@ -26,7 +26,7 @@ val set : t -> key:key -> data:data -> unit
     @param remove_keys defaults to [[]]
 *)
 val set_batch :
-  t -> ?remove_keys:key list -> key_data_pairs:(key * data) list -> unit -> unit
+  t -> ?remove_keys:key list -> key_data_pairs:(key * data) list -> unit
 
 val remove : t -> key:key -> unit
 

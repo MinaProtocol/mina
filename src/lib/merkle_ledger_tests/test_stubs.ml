@@ -120,7 +120,7 @@ struct
 
   let set t ~key ~data = Bigstring_frozen.Table.set t.table ~key ~data
 
-  let set_batch t ?(remove_keys = []) ~key_data_pairs () =
+  let set_batch t ?(remove_keys = []) ~key_data_pairs =
     List.iter key_data_pairs ~f:(fun (key, data) -> set t ~key ~data) ;
     List.iter remove_keys ~f:(fun key ->
         Bigstring_frozen.Table.remove t.table key )
