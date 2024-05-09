@@ -1,0 +1,6 @@
+(executable
+  (name dump_slot_ledger)
+  (libraries
+    async caqti caqti-driver-postgresql core cli_lib base base.caml mina_caqti  
+    )
+ (preprocess (pps ppx_mina ppx_jane ppx_custom_printf ppx_deriving.show )))
