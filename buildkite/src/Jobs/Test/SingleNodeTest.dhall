@@ -70,6 +70,6 @@ Pipeline.build
         tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
       },
     steps = [
-      buildTestCmd Size.XLarge
+      buildTestCmd Size.QA
     ]
   }
