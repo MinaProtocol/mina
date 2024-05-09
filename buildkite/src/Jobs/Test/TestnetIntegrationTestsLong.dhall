@@ -28,6 +28,6 @@ in Pipeline.build Pipeline.Config::{
     tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
   },
   steps = [
-    TestExecutive.execute "hard-fork" dependsOn
+    TestExecutive.executeCloud "hard-fork" dependsOn
   ]
 }

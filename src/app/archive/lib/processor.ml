@@ -3894,32 +3894,6 @@ module Block = struct
       Map.merge existing_block_ids new_block_ids ~f:check_conflict
       |> Map.merge external_block_ids ~f:check_conflict
     in
-    let%bind () =
-      (* filter out direct descendants of the genesis block, as those maintain the NULL parent reference *)
-      let ids, parent_ids =
-        missing_blocks
-        |> List.filter ~f:(fun block ->
-               (*
-            not (State_hash.equal block.parent_hash genesis_block_hash))
-            *)
-               Unsigned.UInt32.to_int block.height > 1 )
-        |> List.map ~f:(fun block ->
-               ( Int.to_string @@ Map.find_exn block_ids block.state_hash
-               , Int.to_string @@ Map.find_exn block_ids block.parent_hash ) )
-        |> List.unzip
-      in
-      let ids_sql = String.concat ~sep:"," ids in
-      let parent_ids_sql = String.concat ~sep:"," parent_ids in
-      Conn.exec
-        (Caqti_request.exec Caqti_type.unit
-           (sprintf
-              "UPDATE %s AS b SET parent_id = data.parent_id FROM (SELECT \
-               unnest(array[%s]) as id, unnest(array[%s]) as parent_id) AS \
-               data WHERE b.id = data.id"
-              table_name ids_sql parent_ids_sql ) )
-        ()
-    in
-
     let%bind user_cmd_ids =
       let compare_by_hash (a : User_command.Signed_command.t)
           (b : User_command.Signed_command.t) =
@@ -4059,7 +4033,31 @@ module Block = struct
     (* TODO: currently unsupported *)
     assert (List.for_all blocks ~f:(fun block -> List.is_empty block.zkapp_cmds)) ;
     let _zkapp_cmd_ids = () in
-
+    let%bind () =
+      (* filter out direct descendants of the genesis block, as those maintain the NULL parent reference *)
+      let ids, parent_ids =
+        missing_blocks
+        |> List.filter ~f:(fun block ->
+               (*
+            not (State_hash.equal block.parent_hash genesis_block_hash))
+            *)
+               Unsigned.UInt32.to_int block.height > 1 )
+        |> List.map ~f:(fun block ->
+               ( Int.to_string @@ Map.find_exn block_ids block.state_hash
+               , Int.to_string @@ Map.find_exn block_ids block.parent_hash ) )
+        |> List.unzip
+      in
+      let ids_sql = String.concat ~sep:"," ids in
+      let parent_ids_sql = String.concat ~sep:"," parent_ids in
+      Conn.exec
+        (Caqti_request.exec Caqti_type.unit
+           (sprintf
+              "UPDATE %s AS b SET parent_id = data.parent_id FROM (SELECT \
+               unnest(array[%s]) as id, unnest(array[%s]) as parent_id) AS \
+               data WHERE b.id = data.id"
+              table_name ids_sql parent_ids_sql ) )
+        ()
+    in
     return ()
 
   let add_from_extensional (module Conn : CONNECTION)
@@ -4902,13 +4900,8 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
-      [%log info]
-        "Starting archive process; built with commit $commit on branch $branch"
-        ~metadata:
-          [ ("commit", `String Mina_version.commit_id)
-          ; ("branch", `String Mina_version.branch)
-          ; ("commit_date", `String Mina_version.commit_date)
-          ] ;
+      [%log info] "Starting archive process; built with commit $commit"
+        ~metadata:[ ("commit", `String Mina_version.commit_id) ] ;
       let%bind () = add_genesis_accounts pool ~logger ~runtime_config_opt in
       run ~constraint_constants pool reader ~logger ~delete_older_than
       |> don't_wait_for ;

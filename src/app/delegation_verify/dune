@@ -27,7 +27,7 @@
    uptime_service
    currency
    ledger_proof
-   mina_base_import
+   mina_base.import
    mina_state
    mina_wire_types
    consensus
