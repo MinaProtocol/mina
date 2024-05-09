@@ -92,7 +92,6 @@ let
     [ zlib bzip2 gmp openssl libffi ]
     ++ lib.optional (!(stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
 
-  # TODO fix propagated build inputs
   base-libs =
     let deps = pkgs.lib.getAttrs (builtins.attrNames implicit-deps) scope;
     in pkgs.stdenv.mkDerivation {
@@ -1046,6 +1045,94 @@ let
       name = "source-${pkgName}-with-correct-symlinks";
     } (mergeFilters filters);
 
+  vmTestBuildInputs = self: pkgNames:
+    builtins.concatMap (pkg:
+      let drv = self.pkgs."${pkg}";
+      in drv.buildInputs ++ drv.nativeBuildInputs) pkgNames;
+
+  vmTestScript = self: name: auxBuildInputs: pkgNames: testTargetString:
+    let
+      copyPkg = pkg:
+        "cp --no-preserve=mode,ownership,timestamps -RLTu ${
+          self.src.pkgs."${pkg}"
+        } .";
+      copyPrebuilt = pkg:
+        "cp --no-preserve=mode,ownership,timestamps -RLTu ${
+          self.pkgs."${pkg}"
+        } _build";
+      buildInputs = vmTestBuildInputs self pkgNames ++ auxBuildInputs;
+      subpaths = suffix:
+        builtins.filter builtins.pathExists
+        (builtins.map (drv: "${drv.out}/${suffix}") buildInputs);
+      libs = subpaths "lib";
+      bins = subpaths "bin";
+      setupHooks = subpaths "nix-support/setup-hook";
+      propagatedFiles = subpaths "nix-support/propagated-build-inputs";
+      propagatedScript = if propagatedFiles == [ ] then
+        ""
+      else ''
+        filesToProcess=${builtins.concatStringsSep " " propagatedFiles}
+        while [[ "$filesToProcess" != "" ]]; do
+          next=""
+          for pbiFile in $filesToProcess; do
+            for input in $(<$pbiFile); do
+              [ ! -d "$input/lib" ] || export LIBRARY_PATH="''${LIBRARY_PATH:+$LIBRARY_PATH:}$input/lib"
+              [ ! -d "$input/bin" ] || export PATH="''${PATH:+$PATH:}$input/bin"
+              if [[ -f "$input/nix-support/propagated-build-inputs" ]]; then
+                next="$next $input/nix-support/propagated-build-inputs"
+              fi
+            done
+          done
+          filesToProcess="$next"
+        done
+      '';
+    in pkgs.writeShellScriptBin "runtest-${name}" ''
+      ${pkgs.lib.concatMapStringsSep "\n" (hook: "source " + hook) setupHooks}
+      export LIBRARY_PATH="''${LIBRARY_PATH:+$LIBRARY_PATH:}${
+        builtins.concatStringsSep ":" libs
+      }"
+      export PATH="''${PATH:+$PATH:}${builtins.concatStringsSep ":" bins}"
+      ${propagatedScript}
+      ${pkgs.lib.concatMapStringsSep "\n" copyPkg pkgNames}
+      ${pkgs.lib.concatMapStringsSep "\n" copyPrebuilt pkgNames}
+      dune build ${testTargetString} -j 8 --root=. --build-dir=_build
+    '';
+
+  vmTest = self: name: auxPackages: pkgNames: testTargetString:
+    let vmScript = vmTestScript self name [ ] pkgNames testTargetString;
+    in mkVmTest ([ vmScript ] ++ auxPackages ++ vmTestBuildInputs self pkgNames)
+    name;
+
+  mkVmTest = packages: name:
+    pkgs.testers.runNixOSTest {
+      name = "vmtest-${name}";
+      nodes.machine = { config, pkgs, ... }: {
+        security.pam.loginLimits = [{
+          domain = "*";
+          type = "soft";
+          item = "nofile";
+          value = "65536";
+        }];
+        users.users.mina = {
+          isNormalUser = true;
+          home = "/home/mina";
+          extraGroups = [ "wheel" ];
+          inherit packages;
+        };
+        system.stateVersion = "23.11";
+        virtualisation = {
+          graphics = false;
+          cores = 8;
+          memorySize = 16384; # TODO Lower the requirement
+          diskSize = 4096;
+        };
+      };
+      testScript = ''
+        machine.wait_for_unit("default.target")
+        machine.succeed("cd /home/mina && su -- mina -c 'runtest-${name}'")
+      '';
+    };
+
   nonConsensusPkgs = builtins.filter (s:
     pkgs.lib.hasSuffix "_nonconsensus" s
     || pkgs.lib.hasPrefix "__src-nonconsensus-" s)
@@ -1072,7 +1159,9 @@ let
                 throw "Executable with name ${name} defined more than once"
               else
                 self.all-exes."${package}"."${name}";
-            }) { } (builtins.attrValues info.exes);
+            }) { } (builtins.attrValues info.exes) // {
+              libp2p_helper = pkgs.libp2p_helper;
+            };
           all = mkCombined "all"
             (pkgs.lib.mapAttrsToList (pkg: _: self.pkgs."${pkg}")
               info.packages);
@@ -1088,9 +1177,9 @@ let
       };
       childProcessesTester = pkgs.writeShellScriptBin "mina-tester.sh"
         (builtins.readFile ../src/lib/child_processes/tester.sh);
-      libp2pHelperPath = {
-        MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
-      };
+      withLibp2pHelper = (s: {
+        nativeBuildInputs = s.nativeBuildInputs ++ [ pkgs.libp2p_helper ];
+      });
     in pkgs.lib.recursiveUpdate super {
       pkgs.mina_version = super.pkgs.mina_version.overrideAttrs {
         MINA_COMMIT_SHA1 = inputs.self.sourceInfo.rev or "<dirty>";
@@ -1124,10 +1213,10 @@ let
       tested.child_processes = super.tested.child_processes.overrideAttrs
         (s: { buildInputs = s.buildInputs ++ [ childProcessesTester ]; });
       tested.block_storage =
-        super.tested.block_storage.overrideAttrs libp2pHelperPath;
-      tested.mina_lib = super.tested.mina_lib.overrideAttrs libp2pHelperPath;
+        super.tested.block_storage.overrideAttrs withLibp2pHelper;
+      tested.mina_lib = super.tested.mina_lib.overrideAttrs withLibp2pHelper;
       tested.mina_lib_tests =
-        super.tested.mina_lib_tests.overrideAttrs libp2pHelperPath;
+        super.tested.mina_lib_tests.overrideAttrs withLibp2pHelper;
       tested.archive_lib = super.tested.archive_lib.overrideAttrs (s: {
         buildInputs = s.buildInputs ++ [ pkgs.ephemeralpg ];
         preBuild = ''
@@ -1143,6 +1232,9 @@ let
           touch $out
         '';
       };
+      tested.__src-test-command_line_tests__ =
+        vmTest self "cmd-tests" [ pkgs.libp2p_helper ]
+        [ "__src-test-command_line_tests__" ] "src/test/command_line_tests";
     };
 
   overlay = self: super:
@@ -1363,7 +1455,8 @@ let
       mina_tests = runMinaCheck {
         name = "tests";
         extraArgs = {
-          MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/mina-libp2p_helper";
+          MINA_LIBP2P_HELPER_PATH =
+            "${pkgs.libp2p_helper}/bin/mina-libp2p_helper";
           MINA_LIBP2P_PASS = "naughty blue worm";
           MINA_PRIVKEY_PASS = "naughty blue worm";
           TZDIR = "${pkgs.tzdata}/share/zoneinfo";
