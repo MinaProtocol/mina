@@ -13,9 +13,7 @@ TESTNET_NAME="berkeley"
 git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh
 
-DEBS="mina-${TESTNET_NAME}"
-USE_SUDO="1"
-source buildkite/scripts/debian/install.sh 
+source buildkite/scripts/debian/install.sh "mina-${TESTNET_NAME}" 1
 
 K=1
 MAX_NUM_UPDATES=4

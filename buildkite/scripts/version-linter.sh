@@ -33,9 +33,7 @@ echo "--- Run Python version linter with branches: ${pr_branch} ${base_branch} $
 echo "--- Install Mina"
 source buildkite/scripts/export-git-env-vars.sh
 
-DEBS="mina-${TESTNET_NAME}"
-USE_SUDO="1"
-source buildkite/scripts/debian/install.sh 
+source buildkite/scripts/debian/install.sh "mina-${TESTNET_NAME}" 1
 
 echo "--- Audit type shapes"
 mina internal audit-type-shapes

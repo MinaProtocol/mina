@@ -48,8 +48,7 @@ echo "deb [trusted=yes] https://apt.releases.hashicorp.com $MINA_DEB_CODENAME ma
 apt-get update
 apt-get install -y "terraform" "docker" "docker-compose-plugin" "docker-ce"
 
-DEBS="mina-test-executive"
-source buildkite/scripts/debian/install.sh 
+source buildkite/scripts/debian/install.sh "mina-test-executive"
 
 mina-test-executive local "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \

@@ -13,9 +13,7 @@ TESTNET_NAME="berkeley"
 git config --global --add safe.directory /workdir
 source buildkite/scripts/export-git-env-vars.sh
 
-DEBS="mina-${TESTNET_NAME}"
-USE_SUDO=1
-source buildkite/scripts/debian/install.sh 
+source buildkite/scripts/debian/install.sh "mina-${TESTNET_NAME}" 1
 
 MINA_COMMIT_SHA1=$(git log -n 1 --format=%h --abbrev=7 --no-merges)
 export TYPE_SHAPE_FILE=${MINA_COMMIT_SHA1}-type_shape.txt

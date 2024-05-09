@@ -1,12 +1,18 @@
 #!/bin/bash
 
-set -x
+
+if [[ $# -ne 1 ]]; then
+    echo "Usage: $0 '<debians>' '[use-sudo]'"
+    exit 1
+fi
 
 if [ -z $MINA_DEB_CODENAME ]; then 
     echo "MINA_DEB_CODENAME env var is not defined"
     exit -1
 fi
 
+DEBS=$1
+USE_SUDO=${2:-0}
 
 LOCAL_DEB_FOLDER=debs
 mkdir -p $LOCAL_DEB_FOLDER
@@ -34,7 +40,7 @@ else
 fi
 
 # Install aptly
-if [ -n $USE_SUDO ]; then
+if [ $USE_SUDO = 1 ]; then
   sudo apt-get update 
   sudo apt-get install aptly
 else
@@ -49,7 +55,7 @@ source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $
 echo "Installing mina packages: $DEBS"
 echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | sudo tee /etc/apt/sources.list.d/mina.list
 
-if [ -n $USE_SUDO ]; then
+if [ $USE_SUDO = 1 ]; then
   sudo apt-get update --yes
   sudo apt-get install --yes --allow-downgrades "${debs[@]}"
 else
