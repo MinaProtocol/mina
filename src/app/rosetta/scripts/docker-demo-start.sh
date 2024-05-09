@@ -32,7 +32,7 @@ export POSTGRES_USERNAME=${POSTGRES_USERNAME:=pguser}
 export POSTGRES_DBNAME=${POSTGRES_DBNAME:=archive}
 export POSTGRES_DATA_DIR=${POSTGRES_DATA_DIR:=/data/postgresql}
 export PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${POSTGRES_DBNAME}
-export MINA_POSTGRES_CONF=${MINA_POSTGRES_CONF:=/etc/mina/rosetta/postgresql.conf}
+export MINA_POSTGRES_CONF=${MINA_POSTGRES_CONF:=/etc/mina/rosetta/scripts/postgresql.conf}
 
 # Mina Archive variables
 export MINA_ARCHIVE_PORT=${MINA_ARCHIVE_PORT:=3086}

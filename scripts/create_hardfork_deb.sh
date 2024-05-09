@@ -47,6 +47,12 @@ for ledger_tarball in $LEDGER_TARBALLS; do
   cp "${ledger_tarball}" "${BUILDDIR}/var/lib/coda/"
 done
 
+# Overwrite outdated ledgers that are being updated by the hardfork (backing up the outdated ledgers)
+mv "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.old.json"
+cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
+mv "${BUILDDIR}/etc/mina/rosetta/genesis_ledgers/${NETWORK_NAME}.json" "${BUILDDIR}/etc/mina/rosetta/genesis_ledgers/${NETWORK_NAME}.old.json"
+cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/etc/mina/rosetta/genesis_ledgers/${NETWORK_NAME}.json"
+
 build_deb "${NETWORK_TAG}"
 build_logproc_deb
 $BUILD_KEYPAIR_DEB && MINA_BUILD_MAINNET=1 build_keypair_deb
