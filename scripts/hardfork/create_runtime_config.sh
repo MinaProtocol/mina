@@ -11,7 +11,7 @@ GENESIS_TIMESTAMP=${GENESIS_TIMESTAMP:=$(date -u +"%Y-%m-%dT%H:%M:%SZ" -d "10 mi
 
 # Pull the original genesis timestamp from the pre-fork config file
 ORIGINAL_GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$FORKING_FROM_CONFIG_JSON")
-OFFSET=$(jq -r '.fork.global_slot_since_genesis' "$FORKING_FROM_CONFIG_JSON")
+OFFSET=$(jq -r '.proof.fork.global_slot_since_genesis' "$FORKING_FROM_CONFIG_JSON")
 
 if [[ "$OFFSET" == null ]]; then
   OFFSET=0
