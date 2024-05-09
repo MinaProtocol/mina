@@ -1146,6 +1146,15 @@ let
       root = ../src/app/archive;
       include = [ (matchExt "sql") ];
     };
+
+  skippedTest = pkgs.stdenv.mkDerivation {
+    name = "skipped-test";
+    phases = [ "installPhase" ];
+    installPhase = ''
+      echo "echo test is skipped" > $out
+    '';
+  };
+
   minaPkgs = self:
     let
       super0 = mkOutputs (genPackage self) (genTestedPackage self) (genExe self)
@@ -1225,16 +1234,19 @@ let
         '';
       });
       # TODO remove this override after merging the latest `develop`
-      tested.__src-lib-crypto-snarky_tests__ = pkgs.stdenv.mkDerivation {
-        name = "skipped-src-lib-crypto-snarky_tests";
-        phases = [ "installPhase" ];
-        installPhase = ''
-          touch $out
-        '';
-      };
+      tested.__src-lib-crypto-snarky_tests__ = skippedTest;
       tested.__src-test-command_line_tests__ =
         vmTest self "cmd-tests" [ pkgs.libp2p_helper ]
         [ "__src-test-command_line_tests__" ] "src/test/command_line_tests";
+      tested.__src-lib-staged_ledger-test__ =
+        vmTest self "staged-ledger-tests" [ ]
+        [ "__src-lib-staged_ledger-test__" ] "src/lib/staged_ledger/test";
+      tested.__src-lib-mina_net2-tests__ = skippedTest;
+      tested.mina_net2 =
+        vmTest self "mina_net2-tests" [ pkgs.libp2p_helper pkgs.gcc ] [
+          "mina_net2"
+          "__src-lib-mina_net2-tests__"
+        ] "src/lib/mina_net2";
     };
 
   overlay = self: super:
