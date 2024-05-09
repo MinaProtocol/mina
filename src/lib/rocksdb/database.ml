@@ -31,8 +31,8 @@ let set t ~(key : Bigstring.t) ~(data : Bigstring.t) : unit =
   Rocks.put ?key_pos:None ?key_len:None ?value_pos:None ?value_len:None
     ?opts:None t.db key data
 
-let set_batch t ?(remove_keys : Bigstring.t list = [])
-    ~(key_data_pairs : (Bigstring.t * Bigstring.t) list) () : unit =
+let[@warning "-16"] set_batch t ?(remove_keys : Bigstring.t list = [])
+    ~(key_data_pairs : (Bigstring.t * Bigstring.t) list) : unit =
   let batch = Rocks.WriteBatch.create () in
   (* write to batch *)
   List.iter key_data_pairs ~f:(fun (key, data) ->
