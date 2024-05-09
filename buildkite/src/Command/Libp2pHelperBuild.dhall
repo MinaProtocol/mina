@@ -4,6 +4,7 @@ let Command = ./Base.dhall
 let Docker = ./Docker/Type.dhall
 let Size = ./Size.dhall
 let Toolchain = ../Constants/Toolchain.dhall
+let BuildFlags = ../Constants/BuildFlags.dhall
 let Cmd = ../Lib/Cmds.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
@@ -23,11 +24,11 @@ let commands = \(debVersion : DebianVersions.DebVersion) ->
 
 in
 
-let cmdConfig = \(debVersion : DebianVersions.DebVersion) ->
+let cmdConfig = \(debVersion : DebianVersions.DebVersion) -> \(buildFlags: BuildFlags.Type) ->
   Command.build
     Command.Config::{
       commands  = commands debVersion,
-      label = "Build Libp2p helper for ${DebianVersions.capitalName debVersion}",
+      label = "Build Libp2p helper for ${DebianVersions.capitalName debVersion} ${BuildFlags.toSuffixUppercase buildFlags}",
       key = "libp2p-helper",
       target = Size.Small
     }

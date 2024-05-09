@@ -130,7 +130,7 @@ let MinaBuildSpec = {
 let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type = 
   \(spec: MinaBuildSpec.Type) ->
     let steps = [
-        Libp2p.step spec.debVersion,
+        Libp2p.step spec.debVersion spec.buildFlags,
         Command.build
           Command.Config::{
             commands = Toolchain.select spec.toolchainSelectMode spec.debVersion ([
@@ -142,7 +142,7 @@ let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type =
                 "MINA_DEB_CODENAME=${DebianVersions.lowerName spec.debVersion}"
               ] # BuildFlags.buildEnvs spec.buildFlags )
             "./buildkite/scripts/build-release.sh ${Artifacts.toDebianNames spec.artifacts}",
-            label = "Build Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile}",
+            label = "Build Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile} ${BuildFlags.toSuffixUppercase spec.buildFlags}",
             key = "build-deb-pkg",
             target = Size.XLarge,
             retries = [
