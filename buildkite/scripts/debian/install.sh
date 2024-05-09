@@ -8,7 +8,7 @@ if [ -z $MINA_DEB_CODENAME ]; then
 fi
 
 
-LOCAL_DEB_FOLDER=_build
+LOCAL_DEB_FOLDER=debs
 mkdir -p $LOCAL_DEB_FOLDER
 source ./buildkite/scripts/export-git-env-vars.sh
 
@@ -22,14 +22,14 @@ else
     case $i in
       mina-berkeley|mina-devnet|mina-mainnet)
         # Downaload mina-logproc too
-        source ./buildkite/scripts/download-artifact-from-cache.sh "mina-logproc*" $MINA_DEB_CODENAME/_build "" "_build"
+        source ./buildkite/scripts/download-artifact-from-cache.sh "mina-logproc*" $MINA_DEB_CODENAME/_build "" $LOCAL_DEB_FOLDER
       ;;
       mina-create-legacy-genesis)
         # Download locally static debians (for example mina-legacy-create-genesis )
         gsutil -m cp "gs://buildkite_k8s/coda/shared/debs/$MINA_DEB_CODENAME/$i*" $LOCAL_DEB_FOLDER
       ;;
     esac
-    source ./buildkite/scripts/download-artifact-from-cache.sh "${i}_*" $MINA_DEB_CODENAME/_build "" "_build"
+    source ./buildkite/scripts/download-artifact-from-cache.sh "${i}_*" $MINA_DEB_CODENAME/_build "" $LOCAL_DEB_FOLDER
   done
 fi
 
@@ -43,7 +43,7 @@ else
 fi
 
 # Start aptly
-source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians _build --component unstable --clean --background
+source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background
 
 # Install debians
 echo "Installing mina packages: $DEBS"

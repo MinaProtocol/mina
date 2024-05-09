@@ -149,7 +149,6 @@ function stop(){
     local __clean=0
     
     while [ ${#} -gt 0 ]; do
-        error_message="Error: a value is needed for '$1'";
         case $1 in
             -h | --help )
                 stop_help;

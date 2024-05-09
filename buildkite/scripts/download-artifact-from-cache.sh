@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -eou pipefail
-set +x
+set -x
 
 if [[ $# -lt 2 ]]; then
   echo "Usage: download-artifact-from-cache.sh <remote-folder> <file or regexp> [gsutil opts]"
