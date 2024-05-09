@@ -7,20 +7,21 @@ if [[ $# -ne 3 ]]; then
   exit 1
 fi
 
+PSQL=${PSQL:-psql}
 CONN_STR=$1
 LAST_BLOCK_HASH=$2
 PROTOCOL_VERSION=$3
 
-GENESIS_HASH=$(psql "$CONN_STR" -t -c  \
+GENESIS_HASH=$($PSQL "$CONN_STR" -t -c  \
     "select state_hash from blocks where protocol_version_id = $PROTOCOL_VERSION and global_slot_since_hard_fork = 0 ;" | xargs)
 
-GENESIS_ID=$(psql "$CONN_STR" -t -c  \
+GENESIS_ID=$($PSQL "$CONN_STR" -t -c  \
     "select id from blocks where protocol_version_id = $PROTOCOL_VERSION and global_slot_since_hard_fork = 0 ;" | xargs)
 
-HEIGHT=$(psql "$CONN_STR" -t -c  \
+HEIGHT=$($PSQL "$CONN_STR" -t -c  \
     "select height from blocks where state_hash = '$LAST_BLOCK_HASH';" | xargs)
 
-ID=$(psql "$CONN_STR" -t -c  \
+ID=$($PSQL "$CONN_STR" -t -c  \
     "select id from blocks where state_hash = '$LAST_BLOCK_HASH';" | xargs)
 
 
@@ -40,7 +41,7 @@ fi
 
 
 echo "Calculating canonical chain..."
-canon_chain=$(psql $CONN_STR -U postgres -t -c  "WITH RECURSIVE chain AS ( 
+canon_chain=$($PSQL $CONN_STR -U postgres -t -c  "WITH RECURSIVE chain AS ( 
                     SELECT id, parent_id, height,state_hash 
                     FROM blocks b WHERE b.id = $ID and b.protocol_version_id = $PROTOCOL_VERSION
 
@@ -61,7 +62,7 @@ canon_chain=$(psql $CONN_STR -U postgres -t -c  "WITH RECURSIVE chain AS (
 canon_chain=(${canon_chain// / })
 
 echo "Updating non canonical blocks to orphaned..."
-psql "$CONN_STR" -c "update blocks set chain_status = 'orphaned' where protocol_version_id = $PROTOCOL_VERSION;"
+$PSQL "$CONN_STR" -c "update blocks set chain_status = 'orphaned' where protocol_version_id = $PROTOCOL_VERSION;"
 
 function join_by {
   local d=${1-} f=${2-}
@@ -75,6 +76,6 @@ bs=500
 for ((i=0; i<${#canon_chain[@]}; i+=bs)); do
     echo " - $i of ${#canon_chain[@]}"
     IN_CLAUSE=$(join_by , ${canon_chain[@]:i:bs})
-    psql "$CONN_STR" -q -c "update blocks set chain_status = 'canonical' where id in (${IN_CLAUSE}) and protocol_version_id = $PROTOCOL_VERSION"
+    $PSQL "$CONN_STR" -q -c "update blocks set chain_status = 'canonical' where id in (${IN_CLAUSE}) and protocol_version_id = $PROTOCOL_VERSION"
 done
 echo " - ${#canon_chain[@]} of ${#canon_chain[@]}"

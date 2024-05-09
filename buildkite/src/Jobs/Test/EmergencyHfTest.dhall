@@ -31,7 +31,7 @@ in  Pipeline.build
         Command.build
           Command.Config::{
             commands = [
-              Cmd.run "./scripts/archive/emergency_hf/test/runner.sh"
+              Cmd.run "PSQL=\"docker exec replayer-postgres psql\" ./scripts/archive/emergency_hf/test/runner.sh "
             ],
             label = "Emergency HF test",
             key = "emergency-hf-test",
