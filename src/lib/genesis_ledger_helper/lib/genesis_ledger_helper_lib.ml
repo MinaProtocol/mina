@@ -525,7 +525,7 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
     match
       let%bind daemon = config.genesis in
       let%map genesis_state_timestamp = daemon.genesis_state_timestamp in
-      Genesis_constants.validate_time (Some genesis_state_timestamp)
+      Genesis_constants.validate_time genesis_state_timestamp
     with
     | Some (Ok time) ->
         Ok (Some time)

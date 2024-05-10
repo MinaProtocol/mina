@@ -118,35 +118,8 @@ module Constraint_constants = struct
 
       [%%inject "block_window_duration_ms", block_window_duration]
 
-      [%%if scan_state_with_tps_goal]
-
-      [%%inject "tps_goal_x10", scan_state_tps_goal_x10]
-
-      let max_coinbases = 2
-
-      (* block_window_duration is in milliseconds, so divide by 1000 divide
-         by 10 again because we have tps * 10
-      *)
-      let max_user_commands_per_block =
-        tps_goal_x10 * block_window_duration_ms / (1000 * 10)
-
-      (** Log of the capacity of transactions per transition.
-            - 1 will only work if we don't have prover fees.
-            - 2 will work with prover fees, but not if we want a transaction
-              included in every block.
-            - At least 3 ensures a transaction per block and the staged-ledger
-              unit tests pass.
-        *)
-      let transaction_capacity_log_2 =
-        1
-        + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
-
-      [%%else]
-
       [%%inject
       "transaction_capacity_log_2", scan_state_transaction_capacity_log_2]
-
-      [%%endif]
 
       [%%inject "supercharged_coinbase_factor", supercharged_coinbase_factor]
 
@@ -215,11 +188,7 @@ let genesis_timestamp_of_string str =
 let of_time t = Time.to_span_since_epoch t |> Time.Span.to_ms |> Int64.of_float
 
 let validate_time time_str =
-  match
-    Result.try_with (fun () ->
-        Option.value_map ~default:(Time.now ()) ~f:genesis_timestamp_of_string
-          time_str )
-  with
+  match Result.try_with (fun () -> genesis_timestamp_of_string time_str) with
   | Ok time ->
       Ok (of_time time)
   | Error _ ->
@@ -279,32 +248,6 @@ module Protocol = struct
                    ~zone:Time.Zone.utc ) )
           ]
 
-      let of_yojson = function
-        | `Assoc
-            [ ("k", `Int k)
-            ; ("slots_per_epoch", `Int slots_per_epoch)
-            ; ("slots_per_sub_window", `Int slots_per_sub_window)
-            ; ("grace_period_slots", `Int grace_period_slots)
-            ; ("delta", `Int delta)
-            ; ("genesis_state_timestamp", `String time_str)
-            ] -> (
-            match validate_time time_str with
-            | Ok genesis_state_timestamp ->
-                Ok
-                  { Poly.k
-                  ; slots_per_epoch
-                  ; slots_per_sub_window
-                  ; grace_period_slots
-                  ; delta
-                  ; genesis_state_timestamp
-                  }
-            | Error e ->
-                Error (sprintf !"Genesis_constants.Protocol.of_yojson: %s" e) )
-        | _ ->
-            Error "Genesis_constants.Protocol.of_yojson: unexpected JSON"
-
-      let t_of_sexp _ = failwith "t_of_sexp: not implemented"
-
       let sexp_of_t (t : t) =
         let module T = struct
           type t = (int, int, string) Poly.Stable.V1.t [@@deriving sexp]
@@ -326,7 +269,7 @@ module Protocol = struct
     end
   end]
 
-  [%%define_locally Stable.Latest.(to_yojson)]
+  [%%define_locally Stable.Latest.(to_yojson, sexp_of_t)]
 end
 
 module T = struct
