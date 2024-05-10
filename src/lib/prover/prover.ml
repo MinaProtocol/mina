@@ -66,7 +66,6 @@ module Worker_state = struct
     ; logger : Logger.Stable.Latest.t
     ; proof_level : Genesis_constants.Proof_level.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
-    ; commit_id : string
     }
   [@@deriving bin_io_unversioned]
 
@@ -83,8 +82,7 @@ module Worker_state = struct
           }
         , Lazy.force Proof.transaction_dummy )
 
-  let create { logger; proof_level; constraint_constants; commit_id; _ } :
-      t Deferred.t =
+  let create { logger; proof_level; constraint_constants; _ } : t Deferred.t =
     Deferred.return
       (let m =
          match proof_level with
@@ -157,7 +155,7 @@ module Worker_state = struct
 
                let toggle_internal_tracing enabled =
                  don't_wait_for
-                 @@ Internal_tracing.toggle ~commit_id ~logger
+                 @@ Internal_tracing.toggle ~logger
                       (if enabled then `Enabled else `Disabled)
 
                let set_itn_logger_data ~daemon_port =
@@ -327,7 +325,6 @@ module Worker = struct
             ; logger
             ; proof_level
             ; constraint_constants
-            ; commit_id
             } =
         let max_size = 256 * 1024 * 512 in
         let num_rotate = 1 in
@@ -346,7 +343,7 @@ module Worker = struct
                    ~directory:(conf_dir ^ "/internal-tracing")
                    ~log_filename () ) ) ;
         if enable_internal_tracing then
-          don't_wait_for @@ Internal_tracing.toggle ~commit_id ~logger `Enabled ;
+          don't_wait_for @@ Internal_tracing.toggle ~logger `Enabled ;
         [%log info] "Prover started" ;
         Worker_state.create
           { conf_dir
@@ -355,7 +352,6 @@ module Worker = struct
           ; logger
           ; proof_level
           ; constraint_constants
-          ; commit_id
           }
 
       let init_connection_state ~connection:_ ~worker_state:_ () = Deferred.unit
@@ -369,7 +365,7 @@ type t =
   { connection : Worker.Connection.t; process : Process.t; logger : Logger.t }
 
 let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
-    ~pids ~conf_dir ~proof_level ~constraint_constants ~commit_id () =
+    ~pids ~conf_dir ~proof_level ~constraint_constants () =
   [%log info] "Starting a new prover process" ;
   let on_failure err =
     [%log error] "Prover process failed with error $err"
@@ -386,7 +382,6 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
       ; logger
       ; proof_level
       ; constraint_constants
-      ; commit_id
       }
   in
   [%log info]

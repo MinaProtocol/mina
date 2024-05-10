@@ -30,6 +30,7 @@
     transition_frontier
     logger
     node_addrs_and_ports
+    mina_version
     participating_state
     mina_metrics
     mina_block

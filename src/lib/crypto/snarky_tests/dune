@@ -48,6 +48,7 @@
   pickles.pseudo
   pickles.limb_vector
   pickles_base
+  mina_version
   base58_check
   codable
   random_oracle_input
