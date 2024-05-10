@@ -153,8 +153,7 @@ module type S0 = sig
   end
 
   val command_from_rpcs :
-       commit_id:string
-    -> (module Rpcs_versioned_S with type Work.ledger_proof = ledger_proof)
+       (module Rpcs_versioned_S with type Work.ledger_proof = ledger_proof)
     -> Command.t
 
   val arguments :
@@ -171,5 +170,5 @@ module type S = sig
   module Rpcs_versioned :
     Rpcs_versioned_S with type Work.ledger_proof = ledger_proof
 
-  val command : commit_id:string -> Command.t
+  val command : Command.t
 end

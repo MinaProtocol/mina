@@ -342,7 +342,7 @@ module Make (Inputs : Intf.Inputs_intf) :
     in
     go ()
 
-  let command_from_rpcs ~commit_id
+  let command_from_rpcs
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
         with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
     Command.async ~summary:"Snark worker"
@@ -369,14 +369,12 @@ module Make (Inputs : Intf.Inputs_intf) :
         Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
             let logrotate_max_size = 1024 * 10 in
             let logrotate_num_rotate = 1 in
-            Logger.Consumer_registry.register ~commit_id
-              ~id:Logger.Logger_id.snark_worker
+            Logger.Consumer_registry.register ~id:Logger.Logger_id.snark_worker
               ~processor:(Logger.Processor.raw ())
               ~transport:
                 (Logger_file_system.dumb_logrotate ~directory:conf_dir
                    ~log_filename:"mina-snark-worker.log"
-                   ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate )
-              () ) ;
+                   ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ) ;
         Signal.handle [ Signal.term ] ~f:(fun _signal ->
             [%log info]
               !"Received signal to terminate. Aborting snark worker process" ;

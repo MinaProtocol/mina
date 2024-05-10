@@ -1434,7 +1434,7 @@ module type Itn_settable = sig
   val set_itn_logger_data : t -> daemon_port:int -> unit Deferred.Or_error.t
 end
 
-let start_filtered_log ~commit_id
+let start_filtered_log
     in_memory_reverse_structured_log_messages_for_integration_test
     (structured_log_ids : string list) =
   let handle str =
@@ -1455,10 +1455,9 @@ let start_filtered_log ~commit_id
       Structured_log_events.Set.of_list
       @@ List.map ~f:Structured_log_events.id_of_string structured_log_ids
     in
-    Logger.Consumer_registry.register ~id:Logger.Logger_id.mina ~commit_id
+    Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
       ~processor:(Logger.Processor.raw_structured_log_events event_set)
-      ~transport:(Logger.Transport.raw handle)
-      () ;
+      ~transport:(Logger.Transport.raw handle) ;
     Ok () )
 
 let create ~commit_id ?wallets (config : Config.t) =
@@ -1491,7 +1490,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           if not (List.is_empty config.start_filtered_logs) then
             (* Start the filtered logs, if requested. *)
             Or_error.ok_exn
-            @@ start_filtered_log ~commit_id
+            @@ start_filtered_log
                  in_memory_reverse_structured_log_messages_for_integration_test
                  config.start_filtered_logs ;
           let%bind prover =
@@ -1572,9 +1571,9 @@ let create ~commit_id ?wallets (config : Config.t) =
                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
               (fun () ->
                 O1trace.thread "manage_vrf_evaluator_subprocess" (fun () ->
-                    Vrf_evaluator.create ~commit_id ~constraint_constants
-                      ~pids:config.pids ~logger:config.logger
-                      ~conf_dir:config.conf_dir ~consensus_constants
+                    Vrf_evaluator.create ~constraint_constants ~pids:config.pids
+                      ~logger:config.logger ~conf_dir:config.conf_dir
+                      ~consensus_constants
                       ~keypairs:config.block_production_keypairs ) )
             >>| Result.ok_exn
           in
@@ -2296,10 +2295,10 @@ let net { components = { net; _ }; _ } = net
 let runtime_config { config = { precomputed_values; _ }; _ } =
   Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
 
-let start_filtered_log ~commit_id
+let start_filtered_log
     ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)
     (structured_log_ids : string list) =
-  start_filtered_log ~commit_id
+  start_filtered_log
     in_memory_reverse_structured_log_messages_for_integration_test
     structured_log_ids
 
