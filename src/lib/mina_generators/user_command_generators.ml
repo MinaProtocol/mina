@@ -4,8 +4,6 @@
    Zkapp_command
 *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
