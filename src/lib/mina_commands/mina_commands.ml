@@ -256,7 +256,7 @@ type active_state_fields =
 
 let max_block_height = ref 1
 
-let get_status ~commit_id ~flag t =
+let get_status ~flag t =
   let open Mina_lib.Config in
   let config = Mina_lib.config t in
   let precomputed_values = config.precomputed_values in
@@ -267,6 +267,7 @@ let get_status ~commit_id ~flag t =
     Time_ns.diff (Time_ns.now ()) Mina_lib.daemon_start_time
     |> Time_ns.Span.to_sec |> Int.of_float
   in
+  let commit_id = Mina_version.commit_id in
   let conf_dir = config.conf_dir in
   let%map peers =
     let%map undisplay_peers = Mina_lib.peers t in
@@ -509,9 +510,7 @@ let get_status ~commit_id ~flag t =
   ; metrics
   }
 
-let clear_hist_status ~commit_id ~flag t =
-  Perf_histograms.wipe () ;
-  get_status ~flag ~commit_id t
+let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
 module Subscriptions = struct
   let new_block t public_key =

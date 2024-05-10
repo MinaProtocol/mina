@@ -1682,7 +1682,7 @@ let%test_module _ =
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified" () )
+            () )
 
     let `VK vk, `Prover prover =
       Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
@@ -3096,7 +3096,7 @@ let%test_module _ =
             Verifier.create ~logger ~proof_level:Full ~constraint_constants
               ~conf_dir:None
               ~pids:(Child_processes.Termination.create_pid_table ())
-              ~commit_id:"not specified" ()
+              ()
           in
           let%bind test =
             setup_test ~verifier:verifier_full

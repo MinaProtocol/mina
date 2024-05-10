@@ -92,7 +92,7 @@ let%test_module "transaction_status" =
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            ~commit_id:"not specified" () )
+            () )
 
     let key_gen =
       let open Quickcheck.Generator in

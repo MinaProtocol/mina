@@ -31,6 +31,7 @@
    mina_lib
    mina_base
    user_command_input
+   mina_version
    node_addrs_and_ports
    mina_numbers
    participating_state
