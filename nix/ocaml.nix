@@ -1174,9 +1174,13 @@ let
           all = mkCombined "all"
             (pkgs.lib.mapAttrsToList (pkg: _: self.pkgs."${pkg}")
               info.packages);
-          all-tested = mkCombined "all-tested"
-            (pkgs.lib.mapAttrsToList (pkg: _: self.tested."${pkg}")
-              info.packages);
+          all-tested = mkCombined "all-tested" (builtins.concatLists
+            (pkgs.lib.mapAttrsToList (pkg: _:
+              [ self.tested."${pkg}" ]
+              ++ (if info.pseudoPackages ? "${pkg}" then
+                [ ]
+              else
+                [ self.pkgs."${pkg}" ])) info.packages));
         };
       super = pkgs.lib.recursiveUpdate super0 {
         src.pkgs = nonConsensusSrcOverrides super0.src.pkgs;
