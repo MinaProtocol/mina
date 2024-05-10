@@ -15,7 +15,6 @@
    hash_prefix_create
    pickles
    )
- (preprocessor_deps ../../config/config.mlh)
  (preprocess
   (pps ppx_custom_printf ppx_snarky ppx_version ppx_inline_test ppx_compare ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))

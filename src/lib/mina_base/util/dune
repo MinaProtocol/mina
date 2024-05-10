@@ -8,8 +8,5 @@
    snark_params
    bignum_bigint
 )
- (preprocessor_deps ../../../config/config.mlh)
- (preprocess (pps
-    ppx_version
-    ppx_optcomp))
+ (preprocess (pps ppx_version))
  (instrumentation (backend bisect_ppx)))

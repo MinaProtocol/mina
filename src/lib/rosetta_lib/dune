@@ -30,7 +30,6 @@
    unsigned_extended
    mina_base.import
  )
- (preprocessor_deps ../../config/config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_assert ppx_let ppx_sexp_conv
                   ppx_compare ppx_deriving.std ppx_custom_printf

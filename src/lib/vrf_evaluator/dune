@@ -29,6 +29,5 @@
    logger.file_system
    ppx_version.runtime
  )
- (preprocessor_deps "../../config/config.mlh")
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_jane)))
