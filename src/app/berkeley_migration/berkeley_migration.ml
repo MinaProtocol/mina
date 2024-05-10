@@ -343,10 +343,8 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
   Cli_lib.Stdout_log.setup log_json log_level ;
   Option.iter log_filename ~f:(fun log_filename ->
       Logger.Consumer_registry.register ~id:"default"
-        ~commit_id:Mina_version.commit_id
         ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
-        ~transport:(Logger_file_system.evergrowing ~log_filename)
-        () ) ;
+        ~transport:(Logger_file_system.evergrowing ~log_filename) ) ;
   let logger = Logger.create () in
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in

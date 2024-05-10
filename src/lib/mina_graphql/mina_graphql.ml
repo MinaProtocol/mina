@@ -171,8 +171,7 @@ module Mutations = struct
       ~typ:(non_null bool)
       ~args:Arg.[ arg "filter" ~typ:(non_null (list (non_null string))) ]
       ~resolve:(fun { ctx = t; _ } () filter ->
-        Result.is_ok
-        @@ Mina_lib.start_filtered_log ~commit_id:"not specified" t filter )
+        Result.is_ok @@ Mina_lib.start_filtered_log t filter )
 
   let create_account =
     io_field "createAccount"
