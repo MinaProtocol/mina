@@ -1,6 +1,6 @@
 (* protocol_version.ml *)
 
-[%%import "/src/config.mlh"]
+[%%import "/src/config/config.mlh"]
 
 (* see RFC 0049 for details *)
 

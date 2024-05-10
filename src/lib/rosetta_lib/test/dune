@@ -13,6 +13,6 @@
    rosetta_lib
    rosetta_coding
 )
- (preprocessor_deps ../../../config.mlh)
+ (preprocessor_deps ../../../config/config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp)))

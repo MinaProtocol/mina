@@ -34,7 +34,7 @@
    kimchi_backend_common
    ppx_version.runtime
  )
- (preprocessor_deps ../../config.mlh)
+ (preprocessor_deps ../../config/config.mlh)
  (preprocess
   (pps ppx_version ppx_mina ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash
        ppx_let ppx_inline_test ppx_compare ppx_deriving_yojson ppx_assert))

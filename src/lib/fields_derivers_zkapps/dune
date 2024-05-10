@@ -28,7 +28,7 @@
  )
  (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../config.mlh)
+ (preprocessor_deps ../../config/config.mlh)
  (preprocess
   (pps
    ppx_annot

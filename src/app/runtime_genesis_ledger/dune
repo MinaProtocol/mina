@@ -25,6 +25,6 @@
    consensus
    mina_base
  )
- (preprocessor_deps ../../config.mlh)
+ (preprocessor_deps ../../config/config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_let ppx_optcomp ppx_deriving_yojson)))

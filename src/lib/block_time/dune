@@ -3,7 +3,7 @@
  (public_name block_time)
  (library_flags -linkall)
  (inline_tests (flags -verbose -show-counts))
- (preprocessor_deps ../../config.mlh)
+ (preprocessor_deps ../../config/config.mlh)
  (libraries
    ;; opam libraries
    integers

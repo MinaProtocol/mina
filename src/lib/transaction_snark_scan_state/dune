@@ -45,7 +45,7 @@
    mina_wire_types
    internal_tracing
  )
- (preprocessor_deps ../../config.mlh)
+ (preprocessor_deps ../../config/config.mlh)
  (preprocess
   (pps ppx_base ppx_mina ppx_version ppx_let ppx_sexp_conv ppx_bin_prot ppx_custom_printf
        ppx_compare ppx_deriving_yojson ppx_optcomp))

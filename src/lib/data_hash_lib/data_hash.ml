@@ -1,6 +1,6 @@
 (* data_hash.ml *)
 
-[%%import "/src/config.mlh"]
+[%%import "/src/config/config.mlh"]
 
 open Core_kernel
 open Snark_params.Tick

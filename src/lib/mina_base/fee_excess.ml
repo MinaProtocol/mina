@@ -28,7 +28,7 @@
     implementation.
 *)
 
-[%%import "/src/config.mlh"]
+[%%import "/src/config/config.mlh"]
 
 open Core_kernel
 

@@ -1,4 +1,4 @@
-[%%import "/src/config.mlh"]
+[%%import "/src/config/config.mlh"]
 
 type t = Testnet | Mainnet | Other_network of string
 

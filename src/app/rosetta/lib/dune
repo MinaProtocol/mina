@@ -52,7 +52,7 @@
   mina_numbers
   mina_transaction)
  (preprocessor_deps
-  ../../../config.mlh
+  ../../../config/config.mlh
   ../../../graphql-ppx-config.inc
   ../../../../graphql_schema.json)
  (instrumentation

@@ -1,6 +1,6 @@
 (* transaction_union_payload.ml *)
 
-[%%import "/src/config.mlh"]
+[%%import "/src/config/config.mlh"]
 
 open Core_kernel
 open Currency

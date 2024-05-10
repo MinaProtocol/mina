@@ -1,6 +1,6 @@
 (* snark_params_nonconsensus.ml *)
 
-[%%import "/src/config.mlh"]
+[%%import "/src/config/config.mlh"]
 
 [%%ifdef consensus_mechanism]
 

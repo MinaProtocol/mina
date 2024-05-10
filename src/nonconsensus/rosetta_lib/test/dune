@@ -15,6 +15,6 @@
   (or
    (= %{profile} nonconsensus_mainnet)
    (= %{profile} nonconsensus_medium_curves)))
- (preprocessor_deps ../../../config.mlh)
+ (preprocessor_deps ../../../config/config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_optcomp)))

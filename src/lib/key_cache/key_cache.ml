@@ -1,7 +1,7 @@
 open Core_kernel
 open Async_kernel
 
-[%%import "/src/config.mlh"]
+[%%import "/src/config/config.mlh"]
 
 module Spec = struct
   type t =

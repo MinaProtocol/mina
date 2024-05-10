@@ -23,7 +23,7 @@
    snark_params
    snarky.backendless
  )
- (preprocessor_deps ../../config.mlh)
+ (preprocessor_deps ../../config/config.mlh)
  (preprocess
   (pps ppx_jane ppx_annot ppx_snarky ppx_here ppx_mina ppx_version))
  (instrumentation (backend bisect_ppx))

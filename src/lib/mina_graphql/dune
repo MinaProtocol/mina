@@ -109,5 +109,5 @@
    itn_logger
  )
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../config.mlh)
+ (preprocessor_deps ../../config/config.mlh)
  (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make)))

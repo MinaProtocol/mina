@@ -1,6 +1,6 @@
 (* receipt.ml *)
 
-[%%import "/src/config.mlh"]
+[%%import "/src/config/config.mlh"]
 
 open Core_kernel
 module B58_lib = Base58_check

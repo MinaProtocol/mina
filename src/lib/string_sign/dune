@@ -20,7 +20,7 @@
    mina_signature_kind
    mina_base
  )
- (preprocessor_deps ../../config.mlh)
+ (preprocessor_deps ../../config/config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_jane ppx_version ppx_inline_test))
  (synopsis "Schnorr signatures for strings"))

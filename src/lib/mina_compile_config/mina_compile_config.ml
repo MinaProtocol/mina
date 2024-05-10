@@ -1,4 +1,4 @@
-[%%import "/src/config.mlh"]
+[%%import "/src/config/config.mlh"]
 
 (** This file consists of compile-time constants that are not in
     Genesis_constants.

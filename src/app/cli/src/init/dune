@@ -124,7 +124,7 @@
    internal_tracing
  )
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../../../config.mlh
+ (preprocessor_deps ../../../../config/config.mlh
                     ../../../../../graphql_schema.json
                     ../../../../graphql-ppx-config.inc)
  (preprocess (pps ppx_deriving_yojson ppx_mina ppx_version
