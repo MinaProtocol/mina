@@ -1194,9 +1194,10 @@ let
         nativeBuildInputs = s.nativeBuildInputs ++ [ pkgs.libp2p_helper ];
       });
     in pkgs.lib.recursiveUpdate super {
-      pkgs.mina_version = super.pkgs.mina_version.overrideAttrs {
-        MINA_COMMIT_SHA1 = inputs.self.sourceInfo.rev or "<dirty>";
-      };
+      pkgs.mina_version_compiled =
+        super.pkgs.mina_version_compiled.overrideAttrs {
+          MINA_COMMIT_SHA1 = inputs.self.sourceInfo.rev or "<dirty>";
+        };
       pkgs.kimchi_bindings =
         super.pkgs.kimchi_bindings.overrideAttrs marlinPlonkStubs;
       pkgs.kimchi_types =
