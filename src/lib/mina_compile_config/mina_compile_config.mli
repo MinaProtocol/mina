@@ -22,8 +22,6 @@ val rpc_heartbeat_timeout_sec : float
 
 val rpc_heartbeat_send_every_sec : float
 
-val generate_genesis_proof : bool
-
 val zkapp_proof_update_cost : float
 
 val zkapp_signed_pair_update_cost : float

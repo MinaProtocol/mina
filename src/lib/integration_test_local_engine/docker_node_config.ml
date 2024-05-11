@@ -61,7 +61,6 @@ module Base_node_config = struct
     ; log_level : string
     ; log_snark_work_gossip : bool
     ; log_txn_pool_gossip : bool
-    ; generate_genesis_proof : bool
     ; client_port : string
     ; rest_port : string
     ; external_port : string
@@ -128,7 +127,6 @@ module Base_node_config = struct
     ; peer
     ; log_snark_work_gossip = true
     ; log_txn_pool_gossip = true
-    ; generate_genesis_proof = true
     ; log_level = "Debug"
     ; client_port = PortManager.mina_internal_client_port |> Int.to_string
     ; rest_port = PortManager.mina_internal_rest_port |> Int.to_string
@@ -157,8 +155,6 @@ module Base_node_config = struct
       ; Bool.to_string t.log_snark_work_gossip
       ; "-log-txn-pool-gossip"
       ; Bool.to_string t.log_txn_pool_gossip
-      ; "-generate-genesis-proof"
-      ; Bool.to_string t.generate_genesis_proof
       ; "-client-port"
       ; t.client_port
       ; "-rest-port"
