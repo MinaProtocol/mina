@@ -47,3 +47,7 @@ val slot_tx_end : int option
 val slot_chain_end : int option
 
 val handle_unconsumed_cache_item : logger:Logger.t -> cache_name:string -> unit
+
+module Time_controller : module type of Time_controller.T
+
+module type Time_controller_intf = Time_controller_intf.S

@@ -128,3 +128,7 @@ let handle_unconsumed_cache_item ~logger ~cache_name =
     ~metadata:[ ("cache", `String (msg cache_name)) ]
 
 [%%endif]
+
+module Time_controller = Time_controller.T
+
+module type Time_controller_intf = Time_controller_intf.S

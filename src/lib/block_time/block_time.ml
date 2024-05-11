@@ -1,5 +1,3 @@
-[%%import "/src/config/config.mlh"]
-
 open Core_kernel
 open Snark_params
 open Tick
@@ -37,88 +35,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let max_value = UInt64.max_int
 
     let zero = UInt64.zero
-
-    module Controller = struct
-      [%%if time_offsets]
-
-      type t = unit -> Time.Span.t [@@deriving sexp]
-
-      (* NB: All instances are identical by construction (see basic below). *)
-      let equal _ _ = true
-
-      (* NB: All instances are identical by construction (see basic below). *)
-      let compare _ _ = 0
-
-      let time_offset = ref None
-
-      let setting_enabled = ref None
-
-      let disable_setting_offset () = setting_enabled := Some false
-
-      let enable_setting_offset () =
-        match !setting_enabled with
-        | None ->
-            setting_enabled := Some true
-        | Some true ->
-            ()
-        | Some false ->
-            failwith
-              "Cannot enable time offset mutations; it has been explicitly \
-               disabled"
-
-      let set_time_offset offset =
-        match !setting_enabled with
-        | Some true ->
-            time_offset := Some offset
-        | None | Some false ->
-            failwith "Cannot mutate the time offset"
-
-      let create offset = offset
-
-      let basic ~logger:_ () =
-        match !time_offset with
-        | Some offset ->
-            offset
-        | None ->
-            let offset =
-              let env = "MINA_TIME_OFFSET" in
-              let env_offset =
-                match Core_kernel.Sys.getenv_opt env with
-                | Some tm ->
-                    Int.of_string tm
-                | None ->
-                    let default = 0 in
-                    eprintf
-                      "Environment variable %s not found, using default of %d\n\
-                       %!"
-                      env default ;
-                    default
-              in
-              Core_kernel.Time.Span.of_int_sec env_offset
-            in
-            time_offset := Some offset ;
-            offset
-
-      let get_time_offset ~logger = basic ~logger ()
-
-      [%%else]
-
-      type t = unit [@@deriving sexp, equal, compare]
-
-      let create () = ()
-
-      let basic ~logger:_ = ()
-
-      let disable_setting_offset () = ()
-
-      let enable_setting_offset () = ()
-
-      let set_time_offset _ = failwith "Cannot mutate the time offset"
-
-      let get_time_offset _ = Core_kernel.Time.Span.of_int_sec 0
-
-      [%%endif]
-    end
 
     module B = Bits
     module Bits = Bits.UInt64
@@ -195,16 +111,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
       if Int64.(t_int64 < zero) then failwith "converting to negative timestamp" ;
       Time.of_span_since_epoch (Time.Span.of_ms (Int64.to_float t_int64))
 
-    [%%if time_offsets]
-
-    let now offset = of_time (Time.sub (Time.now ()) (offset ()))
-
-    [%%else]
-
-    let now _ = of_time (Time.now ())
-
-    [%%endif]
-
     let field_var_to_unpacked (x : Tick.Field.Var.t) =
       Tick.Field.Checked.unpack ~length:64 x
 
@@ -249,17 +155,21 @@ module Make_str (_ : Wire_types.Concrete) = struct
       (* convert to milliseconds *)
       Int64.(int64_ns / 1_000_000L) |> UInt64.of_int64
 
-    [%%if time_offsets]
+    module Controller = Mina_compile_config.Time_controller (struct
+      type time = t
 
-    let to_system_time (offset : Controller.t) (t : t) =
-      of_span_since_epoch
-        Span.(to_span_since_epoch t + of_time_span (offset ()))
+      type span = Span.t
 
-    [%%else]
+      let to_span_since_epoch = to_span_since_epoch
 
-    let to_system_time (_offset : Controller.t) (t : t) = t
+      let of_span_since_epoch = of_span_since_epoch
 
-    [%%endif]
+      let of_time = of_time
+
+      [%%define_locally Span.(( + ), of_time_span)]
+    end)
+
+    [%%define_locally Controller.(to_system_time, now)]
 
     let to_string_system_time_exn (offset : Controller.t) (t : t) : string =
       to_system_time offset t |> to_string_exn
