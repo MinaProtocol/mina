@@ -110,3 +110,21 @@ let slot_chain_end = Some slot_chain_end
 [%%inject "download_snark_keys", download_snark_keys]
 
 let () = Key_cache.set_downloads_enabled download_snark_keys
+
+[%%if cache_exceptions]
+
+let handle_unconsumed_cache_item ~logger:_ ~cache_name =
+  let open Core_kernel.Error in
+  let msg =
+    Core_kernel.sprintf "cached item was not consumed (cache name = \"%s\")"
+      cache_name
+  in
+  raise (of_string msg)
+
+[%%else]
+
+let handle_unconsumed_cache_item ~logger ~cache_name =
+  [%log error] "Unconsumed item in cache: $cache"
+    ~metadata:[ ("cache", `String (msg cache_name)) ]
+
+[%%endif]
