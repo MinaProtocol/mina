@@ -1,6 +1,6 @@
 open Ppxlib
 open Core_kernel
-open Signature_lib
+open Signature_lib_base
 
 let keypairs =
   let n = 1200 in

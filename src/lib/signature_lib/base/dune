@@ -1,6 +1,6 @@
 (library
- (name signature_lib)
- (public_name signature_lib)
+ (name signature_lib_base)
+ (public_name signature_lib_base)
  (library_flags -linkall)
  (inline_tests (flags -verbose -show-counts))
  (libraries
@@ -23,7 +23,6 @@
    bitstring_lib
    codable
    snark_params
-   mina_signature_kind
    blake2
    hash_prefix_states
    non_zero_curve_point
@@ -39,9 +38,8 @@
    h_list
    test_util
    ppx_version.runtime
-   signature_lib_base
  )
- (preprocessor_deps ../../config/config.mlh ../consensus/mechanism.mlh)
+ (preprocessor_deps ../../consensus/mechanism.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                ppx_snarky ppx_mina ppx_version ppx_custom_printf ppx_optcomp ppx_sexp_conv

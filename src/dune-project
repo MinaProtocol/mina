@@ -189,6 +189,7 @@
 (package (name sgn_type))
 (package (name sha256_lib))
 (package (name signature_lib))
+(package (name signature_lib_base))
 (package (name snark_bits))
 (package (name snark_keys_header))
 (package (name snark_keys))

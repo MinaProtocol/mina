@@ -20,7 +20,7 @@
    tuple_lib
    crs
    snarky.backendless
-   signature_lib
+   signature_lib_base
 )
  (preprocess
   (pps ppx_version ppx_jane ppxlib.metaquot))

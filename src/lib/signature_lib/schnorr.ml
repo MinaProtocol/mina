@@ -4,6 +4,7 @@
 
 module Bignum_bigint = Bigint
 open Core_kernel
+open Signature_lib_base
 
 module type Message_intf = sig
   type field
