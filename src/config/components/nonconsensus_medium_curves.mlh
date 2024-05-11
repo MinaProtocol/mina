@@ -17,7 +17,6 @@
 [%%define block_window_duration 360000]
 
 [%%define integration_tests true]
-[%%define force_updates false]
 
 [%%define print_versioned_types false]
 

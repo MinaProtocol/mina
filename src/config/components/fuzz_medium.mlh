@@ -20,7 +20,6 @@
 [%%define block_window_duration 1000]
 
 [%%define integration_tests false]
-[%%define force_updates false]
 
 [%%define download_snark_keys false]
 
