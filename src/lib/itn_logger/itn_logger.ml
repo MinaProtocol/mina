@@ -67,6 +67,14 @@ module Submit_internal_log = struct
       ~bin_response
 end
 
+(* TODO move elsewhere *)
+
+let rpc_handshake_timeout_sec = 60.0
+
+let rpc_heartbeat_timeout_sec = 60.0
+
+let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
+
 let dispatch_remote_log log =
   let open Async.Deferred.Let_syntax in
   let rpc = Submit_internal_log.rpc in
@@ -80,16 +88,11 @@ let dispatch_remote_log log =
   | Some where_to_connect -> (
       let%map res =
         Async.Rpc.Connection.with_client
-          ~handshake_timeout:
-            (Time.Span.of_sec Mina_compile_config.rpc_handshake_timeout_sec)
+          ~handshake_timeout:(Time.Span.of_sec rpc_handshake_timeout_sec)
           ~heartbeat_config:
             (Async.Rpc.Connection.Heartbeat_config.create
-               ~timeout:
-                 (Time_ns.Span.of_sec
-                    Mina_compile_config.rpc_heartbeat_timeout_sec )
-               ~send_every:
-                 (Time_ns.Span.of_sec
-                    Mina_compile_config.rpc_heartbeat_send_every_sec )
+               ~timeout:(Time_ns.Span.of_sec rpc_heartbeat_timeout_sec)
+               ~send_every:(Time_ns.Span.of_sec rpc_heartbeat_send_every_sec)
                () )
           where_to_connect
           (fun conn -> Async.Rpc.Rpc.dispatch rpc conn log)

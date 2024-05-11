@@ -390,13 +390,14 @@ let log t ~level ~module_ ~location ?(metadata = []) ?event_id fmt =
     raw t message' ;
     match level with
     | Internal ->
-        if Mina_compile_config.itn_features then
-          let timestamp = message'.timestamp in
-          let entries =
-            Itn_logger.postprocess_message ~timestamp ~message ~metadata
-          in
-          List.iter entries ~f:(fun (timestamp, message, metadata) ->
-              Itn_logger.log ~timestamp ~message ~metadata () )
+        (* TODO uncomment *)
+        (* if Mina_compile_config.itn_features then *)
+        let timestamp = message'.timestamp in
+        let entries =
+          Itn_logger.postprocess_message ~timestamp ~message ~metadata
+        in
+        List.iter entries ~f:(fun (timestamp, message, metadata) ->
+            Itn_logger.log ~timestamp ~message ~metadata () )
     | _ ->
         ()
   in
