@@ -1,0 +1,6 @@
+[%%import "/src/config/components/mainnet.mlh"]
+
+[%%undef compaction_interval]
+[%%undef zkapp_cmd_limit]
+[%%undef slot_tx_end]
+[%%undef slot_chain_end]

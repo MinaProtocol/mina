@@ -1,0 +1,36 @@
+[%%import "/src/config/components/ledger_depth/full.mlh"]
+[%%import "/src/config/components/curve/medium.mlh"]
+[%%import "/src/config/components/coinbase/standard.mlh"]
+[%%import "/src/config/components/consensus/postake_short.mlh"]
+[%%import "/src/config/components/scan_state/small.mlh"]
+[%%import "/src/config/components/debug_level/some.mlh"]
+[%%import "/src/config/components/proof_level/check.mlh"]
+[%%import "/src/config/components/txpool_size.mlh"]
+[%%import "/src/config/components/account_creation_fee/standard.mlh"]
+[%%import "/src/config/components/amount_defaults/standard.mlh"]
+[%%import "/src/config/components/protocol_version/current.mlh"]
+[%%import "/src/config/components/supercharged_coinbase_factor/one.mlh"]
+
+[%%define time_offsets true]
+
+[%%define plugins false]
+
+[%%define genesis_ledger "test_split_two_stakers"]
+[%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
+[%%define block_window_duration 10000]
+
+[%%define integration_tests true]
+[%%define force_updates false]
+
+[%%define download_snark_keys false]
+
+[%%define print_versioned_types false]
+
+[%%define test_full_epoch false]
+[%%import "/src/config/components/fork.mlh"]
+[%%import "/src/config/components/features/dev.mlh"]
+[%%undef compaction_interval]
+[%%define vrf_poll_interval 0]
+[%%undef zkapp_cmd_limit]
+[%%undef slot_tx_end]
+[%%undef slot_chain_end]

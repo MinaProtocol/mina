@@ -1,5 +1,13 @@
+; Fallback mode allows manual override in FS
 (rule
-  (targets config.mlh)
+  (target config_unpromoted.mlh)
   (mode fallback)
-  (deps (source_tree .))
-  (action (copy %{profile}.mlh config.mlh)))
+  (deps (source_tree components))
+  (action (copy components/%{profile}.mlh config_unpromoted.mlh)))
+
+; Promotion is needed for ocaml-lsp to pick up the config
+(rule
+  (target config.mlh)
+  (mode promote)
+  (deps config_unpromoted.mlh)
+  (action (copy config_unpromoted.mlh config.mlh)))

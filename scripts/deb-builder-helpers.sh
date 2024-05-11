@@ -171,8 +171,8 @@ copy_common_daemon_configs() {
   # Copy over Build Configs (based on $2)
   mkdir -p "${BUILDDIR}/etc/coda/build_config"
   # Use parameter expansion to either return "mainnet.mlh" or "devnet.mlh"
-  cp "../src/config/${2//test/dev}.mlh" "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
-  rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
+  cp "../src/config/components/${2//test/dev}.mlh" "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
+  rsync -Huav ../src/config/components/* "${BUILDDIR}/etc/coda/build_config/."
 
   mkdir -p "${BUILDDIR}/var/lib/coda"
 

@@ -79,7 +79,7 @@ Verify that online docs https://codaprotocol.com/docs/getting-started are update
 Monitor the health of the QA-net by checking the logs (https://console.cloud.google.com/kubernetes), grafana dashboard (https://o1testnet.grafana.net), node status, and other tools. Check for
 1. Crashes
 2. Forks
-3. Expected transactions per second(TPS): TPS is currently a compile time configuration and all the compile-time constants for the testnet/qa-net are defined in `src/config/testnet_postake_medium_curves.mlh`. The file consists of configuration for TPS such as `[%%import "/src/config/scan_state/standard.mlh"]` or `[%%import "/src/config/scan_state/medium.mlh"]`. Each of these files indirectly defines maximum reachable TPS via scan state size(`transaction_capacity_log_2`). Verify this against the observed value on the grafana dashboard.
+3. Expected transactions per second(TPS): TPS is currently a compile time configuration and all the compile-time constants for the testnet/qa-net are defined in `src/config/testnet_postake_medium_curves.mlh`. The file consists of configuration for TPS such as `[%%import "/src/config/components/scan_state/standard.mlh"]` or `[%%import "/src/config/components/scan_state/medium.mlh"]`. Each of these files indirectly defines maximum reachable TPS via scan state size(`transaction_capacity_log_2`). Verify this against the observed value on the grafana dashboard.
 4. Blocks being produced consistently
 
 Report the status of the network and testing to the rest of the team on `#qa-net-discussion` channel.

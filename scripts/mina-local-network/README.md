@@ -83,7 +83,7 @@
 It is possible to run faster and less resources demanding networks.  
 First of all you need to either:
 
-- Build `Mina` using [lightnet](https://github.com/MinaProtocol/mina/tree/develop/src/config/lightnet.mlh) Dune profile:
+- Build `Mina` using [lightnet](https://github.com/MinaProtocol/mina/tree/develop/src/config/components/lightnet.mlh) Dune profile:
 
   ```shell
        MINA_COMMIT_SHA1=$(git rev-parse HEAD) \

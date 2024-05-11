@@ -4,8 +4,8 @@
 /dockerfiles/ @MinaProtocol/infra-eng-reviewers
 /scripts/ @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
 /Makefile @MinaProtocol/infra-eng-reviewers
-/src/config/dev.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
-/src/config/testnet_postake_medium_curves.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
+/src/config/components/dev.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
+/src/config/components/testnet_postake_medium_curves.mlh @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
 /CODE_OF_CONDUCT.md @aneesharaines
 /CONTRIBUTING.md @MinaProtocol/product-eng-reviewers
 /LICENSE @aneesharaines
