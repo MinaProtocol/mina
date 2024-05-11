@@ -1,4 +1,4 @@
-[%%import "/src/config/config.mlh"]
+[%%import "/src/lib/consensus/mechanism.mlh"]
 
 module Set_or_keep = struct
   module V1 = struct

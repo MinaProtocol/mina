@@ -1,6 +1,6 @@
 (* bits.ml *)
 
-[%%import "/src/config/config.mlh"]
+[%%import "/src/lib/consensus/mechanism.mlh"]
 
 open Core_kernel
 open Fold_lib

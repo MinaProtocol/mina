@@ -79,7 +79,7 @@
    internal_tracing
    o1trace
  )
- (preprocessor_deps "../../config/config.mlh")
+ (preprocessor_deps "mechanism.mlh")
  (preprocess
   (pps
     h_list.ppx
@@ -109,3 +109,15 @@
  (preprocess (pps ppx_version ppx_jane))
  (enabled_if false) ;; Compilation is disabled until this executable has been fixed.
 )
+
+(rule
+  (target mechanism.mlh)
+  (mode fallback)
+  (enabled_if (not (or (= %{profile} "nonconsensus_mainnet") (= %{profile} "nonconsensus_medium_curves"))))
+  (action (write-file mechanism.mlh "[%%define consensus_mechanism \"proof_of_stake\"]")))
+
+(rule
+  (target mechanism.mlh)
+  (mode fallback)
+  (enabled_if (or (= %{profile} "nonconsensus_mainnet") (= %{profile} "nonconsensus_medium_curves")))
+  (action (write-file mechanism.mlh "")))

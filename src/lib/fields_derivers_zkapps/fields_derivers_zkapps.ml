@@ -1,4 +1,4 @@
-[%%import "/src/config/config.mlh"]
+[%%import "/src/lib/consensus/mechanism.mlh"]
 
 open Core_kernel
 module Field = Snark_params.Tick.Field

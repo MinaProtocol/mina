@@ -1,5 +1,7 @@
 [%%import "/src/config/config.mlh"]
 
+[%%import "/src/lib/consensus/mechanism.mlh"]
+
 module Bignum_bigint = Bigint
 open Core_kernel
 

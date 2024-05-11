@@ -1,6 +1,6 @@
 (* data_hash.ml *)
 
-[%%import "/src/config/config.mlh"]
+[%%import "/src/lib/consensus/mechanism.mlh"]
 
 open Core_kernel
 open Snark_params.Tick

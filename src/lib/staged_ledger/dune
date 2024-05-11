@@ -72,7 +72,7 @@
    internal_tracing
    cache_dir
  )
- (preprocessor_deps ../../config/config.mlh)
+ (preprocessor_deps ../../config/config.mlh ../consensus/mechanism.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                ppx_optcomp lens.ppx_deriving ppx_mina ppx_version ppx_bin_prot ppx_fields_conv ppx_sexp_conv ppx_compare ppx_deriving.make

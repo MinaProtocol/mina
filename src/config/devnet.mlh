@@ -11,7 +11,6 @@
 [%%import "/src/config/supercharged_coinbase_factor/one.mlh"]
 
 (* custom consensus parameters for the testnet release *)
-[%%define consensus_mechanism "proof_of_stake"]
 [%%define k 290]
 [%%define delta 0]
 [%%define slots_per_epoch 7140]

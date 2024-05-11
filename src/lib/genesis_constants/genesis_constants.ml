@@ -1,3 +1,5 @@
+[%%import "/src/lib/consensus/mechanism.mlh"]
+
 [%%import "/src/config/config.mlh"]
 
 open Core_kernel

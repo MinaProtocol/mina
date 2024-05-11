@@ -1,6 +1,6 @@
 (* state_hash.ml -- defines the type for the protocol state hash *)
 
-[%%import "/src/config/config.mlh"]
+[%%import "/src/lib/consensus/mechanism.mlh"]
 
 open Core_kernel
 open Snark_params.Tick

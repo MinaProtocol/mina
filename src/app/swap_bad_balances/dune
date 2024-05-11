@@ -23,6 +23,5 @@
    mina_stdlib
    logger
  )
- (preprocessor_deps ../../config/config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_mina ppx_let ppx_hash ppx_compare ppx_sexp_conv)))

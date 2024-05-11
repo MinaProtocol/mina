@@ -32,7 +32,7 @@
   (or
    (= %{profile} nonconsensus_mainnet)
    (= %{profile} nonconsensus_medium_curves)))
- (preprocessor_deps ../../config/config.mlh)
+ (preprocessor_deps ../../config/config.mlh ../../lib/consensus/mechanism.mlh)
  (preprocess
   (pps ppx_mina ppx_version ppx_optcomp ppx_sexp_conv
        ppx_custom_printf ppx_bin_prot ppx_hash ppx_compare ppx_compare ppx_deriving_yojson

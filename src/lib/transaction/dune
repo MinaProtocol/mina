@@ -33,7 +33,7 @@
    mina_wire_types
  )
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../config/config.mlh)
+ (preprocessor_deps ../consensus/mechanism.mlh)
  (preprocess
   (pps
     h_list.ppx

@@ -1,5 +1,7 @@
 [%%import "/src/config/config.mlh"]
 
+[%%import "/src/lib/consensus/mechanism.mlh"]
+
 (* Only show stdout for failed inline tests. *)
 open Inline_test_quiet_logs
 open Core_kernel

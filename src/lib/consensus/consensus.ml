@@ -1,4 +1,4 @@
-[%%import "/src/config/config.mlh"]
+[%%import "mechanism.mlh"]
 
 module Intf = Intf
 

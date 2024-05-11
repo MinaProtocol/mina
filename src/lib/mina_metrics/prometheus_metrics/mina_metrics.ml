@@ -1,5 +1,3 @@
-[%%import "/src/config/config.mlh"]
-
 open Core_kernel
 
 (* We re-export a constrained subset of prometheus to keep consumers of this
@@ -13,7 +11,8 @@ open Async_kernel
 
 let time_offset_sec = 1609459200.
 
-[%%inject "block_window_duration", block_window_duration]
+(* TODO configure in runtime based on block window *)
+let tick_interval_int = 180000
 
 (* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 module TextFormat_0_0_4 = struct
@@ -435,11 +434,10 @@ module Network = struct
     Counter.v "messages_received" ~help ~namespace ~subsystem
 
   module Delay_time_spec = struct
-    let tick_interval =
-      Core.Time.Span.of_ms (Int.to_float block_window_duration)
+    let tick_interval = Core.Time.Span.of_ms (Int.to_float tick_interval_int)
 
     let rolling_interval =
-      Core.Time.Span.of_ms (Int.to_float (block_window_duration * 20))
+      Core.Time.Span.of_ms (Int.to_float (tick_interval_int * 20))
   end
 
   module Block = struct
@@ -1446,17 +1444,17 @@ module Block_latency = struct
 
   module Latency_time_spec = struct
     let tick_interval =
-      Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
+      Core.Time.Span.of_ms (Int.to_float (tick_interval_int / 2))
 
     let rolling_interval =
-      Core.Time.Span.of_ms (Int.to_float (block_window_duration * 20))
+      Core.Time.Span.of_ms (Int.to_float (tick_interval_int * 20))
   end
 
   module Gossip_slots =
     Moving_bucketed_average
       (struct
         let bucket_interval =
-          Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
+          Core.Time.Span.of_ms (Int.to_float (tick_interval_int / 2))
 
         let num_buckets = 40
 

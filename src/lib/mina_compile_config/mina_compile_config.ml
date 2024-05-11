@@ -108,3 +108,7 @@ let slot_chain_end : int option = None
 let slot_chain_end = Some slot_chain_end
 
 [%%endif]
+
+[%%inject "download_snark_keys", download_snark_keys]
+
+let () = Key_cache.set_downloads_enabled download_snark_keys

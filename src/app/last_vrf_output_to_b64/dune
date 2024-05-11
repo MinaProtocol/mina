@@ -9,6 +9,5 @@
    hex
    ;; local libraries
  )
- (preprocessor_deps ../../config/config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version)))

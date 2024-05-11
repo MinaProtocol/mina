@@ -1,5 +1,5 @@
 module type Full = sig
-  [%%import "../../config/config.mlh"]
+  [%%import "mechanism.mlh"]
 
   module Intf : module type of Intf
 

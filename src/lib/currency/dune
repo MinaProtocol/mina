@@ -34,7 +34,7 @@
    kimchi_backend_common
    ppx_version.runtime
  )
- (preprocessor_deps ../../config/config.mlh)
+ (preprocessor_deps ../consensus/mechanism.mlh)
  (preprocess
   (pps
    ppx_annot

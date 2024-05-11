@@ -1,5 +1,7 @@
 [%%import "/src/config/config.mlh"]
 
+[%%import "/src/lib/consensus/mechanism.mlh"]
+
 open Core_kernel
 open Mina_base
 
