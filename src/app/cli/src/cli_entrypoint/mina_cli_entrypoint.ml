@@ -8,12 +8,6 @@ open Signature_lib
 open Init
 module YJ = Yojson.Safe
 
-[%%if record_async_backtraces]
-
-let () = Async.Scheduler.set_record_backtraces true
-
-[%%endif]
-
 type mina_initialization =
   { mina : Mina_lib.t
   ; client_trustlist : Unix.Cidr.t list option
@@ -48,19 +42,14 @@ let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
   in
   Blake2.to_hex b2
 
-[%%if plugins]
-
 let plugin_flag =
   let open Command.Param in
-  flag "--load-plugin" ~aliases:[ "load-plugin" ] (listed string)
-    ~doc:
-      "PATH The path to load a .cmxs plugin from. May be passed multiple times"
-
-[%%else]
-
-let plugin_flag = Command.Param.return []
-
-[%%endif]
+  if Mina_compile_config.with_plugins then
+    flag "--load-plugin" ~aliases:[ "load-plugin" ] (listed string)
+      ~doc:
+        "PATH The path to load a .cmxs plugin from. May be passed multiple \
+         times"
+  else return []
 
 let load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level config_files =
   let%bind config_jsons =

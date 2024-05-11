@@ -1,5 +1,3 @@
-[%%import "/src/config/config.mlh"]
-
 open Core_kernel
 open Mina_base_util
 open Fold_lib
@@ -215,16 +213,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     let var_of_t t : var =
       List.map (Fold.to_list @@ fold t) ~f:Boolean.var_of_value
 
-    [%%if proof_level = "check"]
-
-    let warn_improper_transport () = ()
-
-    [%%else]
-
     let warn_improper_transport () =
-      printf "WARNING: improperly transporting staged-ledger-hash\n"
-
-    [%%endif]
+      if not @@ Genesis_constants.Proof_level.(equal compiled Check) then
+        printf "WARNING: improperly transporting staged-ledger-hash\n"
 
     let typ : (var, value) Typ.t =
       Typ.transport (Typ.list ~length:length_in_bits Boolean.typ)
@@ -319,13 +310,13 @@ module Make_str (A : Wire_types.Concrete) = struct
     Random_oracle.Input.Chunked.(
       append
         (Non_snark.to_input non_snark)
-        (field (pending_coinbase_hash :> Field.t)))
+        (field (pending_coinbase_hash :> Field.t)) )
 
   let var_to_input ({ non_snark; pending_coinbase_hash } : var) =
     Random_oracle.Input.Chunked.(
       append
         (Non_snark.var_to_input non_snark)
-        (field (Pending_coinbase.Hash.var_to_hash_packed pending_coinbase_hash)))
+        (field (Pending_coinbase.Hash.var_to_hash_packed pending_coinbase_hash)) )
 
   let typ : (var, t) Typ.t =
     Typ.of_hlistable

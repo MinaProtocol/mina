@@ -132,3 +132,11 @@ let handle_unconsumed_cache_item ~logger ~cache_name =
 module Time_controller = Time_controller.T
 
 module type Time_controller_intf = Time_controller_intf.S
+
+[%%if record_async_backtraces]
+
+let () = Async.Scheduler.set_record_backtraces true
+
+[%%endif]
+
+[%%inject "with_plugins", plugins]
