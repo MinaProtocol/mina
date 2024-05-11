@@ -436,14 +436,6 @@ module T = struct
       (Ledger.merkle_root ledger)
       pending_coinbase_collection
 
-  [%%if call_logger]
-
-  let hash t =
-    Mina_debug.Call_logger.record_call "Staged_ledger.hash" ;
-    hash t
-
-  [%%endif]
-
   let ledger { ledger; _ } = ledger
 
   let create_exn ~constraint_constants ~ledger : t =

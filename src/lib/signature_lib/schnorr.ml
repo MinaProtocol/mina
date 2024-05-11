@@ -260,17 +260,6 @@ module Make
     | exception _ ->
         false
 
-  [%%if call_logger]
-
-  let verify s pk m =
-    Mina_debug.Call_logger.record_call "Signature_lib.Schnorr.verify" ;
-    if Random.int 1000 = 0 then (
-      print_endline "SCHNORR BACKTRACE:" ;
-      Printexc.print_backtrace stdout ) ;
-    verify s pk m
-
-  [%%endif]
-
   module Checked = struct
     let to_bits x =
       Field.Checked.choose_preimage_var x ~length:Field.size_in_bits

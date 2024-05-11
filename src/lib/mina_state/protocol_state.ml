@@ -315,14 +315,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           hash
     else state.body.genesis_state_hash
 
-  [%%if call_logger]
-
-  let hash s =
-    Mina_debug.Call_logger.record_call "Protocol_state.hash" ;
-    hash s
-
-  [%%endif]
-
   let negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
       ~consensus_constants ~genesis_body_reference =
     { Poly.Stable.Latest.previous_state_hash =
