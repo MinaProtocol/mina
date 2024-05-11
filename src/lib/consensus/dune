@@ -111,13 +111,20 @@
 )
 
 (rule
-  (target mechanism.mlh)
+  (target mechanism_unpromoted.mlh)
   (mode fallback)
   (enabled_if (not (or (= %{profile} "nonconsensus_mainnet") (= %{profile} "nonconsensus_medium_curves"))))
-  (action (write-file mechanism.mlh "[%%define consensus_mechanism \"proof_of_stake\"]")))
+  (action (write-file mechanism_unpromoted.mlh "[%%define consensus_mechanism \"proof_of_stake\"]")))
 
 (rule
-  (target mechanism.mlh)
+  (target mechanism_unpromoted.mlh)
   (mode fallback)
   (enabled_if (or (= %{profile} "nonconsensus_mainnet") (= %{profile} "nonconsensus_medium_curves")))
-  (action (write-file mechanism.mlh "")))
+  (action (write-file mechanism_unpromoted.mlh "")))
+
+; Promotion is needed for ocaml-lsp to pick up the config
+(rule
+  (target mechanism.mlh)
+  (mode promote)
+  (deps mechanism_unpromoted.mlh)
+  (action (copy mechanism_unpromoted.mlh mechanism.mlh)))
