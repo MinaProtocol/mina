@@ -22,20 +22,22 @@ let
 
   # Extra packages which are not in opam.export but useful for development, such as an LSP server.
   extra-packages = with implicit-deps; {
-    dune-rpc = "3.5.0";
-    dyn = "3.5.0";
-    fiber = "3.5.0";
-    chrome-trace = "3.5.0";
-    ocaml-lsp-server = "1.15.1-4.14";
-    ocamlc-loc = "3.5.0";
+    dune-rpc = "3.15.2";
+    dyn = "3.15.2";
+    fiber = "3.7.0";
+    chrome-trace = "3.15.2";
+    ocaml-lsp-server = "1.16.0-4.14";
+    ocamlc-loc = "3.15.2";
     ocaml-system = ocaml;
     ocamlformat-rpc-lib = "0.22.4";
+    camlp-streams = "5.0.1";
     omd = "1.3.2";
-    ordering = "3.5.0";
-    pp = "1.1.2";
+    ordering = "3.15.2";
+    pp = "1.2.0";
     ppx_yojson_conv_lib = "v0.15.0";
-    stdune = "3.5.0";
+    stdune = "3.15.2";
     xdg = dune;
+    merlin-lib = "4.14-414";
   };
 
   implicit-deps-overlay = self: super:
@@ -46,6 +48,12 @@ let
       };
     } else
       { }) // {
+        ocamlformat = super.ocamlformat.overrideAttrs (oa:
+          {buildInputs = oa.buildInputs ++ [ self.csexp ]; });
+
+        ocamlc-loc = super.ocamlc-loc.overrideAttrs (oa:
+          {nativeBuildInputs = oa.nativeBuildInputs ++ [ self.dune ]; });
+
         # https://github.com/Drup/ocaml-lmdb/issues/41
         lmdb = super.lmdb.overrideAttrs
           (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
