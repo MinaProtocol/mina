@@ -1028,6 +1028,7 @@ let protocol_version_status t =
   in
   let matches_daemon =
     Protocol_version.compatible_with_daemon
+      ~current:Mina_compile_config.current_protocol_version
       (Header.current_protocol_version header)
   in
   { valid_current; valid_next; matches_daemon }
@@ -1072,7 +1073,7 @@ let create (config : Config.t) ~sinks
     let%bind () =
       Trust_system.(
         record_envelope_sender config.trust_system config.logger sender
-          Actions.(Made_request, Some (action_msg, msg_args)))
+          Actions.(Made_request, Some (action_msg, msg_args)) )
     in
     let%bind result = f data_in_envelope in
     return (result, sender)
@@ -1085,7 +1086,7 @@ let create (config : Config.t) ~sinks
         incr_failed_response failed_response_counter ;
         Trust_system.(
           record_envelope_sender config.trust_system config.logger sender
-            Actions.(Requested_unknown_item, Some (action_msg, msg_args))) )
+            Actions.(Requested_unknown_item, Some (action_msg, msg_args)) ) )
       else return ()
     in
     result
@@ -1149,7 +1150,9 @@ let create (config : Config.t) ~sinks
                          (Header.current_protocol_version
                             (Mina_block.header external_transition) ) ) )
                 ; ( "daemon_current_protocol_version"
-                  , `String Protocol_version.(to_string current) )
+                  , `String
+                      (Protocol_version.to_string
+                         Mina_compile_config.current_protocol_version ) )
                 ] ) )
         in
         Trust_system.record_envelope_sender config.trust_system config.logger
@@ -1201,7 +1204,7 @@ let create (config : Config.t) ~sinks
                           , Syncable_ledger.Query.to_yojson
                               Mina_ledger.Ledger.Addr.to_yojson query )
                         ; ("error", Error_json.error_to_yojson err)
-                        ] ) ))
+                        ] ) ) )
           else return ()
     in
     return result
@@ -1564,7 +1567,7 @@ let try_non_preferred_peers (type b) t input peers ~rpc :
                     Actions.
                       ( Fulfilled_request
                       , Some ("Nonpreferred peer returned valid response", [])
-                      ))
+                      ) )
               in
               return (Ok (Envelope.Incoming.map envelope ~f:(Fn.const data)))
           | Connected { data = Ok None; _ } ->
@@ -1591,7 +1594,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
               record t.trust_system t.logger peer
                 Actions.
                   ( Fulfilled_request
-                  , Some ("Preferred peer returned valid response", []) ))
+                  , Some ("Preferred peer returned valid response", []) ) )
       in
       return (Ok (Envelope.Incoming.wrap ~data:response ~sender))
   | Connected { data = Ok None; sender; _ } ->
@@ -1603,7 +1606,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
                 Actions.
                   ( No_reply_from_preferred_peer
                   , Some ("When querying preferred peer, got no response", [])
-                  ))
+                  ) )
         | Local ->
             return ()
       in
@@ -1619,7 +1622,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
                   ( Outgoing_connection_error
                   , Some
                       ( "Error while doing RPC"
-                      , [ ("error", Error_json.error_to_yojson e) ] ) ))
+                      , [ ("error", Error_json.error_to_yojson e) ] ) ) )
         | Local ->
             return ()
       in

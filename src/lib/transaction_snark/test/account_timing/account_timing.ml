@@ -58,7 +58,7 @@ let%test_module "account timing check" =
           as_prover
             As_prover.(
               let%map checked_timing = read Account.Timing.typ checked_timing in
-              assert (Account.Timing.equal checked_timing unchecked_timing))
+              assert (Account.Timing.equal checked_timing unchecked_timing) )
         in
         let%map equal_balances_checked =
           Balance.Checked.equal checked_min_balance
@@ -295,7 +295,8 @@ let%test_module "account timing check" =
 
     (* user commands with timings *)
 
-    let constraint_constants = Genesis_constants.Constraint_constants.compiled
+    let constraint_constants =
+      Mina_compile_config.Genesis_constants.Constraint_constants.compiled
 
     let keypairss, keypairs =
       (* these tests are based on relative balance/payment amounts, don't need to
@@ -352,7 +353,7 @@ let%test_module "account timing check" =
         let stack_with_state =
           Pending_coinbase.Stack.(
             push_state state_body_hash txn_global_slot
-              Pending_coinbase.Stack.empty)
+              Pending_coinbase.Stack.empty )
         in
         match transaction with
         | Coinbase c ->
@@ -430,13 +431,13 @@ let%test_module "account timing check" =
                               Transaction_status.Failure.(
                                 equal
                                   (List.concat failuress |> List.hd_exn)
-                                  expected_failure)
+                                  expected_failure )
                           then
                             failwithf
                               "Expected transaction to fail with %s but failed \
                                with %s"
                               Transaction_status.Failure.(
-                                to_string expected_failure)
+                                to_string expected_failure )
                               failures_str ()
                       | None ->
                           failwithf
@@ -717,7 +718,7 @@ let%test_module "account timing check" =
         *)
         let amount =
           liquid_bal_100_slots
-          - Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee
+          - Fee.to_nanomina_int Mina_compile_config.minimum_user_command_fee
         in
         let%map user_command =
           let%map payment =
@@ -1064,8 +1065,7 @@ let%test_module "account timing check" =
           in
           let%bind balance =
             unless_fixed ?fixed:balance
-              Balance.(
-                gen_incl (of_mina_int_exn 1_000) (of_mina_int_exn 50_000))
+              Balance.(gen_incl (of_mina_int_exn 1_000) (of_mina_int_exn 50_000))
           in
           let%bind init_min_bal =
             unless_fixed ?fixed:init_min_bal
@@ -1086,7 +1086,7 @@ let%test_module "account timing check" =
           let to_vest =
             Amount.(
               Option.value ~default:zero @@ (init_min_amt - cliff_amt)
-              |> to_nanomina_int)
+              |> to_nanomina_int )
           in
           (* A numeric trick to get the division result rounded up instead of down. *)
           let div_rnd_up num denom = (num + denom - 1) / denom in
@@ -1095,7 +1095,7 @@ let%test_module "account timing check" =
               Amount.(
                 gen_incl
                   (of_nanomina_int_exn @@ div_rnd_up to_vest 100)
-                  (of_nanomina_int_exn @@ div_rnd_up to_vest 10))
+                  (of_nanomina_int_exn @@ div_rnd_up to_vest 10) )
           in
           let vest_time =
             if Amount.(vest_incr > zero) then
@@ -1108,7 +1108,7 @@ let%test_module "account timing check" =
               Global_slot_since_genesis.(
                 gen_incl
                   (of_int @@ Int.max 0 (to_int cliff_time - vest_time))
-                  (of_int @@ (to_int cliff_time + (2 * vest_time))))
+                  (of_int @@ (to_int cliff_time + (2 * vest_time))) )
           in
           let available_funds =
             let open Currency in
@@ -1231,7 +1231,7 @@ let%test_module "account timing check" =
             Option.value ~default:zero @@ Signed_command.amount cmd
           in
           let fee =
-            Currency.Fee.to_uint64 Currency.Fee.minimum_user_command_fee
+            Currency.Fee.to_uint64 Mina_compile_config.minimum_user_command_fee
             |> of_uint64
           in
           let total = Option.value ~default:max_int (amount + fee) in
@@ -1510,8 +1510,7 @@ let%test_module "account timing check" =
               let result =
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
                   ~constraint_constants
-                  ~global_slot:
-                    Mina_numbers.Global_slot_since_genesis.(succ zero)
+                  ~global_slot:Mina_numbers.Global_slot_since_genesis.(succ zero)
                   ~state_view:Transaction_snark_tests.Util.genesis_state_view
                   ledger zkapp_command
               in
@@ -1591,8 +1590,7 @@ let%test_module "account timing check" =
               match
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
                   ~constraint_constants
-                  ~global_slot:
-                    Mina_numbers.Global_slot_since_genesis.(succ zero)
+                  ~global_slot:Mina_numbers.Global_slot_since_genesis.(succ zero)
                   ~state_view:Transaction_snark_tests.Util.genesis_state_view
                   ledger zkapp_command
               with
@@ -1632,7 +1630,7 @@ let%test_module "account timing check" =
               Currency.Amount.(
                 add
                   (of_nanomina_int_exn balance)
-                  (of_fee constraint_constants.account_creation_fee))
+                  (of_fee constraint_constants.account_creation_fee) )
         ; zkapp_account_keypairs = [ zkapp_keypair ]
         ; memo =
             Signed_command_memo.create_from_string_exn
@@ -1690,8 +1688,7 @@ let%test_module "account timing check" =
               let result =
                 Mina_ledger.Ledger.apply_zkapp_command_unchecked
                   ~constraint_constants
-                  ~global_slot:
-                    Mina_numbers.Global_slot_since_genesis.(succ zero)
+                  ~global_slot:Mina_numbers.Global_slot_since_genesis.(succ zero)
                   ~state_view:Transaction_snark_tests.Util.genesis_state_view
                   ledger zkapp_command
               in
@@ -2122,7 +2119,7 @@ let%test_module "account timing check" =
                 ledger_init_state ;
               apply_zkapp_commands_at_slot ledger
                 Mina_numbers.Global_slot_since_genesis.(
-                  of_int (100_000 + 10_000))
+                  of_int (100_000 + 10_000) )
                 [ zkapp_command ] ) )
 
     (* same as previous test, amount is incremented by 1 *)

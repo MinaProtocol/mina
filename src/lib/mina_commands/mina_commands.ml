@@ -213,7 +213,7 @@ let chain_id_inputs (t : Mina_lib.t) =
     Lazy.force precomputed_values.constraint_system_digests
     |> List.map ~f:(fun (_, digest) -> Md5.to_hex digest)
   in
-  let protocol_version = Protocol_version.current in
+  let protocol_version = Mina_compile_config.current_protocol_version in
   let protocol_transaction_version =
     Protocol_version.transaction protocol_version
   in

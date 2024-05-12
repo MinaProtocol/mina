@@ -323,7 +323,7 @@ module As_prover_circuits = struct
 
   let get_id =
     Snarky_backendless.Cvar.(
-      function Var v -> v | _ -> failwith "should have been a var")
+      function Var v -> v | _ -> failwith "should have been a var" )
 
   let main as_prover vars
       ((b1, b2, b3) : Impl.Field.t * Impl.Field.t * Impl.Field.t) () =
@@ -386,7 +386,7 @@ module As_prover_circuits = struct
     let generate_witness_fails () =
       Alcotest.(
         check_raises "should fail accesing non existent var"
-          (Failure "vector_get") generate_witness_fails)
+          (Failure "vector_get") generate_witness_fails )
 
     (* test that as_prover doesn't affect constraints *)
     let as_prover_does_nothing () =
@@ -443,7 +443,7 @@ let out_of_circuit_impure_function () =
 let out_of_circuit_impure_function () =
   Alcotest.(
     check_raises "should fail to create constraints outside of a circuit"
-      (Failure "This function can't be run outside of a checked computation."))
+      (Failure "This function can't be run outside of a checked computation.") )
     out_of_circuit_impure_function
 
 let outside_circuit_tests =
@@ -521,7 +521,7 @@ module Improper_calls = struct
         check_raises
           "should fail to call prover functions outside as_prover block"
           (Failure "Can't evaluate prover code outside an as_prover block")
-          prover_functions_outside_prover_block)
+          prover_functions_outside_prover_block )
 
     (* There could be cases like recursive proofs where a proof
         is generated inside another and used by the outher circuit *)
@@ -575,7 +575,7 @@ module Improper_calls = struct
           "should fail to use prover functions outside prover block, even \
            inside a block of another circuit  "
           (Failure "Can't evaluate prover code outside an as_prover block")
-          prover_function_in_prover_block_of_other_circuit)
+          prover_function_in_prover_block_of_other_circuit )
   end
 
   let tests =
@@ -603,7 +603,8 @@ end
 module Protocol_circuits = struct
   (* Full because we want to be sure nothing changes *)
   let proof_level, constraint_constants =
-    Genesis_constants.(Proof_level.Full, Constraint_constants.compiled)
+    Mina_compile_config.Genesis_constants.
+      (Proof_level.Full, Constraint_constants.compiled)
 
   let print_hash print expected digest : unit =
     if print then Format.printf "expected:\n%s\n\n" expected ;

@@ -117,7 +117,7 @@ let%test_module "Composability test" =
                   ; set_delegate = Proof
                   ; set_permissions = Proof
                   ; set_verification_key =
-                      (Proof, Mina_numbers.Txn_version.current)
+                      (Proof, Mina_compile_config.current_txn_version)
                   ; set_zkapp_uri = Proof
                   ; edit_action_state = Proof
                   ; set_token_symbol = Proof
@@ -285,7 +285,7 @@ let%test_module "Composability test" =
             Account.create account_id
               Currency.Balance.(
                 Option.value_exn
-                  (add_amount zero (Currency.Amount.of_nanomina_int_exn 500)))
+                  (add_amount zero (Currency.Amount.of_nanomina_int_exn 500)) )
           in
           let _, loc =
             Ledger.get_or_create_account ledger account_id account

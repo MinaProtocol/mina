@@ -22,12 +22,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
-        [ create ~account_name:"node-a-key" ~balance:"8000000000" ()
-        ; create ~account_name:"node-b-key" ~balance:"1000000000" ()
-        ; create ~account_name:"fish1" ~balance:"3000" ()
-        ; create ~account_name:"fish2" ~balance:"3000" ()
-        ; create ~account_name:"snark-node-key" ~balance:"0" ()
-        ])
+         [ create ~account_name:"node-a-key" ~balance:"8000000000" ()
+         ; create ~account_name:"node-b-key" ~balance:"1000000000" ()
+         ; create ~account_name:"fish1" ~balance:"3000" ()
+         ; create ~account_name:"fish2" ~balance:"3000" ()
+         ; create ~account_name:"snark-node-key" ~balance:"0" ()
+         ] )
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -195,7 +195,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           edit_state = Permissions.Auth_required.Proof
         ; edit_action_state = Proof
         ; set_delegate = Proof
-        ; set_verification_key = (Proof, Mina_numbers.Txn_version.current)
+        ; set_verification_key = (Proof, Mina_compile_config.current_txn_version)
         ; set_permissions = Proof
         ; set_zkapp_uri = Proof
         ; set_token_symbol = Proof
@@ -720,7 +720,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            ~node_uri:(Network.Node.get_ingress_uri node)
            ~expected_failure:
              Network_pool.Transaction_pool.Diff_versioned.Diff_error.(
-               to_string_name Fee_payer_not_permitted_to_send) )
+               to_string_name Fee_payer_not_permitted_to_send ) )
     in
     let%bind () =
       section_hard "Verify that updated permissions are in ledger accounts"

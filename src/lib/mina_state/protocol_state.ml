@@ -1,5 +1,3 @@
-[%%import "/src/config/config.mlh"]
-
 [%%import "/src/lib/consensus/mechanism.mlh"]
 
 open Core_kernel
@@ -129,7 +127,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           (Blockchain_state.to_input blockchain_state)
           (Consensus.Data.Consensus_state.to_input consensus_state)
         |> append (field (genesis_state_hash :> Field.t))
-        |> append (Protocol_constants_checked.to_input constants))
+        |> append (Protocol_constants_checked.to_input constants) )
 
     let var_to_input
         { Poly.genesis_state_hash
@@ -147,14 +145,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       Random_oracle.Input.Chunked.(
         append blockchain_state consensus_state
         |> append (field (State_hash.var_to_hash_packed genesis_state_hash))
-        |> append constants)
+        |> append constants )
 
     let hash_checked (t : var) =
       let%bind input = var_to_input t in
       make_checked (fun () ->
           Random_oracle.Checked.(
             hash ~init:Hash_prefix.protocol_state_body (pack_input input)
-            |> State_body_hash.var_of_hash_packed) )
+            |> State_body_hash.var_of_hash_packed ) )
 
     let consensus_state { Poly.consensus_state; _ } = consensus_state
 

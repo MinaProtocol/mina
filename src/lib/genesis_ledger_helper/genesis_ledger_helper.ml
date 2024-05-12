@@ -922,9 +922,10 @@ let load_config_file filename =
 let print_config ~logger config =
   let ledger_name_json =
     Option.value ~default:`Null
-    @@ let%bind.Option ledger = config.Runtime_config.ledger in
-       let%map.Option name = ledger.name in
-       `String name
+    @@
+    let%bind.Option ledger = config.Runtime_config.ledger in
+    let%map.Option name = ledger.name in
+    `String name
   in
   let ( json_config
       , `Accounts_omitted
@@ -951,7 +952,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~proof_level ?overwrite_version (config : Runtime_config.t) =
   print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
-  let genesis_constants = Genesis_constants.compiled in
+  let genesis_constants = Mina_compile_config.Genesis_constants.compiled in
   let proof_level =
     List.find_map_exn ~f:Fn.id
       [ proof_level
@@ -963,15 +964,15 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
           | Check ->
               Check
           | None ->
-              None)
-      ; Some Genesis_constants.Proof_level.compiled
+              None )
+      ; Some Mina_compile_config.Genesis_constants.Proof_level.compiled
       ]
   in
   let constraint_constants, blockchain_proof_system_id =
     match config.proof with
     | None ->
         [%log info] "Using the compiled constraint constants" ;
-        ( Genesis_constants.Constraint_constants.compiled
+        ( Mina_compile_config.Genesis_constants.Constraint_constants.compiled
         , Some (Pickles.Verification_key.Id.dummy ()) )
     | Some config ->
         [%log info] "Using the constraint constants from the configuration file" ;
@@ -986,11 +987,15 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
           None
         in
         ( make_constraint_constants
-            ~default:Genesis_constants.Constraint_constants.compiled config
+            ~default:
+              Mina_compile_config.Genesis_constants.Constraint_constants
+              .compiled config
         , blockchain_proof_system_id )
   in
   let%bind () =
-    match (proof_level, Genesis_constants.Proof_level.compiled) with
+    match
+      (proof_level, Mina_compile_config.Genesis_constants.Proof_level.compiled)
+    with
     | _, Full | (Check | None), _ ->
         return ()
     | Full, ((Check | None) as compiled) ->

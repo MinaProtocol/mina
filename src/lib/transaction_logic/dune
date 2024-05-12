@@ -48,7 +48,9 @@
    unsigned_extended
    ppx_version.runtime
    with_hash
-   bounded_types)
+   bounded_types
+   mina_compile_config
+ )
  (instrumentation (backend bisect_ppx))
  (preprocess
   (pps

@@ -55,10 +55,11 @@ module Auth_required = struct
         | Either
         | Proof
         | Signature
-        | Impossible (* Both and either can both be subsumed in verification key.
-                        It is good to have "Either" as a separate thing to spare the owner from
-                        having to make a proof instead of a signature. Both, I'm not sure if there's
-                        a good justification for. *)
+        | Impossible
+          (* Both and either can both be subsumed in verification key.
+             It is good to have "Either" as a separate thing to spare the owner from
+             having to make a proof instead of a signature. Both, I'm not sure if there's
+             a good justification for. *)
       [@@deriving sexp, equal, compare, hash, yojson, enum]
 
       let to_latest = Fn.id
@@ -425,7 +426,8 @@ let gen ~auth_tag : t Quickcheck.Generator.t =
   let%bind set_permissions = auth_required_gen in
   let%bind set_verification_key_auth = auth_required_gen in
   let txn_version =
-    Mina_numbers.Txn_version.of_int @@ Protocol_version.(transaction current)
+    Mina_numbers.Txn_version.of_int
+    @@ Protocol_version.transaction Mina_compile_config.current_protocol_version
   in
   let%bind set_zkapp_uri = auth_required_gen in
   let%bind edit_action_state = auth_required_gen in
@@ -583,7 +585,7 @@ let user_default : t =
   ; receive = None
   ; set_delegate = Signature
   ; set_permissions = Signature
-  ; set_verification_key = (Signature, Mina_numbers.Txn_version.current)
+  ; set_verification_key = (Signature, Mina_compile_config.current_txn_version)
   ; set_zkapp_uri = Signature
   ; edit_action_state = Signature
   ; set_token_symbol = Signature
@@ -600,7 +602,7 @@ let empty : t =
   ; access = None
   ; set_delegate = None
   ; set_permissions = None
-  ; set_verification_key = (None, Mina_numbers.Txn_version.current)
+  ; set_verification_key = (None, Mina_compile_config.current_txn_version)
   ; set_zkapp_uri = None
   ; edit_action_state = None
   ; set_token_symbol = None

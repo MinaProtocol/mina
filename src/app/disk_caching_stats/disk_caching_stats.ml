@@ -174,7 +174,8 @@ module Values = struct
     let vk =
       let `VK vk, `Prover _ =
         Transaction_snark.For_tests.create_trivial_snapp
-          ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+          ~constraint_constants:
+            Mina_compile_config.Genesis_constants.Constraint_constants.compiled
           ()
       in
       vk
@@ -249,7 +250,7 @@ module Values = struct
         Some
           { app_state =
               Pickles_types.Vector.init Mina_base.Zkapp_state.Max_state_size.n
-                ~f:(fun _ -> field ())
+                ~f:(fun _ -> field () )
           ; verification_key = Some (verification_key ())
           ; zkapp_uri = zkapp_uri ()
           ; zkapp_version = zkapp_version ()
@@ -309,7 +310,8 @@ module Values = struct
         ; update =
             { app_state =
                 Pickles_types.Vector.init Mina_base.Zkapp_state.Max_state_size.n
-                  ~f:(fun _ -> Mina_base.Zkapp_basic.Set_or_keep.Set (field ()))
+                  ~f:(fun _ ->
+                    Mina_base.Zkapp_basic.Set_or_keep.Set (field ()) )
             ; delegate = Set (public_key ())
             ; verification_key = Set (verification_key ())
             ; permissions = Set (permissions ())
@@ -759,14 +761,14 @@ let () =
               side_loaded_proof_serial_times.write
               + side_loaded_proof_serial_times.hash
               + verification_key_serial_times.write
-              + verification_key_serial_times.hash) ) ) ;
+              + verification_key_serial_times.hash ) ) ) ;
   Printf.printf
     !"snark work ingest = %{Time.Span}\n"
     (Time.Span.of_ns
        ( 2.0
        *. Time.Span.to_ns
             Time.Span.(
-              ledger_proof_serial_times.write + ledger_proof_serial_times.hash)
+              ledger_proof_serial_times.write + ledger_proof_serial_times.hash )
        ) ) ;
   Printf.printf
     !"block ingest = %{Time.Span}\n"
@@ -780,7 +782,7 @@ let () =
                 side_loaded_proof_serial_times.write
                 + side_loaded_proof_serial_times.hash
                 + verification_key_serial_times.write
-                + verification_key_serial_times.hash) )
+                + verification_key_serial_times.hash ) )
      in
      let snark_works =
        Time.Span.of_ns
@@ -788,7 +790,7 @@ let () =
          *. Int.to_float Params.max_zkapp_commands_per_block
          *. Time.Span.to_ns
               Time.Span.(
-                ledger_proof_serial_times.write + ledger_proof_serial_times.hash)
+                ledger_proof_serial_times.write + ledger_proof_serial_times.hash )
          )
      in
      Time.Span.(zkapps + snark_works) ) ;
@@ -802,7 +804,7 @@ let () =
          *. Time.Span.to_ns
               Time.Span.(
                 side_loaded_proof_serial_times.read
-                + verification_key_serial_times.read) )
+                + verification_key_serial_times.read ) )
      in
      let snark_works =
        Time.Span.of_ns

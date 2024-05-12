@@ -429,7 +429,7 @@ let get_node_state t =
     Time.(
       Span.to_string_hum
       @@ Time.diff (now ())
-           (Time_ns.to_time_float_round_nearest_microsecond daemon_start_time))
+           (Time_ns.to_time_float_round_nearest_microsecond daemon_start_time) )
   in
   let%map hardware_info = Conf_dir.get_hw_info () in
   { Node_error_service.peer_id
@@ -462,12 +462,8 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
   let open Mina_incremental.Status in
   let restart_delay = Time.Span.of_min 5. in
   let offline_shutdown_delay = Time.Span.of_min 25. in
-  let after_genesis =
-    let genesis_timestamp =
-      Genesis_constants.(
-        genesis_timestamp_of_string genesis_state_timestamp_string)
-    in
-    fun () -> Time.(( >= ) (now ())) genesis_timestamp
+  let after_genesis () =
+    Time.(( >= ) (now ())) Mina_compile_config.Genesis_constants.genesis_time
   in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
@@ -480,30 +476,31 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
           | `Offline ->
               (* nothing to do if offline before genesis *)
               ( if after_genesis () then
-                match !next_helper_restart with
-                | None ->
-                    next_helper_restart :=
-                      Some
-                        (Async.Clock.Event.run_after restart_delay
-                           (fun () ->
-                             [%log info]
-                               "Offline for too long; restarting libp2p_helper" ;
-                             Mina_networking.restart_helper net ;
-                             next_helper_restart := None ;
-                             if not is_seed then
-                               match !offline_shutdown with
-                               | None ->
-                                   offline_shutdown :=
-                                     Some
-                                       (Async.Clock.Event.run_after
-                                          offline_shutdown_delay
-                                          (fun () -> raise Offline_shutdown)
-                                          () )
-                               | Some _ ->
-                                   () )
-                           () )
-                | Some _ ->
-                    () ) ;
+                  match !next_helper_restart with
+                  | None ->
+                      next_helper_restart :=
+                        Some
+                          (Async.Clock.Event.run_after restart_delay
+                             (fun () ->
+                               [%log info]
+                                 "Offline for too long; restarting \
+                                  libp2p_helper" ;
+                               Mina_networking.restart_helper net ;
+                               next_helper_restart := None ;
+                               if not is_seed then
+                                 match !offline_shutdown with
+                                 | None ->
+                                     offline_shutdown :=
+                                       Some
+                                         (Async.Clock.Event.run_after
+                                            offline_shutdown_delay
+                                            (fun () -> raise Offline_shutdown)
+                                            () )
+                                 | Some _ ->
+                                     () )
+                             () )
+                  | Some _ ->
+                      () ) ;
               let is_empty = function `Empty -> true | _ -> false in
               if is_empty first_connection then (
                 [%str_log info] Connecting ;
@@ -536,86 +533,87 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
   let observer = observe incremental_status in
   (* monitor Mina status, issue a warning if offline for too long (unless we are a seed node) *)
   ( if not is_seed then
-    let offline_timeout_min = 15.0 in
-    let offline_timeout_duration = Time.Span.of_min offline_timeout_min in
-    let offline_timeout = ref None in
-    let offline_warned = ref false in
-    let bootstrap_timeout_min = 120.0 in
-    let bootstrap_timeout_duration = Time.Span.of_min bootstrap_timeout_min in
-    let bootstrap_timeout = ref None in
-    let log_offline_warning _tm =
-      [%log error]
-        "Daemon has not received any gossip messages for %0.0f minutes; check \
-         the daemon's external port forwarding, if needed"
-        offline_timeout_min ;
-      offline_warned := true
-    in
-    let start_offline_timeout () =
-      match !offline_timeout with
-      | Some _ ->
-          ()
-      | None ->
-          offline_timeout :=
-            Some
-              (Timeout.create () offline_timeout_duration ~f:log_offline_warning)
-    in
-    let stop_offline_timeout () =
-      match !offline_timeout with
-      | Some timeout ->
-          if !offline_warned then (
-            [%log info]
-              "Daemon had been offline (no gossip messages received), now back \
-               online" ;
-            offline_warned := false ) ;
-          Timeout.cancel () timeout () ;
-          offline_timeout := None
-      | None ->
-          ()
-    in
-    let log_bootstrap_error_and_restart _tm =
-      [%log error] "Daemon has been in bootstrap for %0.0f minutes"
-        bootstrap_timeout_min ;
-      raise Bootstrap_stuck_shutdown
-    in
-    let start_bootstrap_timeout () =
-      match !bootstrap_timeout with
-      | Some _ ->
-          ()
-      | None ->
-          (* don't check bootstrap timeout before genesis *)
-          if after_genesis () then
-            bootstrap_timeout :=
+      let offline_timeout_min = 15.0 in
+      let offline_timeout_duration = Time.Span.of_min offline_timeout_min in
+      let offline_timeout = ref None in
+      let offline_warned = ref false in
+      let bootstrap_timeout_min = 120.0 in
+      let bootstrap_timeout_duration = Time.Span.of_min bootstrap_timeout_min in
+      let bootstrap_timeout = ref None in
+      let log_offline_warning _tm =
+        [%log error]
+          "Daemon has not received any gossip messages for %0.0f minutes; \
+           check the daemon's external port forwarding, if needed"
+          offline_timeout_min ;
+        offline_warned := true
+      in
+      let start_offline_timeout () =
+        match !offline_timeout with
+        | Some _ ->
+            ()
+        | None ->
+            offline_timeout :=
               Some
-                (Timeout.create () bootstrap_timeout_duration
-                   ~f:log_bootstrap_error_and_restart )
-    in
-    let stop_bootstrap_timeout () =
-      match !bootstrap_timeout with
-      | Some timeout ->
-          Timeout.cancel () timeout () ;
-          bootstrap_timeout := None
-      | None ->
-          ()
-    in
-    let handle_status_change (sync_status : Sync_status.t) =
-      ( match sync_status with
-      | `Offline ->
-          start_offline_timeout ()
-      | _ ->
-          stop_offline_timeout () ) ;
-      match sync_status with
-      | `Bootstrap ->
-          start_bootstrap_timeout ()
-      | _ ->
-          stop_bootstrap_timeout ()
-    in
-    Observer.on_update_exn observer ~f:(function
-      | Initialized sync_status ->
-          handle_status_change sync_status
-      | Changed (_old_sync_status, new_sync_status) ->
-          handle_status_change new_sync_status
-      | Invalidated ->
-          () ) ) ;
+                (Timeout.create () offline_timeout_duration
+                   ~f:log_offline_warning )
+      in
+      let stop_offline_timeout () =
+        match !offline_timeout with
+        | Some timeout ->
+            if !offline_warned then (
+              [%log info]
+                "Daemon had been offline (no gossip messages received), now \
+                 back online" ;
+              offline_warned := false ) ;
+            Timeout.cancel () timeout () ;
+            offline_timeout := None
+        | None ->
+            ()
+      in
+      let log_bootstrap_error_and_restart _tm =
+        [%log error] "Daemon has been in bootstrap for %0.0f minutes"
+          bootstrap_timeout_min ;
+        raise Bootstrap_stuck_shutdown
+      in
+      let start_bootstrap_timeout () =
+        match !bootstrap_timeout with
+        | Some _ ->
+            ()
+        | None ->
+            (* don't check bootstrap timeout before genesis *)
+            if after_genesis () then
+              bootstrap_timeout :=
+                Some
+                  (Timeout.create () bootstrap_timeout_duration
+                     ~f:log_bootstrap_error_and_restart )
+      in
+      let stop_bootstrap_timeout () =
+        match !bootstrap_timeout with
+        | Some timeout ->
+            Timeout.cancel () timeout () ;
+            bootstrap_timeout := None
+        | None ->
+            ()
+      in
+      let handle_status_change (sync_status : Sync_status.t) =
+        ( match sync_status with
+        | `Offline ->
+            start_offline_timeout ()
+        | _ ->
+            stop_offline_timeout () ) ;
+        match sync_status with
+        | `Bootstrap ->
+            start_bootstrap_timeout ()
+        | _ ->
+            stop_bootstrap_timeout ()
+      in
+      Observer.on_update_exn observer ~f:(function
+        | Initialized sync_status ->
+            handle_status_change sync_status
+        | Changed (_old_sync_status, new_sync_status) ->
+            handle_status_change new_sync_status
+        | Invalidated ->
+            () ) ) ;
   (* recompute Mina status on an interval *)
   let stabilize () = O1trace.sync_thread "stabilize_sync_status" stabilize in
   stabilize () ;
@@ -889,7 +887,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
       |> List.length
     in
     Mina_metrics.(
-      Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
+      Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work) )
   in
   let spec = work.spec.instances in
   let cb _ =
@@ -1028,7 +1026,7 @@ let next_epoch_ledger t =
   in
   if
     Mina_numbers.Length.(
-      equal root_epoch best_tip_epoch || equal best_tip_epoch zero)
+      equal root_epoch best_tip_epoch || equal best_tip_epoch zero )
   then
     (*root is in the same epoch as the best tip and so the next epoch ledger in the local state will be updated by Proof_of_stake.frontier_root_transition. Next epoch ledger in genesis epoch is the genesis ledger*)
     `Finalized
@@ -1416,7 +1414,7 @@ let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
             after
               Time.(
                 diff (now ())
-                  (Network_pool.Rate_limiter.next_expires rl (Remote us)))
+                  (Network_pool.Rate_limiter.next_expires rl (Remote us)) )
           in
           able_to_send_or_wait ()
   in
@@ -1852,8 +1850,8 @@ let create ?wallets (config : Config.t) =
             O1trace.thread "mina_networking" (fun () ->
                 Mina_networking.create config.net_config ~get_some_initial_peers
                   ~sinks
-                  ~get_staged_ledger_aux_and_pending_coinbases_at_hash:(fun query_env
-                                                                            ->
+                  ~get_staged_ledger_aux_and_pending_coinbases_at_hash:(fun
+                      query_env ->
                     O1trace.thread
                       "handle_request_get_staged_ledger_aux_and_pending_coinbases_at_hash"
                       (fun () ->
@@ -1910,8 +1908,7 @@ let create ?wallets (config : Config.t) =
                                        !"%s for ledger_hash: \
                                          %{sexp:Ledger_hash.t}"
                                        Mina_networking
-                                       .refused_answer_query_string ledger_hash ) ) )
-                    )
+                                       .refused_answer_query_string ledger_hash ) ) ) )
                   ~get_ancestry:
                     (handle_request "get_ancestry" ~f:(fun ~frontier s ->
                          s
@@ -2032,7 +2029,7 @@ let create ?wallets (config : Config.t) =
             let api_pipe, new_blocks_pipe =
               Strict_pipe.Reader.(
                 Fork.two
-                  (map downstream_pipe ~f:(fun (`Transition t, _, _) -> t)))
+                  (map downstream_pipe ~f:(fun (`Transition t, _, _) -> t)) )
             in
             (network_pipe, api_pipe, new_blocks_pipe)
           in
@@ -2060,8 +2057,8 @@ let create ?wallets (config : Config.t) =
               Strict_pipe.Reader.iter_without_pushback
                 valid_transitions_for_network
                 ~f:(fun
-                     (`Transition transition, `Source source, `Valid_cb valid_cb)
-                   ->
+                    (`Transition transition, `Source source, `Valid_cb valid_cb)
+                  ->
                   let hash =
                     Mina_block.Validated.forget transition
                     |> State_hash.With_state_hashes.state_hash
@@ -2333,7 +2330,7 @@ let best_chain_block_by_height (t : t) height =
          let block_height =
            Mina_block.(
              blockchain_length @@ With_hash.data
-             @@ Validated.forget validated_transition)
+             @@ Validated.forget validated_transition )
          in
          Unsigned.UInt32.equal block_height height )
   |> Result.of_option

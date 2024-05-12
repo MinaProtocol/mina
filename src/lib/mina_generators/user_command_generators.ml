@@ -78,7 +78,7 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
         vk
   in
   let%bind balances =
-    let min_cmd_fee = Currency.Fee.minimum_user_command_fee in
+    let min_cmd_fee = Mina_compile_config.minimum_user_command_fee in
     let min_balance =
       Currency.Fee.to_nanomina_int min_cmd_fee
       |> Int.( + ) 100_000_000_000_000_000
@@ -108,7 +108,7 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
       ; send = Either
       ; set_delegate = Either
       ; set_permissions = Either
-      ; set_verification_key = (Either, Mina_numbers.Txn_version.current)
+      ; set_verification_key = (Either, Mina_compile_config.current_txn_version)
       ; set_zkapp_uri = Either
       ; edit_action_state = Either
       ; set_token_symbol = Either
@@ -130,7 +130,10 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
   let fee_payer_keypair = List.hd_exn new_keypairs in
   let ledger =
     Ledger.create
-      ~depth:Genesis_constants.Constraint_constants.compiled.ledger_depth ()
+      ~depth:
+        Mina_compile_config.Genesis_constants.Constraint_constants.compiled
+          .ledger_depth
+      ()
   in
   List.iter2_exn account_ids accounts ~f:(fun acct_id acct ->
       match Ledger.get_or_create_account ledger acct_id acct with

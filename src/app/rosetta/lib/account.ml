@@ -32,7 +32,7 @@ module Sql = struct
   module Balance_from_last_relevant_command = struct
     let max_txns =
       Int.pow 2
-        Genesis_constants.Constraint_constants.compiled
+        Mina_compile_config.Genesis_constants.Constraint_constants.compiled
           .transaction_capacity_log_2
 
     let query_pending =

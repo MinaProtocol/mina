@@ -195,8 +195,7 @@ module Voting_for = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION) voting_for =
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name
-      ~cols:([ "value" ], typ)
+      ~table_name ~cols:([ "value" ], typ)
       (module Conn)
       (State_hash.to_base58_check voting_for)
 
@@ -216,8 +215,7 @@ module Token_symbols = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION) token_symbol =
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name
-      ~cols:([ "value" ], typ)
+      ~table_name ~cols:([ "value" ], typ)
       (module Conn)
       token_symbol
 
@@ -524,8 +522,7 @@ module Zkapp_verification_key_hashes = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (verification_key_hash : Pickles.Backend.Tick.Field.t) =
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name
-      ~cols:([ "value" ], typ)
+      ~table_name ~cols:([ "value" ], typ)
       (module Conn)
       (Pickles.Backend.Tick.Field.to_string verification_key_hash)
 
@@ -777,8 +774,7 @@ module Zkapp_uri = struct
 
   let add_if_doesn't_exist (module Conn : CONNECTION) zkapp_uri =
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name
-      ~cols:([ "value" ], typ)
+      ~table_name ~cols:([ "value" ], typ)
       (module Conn)
       zkapp_uri
 
@@ -3186,10 +3182,10 @@ module Block = struct
                   Mina_caqti.deferred_result_list_fold
                     fee_transfer_infos_with_balances ~init:()
                     ~f:(fun
-                         ()
-                         ( (fee_transfer_id, secondary_sequence_no, _, _)
-                         , (status, failure_reason) )
-                       ->
+                        ()
+                        ( (fee_transfer_id, secondary_sequence_no, _, _)
+                        , (status, failure_reason) )
+                      ->
                       Block_and_internal_command.add
                         (module Conn)
                         ~block_id ~internal_command_id:fee_transfer_id
@@ -3998,16 +3994,16 @@ module Block = struct
         List.bind missing_blocks ~f:(fun block ->
             List.map block.internal_cmds
               ~f:(fun
-                   { hash
-                   ; sequence_no
-                   ; secondary_sequence_no
-                   ; status
-                   ; failure_reason
-                   ; command_type
-                   ; fee = _
-                   ; receiver = _
-                   }
-                 ->
+                  { hash
+                  ; sequence_no
+                  ; secondary_sequence_no
+                  ; status
+                  ; failure_reason
+                  ; command_type
+                  ; fee = _
+                  ; receiver = _
+                  }
+                ->
                 { Block_and_internal_command.block_id =
                     Map.find_exn block_ids block.state_hash
                 ; internal_command_id =
@@ -4211,10 +4207,10 @@ module Block = struct
       Mina_caqti.deferred_result_list_fold internal_cmds_ids_and_seq_nos
         ~init:()
         ~f:(fun
-             ()
-             ( (internal_command, internal_command_id)
-             , (sequence_no, secondary_sequence_no) )
-           ->
+            ()
+            ( (internal_command, internal_command_id)
+            , (sequence_no, secondary_sequence_no) )
+          ->
           Block_and_internal_command.add_if_doesn't_exist
             (module Conn)
             ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
@@ -4233,10 +4229,10 @@ module Block = struct
             let (account_updates : Account_update.Simple.t list) =
               List.map account_updates
                 ~f:(fun
-                     (body : Account_update.Body.Simple.t)
-                     :
-                     Account_update.Simple.t
-                   -> { body; authorization = None_given } )
+                    (body : Account_update.Body.Simple.t)
+                    :
+                    Account_update.Simple.t
+                  -> { body; authorization = None_given } )
             in
             let%map cmd_id =
               User_command.Zkapp_command.add_if_doesn't_exist
@@ -4369,7 +4365,10 @@ module Block = struct
         (* unit tests, no canonical block, can't mark any block as canonical *)
         Deferred.Result.return ()
     | Some (highest_canonical_block_id, greatest_canonical_height) ->
-        let k_int64 = Genesis_constants.k |> Int64.of_int in
+        let k_int64 =
+          Mina_compile_config.Genesis_constants.compiled.protocol.k
+          |> Int64.of_int
+        in
         let%bind block = load (module Conn) ~id:block_id in
         if
           Int64.( > ) block.height
@@ -4729,7 +4728,9 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
   | None ->
       Deferred.unit
   | Some runtime_config -> (
-      let proof_level = Genesis_constants.Proof_level.compiled in
+      let proof_level =
+        Mina_compile_config.Genesis_constants.Proof_level.compiled
+      in
       let%bind precomputed_values =
         match%map
           Genesis_ledger_helper.init_from_config_file ~logger
@@ -4742,7 +4743,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
               (Error.to_string_hum err) ()
       in
       let constraint_constants =
-        Genesis_constants.Constraint_constants.compiled
+        Mina_compile_config.Genesis_constants.Constraint_constants.compiled
       in
       let ledger =
         Precomputed_values.genesis_ledger precomputed_values |> Lazy.force

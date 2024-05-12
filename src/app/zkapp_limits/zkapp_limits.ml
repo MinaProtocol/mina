@@ -1,7 +1,7 @@
 (*All the limits set for zkApp transactions*)
 open Core_kernel
 
-let genesis_constants = Genesis_constants.compiled
+let genesis_constants = Mina_compile_config.Genesis_constants.compiled
 
 let main () =
   let cost_limit = genesis_constants.zkapp_transaction_cost_limit in

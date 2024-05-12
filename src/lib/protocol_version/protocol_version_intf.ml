@@ -18,14 +18,12 @@ module type Full = sig
 
   val create : transaction:int -> network:int -> patch:int -> t
 
-  val current : t
-
   val get_proposed_opt : unit -> t option
 
   val set_proposed_opt : t option -> unit
 
   (** a daemon can accept blocks or RPC responses with compatible protocol versions *)
-  val compatible_with_daemon : t -> bool
+  val compatible_with_daemon : current:t -> t -> bool
 
   val to_string : t -> string
 

@@ -232,7 +232,8 @@ end
 (* Functor over user command, base ledger and transaction validator for
    mocking. *)
 module Make0
-    (Base_ledger : Intf.Base_ledger_intf) (Staged_ledger : sig
+    (Base_ledger : Intf.Base_ledger_intf)
+    (Staged_ledger : sig
       type t
 
       val ledger : t -> Base_ledger.t
@@ -397,7 +398,7 @@ struct
           ~f:(inc_map ~default_map:Account_id.Map.empty account_id) ;
         Mina_metrics.(
           Gauge.set Transaction_pool.vk_refcount_table_size
-            (Float.of_int (Zkapp_basic.F_map.Table.length t.verification_keys)))
+            (Float.of_int (Zkapp_basic.F_map.Table.length t.verification_keys)) )
 
       let dec (t : t) ~account_id ~vk_hash =
         let open Option.Let_syntax in
@@ -417,7 +418,7 @@ struct
           ~f:(Option.bind ~f:(dec_map account_id)) ;
         Mina_metrics.(
           Gauge.set Transaction_pool.vk_refcount_table_size
-            (Float.of_int (Zkapp_basic.F_map.Table.length t.verification_keys)))
+            (Float.of_int (Zkapp_basic.F_map.Table.length t.verification_keys)) )
 
       let lift_common (t : t) table_modify cmd =
         User_command.extract_vks cmd
@@ -743,7 +744,7 @@ struct
         (Sequence.length dropped_backtrack) ;
       Mina_metrics.(
         Gauge.set Transaction_pool.pool_size
-          (Float.of_int (Indexed_pool.size pool''))) ;
+          (Float.of_int (Indexed_pool.size pool'')) ) ;
       t.pool <- pool'' ;
       List.iter locally_generated_dropped ~f:(fun cmd ->
           (* If the dropped transaction was included in the winning chain, it'll
@@ -810,7 +811,7 @@ struct
                       vk_table_lift_hashed Vk_refcount_table.inc cmd ;
                       Mina_metrics.(
                         Gauge.set Transaction_pool.pool_size
-                          (Float.of_int (Indexed_pool.size pool'''))) ;
+                          (Float.of_int (Indexed_pool.size pool''')) ) ;
                       t.pool <- pool''' )
               | None ->
                   log_and_remove "Fee_payer_account not found"
@@ -832,7 +833,7 @@ struct
               : (Time.t * [ `Batch of int ]) option ) ) ;
       Mina_metrics.(
         Gauge.set Transaction_pool.pool_size
-          (Float.of_int (Indexed_pool.size pool))) ;
+          (Float.of_int (Indexed_pool.size pool)) ) ;
       t.pool <- pool
 
     let create ~constraint_constants ~consensus_constants ~time_controller
@@ -948,7 +949,7 @@ struct
                    (Sequence.length dropped) (Indexed_pool.size t.pool) ;
                  Mina_metrics.(
                    Gauge.set Transaction_pool.pool_size
-                     (Float.of_int (Indexed_pool.size new_pool))) ;
+                     (Float.of_int (Indexed_pool.size new_pool)) ) ;
                  t.pool <- new_pool ;
                  t.best_tip_diff_relay <-
                    Some
@@ -1442,7 +1443,7 @@ struct
           List.iter
             (List.init (max 0 (pool_size_after - pool_size_before)) ~f:Fn.id)
             ~f:(fun _ ->
-              Counter.inc_one Transaction_pool.transactions_added_to_pool )) ;
+              Counter.inc_one Transaction_pool.transactions_added_to_pool ) ) ;
         (* partition the results *)
         let accepted, rejected, _dropped =
           List.partition3_map add_results ~f:(function
@@ -1470,12 +1471,13 @@ struct
         match apply t diff with
         | Ok (decision, accepted, rejected) ->
             ( if not (List.is_empty accepted) then
-              Mina_metrics.(
-                Gauge.set Transaction_pool.useful_transactions_received_time_sec
-                  (let x =
-                     Time.(now () |> to_span_since_epoch |> Span.to_sec)
-                   in
-                   x -. Mina_metrics.time_offset_sec )) ) ;
+                Mina_metrics.(
+                  Gauge.set
+                    Transaction_pool.useful_transactions_received_time_sec
+                    (let x =
+                       Time.(now () |> to_span_since_epoch |> Span.to_sec)
+                     in
+                     x -. Mina_metrics.time_offset_sec ) ) ) ;
             let forget_cmd =
               Transaction_hash.User_command_with_valid_signature.command
             in
@@ -1579,8 +1581,8 @@ struct
       let rebroadcastable_txs =
         Hashtbl.to_alist t.locally_generated_uncommitted
         |> List.sort
-             ~compare:(fun (txn1, (_, `Batch batch1)) (txn2, (_, `Batch batch2))
-                      ->
+             ~compare:(fun
+                 (txn1, (_, `Batch batch1)) (txn2, (_, `Batch batch2)) ->
                let cmp = compare batch1 batch2 in
                let get_hash =
                  Transaction_hash.User_command_with_valid_signature.hash
@@ -1613,13 +1615,14 @@ struct
 end
 
 (* Use this one in downstream consumers *)
-module Make (Staged_ledger : sig
-  type t
+module Make
+    (Staged_ledger : sig
+      type t
 
-  val ledger : t -> Mina_ledger.Ledger.t
-end)
-(Transition_frontier : Transition_frontier_intf
-                         with type staged_ledger := Staged_ledger.t) :
+      val ledger : t -> Mina_ledger.Ledger.t
+    end)
+    (Transition_frontier : Transition_frontier_intf
+                             with type staged_ledger := Staged_ledger.t) :
   S with type transition_frontier := Transition_frontier.t =
   Make0 (Mina_ledger.Ledger) (Staged_ledger) (Transition_frontier)
 
@@ -1671,7 +1674,7 @@ let%test_module _ =
     let proof_level = precomputed_values.proof_level
 
     let minimum_fee =
-      Currency.Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee
+      Currency.Fee.to_nanomina_int Mina_compile_config.minimum_user_command_fee
 
     let logger = Logger.create ()
 
@@ -1690,7 +1693,9 @@ let%test_module _ =
     let dummy_state_view =
       let state_body =
         let consensus_constants =
-          let genesis_constants = Genesis_constants.for_unit_tests in
+          let genesis_constants =
+            Mina_compile_config.Genesis_constants.for_unit_tests
+          in
           Consensus.Constants.create ~constraint_constants
             ~protocol_constants:genesis_constants.protocol
         in
@@ -1930,7 +1935,8 @@ let%test_module _ =
       let trust_system = Trust_system.null () in
       let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
-          ~genesis_constants:Genesis_constants.compiled ~slot_tx_end
+          ~genesis_constants:Mina_compile_config.Genesis_constants.compiled
+          ~slot_tx_end
       in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
@@ -2133,7 +2139,7 @@ let%test_module _ =
                                   ( match p.body.preconditions.account.nonce with
                                   | Zkapp_basic.Or_ignore.Check n as c
                                     when Zkapp_precondition.Numeric.(
-                                           is_constant Tc.nonce c) ->
+                                           is_constant Tc.nonce c ) ->
                                       Zkapp_precondition.Account.nonce n.lower
                                   | _ ->
                                       Zkapp_precondition.Account.accept )
@@ -2391,7 +2397,7 @@ let%test_module _ =
       (* for testing, consider this slot to be a since-genesis slot *)
       Consensus.Data.Consensus_time.(
         of_time_exn ~constants:consensus_constants current_time
-        |> to_global_slot)
+        |> to_global_slot )
       |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
       |> Mina_numbers.Global_slot_since_genesis.of_uint32
 
@@ -2434,7 +2440,7 @@ let%test_module _ =
         let slot_end =
           Consensus.Data.Consensus_time.(
             of_time_exn ~constants:consensus_constants current_time
-            |> end_time ~constants:consensus_constants)
+            |> end_time ~constants:consensus_constants )
         in
         at (Block_time.to_time_exn slot_end)
       in
@@ -2539,7 +2545,7 @@ let%test_module _ =
           let n_block_times n =
             Int64.(
               Block_time.Span.to_ms consensus_constants.block_window_duration_ms
-              * n)
+              * n )
             |> Block_time.Span.of_ms
           in
           let%bind () =
@@ -2597,7 +2603,7 @@ let%test_module _ =
           let n_block_times n =
             Int64.(
               Block_time.Span.to_ms consensus_constants.block_window_duration_ms
-              * n)
+              * n )
             |> Block_time.Span.of_ms
           in
           let%bind () =
@@ -2745,15 +2751,15 @@ let%test_module _ =
     let%test_unit "max size is maintained" =
       Quickcheck.test ~trials:500
         (let open Quickcheck.Generator.Let_syntax in
-        let%bind init_ledger_state =
-          Mina_ledger.Ledger.gen_initial_ledger_state
-        in
-        let%bind cmds_count = Int.gen_incl pool_max_size (pool_max_size * 2) in
-        let%bind cmds =
-          User_command.Valid.Gen.sequence ~sign_type:`Real ~length:cmds_count
-            init_ledger_state
-        in
-        return (init_ledger_state, cmds))
+         let%bind init_ledger_state =
+           Mina_ledger.Ledger.gen_initial_ledger_state
+         in
+         let%bind cmds_count = Int.gen_incl pool_max_size (pool_max_size * 2) in
+         let%bind cmds =
+           User_command.Valid.Gen.sequence ~sign_type:`Real ~length:cmds_count
+             init_ledger_state
+         in
+         return (init_ledger_state, cmds) )
         ~f:(fun (init_ledger_state, cmds) ->
           Thread_safe.block_on_async_exn (fun () ->
               let%bind t = setup_test () in
@@ -3130,7 +3136,7 @@ let%test_module _ =
           let curr_slot =
             Mina_numbers.(
               Global_slot_since_hard_fork.of_uint32
-              @@ Global_slot_since_genesis.to_uint32 @@ current_global_slot ())
+              @@ Global_slot_since_genesis.to_uint32 @@ current_global_slot () )
           in
           let slot_tx_end =
             Mina_numbers.Global_slot_since_hard_fork.(succ @@ succ curr_slot)
@@ -3144,7 +3150,7 @@ let%test_module _ =
           let curr_slot =
             Mina_numbers.(
               Global_slot_since_hard_fork.of_uint32
-              @@ Global_slot_since_genesis.to_uint32 @@ current_global_slot ())
+              @@ Global_slot_since_genesis.to_uint32 @@ current_global_slot () )
           in
           let%bind t = setup_test ~slot_tx_end:curr_slot () in
           assert_pool_txs t [] ;
@@ -3155,13 +3161,13 @@ let%test_module _ =
           let curr_slot =
             Mina_numbers.(
               Global_slot_since_hard_fork.of_uint32
-              @@ Global_slot_since_genesis.to_uint32 @@ current_global_slot ())
+              @@ Global_slot_since_genesis.to_uint32 @@ current_global_slot () )
           in
           let slot_tx_end =
             Option.value_exn
             @@ Mina_numbers.(
                  Global_slot_since_hard_fork.(
-                   sub curr_slot @@ Global_slot_span.of_int 1))
+                   sub curr_slot @@ Global_slot_span.of_int 1 ) )
           in
           let%bind t = setup_test ~slot_tx_end () in
           assert_pool_txs t [] ;

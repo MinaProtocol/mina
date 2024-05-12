@@ -62,10 +62,10 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     let typ : (var, t) Typ.t =
-      let of_hlist
-            : 'public_key 'amount.
-                 (unit, 'public_key -> 'amount -> unit) H_list.t
-              -> 'public_key * 'amount =
+      let of_hlist :
+            'public_key 'amount.
+               (unit, 'public_key -> 'amount -> unit) H_list.t
+            -> 'public_key * 'amount =
         let open H_list in
         fun [ public_key; amount ] -> (public_key, amount)
       in
@@ -607,7 +607,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let data_hash t =
         Random_oracle.(
-          hash ~init:Hash_prefix_states.coinbase_stack (pack_input (to_input t)))
+          hash ~init:Hash_prefix_states.coinbase_stack (pack_input (to_input t)) )
         |> Hash_builder.of_digest
 
       let var_to_input ({ data; state } : var) =
@@ -619,7 +619,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         make_checked (fun () ->
             Random_oracle.Checked.(
               hash ~init:Hash_prefix_states.coinbase_stack
-                (pack_input (var_to_input t))) )
+                (pack_input (var_to_input t)) ) )
 
       let var_of_t t =
         { Poly.data = Coinbase_stack.var_of_t t.Poly.data
@@ -871,7 +871,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             Typ.(Address.typ ~depth * Address.typ ~depth)
             As_prover.(
               map (read Update.Action.typ action) ~f:(fun act ->
-                  Find_index_of_newest_stacks act ))
+                  Find_index_of_newest_stacks act ) )
         in
         let equal_to_zero x = Amount.(equal_var x (var_of_t zero)) in
         let%bind no_update = Update.Action.Checked.no_update action in
@@ -1000,7 +1000,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             As_prover.(
               map
                 (read (Address.typ ~depth) addr)
-                ~f:(fun a -> Get_coinbase_stack a))
+                ~f:(fun a -> Get_coinbase_stack a) )
         in
         let stack_hash = Stack.hash_var in
         let%bind prev_entry_hash = stack_hash prev in
@@ -1015,10 +1015,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         let%bind () =
           perform
             (let open As_prover in
-            let open Let_syntax in
-            let%map addr = read (Address.typ ~depth) addr
-            and next = read Stack.typ next in
-            Set_oldest_coinbase_stack (addr, next))
+             let open Let_syntax in
+             let%map addr = read (Address.typ ~depth) addr
+             and next = read Stack.typ next in
+             Set_oldest_coinbase_stack (addr, next) )
         in
         let%map new_root =
           Merkle_tree.implied_root next_entry_hash addr prev_path
@@ -1045,15 +1045,15 @@ module Make_str (A : Wire_types.Concrete) = struct
           else len
         in
         ( if i >= len then
-          let cur_hash = ref (Array.last !cached) in
-          cached :=
-            Array.append !cached
-              (Array.init
-                 (i + 1 - len)
-                 ~f:(fun i ->
-                   cur_hash :=
-                     Hash.merge ~height:(i + len - 1) !cur_hash !cur_hash ;
-                   !cur_hash ) ) ) ;
+            let cur_hash = ref (Array.last !cached) in
+            cached :=
+              Array.append !cached
+                (Array.init
+                   (i + 1 - len)
+                   ~f:(fun i ->
+                     cur_hash :=
+                       Hash.merge ~height:(i + len - 1) !cur_hash !cur_hash ;
+                     !cur_hash ) ) ) ;
         !cached.(i)
 
     let create_exn' ~depth () =
@@ -1314,7 +1314,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let%test_unit "add stack + remove stack = initial tree " =
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Mina_compile_config.Genesis_constants.Constraint_constants.for_unit_tests
     in
     let depth = constraint_constants.pending_coinbase_depth in
     let coinbases_gen =
@@ -1399,7 +1399,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   let%test_unit "Checked_stack = Unchecked_stack" =
     let open Quickcheck in
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Mina_compile_config.Genesis_constants.Constraint_constants.for_unit_tests
     in
     test ~trials:20
       (Generator.tuple2 Stack.gen (Coinbase.Gen.gen ~constraint_constants))
@@ -1422,7 +1422,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   let%test_unit "Checked_tree = Unchecked_tree" =
     let open Quickcheck in
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Mina_compile_config.Genesis_constants.Constraint_constants.for_unit_tests
     in
     let depth = constraint_constants.pending_coinbase_depth in
     let pending_coinbases = create ~depth () |> Or_error.ok_exn in
@@ -1430,14 +1430,16 @@ module Make_str (A : Wire_types.Concrete) = struct
       (Generator.tuple3
          (Coinbase.Gen.gen ~constraint_constants)
          State_body_hash.gen Mina_numbers.Global_slot_since_genesis.gen )
-      ~f:(fun ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
-              , state_body_hash
-              , global_slot ) ->
+      ~f:(fun
+          ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
+          , state_body_hash
+          , global_slot )
+        ->
         let amount = coinbase.amount in
         let is_new_stack, action =
           Currency.Amount.(
             if equal coinbase.amount zero then (true, Update.Action.Update_none)
-            else (true, Update_one))
+            else (true, Update_one) )
         in
         let unchecked =
           add_coinbase_with_zero_checks ~constraint_constants
@@ -1487,22 +1489,24 @@ module Make_str (A : Wire_types.Concrete) = struct
   let%test_unit "Checked_tree = Unchecked_tree after pop" =
     let open Quickcheck in
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Mina_compile_config.Genesis_constants.Constraint_constants.for_unit_tests
     in
     let depth = constraint_constants.pending_coinbase_depth in
     test ~trials:20
       (Generator.tuple3
          (Coinbase.Gen.gen ~constraint_constants)
          State_body_hash.gen Mina_numbers.Global_slot_since_genesis.gen )
-      ~f:(fun ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
-              , state_body_hash
-              , global_slot ) ->
+      ~f:(fun
+          ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
+          , state_body_hash
+          , global_slot )
+        ->
         let pending_coinbases = create ~depth () |> Or_error.ok_exn in
         let amount = coinbase.amount in
         let action =
           Currency.Amount.(
             if equal coinbase.amount zero then Update.Action.Update_none
-            else Update_one)
+            else Update_one )
         in
         let unchecked =
           add_coinbase_with_zero_checks ~constraint_constants
@@ -1579,7 +1583,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     let open Quickcheck in
     let module Pending_coinbase = T in
     let constraint_constants =
-      { Genesis_constants.Constraint_constants.for_unit_tests with
+      { Mina_compile_config.Genesis_constants.Constraint_constants
+        .for_unit_tests
+        with
         pending_coinbase_depth = 3
       }
     in
@@ -1606,11 +1612,11 @@ module Make_str (A : Wire_types.Concrete) = struct
           let updated =
             List.fold coinbases ~init:t'
               ~f:(fun
-                   pending_coinbases
-                   ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
-                   , state_body_hash
-                   , global_slot )
-                 ->
+                  pending_coinbases
+                  ( (coinbase, `Supercharged_coinbase supercharged_coinbase)
+                  , state_body_hash
+                  , global_slot )
+                ->
                 add_coinbase_with_zero_checks ~constraint_constants
                   (module Pending_coinbase)
                   pending_coinbases ~coinbase ~is_new_stack:false
@@ -1653,7 +1659,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           in
           let pending_coinbases' =
             List.fold ~init:pending_coinbases_updated (List.rev added_stacks)
-              ~f:(fun pc expected_stack -> remove_check pc expected_stack)
+              ~f:(fun pc expected_stack -> remove_check pc expected_stack )
           in
           let remaining_lists =
             List.drop coinbase_lists max_coinbase_stack_count
@@ -1668,7 +1674,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           (list
              (Generator.tuple3
                 (Coinbase.Gen.gen ~constraint_constants)
-                State_body_hash.gen Mina_numbers.Global_slot_since_genesis.gen ) ))
+                State_body_hash.gen Mina_numbers.Global_slot_since_genesis.gen ) ) )
     in
     test ~trials:100 coinbase_lists_gen ~f:add_remove_check
 end

@@ -1,5 +1,3 @@
-[%%import "/src/config/config.mlh"]
-
 open Core
 open Async
 open Mina_base
@@ -308,7 +306,8 @@ let setup_daemon logger =
         (sprintf
            "FEE Amount a worker wants to get compensated for generating a \
             snark proof (default: %d)"
-           (Currency.Fee.to_nanomina_int Currency.Fee.default_snark_worker_fee) )
+           (Currency.Fee.to_nanomina_int
+              Mina_compile_config.default_snark_worker_fee ) )
       (optional txn_fee)
   and work_reassignment_wait =
     flag "--work-reassignment-wait"
@@ -831,7 +830,8 @@ let setup_daemon logger =
               |> Option.map ~f:Currency.Fee.of_nanomina_int_exn
             in
             or_from_config json_to_currency_fee_option "snark-worker-fee"
-              ~default:Currency.Fee.default_snark_worker_fee snark_work_fee
+              ~default:Mina_compile_config.default_snark_worker_fee
+              snark_work_fee
           in
           let node_status_url =
             maybe_from_config YJ.Util.to_string_option "node-status-url"
@@ -1229,12 +1229,13 @@ let setup_daemon logger =
               {|No peers were given.
 
 Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
+          let current_version = Mina_compile_config.current_protocol_version in
           let chain_id =
             let protocol_transaction_version =
-              Protocol_version.(transaction current)
+              Protocol_version.transaction current_version
             in
             let protocol_network_version =
-              Protocol_version.(transaction current)
+              Protocol_version.transaction current_version
             in
             chain_id ~genesis_state_hash
               ~genesis_constants:precomputed_values.genesis_constants
@@ -1244,7 +1245,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           in
           [%log info] "Daemon will use chain id %s" chain_id ;
           [%log info] "Daemon running protocol version %s"
-            Protocol_version.(to_string current) ;
+            (Protocol_version.to_string current_version) ;
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
               { timeout = Time.Span.of_sec 3.
@@ -1690,10 +1691,13 @@ let internal_commands logger =
                  [%log info] "Prover state being logged to %s" conf_dir ;
                  let%bind prover =
                    Prover.create ~logger
-                     ~proof_level:Genesis_constants.Proof_level.compiled
+                     ~proof_level:
+                       Mina_compile_config.Genesis_constants.Proof_level
+                       .compiled
                      ~constraint_constants:
-                       Genesis_constants.Constraint_constants.compiled
-                     ~pids:(Pid.Table.create ()) ~conf_dir ()
+                       Mina_compile_config.Genesis_constants
+                       .Constraint_constants
+                       .compiled ~pids:(Pid.Table.create ()) ~conf_dir ()
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
@@ -1719,9 +1723,11 @@ let internal_commands logger =
            | `Ok sexp -> (
                let%bind worker_state =
                  Snark_worker.Prod.Inputs.Worker_state.create
-                   ~proof_level:Genesis_constants.Proof_level.compiled
+                   ~proof_level:
+                     Mina_compile_config.Genesis_constants.Proof_level.compiled
                    ~constraint_constants:
-                     Genesis_constants.Constraint_constants.compiled ()
+                     Mina_compile_config.Genesis_constants.Constraint_constants
+                     .compiled ()
                in
                let sok_message =
                  { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
@@ -1836,10 +1842,12 @@ let internal_commands logger =
            in
            let%bind verifier =
              Verifier.create ~logger
-               ~proof_level:Genesis_constants.Proof_level.compiled
+               ~proof_level:
+                 Mina_compile_config.Genesis_constants.Proof_level.compiled
                ~constraint_constants:
-                 Genesis_constants.Constraint_constants.compiled
-               ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir) ()
+                 Mina_compile_config.Genesis_constants.Constraint_constants
+                 .compiled ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir)
+               ()
            in
            let%bind result =
              match input with

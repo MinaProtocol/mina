@@ -214,8 +214,12 @@ module Make_str (A : Wire_types.Concrete) = struct
       List.map (Fold.to_list @@ fold t) ~f:Boolean.var_of_value
 
     let warn_improper_transport () =
-      if not @@ Genesis_constants.Proof_level.(equal compiled Check) then
-        printf "WARNING: improperly transporting staged-ledger-hash\n"
+      let open Genesis_constants.Proof_level in
+      if
+        not
+        @@ equal Mina_compile_config.Genesis_constants.Proof_level.compiled
+             Check
+      then printf "WARNING: improperly transporting staged-ledger-hash\n"
 
     let typ : (var, value) Typ.t =
       Typ.transport (Typ.list ~length:length_in_bits Boolean.typ)

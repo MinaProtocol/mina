@@ -16,6 +16,15 @@
 
 [%%inject "minimum_user_command_fee_string", minimum_user_command_fee]
 
+let minimum_user_command_fee =
+  Currency.Fee.of_mina_string_exn minimum_user_command_fee_string
+
+let default_transaction_fee =
+  Currency.Fee.of_mina_string_exn default_transaction_fee_string
+
+let default_snark_worker_fee =
+  Currency.Fee.of_mina_string_exn default_snark_worker_fee_string
+
 [%%inject "itn_features", itn_features]
 
 [%%ifndef compaction_interval]
@@ -53,18 +62,6 @@ let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
   The method used to estimate the cost was linear least squares.
 *)
 
-let zkapp_proof_update_cost = 10.26
-
-let zkapp_signed_pair_update_cost = 10.08
-
-let zkapp_signed_single_update_cost = 9.14
-
-let zkapp_transaction_cost_limit = 69.45
-
-let max_event_elements = 100
-
-let max_action_elements = 100
-
 [%%inject "network_id", network]
 
 [%%ifndef zkapp_cmd_limit]
@@ -78,8 +75,6 @@ let zkapp_cmd_limit = None
 let zkapp_cmd_limit = Some zkapp_cmd_limit
 
 [%%endif]
-
-let zkapp_cmd_limit_hardcap = 128
 
 let zkapps_disabled = false
 
@@ -129,10 +124,6 @@ let handle_unconsumed_cache_item ~logger ~cache_name =
 
 [%%endif]
 
-module Time_controller = Time_controller.T
-
-module type Time_controller_intf = Time_controller_intf.S
-
 [%%if record_async_backtraces]
 
 let () = Async.Scheduler.set_record_backtraces true
@@ -140,3 +131,24 @@ let () = Async.Scheduler.set_record_backtraces true
 [%%endif]
 
 [%%inject "with_plugins", plugins]
+
+include struct
+  [%%inject "transaction", protocol_version_transaction]
+
+  [%%inject "network", protocol_version_network]
+
+  [%%inject "patch", protocol_version_patch]
+
+  let current_protocol_version =
+    Protocol_version.create ~transaction ~network ~patch
+end
+
+let current_txn_version =
+  Mina_numbers.Txn_version.of_int
+  @@ Protocol_version.transaction current_protocol_version
+
+module Time_controller = Time_controller.T
+
+module type Time_controller_intf = Time_controller_intf.S
+
+module Genesis_constants = Genesis

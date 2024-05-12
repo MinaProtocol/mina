@@ -59,7 +59,9 @@ let%test_module "Epoch ledger sync tests" =
       in
       let constraint_constants = precomputed_values.constraint_constants in
       let consensus_constants =
-        let genesis_constants = Genesis_constants.for_unit_tests in
+        let genesis_constants =
+          Mina_compile_config.Genesis_constants.for_unit_tests
+        in
         Consensus.Constants.create ~constraint_constants
           ~protocol_constants:genesis_constants.protocol
       in
@@ -241,7 +243,7 @@ let%test_module "Epoch ledger sync tests" =
           Any.Creatable
             ( (module Libp2p)
             , Libp2p.create ~allow_multiple_instances:true ~pids
-                gossip_net_params ))
+                gossip_net_params ) )
       in
       let log_gossip_heard : Mina_networking.Config.log_gossip_heard =
         { snark_pool_diff = false
@@ -458,7 +460,7 @@ let%test_module "Epoch ledger sync tests" =
       let%bind () =
         match%map
           Mina_ledger.Sync_ledger.Db.fetch sync_ledger1 staking_ledger_root
-            ~data:() ~equal:(fun () () -> true)
+            ~data:() ~equal:(fun () () -> true )
         with
         | `Ok ledger ->
             let sync_ledger1_tm1 = Unix.gettimeofday () in
@@ -475,7 +477,7 @@ let%test_module "Epoch ledger sync tests" =
       let sync_ledger2 = make_sync_ledger () in
       match%bind
         Mina_ledger.Sync_ledger.Db.fetch sync_ledger2 next_epoch_ledger_root
-          ~data:() ~equal:(fun () () -> true)
+          ~data:() ~equal:(fun () () -> true )
       with
       | `Ok ledger ->
           let sync_ledger2_tm1 = Unix.gettimeofday () in

@@ -14,7 +14,8 @@ struct
       permissions =
         Zkapp_basic.Set_or_keep.Set
           { Permissions.user_default with
-            set_verification_key = (Proof, Mina_numbers.Txn_version.current)
+            set_verification_key =
+              (Proof, Mina_compile_config.current_txn_version)
           }
     }
 
@@ -44,7 +45,7 @@ let%test_module "Update account verification key permission from mainnet to \
           Zkapp_basic.Set_or_keep.Set
             { Permissions.user_default with
               set_verification_key =
-                (perm_after, Mina_numbers.Txn_version.current)
+                (perm_after, Mina_compile_config.current_txn_version)
             }
       }
 

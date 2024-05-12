@@ -73,7 +73,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let `VK vk, `Prover prover =
     Transaction_snark.For_tests.create_trivial_snapp
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
+      ~constraint_constants:
+        Mina_compile_config.Genesis_constants.Constraint_constants.compiled ()
 
   let config =
     let open Test_config in
@@ -81,10 +82,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
-        [ create ~account_name:"whale1-key" ~balance:"9000000000" ()
-        ; create ~account_name:"whale2-key" ~balance:"1000000000" ()
-        ; create ~account_name:"snark-node-key" ~balance:"100" ()
-        ])
+         [ create ~account_name:"whale1-key" ~balance:"9000000000" ()
+         ; create ~account_name:"whale2-key" ~balance:"1000000000" ()
+         ; create ~account_name:"snark-node-key" ~balance:"100" ()
+         ] )
     ; block_producers =
         [ { node_name = "whale1"; account_name = "whale1-key" }
         ; { node_name = "whale2"; account_name = "whale2-key" }
@@ -175,7 +176,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                   ; set_delegate = Proof
                   ; set_permissions = Signature
                   ; set_verification_key =
-                      (Signature, Mina_numbers.Txn_version.current)
+                      (Signature, Mina_compile_config.current_txn_version)
                   ; set_zkapp_uri = Proof
                   ; edit_action_state = Proof
                   ; set_token_symbol = Proof
@@ -334,7 +335,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           permissions =
             Zkapp_basic.Set_or_keep.Set
               { Permissions.user_default with
-                set_verification_key = (Proof, Mina_numbers.Txn_version.current)
+                set_verification_key =
+                  (Proof, Mina_compile_config.current_txn_version)
               }
         }
       in
@@ -344,7 +346,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Zkapp_basic.Set_or_keep.Set
               { Permissions.user_default with
                 set_verification_key =
-                  (Impossible, Mina_numbers.Txn_version.current)
+                  (Impossible, Mina_compile_config.current_txn_version)
               }
         }
       in

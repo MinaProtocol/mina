@@ -88,7 +88,7 @@ let received_bad_proof ({ context = (module Context); _ } as t) host e =
         ( Violated_protocol
         , Some
             ( "Bad ancestor proof: $error"
-            , [ ("error", Error_json.error_to_yojson e) ] ) ))
+            , [ ("error", Error_json.error_to_yojson e) ] ) ) )
 
 let done_syncing_root root_sync_ledger =
   Option.is_some (Sync_ledger.Db.peek_valid_tree root_sync_ledger)
@@ -106,7 +106,7 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger
       record t.trust_system logger sender
         Actions.
           ( Fulfilled_request
-          , Some ("Received verified peer root and best tip", []) ))
+          , Some ("Received verified peer root and best tip", []) ) )
   in
   t.best_seen_transition <- peer_best_tip ;
   t.current_root <- peer_root ;
@@ -275,7 +275,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                            , `Valid_cb valid_cb ) ->
                         Mina_metrics.(
                           Counter.inc_one
-                            Pipe.Drop_on_overflow.bootstrap_sync_ledger) ;
+                            Pipe.Drop_on_overflow.bootstrap_sync_ledger ) ;
                         Mina_block.handle_dropped_transition ?valid_cb
                           ( With_hash.hash
                           @@ Mina_block.Validation.block_with_hash
@@ -336,10 +336,10 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         in
         Mina_metrics.(
           Counter.inc Bootstrap.root_snarked_ledger_sync_ms
-            Time.Span.(to_ms sync_ledger_time)) ;
+            Time.Span.(to_ms sync_ledger_time) ) ;
         Mina_metrics.(
           Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
-            (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
+            (Float.of_int t.num_of_root_snarked_ledger_retargeted) ) ;
         (* step 2. Download scan state and pending coinbases. *)
         let%bind ( staged_ledger_data_download_time
                  , staged_ledger_construction_time
@@ -440,34 +440,34 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                         =
                       time_deferred
                         (let open Deferred.Let_syntax in
-                        let temp_mask =
-                          Ledger.of_database temp_snarked_ledger
-                        in
-                        let%map result =
-                          Staged_ledger
-                          .of_scan_state_pending_coinbases_and_snarked_ledger
-                            ~logger
-                            ~snarked_local_state:
-                              Mina_block.(
-                                t.current_root |> Validation.block |> header
-                                |> Header.protocol_state
-                                |> Protocol_state.blockchain_state
-                                |> Blockchain_state.snarked_local_state)
-                            ~verifier ~constraint_constants ~scan_state
-                            ~snarked_ledger:temp_mask ~expected_merkle_root
-                            ~pending_coinbases ~get_state
-                        in
-                        ignore
-                          ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__
-                              temp_mask
-                            : Ledger.unattached_mask ) ;
-                        Result.map result
-                          ~f:
-                            (const
-                               ( scan_state
-                               , pending_coinbases
-                               , new_root
-                               , protocol_states ) ))
+                         let temp_mask =
+                           Ledger.of_database temp_snarked_ledger
+                         in
+                         let%map result =
+                           Staged_ledger
+                           .of_scan_state_pending_coinbases_and_snarked_ledger
+                             ~logger
+                             ~snarked_local_state:
+                               Mina_block.(
+                                 t.current_root |> Validation.block |> header
+                                 |> Header.protocol_state
+                                 |> Protocol_state.blockchain_state
+                                 |> Blockchain_state.snarked_local_state )
+                             ~verifier ~constraint_constants ~scan_state
+                             ~snarked_ledger:temp_mask ~expected_merkle_root
+                             ~pending_coinbases ~get_state
+                         in
+                         ignore
+                           ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__
+                               temp_mask
+                             : Ledger.unattached_mask ) ;
+                         Result.map result
+                           ~f:
+                             (const
+                                ( scan_state
+                                , pending_coinbases
+                                , new_root
+                                , protocol_states ) ) )
                     in
                     Ok (staged_ledger_construction_time, construction_result) )
               in
@@ -491,7 +491,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                     , Some
                         ( "Can't find scan state from the peer or received \
                            faulty scan state from the peer."
-                        , [] ) ))
+                        , [] ) ) )
             in
             [%log error]
               ~metadata:
@@ -520,7 +520,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                 record t.trust_system logger sender
                   Actions.
                     ( Fulfilled_request
-                    , Some ("Received valid scan state from peer", []) ))
+                    , Some ("Received valid scan state from peer", []) ) )
             in
             let best_seen_block_with_hash, _ = t.best_seen_transition in
             let consensus_state =
@@ -596,7 +596,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                   with_instance_exn persistent_root ~f:(fun instance ->
                       Instance.set_root_state_hash instance
                       @@ Mina_block.Validated.state_hash
-                      @@ Mina_block.Validated.lift new_root )) ;
+                      @@ Mina_block.Validated.lift new_root ) ) ;
                 let%map new_frontier =
                   let fail msg =
                     failwith
@@ -635,7 +635,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                 in
                 let root_consensus_state =
                   Transition_frontier.(
-                    Breadcrumb.consensus_state_with_hashes (root new_frontier))
+                    Breadcrumb.consensus_state_with_hashes (root new_frontier) )
                 in
                 let filtered_collected_transitions =
                   List.filter collected_transitions
@@ -686,7 +686,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           ] ;
       Mina_metrics.(
         Gauge.set Bootstrap.bootstrap_time_ms
-          Core.Time.(Span.to_ms @@ time_elapsed)) ;
+          Core.Time.(Span.to_ms @@ time_elapsed) ) ;
       result )
 
 let%test_module "Bootstrap_controller tests" =
@@ -694,7 +694,8 @@ let%test_module "Bootstrap_controller tests" =
     open Pipe_lib
 
     let max_frontier_length =
-      Transition_frontier.global_max_length Genesis_constants.compiled
+      Transition_frontier.global_max_length
+        Mina_compile_config.Genesis_constants.compiled
 
     let logger = Logger.create ()
 
@@ -718,7 +719,8 @@ let%test_module "Bootstrap_controller tests" =
       let precomputed_values = precomputed_values
 
       let constraint_constants =
-        Genesis_constants.Constraint_constants.for_unit_tests
+        Mina_compile_config.Genesis_constants.Constraint_constants
+        .for_unit_tests
 
       let consensus_constants = precomputed_values.consensus_constants
     end
@@ -765,29 +767,29 @@ let%test_module "Bootstrap_controller tests" =
       let branch_size = (max_frontier_length * 2) + 2 in
       Quickcheck.test ~trials:1
         (let open Quickcheck.Generator.Let_syntax in
-        (* we only need one node for this test, but we need more than one peer so that mina_networking does not throw an error *)
-        let%bind fake_network =
-          Fake_network.Generator.(
-            gen ~precomputed_values ~verifier ~max_frontier_length
-              [ fresh_peer; fresh_peer ] ~use_super_catchup:false)
-        in
-        let%map make_branch =
-          Transition_frontier.Breadcrumb.For_tests.gen_seq ~precomputed_values
-            ~verifier
-            ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts)
-            branch_size
-        in
-        let [ me; _ ] = fake_network.peer_networks in
-        let branch =
-          Async.Thread_safe.block_on_async_exn (fun () ->
-              make_branch (Transition_frontier.root me.state.frontier) )
-        in
-        (fake_network, branch))
+         (* we only need one node for this test, but we need more than one peer so that mina_networking does not throw an error *)
+         let%bind fake_network =
+           Fake_network.Generator.(
+             gen ~precomputed_values ~verifier ~max_frontier_length
+               [ fresh_peer; fresh_peer ] ~use_super_catchup:false )
+         in
+         let%map make_branch =
+           Transition_frontier.Breadcrumb.For_tests.gen_seq ~precomputed_values
+             ~verifier
+             ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts)
+             branch_size
+         in
+         let [ me; _ ] = fake_network.peer_networks in
+         let branch =
+           Async.Thread_safe.block_on_async_exn (fun () ->
+               make_branch (Transition_frontier.root me.state.frontier) )
+         in
+         (fake_network, branch) )
         ~f:(fun (fake_network, branch) ->
           let [ me; other ] = fake_network.peer_networks in
           let genesis_root =
             Transition_frontier.(
-              Breadcrumb.validated_transition @@ root me.state.frontier)
+              Breadcrumb.validated_transition @@ root me.state.frontier )
             |> Mina_block.Validated.remember
           in
           let transition_graph = Transition_cache.create () in
@@ -806,7 +808,8 @@ let%test_module "Bootstrap_controller tests" =
               let sync_deferred =
                 sync_ledger bootstrap ~root_sync_ledger ~transition_graph
                   ~preferred:[] ~sync_ledger_reader
-                  ~genesis_constants:Genesis_constants.compiled
+                  ~genesis_constants:
+                    Mina_compile_config.Genesis_constants.compiled
               in
               let%bind () =
                 Deferred.List.iter branch ~f:(fun breadcrumb ->
@@ -856,7 +859,7 @@ let%test_module "Bootstrap_controller tests" =
       in
       let initial_root_transition =
         Transition_frontier.(
-          Breadcrumb.validated_transition (root my_net.state.frontier))
+          Breadcrumb.validated_transition (root my_net.state.frontier) )
       in
       let%bind () =
         Transition_frontier.close ~loc:__LOC__ my_net.state.frontier
@@ -886,7 +889,7 @@ let%test_module "Bootstrap_controller tests" =
                 Result.ok_if_true
                   Mina_numbers.Length.(
                     Mina_block.blockchain_length max_acc
-                    <= Mina_block.blockchain_length transition)
+                    <= Mina_block.blockchain_length transition )
                   ~error:
                     (Error.of_string
                        "The blocks are not sorted in increasing order" )
@@ -903,7 +906,7 @@ let%test_module "Bootstrap_controller tests" =
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 2) + 2)
-            ])
+            ] )
         ~f:(fun fake_network ->
           let [ my_net; peer_net ] = fake_network.peer_networks in
           let transition_reader, transition_writer =

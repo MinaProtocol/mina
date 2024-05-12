@@ -8,10 +8,6 @@ module Proof_level : sig
   val to_string : t -> string
 
   val of_string : string -> t
-
-  val compiled : t
-
-  val for_unit_tests : t
 end
 
 module Fork_constants : sig
@@ -44,10 +40,6 @@ module Constraint_constants : sig
   include Binable.S with type t := t
 
   val to_snark_keys_header : t -> Snark_keys_header.Constraint_constants.t
-
-  val compiled : t
-
-  val for_unit_tests : t
 end
 
 module Protocol : sig
@@ -101,24 +93,8 @@ val hash : t -> string
 
 val validate_time : string -> (int64, string) result
 
-val genesis_timestamp_of_string : string -> Time.t
+val genesis_time_of_string : string -> Time.t
 
 val genesis_timestamp_to_string : int64 -> string
 
-val genesis_state_timestamp_string : string
-
-val k : int
-
-val slots_per_epoch : int
-
-val slots_per_sub_window : int
-
-val grace_period_slots : int
-
-val delta : int
-
-val pool_max_size : int
-
-val compiled : t
-
-val for_unit_tests : t
+val genesis_timestamp_of_time : Time.t -> int64

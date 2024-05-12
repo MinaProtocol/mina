@@ -93,8 +93,9 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
       |> Signature_lib.Public_key.compress )
   in
   Ledger.with_ledger
-    ~depth:Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
-    ~f:(fun ledger ->
+    ~depth:
+      Mina_compile_config.Genesis_constants.Constraint_constants.for_unit_tests
+        .ledger_depth ~f:(fun ledger ->
       let _, pub1 = keygen () in
       let _, pub2 = keygen () in
       let aid1 = Account_id.create pub1 Token_id.default in
@@ -134,16 +135,16 @@ let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
   T.apply_zkapp_command_first_pass_aux ~constraint_constants ~global_slot
     ~state_view ~fee_excess ~supply_increase (ref first_pass_ledger) c ~init:[]
     ~f:(fun
-         acc
-         ( { first_pass_ledger
-           ; second_pass_ledger = _ (*expected to be empty*)
-           ; fee_excess
-           ; supply_increase
-           ; protocol_state
-           ; block_global_slot
-           }
-         , local_state )
-       ->
+        acc
+        ( { first_pass_ledger
+          ; second_pass_ledger = _ (*expected to be empty*)
+          ; fee_excess
+          ; supply_increase
+          ; protocol_state
+          ; block_global_slot
+          }
+        , local_state )
+      ->
       ( { GS.first_pass_ledger = !first_pass_ledger
         ; second_pass_ledger
         ; fee_excess
@@ -157,16 +158,16 @@ let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
 let apply_zkapp_second_pass_unchecked_with_states ~init ledger c =
   T.apply_zkapp_command_second_pass_aux (ref ledger) c ~init
     ~f:(fun
-         acc
-         ( { first_pass_ledger
-           ; second_pass_ledger
-           ; fee_excess
-           ; supply_increase
-           ; protocol_state
-           ; block_global_slot
-           }
-         , local_state )
-       ->
+        acc
+        ( { first_pass_ledger
+          ; second_pass_ledger
+          ; fee_excess
+          ; supply_increase
+          ; protocol_state
+          ; block_global_slot
+          }
+        , local_state )
+      ->
       ( { GS.first_pass_ledger = !first_pass_ledger
         ; second_pass_ledger = !second_pass_ledger
         ; fee_excess

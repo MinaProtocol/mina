@@ -48,7 +48,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           [%test_eq: Balance.t] total_balance
             Balance.(
               Option.value_exn
-                (liquid_balance + Balance.to_amount locked_balance)) ;
+                (liquid_balance + Balance.to_amount locked_balance) ) ;
           { liquid = liquid_balance; locked = locked_balance }
       | _ ->
           failwith "Malformed GraphQL balance."
@@ -134,61 +134,66 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; epoch_data = Some { staking; next = Some next }
     ; genesis_ledger =
         (let open Test_account in
-        (* the genesis ledger contains the staking ledger plus some other accounts *)
-        staking_accounts
-        @ [ create ~account_name:"fish1" ~balance:"100" ()
-          ; create ~account_name:"fish2" ~balance:"100" ()
-          ; create ~account_name:"fish3" ~balance:"1000" ()
-            (* account fully vested before hard fork *)
-          ; create ~account_name:"timed1" ~balance:"10000" (* balance in Mina *)
-              ~timing:
-                (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:100_000
-                   ~cliff_amount:1_000_000_000_000 ~vesting_period:1000
-                   ~vesting_increment:1_000_000_000_000 )
-              ()
-            (* account starts vesting before hard fork, not fully vested after
-               cliff is before hard fork
-            *)
-          ; create ~account_name:"timed2" ~balance:"10000" (* balance in Mina *)
-              ~timing:
-                (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:499_995
-                   ~cliff_amount:2_000_000_000_000 ~vesting_period:5
-                   ~vesting_increment:3_000_000_000_000 )
-              ()
-            (* cliff at hard fork, vesting with each slot *)
-          ; create ~account_name:"timed3" ~balance:"20000" (* balance in Mina *)
-              ~timing:
-                (make_timing ~min_balance:20_000_000_000_000 ~cliff_time:500_000
-                   ~cliff_amount:2_000_000_000_000 ~vesting_period:1
-                   ~vesting_increment:1_000_000_000_000 )
-              ()
-            (* cliff after hard fork, vesting with each slot *)
-          ; create ~account_name:"timed4" ~balance:"20000" (* balance in Mina *)
-              ~timing:
-                (make_timing ~min_balance:20_000_000_000_000 ~cliff_time:500_002
-                   ~cliff_amount:2_000_000_000_000 ~vesting_period:1
-                   ~vesting_increment:1_000_000_000_000 )
-              ()
-            (* account finishes vesting at the hard fork. *)
-          ; create ~account_name:"timed5" ~balance:"10000" (* balance in Mina *)
-              ~timing:
-                (make_timing ~min_balance:10_000_000_000_000 ~cliff_time:499_995
-                   ~cliff_amount:2_000_000_000_000 ~vesting_period:1
-                   ~vesting_increment:2_000_000_000_000 )
-              ()
-          ; create ~account_name:"vk-proof" ~balance:"10000"
-              ~permissions:
-                { Permissions.user_default with
-                  set_verification_key = (Proof, older_version)
-                }
-              ~zkapp:Zkapp_account.default ()
-          ; create ~account_name:"vk-impossible" ~balance:"1000"
-              ~permissions:
-                { Permissions.user_default with
-                  set_verification_key = (Proof, older_version)
-                }
-              ~zkapp:Zkapp_account.default ()
-          ])
+         (* the genesis ledger contains the staking ledger plus some other accounts *)
+         staking_accounts
+         @ [ create ~account_name:"fish1" ~balance:"100" ()
+           ; create ~account_name:"fish2" ~balance:"100" ()
+           ; create ~account_name:"fish3" ~balance:"1000" ()
+             (* account fully vested before hard fork *)
+           ; create ~account_name:"timed1"
+               ~balance:"10000" (* balance in Mina *)
+               ~timing:
+                 (make_timing ~min_balance:10_000_000_000_000
+                    ~cliff_time:100_000 ~cliff_amount:1_000_000_000_000
+                    ~vesting_period:1000 ~vesting_increment:1_000_000_000_000 )
+               ()
+             (* account starts vesting before hard fork, not fully vested after
+                cliff is before hard fork
+             *)
+           ; create ~account_name:"timed2"
+               ~balance:"10000" (* balance in Mina *)
+               ~timing:
+                 (make_timing ~min_balance:10_000_000_000_000
+                    ~cliff_time:499_995 ~cliff_amount:2_000_000_000_000
+                    ~vesting_period:5 ~vesting_increment:3_000_000_000_000 )
+               ()
+             (* cliff at hard fork, vesting with each slot *)
+           ; create ~account_name:"timed3"
+               ~balance:"20000" (* balance in Mina *)
+               ~timing:
+                 (make_timing ~min_balance:20_000_000_000_000
+                    ~cliff_time:500_000 ~cliff_amount:2_000_000_000_000
+                    ~vesting_period:1 ~vesting_increment:1_000_000_000_000 )
+               ()
+             (* cliff after hard fork, vesting with each slot *)
+           ; create ~account_name:"timed4"
+               ~balance:"20000" (* balance in Mina *)
+               ~timing:
+                 (make_timing ~min_balance:20_000_000_000_000
+                    ~cliff_time:500_002 ~cliff_amount:2_000_000_000_000
+                    ~vesting_period:1 ~vesting_increment:1_000_000_000_000 )
+               ()
+             (* account finishes vesting at the hard fork. *)
+           ; create ~account_name:"timed5"
+               ~balance:"10000" (* balance in Mina *)
+               ~timing:
+                 (make_timing ~min_balance:10_000_000_000_000
+                    ~cliff_time:499_995 ~cliff_amount:2_000_000_000_000
+                    ~vesting_period:1 ~vesting_increment:2_000_000_000_000 )
+               ()
+           ; create ~account_name:"vk-proof" ~balance:"10000"
+               ~permissions:
+                 { Permissions.user_default with
+                   set_verification_key = (Proof, older_version)
+                 }
+               ~zkapp:Zkapp_account.default ()
+           ; create ~account_name:"vk-impossible" ~balance:"1000"
+               ~permissions:
+                 { Permissions.user_default with
+                   set_verification_key = (Proof, older_version)
+                 }
+               ~zkapp:Zkapp_account.default ()
+           ] )
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -213,7 +218,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let constraint_constants =
-      Genesis_constants.Constraint_constants.compiled
+      Mina_compile_config.Genesis_constants.Constraint_constants.compiled
     in
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in
@@ -534,12 +539,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind () =
            Malleable_error.List.iter blocks
              ~f:(fun
-                  { height
-                  ; global_slot_since_genesis
-                  ; global_slot_since_hard_fork
-                  ; _
-                  }
-                ->
+                 { height
+                 ; global_slot_since_genesis
+                 ; global_slot_since_hard_fork
+                 ; _
+                 }
+               ->
                [%log info]
                  "Examining block in best tip with height = %Ld, global slot \
                   since hard fork = %d, global slot since genesis = %d"

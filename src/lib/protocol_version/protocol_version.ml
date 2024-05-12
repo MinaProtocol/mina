@@ -1,7 +1,5 @@
 (* protocol_version.ml *)
 
-[%%import "/src/config/config.mlh"]
-
 (* see RFC 0049 for details *)
 
 open Core_kernel
@@ -47,25 +45,13 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let to_string t = sprintf "%u.%u.%u" t.transaction t.network t.patch
 
-  [%%inject "current_transaction", protocol_version_transaction]
-
-  [%%inject "current_network", protocol_version_network]
-
-  [%%inject "current_patch", protocol_version_patch]
-
-  let current =
-    { transaction = current_transaction
-    ; network = current_network
-    ; patch = current_patch
-    }
-
   let (proposed_protocol_version_opt : t option ref) = ref None
 
   let set_proposed_opt t_opt = proposed_protocol_version_opt := t_opt
 
   let get_proposed_opt () = !proposed_protocol_version_opt
 
-  let compatible_with_daemon (t : t) =
+  let compatible_with_daemon ~current t =
     (* patch not considered for compatibility *)
     Int.equal t.transaction current.transaction
     && Int.equal t.network current.network

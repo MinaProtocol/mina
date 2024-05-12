@@ -97,7 +97,8 @@ let csv_data_of_strings ss =
   | _ ->
       failwith "Incorrect number of fields in CSV line"
 
-let constraint_constants = Genesis_constants.Constraint_constants.compiled
+let constraint_constants =
+  Mina_compile_config.Genesis_constants.Constraint_constants.compiled
 
 let proof_level = Genesis_constants.Proof_level.Full
 
@@ -120,7 +121,8 @@ let query_db pool ~f ~item =
       failwithf "Error getting %s from db, error: %s" item
         (Caqti_error.show msg) ()
 
-let slots_per_epoch = Genesis_constants.slots_per_epoch
+let slots_per_epoch =
+  Mina_compile_config.Genesis_constants.compiled.protocol.slots_per_epoch
 
 let slots_per_epoch_uint32 = slots_per_epoch |> Unsigned.UInt32.of_int
 
@@ -330,9 +332,9 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
         let csv_datas = List.map split_lines ~f:csv_data_of_strings in
         List.iter csv_datas
           ~f:(fun
-               ({ payout_addr; delegatee; payout_received; deficit; _ } :
-                 csv_data )
-             ->
+              ({ payout_addr; delegatee; payout_received; deficit; _ } :
+                csv_data )
+            ->
             let key : Delegatee_payout_address.t = { delegatee; payout_addr } in
             let data : previous_epoch_status = { payout_received; deficit } in
             match Deficit.Table.add deficit_tbl ~key ~data with
@@ -675,7 +677,7 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
             let payments_from_coinbase_receivers =
               (* to check compliance, don't need to know the payment source *)
               List.concat_map payments_by_coinbase_receivers
-                ~f:(fun (_cb_receiver, payments) -> payments)
+                ~f:(fun (_cb_receiver, payments) -> payments )
             in
             let payments_from_known_senders =
               payments_from_delegatee @ payments_from_coinbase_receivers
@@ -844,31 +846,33 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
                         )
                       ] ;
                 ( if input.epoch > 0 then
-                  let deficit_reduction =
-                    match
-                      Currency.Amount.( - ) prev_epoch_deficit remaining_deficit
-                    with
-                    | Some diff ->
-                        diff
-                    | None ->
-                        failwith "Underflow calculating deficit reduction"
-                  in
-                  let updated_payout_received =
-                    match
-                      Currency.Amount.( + ) prev_payout_received
-                        deficit_reduction
-                    with
-                    | Some sum ->
-                        sum
-                    | None ->
-                        failwith "Overflow calculating updated payout received"
-                  in
-                  let data =
-                    { payout_received = updated_payout_received
-                    ; deficit = remaining_deficit
-                    }
-                  in
-                  Deficit.Table.set deficit_tbl ~key:deficit_tbl_key ~data ) ;
+                    let deficit_reduction =
+                      match
+                        Currency.Amount.( - ) prev_epoch_deficit
+                          remaining_deficit
+                      with
+                      | Some diff ->
+                          diff
+                      | None ->
+                          failwith "Underflow calculating deficit reduction"
+                    in
+                    let updated_payout_received =
+                      match
+                        Currency.Amount.( + ) prev_payout_received
+                          deficit_reduction
+                      with
+                      | Some sum ->
+                          sum
+                      | None ->
+                          failwith
+                            "Overflow calculating updated payout received"
+                    in
+                    let data =
+                      { payout_received = updated_payout_received
+                      ; deficit = remaining_deficit
+                      }
+                    in
+                    Deficit.Table.set deficit_tbl ~key:deficit_tbl_key ~data ) ;
                 let to_slot_3500_available =
                   match
                     Currency.Amount.( - ) total_to_slot_3500_as_currency
@@ -1017,31 +1021,31 @@ let () =
   Command.(
     run
       (let open Let_syntax in
-      Command.async
-        ~summary:
-          "Check compliance for Mina Foundation and O(1) Labs delegations"
-        (let%map input_file =
-           Param.flag "--input-file"
-             ~doc:
-               "file File containing the starting staking ledger and epoch \
-                number"
-             Param.(required string)
-         and csv_file =
-           Param.flag "--output-csv-file"
-             ~doc:"file CSV file to write containing payment statuses"
-             Param.(required string)
-         and preliminary_csv_file_opt =
-           Param.flag "--preliminary-csv-file"
-             ~doc:"file Preliminary CSV file from previous epoch"
-             Param.(optional string)
-         and archive_uri =
-           Param.flag "--archive-uri"
-             ~doc:
-               "URI URI for connecting to the archive database (e.g., \
-                postgres://$USER@localhost:5432/archiver)"
-             Param.(required string)
-         and payout_addresses =
-           Param.anon Anons.(sequence ("PAYOUT ADDRESSES" %: Param.string))
-         in
-         main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
-           ~payout_addresses )))
+       Command.async
+         ~summary:
+           "Check compliance for Mina Foundation and O(1) Labs delegations"
+         (let%map input_file =
+            Param.flag "--input-file"
+              ~doc:
+                "file File containing the starting staking ledger and epoch \
+                 number"
+              Param.(required string)
+          and csv_file =
+            Param.flag "--output-csv-file"
+              ~doc:"file CSV file to write containing payment statuses"
+              Param.(required string)
+          and preliminary_csv_file_opt =
+            Param.flag "--preliminary-csv-file"
+              ~doc:"file Preliminary CSV file from previous epoch"
+              Param.(optional string)
+          and archive_uri =
+            Param.flag "--archive-uri"
+              ~doc:
+                "URI URI for connecting to the archive database (e.g., \
+                 postgres://$USER@localhost:5432/archiver)"
+              Param.(required string)
+          and payout_addresses =
+            Param.anon Anons.(sequence ("PAYOUT ADDRESSES" %: Param.string))
+          in
+          main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
+            ~payout_addresses ) ) )

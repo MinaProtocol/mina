@@ -162,7 +162,9 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
                           (Mina_block.header transition)
                       |> Protocol_version.to_string ) )
                 ; ( "daemon_current_protocol_version"
-                  , `String Protocol_version.(to_string current) )
+                  , `String
+                      (Protocol_version.to_string
+                         Mina_compile_config.current_protocol_version ) )
                 ] ) )
       in
       Error (Error.of_string "mismatched protocol version")
@@ -274,7 +276,7 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
                 record trust_system logger peer
                   Actions.
                     ( Sent_invalid_transition_chain_merkle_proof
-                    , Some (error_msg, []) ))
+                    , Some (error_msg, []) ) )
             in
             Deferred.Result.fail
             @@ `Invalid_transition_chain_proof (Error.of_string error_msg)
@@ -297,7 +299,7 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
              end in
              let all_hashes =
                List.map (Transition_frontier.all_breadcrumbs frontier)
-                 ~f:(fun b -> Frontier_base.Breadcrumb.state_hash b)
+                 ~f:(fun b -> Frontier_base.Breadcrumb.state_hash b )
              in
              [%log debug]
                ~metadata:
@@ -437,7 +439,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                     Gauge.set
                       Transition_frontier_controller
                       .transitions_downloaded_from_catchup
-                      (Float.of_int (List.length transitions))) ;
+                      (Float.of_int (List.length transitions)) ) ;
                   [%log debug]
                     ~metadata:
                       [ ("n", `Int (List.length transitions))
@@ -462,7 +464,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                     in
                     Trust_system.(
                       record trust_system logger peer
-                        Actions.(Violated_protocol, Some (error_msg, [])))
+                        Actions.(Violated_protocol, Some (error_msg, [])) )
                     |> don't_wait_for ;
                     Deferred.Or_error.error_string error_msg )
                   else
@@ -525,7 +527,7 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
           , `Float
               Core.Time.(
                 Span.to_sec
-                @@ diff verification_end_time verification_start_time) )
+                @@ diff verification_end_time verification_start_time ) )
         ]
       "verification of proofs complete" ;
     let slot_tx_end =
@@ -569,7 +571,7 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
               , `Float
                   Core.Time.(
                     Span.to_sec
-                    @@ diff validation_end_time verification_end_time) )
+                    @@ diff validation_end_time verification_end_time ) )
             ]
           "validation of transitions complete" ;
         if List.length transitions <= 0 then
@@ -783,7 +785,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                                Mina_metrics.(
                                  Counter.inc Rejected_blocks.no_common_ancestor
                                    ( Float.of_int
-                                   @@ (1 + List.length children_transitions) )) ) ;
+                                   @@ (1 + List.length children_transitions) ) ) ) ;
                          return
                            (Error (Error.of_list @@ List.map errors ~f:to_error))
                      )
@@ -838,7 +840,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                      ~subtrees:trees_of_breadcrumbs ;
                    Mina_metrics.(
                      Gauge.set Transition_frontier_controller.catchup_time_ms
-                       Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+                       Core.Time.(Span.to_ms @@ diff (now ()) start_time) ) ;
                    Catchup_jobs.decr () )
                  else
                    let ivar = Ivar.create () in
@@ -847,7 +849,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                    let%bind () = Ivar.read ivar in
                    Mina_metrics.(
                      Gauge.set Transition_frontier_controller.catchup_time_ms
-                       Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+                       Core.Time.(Span.to_ms @@ diff (now ()) start_time) ) ;
                    Catchup_jobs.decr ()
              | Error e ->
                  [%log warn]
@@ -859,7 +861,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                  garbage_collect_subtrees ~logger ~subtrees ;
                  Mina_metrics.(
                    Gauge.set Transition_frontier_controller.catchup_time_ms
-                     Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
+                     Core.Time.(Span.to_ms @@ diff (now ()) start_time) ) ;
                  Catchup_jobs.decr () ) ) )
 
 (* Unit tests *)
@@ -1026,7 +1028,7 @@ let%test_module "Ledger_catchup tests" =
             ~use_super_catchup
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size
-            ])
+            ] )
         ~f:(fun network ->
           let open Fake_network in
           let [ my_net; peer_net ] = network.peer_networks in
@@ -1034,7 +1036,7 @@ let%test_module "Ledger_catchup tests" =
           let target_best_tip_path =
             Transition_frontier.(
               path_map ~f:Fn.id peer_net.state.frontier
-                (best_tip peer_net.state.frontier))
+                (best_tip peer_net.state.frontier) )
           in
           Thread_safe.block_on_async_exn (fun () ->
               test_successful_catchup ~my_net ~target_best_tip_path ) )
@@ -1045,7 +1047,7 @@ let%test_module "Ledger_catchup tests" =
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
             ~use_super_catchup
-            [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
+            [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ] )
         ~f:(fun network ->
           let open Fake_network in
           let [ my_net; peer_net ] = network.peer_networks in
@@ -1062,7 +1064,7 @@ let%test_module "Ledger_catchup tests" =
             ~use_super_catchup
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
-            ])
+            ] )
         ~f:(fun network ->
           let open Fake_network in
           let [ my_net; peer_net ] = network.peer_networks in
@@ -1103,8 +1105,7 @@ let%test_module "Ledger_catchup tests" =
                   (Ivar.read (Cache_lib.Cached.final_state cached_transition))
               in
               if not ([%equal: [ `Failed | `Success of _ ]] result `Failed) then
-                failwith "expected ledger catchup to fail, but it succeeded" )
-          )
+                failwith "expected ledger catchup to fail, but it succeeded" ) )
 
     (* TODO: fix and re-enable *)
     (*

@@ -79,7 +79,7 @@ let main ~max_num_updates ?min_num_updates num_transactions repeats preeval
   Test_util.with_randomness 123456789 (fun () ->
       let module T = Transaction_snark.Make (struct
         let constraint_constants =
-          Genesis_constants.Constraint_constants.compiled
+          Mina_compile_config.Genesis_constants.Constraint_constants.compiled
 
         let proof_level = Genesis_constants.Proof_level.Full
       end) in

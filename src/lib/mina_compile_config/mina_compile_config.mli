@@ -2,11 +2,11 @@ val curve_size : int
 
 val genesis_ledger : string
 
-val default_transaction_fee_string : string
+val default_transaction_fee : Currency.Fee.t
 
-val default_snark_worker_fee_string : string
+val default_snark_worker_fee : Currency.Fee.t
 
-val minimum_user_command_fee_string : string
+val minimum_user_command_fee : Currency.Fee.t
 
 val itn_features : bool
 
@@ -22,23 +22,9 @@ val rpc_heartbeat_timeout_sec : float
 
 val rpc_heartbeat_send_every_sec : float
 
-val zkapp_proof_update_cost : float
-
-val zkapp_signed_pair_update_cost : float
-
-val zkapp_signed_single_update_cost : float
-
-val zkapp_transaction_cost_limit : float
-
-val max_event_elements : int
-
-val max_action_elements : int
-
 val network_id : string
 
 val zkapp_cmd_limit : int option
-
-val zkapp_cmd_limit_hardcap : int
 
 val zkapps_disabled : bool
 
@@ -48,8 +34,14 @@ val slot_chain_end : int option
 
 val handle_unconsumed_cache_item : logger:Logger.t -> cache_name:string -> unit
 
+val with_plugins : bool
+
+val current_protocol_version : Protocol_version.t
+
+val current_txn_version : Mina_numbers.Txn_version.t
+
 module Time_controller : module type of Time_controller.T
 
 module type Time_controller_intf = Time_controller_intf.S
 
-val with_plugins : bool
+module Genesis_constants : module type of Genesis

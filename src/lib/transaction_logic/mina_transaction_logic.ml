@@ -179,14 +179,14 @@ module Transaction_applied = struct
     let burned_tokens = Currency.Amount.Signed.of_unsigned (burned_tokens t) in
     let account_creation_fees =
       let account_creation_fee_int =
-        Genesis_constants.Constraint_constants.compiled.account_creation_fee
-        |> Currency.Fee.to_nanomina_int
+        Mina_compile_config.Genesis_constants.Constraint_constants.compiled
+          .account_creation_fee |> Currency.Fee.to_nanomina_int
       in
       let num_accounts_created = List.length @@ new_accounts t in
       (* int type is OK, no danger of overflow *)
       Currency.Amount.(
         Signed.of_unsigned
-        @@ of_nanomina_int_exn (account_creation_fee_int * num_accounts_created))
+        @@ of_nanomina_int_exn (account_creation_fee_int * num_accounts_created) )
     in
     let txn : Transaction.t =
       match t.varying with
@@ -218,7 +218,7 @@ module Transaction_applied = struct
         [ burned_tokens; account_creation_fees ]
     in
     Option.value_map total ~default:(Or_error.error_string "overflow")
-      ~f:(fun v -> Ok v)
+      ~f:(fun v -> Ok v )
 
   let transaction_with_status : t -> Transaction.t With_status.t =
    fun { varying; _ } ->
@@ -1325,9 +1325,13 @@ module Make (L : Ledger_intf.S) :
 
       let if_ = value_if
 
-      let equal_to_current = Mina_numbers.Txn_version.equal_to_current
+      let equal_to_current =
+        Mina_numbers.Txn_version.equal_to_current
+          ~current:Mina_compile_config.current_txn_version
 
-      let older_than_current = Mina_numbers.Txn_version.older_than_current
+      let older_than_current =
+        Mina_numbers.Txn_version.older_than_current
+          ~current:Mina_compile_config.current_txn_version
     end
 
     module Global_slot_since_genesis = struct
@@ -1946,7 +1950,7 @@ module Make (L : Ledger_intf.S) :
         , Option.Let_syntax.(
             let%bind loc = L.location_of_account ledger id in
             let%map a = L.get ledger loc in
-            (loc, a)) )
+            (loc, a) ) )
       ]
     in
     let perform eff = Env.perform ~constraint_constants eff in
@@ -1964,10 +1968,11 @@ module Make (L : Ledger_intf.S) :
         ; block_global_slot = global_slot
         }
       , { stack_frame =
-            ({ calls = []
-             ; caller = Token_id.default
-             ; caller_caller = Token_id.default
-             } : Inputs.Stack_frame.t)
+            ( { calls = []
+              ; caller = Token_id.default
+              ; caller_caller = Token_id.default
+              }
+              : Inputs.Stack_frame.t )
         ; call_stack = []
         ; transaction_commitment = Inputs.Transaction_commitment.empty
         ; full_transaction_commitment = Inputs.Transaction_commitment.empty
@@ -2018,7 +2023,7 @@ module Make (L : Ledger_intf.S) :
     let%map partial_stmt, _user_acc =
       apply_zkapp_command_first_pass_aux ~constraint_constants ~global_slot
         ~state_view ~fee_excess ~supply_increase ledger command ~init:None
-        ~f:(fun _acc state -> Some state)
+        ~f:(fun _acc state -> Some state )
     in
     partial_stmt
 
@@ -2049,7 +2054,7 @@ module Make (L : Ledger_intf.S) :
                  , Option.Let_syntax.(
                      let%bind loc = L.location_of_account ledger id in
                      let%map a = L.get ledger loc in
-                     (loc, a)) ) ) )
+                     (loc, a) ) ) ) )
     in
     let rec step_all (user_acc : user_acc)
         ( (g_state : Inputs.Global_state.t)
@@ -2074,7 +2079,7 @@ module Make (L : Ledger_intf.S) :
           , Option.Let_syntax.(
               let%bind loc = L.location_of_account ledger id in
               let%map a = L.get ledger loc in
-              (loc, a)) ) )
+              (loc, a) ) ) )
     in
     let accounts () =
       List.map original_account_states
@@ -2140,7 +2145,7 @@ module Make (L : Ledger_intf.S) :
                   { With_status.data = c.command
                   ; status =
                       ( if successfully_applied then Applied
-                      else Failed failure_status_tbl )
+                        else Failed failure_status_tbl )
                   }
               ; new_accounts
               }
@@ -2598,7 +2603,8 @@ module For_tests = struct
             ; receive = None
             ; set_delegate = Either
             ; set_permissions = Either
-            ; set_verification_key = (Either, Mina_numbers.Txn_version.current)
+            ; set_verification_key =
+                (Either, Mina_compile_config.current_txn_version)
             ; set_zkapp_uri = Either
             ; edit_action_state = Either
             ; set_token_symbol = Either
@@ -2683,13 +2689,13 @@ module For_tests = struct
         Currency.Amount.(
           gen_incl
             (of_nanomina_int_exn 1_000_000)
-            (of_nanomina_int_exn 100_000_000))
+            (of_nanomina_int_exn 100_000_000) )
       in
       let gen_fee () =
         Currency.Fee.(
           gen_incl
             (of_nanomina_int_exn 1_000_000)
-            (of_nanomina_int_exn 100_000_000))
+            (of_nanomina_int_exn 100_000_000) )
       in
       let nonce : Account_nonce.t = Map.find_exn nonces sender in
       let%bind fee = gen_fee () in
@@ -2795,11 +2801,11 @@ module For_tests = struct
                 ; implicit_account_creation_fee = true
                 ; authorization_kind =
                     ( if use_full_commitment then Signature
-                    else Proof Zkapp_basic.F.zero )
+                      else Proof Zkapp_basic.F.zero )
                 }
             ; authorization =
                 ( if use_full_commitment then Signature Signature.dummy
-                else Proof (Lazy.force Mina_base.Proof.transaction_dummy) )
+                  else Proof (Lazy.force Mina_base.Proof.transaction_dummy) )
             }
           ; { body =
                 { public_key = receiver

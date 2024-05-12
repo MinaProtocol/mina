@@ -1,7 +1,8 @@
 open Core_kernel
 
 module Config = struct
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled
+  let constraint_constants =
+    Mina_compile_config.Genesis_constants.Constraint_constants.compiled
 
   let proof_level = Genesis_constants.Proof_level.Full
 end

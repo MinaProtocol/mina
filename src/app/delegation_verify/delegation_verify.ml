@@ -48,8 +48,10 @@ let instantiate_verify_functions ~logger = function
   | None ->
       Deferred.return
         (Verifier.verify_functions
-           ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-           ~proof_level:Genesis_constants.Proof_level.compiled () )
+           ~constraint_constants:
+             Mina_compile_config.Genesis_constants.Constraint_constants.compiled
+           ~proof_level:
+             Mina_compile_config.Genesis_constants.Proof_level.compiled () )
   | Some config_file ->
       let%bind.Deferred precomputed_values =
         let%bind.Deferred.Or_error config_json =
@@ -173,7 +175,7 @@ let filesystem_command =
             Deferred.unit
         | Error e ->
             Output.display_error @@ Error.to_string_hum e ;
-            exit 1)
+            exit 1 )
 
 let cassandra_command =
   Command.async ~summary:"Verify submissions and block read from Cassandra"
@@ -209,7 +211,7 @@ let cassandra_command =
             Deferred.unit
         | Error e ->
             Output.display_error @@ Error.to_string_hum e ;
-            exit 1)
+            exit 1 )
 
 let stdin_command =
   Command.async
@@ -234,7 +236,7 @@ let stdin_command =
             Deferred.unit
         | Error e ->
             Output.display_error @@ Error.to_string_hum e ;
-            exit 1)
+            exit 1 )
 
 let command =
   Command.group

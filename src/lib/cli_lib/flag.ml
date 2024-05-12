@@ -3,19 +3,19 @@ open Core
 let json =
   Command.Param.(
     flag "--json" ~aliases:[ "json" ] no_arg
-      ~doc:"Use JSON output (default: plaintext)")
+      ~doc:"Use JSON output (default: plaintext)" )
 
 let plaintext =
   Command.Param.(
     flag "--plaintext" ~aliases:[ "plaintext" ] no_arg
-      ~doc:"Use plaintext input or output (default: JSON)")
+      ~doc:"Use plaintext input or output (default: JSON)" )
 
 let performance =
   Command.Param.(
     flag "--performance" ~aliases:[ "performance" ] no_arg
       ~doc:
         "Include performance histograms in status output (default: don't \
-         include)")
+         include)" )
 
 let privkey_write_path =
   let open Command.Param in
@@ -356,7 +356,8 @@ let signed_command_common : signed_command_common Command.Param.t =
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
-           (Currency.Fee.to_mina_string Currency.Fee.default_transaction_fee)
+           (Currency.Fee.to_mina_string
+              Mina_compile_config.default_transaction_fee )
            (Currency.Fee.to_mina_string Mina_base.Signed_command.minimum_fee) )
       (optional txn_fee)
   and nonce =
@@ -371,7 +372,7 @@ let signed_command_common : signed_command_common Command.Param.t =
       ~doc:"STRING Memo accompanying the transaction" (optional string)
   in
   { sender
-  ; fee = Option.value fee ~default:Currency.Fee.default_transaction_fee
+  ; fee = Option.value fee ~default:Mina_compile_config.default_transaction_fee
   ; nonce
   ; memo
   }
@@ -402,7 +403,8 @@ module Signed_command = struct
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
-           (Currency.Fee.to_mina_string Currency.Fee.default_transaction_fee)
+           (Currency.Fee.to_mina_string
+              Mina_compile_config.default_transaction_fee )
            (Currency.Fee.to_mina_string Mina_base.Signed_command.minimum_fee) )
       (optional txn_fee)
 

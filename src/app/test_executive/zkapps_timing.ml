@@ -21,10 +21,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
-        [ create ~account_name:"node-a-key" ~balance:"8000000000" ()
-        ; create ~account_name:"node-b-key" ~balance:"1000000000" ()
-        ; create ~account_name:"node-c-key" ~balance:"1000000000" ()
-        ])
+         [ create ~account_name:"node-a-key" ~balance:"8000000000" ()
+         ; create ~account_name:"node-b-key" ~balance:"1000000000" ()
+         ; create ~account_name:"node-c-key" ~balance:"1000000000" ()
+         ] )
     ; block_producers =
         [ { node_name = "node-a"; account_name = "node-a-key" }
         ; { node_name = "node-b"; account_name = "node-b-key" }
@@ -47,7 +47,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let node = List.hd_exn block_producer_nodes in
     let constraint_constants =
-      Genesis_constants.Constraint_constants.compiled
+      Mina_compile_config.Genesis_constants.Constraint_constants.compiled
     in
     let block_window_duration_ms =
       constraint_constants.block_window_duration_ms

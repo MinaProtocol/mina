@@ -12,11 +12,11 @@ let create_accounts port (privkey_path, key_prefix, num_accounts, fee, amount) =
   let pk_check_wait = Time.Span.of_sec 10. in
   let pk_check_timeout = Time.Span.of_min 30. in
   let min_fee =
-    Currency.Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee
+    Currency.Fee.to_nanomina_int Mina_compile_config.minimum_user_command_fee
   in
   let account_creation_fee_int =
     let constraint_constants =
-      Genesis_constants.Constraint_constants.compiled
+      Mina_compile_config.Genesis_constants.Constraint_constants.compiled
     in
     Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
   in
@@ -239,7 +239,7 @@ let create_accounts port (privkey_path, key_prefix, num_accounts, fee, amount) =
         List.map zkapps_batch ~f:(fun zkapp ->
             let acct_update_pks =
               List.map (Zkapp_command.Call_forest.to_list zkapp.account_updates)
-                ~f:(fun acct_update -> acct_update.body.public_key)
+                ~f:(fun acct_update -> acct_update.body.public_key )
             in
             zkapp.fee_payer.body.public_key :: acct_update_pks )
         |> List.concat

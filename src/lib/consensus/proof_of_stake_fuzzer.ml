@@ -1,5 +1,3 @@
-[%%import "../../config/config.mlh"]
-
 open Core_kernel
 open Async
 open Unsigned
@@ -109,7 +107,7 @@ module Vrf_distribution = struct
                  | `Produce (proposal_time, _, proposal_data, _) ->
                      Some
                        ( Block_time.(
-                           of_span_since_epoch @@ Span.of_ms proposal_time)
+                           of_span_since_epoch @@ Span.of_ms proposal_time )
                        , proposal_data )
                in
                record_proposal ~staker ~proposal_data ;
@@ -119,7 +117,7 @@ module Vrf_distribution = struct
                  < Global_slot_since_genesis.(
                      epoch
                        (of_slot_number ~constants
-                          (Block_data.global_slot proposal_data) ))
+                          (Block_data.global_slot proposal_data) ) )
                in
                let new_global_slot =
                  Global_slot_since_genesis.of_slot_number ~constants
@@ -234,7 +232,8 @@ let run () =
 
 (* TODO: Should these be runtime configurable? *)
 
-let constraint_constants = Genesis_constants.Constraint_constants.compiled
+let constraint_constants =
+  Mina_compile_config.Genesis_constants.Constraint_constants.compiled
 
 let precomputed_values = Lazy.force Precomputed_values.compiled
 
@@ -284,9 +283,7 @@ let create_genesis_data () =
   in
   (genesis_transition, Or_error.ok_exn genesis_staged_ledger_res)
 
-[%%if proof_level = "full"]
-
-let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
+let prove_blockchain_full ~logger (module Keys : Keys_lib.Keys.S)
     (chain : Blockchain.t) (next_state : Protocol_state.Value.t)
     (block : Snark_transition.value) state_for_handler pending_coinbase =
   let wrap hash proof =
@@ -328,9 +325,7 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
         "Prover threw an error while extending block: $error" ) ;
   res
 
-[%%elif proof_level = "check"]
-
-let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
+let prove_blockchain_check ~logger (module Keys : Keys_lib.Keys.S)
     (chain : Blockchain.t) (next_state : Protocol_state.Value.t)
     (block : Snark_transition.value) state_for_handler pending_coinbase =
   let next_state_top_hash = Keys.Step.instance_hash next_state in
@@ -363,18 +358,17 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
         "Prover threw an error while extending block: $error" ) ;
   res
 
-[%%elif proof_level = "none"]
-
-let prove_blockchain ~logger:_ _ _ _ _ _ _ =
+let prove_blockchain_none ~logger:_ _ _ _ _ _ _ =
   failwith "cannot run fuzzer with proof_level = \"none\""
 
-[%%else]
-
-[%%show proof_level]
-
-[%%error "invalid proof_level"]
-
-[%%endif]
+let prove_blockchain =
+  match Mina_compile_config.Genesis_constants.Proof_level.compiled with
+  | Full ->
+      prove_blockchain_full
+  | Check ->
+      prove_blockchain_check
+  | None ->
+      prove_blockchain_none
 
 (* TODO: update stakers' relative local_states *)
 let propose_block_onto_chain ~logger ~keys
@@ -504,7 +498,7 @@ let main () =
         (Transport_file_system.dumb_logrotate ~directory:"fuzz_logs"
            ~log_filename:"log"
            ~max_size:(500 * 1024 * 1024)
-           ~num_rotate:1 )) ;
+           ~num_rotate:1 ) ) ;
   don't_wait_for
     (let%bind genesis_transition, genesis_staged_ledger =
        create_genesis_data ()
@@ -551,11 +545,11 @@ let main () =
                @@ Global_slot_since_genesis.(
                     slot
                       (of_slot_number ~constants:consensus_constants
-                         (Block_data.global_slot block_data) )) ) ;
+                         (Block_data.global_slot block_data) ) ) ) ;
              propose_block_onto_chain ~logger ~keys previous_chain proposal )
        in
        loop (UInt32.succ epoch) final_chain
      in
      loop UInt32.zero (genesis_transition, genesis_staged_ledger) )
 
-let _ = Async.Scheduler.go_main ~main ()
+let (_ : never_returns) = Async.Scheduler.go_main ~main ()

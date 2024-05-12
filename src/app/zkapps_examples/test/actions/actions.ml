@@ -55,7 +55,7 @@ let%test_module "Actions test" =
                   ; set_delegate = Proof
                   ; set_permissions = Proof
                   ; set_verification_key =
-                      (Proof, Mina_numbers.Txn_version.current)
+                      (Proof, Mina_compile_config.current_txn_version)
                   ; set_zkapp_uri = Proof
                   ; edit_action_state = Proof
                   ; set_token_symbol = Proof

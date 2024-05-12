@@ -1,19 +1,10 @@
-[%%import "/src/config/config.mlh"]
-
-[%%if defined genesis_ledger]
-
-[%%inject "genesis_ledger", genesis_ledger]
-
 include Genesis_ledger.Make (struct
-  include (val Genesis_ledger.fetch_ledger_exn genesis_ledger)
+  include
+    (val Genesis_ledger.fetch_ledger_exn Mina_compile_config.genesis_ledger)
 
   let directory = `Ephemeral
 
-  let depth = Genesis_constants.Constraint_constants.compiled.ledger_depth
+  let depth =
+    Mina_compile_config.Genesis_constants.Constraint_constants.compiled
+      .ledger_depth
 end)
-
-[%%else]
-
-[%%optcomp.error "\"genesis_ledger\" not set in config.mlh"]
-
-[%%endif]

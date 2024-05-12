@@ -207,7 +207,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ignore
             ( Pickles.Step_verifier.Scalar_challenge.endo g ~num_bits:4
                 (Kimchi_backend_common.Scalar_challenge.create x)
-              : Field.t * Field.t ))
+              : Field.t * Field.t ) )
 
   module Base = struct
     module User_command_failure = struct
@@ -410,7 +410,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   else
                     Amount.(
                       Balance.to_amount source_account.balance
-                      < payload.body.amount)
+                      < payload.body.amount )
                 in
                 let timing_or_error =
                   Mina_transaction_logic.validate_timing
@@ -465,7 +465,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let receiver =
                   Account_id.create txn.payload.body.receiver_pk token
                 in
-                (txn, fee_payer, source, receiver))
+                (txn, fee_payer, source, receiver) )
         in
         let%bind fee_payer_idx =
           exists (Typ.Internal.ref ())
@@ -474,7 +474,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let%map _txn, fee_payer, _source, _receiver =
                   read (Typ.Internal.ref ()) data
                 in
-                Ledger_hash.Find_index fee_payer)
+                Ledger_hash.Find_index fee_payer )
         in
         let%bind fee_payer_account =
           exists (Typ.Internal.ref ())
@@ -483,7 +483,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let%map fee_payer_idx =
                   read (Typ.Internal.ref ()) fee_payer_idx
                 in
-                Ledger_hash.Get_element fee_payer_idx)
+                Ledger_hash.Get_element fee_payer_idx )
         in
         let%bind source_idx =
           exists (Typ.Internal.ref ())
@@ -492,14 +492,14 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let%map _txn, _fee_payer, source, _receiver =
                   read (Typ.Internal.ref ()) data
                 in
-                Ledger_hash.Find_index source)
+                Ledger_hash.Find_index source )
         in
         let%bind source_account =
           exists (Typ.Internal.ref ())
             ~request:
               As_prover.(
                 let%map source_idx = read (Typ.Internal.ref ()) source_idx in
-                Ledger_hash.Get_element source_idx)
+                Ledger_hash.Get_element source_idx )
         in
         let%bind receiver_idx =
           exists (Typ.Internal.ref ())
@@ -508,7 +508,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let%map _txn, _fee_payer, _source, receiver =
                   read (Typ.Internal.ref ()) data
                 in
-                Ledger_hash.Find_index receiver)
+                Ledger_hash.Find_index receiver )
         in
         let%bind receiver_account =
           exists (Typ.Internal.ref ())
@@ -517,7 +517,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let%map receiver_idx =
                   read (Typ.Internal.ref ()) receiver_idx
                 in
-                Ledger_hash.Get_element receiver_idx)
+                Ledger_hash.Get_element receiver_idx )
         in
         exists typ
           ~compute:
@@ -538,7 +538,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 read Mina_numbers.Global_slot_since_genesis.typ txn_global_slot
               in
               compute_unchecked ~constraint_constants ~txn_global_slot
-                ~fee_payer_account ~source_account ~receiver_account txn)
+                ~fee_payer_account ~source_account ~receiver_account txn )
     end
 
     let%snarkydef_ check_signature shifted ~payload ~is_user_command ~signer
@@ -760,7 +760,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             Account_id.(
               Checked.create
                 (Public_key.Compressed.var_of_t (public_key id))
-                (Token_id.Checked.constant (token_id id)))
+                (Token_id.Checked.constant (token_id id)) )
 
           let invalid = constant Account_id.invalid
 
@@ -1472,11 +1472,18 @@ module Make_str (A : Wire_types.Concrete) = struct
               @@ Mina_numbers.Txn_version.Checked.if_ cond ~then_ ~else_
 
             let equal_to_current t =
-              run_checked @@ Mina_numbers.Txn_version.equal_to_current_checked t
+              run_checked
+              @@ Mina_numbers.Txn_version.equal_to_current_checked t
+                   ~current:
+                     (Mina_numbers.Txn_version.Checked.constant
+                        Mina_compile_config.current_txn_version )
 
             let older_than_current t =
               run_checked
               @@ Mina_numbers.Txn_version.older_than_current_checked t
+                   ~current:
+                     (Mina_numbers.Txn_version.Checked.constant
+                        Mina_compile_config.current_txn_version )
           end
 
           module Ledger = struct
@@ -1515,7 +1522,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 exists
                   Typ.(
                     list ~length:constraint_constants.ledger_depth
-                      (Boolean.typ * field))
+                      (Boolean.typ * field) )
                   ~compute:(fun () ->
                     List.map
                       (Sparse_ledger.path_exn (V.get ledger) (V.get idx))
@@ -1539,7 +1546,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                           read Mina_base.Account.Checked.Unhashed.typ a.data
                         in
                         let idx = idx ledger (Mina_base.Account.identifier a) in
-                        Sparse_ledger.set_exn ledger idx a) )
+                        Sparse_ledger.set_exn ledger idx a ) )
 
             let check_inclusion ((root, _) : t) (account, incl) =
               with_label __LOC__ (fun () ->
@@ -1616,7 +1623,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 | Proof ->
                     set_zkapp_input
                       { account_update = (account_update.hash :> Field.t)
-                      ; calls = (calls :> Field.t)
+                      ; calls :> Field.t
                       } ;
                     set_must_verify will_succeed ;
                     Boolean.true_
@@ -1860,7 +1867,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let ( ! ) x = Option.value_exn x in
         let state_body =
           exists (Mina_state.Protocol_state.Body.typ ~constraint_constants)
-            ~compute:(fun () -> !witness.state_body)
+            ~compute:(fun () -> !witness.state_body )
         in
         let block_global_slot =
           exists Mina_numbers.Global_slot_since_genesis.typ ~compute:(fun () ->
@@ -2251,7 +2258,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                         ; is_stake_delegation
                         ; is_fee_transfer
                         ; is_coinbase
-                        ])
+                        ] )
               ] )
       in
       let current_global_slot = global_slot in
@@ -2278,7 +2285,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind () =
         [%with_label_ "Check slot validity"] (fun () ->
             Global_slot_since_genesis.Checked.(
-              current_global_slot <= payload.common.valid_until)
+              current_global_slot <= payload.common.valid_until )
             >>= Boolean.Assert.is_true )
       in
 
@@ -2359,7 +2366,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind () =
         [%with_label_ "A failing user command is a user command"]
           Boolean.(
-            fun () -> Assert.any [ is_user_command; not user_command_fails ])
+            fun () -> Assert.any [ is_user_command; not user_command_fails ] )
       in
       let%bind predicate_result =
         let%bind is_own_account =
@@ -2455,7 +2462,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let%bind () =
                   [%with_label_
                     "Fee payer access should be permitted for all commands"]
-                    (fun () -> Boolean.Assert.is_true permitted_to_access)
+                    (fun () -> Boolean.Assert.is_true permitted_to_access )
                 in
                 let%bind () =
                   [%with_label_
@@ -2512,7 +2519,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       in
                       new_account_fees := account_creation_fee ;
                       Amount.Signed.Checked.(
-                        add fee_payer_amount account_creation_fee) )
+                        add fee_payer_amount account_creation_fee ) )
                 in
                 let%bind () =
                   [%with_label_ "Burned tokens in fee payer"] (fun () ->
@@ -2541,7 +2548,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       in
                       let timed_balance_check ok =
                         [%with_label_ "Check fee payer timed balance"]
-                          (fun () -> Boolean.Assert.is_true ok)
+                          (fun () -> Boolean.Assert.is_true ok )
                       in
                       let%bind `Min_balance _, timing =
                         check_timing ~balance_check ~timed_balance_check
@@ -2661,7 +2668,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     (fun () ->
                       let%bind token_should_not_create =
                         Boolean.(
-                          should_pay_to_create &&& Boolean.not token_default)
+                          should_pay_to_create &&& Boolean.not token_default )
                       in
                       let%bind token_cannot_create =
                         Boolean.(token_should_not_create &&& is_user_command)
@@ -2698,7 +2705,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     in
                     let%bind new_account_fees_total =
                       Amount.Signed.Checked.(
-                        add @@ negate @@ of_unsigned account_creation_fee)
+                        add @@ negate @@ of_unsigned account_creation_fee )
                         !new_account_fees
                     in
                     new_account_fees := new_account_fees_total ;
@@ -2739,7 +2746,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   let%bind () =
                     [%with_label_ "Overflow error only occurs in user commands"]
                       Boolean.(
-                        fun () -> Assert.any [ is_user_command; not overflow ])
+                        fun () -> Assert.any [ is_user_command; not overflow ] )
                   in
                   receiver_overflow := overflow ;
                   Balance.Checked.if_ overflow ~then_:account.balance
@@ -2915,7 +2922,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                                 (not ok)
                                 &&& not
                                       user_command_failure
-                                        .source_insufficient_balance)
+                                        .source_insufficient_balance )
                             in
                             Boolean.Assert.( = ) not_ok
                               user_command_failure.source_bad_timing )
@@ -2980,7 +2987,7 @@ module Make_str (A : Wire_types.Concrete) = struct
              let%bind fee_transfer_excess, fee_transfer_excess_overflowed =
                let%map magnitude, `Overflow overflowed =
                  Checked.(
-                   add_flagged payload.body.amount (of_fee payload.common.fee))
+                   add_flagged payload.body.amount (of_fee payload.common.fee) )
                in
                (Signed.create_var ~magnitude ~sgn:Sgn.Checked.neg, overflowed)
              in
@@ -2992,7 +2999,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                      Assert.any
                        [ not is_fee_transfer
                        ; not fee_transfer_excess_overflowed
-                       ])
+                       ] )
              in
              Signed.Checked.if_ is_fee_transfer ~then_:fee_transfer_excess
                ~else_:user_command_excess )
@@ -3007,7 +3014,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             let%bind amt0, `Overflow overflow0 =
               Amount.Signed.Checked.(
                 add_flagged expected_supply_increase
-                  (negate (of_unsigned !burned_tokens)))
+                  (negate (of_unsigned !burned_tokens)) )
             in
             let%bind () = Boolean.Assert.is_true (Boolean.not overflow0) in
             let%bind new_account_fees_total =
@@ -3411,9 +3418,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                 (fun () ->
                   Checked.map ~f:As_prover.return
                     (let open Checked in
-                    exists Statement.With_sok.typ
-                      ~compute:(As_prover.return statement)
-                    >>= Base.main ~constraint_constants) )
+                     exists Statement.With_sok.typ
+                       ~compute:(As_prover.return statement)
+                     >>= Base.main ~constraint_constants ) )
                 handler ) )
         : unit )
 
@@ -3534,13 +3541,13 @@ module Make_str (A : Wire_types.Concrete) = struct
             Tick.constraint_system ~input_typ:Statement.With_sok.typ
               ~return_typ:(Snarky_backendless.Typ.unit ()) (fun x ->
                 let open Tick in
-                Checked.map ~f:ignore @@ main x )) )
+                Checked.map ~f:ignore @@ main x ) ) )
     ; ( "transaction-base"
       , digest
           Base.(
             Tick.constraint_system ~input_typ:Statement.With_sok.typ
               ~return_typ:(Snarky_backendless.Typ.unit ())
-              (main ~constraint_constants)) )
+              (main ~constraint_constants) ) )
     ]
 
   module Account_update_group = Zkapp_command.Make_update_group (struct
@@ -3610,14 +3617,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       List.fold_left ~init:(fee_excess, supply_increase, [], [])
         zkapp_commands_with_context
         ~f:(fun
-             (fee_excess, supply_increase, will_succeeds_rev, statess_rev)
-             ( _
-             , _
-             , first_pass_ledger
-             , second_pass_ledger
-             , `Connecting_ledger_hash connecting_ledger
-             , zkapp_command )
-           ->
+            (fee_excess, supply_increase, will_succeeds_rev, statess_rev)
+            ( _
+            , _
+            , first_pass_ledger
+            , second_pass_ledger
+            , `Connecting_ledger_hash connecting_ledger
+            , zkapp_command )
+          ->
           let first_pass_ledger =
             sparse_first_pass_ledger zkapp_command first_pass_ledger
           in
@@ -3675,14 +3682,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       let zkapp_commands =
         List.map2_exn zkapp_commands_with_context will_succeeds
           ~f:(fun
-               ( pending_coinbase_init_stack
-               , pending_coinbase_stack_state
-               , _
-               , _
-               , _
-               , account_updates )
-               will_succeed
-             ->
+              ( pending_coinbase_init_stack
+              , pending_coinbase_stack_state
+              , _
+              , _
+              , _
+              , account_updates )
+              will_succeed
+            ->
             ( pending_coinbase_init_stack
             , pending_coinbase_stack_state
             , { Mina_transaction_logic.Zkapp_command_logic.Start_data
@@ -3702,15 +3709,15 @@ module Make_str (A : Wire_types.Concrete) = struct
     in
     List.fold_right states_rev ~init:[]
       ~f:(fun
-           ({ kind
-            ; spec
-            ; state_before = { global = source_global; local = source_local }
-            ; state_after = { global = target_global; local = target_local }
-            ; connecting_ledger
-            } :
-             Account_update_group.Zkapp_command_intermediate_state.t )
-           witnesses
-         ->
+          ({ kind
+           ; spec
+           ; state_before = { global = source_global; local = source_local }
+           ; state_after = { global = target_global; local = target_local }
+           ; connecting_ledger
+           } :
+            Account_update_group.Zkapp_command_intermediate_state.t )
+          witnesses
+        ->
         (*Transaction snark says nothing about failure status*)
         let source_local = { source_local with failure_status_tbl = [] } in
         let target_local = { target_local with failure_status_tbl = [] } in
@@ -3786,7 +3793,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                    , `Pending_coinbase_of_statement
                        pending_coinbase_stack_state2
                    , zkapp_command2 )
-                   :: rest ->
+                :: rest ->
                   let commitment', full_commitment' =
                     mk_next_commitments zkapp_command2.account_updates
                   in
@@ -3856,7 +3863,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let fee_excess =
             match
               Amount.Signed.(
-                add target_global.fee_excess (negate source_global.fee_excess))
+                add target_global.fee_excess (negate source_global.fee_excess) )
             with
             | None ->
                 failwith
@@ -3878,7 +3885,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           match
             Amount.Signed.(
               add target_global.supply_increase
-                (negate source_global.supply_increase))
+                (negate source_global.supply_increase) )
           with
           | None ->
               failwith
@@ -4007,7 +4014,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let account : Account.t =
           Sparse_ledger.(
             get_exn witness.local_state_init.ledger
-              (find_index_exn witness.local_state_init.ledger account_id))
+              (find_index_exn witness.local_state_init.ledger account_id) )
         in
         match
           Option.value_map ~default:None account.zkapp ~f:(fun s ->
@@ -4219,7 +4226,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         assert (Or_error.is_error invalid_verification)
       in
       let constraint_constants =
-        Genesis_constants.Constraint_constants.compiled
+        Mina_compile_config.Genesis_constants.Constraint_constants.compiled
       in
       let `VK vk_a, `Prover prover_a =
         create_trivial_snapp ~unique_id:0 ~constraint_constants ()
@@ -4300,10 +4307,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ~default:Zkapp_precondition.Protocol_state.accept
             ; account =
                 ( if sender_is_the_same_as_fee_payer then
-                  Zkapp_precondition.Account.accept
-                else
-                  Zkapp_precondition.Account.nonce
-                    (Account.Nonce.succ sender_nonce) )
+                    Zkapp_precondition.Account.accept
+                  else
+                    Zkapp_precondition.Account.nonce
+                      (Account.Nonce.succ sender_nonce) )
             ; valid_while =
                 Option.value_map preconditions
                   ~f:(fun { valid_while; _ } -> valid_while)
@@ -4784,7 +4791,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                          account_update_digest =
                            account_update_digest_with_current_chain
                        } )
-                    Forest.empty)
+                    Forest.empty )
             }
         ]
       in
@@ -4891,10 +4898,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%map.Async.Deferred snapp_zkapp_command =
         Async.Deferred.List.map snapp_zkapp_command_keypairs
           ~f:(fun
-               ( ( (snapp_account_update, simple_snapp_account_update)
-                 , tx_statement )
-               , snapp_keypair )
-             ->
+              ( ( (snapp_account_update, simple_snapp_account_update)
+                , tx_statement )
+              , snapp_keypair )
+            ->
             match spec.current_auth with
             | Permissions.Auth_required.Proof ->
                 let handler
@@ -5002,7 +5009,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           , `Txn_commitment _commitment
           , `Full_txn_commitment _full_commitment ) =
         create_zkapp_command
-          ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+          ~constraint_constants:
+            Mina_compile_config.Genesis_constants.Constraint_constants.compiled
           (Multiple_transfers_spec.spec_of_t spec)
           ~update:spec.snapp_update ~receiver_update:spec.snapp_update
       in

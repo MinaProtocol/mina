@@ -188,10 +188,11 @@ let%test_module "Archive node unit tests" =
                       add_token_owners tree.calls )
               in
               let%bind _ =
+                let current = Mina_compile_config.current_protocol_version in
                 Processor.Protocol_versions.add_if_doesn't_exist conn
-                  ~transaction:Protocol_version.(transaction current)
-                  ~network:Protocol_version.(network current)
-                  ~patch:Protocol_version.(patch current)
+                  ~transaction:(Protocol_version.transaction current)
+                  ~network:(Protocol_version.network current)
+                  ~patch:(Protocol_version.patch current)
               in
               add_token_owners p.account_updates ;
               match%map

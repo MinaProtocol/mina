@@ -271,7 +271,7 @@ let check_invariants (constants : Stable.Latest.t) =
   in
   assert (
     UInt32.(
-      compare grace_period_effective_end (div slots_per_epoch (of_int 3)) < 0) )
+      compare grace_period_effective_end (div slots_per_epoch (of_int 3)) < 0 ) )
 
 let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~(protocol_constants : Genesis_constants.Protocol.t) : t =
@@ -306,8 +306,10 @@ let for_unit_tests =
   lazy
     (create
        ~constraint_constants:
-         Genesis_constants.Constraint_constants.for_unit_tests
-       ~protocol_constants:Genesis_constants.for_unit_tests.protocol )
+         Mina_compile_config.Genesis_constants.Constraint_constants
+         .for_unit_tests
+       ~protocol_constants:
+         Mina_compile_config.Genesis_constants.for_unit_tests.protocol )
 
 let to_protocol_constants
     ({ k
@@ -454,9 +456,11 @@ end
 
 let%test_unit "checked = unchecked" =
   let open Mina_base in
-  let for_unit_tests = Genesis_constants.for_unit_tests.protocol in
+  let for_unit_tests =
+    Mina_compile_config.Genesis_constants.for_unit_tests.protocol
+  in
   let constraint_constants =
-    Genesis_constants.Constraint_constants.for_unit_tests
+    Mina_compile_config.Genesis_constants.Constraint_constants.for_unit_tests
   in
   let test =
     Test_util.test_equal Protocol_constants_checked.typ typ

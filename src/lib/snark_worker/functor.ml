@@ -157,7 +157,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         | `Merge ->
             Mina_metrics.(
               Cryptography.Snark_work_histogram.observe
-                Cryptography.snark_work_merge_time_sec (Time.Span.to_sec time)) ;
+                Cryptography.snark_work_merge_time_sec (Time.Span.to_sec time) ) ;
             [%str_log info] (Merge_snark_generated { time })
         | `Transition ->
             let transaction_type, zkapp_command_count, proof_zkapp_command_count
@@ -187,7 +187,7 @@ module Make (Inputs : Intf.Inputs_intf) :
                               Tag.equal Proof
                                 (tag
                                    (Mina_base.Account_update.authorization
-                                      account_update ) ))
+                                      account_update ) ) )
                           then proof_updates_count + 1
                           else proof_updates_count ) )
                   in
@@ -197,22 +197,22 @@ module Make (Inputs : Intf.Inputs_intf) :
                         (Time.Span.to_sec time) ;
                       Counter.inc_one snark_work_zkapp_base_submissions ;
                       Counter.inc zkapp_transaction_length (Float.of_int c) ;
-                      Counter.inc zkapp_proof_updates (Float.of_int p))) ;
+                      Counter.inc zkapp_proof_updates (Float.of_int p) ) ) ;
                   ("zkapp_command", c, p)
               | Command (Signed_command _) ->
                   Mina_metrics.(
                     Counter.inc Cryptography.snark_work_base_time_sec
-                      (Time.Span.to_sec time)) ;
+                      (Time.Span.to_sec time) ) ;
                   ("signed command", 1, 0)
               | Coinbase _ ->
                   Mina_metrics.(
                     Counter.inc Cryptography.snark_work_base_time_sec
-                      (Time.Span.to_sec time)) ;
+                      (Time.Span.to_sec time) ) ;
                   ("coinbase", 1, 0)
               | Fee_transfer _ ->
                   Mina_metrics.(
                     Counter.inc Cryptography.snark_work_base_time_sec
-                      (Time.Span.to_sec time)) ;
+                      (Time.Span.to_sec time) ) ;
                   ("fee_transfer", 1, 0)
             in
             [%str_log info]
@@ -229,7 +229,7 @@ module Make (Inputs : Intf.Inputs_intf) :
       ~proof_level daemon_address shutdown_on_disconnect =
     let constraint_constants =
       (* TODO: Make this configurable. *)
-      Genesis_constants.Constraint_constants.compiled
+      Mina_compile_config.Genesis_constants.Constraint_constants.compiled
     in
     let%bind state =
       Worker_state.create ~constraint_constants ~proof_level ()
@@ -244,11 +244,11 @@ module Make (Inputs : Intf.Inputs_intf) :
            If the string becomes too long, chop off the first 10 lines and include
            only that *)
       ( if String.length error_str < 4096 then
-        [%log error] !"Error %s: %{sexp:Error.t}" label error
-      else
-        let lines = String.split ~on:'\n' error_str in
-        [%log error] !"Error %s: %s" label
-          (String.concat ~sep:"\\n" (List.take lines 10)) ) ;
+          [%log error] !"Error %s: %{sexp:Error.t}" label error
+        else
+          let lines = String.split ~on:'\n' error_str in
+          [%log error] !"Error %s: %s" label
+            (String.concat ~sep:"\\n" (List.take lines 10)) ) ;
       let%bind () = wait ~sec () in
       (* FIXME: Use a backoff algo here *)
       k ()
@@ -347,46 +347,48 @@ module Make (Inputs : Intf.Inputs_intf) :
         with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
     Command.async ~summary:"Snark worker"
       (let open Command.Let_syntax in
-      let%map_open daemon_port =
-        flag "--daemon-address" ~aliases:[ "daemon-address" ]
-          (required (Arg_type.create Host_and_port.of_string))
-          ~doc:"HOST-AND-PORT address daemon is listening on"
-      and proof_level =
-        flag "--proof-level" ~aliases:[ "proof-level" ]
-          (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
-          ~doc:"full|check|none"
-      and shutdown_on_disconnect =
-        flag "--shutdown-on-disconnect"
-          ~aliases:[ "shutdown-on-disconnect" ]
-          (optional bool)
-          ~doc:
-            "true|false Shutdown when disconnected from daemon (default:true)"
-      and conf_dir = Cli_lib.Flag.conf_dir in
-      fun () ->
-        let logger =
-          Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
-        in
-        Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
-            let logrotate_max_size = 1024 * 10 in
-            let logrotate_num_rotate = 1 in
-            Logger.Consumer_registry.register ~id:Logger.Logger_id.snark_worker
-              ~processor:(Logger.Processor.raw ())
-              ~transport:
-                (Logger_file_system.dumb_logrotate ~directory:conf_dir
-                   ~log_filename:"mina-snark-worker.log"
-                   ~max_size:logrotate_max_size ~num_rotate:logrotate_num_rotate ) ) ;
-        Signal.handle [ Signal.term ] ~f:(fun _signal ->
-            [%log info]
-              !"Received signal to terminate. Aborting snark worker process" ;
-            Core.exit 0 ) ;
-        let proof_level =
-          Option.value ~default:Genesis_constants.Proof_level.compiled
-            proof_level
-        in
-        main
-          (module Rpcs_versioned)
-          ~logger ~proof_level daemon_port
-          (Option.value ~default:true shutdown_on_disconnect))
+       let%map_open daemon_port =
+         flag "--daemon-address" ~aliases:[ "daemon-address" ]
+           (required (Arg_type.create Host_and_port.of_string))
+           ~doc:"HOST-AND-PORT address daemon is listening on"
+       and proof_level =
+         flag "--proof-level" ~aliases:[ "proof-level" ]
+           (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
+           ~doc:"full|check|none"
+       and shutdown_on_disconnect =
+         flag "--shutdown-on-disconnect"
+           ~aliases:[ "shutdown-on-disconnect" ]
+           (optional bool)
+           ~doc:
+             "true|false Shutdown when disconnected from daemon (default:true)"
+       and conf_dir = Cli_lib.Flag.conf_dir in
+       fun () ->
+         let logger =
+           Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
+         in
+         Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
+             let logrotate_max_size = 1024 * 10 in
+             let logrotate_num_rotate = 1 in
+             Logger.Consumer_registry.register ~id:Logger.Logger_id.snark_worker
+               ~processor:(Logger.Processor.raw ())
+               ~transport:
+                 (Logger_file_system.dumb_logrotate ~directory:conf_dir
+                    ~log_filename:"mina-snark-worker.log"
+                    ~max_size:logrotate_max_size
+                    ~num_rotate:logrotate_num_rotate ) ) ;
+         Signal.handle [ Signal.term ] ~f:(fun _signal ->
+             [%log info]
+               !"Received signal to terminate. Aborting snark worker process" ;
+             Core.exit 0 ) ;
+         let proof_level =
+           Option.value
+             ~default:Mina_compile_config.Genesis_constants.Proof_level.compiled
+             proof_level
+         in
+         main
+           (module Rpcs_versioned)
+           ~logger ~proof_level daemon_port
+           (Option.value ~default:true shutdown_on_disconnect) )
 
   let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect =
     [ "-daemon-address"

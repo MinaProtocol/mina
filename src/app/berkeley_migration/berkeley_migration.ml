@@ -295,7 +295,7 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
     Progress.with_reporter
       Progress.Line.(
         list
-          [ const "Migrating accounts"; spinner (); bar total; count_to total ])
+          [ const "Migrating accounts"; spinner (); bar total; count_to total ] )
       (fun progress ->
         Deferred.List.iter account_ids_to_migrate ~f:(fun (acct_id, index) ->
             match Mina_ledger.Ledger.location_of_account ledger acct_id with
@@ -370,7 +370,9 @@ let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
         |> Runtime_config.of_yojson |> Result.ok_or_failwith
       in
       [%log info] "Getting precomputed values from runtime config" ;
-      let proof_level = Genesis_constants.Proof_level.compiled in
+      let proof_level =
+        Mina_compile_config.Genesis_constants.Proof_level.compiled
+      in
       let%bind precomputed_values =
         match%map
           Genesis_ledger_helper.init_from_config_file ~logger
@@ -576,68 +578,68 @@ let () =
   Command.(
     run
       (let open Let_syntax in
-      Command.async
-        ~summary:"Migrate mainnet archive database to Berkeley schema"
-        (let%map mainnet_archive_uri =
-           Param.flag "--mainnet-archive-uri"
-             ~doc:"URI URI for connecting to the mainnet archive database"
-             Param.(required string)
-         and migrated_archive_uri =
-           Param.flag "--migrated-archive-uri"
-             ~doc:"URI URI for connecting to the migrated archive database"
-             Param.(required string)
-         and runtime_config_file =
-           Param.flag "--config-file" ~aliases:[ "-config-file" ]
-             Param.(required string)
-             ~doc:
-               "PATH to the configuration file containing the berkeley genesis \
-                ledger"
-         and fork_state_hash =
-           Param.flag "--fork-state-hash" ~aliases:[ "-fork-state-hash" ]
-             Param.(optional string)
-             ~doc:
-               "String state hash of the fork for the migration (if omitted, \
-                only canonical blocks will be migrated)"
-         and mina_network_blocks_bucket =
-           Param.flag "--blocks-bucket" ~aliases:[ "-blocks-bucket" ]
-             Param.(required string)
-             ~doc:"Bucket with precomputed mainnet blocks"
-         and batch_size =
-           Param.flag "--batch-size" ~aliases:[ "-batch-size" ]
-             Param.(required int)
-             ~doc:"Batch size used when downloading precomputed blocks"
-         and network =
-           Param.flag "--network" ~aliases:[ "-network" ]
-             Param.(required string)
-             ~doc:"Network name used when downloading precomputed blocks"
-         and stream_precomputed_blocks =
-           Param.flag "--stream-precomputed-blocks"
-             ~aliases:[ "-stream-precomputed-blocks" ]
-             Param.no_arg
-             ~doc:
-               "Download precomputed blocks in chunks; this is much slower,\n\
-               \                but uses far less disk space"
-         and keep_precomputed_blocks =
-           Param.flag "--keep-precomputed-blocks"
-             ~aliases:[ "-keep-precomputed-blocks" ]
-             Param.no_arg
-             ~doc:
-               "Keep the precomputed blocks on-disk after the migration is \
-                complete"
-         and precomputed_blocks_local_path =
-           Param.flag "--precomputed-blocks-local-path"
-             ~aliases:[ "-precomputed-blocks-local-path" ]
-             Param.(optional string)
-             ~doc:"PATH the precomputed blocks on-disk location"
-         and log_json = Cli_lib.Flag.Log.json
-         and log_level = Cli_lib.Flag.Log.level
-         and file_log_level = Cli_lib.Flag.Log.file_log_level
-         and log_filename = Cli_lib.Flag.Log.file in
-         let precomputed_blocks_local_path =
-           Option.value precomputed_blocks_local_path ~default:"."
-         in
-         main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
-           ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
-           ~stream_precomputed_blocks ~keep_precomputed_blocks ~log_json
-           ~log_level ~log_filename ~file_log_level
-           ~precomputed_blocks_local_path )))
+       Command.async
+         ~summary:"Migrate mainnet archive database to Berkeley schema"
+         (let%map mainnet_archive_uri =
+            Param.flag "--mainnet-archive-uri"
+              ~doc:"URI URI for connecting to the mainnet archive database"
+              Param.(required string)
+          and migrated_archive_uri =
+            Param.flag "--migrated-archive-uri"
+              ~doc:"URI URI for connecting to the migrated archive database"
+              Param.(required string)
+          and runtime_config_file =
+            Param.flag "--config-file" ~aliases:[ "-config-file" ]
+              Param.(required string)
+              ~doc:
+                "PATH to the configuration file containing the berkeley \
+                 genesis ledger"
+          and fork_state_hash =
+            Param.flag "--fork-state-hash" ~aliases:[ "-fork-state-hash" ]
+              Param.(optional string)
+              ~doc:
+                "String state hash of the fork for the migration (if omitted, \
+                 only canonical blocks will be migrated)"
+          and mina_network_blocks_bucket =
+            Param.flag "--blocks-bucket" ~aliases:[ "-blocks-bucket" ]
+              Param.(required string)
+              ~doc:"Bucket with precomputed mainnet blocks"
+          and batch_size =
+            Param.flag "--batch-size" ~aliases:[ "-batch-size" ]
+              Param.(required int)
+              ~doc:"Batch size used when downloading precomputed blocks"
+          and network =
+            Param.flag "--network" ~aliases:[ "-network" ]
+              Param.(required string)
+              ~doc:"Network name used when downloading precomputed blocks"
+          and stream_precomputed_blocks =
+            Param.flag "--stream-precomputed-blocks"
+              ~aliases:[ "-stream-precomputed-blocks" ]
+              Param.no_arg
+              ~doc:
+                "Download precomputed blocks in chunks; this is much slower,\n\
+                \                but uses far less disk space"
+          and keep_precomputed_blocks =
+            Param.flag "--keep-precomputed-blocks"
+              ~aliases:[ "-keep-precomputed-blocks" ]
+              Param.no_arg
+              ~doc:
+                "Keep the precomputed blocks on-disk after the migration is \
+                 complete"
+          and precomputed_blocks_local_path =
+            Param.flag "--precomputed-blocks-local-path"
+              ~aliases:[ "-precomputed-blocks-local-path" ]
+              Param.(optional string)
+              ~doc:"PATH the precomputed blocks on-disk location"
+          and log_json = Cli_lib.Flag.Log.json
+          and log_level = Cli_lib.Flag.Log.level
+          and file_log_level = Cli_lib.Flag.Log.file_log_level
+          and log_filename = Cli_lib.Flag.Log.file in
+          let precomputed_blocks_local_path =
+            Option.value precomputed_blocks_local_path ~default:"."
+          in
+          main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
+            ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
+            ~stream_precomputed_blocks ~keep_precomputed_blocks ~log_json
+            ~log_level ~log_filename ~file_log_level
+            ~precomputed_blocks_local_path ) ) )

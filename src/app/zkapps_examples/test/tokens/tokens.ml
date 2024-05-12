@@ -14,8 +14,8 @@ let gen_keys () =
   (Public_key.compress kp.public_key, kp.private_key)
 
 let fee_to_create n =
-  Genesis_constants.Constraint_constants.compiled.account_creation_fee
-  |> Currency.Amount.of_fee
+  Mina_compile_config.Genesis_constants.Constraint_constants.compiled
+    .account_creation_fee |> Currency.Amount.of_fee
   |> (fun x -> Currency.Amount.scale x n)
   |> Option.value_exn
 

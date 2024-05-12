@@ -71,7 +71,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let accounts_referenced (t : t) =
         List.map (account_access_statuses t Applied)
-          ~f:(fun (acct_id, _status) -> acct_id)
+          ~f:(fun (acct_id, _status) -> acct_id )
     end
 
     module V1 = struct
@@ -132,7 +132,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let nonce = Fn.compose Payload.nonce payload
 
   (* for filtering *)
-  let minimum_fee = Currency.Fee.minimum_user_command_fee
+  let minimum_fee = Mina_compile_config.minimum_user_command_fee
 
   let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
@@ -168,8 +168,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         "delegation"
 
   let to_input_legacy (payload : Payload.t) =
-    Transaction_union_payload.(
-      to_input_legacy (of_user_command_payload payload))
+    Transaction_union_payload.(to_input_legacy (of_user_command_payload payload))
 
   let sign_payload ?signature_kind (private_key : Signature_lib.Private_key.t)
       (payload : Payload.t) : Signature.t =
@@ -194,7 +193,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
         ?(nonce = Account_nonce.zero) ~fee_range create_body =
       let open Quickcheck.Generator.Let_syntax in
-      let min_fee = Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee in
+      let min_fee =
+        Fee.to_nanomina_int Mina_compile_config.minimum_user_command_fee
+      in
       let max_fee = min_fee + fee_range in
       let%bind (signer : Signature_keypair.t), (receiver : Signature_keypair.t)
           =
@@ -345,7 +346,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               Currency.Fee.(
                 gen_incl (of_string "6000000000")
                   (min (of_string "10000000000")
-                     (Currency.Amount.to_fee this_split) ))
+                     (Currency.Amount.to_fee this_split) ) )
             in
             let amount =
               Option.value_exn Currency.Amount.(this_split - of_fee fee)

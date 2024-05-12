@@ -231,7 +231,7 @@ module Output = struct
         of_bits_lsb (c_bias (Array.to_list (Blake2.string_to_bits vrf_output)))
       in
       Bignum.(
-        of_bigint n / of_bigint Bignum_bigint.(shift_left one length_in_bits))
+        of_bigint n / of_bigint Bignum_bigint.(shift_left one length_in_bits) )
 
     let to_input (t : t) =
       List.map (to_bits t) ~f:(fun b -> (Mina_base.Util.field_of_bool b, 1))
@@ -258,7 +258,7 @@ module Output = struct
       Random_oracle.Input.Chunked.(
         append
           (Message.to_input ~constraint_constants msg)
-          (field_elements [| x; y |]))
+          (field_elements [| x; y |]) )
     in
     let open Random_oracle in
     hash ~init:Hash_prefix_states.vrf_output (pack_input input)
@@ -282,7 +282,7 @@ module Output = struct
 
   let%test_unit "hash unchecked vs. checked equality" =
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Mina_compile_config.Genesis_constants.Constraint_constants.for_unit_tests
     in
     let gen_inner_curve_point =
       let open Quickcheck.Generator.Let_syntax in
@@ -300,7 +300,7 @@ module Output = struct
         (Test_util.test_equal ~equal:Field.equal
            Snark_params.Tick.Typ.(
              Message.typ ~constraint_constants
-             * Snark_params.Tick.Inner_curve.typ)
+             * Snark_params.Tick.Inner_curve.typ )
            typ
            (fun (msg, g) -> Checked.hash msg g)
            (fun (msg, g) -> hash ~constraint_constants msg g) )
@@ -337,7 +337,7 @@ module Threshold = struct
       let bottom = bigint_of_uint64 (Amount.to_uint64 total_stake) in
       Bignum.(
         of_bigint Bignum_bigint.(shift_left top k / bottom)
-        / of_bigint Bignum_bigint.(shift_left one k))
+        / of_bigint Bignum_bigint.(shift_left one k) )
     in
     let rhs = Snarky_taylor.Exp.Unchecked.one_minus_exp params input in
     let lhs = Output.Truncated.to_fraction vrf_output in
@@ -378,7 +378,7 @@ module Threshold = struct
           Floating_point.(
             le ~m
               (of_bits ~m lhs ~precision:Output.Truncated.length_in_bits)
-              rhs) )
+              rhs ) )
   end
 end
 
@@ -634,7 +634,9 @@ module Layout = struct
 end
 
 let%test_unit "Standalone and integrates vrfs are consistent" =
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let constraint_constants =
+    Mina_compile_config.Genesis_constants.Constraint_constants.compiled
+  in
   let module Standalone = Standalone (struct
     let constraint_constants = constraint_constants
   end) in

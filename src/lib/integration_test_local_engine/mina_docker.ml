@@ -111,14 +111,14 @@ module Network_config = struct
     let add_accounts accounts_and_keypairs =
       List.map accounts_and_keypairs
         ~f:(fun
-             ( { Test_config.Test_account.balance
-               ; account_name
-               ; timing
-               ; permissions
-               ; zkapp
-               }
-             , (pk, sk) )
-           ->
+            ( { Test_config.Test_account.balance
+              ; account_name
+              ; timing
+              ; permissions
+              ; zkapp
+              }
+            , (pk, sk) )
+          ->
           let timing = runtime_timing_of_timing timing in
           let default = Runtime_config.Accounts.Single.default in
           let account =
@@ -143,14 +143,16 @@ module Network_config = struct
     let genesis_ledger_accounts = add_accounts genesis_accounts_and_keys in
     let constraint_constants =
       Genesis_ledger_helper.make_constraint_constants
-        ~default:Genesis_constants.Constraint_constants.compiled proof_config
+        ~default:
+          Mina_compile_config.Genesis_constants.Constraint_constants.compiled
+        proof_config
     in
     let ledger_is_prefix ledger1 ledger2 =
       List.is_prefix ledger2 ~prefix:ledger1
         ~equal:(fun
-                 ({ account_name = name1; _ } : Test_config.Test_account.t)
-                 ({ account_name = name2; _ } : Test_config.Test_account.t)
-               -> String.equal name1 name2 )
+            ({ account_name = name1; _ } : Test_config.Test_account.t)
+            ({ account_name = name2; _ } : Test_config.Test_account.t)
+          -> String.equal name1 name2 )
     in
     let runtime_config =
       { Runtime_config.daemon =
@@ -203,8 +205,7 @@ module Network_config = struct
                 let epoch_ledger_accounts =
                   List.map epoch_accounts
                     ~f:(fun
-                         { account_name; balance; timing; permissions; zkapp }
-                       ->
+                        { account_name; balance; timing; permissions; zkapp } ->
                       let balance = Balance.of_mina_string_exn balance in
                       let timing = runtime_timing_of_timing timing in
                       let genesis_account =
@@ -278,7 +279,8 @@ module Network_config = struct
     let genesis_constants =
       Or_error.ok_exn
         (Genesis_ledger_helper.make_genesis_constants ~logger
-           ~default:Genesis_constants.compiled runtime_config )
+           ~default:Mina_compile_config.Genesis_constants.compiled
+           runtime_config )
     in
     let constants : Test_config.constants =
       { constraints = constraint_constants; genesis = genesis_constants }
@@ -602,7 +604,7 @@ module Network_config = struct
       match network_config.docker.snark_coordinator_config with
       | Some snark_coordinator_config ->
           List.map snark_coordinator_config.config.worker_nodes
-            ~f:(fun config -> (config.service_name, config.docker_config))
+            ~f:(fun config -> (config.service_name, config.docker_config) )
           |> StringMap.of_alist_exn
       | None ->
           StringMap.empty
@@ -716,7 +718,7 @@ module Network_manager = struct
           Out_channel.with_file ~fail_if_exists:true keypath ~f:(fun ch ->
               kp.private_key |> Out_channel.output_string ch ) ;
           Out_channel.with_file ~fail_if_exists:true (keypath ^ ".pub")
-            ~f:(fun ch -> kp.public_key |> Out_channel.output_string ch) ;
+            ~f:(fun ch -> kp.public_key |> Out_channel.output_string ch ) ;
           ignore
             (Util.run_cmd_exn kps_base_path "chmod" [ "600"; kp.keypair_name ]) )
       |> Deferred.return
@@ -750,7 +752,7 @@ module Network_manager = struct
       Docker_node_config.Archive_node_config.archive_entrypoint_script
     in
     Out_channel.with_file ~fail_if_exists:true (docker_dir ^/ archive_filename)
-      ~f:(fun ch -> archive_script |> Out_channel.output_string ch) ;
+      ~f:(fun ch -> archive_script |> Out_channel.output_string ch ) ;
     ignore (Util.run_cmd_exn docker_dir "chmod" [ "+x"; archive_filename ]) ;
     let%bind _ =
       Deferred.List.iter network_config.docker.mina_archive_schema_aux_files

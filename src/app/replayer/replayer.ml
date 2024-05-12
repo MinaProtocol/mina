@@ -54,7 +54,8 @@ end
 
 let error_count = ref 0
 
-let constraint_constants = Genesis_constants.Constraint_constants.compiled
+let constraint_constants =
+  Mina_compile_config.Genesis_constants.Constraint_constants.compiled
 
 let proof_level = Genesis_constants.Proof_level.Full
 
@@ -729,13 +730,13 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
             let%bind () =
               Deferred.List.iter block_infos
                 ~f:(fun
-                     { global_slot_since_genesis
-                     ; state_hash
-                     ; ledger_hash
-                     ; snarked_ledger_hash_id
-                     ; _
-                     }
-                   ->
+                    { global_slot_since_genesis
+                    ; state_hash
+                    ; ledger_hash
+                    ; snarked_ledger_hash_id
+                    ; _
+                    }
+                  ->
                   let%map snarked_hash =
                     query_db ~f:(fun db ->
                         Sql.Snarked_ledger_hashes.run db snarked_ledger_hash_id )
@@ -1299,10 +1300,11 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                             ~constraint_constants
                             ~global_slot:
                               ( if migration_mode then parent_global_slot
-                              else
-                                Mina_numbers.Global_slot_since_genesis.of_uint32
-                                  (Unsigned.UInt32.of_int64
-                                     last_global_slot_since_genesis ) )
+                                else
+                                  Mina_numbers.Global_slot_since_genesis
+                                  .of_uint32
+                                    (Unsigned.UInt32.of_int64
+                                       last_global_slot_since_genesis ) )
                             ~txn_state_view ledger txn
                         with
                         | Ok partially_applied ->
@@ -1374,45 +1376,49 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                 apply_transaction_phases (List.rev block_txns)
               in
               ( if migration_mode then
-                [%log spam]
-                  "We are doing migration, so the snarked_ledger_hash in \
-                   global_slot_hashes_tbl is irrelevant"
-              else if
-              Frozen_ledger_hash.equal snarked_hash
-                (First_pass_ledger_hashes.get_last_snarked_hash ())
-            then
-                [%log spam]
-                  "Snarked ledger hash same as in the preceding block, not \
-                   checking it again"
-              else if
-              Frozen_ledger_hash.equal snarked_hash genesis_snarked_ledger_hash
-            then
-                [%log spam] "Snarked ledger hash is genesis snarked ledger hash"
-              else
-                match First_pass_ledger_hashes.find snarked_hash with
-                | None ->
-                    if not !found_snarked_ledger_hash then (
-                      [%log info]
-                        "Current snarked ledger hash not among first-pass \
-                         ledger hashes, but we haven't yet found one. The \
-                         transaction that created this ledger hash might have \
-                         been in an older replayer run that created a \
-                         checkpoint file without saved first-pass ledger \
+                  [%log spam]
+                    "We are doing migration, so the snarked_ledger_hash in \
+                     global_slot_hashes_tbl is irrelevant"
+                else if
+                  Frozen_ledger_hash.equal snarked_hash
+                    (First_pass_ledger_hashes.get_last_snarked_hash ())
+                then
+                  [%log spam]
+                    "Snarked ledger hash same as in the preceding block, not \
+                     checking it again"
+                else if
+                  Frozen_ledger_hash.equal snarked_hash
+                    genesis_snarked_ledger_hash
+                then
+                  [%log spam]
+                    "Snarked ledger hash is genesis snarked ledger hash"
+                else
+                  match First_pass_ledger_hashes.find snarked_hash with
+                  | None ->
+                      if not !found_snarked_ledger_hash then (
+                        [%log info]
+                          "Current snarked ledger hash not among first-pass \
+                           ledger hashes, but we haven't yet found one. The \
+                           transaction that created this ledger hash might \
+                           have been in an older replayer run that created a \
+                           checkpoint file without saved first-pass ledger \
+                           hashes" ;
+                        First_pass_ledger_hashes.set_last_snarked_hash
+                          snarked_hash )
+                      else
+                        [%log error]
+                          "Current snarked ledger hash does not appear among \
+                           first-pass ledger hashes" ;
+                      if continue_on_error then incr error_count
+                      else Core_kernel.exit 1
+                  | Some (_hash, n) ->
+                      [%log spam]
+                        "Found snarked ledger hash among first-pass ledger \
                          hashes" ;
+                      found_snarked_ledger_hash := true ;
                       First_pass_ledger_hashes.set_last_snarked_hash
-                        snarked_hash )
-                    else
-                      [%log error]
-                        "Current snarked ledger hash does not appear among \
-                         first-pass ledger hashes" ;
-                    if continue_on_error then incr error_count
-                    else Core_kernel.exit 1
-                | Some (_hash, n) ->
-                    [%log spam]
-                      "Found snarked ledger hash among first-pass ledger hashes" ;
-                    found_snarked_ledger_hash := true ;
-                    First_pass_ledger_hashes.set_last_snarked_hash snarked_hash ;
-                    First_pass_ledger_hashes.flush_older_than n ) ;
+                        snarked_hash ;
+                      First_pass_ledger_hashes.flush_older_than n ) ;
               if List.is_empty block_txns then (
                 [%log spam]
                   "No transactions to run for block with state hash $state_hash"
@@ -1779,50 +1785,51 @@ let () =
   Command.(
     run
       (let open Let_syntax in
-      Command.async ~summary:"Replay transactions from Mina archive database"
-        (let%map input_file =
-           Param.flag "--input-file"
-             ~doc:"file File containing the starting ledger"
-             Param.(required string)
-         and output_file_opt =
-           Param.flag "--output-file"
-             ~doc:"file File containing the resulting ledger"
-             Param.(optional string)
-         and migration_mode =
-           Param.flag "--migration-mode"
-             ~doc:
-               "If this flag is turned on then migration mode would be \
-                started, which means ledger hash check would be disabled and \
-                this app would populates the `accounts_accessed` and \
-                `accounts_created` tables"
-             Param.no_arg
-         and archive_uri =
-           Param.flag "--archive-uri"
-             ~doc:
-               "URI URI for connecting to the archive database (e.g., \
-                postgres://$USER@localhost:5432/archiver)"
-             Param.(required string)
-         and continue_on_error =
-           Param.flag "--continue-on-error"
-             ~doc:"Continue processing after errors" Param.no_arg
-         and checkpoint_interval =
-           Param.flag "--checkpoint-interval"
-             ~doc:"NN Write checkpoint file every NN slots"
-             Param.(optional int)
-         and checkpoint_output_folder_opt =
-           Param.flag "--checkpoint-output-folder"
-             ~doc:"file Folder containing the resulting checkpoints"
-             Param.(optional string)
-         and genesis_dir_opt =
-           Param.flag "--genesis-ledger-dir"
-             ~doc:"DIR Directory that contains the genesis ledger"
-             Param.(optional string)
-         and checkpoint_file_prefix =
-           Param.flag "--checkpoint-file-prefix"
-             ~doc:"string Checkpoint file prefix (default: 'replayer')"
-             Param.(optional_with_default "replayer" string)
-         and log_json = Cli_lib.Flag.Log.json
-         and log_level = Cli_lib.Flag.Log.level in
-         main ~input_file ~output_file_opt ~migration_mode ~archive_uri
-           ~checkpoint_interval ~continue_on_error ~checkpoint_output_folder_opt
-           ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level )))
+       Command.async ~summary:"Replay transactions from Mina archive database"
+         (let%map input_file =
+            Param.flag "--input-file"
+              ~doc:"file File containing the starting ledger"
+              Param.(required string)
+          and output_file_opt =
+            Param.flag "--output-file"
+              ~doc:"file File containing the resulting ledger"
+              Param.(optional string)
+          and migration_mode =
+            Param.flag "--migration-mode"
+              ~doc:
+                "If this flag is turned on then migration mode would be \
+                 started, which means ledger hash check would be disabled and \
+                 this app would populates the `accounts_accessed` and \
+                 `accounts_created` tables"
+              Param.no_arg
+          and archive_uri =
+            Param.flag "--archive-uri"
+              ~doc:
+                "URI URI for connecting to the archive database (e.g., \
+                 postgres://$USER@localhost:5432/archiver)"
+              Param.(required string)
+          and continue_on_error =
+            Param.flag "--continue-on-error"
+              ~doc:"Continue processing after errors" Param.no_arg
+          and checkpoint_interval =
+            Param.flag "--checkpoint-interval"
+              ~doc:"NN Write checkpoint file every NN slots"
+              Param.(optional int)
+          and checkpoint_output_folder_opt =
+            Param.flag "--checkpoint-output-folder"
+              ~doc:"file Folder containing the resulting checkpoints"
+              Param.(optional string)
+          and genesis_dir_opt =
+            Param.flag "--genesis-ledger-dir"
+              ~doc:"DIR Directory that contains the genesis ledger"
+              Param.(optional string)
+          and checkpoint_file_prefix =
+            Param.flag "--checkpoint-file-prefix"
+              ~doc:"string Checkpoint file prefix (default: 'replayer')"
+              Param.(optional_with_default "replayer" string)
+          and log_json = Cli_lib.Flag.Log.json
+          and log_level = Cli_lib.Flag.Log.level in
+          main ~input_file ~output_file_opt ~migration_mode ~archive_uri
+            ~checkpoint_interval ~continue_on_error
+            ~checkpoint_output_folder_opt ~checkpoint_file_prefix
+            ~genesis_dir_opt ~log_json ~log_level ) ) )

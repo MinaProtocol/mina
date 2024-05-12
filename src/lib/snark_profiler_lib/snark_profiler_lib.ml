@@ -5,11 +5,12 @@ open Signature_lib
 open Mina_base
 open Mina_transaction
 
-let constraint_constants = Genesis_constants.Constraint_constants.compiled
+let constraint_constants =
+  Mina_compile_config.Genesis_constants.Constraint_constants.compiled
 
-let genesis_constants = Genesis_constants.compiled
+let genesis_constants = Mina_compile_config.Genesis_constants.compiled
 
-let proof_level = Genesis_constants.Proof_level.compiled
+let proof_level = Mina_compile_config.Genesis_constants.Proof_level.compiled
 
 (* We're just profiling, so okay to monkey-patch here *)
 module Sparse_ledger = struct
@@ -163,8 +164,10 @@ module Transaction_key = struct
     List.fold
       ~init:({ proof_segments = 0; signed_single = 0; signed_pair = 0 } : t)
       segments
-      ~f:(fun ({ proof_segments; signed_single; signed_pair } as acc)
-              (_, segment, _) ->
+      ~f:(fun
+          ({ proof_segments; signed_single; signed_pair } as acc)
+          (_, segment, _)
+        ->
         match segment with
         | Transaction_snark.Zkapp_command_segment.Basic.Proved ->
             { acc with proof_segments = proof_segments + 1 }
@@ -207,7 +210,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
           ~data:kp.private_key )
   in
   let balances =
-    let min_cmd_fee = Currency.Fee.minimum_user_command_fee in
+    let min_cmd_fee = Mina_compile_config.minimum_user_command_fee in
     let min_balance =
       Currency.Fee.to_nanomina_int min_cmd_fee
       |> Int.( + ) 1_000_000_000_000_000
@@ -238,7 +241,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
       ; send = Either
       ; set_delegate = Either
       ; set_permissions = Either
-      ; set_verification_key = (Either, Mina_numbers.Txn_version.current)
+      ; set_verification_key = (Either, Mina_compile_config.current_txn_version)
       ; set_zkapp_uri = Either
       ; edit_action_state = Either
       ; set_token_symbol = Either
@@ -314,8 +317,8 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
               (kp, amount) )
       ; amount =
           ( if receiver_count > 0 then
-            Currency.Amount.scale amount receiver_count |> Option.value_exn
-          else Currency.Amount.zero )
+              Currency.Amount.scale amount receiver_count |> Option.value_exn
+            else Currency.Amount.zero )
       ; zkapp_account_keypairs = List.take keypairs_in_ledger num_proof_updates
       ; memo = Signed_command_memo.create_from_string_exn "blah"
       ; new_zkapp_account = false
@@ -511,7 +514,7 @@ let precomputed_values = Precomputed_values.compiled_inputs
 let state_body =
   Mina_state.(
     Lazy.map precomputed_values ~f:(fun values ->
-        values.protocol_state_with_hashes.data |> Protocol_state.body ))
+        values.protocol_state_with_hashes.data |> Protocol_state.body ) )
 
 let curr_state_view = Lazy.map state_body ~f:Mina_state.Protocol_state.Body.view
 
@@ -522,7 +525,7 @@ let pending_coinbase_stack_target (t : Transaction.t) stack =
     Pending_coinbase.Stack.(
       push_state
         (Lazy.force state_body_hash)
-        (Lazy.force curr_state_view).global_slot_since_genesis stack)
+        (Lazy.force curr_state_view).global_slot_since_genesis stack )
   in
   let target =
     match t with
@@ -584,8 +587,10 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
     |> Async.Deferred.List.fold
          ~init:
            ((Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty), [])
-         ~f:(fun ((max_span, source_ledger, coinbase_stack_source), proofs)
-                 (target_ledger, applied) ->
+         ~f:(fun
+             ((max_span, source_ledger, coinbase_stack_source), proofs)
+             (target_ledger, applied)
+           ->
            let txn =
              With_status.data
              @@ Mina_ledger.Ledger.Transaction_applied.transaction applied

@@ -61,7 +61,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       let state = Envelope.Incoming.data e in
       let state_hash =
         Mina_block.(
-          state |> header |> Header.protocol_state |> Protocol_state.hashes)
+          state |> header |> Header.protocol_state |> Protocol_state.hashes )
           .state_hash
       in
       Internal_tracing.Context_call.with_call_id ~tag:"block_received"
@@ -93,7 +93,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
                 processing_start_time
             in
             Mina_metrics.Block_latency.(
-              Validation_acceptance_time.update processing_time_span)
+              Validation_acceptance_time.update processing_time_span )
         | Some _ ->
             ()
         | None ->
@@ -105,7 +105,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
            Mina_block.(
              header state |> Header.protocol_state
              |> Protocol_state.blockchain_state |> Blockchain_state.timestamp
-             |> Block_time.to_time_exn) ) ;
+             |> Block_time.to_time_exn ) ) ;
       Mina_metrics.(Gauge.inc_one Network.new_state_received) ;
       if log_gossip_heard then
         [%str_log info]
@@ -114,7 +114,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
              { state_hash =
                  Mina_block.(
                    header state |> Header.protocol_state
-                   |> Protocol_state.hashes)
+                   |> Protocol_state.hashes )
                    .state_hash
              ; sender = Envelope.Incoming.sender e
              } ) ;
@@ -140,7 +140,8 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       in
       let transactions =
         Mina_block.transactions state
-          ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+          ~constraint_constants:
+            Mina_compile_config.Genesis_constants.Constraint_constants.compiled
       in
       let exists_well_formedness_errors =
         List.exists transactions ~f:(fun txn ->

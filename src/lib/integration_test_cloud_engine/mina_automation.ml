@@ -184,14 +184,14 @@ module Network_config = struct
     let add_accounts accounts_and_keypairs =
       List.map accounts_and_keypairs
         ~f:(fun
-             ( { Test_config.Test_account.balance
-               ; account_name
-               ; timing
-               ; permissions
-               ; zkapp
-               }
-             , (pk, sk) )
-           ->
+            ( { Test_config.Test_account.balance
+              ; account_name
+              ; timing
+              ; permissions
+              ; zkapp
+              }
+            , (pk, sk) )
+          ->
           let timing = runtime_timing_of_timing timing in
           let default = Runtime_config.Accounts.Single.default in
           let account =
@@ -219,14 +219,16 @@ module Network_config = struct
     (* DAEMON CONFIG *)
     let constraint_constants =
       Genesis_ledger_helper.make_constraint_constants
-        ~default:Genesis_constants.Constraint_constants.compiled proof_config
+        ~default:
+          Mina_compile_config.Genesis_constants.Constraint_constants.compiled
+        proof_config
     in
     let ledger_is_prefix ledger1 ledger2 =
       List.is_prefix ledger2 ~prefix:ledger1
         ~equal:(fun
-                 ({ account_name = name1; _ } : Test_config.Test_account.t)
-                 ({ account_name = name2; _ } : Test_config.Test_account.t)
-               -> String.equal name1 name2 )
+            ({ account_name = name1; _ } : Test_config.Test_account.t)
+            ({ account_name = name2; _ } : Test_config.Test_account.t)
+          -> String.equal name1 name2 )
     in
     let runtime_config =
       { Runtime_config.daemon =
@@ -290,8 +292,7 @@ module Network_config = struct
                 let epoch_ledger_accounts =
                   List.map epoch_accounts
                     ~f:(fun
-                         { account_name; balance; timing; permissions; zkapp }
-                       ->
+                        { account_name; balance; timing; permissions; zkapp } ->
                       let balance = Balance.of_mina_string_exn balance in
                       let timing = runtime_timing_of_timing timing in
                       let genesis_account =
@@ -374,7 +375,8 @@ module Network_config = struct
     let genesis_constants =
       Or_error.ok_exn
         (Genesis_ledger_helper.make_genesis_constants ~logger
-           ~default:Genesis_constants.compiled runtime_config )
+           ~default:Mina_compile_config.Genesis_constants.compiled
+           runtime_config )
     in
     let constants : Test_config.constants =
       { constraints = constraint_constants; genesis = genesis_constants }

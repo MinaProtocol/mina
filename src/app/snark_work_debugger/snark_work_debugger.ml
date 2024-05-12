@@ -20,7 +20,8 @@ let main (spec_path : string) =
   let%bind spec = Reader.load_sexp_exn spec_path Inputs.single_spec_of_sexp in
   let%bind worker =
     Inputs.Worker_state.create
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+      ~constraint_constants:
+        Mina_compile_config.Genesis_constants.Constraint_constants.compiled
       ~proof_level:Full ()
   in
   let message =
@@ -28,7 +29,7 @@ let main (spec_path : string) =
       ~prover:
         Signature_lib.(
           Public_key.compress
-            (Public_key.of_private_key_exn (Private_key.create ())))
+            (Public_key.of_private_key_exn (Private_key.create ())) )
   in
   Inputs.perform_single worker ~message spec >>| ignore
 
@@ -40,6 +41,6 @@ let cmd =
         let open Command.Param in
         flag "--spec" ~doc:"PATH Spec path" (required string)
       in
-      fun () -> Obj.magic (main path))
+      fun () -> Obj.magic (main path) )
 
 let () = Command.run cmd

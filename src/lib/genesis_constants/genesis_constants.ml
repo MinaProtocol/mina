@@ -1,7 +1,3 @@
-[%%import "/src/lib/consensus/mechanism.mlh"]
-
-[%%import "/src/config/config.mlh"]
-
 open Core_kernel
 
 module Proof_level = struct
@@ -18,12 +14,6 @@ module Proof_level = struct
         None
     | s ->
         failwithf "unrecognised proof level %s" s ()
-
-  [%%inject "compiled", proof_level]
-
-  let compiled = of_string compiled
-
-  let for_unit_tests = Check
 end
 
 module Fork_constants = struct
@@ -82,117 +72,26 @@ module Constraint_constants = struct
         | None ->
             None )
     }
-
-  (* Generate the compile-time constraint constants, using a signature to hide
-     the optcomp constants that we import.
-  *)
-  include (
-    struct
-      [%%ifdef consensus_mechanism]
-
-      [%%inject "sub_windows_per_window", sub_windows_per_window]
-
-      [%%else]
-
-      (* Invalid value, this should not be used by nonconsensus nodes. *)
-      let sub_windows_per_window = -1
-
-      [%%endif]
-
-      [%%inject "ledger_depth", ledger_depth]
-
-      [%%inject "coinbase_amount_string", coinbase]
-
-      [%%inject "account_creation_fee_string", account_creation_fee_int]
-
-      (** All the proofs before the last [work_delay] blocks must be
-            completed to add transactions. [work_delay] is the minimum number
-            of blocks and will increase if the throughput is less.
-            - If [work_delay = 0], all the work that was added to the scan
-              state in the previous block is expected to be completed and
-              included in the current block if any transactions/coinbase are to
-              be included.
-            - [work_delay >= 1] means that there's at least two block times for
-              completing the proofs.
-        *)
-
-      [%%inject "work_delay", scan_state_work_delay]
-
-      [%%inject "block_window_duration_ms", block_window_duration]
-
-      [%%inject
-      "transaction_capacity_log_2", scan_state_transaction_capacity_log_2]
-
-      [%%inject "supercharged_coinbase_factor", supercharged_coinbase_factor]
-
-      let pending_coinbase_depth =
-        Core_kernel.Int.ceil_log2
-          (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
-
-      [%%ifndef fork_blockchain_length]
-
-      let fork = None
-
-      [%%else]
-
-      [%%inject "fork_blockchain_length", fork_blockchain_length]
-
-      [%%inject "fork_state_hash", fork_state_hash]
-
-      [%%inject "fork_global_slot_since_genesis", fork_genesis_slot]
-
-      let fork =
-        Some
-          { Fork_constants.state_hash =
-              Data_hash_lib.State_hash.of_base58_check_exn fork_state_hash
-          ; blockchain_length =
-              Mina_numbers.Length.of_int fork_blockchain_length
-          ; global_slot_since_genesis =
-              Mina_numbers.Global_slot_since_genesis.of_int
-                fork_global_slot_since_genesis
-          }
-
-      [%%endif]
-
-      let compiled =
-        { sub_windows_per_window
-        ; ledger_depth
-        ; work_delay
-        ; block_window_duration_ms
-        ; transaction_capacity_log_2
-        ; pending_coinbase_depth
-        ; coinbase_amount =
-            Currency.Amount.of_mina_string_exn coinbase_amount_string
-        ; supercharged_coinbase_factor
-        ; account_creation_fee =
-            Currency.Fee.of_mina_string_exn account_creation_fee_string
-        ; fork
-        }
-    end :
-      sig
-        val compiled : t
-      end )
-
-  let for_unit_tests = compiled
 end
 
 (*Constants that can be specified for generating the base proof (that are not required for key-generation) in runtime_genesis_ledger.exe and that can be configured at runtime.
   The types are defined such that this module doesn't depend on any of the coda libraries (except blake2 and module_version) to avoid dependency cycles.
   TODO: #4659 move key generation to runtime_genesis_ledger.exe to include scan_state constants, consensus constants (c and  block_window_duration) and ledger depth here*)
 
-let genesis_timestamp_of_string str =
+let genesis_time_of_string str =
   let default_zone = Time.Zone.of_utc_offset ~hours:(-8) in
   Time.of_string_gen
     ~find_zone:(fun _ -> assert false)
     ~default_zone:(fun () -> default_zone)
     str
 
-let of_time t = Time.to_span_since_epoch t |> Time.Span.to_ms |> Int64.of_float
+let genesis_timestamp_of_time t =
+  Time.to_span_since_epoch t |> Time.Span.to_ms |> Int64.of_float
 
 let validate_time time_str =
-  match Result.try_with (fun () -> genesis_timestamp_of_string time_str) with
+  match Result.try_with (fun () -> genesis_time_of_string time_str) with
   | Ok time ->
-      Ok (of_time time)
+      Ok (genesis_timestamp_of_time time)
   | Error _ ->
       Error
         "Invalid timestamp. Please specify timestamp in \"%Y-%m-%d \
@@ -311,43 +210,3 @@ module T = struct
 end
 
 include T
-
-[%%inject "genesis_state_timestamp_string", genesis_state_timestamp]
-
-[%%inject "k", k]
-
-[%%inject "slots_per_epoch", slots_per_epoch]
-
-[%%inject "slots_per_sub_window", slots_per_sub_window]
-
-[%%inject "grace_period_slots", grace_period_slots]
-
-[%%inject "delta", delta]
-
-[%%inject "pool_max_size", pool_max_size]
-
-let compiled : t =
-  { protocol =
-      { k
-      ; slots_per_epoch
-      ; slots_per_sub_window
-      ; grace_period_slots
-      ; delta
-      ; genesis_state_timestamp =
-          genesis_timestamp_of_string genesis_state_timestamp_string |> of_time
-      }
-  ; txpool_max_size = pool_max_size
-  ; num_accounts = None
-  ; zkapp_proof_update_cost = Mina_compile_config.zkapp_proof_update_cost
-  ; zkapp_signed_single_update_cost =
-      Mina_compile_config.zkapp_signed_single_update_cost
-  ; zkapp_signed_pair_update_cost =
-      Mina_compile_config.zkapp_signed_pair_update_cost
-  ; zkapp_transaction_cost_limit =
-      Mina_compile_config.zkapp_transaction_cost_limit
-  ; max_event_elements = Mina_compile_config.max_event_elements
-  ; max_action_elements = Mina_compile_config.max_action_elements
-  ; zkapp_cmd_limit_hardcap = Mina_compile_config.zkapp_cmd_limit_hardcap
-  }
-
-let for_unit_tests = compiled

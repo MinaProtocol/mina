@@ -3,7 +3,8 @@ open Mina_base
 
 let `VK { With_hash.data = vk; hash = _ }, `Prover p =
   Transaction_snark.For_tests.create_trivial_snapp
-    ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
+    ~constraint_constants:
+      Mina_compile_config.Genesis_constants.Constraint_constants.compiled ()
 
 let vk =
   vk

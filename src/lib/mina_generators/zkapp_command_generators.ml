@@ -252,14 +252,15 @@ let gen_fee ?fee_range ~num_updates (account : Account.t) =
   let balance = account.balance in
   let lo_fee =
     Option.value_exn
-      Currency.Fee.(scale minimum_user_command_fee (num_updates * 2))
+    @@ Currency.Fee.scale Mina_compile_config.minimum_user_command_fee
+         (num_updates * 2)
   in
   let hi_fee = Option.value_exn Currency.Fee.(scale lo_fee 2) in
   assert (
     Currency.(
-      Fee.(hi_fee <= (Balance.to_amount balance |> Currency.Amount.to_fee))) ) ;
+      Fee.(hi_fee <= (Balance.to_amount balance |> Currency.Amount.to_fee)) ) ) ;
   Option.value_map fee_range ~default:(Currency.Fee.gen_incl lo_fee hi_fee)
-    ~f:(fun (lo, hi) -> Currency.Fee.(gen_incl lo hi))
+    ~f:(fun (lo, hi) -> Currency.Fee.(gen_incl lo hi) )
 
 (*Fee payer balance change is Neg*)
 let fee_to_amt fee =
@@ -300,17 +301,19 @@ let gen_balance_change ?permissions_auth (account : Account.t) ?failure
     Option.value_map balance_change_range
       ~default:
         ( if new_account then
-          Currency.Amount.gen_incl
-            (Currency.Amount.of_mina_string_exn "50.0")
-            (Currency.Amount.of_mina_string_exn "100.0")
-        else
-          Currency.Amount.gen_incl Currency.Amount.zero
-            (Currency.Balance.to_amount small_balance_change) )
-      ~f:(fun { min_balance_change
-              ; max_balance_change
-              ; min_new_zkapp_balance
-              ; max_new_zkapp_balance
-              } ->
+            Currency.Amount.gen_incl
+              (Currency.Amount.of_mina_string_exn "50.0")
+              (Currency.Amount.of_mina_string_exn "100.0")
+          else
+            Currency.Amount.gen_incl Currency.Amount.zero
+              (Currency.Balance.to_amount small_balance_change) )
+      ~f:(fun
+          { min_balance_change
+          ; max_balance_change
+          ; min_new_zkapp_balance
+          ; max_new_zkapp_balance
+          }
+        ->
         if new_account then
           Currency.Amount.(gen_incl min_new_zkapp_balance max_new_zkapp_balance)
         else Currency.Amount.(gen_incl min_balance_change max_balance_change) )
@@ -560,7 +563,7 @@ let gen_invalid_protocol_state_precondition
         if
           lower
           || Global_slot_since_genesis.(
-               psv.global_slot_since_genesis > increment)
+               psv.global_slot_since_genesis > increment )
         then
           { lower = Global_slot_since_genesis.zero
           ; upper =
@@ -996,10 +999,10 @@ let gen_account_update_body_components (type a b c d) ?global_slot
   { Account_update_body_components.public_key
   ; update =
       ( if new_account then
-        { update with
-          verification_key = Zkapp_basic.Set_or_keep.Set verification_key
-        }
-      else update )
+          { update with
+            verification_key = Zkapp_basic.Set_or_keep.Set verification_key
+          }
+        else update )
   ; token_id
   ; balance_change
   ; increment_nonce = account_update_increment_nonce
@@ -1273,7 +1276,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                           { perm with
                             set_verification_key =
                               ( Auth_required.from ~auth_tag
-                              , Mina_numbers.Txn_version.current )
+                              , Mina_compile_config.current_txn_version )
                           }
                     }
                 | `Zkapp_uri ->
@@ -1439,15 +1442,17 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
     List.fold account_updates0
       ~init:
         ( if num_new_accounts = 0 then Currency.Amount.Signed.zero
-        else
-          Currency.Amount.(
-            Signed.of_unsigned
-              ( scale
-                  (of_fee
-                     Genesis_constants.Constraint_constants.compiled
-                       .account_creation_fee )
-                  num_new_accounts
-              |> Option.value_exn )) )
+          else
+            Currency.Amount.(
+              Signed.of_unsigned
+                ( scale
+                    (of_fee
+                       Mina_compile_config.Genesis_constants
+                       .Constraint_constants
+                       .compiled
+                         .account_creation_fee )
+                    num_new_accounts
+                |> Option.value_exn ) ) )
       ~f:(fun acc node ->
         match
           Currency.Amount.Signed.add acc node.account_update.body.balance_change
@@ -1486,8 +1491,9 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
               Signed.negate
                 (Signed.of_unsigned
                    (of_fee
-                      Genesis_constants.Constraint_constants.compiled
-                        .account_creation_fee ) ))
+                      Mina_compile_config.Genesis_constants.Constraint_constants
+                      .compiled
+                        .account_creation_fee ) ) )
           in
           gen_account_update_from ~no_account_precondition ?balance_change_range
             ?global_slot ~zkapp_account_ids ~account_ids_seen ~authorization
@@ -1801,7 +1807,7 @@ let%test_module _ =
                   ~account_state_tbl:(Account_id.Table.create ())
                   ~generate_new_accounts:false ~ledger () ) )
             ~size:100
-            ~random:(Splittable_random.State.create Random.State.default))
+            ~random:(Splittable_random.State.create Random.State.default) )
       in
       ()
 
@@ -1827,7 +1833,7 @@ let%test_module _ =
                   ~account_state_tbl:(Account_id.Table.create ())
                   ~generate_new_accounts:false ~ledger () ) )
             ~size:100
-            ~random:(Splittable_random.State.create Random.State.default))
+            ~random:(Splittable_random.State.create Random.State.default) )
       in
       ()
   end )

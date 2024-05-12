@@ -24,8 +24,8 @@ module Worker_state = struct
            let%bind (worker_state : Prod.Worker_state.t) =
              Prod.Worker_state.create
                ~constraint_constants:
-                 Genesis_constants.Constraint_constants.compiled
-               ~proof_level:Full ()
+                 Mina_compile_config.Genesis_constants.Constraint_constants
+                 .compiled ~proof_level:Full ()
            in
            Prod.perform_single worker_state ~message single_spec
        end in

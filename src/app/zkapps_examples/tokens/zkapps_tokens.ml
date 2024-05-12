@@ -275,7 +275,7 @@ module Rules = struct
         in
         Boolean.(
           Assert.any
-            [ is_correct; is_empty &&& forest_is_empty &&& new_stack_is_empty ]) ;
+            [ is_correct; is_empty &&& forest_is_empty &&& new_stack_is_empty ] ) ;
         (elt, new_stack)
     end
 
@@ -633,8 +633,7 @@ module Transfer_recursive = struct
          ~max_proofs_verified:(module Nat.N2)
          ~name:"transfer recurse"
          ~constraint_constants:
-           Genesis_constants.Constraint_constants.(
-             to_snark_keys_header compiled)
+           Genesis_constants.Constraint_constants.(to_snark_keys_header compiled)
          ~choices:(fun ~self -> [ Rules.Transfer.Recursive.rule self ]) )
 
   let tag = Lazy.map lazy_compiled ~f:(fun (tag, _, _, _) -> tag)
@@ -665,7 +664,8 @@ let lazy_compiled =
        ~max_proofs_verified:(module Nat.N2)
        ~name:"tokens"
        ~constraint_constants:
-         Genesis_constants.Constraint_constants.(to_snark_keys_header compiled)
+         Mina_compile_config.Genesis_constants.Constraint_constants.(
+           to_snark_keys_header compiled )
        ~choices:(fun ~self:_ ->
          [ Rules.Initialize_state.rule
          ; Rules.Mint.rule
@@ -715,7 +715,7 @@ let initialize ?(may_use_token = Account_update.May_use_token.No) public_key
 
 let mint_prover =
   Lazy.map lazy_compiled
-    ~f:(fun (_, _, _, Pickles.Provers.[ _; mint_prover; _ ]) -> mint_prover)
+    ~f:(fun (_, _, _, Pickles.Provers.[ _; mint_prover; _ ]) -> mint_prover )
 
 let mint ~owner_public_key ~owner_token_id ~amount ~mint_to_public_key
     ?(may_use_token = Account_update.May_use_token.No) =

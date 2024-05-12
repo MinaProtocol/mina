@@ -69,7 +69,7 @@ let get_balance_graphql =
          let%map response =
            Graphql_client.query_exn
              Graphql_queries.Get_tracked_account.(
-               make @@ makeVariables ~public_key ~token ())
+               make @@ makeVariables ~public_key ~token () )
              graphql_endpoint
          in
          match response.account with
@@ -96,7 +96,7 @@ let get_tokens_graphql =
          let%map response =
            Graphql_client.query_exn
              Graphql_queries.Get_all_accounts.(
-               make @@ makeVariables ~public_key ())
+               make @@ makeVariables ~public_key () )
              graphql_endpoint
          in
          printf "Accounts are held for token IDs:\n" ;
@@ -453,7 +453,7 @@ let batch_send_payments =
           let keypair = Keypair.create () in
           { Payment_info.receiver =
               Public_key.(
-                Compressed.to_base58_check (compress keypair.public_key))
+                Compressed.to_base58_check (compress keypair.public_key) )
           ; valid_until =
               Some (Mina_numbers.Global_slot_since_genesis.random ())
           ; amount = Currency.Amount.of_nanomina_int_exn (Random.int 100)
@@ -519,9 +519,9 @@ let send_payment_graphql =
   Command.async ~summary:"Send payment to an address"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun
-            graphql_endpoint
-            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, amount)
-          ->
+           graphql_endpoint
+           ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver, amount)
+         ->
          let%map response =
            let input =
              Mina_graphql.Types.Input.SendPaymentInput.make_input ~to_:receiver
@@ -546,16 +546,16 @@ let delegate_stake_graphql =
   Command.async ~summary:"Delegate your stake to another public key"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun
-            graphql_endpoint
-            ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver)
-          ->
+           graphql_endpoint
+           ({ Cli_lib.Flag.sender; fee; nonce; memo }, receiver)
+         ->
          let%map response =
            Graphql_client.query_exn
              Graphql_queries.Send_delegation.(
                make
                @@ makeVariables ~receiver ~sender
                     ~fee:(Currency.Fee.to_uint64 fee)
-                    ?nonce ?memo ())
+                    ?nonce ?memo () )
              graphql_endpoint
          in
          printf "Dispatched stake delegation with ID %s\n"
@@ -565,7 +565,7 @@ let cancel_transaction_graphql =
   let txn_id_flag =
     Command.Param.(
       flag "--id" ~aliases:[ "id" ] ~doc:"ID Transaction ID to be cancelled"
-        (required Cli_lib.Arg_type.user_command))
+        (required Cli_lib.Arg_type.user_command) )
   in
   Command.async
     ~summary:
@@ -623,7 +623,7 @@ let send_rosetta_transactions_graphql =
                        Graphql_client.query_exn
                          Graphql_queries.Send_rosetta_transaction.(
                            make
-                           @@ makeVariables ~transaction:transaction_json ())
+                           @@ makeVariables ~transaction:transaction_json () )
                          graphql_endpoint
                      in
                      printf "Dispatched command with TRANSACTION_ID %s\n"
@@ -682,31 +682,32 @@ end
 let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
     (let open Command.Let_syntax in
-    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    Cli_lib.Exceptions.handle_nicely
-    @@ fun () ->
-    let open Deferred.Let_syntax in
-    let%bind privkey =
-      Secrets.Password.hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
-    in
-    let pk = Private_key.of_base58_check_exn (Bytes.to_string privkey) in
-    let kp = Keypair.of_private_key_exn pk in
-    Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path)
+     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
+     Cli_lib.Exceptions.handle_nicely
+     @@ fun () ->
+     let open Deferred.Let_syntax in
+     let%bind privkey =
+       Secrets.Password.hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
+     in
+     let pk = Private_key.of_base58_check_exn (Bytes.to_string privkey) in
+     let kp = Keypair.of_private_key_exn pk in
+     Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path )
 
 let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
     (let open Command.Let_syntax in
-    let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
-    Cli_lib.Exceptions.handle_nicely
-    @@ fun () ->
-    let open Deferred.Let_syntax in
-    let%map kp =
-      Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair" privkey_path
-    in
-    printf "Public key: %s\nPrivate key: %s\n"
-      ( kp.public_key |> Public_key.compress
-      |> Public_key.Compressed.to_base58_check )
-      (kp.private_key |> Private_key.to_base58_check))
+     let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
+     Cli_lib.Exceptions.handle_nicely
+     @@ fun () ->
+     let open Deferred.Let_syntax in
+     let%map kp =
+       Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair"
+         privkey_path
+     in
+     printf "Public key: %s\nPrivate key: %s\n"
+       ( kp.public_key |> Public_key.compress
+       |> Public_key.Compressed.to_base58_check )
+       (kp.private_key |> Private_key.to_base58_check) )
 
 let handle_export_ledger_response ~json = function
   | Error e ->
@@ -732,7 +733,7 @@ let export_ledger =
         ~doc:
           "STATE-HASH State hash, if printing a staged ledger (default: state \
            hash for the best tip)"
-        (optional string))
+        (optional string) )
   in
   let ledger_kind =
     let available_ledgers =
@@ -803,12 +804,12 @@ let hash_ledger =
        Command.Param.(
          flag "--ledger-file"
            ~doc:"LEDGER-FILE File containing an exported ledger"
-           (required string))
+           (required string) )
      and plaintext = Cli_lib.Flag.plaintext in
      fun () ->
        let process_accounts accounts =
          let constraint_constants =
-           Genesis_constants.Constraint_constants.compiled
+           Mina_compile_config.Genesis_constants.Constraint_constants.compiled
          in
          let packed_ledger =
            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
@@ -853,7 +854,7 @@ let currency_in_ledger =
        Command.Param.(
          flag "--ledger-file"
            ~doc:"LEDGER-FILE File containing an exported ledger"
-           (required string))
+           (required string) )
      and plaintext = Cli_lib.Flag.plaintext in
      fun () ->
        let process_accounts accounts =
@@ -911,9 +912,11 @@ let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
          (* TODO: Allow these to be configurable. *)
-         let proof_level = Genesis_constants.Proof_level.compiled in
+         let proof_level =
+           Mina_compile_config.Genesis_constants.Proof_level.compiled
+         in
          let constraint_constants =
-           Genesis_constants.Constraint_constants.compiled
+           Mina_compile_config.Genesis_constants.Constraint_constants.compiled
          in
          let all =
            Transaction_snark.constraint_system_digests ~constraint_constants ()
@@ -970,7 +973,7 @@ let snark_pool_list =
 let pooled_user_commands =
   let public_key_flag =
     Command.Param.(
-      anon @@ maybe @@ ("public-key" %: Cli_lib.Arg_type.public_key_compressed))
+      anon @@ maybe @@ ("public-key" %: Cli_lib.Arg_type.public_key_compressed) )
   in
   Command.async
     ~summary:"Retrieve all the user commands that are pending inclusion"
@@ -985,7 +988,7 @@ let pooled_user_commands =
 let pooled_zkapp_commands =
   let public_key_flag =
     Command.Param.(
-      anon @@ maybe @@ ("public-key" %: Cli_lib.Arg_type.public_key_compressed))
+      anon @@ maybe @@ ("public-key" %: Cli_lib.Arg_type.public_key_compressed) )
   in
   Command.async
     ~summary:"Retrieve all the zkApp commands that are pending inclusion"
@@ -997,7 +1000,7 @@ let pooled_zkapp_commands =
          in
          let graphql =
            Graphql_queries.Pooled_zkapp_commands.(
-             make @@ makeVariables ~public_key ())
+             make @@ makeVariables ~public_key () )
          in
          let%bind raw_response =
            Graphql_client.query_json_exn graphql graphql_endpoint
@@ -1139,7 +1142,7 @@ let set_coinbase_receiver_graphql =
          let%map result =
            Graphql_client.query_exn
              Graphql_queries.Set_coinbase_receiver.(
-               make @@ makeVariables ?public_key ())
+               make @@ makeVariables ?public_key () )
              graphql_endpoint
          in
          printf
@@ -1164,7 +1167,7 @@ let set_snark_worker =
        ~f:(fun graphql_endpoint optional_public_key ->
          let graphql =
            Graphql_queries.Set_snark_worker.(
-             make @@ makeVariables ?public_key:optional_public_key ())
+             make @@ makeVariables ?public_key:optional_public_key () )
          in
          Deferred.map (Graphql_client.query_exn graphql graphql_endpoint)
            ~f:(fun response ->
@@ -1187,15 +1190,14 @@ let set_snark_work_fee =
        ~f:(fun graphql_endpoint fee ->
          let graphql =
            Graphql_queries.Set_snark_work_fee.(
-             make @@ makeVariables ~fee:(Currency.Fee.to_uint64 fee) ())
+             make @@ makeVariables ~fee:(Currency.Fee.to_uint64 fee) () )
          in
          Deferred.map (Graphql_client.query_exn graphql graphql_endpoint)
            ~f:(fun response ->
              printf
                !"Updated snark work fee: %i\nOld snark work fee: %i\n"
                (Currency.Fee.to_nanomina_int fee)
-               (Currency.Fee.to_nanomina_int response.setSnarkWorkFee.lastFee) )
-         )
+               (Currency.Fee.to_nanomina_int response.setSnarkWorkFee.lastFee) ) )
 
 let import_key =
   Command.async
@@ -1204,8 +1206,7 @@ let import_key =
        Set MINA_PRIVKEY_PASS environment variable to use non-interactively \
        (key will be imported using the same password)."
     (let%map_open.Command access_method =
-       choose_one
-         ~if_nothing_chosen:(Default_to `None)
+       choose_one ~if_nothing_chosen:(Default_to `None)
          [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
            |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
          ; Cli_lib.Flag.conf_dir
@@ -1232,7 +1233,7 @@ let import_key =
            Graphql_queries.Import_account.(
              make
              @@ makeVariables ~path:privkey_path
-                  ~password:(Bytes.to_string password) ())
+                  ~password:(Bytes.to_string password) () )
          in
          match%map Graphql_client.query graphql graphql_endpoint with
          | Ok res ->
@@ -1415,8 +1416,7 @@ let export_key =
 let list_accounts =
   Command.async ~summary:"List all owned accounts"
     (let%map_open.Command access_method =
-       choose_one
-         ~if_nothing_chosen:(Default_to `None)
+       choose_one ~if_nothing_chosen:(Default_to `None)
          [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
            |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
          ; Cli_lib.Flag.conf_dir
@@ -1507,7 +1507,7 @@ let create_account =
          let%map response =
            Graphql_client.query_exn
              Graphql_queries.Create_account.(
-               make @@ makeVariables ~password:(Bytes.to_string password) ())
+               make @@ makeVariables ~password:(Bytes.to_string password) () )
              graphql_endpoint
          in
          let pk_string =
@@ -1524,7 +1524,7 @@ let create_hd_account =
            Graphql_client.(
              query_exn
                Graphql_queries.Create_hd_account.(
-                 make @@ makeVariables ~hd_index ()))
+                 make @@ makeVariables ~hd_index () ) )
              graphql_endpoint
          in
          let pk_string =
@@ -1558,7 +1558,7 @@ let unlock_account =
                    make
                    @@ makeVariables ~public_key:pk_str
                         ~password:(Bytes.to_string password_bytes)
-                        ())
+                        () )
                  graphql_endpoint
              in
              let pk_string =
@@ -1584,7 +1584,7 @@ let lock_account =
          let%map response =
            Graphql_client.query_exn
              Graphql_queries.Lock_account.(
-               make @@ makeVariables ~public_key:pk ())
+               make @@ makeVariables ~public_key:pk () )
              graphql_endpoint
          in
          let pk_string =
@@ -1597,67 +1597,67 @@ let generate_libp2p_keypair_do privkey_path =
   @@ fun () ->
   Deferred.ignore_m
     (let open Deferred.Let_syntax in
-    (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
-    let logger = Logger.null () in
-    (* Using the helper only for keypair generation requires no state. *)
-    File_system.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
-        match%bind
-          Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
-        with
-        | Ok net ->
-            let%bind me = Mina_net2.generate_random_keypair net in
-            let%bind () = Mina_net2.shutdown net in
-            let%map () =
-              Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path me
-            in
-            printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
-        | Error e ->
-            [%log fatal] "failed to generate libp2p keypair: $error"
-              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-            exit 20 ))
+     (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
+     let logger = Logger.null () in
+     (* Using the helper only for keypair generation requires no state. *)
+     File_system.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
+         match%bind
+           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
+             ~pids:(Child_processes.Termination.create_pid_table ())
+             ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
+         with
+         | Ok net ->
+             let%bind me = Mina_net2.generate_random_keypair net in
+             let%bind () = Mina_net2.shutdown net in
+             let%map () =
+               Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path me
+             in
+             printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
+         | Error e ->
+             [%log fatal] "failed to generate libp2p keypair: $error"
+               ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+             exit 20 ) )
 
 let generate_libp2p_keypair =
   Command.async
     ~summary:"Generate a new libp2p keypair and print out the peer ID"
     (let open Command.Let_syntax in
-    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    generate_libp2p_keypair_do privkey_path)
+     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
+     generate_libp2p_keypair_do privkey_path )
 
 let dump_libp2p_keypair_do privkey_path =
   Cli_lib.Exceptions.handle_nicely
   @@ fun () ->
   Deferred.ignore_m
     (let open Deferred.Let_syntax in
-    let logger = Logger.null () in
-    (* Using the helper only for keypair generation requires no state. *)
-    File_system.with_temp_dir "mina-dump-libp2p-keypair" ~f:(fun tmpd ->
-        match%bind
-          Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
-        with
-        | Ok net ->
-            let%bind () = Mina_net2.shutdown net in
-            let%map me = Secrets.Libp2p_keypair.read_exn' privkey_path in
-            printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
-        | Error e ->
-            [%log fatal] "failed to dump libp2p keypair: $error"
-              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-            exit 20 ))
+     let logger = Logger.null () in
+     (* Using the helper only for keypair generation requires no state. *)
+     File_system.with_temp_dir "mina-dump-libp2p-keypair" ~f:(fun tmpd ->
+         match%bind
+           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
+             ~pids:(Child_processes.Termination.create_pid_table ())
+             ~on_peer_connected:ignore ~on_peer_disconnected:ignore ()
+         with
+         | Ok net ->
+             let%bind () = Mina_net2.shutdown net in
+             let%map me = Secrets.Libp2p_keypair.read_exn' privkey_path in
+             printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
+         | Error e ->
+             [%log fatal] "failed to dump libp2p keypair: $error"
+               ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+             exit 20 ) )
 
 let dump_libp2p_keypair =
   Command.async ~summary:"Print an existing libp2p keypair"
     (let open Command.Let_syntax in
-    let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
-    dump_libp2p_keypair_do privkey_path)
+     let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
+     dump_libp2p_keypair_do privkey_path )
 
 let trustlist_ip_flag =
   Command.Param.(
     flag "--ip-address" ~aliases:[ "ip-address" ]
       ~doc:"CIDR An IPv4 CIDR mask for the client trustlist (eg, 10.0.0.0/8)"
-      (required Cli_lib.Arg_type.cidr_mask))
+      (required Cli_lib.Arg_type.cidr_mask) )
 
 let trustlist_add =
   let open Deferred.Let_syntax in
@@ -1735,7 +1735,7 @@ let add_peers_graphql =
         ~doc:
           "true/false Whether to add these peers as 'seed' peers, which may \
            perform peer exchange. Default: true"
-        (optional bool))
+        (optional bool) )
   in
   let peers =
     Param.(anon Anons.(non_empty_sequence_as_list ("peer" %: string)))
@@ -1952,15 +1952,15 @@ let archive_blocks =
        over the rest-server"
     (Cli_lib.Background_daemon.graphql_init params
        ~f:(fun
-            graphql_endpoint
-            ( files
-            , success_file
-            , failure_file
-            , log_successes
-            , archive_process_location
-            , precomputed_flag
-            , extensional_flag )
-          ->
+           graphql_endpoint
+           ( files
+           , success_file
+           , failure_file
+           , log_successes
+           , archive_process_location
+           , precomputed_flag
+           , extensional_flag )
+         ->
          if Bool.equal precomputed_flag extensional_flag then
            failwith
              "Must provide exactly one of -precomputed and -extensional flags" ;
@@ -2011,7 +2011,7 @@ let archive_blocks =
            make_send_block
              ~graphql_make:(fun block ->
                Graphql_queries.Archive_precomputed_block.(
-                 make @@ makeVariables ~block ()) )
+                 make @@ makeVariables ~block () ) )
              ~archive_dispatch:
                Mina_lib.Archive_client.dispatch_precomputed_block
          in
@@ -2019,7 +2019,7 @@ let archive_blocks =
            make_send_block
              ~graphql_make:(fun block ->
                Graphql_queries.Archive_extensional_block.(
-                 make @@ makeVariables ~block ()) )
+                 make @@ makeVariables ~block () ) )
              ~archive_dispatch:
                Mina_lib.Archive_client.dispatch_extensional_block
          in
@@ -2252,27 +2252,29 @@ let signature_kind =
 let itn_create_accounts =
   Command.async ~summary:"Fund new accounts for incentivized testnet"
     (let open Command.Param in
-    let privkey_path = Cli_lib.Flag.privkey_read_path in
-    let key_prefix =
-      flag "--key-prefix" ~doc:"STRING prefix of keyfiles" (required string)
-    in
-    let num_accounts =
-      flag "--num-accounts" ~doc:"NN Number of new accounts" (required int)
-    in
-    let fee =
-      flag "--fee"
-        ~doc:
-          (sprintf "NN Fee in nanomina paid to create an account (minimum: %s)"
-             Mina_compile_config.minimum_user_command_fee_string )
-        (required int)
-    in
-    let amount =
-      flag "--amount"
-        ~doc:"NN Amount in nanomina to be divided among new accounts"
-        (required int)
-    in
-    let args = Args.zip5 privkey_path key_prefix num_accounts fee amount in
-    Cli_lib.Background_daemon.rpc_init args ~f:Itn.create_accounts)
+     let privkey_path = Cli_lib.Flag.privkey_read_path in
+     let key_prefix =
+       flag "--key-prefix" ~doc:"STRING prefix of keyfiles" (required string)
+     in
+     let num_accounts =
+       flag "--num-accounts" ~doc:"NN Number of new accounts" (required int)
+     in
+     let fee =
+       flag "--fee"
+         ~doc:
+           ( sprintf
+               "NN Fee in nanomina paid to create an account (minimum: %s MINA)"
+           @@ Currency.Fee.to_mina_string
+                Mina_compile_config.minimum_user_command_fee )
+         (required int)
+     in
+     let amount =
+       flag "--amount"
+         ~doc:"NN Amount in nanomina to be divided among new accounts"
+         (required int)
+     in
+     let args = Args.zip5 privkey_path key_prefix num_accounts fee amount in
+     Cli_lib.Background_daemon.rpc_init args ~f:Itn.create_accounts )
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -2309,7 +2311,7 @@ module Visualization = struct
 
     let command =
       create_command ~name Daemon_rpcs.Visualization.Registered_masks.rpc
-        ~f:(fun filename () -> Visualization_message.success name filename)
+        ~f:(fun filename () -> Visualization_message.success name filename )
   end
 
   let command_group =

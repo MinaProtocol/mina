@@ -408,7 +408,7 @@ module Mutations = struct
         in
         let%bind accounts = Ledger.to_list best_tip_ledger in
         let constraint_constants =
-          Genesis_constants.Constraint_constants.compiled
+          Mina_compile_config.Genesis_constants.Constraint_constants.compiled
         in
         let depth = constraint_constants.ledger_depth in
         let ledger = Ledger.create_ephemeral ~depth () in
@@ -564,15 +564,15 @@ module Mutations = struct
     let open Deferred.Result.Let_syntax in
     let%bind user_command_input =
       (let open Result.Let_syntax in
-      let%bind sign_choice =
-        match%map find_identity ~public_key:signer mina with
-        | `Keypair sender_kp ->
-            User_command_input.Sign_choice.Keypair sender_kp
-        | `Hd_index hd_index ->
-            Hd_index hd_index
-      in
-      create_user_command_input ~nonce_opt ~signer ~memo ~fee ~fee_payer_pk
-        ~valid_until ~body ~sign_choice)
+       let%bind sign_choice =
+         match%map find_identity ~public_key:signer mina with
+         | `Keypair sender_kp ->
+             User_command_input.Sign_choice.Keypair sender_kp
+         | `Hd_index hd_index ->
+             Hd_index hd_index
+       in
+       create_user_command_input ~nonce_opt ~signer ~memo ~fee ~fee_payer_pk
+         ~valid_until ~body ~sign_choice )
       |> Deferred.return
     in
     let%map cmd = send_user_command mina user_command_input in
@@ -595,8 +595,12 @@ module Mutations = struct
           [ arg "input" ~typ:(non_null Types.Input.SendDelegationInput.arg_typ)
           ; Types.Input.Fields.signature
           ]
-      ~resolve:(fun { ctx = mina; _ } ()
-                    (from, to_, fee, valid_until, memo, nonce_opt) signature ->
+      ~resolve:(fun
+          { ctx = mina; _ }
+          ()
+          (from, to_, fee, valid_until, memo, nonce_opt)
+          signature
+        ->
         let body =
           Signed_command_payload.Body.Stake_delegation
             (Set_delegate { new_delegate = to_ })
@@ -620,9 +624,12 @@ module Mutations = struct
           [ arg "input" ~typ:(non_null Types.Input.SendPaymentInput.arg_typ)
           ; Types.Input.Fields.signature
           ]
-      ~resolve:(fun { ctx = mina; _ } ()
-                    (from, to_, amount, fee, valid_until, memo, nonce_opt)
-                    signature ->
+      ~resolve:(fun
+          { ctx = mina; _ }
+          ()
+          (from, to_, amount, fee, valid_until, memo, nonce_opt)
+          signature
+        ->
         let body =
           Signed_command_payload.Body.Payment
             { receiver_pk = to_; amount = Amount.of_uint64 amount }
@@ -680,8 +687,16 @@ module Mutations = struct
           ; repeat_count
           ; repeat_delay_ms
           ]
-      ~resolve:(fun { ctx = mina; _ } () senders_list receiver_pk amount fee
-                    repeat_count repeat_delay_ms ->
+      ~resolve:(fun
+          { ctx = mina; _ }
+          ()
+          senders_list
+          receiver_pk
+          amount
+          fee
+          repeat_count
+          repeat_delay_ms
+        ->
         let dumb_password = lazy (return (Bytes.of_string "dumb")) in
         let senders = Array.of_list senders_list in
         let repeat_delay =
@@ -768,8 +783,7 @@ module Mutations = struct
               (sprintf "Transaction could not be entered into the pool: %s"
                  diff_error )
         | Ok _ ->
-            Error "Internal error: response from transaction pool was malformed"
-        )
+            Error "Internal error: response from transaction pool was malformed" )
 
   let export_logs =
     io_field "exportLogs" ~doc:"Export daemon logs to tar archive"
@@ -1257,7 +1271,7 @@ module Mutations = struct
             in
             let unused_keypairs =
               List.init (20 + zkapp_command_details.num_new_accounts)
-                ~f:(fun _ -> Signature_lib.Keypair.create ())
+                ~f:(fun _ -> Signature_lib.Keypair.create () )
             in
             let fee_payer_keypairs =
               List.map zkapp_command_details.fee_payers
@@ -1467,7 +1481,8 @@ module Mutations = struct
                 ~typ:bool
             ]
         ~typ:(non_null string)
-        ~resolve:(fun { ctx = with_seq_no, mina; _ } () delay_secs clean_config ->
+        ~resolve:(fun
+            { ctx = with_seq_no, mina; _ } () delay_secs clean_config ->
           O1trace.thread "itn_stop_daemon"
           @@ fun () ->
           if not with_seq_no then return @@ Error "Missing sequence information"
@@ -1959,8 +1974,12 @@ module Queries = struct
           [ arg "payment" ~typ:guid ~doc:"Id of a Payment"
           ; arg "zkappTransaction" ~typ:guid ~doc:"Id of a zkApp transaction"
           ]
-      ~resolve:(fun { ctx = mina; _ } () (serialized_payment : string option)
-                    (serialized_zkapp : string option) ->
+      ~resolve:(fun
+          { ctx = mina; _ }
+          ()
+          (serialized_payment : string option)
+          (serialized_zkapp : string option)
+        ->
         let open Result.Let_syntax in
         let deserialize_txn serialized_txn =
           let res =
@@ -1968,11 +1987,11 @@ module Queries = struct
             | `Signed_command cmd ->
                 Or_error.(
                   Signed_command.of_base64 cmd
-                  >>| fun c -> User_command.Signed_command c)
+                  >>| fun c -> User_command.Signed_command c )
             | `Zkapp_command cmd ->
                 Or_error.(
                   Zkapp_command.of_base64 cmd
-                  >>| fun c -> User_command.Zkapp_command c)
+                  >>| fun c -> User_command.Zkapp_command c )
           in
           result_of_or_error res ~error:"Invalid transaction provided"
           |> Result.map ~f:(fun cmd ->
@@ -2115,8 +2134,12 @@ module Queries = struct
           ; arg "height"
               ~doc:"The height of the desired block in the best chain" ~typ:int
           ]
-      ~resolve:(fun { ctx = mina; _ } () (state_hash_base58_opt : string option)
-                    (height_opt : int option) ->
+      ~resolve:(fun
+          { ctx = mina; _ }
+          ()
+          (state_hash_base58_opt : string option)
+          (height_opt : int option)
+        ->
         let open Result.Let_syntax in
         let block_from_state_hash state_hash_base58 =
           let%bind state_hash =
@@ -2156,8 +2179,7 @@ module Queries = struct
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null string)
       ~resolve:(fun { ctx = mina; _ } () ->
-        List.map (Mina_lib.initial_peers mina) ~f:Mina_net2.Multiaddr.to_string
-        )
+        List.map (Mina_lib.initial_peers mina) ~f:Mina_net2.Multiaddr.to_string )
 
   let get_peers =
     io_field "getPeers"
@@ -2186,7 +2208,7 @@ module Queries = struct
         let snark_pool = Mina_lib.snark_pool mina in
         let fee_opt =
           Mina_lib.(
-            Option.map (snark_worker_key mina) ~f:(fun _ -> snark_work_fee mina))
+            Option.map (snark_worker_key mina) ~f:(fun _ -> snark_work_fee mina) )
         in
         let (module S) = Mina_lib.work_selection_method mina in
         S.pending_work_statements ~snark_pool ~fee_opt snark_job_state )
@@ -2232,9 +2254,12 @@ module Queries = struct
           [ arg "input" ~typ:(non_null Types.Input.SendPaymentInput.arg_typ)
           ; Types.Input.Fields.signature
           ]
-      ~resolve:(fun { ctx = mina; _ } ()
-                    (from, to_, amount, fee, valid_until, memo, nonce_opt)
-                    signature ->
+      ~resolve:(fun
+          { ctx = mina; _ }
+          ()
+          (from, to_, amount, fee, valid_until, memo, nonce_opt)
+          signature
+        ->
         let open Deferred.Result.Let_syntax in
         let body =
           Signed_command_payload.Body.Payment
@@ -2573,8 +2598,7 @@ module Queries = struct
           ledger.name
         in
         "mina:"
-        ^ Option.value ~default:Mina_compile_config.network_id configured_name
-        )
+        ^ Option.value ~default:Mina_compile_config.network_id configured_name )
 
   let signature_kind =
     field "signatureKind"
@@ -2665,8 +2689,7 @@ module Queries = struct
               in
               List.map (Queue.to_list vrf_state.queue)
                 ~f:(fun { global_slot; _ } ->
-                  Mina_numbers.Global_slot_since_hard_fork.to_int global_slot )
-          )
+                  Mina_numbers.Global_slot_since_hard_fork.to_int global_slot ) )
 
     let internal_logs =
       io_field "internalLogs"
@@ -2691,18 +2714,18 @@ end
 let schema =
   Graphql_async.Schema.(
     schema Queries.commands ~mutations:Mutations.commands
-      ~subscriptions:Subscriptions.commands)
+      ~subscriptions:Subscriptions.commands )
 
 let schema_limited =
   (* including version because that's the default query *)
   Graphql_async.Schema.(
     schema
       [ Queries.daemon_status; Queries.block; Queries.version ]
-      ~mutations:[] ~subscriptions:[])
+      ~mutations:[] ~subscriptions:[] )
 
 let schema_itn : (bool * Mina_lib.t) Schema.schema =
   if Mina_compile_config.itn_features then
     Graphql_async.Schema.(
       schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
-        ~subscriptions:[])
+        ~subscriptions:[] )
   else Graphql_async.Schema.(schema [] ~mutations:[] ~subscriptions:[])

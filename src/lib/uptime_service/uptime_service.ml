@@ -5,9 +5,7 @@ open Async
 open Mina_base
 open Pipe_lib
 open Signature_lib
-
 module Blake2 = Blake2.Make ()
-
 module Uptime_snark_worker = Uptime_snark_worker
 
 module Proof_data = struct
@@ -63,54 +61,54 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
           in
           let succeeded = status_code = 200 in
           ( if succeeded then
-            [%log info]
-              "Sent block with state hash $state_hash to uptime service at URL \
-               $url"
-              ~metadata:
-                [ ("state_hash", State_hash.to_yojson state_hash)
-                ; ("url", `String (Uri.to_string url))
-                ; ( "includes_snark_work"
-                  , `Bool (Option.is_some block_data.snark_work) )
-                ; ("is_produced_block", `Bool produced)
-                ]
-          else if unretriable then
-            [%log error]
-              "Got unrecoverable response from update service backend at URL \
-               $url, not retrying to send block"
-              ~metadata:
+              [%log info]
+                "Sent block with state hash $state_hash to uptime service at \
+                 URL $url"
+                ~metadata:
+                  [ ("state_hash", State_hash.to_yojson state_hash)
+                  ; ("url", `String (Uri.to_string url))
+                  ; ( "includes_snark_work"
+                    , `Bool (Option.is_some block_data.snark_work) )
+                  ; ("is_produced_block", `Bool produced)
+                  ]
+            else if unretriable then
+              [%log error]
+                "Got unrecoverable response from update service backend at URL \
+                 $url, not retrying to send block"
+                ~metadata:
+                  [ ("state_hash", State_hash.to_yojson state_hash)
+                  ; ("url", `String (Uri.to_string url))
+                  ; ("http_code", `Int status_code)
+                  ; ("http_error", `String status_string)
+                  ]
+            else if attempt >= max_attempts then
+              let base_metadata =
                 [ ("state_hash", State_hash.to_yojson state_hash)
                 ; ("url", `String (Uri.to_string url))
                 ; ("http_code", `Int status_code)
                 ; ("http_error", `String status_string)
                 ]
-          else if attempt >= max_attempts then
-            let base_metadata =
-              [ ("state_hash", State_hash.to_yojson state_hash)
-              ; ("url", `String (Uri.to_string url))
-              ; ("http_code", `Int status_code)
-              ; ("http_error", `String status_string)
-              ]
-            in
-            let extra_metadata = metadata_of_body body in
-            let metadata = base_metadata @ extra_metadata in
-            [%log error]
-              "After %d attempts, failed to send block with state hash \
-               $state_hash to uptime service at URL $url, no more retries"
-              max_attempts ~metadata
-          else
-            let base_metadata =
-              [ ("state_hash", State_hash.to_yojson state_hash)
-              ; ("url", `String (Uri.to_string url))
-              ; ("http_code", `Int status_code)
-              ; ("http_error", `String status_string)
-              ]
-            in
-            let extra_metadata = metadata_of_body body in
-            let metadata = base_metadata @ extra_metadata in
-            [%log info]
-              "Failure when sending block with state hash $state_hash to \
-               uptime service at URL $url, attempt %d of %d, retrying"
-              attempt max_attempts ~metadata ) ;
+              in
+              let extra_metadata = metadata_of_body body in
+              let metadata = base_metadata @ extra_metadata in
+              [%log error]
+                "After %d attempts, failed to send block with state hash \
+                 $state_hash to uptime service at URL $url, no more retries"
+                max_attempts ~metadata
+            else
+              let base_metadata =
+                [ ("state_hash", State_hash.to_yojson state_hash)
+                ; ("url", `String (Uri.to_string url))
+                ; ("http_code", `Int status_code)
+                ; ("http_error", `String status_string)
+                ]
+              in
+              let extra_metadata = metadata_of_body body in
+              let metadata = base_metadata @ extra_metadata in
+              [%log info]
+                "Failure when sending block with state hash $state_hash to \
+                 uptime service at URL $url, attempt %d of %d, retrying"
+                attempt max_attempts ~metadata ) ;
           succeeded || unretriable
       | Error exn ->
           [%log warn]
@@ -218,7 +216,8 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
         List.is_empty
           (Mina_block.transactions
              ~constraint_constants:
-               Genesis_constants.Constraint_constants.compiled best_tip_block )
+               Mina_compile_config.Genesis_constants.Constraint_constants
+               .compiled best_tip_block )
       then (
         [%log info]
           "No transactions in block, sending block without SNARK work to \
@@ -378,8 +377,10 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
       in
       let slot_duration_ms =
         Consensus.Configuration.t
-          ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-          ~protocol_constants:Genesis_constants.compiled.protocol
+          ~constraint_constants:
+            Mina_compile_config.Genesis_constants.Constraint_constants.compiled
+          ~protocol_constants:
+            Mina_compile_config.Genesis_constants.compiled.protocol
         |> Consensus.Configuration.slot_duration |> Float.of_int
       in
       let make_slots_span min =

@@ -549,9 +549,8 @@ let compile :
        Pickles.Tag.t
        * _
        * (module Pickles.Proof_intf
-            with type t = ( max_proofs_verified
-                          , max_proofs_verified )
-                          Pickles.Proof.t
+            with type t =
+              (max_proofs_verified, max_proofs_verified) Pickles.Proof.t
              and type statement = Zkapp_statement.t )
        * ( prev_valuess
          , widthss
@@ -736,7 +735,8 @@ module Deploy_account_update = struct
               ; receive = None
               ; set_delegate = Proof
               ; set_permissions = Proof
-              ; set_verification_key = (Proof, Mina_numbers.Txn_version.current)
+              ; set_verification_key =
+                  (Proof, Mina_compile_config.current_txn_version)
               ; set_zkapp_uri = Proof
               ; edit_action_state = Proof
               ; set_token_symbol = Proof

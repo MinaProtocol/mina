@@ -62,7 +62,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           let cur_ver_fun =
             Option.(bind current_protocol_version ~f:(Fn.compose return const))
           in
-          let cur_ver_fallback () = Protocol_version.current in
+          let cur_ver_fallback () =
+            Mina_compile_config.current_protocol_version
+          in
           { protocol_state
           ; protocol_state_proof
           ; delta_block_chain_proof
@@ -113,7 +115,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         ~f:Protocol_version.is_valid
     in
     let matches_daemon =
-      Protocol_version.compatible_with_daemon (current_protocol_version body)
+      Protocol_version.compatible_with_daemon
+        ~current:Mina_compile_config.current_protocol_version
+        (current_protocol_version body)
     in
     { valid_current; valid_next; matches_daemon }
 end

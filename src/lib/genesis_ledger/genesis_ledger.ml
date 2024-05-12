@@ -126,13 +126,13 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
           lazy (Ledger.create ~directory_name ~depth (), false)
     in
     ( if insert_accounts then
-      let addrs_and_accounts =
-        let ledger_depth = Ledger.depth ledger in
-        Lazy.force accounts
-        |> List.mapi ~f:(fun i (_, acct) ->
-               (Ledger.Addr.of_int_exn ~ledger_depth i, acct) )
-      in
-      Ledger.set_batch_accounts ledger addrs_and_accounts ) ;
+        let addrs_and_accounts =
+          let ledger_depth = Ledger.depth ledger in
+          Lazy.force accounts
+          |> List.mapi ~f:(fun i (_, acct) ->
+                 (Ledger.Addr.of_int_exn ~ledger_depth i, acct) )
+        in
+        Ledger.set_batch_accounts ledger addrs_and_accounts ) ;
     ledger
 
   include Utils
@@ -273,7 +273,9 @@ module Unit_test_ledger = Make (struct
 
   let directory = `Ephemeral
 
-  let depth = Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
+  let depth =
+    Mina_compile_config.Genesis_constants.Constraint_constants.for_unit_tests
+      .ledger_depth
 end)
 
 let for_unit_tests : Packed.t = (module Unit_test_ledger)

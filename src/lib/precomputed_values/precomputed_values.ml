@@ -1,9 +1,11 @@
 let constraint_system_digests =
   lazy
     (let constraint_constants =
-       Genesis_constants.Constraint_constants.compiled
+       Mina_compile_config.Genesis_constants.Constraint_constants.compiled
      in
-     let proof_level = Genesis_constants.Proof_level.compiled in
+     let proof_level =
+       Mina_compile_config.Genesis_constants.Proof_level.compiled
+     in
      let ts =
        Transaction_snark.constraint_system_digests ~constraint_constants ()
      in
@@ -26,15 +28,18 @@ let for_unit_tests =
             Packed.t for_unit_tests )
          ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
          ~constraint_constants:
-           Genesis_constants.Constraint_constants.for_unit_tests
+           Mina_compile_config.Genesis_constants.Constraint_constants
+           .for_unit_tests
          ~consensus_constants:(Lazy.force Consensus.Constants.for_unit_tests)
          ~genesis_body_reference
      in
      { runtime_config = Runtime_config.default
      ; constraint_constants =
-         Genesis_constants.Constraint_constants.for_unit_tests
-     ; proof_level = Genesis_constants.Proof_level.for_unit_tests
-     ; genesis_constants = Genesis_constants.for_unit_tests
+         Mina_compile_config.Genesis_constants.Constraint_constants
+         .for_unit_tests
+     ; proof_level =
+         Mina_compile_config.Genesis_constants.Proof_level.for_unit_tests
+     ; genesis_constants = Mina_compile_config.Genesis_constants.for_unit_tests
      ; genesis_ledger = Genesis_ledger.for_unit_tests
      ; genesis_epoch_data = Consensus.Genesis_epoch_data.for_unit_tests
      ; genesis_body_reference
@@ -48,9 +53,9 @@ let compiled_inputs =
   lazy
     (let open Staged_ledger_diff in
      let constraint_constants =
-       Genesis_constants.Constraint_constants.compiled
+       Mina_compile_config.Genesis_constants.Constraint_constants.compiled
      in
-     let genesis_constants = Genesis_constants.compiled in
+     let genesis_constants = Mina_compile_config.Genesis_constants.compiled in
      let genesis_epoch_data = Consensus.Genesis_epoch_data.compiled in
      let consensus_constants =
        Consensus.Constants.create ~constraint_constants
@@ -63,7 +68,7 @@ let compiled_inputs =
      in
      { Genesis_proof.Inputs.runtime_config = Runtime_config.default
      ; constraint_constants
-     ; proof_level = Genesis_constants.Proof_level.compiled
+     ; proof_level = Mina_compile_config.Genesis_constants.Proof_level.compiled
      ; genesis_constants
      ; genesis_ledger = (module Test_genesis_ledger)
      ; genesis_epoch_data

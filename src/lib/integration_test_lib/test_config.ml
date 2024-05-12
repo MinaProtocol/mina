@@ -135,7 +135,8 @@ let default =
 let transaction_capacity_log_2 (config : t) =
   match config.proof_config.transaction_capacity with
   | None ->
-      Genesis_constants.Constraint_constants.compiled.transaction_capacity_log_2
+      Mina_compile_config.Genesis_constants.Constraint_constants.compiled
+        .transaction_capacity_log_2
   | Some (Log_2 i) ->
       i
   | Some (Txns_per_second_x10 tps_goal_x10) ->
@@ -143,7 +144,7 @@ let transaction_capacity_log_2 (config : t) =
       let block_window_duration_ms =
         Option.value
           ~default:
-            Genesis_constants.Constraint_constants.compiled
+            Mina_compile_config.Genesis_constants.Constraint_constants.compiled
               .block_window_duration_ms
           config.proof_config.block_window_duration_ms
       in
@@ -169,7 +170,9 @@ let transaction_capacity config =
 let blocks_for_first_ledger_proof (config : t) =
   let work_delay =
     Option.value
-      ~default:Genesis_constants.Constraint_constants.compiled.work_delay
+      ~default:
+        Mina_compile_config.Genesis_constants.Constraint_constants.compiled
+          .work_delay
       config.proof_config.work_delay
   in
   let transaction_capacity_log_2 = transaction_capacity_log_2 config in

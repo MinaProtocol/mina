@@ -56,14 +56,14 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
           Transaction_snark.For_tests.deploy_snapp ~constraint_constants
             ~permissions:
               ( if max_cost then
-                { Permissions.user_default with
-                  set_verification_key =
-                    ( Permissions.Auth_required.Proof
-                    , Mina_numbers.Txn_version.current )
-                ; edit_state = Permissions.Auth_required.Proof
-                ; edit_action_state = Proof
-                }
-              else Permissions.user_default )
+                  { Permissions.user_default with
+                    set_verification_key =
+                      ( Permissions.Auth_required.Proof
+                      , Mina_compile_config.current_txn_version )
+                  ; edit_state = Permissions.Auth_required.Proof
+                  ; edit_action_state = Proof
+                  }
+                else Permissions.user_default )
             spec
         in
         let%bind () = after wait_span in
@@ -225,31 +225,32 @@ let send_zkapps ~fee_payer_array ~constraint_constants ~tm_end ~scheduler_tbl
           Option.some
           @@ Quickcheck.Generator.generate
                ( if zkapp_command_details.max_cost then
-                 Mina_generators.Zkapp_command_generators
-                 .gen_max_cost_zkapp_command_from ~memo
-                   ~fee_range:
-                     ( zkapp_command_details.min_fee
-                     , zkapp_command_details.max_fee )
-                   ~fee_payer_keypair:fee_payer ~account_state_tbl ~vk
-                   ~genesis_constants:
-                     (Mina_lib.config mina).precomputed_values.genesis_constants
-                   ()
-               else
-                 Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
-                   ~memo
-                   ?max_account_updates:
-                     zkapp_command_details.max_account_updates
-                   ~no_account_precondition:
-                     zkapp_command_details.no_precondition
-                   ~fee_range:
-                     ( zkapp_command_details.min_fee
-                     , zkapp_command_details.max_fee )
-                   ~balance_change_range:
-                     zkapp_command_details.balance_change_range
-                   ~ignore_sequence_events_precond:true ~no_token_accounts:true
-                   ~limited:true ~fee_payer_keypair:fee_payer ~keymap
-                   ~account_state_tbl ~generate_new_accounts ~ledger ~vk
-                   ~available_public_keys:unused_pks () )
+                   Mina_generators.Zkapp_command_generators
+                   .gen_max_cost_zkapp_command_from ~memo
+                     ~fee_range:
+                       ( zkapp_command_details.min_fee
+                       , zkapp_command_details.max_fee )
+                     ~fee_payer_keypair:fee_payer ~account_state_tbl ~vk
+                     ~genesis_constants:
+                       (Mina_lib.config mina).precomputed_values
+                         .genesis_constants ()
+                 else
+                   Mina_generators.Zkapp_command_generators
+                   .gen_zkapp_command_from ~memo
+                     ?max_account_updates:
+                       zkapp_command_details.max_account_updates
+                     ~no_account_precondition:
+                       zkapp_command_details.no_precondition
+                     ~fee_range:
+                       ( zkapp_command_details.min_fee
+                       , zkapp_command_details.max_fee )
+                     ~balance_change_range:
+                       zkapp_command_details.balance_change_range
+                     ~ignore_sequence_events_precond:true
+                     ~no_token_accounts:true ~limited:true
+                     ~fee_payer_keypair:fee_payer ~keymap ~account_state_tbl
+                     ~generate_new_accounts ~ledger ~vk
+                     ~available_public_keys:unused_pks () )
                ~size:1
                ~random:(Splittable_random.State.create Random.State.default)
     in

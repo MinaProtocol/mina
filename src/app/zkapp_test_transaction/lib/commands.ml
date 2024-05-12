@@ -3,7 +3,8 @@ open Async
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 
-let constraint_constants = Genesis_constants.Constraint_constants.compiled
+let constraint_constants =
+  Mina_compile_config.Genesis_constants.Constraint_constants.compiled
 
 let proof_level = Genesis_constants.Proof_level.Full
 
@@ -68,7 +69,8 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
             permissions =
               { Permissions.user_default with
                 edit_state = Proof
-              ; set_verification_key = (Proof, Mina_numbers.Txn_version.current)
+              ; set_verification_key =
+                  (Proof, Mina_compile_config.current_txn_version)
               ; set_zkapp_uri = Proof
               ; set_token_symbol = Proof
               }
@@ -79,7 +81,8 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
   in
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
-      ~protocol_constants:Genesis_constants.compiled.protocol
+      ~protocol_constants:
+        Mina_compile_config.Genesis_constants.compiled.protocol
   in
   let state_body =
     let compile_time_genesis =
@@ -159,7 +162,8 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
   in
   let consensus_constants =
     Consensus.Constants.create ~constraint_constants
-      ~protocol_constants:Genesis_constants.compiled.protocol
+      ~protocol_constants:
+        Mina_compile_config.Genesis_constants.compiled.protocol
   in
   let open Staged_ledger_diff in
   let compile_time_genesis =
@@ -756,11 +760,11 @@ let%test_module "ZkApps test transaction" =
                       && ok ) )
               in
               if ok_fee_payer && ok_account_updates then return (Ok "Passed")
-              else return (Error "invalid snapp transaction generated") ))
+              else return (Error "invalid snapp transaction generated") ) )
       in
       let schema =
         Graphql_async.Schema.(
-          schema [] ~mutations:[ query_top_level ] ~subscriptions:[])
+          schema [] ~mutations:[ query_top_level ] ~subscriptions:[] )
       in
       let%map res = execute () schema query in
       match res with
