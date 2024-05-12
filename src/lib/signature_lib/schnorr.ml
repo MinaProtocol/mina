@@ -14,7 +14,7 @@ module type Message_intf = sig
   type curve_scalar
 
   val derive :
-       ?signature_kind:Mina_signature_kind.t
+       ?signature_kind:Mina_compile_config.signature_kind_t
     -> t
     -> private_key:curve_scalar
     -> public_key:curve
@@ -27,7 +27,7 @@ module type Message_intf = sig
     t -> private_key:curve_scalar -> public_key:curve -> curve_scalar
 
   val hash :
-       ?signature_kind:Mina_signature_kind.t
+       ?signature_kind:Mina_compile_config.signature_kind_t
     -> t
     -> public_key:curve
     -> r:field
@@ -130,13 +130,13 @@ module type S = sig
   val compress : curve -> bool list
 
   val sign :
-       ?signature_kind:Mina_signature_kind.t
+       ?signature_kind:Mina_compile_config.signature_kind_t
     -> Private_key.t
     -> Message.t
     -> Signature.t
 
   val verify :
-       ?signature_kind:Mina_signature_kind.t
+       ?signature_kind:Mina_compile_config.signature_kind_t
     -> Signature.t
     -> Public_key.t
     -> Message.t
@@ -337,13 +337,13 @@ module type S = sig
   end
 
   val sign :
-       ?signature_kind:Mina_signature_kind.t
+       ?signature_kind:Mina_compile_config.signature_kind_t
     -> Private_key.t
     -> Message.t
     -> Signature.t
 
   val verify :
-       ?signature_kind:Mina_signature_kind.t
+       ?signature_kind:Mina_compile_config.signature_kind_t
     -> Signature.t
     -> Public_key.t
     -> Message.t
@@ -445,7 +445,7 @@ module Message = struct
   let network_id_other chain_name = chain_name
 
   let network_id =
-    match Mina_signature_kind.t with
+    match Mina_compile_config.signature_kind with
     | Mainnet ->
         network_id_mainnet
     | Testnet ->
@@ -475,7 +475,7 @@ module Message = struct
       |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
       |> Tock.Field.project
 
-    let derive ?(signature_kind = Mina_signature_kind.t) =
+    let derive ?(signature_kind = Mina_compile_config.signature_kind) =
       make_derive
         ~network_id:
           ( match signature_kind with
@@ -501,8 +501,8 @@ module Message = struct
       |> Digest.to_bits ~length:Field.size_in_bits
       |> Inner_curve.Scalar.of_bits
 
-    let hash ?signature_kind =
-      make_hash ~init:(Hash_prefix_states.signature_legacy ?signature_kind)
+    let hash ?(signature_kind = Mina_compile_config.signature_kind) =
+      make_hash ~init:(Hash_prefix_states.signature_legacy signature_kind)
 
     let hash_for_mainnet =
       make_hash ~init:Hash_prefix_states.signature_for_mainnet_legacy
@@ -523,7 +523,9 @@ module Message = struct
       make_checked (fun () ->
           let open Random_oracle.Legacy.Checked in
           hash
-            ~init:(Hash_prefix_states.signature_legacy ?signature_kind:None)
+            ~init:
+              (Hash_prefix_states.signature_legacy
+                 Mina_compile_config.signature_kind )
             (pack_input input)
           |> Digest.to_bits ~length:Field.size_in_bits
           |> Bitstring_lib.Bitstring.Lsb_first.of_list )
@@ -553,7 +555,7 @@ module Message = struct
       |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
       |> Tock.Field.project
 
-    let derive ?(signature_kind = Mina_signature_kind.t) =
+    let derive ?(signature_kind = Mina_compile_config.signature_kind) =
       make_derive
         ~network_id:
           ( match signature_kind with
@@ -579,8 +581,8 @@ module Message = struct
       |> Digest.to_bits ~length:Field.size_in_bits
       |> Inner_curve.Scalar.of_bits
 
-    let hash ?signature_kind =
-      make_hash ~init:(Hash_prefix_states.signature ?signature_kind)
+    let hash ?(signature_kind = Mina_compile_config.signature_kind) =
+      make_hash ~init:(Hash_prefix_states.signature signature_kind)
 
     let hash_for_mainnet =
       make_hash ~init:Hash_prefix_states.signature_for_mainnet
@@ -601,7 +603,8 @@ module Message = struct
       make_checked (fun () ->
           let open Random_oracle.Checked in
           hash
-            ~init:(Hash_prefix_states.signature ?signature_kind:None)
+            ~init:
+              (Hash_prefix_states.signature Mina_compile_config.signature_kind)
             (pack_input input)
           |> Digest.to_bits ~length:Field.size_in_bits
           |> Bitstring_lib.Bitstring.Lsb_first.of_list )

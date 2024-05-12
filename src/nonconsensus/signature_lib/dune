@@ -18,7 +18,6 @@
    mina_wire_types
    base58_check
    blake2
-   mina_signature_kind
    random_oracle_input
    fold_lib
    snarkette

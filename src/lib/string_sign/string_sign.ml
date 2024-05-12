@@ -85,12 +85,10 @@ let%test_module "Sign_string tests" =
 
     let%test "Sign, verify with mainnet" =
       let s = "Rain and Spain don't rhyme with cheese" in
-      let signature_kind = Mina_signature_kind.Mainnet in
       let signature = sign ~signature_kind:Mainnet keypair.private_key s in
-      verify ~signature_kind signature keypair.public_key s
+      verify ~signature_kind:Mainnet signature keypair.public_key s
 
     let%test "Sign with legacy mainnet, verify with mainnet" =
-      let open Mina_signature_kind in
       let s = "Legacy signature for mainnet" in
       let signature =
         "\"7mX3ZLNHk9CKtMd7hFLXYwEBXyiosDug9BLWDND1KJEdyfMWX9oWHscxGMT3q4P9DdYiXsXFynsfoLhooy3XJ5dgduPSHw5u\""
@@ -101,12 +99,10 @@ let%test_module "Sign_string tests" =
 
     let%test "Sign, verify with testnet" =
       let s = "In a galaxy far, far away" in
-      let signature_kind = Mina_signature_kind.Testnet in
-      let signature = sign ~signature_kind keypair.private_key s in
-      verify ~signature_kind signature keypair.public_key s
+      let signature = sign ~signature_kind:Testnet keypair.private_key s in
+      verify ~signature_kind:Testnet signature keypair.public_key s
 
     let%test "Sign with legacy testnet, verify with testnet" =
-      let open Mina_signature_kind in
       let s = "Legacy signature for testnet" in
       let signature =
         "\"7mXR8PX3MuDWa7vTWTy6NWE83nKkRQosU2NzcCohuP56qy5CmugUTEgVD14xRSPMD7DsdCsgD2Y6ehY6Dkh6hRTU28i6CF37\""
@@ -117,15 +113,14 @@ let%test_module "Sign_string tests" =
 
     let%test "Sign, verify with other networks" =
       let s = "Sky is blue" in
-      let signature_kind = Mina_signature_kind.Other_network "Foo" in
       let signature =
         sign ~signature_kind:(Other_network "Foo") keypair.private_key s
       in
-      verify ~signature_kind signature keypair.public_key s
+      verify ~signature_kind:(Other_network "Foo") signature keypair.public_key
+        s
 
     let%test "Sign with testnet, fail to verify with mainnet or other networks"
         =
-      let open Mina_signature_kind in
       let s = "Some pills make you larger" in
       let signature = sign ~signature_kind:Testnet keypair.private_key s in
       verify ~signature_kind:Testnet signature keypair.public_key s
@@ -135,7 +130,6 @@ let%test_module "Sign_string tests" =
               keypair.public_key s )
 
     let%test "Sign with mainnet, fail to verify with testnet or other network" =
-      let open Mina_signature_kind in
       let s = "Watson, come here, I need you" in
       let signature = sign ~signature_kind:Mainnet keypair.private_key s in
       verify ~signature_kind:Mainnet signature keypair.public_key s
@@ -146,7 +140,6 @@ let%test_module "Sign_string tests" =
 
     let%test "Sign with other networks, fail to verify with mainnet or testnet \
               or network with a different chain-name" =
-      let open Mina_signature_kind in
       let s = "Roses are red" in
       let signature =
         sign ~signature_kind:(Other_network "Foo") keypair.private_key s

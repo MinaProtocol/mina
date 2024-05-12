@@ -11,7 +11,6 @@
    hash_prefixes
    random_oracle_nonconsensus
    snark_params_nonconsensus
-   mina_signature_kind
  )
  (enabled_if
   (or

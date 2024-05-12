@@ -10,10 +10,10 @@
    ;; local libraries
    snark_params
    random_oracle
-   mina_signature_kind
    hash_prefixes
    hash_prefix_create
    pickles
+   mina_compile_config.intf
    )
  (preprocess
   (pps ppx_custom_printf ppx_snarky ppx_version ppx_inline_test ppx_compare ppx_deriving_yojson))

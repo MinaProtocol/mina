@@ -23,7 +23,6 @@
    bitstring_lib
    codable
    snark_params
-   mina_signature_kind
    blake2
    hash_prefix_states
    non_zero_curve_point
@@ -40,6 +39,7 @@
    test_util
    ppx_version.runtime
    signature_lib_base
+   mina_compile_config
  )
  (preprocessor_deps ../consensus/mechanism.mlh)
  (instrumentation (backend bisect_ppx))

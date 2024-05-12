@@ -3111,8 +3111,7 @@ let%test_module _ =
               ()
           in
           let%bind zkapp_command =
-            mk_single_account_update
-              ~chain:Mina_signature_kind.(Other_network "invalid")
+            mk_single_account_update ~chain:(Other_network "invalid")
               ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0 ~zkapp_account_idx:1
               ~ledger:(Option.value_exn test.txn_pool.best_tip_ledger)
           in

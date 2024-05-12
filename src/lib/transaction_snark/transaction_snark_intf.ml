@@ -313,7 +313,7 @@ module type Full = sig
            * ( Pickles.Side_loaded.Verification_key.t
              , Snark_params.Tick.Field.t )
              With_hash.t
-      -> chain:Mina_signature_kind.t
+      -> chain:Mina_compile_config.signature_kind_t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Single_account_update_spec.t
       -> Zkapp_command.t Async.Deferred.t

@@ -67,7 +67,6 @@
    random_oracle_input
    data_hash_lib
    pickles.backend
-   mina_signature_kind
    mina_base.util
    kimchi_backend
    hex

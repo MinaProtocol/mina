@@ -14,7 +14,7 @@
    sexplib0
    graphql_parser
    ;; local libraries
-   signature_lib
+   signature_lib_base
    fields_derivers.graphql
    fields_derivers.json
    currency

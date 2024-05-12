@@ -433,7 +433,7 @@ module May_use_token = struct
               let%bind () = typ.check x in
               let sum =
                 Field.Var.(
-                  add (parents_own_token :> t) (inherit_from_parent :> t))
+                  add (parents_own_token :> t) (inherit_from_parent :> t) )
               in
               (* Assert boolean; we should really have a helper for this
                  somewhere.
@@ -899,7 +899,7 @@ module Update = struct
         |> Typ.transport_var
              ~there:
                (Set_or_keep.Checked.map
-                  ~f:(fun { Zkapp_basic.Flagged_option.data; _ } -> data) )
+                  ~f:(fun { Zkapp_basic.Flagged_option.data; _ } -> data ) )
              ~back:(fun x ->
                Set_or_keep.Checked.map x ~f:(fun data ->
                    { Zkapp_basic.Flagged_option.data
@@ -996,7 +996,7 @@ module Account_precondition = struct
     let digest x =
       Random_oracle.(
         hash ~init:Hash_prefix_states.account_update_account_precondition
-          (pack_input x))
+          (pack_input x) )
     in
     t |> Zkapp_precondition.Account.to_input |> digest
 
@@ -1007,7 +1007,7 @@ module Account_precondition = struct
       let digest x =
         Random_oracle.Checked.(
           hash ~init:Hash_prefix_states.account_update_account_precondition
-            (pack_input x))
+            (pack_input x) )
       in
       Zkapp_precondition.Account.Checked.to_input t |> digest
 
@@ -1356,7 +1356,7 @@ module Body = struct
       Fields.make_creator obj ~public_key:!.public_key ~fee:!.fee
         ~valid_until:
           !.Fields_derivers_zkapps.Derivers.(
-              option ~js_type:Or_undefined @@ global_slot_since_genesis @@ o ())
+              option ~js_type:Or_undefined @@ global_slot_since_genesis @@ o () )
         ~nonce:!.uint32
       |> finish "FeePayerBody" ~t_toplevel_annots
   end
@@ -1515,9 +1515,9 @@ module Body = struct
         ; Authorization_kind.Checked.to_input authorization_kind
         ]
 
-    let digest ?chain (t : t) =
+    let digest ?(chain = Mina_compile_config.signature_kind) (t : t) =
       Random_oracle.Checked.(
-        hash ~init:(Hash_prefix.zkapp_body ?chain) (pack_input (to_input t)))
+        hash ~init:(Hash_prefix.zkapp_body chain) (pack_input (to_input t)) )
   end
 
   let typ () : (Checked.t, t) Typ.t =
@@ -1588,9 +1588,9 @@ module Body = struct
       ; Authorization_kind.to_input authorization_kind
       ]
 
-  let digest ?chain (t : t) =
+  let digest ?(chain = Mina_compile_config.signature_kind) (t : t) =
     Random_oracle.(
-      hash ~init:(Hash_prefix.zkapp_body ?chain) (pack_input (to_input t)))
+      hash ~init:(Hash_prefix.zkapp_body chain) (pack_input (to_input t)) )
 
   module Digested = struct
     type t = Random_oracle.Digest.t

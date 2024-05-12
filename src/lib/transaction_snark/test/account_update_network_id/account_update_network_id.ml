@@ -35,7 +35,7 @@ let%test_module "Account update network id tests" =
                   in
                   let%bind zkapp_command =
                     Transaction_snark.For_tests.single_account_update
-                      ~chain:Mina_signature_kind.(Other_network "invalid")
+                      ~chain:(Other_network "invalid")
                       ~constraint_constants:U.constraint_constants spec
                   in
                   Transaction_snark.For_tests.create_trivial_zkapp_account
@@ -43,7 +43,7 @@ let%test_module "Account update network id tests" =
                       { Permissions.user_default with set_zkapp_uri = Proof }
                     ~vk ~ledger
                     Signature_lib.Public_key.(
-                      compress zkapp_account_keypair.public_key) ;
+                      compress zkapp_account_keypair.public_key ) ;
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;

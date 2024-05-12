@@ -2,7 +2,7 @@ open Snark_params
 open Tick
 open Random_oracle
 
-val signature : ?signature_kind:Mina_signature_kind.t -> Field.t State.t
+val signature : Mina_compile_config_intf.signature_kind_t -> Field.t State.t
 
 val signature_for_mainnet : Field.t State.t
 
@@ -11,7 +11,7 @@ val signature_for_testnet : Field.t State.t
 val signature_for_other : string -> Field.t State.t
 
 val signature_legacy :
-  ?signature_kind:Mina_signature_kind.t -> Field.t Legacy.State.t
+  Mina_compile_config_intf.signature_kind_t -> Field.t Legacy.State.t
 
 val signature_for_mainnet_legacy : Field.t Legacy.State.t
 
@@ -50,7 +50,7 @@ val zkapp_account : Field.t State.t
 
 val zkapp_payload : Field.t State.t
 
-val zkapp_body : ?chain:Mina_signature_kind.t -> Field.t State.t
+val zkapp_body : Mina_compile_config_intf.signature_kind_t -> Field.t State.t
 
 val zkapp_precondition : Field.t State.t
 

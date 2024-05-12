@@ -39,9 +39,8 @@ let zkapp_body_mainnet = create "MainnetZkappBody"
 
 let zkapp_body_testnet = create "TestnetZkappBody"
 
-let zkapp_body ?(chain = Mina_signature_kind.t) =
-  match chain with
-  | Mainnet ->
+let zkapp_body = function
+  | Mina_compile_config_intf.Mainnet ->
       zkapp_body_mainnet
   | Testnet ->
       zkapp_body_testnet

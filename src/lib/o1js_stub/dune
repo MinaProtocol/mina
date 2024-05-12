@@ -44,7 +44,6 @@
   fields_derivers.zkapps
   genesis_constants
   mina_numbers
-  mina_signature_kind
   mina_transaction
   mina_transaction_logic
   random_oracle

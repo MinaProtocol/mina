@@ -17,7 +17,6 @@
    snark_params
    random_oracle
    pickles
-   mina_signature_kind
    mina_base
  )
  (instrumentation (backend bisect_ppx))

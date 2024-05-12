@@ -10,7 +10,6 @@
    digestif.ocaml
    ;;local libraries
    random_oracle_input
-   mina_signature_kind
    signature_lib_nonconsensus
    mina_base_nonconsensus
    snark_params_nonconsensus

@@ -176,9 +176,9 @@ module Make (Schema : Graphql_intf.Schema) = struct
   let public_key obj : _ Unified_input.t =
     iso_string obj ~name:"PublicKey" ~js_type:PublicKey
       ~doc:"String representing a public key in base58"
-      ~to_string:Signature_lib.Public_key.Compressed.to_string
+      ~to_string:Signature_lib_base.Public_key.Compressed.to_string
       ~of_string:
-        (except ~f:Signature_lib.Public_key.Compressed.of_base58_check_exn
+        (except ~f:Signature_lib_base.Public_key.Compressed.of_base58_check_exn
            `Public_key )
 
   let skip obj : _ Unified_input.t =
@@ -406,7 +406,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
           field "query" ~typ:(non_null typ)
             ~args:Arg.[]
             ~doc:"sample query"
-            ~resolve:(fun _ _ -> ()))
+            ~resolve:(fun _ _ -> ()) )
       in
       let schema =
         Schema.(schema [ query_top_level ] ~mutations:[] ~subscriptions:[])
@@ -464,17 +464,17 @@ module Make (Schema : Graphql_intf.Schema) = struct
                 ~doc:"sample args query"
                 ~resolve:(fun { ctx; _ } () (input : 'a) ->
                   ctx := Some input ;
-                  0 ))
+                  0 ) )
           in
           let out_schema : ('a option ref, unit) Schema.field =
             Schema.(
               field "out" ~typ:(typ deriver)
                 ~args:Arg.[]
                 ~doc:"sample query"
-                ~resolve:(fun { ctx; _ } () -> Option.value_exn !ctx))
+                ~resolve:(fun { ctx; _ } () -> Option.value_exn !ctx) )
           in
           Schema.(
-            schema [ in_schema; out_schema ] ~mutations:[] ~subscriptions:[])
+            schema [ in_schema; out_schema ] ~mutations:[] ~subscriptions:[] )
         in
         let ctx = ref None in
         let open M in
@@ -563,7 +563,7 @@ let verification_key_with_hash obj =
     in
     Pickles.Side_loaded.Verification_key.(
       iso_string obj ~name:"VerificationKey" ~js_type:String
-        ~to_string:to_base64 ~of_string ~doc:"Verification key in Base64 format")
+        ~to_string:to_base64 ~of_string ~doc:"Verification key in Base64 format" )
   in
   let ( !. ) =
     ( !. ) ~t_fields_annots:With_hash.Stable.Latest.t_fields_annots
@@ -614,7 +614,7 @@ let%test_module "Test" =
     module Schema = Graphql_schema.Make (IO) (Field_error)
     module Derivers = Make (Schema)
     include Derivers
-    module Public_key = Signature_lib.Public_key.Compressed
+    module Public_key = Signature_lib_base.Public_key.Compressed
 
     module Or_ignore_test = struct
       type 'a t = Check of 'a | Ignore [@@deriving compare, sexp, equal]

@@ -34,7 +34,6 @@
    signature_lib_nonconsensus
    quickcheck_lib_nonconsensus
    mina_base_nonconsensus.util
-   mina_signature_kind
    fold_lib
    snarkette
    fields_derivers.graphql

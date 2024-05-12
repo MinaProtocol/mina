@@ -14,7 +14,7 @@
  (public_name archive-testnet)
  (modules archive_testnet_signatures)
  (modes native)
- (libraries archive_cli mina_signature_kind.testnet async async_unix core_kernel base mina_version_compiled bounded_types)
+ (libraries archive_cli mina_compile_config.devnet async async_unix core_kernel base mina_version_compiled bounded_types)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version)))
 
@@ -24,6 +24,6 @@
  (public_name archive-mainnet)
  (modules archive_mainnet_signatures)
  (modes native)
- (libraries archive_cli mina_signature_kind.mainnet async async_unix core_kernel base mina_version_compiled bounded_types)
+ (libraries archive_cli mina_compile_config.mainnet async async_unix core_kernel base mina_version_compiled bounded_types)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version)))
