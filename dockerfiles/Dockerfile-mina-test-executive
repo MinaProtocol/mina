@@ -60,7 +60,7 @@ RUN curl https://baltocdn.com/helm/signing.asc | sudo apt-key add - \
     && sudo apt-get install -y helm
 
 # Get yarn + nodejs
-RUN curl -sL https://deb.nodesource.com/setup_16.x | sudo -E bash - \
+RUN curl -sL https://deb.nodesource.com/setup_20.x | sudo -E bash - \
     && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - \
     && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
     && sudo apt-get update \

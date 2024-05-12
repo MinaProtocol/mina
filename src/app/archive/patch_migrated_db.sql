@@ -2,5 +2,5 @@
 -- in this PR https://github.com/MinaProtocol/mina/pull/14407 
 ALTER TABLE zkapp_permissions RENAME COLUMN set_verification_key TO set_verification_key_auth;
 ALTER TABLE zkapp_permissions ADD COLUMN set_verification_key_txn_version int;
-UPDATE      zkapp_permissions SET set_verification_key_txn_version = 1;
+UPDATE      zkapp_permissions SET set_verification_key_txn_version = 2;
 ALTER TABLE zkapp_permissions ALTER COLUMN set_verification_key_txn_version SET NOT NULL;

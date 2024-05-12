@@ -37,7 +37,7 @@ Alternatively, you could use an official image that is built in exactly this way
 
 ### All-in-one container
 
-The container includes 4 scripts in `/etc/mina/rosetta` that run a different set of services connected to a particular network
+The container includes 3 scripts in `/etc/mina/rosetta/scripts` that run a different set of services connected to a particular network
 
 * `docker-standalone-start.sh` is the most straightforward, it starts only the
   Rosetta API endpoint and any flags passed into the script go to
@@ -47,37 +47,31 @@ The container includes 4 scripts in `/etc/mina/rosetta` that run a different set
   starts a full suite of tools (a Mina node, Mina archive, a PostgreSQL DB,
   and Rosetta node), but for a demo network with all operations occurring inside
   this container and no external network activity.
-* The default, `docker-start.sh` connects the Mina node to our
-  [Mainnet](https://docs.minaprotocol.com/node-operators/connecting-to-the-network)
-  network and initializes the archive database from publicly available nightly
+* `docker-start.sh` connects the Mina node to a network (by default,
+  [Mainnet](https://docs.minaprotocol.com/node-operators/connecting-to-the-network))
+  and initializes the archive database from publicly available nightly
   O(1) Labs backups. As with `docker-demo-start.sh`, this script runs a Mina
   node, a Mina archive, a PostgreSQL DB, and Rosetta. The script also
   periodically checks for blocks that may be missing between the nightly backup
   and the tip of the chain and will fill in those gaps by walking back the
   linked list of blocks in the canonical chain and importing them one at a time.
+  After this initial bootstrap, it will query once every 60 minutes for missing
+  blocks and import them as needed. This script is most useful for connecting
+  to a real network and is the default script used when running the container.
   This can also be used to connect to other networks and has several
-  configuration parameters. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/src/app/rosetta/docker-start.sh)
+  configuration parameters. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/11513e679fae11e3cd0d3a91dd242628fd712ff5/src/app/rosetta/scripts/docker-start.sh)
   for more information about what you can configure and how.
-* `docker-devnet-start.sh` connects the Mina node to our
-  [Devnet](https://docs.minaprotocol.com/node-operators/connecting-to-devnet)
-  network with the archive database initialized similarly to `docker-start.sh`.
-  As with `docker-demo-start.sh`, this script runs a Mina node, a Mina archive, a
-  PostgreSQL DB, and a Rosetta node. `docker-devnet-start.sh` is now just a
-  special case of `docker-start.sh` so inspect the source there for more
-  detailed configuration.
-* Finally, the `docker-berkeley-start.sh` is the same as
-  `docker-devnet-start.sh` but for the Berkeley network.
 
 For example, to run the `docker-start.sh` and connect to a network:
 
 ```bash
 docker run -it --rm --name rosetta \
     --entrypoint=./docker-start.sh \
-    -p 10101:10101 -p 3081:3081 -p 3085:3085 -p 3086:3086 -p 3087:3087 \
+    -p 8302:8302 -p 3081:3081 -p 3085:3085 -p 3086:3086 -p 3087:3087 \
     <DOCKER_IMAGE>
 ```
 
-* Port 10101 is the default P2P port and must be exposed to the open internet
+* Port 8302 is the default P2P port and must be exposed to the open internet
 * The daemon listens to client requests on port 3081
 * The GraphQL API runs on port 3085 (accessible via `localhost:3085/graphql`)
 * Archive node runs on port 3086
@@ -85,7 +79,9 @@ docker run -it --rm --name rosetta \
 * `<DOCKER_IMAGE>` should be the name of an image compatible with the
   network you wish to connect to.
 
-Note: this image does not define a volume for DB data. If you want to persist it, please create a volume mapping pointing to the DB directory of the container (default: `/data/postgresql`).
+Note: this image does not define a volume for DB data. If you want to persist it,
+please create a volume mapping pointing to the DB directory of the container
+(default: `/data/postgresql`).
 
 ### Standalone container
 

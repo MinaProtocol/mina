@@ -31,12 +31,16 @@ echo "--- Download and extract previous network config"
 curl -o config.json.gz $CONFIG_JSON_GZ_URL
 gunzip config.json.gz
 
+# Patch against a bug in 1.4 which is fixed by PR #15462
+mv config.json config_orig.json
+jq 'del(.ledger.num_accounts) | del(.ledger.name)' config_orig.json > config.json 
+
 echo "--- Migrate accounts to new network format"
 # TODO: At this stage, we need to migrate the json accounts into the new network's format.
 #       For now, this is hard-coded to the mainnet -> berkeley migration, but we need to select
 #       a migration to perform in the future.
 # NB: we use sed here instead of jq, because jq is extremely slow at processing this file
-sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "1"}/' config.json
+sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "2"}/' config.json
 
 case "${NETWORK_NAME}" in
   mainnet)
@@ -54,6 +58,9 @@ _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --confi
 echo "--- Create hardfork config"
 FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hardfork_ledger_hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
 
+echo "--- New genesis config"
+cat new_config.json
+
 existing_files=$(aws s3 ls s3://snark-keys.o1test.net/ | awk '{print $4}')
 for file in hardfork_ledgers/*; do
   filename=$(basename "$file")
@@ -63,7 +70,7 @@ for file in hardfork_ledgers/*; do
     oldhash=$(openssl dgst -r -sha3-256 "$file" | awk '{print $1}')
     aws s3 cp "s3://snark-keys.o1test.net/$filename" "$file"
     newhash=$(openssl dgst -r -sha3-256 "$file" | awk '{print $1}')
-    sed -i 's/$oldhash/$newhash/g' new_config.json 
+    sed -i "s/$oldhash/$newhash/g" new_config.json 
   else
     aws s3 cp --acl public-read "$file" s3://snark-keys.o1test.net/
   fi

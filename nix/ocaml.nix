@@ -1,5 +1,5 @@
 # A set defining OCaml parts&dependencies of Minaocamlnix
-{ inputs, ... }@args:
+{ inputs, src, ... }@args:
 let
   opam-nix = inputs.opam-nix.lib.${pkgs.system};
 
@@ -12,16 +12,17 @@ let
     escapeShellArg;
 
   external-repo =
-    opam-nix.makeOpamRepoRec ../src/external; # Pin external packages
+    opam-nix.makeOpamRepoRec "${src}/src/external"; # Pin external packages
   repos = [ external-repo inputs.opam-repository ];
 
-  export = opam-nix.importOpam ../opam.export;
+  export = opam-nix.importOpam "${src}/opam.export";
   external-packages = pkgs.lib.getAttrs [ "sodium" "base58" ]
     (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
   # Packages which are `installed` in the export.
   # These are all the transitive ocaml dependencies of Mina.
-  export-installed = opam-nix.opamListToQuery export.installed;
+  export-installed = builtins.removeAttrs
+    (opam-nix.opamListToQuery export.installed) ["check_opam_switch"];
 
   # Extra packages which are not in opam.export but useful for development, such as an LSP server.
   extra-packages = with implicit-deps; {
@@ -45,9 +46,34 @@ let
   implicit-deps = export-installed // external-packages;
 
   # Pins from opam.export
-  pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg) export.package;
+  pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg)
+    (builtins.removeAttrs export.package.section ["check_opam_switch"]);
 
-  scope = opam-nix.applyOverlays opam-nix.__overlays
+  implicit-deps-overlay = self: super:
+    (if pkgs.stdenv.isDarwin then {
+      async_ssl = super.async_ssl.overrideAttrs
+        { NIX_CFLAGS_COMPILE = "-Wno-implicit-function-declaration -Wno-incompatible-function-pointer-types"; };
+    } else {}) //
+    {
+      # https://github.com/Drup/ocaml-lmdb/issues/41
+      lmdb = super.lmdb.overrideAttrs
+        (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
+
+      # Doesn't have an explicit dependency on ctypes-foreign
+      ctypes = super.ctypes.overrideAttrs
+        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
+
+      # Can't find sodium-static and ctypes
+      sodium = super.sodium.overrideAttrs (_: {
+        NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
+        propagatedBuildInputs = [ pkgs.sodium-static ];
+        preBuild = ''
+          export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
+        '';
+      });
+    };
+
+  scope = opam-nix.applyOverlays (opam-nix.__overlays ++ [ implicit-deps-overlay ])
     (opam-nix.defsToScope pkgs { }
       ((opam-nix.queryToDefs repos (extra-packages // implicit-deps)) // pins));
 
@@ -60,14 +86,6 @@ let
   external-libs = with pkgs;
     [ zlib bzip2 gmp openssl libffi ]
     ++ lib.optional (!(stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
-
-  # Only get the ocaml stuff, to reduce the amount of unnecessary rebuilds
-  filtered-src = with inputs.nix-filter.lib;
-    filter {
-      root = ../.;
-      include =
-        [ (inDirectory "src") "dune" "dune-project" "./graphql_schema.json" ];
-    };
 
   overlay = self: super:
     let
@@ -114,30 +132,14 @@ let
             outputs = [ "out" ];
             installPhase = "touch $out";
           } // extraArgs);
-    in {
-      # https://github.com/Drup/ocaml-lmdb/issues/41
-      lmdb = super.lmdb.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
-
-      # Can't find sodium-static and ctypes
-      sodium = super.sodium.overrideAttrs (_: {
-        NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
-        propagatedBuildInputs = [ pkgs.sodium-static ];
-        preBuild = ''
-          export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
-        '';
-      });
-
-      # Doesn't have an explicit dependency on ctypes
-      rpc_parallel = super.rpc_parallel.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes ]; });
-
+    in 
+    {
       # Some "core" Mina executables, without the version info.
       mina-dev = pkgs.stdenv.mkDerivation ({
         pname = "mina";
         version = "dev";
         # Prevent unnecessary rebuilds on non-source changes
-        src = filtered-src;
+        inherit src;
 
         withFakeOpam = false;
 
@@ -166,7 +168,7 @@ let
         ] ++ ocaml-libs;
 
         # todo: slimmed rocksdb
-        MINA_ROCKSDB = "${pkgs.rocksdb}/lib/librocksdb.a";
+        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
         # this is used to retrieve the path of the built static library
@@ -182,9 +184,9 @@ let
 
         configurePhase = ''
           export MINA_ROOT="$PWD"
-          export -f patchShebangs stopNest isScript
+          export -f patchShebangs isScript
           fd . --type executable -x bash -c "patchShebangs {}"
-          export -n patchShebangs stopNest isScript
+          export -n patchShebangs isScript
           # Get the mina version at runtime, from the wrapper script. Used to prevent rebuilding everything every time commit info changes.
           sed -i "s/default_implementation [^)]*/default_implementation $MINA_VERSION_IMPLEMENTATION/" src/lib/mina_version/dune
         '';
@@ -206,7 +208,9 @@ let
             src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
             src/app/replayer/replayer.exe \
             src/app/swap_bad_balances/swap_bad_balances.exe \
-            src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
+            src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+            src/app/berkeley_migration/berkeley_migration.exe \
+            src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe
           # TODO figure out purpose of the line below
           # dune exec src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir _build/coda_cache_dir
           # Building documentation fails, because not everything in the source tree compiles. Ignore the errors.
@@ -222,10 +226,11 @@ let
           "genesis"
           "sample"
           "batch_txn_tool"
+          "berkeley_migration"
         ];
 
         installPhase = ''
-          mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
+          mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin $berkeley_migration/bin
           # TODO uncomment when genesis is generated above
           # mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
           pushd _build/default
@@ -244,6 +249,9 @@ let
           cp src/app/archive_blocks/archive_blocks.exe $archive/bin/mina-archive-blocks
           cp src/app/missing_blocks_auditor/missing_blocks_auditor.exe $archive/bin/mina-missing-blocks-auditor
           cp src/app/replayer/replayer.exe $archive/bin/mina-replayer
+          cp src/app/replayer/replayer.exe $berkeley_migration/bin/mina-migration-replayer
+          cp src/app/berkeley_migration/berkeley_migration.exe $berkeley_migration/bin/mina-berkeley-migration
+          cp src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe $berkeley_migration/bin/mina-berkeley-migration-verifier
           cp src/app/swap_bad_balances/swap_bad_balances.exe $archive/bin/mina-swap-bad-balances
           cp -R _doc/_html $out/share/doc/html
           # cp src/lib/mina_base/sample_keypairs.json $sample/share/mina
@@ -279,7 +287,7 @@ let
         version = "mainnet";
         DUNE_PROFILE = "mainnet";
         # For compatibility with Docker build
-        MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
+        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
       });
 
       mainnet = wrapMina self.mainnet-pkg { };
@@ -288,39 +296,10 @@ let
         version = "devnet";
         DUNE_PROFILE = "devnet";
         # For compatibility with Docker build
-        MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
+        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
       });
 
       devnet = wrapMina self.devnet-pkg { };
-
-      berkeley-migration-pkg = self.mina-dev.overrideAttrs (s: {
-        pname = "mina-berkeley-migration";
-        version = "mainnet";
-        DUNE_PROFILE = "berkeley_archive_migration";
-        # For compatibility with Docker build
-        MINA_ROCKSDB = "${pkgs.rocksdb511}/lib/librocksdb.a";
-        buildPhase = ''
-          dune build --display=short \
-            src/app/berkeley_migration/berkeley_migration.exe \
-            src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe \
-            src/app/replayer/replayer.exe
-        '';
-
-        outputs = [ "out" ];
-
-        installPhase = ''
-          mkdir -p $out/bin
-          pushd _build/default
-          cp src/app/berkeley_migration/berkeley_migration.exe $out/bin/mina-berkeley-migration
-          cp src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe $out/bin/mina-berkeley-migration-verifier
-          cp src/app/replayer/replayer.exe $out/bin/mina-migration-replayer
-          popd
-          remove-references-to -t $(dirname $(dirname $(command -v ocaml))) $out/bin/*
-        '';
-        shellHook = "";
-      });
-
-      berkeley-migration = wrapMina self.berkeley-migration-pkg { };
 
       # Unit tests
       mina_tests = runMinaCheck {

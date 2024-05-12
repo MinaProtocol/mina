@@ -1501,8 +1501,8 @@ let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
 let ledger_of_accounts accounts =
   Ledger.
     { base = Accounts accounts
-    ; num_accounts = Some (List.length accounts)
-    ; balances = List.mapi accounts ~f:(fun i a -> (i, a.balance))
+    ; num_accounts = None
+    ; balances = []
     ; hash = None
     ; s3_data_hash = None
     ; name = None
@@ -1510,8 +1510,7 @@ let ledger_of_accounts accounts =
     }
 
 let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
-    ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger ~next_epoch_seed
-    (runtime_config : t) =
+    ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger ~next_epoch_seed =
   let open Async.Deferred.Result.Let_syntax in
   let global_slot_since_genesis =
     Mina_numbers.Global_slot_since_hard_fork.to_int global_slot
@@ -1526,7 +1525,10 @@ let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
     Mina_ledger.Ledger.Any_ledger.cast (module Mina_ledger.Ledger) staged_ledger
     |> ledger_accounts
   in
-  let ledger = Option.value_exn runtime_config.ledger in
+  let hash =
+    Option.some @@ Mina_base.Ledger_hash.to_base58_check
+    @@ Mina_ledger.Ledger.merkle_root staged_ledger
+  in
   let fork =
     Fork_config.
       { state_hash = Mina_base.State_hash.to_base58_check state_hash
@@ -1566,7 +1568,14 @@ let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
      startup, even though it already exists, leading to an error.*)
     ~epoch_data
     ~ledger:
-      { ledger with base = Accounts accounts; add_genesis_winner = Some false }
+      { base = Accounts accounts
+      ; num_accounts = None
+      ; balances = []
+      ; hash
+      ; s3_data_hash = None
+      ; name = None
+      ; add_genesis_winner = Some false
+      }
     ~proof:(Proof_keys.make ~fork ()) ()
 
 let slot_tx_end_or_default, slot_chain_end_or_default =

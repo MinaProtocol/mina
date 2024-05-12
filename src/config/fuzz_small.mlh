@@ -26,7 +26,6 @@
 [%%define generate_genesis_proof false]
 
 [%%define print_versioned_types false]
-[%%define daemon_expiry "never"]
 [%%define pending_coinbase_hack false]
 [%%import "/src/config/fork.mlh"]
 [%%import "/src/config/features/dev.mlh"]

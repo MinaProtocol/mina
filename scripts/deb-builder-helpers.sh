@@ -50,12 +50,11 @@ case "${MINA_DEB_CODENAME}" in
 esac
 
 case "${DUNE_PROFILE}" in
-  devnet)
+  devnet|mainnet)
     MINA_DEB_NAME="mina-berkeley"
     DEB_SUFFIX=""
    ;;
   *)
-
     # use dune profile as suffix but replace underscore to dashes so deb builder won't complain
     _SUFFIX=${DUNE_PROFILE//_/-}
     MINA_DEB_NAME="mina-berkeley-${_SUFFIX}"
@@ -157,11 +156,11 @@ copy_common_daemon_configs() {
   mkdir -p "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   mkdir -p "${BUILDDIR}/etc/mina/rosetta/archive"
   mkdir -p "${BUILDDIR}/etc/mina/rosetta/genesis_ledgers"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/scripts"
 
   # --- Copy artifacts
-  cp ../src/app/rosetta/*.conf "${BUILDDIR}/etc/mina/rosetta"
-  cp ../src/app/rosetta/*.sh "${BUILDDIR}/etc/mina/rosetta"
-  cp ../scripts/archive/download-missing-blocks.sh "${BUILDDIR}/etc/mina/rosetta"
+  cp ../src/app/rosetta/scripts/* "${BUILDDIR}/etc/mina/rosetta/scripts"
+  cp ../scripts/archive/download-missing-blocks.sh "${BUILDDIR}/etc/mina/rosetta/scripts"
 
   cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
@@ -341,6 +340,7 @@ build_archive_deb () {
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-replayer"
   cp ./default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILDDIR}/usr/local/bin/mina-swap-bad-balances"
 
+
   build_deb "$ARCHIVE_DEB"
 
 }
@@ -353,16 +353,15 @@ build_archive_migration_deb () {
   echo "------------------------------------------------------------"
   echo "--- Building archive migration deb"
 
-
   create_control_file "$ARCHIVE_MIGRATION_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
  Compatible with Mina Daemon'
 
   cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
   cp ./default/src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-verifier"
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-migration-replayer"
-
+  cp ../scripts/archive/migration/berkeley_migration.sh "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-script"
+  
   build_deb "$ARCHIVE_MIGRATION_DEB"
-
 }
 ##################################### END ARCHIVE PACKAGE ######################################
 

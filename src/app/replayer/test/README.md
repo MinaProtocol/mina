@@ -72,7 +72,7 @@ a) We can alter input config and use `target_epoch_ledgers_state_hash` property 
 
 b) Convert pending chain to canonical blocks using helper script:
 
-`./src/app/replayer/test/convert postgres://postgres:postgres@localhost:5432/archive '3NLbZ28M72eewCxYUCE3CwQo5c7wPzoiGcNC5Bbe8oEnrutXtZt9'`
+`./src/app/replayer/test/convert_chain_to_canonical.sh postgres://postgres:postgres@localhost:5432/archive '3NLbZ28M72eewCxYUCE3CwQo5c7wPzoiGcNC5Bbe8oEnrutXtZt9'`
 
 As a result archive database will now have blocks which are a part of chain from genesis block to target block converted to canonical. All blocks which are not a part of mentioned chain and have height smaller than target blocks will be orphaned. Rest will be left intact as pending. DO NOT USE on production.
 

@@ -70,6 +70,8 @@ struct
     (* input must be at least as long as the version byte and checksum *)
     if len < version_len + checksum_len then
       raise (Invalid_base58_check_length M.description) ;
+    if not (Char.equal decoded.[0] version_byte) then
+      raise (Invalid_base58_version_byte (decoded.[0], M.description)) ;
     let checksum =
       String.sub decoded
         ~pos:(String.length decoded - checksum_len)
@@ -80,8 +82,6 @@ struct
     in
     if not (String.equal checksum (compute_checksum payload)) then
       raise (Invalid_base58_checksum M.description) ;
-    if not (Char.equal decoded.[0] version_byte) then
-      raise (Invalid_base58_version_byte (decoded.[0], M.description)) ;
     payload
 
   let decode s =

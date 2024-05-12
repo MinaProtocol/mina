@@ -32,9 +32,8 @@ Pipeline.build
   Pipeline.Config::{
     spec =
       let unitDirtyWhen = [
-        S.strictlyStart (S.contains "src/app/zkapps_examples"),
-        S.strictlyStart (S.contains "src/lib"),
-        S.exactly "buildkite/src/Jobs/Test/DaemonUnitTest" "dhall",
+        S.strictlyStart (S.contains "src"),
+        S.exactly "buildkite/src/Jobs/Test/ZkappsExamplesTest" "dhall",
         S.exactly "scripts/link-coredumps" "sh",
         S.exactly "buildkite/scripts/zkapps-examples-unit-tests" "sh"
       ]

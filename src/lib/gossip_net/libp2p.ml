@@ -49,7 +49,7 @@ module Config = struct
     ; pubsub_v1 : pubsub_topic_mode_t
     ; pubsub_v0 : pubsub_topic_mode_t
     ; validation_queue_size : int
-    ; mutable keypair : Mina_net2.Keypair.t
+    ; mutable keypair : Mina_net2.Keypair.t option
     ; all_peers_seen_metric : bool
     ; known_private_ip_nets : Core.Unix.Cidr.t list
     }
@@ -244,7 +244,18 @@ module Make (Rpc_intf : Network_peer.Rpc_intf.Rpc_interface_intf) :
       with
       | Ok (Ok net2) -> (
           let open Mina_net2 in
-          let me = config.keypair in
+          (* Make an ephemeral keypair for this session.
+             TODO(15495): persist in the config dir.
+          *)
+          let%bind me =
+            match config.keypair with
+            | Some kp ->
+                return kp
+            | None ->
+                let%map kp = Mina_net2.generate_random_keypair net2 in
+                config.keypair <- Some kp ;
+                kp
+          in
           let my_peer_id = Keypair.to_peer_id me |> Peer.Id.to_string in
           Logger.append_to_global_metadata
             [ ("peer_id", `String my_peer_id)

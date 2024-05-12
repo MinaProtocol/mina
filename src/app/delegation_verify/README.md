@@ -10,6 +10,8 @@ the time of each submission.
 The tool can work in two distinct modes:
 * **file system mode**, where all submission and blocks should be
   stored in files on a local file system;
+* **stdin mode**, where all data is passed in through **stdin**, while
+  results are output to **stdout**.
 * **cassandra mode**, where all the data is stored in a Cassandra
   database.
   
@@ -83,6 +85,43 @@ For each `<filename{i}>` parameter one line of output is printed to
 
 The stateless verification would check the protocol_state_proof in the
 block and the transaction_snark_proof in the snark_work.
+
+Stdin mode
+----------
+
+Usage:
+```
+./delegation_verify stdin
+```
+
+This mode does not require any special options, but it still accepts
+global options described below. It reads its **stdin** buffer, trying
+to parse a JSON list of objects. Objects don't need to follow any
+specific format; it's sufficient that they provide the essential data:
+
+* `submitted_at` – timestamp of the submission for indentification;
+* `block_hash` – needed to identify the block to verify;
+* `snark_work` (optional) – a base64-encoded SNARK proof to verify;
+* `submitter` – the submitter's public key;
+* `raw_block` – the block data which `block_hash` refers to.
+
+Each submission can contain arbitrary other fields, which will be
+ignored. The verifier will process submissions and for each it will
+output the same JSON object with the following additional fields:
+
+* `state_hash` – the hash of the blockchain's state at the block;
+* `parent` – the hash of the blockchain's state at the preceding block;
+* `slot` – the global slot since genesis at which submission was sent;
+* `height` – the height of the block in the blockchain;
+* `verified` – always `true`;
+* `error` – `null` if verification has passed, otherwise a string
+  describing the error.
+  
+*NOTE*: Output objects are not on a list. Instead they are separated
+with newlines. This is because submissions are processed asynchronously
+and each thread outputs its results immediately as it finishes. For
+this reason the order in which submissions are output is unspecified
+and can vary between runs of the same inputs.
 
 Cassandra mode
 --------------

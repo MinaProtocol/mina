@@ -28,7 +28,7 @@
    base58_check
    direction
    codable
-   mina_base_import
+   mina_base.import
    mina_numbers
    mina_stdlib
    data_hash_lib

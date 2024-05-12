@@ -174,11 +174,18 @@ in
       cargoLock.lockFile = lock;
       cargoLock.outputHashes = narHashesFromCargoLock lock;
 
+      # Without this env variable, wasm pack attempts to create cache dir in root
+      # which leads to permissions issue
+      WASM_PACK_CACHE = ".wasm-pack-cache";
+
       # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
       # Want to run after cargoSetupPostUnpackHook
       prePatch = ''
         chmod +w $NIX_BUILD_TOP/cargo-vendor-dir
-        ln -sf ${final.kimchi-rust-std-deps}/*/ $NIX_BUILD_TOP/cargo-vendor-dir
+        for name in ''$(ls ${final.kimchi-rust-std-deps}); do
+          dest="$NIX_BUILD_TOP/cargo-vendor-dir/$name"
+          [ -e "$dest" ] || ln -s ${final.kimchi-rust-std-deps}/$name "$dest"
+        done
         chmod -w $NIX_BUILD_TOP/cargo-vendor-dir
       '';
 

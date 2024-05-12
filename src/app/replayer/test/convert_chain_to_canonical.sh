@@ -23,7 +23,7 @@ do
 
 done
 
-psql $CONN_STR -c "update blocks set chain_status = 'orphaned' and height < $HEIGHT;"
+psql $CONN_STR -c "update blocks set chain_status = 'orphaned' where height <= $HEIGHT;"
 
 for block in ${canon_chain[@]}; do 
     psql $CONN_STR -c "update blocks set chain_status = 'canonical' where state_hash = '$block'"
