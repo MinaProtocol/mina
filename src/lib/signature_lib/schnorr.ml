@@ -1,5 +1,3 @@
-[%%import "/src/config/config.mlh"]
-
 [%%import "/src/lib/consensus/mechanism.mlh"]
 
 module Bignum_bigint = Bigint
@@ -146,7 +144,8 @@ module type S = sig
 end
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.S) (Curve : sig
+    (Impl : Snarky_backendless.Snark_intf.S)
+    (Curve : sig
       open Impl
 
       module Scalar : sig
@@ -352,7 +351,8 @@ module type S = sig
 end
 
 module Make
-    (Impl : module type of Snark_params.Tick) (Curve : sig
+    (Impl : module type of Snark_params.Tick)
+    (Curve : sig
       open Impl
 
       module Scalar : sig
@@ -678,7 +678,7 @@ let%test_unit "schnorr checked + unchecked" =
       (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
          Tick.Typ.(
            tuple3 Tick.Inner_curve.typ (legacy_message_typ ())
-             Legacy.Signature.typ)
+             Legacy.Signature.typ )
          Tick.Boolean.typ
          (fun (public_key, msg, s) ->
            let open Tick.Checked in
@@ -697,7 +697,7 @@ let%test_unit "schnorr checked + unchecked" =
       (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
          Tick.Typ.(
            tuple3 Tick.Inner_curve.typ (chunked_message_typ ())
-             Chunked.Signature.typ)
+             Chunked.Signature.typ )
          Tick.Boolean.typ
          (fun (public_key, msg, s) ->
            let open Tick.Checked in

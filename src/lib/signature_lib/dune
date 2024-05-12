@@ -41,7 +41,7 @@
    ppx_version.runtime
    signature_lib_base
  )
- (preprocessor_deps ../../config/config.mlh ../consensus/mechanism.mlh)
+ (preprocessor_deps ../consensus/mechanism.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                ppx_snarky ppx_mina ppx_version ppx_custom_printf ppx_optcomp ppx_sexp_conv
