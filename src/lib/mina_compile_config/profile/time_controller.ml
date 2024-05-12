@@ -1,4 +1,4 @@
-[%%import "/src/config/config.mlh"]
+[%%import "config.mlh"]
 
 open Core_kernel
 

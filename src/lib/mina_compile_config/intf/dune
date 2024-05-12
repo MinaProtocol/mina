@@ -1,0 +1,6 @@
+(library
+ (name mina_compile_config_intf)
+ (public_name mina_compile_config.intf)
+ (libraries logger core_kernel)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_base)))

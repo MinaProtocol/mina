@@ -1,7 +1,8 @@
 (library
  (name mina_compile_config)
  (public_name mina_compile_config)
- (libraries key_cache logger genesis_constants currency core_kernel protocol_version mina_numbers)
- (preprocessor_deps ../../config/config.mlh)
+ (libraries mina_compile_config.intf key_cache logger genesis_constants currency core_kernel protocol_version mina_numbers)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_base ppx_optcomp)))
+ (preprocess (pps ppx_version))
+ (virtual_modules mina_compile_config)
+ (default_implementation mina_compile_config_profile))

@@ -1,4 +1,4 @@
-[%%import "/src/config/config.mlh"]
+[%%import "config.mlh"]
 
 (** This file consists of compile-time constants that are not in
     Genesis_constants.
@@ -147,8 +147,23 @@ let current_txn_version =
   Mina_numbers.Txn_version.of_int
   @@ Protocol_version.transaction current_protocol_version
 
+include Mina_compile_config_intf
+
+[%%if network = "mainnet"]
+
+let signature_kind = Mainnet
+
+[%%elif network = "testnet"]
+
+let signature_kind = Testnet
+
+[%%else]
+
+[%%inject "network", chain_name]
+
+let signature_kind = Other_network chain_name
+
+[%%endif]
+
 module Time_controller = Time_controller.T
-
-module type Time_controller_intf = Time_controller_intf.S
-
 module Genesis_constants = Genesis

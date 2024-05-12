@@ -173,40 +173,36 @@ module Protocol = struct
   [%%define_locally Stable.Latest.(to_yojson, sexp_of_t)]
 end
 
-module T = struct
-  (* bin_io is for printing chain id inputs *)
-  type t =
-    { protocol : Protocol.Stable.Latest.t
-    ; txpool_max_size : int
-    ; num_accounts : int option
-    ; zkapp_proof_update_cost : float
-    ; zkapp_signed_single_update_cost : float
-    ; zkapp_signed_pair_update_cost : float
-    ; zkapp_transaction_cost_limit : float
-    ; max_event_elements : int
-    ; max_action_elements : int
-    ; zkapp_cmd_limit_hardcap : int
-    }
-  [@@deriving to_yojson, sexp_of, bin_io_unversioned]
+(* bin_io is for printing chain id inputs *)
+type t =
+  { protocol : Protocol.Stable.Latest.t
+  ; txpool_max_size : int
+  ; num_accounts : int option
+  ; zkapp_proof_update_cost : float
+  ; zkapp_signed_single_update_cost : float
+  ; zkapp_signed_pair_update_cost : float
+  ; zkapp_transaction_cost_limit : float
+  ; max_event_elements : int
+  ; max_action_elements : int
+  ; zkapp_cmd_limit_hardcap : int
+  }
+[@@deriving to_yojson, sexp_of, bin_io_unversioned]
 
-  let hash (t : t) =
-    let str =
-      ( List.map
-          (* TODO: *)
-          [ t.protocol.k
-          ; t.protocol.slots_per_epoch
-          ; t.protocol.slots_per_sub_window
-          ; t.protocol.delta
-          ; t.txpool_max_size
-          ]
-          ~f:Int.to_string
-      |> String.concat ~sep:"" )
-      ^ Time.to_string_abs ~zone:Time.Zone.utc
-          (Time.of_span_since_epoch
-             (Time.Span.of_ms
-                (Int64.to_float t.protocol.genesis_state_timestamp) ) )
-    in
-    Blake2.digest_string str |> Blake2.to_hex
-end
-
-include T
+let hash (t : t) =
+  let str =
+    ( List.map
+        (* TODO: *)
+        [ t.protocol.k
+        ; t.protocol.slots_per_epoch
+        ; t.protocol.slots_per_sub_window
+        ; t.protocol.delta
+        ; t.txpool_max_size
+        ]
+        ~f:Int.to_string
+    |> String.concat ~sep:"" )
+    ^ Time.to_string_abs ~zone:Time.Zone.utc
+        (Time.of_span_since_epoch
+           (Time.Span.of_ms
+              (Int64.to_float t.protocol.genesis_state_timestamp) ) )
+  in
+  Blake2.digest_string str |> Blake2.to_hex

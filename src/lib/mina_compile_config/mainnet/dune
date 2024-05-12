@@ -1,0 +1,22 @@
+(library
+ (name mina_compile_config_mainnet)
+ (public_name mina_compile_config.mainnet)
+ (libraries mina_compile_config.intf key_cache logger genesis_constants currency core_kernel protocol_version mina_numbers)
+ (preprocessor_deps ../../consensus/mechanism.mlh config.mlh)
+ (instrumentation (backend bisect_ppx))
+ (implements mina_compile_config)
+ (preprocess (pps ppx_version ppx_base ppx_optcomp)))
+
+; Fallback mode allows manual override in FS
+(rule
+  (target config_unpromoted.mlh)
+  (mode fallback)
+  (deps (source_tree components))
+  (action (copy ../../../config/components/mainnet.mlh config_unpromoted.mlh)))
+
+; Promotion is needed for ocaml-lsp to pick up the config
+(rule
+  (target config.mlh)
+  (mode promote)
+  (deps config_unpromoted.mlh)
+  (action (copy config_unpromoted.mlh config.mlh)))

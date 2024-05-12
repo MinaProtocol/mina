@@ -1,4 +1,4 @@
-module type S = sig
+module type Time_controller_intf = sig
   type t [@@deriving sexp, equal, compare]
 
   val create : t -> t
@@ -29,3 +29,5 @@ module type S = sig
       *)
   val enable_setting_offset : unit -> unit
 end
+
+type signature_kind_t = Testnet | Mainnet | Other_network of string

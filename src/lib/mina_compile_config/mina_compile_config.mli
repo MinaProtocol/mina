@@ -40,8 +40,54 @@ val current_protocol_version : Protocol_version.t
 
 val current_txn_version : Mina_numbers.Txn_version.t
 
-module Time_controller : module type of Time_controller.T
+type signature_kind_t = Mina_compile_config_intf.signature_kind_t
 
-module type Time_controller_intf = Time_controller_intf.S
+val signature_kind : signature_kind_t
 
-module Genesis_constants : module type of Genesis
+module type Time_controller_intf = Mina_compile_config_intf.Time_controller_intf
+
+module Time_controller : functor
+  (F : sig
+     type time
+
+     type span
+
+     val to_span_since_epoch : time -> span
+
+     val of_span_since_epoch : span -> time
+
+     val of_time_span : Core_kernel.Time.Span.t -> span
+
+     val of_time : Core_kernel.Time.t -> time
+
+     val ( + ) : span -> span -> span
+   end)
+  -> sig
+  include Time_controller_intf
+
+  val to_system_time : t -> F.time -> F.time
+
+  val now : t -> F.time
+end
+
+module Genesis_constants : sig
+  module Proof_level : sig
+    val compiled : Genesis_constants.Proof_level.t
+
+    val for_unit_tests : Genesis_constants.Proof_level.t
+  end
+
+  module Constraint_constants : sig
+    val fork : Genesis_constants.Fork_constants.t option
+
+    val compiled : Genesis_constants.Constraint_constants.t
+
+    val for_unit_tests : Genesis_constants.Constraint_constants.t
+  end
+
+  val genesis_time : Core_kernel.Time.t
+
+  val compiled : Genesis_constants.t
+
+  val for_unit_tests : Genesis_constants.t
+end

@@ -1,4 +1,4 @@
-[%%import "/src/config/config.mlh"]
+[%%import "config.mlh"]
 
 [%%import "/src/lib/consensus/mechanism.mlh"]
 
