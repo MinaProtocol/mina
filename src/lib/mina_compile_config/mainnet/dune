@@ -1,7 +1,7 @@
 (library
  (name mina_compile_config_mainnet)
  (public_name mina_compile_config.mainnet)
- (libraries mina_compile_config.intf key_cache logger genesis_constants currency core_kernel protocol_version mina_numbers)
+ (libraries mina_compile_config_intf key_cache logger genesis_constants currency core_kernel protocol_version mina_numbers)
  (preprocessor_deps ../../consensus/mechanism.mlh config.mlh)
  (instrumentation (backend bisect_ppx))
  (implements mina_compile_config)

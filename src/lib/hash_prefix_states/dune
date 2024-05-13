@@ -13,7 +13,7 @@
    hash_prefixes
    hash_prefix_create
    pickles
-   mina_compile_config.intf
+   mina_compile_config_intf
    )
  (preprocess
   (pps ppx_custom_printf ppx_snarky ppx_version ppx_inline_test ppx_compare ppx_deriving_yojson))

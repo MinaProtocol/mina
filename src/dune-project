@@ -108,6 +108,7 @@
 (package (name mina_caqti))
 (package (name mina_commands))
 (package (name mina_compile_config))
+(package (name mina_compile_config_intf))
 (package (name mina_debug))
 (package (name mina_generators))
 (package (name mina_graphql))
