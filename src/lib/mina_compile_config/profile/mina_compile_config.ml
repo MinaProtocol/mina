@@ -6,8 +6,6 @@
     tests and production.
 *)
 
-[%%inject "curve_size", curve_size]
-
 [%%inject "genesis_ledger", genesis_ledger]
 
 [%%inject "default_transaction_fee_string", default_transaction_fee]

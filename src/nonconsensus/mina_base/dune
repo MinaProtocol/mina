@@ -24,7 +24,7 @@
    unsigned_extended_nonconsensus
    snark_params_nonconsensus
    rosetta_coding_nonconsensus
-   hex_nonconsensus
+   hex
    data_hash_lib_nonconsensus
    mina_compile_config_nonconsensus
    mina_numbers_nonconsensus

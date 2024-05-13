@@ -119,7 +119,7 @@
   (target mechanism_unpromoted.mlh)
   (mode fallback)
   (enabled_if (or (= %{profile} "nonconsensus_mainnet") (= %{profile} "nonconsensus_medium_curves")))
-  (action (write-file mechanism_unpromoted.mlh "")))
+  (action (write-file mechanism_unpromoted.mlh "[%%undef consensus_mechanism]")))
 
 ; Promotion is needed for ocaml-lsp to pick up the config
 (rule

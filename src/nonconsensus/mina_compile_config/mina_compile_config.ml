@@ -1,1 +1,1 @@
-../../lib/mina_compile_config/mina_compile_config.ml
+../../lib/mina_compile_config/profile/mina_compile_config.ml

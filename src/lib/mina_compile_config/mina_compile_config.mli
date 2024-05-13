@@ -1,5 +1,3 @@
-val curve_size : int
-
 val genesis_ledger : string
 
 val default_transaction_fee : Currency.Fee.t

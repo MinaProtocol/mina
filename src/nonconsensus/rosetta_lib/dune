@@ -21,7 +21,7 @@
    mina_numbers_nonconsensus
    mina_compile_config_nonconsensus
    mina_base_nonconsensus.import
-   hex_nonconsensus
+   hex
    signature_lib_nonconsensus
    mina_base_nonconsensus
    currency_nonconsensus

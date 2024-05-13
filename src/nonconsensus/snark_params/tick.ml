@@ -1,6 +1,5 @@
 (* snark_params_nonconsensus.ml *)
 
-[%%import "/src/config/config.mlh"]
 [%%import "/src/lib/consensus/mechanism.mlh"]
 
 [%%ifdef consensus_mechanism]
@@ -13,19 +12,7 @@
 
 open Snarkette
 
-[%%if curve_size = 255]
-
-(* only size we should be building nonconsensus code for *)
-
-[%%else]
-
-[%%show curve_size]
-
-[%%error "invalid value for \"curve_size\""]
-
-[%%endif]
-
-[%%inject "ledger_depth", ledger_depth]
+let ledger_depth = Mina_compile_config.Genesis_constants.Constraint_constants.ledger_depth
 
 module Field = struct
   open Core_kernel

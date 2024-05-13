@@ -21,6 +21,8 @@ src/lib/mina_compile_config/devnet/config.mlh
 src/lib/mina_compile_config/devnet/config_unpromoted.mlh
 src/lib/mina_compile_config/mainnet/config.mlh
 src/lib/mina_compile_config/mainnet/config_unpromoted.mlh
+src/nonconsensus/mina_compile_config/config.mlh
+src/nonconsensus/mina_compile_config/config_unpromoted.mlh
 src/external/ocaml-rocksdb/rocksdb
 .stack-work/
 /wallet-keys/

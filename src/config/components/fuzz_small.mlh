@@ -1,5 +1,4 @@
 [%%import "/src/config/components/ledger_depth/tiny.mlh"]
-[%%import "/src/config/components/curve/medium.mlh"]
 [%%import "/src/config/components/coinbase/standard.mlh"]
 [%%import "/src/config/components/consensus/postake_short.mlh"]
 [%%import "/src/config/components/scan_state/medium.mlh"]
