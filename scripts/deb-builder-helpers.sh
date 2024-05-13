@@ -65,7 +65,7 @@ esac
 
 
 #ADd suffix to debian to distinguish instrumented packages
-if [ -n "$DUNE_INSTRUMENT_WITH" ]; then
+if [[ ! -v DUNE_INSTRUMENT_WITH ]]; then
     INSTRUMENTED_SUFFIX=instrumented
     MINA_DEB_NAME="${MINA_DEB_NAME}-${INSTRUMENTED_SUFFIX}"
     DEB_SUFFIX="${DEB_SUFFIX}-${INSTRUMENTED_SUFFIX}"
