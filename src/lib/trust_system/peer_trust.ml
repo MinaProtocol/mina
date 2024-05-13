@@ -196,7 +196,7 @@ module Make0 (Inputs : Input_intf) = struct
     let simple_new = Record_inst.to_peer_status new_record in
     let action_fmt, action_metadata = Action.to_log action in
     let log_trust_change () =
-      if Float.(simple_new.trust <> simple_old.trust) then
+      if Float.(abs (simple_new.trust - simple_old.trust) < epsilon_float) then
         let verb =
           if Float.(simple_new.trust > simple_old.trust) then "Increasing"
           else "Decreasing"
