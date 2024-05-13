@@ -7,12 +7,13 @@
 
 (rule
  (deps print_blockchain_snark_vk.exe)
- (targets blockchain_snark_vk.json.corrected)
+ (targets blockchain_snark_vk.json.computed)
  (action
   (with-stdout-to %{targets}
    (run %{deps}))))
 
 (rule
+ (deps (:orig blockchain_snark_vk.json) (:computed blockchain_snark_vk.json.computed))
  (alias runtest)
  (action
-  (diff blockchain_snark_vk.json blockchain_snark_vk.json.corrected)))
+  (diff %{orig} %{computed})))
