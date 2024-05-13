@@ -163,7 +163,7 @@ let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type =
         JobSpec::{
           dirtyWhen = DebianVersions.dirtyWhen spec.debVersion,
           path = "Release",
-          name = "${spec.prefix}${DebianVersions.capitalName spec.debVersion}${Profiles.toSuffixUppercase spec.profile}",
+          name = "${spec.prefix}${DebianVersions.capitalName spec.debVersion}${Profiles.toSuffixUppercase spec.profile}${BuildFlags.toSuffixUppercase spec.buildFlags}",
           tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ],
           mode = spec.mode
         },
