@@ -5,7 +5,7 @@
  (preprocessor_deps ../../../config/mechanism.mlh config.mlh)
  (instrumentation (backend bisect_ppx))
  (implements mina_compile_config)
- (preprocess (pps ppx_version ppx_base ppx_optcomp)))
+ (preprocess (pps ppx_version ppx_base ppx_optcomp ppx_mina)))
 
 ; Fallback mode allows manual override in FS
 (rule
