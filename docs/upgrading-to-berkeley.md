@@ -77,7 +77,7 @@ Here are some general instructions that should help you get most of the way ther
 
 2. **Environment Preparation:**
     - **Prepare Environment Variables:** Set up the necessary environment variables manually to match the expected configuration for verification.
-    - **Create `genesis_ledger` Directory:** Temporarily, create a new directory named `genesis_ledger` in the working directory and place the daemon config for the required chain, typically `mainnet.json`. Alternatively, make sure that `genesis_ledger/mainnet.json` is present. The script assumes that it is running in a directory where this is present.
+    - **Create `genesis_ledgers` Directory:** Temporarily, create a new directory named `genesis_ledgers` in the working directory and place the daemon config for the required chain, typically `mainnet.json`. Alternatively, make sure that `genesis_ledgers/mainnet.json` is present. The script assumes that it is running in a directory where this is present.
 
 3. **Set Environment Variables:**
     - **GSUTIL Path:**
