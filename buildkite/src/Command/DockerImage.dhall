@@ -8,6 +8,9 @@ let B/If = B.definitions/commandStep/properties/if/Type
 let Command = ./Base.dhall
 let Size = ./Size.dhall
 
+let Profiles = ../Constants/Profiles.dhall
+let BuildFlags = ../Constants/BuildFlags.dhall
+
 let Cmd = ../Lib/Cmds.dhall
 
 let DockerLogin = ../Command/DockerLogin/Type.dhall
@@ -24,7 +27,8 @@ let ReleaseSpec = {
     deb_codename: Text,
     deb_release: Text,
     deb_version: Text,
-    deb_profile: Text,
+    deb_profile: Profiles.Type,
+    build_flags: BuildFlags.Type,
     extra_args: Text,
     step_key: Text,
     `if`: Optional B/If
@@ -37,9 +41,10 @@ let ReleaseSpec = {
     branch = "\\\${BUILDKITE_BRANCH}",
     repo = "\\\${BUILDKITE_REPO}",
     deb_codename = "bullseye",
-    deb_profile = "devnet",
     deb_release = "\\\${MINA_DEB_RELEASE}",
     deb_version = "\\\${MINA_DEB_VERSION}",
+    deb_profile = Profiles.Type.Standard,
+    build_flags = BuildFlags.Type.None,
     extra_args = "",
     step_key = "daemon-standard-docker-image",
     `if` = None B/If
@@ -52,7 +57,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
     [
         Cmd.run (
           "export MINA_DEB_CODENAME=${spec.deb_codename} && source ./buildkite/scripts/export-git-env-vars.sh && ./scripts/release-docker.sh " ++
-              "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --deb-profile ${spec.deb_profile} --repo ${spec.repo} --extra-args \\\"${spec.extra_args}\\\""
+              "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --deb-profile '${Profiles.duneProfile spec.deb_profile}${BuildFlags.toLabelSegment spec.build_flags}' --repo ${spec.repo} --extra-args \\\"${spec.extra_args}\\\""
         )
     ]
 

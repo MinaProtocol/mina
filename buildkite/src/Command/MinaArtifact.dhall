@@ -27,10 +27,11 @@ let Toolchain = ../Constants/Toolchain.dhall
 
 in
 
-let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -> DockerImage.ReleaseSpec.Type = 
+let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -> BuildFlags.Type -> DockerImage.ReleaseSpec.Type = 
   \(artifact : Artifacts.Type) ->
   \(debVersion : DebianVersions.DebVersion) ->
   \(profile : Profiles.Type) ->
+  \(build_flags: BuildFlags.Type) ->
   merge {
         Daemon = 
           DockerImage.ReleaseSpec::{
@@ -38,8 +39,8 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             service="mina-daemon",
             network="berkeley",
             deb_codename="${DebianVersions.lowerName debVersion}",
-            deb_profile="${Profiles.lowerName profile}",
-            step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
+            deb_profile=profile,
+            step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment build_flags}-docker-image"
           },
 
         TestExecutive = 
@@ -64,8 +65,8 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             deps=DebianVersions.dependsOn debVersion profile,
             service="mina-archive",
             deb_codename="${DebianVersions.lowerName debVersion}",
-            deb_profile="${Profiles.lowerName profile}",
-            step_key="archive-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
+            deb_profile=profile,
+            step_key="archive-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment build_flags}-docker-image"
           },
 
         ArchiveMigration = 
@@ -73,7 +74,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             deps=DebianVersions.dependsOn debVersion profile,
             service="mina-archive-migration",
             deb_codename="${DebianVersions.lowerName debVersion}",
-            deb_profile="${Profiles.lowerName profile}",
+            deb_profile=profile,
             step_key="archive-migration-${DebianVersions.lowerName debVersion}-docker-image"
           },
           
@@ -83,7 +84,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             service="mina-rosetta",
             network="berkeley",
             deb_codename="${DebianVersions.lowerName debVersion}",
-            step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
+            step_key="rosetta-${DebianVersions.lowerName debVersion}${BuildFlags.toLabelSegment build_flags}-docker-image"
           },
 
         ZkappTestTransaction = 
@@ -91,7 +92,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             deps=DebianVersions.dependsOn debVersion profile,
             service="mina-zkapp-test-transaction",
             deb_codename="${DebianVersions.lowerName debVersion}",
-            step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
+            step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment build_flags}-docker-image"
           },
         
         FunctionalTestSuite = 
@@ -154,7 +155,7 @@ let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type =
       ] # (List/map
             Artifacts.Type
             Command.Type
-            (\(artifact : Artifacts.Type) ->  DockerImage.generateStep (docker_step artifact spec.debVersion spec.profile) )
+            (\(artifact : Artifacts.Type) ->  DockerImage.generateStep (docker_step artifact spec.debVersion spec.profile spec.buildFlags) )
             spec.artifacts)
     in
 

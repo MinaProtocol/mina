@@ -49,6 +49,7 @@ case "${MINA_DEB_CODENAME}" in
     ;;
 esac
 
+# Add suffix to debian to distinguish different profiles (mainnet/devnet/lightnet)
 case "${DUNE_PROFILE}" in
   devnet|mainnet)
     MINA_DEB_NAME="mina-berkeley"
@@ -61,6 +62,14 @@ case "${DUNE_PROFILE}" in
     DEB_SUFFIX="-${_SUFFIX}"
     ;;
 esac
+
+
+#ADd suffix to debian to distinguish instrumented packages
+if [ -n "$DUNE_INSTRUMENT_WITH" ]; then
+    INSTRUMENTED_SUFFIX=instrumented
+    MINA_DEB_NAME="${MINA_DEB_NAME}-${INSTRUMENTED_SUFFIX}"
+    DEB_SUFFIX="${DEB_SUFFIX}-${INSTRUMENTED_SUFFIX}"
+fi 
 
 BUILDDIR="deb_build"
 
@@ -347,8 +356,7 @@ build_archive_deb () {
 
 ##################################### ARCHIVE PACKAGE ##########################################
 build_archive_migration_deb () {
-
-  ARCHIVE_MIGRATION_DEB=mina-archive-migration${DEB_SUFFIX}
+ARCHIVE_MIGRATION_DEB=mina-archive-migration${DEB_SUFFIX}
 
   echo "------------------------------------------------------------"
   echo "--- Building archive migration deb"
