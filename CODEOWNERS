@@ -23,7 +23,6 @@
 /src/app/runtime_genesis_ledger/ @MinaProtocol/protocol-eng-reviewers
 /src/app/archive_blocks/ @MinaProtocol/protocol-eng-reviewers
 /src/app/extract_blocks/ @MinaProtocol/protocol-eng-reviewers
-/src/app/patch_archive_test/ @MinaProtocol/protocol-eng-reviewers
 /src/app/rosetta/ @MinaProtocol/mina-foundation-eng
 
 /src/lib/ @MinaProtocol/protocol-eng-reviewers
