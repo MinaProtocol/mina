@@ -31,8 +31,6 @@ module Chain_hash : sig
   val cons_zkapp_command_commitment :
     Mina_numbers.Index.t -> Zkapp_command_elt.t -> t -> t
 
-  [%%ifdef consensus_mechanism]
-
   val gen : t Quickcheck.Generator.t
 
   module Checked : sig
@@ -57,8 +55,6 @@ module Chain_hash : sig
     val cons_zkapp_command_commitment :
       Mina_numbers.Index.Checked.t -> Zkapp_command_elt.t -> t -> t Checked.t
   end
-
-  [%%endif]
 
   [%%versioned:
   module Stable : sig
