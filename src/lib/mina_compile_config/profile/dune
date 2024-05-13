@@ -11,8 +11,8 @@
 (rule
   (target config_unpromoted.mlh)
   (mode fallback)
-  (deps (source_tree ../../../config/components))
-  (action (copy ../../../config/components/%{profile}.mlh config_unpromoted.mlh)))
+  (deps (source_tree ../../../config))
+  (action (copy ../../../config/%{profile}.mlh config_unpromoted.mlh)))
 
 ; Promotion is needed for ocaml-lsp to pick up the config
 (rule

@@ -1,4 +1,4 @@
-[%%import "/src/config/components/mainnet.mlh"]
+[%%import "/src/config/mainnet.mlh"]
 
 [%%undef compaction_interval]
 [%%undef zkapp_cmd_limit]

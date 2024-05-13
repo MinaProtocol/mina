@@ -6,7 +6,7 @@
 [%%import "/src/config/txpool_size.mlh"]
 [%%import "/src/config/account_creation_fee/realistic.mlh"]
 [%%import "/src/config/amount_defaults/realistic.mlh"]
-[%%import "/src/config/protocol_version/current.mlh"]
+[%%import "/src/config/protocol_version/version2.mlh"]
 [%%import "/src/config/supercharged_coinbase_factor/one.mlh"]
 
 (* custom consensus parameters for the mainnet release *)
@@ -42,6 +42,4 @@
 (* 2*block_window_duration *)
 [%%define compaction_interval 360000]
 [%%define vrf_poll_interval 5000]
-[%%define zkapp_cmd_limit 24]
-[%%undef slot_tx_end]
-[%%undef slot_chain_end]
+[%%undef zkapp_cmd_limit]
