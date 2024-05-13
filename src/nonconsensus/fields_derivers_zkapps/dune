@@ -29,7 +29,7 @@
    (= %{profile} nonconsensus_mainnet)
    (= %{profile} nonconsensus_medium_curves)))
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../lib/consensus/mechanism.mlh)
+ (preprocessor_deps ../../config/mechanism.mlh)
  (preprocess
   (pps
    ppx_annot

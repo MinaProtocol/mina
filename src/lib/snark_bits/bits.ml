@@ -1,6 +1,6 @@
 (* bits.ml *)
 
-[%%import "/src/lib/consensus/mechanism.mlh"]
+[%%import "/src/config/mechanism.mlh"]
 
 open Core_kernel
 open Fold_lib
@@ -105,7 +105,8 @@ end
 
 module Make_field0
     (Field : Snarky_backendless.Field_intf.S)
-    (Bigint : Big_int_intf with type field := Field.t) (M : sig
+    (Bigint : Big_int_intf with type field := Field.t)
+    (M : sig
       val bit_length : int
     end) : Bits_intf.S with type t = Field.t = struct
   open M
@@ -150,7 +151,8 @@ module Make_field
 
 module Small
     (Field : Snarky_backendless.Field_intf.S)
-    (Bigint : Big_int_intf with type field := Field.t) (M : sig
+    (Bigint : Big_int_intf with type field := Field.t)
+    (M : sig
       val bit_length : int
     end) : Bits_intf.S with type t = Field.t = struct
   let () = assert (M.bit_length < Field.size_in_bits)
@@ -160,7 +162,8 @@ end
 
 module Snarkable = struct
   module Small_bit_vector
-      (Impl : Snarky_backendless.Snark_intf.S) (V : sig
+      (Impl : Snarky_backendless.Snark_intf.S)
+      (V : sig
         type t
 
         val empty : t
@@ -302,7 +305,8 @@ module Snarkable = struct
     Small_bit_vector (Impl) (Vector.UInt32)
 
   module Field_backed
-      (Impl : Snarky_backendless.Snark_intf.S) (M : sig
+      (Impl : Snarky_backendless.Snark_intf.S)
+      (M : sig
         val bit_length : int
       end) =
   struct
@@ -374,7 +378,8 @@ module Snarkable = struct
       end)
 
   module Small
-      (Impl : Snarky_backendless.Snark_intf.S) (M : sig
+      (Impl : Snarky_backendless.Snark_intf.S)
+      (M : sig
         val bit_length : int
       end) :
     Bits_intf.Snarkable.Faithful
@@ -400,7 +405,8 @@ module Snarkable = struct
 end
 
 module Make_unpacked
-    (Impl : Snarky_backendless.Snark_intf.S) (M : sig
+    (Impl : Snarky_backendless.Snark_intf.S)
+    (M : sig
       val bit_length : int
     end) =
 struct

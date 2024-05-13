@@ -19,7 +19,7 @@
   (or
    (= %{profile} nonconsensus_mainnet)
    (= %{profile} nonconsensus_medium_curves)))
- (preprocessor_deps ../../lib/consensus/mechanism.mlh)
+ (preprocessor_deps ../../config/mechanism.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_snarky ppx_optcomp ppx_inline_test))
  (synopsis "Schnorr signatures for strings, nonconsensus version"))

@@ -1,4 +1,4 @@
-[%%import "/src/lib/consensus/mechanism.mlh"]
+[%%import "/src/config/mechanism.mlh"]
 
 open Core_kernel
 open Snark_params.Tick
@@ -274,7 +274,7 @@ module Uncompressed = struct
       exists Typ.field
         ~compute:
           As_prover.(
-            map (read Compressed.typ c) ~f:(fun c -> snd (decompress_exn c)))
+            map (read Compressed.typ c) ~f:(fun c -> snd (decompress_exn c)) )
     in
     let%map () = Inner_curve.Checked.Assert.on_curve (x, y)
     and () = parity_var y >>= Boolean.Assert.(( = ) is_odd) in

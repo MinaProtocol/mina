@@ -16,7 +16,7 @@
     kimchi_pasta.basic
     blake2
     )
-  (preprocessor_deps ../consensus/mechanism.mlh)
+  (preprocessor_deps ../../config/mechanism.mlh)
   (preprocess (pps ppx_version ppx_optcomp))
   (instrumentation (backend bisect_ppx)))
 

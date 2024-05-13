@@ -79,7 +79,7 @@
    internal_tracing
    o1trace
  )
- (preprocessor_deps "mechanism.mlh")
+ (preprocessor_deps "../../config/mechanism.mlh")
  (preprocess
   (pps
     h_list.ppx
@@ -108,22 +108,3 @@
  (preprocess (pps ppx_version ppx_jane))
  (enabled_if false) ;; Compilation is disabled until this executable has been fixed.
 )
-
-(rule
-  (target mechanism_unpromoted.mlh)
-  (mode fallback)
-  (enabled_if (not (or (= %{profile} "nonconsensus_mainnet") (= %{profile} "nonconsensus_medium_curves"))))
-  (action (write-file mechanism_unpromoted.mlh "[%%define consensus_mechanism \"proof_of_stake\"]")))
-
-(rule
-  (target mechanism_unpromoted.mlh)
-  (mode fallback)
-  (enabled_if (or (= %{profile} "nonconsensus_mainnet") (= %{profile} "nonconsensus_medium_curves")))
-  (action (write-file mechanism_unpromoted.mlh "[%%undef consensus_mechanism]")))
-
-; Promotion is needed for ocaml-lsp to pick up the config
-(rule
-  (target mechanism.mlh)
-  (mode promote)
-  (deps mechanism_unpromoted.mlh)
-  (action (copy mechanism_unpromoted.mlh mechanism.mlh)))

@@ -1,4 +1,4 @@
-[%%import "/src/lib/consensus/mechanism.mlh"]
+[%%import "/src/config/mechanism.mlh"]
 
 open Core_kernel
 
@@ -57,7 +57,7 @@ module Flagged_option = struct
 
   let to_input' ~field_of_bool { is_some; data } ~f =
     Random_oracle_input.Chunked.(
-      append (packed (field_of_bool is_some, 1)) (f data))
+      append (packed (field_of_bool is_some, 1)) (f data) )
 
   let to_input { is_some; data } ~default ~f =
     let data = if is_some then data else default in
@@ -373,8 +373,7 @@ module Account_state = struct
           (b :> Field.t) )
 
     let check (t : t) ~is_empty =
-      Boolean.(
-        any [ t.any; t.empty && is_empty; (not t.empty) && not is_empty ])
+      Boolean.(any [ t.any; t.empty && is_empty; (not t.empty) && not is_empty ])
   end
 
   let typ : (Checked.t, t) Typ.t =

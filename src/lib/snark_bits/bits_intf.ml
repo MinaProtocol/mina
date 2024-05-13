@@ -1,6 +1,6 @@
 (* bits_intf.ml *)
 
-[%%import "/src/lib/consensus/mechanism.mlh"]
+[%%import "/src/config/mechanism.mlh"]
 
 open Fold_lib
 

@@ -1,4 +1,4 @@
-[%%import "/src/lib/consensus/mechanism.mlh"]
+[%%import "/src/config/mechanism.mlh"]
 
 open Core_kernel
 open Fold_lib
@@ -75,7 +75,7 @@ struct
         ~compute:
           As_prover.(
             let%map x = read typ x and y = read typ y in
-            (N.div x y, N.rem x y))
+            (N.div x y, N.rem x y) )
     in
 
     (* q * y + r = x
@@ -185,14 +185,15 @@ end
 
 open Snark_params.Tick
 
-module Make (N : sig
-  type t [@@deriving sexp, compare, hash]
+module Make
+    (N : sig
+      type t [@@deriving sexp, compare, hash]
 
-  include Unsigned_extended.S with type t := t
+      include Unsigned_extended.S with type t := t
 
-  val random : unit -> t
-end)
-(Bits : Bits_intf.Convertible_bits with type t := N.t) =
+      val random : unit -> t
+    end)
+    (Bits : Bits_intf.Convertible_bits with type t := N.t) =
 struct
   type t = N.t [@@deriving sexp, compare, hash, yojson]
 

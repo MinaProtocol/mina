@@ -1,6 +1,6 @@
 (* account.ml *)
 
-[%%import "/src/lib/consensus/mechanism.mlh"]
+[%%import "/src/config/mechanism.mlh"]
 
 open Core_kernel
 open Mina_base_util
@@ -503,7 +503,7 @@ module Checked = struct
   let digest t =
     make_checked (fun () ->
         Random_oracle.Checked.(
-          hash ~init:crypto_hash_prefix (pack_input (to_input t))) )
+          hash ~init:crypto_hash_prefix (pack_input (to_input t)) ) )
 
   let balance_upper_bound = Bignum_bigint.(one lsl Balance.length_in_bits)
 
@@ -738,7 +738,7 @@ let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
               Global_slot_span.to_uint32 vesting_period
             in
             Infix.((global_slot_u32 - cliff_time_u32) / vesting_period_u32)
-            |> to_int64 |> UInt64.of_int64)
+            |> to_int64 |> UInt64.of_int64 )
         in
         let vesting_decrement =
           let vesting_increment = Amount.to_uint64 vesting_increment in

@@ -1,6 +1,6 @@
 (* transaction_union_tag.ml *)
 
-[%%import "/src/lib/consensus/mechanism.mlh"]
+[%%import "/src/config/mechanism.mlh"]
 
 open Core_kernel
 

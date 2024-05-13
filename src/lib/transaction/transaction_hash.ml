@@ -1,7 +1,7 @@
 open Core_kernel
 open Mina_base
 
-[%%import "/src/lib/consensus/mechanism.mlh"]
+[%%import "/src/config/mechanism.mlh"]
 
 module T = struct
   include Blake2.Make ()

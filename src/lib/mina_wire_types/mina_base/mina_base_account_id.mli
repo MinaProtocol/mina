@@ -1,4 +1,4 @@
-[%%import "/src/lib/consensus/mechanism.mlh"]
+[%%import "/src/config/mechanism.mlh"]
 
 open Utils
 
@@ -32,7 +32,7 @@ module M : Types.S
 module type Local_sig = Signature(Types).S
 
 module Make
-    (Signature : Local_sig) (_ : functor (A : Concrete) -> Signature(A).S) :
-  Signature(M).S
+    (Signature : Local_sig)
+    (_ : functor (A : Concrete) -> Signature(A).S) : Signature(M).S
 
 include Types.S with module Digest = M.Digest and module V2 = M.V2

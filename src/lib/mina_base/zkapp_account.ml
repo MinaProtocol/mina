@@ -1,4 +1,4 @@
-[%%import "/src/lib/consensus/mechanism.mlh"]
+[%%import "/src/config/mechanism.mlh"]
 
 open Core_kernel
 open Snark_params.Tick
@@ -123,7 +123,7 @@ module Actions = struct
 
   let is_empty_var (e : var) =
     Snark_params.Tick.Field.(
-      Checked.equal (Data_as_hash.hash e) (Var.constant empty_hash))
+      Checked.equal (Data_as_hash.hash e) (Var.constant empty_hash) )
 
   let empty_state_element =
     let salt_phrase = "MinaZkappActionStateEmptyElt" in
@@ -297,15 +297,15 @@ module Checked = struct
   let digest_vk t =
     Random_oracle.Checked.(
       hash ~init:Hash_prefix_states.side_loaded_vk
-        (pack_input (Pickles.Side_loaded.Verification_key.Checked.to_input t)))
+        (pack_input (Pickles.Side_loaded.Verification_key.Checked.to_input t)) )
 
   let digest t =
     Random_oracle.Checked.(
-      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
+      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)) )
 
   let digest' t =
     Random_oracle.Checked.(
-      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input' t)))
+      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input' t)) )
 end
 
 [%%define_locally Verification_key_wire.(digest_vk, dummy_vk_hash)]
@@ -403,7 +403,7 @@ let default : _ Poly.t =
 
 let digest (t : t) =
   Random_oracle.(
-    hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
+    hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)) )
 
 let default_digest = lazy (digest default)
 

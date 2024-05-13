@@ -1,4 +1,4 @@
-[%%import "/src/lib/consensus/mechanism.mlh"]
+[%%import "/src/config/mechanism.mlh"]
 
 open Core_kernel
 open Snark_params.Tick
@@ -56,12 +56,12 @@ module Checked = struct
   let is_pos (v : var) =
     Boolean.Unsafe.of_cvar
       (let open Field.Checked in
-      one_half * (v + Field.Var.constant Field.one))
+       one_half * (v + Field.Var.constant Field.one) )
 
   let is_neg (v : var) =
     Boolean.Unsafe.of_cvar
       (let open Field.Checked in
-      neg_one_half * (v - Field.Var.constant Field.one))
+       neg_one_half * (v - Field.Var.constant Field.one) )
 
   let pos_if_true (b : Boolean.var) =
     let open Field.Checked in

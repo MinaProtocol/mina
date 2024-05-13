@@ -41,7 +41,7 @@
    signature_lib_base
    mina_compile_config
  )
- (preprocessor_deps ../consensus/mechanism.mlh)
+ (preprocessor_deps ../../config/mechanism.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                ppx_snarky ppx_mina ppx_version ppx_custom_printf ppx_optcomp ppx_sexp_conv
