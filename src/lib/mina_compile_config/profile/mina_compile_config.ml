@@ -118,7 +118,7 @@ let handle_unconsumed_cache_item ~logger:_ ~cache_name =
 
 let handle_unconsumed_cache_item ~logger ~cache_name =
   [%log error] "Unconsumed item in cache: $cache"
-    ~metadata:[ ("cache", `String (msg cache_name)) ]
+    ~metadata:[ ("cache", `String cache_name) ]
 
 [%%endif]
 
