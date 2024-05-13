@@ -8,7 +8,7 @@ POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g')
 PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:5432/${POSTGRES_DBNAME}
 DUMP_TIME=${5:=0000}
 MINA_ARCHIVE_DUMP_URL=${MINA_ARCHIVE_DUMP_URL:=https://storage.googleapis.com/mina-archive-dumps}
-MINA_POSTGRES_CONF=${MINA_POSTGRES_CONF:=/etc/mina/rosetta/postgresql.conf}
+MINA_POSTGRES_CONF=${MINA_POSTGRES_CONF:=/etc/mina/rosetta/scripts/postgresql.conf}
 
 pg_ctlcluster ${POSTGRES_VERSION} main start
 echo "[POPULATE] Top 10 blocks in ${POSTGRES_DATA_DIR} archiveDB:"

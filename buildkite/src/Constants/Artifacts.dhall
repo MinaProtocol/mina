@@ -75,11 +75,13 @@ let dockerTag = \(artifact: Artifact)
   -> \(codename: DebianVersions.DebVersion) 
   -> \(profile: Profiles.Type) 
   -> \(network: Network.Type) 
+  -> \(remove_profile_from_name: Bool)
   -> 
     let version_and_codename = "${version}-${DebianVersions.lowerName codename}"
+    let profile_part = if remove_profile_from_name then "" else "${Profiles.toLabelSegment profile}"
     in
     merge {
-      Daemon ="${version_and_codename}-${Network.lowerName network}${Profiles.toLabelSegment profile}"
+      Daemon ="${version_and_codename}-${Network.lowerName network}${profile_part}"
       , Archive = "${version_and_codename}"
       , ArchiveMigration  = "${version_and_codename}"
       , TestExecutive = "${version_and_codename}"
