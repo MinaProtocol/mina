@@ -4,6 +4,10 @@
  (libraries mina_compile_config_intf key_cache logger currency_nonconsensus core_kernel protocol_version mina_numbers_nonconsensus)
  (preprocessor_deps ../../config/mechanism.mlh config.mlh)
  (instrumentation (backend bisect_ppx))
+ (enabled_if
+  (or
+   (= %{profile} nonconsensus_mainnet)
+   (= %{profile} nonconsensus_medium_curves)))
  (preprocess (pps ppx_version ppx_base ppx_optcomp)))
 
 ; Fallback mode allows manual override in FS
