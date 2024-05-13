@@ -65,8 +65,6 @@ module type Full = sig
 
   val diff : constants:Constants.t -> t -> Epoch.t * Slot.t -> t
 
-  [%%ifdef consensus_mechanism]
-
   open Snark_params.Tick
 
   module Checked : sig
@@ -92,8 +90,6 @@ module type Full = sig
   end
 
   val typ : (Checked.t, t) Typ.t
-
-  [%%endif]
 
   val slot_number : ('a, _) Poly.t -> 'a
 

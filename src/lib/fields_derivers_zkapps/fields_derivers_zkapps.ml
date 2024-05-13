@@ -539,8 +539,6 @@ module Derivers = Make (Fields_derivers_graphql.Schema)
 include Derivers
 module Js_layout = Fields_derivers_js.Js_layout
 
-[%%ifdef consensus_mechanism]
-
 let proof obj : _ Unified_input.t =
   let of_string s =
     match Pickles.Side_loaded.Proof.of_base64 s with
@@ -580,8 +578,6 @@ let%test_unit "verification key with hash, roundtrip json" =
   let v = { With_hash.data; hash = Field.one } in
   let o = verification_key_with_hash @@ o () in
   [%test_eq: (t, Field.t) With_hash.t] v (of_json o (to_json o v))
-
-[%%endif]
 
 let%test_module "Test" =
   ( module struct
