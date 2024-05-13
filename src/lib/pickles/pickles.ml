@@ -188,6 +188,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               ; account_creation_fee = Unsigned.UInt64.of_int 0
               ; fork = None
               }
+          ; commit = ""
           ; length = 0
           ; constraint_system_hash = ""
           ; identifying_hash = ""
@@ -312,18 +313,19 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ?constraint_constants ~choices () =
+      ~max_proofs_verified ~name ?constraint_constants ?commit ~choices () =
     compile_with_wrap_main_override_promise ?self ?cache ?storables ?proof_cache
       ?disk_keys ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
-      ~branches ~max_proofs_verified ~name ?constraint_constants ~choices ()
+      ~branches ~max_proofs_verified ~name ?constraint_constants ?commit
+      ~choices ()
 
   let compile ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-      ~max_proofs_verified ~name ?constraint_constants ~choices () =
+      ~max_proofs_verified ~name ?constraint_constants ?commit ~choices () =
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
         ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-        ~max_proofs_verified ~name ?constraint_constants ~choices ()
+        ~max_proofs_verified ~name ?constraint_constants ?commit ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -1005,6 +1007,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 Snark_keys_header.header_version
             ; kind
             ; constraint_constants
+            ; commit = "[NOT SPECIFIED]"
             ; length = (* This is a dummy, it gets filled in on read/write. *) 0
             ; constraint_system_hash
             ; identifying_hash =

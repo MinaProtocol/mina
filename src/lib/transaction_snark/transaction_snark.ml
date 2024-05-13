@@ -3318,6 +3318,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~constraint_constants:
         (Genesis_constants.Constraint_constants.to_snark_keys_header
            constraint_constants )
+      ~commit:Mina_version.commit_id
       ~choices:(fun ~self ->
         let zkapp_command x =
           Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
