@@ -31,21 +31,21 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
   \(artifact : Artifacts.Type) ->
   \(debVersion : DebianVersions.DebVersion) ->
   \(profile : Profiles.Type) ->
-  \(build_flags: BuildFlags.Type) ->
+  \(buildFlags: BuildFlags.Type) ->
   merge {
         Daemon = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
+            deps=DebianVersions.dependsOnBuildFlag debVersion profile buildFlags,
             service="mina-daemon",
             network="berkeley",
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_profile=profile,
-            step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment build_flags}-docker-image"
+            step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment buildFlags}-docker-image"
           },
 
         TestExecutive = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
+            deps=DebianVersions.dependsOnBuildFlag debVersion profile buildFlags,
             service="mina-test-executive",
             deb_codename="${DebianVersions.lowerName debVersion}",
             step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image"
@@ -53,7 +53,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
 
         BatchTxn = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
+            deps=DebianVersions.dependsOnBuildFlag debVersion profile buildFlags,
             service="mina-batch-txn",
             network="berkeley",
             deb_codename="${DebianVersions.lowerName debVersion}",
@@ -62,16 +62,16 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
 
         Archive = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
+            deps=DebianVersions.dependsOnBuildFlag debVersion profile buildFlags,
             service="mina-archive",
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_profile=profile,
-            step_key="archive-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment build_flags}-docker-image"
+            step_key="archive-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment buildFlags}-docker-image"
           },
 
         ArchiveMigration = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
+            deps=DebianVersions.dependsOnBuildFlag debVersion profile buildFlags,
             service="mina-archive-migration",
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_profile=profile,
@@ -80,24 +80,24 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
           
         Rosetta = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
+            deps=DebianVersions.dependsOnBuildFlag debVersion profile buildFlags,
             service="mina-rosetta",
             network="berkeley",
             deb_codename="${DebianVersions.lowerName debVersion}",
-            step_key="rosetta-${DebianVersions.lowerName debVersion}${BuildFlags.toLabelSegment build_flags}-docker-image"
+            step_key="rosetta-${DebianVersions.lowerName debVersion}${BuildFlags.toLabelSegment buildFlags}-docker-image"
           },
 
         ZkappTestTransaction = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
+            deps=DebianVersions.dependsOnBuildFlag debVersion profile buildFlags,
             service="mina-zkapp-test-transaction",
             deb_codename="${DebianVersions.lowerName debVersion}",
-            step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment build_flags}-docker-image"
+            step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment buildFlags}-docker-image"
           },
         
         FunctionalTestSuite = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
+            deps=DebianVersions.dependsOnBuildFlag debVersion profile buildFlags,
             service="mina-test-suite",
             deb_codename="${DebianVersions.lowerName debVersion}",
             step_key="test-suite-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
