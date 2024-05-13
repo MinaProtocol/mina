@@ -1,6 +1,6 @@
 (library
- (name pickles_unix)
- (public_name pickles.unix)
+ (name pickles_graphql)
+ (public_name graphql_lib.pickles)
  (flags
   (:standard
     -w +a-40..42-44
@@ -26,4 +26,4 @@
  )
  (preprocess (pps ppx_jane ppx_version))
  (instrumentation (backend bisect_ppx))
- (synopsis "Utils that depends on the unix library"))
+ (synopsis "Definitions required for graphql implementation"))

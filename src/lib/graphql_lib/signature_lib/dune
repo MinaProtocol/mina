@@ -1,21 +1,21 @@
 (library
- (name data_hash_lib_unix)
- (public_name data_hash_lib.unix)
+ (name signature_lib_graphql)
+ (public_name graphql_lib.signature_lib)
  (inline_tests (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
   graphql-async
   graphql
   yojson
-  ppx_inline_test.config
   core_kernel
+  core
   sexplib0
-  base
+  ppx_inline_test.config
   ;; local libraries
   graphql_basic_scalars
-  data_hash_lib)
+  signature_lib)
  (preprocess
   (pps ppx_jane ppx_version))
  (instrumentation
   (backend bisect_ppx))
- (synopsis "Utils that depends on the unix library"))
+ (synopsis "Definitions required for graphql implementation"))

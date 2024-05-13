@@ -1,6 +1,6 @@
 (library
- (name filtered_external_transition_unix)
- (public_name filtered_external_transition.unix)
+ (name block_time_graphql)
+ (public_name graphql_lib.block_time)
  (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
@@ -13,9 +13,9 @@
    ppx_inline_test.config
    ;; local libraries
    graphql_basic_scalars
-   filtered_external_transition
+   block_time
  )
  (preprocess (pps ppx_jane ppx_version))
  (instrumentation
   (backend bisect_ppx))
- (synopsis "Utils that depends on the unix library"))
+ (synopsis "Definitions required for graphql implementation"))

@@ -1,6 +1,6 @@
 (library
- (name snark_params_unix)
- (public_name snark_params.unix)
+ (name snark_params_graphql)
+ (public_name graphql_lib.snark_params)
  (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
@@ -17,4 +17,4 @@
  )
  (preprocess (pps ppx_jane ppx_version))
  (instrumentation (backend bisect_ppx))
- (synopsis "Utils that depends on the unix library"))
+ (synopsis "Definitions required for graphql implementation"))

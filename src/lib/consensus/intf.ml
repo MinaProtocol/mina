@@ -564,9 +564,9 @@ module type S = sig
 
       val next_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
 
-      val graphql_type : unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
-
       val curr_slot : Value.t -> Slot.t
+
+      val curr_epoch : Value.t -> Epoch.t
 
       val epoch_count : Value.t -> Length.t
 
@@ -588,6 +588,8 @@ module type S = sig
       val supercharge_coinbase_var : var -> Boolean.var
 
       val supercharge_coinbase : Value.t -> bool
+
+      val has_ancestor_in_same_checkpoint_window : Value.t -> bool
     end
 
     module Block_data : sig
