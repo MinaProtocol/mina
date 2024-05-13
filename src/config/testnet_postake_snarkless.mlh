@@ -34,5 +34,3 @@
 [%%undef compaction_interval]
 [%%define vrf_poll_interval 0]
 [%%undef zkapp_cmd_limit]
-[%%undef slot_tx_end]
-[%%undef slot_chain_end]
