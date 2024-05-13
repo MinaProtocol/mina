@@ -1,7 +1,7 @@
 open Core_kernel
 open Mina_base
 
-let different_version = Mina_numbers.Txn_version.(succ current)
+let different_version = Mina_numbers.Txn_version.succ Mina_compile_config.current_txn_version
 
 let update_vk_perm_to_be ~auth : Zkapp_command.t =
   let account_update : Account_update.t =

@@ -51,7 +51,7 @@ let%test_module "Update account verification key permission from mainnet to \
 
     let older_version =
       let oldest = Mina_numbers.Txn_version.of_int 1 in
-      if Mina_numbers.Txn_version.equal_to_current oldest then
+      if Mina_numbers.Txn_version.equal_to_current oldest ~current:Mina_compile_config.current_txn_version then
         failwith "already oldest version"
       else oldest
 

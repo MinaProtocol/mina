@@ -633,7 +633,7 @@ module Transfer_recursive = struct
          ~max_proofs_verified:(module Nat.N2)
          ~name:"transfer recurse"
          ~constraint_constants:
-           Genesis_constants.Constraint_constants.(to_snark_keys_header compiled)
+           (Genesis_constants.Constraint_constants.to_snark_keys_header Mina_compile_config.Genesis_constants.Constraint_constants.compiled)
          ~choices:(fun ~self -> [ Rules.Transfer.Recursive.rule self ]) )
 
   let tag = Lazy.map lazy_compiled ~f:(fun (tag, _, _, _) -> tag)
@@ -664,8 +664,7 @@ let lazy_compiled =
        ~max_proofs_verified:(module Nat.N2)
        ~name:"tokens"
        ~constraint_constants:
-         Mina_compile_config.Genesis_constants.Constraint_constants.(
-           to_snark_keys_header compiled )
+         (Genesis_constants.Constraint_constants.to_snark_keys_header Mina_compile_config.Genesis_constants.Constraint_constants.compiled)
        ~choices:(fun ~self:_ ->
          [ Rules.Initialize_state.rule
          ; Rules.Mint.rule

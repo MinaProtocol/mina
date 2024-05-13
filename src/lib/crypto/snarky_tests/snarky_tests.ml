@@ -603,8 +603,7 @@ end
 module Protocol_circuits = struct
   (* Full because we want to be sure nothing changes *)
   let proof_level, constraint_constants =
-    Mina_compile_config.Genesis_constants.
-      (Proof_level.Full, Constraint_constants.compiled)
+    (Genesis_constants.Proof_level.Full, Mina_compile_config.Genesis_constants.Constraint_constants.compiled)
 
   let print_hash print expected digest : unit =
     if print then Format.printf "expected:\n%s\n\n" expected ;
