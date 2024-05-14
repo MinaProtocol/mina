@@ -41,7 +41,7 @@ services:
   rosetta:
     image: ${MINA_DAEMON_IMAGE}
     entrypoint: >-
-      /etc/mina/rosetta/docker-standalone-start.sh
+      /etc/mina/rosetta/scripts/docker-standalone-start.sh
         --archive-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/$POSTGRES_DB
         --graphql-uri http://daemon:${MINA_REST_PORT}/graphql
     # depends_on:

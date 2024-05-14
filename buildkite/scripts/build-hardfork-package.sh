@@ -73,6 +73,9 @@ for file in hardfork_ledgers/*; do
   fi
 done
 
+echo "--- New genesis config"
+cat new_config.json
+
 echo "--- Build hardfork package for Debian ${MINA_DEB_CODENAME}"
 RUNTIME_CONFIG_JSON=new_config.json LEDGER_TARBALLS="$(echo hardfork_ledgers/*.tar.gz)" ./scripts/create_hardfork_deb.sh
 mkdir -p /tmp/artifacts
