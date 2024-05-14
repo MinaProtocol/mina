@@ -119,6 +119,19 @@ module String = struct
         module With_all_version_tags = Stable.V1
       end
     end
+
+    type t = Stable.V1.t
+
+    [%%define_locally
+    Stable.V1.
+      ( compare
+      , equal
+      , hash
+      , hash_fold_t
+      , sexp_of_t
+      , t_of_sexp
+      , to_yojson
+      , of_yojson )]
   end
 
   module Of_stringable (M : Stringable.S) =
