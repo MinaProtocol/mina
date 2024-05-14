@@ -218,7 +218,7 @@ log_status "launching nodes"
 
 bp_pid=$!
 
-echo "Block producer PID: $bp_pid"
+echo "started block producer with PID $bp_pid"
 
 "$MINA_EXE" daemon "${COMMON_ARGS[@]}" \
   "${NODE_ARGS_2[@]}" \
@@ -229,7 +229,7 @@ echo "Block producer PID: $bp_pid"
 
 sw_pid=$!
 
-echo "Snark worker PID: $sw_pid"
+log_status "started snark worker with PID $sw_pid"
 
 log_status "importing accounts"
 
@@ -300,4 +300,5 @@ done
 
 echo "Finished at $(date)"
 
-wait
+wait $bp_pid
+

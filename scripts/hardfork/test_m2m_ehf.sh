@@ -68,8 +68,6 @@ fi
 LOG_POLLING_IVAL=${LOG_POLLING_IVAL:-"1m"}
 log_file=$(mktemp)
 
-echo "status file: $log_file"
-
 env UNTIL_HEIGHT=${UNTIL_HEIGHT} LOG_FILE=${log_file} K=${K} "$SCRIPT_DIR"/run-localnet.sh -m "$MAIN_MINA_EXE" -i "$MAIN_SLOT" \
   -s "$MAIN_SLOT" &
 
@@ -92,61 +90,51 @@ while [[ "$(stat -c %s localnet/fork_config.json)" == 0 ]] || [[ "$(head -c 4 lo
   get_fork_config 10313 $FORK_CONFIG_HEIGHT > localnet/fork_config.json
 done
 
-# Cleanup any pre-existing data
-rm -Rf localnet/hf_ledgers
-mkdir localnet/hf_ledgers
+echo "Generating runtime config ..."
 
-echo "runtime config generation 1/2"
+# rm -Rf localnet/hf_ledgers
+# mkdir localnet/hf_ledgers
 
-# # #  Runtime config is converted with a script to have only ledger hashes in the config
+# "$FORK_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/hf_ledgers --hash-output-file localnet/hf_ledger_hashes.json
+
+#  Runtime config is converted with a script to have only ledger hashes in the config
 # "$FORK_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/hf_ledgers --hash-output-file localnet/hf_ledger_hashes.json
 
 NOW_UNIX_TS=$(date +%s)
 FORK_GENESIS_UNIX_TS=$((NOW_UNIX_TS - NOW_UNIX_TS%60 + FORK_DELAY*60))
 export GENESIS_TIMESTAMP="$( date -u -d @$FORK_GENESIS_UNIX_TS '+%F %H:%M:%S+00:00' )"
 
-# echo "runtime config generation 2/2"
-
 FORKING_FROM_CONFIG_JSON=localnet/config/base.json \
     SECONDS_PER_SLOT="$MAIN_SLOT" \
     FORK_CONFIG_JSON=localnet/fork_config.json \
     "$SCRIPT_DIR"/crc.sh > localnet/config.json
 
-# # wait "$MAIN_NETWORK_PID"
+# Node is shutdown and restarted with mina-fork and the config from previous step
 
-# # # # echo "Config for the fork is correct, starting a new network"
-
-echo "waiting" > ${log_file}
-
-# # Now we can stop the mainnet nodes
+# Stop the mainnet nodes
 stop_nodes "$MAIN_MINA_EXE"
 
-# # # 8. Node is shutdown and restarted with mina-fork and the config from previous step
-# Since we are importing accounts from a compatible-ready JSON configuration, this might take more time 
-# We let it take around 2 hrs (120 tries with a default sleep interval of 1m)
-env UNTIL_HEIGHT=${UNTIL_HEIGHT} LOG_FILE=${log_file} MAX_TRIES=120 \
+# This cleans up all the log file to avoid getting to the end
+echo "starting forked network" > $log_file
+
+# Since we are importing accounts from a compatible-ready JSON configuration, this might take more time
+# We let it take around 1 hr (60 tries with a default sleep interval of 1m)
+env UNTIL_HEIGHT=${UNTIL_HEIGHT} LOG_FILE=${log_file} MAX_TRIES=60 \
     "$SCRIPT_DIR"/run-localnet.sh -m "$FORK_MINA_EXE" -d "$FORK_DELAY" -i "$FORK_SLOT" \
    -s "$FORK_SLOT" -c localnet/config.json --genesis-ledger-dir localnet/hf_ledgers &
 
 
+# We're happy once we get some blocks
+# This does assume that UNTIL_HEIGHT is at least 2, but let's be honest, this should always be the case
+lim=$(($UNTIL_HEIGHT / 2))
 j=0
-while true; do
+while [[ $(tail -n 1 $log_file | grep "in_progress" | cut -d'=' -f 2) -lt ${lim}  ]]; do
     j=$((j+1))
-    echo "$(tail -n 1 $log_file)" # the log includes a timestamp
+    echo "$(tail -n 1 $log_file)"
     sleep ${LOG_POLLING_IVAL}
 done
 
+echo "${lim} blocks have been produced: success!"
 
-# # sleep "${FORK_DELAY}m"
-
-# # sleep $((FORK_SLOT*10))s
-# # echo "getting h1"
-# # height1=$(! get_height 10303)
-# # if [[ $height1 == 0 ]]; then
-# #   echo "Assertion failed: block height $height1 should be greater than 0." >&2
-# #   stop_nodes "$FORK_MINA_EXE"
-# #   exit 3
-# # fi
-# # echo "Blocks are produced."
-
+# Stop forked-net nodes
 stop_nodes "$FORK_MINA_EXE"

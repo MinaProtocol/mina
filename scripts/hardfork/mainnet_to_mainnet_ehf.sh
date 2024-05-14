@@ -28,7 +28,7 @@ SRC_NAME="compatible"
 SRC_BRANCH="compatible"
 SRC_DEVNET="$INIT_DIR/$SRC_NAME-devnet"
 
-DST_NAME="compatible2"
+DST_NAME="${SRC_NAME}"
 DST_BRANCH="${SRC_BRANCH}"
 DST_DEVNET="$INIT_DIR/$DST_NAME-devnet"
 
@@ -56,35 +56,17 @@ if [[ ! -L ${SRC_DEVNET} ]]; then
     fi
 fi
 
-echo "Building destination network $DST_NAME ..."
-if [[ ! -L ${DST_DEVNET} ]]; then
-  if [[ $# == 0 ]]; then
-    dst_build=$(mktemp -d)
-    git clone -b $DST_BRANCH --single-branch "https://github.com/MinaProtocol/mina.git" "$dst_build"
-    cd "$dst_build"
-  else
-    git checkout -f $1
-    git checkout -f $DST_BRANCH
-    git checkout -f $1 -- scripts/hardfork
-    dst_build="$INIT_DIR"
-  fi
-  
-  git submodule sync --recursive
-  git submodule update --init --recursive
+# Default configuration for hard fork test for compatible
 
-  git apply "$SCRIPT_DIR"/localnet-patches/compatible.patch
-  nix "${NIX_OPTS[@]}" build "$dst_build?submodules=1#devnet" --out-link "$DST_DEVNET"
-  nix "${NIX_OPTS[@]}" build "$dst_build?submodules=1#devnet.genesis" --out-link "$DST_DEVNET"
-  git apply -R "$SCRIPT_DIR"/localnet-patches/compatible.patch
-  if [[ $# == 0 ]]; then
-    cd -
-    rm -Rf "$dst_build"
-  fi
-fi
+# height that we need to reach to trigger hard fork
+UNTIL_HEIGHT=10
 
-SRC_TX_COUNT="30"
-export SRC_TX_COUNT
+# height from which we get the fork configuration 
+FORK_CONFIG_HEIGHT=5
 
-echo "Running HF emergency test scenario (after $SRC_TX_COUNT transactions)"
+# depth of the node state we remember (should be at least UNTIL_HEIGHT - FORK_CONFIG_HEIGHT)
+K=30
 
-env UNTIL_HEIGHT=10 K=30 $SCRIPT_DIR/test_m2m_ehf.sh $SRC_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger} $DST_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger}
+echo "Running compatible to compatible HF emergency test scenario at height ${UNTIL_HEIGHT} with fork config at height ${FORK_CONFIG_HEIGHT}"
+
+env UNTIL_HEIGHT=${UNTIL_HEIGHT} K=${K} FORK_CONFIG_HEIGHT=${FORK_CONFIG_HEIGHT} $SCRIPT_DIR/test_m2m_ehf.sh $SRC_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger} $DST_DEVNET{/bin/mina,-genesis/bin/runtime_genesis_ledger}
