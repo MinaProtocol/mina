@@ -193,7 +193,7 @@ let
       let
         fileOuts2Src' = builtins.foldl' (acc': out:
           extendAccImpl "Output ${out} appears twice in dune files" out el.src
-          acc') fileOuts2Src el.file_outs;
+          acc') fileOuts2Src (builtins.attrNames el.file_outs);
         srcInfo' =
           extendAccImpl "Source ${el.src} appears twice in dune description"
           el.src (builtins.removeAttrs el [ "units" "src" ]) srcInfo;
@@ -670,11 +670,23 @@ let
   commonNativeBuildInputs = [ ];
 
   packageDepsImpl = update: field: pkg:
-    (attrFold (acc0: _: attrFold (acc: _: v: update acc v."${field}") acc0) { }
-      allDeps.units."${pkg}");
+    builtins.foldl' (acc0: v0:
+      builtins.foldl' (acc: v: update acc v."${field}") acc0
+      (builtins.attrValues v0)) { }
+    (builtins.attrValues allDeps.units."${pkg}");
 
   packageDeps = packageDepsImpl (a: b: a // b);
   packageDepsMulti = packageDepsImpl pkgs.lib.recursiveUpdate;
+
+  packageDefAny = predicate: pkg:
+    builtins.foldl' (acc0: v0:
+      builtins.foldl' (acc: v: acc || predicate v) acc0
+      (builtins.attrValues v0)) false
+    (builtins.attrValues info.packages."${pkg}");
+  packageHasTestDefs =
+    packageDefAny (v: (v.has_inline_tests or false) || v.type == "test");
+  packageHasSrcApp =
+    packageDefAny ({ src, ... }: pkgs.lib.hasPrefix "src/app/" src);
 
   packagesDotGraph = let
     sep = "\n  ";
@@ -837,7 +849,8 @@ let
       nativeBuildInputs = commonNativeBuildInputs;
       buildPhase = ''
         dune build ${
-          builtins.concatStringsSep " " info.srcInfo."${src}".file_outs
+          builtins.concatStringsSep " "
+          (builtins.attrNames info.srcInfo."${src}".file_outs)
         }
       '';
       installPhase = ''
@@ -851,7 +864,9 @@ let
       duneFile = if src == "." then "dune" else "${src}/dune";
       notAnOutput = dep:
         !(info.fileOuts2Src ? "${dep}" || info.exes ? "${dep}");
-      srcFiles = [ duneFile ]
+      srcFiles = [ duneFile ] ++ builtins.attrNames
+        info.srcInfo."${src}".file_outs
+        # ^ include out files is they exist in file system so that dune can handle mode correctly
         ++ builtins.filter notAnOutput info.srcInfo."${src}".file_deps;
     in builtins.map (mkFilter dotIncludeAll) srcFiles;
 
@@ -1120,6 +1135,20 @@ let
     '';
   };
 
+  testOrPkgImpl = noTest: self: pkg:
+    let
+      hasTestDefs = !noTest && packageHasTestDefs pkg;
+      isPseudo = info.pseudoPackages ? "${pkg}";
+    in if hasTestDefs && isPseudo then
+      [ self.tested."${pkg}" ]
+    else if hasTestDefs && !isPseudo then [
+      self.pkgs."${pkg}"
+      self.tested."${pkg}"
+    ] else
+      [ self.pkgs."${pkg}" ];
+  testOrPkg = testOrPkgImpl false;
+  testOrPkg' = self: pkg: testOrPkgImpl (packageHasSrcApp pkg) self pkg;
+
   minaPkgs = self:
     let
       super0 = mkOutputs (genPackage self) (genTestedPackage self) (genExe self)
@@ -1136,16 +1165,13 @@ let
             }) { } (builtins.attrValues info.exes) // {
               libp2p_helper = pkgs.libp2p_helper;
             };
-          all = mkCombined "all"
-            (pkgs.lib.mapAttrsToList (pkg: _: self.pkgs."${pkg}")
-              info.packages);
-          all-tested = mkCombined "all-tested" (builtins.concatLists
-            (pkgs.lib.mapAttrsToList (pkg: _:
-              [ self.tested."${pkg}" ]
-              ++ (if info.pseudoPackages ? "${pkg}" then
-                [ ]
-              else
-                [ self.pkgs."${pkg}" ])) info.packages));
+          all = mkCombined "all" (builtins.map (pkg: self.pkgs."${pkg}")
+            (builtins.attrNames info.packages));
+          default = mkCombined "default" (builtins.concatMap (testOrPkg' self)
+            (builtins.attrNames info.packages));
+          all-tested = mkCombined "all-tested"
+            (builtins.concatMap (testOrPkg self)
+              (builtins.attrNames info.packages));
         };
       super = pkgs.lib.recursiveUpdate super0 {
         src.pkgs = nonConsensusSrcOverrides super0.src.pkgs;
@@ -1225,8 +1251,7 @@ let
 
       # Make a script wrapper around a binary, setting all the necessary environment variables and adding necessary tools to PATH.
       # Also passes the version information to the executable.
-      wrapMina = let
-        commit_sha1 = inputs.self.sourceInfo.rev or "<dirty>";
+      wrapMina = let commit_sha1 = inputs.self.sourceInfo.rev or "<dirty>";
       in package:
       { deps ? [ pkgs.gnutar pkgs.gzip ] }:
       pkgs.runCommand "${package.name}-release" {

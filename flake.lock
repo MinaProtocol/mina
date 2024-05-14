@@ -8,11 +8,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1715162423,
-        "narHash": "sha256-bd4iFBrlbg6crGhDR8iu7fCxbof1lEMTuIIP/g/i1kQ=",
+        "lastModified": 1715685347,
+        "narHash": "sha256-cCC8BppfaicbTb7POuK3c/HEznpTZwbXPEhfOzi4vRg=",
         "owner": "o1-labs",
         "repo": "describe-dune",
-        "rev": "ad037c72c891507c4b58ca72f721e950f3f2b7e6",
+        "rev": "8b9be63e0b5ceed90c9af4a5262497d0f7c434a4",
         "type": "github"
       },
       "original": {
