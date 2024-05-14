@@ -16,7 +16,7 @@ OUTPUT=$($DUMP_SLOT_APP --postgres-uri $PG_CONN --slot 60)
 EXPECTED=""
 echo $OUTPUT
 
-if [ $RESULT == $EXPECTED ]; then 
+if [ $OUTPUT == $EXPECTED ]; then
     exit 0
 else
     exit 1
