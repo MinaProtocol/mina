@@ -340,7 +340,7 @@ build_archive_deb () {
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-replayer"
   cp ./default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILDDIR}/usr/local/bin/mina-swap-bad-balances"
 
-  cp ./default/src/src/app/dump_slot_ledger/dump_slot_ledger.exe "${BUILDDIR}/usr/local/bin/mina-dump-slot-ledger"
+  cp ./default/src/app/dump_slot_ledger/dump_slot_ledger.exe "${BUILDDIR}/usr/local/bin/mina-dump-slot-ledger"
 
 
   build_deb "$ARCHIVE_DEB"
