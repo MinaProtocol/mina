@@ -644,7 +644,7 @@ let%test_unit "Standalone and integrates vrfs are consistent" =
     let%map message = Message.gen ~constraint_constants in
     (private_key, message)
   in
-  Quickcheck.test ~seed:(`Deterministic "") inputs
+  Quickcheck.test ~trials:1000 ~seed:(`Deterministic "") inputs
     ~f:(fun (private_key, message) ->
       let integrated_vrf =
         Integrated.eval ~constraint_constants ~private_key message
