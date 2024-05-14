@@ -11,9 +11,10 @@ esac; shift; done
 
 
 echo "Running slot dumping tool"
-OUTPUT=$($DUMP_SLOT_APP --archive-uri $PG_CONN --slot 60)
+OUTPUT=$($DUMP_SLOT_APP --postgres-uri $PG_CONN --slot 60)
 
 EXPECTED=""
+echo $OUTPUT
 
 if [ $RESULT == $EXPECTED ]; then 
     exit 0
