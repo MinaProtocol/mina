@@ -709,6 +709,7 @@ let
     }'';
 
   genPatch = self: fileDeps: exeDeps:
+    # TODO rewrite to avoid manual referring to derivations
     let
       traverseExes = f:
         builtins.concatLists (pkgs.lib.mapAttrsToList (pkg: nameMap:
@@ -818,11 +819,11 @@ let
           postPatch = ''
             drv=""
             for input in $nativeBuildInputs; do
-              if [[ "$input" ~= '-${pkg}-dev$' ]]; then
+              if [[ "$input" =~ -${pkg}-dev$ ]]; then
                 drv="$input"
               fi
             done
-            [[ "$drv" == "" ]] && exit 2
+            [[ "$drv" != "" ]] || exit 2
             cp --no-preserve=mode,ownership -RL "$drv" _build
           '';
           nativeBuildInputs = s.nativeBuildInputs ++ [ drv ];
