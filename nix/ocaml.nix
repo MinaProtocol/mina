@@ -163,41 +163,6 @@ let
   };
 
   duneDescLoaded = builtins.fromJSON (builtins.readFile dune-description);
-  duneOutFiles = builtins.foldl' (acc0: el:
-    let
-      extendAcc = acc: file:
-        acc // {
-          "${file}" = if acc ? "${file}" then
-            builtins.throw
-            "File ${file} is defined as output of many dune files"
-          else
-            el.src;
-        };
-      extendAccExe = acc: unit:
-        if unit.type == "exe" then
-          extendAcc acc "${el.src}/${unit.name}.exe"
-        else
-          acc;
-      acc1 = builtins.foldl' extendAcc acc0 el.file_outs;
-    in builtins.foldl' extendAccExe acc1 el.units) { } duneDescLoaded;
-
-  collectLibLocs = attrName:
-    let
-      extendAcc = src: acc: name:
-        acc // {
-          "${name}" = if acc ? "${name}" then
-            builtins.throw
-            "Library with ${attrName} ${name} is defined in multiple dune files"
-          else
-            src;
-        };
-      extendAccLib = src: acc: unit:
-        if unit.type == "lib" && unit ? "${attrName}" then
-          extendAcc src acc unit."${attrName}"
-        else
-          acc;
-      foldF = acc0: el: builtins.foldl' (extendAccLib el.src) acc0 el.units;
-    in builtins.foldl' foldF { };
 
   quote = builtins.replaceStrings [ "." "/" ] [ "__" "-" ];
 
