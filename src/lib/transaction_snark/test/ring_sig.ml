@@ -102,7 +102,8 @@ let%test_unit "1-of-2" =
 let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
   let proof_cache =
     Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
-    @@ Yojson.Safe.from_file "proof_cache.json" in
+    @@ Yojson.Safe.from_file "proof_cache.json"
+  in
   Transaction_snark.For_tests.set_proof_cache proof_cache ;
   let open Mina_transaction_logic.For_tests in
   let gen =
@@ -337,8 +338,8 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
           |> fun () ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) ) ;
-      match Sys.getenv "PROOF_CACHE_OUT" with
-      | Some path ->
-          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
-      | None ->
-          ()
+  match Sys.getenv "PROOF_CACHE_OUT" with
+  | Some path ->
+      Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
+  | None ->
+      ()
