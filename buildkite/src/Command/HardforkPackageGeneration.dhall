@@ -103,7 +103,10 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
                   )
                   "./buildkite/scripts/build-hardfork-package.sh"
                 # 
-                [ Cmd.run "./buildkite/scripts/upload-deb-to-gs.sh ${DebianVersions.lowerName debVersion}" ]
+                [ 
+                  Cmd.run "./buildkite/scripts/upload-deb-to-gs.sh ${DebianVersions.lowerName debVersion}",
+                  Cmd.run "make publish_debs"
+                ]
             , label = "Build Mina Hardfork Package for ${DebianVersions.capitalName debVersion}"
             , key = generateLedgersJobKey
             , target = Size.XLarge
