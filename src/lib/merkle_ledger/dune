@@ -28,7 +28,6 @@
   core.uuid
   core_kernel
   core_kernel.uuid
-  extlib
   integers
   rocks
   sexplib0
