@@ -104,13 +104,24 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
                   "./buildkite/scripts/build-hardfork-package.sh"
                 # 
                 [ 
-                  Cmd.run "./buildkite/scripts/upload-deb-to-gs.sh ${DebianVersions.lowerName debVersion}",
-                  Cmd.run "make publish_debs"
+                  Cmd.run "./buildkite/scripts/upload-deb-to-gs.sh ${DebianVersions.lowerName debVersion}"
                 ]
             , label = "Build Mina Hardfork Package for ${DebianVersions.capitalName debVersion}"
             , key = generateLedgersJobKey
             , target = Size.XLarge
             }
+        , Command.build
+          Command.Config::{
+            commands = Toolchain.runner debVersion [
+              "AWS_ACCESS_KEY_ID",
+              "AWS_SECRET_ACCESS_KEY",
+              "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
+            ] "./buildkite/scripts/publish-deb.sh"
+            , label = "Publish Mina for ${DebianVersions.capitalName debVersion} Hardfork"
+            , depends_on = [{ name = pipelineName, key = generateLedgersJobKey}]
+            , key = "publish-hardfork-deb-pkg"
+            , target = Size.Small
+          }
         , DockerImage.generateStep
             DockerImage.ReleaseSpec::{
               deps =
