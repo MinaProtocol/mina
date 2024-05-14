@@ -9,6 +9,8 @@ open Currency
 open Pickles_types
 module Wire_types = Mina_wire_types.Transaction_snark
 
+let () = Key_cache_native.linkme
+
 let proof_cache = ref None
 
 module Make_sig (A : Wire_types.Types.S) = struct
