@@ -1,5 +1,6 @@
 open Core_kernel
 
+open Kimchi_gadgets_common
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 let tests_enabled = true

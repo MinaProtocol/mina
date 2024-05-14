@@ -1,7 +1,7 @@
 (library
  (inline_tests (flags -verbose -show-counts))
- (name kimchi_gadgets)
- (public_name kimchi_backend.gadgets)
+ (name kimchi_gadgets_keccak)
+ (public_name kimchi_backend.gadgets.keccak)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_jane))
  (libraries
@@ -17,10 +17,6 @@
   kimchi_gadgets_test_runner
   mina_stdlib
   snarky.backendless
-  kimchi_backend.gadgets.bitwise
   kimchi_backend.gadgets.common
-  kimchi_backend.gadgets.ethereum
-  kimchi_backend.gadgets.generic
-  kimchi_backend.gadgets.keccak
-  kimchi_backend.gadgets.lookup
-  kimchi_backend.gadgets.range_check))
+  kimchi_backend.gadgets.bitwise
+  kimchi_backend.gadgets.lookup))
