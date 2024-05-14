@@ -57,7 +57,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
     [
         Cmd.run (
           "export MINA_DEB_CODENAME=${spec.deb_codename} && source ./buildkite/scripts/export-git-env-vars.sh && ./scripts/release-docker.sh " ++
-              "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --deb-profile '${Profiles.lowername spec.deb_profile} --deb-build-flag ${BuildFlags.to spec.build_flags}' --repo ${spec.repo} --extra-args \\\"${spec.extra_args}\\\""
+              "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --deb-profile '${Profiles.lowerName spec.deb_profile} --deb-build-flag ${BuildFlags.to spec.build_flags}' --repo ${spec.repo} --extra-args \\\"${spec.extra_args}\\\""
         )
     ]
 
