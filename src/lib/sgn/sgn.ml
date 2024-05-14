@@ -28,8 +28,6 @@ let of_field_exn x =
   else if Field.equal x neg_one then Neg
   else failwith "Sgn.of_field: Expected positive or negative 1"
 
-[%%ifdef consensus_mechanism]
-
 type var = Field.Var.t
 
 let typ : (var, t) Typ.t =
@@ -81,5 +79,3 @@ module Checked = struct
 
   let if_ = Field.Checked.if_
 end
-
-[%%endif]

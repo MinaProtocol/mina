@@ -21,8 +21,6 @@ val gen : t Quickcheck.Generator.t
 
 val negate : t -> t
 
-[%%ifdef consensus_mechanism]
-
 type var = private Field.Var.t
 
 val typ : (var, t) Typ.t
@@ -46,5 +44,3 @@ module Checked : sig
 
   val if_ : Boolean.var -> then_:var -> else_:var -> var Checked.t
 end
-
-[%%endif]

@@ -36,8 +36,6 @@ module type Message_intf = sig
 
   val hash_for_testnet : t -> public_key:curve -> r:field -> curve_scalar
 
-  [%%ifdef consensus_mechanism]
-
   type field_var
 
   type boolean_var
@@ -52,11 +50,7 @@ module type Message_intf = sig
 
   val hash_checked :
     var -> public_key:curve_var -> r:field_var -> curve_scalar_var checked
-
-  [%%endif]
 end
-
-[%%ifdef consensus_mechanism]
 
 module type S = sig
   module Impl : Snarky_backendless.Snark_intf.S
@@ -314,135 +308,6 @@ module Make
   end
 end
 
-[%%else]
-
-(* nonconsensus version of the functor; yes, there's some repeated code,
-   but seems difficult to abstract over the functors and signatures
-*)
-
-module type S = sig
-  open Snark_params.Tick
-
-  type curve
-
-  type curve_scalar
-
-  module Message :
-    Message_intf
-      with type curve_scalar := curve_scalar
-       and type curve := curve
-       and type field := Field.t
-
-  module Signature : sig
-    type t = Field.t * curve_scalar [@@deriving sexp]
-  end
-
-  module Private_key : sig
-    type t = curve_scalar [@@deriving sexp]
-  end
-
-  module Public_key : sig
-    type t = curve [@@deriving sexp]
-  end
-
-  val sign :
-       ?signature_kind:Mina_signature_kind.t
-    -> Private_key.t
-    -> Message.t
-    -> Signature.t
-
-  val verify :
-       ?signature_kind:Mina_signature_kind.t
-    -> Signature.t
-    -> Public_key.t
-    -> Message.t
-    -> bool
-end
-
-module Make
-    (Impl : module type of Snark_params.Tick) (Curve : sig
-      open Impl
-
-      module Scalar : sig
-        type t [@@deriving sexp, equal]
-
-        val zero : t
-
-        val ( * ) : t -> t -> t
-
-        val ( + ) : t -> t -> t
-
-        val negate : t -> t
-      end
-
-      type t [@@deriving sexp]
-
-      val one : t
-
-      val ( + ) : t -> t -> t
-
-      val negate : t -> t
-
-      val scale : t -> Scalar.t -> t
-
-      val to_affine_exn : t -> Field.t * Field.t
-    end)
-    (Message : Message_intf
-                 with type curve := Curve.t
-                  and type curve_scalar := Curve.Scalar.t
-                  and type field := Impl.Field.t) :
-  S
-    with type curve := Curve.t
-     and type curve_scalar := Curve.Scalar.t
-     and module Message := Message = struct
-  module Private_key = struct
-    type t = Curve.Scalar.t [@@deriving sexp]
-  end
-
-  module Signature = struct
-    type t = Impl.Field.t * Curve.Scalar.t [@@deriving sexp]
-  end
-
-  module Public_key : sig
-    type t = Curve.t [@@deriving sexp]
-  end =
-    Curve
-
-  let is_even (t : Impl.Field.t) = not @@ Impl.Field.parity t
-
-  let sign ?signature_kind (d_prime : Private_key.t) m =
-    let public_key =
-      (* TODO: Don't recompute this. *)
-      Curve.scale Curve.one d_prime
-    in
-    (* TODO: Once we switch to implicit sign-bit we'll have to conditionally negate d_prime. *)
-    let d = d_prime in
-    let derive = Message.derive ?signature_kind in
-    let k_prime = derive m ~public_key ~private_key:d in
-    assert (not Curve.Scalar.(equal k_prime zero)) ;
-    let r, (ry : Impl.Field.t) =
-      Curve.(to_affine_exn (scale Curve.one k_prime))
-    in
-    let k = if is_even ry then k_prime else Curve.Scalar.negate k_prime in
-    let hash = Message.hash ?signature_kind in
-    let e = hash m ~public_key ~r in
-    let s = Curve.Scalar.(k + (e * d)) in
-    (r, s)
-
-  let verify ?signature_kind ((r, s) : Signature.t) (pk : Public_key.t)
-      (m : Message.t) =
-    let hash = Message.hash ?signature_kind in
-    let e = hash ~public_key:pk ~r m in
-    let r_pt = Curve.(scale one s + negate (scale pk e)) in
-    match Curve.to_affine_exn r_pt with
-    | rx, ry ->
-        is_even ry && Impl.Field.(equal rx r)
-    | exception _ ->
-        false
-end
-
-[%%endif]
-
 open Snark_params
 
 module Message = struct
@@ -518,8 +383,6 @@ module Message = struct
     let hash_for_testnet =
       make_hash ~init:Hash_prefix_states.signature_for_testnet_legacy
 
-    [%%ifdef consensus_mechanism]
-
     type var = (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
 
     let%snarkydef_ hash_checked t ~public_key ~r =
@@ -535,8 +398,6 @@ module Message = struct
             (pack_input input)
           |> Digest.to_bits ~length:Field.size_in_bits
           |> Bitstring_lib.Bitstring.Lsb_first.of_list )
-
-    [%%endif]
   end
 
   module Chunked = struct
@@ -596,8 +457,6 @@ module Message = struct
     let hash_for_testnet =
       make_hash ~init:Hash_prefix_states.signature_for_testnet
 
-    [%%ifdef consensus_mechanism]
-
     type var = Field.Var.t Random_oracle.Input.Chunked.t
 
     let%snarkydef_ hash_checked t ~public_key ~r =
@@ -613,15 +472,11 @@ module Message = struct
             (pack_input input)
           |> Digest.to_bits ~length:Field.size_in_bits
           |> Bitstring_lib.Bitstring.Lsb_first.of_list )
-
-    [%%endif]
   end
 end
 
 module Legacy = Make (Tick) (Tick.Inner_curve) (Message.Legacy)
 module Chunked = Make (Tick) (Tick.Inner_curve) (Message.Chunked)
-
-[%%ifdef consensus_mechanism]
 
 let gen_legacy =
   let open Quickcheck.Let_syntax in
@@ -715,5 +570,3 @@ let%test_unit "schnorr checked + unchecked" =
            Chunked.Checked.verifies (module Shifted) s public_key msg )
          (fun _ -> true) )
         (pubkey, msg, s) )
-
-[%%endif]

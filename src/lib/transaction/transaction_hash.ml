@@ -108,8 +108,6 @@ let ( hash_signed_command_v1
   , hash_coinbase
   , hash_fee_transfer )
 
-[%%ifdef consensus_mechanism]
-
 let hash_command cmd =
   match cmd with
   | User_command.Signed_command s ->
@@ -307,5 +305,3 @@ let%test_module "Transaction hashes" =
       in
       run_test ~transaction_id ~expected_hash
   end )
-
-[%%endif]

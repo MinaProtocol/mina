@@ -2,13 +2,7 @@
 
 open Core_kernel
 open Mina_base_util
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
-
 open Signature_lib
 module Impl = Pickles.Impls.Step
 open Mina_numbers
@@ -63,8 +57,6 @@ module Authorization_kind = struct
            [| (f is_signed, 1); (f is_proved, 1) |] )
         (Random_oracle_input.Chunked.field verification_key_hash)
 
-    [%%ifdef consensus_mechanism]
-
     module Checked = struct
       type t =
         { is_signed : Boolean.var
@@ -96,8 +88,6 @@ module Authorization_kind = struct
       Fields.make_creator obj ~is_signed:!.bool ~is_proved:!.bool
         ~verification_key_hash:!.verification_key_hash
       |> finish "AuthorizationKindStructured" ~t_toplevel_annots
-
-    [%%endif]
   end
 
   let to_control_tag : t -> Control.Tag.t = function
@@ -143,14 +133,10 @@ module Authorization_kind = struct
 
   let to_input x = Structured.to_input (to_structured x)
 
-  [%%ifdef consensus_mechanism]
-
   module Checked = Structured.Checked
 
   let typ =
     Structured.typ |> Typ.transport ~there:to_structured ~back:of_structured_exn
-
-  [%%endif]
 end
 
 module May_use_token = struct
