@@ -16,11 +16,4 @@
   kimchi_backend.pasta
   kimchi_gadgets_test_runner
   mina_stdlib
-  snarky.backendless
-  kimchi_backend.gadgets.bitwise
-  kimchi_backend.gadgets.common
-  kimchi_backend.gadgets.ethereum
-  kimchi_backend.gadgets.generic
-  kimchi_backend.gadgets.keccak
-  kimchi_backend.gadgets.lookup
-  kimchi_backend.gadgets.range_check))
+  snarky.backendless))

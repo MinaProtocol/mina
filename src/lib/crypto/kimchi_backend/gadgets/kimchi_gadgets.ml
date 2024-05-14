@@ -1,7 +1,0 @@
-include Kimchi_gadgets_bitwise
-include Kimchi_gadgets_common
-include Kimchi_gadgets_ethereum
-include Kimchi_gadgets_generic
-include Kimchi_gadgets_keccak
-include Kimchi_gadgets_lookup
-include Kimchi_gadgets_range_check

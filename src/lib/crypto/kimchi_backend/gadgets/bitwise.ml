@@ -1,8 +1,5 @@
 open Core_kernel
 
-open Kimchi_gadgets_common
-open Kimchi_gadgets_generic
-open Kimchi_gadgets_range_check
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint

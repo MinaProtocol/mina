@@ -2,10 +2,6 @@ open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 
-open Kimchi_gadgets_common
-open Kimchi_gadgets_bitwise
-open Kimchi_gadgets_lookup
-
 let tests_enabled = true
 
 (* Endianness type *)
