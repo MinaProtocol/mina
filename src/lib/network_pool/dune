@@ -77,7 +77,7 @@
    kimchi_backend_common
    kimchi_pasta
    kimchi_pasta.basic
-   genesis_ledger
+   coda_genesis_ledger
    staged_ledger_diff
    mina_wire_types
  )

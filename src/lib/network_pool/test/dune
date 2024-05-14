@@ -19,7 +19,7 @@
   data_hash_lib
   genesis_constants
   bounded_types
-  genesis_ledger
+  coda_genesis_ledger
   logger
   mina_base
   mina_base.import
