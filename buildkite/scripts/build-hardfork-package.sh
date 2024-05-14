@@ -81,8 +81,6 @@ RUNTIME_CONFIG_JSON=new_config.json LEDGER_TARBALLS="$(echo hardfork_ledgers/*.t
 mkdir -p /tmp/artifacts
 cp _build/mina*.deb /tmp/artifacts/.
 
-./buildkite/scripts/upload-deb-to-gs.sh $MINA_DEB_CODENAME
-
 echo "--- Upload debs to amazon s3 repo"
 make publish_debs
 
