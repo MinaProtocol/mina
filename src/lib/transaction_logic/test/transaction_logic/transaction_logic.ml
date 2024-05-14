@@ -83,7 +83,8 @@ let setup =
   (global_slot, sender, receiver, amount, fee)
 
 let simple_payment () =
-  Quickcheck.test setup ~f:(fun (global_slot, sender, receiver, amount, fee) ->
+  Quickcheck.test ~trials:1000 setup
+    ~f:(fun (global_slot, sender, receiver, amount, fee) ->
       let accounts = [ sender; receiver ] in
       let txn = signed_command ~fee ~sender ~receiver amount in
       let txn_state_view = protocol_state in
@@ -99,7 +100,8 @@ let simple_payment () =
            ~txn_state_view ledger [ txn ] ) )
 
 let simple_payment_signer_different_from_fee_payer () =
-  Quickcheck.test setup ~f:(fun (global_slot, sender, receiver, amount, fee) ->
+  Quickcheck.test ~trials:1000 setup
+    ~f:(fun (global_slot, sender, receiver, amount, fee) ->
       let accounts = [ sender; receiver ] in
       let txn = signed_command ~signer:receiver ~fee ~sender ~receiver amount in
       let txn_state_view = protocol_state in
