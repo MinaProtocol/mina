@@ -121,6 +121,9 @@
  (name pasta_bindings_backend_native)
  (modules pasta_bindings_backend)
  (foreign_archives wires_15_stubs)
+ (no_dynlink) 
+ ; ^ Required for compilation of this library separately
+ ; from libraries that depend on it
  (c_library_flags :standard "-lpthread")
  (libraries bounded_types)
  (instrumentation
