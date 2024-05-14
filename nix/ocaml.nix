@@ -806,18 +806,26 @@ let
         (packageDepsMulti "exes" pkg));
 
   genTestedPackage = self: pkg: _:
-    let drv = self.pkgs."${pkg}";
-    in drv.overrideAttrs {
-      pname = "test-${pkg}";
+    let
+      drv = self.pkgs."${pkg}";
       # For detached units (with no package) there is no need to rely on pre-built
       # libraries/executables because detached units can not be a dependency of other
       # packages, hence no use to introduce indirection
-      ${if info.pseudoPackages ? "${pkg}" then null else "postPatch"} = ''
-        cp --no-preserve=mode,ownership -RL ${drv} _build
-      '';
-      installPhase = "touch $out";
-      dontCheck = false;
-    };
+      usePrebuilt = s:
+        if info.pseudoPackages ? "${pkg}" then
+          { }
+        else {
+          postPatch = ''
+            cp --no-preserve=mode,ownership -RL ${drv} _build
+          '';
+          nativeBuildInputs = s.nativeBuildInputs ++ [ drv ];
+        };
+    in drv.overrideAttrs (s:
+      usePrebuilt s // {
+        pname = "test-${pkg}";
+        installPhase = "touch $out";
+        dontCheck = false;
+      });
 
   genExe = self: pkg: name: exeDef:
     let
