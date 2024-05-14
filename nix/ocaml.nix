@@ -816,7 +816,14 @@ let
           { }
         else {
           postPatch = ''
-            cp --no-preserve=mode,ownership -RL ${drv} _build
+            drv=""
+            for input in $nativeBuildInputs; do
+              if [[ "$input" ~= '-${pkg}-dev$' ]]; then
+                drv="$input"
+              fi
+            done
+            [[ "$drv" == "" ]] && exit 2
+            cp --no-preserve=mode,ownership -RL "$drv" _build
           '';
           nativeBuildInputs = s.nativeBuildInputs ++ [ drv ];
         };
@@ -1157,6 +1164,8 @@ let
   testOrPkg = testOrPkgImpl false;
   testOrPkg' = self: pkg: testOrPkgImpl (packageHasSrcApp pkg) self pkg;
 
+  packageNames = builtins.attrNames info.packages;
+
   minaPkgs = self:
     let
       super0 = mkOutputs (genPackage self) (genTestedPackage self) (genExe self)
@@ -1173,13 +1182,12 @@ let
             }) { } (builtins.attrValues info.exes) // {
               libp2p_helper = pkgs.libp2p_helper;
             };
-          all = mkCombined "all" (builtins.map (pkg: self.pkgs."${pkg}")
-            (builtins.attrNames info.packages));
-          default = mkCombined "default" (builtins.concatMap (testOrPkg' self)
-            (builtins.attrNames info.packages));
+          all = mkCombined "all"
+            (builtins.map (pkg: self.pkgs."${pkg}") packageNames);
+          default = mkCombined "default"
+            (builtins.concatMap (testOrPkg' self) packageNames);
           all-tested = mkCombined "all-tested"
-            (builtins.concatMap (testOrPkg self)
-              (builtins.attrNames info.packages));
+            (builtins.concatMap (testOrPkg self) packageNames);
         };
       super = pkgs.lib.recursiveUpdate super0 {
         src.pkgs = nonConsensusSrcOverrides super0.src.pkgs;
