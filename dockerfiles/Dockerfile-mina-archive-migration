@@ -6,13 +6,16 @@ ARG deb_version
 ARG deb_codename=bullseye
 ARG deb_release=unstable
 ARG deb_profile
+ARG deb_build_flags
 
 # if --build-arg deb_profile is defined, add hypen at beginning.
 ENV SUFFIX=${deb_profile:+-${deb_profile}}
+ENV SUFFIX=${SUFFIX}${deb_build_flags:+-${deb_build_flags}}
 # construct mina debian package name based on network and suffix.
 # possible values:
 # - mina-archive
-# - mina-archive-lightnet etc.
+# - mina-archive-instrumented etc.
+
 ENV MINA_DEB=mina-archive-migration${SUFFIX}
 
 ENV DEBIAN_FRONTEND noninteractive
