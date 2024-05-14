@@ -50,5 +50,3 @@
 /src/lib/snarky_group_map/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky_log/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/unsigned_extended/ @MinaProtocol/crypto-eng-reviewers
-
-/src/nonconsensus @MinaProtocol/protocol-eng-reviewers

@@ -31,21 +31,9 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-
-[%%ifndef consensus_mechanism]
-
-open Mina_base_import
-
-[%%endif]
-
 open Currency
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params
 open Tick
-
-[%%endif]
 
 module Poly = struct
   [%%versioned
@@ -105,8 +93,6 @@ module Poly = struct
 
   [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 
-  [%%ifdef consensus_mechanism]
-
   let typ (token_typ : ('token_var, 'token) Typ.t)
       (fee_typ : ('fee_var, 'fee) Typ.t) :
       (('token_var, 'fee_var) t, ('token, 'fee) t) Typ.t =
@@ -114,8 +100,6 @@ module Poly = struct
       [ token_typ; fee_typ; token_typ; fee_typ ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
-
-  [%%endif]
 end
 
 [%%versioned
@@ -143,8 +127,6 @@ let poly_to_yojson = Poly.to_yojson
 
 let poly_of_yojson = Poly.of_yojson
 
-[%%ifdef consensus_mechanism]
-
 type var = (Token_id.Checked.t, Fee.Signed.var) poly
 
 let typ : (var, t) Typ.t = Poly.typ Token_id.typ Fee.Signed.typ
@@ -157,8 +139,6 @@ let var_of_t ({ fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } : t) :
   ; fee_excess_r = Fee.Signed.Checked.constant fee_excess_r
   }
 
-[%%endif]
-
 let to_input { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
   let open Random_oracle.Input.Chunked in
   List.reduce_exn ~f:append
@@ -167,8 +147,6 @@ let to_input { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
     ; Token_id.to_input fee_token_r
     ; Fee.Signed.to_input fee_excess_r
     ]
-
-[%%ifdef consensus_mechanism]
 
 let to_input_checked { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
   let fee_token_l = Token_id.Checked.to_input fee_token_l
@@ -191,8 +169,6 @@ let assert_equal_checked (t1 : var) (t2 : var) =
     ; [%with_label_ "fee_excess_r"] (fun () ->
           Fee.Signed.Checked.assert_equal t1.fee_excess_r t2.fee_excess_r )
     ]
-
-[%%endif]
 
 (** Eliminate a fee excess, either by combining it with one to the left/right,
     or by checking that it is zero.
@@ -226,8 +202,6 @@ let eliminate_fee_excess (fee_token_l, fee_excess_l) (fee_token_m, fee_excess_m)
       !"Error eliminating fee excess: Excess for token %{sexp: Token_id.t} \
         %{sexp: Fee.Signed.t} was nonzero"
       fee_token_m fee_excess_m
-
-[%%ifdef consensus_mechanism]
 
 (* We use field elements instead of a currency type here, under the following
    assumptions:
@@ -291,8 +265,6 @@ let%snarkydef_ eliminate_fee_excess_checked (fee_token_l, fee_excess_l)
   in
   ((fee_token_l, fee_excess_l), (fee_token_r, fee_excess_r))
 
-[%%endif]
-
 (* 'Rebalance' to a canonical form, where
    - if there is only 1 nonzero excess, it is to the left
    - any zero fee excess has the default token
@@ -327,8 +299,6 @@ let rebalance ({ fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } : t) =
     else fee_token_r
   in
   { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
-
-[%%ifdef consensus_mechanism]
 
 let rebalance_checked { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
   let open Checked.Let_syntax in
@@ -374,8 +344,6 @@ let rebalance_checked { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } =
   in
   { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
 
-[%%endif]
-
 (** Combine the fee excesses from two transitions. *)
 let combine
     ({ fee_token_l = fee_token1_l
@@ -413,8 +381,6 @@ let combine
     ; fee_token_r = fee_token2_r
     ; fee_excess_r = fee_excess2_r
     }
-
-[%%ifdef consensus_mechanism]
 
 let%snarkydef_ combine_checked
     { fee_token_l = fee_token1_l
@@ -506,8 +472,6 @@ let%snarkydef_ combine_checked
   in
   { fee_token_l; fee_excess_l; fee_token_r; fee_excess_r }
 
-[%%endif]
-
 let empty =
   { fee_token_l = Token_id.default
   ; fee_excess_l = Fee.Signed.zero
@@ -555,8 +519,6 @@ let to_one_or_two ({ fee_token_l; fee_excess_l; fee_token_r; fee_excess_r } : t)
     `One (fee_token_l, fee_excess_l)
   else `Two ((fee_token_l, fee_excess_l), (fee_token_r, fee_excess_r))
 
-[%%ifdef consensus_mechanism]
-
 let gen_single ?(token_id = Token_id.gen) ?(excess = Fee.Signed.gen) () :
     (Token_id.t * Fee.Signed.t) Quickcheck.Generator.t =
   Quickcheck.Generator.tuple2 token_id excess
@@ -577,5 +539,3 @@ let gen : t Quickcheck.Generator.t =
           ; fee_token_r = Token_id.default
           ; fee_excess_r = Fee.Signed.zero
           } )
-
-[%%endif]
