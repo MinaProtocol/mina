@@ -65,8 +65,6 @@ K=${K:-10}
 # 0 means "run forever" (another external element will probably terminate the chain under certain conditions)
 UNTIL_HEIGHT=${UNTIL_HEIGHT:-0}
 
-
-
 echo "Creates a quick-epoch-turnaround configuration in localnet/ and launches two Mina nodes" >&2
 echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-s|--slot $SLOT] [-b|--berkeley] [-c|--config ./config.json] [--slot-tx-end 100] [--slot-chain-end 130] [--genesis-ledger-dir ./genesis]" >&2
 echo "Consider reading script's code for information on optional arguments" >&2
@@ -106,7 +104,6 @@ if [[ "$CONF_SUFFIX" != "" ]] && [[ "$CUSTOM_CONF" != "" ]]; then
   echo "Can't use both --berkeley and --config options" >&2
   exit 1
 fi
-
 
 log_status "setup"
 
@@ -189,6 +186,12 @@ fi
 # Launch two Mina nodes and send transactions on an interval
 ##############################################################
 
+stop_nodes(){
+    echo "Stopping nodes"
+    "$1" client stop-daemon --daemon-port 10301
+    "$1" client stop-daemon --daemon-port 10311
+}
+
 COMMON_ARGS=( --file-log-level Info --log-level Error --seed )
 COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/base.json" )
 COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/daemon$CONF_SUFFIX.json" )
@@ -239,6 +242,7 @@ while ! "$MINA_EXE" accounts import --privkey-path "$PWD/$CONF_DIR/bp" --rest-se
   log_status "importing accounts ($i/$MAX_TRIES)"
   if [[ $i -gt $MAX_TRIES ]]; then
       echo "Could not succeed importing accounts"
+      stop_nodes "$MINA_EXE"
       exit 3
   fi
 done
@@ -255,6 +259,7 @@ while ! "$MINA_EXE" ledger export staged-ledger --daemon-port 10311 > localnet/e
 
   if [[ $i -gt $MAX_TRIES ]]; then
       echo "Could not succeed exporting staged ledger"
+      stop_nodes "$MINA_EXE"
       exit 3
   fi
 done
