@@ -13,6 +13,12 @@ open Mina_base
    accounts always yield the same results. *)
 let%test_module "account timing check" =
   ( module struct
+    let proof_cache =
+      Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
+      @@ Yojson.Safe.from_file "proof_cache.json"
+
+    let () = Transaction_snark.For_tests.set_proof_cache proof_cache
+
     open Mina_ledger.Ledger.For_tests
 
     let account_with_default_vesting_schedule ?(token = Token_id.default)
@@ -297,21 +303,27 @@ let%test_module "account timing check" =
 
     let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
-    let keypairss, keypairs =
+    let keypairss, keypairs, txn_snark_private_key, zkapp_keypair =
       (* these tests are based on relative balance/payment amounts, don't need to
          run on multiple keypairs
       *)
       let length = 1 in
       (* keypair pair (for payment sender/receiver)  *)
-      let keypairss =
-        List.init length ~f:(fun _ ->
-            (Signature_lib.Keypair.create (), Signature_lib.Keypair.create ()) )
+      Quickcheck.random_value
+      @@
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind keypairss =
+        Quickcheck.Generator.list_with_length length
+        @@ Quickcheck.Generator.tuple2 Signature_lib.Keypair.gen
+             Signature_lib.Keypair.gen
       in
+      let%bind txn_snark_private_key = Signature_lib.Private_key.gen in
+      let%map zkapp_keypair = Signature_lib.Keypair.gen in
       (* list of keypairs *)
       let keypairs =
         List.map keypairss ~f:(fun (kp1, kp2) -> [ kp1; kp2 ]) |> List.concat
       in
-      (keypairss, keypairs)
+      (keypairss, keypairs, txn_snark_private_key, zkapp_keypair)
 
     (* we're testing timings, not signatures *)
     let validate_user_command uc =
@@ -328,7 +340,7 @@ let%test_module "account timing check" =
       let sok_message =
         Sok_message.create ~fee:Currency.Fee.zero
           ~prover:
-            Public_key.(compress (of_private_key_exn (Private_key.create ())))
+            Public_key.(compress (of_private_key_exn txn_snark_private_key))
       in
       let state_body = Transaction_snark_tests.Util.genesis_state_body in
       let txn_state_view = Transaction_snark_tests.Util.genesis_state_view in
@@ -1620,7 +1632,6 @@ let%test_module "account timing check" =
       in
       let ledger_init_state = Array.of_list [ untimed ] in
       let sender_keypair = List.nth_exn keypairs 0 in
-      let zkapp_keypair = Signature_lib.Keypair.create () in
       let fee = 1_000_000 in
       let (create_timed_account_spec
             : Transaction_snark.For_tests.Deploy_snapp_spec.t ) =
@@ -2215,7 +2226,6 @@ let%test_module "account timing check" =
         |> Array.of_list
       in
       let sender_keypair = List.hd_exn keypairs in
-      let zkapp_keypair = Signature_lib.Keypair.create () in
       let (create_timed_account_spec
             : Transaction_snark.For_tests.Deploy_snapp_spec.t ) =
         { sender = (sender_keypair, Account.Nonce.zero)
@@ -2443,4 +2453,11 @@ let%test_module "account timing check" =
                       , Pass_2 )
                     ledger
                     [ update_timing_zkapp_command ] ) ) )
+
+    let () =
+      match Sys.getenv "PROOF_CACHE_OUT" with
+      | Some path ->
+          Yojson.Safe.to_file path @@ Pickles.Proof_cache.to_yojson proof_cache
+      | None ->
+          ()
   end )
