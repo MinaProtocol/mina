@@ -49,9 +49,9 @@
    mina_runtime_config
    logger
    kimchi_backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
-   kimchi_backend.common
+   kimchi_pasta
+   kimchi_pasta.basic
+   kimchi_backend_common
    block_time
    data_hash_lib
    pickles

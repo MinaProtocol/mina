@@ -17,8 +17,8 @@
    kimchi_bindings.pasta_fp_poseidon
    kimchi_bindings
    kimchi_backend
-   kimchi_backend.common
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_backend_common
+   kimchi_pasta
+   kimchi_pasta.basic
  )
  (implements random_oracle.permutation))

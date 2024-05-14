@@ -28,8 +28,8 @@
    mina_base.util
    bounded_types
    unsigned_extended
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    fold_lib
    random_oracle_input
    outside_hash_image

@@ -17,8 +17,8 @@
    ;; local libraries
    mina_wire_types
    crypto_params
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    random_oracle_input
    bitstring_lib
    codable

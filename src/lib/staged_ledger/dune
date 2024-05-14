@@ -19,8 +19,8 @@
    base.base_internalhash_types
    integers
    ;; local libraries
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    random_oracle_input
    bounded_types
    mina_base.import

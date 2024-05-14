@@ -32,8 +32,8 @@
    mina_runtime_config
    sgn
    mina_base.util
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    pickles
    random_oracle
    pipe_lib

@@ -42,8 +42,8 @@
    kimchi_bindings
    kimchi_types
    pasta_bindings
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    data_hash_lib
    transition_handler
    network_pool

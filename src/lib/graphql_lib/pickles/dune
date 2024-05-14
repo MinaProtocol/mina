@@ -17,8 +17,8 @@
    graphql-async
    ;; local libraries
    graphql_basic_scalars
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    mina_base
    pickles
    pickles.backend

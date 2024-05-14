@@ -28,10 +28,10 @@
   pickles.limb_vector
   pickles_types
   kimchi_backend
-  kimchi_backend.pasta
-  kimchi_backend.pasta.basic
-  kimchi_backend.pasta.constraint_system
-  kimchi_backend.common
+  kimchi_pasta
+  kimchi_pasta.basic
+  kimchi_pasta.constraint_system
+  kimchi_backend_common
   kimchi_bindings
   kimchi_types
   pasta_bindings
