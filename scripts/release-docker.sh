@@ -26,6 +26,7 @@ function usage() {
   echo "      --deb-release         The debian package release channel to pull from (unstable,alpha,beta,stable). Default=unstable"
   echo "      --deb-version         The version string for the debian package to install"
   echo "      --deb-profile         The profile string for the debian package to install"
+  echo "      --deb-build-flags     The build flags string for the debian package to install"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
@@ -43,6 +44,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-codename) DEB_CODENAME="--build-arg deb_codename=$2"; shift;;
   --deb-release) DEB_RELEASE="--build-arg deb_release=$2"; shift;;
   --deb-version) DEB_VERSION="--build-arg deb_version=$2"; shift;;
+  --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
   --deb-profile) DEB_PROFILE="$2"; shift;;
   --extra-args) EXTRA=${@:2}; shift $((${#}-1));;
   *) echo "Unknown parameter passed: $1"; exit 1;;
@@ -70,6 +72,16 @@ case "${DEB_PROFILE}" in
     SERVICE_SUFFIX="-${DEB_PROFILE}"
     ;;
 esac
+
+case "${DEB_BUILD_FLAGS}" in
+  )
+    ;;
+  *)
+    DOCKER_DEB_BUILD_FLAG="${DOCKER_DEB_BUILD_FLAG}-${DEB_BUILD_FLAGS}"
+    SERVICE_SUFFIX="${SERVICE_SUFFIX}-${DEB_BUILD_FLAGS}"
+    ;;
+esac
+
 
 
 # Debug prints for visability
