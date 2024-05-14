@@ -74,7 +74,7 @@ case "${DEB_PROFILE}" in
 esac
 
 case "${DEB_BUILD_FLAGS}" in
-  )
+  none|"")
     ;;
   *)
     DOCKER_DEB_BUILD_FLAG="${DOCKER_DEB_BUILD_FLAG}-${DEB_BUILD_FLAGS}"
