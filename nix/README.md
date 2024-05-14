@@ -527,7 +527,7 @@ If you get an error like
 [
   "Failed to connect to libp2p_helper process",
   [
-    "Could not start libp2p_helper. If you are a dev, did you forget to `make libp2p_helper` and set MINA_LIBP2P_HELPER_PATH? Try MINA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper.",
+    "Could not start libp2p_helper. If you are a dev, did you forget to `make libp2p_helper` and set MINA_LIBP2P_HELPER_PATH? Try MINA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/mina-libp2p_helper.",
     [
       "Unix.Unix_error", "No such file or directory",
       "Core.Unix.create_process",
