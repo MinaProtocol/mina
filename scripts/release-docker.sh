@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive' 'mina-archive-migration' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-test-executive' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
+VALID_SERVICES=('mina-archive' 'mina-archive-instrumented' 'mina-archive-migration' 'mina-daemon' 'mina-daemon-instrumented' 'mina-rosetta' 'mina-test-suite' 'mina-test-executive' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -26,7 +26,6 @@ function usage() {
   echo "      --deb-release         The debian package release channel to pull from (unstable,alpha,beta,stable). Default=unstable"
   echo "      --deb-version         The version string for the debian package to install"
   echo "      --deb-profile         The profile string for the debian package to install"
-  echo "      --deb-build-flags     The build flags string for the debian package to install"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
@@ -44,7 +43,6 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-codename) DEB_CODENAME="--build-arg deb_codename=$2"; shift;;
   --deb-release) DEB_RELEASE="--build-arg deb_release=$2"; shift;;
   --deb-version) DEB_VERSION="--build-arg deb_version=$2"; shift;;
-  --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
   --deb-profile) DEB_PROFILE="$2"; shift;;
   --extra-args) EXTRA=${@:2}; shift $((${#}-1));;
   *) echo "Unknown parameter passed: $1"; exit 1;;
@@ -73,17 +71,6 @@ case "${DEB_PROFILE}" in
     ;;
 esac
 
-case "${DEB_BUILD_FLAGS}" in
-  none)
-    ;;
-  *)
-    DOCKER_DEB_BUILD_FLAG="--build-arg deb_build_flags=-${DEB_BUILD_FLAGS}"
-    SERVICE_SUFFIX="${SERVICE_SUFFIX}-${DEB_BUILD_FLAGS}"
-    ;;
-esac
-
-
-
 # Debug prints for visability
 # Substring removal to cut the --build-arg arguments on the = so that the output is exactly the input flags https://wiki.bash-hackers.org/syntax/pe#substring_removal
 echo "--service ${SERVICE} --version ${VERSION} --branch ${BRANCH##*=} --deb-version ${DEB_VERSION##*=} --deb-profile ${DOCKER_DEB_PROFILE##*=} --deb-release ${DEB_RELEASE##*=} --deb-codename ${DEB_CODENAME##*=}"
@@ -102,6 +89,11 @@ mina-archive)
   DOCKER_CONTEXT="dockerfiles/"
   SERVICE=${SERVICE}${SERVICE_SUFFIX}
   ;;
+mina-archive-instrumented)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
+  DOCKER_CONTEXT="dockerfiles/"
+  SERVICE=${SERVICE}${SERVICE_SUFFIX}
+  ;;
 mina-archive-migration)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive-migration"
   DOCKER_CONTEXT="dockerfiles/"
@@ -114,6 +106,11 @@ bot)
 mina-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
   DOCKER_CONTEXT="dockerfiles/"
+  VERSION="${VERSION}-${NETWORK##*=}"
+  SERVICE=${SERVICE}${SERVICE_SUFFIX}
+  ;;
+mina-daemon-instrumented)
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
   VERSION="${VERSION}-${NETWORK##*=}"
   SERVICE=${SERVICE}${SERVICE_SUFFIX}
   ;;
