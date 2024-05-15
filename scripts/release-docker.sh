@@ -93,6 +93,7 @@ mina-archive-instrumented)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
   DOCKER_CONTEXT="dockerfiles/"
   SERVICE=${SERVICE}${SERVICE_SUFFIX}
+  DEB_PROFILE=${DEB_PROFILE}-instrumented
   ;;
 mina-archive-migration)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive-migration"
@@ -114,6 +115,7 @@ mina-daemon-instrumented)
   DOCKER_CONTEXT="dockerfiles/"
   VERSION="${VERSION}-${NETWORK##*=}"
   SERVICE=${SERVICE}${SERVICE_SUFFIX}
+  DEB_PROFILE=${DEB_PROFILE}-instrumented
   ;;
 mina-toolchain)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
