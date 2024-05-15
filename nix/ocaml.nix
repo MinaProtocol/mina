@@ -708,8 +708,7 @@ let
 
     }'';
 
-  genPatch = self: fileDeps: exeDeps:
-    # TODO rewrite to avoid manual referring to derivations
+  genPatch = self: fileDeps: exeDeps: buildInputs:
     let
       traverseExes = f:
         builtins.concatLists (pkgs.lib.mapAttrsToList (pkg: nameMap:
@@ -717,35 +716,58 @@ let
           (builtins.attrNames nameMap)) exeDeps);
       exes = traverseExes (pkg: key:
         { src, name, ... }:
-        let exeDrv = self.all-exes."${pkg}"."${key}";
-        in "'${exeDrv}/bin/${key}' '${src}/${name}.exe'");
+        let exeEnvVar = artifactEnvVar [ "all-exes" pkg key ];
+        in "'${exeEnvVar}' '${key}' '${src}/${name}.exe'");
       # TODO if exe is public, try to promote to package dependency and use as such
       installExes = if exes == [ ] then
         ""
       else ''
         exesArr=( ${builtins.concatStringsSep " " exes} )
         for i in {0..${builtins.toString (builtins.length exes - 1)}}; do
-          src="''${exesArr[$i*2]}"
-          dst="''${exesArr[$i*2+1]}"
-          install -D "$src" "$dst"
+          drvEnvName="''${exesArr[$i*3]}"
+          drv="''${!drvEnvName}"
+          exe="''${exesArr[$i*3+1]}"
+          dst="''${exesArr[$i*3+2]}"
+          install -D "$drv/bin/$exe" "$dst"
         done
       '';
+      exeInputs = traverseExes (pkg: key: _: self.all-exes."${pkg}"."${key}");
+      fileInputs = builtins.map (dep: self.files."${quote dep}")
+        (builtins.attrNames fileDeps);
     in {
-      fileDeps = builtins.map (dep: self.files."${quote dep}")
+      fileDeps = builtins.map (dep: artifactEnvVar [ "files" dep ])
         (builtins.attrNames fileDeps);
       patchPhase = ''
         runHook prePatch
 
-        for fileDep in $fileDeps; do
-          cp --no-preserve=mode,ownership -RLTu $fileDep ./
+        for fileDepEnvName in $fileDeps; do
+          cp --no-preserve=mode,ownership -RLTu "''${!fileDepEnvName}" ./
         done
         ${installExes}
 
         runHook postPatch
       '';
+      buildInputs = buildInputs ++ exeInputs ++ fileInputs;
     };
 
-  installNixSupport = ''
+  artifactEnvVar = pkgs.lib.concatMapStringsSep "_"
+    (builtins.replaceStrings [ "-" "." "/" ] [ "___" "__" "___" ]);
+
+  installNixSupportFile = src:
+    let envVar = artifactEnvVar [ "files" src ];
+    in ''
+      mkdir -p $out/nix-support
+      echo "export ${envVar}=$out" > $out/nix-support/setup-hook
+    '';
+
+  installNixSupportExe = pkg: key:
+    let envVar = artifactEnvVar [ "all-exes" pkg key ];
+    in ''
+      mkdir -p $out/nix-support
+      echo "export ${envVar}=$out" > $out/nix-support/setup-hook
+    '';
+
+  installNixSupportPkg = ''
     mkdir -p $out/nix-support
     {
       echo -n 'export OCAMLPATH=$'
@@ -776,14 +798,13 @@ let
       let
         pkgDeps = builtins.filter (d: !(info.pseudoPackages ? "${d}"))
           (builtins.attrNames (packageDeps "pkgs" pkg));
+        buildInputs = commonBuildInputs ++ pkgs.lib.attrVals pkgDeps self.pkgs;
       in pkgs.stdenv.mkDerivation (final:
         {
           pname = pkg;
           version = "dev";
           src = self.src.pkgs."${pkg}";
           dontCheck = true;
-          buildInputs = commonBuildInputs
-            ++ pkgs.lib.attrVals pkgDeps self.pkgs;
           nativeBuildInputs = commonNativeBuildInputs;
           buildPhase = ''
             runHook preBuild
@@ -799,12 +820,13 @@ let
             runHook preInstall
 
             mv _build $out
-            ${installNixSupport}
+            ${installNixSupportPkg}
 
             runHook postInstall
           '';
-        } // genPatch self (packageDeps "files" pkg)
-        (packageDepsMulti "exes" pkg));
+        }
+        // genPatch self (packageDeps "files" pkg) (packageDepsMulti "exes" pkg)
+        buildInputs);
 
   genTestedPackage = self: pkg: _:
     let
@@ -840,20 +862,29 @@ let
       deps = field: allDeps.units."${pkg}".exe."${name}"."${field}" or { };
       pkgDeps = builtins.filter (d: !(info.pseudoPackages ? "${d}"))
         (builtins.attrNames (deps "pkgs"));
+      buildInputs = commonBuildInputs ++ pkgs.lib.attrVals pkgDeps self.pkgs;
     in pkgs.stdenv.mkDerivation ({
       pname = "${name}.exe";
       version = "dev";
       src = self.src.all-exes."${pkg}"."${name}";
-      buildInputs = commonBuildInputs ++ pkgs.lib.attrVals pkgDeps self.pkgs;
       nativeBuildInputs = commonNativeBuildInputs;
       buildPhase = ''
+        runHook preBuild
+
         dune build -j $NIX_BUILD_CORES --root=. --build-dir=_build "${exeDef.src}/${exeDef.name}.exe"
+
+        runHook postBuild
       '';
       installPhase = ''
+        runHook preInstall
+
         mkdir -p $out/bin
         mv "_build/default/${exeDef.src}/${exeDef.name}.exe" $out/bin/${name}
+        ${installNixSupportExe pkg name}
+
+        runHook postInstall
       '';
-    } // genPatch self (deps "files") (deps "exes"));
+    } // genPatch self (deps "files") (deps "exes") buildInputs);
 
   genFile = self: pname: src:
     let deps = field: allDeps.files."${src}"."${field}";
@@ -861,19 +892,26 @@ let
       inherit pname;
       version = "dev";
       src = self.src.files."${pname}";
-      buildInputs = commonBuildInputs;
       nativeBuildInputs = commonNativeBuildInputs;
+      fileOuts = builtins.concatStringsSep " "
+        (builtins.attrNames info.srcInfo."${src}".file_outs);
       buildPhase = ''
-        dune build ${
-          builtins.concatStringsSep " "
-          (builtins.attrNames info.srcInfo."${src}".file_outs)
-        }
+        runHook preBuild
+
+        dune build $fileOuts
+
+        runHook postBuild
       '';
       installPhase = ''
-        rm -Rf _build/default/.dune
+        runHook preInstall
+
+        rm -Rf _build/default/.*
         mv _build/default $out
+        ${installNixSupportFile src}
+
+        runHook postInstall
       '';
-    } // genPatch self (deps "files") (deps "exes"));
+    } // genPatch self (deps "files") (deps "exes") commonBuildInputs);
 
   duneAndFileDepsFilters = src:
     let
