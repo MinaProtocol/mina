@@ -767,20 +767,23 @@ let
       echo "export ${envVar}=$out" > $out/nix-support/setup-hook
     '';
 
-  installNixSupportPkg = ''
-    mkdir -p $out/nix-support
-    {
-      echo -n 'export OCAMLPATH=$'
-      echo -n '{OCAMLPATH-}$'
-      echo '{OCAMLPATH:+:}'"$out/install/default/lib"
-      if [[ -d $out/install/default/lib/stublibs ]]; then
-        echo -n 'export CAML_LD_LIBRARY_PATH=$'
-        echo -n '{CAML_LD_LIBRARY_PATH-}$'
-        echo '{CAML_LD_LIBRARY_PATH:+:}'"$out/install/default/lib/stublibs"
-      fi
-    } > $out/nix-support/setup-hook
-    [ ! -d $out/install/default/bin ] || ln -s install/default/bin $out/bin
-  '';
+  installNixSupportPkg = pkg:
+    let envVar = artifactEnvVar [ "pkgs" pkg ];
+    in ''
+      mkdir -p $out/nix-support
+      {
+        echo -n 'export OCAMLPATH=$'
+        echo -n '{OCAMLPATH-}$'
+        echo '{OCAMLPATH:+:}'"$out/install/default/lib"
+        if [[ -d $out/install/default/lib/stublibs ]]; then
+          echo -n 'export CAML_LD_LIBRARY_PATH=$'
+          echo -n '{CAML_LD_LIBRARY_PATH-}$'
+          echo '{CAML_LD_LIBRARY_PATH:+:}'"$out/install/default/lib/stublibs"
+        fi
+        echo "export ${envVar}=$out"
+      } > $out/nix-support/setup-hook
+      [ ! -d $out/install/default/bin ] || ln -s install/default/bin $out/bin
+    '';
 
   # Make separate libs a separately-built derivation instead of `rm -Rf` hack
   genPackage = self: pkg: pkgDef:
@@ -799,38 +802,41 @@ let
         pkgDeps = builtins.filter (d: !(info.pseudoPackages ? "${d}"))
           (builtins.attrNames (packageDeps "pkgs" pkg));
         buildInputs = commonBuildInputs ++ pkgs.lib.attrVals pkgDeps self.pkgs;
-      in pkgs.stdenv.mkDerivation (final:
-        {
-          pname = pkg;
-          version = "dev";
-          src = self.src.pkgs."${pkg}";
-          dontCheck = true;
-          nativeBuildInputs = commonNativeBuildInputs;
-          buildPhase = ''
-            runHook preBuild
+      in pkgs.stdenv.mkDerivation ({
+        pname = pkg;
+        version = "dev";
+        src = self.src.pkgs."${pkg}";
+        dontCheck = true;
+        nativeBuildInputs = commonNativeBuildInputs;
+        buildPhase = ''
+          runHook preBuild
 
-            dune build \
-              ${if final.dontCheck then "" else " @runtest "} \
-              ${packageArg} \
-              -j $NIX_BUILD_CORES --root=. --build-dir=_build
+          runtest=""
+          if [[ "$dontCheck" != 1 ]]; then
+            echo "Running tests for ${pkg}"
+            runtest=" @runtest "
+          fi
 
-            runHook postBuild
-          '';
-          installPhase = ''
-            runHook preInstall
+          dune build $runtest ${packageArg} \
+            -j $NIX_BUILD_CORES --root=. --build-dir=_build
 
-            mv _build $out
-            ${installNixSupportPkg}
+          runHook postBuild
+        '';
+        installPhase = ''
+          runHook preInstall
 
-            runHook postInstall
-          '';
-        }
-        // genPatch self (packageDeps "files" pkg) (packageDepsMulti "exes" pkg)
+          mv _build $out
+          ${installNixSupportPkg pkg}
+
+          runHook postInstall
+        '';
+      } // genPatch self (packageDeps "files" pkg) (packageDepsMulti "exes" pkg)
         buildInputs);
 
   genTestedPackage = self: pkg: _:
     let
       drv = self.pkgs."${pkg}";
+      pkgEnvVar = artifactEnvVar [ "pkgs" pkg ];
       # For detached units (with no package) there is no need to rely on pre-built
       # libraries/executables because detached units can not be a dependency of other
       # packages, hence no use to introduce indirection
@@ -839,16 +845,11 @@ let
           { }
         else {
           postPatch = ''
-            drv=""
-            for input in $nativeBuildInputs; do
-              if [[ "$input" =~ -${pkg}-dev$ ]]; then
-                drv="$input"
-              fi
-            done
-            [[ "$drv" != "" ]] || exit 2
-            cp --no-preserve=mode,ownership -RL "$drv" _build
+            envVar="${pkgEnvVar}"
+            echo "Reusing build artifacts from: ''${!envVar}"
+            cp --no-preserve=mode,ownership -RL "''${!envVar}" _build
           '';
-          nativeBuildInputs = s.nativeBuildInputs ++ [ drv ];
+          buildInputs = s.buildInputs ++ [ drv ];
         };
     in drv.overrideAttrs (s:
       usePrebuilt s // {
@@ -1079,63 +1080,30 @@ let
       name = "source-${pkgName}-with-correct-symlinks";
     } (mergeFilters filters);
 
-  vmTestBuildInputs = self: pkgNames:
-    builtins.concatMap (pkg:
-      let drv = self.pkgs."${pkg}";
-      in drv.buildInputs ++ drv.nativeBuildInputs) pkgNames;
-
-  vmTestScript = self: name: auxBuildInputs: pkgNames: testTargetString:
+  vmTestScript = self: pkg: buildCmd:
     let
-      copyPkg = pkg:
-        "cp --no-preserve=mode,ownership,timestamps -RLTu ${
-          self.src.pkgs."${pkg}"
-        } .";
-      copyPrebuilt = pkg:
-        "cp --no-preserve=mode,ownership,timestamps -RLTu ${
-          self.pkgs."${pkg}"
-        } _build";
-      buildInputs = vmTestBuildInputs self pkgNames ++ auxBuildInputs;
-      subpaths = suffix:
-        builtins.filter builtins.pathExists
-        (builtins.map (drv: "${drv.out}/${suffix}") buildInputs);
-      libs = subpaths "lib";
-      bins = subpaths "bin";
-      setupHooks = subpaths "nix-support/setup-hook";
-      propagatedFiles = subpaths "nix-support/propagated-build-inputs";
-      propagatedScript = if propagatedFiles == [ ] then
-        ""
-      else ''
-        filesToProcess=${builtins.concatStringsSep " " propagatedFiles}
-        while [[ "$filesToProcess" != "" ]]; do
-          next=""
-          for pbiFile in $filesToProcess; do
-            for input in $(<$pbiFile); do
-              [ ! -d "$input/lib" ] || export LIBRARY_PATH="''${LIBRARY_PATH:+$LIBRARY_PATH:}$input/lib"
-              [ ! -d "$input/bin" ] || export PATH="''${PATH:+$PATH:}$input/bin"
-              if [[ -f "$input/nix-support/propagated-build-inputs" ]]; then
-                next="$next $input/nix-support/propagated-build-inputs"
-              fi
-            done
-          done
-          filesToProcess="$next"
-        done
+      pkgEnvVar = artifactEnvVar [ "pkgs" pkg ];
+      script = pkgs.writeShellScriptBin "runtest-${pkg}" ''
+        set -eo pipefail
+        source "$(which env-${pkg})" || true # Ignore read-only variables
+        source $stdenv/setup
+        export NIX_STORE=/nix/store
+        export NIX_BUILD_TOP=/build
+        mkdir -p /build
+        phases='unpackPhase patchPhase configurePhase' genericBuild
+        envVar="${pkgEnvVar}"
+        echo "Reusing build artifacts from: ''${!envVar}"
+        cp --no-preserve=mode,ownership -RL "''${!envVar}" _build
+        export dontCheck=0
+        export phases='buildPhase'
+        ${buildCmd}
       '';
-    in pkgs.writeShellScriptBin "runtest-${name}" ''
-      ${pkgs.lib.concatMapStringsSep "\n" (hook: "source " + hook) setupHooks}
-      export LIBRARY_PATH="''${LIBRARY_PATH:+$LIBRARY_PATH:}${
-        builtins.concatStringsSep ":" libs
-      }"
-      export PATH="''${PATH:+$PATH:}${builtins.concatStringsSep ":" bins}"
-      ${propagatedScript}
-      ${pkgs.lib.concatMapStringsSep "\n" copyPkg pkgNames}
-      ${pkgs.lib.concatMapStringsSep "\n" copyPrebuilt pkgNames}
-      dune build ${testTargetString} -j 8 --root=. --build-dir=_build
-    '';
+      drv = self.pkgs."${pkg}";
+    in [ script drv ];
 
-  vmTest = self: name: auxPackages: pkgNames: testTargetString:
-    let vmScript = vmTestScript self name [ ] pkgNames testTargetString;
-    in mkVmTest ([ vmScript ] ++ auxPackages ++ vmTestBuildInputs self pkgNames)
-    name;
+  vmTest = self: pkg: auxBuildInputs: buildCmd:
+    let vmScript = vmTestScript self pkg buildCmd ++ auxBuildInputs;
+    in mkVmTest vmScript pkg;
 
   mkVmTest = packages: name:
     pkgs.testers.runNixOSTest {
@@ -1147,12 +1115,7 @@ let
           item = "nofile";
           value = "65536";
         }];
-        users.users.mina = {
-          isNormalUser = true;
-          home = "/home/mina";
-          extraGroups = [ "wheel" ];
-          inherit packages;
-        };
+        environment.systemPackages = packages;
         system.stateVersion = "23.11";
         virtualisation = {
           graphics = false;
@@ -1163,17 +1126,17 @@ let
       };
       testScript = ''
         machine.wait_for_unit("default.target")
-        machine.succeed("cd /home/mina && su -- mina -c 'runtest-${name}'")
+        machine.succeed("runtest-${name}")
       '';
     };
 
-  nonConsensusPkgs = builtins.filter (s:
-    pkgs.lib.hasSuffix "_nonconsensus" s
-    || pkgs.lib.hasPrefix "__src-nonconsensus-" s)
-    (builtins.attrNames info.packages);
-  nonConsensusSrcOverrides = super:
-    pkgs.lib.genAttrs nonConsensusPkgs
-    (pkg: fixupSymlinksInSource pkg super."${pkg}" ../.);
+  # nonConsensusPkgs = builtins.filter (s:
+  #   pkgs.lib.hasSuffix "_nonconsensus" s
+  #   || pkgs.lib.hasPrefix "__src-nonconsensus-" s)
+  #   (builtins.attrNames info.packages);
+  # nonConsensusSrcOverrides = super:
+  #   pkgs.lib.genAttrs nonConsensusPkgs
+  #   (pkg: fixupSymlinksInSource pkg super."${pkg}" ../.);
 
   sqlSchemaFiles = with inputs.nix-filter.lib;
     filter {
@@ -1228,9 +1191,9 @@ let
           all-tested = mkCombined "all-tested"
             (builtins.concatMap (testOrPkg self) packageNames);
         };
-      super = pkgs.lib.recursiveUpdate super0 {
-        src.pkgs = nonConsensusSrcOverrides super0.src.pkgs;
-      };
+      # super = pkgs.lib.recursiveUpdate super0 {
+      #   src.pkgs = nonConsensusSrcOverrides super0.src.pkgs;
+      # };
       marlinPlonkStubs = {
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
       };
@@ -1239,6 +1202,31 @@ let
       withLibp2pHelper = (s: {
         nativeBuildInputs = s.nativeBuildInputs ++ [ pkgs.libp2p_helper ];
       });
+      vmTestOverrides = pkg:
+        let envVar = artifactEnvVar [ "pkgs" pkg ];
+        in {
+          postInstall = ''
+            mkdir -p $out/bin
+            declare > $out/bin/env-${pkg}
+            echo "export ${envVar}=$out" >> $out/bin/env-${pkg}
+            chmod +x $out/bin/env-${pkg}
+          '';
+        };
+      testWithVm' = buildCmd: pkg: auxBuildInputs: {
+        pkgs."${pkg}" =
+          super0.pkgs."${pkg}".overrideAttrs (vmTestOverrides pkg);
+        tested."${pkg}" = vmTest self pkg auxBuildInputs buildCmd;
+      };
+      testWithVm = testWithVm' "genericBuild";
+      super = builtins.foldl' pkgs.lib.recursiveUpdate super0 [
+        # TODO stabilize tests and remove the hack
+        (testWithVm' "genericBuild || genericBuild || genericBuild" "mina_net2"
+          [ pkgs.libp2p_helper ])
+        (testWithVm' "genericBuild || genericBuild || genericBuild"
+          "__src-lib-mina_net2-tests__" [ pkgs.libp2p_helper ])
+        (testWithVm "__src-test-command_line_tests__" [ pkgs.libp2p_helper ])
+        (testWithVm "__src-lib-staged_ledger-test__" [ ])
+      ];
     in pkgs.lib.recursiveUpdate super {
       pkgs.mina_version_compiled =
         super.pkgs.mina_version_compiled.overrideAttrs {
@@ -1284,20 +1272,8 @@ let
           ( cd ${sqlSchemaFiles} && psql "$MINA_TEST_POSTGRES" < create_schema.sql >/dev/null )
         '';
       });
-      # TODO remove this override after merging the latest `develop`
-      tested.__src-lib-crypto-snarky_tests__ = skippedTest;
-      tested.__src-test-command_line_tests__ =
-        vmTest self "cmd-tests" [ pkgs.libp2p_helper ]
-        [ "__src-test-command_line_tests__" ] "src/test/command_line_tests";
-      tested.__src-lib-staged_ledger-test__ =
-        vmTest self "staged-ledger-tests" [ ]
-        [ "__src-lib-staged_ledger-test__" ] "src/lib/staged_ledger/test";
-      tested.__src-lib-mina_net2-tests__ = skippedTest;
-      tested.mina_net2 =
-        vmTest self "mina_net2-tests" [ pkgs.libp2p_helper pkgs.gcc ] [
-          "mina_net2"
-          "__src-lib-mina_net2-tests__"
-        ] "src/lib/mina_net2";
+      # # TODO remove this override after merging the latest `develop`
+      # tested.__src-lib-crypto-snarky_tests__ = skippedTest;
     };
 
   overlay = self: super:
