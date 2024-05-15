@@ -26,7 +26,6 @@ function usage() {
   echo "      --deb-release         The debian package release channel to pull from (unstable,alpha,beta,stable). Default=unstable"
   echo "      --deb-version         The version string for the debian package to install"
   echo "      --deb-profile         The profile string for the debian package to install"
-  echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
   exit 1
@@ -159,6 +158,10 @@ TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}"
 GITHASH=$(git rev-parse --short=7 HEAD)
 HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}"
 BUILD_NETWORK="--network=host"
+
+echo "Building docker: "
+echo "- build args: $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_PROFILE $BRANCH $REPO $extra_build_args"
+echo "- tag: $TAG"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')

@@ -6,13 +6,9 @@ RED='\033[0;31m'
 
 ARCH=amd64
 
-while [[ "$#" -gt 0 ]]; do case $1 in
-  -n|--names) DEB_NAMES="$2"; shift;;
-  -r|--release) DEB_RELEASE="$2"; shift;;
-  -v|--version) DEB_VERSION="$2"; shift;;
-  -c|--codename) DEB_CODENAME="$2"; shift;;
-  *) echo "Unknown parameter passed: $1"; exit 1;;
-esac; shift; done
+# Always prefer to push to experimental
+DEB_RELEASE="experimental"
+WAIT=0
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -24,10 +20,21 @@ function usage() {
   echo "  -r, --release       The Debian release"
   echo "  -v, --version       The Debian version"
   echo "  -c, --codename      The Debian codename"
+  echo "  -w, --wait          Wait for debian to be available at repo. By default is disabled"
   echo ""
-  echo "Example: $0 --name mina-archive_2.0.0berkeley-rc1-berkeley-48efea4 --release unstable --version 2.0.0berkeley-rc1-berkeley-48efea4 --codename bullseye "
+  echo "Example: $0 --name mina-archive_2.0.0berkeley-rc1-berkeley-48efea4 --release experimental --version 2.0.0berkeley-rc1-berkeley-48efea4 --codename bullseye "
   exit 1
 }
+
+while [[ "$#" -gt 0 ]]; do case $1 in
+  -n|--names) DEB_NAMES="$2"; shift;;
+  -r|--release) DEB_RELEASE="$2"; shift;;
+  -v|--version) DEB_VERSION="$2"; shift;;
+  -c|--codename) DEB_CODENAME="$2"; shift;;
+  -w|--wait) WAIT=1; shift;;
+  -h|--help) usage; exit 0;;
+  *) echo "Unknown parameter passed: $1"; usage; exit 1;;
+esac; shift; done
 
 if [[ -z "$DEB_NAMES" ]]; then usage "Debian(s) to upload are not set!"; fi;
 if [[ -z "$DEB_VERSION" ]]; then usage "Version is not set!"; fi;
@@ -55,7 +62,6 @@ echo "Publishing debs: ${DEB_NAMES} to Release: ${DEB_RELEASE} and Codename: ${D
 ${DEBS3_UPLOAD} --component "${DEB_RELEASE}" --codename "${DEB_CODENAME}" "${DEB_NAMES}" \
 || (  scripts/clear-deb-s3-lockfile.sh \
    && ${DEBS3_UPLOAD} --component "${DEB_RELEASE}" --codename "${DEB_CODENAME}" "${DEB_NAMES}")
-set +x
 
 # Verify integrity of debs on remote repo
 
@@ -65,6 +71,10 @@ function verify_o1test_repo_has_package {
   ${DEBS3_SHOW} ${1} ${DEB_VERSION} $ARCH -c $DEB_CODENAME -m $DEB_RELEASE
   return $?
 }
+
+if [ $WAIT -eq 0 ]; then
+  exit 0
+fi
 
 for deb in $DEB_NAMES
 do

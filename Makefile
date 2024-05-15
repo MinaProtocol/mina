@@ -67,9 +67,7 @@ endif
 ocaml_checks: ocaml_version ocaml_word_size check_opam_switch
 
 libp2p_helper:
-ifeq (, $(MINA_LIBP2P_HELPER_PATH))
 	make -C src/app/libp2p_helper
-endif
 
 genesis_ledger: ocaml_checks
 	$(info Building runtime_genesis_ledger)
@@ -165,6 +163,14 @@ zkapp_limits: ocaml_checks
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/zkapp_limits/zkapp_limits.exe --profile=devnet
 	$(info Build complete)
 
+build_deamon_apps: build_all_sigs build_rosetta_all_sigs
+	$(info Starting Build)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) \
+	dune build src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+			   src/app/generate_keypair/generate_keypair.exe \
+			   src/app/validate_keypair/validate_keypair.exe 
+	$(info Build complete)
+
 dev: build
 
 macos-portable:
@@ -208,15 +214,13 @@ macos-setup:
 publish-macos:
 	@./scripts/publish-macos.sh
 
-deb:
-	./scripts/rebuild-deb.sh
-	./scripts/archive/build-release-archives.sh
+daemon_deb:
+	./scripts/deb/build.sh daemon
 	@mkdir -p /tmp/artifacts
 	@cp _build/mina*.deb /tmp/artifacts/.
 
-deb_optimized:
-	./scripts/rebuild-deb.sh "optimized"
-	./scripts/archive/build-release-archives.sh
+deb:
+	./scripts/deb/build.sh
 	@mkdir -p /tmp/artifacts
 	@cp _build/mina*.deb /tmp/artifacts/.
 
@@ -231,7 +235,7 @@ build_or_download_pv_keys: ocaml_checks
 	$(info Keys built)
 
 publish_debs:
-	@./buildkite/scripts/publish-deb.sh
+	@./buildkite/scripts/deb/publish.sh
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts

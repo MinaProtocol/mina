@@ -6,22 +6,6 @@ echo "--- Setting up the envrionment to build debian packages..."
 
 set -euo pipefail
 
-SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd "${SCRIPTPATH}/../_build"
-
-GITHASH=$(git rev-parse --short=7 HEAD)
-GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
-
-set +u
-BUILD_NUM=${BUILDKITE_BUILD_NUM}
-BUILD_URL=${BUILDKITE_BUILD_URL}
-set -u
-
-# Load in env vars for githash/branch/etc.
-source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
-
-cd "${SCRIPTPATH}/../_build"
-
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
 
