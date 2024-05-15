@@ -61,16 +61,12 @@ end]
 let dummy =
   Poly.{ receiver_pk = Public_key.Compressed.empty; amount = Amount.zero }
 
-[%%ifdef consensus_mechanism]
-
 type var = (Public_key.Compressed.var, Amount.var) Poly.t
 
 let var_of_t ({ receiver_pk; amount } : t) : var =
   { receiver_pk = Public_key.Compressed.var_of_t receiver_pk
   ; amount = Amount.var_of_t amount
   }
-
-[%%endif]
 
 let gen_aux max_amount =
   let open Quickcheck.Generator.Let_syntax in

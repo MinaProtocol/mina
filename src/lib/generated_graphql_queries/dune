@@ -6,7 +6,7 @@
    graphql_lib base
  )
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../../graphql_schema.json)
+ (preprocessor_deps ../../../graphql_schema.json ../../graphql-ppx-config.inc)
  (preprocess (pps ppx_base ppx_version
                   graphql_ppx -- %{read-lines:../../graphql-ppx-config.inc}
 )))

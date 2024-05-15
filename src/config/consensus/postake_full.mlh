@@ -1,4 +1,3 @@
-[%%define consensus_mechanism "proof_of_stake"]
 [%%define k 290]
 [%%define slots_per_epoch 7140]
 [%%define slots_per_sub_window 7]
