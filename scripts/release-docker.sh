@@ -111,6 +111,7 @@ mina-daemon)
   ;;
 mina-daemon-instrumented)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
+  DOCKER_CONTEXT="dockerfiles/"
   VERSION="${VERSION}-${NETWORK##*=}"
   SERVICE=${SERVICE}${SERVICE_SUFFIX}
   ;;
