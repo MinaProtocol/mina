@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-if [[ $# -ne 1 ]]; then
+if [[ $# -gt 2 ]] || [[ $# -lt 1 ]]; then
     echo "Usage: $0 '<debians>' '[use-sudo]'"
     exit 1
 fi
