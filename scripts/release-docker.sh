@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('mina-archive' 'mina-archive-instrumented' 'mina-archive-migration' 'mina-daemon' 'mina-daemon-instrumented' 'mina-rosetta' 'mina-test-suite' 'mina-test-executive' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
+VALID_SERVICES=('mina-archive' 'mina-archive-migration' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-test-executive' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'bot' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain' 'itn-orchestrator')
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -26,6 +26,7 @@ function usage() {
   echo "      --deb-release         The debian package release channel to pull from (unstable,alpha,beta,stable). Default=unstable"
   echo "      --deb-version         The version string for the debian package to install"
   echo "      --deb-profile         The profile string for the debian package to install"
+  echo "      --deb-build-flags     The build-flags string for the debian package to install"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
@@ -44,6 +45,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-release) DEB_RELEASE="--build-arg deb_release=$2"; shift;;
   --deb-version) DEB_VERSION="--build-arg deb_version=$2"; shift;;
   --deb-profile) DEB_PROFILE="$2"; shift;;
+  --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
   --extra-args) EXTRA=${@:2}; shift $((${#}-1));;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
@@ -59,21 +61,37 @@ case "${DEB_CODENAME##*=}" in
 esac
 IMAGE="--build-arg image=${IMAGE}"
 
-# Determine profile for mina name. To preserve backward compatibility standard profile is default.
-case "${DEB_PROFILE}" in
-  standard)
-    DOCKER_DEB_PROFILE=""
-    SERVICE_SUFFIX=""
-    ;;
-  *)
-    DOCKER_DEB_PROFILE="--build-arg deb_profile=${DEB_PROFILE}"
-    SERVICE_SUFFIX="-${DEB_PROFILE}"
-    ;;
-esac
+# Determine suffix for mina name. Suffix is combined from profile and service name 
+# Possible outcomes:
+# - instrumented
+# - hardfork
+# - lightnet
+# - hardfork-instrumented
+  case "${DEB_PROFILE}" in
+    standard)
+      case "${SERVICE}" in 
+        *instrumented)
+          DOCKER_DEB_SUFFIX="--build-arg deb_suffix=instrumented"
+          ;;
+        *)
+          ;;
+      esac
+      ;;
+    *)
+      case "${DEB_BUILD_FLAGS}" in 
+        *instrumented)
+          DOCKER_DEB_SUFFIX="--build-arg deb_suffix=${DEB_PROFILE}-instrumented"
+          ;;
+        *)
+          DOCKER_DEB_SUFFIX="--build-arg deb_suffix=${DEB_PROFILE}"
+          ;;
+      esac
+      ;;
+  esac
 
 # Debug prints for visability
 # Substring removal to cut the --build-arg arguments on the = so that the output is exactly the input flags https://wiki.bash-hackers.org/syntax/pe#substring_removal
-echo "--service ${SERVICE} --version ${VERSION} --branch ${BRANCH##*=} --deb-version ${DEB_VERSION##*=} --deb-profile ${DOCKER_DEB_PROFILE##*=} --deb-release ${DEB_RELEASE##*=} --deb-codename ${DEB_CODENAME##*=}"
+echo "--service ${SERVICE} --version ${VERSION} --branch ${BRANCH##*=} --deb-version ${DEB_VERSION##*=} --deb-suffix ${DOCKER_DEB_SUFFIX##*=} --deb-release ${DEB_RELEASE##*=} --deb-codename ${DEB_CODENAME##*=}"
 echo ${EXTRA}
 echo "docker image: ${IMAGE}"
 
@@ -87,18 +105,10 @@ case "${SERVICE}" in
 mina-archive)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
   DOCKER_CONTEXT="dockerfiles/"
-  SERVICE=${SERVICE}${SERVICE_SUFFIX}
-  ;;
-mina-archive-instrumented)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
-  DOCKER_CONTEXT="dockerfiles/"
-  SERVICE=${SERVICE}${SERVICE_SUFFIX}
-  DEB_PROFILE=${DEB_PROFILE}-instrumented
   ;;
 mina-archive-migration)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive-migration"
   DOCKER_CONTEXT="dockerfiles/"
-  SERVICE=${SERVICE}${SERVICE_SUFFIX}
   ;;
 bot)
   DOCKERFILE_PATH="frontend/bot/Dockerfile"
@@ -108,14 +118,6 @@ mina-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
   DOCKER_CONTEXT="dockerfiles/"
   VERSION="${VERSION}-${NETWORK##*=}"
-  SERVICE=${SERVICE}${SERVICE_SUFFIX}
-  ;;
-mina-daemon-instrumented)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
-  DOCKER_CONTEXT="dockerfiles/"
-  VERSION="${VERSION}-${NETWORK##*=}"
-  SERVICE=${SERVICE}${SERVICE_SUFFIX}
-  DEB_PROFILE=${DEB_PROFILE}-instrumented
   ;;
 mina-toolchain)
   DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
@@ -173,9 +175,9 @@ HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK#
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
-  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_PROFILE $DOCKER_DEB_BUILD_FLAG $BRANCH $REPO $extra_build_args -t "$TAG" -
+  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $BRANCH $REPO $extra_build_args -t "$TAG" -
 else
-  docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_PROFILE $DOCKER_DEB_BUILD_FLAG $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
+  docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX  $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
 if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
