@@ -13,11 +13,7 @@ open Snark_params.Tick
 module Legacy_token_id : sig
   val default : (Field.t, bool) Random_oracle_input.Legacy.t
 
-  [%%ifdef consensus_mechanism]
-
   val default_checked : (Field.Var.t, Boolean.var) Random_oracle_input.Legacy.t
-
-  [%%endif]
 end
 
 module Body : sig
@@ -114,8 +110,6 @@ module Common : sig
 
   val gen : t Quickcheck.Generator.t
 
-  [%%ifdef consensus_mechanism]
-
   type var =
     ( Currency.Fee.var
     , Public_key.Compressed.var
@@ -134,8 +128,6 @@ module Common : sig
 
     val constant : t -> var
   end
-
-  [%%endif]
 end
 
 module Poly : sig
