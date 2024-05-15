@@ -171,18 +171,14 @@ module Make (Engine : Intf.Engine.S) () :
   type log_error = Node.t * Event_type.Log_error.t
 
   type log_error_accumulator =
-    { warn : log_error DynArray.t
-    ; error : log_error DynArray.t
-    ; faulty_peer : log_error DynArray.t
-    ; fatal : log_error DynArray.t
+    { warn : log_error list ref
+    ; error : log_error list ref
+    ; faulty_peer : log_error list ref
+    ; fatal : log_error list ref
     }
 
   let empty_log_error_accumulator () =
-    { warn = DynArray.create ()
-    ; error = DynArray.create ()
-    ; faulty_peer = DynArray.create ()
-    ; fatal = DynArray.create ()
-    }
+    { warn = ref []; error = ref []; faulty_peer = ref []; fatal = ref [] }
 
   let watch_log_errors ~logger ~event_router ~on_fatal_error =
     let log_error_accumulator = empty_log_error_accumulator () in
@@ -203,7 +199,7 @@ module Make (Engine : Intf.Engine.S) () :
               | _ ->
                   failwith "unexpected log level encountered"
             in
-            DynArray.add acc (node, message) ;
+            acc := (node, message) :: !acc ;
             if Logger.Level.equal message.level Fatal then (
               [%log fatal] "Error occured $error"
                 ~metadata:[ ("error", Logger.Message.to_yojson message) ] ;
@@ -216,9 +212,8 @@ module Make (Engine : Intf.Engine.S) () :
       =
     let open Test_error in
     let lift error_array =
-      DynArray.to_list error_array
-      |> List.map ~f:(fun (node, message) ->
-             { node_id = Node.id node; error_message = message } )
+      List.rev_map !error_array ~f:(fun (node, message) ->
+          { node_id = Node.id node; error_message = message } )
     in
     let time_of_error { error_message; _ } = error_message.timestamp in
     let accumulate_errors =

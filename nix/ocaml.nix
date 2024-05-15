@@ -113,7 +113,7 @@ let
         for i in $(find -L "${placeholder output}/bin" -type f); do
           wrapProgram "$i" \
             --prefix PATH : ${makeBinPath deps} \
-            --set MINA_LIBP2P_HELPER_PATH ${pkgs.libp2p_helper}/bin/libp2p_helper \
+            --set MINA_LIBP2P_HELPER_PATH ${pkgs.libp2p_helper}/bin/mina-libp2p_helper \
             --set MINA_COMMIT_SHA1 ${escapeShellArg commit_sha1} \
             --set MINA_COMMIT_DATE ${escapeShellArg commit_date} \
             --set MINA_BRANCH "''${MINA_BRANCH-<unknown due to nix build>}"
@@ -252,7 +252,6 @@ let
           cp src/app/replayer/replayer.exe $berkeley_migration/bin/mina-migration-replayer
           cp src/app/berkeley_migration/berkeley_migration.exe $berkeley_migration/bin/mina-berkeley-migration
           cp src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe $berkeley_migration/bin/mina-berkeley-migration-verifier
-          cp ${../scripts/archive/migration/mina-berkeley-migration-script} $berkeley_migration/bin/mina-berkeley-migration-script
           cp src/app/swap_bad_balances/swap_bad_balances.exe $archive/bin/mina-swap-bad-balances
           cp -R _doc/_html $out/share/doc/html
           # cp src/lib/mina_base/sample_keypairs.json $sample/share/mina
@@ -260,7 +259,7 @@ let
           remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$mainnet/bin/*,$testnet/bin*,$genesis/bin/*,$generate_keypair/bin/*}
         '';
         shellHook =
-          "export MINA_LIBP2P_HELPER_PATH=${pkgs.libp2p_helper}/bin/libp2p_helper";
+          "export MINA_LIBP2P_HELPER_PATH=${pkgs.libp2p_helper}/bin/mina-libp2p_helper";
       } // optionalAttrs pkgs.stdenv.isDarwin {
         OCAMLPARAM = "_,cclib=-lc++";
       });
@@ -306,7 +305,7 @@ let
       mina_tests = runMinaCheck {
         name = "tests";
         extraArgs = {
-          MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/libp2p_helper";
+          MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/mina-libp2p_helper";
           MINA_LIBP2P_PASS = "naughty blue worm";
           MINA_PRIVKEY_PASS = "naughty blue worm";
           TZDIR = "${pkgs.tzdata}/share/zoneinfo";

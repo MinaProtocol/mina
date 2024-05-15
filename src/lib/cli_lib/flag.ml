@@ -334,11 +334,6 @@ module Log = struct
             %d)"
            Default.file_log_rotations )
       (optional_with_default Default.file_log_rotations int)
-
-  let file =
-    let open Command.Param in
-    flag "--log-file" ~aliases:[ "log-file" ]
-      ~doc:"FILE Set log file (stores JSON)" (optional string)
 end
 
 type signed_command_common =

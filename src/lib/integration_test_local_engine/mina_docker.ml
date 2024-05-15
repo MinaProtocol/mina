@@ -890,7 +890,7 @@ module Network_manager = struct
 
   let poll_until_stack_deployed ~logger =
     let poll_interval = Time.Span.of_sec 15.0 in
-    let max_polls = 20 (* 5 mins *) in
+    let max_polls = 60 (* 15 mins *) in
     let get_service_statuses () =
       let%bind output =
         Util.run_cmd_exn "/" "docker"

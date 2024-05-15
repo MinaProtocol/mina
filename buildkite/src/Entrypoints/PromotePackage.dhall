@@ -24,6 +24,7 @@ let promote_artifacts =
   \(to_channel: DebianChannel.Type ) ->
   \(tag: Text ) ->
   \(remove_profile_from_name: Bool) ->
+  \(publish: Bool) ->
 
   let debians_spec =
       List/map 
@@ -80,6 +81,8 @@ let promote_artifacts =
               , codename = codename
               , new_tag = new_version
               , network = network
+              , publish = publish
+              , remove_profile_from_name = remove_profile_from_name
               , step_key = "add-tag-to-${Artifact.lowerName docker}-${DebianVersions.lowerName codename}-docker"
           }
         )
