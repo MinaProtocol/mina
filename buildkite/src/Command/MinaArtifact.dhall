@@ -40,6 +40,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             network="berkeley",
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_profile=profile,
+            build_flags=buildFlags,
             step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment buildFlags}-docker-image"
           },
 
@@ -66,6 +67,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             service="mina-archive",
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_profile=profile,
+            build_flags=buildFlags,
             step_key="archive-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment buildFlags}-docker-image"
           },
 
@@ -168,7 +170,8 @@ let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type =
           tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ],
           mode = spec.mode
         },
-      steps = steps    }
+      steps = steps
+    }
 
 in
 {
