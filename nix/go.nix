@@ -74,6 +74,10 @@ final: prev: {
       cp -r --reflink=auto ${final.libp2p_ipc_go}/ vendor/libp2p_ipc
       sed -i 's/.*libp2p_ipc.*//' go.mod
     '';
+    # For compatibility with mina's child_processes library
+    postInstall = ''
+      mv $out/bin/libp2p_helper $out/bin/mina-libp2p_helper
+    '';
   };
 
   # Tool for testing implementation of the rosetta api
