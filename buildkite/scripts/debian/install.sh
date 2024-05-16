@@ -14,6 +14,14 @@ fi
 DEBS=$1
 USE_SUDO=${2:-0}
 
+
+if [ "$USE_SUDO" == "1" ]; then
+   SUDO="sudo"
+else
+   SUDO=""
+fi
+
+
 LOCAL_DEB_FOLDER=debs
 mkdir -p $LOCAL_DEB_FOLDER
 source ./buildkite/scripts/export-git-env-vars.sh
@@ -31,7 +39,7 @@ else
         source ./buildkite/scripts/download-artifact-from-cache.sh "mina-logproc*" $MINA_DEB_CODENAME/_build "" $LOCAL_DEB_FOLDER
       ;;
       mina-create-legacy-genesis)
-        # Download locally static debians (for example mina-legacy-create-genesis )
+        # DowPnload locally static debians (for example mina-legacy-create-genesis )
         gsutil -m cp "gs://buildkite_k8s/coda/shared/debs/$MINA_DEB_CODENAME/$i*" $LOCAL_DEB_FOLDER
       ;;
     esac
@@ -40,28 +48,18 @@ else
 fi
 
 # Install aptly
-if [ $USE_SUDO = 1 ]; then
-  sudo apt-get update 
-  sudo apt-get install aptly
-else
-  apt-get update 
-  apt-get install aptly
-fi
+$SUDO apt-get update 
+$SUDO apt-get install -y aptly
 
 # Start aptly
 source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background
 
 # Install debians
 echo "Installing mina packages: $DEBS"
-echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | sudo tee /etc/apt/sources.list.d/mina.list
+echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | $SUDO tee /etc/apt/sources.list.d/mina.list
 
-if [ $USE_SUDO = 1 ]; then
-  sudo apt-get update --yes
-  sudo apt-get install --yes --allow-downgrades "${debs[@]}"
-else
-  apt-get update --yes
-  apt-get install --yes --allow-downgrades "${debs[@]}"
-fi
+$SUDO apt-get update --yes
+$SUDO apt-get install --yes --allow-downgrades "${debs[@]}"
 
 
 
