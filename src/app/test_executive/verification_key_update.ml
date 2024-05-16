@@ -132,6 +132,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              constraint_constants )
         ~choices:(fun ~self:_ -> [ Trivial_rule1.rule ])
     in
+    let%bind.Async.Deferred vk1 =
+      Pickles.Side_loaded.Verification_key.of_compiled tag1
+    in
     let tag2, _, _, Pickles.Provers.[ trivial_prover2 ] =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
@@ -142,9 +145,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           (Genesis_constants.Constraint_constants.to_snark_keys_header
              constraint_constants )
         ~choices:(fun ~self:_ -> [ Trivial_rule2.rule ])
-    in
-    let%bind.Async.Deferred vk1 =
-      Pickles.Side_loaded.Verification_key.of_compiled tag1
     in
     let%bind.Async.Deferred vk2 =
       Pickles.Side_loaded.Verification_key.of_compiled tag2
@@ -387,19 +387,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; snapp_update = snapp_update_impossible
         }
       in
-      let%map invalid_update_vk_perm_proof =
+      let%bind invalid_update_vk_perm_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_invalid_proof
-      and invalid_update_vk_perm_impossible =
+      in
+      let%bind invalid_update_vk_perm_impossible =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_invalid_impossible
-      and update_vk_perm_proof =
+      in
+      let%bind update_vk_perm_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_proof
-      and update_vk_perm_impossible =
+      in
+      let%map update_vk_perm_impossible =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_impossible
@@ -452,15 +455,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; current_auth = Proof
         }
       in
-      let%map failed_update_vk_signature_1 =
+      let%bind failed_update_vk_signature_1 =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_failed_signature_1
-      and failed_update_vk_signature_2 =
+      in
+      let%bind failed_update_vk_signature_2 =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_failed_signature_2
-      and update_vk_proof =
+      in
+      let%map update_vk_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_proof
