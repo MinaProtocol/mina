@@ -48,10 +48,7 @@ echo "deb [trusted=yes] https://apt.releases.hashicorp.com $MINA_DEB_CODENAME ma
 apt-get update
 apt-get install -y "terraform" "docker" "docker-compose-plugin" "docker-ce"
 
-echo "Installing mina daemon package: mina-test-executive=${MINA_DEB_VERSION}"
-echo "deb [trusted=yes] http://packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_RELEASE" | tee /etc/apt/sources.list.d/mina.list
-apt-get update
-apt-get install --allow-downgrades -y "mina-test-executive=$MINA_DEB_VERSION" "mina-logproc=$MINA_DEB_VERSION"
+source buildkite/scripts/debian/install.sh "mina-test-executive"
 
 mina-test-executive local "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
