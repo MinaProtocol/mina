@@ -12,7 +12,7 @@ set -x
 
 
 apt-get update 
-apt-get install aptly
+apt-get install -y aptly
 
 # Download locally static debians (for example mina-legacy )
 
