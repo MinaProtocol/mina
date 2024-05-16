@@ -15,7 +15,7 @@ DEBS=$1
 USE_SUDO=${2:-0}
 
 
-if [ "$USE_SUDO"="1" ]; then
+if [ "$USE_SUDO" == "1" ]; then
    SUDO="sudo"
 else
    SUDO=""
