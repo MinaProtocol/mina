@@ -52,14 +52,14 @@ DEBS3_UPLOAD="deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
 echo "Publishing debs: ${DEB_NAMES} to Release: ${DEB_RELEASE} and Codename: ${DEB_CODENAME}"
 # Upload the deb files to s3.
 # If this fails, attempt to remove the lockfile and retry.
-${DEBS3_UPLOAD} --component "${DEB_RELEASE}" --codename "${DEB_CODENAME}" "${DEB_NAMES}" \
-|| (  scripts/clear-deb-s3-lockfile.sh \
-   && ${DEBS3_UPLOAD} --component "${DEB_RELEASE}" --codename "${DEB_CODENAME}" "${DEB_NAMES}")
-set +x
+for i in {1..10}; do (
+  ${DEBS3_UPLOAD} \
+    --component "${DEB_RELEASE}" \
+    --codename "${DEB_CODENAME}" \
+    "${DEB_NAMES}"
+) && break || scripts/clear-deb-s3-lockfile.sh; done
 
 # Verify integrity of debs on remote repo
-
-
 function verify_o1test_repo_has_package {
   sudo apt-get update
   ${DEBS3_SHOW} ${1} ${DEB_VERSION} $ARCH -c $DEB_CODENAME -m $DEB_RELEASE

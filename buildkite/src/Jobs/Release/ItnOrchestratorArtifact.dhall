@@ -14,6 +14,7 @@ let Size = ../../Command/Size.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 let Profiles = ../../Constants/Profiles.dhall
 let DebianVersions = ../../Constants/DebianVersions.dhall
+let DebianRepo = ../../Constants/DebianRepo.dhall
 
 let spec = DockerImage.ReleaseSpec::{
     service="itn-orchestrator",
