@@ -1218,13 +1218,14 @@ let
         tested."${pkg}" = vmTest self pkg auxBuildInputs buildCmd;
       };
       testWithVm = testWithVm' "genericBuild";
+      cmdLineTest = "mv _build/default/src/test/command_line_tests/command_line_tests.exe tests.exe && chmod +x tests.exe && ./tests.exe --mina-path mina";
       super = builtins.foldl' pkgs.lib.recursiveUpdate super0 [
         # TODO stabilize tests and remove the hack
         (testWithVm' "genericBuild || genericBuild || genericBuild" "mina_net2"
           [ pkgs.libp2p_helper ])
         (testWithVm' "genericBuild || genericBuild || genericBuild"
           "__src-lib-mina_net2-tests__" [ pkgs.libp2p_helper ])
-        (testWithVm "__src-test-command_line_tests__" [ pkgs.libp2p_helper ])
+        (testWithVm' cmdLineTest "__src-test-command_line_tests__" [ pkgs.libp2p_helper ])
         (testWithVm "__src-lib-staged_ledger-test__" [ ])
       ];
     in pkgs.lib.recursiveUpdate super {
