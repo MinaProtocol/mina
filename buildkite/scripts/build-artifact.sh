@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eo pipefail
+set -eox pipefail
 
 ([ -z ${DUNE_PROFILE+x} ]) && echo "required env vars were not provided" && exit 1
 
