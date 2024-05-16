@@ -45,6 +45,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-release) DEB_RELEASE="--build-arg deb_release=$2"; shift;;
   --deb-version) DEB_VERSION="--build-arg deb_version=$2"; shift;;
   --deb-profile) DEB_PROFILE="$2"; shift;;
+  --deb-repo) DEB_REPO="--build-arg deb_repo=$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
   --extra-args) EXTRA=${@:2}; shift $((${#}-1));;
   *) echo "Unknown parameter passed: $1"; exit 1;;
@@ -171,13 +172,14 @@ TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}"
 # friendly, predictable tag
 GITHASH=$(git rev-parse --short=7 HEAD)
 HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}"
+BUILD_NETWORK="--network=host"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
   cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $BRANCH $REPO $extra_build_args -t "$TAG" -
 else
-  docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX  $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
+  docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
 if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then

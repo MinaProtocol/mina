@@ -32,10 +32,13 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
   \(debVersion : DebianVersions.DebVersion) ->
   \(profile : Profiles.Type) ->
   \(buildFlags: BuildFlags.Type) ->
+
+  let step_dep_name = "build"
+  in
   merge {
         Daemon = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOnBuildFlag debVersion profile buildFlags,
+            deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,
             service="mina-daemon",
             network="berkeley",
             deb_codename="${DebianVersions.lowerName debVersion}",
@@ -46,16 +49,14 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
 
         TestExecutive = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOnBuildFlag debVersion profile buildFlags,
-            service="mina-test-executive",
+            deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,            service="mina-test-executive",
             deb_codename="${DebianVersions.lowerName debVersion}",
             step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image"
           },
 
         BatchTxn = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOnBuildFlag debVersion profile buildFlags,
-            service="mina-batch-txn",
+            deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,            service="mina-batch-txn",
             network="berkeley",
             deb_codename="${DebianVersions.lowerName debVersion}",
             step_key="batch-txn-${DebianVersions.lowerName debVersion}-docker-image"
@@ -63,8 +64,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
 
         Archive = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOnBuildFlag debVersion profile buildFlags,
-            service="mina-archive",
+            deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,            service="mina-archive",
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_profile=profile,
             build_flags=buildFlags,
@@ -73,8 +73,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
 
         ArchiveMigration = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOnBuildFlag debVersion profile buildFlags,
-            service="mina-archive-migration",
+            deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,            service="mina-archive-migration",
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_profile=profile,
             step_key="archive-migration-${DebianVersions.lowerName debVersion}-docker-image"
@@ -82,8 +81,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
           
         Rosetta = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOnBuildFlag debVersion profile buildFlags,
-            service="mina-rosetta",
+            deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,            service="mina-rosetta",
             network="berkeley",
             deb_codename="${DebianVersions.lowerName debVersion}",
             step_key="rosetta-${DebianVersions.lowerName debVersion}${BuildFlags.toLabelSegment buildFlags}-docker-image"
@@ -91,15 +89,14 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
 
         ZkappTestTransaction = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOnBuildFlag debVersion profile buildFlags,
-            service="mina-zkapp-test-transaction",
+            deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,            service="mina-zkapp-test-transaction",
             deb_codename="${DebianVersions.lowerName debVersion}",
             step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment buildFlags}-docker-image"
           },
         
         FunctionalTestSuite = 
           DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOnBuildFlag debVersion profile buildFlags,
+            deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,
             service="mina-test-suite",
             deb_codename="${DebianVersions.lowerName debVersion}",
             step_key="test-suite-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
@@ -130,13 +127,12 @@ let MinaBuildSpec = {
   }
 }
 
-let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type = 
+let build_artifacts = 
   \(spec: MinaBuildSpec.Type) ->
-    let steps = [
-        Libp2p.step spec.debVersion spec.buildFlags,
         Command.build
           Command.Config::{
-            commands = Toolchain.select spec.toolchainSelectMode spec.debVersion ([
+            commands = (
+              (Toolchain.select spec.toolchainSelectMode spec.debVersion ([
                 "DUNE_PROFILE=${Profiles.duneProfile spec.profile}",
                 "AWS_ACCESS_KEY_ID",
                 "AWS_SECRET_ACCESS_KEY",
@@ -144,7 +140,9 @@ let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type =
                 "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
                 "MINA_DEB_CODENAME=${DebianVersions.lowerName spec.debVersion}"
               ] # BuildFlags.buildEnvs spec.buildFlags )
-            "./buildkite/scripts/build-release.sh ${Artifacts.toDebianNames spec.artifacts}",
+            "./buildkite/scripts/build-release.sh ${Artifacts.toDebianNames spec.artifacts}")
+               #
+              [Cmd.run "./buildkite/scripts/upload-deb-to-gs.sh ${DebianVersions.lowerName spec.debVersion}"]),
             label = "Build Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile} ${BuildFlags.toSuffixUppercase spec.buildFlags}",
             key = "build-deb-pkg",
             target = Size.XLarge,
@@ -154,6 +152,28 @@ let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type =
                 limit = Some 2
               } ] -- libp2p error
           }
+
+let publish_to_debian_repo = 
+   \(spec: MinaBuildSpec.Type) -> 
+   Command.build
+          Command.Config::{
+            commands = Toolchain.select spec.toolchainSelectMode spec.debVersion [
+              "AWS_ACCESS_KEY_ID",
+              "AWS_SECRET_ACCESS_KEY",
+              "MINA_DEB_CODENAME=${DebianVersions.lowerName spec.debVersion}"
+            ] "./buildkite/scripts/publish-deb.sh",
+            label = "Publish Mina for ${DebianVersions.capitalName spec.debVersion} ${Profiles.toSuffixUppercase spec.profile}",
+            key = "publish-deb-pkg",
+            depends_on = DebianVersions.dependsOnStep spec.debVersion spec.profile spec.buildFlags "build",
+            target = Size.Small
+          }
+
+let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type = 
+  \(spec: MinaBuildSpec.Type) ->
+    let steps = [
+        Libp2p.step spec.debVersion spec.buildFlags,
+        (build_artifacts spec),
+        (publish_to_debian_repo spec)
       ] # (List/map
             Artifacts.Type
             Command.Type

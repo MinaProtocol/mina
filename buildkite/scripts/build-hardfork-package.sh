@@ -81,8 +81,5 @@ RUNTIME_CONFIG_JSON=new_config.json LEDGER_TARBALLS="$(echo hardfork_ledgers/*.t
 mkdir -p /tmp/artifacts
 cp _build/mina*.deb /tmp/artifacts/.
 
-echo "--- Upload debs to amazon s3 repo"
-make publish_debs
-
 echo "--- Git diff after build is complete:"
 git diff --exit-code -- .
