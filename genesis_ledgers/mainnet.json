@@ -2,10 +2,6 @@
   "genesis": {
     "genesis_state_timestamp": "2021-03-17T00:00:00Z"
   },
-  "daemon": {
-    "slot_tx_end": 564180,
-    "slot_chain_end": 564280
-  },
   "ledger": {
     "name": "mainnet",
     "accounts": [
