@@ -42,10 +42,10 @@ fi
 # Install aptly
 if [ $USE_SUDO = 1 ]; then
   sudo apt-get update 
-  sudo apt-get install aptly
+  sudo apt-get install -y aptly
 else
   apt-get update 
-  apt-get install aptly
+  apt-get install -y aptly
 fi
 
 # Start aptly
