@@ -19,10 +19,9 @@ RELEASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 --no-merges $relea
 
 if ! $(gsutil ls gs://mina-type-shapes/$BUILDKITE_COMMIT 2>/dev/null); then
     git checkout $BUILDKITE_COMMIT
-    source ~/.profile
     export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
     export GO=/usr/lib/go/bin/go
-    make -C src/app/libp2p_helper
+    eval $(opam env)
 
     dune exec src/app/cli/src/mina.exe internal dump-mina-shapes 2> ${BUILDKITE_COMMIT}_type-shapes.txt
     gsutil cp ${BUILDKITE_COMMIT}_type-shapes.txt gs://mina-type-shapes
@@ -30,10 +29,9 @@ fi
 
 if ! $(gsutil ls gs://mina-type-shapes/$RELEASE_BRANCH_COMMIT 2>/dev/null); then
     git checkout $RELEASE_BRANCH_COMMIT
-    source ~/.profile
     export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
     export GO=/usr/lib/go/bin/go
-    make -C src/app/libp2p_helper
+    eval $(opam env)
 
     dune exec src/app/cli/src/mina.exe internal dump-mina-shapes 2> ${RELEASE_BRANCH_COMMIT}_type-shapes.txt
     gsutil cp ${RELEASE_BRANCH_COMMIT}_type-shapes.txt gs://mina-type-shapes
