@@ -4899,7 +4899,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         List.zip_exn snapp_zkapp_command spec.zkapp_account_keypairs
       in
       let%map.Async.Deferred snapp_zkapp_command =
-        Async.Deferred.List.map snapp_zkapp_command_keypairs
+        Async.Deferred.List.map ~how:`Sequential snapp_zkapp_command_keypairs
           ~f:(fun
                ( ( (snapp_account_update, simple_snapp_account_update)
                  , tx_statement )
