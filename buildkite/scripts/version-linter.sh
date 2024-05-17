@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eo pipefail
+set -eox pipefail
 
 if [[ $# -ne 1 ]]; then
     echo "Usage: $0 <release-branch>"
