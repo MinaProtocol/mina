@@ -24,7 +24,6 @@ if ! $(gsutil ls gs://mina-type-shapes/$BUILDKITE_COMMIT 2>/dev/null); then
     eval $(opam env)
 
     dune exec src/app/cli/src/mina.exe internal dump-type-shapes > ${BUILDKITE_COMMIT:0:7}-type-shapes.txt
-    gsutil cp ${BUILDKITE_COMMIT:0:7}-type-shapes.txt gs://mina-type-shapes
 fi
 
 if ! $(gsutil ls gs://mina-type-shapes/$RELEASE_BRANCH_COMMIT 2>/dev/null); then
@@ -34,5 +33,4 @@ if ! $(gsutil ls gs://mina-type-shapes/$RELEASE_BRANCH_COMMIT 2>/dev/null); then
     eval $(opam env)
 
     dune exec src/app/cli/src/mina.exe internal dump-type-shapes > ${BUILDKITE_COMMIT:0:7}-type-shapes.txt
-    gsutil cp ${BUILDKITE_COMMIT:0:7}-type-shapes.txt gs://mina-type-shapes
 fi
