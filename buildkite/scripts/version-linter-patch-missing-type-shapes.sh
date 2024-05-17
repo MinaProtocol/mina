@@ -23,8 +23,8 @@ if ! $(gsutil ls gs://mina-type-shapes/$BUILDKITE_COMMIT 2>/dev/null); then
     export GO=/usr/lib/go/bin/go
     eval $(opam env)
 
-    dune exec src/app/cli/src/mina.exe internal dump-type-shapes > ${BUILDKITE_COMMIT}-type-shapes.txt
-    gsutil cp ${BUILDKITE_COMMIT}_type-shapes.txt gs://mina-type-shapes
+    dune exec src/app/cli/src/mina.exe internal dump-type-shapes > ${BUILDKITE_COMMIT:0:7}-type-shapes.txt
+    gsutil cp ${BUILDKITE_COMMIT:0:7}-type-shapes.txt gs://mina-type-shapes
 fi
 
 if ! $(gsutil ls gs://mina-type-shapes/$RELEASE_BRANCH_COMMIT 2>/dev/null); then
@@ -33,6 +33,6 @@ if ! $(gsutil ls gs://mina-type-shapes/$RELEASE_BRANCH_COMMIT 2>/dev/null); then
     export GO=/usr/lib/go/bin/go
     eval $(opam env)
 
-    dune exec src/app/cli/src/mina.exe internal dump-type-shapes > ${RELEASE_BRANCH_COMMIT}-type-shapes.txt
-    gsutil cp ${RELEASE_BRANCH_COMMIT}_type-shapes.txt gs://mina-type-shapes
+    dune exec src/app/cli/src/mina.exe internal dump-type-shapes > ${BUILDKITE_COMMIT:0:7}-type-shapes.txt
+    gsutil cp ${BUILDKITE_COMMIT:0:7}-type-shapes.txt gs://mina-type-shapes
 fi
