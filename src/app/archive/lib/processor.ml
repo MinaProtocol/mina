@@ -4900,13 +4900,8 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
-      [%log info]
-        "Starting archive process; built with commit $commit on branch $branch"
-        ~metadata:
-          [ ("commit", `String Mina_version.commit_id)
-          ; ("branch", `String Mina_version.branch)
-          ; ("commit_date", `String Mina_version.commit_date)
-          ] ;
+      [%log info] "Starting archive process; built with commit $commit"
+        ~metadata:[ ("commit", `String Mina_version.commit_id) ] ;
       let%bind () = add_genesis_accounts pool ~logger ~runtime_config_opt in
       run ~constraint_constants pool reader ~logger ~delete_older_than
       |> don't_wait_for ;

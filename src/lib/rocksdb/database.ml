@@ -1,6 +1,4 @@
-(* rocksdb.ml -- expose RocksDB operations for Coda *)
-
-open Core
+(* rocksdb.ml -- expose RocksDB operations for Mina *)
 
 type t = { uuid : Uuid.Stable.V1.t; db : (Rocks.t[@sexp.opaque]) }
 [@@deriving sexp]
@@ -33,7 +31,7 @@ let set t ~(key : Bigstring.t) ~(data : Bigstring.t) : unit =
   Rocks.put ?key_pos:None ?key_len:None ?value_pos:None ?value_len:None
     ?opts:None t.db key data
 
-let set_batch t ?(remove_keys = [])
+let[@warning "-16"] set_batch t ?(remove_keys : Bigstring.t list = [])
     ~(key_data_pairs : (Bigstring.t * Bigstring.t) list) : unit =
   let batch = Rocks.WriteBatch.create () in
   (* write to batch *)
@@ -57,30 +55,67 @@ module Batch = struct
     Rocks.write t.db batch ; result
 end
 
-let copy _t = failwith "copy: not implemented"
-
 let remove t ~(key : Bigstring.t) : unit =
   Rocks.delete ?pos:None ?len:None ?opts:None t.db key
+
+let copy_bigstring t : Bigstring.t =
+  let tlen = Bigstring.length t in
+  let new_t = Bigstring.create tlen in
+  Bigstring.blit ~src:t ~dst:new_t ~src_pos:0 ~dst_pos:0 ~len:tlen ;
+  new_t
 
 let to_alist t : (Bigstring.t * Bigstring.t) list =
   let iterator = Rocks.Iterator.create t.db in
   Rocks.Iterator.seek_to_last iterator ;
   (* iterate backwards and cons, to build list sorted by key *)
-  let copy t =
-    let tlen = Bigstring.length t in
-    let new_t = Bigstring.create tlen in
-    Bigstring.blit ~src:t ~dst:new_t ~src_pos:0 ~dst_pos:0 ~len:tlen ;
-    new_t
-  in
   let rec loop accum =
     if Rocks.Iterator.is_valid iterator then (
-      let key = copy (Rocks.Iterator.get_key iterator) in
-      let value = copy (Rocks.Iterator.get_value iterator) in
+      let key = copy_bigstring (Rocks.Iterator.get_key iterator) in
+      let value = copy_bigstring (Rocks.Iterator.get_value iterator) in
       Rocks.Iterator.prev iterator ;
       loop ((key, value) :: accum) )
     else accum
   in
   loop []
+
+let foldi :
+       t
+    -> init:'a
+    -> f:(int -> 'a -> key:Bigstring.t -> data:Bigstring.t -> 'a)
+    -> 'a =
+ fun t ~init ~f ->
+  let iterator = Rocks.Iterator.create t.db in
+  let rec loop i accum =
+    if Rocks.Iterator.is_valid iterator then (
+      let key = copy_bigstring (Rocks.Iterator.get_key iterator) in
+      let data = copy_bigstring (Rocks.Iterator.get_value iterator) in
+      Rocks.Iterator.next iterator ;
+      loop (i + 1) (f i accum ~key ~data) )
+    else accum
+  in
+  loop 0 init
+
+let fold_until :
+       t
+    -> init:'a
+    -> f:
+         (   'a
+          -> key:Bigstring.t
+          -> data:Bigstring.t
+          -> ('a, 'b) Continue_or_stop.t )
+    -> finish:('a -> 'b)
+    -> 'b =
+ fun t ~init ~f ~finish ->
+  let iterator = Rocks.Iterator.create t.db in
+  let rec loop accum =
+    if Rocks.Iterator.is_valid iterator then (
+      let key = copy_bigstring (Rocks.Iterator.get_key iterator) in
+      let data = copy_bigstring (Rocks.Iterator.get_value iterator) in
+      Rocks.Iterator.next iterator ;
+      match f accum ~key ~data with Stop _ -> accum | Continue v -> loop v )
+    else accum
+  in
+  finish @@ loop init
 
 let to_bigstring = Bigstring.of_string
 
@@ -89,7 +124,7 @@ let%test_unit "get_batch" =
       File_system.with_temp_dir "/tmp/mina-rocksdb-test" ~f:(fun db_dir ->
           let db = create db_dir in
           let[@warning "-8"] [ key1; key2; key3 ] =
-            List.map ~f:Bigstring.of_string [ "a"; "b"; "c" ]
+            List.map ~f:(fun s -> Bigstring.of_string s) [ "a"; "b"; "c" ]
           in
           let data = Bigstring.of_string "test" in
           set db ~key:key1 ~data ;
@@ -141,6 +176,7 @@ let%test_unit "checkpoint read" =
       | `Duplicate_key _ ->
           Deferred.unit
       | `Ok db_hashtbl -> (
+          let open Core in
           let cp_hashtbl = Hashtbl.copy db_hashtbl in
           let db_dir = Filename.temp_dir "test_db" "" in
           let cp_dir =

@@ -1,1 +1,1 @@
-<XLarge|Large|Medium|Small|Integration|QA>
+<XLarge|Large|Medium|Small|Integration|QA|Hardfork>

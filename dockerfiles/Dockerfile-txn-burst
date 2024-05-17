@@ -11,6 +11,7 @@ ARG deb_version
 ARG deb_codename=bullseye
 ARG deb_release=unstable
 ARG network=mainnet
+ARG deb_repo="http://packages.o1test.net"
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $deb_codename $deb_release $deb_version"
@@ -32,7 +33,7 @@ RUN apt-get -y update \
     && rm -rf /var/lib/apt/lists/*
 
 #install mina and txn burst tool
-RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" | tee /etc/apt/sources.list.d/mina.list \
+RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" | tee /etc/apt/sources.list.d/mina.list \
   && apt-get update\
   && apt-get install --quiet --yes --allow-downgrades "mina-$network=$deb_version" \
   && apt-get install --quiet --yes --allow-downgrades "mina-batch-txn=$deb_version" \

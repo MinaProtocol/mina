@@ -1,14 +1,6 @@
-open Core_kernel
-
-module type Inputs_intf = sig
-  include Base_inputs_intf.S
-
-  module Location : Location_intf.S
-end
-
-module Make (Inputs : Inputs_intf) : sig
+module Make (Inputs : Intf.Inputs.Intf) : sig
   include
-    Base_ledger_intf.S
+    Intf.Ledger.NULL
       with module Addr = Inputs.Location.Addr
       with module Location = Inputs.Location
       with type key := Inputs.Key.t
@@ -19,8 +11,6 @@ module Make (Inputs : Inputs_intf) : sig
        and type hash := Inputs.Hash.t
        and type root_hash := Inputs.Hash.t
        and type account := Inputs.Account.t
-
-  val create : depth:int -> unit -> t
 end = struct
   open Inputs
 

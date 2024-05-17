@@ -330,13 +330,8 @@ let migrate_genesis_balances ~logger ~precomputed_values ~migrated_pool =
 let main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
     ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
     ~stream_precomputed_blocks ~keep_precomputed_blocks
-    ~precomputed_blocks_local_path ~log_json ~log_level ~file_log_level
-    ~log_filename () =
+    ~precomputed_blocks_local_path ~log_json ~log_level () =
   Cli_lib.Stdout_log.setup log_json log_level ;
-  Option.iter log_filename ~f:(fun log_filename ->
-      Logger.Consumer_registry.register ~id:"default"
-        ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
-        ~transport:(Logger_file_system.evergrowing ~log_filename) ) ;
   let logger = Logger.create () in
   let mainnet_archive_uri = Uri.of_string mainnet_archive_uri in
   let migrated_archive_uri = Uri.of_string migrated_archive_uri in
@@ -616,20 +611,18 @@ let () =
              ~doc:
                "Keep the precomputed blocks on-disk after the migration is \
                 complete"
+         and log_json = Cli_lib.Flag.Log.json
+         and log_level = Cli_lib.Flag.Log.level
          and precomputed_blocks_local_path =
            Param.flag "--precomputed-blocks-local-path"
              ~aliases:[ "-precomputed-blocks-local-path" ]
              Param.(optional string)
              ~doc:"PATH the precomputed blocks on-disk location"
-         and log_json = Cli_lib.Flag.Log.json
-         and log_level = Cli_lib.Flag.Log.level
-         and file_log_level = Cli_lib.Flag.Log.file_log_level
-         and log_filename = Cli_lib.Flag.Log.file in
+         in
          let precomputed_blocks_local_path =
            Option.value precomputed_blocks_local_path ~default:"."
          in
          main ~mainnet_archive_uri ~migrated_archive_uri ~runtime_config_file
            ~fork_state_hash ~mina_network_blocks_bucket ~batch_size ~network
            ~stream_precomputed_blocks ~keep_precomputed_blocks ~log_json
-           ~log_level ~log_filename ~file_log_level
-           ~precomputed_blocks_local_path )))
+           ~log_level ~precomputed_blocks_local_path )))

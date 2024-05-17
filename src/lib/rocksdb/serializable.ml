@@ -1,5 +1,3 @@
-open Core_kernel
-
 module Make (Key : Binable.S) (Value : Binable.S) :
   Key_value_database.Intf.S
     with module M := Key_value_database.Monad.Ident
@@ -29,7 +27,7 @@ module Make (Key : Binable.S) (Value : Binable.S) :
       ~key:(Binable.to_bigstring (module Key) key)
       ~data:(Binable.to_bigstring (module Value) data)
 
-  let set_batch t ?(remove_keys = []) ~update_pairs =
+  let[@warning "-16"] set_batch t ?(remove_keys = []) ~update_pairs =
     let key_data_pairs =
       List.map update_pairs ~f:(fun (key, data) ->
           ( Binable.to_bigstring (module Key) key
@@ -52,45 +50,8 @@ end
 (** Database Interface for storing heterogeneous key-value pairs. Similar to
     Janestreet's Core.Univ_map *)
 module GADT = struct
-  module type Database_intf = sig
-    type t
-
-    type 'a g
-
-    val set : t -> key:'a g -> data:'a -> unit
-
-    val set_raw : t -> key:'a g -> data:Bigstring.t -> unit
-
-    val remove : t -> key:'a g -> unit
-  end
-
-  module type S = sig
-    include Database_intf
-
-    module Some_key : Key_intf.Some_key_intf with type 'a unwrapped_t := 'a g
-
-    module T : sig
-      type nonrec t = t
-    end
-
-    val create : string -> t
-
-    val close : t -> unit
-
-    val get : t -> key:'a g -> 'a option
-
-    val get_raw : t -> key:'a g -> Bigstring.t option
-
-    val get_batch : t -> keys:Some_key.t list -> Some_key.with_value option list
-
-    module Batch : sig
-      include Database_intf with type 'a g := 'a g
-
-      val with_batch : T.t -> f:(t -> 'a) -> 'a
-    end
-  end
-
-  module Make (Key : Key_intf.S) : S with type 'a g := 'a Key.t = struct
+  module Make (Key : Intf.Key.S) : Intf.Database.S with type 'a g := 'a Key.t =
+  struct
     let bin_key_dump (key : 'a Key.t) =
       Bin_prot.Utils.bin_dump (Key.binable_key_type key).writer key
 
@@ -132,19 +93,20 @@ module GADT = struct
       let bin_data = Key.binable_data_type key in
       bin_data.reader.read serialized_value ~pos_ref:(ref 0)
 
-    module Some_key = Key_intf.Some_key (Key)
+    (* This one's re-exported as Key at the end. The name is to prevent from
+       hiding the Key module parameter *)
+    module K = Intf.Key.Some (Key)
 
     let get_batch t ~keys =
-      let open Some_key in
-      let skeys = List.map keys ~f:(fun (Some_key k) -> bin_key_dump k) in
+      let skeys = List.map keys ~f:(fun (K.Some_key k) -> bin_key_dump k) in
       let serialized_value_opts = Database.get_batch ~keys:skeys t in
-      let f (Some_key k) =
+      let f (K.Some_key k) =
         Option.map ~f:(fun serialized_value ->
             let bin_data = Key.binable_data_type k in
             let value =
               bin_data.reader.read serialized_value ~pos_ref:(ref 0)
             in
-            Some_key_value (k, value) )
+            K.Some_key_value (k, value) )
       in
       List.map2_exn keys serialized_value_opts ~f
 
@@ -153,5 +115,7 @@ module GADT = struct
 
       let with_batch = Database.Batch.with_batch
     end
+
+    module Key = K
   end
 end

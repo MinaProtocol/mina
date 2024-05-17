@@ -1,0 +1,87 @@
+From b417566203405ae0aca76cbbfbf5faf4f71395ef Mon Sep 17 00:00:00 2001
+From: georgeee <george.agapov@gmail.com>
+Date: Fri, 16 Feb 2024 19:39:22 +0100
+Subject: [PATCH 3/3] Cache loaded caches in Ledger.load
+
+Problem: when load of a ledger file is attempted twice, error comes from
+Rocksdb locking mechanism
+
+Solution: use simple cache map when loading epoch ledgers, using
+previously loaded ledgers.
+---
+ .../genesis_ledger_helper.ml                  | 21 +++++++++++++------
+ 1 file changed, 15 insertions(+), 6 deletions(-)
+
+diff --git a/src/lib/genesis_ledger_helper/genesis_ledger_helper.ml b/src/lib/genesis_ledger_helper/genesis_ledger_helper.ml
+index b98c35465d..7c44c9d3df 100644
+--- a/src/lib/genesis_ledger_helper/genesis_ledger_helper.ml
++++ b/src/lib/genesis_ledger_helper/genesis_ledger_helper.ml
+@@ -411,6 +411,7 @@ module Ledger = struct
+     end) )
+ 
+   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
++      ?(ledger_cache = String.Map.empty)
+       ?(ledger_name_prefix = "genesis_ledger") (config : Runtime_config.Ledger.t)
+       =
+     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
+@@ -424,6 +425,9 @@ module Ledger = struct
+             ~ledger_name_prefix config
+         in
+         match tar_path with
++        | Some tar_path when Map.mem ledger_cache tar_path ->
++            Deferred.Result.return
++              (Map.find_exn ledger_cache tar_path, config, tar_path)
+         | Some tar_path -> (
+             match%map
+               load_from_tar ~genesis_dir ~logger ~constraint_constants
+@@ -552,6 +556,7 @@ end
+ 
+ module Epoch_data = struct
+   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
++      ?(ledger_cache = String.Map.empty)
+       (config : Runtime_config.Epoch_data.t option) =
+     let open Deferred.Or_error.Let_syntax in
+     match config with
+@@ -559,13 +564,13 @@ module Epoch_data = struct
+         Deferred.Or_error.return (None, None)
+     | Some config ->
+         let ledger_name_prefix = "epoch_ledger" in
+-        let load_ledger ledger =
++        let load_ledger ~ledger_cache ledger =
+           Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+-            ~ledger_name_prefix ledger
++            ~ledger_name_prefix ~ledger_cache ledger
+         in
+-        let%bind staking, staking_config =
++        let%bind staking, staking_config, ledger_cache =
+           let%map staking_ledger, config', ledger_file =
+-            load_ledger config.staking.ledger
++            load_ledger ~ledger_cache config.staking.ledger
+           in
+           [%log trace] "Loaded staking epoch ledger from $ledger_file"
+             ~metadata:[ ("ledger_file", `String ledger_file) ] ;
+@@ -573,7 +578,9 @@ module Epoch_data = struct
+                 Genesis_ledger.Packed.t staking_ledger
+             ; seed = Epoch_seed.of_base58_check_exn config.staking.seed
+             }
+-          , { config.staking with ledger = config' } )
++          , { config.staking with ledger = config' }
++          , Map.add ledger_cache ~key:ledger_file ~data:staking_ledger
++            |> function `Duplicate -> ledger_cache | `Ok m -> m )
+         in
+         let%map next, next_config =
+           match config.next with
+@@ -583,7 +590,9 @@ module Epoch_data = struct
+                  epoch ledger" ;
+               Deferred.Or_error.return (None, None)
+           | Some { ledger; seed } ->
+-              let%map next_ledger, config'', ledger_file = load_ledger ledger in
++              let%map next_ledger, config'', ledger_file =
++                load_ledger ~ledger_cache ledger
++              in
+               [%log trace] "Loaded next epoch ledger from $ledger_file"
+                 ~metadata:[ ("ledger_file", `String ledger_file) ] ;
+               ( Some
+-- 
+2.18.1
+
