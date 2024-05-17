@@ -23,7 +23,6 @@
 /src/app/runtime_genesis_ledger/ @MinaProtocol/protocol-eng-reviewers
 /src/app/archive_blocks/ @MinaProtocol/protocol-eng-reviewers
 /src/app/extract_blocks/ @MinaProtocol/protocol-eng-reviewers
-/src/app/patch_archive_test/ @MinaProtocol/protocol-eng-reviewers
 /src/app/rosetta/ @MinaProtocol/mina-foundation-eng
 
 /src/lib/ @MinaProtocol/protocol-eng-reviewers
@@ -51,5 +50,3 @@
 /src/lib/snarky_group_map/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky_log/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/unsigned_extended/ @MinaProtocol/crypto-eng-reviewers
-
-/src/nonconsensus @MinaProtocol/protocol-eng-reviewers

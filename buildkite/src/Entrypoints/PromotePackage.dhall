@@ -82,6 +82,7 @@ let promote_artifacts =
               , new_tag = new_version
               , network = network
               , publish = publish
+              , remove_profile_from_name = remove_profile_from_name
               , step_key = "add-tag-to-${Artifact.lowerName docker}-${DebianVersions.lowerName codename}-docker"
           }
         )

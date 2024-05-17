@@ -50,12 +50,11 @@ case "${MINA_DEB_CODENAME}" in
 esac
 
 case "${DUNE_PROFILE}" in
-  devnet)
+  devnet|mainnet)
     MINA_DEB_NAME="mina-berkeley"
     DEB_SUFFIX=""
    ;;
   *)
-
     # use dune profile as suffix but replace underscore to dashes so deb builder won't complain
     _SUFFIX=${DUNE_PROFILE//_/-}
     MINA_DEB_NAME="mina-berkeley-${_SUFFIX}"

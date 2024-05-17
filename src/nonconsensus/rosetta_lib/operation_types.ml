@@ -1,1 +1,0 @@
-../../lib/rosetta_lib/operation_types.ml
