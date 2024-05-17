@@ -1,9 +1,12 @@
 open Core_kernel
 open Mina_base
 
-let `VK { With_hash.data = vk; hash = _ }, `Prover p =
+let `VK vk, `Prover p =
   Transaction_snark.For_tests.create_trivial_snapp
     ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
+
+let { With_hash.data = vk; hash = _ } =
+  Async.Thread_safe.block_on_async_exn (fun () -> vk)
 
 let vk =
   vk

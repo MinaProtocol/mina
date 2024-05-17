@@ -89,6 +89,8 @@ module Step : sig
          Import.Types.Step.Statement.t
        , Impl.field )
        Import.Spec.ETyp.t
+
+  module Async_promise : module type of Async_generic (Promise)
 end
 
 module Wrap : sig
