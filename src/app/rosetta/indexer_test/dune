@@ -1,0 +1,18 @@
+(test
+ (name indexer_test)
+ (enabled_if false)
+ (libraries
+  lib
+  async
+  core_kernel
+  base
+  async.async_command
+  core
+  async_kernel
+  alcotest
+  alcotest-async
+  cmdliner)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_mina ppx_jane ppx_string ppx_deriving.make)))
