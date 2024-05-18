@@ -4,10 +4,14 @@
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
 {
   toolchainBase = "codaprotocol/ci-toolchain-base:v3",
-  minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:a2363c26b7ebceba98c5a82dddbbe5d42455abf59307f3d6cdcdf4b5a19b69c9",
-  minaToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:158ae36aed9de54ef5da39f7c98b2c9ba5d519c4c419c9c4109005a23675f539",
-  minaToolchainBookworm = "gcr.io/o1labs-192920/mina-toolchain@sha256:158ae36aed9de54ef5da39f7c98b2c9ba5d519c4c419c9c4109005a23675f539",
-  minaToolchain = "gcr.io/o1labs-192920/mina-toolchain@sha256:158ae36aed9de54ef5da39f7c98b2c9ba5d519c4c419c9c4109005a23675f539",
+  minaToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:45fee6cb346a6f6364133cc473d47a5c51797b923a6b6809fbe8d067cce8d8d5",
+  minaToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:97e90e9962c3378e97966b939064c834d8f75b3b7e312bbbaf499bb0493733a5",
+  minaToolchainBookworm = "gcr.io/o1labs-192920/mina-toolchain@sha256:97e90e9962c3378e97966b939064c834d8f75b3b7e312bbbaf499bb0493733a5",
+  minaToolchain = "gcr.io/o1labs-192920/mina-toolchain@sha256:97e90e9962c3378e97966b939064c834d8f75b3b7e312bbbaf499bb0493733a5",
+  minaCaqtiToolchainBuster = "gcr.io/o1labs-192920/mina-toolchain@sha256:900320a7063bf686d2e5a8fa67a111479b3274f3439beae88f96364e209b7a0d",
+  minaCaqtiToolchainBullseye = "gcr.io/o1labs-192920/mina-toolchain@sha256:609210748ee04b2926b86d6590e29b5a32d4709eefdf907f83b819f38cce8f46",
+  minaCaqtiToolchainBookworm = "gcr.io/o1labs-192920/mina-toolchain@sha256:609210748ee04b2926b86d6590e29b5a32d4709eefdf907f83b819f38cce8f46",
+  minaCaqtiToolchain = "gcr.io/o1labs-192920/mina-toolchain@sha256:609210748ee04b2926b86d6590e29b5a32d4709eefdf907f83b819f38cce8f46",
   delegationBackendToolchain = "gcr.io/o1labs-192920/delegation-backend-production@sha256:12ffd0a9016819c720687f440c7a46b8815f8d3ad06d306d342ee5f8dd4375f5",
   elixirToolchain = "elixir:1.10-alpine",
   nodeToolchain = "node:14.13.1-stretch-slim",

@@ -232,7 +232,7 @@ let main_body ~(feature_flags : _ Plonk_types.Features.t) () =
     main_fixed_lookup_tables_multiple_tables_multiple_lookups () )
 
 let register_test name feature_flags1 feature_flags2 =
-  let _tag, _cache_handle, proof, Pickles.Provers.[ prove1; prove2 ] =
+  let tag, _cache_handle, proof, Pickles.Provers.[ prove1; prove2 ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N2)
@@ -264,6 +264,11 @@ let register_test name feature_flags1 feature_flags2 =
         ] )
       ()
   in
+  (* force vk creation before adding test *)
+  let _vk =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        Pickles.Side_loaded.Verification_key.of_compiled tag )
+  in
   let module Proof = (val proof) in
   let test_prove1 () =
     let public_input1, (), proof1 =
@@ -281,7 +286,6 @@ let register_test name feature_flags1 feature_flags2 =
       (Async.Thread_safe.block_on_async_exn (fun () ->
            Proof.verify [ (public_input2, proof2) ] ) )
   in
-
   let open Alcotest in
   add_tests name
     [ test_case "prove 1" `Quick test_prove1
