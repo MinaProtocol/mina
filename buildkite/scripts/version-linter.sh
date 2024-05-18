@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eo pipefail
+set -eox pipefail
 
 if [[ $# -ne 1 ]]; then
     echo "Usage: $0 <release-branch>"
@@ -34,9 +34,6 @@ fi
 
 echo "--- Run Python version linter with branches: ${pr_branch} ${base_branch} ${release_branch}"
 ./scripts/version-linter.py ${pr_branch} ${base_branch} ${release_branch}
-
-echo "--- Install Mina"
-source buildkite/scripts/export-git-env-vars.sh
 
 source buildkite/scripts/debian/install.sh "mina-${TESTNET_NAME}" 1
 
