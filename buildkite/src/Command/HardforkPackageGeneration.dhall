@@ -132,7 +132,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
             , service = "mina-daemon"
             , network = network_name
             , deb_codename = "${DebianVersions.lowerName debVersion}"
-            , deb_profile = "${Profiles.lowerName profile}"
+            , deb_profile = profile
             , step_key = "daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
             }
         , Command.build Command.Config::{
@@ -170,7 +170,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
             , service = "mina-archive"
             , network = network_name
             , deb_codename = "${DebianVersions.lowerName debVersion}"
-            , deb_profile = "${Profiles.lowerName profile}"
+            , deb_profile = profile
             , step_key = "archive-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
             }
         , DockerImage.generateStep
