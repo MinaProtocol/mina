@@ -1234,6 +1234,8 @@ let
         chmod +x tests.exe
         export TMPDIR=tmp # to align with janestreet core library
         mkdir -p $TMPDIR
+        export MINA_LIBP2P_PASS="naughty blue worm"
+        export MINA_PRIVKEY_PASS="naughty blue worm"
         ./tests.exe --mina-path mina
       '';
       super = builtins.foldl' pkgs.lib.recursiveUpdate super0 [
@@ -1560,6 +1562,7 @@ let
           pkgs.writeText "separated-libs.json" (builtins.toJSON separatedLibs);
         all-deps = pkgs.writeText "all-deps.json" (allDepsToJSON allDeps);
         package-deps-graph = pkgs.writeText "packages.dot" packagesDotGraph;
+        inherit (pkgs) libp2p_helper;
         inherit base-libs;
       };
 
