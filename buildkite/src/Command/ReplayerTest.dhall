@@ -1,7 +1,7 @@
 let B = ../External/Buildkite.dhall
 
 let Prelude = ../External/Prelude.dhall
-
+let Artifacts = ../Constants/Artifacts.dhall
 let Command = ./Base.dhall
 let Docker = ./Docker/Type.dhall
 let Size = ./Size.dhall
@@ -16,8 +16,9 @@ let Cmd = ../Lib/Cmds.dhall in
       Command.Config::{
         commands = [
         RunWithPostgres.runInDockerWithPostgresConn
-           Artifacts.Type.Archive 
+          ([] : List Text)
            "./src/app/replayer/test/archive/sample_db/archive_db.sql"
+           Artifacts.Type.Archive 
            "./scripts/replayer-test.sh -d /workdir/src/app/replayer/ -a mina-replayer -p $PG_CONN"
         ],
         label = "Archive: Replayer test",
