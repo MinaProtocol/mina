@@ -1085,17 +1085,22 @@ let
       pkgEnvVar = artifactEnvVar [ "pkgs" pkg ];
       script = pkgs.writeShellScriptBin "runtest-${pkg}" ''
         set -eo pipefail
+        PATH_BK="$PATH"
         source "$(which env-${pkg})" || true # Ignore read-only variables
         source $stdenv/setup
         export NIX_STORE=/nix/store
-        export NIX_BUILD_TOP=/build
-        mkdir -p /build
+        export NIX_BUILD_TOP=/home/builder/build
+        export NIX_ENFORCE_NO_NATIVE=0
+        export NIX_ENFORCE_PURITY=0
+        export NIX_HARDENING_ENABLE=""
+        mkdir -p $NIX_BUILD_TOP
         phases='unpackPhase patchPhase configurePhase' genericBuild
         envVar="${pkgEnvVar}"
         echo "Reusing build artifacts from: ''${!envVar}"
         cp --no-preserve=mode,ownership -RL "''${!envVar}" _build
         export dontCheck=0
         export phases='buildPhase'
+        export PATH="$PATH:$PATH_BK"
         ${buildCmd}
       '';
       drv = self.pkgs."${pkg}";
@@ -1115,7 +1120,12 @@ let
           item = "nofile";
           value = "65536";
         }];
-        environment.systemPackages = packages;
+        users.users.builder = {
+          isNormalUser = true;
+          home = "/home/builder";
+          extraGroups = [ "wheel" ];
+          inherit packages;
+        };
         system.stateVersion = "23.11";
         virtualisation = {
           graphics = false;
@@ -1126,7 +1136,7 @@ let
       };
       testScript = ''
         machine.wait_for_unit("default.target")
-        machine.succeed("runtest-${name}")
+        machine.succeed("cd /home/builder && su -- builder -c 'runtest-${name}'")
       '';
     };
 
@@ -1218,14 +1228,22 @@ let
         tested."${pkg}" = vmTest self pkg auxBuildInputs buildCmd;
       };
       testWithVm = testWithVm' "genericBuild";
-      cmdLineTest = "mv _build/default/src/test/command_line_tests/command_line_tests.exe tests.exe && chmod +x tests.exe && ./tests.exe --mina-path mina";
+      cmdLineTest = ''
+        mina --version
+        mv _build/default/src/test/command_line_tests/command_line_tests.exe tests.exe
+        chmod +x tests.exe
+        export TMPDIR=tmp # to align with janestreet core library
+        mkdir -p $TMPDIR
+        ./tests.exe --mina-path mina
+      '';
       super = builtins.foldl' pkgs.lib.recursiveUpdate super0 [
-        # TODO stabilize tests and remove the hack
-        (testWithVm' "genericBuild || genericBuild || genericBuild" "mina_net2"
-          [ pkgs.libp2p_helper ])
-        (testWithVm' "genericBuild || genericBuild || genericBuild"
-          "__src-lib-mina_net2-tests__" [ pkgs.libp2p_helper ])
-        (testWithVm' cmdLineTest "__src-test-command_line_tests__" [ pkgs.libp2p_helper ])
+        # TODO stabilize tests and remove the triple-retry hack
+        (testWithVm "mina_net2" [ pkgs.libp2p_helper ])
+        (testWithVm "__src-lib-mina_net2-tests__" [ pkgs.libp2p_helper ])
+        (testWithVm' cmdLineTest "__src-test-command_line_tests__" [
+          self.pkgs.cli
+          pkgs.libp2p_helper
+        ])
         (testWithVm "__src-lib-staged_ledger-test__" [ ])
       ];
     in pkgs.lib.recursiveUpdate super {
@@ -1273,8 +1291,6 @@ let
           ( cd ${sqlSchemaFiles} && psql "$MINA_TEST_POSTGRES" < create_schema.sql >/dev/null )
         '';
       });
-      # # TODO remove this override after merging the latest `develop`
-      # tested.__src-lib-crypto-snarky_tests__ = skippedTest;
     };
 
   overlay = self: super:
