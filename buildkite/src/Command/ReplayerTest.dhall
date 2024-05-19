@@ -5,6 +5,7 @@ let Prelude = ../External/Prelude.dhall
 let Command = ./Base.dhall
 let Docker = ./Docker/Type.dhall
 let Size = ./Size.dhall
+let RunWithPostgres = ./RunWithPostgres.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
@@ -14,11 +15,13 @@ let Cmd = ../Lib/Cmds.dhall in
     Command.build
       Command.Config::{
         commands = [
-          Cmd.run "./buildkite/scripts/replayer-test.sh"
+        RunWithPostgres.runInDockerWithPostgresConn
+           Artifacts.Type.Archive 
+           "./src/app/replayer/test/archive/sample_db/archive_db.sql"
+           "./scripts/replayer-test.sh -d /workdir/src/app/replayer/ -a mina-replayer -p $PG_CONN"
         ],
-        label = "Replayer test",
+        label = "Archive: Replayer test",
         key = "replayer-test",
-        soft_fail = Some (B/SoftFail.Boolean True),
         target = Size.Large,
         depends_on = dependsOn
       }
