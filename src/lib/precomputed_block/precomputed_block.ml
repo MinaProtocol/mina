@@ -22,8 +22,6 @@ module Id = struct
       (Mina_base.State_hash.to_base58_check state_hash)
 end
 
-(* We define a subset of the mainnet precomputed block type here for the fields we need, to avoid the need to port some of the tricky old types *)
-
 type blockchain_state = { snarked_ledger_hash : Mina_base.Ledger_hash.t }
 
 type consensus_state =
