@@ -42,7 +42,9 @@ let%test_module "Tokens test" =
 
     let owned_token_id = Account_id.derive_token_id ~owner:account_id
 
-    let vk = Lazy.force Zkapps_tokens.vk
+    let vk =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Lazy.force Zkapps_tokens.vk )
 
     let mint_to_keys = gen_keys ()
 

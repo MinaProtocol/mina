@@ -138,7 +138,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ; authorization_kind = Signature
              }
            in
-           return
+           Malleable_error.lift
            @@ Transaction_snark.For_tests.deploy_snapp
                 ~constraint_constants:(Network.constraint_constants network)
                 parties_spec
