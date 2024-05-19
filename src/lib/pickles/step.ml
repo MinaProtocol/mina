@@ -124,7 +124,7 @@ struct
         -> _ array Plonk_verification_key_evals.t
         -> value
         -> (local_max_proofs_verified, local_max_proofs_verified) Proof.t
-        -> (var, value, local_max_proofs_verified, m) Tag.t
+        -> (var, value, local_max_proofs_verified, m) Types_map.Basic.t
         -> must_verify:bool
         -> [ `Sg of Tock.Curve.Affine.t ]
            * Unfinalized.Constant.t
@@ -135,7 +135,7 @@ struct
              , m )
              Per_proof_witness.Constant.No_app_state.t
            * [ `Actual_wrap_domain of int ] =
-     fun dlog_vk dlog_index app_state (T t) tag ~must_verify ->
+     fun dlog_vk dlog_index app_state (T t) data ~must_verify ->
       let t =
         { t with
           statement =
@@ -146,7 +146,6 @@ struct
         }
       in
       let proof = Wrap_wire_proof.to_kimchi_proof t.proof in
-      let data = Types_map.lookup_basic tag in
       let plonk0 = t.statement.proof_state.deferred_values.plonk in
       let plonk =
         let domain =
@@ -546,6 +545,22 @@ struct
     let auxiliary_value = ref None in
     let actual_wrap_domains = ref None in
     let compute_prev_proof_parts prev_proof_requests =
+      [%log internal] "Step_compute_prev_proof_parts" ;
+      let%map.Promise prevs =
+        let rec go :
+            type vars values ns ms.
+               (vars, values, ns, ms) H4.T(Tag).t
+            -> (vars, values, ns, ms) H4.T(Types_map.Basic).t Promise.t =
+          function
+          | [] ->
+              Promise.return ([] : _ H4.T(Types_map.Basic).t)
+          | tag :: tags ->
+              let%bind.Promise data = Types_map.lookup_basic tag in
+              let%map.Promise rest = go tags in
+              (data :: rest : _ H4.T(Types_map.Basic).t)
+        in
+        go branch_data.rule.prevs
+      in
       let ( challenge_polynomial_commitments'
           , unfinalized_proofs'
           , statements_with_hashes'
@@ -556,6 +571,7 @@ struct
         let[@warning "-4"] rec go :
             type vars values ns ms k.
                (vars, values, ns, ms) H4.T(Tag).t
+            -> (vars, values, ns, ms) H4.T(Types_map.Basic).t
             -> ( values
                , ns )
                H2.T(Inductive_rule.Previous_proof_statement.Constant).t
@@ -570,11 +586,12 @@ struct
                  H3.T(Per_proof_witness.Constant.No_app_state).t
                * (ns, ns) H2.T(Proof).t
                * (int, k) Vector.t =
-         fun ts prev_proof_stmts l ->
-          match (ts, prev_proof_stmts, l) with
-          | [], [], Z ->
+         fun ts datas prev_proof_stmts l ->
+          match (ts, datas, prev_proof_stmts, l) with
+          | [], [], [], Z ->
               ([], [], [], [], [], [], [])
           | ( t :: ts
+            , data :: datas
             , { public_input = app_state
               ; proof = p
               ; proof_must_verify = must_verify
@@ -584,13 +601,13 @@ struct
               let dlog_vk, dlog_index =
                 if Type_equal.Id.same self.Tag.id t.id then
                   (self_dlog_vk, self_dlog_plonk_index)
-                else
-                  let d = Types_map.lookup_basic t in
-                  (d.wrap_vk, d.wrap_key)
+                else (data.wrap_vk, data.wrap_key)
               in
               let `Sg sg, u, s, x, w, `Actual_wrap_domain domain =
-                expand_proof dlog_vk dlog_index app_state p t ~must_verify
-              and sgs, us, ss, xs, ws, ps, domains = go ts prev_proof_stmts l in
+                expand_proof dlog_vk dlog_index app_state p data ~must_verify
+              and sgs, us, ss, xs, ws, ps, domains =
+                go ts datas prev_proof_stmts l
+              in
               ( sg :: sgs
               , u :: us
               , s :: ss
@@ -598,12 +615,12 @@ struct
               , w :: ws
               , p :: ps
               , domain :: domains )
-          | _, _ :: _, _ ->
+          | _, _, _ :: _, _ ->
               .
-          | _, [], _ ->
+          | _, _, [], _ ->
               .
         in
-        go branch_data.rule.prevs prev_proof_requests prev_vars_length
+        go branch_data.rule.prevs prevs prev_proof_requests prev_vars_length
       in
       challenge_polynomial_commitments := Some challenge_polynomial_commitments' ;
       unfinalized_proofs := Some unfinalized_proofs' ;
@@ -611,7 +628,8 @@ struct
       x_hats := Some x_hats' ;
       witnesses := Some witnesses' ;
       prev_proofs := Some prev_proofs' ;
-      actual_wrap_domains := Some actual_wrap_domains'
+      actual_wrap_domains := Some actual_wrap_domains' ;
+      [%log internal] "Step_compute_prev_proof_parts_done"
     in
     let unfinalized_proofs = lazy (Option.value_exn !unfinalized_proofs) in
     let unfinalized_proofs_extended =
@@ -722,10 +740,7 @@ struct
       let k x = respond (Provide x) in
       match request with
       | Req.Compute_prev_proof_parts prev_proof_requests ->
-          [%log internal] "Step_compute_prev_proof_parts" ;
-          compute_prev_proof_parts prev_proof_requests ;
-          [%log internal] "Step_compute_prev_proof_parts_done" ;
-          k ()
+          k (compute_prev_proof_parts prev_proof_requests)
       | Req.Proof_with_datas ->
           k (Option.value_exn !witnesses)
       | Req.Wrap_index ->
@@ -790,66 +805,54 @@ struct
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
           ~wrap_rounds:Tock.Rounds.n
       in
+      let%bind.Promise main = branch_data.main ~step_domains in
+      let%bind.Promise step_domains = step_domains in
       let { Domains.h } = Vector.nth_exn step_domains branch_data.index in
       ksprintf Common.time "step-prover %d (%d)" branch_data.index
-        (Domain.size h)
-        (fun () ->
-          let promise_or_error =
-            (* Use a try_with to give an informative backtrace.
-               If we don't do this, the backtrace will be obfuscated by the
-               Promise, and it's significantly harder to track down errors.
-               This only applies to errors in the 'witness generation' stage;
-               proving errors are emitted inside the promise, and are therefore
-               unaffected.
-            *)
-            Or_error.try_with ~backtrace:true (fun () ->
-                [%log internal] "Step_generate_witness_conv" ;
-                Impls.Step.generate_witness_conv
-                  ~f:(fun { Impls.Step.Proof_inputs.auxiliary_inputs
-                          ; public_inputs
-                          } next_statement_hashed ->
-                    [%log internal] "Backend_tick_proof_create_async" ;
-                    let create_proof () =
-                      Backend.Tick.Proof.create_async ~primary:public_inputs
-                        ~auxiliary:auxiliary_inputs
-                        ~message:
-                          (Lazy.force prev_challenge_polynomial_commitments)
-                        pk
-                    in
-                    let%map.Promise proof =
-                      match proof_cache with
-                      | None ->
-                          create_proof ()
-                      | Some proof_cache -> (
-                          match
-                            Proof_cache.get_step_proof proof_cache ~keypair:pk
-                              ~public_input:public_inputs
-                          with
-                          | None ->
-                              if
-                                Proof_cache
-                                .is_env_var_set_requesting_error_for_proofs ()
-                              then failwith "Regenerated proof" ;
-                              let%map.Promise proof = create_proof () in
-                              Proof_cache.set_step_proof proof_cache ~keypair:pk
-                                ~public_input:public_inputs proof.proof ;
-                              proof
-                          | Some proof ->
-                              Promise.return
-                                ( { proof; public_evals = None }
-                                  : Tick.Proof.with_public_evals ) )
-                    in
-                    [%log internal] "Backend_tick_proof_create_async_done" ;
-                    (proof, next_statement_hashed) )
-                  ~input_typ:Impls.Step.Typ.unit ~return_typ:input
-                  (fun () () ->
-                    Impls.Step.handle
-                      (fun () -> conv_inv (branch_data.main ~step_domains ()))
-                      handler ) )
+        (Domain.size h) (fun () ->
+          [%log internal] "Step_generate_witness_conv" ;
+          let builder =
+            Impls.Step.generate_witness_manual ~handlers:[ handler ]
+              ~input_typ:Impls.Step.Typ.unit ~return_typ:input ()
           in
-          (* Re-raise any captured errors, complete with their backtrace. *)
-          Or_error.ok_exn promise_or_error )
-        ()
+          let%bind.Promise res =
+            builder.run_circuit (fun () () ->
+                Promise.map ~f:conv_inv (main ()) )
+          in
+          let ( { Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs }
+              , next_statement_hashed ) =
+            builder.finish_computation res
+          in
+          [%log internal] "Backend_tick_proof_create_async" ;
+          let create_proof () =
+            Backend.Tick.Proof.create_async ~primary:public_inputs
+              ~auxiliary:auxiliary_inputs
+              ~message:(Lazy.force prev_challenge_polynomial_commitments)
+              pk
+          in
+          let%map.Promise proof =
+            match proof_cache with
+            | None ->
+                create_proof ()
+            | Some proof_cache -> (
+                match
+                  Proof_cache.get_step_proof proof_cache ~keypair:pk
+                    ~public_input:public_inputs
+                with
+                | None ->
+                    if Proof_cache.is_env_var_set_requesting_error_for_proofs ()
+                    then failwith "Regenerated proof" ;
+                    let%map.Promise proof = create_proof () in
+                    Proof_cache.set_step_proof proof_cache ~keypair:pk
+                      ~public_input:public_inputs proof.proof ;
+                    proof
+                | Some proof ->
+                    Promise.return
+                      ( { proof; public_evals = None }
+                        : Tick.Proof.with_public_evals ) )
+          in
+          [%log internal] "Backend_tick_proof_create_async_done" ;
+          (proof, next_statement_hashed) )
     in
     let prev_evals =
       extract_from_proofs

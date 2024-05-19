@@ -10,7 +10,6 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let dependsOn = DebianVersions.dependsOn DebianVersions.DebVersion.Bullseye Profiles.Type.Standard
 
-
 in Pipeline.build Pipeline.Config::{
   spec =
     JobSpec::{
