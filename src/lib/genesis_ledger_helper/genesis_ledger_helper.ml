@@ -325,6 +325,9 @@ module Ledger = struct
         ; ("path", `String tar_path)
         ; ("dir", `String dirname)
         ] ;
+    (* This sleep for 5s is a hack for rocksdb. It seems like rocksdb would need some
+       time to stablize *)
+    let%bind () = after (Time.Span.of_int_sec 5) in
     let open Deferred.Or_error.Let_syntax in
     let%map () = Tar.create ~root:dirname ~file:tar_path ~directory:"." () in
     tar_path

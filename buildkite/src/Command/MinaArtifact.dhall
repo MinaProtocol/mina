@@ -101,7 +101,9 @@ let hardforkPipeline : DebianVersions.DebVersion -> Pipeline.Config.Type =
         [ Command.build Command.Config::{
             commands = [
               Cmd.runInDocker Cmd.Docker::{
-                image = "\\\${MINA_DAEMON_DOCKER_IMAGE:-gcr.io/o1labs-192920/mina-daemon@sha256:6da66879aacab050a6955c84347f587e43044987b04b9de4522a942f770cc5e7}"
+                -- we are using a hard-coded docker image here because we don't want to wait for the image to be built.
+                -- this job exists solely for saving us time during hard fork process.
+                image = "\\\${MINA_DAEMON_DOCKER_IMAGE:-gcr.io/o1labs-192920/mina-daemon:3.0.1-migration-tooling-package-generation-fix-tarball-a980e1c-bullseye-mainnet-hardfork}"
               , extraEnv = [ "NETWORK_NAME=\$NETWORK_NAME"
                            , "CONFIG_JSON_GZ_URL=\$CONFIG_JSON_GZ_URL"
                            , "AWS_ACCESS_KEY_ID"
