@@ -80,18 +80,19 @@ function initial_help(){
     echo ""
     echo "Parameters:"
     echo ""
-    printf "  %-25s %s\n" "-h | --help" "show help";
-    printf "  %-25s %s\n" "-g | --genesis-ledger" "[file] path to genesis ledger file";
-    printf "  %-25s %s\n" "-s | --source-db" "[connection_str] connection string to database to be migrated";
-    printf "  %-25s %s\n" "-t | --target-db" "[connection_str] connection string to database which will hold migrated data";
-    printf "  %-25s %s\n" "-b | --blocks-bucket" "[string] name of precomputed blocks bucket. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
+    printf "  %-25s %s\n" "-h  | --help" "show help";
+    printf "  %-25s %s\n" "-g  | --genesis-ledger" "[file] path to genesis ledger file";
+    printf "  %-25s %s\n" "-s  | --source-db" "[connection_str] connection string to database to be migrated";
+    printf "  %-25s %s\n" "-t  | --target-db" "[connection_str] connection string to database which will hold migrated data";
+    printf "  %-25s %s\n" "-b  | --blocks-bucket" "[string] name of precomputed blocks bucket. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
     printf "  %-25s %s\n" "-bs | --blocks-batch-size" "[int] number of precomputed blocks to be fetch at once from Gcloud. Bigger number like 1000 can help speed up migration process";
-    printf "  %-25s %s\n" "-n | --network" "[string] network name when determining precomputed blocks. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
-    printf "  %-25s %s\n" "-d | --delete-blocks" "[flag] delete blocks after they are processed (saves space with -sb)"
-    printf "  %-25s %s\n" "-p | --prefetch-blocks" "[flag] downloads all blocks at once instead of incrementally"
-    printf "  %-25s %s\n" "-i | --checkpoint-interval" "[int] replayer checkpoint interval. Default: 1000"
-    printf "  %-25s %s\n" "-c | --checkpoint-output-path" "[file] output folder for replayer checkpoints"
-    printf "  %-25s %s\n" "-l | --precomputed-blocks-local-path" "[file] on-disk precomputed blocks location"
+    printf "  %-25s %s\n" "-n  | --network" "[string] network name when determining precomputed blocks. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
+    printf "  %-25s %s\n" "-d  | --delete-blocks" "[flag] delete blocks after they are processed (saves space with -sb)"
+    printf "  %-25s %s\n" "-p  | --prefetch-blocks" "[flag] downloads all blocks at once instead of incrementally"
+    printf "  %-25s %s\n" "-i  | --checkpoint-interval" "[int] replayer checkpoint interval. Default: 1000"
+    printf "  %-25s %s\n" "-cp | --checkpoint-prefix" "[string] replayer checkpoint prefix. Default: $CHECKPOINT_PREFIX"
+    printf "  %-25s %s\n" "-c  | --checkpoint-output-path" "[file] output folder for replayer checkpoints"
+    printf "  %-25s %s\n" "-l  | --precomputed-blocks-local-path" "[file] on-disk precomputed blocks location"
     echo ""
     echo "Example:"
     echo ""
@@ -123,6 +124,7 @@ function initial(){
     local __checkpoint_output_path='.'
     local __precomputed_blocks_local_path='.'
     local __checkpoint_interval=$CHECKPOINT_INTERVAL
+    local __checkpoint_prefix=$CHECKPOINT_PREFIX
 
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
@@ -168,6 +170,10 @@ function initial(){
             ;;
             -i | --checkpoint-interval )
                 __checkpoint_interval=${2:?$error_message}
+                shift 2;
+            ;;
+            -cp | --checkpoint-prefix )
+                __checkpoint_prefix=${2:?$error_message}
                 shift 2;
             ;;
             -l | --precomputed-blocks-local-path )
@@ -226,7 +232,8 @@ function initial(){
         "$__network" \
         "$__checkpoint_output_path" \
         "$__precomputed_blocks_local_path" \
-        "$__checkpoint_interval"
+        "$__checkpoint_interval" \
+        "$__checkpoint_prefix"
 }
 
 function check_log_for_error() {
@@ -273,6 +280,7 @@ function run_initial_migration() {
     local __checkpoint_output_path=$9
     local __precomputed_blocks_local_path=${10}
     local __checkpoint_interval=${11}
+    local __checkpoint_prefix=${12}
     
     local __date=$(date '+%Y-%m-%d_%H_%M_%S')
     local __berkely_migration_log="berkeley_migration_$__date.log"
@@ -306,7 +314,7 @@ function run_initial_migration() {
         --archive-uri "$__migrated_archive_uri" \
         --input-file "$__config_file" \
         --checkpoint-interval "$__checkpoint_interval" \
-        --checkpoint-file-prefix "$CHECKPOINT_PREFIX" \
+        --checkpoint-file-prefix "$__checkpoint_prefix" \
         --checkpoint-output-folder "$__checkpoint_output_path" \
         --log-file "$__replayer_log"
 
@@ -314,7 +322,7 @@ function run_initial_migration() {
 
     set -e # exit immediately on errors
 
-    check_output_replayer_for_initial "$CHECKPOINT_PREFIX"
+    check_output_replayer_for_initial "$__checkpoint_prefix"
     
     mina-berkeley-migration-verifier pre-fork \
         --mainnet-archive-uri "$__mainnet_archive_uri" \
@@ -330,19 +338,20 @@ function incremental_help(){
     echo ""
     echo "Parameters:"
     echo ""
-    printf "  %-25s %s\n" "-h | --help" "show help";
-    printf "  %-25s %s\n" "-g | --genesis-ledger" "[file] path to genesis ledger file";
-    printf "  %-25s %s\n" "-r | --replayer-checkpoint" "[file] path to genesis ledger file";
-    printf "  %-25s %s\n" "-s | --source-db" "[connection_str] connection string to database to be migrated";
-    printf "  %-25s %s\n" "-t | --target-db" "[connection_str] connection string to database which will hold migrated data";
-    printf "  %-25s %s\n" "-b | --blocks-bucket" "[string] name of precomputed blocks bucket. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
+    printf "  %-25s %s\n" "-h  | --help" "show help";
+    printf "  %-25s %s\n" "-g  | --genesis-ledger" "[file] path to genesis ledger file";
+    printf "  %-25s %s\n" "-r  | --replayer-checkpoint" "[file] path to genesis ledger file";
+    printf "  %-25s %s\n" "-s  | --source-db" "[connection_str] connection string to database to be migrated";
+    printf "  %-25s %s\n" "-t  | --target-db" "[connection_str] connection string to database which will hold migrated data";
+    printf "  %-25s %s\n" "-b  | --blocks-bucket" "[string] name of precomputed blocks bucket. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
     printf "  %-25s %s\n" "-bs | --blocks-batch-size" "[int] number of precomputed blocks to be fetch at once from Gcloud. Bigger number like 1000 can help speed up migration process";
-    printf "  %-25s %s\n" "-n | --network" "[string] network name when determining precomputed blocks. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
-    printf "  %-25s %s\n" "-d | --delete-blocks" "delete blocks after they are processed (saves space with -sb)"
-    printf "  %-25s %s\n" "-p | --prefetch-blocks" "downloads all blocks at once instead of incrementally"
-    printf "  %-25s %s\n" "-c | --checkpoint-output-path" "[file] output folder for replayer checkpoints"
-    printf "  %-25s %s\n" "-i | --checkpoint-interval" "[int] replayer checkpoint interval. Default: 1000"
-    printf "  %-25s %s\n" "-l | --precomputed-blocks-local-path" "[file] on-disk precomputed blocks location"
+    printf "  %-25s %s\n" "-n  | --network" "[string] network name when determining precomputed blocks. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
+    printf "  %-25s %s\n" "-d  | --delete-blocks" "delete blocks after they are processed (saves space with -sb)"
+    printf "  %-25s %s\n" "-p  | --prefetch-blocks" "downloads all blocks at once instead of incrementally"
+    printf "  %-25s %s\n" "-c  | --checkpoint-output-path" "[file] output folder for replayer checkpoints"
+    printf "  %-25s %s\n" "-i  | --checkpoint-interval" "[int] replayer checkpoint interval. Default: 1000"
+    printf "  %-25s %s\n" "-cp | --checkpoint-prefix" "[string] replayer checkpoint prefix. Default: $CHECKPOINT_PREFIX"
+    printf "  %-25s %s\n" "-l  | --precomputed-blocks-local-path" "[file] on-disk precomputed blocks location"
     echo ""
     echo "Example:"
     echo ""
@@ -402,6 +411,7 @@ function incremental(){
     local __checkpoint_interval=$CHECKPOINT_INTERVAL
     local __checkpoint_output_path='.'
     local __precomputed_blocks_local_path='.'
+    local __checkpoint_prefix="$CHECKPOINT_PREFIX"
 
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
@@ -451,6 +461,10 @@ function incremental(){
             ;;
             -c | --checkpoint-output-path )
                 __checkpoint_output_path=${2:?$error_message}
+                shift 2;
+            ;;
+            -cp | --checkpoint-prefix )
+                __checkpoint_prefix=${2:?$error_message}
                 shift 2;
             ;;
             -l | --precomputed-blocks-local-path )
@@ -512,7 +526,8 @@ function incremental(){
         "$__checkpoint_interval" \
         "$__replayer_checkpoint" \
         "$__checkpoint_output_path" \
-        "$__precomputed_blocks_local_path"
+        "$__precomputed_blocks_local_path" \
+        "$__checkpoint_prefix"
 
 }
 
@@ -529,6 +544,7 @@ function run_incremental_migration() {
     local __replayer_checkpoint=${10}
     local __checkpoint_output_path=${11}
     local __precomputed_blocks_local_path=${12}
+    local __checkpoint_prefix=${13}
 
     local __date=$(date '+%Y-%m-%d_%H%M')
     local __berkely_migration_log="berkeley_migration_$__date.log"
@@ -558,7 +574,7 @@ function run_incremental_migration() {
         --archive-uri "$__migrated_archive_uri" \
         --input-file "$__replayer_checkpoint" \
         --checkpoint-interval "$__checkpoint_interval" \
-        --checkpoint-file-prefix "$CHECKPOINT_PREFIX" \
+        --checkpoint-file-prefix "$__checkpoint_prefix" \
         --checkpoint-output-folder "$__checkpoint_output_path" \
         --log-file "$__replayer_log"
 
@@ -566,7 +582,7 @@ function run_incremental_migration() {
 
     set -e # exit immediately on errors
 
-    check_new_replayer_checkpoints_for_incremental "$CHECKPOINT_PREFIX"
+    check_new_replayer_checkpoints_for_incremental "$__checkpoint_prefix"
 
     mina-berkeley-migration-verifier pre-fork \
         --mainnet-archive-uri "$__mainnet_archive_uri" \
@@ -583,20 +599,21 @@ function final_help(){
     echo ""
     echo "Parameters:"
     echo ""
-    printf "  %-25s %s\n" "-h | --help" "show help";
-    printf "  %-25s %s\n" "-g | --genesis-ledger" "[file] path to genesis ledger file";
-    printf "  %-25s %s\n" "-r | --replayer-checkpoint" "[file] path to genesis ledger file";
-    printf "  %-25s %s\n" "-s | --source-db" "[connection_str] connection string to database to be migrated";
-    printf "  %-25s %s\n" "-t | --target-db" "[connection_str] connection string to database which will hold migrated data";
-    printf "  %-25s %s\n" "-b | --blocks-bucket" "[string] name of precomputed blocks bucket. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
+    printf "  %-25s %s\n" "-h  | --help" "show help";
+    printf "  %-25s %s\n" "-g  | --genesis-ledger" "[file] path to genesis ledger file";
+    printf "  %-25s %s\n" "-r  | --replayer-checkpoint" "[file] path to genesis ledger file";
+    printf "  %-25s %s\n" "-s  | --source-db" "[connection_str] connection string to database to be migrated";
+    printf "  %-25s %s\n" "-t  | --target-db" "[connection_str] connection string to database which will hold migrated data";
+    printf "  %-25s %s\n" "-b  | --blocks-bucket" "[string] name of precomputed blocks bucket. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
     printf "  %-25s %s\n" "-bs | --blocks-batch-size" "[int] number of precomputed blocks to be fetch at once from Gcloud. Bigger number like 1000 can help speed up migration process";
-    printf "  %-25s %s\n" "-n | --network" "[string] network name when determining precomputed blocks. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
+    printf "  %-25s %s\n" "-n  | --network" "[string] network name when determining precomputed blocks. NOTICE: there is an assumption that precomputed blocks are named with format: {network}-{height}-{state_hash}.json";
     printf "  %-25s %s\n" "-fc | --fork-genesis-config" "[file] Genesis config file for the fork network. It should be provied by MF or O(1)Labs team after fork block is announced";
-    printf "  %-25s %s\n" "-d | --delete-blocks" "delete blocks after they are processed (saves space with -sb)"
-    printf "  %-25s %s\n" "-p | --prefetch-blocks" "downloads all blocks at once instead of incrementally"
-    printf "  %-25s %s\n" "-c | --checkpoint-output-path" "[file] output folder for replayer checkpoints"
-    printf "  %-25s %s\n" "-i | --checkpoint-interval" "[int] replayer checkpoint interval. Default: 1000"
-    printf "  %-25s %s\n" "-l | --precomputed-blocks-local-path" "[file] on-disk precomputed blocks location"
+    printf "  %-25s %s\n" "-d  | --delete-blocks" "delete blocks after they are processed (saves space with -sb)"
+    printf "  %-25s %s\n" "-p  | --prefetch-blocks" "downloads all blocks at once instead of incrementally"
+    printf "  %-25s %s\n" "-c  | --checkpoint-output-path" "[file] output folder for replayer checkpoints"
+    printf "  %-25s %s\n" "-cp | --checkpoint-prefix" "[string] replayer checkpoint prefix. Default: $CHECKPOINT_PREFIX"
+    printf "  %-25s %s\n" "-i  | --checkpoint-interval" "[int] replayer checkpoint interval. Default: 1000"
+    printf "  %-25s %s\n" "-l  | --precomputed-blocks-local-path" "[file] on-disk precomputed blocks location"
     echo ""
     echo "Example:"
     echo ""
@@ -628,6 +645,7 @@ function final(){
     local __fork_genesis_config=''
     local __checkpoint_output_path='.'
     local __precomputed_blocks_local_path='.'
+    local __checkpoint_prefix="$CHECKPOINT_PREFIX"
     
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
@@ -681,6 +699,10 @@ function final(){
             ;;
             -c | --checkpoint-output-path )
                 __checkpoint_output_path=${2:?$error_message}
+                shift 2;
+            ;;
+            -cp | --checkpoint-prefix )
+                __checkpoint_prefix=${2:?error_message}
                 shift 2;
             ;;
             -l | --precomputed-blocks-local-path )
@@ -748,7 +770,25 @@ function final(){
         "$__replayer_checkpoint" \
         "$__fork_genesis_config" \
         "$__checkpoint_output_path" \
-        "$__precomputed_blocks_local_path"
+        "$__precomputed_blocks_local_path" \
+        "$__checkpoint_prefix"
+}
+
+function find_most_recent_checkpoint() {
+    
+    FILTER=$1
+    declare -A checkpoints
+
+    for i in $FILTER ; do
+      SLOT=$(cat $i | jq .start_slot_since_genesis)
+      checkpoints["$SLOT"]="$i"
+    done
+
+    for k in "${!checkpoints[@]}"
+    do
+        echo $k ',' ${checkpoints["$k"]}
+    done |
+    sort -rn | head -n 1 | cut -d',' -f2 | xargs
 }
 
 function run_final_migration() {
@@ -765,6 +805,7 @@ function run_final_migration() {
     local __fork_genesis_config=${11}
     local __checkpoint_output_path=${12}
     local __precomputed_blocks_local_path=${13}
+    local __checkpoint_prefix=${14}
     
     local __fork_state_hash="$(jq -r .proof.fork.state_hash "$__fork_genesis_config")"
     local __date=$(date '+%Y-%m-%d_%H%M')
@@ -796,7 +837,7 @@ function run_final_migration() {
         --archive-uri "$__migrated_archive_uri" \
         --input-file "$__replayer_checkpoint" \
         --checkpoint-interval "$__checkpoint_interval" \
-        --checkpoint-file-prefix "$CHECKPOINT_PREFIX" \
+        --checkpoint-file-prefix "$__checkpoint_prefix" \
         --checkpoint-output-folder "$__checkpoint_output_path" \
         --log-file "$__replayer_log"
 
@@ -804,10 +845,17 @@ function run_final_migration() {
     set -e # exit immediately on errors
 
     check_incremental_migration_progress "$__replayer_checkpoint" "$__migrated_archive_uri" 
-    check_new_replayer_checkpoints_for_incremental "$CHECKPOINT_PREFIX"
+    check_new_replayer_checkpoints_for_incremental "$__checkpoint_prefix"
 
     # sort by https://stackoverflow.com/questions/60311787/how-to-sort-by-numbers-that-are-part-of-a-filename-in-bash
-    local migrated_replayer_output=$(find . -maxdepth 1 -name "$CHECKPOINT_PREFIX-checkpoint*.json"  | sort -Vrt - -k3,3 | head -n 1)
+    
+    migrated_replayer_output=$(find_most_recent_checkpoint $__checkpoint_prefix-checkpoint*.json)
+
+    echo "Running validations for final migration: "
+    echo "   mainnet-archive-uri: '$__mainnet_archive_uri'"
+    echo "   migrated-archive-uri: '$__migrated_archive_uri'"
+    echo "   fork-genesis-config: '$__fork_genesis_config'"
+    echo "   migrated-replayer-output: '$migrated_replayer_output'"
 
     mina-berkeley-migration-verifier post-fork \
         --mainnet-archive-uri "$__mainnet_archive_uri" \
