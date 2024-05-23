@@ -6,7 +6,7 @@
 2. Go to its root directory and execute commands staying in the same root directory.
 3. Install dependencies.
     - OS dependencies:
-      - `PostgreSQL`, its client and credentials configuration, if you'd like to also run the Archive Node.
+      - `PostgreSQL 11` or later, its client and credentials configuration, if you'd like to also run the Archive Node.
       - `Python3`.
       - `jq` tool.
     - Python dependencies:
