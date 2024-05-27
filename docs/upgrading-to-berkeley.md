@@ -82,7 +82,7 @@ Here are some general instructions that should help you get most of the way ther
 
 2. **Environment Preparation:**
     - **Install mina-create-legacy-genesis**
-      - ``` bash
+      ```bash
       echo "deb [trusted=yes] http://packages.o1test.net bullseye stable" > /etc/apt/sources.list.d/o1.list
       apt-get update
       apt-get install mina-create-legacy-genesis=1.4.1-97f7d8c
