@@ -16,21 +16,21 @@ release_branch=${REMOTE}/$1
 
 RELEASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 --no-merges $release_branch)
 
-
-if ! $(gsutil ls gs://mina-type-shapes/$BUILDKITE_COMMIT 2>/dev/null); then
-    git checkout $BUILDKITE_COMMIT
+function checkout_and_dump() {
+    local __commit=$1
+    git checkout $__commit
+    git submodule sync
+    git submodule update --init --recursive
     export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
     export GO=/usr/lib/go/bin/go
     eval $(opam env)
+    dune exec src/app/cli/src/mina.exe internal dump-type-shapes > ${__commit:0:7}-type-shapes.txt
+}
 
-    dune exec src/app/cli/src/mina.exe internal dump-type-shapes > ${BUILDKITE_COMMIT:0:7}-type-shapes.txt
+if ! $(gsutil ls gs://mina-type-shapes/$BUILDKITE_COMMIT 2>/dev/null); then
+    checkout_and_dump $BUILDKITE_COMMIT
 fi
 
 if ! $(gsutil ls gs://mina-type-shapes/$RELEASE_BRANCH_COMMIT 2>/dev/null); then
-    git checkout $RELEASE_BRANCH_COMMIT
-    export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
-    export GO=/usr/lib/go/bin/go
-    eval $(opam env)
-
-    dune exec src/app/cli/src/mina.exe internal dump-type-shapes > ${BUILDKITE_COMMIT:0:7}-type-shapes.txt
+    checkout_and_dump $RELEASE_BRANCH_COMMIT
 fi
