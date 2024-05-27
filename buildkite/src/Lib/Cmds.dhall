@@ -33,12 +33,7 @@ let module = \(environment : List Text) ->
   let chain : List Text -> Cmd = 
     \(chainOfCommands: List Text) ->
       run (Text/concatSep " && " chainOfCommands)
-
-  let chainWithTearDown : List Text -> Text -> Cmd = 
-    \(chainOfCommands: List Text) ->
-    \(tearDown: Text) ->
-      run ( "( " ++  (Text/concatSep " && " chainOfCommands) ++ " ) || " ++ "${tearDown}" )
- 
+  
   let quietly : Text -> Cmd =
     \(script: Text) -> { line = script, readable = None Text }
   let true : Cmd = quietly "true"
