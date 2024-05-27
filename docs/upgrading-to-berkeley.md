@@ -107,7 +107,7 @@ Here are some general instructions that should help you get most of the way ther
             CONFIG_JSON_GZ_URL=<url to fork config zip> ex: "https://storage.googleapis.com/fork-config-dryrun.json.gz"
             GENESIS_TIMESTAMP=<same ts as your genesis config> ex: "2024-05-03T00:00:00Z"
             NETWORK_NAME=<this should match the intended network> ex: mainnet
-            PRECOMPUTED_BLOCK_GS_PREFIX=<url to the network block datta> ex: "gs://mina_network_block_data/mainnet"
+            PRECOMPUTED_BLOCK_GS_PREFIX=<url to the network block data> ex: "gs://mina_network_block_data/mainnet"
             ```
 
 #### Verification Process
