@@ -100,7 +100,6 @@ let module = \(environment : List Text) ->
   , quietly = quietly
   , run = run
   , chain = chain
-  , chainWithTearDown = chainWithTearDown
   , true = true
   , false = false
   , runInDocker = runInDocker
