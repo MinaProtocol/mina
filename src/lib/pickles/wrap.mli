@@ -63,7 +63,7 @@ val wrap :
            Types.Wrap.Statement.In_circuit.t
         -> ( Challenge.Constant.t
            , scalar_challenge_constant
-           , Pasta_bindings.Fp.t Shifted_value.Type1.t
+           , Backend.Tick.Field.t Shifted_value.Type1.t
            , ( Import.Challenge.Constant.t Import.Types.Scalar_challenge.t
              , bool )
              Import.Types.Opt.t
@@ -105,7 +105,9 @@ val wrap :
        Vector.t
      , 'max_local_max_proofs_verifieds
        Hlist0.H1(Reduced_messages_for_next_proof_over_same_field.Wrap).t
-     , ( (Pasta_bindings.Fq.t, Pasta_bindings.Fq.t array) Plonk_types.All_evals.t
+     , ( ( Backend.Tock.Field.t
+         , Backend.Tock.Field.t array )
+         Plonk_types.All_evals.t
        , 'max_proofs_verified )
        Vector.t )
      Proof.Base.Step.t
