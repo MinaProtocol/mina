@@ -15,7 +15,9 @@ let runInDockerWithPostgresConn : List Text -> Text -> Artifacts.Type -> Text ->
   \(initScript: Text ) -> 
   \(docker: Artifacts.Type) ->
   \(innerScript : Text) ->
-    let port="5433"
+   -- port is used only in pg_conn variable. By using --network host we are disabling 
+   -- any control over postgres port
+    let port="5432" 
     let user="postgres"
     let password="postgres"
     let postgresDockerName="postgres"
@@ -38,7 +40,7 @@ let runInDockerWithPostgresConn : List Text -> Text -> Artifacts.Type -> Text ->
     Cmd.chain [
          "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true", 
          "source buildkite/scripts/export-git-env-vars.sh",
-         "docker run --network host --volume $BUILDKITE_BUILD_CHECKOUT_PATH:/workdir  --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}",
+         "docker run --network host --volume $BUILDKITE_BUILD_CHECKOUT_PATH:/workdir  --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}",
          "sleep 5",
          "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/${initScript}",
          "docker run --network host --volume $BUILDKITE_BUILD_CHECKOUT_PATH:/workdir gcr.io/o1labs-192920/${Artifacts.dockerName docker}:$MINA_DOCKER_TAG ${innerScript}"
