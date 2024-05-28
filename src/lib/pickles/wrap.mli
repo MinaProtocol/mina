@@ -47,7 +47,7 @@ val wrap :
            , bool
            , 'max_proofs_verified
              Reduced_messages_for_next_proof_over_same_field.Wrap.t
-           , (int64, Types.Digest.Limbs.n) Vector.t
+           , (Limb_vector.Constant.Hex64.t, Types.Digest.Limbs.n) Vector.t
            , ( 'b
              , (Backend.Tock.Proof.G.Affine.t, 'actual_proofs_verified) Vector.t
              , ( ( Challenge.Constant.t Scalar_challenge.t
@@ -70,7 +70,7 @@ val wrap :
            , bool
            , 'max_proofs_verified
              Reduced_messages_for_next_proof_over_same_field.Wrap.t
-           , (int64, Types.Digest.Limbs.n) Vector.t
+           , (Limb_vector.Constant.Hex64.t, Types.Digest.Limbs.n) Vector.t
            , ( 'b
              , (Backend.Tock.Proof.G.Affine.t, 'actual_proofs_verified) Vector.t
              , ( ( Challenge.Constant.t Scalar_challenge.t
