@@ -48,7 +48,7 @@ let runInDockerWithPostgresConn : List Text -> Text -> Artifacts.Type -> Text ->
          "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}",
          "sleep 5",
          "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/${initScript}",
-         "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir  ${envVars} gcr.io/o1labs-192920/${Artifacts.dockerName docker}:$MINA_DOCKER_TAG ${innerScript}"
+         "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir  ${envVars} gcr.io/o1labs-192920/${Artifacts.dockerName docker}:\\\$MINA_DOCKER_TAG ${innerScript}"
     ] 
     
 in

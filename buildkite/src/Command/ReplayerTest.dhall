@@ -17,7 +17,7 @@ let Cmd = ../Lib/Cmds.dhall in
         commands = [
         RunWithPostgres.runInDockerWithPostgresConn
           ([] : List Text)
-           "./src/app/replayer/test/archive/sample_db/archive_db.sql"
+           "./src/test/archive/sample_db/archive_db.sql"
            Artifacts.Type.Archive 
            "./scripts/replayer-test.sh -d /workdir/src/app/replayer/ -a mina-replayer -p $PG_CONN"
         ],
