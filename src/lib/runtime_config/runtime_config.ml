@@ -480,6 +480,7 @@ module Json_layout = struct
       ; zkapp_cmd_limit_hardcap : int option [@default None]
       ; slot_tx_end : int option [@default None]
       ; slot_chain_end : int option [@default None]
+      ; network_id : string option [@default None]
       }
     [@@deriving yojson, fields, dhall_type]
 
@@ -1227,6 +1228,7 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap : int option [@default None]
     ; slot_tx_end : int option [@default None]
     ; slot_chain_end : int option [@default None]
+    ; network_id : string option [@default None]
     }
   [@@deriving bin_io_unversioned]
 
@@ -1266,6 +1268,7 @@ module Daemon = struct
     ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
     ; slot_chain_end =
         opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
+    ; network_id = opt_fallthrough ~default:t1.network_id t2.network_id
     }
 
   let gen =
@@ -1289,6 +1292,7 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
     ; slot_tx_end = None
     ; slot_chain_end = None
+    ; network_id = None
     }
 end
 
