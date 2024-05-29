@@ -79,6 +79,7 @@ type t =
   ; txpool_max_size : int
   ; slot_tx_end : int option
   ; slot_chain_end : int option
+  ; network_id : string option
   }
 
 let proof_config_default : Runtime_config.Proof_keys.t =
@@ -114,6 +115,7 @@ let default =
   ; txpool_max_size = 3000
   ; slot_tx_end = None
   ; slot_chain_end = None
+  ; network_id = None
   }
 
 let transaction_capacity_log_2 (config : t) =
