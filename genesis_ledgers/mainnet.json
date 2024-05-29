@@ -2,6 +2,7 @@
   "genesis": {
     "genesis_state_timestamp": "2021-03-17T00:00:00Z"
   },
+  "daemon": { "network_id": "mainnet" },
   "ledger": {
     "name": "mainnet",
     "accounts": [
