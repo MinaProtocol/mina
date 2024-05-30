@@ -127,7 +127,7 @@ let promoteDockerStep = \(spec : PromoteDockerSpec.Type) ->
     Command.build
       Command.Config::{
         commands = [ 
-          Cmd.run "./buildkite/scripts/promote-docker.sh --name ${Artifact.dockerName spec.name} --version ${old_tag} --tag ${new_tag} ${publish} --suffix ${Network.lowerName spec.network}"
+          Cmd.run "./buildkite/scripts/promote-docker.sh --name ${Artifact.dockerName spec.name} --version ${old_tag} --tag ${new_tag} ${publish}"
         ],
         label = "Docker: ${spec.step_key}",
         key = spec.step_key,
@@ -143,7 +143,7 @@ let promoteDockerVerificationStep = \(spec : PromoteDockerSpec.Type) ->
     Command.build
       Command.Config::{
         commands = [
-          Cmd.run "./scripts/docker/verify.sh --package ${Artifact.dockerName spec.name} --version ${new_tag} --repo ${repo} --suffix "
+          Cmd.run "./scripts/docker/verify.sh --package ${Artifact.dockerName spec.name} --version ${new_tag} --repo ${repo} --suffix ${Network.lowerName spec.network}"
         ],
         label = "Docker: ${spec.step_key}",
         key = spec.step_key,
