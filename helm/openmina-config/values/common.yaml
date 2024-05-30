@@ -1,11 +1,11 @@
 testnetName: testnet
 mina:
-  image: openmina/mina:custom-tooling-snark-http-coordinator-mainnet-1.4.0.1-latest
-  snarkCoordinatorImage: binier/mina-snark-worker-rs:latest
+  image: openmina/mina:custom-tooling-snark-http-coordinator-mainnet-3.0.0-latest
+  snarkCoordinatorImage: tizoc/mina-snark-worker-rs:latest
   privkeyPass:
   exposeGraphql: true
   usePodIp: true
-  seedPeersURL: https://storage.googleapis.com/seed-lists/mainnet_seeds.txt
+  seedPeersURL: https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt
   memRequest: "20.0Gi"
   seedPeers: []
   # seedPeers:
