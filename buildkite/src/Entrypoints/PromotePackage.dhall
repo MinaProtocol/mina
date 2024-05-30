@@ -104,7 +104,7 @@ let promote_artifacts =
 
   let pipelineType = Pipeline.build 
     (
-      PromotePackage.pipeline 
+      PromotePackage.promotePipeline 
           (debians_spec)
           (dockers_spec)
           (DebianVersions.DebVersion.Bullseye)
@@ -112,7 +112,7 @@ let promote_artifacts =
     )
   in pipelineType.pipeline
 
-let promote_artifacts = 
+let verify_artifacts = 
   \(debians: List Package.Type) ->
   \(dockers: List Artifact.Type) ->
   \(new_version: Text ) ->
@@ -200,7 +200,7 @@ let promote_artifacts =
 
   let pipelineType = Pipeline.build 
     (
-      PromotePackage.pipeline 
+      PromotePackage.verifyPipeline 
           (debians_spec)
           (dockers_spec)
           (DebianVersions.DebVersion.Bullseye)
