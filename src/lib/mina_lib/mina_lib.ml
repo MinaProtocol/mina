@@ -387,7 +387,7 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     ~first_connection_incr ~first_message_incr =
   let open Mina_incremental.Status in
   let restart_delay = Time.Span.of_min 5. in
-  let offline_shutdown_delay = Time.Span.of_min 25. in
+  let offline_shutdown_delay = Time.Span.of_hr 6. in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
