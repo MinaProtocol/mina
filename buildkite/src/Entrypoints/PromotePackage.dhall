@@ -116,7 +116,6 @@ let verify_artifacts =
   \(debians: List Package.Type) ->
   \(dockers: List Artifact.Type) ->
   \(new_version: Text ) ->
-  \(architecture: Text ) ->
   \(profile: Profile.Type) ->
   \(network: Network.Type) ->
   \(codenames: List DebianVersions.DebVersion ) ->
