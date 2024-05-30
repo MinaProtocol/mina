@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # test replayer on known archive db
+set -x
 
 REPLAYER_DIR=src/app/replayer
 REPLAYER_APP=_build/default/src/app/replayer/replayer.exe
