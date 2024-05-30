@@ -209,6 +209,6 @@ let promote_artifacts =
   in pipelineType.pipeline
 
 in {
-  promote_artifacts = promote_artifacts
+  promote_artifacts = promote_artifacts,
   verify_promoted_artifacts = verify_promoted_artifacts
 }
