@@ -743,11 +743,6 @@ let rec add_from_gossip_exn :
         (of_time_exn ~constants:consensus_constants
            (Block_time.now time_controller) ))
   in
-  let%bind () =
-    Result.ok_if_true ~error:After_slot_tx_end
-    @@ Option.value_map slot_tx_end ~default:true ~f:(fun slot_tx_end' ->
-           Global_slot.(current_global_slot < slot_tx_end') )
-  in
   let unchecked_cmd =
     match cmd0 with
     | `Unchecked x ->
@@ -998,11 +993,6 @@ let add_from_backtrack :
       to_global_slot
         (of_time_exn ~constants:consensus_constants
            (Block_time.now time_controller) ))
-  in
-  let%bind () =
-    Result.ok_if_true ~error:Command_error.After_slot_tx_end
-    @@ Option.value_map slot_tx_end ~default:true ~f:(fun slot_tx_end' ->
-           Global_slot.(current_global_slot < slot_tx_end') )
   in
   let unchecked =
     Transaction_hash.User_command_with_valid_signature.command cmd
