@@ -143,7 +143,7 @@ let verify_artifacts =
             , codename = codename
             , to_channel = to_channel
             , remove_profile_from_name = remove_profile_from_name
-            , step_key = "verify-promote-debian-${Package.lowerName debian}-${DebianVersions.lowerName codename}-from-${DebianChannel.lowerName from_channel}-to-${DebianChannel.lowerName to_channel}"
+            , step_key = "verify-promote-debian-${Package.lowerName debian}-${DebianVersions.lowerName codename}-${DebianChannel.lowerName to_channel}"
           }
         )
         codenames
