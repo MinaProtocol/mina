@@ -110,7 +110,7 @@ let promoteDebianVerificationStep = \(spec : PromoteDebianSpec.Type) ->
     Command.build
       Command.Config::{
         commands = Toolchain.runner 
-            DebianVersions.DebVersion.Bullseye ([] : List String)
+            DebianVersions.DebVersion.Bullseye ([] : List Text)
             "./scripts/debian/verify.sh  --version ${spec.new_version} --codename ${DebianVersions.lowerName spec.codename}  --channel ${DebianChannel.lowerName spec.to_channel}",
         label = "Debian: ${spec.step_key}",
         key = spec.step_key,
