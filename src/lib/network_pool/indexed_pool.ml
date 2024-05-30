@@ -737,12 +737,6 @@ let rec add_from_gossip_exn :
        } as t ) ~verify cmd0 current_nonce balance ->
   let open Command_error in
   let open Result.Let_syntax in
-  let current_global_slot =
-    Consensus.Data.Consensus_time.(
-      to_global_slot
-        (of_time_exn ~constants:consensus_constants
-           (Block_time.now time_controller) ))
-  in
   let unchecked_cmd =
     match cmd0 with
     | `Unchecked x ->
@@ -988,12 +982,6 @@ let add_from_backtrack :
        ; _
        } as t ) cmd ->
   let open Result.Let_syntax in
-  let current_global_slot =
-    Consensus.Data.Consensus_time.(
-      to_global_slot
-        (of_time_exn ~constants:consensus_constants
-           (Block_time.now time_controller) ))
-  in
   let unchecked =
     Transaction_hash.User_command_with_valid_signature.command cmd
   in
