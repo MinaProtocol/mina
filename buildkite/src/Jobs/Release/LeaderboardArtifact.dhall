@@ -12,11 +12,10 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 let Command = ../../Command/Base.dhall
 let Size = ../../Command/Size.dhall
 let DockerImage = ../../Command/DockerImage.dhall
-let DebianRepo = ../../Constants/DebianRepo.dhall
+
 
 let spec = DockerImage.ReleaseSpec::{
     service="leaderboard",
-    deb_repo = DebianRepo.Type.PackagesO1Test,
     step_key="leaderboard-docker-image"
 }
 
