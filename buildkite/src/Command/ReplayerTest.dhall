@@ -19,7 +19,7 @@ let Cmd = ../Lib/Cmds.dhall in
           ([] : List Text)
            "./src/test/archive/sample_db/archive_db.sql"
            Artifacts.Type.Archive 
-           "./scripts/replayer-test.sh -a mina-replayer -p \\\$PG_CONN"
+           "./buildkite/scripts/replayer-test.sh"
         ],
         label = "Archive: Replayer test",
         key = "replayer-test",
