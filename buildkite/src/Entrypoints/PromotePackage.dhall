@@ -210,5 +210,5 @@ let verify_artifacts =
 
 in {
   promote_artifacts = promote_artifacts,
-  verify_promoted_artifacts = verify_promoted_artifacts
+  verify_artifacts = verify_artifacts
 }
