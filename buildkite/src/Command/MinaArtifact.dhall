@@ -20,6 +20,7 @@ let Size = ./Size.dhall
 let Libp2p = ./Libp2pHelperBuild.dhall
 let DockerImage = ./DockerImage.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
+let DebianRepo = ../Constants/DebianRepo.dhall
 let Profiles = ../Constants/Profiles.dhall
 let BuildFlags = ../Constants/BuildFlags.dhall
 let Artifacts = ../Constants/Artifacts.dhall
@@ -44,6 +45,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_profile=profile,
             build_flags=buildFlags,
+            deb_repo = DebianRepo.Type.Local,
             step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment buildFlags}-docker-image"
           },
 
@@ -51,6 +53,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
           DockerImage.ReleaseSpec::{
             deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,            service="mina-test-executive",
             deb_codename="${DebianVersions.lowerName debVersion}",
+            deb_repo = DebianRepo.Type.Local,
             step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image"
           },
 
@@ -59,6 +62,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,            service="mina-batch-txn",
             network="berkeley",
             deb_codename="${DebianVersions.lowerName debVersion}",
+            deb_repo = DebianRepo.Type.Local,
             step_key="batch-txn-${DebianVersions.lowerName debVersion}-docker-image"
           },
 
@@ -68,6 +72,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_profile=profile,
             build_flags=buildFlags,
+            deb_repo = DebianRepo.Type.Local,
             step_key="archive-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment buildFlags}-docker-image"
           },
 
@@ -76,6 +81,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,            service="mina-archive-migration",
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_profile=profile,
+            deb_repo = DebianRepo.Type.Local,
             step_key="archive-migration-${DebianVersions.lowerName debVersion}-docker-image"
           },
           
@@ -84,6 +90,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,            service="mina-rosetta",
             network="berkeley",
             deb_codename="${DebianVersions.lowerName debVersion}",
+            deb_repo = DebianRepo.Type.Local,
             step_key="rosetta-${DebianVersions.lowerName debVersion}${BuildFlags.toLabelSegment buildFlags}-docker-image"
           },
 
@@ -91,6 +98,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
           DockerImage.ReleaseSpec::{
             deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,            service="mina-zkapp-test-transaction",
             deb_codename="${DebianVersions.lowerName debVersion}",
+            deb_repo = DebianRepo.Type.Local,
             step_key="zkapp-test-transaction-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment buildFlags}-docker-image"
           },
         
@@ -99,6 +107,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,
             service="mina-test-suite",
             deb_codename="${DebianVersions.lowerName debVersion}",
+            deb_repo = DebianRepo.Type.Local,
             step_key="test-suite-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
             network="berkeley"
           }
