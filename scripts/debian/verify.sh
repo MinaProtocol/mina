@@ -22,7 +22,7 @@ SCRIPT=" set -x \
     && echo installing mina \
     && apt-get update > /dev/null \
     && apt-get install -y lsb-release ca-certificates > /dev/null \
-    && echo \"deb [trusted=yes] http://packages.o1test.net $(lsb_release -cs) $CHANNEL\" > /etc/apt/sources.list.d/mina.list \
+    && echo \"deb [trusted=yes] http://packages.o1test.net $CODENAME $CHANNEL\" > /etc/apt/sources.list.d/mina.list \
     && apt-get update > /dev/null \
     && apt list -a $PACKAGE \
     && apt-get install -y --allow-downgrades $PACKAGE=$VERSION \
