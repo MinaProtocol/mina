@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -eo pipefail
+set -eox pipefail
 
 CHANNEL=umt-mainnet
 VERSION=3.0.0-f872d85
