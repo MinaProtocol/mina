@@ -26,7 +26,7 @@ SCRIPT=" set -x \
     && apt-get update > /dev/null \
     && apt list -a $PACKAGE \
     && apt-get install -y --allow-downgrades $PACKAGE=$VERSION \
-    && dpkg -S /usr/local/bin/mina* | grep $PACKAGE | awk -F ' ' '{print $2}' | while read -r app; do ${app} --version; ${app} --help;  done
+    && dpkg -S /usr/local/bin/mina* | grep $PACKAGE | awk -F ' ' '{print \$2}' | while read -r app; do ${app} --version; ${app} --help;  done
     "
 
 case $CODENAME in
