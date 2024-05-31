@@ -776,7 +776,7 @@ function final(){
 
 function find_most_recent_checkpoint() {
     
-    FILTER=$1
+    FILTER=$@
     declare -A checkpoints
 
     for i in $FILTER ; do
