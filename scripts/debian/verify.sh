@@ -26,8 +26,8 @@ SCRIPT=' set -x \
     && apt-get update > /dev/null \
     && apt list -a mina-mainnet \
     && apt-get install -y --allow-downgrades '$PACKAGE=$VERSION' \
-    && mina help \
-    && mina version
+    && '$PACKAGE' help \
+    && '$PACKAGE' version
     '
 
 case $CODENAME in
