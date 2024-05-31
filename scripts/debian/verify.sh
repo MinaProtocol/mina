@@ -34,5 +34,5 @@ case $CODENAME in
 esac
 
 echo "Testing packages on all images" \
-  && docker run --platform linux/amd64 -it --rm $DOCKER_IMAGE bash -c "$SCRIPT" \
+  && docker run --rm $DOCKER_IMAGE bash -c "$SCRIPT" \
   && echo && echo 'OK: ALL WORKED FINE!' || (echo 'KO: ERROR!!!' && exit 1)
