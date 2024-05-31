@@ -67,6 +67,7 @@ module Network_config = struct
          ; txpool_max_size
          ; slot_tx_end
          ; slot_chain_end
+         ; network_id
          ; _
          }
           : Test_config.t ) =
@@ -166,6 +167,7 @@ module Network_config = struct
             ; zkapp_cmd_limit_hardcap = None
             ; slot_tx_end
             ; slot_chain_end
+            ; network_id
             }
       ; genesis =
           Some
