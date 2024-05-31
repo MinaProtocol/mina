@@ -24,10 +24,9 @@ SCRIPT=' set -x \
     && apt-get install -y lsb-release ca-certificates > /dev/null \
     && echo "deb [trusted=yes] http://packages.o1test.net $(lsb_release -cs) '$CHANNEL'" > /etc/apt/sources.list.d/mina.list \
     && apt-get update > /dev/null \
-    && apt list -a mina-mainnet \
+    && apt list -a '$PACKAGE' \
     && apt-get install -y --allow-downgrades '$PACKAGE=$VERSION' \
-    && '$PACKAGE' help \
-    && '$PACKAGE' version
+    && dpkg -S /usr/local/bin/mina* | grep '$PACKAGE' | awk -F " /usr/local/bin/" "{print $2}" | while read -r app; do ${app} --version; ${app} --help;  done
     '
 
 case $CODENAME in
