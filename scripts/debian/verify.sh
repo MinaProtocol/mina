@@ -17,17 +17,24 @@ if [ -z $PACKAGE ]; then
   echo "No package defined. exiting.."; exit 1;
 fi
 
-SCRIPT=" set -x \
+case $PACKAGE in
+  mina-archive) COMMAND="mina-archive --version && mina-archive --help" ;;
+  mina-logproc) COMMAND="echo skipped execution for mina-logproc" ;;
+  mina-*) COMMAND="mina --version && mina --help" ;;
+  *) echo "Unknown package passed: $PACKAGE"; exit 1;;
+esac
+
+SCRIPT=' set -x \
     && export DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
     && echo installing mina \
     && apt-get update > /dev/null \
     && apt-get install -y lsb-release ca-certificates > /dev/null \
-    && echo \"deb [trusted=yes] http://packages.o1test.net $CODENAME $CHANNEL\" > /etc/apt/sources.list.d/mina.list \
+    && echo "deb [trusted=yes] http://packages.o1test.net '$CODENAME' '$CHANNEL'" > /etc/apt/sources.list.d/mina.list \
     && apt-get update > /dev/null \
-    && apt list -a $PACKAGE \
-    && apt-get install -y --allow-downgrades $PACKAGE=$VERSION \
-    && dpkg -S /usr/local/bin/mina* | grep $PACKAGE | awk -F ' ' '{print \$2}' | while read -r app; do \${app} --version; \${app} --help;  done
-    "
+    && apt list -a '$PACKAGE' \
+    && apt-get install -y --allow-downgrades '$PACKAGE'='$VERSION' \
+    && '$COMMAND' 
+    '
 
 case $CODENAME in
   buster) DOCKER_IMAGE="debian:buster" ;;
