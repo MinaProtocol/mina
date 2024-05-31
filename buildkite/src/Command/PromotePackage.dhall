@@ -106,6 +106,7 @@ let promoteDebianStep = \(spec : PromoteDebianSpec.Type) ->
 
 let promoteDebianVerificationStep = \(spec : PromoteDebianSpec.Type) ->
     let name = if spec.remove_profile_from_name then "--new-name ${Package.debianName spec.package Profiles.Type.Standard spec.network}" else (Package.debianName spec.package spec.profile spec.network)
+    in
     Command.build
       Command.Config::{
         commands = [
