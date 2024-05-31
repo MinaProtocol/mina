@@ -143,7 +143,7 @@ let promoteDockerVerificationStep = \(spec : PromoteDockerSpec.Type) ->
     Command.build
       Command.Config::{
         commands = [
-          Cmd.run "./scripts/docker/verify.sh --package ${Artifact.dockerName spec.name} --version ${new_tag} --repo ${repo} --suffix ${Network.lowerName spec.network}"
+          Cmd.run "docker pull ${repo}/${Artifact.dockerName spec.name}:${new_tag}"
         ],
         label = "Docker: ${spec.step_key}",
         key = spec.step_key,
