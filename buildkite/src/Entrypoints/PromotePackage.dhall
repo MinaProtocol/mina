@@ -137,7 +137,6 @@ let verify_artifacts =
             profile = profile
             , package = debian
             , new_version = new_version
-            , architecture = architecture
             , network = network
             , codename = codename
             , to_channel = to_channel
