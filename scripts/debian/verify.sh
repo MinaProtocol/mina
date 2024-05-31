@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -x
+set -eo pipefail
 
 CHANNEL=umt-mainnet
 VERSION=3.0.0-f872d85
@@ -17,17 +17,17 @@ if [ -z $PACKAGE ]; then
   echo "No package defined. exiting.."; exit 1;
 fi
 
-SCRIPT=' set -x \
+SCRIPT=" set -x \
     && export DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
     && echo installing mina \
     && apt-get update > /dev/null \
     && apt-get install -y lsb-release ca-certificates > /dev/null \
-    && echo "deb [trusted=yes] http://packages.o1test.net $(lsb_release -cs) '$CHANNEL'" > /etc/apt/sources.list.d/mina.list \
+    && echo \"deb [trusted=yes] http://packages.o1test.net $(lsb_release -cs) $CHANNEL\" > /etc/apt/sources.list.d/mina.list \
     && apt-get update > /dev/null \
-    && apt list -a '$PACKAGE' \
-    && apt-get install -y --allow-downgrades '$PACKAGE=$VERSION' \
-    && dpkg -S /usr/local/bin/mina* | grep '$PACKAGE' | awk -F '' /usr/local/bin/'' ''{print $2}'' | while read -r app; do ${app} --version; ${app} --help;  done
-    '
+    && apt list -a $PACKAGE \
+    && apt-get install -y --allow-downgrades $PACKAGE=$VERSION \
+    && dpkg -S /usr/local/bin/mina* | grep $PACKAGE | awk -F ' /usr/local/bin/' '{print $2}' | while read -r app; do ${app} --version; ${app} --help;  done
+    "
 
 case $CODENAME in
   buster) DOCKER_IMAGE="debian:buster" ;;
@@ -38,4 +38,4 @@ esac
 
 echo "Testing packages on all images" \
   && docker run --rm $DOCKER_IMAGE bash -c "$SCRIPT" \
-  && echo && echo 'OK: ALL WORKED FINE!' || (echo 'KO: ERROR!!!' && exit 1)
+  && echo 'OK: ALL WORKED FINE!' || (echo 'KO: ERROR!!!' && exit 1)
