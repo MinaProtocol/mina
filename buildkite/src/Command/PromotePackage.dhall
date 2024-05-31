@@ -105,10 +105,11 @@ let promoteDebianStep = \(spec : PromoteDebianSpec.Type) ->
       }
 
 let promoteDebianVerificationStep = \(spec : PromoteDebianSpec.Type) ->
+    let name = if spec.remove_profile_from_name then "--new-name ${Package.debianName spec.package Profiles.Type.Standard spec.network}" else (Package.debianName spec.package spec.profile spec.network)
     Command.build
       Command.Config::{
         commands = [
-          Cmd.run "./scripts/debian/verify.sh  --version ${spec.new_version} --codename ${DebianVersions.lowerName spec.codename}  --channel ${DebianChannel.lowerName spec.to_channel}"
+          Cmd.run "./scripts/debian/verify.sh --package ${name} --version ${spec.new_version} --codename ${DebianVersions.lowerName spec.codename}  --channel ${DebianChannel.lowerName spec.to_channel}"
         ],
         label = "Debian: ${spec.step_key}",
         key = spec.step_key,
