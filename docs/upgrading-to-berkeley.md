@@ -86,9 +86,21 @@ Here are some general instructions that should help you get most of the way ther
       echo "deb [trusted=yes] http://packages.o1test.net bullseye stable" > /etc/apt/sources.list.d/o1.list
       apt-get update
       apt-get install mina-create-legacy-genesis=1.4.1-97f7d8c
-      ```
-    - **Prepare Environment Variables:** Set up the necessary environment variables manually to match the expected configuration for verification.
-    - **Create `genesis_ledgers` Directory:** Temporarily, create a new directory named `genesis_ledgers` in the working directory and place the daemon config for the required chain, typically `mainnet.json` there. Alternatively, make sure that `genesis_ledgers/mainnet.json` is present. The script assumes that it is running in a directory where this is present.
+
+    - **Direct Installation Script:**
+        ``` bash
+        #!/bin/bash
+        export CONFIG_JSON_GZ_URL="https://storage.googleapis.com/tmp-hardfork-testing/fork-config-3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15.json.gz"
+        export GENESIS_TIMESTAMP="2024-06-05T00:00:00Z"
+        export NETWORK_NAME="mainnet"
+        mkdir -p genesis_ledgers
+        cp /var/lib/coda/config_93e02797.json genesis_ledgers/mainnet.json
+        curl https://storage.googleapis.com/tmp-hardfork-testing/fork-config-3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15.json.gz > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config mainnet config.json /workdir/verification 
+        ```
+
+- **Prepare Environment Variables:** Set up the necessary environment variables manually to match the expected configuration for verification.
+- **Create `genesis_ledgers` Directory:** Temporarily, create a new directory named `genesis_ledgers` in the working directory and place the daemon config for the required chain, typically `mainnet.json` there. Alternatively, make sure that `genesis_ledgers/mainnet.json` is present. The script assumes that it is running in a directory where this is present.
+
 
 3. **Set Environment Variables:**
     - **GSUTIL Path:**
