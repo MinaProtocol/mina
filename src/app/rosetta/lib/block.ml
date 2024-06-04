@@ -338,7 +338,8 @@ module Sql = struct
         typ
         [%string
           {|
-         SELECT u.id,
+         SELECT DISTINCT ON (u.id)
+                u.id,
                 %{fields},
                 pk_payer.value as fee_payer,
                 pk_source.value as source,
