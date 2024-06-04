@@ -88,6 +88,7 @@ Here are some general instructions that should help you get most of the way ther
       apt-get install mina-create-legacy-genesis=1.4.1-97f7d8c
 
     - **Direct Installation Script:**
+    - ***NOTE this currently needs to be run as root***
         ``` bash
         #!/bin/bash
         export CONFIG_JSON_GZ_URL="https://storage.googleapis.com/tmp-hardfork-testing/fork-config-3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15.json.gz"
@@ -95,7 +96,7 @@ Here are some general instructions that should help you get most of the way ther
         export NETWORK_NAME="mainnet"
         mkdir -p genesis_ledgers
         cp /var/lib/coda/config_93e02797.json genesis_ledgers/mainnet.json
-        curl https://storage.googleapis.com/tmp-hardfork-testing/fork-config-3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15.json.gz > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config mainnet config.json ./workdir/verification 
+        curl https://storage.googleapis.com/tmp-hardfork-testing/fork-config-3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15.json.gz > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config mainnet config.json /workdir/verification 
         ```
 
 - **Prepare Environment Variables:** Set up the necessary environment variables manually to match the expected configuration for verification.
