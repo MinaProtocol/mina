@@ -239,10 +239,10 @@ module Signed = struct
                      then
                        match json with
                        | `Null ->
-                           true
+                           false
                        | _ ->
                            raise (Non_null field)
-                     else false )
+                     else true )
             with Non_null field ->
               Error (sprintf "Found non-null deprecated field '%s'" field)
           in
