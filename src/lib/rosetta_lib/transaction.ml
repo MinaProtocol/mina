@@ -223,6 +223,32 @@ module Signed = struct
       ; stake_delegation : Unsigned.Rendered.Delegation.t option
       }
     [@@deriving yojson]
+
+    let deprecated_fields =
+      [ "create_token"; "create_token_account"; "mint_tokens" ]
+
+    let of_yojson = function
+      | `Assoc l ->
+          let open Result.Let_syntax in
+          let%bind l =
+            let exception Non_null of string in
+            try
+              return
+              @@ List.filter l ~f:(fun (field, json) ->
+                     if List.mem ~equal:String.equal deprecated_fields field
+                     then
+                       match json with
+                       | `Null ->
+                           true
+                       | _ ->
+                           raise (Non_null field)
+                     else false )
+            with Non_null field ->
+              Error (sprintf "Found non-null deprecated field '%s'" field)
+          in
+          of_yojson (`Assoc l)
+      | x ->
+          of_yojson x
   end
 
   let render (t : t) =
