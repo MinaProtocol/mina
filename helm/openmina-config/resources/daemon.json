@@ -1,29 +1,29 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2024-04-09T21:00:00Z"
+    "genesis_state_timestamp": "2024-06-05T00:00:00Z"
   },
   "proof": {
     "fork": {
-      "state_hash": "3NKSvjaGSKiQuAt8BP1b1VCpLbJc9RcEFjYCaBYsJJFdrtd6tpaV",
-      "blockchain_length": 296371,
-      "global_slot_since_genesis": 445860
+      "state_hash": "3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15",
+      "blockchain_length": 359604,
+      "global_slot_since_genesis": 564480
     }
   },
   "ledger": {
     "add_genesis_winner": false,
-    "hash": "jy1wjiJgTkzXr7yL8r5x4ikaNJuikibsRMnkjdH6uqGCsDmR2sf",
-    "s3_data_hash": "e2609d4d6a09656577468145a29c89bdc5f857b1b04a0b64c2d0e9f92937d909"
+    "hash": "jwNw4qb6tnNhpQNxiMLem9WumxZTwmbSx3fYXW4FP3hZRkoQJSE",
+    "s3_data_hash": "1b3c34283e6880a9dfdb7d5dc351e1c063f5865a13012d81acc8d55601d2c8f3"
   },
   "epoch_data": {
     "staking": {
-      "seed": "2vbdR3vZUxh8NFnsnrefko7YCiLUKNPUbQpqSQAFXFijtTjd3531",
-      "hash": "jxvdSnpgWjjERJFdcYNxChJ9F39v4tGrNSzDcaQXuXeJnicrYEP",
-      "s3_data_hash": "84a349f6dd12c76b694b283975885994bcfb9117c3f41fa941e0229da3ce2a33"
+      "seed": "2vahsgRV5nDPmtgr2Xo2Uq2dkngfSgvg7d1TKqQbY3wUS2ZDxCC3",
+      "hash": "jxsAidvKvEQJMC7Z2wkLrFGzCqUxpFMRhAj4K5o49eiFLhKSyXL",
+      "s3_data_hash": "ab6bec51c8523c0d041fab66cb9ca12b03842d3d77b1b06254d7a9c8dc33cbfc"
     },
     "next": {
-      "seed": "2vaduyGw7uST2rT1HmvSxjrkZX26XnFvu4NJvCebMmLzoWaQtdGT",
-      "hash": "jxjmYHK1tnGy5S6CDaLDTRrDbw17DmtEd6Jnw3L86QSsLm15w5g",
-      "s3_data_hash": "094ceb7c580ef53be0bf2385698fd8d2faebf91fdd8542c076df649aa261b94e"
+      "seed": "2vbH4D8B76WMYPRFgeuVvdWVhv6tAFoCJtg83yuJT1dud3QVSiZn",
+      "hash": "jwgzfxD5rEnSP3k4UiZu2569FfhJ1SRUvabfTz21e4btwBHg3jq",
+      "s3_data_hash": "61323d7565130cfa4768c0333f32b2a8ea7fdfbf17065adfa48b4e9956619b44"
     }
   }
 }
