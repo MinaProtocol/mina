@@ -138,6 +138,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; zkapp_command_mint_token2 : Zkapp_command.t
     ; zkapp_command_token_transfer : Zkapp_command.t
     ; zkapp_command_token_transfer2 : Zkapp_command.t
+    ; zkapp_command_nonexistent_fee_payer : Zkapp_command.t
     }
 
   let setup (network_config : network_config) =
@@ -520,6 +521,31 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       , zkapp_command_token_transfer
       , zkapp_command_token_transfer2 )
     in
+    let%bind zkapp_command_nonexistent_fee_payer =
+      let new_kp = Signature_lib.Keypair.create () in
+      let memo =
+        Signed_command_memo.create_from_string_exn "Non-existent account"
+      in
+      let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
+      let spec : Transaction_snark.For_tests.Update_states_spec.t =
+        { sender = (new_kp, Account.Nonce.zero)
+        ; fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount = Currency.Amount.zero
+        ; zkapp_account_keypairs = zkapp_keypairs
+        ; memo
+        ; new_zkapp_account = false
+        ; snapp_update = Account_update.Update.dummy
+        ; current_auth = Permissions.Auth_required.None
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; actions = []
+        ; preconditions = None
+        }
+      in
+      Transaction_snark.For_tests.update_states ~constraint_constants spec
+    in
     Deferred.return
       { zkapp_keypairs
       ; zkapp_command_create_accounts
@@ -536,6 +562,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ; zkapp_command_mint_token2
       ; zkapp_command_token_transfer
       ; zkapp_command_token_transfer2
+      ; zkapp_command_nonexistent_fee_payer
       }
 
   let run network t
@@ -554,6 +581,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       ; zkapp_command_mint_token2
       ; zkapp_command_token_transfer
       ; zkapp_command_token_transfer2
+      ; zkapp_command_nonexistent_fee_payer
       } =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
@@ -601,31 +629,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 | _ ->
                     other_p )
         }
-    in
-    let%bind.Deferred zkapp_command_nonexistent_fee_payer =
-      let new_kp = Signature_lib.Keypair.create () in
-      let memo =
-        Signed_command_memo.create_from_string_exn "Non-existent account"
-      in
-      let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in
-      let spec : Transaction_snark.For_tests.Update_states_spec.t =
-        { sender = (new_kp, Account.Nonce.zero)
-        ; fee
-        ; fee_payer = None
-        ; receivers = []
-        ; amount = Currency.Amount.zero
-        ; zkapp_account_keypairs = zkapp_keypairs
-        ; memo
-        ; new_zkapp_account = false
-        ; snapp_update = Account_update.Update.dummy
-        ; current_auth = Permissions.Auth_required.None
-        ; call_data = Snark_params.Tick.Field.zero
-        ; events = []
-        ; actions = []
-        ; preconditions = None
-        }
-      in
-      Transaction_snark.For_tests.update_states ~constraint_constants spec
     in
     let with_timeout =
       let soft_slots = 4 in
