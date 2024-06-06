@@ -75,6 +75,114 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     Transaction_snark.For_tests.create_trivial_snapp
       ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
 
+  let update_vk (vk : Side_loaded_verification_key.t) : Account_update.t =
+    let body (vk : Side_loaded_verification_key.t) : Account_update.Body.t =
+      { Account_update.Body.dummy with
+        public_key = account_a_pk
+      ; update =
+          { Account_update.Update.dummy with
+            verification_key =
+              Set
+                { data = vk
+                ; hash =
+                    (* TODO: This function should live in
+                       [Side_loaded_verification_key].
+                    *)
+                    Zkapp_account.digest_vk vk
+                }
+          ; permissions =
+              Set
+                { edit_state = Proof
+                ; send = Signature
+                ; receive = Proof
+                ; set_delegate = Proof
+                ; set_permissions = Signature
+                ; set_verification_key =
+                    (Signature, Mina_numbers.Txn_version.current)
+                ; set_zkapp_uri = Proof
+                ; edit_action_state = Proof
+                ; set_token_symbol = Proof
+                ; increment_nonce = Signature
+                ; set_voting_for = Proof
+                ; access = None
+                ; set_timing = Signature
+                }
+          }
+      ; use_full_commitment = true
+      ; preconditions =
+          { Account_update.Preconditions.network =
+              Zkapp_precondition.Protocol_state.accept
+          ; account = Zkapp_precondition.Account.accept
+          ; valid_while = Ignore
+          }
+      ; authorization_kind = Signature
+      }
+    in
+    (* TODO: This is a pain. *)
+    { body = body vk; authorization = Signature Signature.dummy }
+
+  let call_forest_to_zkapp ~call_forest ~nonce : Zkapp_command.t =
+    let memo = Signed_command_memo.empty in
+    let transaction_commitment : Zkapp_command.Transaction_commitment.t =
+      let account_updates_hash = Zkapp_command.Call_forest.hash call_forest in
+      Zkapp_command.Transaction_commitment.create ~account_updates_hash
+    in
+    let fee_payer : Account_update.Fee_payer.t =
+      { body =
+          { Account_update.Body.Fee_payer.dummy with
+            public_key = account_a_pk
+          ; nonce
+          ; fee = Currency.Fee.(of_nanomina_int_exn 20_000_000)
+          }
+      ; authorization = Signature.dummy
+      }
+    in
+    let memo_hash = Signed_command_memo.hash memo in
+    let full_commitment =
+      Zkapp_command.Transaction_commitment.create_complete
+        transaction_commitment ~memo_hash
+        ~fee_payer_hash:
+          (Zkapp_command.Call_forest.Digest.Account_update.create
+             (Account_update.of_fee_payer fee_payer) )
+    in
+    let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
+        Zkapp_command.t =
+      let fee_payer =
+        match fee_payer with
+        | { body = { public_key; _ }; _ }
+          when Public_key.Compressed.equal public_key account_a_pk ->
+            { fee_payer with
+              authorization =
+                Schnorr.Chunked.sign account_a_kp.private_key
+                  (Random_oracle.Input.Chunked.field full_commitment)
+            }
+        | fee_payer ->
+            fee_payer
+      in
+      let account_updates =
+        Zkapp_command.Call_forest.map account_updates ~f:(function
+          | ({ body = { public_key; use_full_commitment; _ }
+             ; authorization = Signature _
+             } as account_update :
+              Account_update.t )
+            when Public_key.Compressed.equal public_key account_a_pk ->
+              let commitment =
+                if use_full_commitment then full_commitment
+                else transaction_commitment
+              in
+              { account_update with
+                authorization =
+                  Signature
+                    (Schnorr.Chunked.sign account_a_kp.private_key
+                       (Random_oracle.Input.Chunked.field commitment) )
+              }
+          | account_update ->
+              account_update )
+      in
+      { fee_payer; account_updates; memo }
+    in
+    sign_all { fee_payer; account_updates = call_forest; memo }
+
   let config =
     let open Test_config in
     { default with
@@ -208,115 +316,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       { public_key = whale1_pk |> Public_key.decompress_exn
       ; private_key = whale1_sk
       }
-    in
-    let update_vk (vk : Side_loaded_verification_key.t) : Account_update.t =
-      let body (vk : Side_loaded_verification_key.t) : Account_update.Body.t =
-        { Account_update.Body.dummy with
-          public_key = account_a_pk
-        ; update =
-            { Account_update.Update.dummy with
-              verification_key =
-                Set
-                  { data = vk
-                  ; hash =
-                      (* TODO: This function should live in
-                         [Side_loaded_verification_key].
-                      *)
-                      Zkapp_account.digest_vk vk
-                  }
-            ; permissions =
-                Set
-                  { edit_state = Proof
-                  ; send = Signature
-                  ; receive = Proof
-                  ; set_delegate = Proof
-                  ; set_permissions = Signature
-                  ; set_verification_key =
-                      (Signature, Mina_numbers.Txn_version.current)
-                  ; set_zkapp_uri = Proof
-                  ; edit_action_state = Proof
-                  ; set_token_symbol = Proof
-                  ; increment_nonce = Signature
-                  ; set_voting_for = Proof
-                  ; access = None
-                  ; set_timing = Signature
-                  }
-            }
-        ; use_full_commitment = true
-        ; preconditions =
-            { Account_update.Preconditions.network =
-                Zkapp_precondition.Protocol_state.accept
-            ; account = Zkapp_precondition.Account.accept
-            ; valid_while = Ignore
-            }
-        ; authorization_kind = Signature
-        }
-      in
-
-      (* TODO: This is a pain. *)
-      { body = body vk; authorization = Signature Signature.dummy }
-    in
-    let call_forest_to_zkapp ~call_forest ~nonce : Zkapp_command.t =
-      let memo = Signed_command_memo.empty in
-      let transaction_commitment : Zkapp_command.Transaction_commitment.t =
-        let account_updates_hash = Zkapp_command.Call_forest.hash call_forest in
-        Zkapp_command.Transaction_commitment.create ~account_updates_hash
-      in
-      let fee_payer : Account_update.Fee_payer.t =
-        { body =
-            { Account_update.Body.Fee_payer.dummy with
-              public_key = account_a_pk
-            ; nonce
-            ; fee = Currency.Fee.(of_nanomina_int_exn 20_000_000)
-            }
-        ; authorization = Signature.dummy
-        }
-      in
-      let memo_hash = Signed_command_memo.hash memo in
-      let full_commitment =
-        Zkapp_command.Transaction_commitment.create_complete
-          transaction_commitment ~memo_hash
-          ~fee_payer_hash:
-            (Zkapp_command.Call_forest.Digest.Account_update.create
-               (Account_update.of_fee_payer fee_payer) )
-      in
-      let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
-          Zkapp_command.t =
-        let fee_payer =
-          match fee_payer with
-          | { body = { public_key; _ }; _ }
-            when Public_key.Compressed.equal public_key account_a_pk ->
-              { fee_payer with
-                authorization =
-                  Schnorr.Chunked.sign account_a_kp.private_key
-                    (Random_oracle.Input.Chunked.field full_commitment)
-              }
-          | fee_payer ->
-              fee_payer
-        in
-        let account_updates =
-          Zkapp_command.Call_forest.map account_updates ~f:(function
-            | ({ body = { public_key; use_full_commitment; _ }
-               ; authorization = Signature _
-               } as account_update :
-                Account_update.t )
-              when Public_key.Compressed.equal public_key account_a_pk ->
-                let commitment =
-                  if use_full_commitment then full_commitment
-                  else transaction_commitment
-                in
-                { account_update with
-                  authorization =
-                    Signature
-                      (Schnorr.Chunked.sign account_a_kp.private_key
-                         (Random_oracle.Input.Chunked.field commitment) )
-                }
-            | account_update ->
-                account_update )
-        in
-        { fee_payer; account_updates; memo }
-      in
-      sign_all { fee_payer; account_updates = call_forest; memo }
     in
     let call_forest1 =
       []
