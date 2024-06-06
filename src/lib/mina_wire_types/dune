@@ -17,7 +17,7 @@
     blake2
     )
   (preprocessor_deps ../../config.mlh)
-  (preprocess (pps ppx_version ppx_optcomp))
+  (preprocess (pps ppx_version ppx_optcomp ppx_deriving_yojson))
   (instrumentation (backend bisect_ppx)))
 
 ; Include index.mld in generated doc
