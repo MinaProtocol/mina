@@ -344,7 +344,7 @@ module Test = struct
 
     type setup
 
-    val setup : unit -> setup
+    val setup : unit -> setup Deferred.t
 
     val run : network -> dsl -> setup -> unit Malleable_error.t
   end

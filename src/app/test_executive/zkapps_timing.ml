@@ -35,7 +35,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type setup = unit
 
-  let setup () = ()
+  let setup () = Deferred.return ()
 
   let run network t () =
     let open Malleable_error.Let_syntax in
