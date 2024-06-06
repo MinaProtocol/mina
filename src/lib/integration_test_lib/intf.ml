@@ -40,6 +40,8 @@ module Engine = struct
       -> test_config:Test_config.t
       -> images:Test_config.Container_images.t
       -> t
+
+    val network_keypair : string -> t -> Network_keypair.t option
   end
 
   module type Network_intf = sig
