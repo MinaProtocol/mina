@@ -1,5 +1,5 @@
 (tests
- (names test_fix_domains pickles_test_optional_custom_gates)
+ (names test_fix_domains pickles_test_optional_custom_gates lookup_range_check)
  (libraries
   ;; opam libraries
   alcotest
@@ -45,7 +45,7 @@
   random_oracle_input
   pickles.composition_types
   pickles.plonk_checks
-  pickles.one_hot_vector
+  pickles_base.one_hot_vector
   snarky_log
   group_map
   snarky_curve

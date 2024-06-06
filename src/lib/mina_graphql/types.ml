@@ -21,7 +21,7 @@ let token_id = Scalars.TokenId.typ ()
 
 let json = Scalars.JSON.typ ()
 
-let field_elem = Mina_base_unix.Graphql_scalars.FieldElem.typ ()
+let field_elem = Mina_base_graphql.Graphql_scalars.FieldElem.typ ()
 
 let epoch_seed = Scalars.EpochSeed.typ ()
 
@@ -429,7 +429,8 @@ let fee_transfer =
       ; field "type"
           ~typ:
             ( non_null
-            @@ Filtered_external_transition_unix.Graphql_scalars.FeeTransferType
+            @@ Filtered_external_transition_graphql.Graphql_scalars
+               .FeeTransferType
                .typ () )
           ~args:Arg.[]
           ~doc:
@@ -888,7 +889,7 @@ let protocol_state :
       ; field "consensusState"
           ~doc:
             "State specific to the minaboros Proof of Stake consensus algorithm"
-          ~typ:(non_null @@ Consensus.Data.Consensus_state.graphql_type ())
+          ~typ:(non_null @@ Graphql_lib.Scalars.Consensus_state.typ ())
           ~args:Arg.[]
           ~resolve:(fun _ t ->
             let protocol_state, _ = t in
@@ -1275,13 +1276,14 @@ module AccountObj = struct
       ~fields:(fun _ ->
         [ field "verificationKey" ~doc:"verification key in Base64 format"
             ~typ:
-              (non_null @@ Pickles_unix.Graphql_scalars.VerificationKey.typ ())
+              ( non_null
+              @@ Pickles_graphql.Graphql_scalars.VerificationKey.typ () )
             ~args:Arg.[]
             ~resolve:(fun _ (vk : _ With_hash.t) -> vk.data)
         ; field "hash" ~doc:"Hash of verification key"
             ~typ:
               ( non_null
-              @@ Pickles_unix.Graphql_scalars.VerificationKeyHash.typ () )
+              @@ Pickles_graphql.Graphql_scalars.VerificationKeyHash.typ () )
             ~args:Arg.[]
             ~resolve:(fun _ (vk : _ With_hash.t) -> vk.hash)
         ] )
@@ -1497,7 +1499,7 @@ module AccountObj = struct
            ; field "zkappState"
                ~typ:
                  ( list @@ non_null
-                 @@ Mina_base_unix.Graphql_scalars.FieldElem.typ () )
+                 @@ Mina_base_graphql.Graphql_scalars.FieldElem.typ () )
                ~doc:
                  "The 8 field elements comprising the zkApp state associated \
                   with this account encoded as bignum strings"
@@ -1537,7 +1539,8 @@ module AccountObj = struct
                ~doc:"Action state associated with this account"
                ~typ:
                  (list
-                    (non_null @@ Snark_params_unix.Graphql_scalars.Action.typ ()) )
+                    ( non_null
+                    @@ Snark_params_graphql.Graphql_scalars.Action.typ () ) )
                ~args:Arg.[]
                ~resolve:(fun _ { account; _ } ->
                  Option.map account.Account.Poly.zkapp ~f:(fun zkapp_account ->
@@ -1547,7 +1550,7 @@ module AccountObj = struct
                ~doc:
                  "The base58Check-encoded hash of this account to bootstrap \
                   the merklePath"
-               ~typ:(Mina_base_unix.Graphql_scalars.FieldElem.typ ())
+               ~typ:(Mina_base_graphql.Graphql_scalars.FieldElem.typ ())
                ~args:Arg.[]
                ~resolve:(fun _ { account; _ } ->
                  let open Option.Let_syntax in
@@ -1586,8 +1589,8 @@ module Command_status = struct
         ; field "failures"
             ~typ:
               ( non_null @@ list @@ non_null
-              @@ Mina_base_unix.Graphql_scalars.TransactionStatusFailure.typ ()
-              )
+              @@ Mina_base_graphql.Graphql_scalars.TransactionStatusFailure.typ
+                   () )
             ~args:[]
             ~doc:
               "Failure reason for the account update or any nested zkapp \
@@ -1676,7 +1679,7 @@ module User_command = struct
             ~deprecated:(Deprecated (Some "use receiver field instead"))
         ; abstract_field "failureReason"
             ~typ:
-              (Mina_base_unix.Graphql_scalars.TransactionStatusFailure.typ ())
+              (Mina_base_graphql.Graphql_scalars.TransactionStatusFailure.typ ())
             ~args:[] ~doc:"null is no failure, reason for failure otherwise."
         ] )
 
@@ -1796,7 +1799,7 @@ module User_command = struct
           AccountObj.get_best_ledger_account mina
           @@ Signed_command.receiver cmd.With_hash.data )
     ; field "failureReason"
-        ~typ:(Mina_base_unix.Graphql_scalars.TransactionStatusFailure.typ ())
+        ~typ:(Mina_base_graphql.Graphql_scalars.TransactionStatusFailure.typ ())
         ~args:[]
         ~doc:
           "null is no failure or status unknown, reason for failure otherwise."
@@ -2003,7 +2006,8 @@ let block :
       ; field "stateHashField"
           ~typ:
             ( non_null
-            @@ Data_hash_lib_unix.Graphql_scalars.StateHashAsDecimal.typ () )
+            @@ Data_hash_lib_graphql.Graphql_scalars.StateHashAsDecimal.typ ()
+            )
           ~doc:"Experimental: Bigint field-element representation of stateHash"
           ~args:Arg.[]
           ~resolve:(fun _ { With_hash.hash; _ } -> hash)

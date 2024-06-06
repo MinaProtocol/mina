@@ -54,6 +54,9 @@ let router ~graphql_uri
     | "construction" :: tl ->
         Construction.router tl body ~get_graphql_uri_or_error ~logger
           ~with_db:with_db'
+    | "search" :: tl ->
+        let%bind graphql_uri = get_graphql_uri_or_error () in
+        Search.router tl body ~graphql_uri ~logger ~with_db:with_db'
     | _ ->
         Deferred.return (Error `Page_not_found)
   with exn -> Deferred.return (Error (`Exception exn))

@@ -4,11 +4,7 @@ module Intf = Intf
 
 module Make : Intf.F
 
-[%%ifdef consensus_mechanism]
-
 module Make_checked : Intf.F_checked
-
-[%%endif]
 
 module Make32 () : Intf.UInt32
 
