@@ -212,11 +212,46 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type network_config = Engine.Network_config.t
 
-  type setup = unit
+  type setup = { zkapp_command_create_accounts : Zkapp_command.t }
 
-  let setup (_network_config : network_config) = Async.Deferred.return ()
+  let setup (network_config : network_config) =
+    let fish1 =
+      Option.value_exn @@ Network_config.network_keypair "fish1" network_config
+    in
+    let zkapp_command_create_accounts =
+      (* construct a Zkapp_command.t *)
+      let zkapp_keypairs =
+        List.init 3 ~f:(fun _ -> Signature_lib.Keypair.create ())
+      in
+      let constraint_constants =
+        Network_config.constraint_constants network_config
+      in
+      let amount = Currency.Amount.of_mina_int_exn 10 in
+      let nonce = Account.Nonce.zero in
+      let memo =
+        Signed_command_memo.create_from_string_exn "Zkapp create account"
+      in
+      let fee = Currency.Fee.of_nanomina_int_exn 20_000_000 in
+      let (zkapp_command_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t)
+          =
+        { sender = (fish1.keypair, nonce)
+        ; fee
+        ; fee_payer = None
+        ; amount
+        ; zkapp_account_keypairs = zkapp_keypairs
+        ; memo
+        ; new_zkapp_account = true
+        ; snapp_update = Account_update.Update.dummy
+        ; preconditions = None
+        ; authorization_kind = Signature
+        }
+      in
+      Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+        zkapp_command_spec
+    in
+    Async.Deferred.return { zkapp_command_create_accounts }
 
-  let run network t () =
+  let run network t { zkapp_command_create_accounts } =
     let open Malleable_error.Let_syntax in
     let constraint_constants =
       Genesis_constants.Constraint_constants.compiled
@@ -305,36 +340,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Signed_command.sign_payload sender.private_key payload
       |> Signature.Raw.encode
     in
-    let zkapp_command_create_accounts =
-      (* construct a Zkapp_command.t *)
-      let zkapp_keypairs =
-        List.init 3 ~f:(fun _ -> Signature_lib.Keypair.create ())
-      in
-      let constraint_constants = Network.constraint_constants network in
-      let amount = Currency.Amount.of_mina_int_exn 10 in
-      let nonce = Account.Nonce.zero in
-      let memo =
-        Signed_command_memo.create_from_string_exn "Zkapp create account"
-      in
-      let fee = Currency.Fee.of_nanomina_int_exn 20_000_000 in
-      let (zkapp_command_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t)
-          =
-        { sender = (fish1.keypair, nonce)
-        ; fee
-        ; fee_payer = None
-        ; amount
-        ; zkapp_account_keypairs = zkapp_keypairs
-        ; memo
-        ; new_zkapp_account = true
-        ; snapp_update = Account_update.Update.dummy
-        ; preconditions = None
-        ; authorization_kind = Signature
-        }
-      in
-      Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-        zkapp_command_spec
-    in
-
     let%bind zkapp_command_update_vk_proof, zkapp_command_update_vk_impossible =
       let snapp_update =
         { Account_update.Update.dummy with
