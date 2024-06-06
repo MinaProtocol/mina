@@ -23,10 +23,7 @@ git config --global --add safe.directory /workdir
 
 source buildkite/scripts/export-git-env-vars.sh
 
-echo "Installing mina daemon package: mina-${TESTNET_VERSION_NAME}=${MINA_DEB_VERSION}"
-echo "deb [trusted=yes] http://packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_RELEASE" | tee /etc/apt/sources.list.d/mina.list
-apt-get update
-apt-get install --allow-downgrades -y "mina-${TESTNET_VERSION_NAME}=${MINA_DEB_VERSION}"
+source buildkite/scripts/debian/install.sh "mina-${TESTNET_VERSION_NAME}"
 
 # Remove lockfile if present
 rm ~/.mina-config/.mina-lock ||:

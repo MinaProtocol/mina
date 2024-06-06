@@ -91,8 +91,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
         [ Command.build
             Command.Config::{
               commands =
-                Toolchain.runner
-                  debVersion
+                Toolchain.runner debVersion
                   (
                     [ "AWS_ACCESS_KEY_ID"
                     , "AWS_SECRET_ACCESS_KEY"
@@ -103,10 +102,26 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
                     # (spec_to_envs spec)
                   )
                   "./buildkite/scripts/build-hardfork-package.sh"
+                # 
+                [ 
+                  Cmd.run "./buildkite/scripts/upload-deb-to-gs.sh ${DebianVersions.lowerName debVersion}"
+                ]
             , label = "Build Mina Hardfork Package for ${DebianVersions.capitalName debVersion}"
             , key = generateLedgersJobKey
             , target = Size.XLarge
             }
+        , Command.build
+          Command.Config::{
+            commands = Toolchain.runner debVersion [
+              "AWS_ACCESS_KEY_ID",
+              "AWS_SECRET_ACCESS_KEY",
+              "MINA_DEB_CODENAME=${DebianVersions.lowerName debVersion}"
+            ] "./buildkite/scripts/publish-deb.sh"
+            , label = "Publish Mina for ${DebianVersions.capitalName debVersion} Hardfork"
+            , depends_on = [{ name = pipelineName, key = generateLedgersJobKey}]
+            , key = "publish-hardfork-deb-pkg"
+            , target = Size.Small
+          }
         , DockerImage.generateStep
             DockerImage.ReleaseSpec::{
               deps =
@@ -117,7 +132,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
             , service = "mina-daemon"
             , network = network_name
             , deb_codename = "${DebianVersions.lowerName debVersion}"
-            , deb_profile = "${Profiles.lowerName profile}"
+            , deb_profile = profile
             , step_key = "daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
             }
         , Command.build Command.Config::{
@@ -155,7 +170,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
             , service = "mina-archive"
             , network = network_name
             , deb_codename = "${DebianVersions.lowerName debVersion}"
-            , deb_profile = "${Profiles.lowerName profile}"
+            , deb_profile = profile
             , step_key = "archive-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
             }
         , DockerImage.generateStep

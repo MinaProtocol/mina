@@ -8,9 +8,13 @@ let B/If = B.definitions/commandStep/properties/if/Type
 let Command = ./Base.dhall
 let Size = ./Size.dhall
 
+let Profiles = ../Constants/Profiles.dhall
+let BuildFlags = ../Constants/BuildFlags.dhall
+
 let Cmd = ../Lib/Cmds.dhall
 
 let DockerLogin = ../Command/DockerLogin/Type.dhall
+let DebianRepo = ../Constants/DebianRepo.dhall
 
 
 let ReleaseSpec = {
@@ -24,7 +28,9 @@ let ReleaseSpec = {
     deb_codename: Text,
     deb_release: Text,
     deb_version: Text,
-    deb_profile: Text,
+    deb_profile: Profiles.Type,
+    deb_repo: DebianRepo.Type,
+    build_flags: BuildFlags.Type,
     extra_args: Text,
     step_key: Text,
     `if`: Optional B/If
@@ -37,9 +43,11 @@ let ReleaseSpec = {
     branch = "\\\${BUILDKITE_BRANCH}",
     repo = "\\\${BUILDKITE_REPO}",
     deb_codename = "bullseye",
-    deb_profile = "devnet",
     deb_release = "\\\${MINA_DEB_RELEASE}",
     deb_version = "\\\${MINA_DEB_VERSION}",
+    deb_profile = Profiles.Type.Standard,
+    build_flags = BuildFlags.Type.None,
+    deb_repo = DebianRepo.Type.PackagesO1Test,
     extra_args = "",
     step_key = "daemon-standard-docker-image",
     `if` = None B/If
@@ -47,16 +55,47 @@ let ReleaseSpec = {
 }
 
 let generateStep = \(spec : ReleaseSpec.Type) ->
+    let exportMinaDebCmd = "export MINA_DEB_CODENAME=${spec.deb_codename}"
+    
+    let buildDockerCmd = "./scripts/release-docker.sh" ++
+              " --service ${spec.service}" ++
+              " --version ${spec.version}" ++
+              " --network ${spec.network}" ++
+              " --branch ${spec.branch}" ++
+              " --deb-codename ${spec.deb_codename}" ++
+              " --deb-repo ${DebianRepo.address spec.deb_repo}" ++
+              " --deb-release ${spec.deb_release}" ++
+              " --deb-version ${spec.deb_version}" ++
+              " --deb-profile ${Profiles.lowerName spec.deb_profile}" ++
+              " --deb-build-flags ${BuildFlags.lowerName spec.build_flags}" ++
+              " --repo ${spec.repo}" ++
+              " --extra-args \\\"${spec.extra_args}\\\""
 
-    let commands : List Cmd.Type =
-    [
-        Cmd.run (
-          "export MINA_DEB_CODENAME=${spec.deb_codename} && source ./buildkite/scripts/export-git-env-vars.sh && ./scripts/release-docker.sh " ++
-              "--service ${spec.service} --version ${spec.version} --network ${spec.network} --branch ${spec.branch} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --deb-profile ${spec.deb_profile} --repo ${spec.repo} --extra-args \\\"${spec.extra_args}\\\""
+    let commands = merge {
+      PackagesO1Test = 
+        [
+          Cmd.run (
+            exportMinaDebCmd ++ 
+            " && source ./buildkite/scripts/export-git-env-vars.sh " ++
+            " && " ++ buildDockerCmd
         )
-    ]
+        ],
 
-    in
+      Local = 
+        [
+          Cmd.run (
+            exportMinaDebCmd ++
+            " && apt update && apt install -y aptly" ++
+            " && ./buildkite/scripts/debian/start_local_repo.sh" ++
+            " && source ./buildkite/scripts/export-git-env-vars.sh " ++
+            " && " ++ buildDockerCmd ++ 
+            " && ./scripts/debian/aptly.sh stop"
+          )
+        ]
+
+    } spec.deb_repo
+
+    in 
 
     Command.build
       Command.Config::{

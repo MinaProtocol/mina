@@ -17,7 +17,7 @@ let domains (type field gates) ?feature_flags
                                            .t )
     (Spec.ETyp.T (typ, conv, _conv_inv))
     (Spec.ETyp.T (return_typ, _ret_conv, ret_conv_inv)) main =
-  let main x () = ret_conv_inv (main (conv x)) in
+  let main x () = Promise.map ~f:ret_conv_inv (main (conv x)) in
 
   let domains2 sys =
     let open Domain in
@@ -77,4 +77,9 @@ let domains (type field gates) ?feature_flags
         Pow_2_roots_of_unity Int.(max lookup_table_length_log2 (ceil_log2 rows))
     }
   in
-  domains2 (Impl.constraint_system ~input_typ:typ ~return_typ main)
+  let constraint_builder =
+    Impl.constraint_system_manual ~input_typ:typ ~return_typ
+  in
+  let%map.Promise res = constraint_builder.run_circuit main in
+  let constraint_system = constraint_builder.finish_computation res in
+  domains2 constraint_system

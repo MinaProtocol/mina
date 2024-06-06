@@ -4,7 +4,7 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 let Profiles = ../../Constants/Profiles.dhall
 let Artifacts = ../../Constants/Artifacts.dhall
 let Toolchain = ../../Constants/Toolchain.dhall
-let ContainerImages = ../../Constants/ContainerImages.dhall
+let BuildFlags = ../../Constants/BuildFlags.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
 let PipelineMode = ../../Pipeline/Mode.dhall
 
@@ -13,8 +13,7 @@ in
 Pipeline.build 
     (ArtifactPipelines.pipeline 
         ArtifactPipelines.MinaBuildSpec::{
-            artifacts = [ Artifacts.Type.ArchiveMigration ],
-            prefix = "MinaArtifactMigration",
-            toolchainSelectMode = (Toolchain.SelectionMode.ByDebian )
+            artifacts = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ],
+            buildFlags = BuildFlags.Type.Instrumented
         }
     )
