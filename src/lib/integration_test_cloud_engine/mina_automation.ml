@@ -387,15 +387,17 @@ module Network_config = struct
     let block_producer_config name keypair =
       { name; keypair; libp2p_secret = "" }
     in
+    let genesis_keypairs =
+      List.fold genesis_accounts_and_keys ~init:String.Map.empty
+        ~f:(fun map ({ account_name; _ }, (pk, sk)) ->
+          let keypair = mk_net_keypair account_name (pk, sk) in
+          String.Map.add_exn map ~key:account_name ~data:keypair )
+    in
     let block_producer_configs =
       List.map block_producers ~f:(fun node ->
           let keypair =
-            match
-              List.find genesis_accounts_and_keys
-                ~f:(fun ({ account_name; _ }, _keypair) ->
-                  String.equal account_name node.account_name )
-            with
-            | Some (_acct, keypair) ->
+            match Map.find genesis_keypairs node.account_name with
+            | Some keypair ->
                 keypair
             | None ->
                 let failstring =
@@ -407,8 +409,7 @@ module Network_config = struct
                 in
                 failwith failstring
           in
-          block_producer_config node.node_name
-            (mk_net_keypair node.account_name keypair) )
+          block_producer_config node.node_name keypair )
     in
     let mina_archive_schema = "create_schema.sql" in
     let long_commit_id =
@@ -425,12 +426,6 @@ module Network_config = struct
       [ mina_archive_base_url ^ "create_schema.sql"
       ; mina_archive_base_url ^ "zkapp_tables.sql"
       ]
-    in
-    let genesis_keypairs =
-      List.fold genesis_accounts_and_keys ~init:String.Map.empty
-        ~f:(fun map ({ account_name; _ }, (pk, sk)) ->
-          let keypair = mk_net_keypair account_name (pk, sk) in
-          String.Map.add_exn map ~key:account_name ~data:keypair )
     in
     let snark_coordinator_config =
       match snark_coordinator with
