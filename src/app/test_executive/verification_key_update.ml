@@ -71,10 +71,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let `VK vk, `Prover prover =
-    Transaction_snark.For_tests.create_trivial_snapp
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
-
   let update_vk (vk : Side_loaded_verification_key.t) : Account_update.t =
     let body (vk : Side_loaded_verification_key.t) : Account_update.Body.t =
       { Account_update.Body.dummy with
