@@ -231,9 +231,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; zkapp_command_update_vk1 : Zkapp_command.t
     ; zkapp_command_update_vk2_refers_vk1 : Zkapp_command.t
     ; zkapp_command_update_vk2 : Zkapp_command.t
+    ; invalid_zkapp_command_set_vk_perm_proof : Zkapp_command.t
+    ; invalid_zkapp_command_set_vk_perm_impossible : Zkapp_command.t
+    ; zkapp_command_set_vk_perm_proof : Zkapp_command.t
+    ; zkapp_command_set_vk_perm_impossible : Zkapp_command.t
     }
 
   let setup (network_config : network_config) =
+    let open Async.Deferred.Let_syntax in
     let constraint_constants =
       Network_config.constraint_constants network_config
     in
@@ -317,37 +322,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       call_forest_to_zkapp ~call_forest:call_forest_update_vk2
         ~nonce:Account.Nonce.(of_int 1)
     in
-    Async.Deferred.return
-      { zkapp_command_create_accounts
-      ; zkapp_command_update_vk1
-      ; zkapp_command_update_vk2_refers_vk1
-      ; zkapp_command_update_vk2
-      }
-
-  let run network t
-      { zkapp_command_create_accounts
-      ; zkapp_command_update_vk1
-      ; zkapp_command_update_vk2_refers_vk1
-      ; zkapp_command_update_vk2
-      } =
-    let open Malleable_error.Let_syntax in
-    let%bind () =
-      section_hard "Wait for nodes to initialize"
-        (wait_for t
-           (Wait_condition.nodes_to_initialize
-              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
-    in
-    let whale1 =
-      Core.String.Map.find_exn (Network.block_producers network) "whale1"
-    in
-    let%bind whale1_pk = pub_key_of_node whale1 in
-    let%bind whale1_sk = priv_key_of_node whale1 in
-    let constraint_constants = Network.constraint_constants network in
-    let (whale1_kp : Keypair.t) =
-      { public_key = whale1_pk |> Public_key.decompress_exn
-      ; private_key = whale1_sk
-      }
-    in
     let%bind ( invalid_zkapp_command_set_vk_perm_proof
              , invalid_zkapp_command_set_vk_perm_impossible
              , zkapp_command_set_vk_perm_proof
@@ -394,7 +368,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let memo = Signed_command_memo.dummy in
       let (spec_invalid_proof : Transaction_snark.For_tests.Update_states_spec.t)
           =
-        { sender = (whale1_kp, Account.Nonce.one)
+        { sender = (whale1.keypair, Account.Nonce.one)
         ; fee
         ; fee_payer = None
         ; receivers = []
@@ -418,32 +392,67 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { spec_invalid_proof with snapp_update = snapp_update_proof }
       and spec_impossible =
         { spec_invalid_proof with
-          sender = (whale1_kp, Account.Nonce.of_int 2)
+          sender = (whale1.keypair, Account.Nonce.of_int 2)
         ; zkapp_account_keypairs = [ account_c_kp ]
         ; snapp_update = snapp_update_impossible
         }
       in
       let%map invalid_update_vk_perm_proof =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_invalid_proof
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_invalid_proof
       and invalid_update_vk_perm_impossible =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_invalid_impossible
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_invalid_impossible
       and update_vk_perm_proof =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_proof
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_proof
       and update_vk_perm_impossible =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_impossible
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_impossible
       in
       ( invalid_update_vk_perm_proof
       , invalid_update_vk_perm_impossible
       , update_vk_perm_proof
       , update_vk_perm_impossible )
+    in
+    Async.Deferred.return
+      { zkapp_command_create_accounts
+      ; zkapp_command_update_vk1
+      ; zkapp_command_update_vk2_refers_vk1
+      ; zkapp_command_update_vk2
+      ; invalid_zkapp_command_set_vk_perm_proof
+      ; invalid_zkapp_command_set_vk_perm_impossible
+      ; zkapp_command_set_vk_perm_proof
+      ; zkapp_command_set_vk_perm_impossible
+      }
+
+  let run network t
+      { zkapp_command_create_accounts
+      ; zkapp_command_update_vk1
+      ; zkapp_command_update_vk2_refers_vk1
+      ; zkapp_command_update_vk2
+      ; invalid_zkapp_command_set_vk_perm_proof
+      ; invalid_zkapp_command_set_vk_perm_impossible
+      ; zkapp_command_set_vk_perm_proof
+      ; zkapp_command_set_vk_perm_impossible
+      } =
+    let open Malleable_error.Let_syntax in
+    let%bind () =
+      section_hard "Wait for nodes to initialize"
+        (wait_for t
+           (Wait_condition.nodes_to_initialize
+              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
+    in
+    let whale1 =
+      Core.String.Map.find_exn (Network.block_producers network) "whale1"
+    in
+    let%bind whale1_pk = pub_key_of_node whale1 in
+    let%bind whale1_sk = priv_key_of_node whale1 in
+    let constraint_constants = Network.constraint_constants network in
+    let (whale1_kp : Keypair.t) =
+      { public_key = whale1_pk |> Public_key.decompress_exn
+      ; private_key = whale1_sk
+      }
     in
     let%bind ( failed_zkapp_command_set_vk_signature_1
              , failed_zkapp_command_set_vk_signature_2
