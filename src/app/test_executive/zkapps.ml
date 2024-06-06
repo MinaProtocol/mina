@@ -125,6 +125,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   type setup =
     { zkapp_keypairs : Signature_lib.Keypair.t list
     ; zkapp_command_create_accounts : Zkapp_command.t
+    ; zkapp_command_update_permissions : Zkapp_command.t
+    ; permissions_updated : Permissions.t
     }
 
   let setup (network_config : network_config) =
@@ -134,6 +136,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let fish1_kp =
       (Option.value_exn @@ Network_config.network_keypair "fish1" network_config)
+        .keypair
+    in
+    let fish2_kp =
+      (Option.value_exn @@ Network_config.network_keypair "fish2" network_config)
         .keypair
     in
     let num_zkapp_accounts = 3 in
@@ -166,41 +172,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
            zkapp_command_spec
     in
-    Deferred.return { zkapp_keypairs; zkapp_command_create_accounts }
-
-  let run network t { zkapp_keypairs; zkapp_command_create_accounts } =
-    let open Malleable_error.Let_syntax in
-    let logger = Logger.create () in
-    let block_producer_nodes =
-      Network.block_producers network |> Core.String.Map.data
-    in
-    (* TODO: capture snark worker processes' failures *)
-    let%bind () =
-      section_hard "Wait for nodes to initialize"
-        (wait_for t
-           ( Wait_condition.nodes_to_initialize
-           @@ (Network.all_mina_nodes network |> Core.String.Map.data) ) )
-    in
-    let node =
-      Core.String.Map.find_exn (Network.block_producers network) "node-a"
-    in
-    let constraint_constants = Network.constraint_constants network in
-    let fish1_kp =
-      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
-        .keypair
-    in
-    let fish2_kp =
-      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish2")
-        .keypair
-    in
-    let single_zkapp_keypair = List.hd_exn zkapp_keypairs in
-    let zkapp_account_ids =
-      List.map zkapp_keypairs ~f:(fun zkapp_keypair ->
-          Account_id.create
-            (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
-            Token_id.default )
-    in
-    let%bind.Deferred zkapp_command_update_permissions, permissions_updated =
+    let%bind zkapp_command_update_permissions, permissions_updated =
       (* construct a Zkapp_command.t, similar to zkapp_test_transaction update-permissions *)
       let nonce = Account.Nonce.zero in
       let memo =
@@ -250,6 +222,50 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           zkapp_command_spec
       in
       (zkapp_command, new_permissions)
+    in
+    Deferred.return
+      { zkapp_keypairs
+      ; zkapp_command_create_accounts
+      ; zkapp_command_update_permissions
+      ; permissions_updated
+      }
+
+  let run network t
+      { zkapp_keypairs
+      ; zkapp_command_create_accounts
+      ; zkapp_command_update_permissions
+      ; permissions_updated
+      } =
+    let open Malleable_error.Let_syntax in
+    let logger = Logger.create () in
+    let block_producer_nodes =
+      Network.block_producers network |> Core.String.Map.data
+    in
+    (* TODO: capture snark worker processes' failures *)
+    let%bind () =
+      section_hard "Wait for nodes to initialize"
+        (wait_for t
+           ( Wait_condition.nodes_to_initialize
+           @@ (Network.all_mina_nodes network |> Core.String.Map.data) ) )
+    in
+    let node =
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
+    in
+    let constraint_constants = Network.constraint_constants network in
+    let fish1_kp =
+      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
+        .keypair
+    in
+    let fish2_kp =
+      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish2")
+        .keypair
+    in
+    let single_zkapp_keypair = List.hd_exn zkapp_keypairs in
+    let zkapp_account_ids =
+      List.map zkapp_keypairs ~f:(fun zkapp_keypair ->
+          Account_id.create
+            (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
+            Token_id.default )
     in
     let%bind.Deferred ( zkapp_update_all
                       , zkapp_command_update_all
