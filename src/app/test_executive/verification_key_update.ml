@@ -116,11 +116,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         , Zkapp_command.Digest.Account_update.t
         , Zkapp_command.Digest.Forest.t )
         Zkapp_command.Call_forest.tree
+    ; zkapp_command_create_accounts : Zkapp_command.t
     }
 
   let setup (network_config : network_config) =
     let constraint_constants =
       Network_config.constraint_constants network_config
+    in
+    let whale1 =
+      Option.value_exn @@ Network_config.network_keypair "whale1" network_config
     in
     (* Build the provers for the various rules. *)
     let tag1, _, _, Pickles.Provers.[ trivial_prover1 ] =
@@ -153,9 +157,40 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind.Async.Deferred account_update2, _ =
       trivial_prover2 ~handler:Trivial_rule2.handler ()
     in
-    Async.Deferred.return { vk1; account_update1; vk2; account_update2 }
+    let zkapp_command_create_accounts =
+      let memo =
+        Signed_command_memo.create_from_string_exn "Zkapp create account"
+      in
+      let (spec : Transaction_snark.For_tests.Deploy_snapp_spec.t) =
+        { sender = (whale1.keypair, Account.Nonce.zero)
+        ; fee = Currency.Fee.of_nanomina_int_exn 20_000_000
+        ; fee_payer = None
+        ; amount = Currency.Amount.of_mina_int_exn 100
+        ; zkapp_account_keypairs = zkapp_kps
+        ; memo
+        ; new_zkapp_account = true
+        ; snapp_update = Account_update.Update.dummy
+        ; preconditions = None
+        ; authorization_kind = Signature
+        }
+      in
+      Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
+    in
+    Async.Deferred.return
+      { vk1
+      ; account_update1
+      ; vk2
+      ; account_update2
+      ; zkapp_command_create_accounts
+      }
 
-  let run network t { vk1; account_update1; vk2; account_update2 } =
+  let run network t
+      { vk1
+      ; account_update1
+      ; vk2
+      ; account_update2
+      ; zkapp_command_create_accounts
+      } =
     let open Malleable_error.Let_syntax in
     let%bind () =
       section_hard "Wait for nodes to initialize"
@@ -220,25 +255,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
       (* TODO: This is a pain. *)
       { body = body vk; authorization = Signature Signature.dummy }
-    in
-    let zkapp_command_create_accounts =
-      let memo =
-        Signed_command_memo.create_from_string_exn "Zkapp create account"
-      in
-      let (spec : Transaction_snark.For_tests.Deploy_snapp_spec.t) =
-        { sender = (whale1_kp, Account.Nonce.zero)
-        ; fee = Currency.Fee.of_nanomina_int_exn 20_000_000
-        ; fee_payer = None
-        ; amount = Currency.Amount.of_mina_int_exn 100
-        ; zkapp_account_keypairs = zkapp_kps
-        ; memo
-        ; new_zkapp_account = true
-        ; snapp_update = Account_update.Update.dummy
-        ; preconditions = None
-        ; authorization_kind = Signature
-        }
-      in
-      Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
     in
     let call_forest_to_zkapp ~call_forest ~nonce : Zkapp_command.t =
       let memo = Signed_command_memo.empty in
