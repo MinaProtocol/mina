@@ -127,6 +127,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; zkapp_command_create_accounts : Zkapp_command.t
     ; zkapp_command_update_permissions : Zkapp_command.t
     ; permissions_updated : Permissions.t
+    ; zkapp_update_all : Account_update.Update.t
+    ; zkapp_command_update_all : Zkapp_command.t
+    ; zkapp_command_invalid_nonce : Zkapp_command.t
+    ; zkapp_command_insufficient_funds : Zkapp_command.t
+    ; zkapp_command_insufficient_replace_fee : Zkapp_command.t
+    ; zkapp_command_insufficient_fee : Zkapp_command.t
+    ; zkapp_command_cross_network_replay : Zkapp_command.t
     }
 
   let setup (network_config : network_config) =
@@ -146,6 +153,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let zkapp_keypairs =
       List.init num_zkapp_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
     in
+    let single_zkapp_keypair = List.hd_exn zkapp_keypairs in
     let%bind zkapp_command_create_accounts =
       (* construct a Zkapp_command.t, similar to zkapp_test_transaction create-zkapp-account *)
       let amount = Currency.Amount.of_mina_int_exn 10 in
@@ -222,50 +230,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           zkapp_command_spec
       in
       (zkapp_command, new_permissions)
-    in
-    Deferred.return
-      { zkapp_keypairs
-      ; zkapp_command_create_accounts
-      ; zkapp_command_update_permissions
-      ; permissions_updated
-      }
-
-  let run network t
-      { zkapp_keypairs
-      ; zkapp_command_create_accounts
-      ; zkapp_command_update_permissions
-      ; permissions_updated
-      } =
-    let open Malleable_error.Let_syntax in
-    let logger = Logger.create () in
-    let block_producer_nodes =
-      Network.block_producers network |> Core.String.Map.data
-    in
-    (* TODO: capture snark worker processes' failures *)
-    let%bind () =
-      section_hard "Wait for nodes to initialize"
-        (wait_for t
-           ( Wait_condition.nodes_to_initialize
-           @@ (Network.all_mina_nodes network |> Core.String.Map.data) ) )
-    in
-    let node =
-      Core.String.Map.find_exn (Network.block_producers network) "node-a"
-    in
-    let constraint_constants = Network.constraint_constants network in
-    let fish1_kp =
-      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
-        .keypair
-    in
-    let fish2_kp =
-      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish2")
-        .keypair
-    in
-    let single_zkapp_keypair = List.hd_exn zkapp_keypairs in
-    let zkapp_account_ids =
-      List.map zkapp_keypairs ~f:(fun zkapp_keypair ->
-          Account_id.create
-            (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
-            Token_id.default )
     in
     let%bind.Deferred ( zkapp_update_all
                       , zkapp_command_update_all
@@ -368,7 +332,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Transaction_snark.For_tests.update_states ~constraint_constants
           spec_insufficient_fee
       in
-
       let%map.Deferred zkapp_command_cross_network_replay =
         let spec : Transaction_snark.For_tests.Single_account_update_spec.t =
           { fee
@@ -392,6 +355,63 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       , zkapp_command_insufficient_replace_fee
       , zkapp_command_insufficient_fee
       , zkapp_command_cross_network_replay )
+    in
+    Deferred.return
+      { zkapp_keypairs
+      ; zkapp_command_create_accounts
+      ; zkapp_command_update_permissions
+      ; permissions_updated
+      ; zkapp_update_all
+      ; zkapp_command_update_all
+      ; zkapp_command_invalid_nonce
+      ; zkapp_command_insufficient_funds
+      ; zkapp_command_insufficient_replace_fee
+      ; zkapp_command_insufficient_fee
+      ; zkapp_command_cross_network_replay
+      }
+
+  let run network t
+      { zkapp_keypairs
+      ; zkapp_command_create_accounts
+      ; zkapp_command_update_permissions
+      ; permissions_updated
+      ; zkapp_update_all
+      ; zkapp_command_update_all
+      ; zkapp_command_invalid_nonce
+      ; zkapp_command_insufficient_funds
+      ; zkapp_command_insufficient_replace_fee
+      ; zkapp_command_insufficient_fee
+      ; zkapp_command_cross_network_replay
+      } =
+    let open Malleable_error.Let_syntax in
+    let logger = Logger.create () in
+    let block_producer_nodes =
+      Network.block_producers network |> Core.String.Map.data
+    in
+    (* TODO: capture snark worker processes' failures *)
+    let%bind () =
+      section_hard "Wait for nodes to initialize"
+        (wait_for t
+           ( Wait_condition.nodes_to_initialize
+           @@ (Network.all_mina_nodes network |> Core.String.Map.data) ) )
+    in
+    let node =
+      Core.String.Map.find_exn (Network.block_producers network) "node-a"
+    in
+    let constraint_constants = Network.constraint_constants network in
+    let fish1_kp =
+      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
+        .keypair
+    in
+    let fish2_kp =
+      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish2")
+        .keypair
+    in
+    let zkapp_account_ids =
+      List.map zkapp_keypairs ~f:(fun zkapp_keypair ->
+          Account_id.create
+            (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
+            Token_id.default )
     in
     let zkapp_command_invalid_signature =
       let p = zkapp_command_update_all in
