@@ -6,6 +6,7 @@ echo "Exporting Variables: "
 export MINA_REPO="https://github.com/MinaProtocol/mina.git"
 
 function find_most_recent_numeric_tag() {
+    git fetch --tags
     TAG=$(git describe --always --abbrev=0 $1 | sed 's!/!-!g; s!_!-!g')
     if [[ $TAG != [0-9]* ]]; then
         TAG=$(find_most_recent_numeric_tag $TAG~)
