@@ -1,6 +1,7 @@
 open Core
 open Async
 open Integration_test_lib
+open Mina_base
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
@@ -35,41 +36,34 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type network_config = Engine.Network_config.t
 
-  type setup = unit
+  type setup =
+    { zkapp_command_create_account_with_timing : Zkapp_command.t
+    ; zkapp_command_create_second_account_with_timing : Zkapp_command.t
+    ; zkapp_command_create_third_account_with_timing : Zkapp_command.t
+    ; timing_account_id : Account_id.t
+    ; timing_update : Account_update.Update.t
+    ; zkapp_command_with_zero_vesting_period : Zkapp_command.t
+    ; zkapp_command_transfer_from_timed_account : Zkapp_command.t
+    ; third_timed_account_id : Account_id.t
+    ; third_timed_account_keypair : Signature_lib.Keypair.t
+    ; zkapp_command_invalid_transfer_from_timed_account : Zkapp_command.t
+    ; zkapp_command_update_timing : Zkapp_command.t
+    }
 
-  let setup (_network_config : network_config) = Deferred.return ()
-
-  let run network t () =
-    let open Malleable_error.Let_syntax in
-    let logger = Logger.create () in
-    let all_mina_nodes = Network.all_mina_nodes network in
-    let%bind () =
-      wait_for t
-        (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data all_mina_nodes) )
-    in
-    let block_producer_nodes =
-      Network.block_producers network |> Core.String.Map.data
-    in
-    let node = List.hd_exn block_producer_nodes in
+  let setup (network_config : network_config) =
+    let open Deferred.Let_syntax in
     let constraint_constants =
-      Genesis_constants.Constraint_constants.compiled
+      Network_config.constraint_constants network_config
     in
-    let block_window_duration_ms =
-      constraint_constants.block_window_duration_ms
-    in
-    let%bind fee_payer_pk = pub_key_of_node node in
-    let%bind fee_payer_sk = priv_key_of_node node in
-    let (keypair : Signature_lib.Keypair.t) =
-      { public_key = fee_payer_pk |> Signature_lib.Public_key.decompress_exn
-      ; private_key = fee_payer_sk
-      }
+    let keypair =
+      (Option.value_exn
+         (Network_config.network_keypair "node-a" network_config) )
+        .keypair
     in
     let ( zkapp_command_create_account_with_timing
         , timing_account_id
         , timing_update
         , timed_account_keypair ) =
-      let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.of_mina_int_exn 10 in
       let nonce = Account.Nonce.of_int 0 in
@@ -110,7 +104,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           (zkapp_keypair.public_key |> Signature_lib.Public_key.compress)
           Token_id.default
       in
-
       ( Transaction_snark.For_tests.deploy_snapp ~constraint_constants
           zkapp_command_spec
       , timing_account_id
@@ -313,7 +306,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       return
       @@ Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
     in
-    let%bind.Deferred zkapp_command_update_timing =
+    let%bind zkapp_command_update_timing =
       let open Mina_base in
       let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
       let amount = Currency.Amount.zero in
@@ -354,6 +347,58 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       Transaction_snark.For_tests.update_states ~constraint_constants
         zkapp_command_spec
+    in
+    Deferred.return
+      { zkapp_command_create_account_with_timing
+      ; zkapp_command_create_second_account_with_timing
+      ; zkapp_command_create_third_account_with_timing
+      ; timing_account_id
+      ; timing_update
+      ; zkapp_command_with_zero_vesting_period
+      ; zkapp_command_transfer_from_timed_account
+      ; third_timed_account_id
+      ; third_timed_account_keypair
+      ; zkapp_command_invalid_transfer_from_timed_account
+      ; zkapp_command_update_timing
+      }
+
+  let run network t
+      { zkapp_command_create_account_with_timing
+      ; zkapp_command_create_second_account_with_timing
+      ; zkapp_command_create_third_account_with_timing
+      ; timing_account_id
+      ; timing_update
+      ; zkapp_command_with_zero_vesting_period
+      ; zkapp_command_transfer_from_timed_account
+      ; third_timed_account_id
+      ; third_timed_account_keypair
+      ; zkapp_command_invalid_transfer_from_timed_account
+      ; zkapp_command_update_timing
+      } =
+    let open Malleable_error.Let_syntax in
+    let logger = Logger.create () in
+    let all_mina_nodes = Network.all_mina_nodes network in
+    let%bind () =
+      wait_for t
+        (Wait_condition.nodes_to_initialize
+           (Core.String.Map.data all_mina_nodes) )
+    in
+    let block_producer_nodes =
+      Network.block_producers network |> Core.String.Map.data
+    in
+    let node = List.hd_exn block_producer_nodes in
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.compiled
+    in
+    let block_window_duration_ms =
+      constraint_constants.block_window_duration_ms
+    in
+    let%bind fee_payer_pk = pub_key_of_node node in
+    let%bind fee_payer_sk = priv_key_of_node node in
+    let (keypair : Signature_lib.Keypair.t) =
+      { public_key = fee_payer_pk |> Signature_lib.Public_key.decompress_exn
+      ; private_key = fee_payer_sk
+      }
     in
     let with_timeout =
       let soft_slots = 3 in
