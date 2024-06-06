@@ -103,28 +103,24 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type network_config = Engine.Network_config.t
 
-  type setup = unit
+  type setup =
+    { vk1 : Side_loaded_verification_key.t
+    ; account_update1 :
+        ( Account_update.t
+        , Zkapp_command.Digest.Account_update.t
+        , Zkapp_command.Digest.Forest.t )
+        Zkapp_command.Call_forest.tree
+    ; vk2 : Side_loaded_verification_key.t
+    ; account_update2 :
+        ( Account_update.t
+        , Zkapp_command.Digest.Account_update.t
+        , Zkapp_command.Digest.Forest.t )
+        Zkapp_command.Call_forest.tree
+    }
 
-  let setup (_network_config : network_config) = Async.Deferred.return ()
-
-  let run network t () =
-    let open Malleable_error.Let_syntax in
-    let%bind () =
-      section_hard "Wait for nodes to initialize"
-        (wait_for t
-           (Wait_condition.nodes_to_initialize
-              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
-    in
-    let whale1 =
-      Core.String.Map.find_exn (Network.block_producers network) "whale1"
-    in
-    let%bind whale1_pk = pub_key_of_node whale1 in
-    let%bind whale1_sk = priv_key_of_node whale1 in
-    let constraint_constants = Network.constraint_constants network in
-    let (whale1_kp : Keypair.t) =
-      { public_key = whale1_pk |> Public_key.decompress_exn
-      ; private_key = whale1_sk
-      }
+  let setup (network_config : network_config) =
+    let constraint_constants =
+      Network_config.constraint_constants network_config
     in
     (* Build the provers for the various rules. *)
     let tag1, _, _, Pickles.Provers.[ trivial_prover1 ] =
@@ -157,7 +153,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind.Async.Deferred account_update2, _ =
       trivial_prover2 ~handler:Trivial_rule2.handler ()
     in
+    Async.Deferred.return { vk1; account_update1; vk2; account_update2 }
 
+  let run network t { vk1; account_update1; vk2; account_update2 } =
+    let open Malleable_error.Let_syntax in
+    let%bind () =
+      section_hard "Wait for nodes to initialize"
+        (wait_for t
+           (Wait_condition.nodes_to_initialize
+              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
+    in
+    let whale1 =
+      Core.String.Map.find_exn (Network.block_producers network) "whale1"
+    in
+    let%bind whale1_pk = pub_key_of_node whale1 in
+    let%bind whale1_sk = priv_key_of_node whale1 in
+    let constraint_constants = Network.constraint_constants network in
+    let (whale1_kp : Keypair.t) =
+      { public_key = whale1_pk |> Public_key.decompress_exn
+      ; private_key = whale1_sk
+      }
+    in
     let update_vk (vk : Side_loaded_verification_key.t) : Account_update.t =
       let body (vk : Side_loaded_verification_key.t) : Account_update.Body.t =
         { Account_update.Body.dummy with
