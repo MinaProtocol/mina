@@ -42,6 +42,8 @@ module Engine = struct
       -> t
 
     val network_keypair : string -> t -> Network_keypair.t option
+
+    val constraint_constants : t -> Genesis_constants.Constraint_constants.t
   end
 
   module type Network_intf = sig

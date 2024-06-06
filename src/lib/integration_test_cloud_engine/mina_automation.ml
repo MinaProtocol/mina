@@ -103,6 +103,8 @@ module Network_config = struct
 
   let network_keypair name t = Map.find t.genesis_keypairs name
 
+  let constraint_constants t = t.constants.constraints
+
   let terraform_config_to_assoc t =
     let[@warning "-8"] (`Assoc assoc : Yojson.Safe.t) =
       terraform_config_to_yojson t

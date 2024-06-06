@@ -35,11 +35,48 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type network_config = Engine.Network_config.t
 
-  type setup = unit
+  type setup =
+    { zkapp_account_keypair : Signature_lib.Keypair.t
+    ; parties_create_accounts : Mina_base.Zkapp_command.t
+    }
 
-  let setup (_network_config : network_config) = Deferred.return ()
+  let setup (network_config : network_config) =
+    let zkapp_account_keypair = Signature_lib.Keypair.create () in
+    let amount = Currency.Amount.of_mina_int_exn 10 in
+    let nonce = Mina_base.Account.Nonce.(succ zero) in
+    let memo =
+      Mina_base.Signed_command_memo.create_from_string_exn
+        "Zkapp create account"
+    in
+    let fee = Currency.Fee.of_nanomina_int_exn 20_000_000 in
+    let sender_kp =
+      (Option.value_exn
+         (Network_config.network_keypair "node-c" network_config) )
+        .keypair
+    in
+    let (parties_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t) =
+      { sender = (sender_kp, nonce)
+      ; fee
+      ; fee_payer = None
+      ; amount
+      ; zkapp_account_keypairs = [ zkapp_account_keypair ]
+      ; memo
+      ; new_zkapp_account = true
+      ; snapp_update = Mina_base.Account_update.Update.dummy
+      ; preconditions = None
+      ; authorization_kind = Signature
+      }
+    in
+    Deferred.return
+    @@ { zkapp_account_keypair
+       ; parties_create_accounts =
+           Transaction_snark.For_tests.deploy_snapp
+             ~constraint_constants:
+               (Network_config.constraint_constants network_config)
+             parties_spec
+       }
 
-  let run network t () =
+  let run network t { zkapp_account_keypair; parties_create_accounts } =
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
@@ -108,7 +145,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.signed_command_to_be_included_in_frontier ~txn_hash
               ~node_included_in:(`Node node_c) ) )
     in
-    let zkapp_account_keypair = Signature_lib.Keypair.create () in
     let%bind () =
       let wait_for_zkapp zkapp_command =
         let%map () =
@@ -119,37 +155,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [%log info] "ZkApp transaction included in transition frontier"
       in
       section_hard "send a zkApp to create an account"
-        (let%bind parties_create_accounts =
-           let amount = Currency.Amount.of_mina_int_exn 10 in
-           let nonce = Mina_base.Account.Nonce.(succ zero) in
-           let memo =
-             Mina_base.Signed_command_memo.create_from_string_exn
-               "Zkapp create account"
-           in
-           let fee = Currency.Fee.of_nanomina_int_exn 20_000_000 in
-           let sender_kp =
-             (Option.value_exn (Node.network_keypair node_c)).keypair
-           in
-           let (parties_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t)
-               =
-             { sender = (sender_kp, nonce)
-             ; fee
-             ; fee_payer = None
-             ; amount
-             ; zkapp_account_keypairs = [ zkapp_account_keypair ]
-             ; memo
-             ; new_zkapp_account = true
-             ; snapp_update = Mina_base.Account_update.Update.dummy
-             ; preconditions = None
-             ; authorization_kind = Signature
-             }
-           in
-           return
-           @@ Transaction_snark.For_tests.deploy_snapp
-                ~constraint_constants:(Network.constraint_constants network)
-                parties_spec
-         in
-         let%bind () =
+        (let%bind () =
            send_zkapp ~logger
              (Network.Node.get_ingress_uri node_c)
              parties_create_accounts
