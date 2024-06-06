@@ -1310,7 +1310,7 @@ struct
           if
             Indexed_pool.member pool
               (Transaction_hash.User_command.of_checked cmd)
-          then Error Diff_error.Duplicate
+          then if is_sender_local then Ok () else Error Diff_error.Duplicate
           else
             match Map.find fee_payer_accounts (fee_payer cmd) with
             | None ->
