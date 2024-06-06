@@ -227,19 +227,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   type network_config = Engine.Network_config.t
 
   type setup =
-    { vk1 : Side_loaded_verification_key.t
-    ; account_update1 :
-        ( Account_update.t
-        , Zkapp_command.Digest.Account_update.t
-        , Zkapp_command.Digest.Forest.t )
-        Zkapp_command.Call_forest.tree
-    ; vk2 : Side_loaded_verification_key.t
-    ; account_update2 :
-        ( Account_update.t
-        , Zkapp_command.Digest.Account_update.t
-        , Zkapp_command.Digest.Forest.t )
-        Zkapp_command.Call_forest.tree
-    ; zkapp_command_create_accounts : Zkapp_command.t
+    { zkapp_command_create_accounts : Zkapp_command.t
+    ; zkapp_command_update_vk1 : Zkapp_command.t
+    ; zkapp_command_update_vk2_refers_vk1 : Zkapp_command.t
+    ; zkapp_command_update_vk2 : Zkapp_command.t
     }
 
   let setup (network_config : network_config) =
@@ -299,39 +290,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
     in
-    Async.Deferred.return
-      { vk1
-      ; account_update1
-      ; vk2
-      ; account_update2
-      ; zkapp_command_create_accounts
-      }
-
-  let run network t
-      { vk1
-      ; account_update1
-      ; vk2
-      ; account_update2
-      ; zkapp_command_create_accounts
-      } =
-    let open Malleable_error.Let_syntax in
-    let%bind () =
-      section_hard "Wait for nodes to initialize"
-        (wait_for t
-           (Wait_condition.nodes_to_initialize
-              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
-    in
-    let whale1 =
-      Core.String.Map.find_exn (Network.block_producers network) "whale1"
-    in
-    let%bind whale1_pk = pub_key_of_node whale1 in
-    let%bind whale1_sk = priv_key_of_node whale1 in
-    let constraint_constants = Network.constraint_constants network in
-    let (whale1_kp : Keypair.t) =
-      { public_key = whale1_pk |> Public_key.decompress_exn
-      ; private_key = whale1_sk
-      }
-    in
     let call_forest1 =
       []
       |> Zkapp_command.Call_forest.cons_tree account_update1
@@ -358,6 +316,37 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let zkapp_command_update_vk2 =
       call_forest_to_zkapp ~call_forest:call_forest_update_vk2
         ~nonce:Account.Nonce.(of_int 1)
+    in
+    Async.Deferred.return
+      { zkapp_command_create_accounts
+      ; zkapp_command_update_vk1
+      ; zkapp_command_update_vk2_refers_vk1
+      ; zkapp_command_update_vk2
+      }
+
+  let run network t
+      { zkapp_command_create_accounts
+      ; zkapp_command_update_vk1
+      ; zkapp_command_update_vk2_refers_vk1
+      ; zkapp_command_update_vk2
+      } =
+    let open Malleable_error.Let_syntax in
+    let%bind () =
+      section_hard "Wait for nodes to initialize"
+        (wait_for t
+           (Wait_condition.nodes_to_initialize
+              (Core.String.Map.data (Network.all_mina_nodes network)) ) )
+    in
+    let whale1 =
+      Core.String.Map.find_exn (Network.block_producers network) "whale1"
+    in
+    let%bind whale1_pk = pub_key_of_node whale1 in
+    let%bind whale1_sk = priv_key_of_node whale1 in
+    let constraint_constants = Network.constraint_constants network in
+    let (whale1_kp : Keypair.t) =
+      { public_key = whale1_pk |> Public_key.decompress_exn
+      ; private_key = whale1_sk
+      }
     in
     let%bind ( invalid_zkapp_command_set_vk_perm_proof
              , invalid_zkapp_command_set_vk_perm_impossible
