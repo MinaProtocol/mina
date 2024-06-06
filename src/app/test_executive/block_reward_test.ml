@@ -26,9 +26,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; block_producers = [ { node_name = "node"; account_name = "node-key" } ]
     }
 
+  type network_config = Engine.Network_config.t
+
   type setup = unit
 
-  let setup () = Async.Deferred.return ()
+  let setup (_network_config : network_config) = Async.Deferred.return ()
 
   let run network t () =
     let open Malleable_error.Let_syntax in

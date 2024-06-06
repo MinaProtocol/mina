@@ -33,9 +33,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
     }
 
+  type network_config = Engine.Network_config.t
+
   type setup = unit
 
-  let setup () = Deferred.return ()
+  let setup (_network_config : network_config) = Deferred.return ()
 
   let run network t () =
     let open Network in

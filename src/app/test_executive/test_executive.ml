@@ -252,7 +252,8 @@ let main inputs =
     (module Test (Test_inputs) : Intf.Test.S
       with type network = Engine.Network.t
        and type node = Engine.Network.Node.t
-       and type dsl = Dsl.t )
+       and type dsl = Dsl.t
+       and type network_config = Engine.Network_config.t )
   in
   (*
     (module Test (Test_inputs)
@@ -326,7 +327,7 @@ let main inputs =
     in
     Monitor.try_with ~here:[%here] ~extract_exn:false (fun () ->
         let open Malleable_error.Let_syntax in
-        let%bind.Deferred setup = T.setup () in
+        let%bind.Deferred setup = T.setup network_config in
         let%bind network, dsl =
           let lift ?exit_code =
             Deferred.bind ~f:(Malleable_error.or_hard_error ?exit_code)

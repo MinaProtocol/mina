@@ -344,9 +344,11 @@ module Test = struct
 
     val config : Test_config.t
 
+    type network_config
+
     type setup
 
-    val setup : unit -> setup Deferred.t
+    val setup : network_config -> setup Deferred.t
 
     val run : network -> dsl -> setup -> unit Malleable_error.t
   end
@@ -358,4 +360,5 @@ module Test = struct
       with type network = Inputs.Engine.Network.t
        and type node = Inputs.Engine.Network.Node.t
        and type dsl = Inputs.Dsl.t
+       and type network_config = Inputs.Engine.Network_config.t
 end

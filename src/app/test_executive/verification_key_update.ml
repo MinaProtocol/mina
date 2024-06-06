@@ -101,9 +101,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let logger = Logger.create ()
 
+  type network_config = Engine.Network_config.t
+
   type setup = unit
 
-  let setup () = Async.Deferred.return ()
+  let setup (_network_config : network_config) = Async.Deferred.return ()
 
   let run network t () =
     let open Malleable_error.Let_syntax in
