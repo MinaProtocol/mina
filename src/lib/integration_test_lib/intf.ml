@@ -342,7 +342,11 @@ module Test = struct
 
     val config : Test_config.t
 
-    val run : network -> dsl -> unit Malleable_error.t
+    type setup
+
+    val setup : unit -> setup
+
+    val run : network -> dsl -> setup -> unit Malleable_error.t
   end
 
   (* NB: until the DSL is actually implemented, a test just takes in the engine

@@ -101,7 +101,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let logger = Logger.create ()
 
-  let run network t =
+  type setup = unit
+
+  let setup () = ()
+
+  let run network t () =
     let open Malleable_error.Let_syntax in
     let%bind () =
       section_hard "Wait for nodes to initialize"

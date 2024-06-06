@@ -32,7 +32,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
     }
 
-  let run network t =
+  type setup = unit
+
+  let setup () = ()
+
+  let run network t () =
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in

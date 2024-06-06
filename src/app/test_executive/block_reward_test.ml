@@ -26,7 +26,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; block_producers = [ { node_name = "node"; account_name = "node-key" } ]
     }
 
-  let run network t =
+  type setup = unit
+
+  let setup () = ()
+
+  let run network t () =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in

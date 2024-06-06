@@ -120,7 +120,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature node_uri
         |> Malleable_error.ignore_m
 
-  let run network t =
+  type setup = unit
+
+  let setup () = ()
+
+  let run network t () =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let block_producer_nodes =

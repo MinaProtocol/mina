@@ -210,7 +210,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     }
 
-  let run network t =
+  type setup = unit
+
+  let setup () = ()
+
+  let run network t () =
     let open Malleable_error.Let_syntax in
     let constraint_constants =
       Genesis_constants.Constraint_constants.compiled
