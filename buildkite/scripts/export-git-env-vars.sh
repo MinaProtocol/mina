@@ -57,12 +57,14 @@ else
 fi
 
 # Determine the packages to build (mainnet y/N)
-case $GITBRANCH in
-    compatible|master|feature/allow-resending-local-txns|release-automation-testing/*|release/1*|release/3*) # whitelist of branches that are "mainnet-like"
-      MINA_BUILD_MAINNET=true ;;
-    *) # Other branches
-      MINA_BUILD_MAINNET=false ;;
-esac
+# case $GITBRANCH in
+#     compatible|master|feature/allow-resending-local-txns|release-automation-testing/*|release/1*|release/3*) # whitelist of branches that are "mainnet-like"
+#       MINA_BUILD_MAINNET=true ;;
+#     *) # Other branches
+#       MINA_BUILD_MAINNET=false ;;
+# esac
+
+export MINA_BUILD_MAINNET=true
 
 echo "Publishing on release channel \"${RELEASE}\""
 [[ -n ${THIS_COMMIT_TAG} ]] && export MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"

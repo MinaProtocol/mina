@@ -277,6 +277,9 @@ build_functional_test_suite_deb() {
 
 ##################################### MAINNET PACKAGE #######################################
 build_daemon_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- MINA_BUILD_MAINNET=${MINA_BUILD_MAINNET}"
  
   if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
   then
