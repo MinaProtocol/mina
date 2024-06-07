@@ -215,7 +215,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
           DockerImage.ReleaseSpec::{
             deps=DebianVersions.dependsOn debVersion profile,
             service="mina-daemon",
-            network="berkeley",
+            network="mainnet",
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_profile="${Profiles.lowerName profile}",
             step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
@@ -233,7 +233,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
           DockerImage.ReleaseSpec::{
             deps=DebianVersions.dependsOn debVersion profile,
             service="mina-batch-txn",
-            network="berkeley",
+            network="mainnet",
             deb_codename="${DebianVersions.lowerName debVersion}",
             step_key="batch-txn-${DebianVersions.lowerName debVersion}-docker-image"
           },
@@ -260,7 +260,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
           DockerImage.ReleaseSpec::{
             deps=DebianVersions.dependsOn debVersion profile,
             service="mina-rosetta",
-            network="berkeley",
+            network="mainnet",
             deb_codename="${DebianVersions.lowerName debVersion}",
             step_key="rosetta-${DebianVersions.lowerName debVersion}-docker-image"
           },
@@ -279,7 +279,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             service="mina-test-suite",
             deb_codename="${DebianVersions.lowerName debVersion}",
             step_key="test-suite-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
-            network="berkeley"
+            network="mainnet"
           }
       } artifact
 in 
