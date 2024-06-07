@@ -58,7 +58,7 @@ fi
 
 # Determine the packages to build (mainnet y/N)
 case $GITBRANCH in
-    compatible|master|berkeley|release-automation-testing/*|release/1*|release/3*) # whitelist of branches that are "mainnet-like"
+    compatible|master|feature/allow-resending-local-txns|release-automation-testing/*|release/1*|release/3*) # whitelist of branches that are "mainnet-like"
       MINA_BUILD_MAINNET=true ;;
     *) # Other branches
       MINA_BUILD_MAINNET=false ;;
