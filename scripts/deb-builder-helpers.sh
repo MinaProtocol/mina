@@ -303,7 +303,7 @@ build_daemon_deb() {
     echo "------------------------------------------------------------"
     echo "--- Building testnet signatures deb without keys:"
 
-    create_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network'
+    create_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
     copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
 
