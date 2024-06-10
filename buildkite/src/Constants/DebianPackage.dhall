@@ -1,15 +1,16 @@
-let Package : Type  = < Daemon | DaemonDevnet | DaemonLightnet | Archive | ArchiveMigration | TestExecutive | BatchTxn | LogProc | ZkappTestTransaction | FunctionalTestSuite >
+let Network = ./Network.dhall
+let Profile = ./Profiles.dhall
 
-let MainPackages = [ Package.Daemon , Package.DaemonDevnet , Package.Archive , Package.ArchiveMigration , Package.LogProc ]
+let Package : Type  = < Daemon |  Archive | ArchiveMigration | TestExecutive | BatchTxn | LogProc | ZkappTestTransaction | FunctionalTestSuite >
 
-let AuxiliaryPackages = [ Package.DaemonLightnet , Package.TestExecutive , Package.BatchTxn , Package.ZkappTestTransaction , Package.FunctionalTestSuite ]
+let MainPackages = [ Package.Daemon , Package.Archive , Package.ArchiveMigration , Package.LogProc ]
+
+let AuxiliaryPackages = [  Package.TestExecutive , Package.BatchTxn , Package.ZkappTestTransaction , Package.FunctionalTestSuite ]
 
 
 let capitalName = \(package : Package) ->
   merge {
     Daemon = "Daemon"
-    , DaemonDevnet = "DaemonDevnet"
-    , DaemonLightnet = "DaemonLightnet"
     , Archive = "Archive"
     , ArchiveMigration = "ArchiveMigration"
     , TestExecutive = "TestExecutive"
@@ -22,8 +23,6 @@ let capitalName = \(package : Package) ->
 let lowerName = \(package : Package) ->
   merge {
     Daemon = "daemon"
-    , DaemonDevnet = "daemon_devnet"
-    , DaemonLightnet = "daemon_lightnet"
     , Archive = "archive"
     , ArchiveMigration = "archive_migration"
     , TestExecutive = "test_executive"
@@ -33,11 +32,9 @@ let lowerName = \(package : Package) ->
     , FunctionalTestSuite = "functional_test_suite"
   } package
 
-let debianName = \(package : Package) ->
+let debianName = \(package : Package) -> \(profile : Profile.Type) -> \(network : Network.Type) ->
   merge {
-    Daemon = "mina-berkeley"
-    , DaemonDevnet = "mina-devnet"
-    , DaemonLightnet = "mina-berkeley-lightnet"
+    Daemon = "mina-${Network.lowerName network}${Profile.toLabelSegment profile}"
     , Archive = "mina-archive"
     , ArchiveMigration = "mina-archive-migration"
     , TestExecutive = "mina-test-executive"

@@ -1,5 +1,6 @@
 let Prelude = ../External/Prelude.dhall
 let Profiles = ./Profiles.dhall
+let BuildFlags = ./BuildFlags.dhall
 let S = ../Lib/SelectFiles.dhall
 let D = S.PathPattern
 
@@ -23,16 +24,21 @@ let lowerName = \(debVersion : DebVersion) ->
     , Focal = "focal"
   } debVersion
 
-let dependsOn = \(debVersion : DebVersion) -> \(profile : Profiles.Type) ->
+
+
+let dependsOnStep = \(debVersion : DebVersion) -> \(profile : Profiles.Type) -> \(buildFlag: BuildFlags.Type) -> \(step : Text )->
   let profileSuffix = Profiles.toSuffixUppercase profile in
   let prefix = "MinaArtifact" in
   merge {
-    Bookworm = [{ name = "${prefix}${profileSuffix}", key = "build-deb-pkg" }]
-    , Bullseye = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "build-deb-pkg" }]
-    , Buster = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "build-deb-pkg" }]
-    , Jammy = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "build-deb-pkg" }]
-    , Focal = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}", key = "build-deb-pkg" }]
+    Bookworm = [{ name = "${prefix}${profileSuffix}${BuildFlags.toSuffixUppercase buildFlag}", key = "${step}-deb-pkg" }]
+    , Bullseye = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase buildFlag}", key = "${step}-deb-pkg" }]
+    , Buster = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase buildFlag}", key = "${step}-deb-pkg" }]
+    , Jammy = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase buildFlag}", key = "${step}-deb-pkg" }]
+    , Focal = [{ name = "${prefix}${capitalName debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase buildFlag}", key = "${step}-deb-pkg" }]
   } debVersion
+
+let dependsOn = \(debVersion : DebVersion) -> \(profile : Profiles.Type) ->
+  dependsOnStep debVersion profile BuildFlags.Type.None "build"
 
 -- Most debian builds are only used for public releases
 -- so they don't need to be triggered by dirtyWhen on every change
@@ -46,6 +52,7 @@ let minimalDirtyWhen = [
   S.exactly "scripts/rebuild-deb" "sh",
   S.exactly "scripts/release-docker" "sh",
   S.exactly "buildkite/scripts/build-artifact" "sh",
+  S.exactly "buildkite/scripts/check-compatibility" "sh",
   -- Snark profiler dirtyWhen
   S.exactly "buildkite/src/Jobs/Test/RunSnarkProfiler" "dhall",
   S.exactly "buildkite/scripts/run-snark-transaction-profiler" "sh",
@@ -86,5 +93,6 @@ in
   , capitalName = capitalName
   , lowerName = lowerName
   , dependsOn = dependsOn
+  , dependsOnStep = dependsOnStep
   , dirtyWhen = dirtyWhen
 }

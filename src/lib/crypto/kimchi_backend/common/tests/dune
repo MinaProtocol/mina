@@ -1,0 +1,38 @@
+(tests
+ (names test_lookup_table_constraint_kind)
+ (libraries
+  ;; opam libraries
+  alcotest
+  bignum.bigint
+  core_kernel
+  base
+  digestif
+  ppx_inline_test.config
+  zarith
+  ;; local libraries
+  kimchi_bindings
+  kimchi_types
+  pasta_bindings
+  kimchi_backend.pasta
+  kimchi_backend.pasta.basic
+  kimchi_backend.gadgets_test_runner
+  kimchi_backend.pasta.constraint_system
+  bitstring_lib
+  snarky.intf
+  snarky.backendless
+  snarky_group_map
+  sponge
+  kimchi_backend
+  mina_version
+  base58_check
+  codable
+  random_oracle_input
+  snarky_log
+  group_map
+  snarky_curve
+  key_cache
+  snark_keys_header
+  tuple_lib
+  promise
+  kimchi_backend.common
+  ppx_version.runtime))

@@ -5,13 +5,12 @@
 
 let Prelude = ../External/Prelude.dhall
 
-let Mode = < PullRequest | Stable | PackageGeneration >
+let Mode = < PullRequest | Stable  >
 
 let capitalName = \(pipelineMode : Mode) ->
   merge {
     PullRequest = "PullRequest"
     , Stable = "Stable"
-    , PackageGeneration = "PackageGeneration"
   } pipelineMode
 
 in

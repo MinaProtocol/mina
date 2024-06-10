@@ -123,12 +123,6 @@ module Constraint_constants = struct
   [@@deriving yojson, sexp, ord, equal]
 end
 
-module Commits = struct
-  (** Commit identifiers *)
-  type t = { mina : string; marlin : string }
-  [@@deriving yojson, sexp, ord, equal]
-end
-
 let header_version = 1
 
 (** Header contents *)
@@ -136,9 +130,8 @@ type t =
   { header_version : int
   ; kind : Kind.t
   ; constraint_constants : Constraint_constants.t
-  ; commits : Commits.t
+  ; commit : string
   ; length : int
-  ; commit_date : string
   ; constraint_system_hash : string
   ; identifying_hash : string
   }
@@ -233,12 +226,8 @@ let%test_module "Check parsing of header" =
           ; account_creation_fee = Unsigned.UInt64.of_int 1
           ; fork = None
           }
-      ; commits =
-          { mina = "7e1fb2cd9138af1d0f24e78477efd40a2a0fcd07"
-          ; marlin = "75836c41fc4947acce9c938da1b2f506843e90ed"
-          }
+      ; commit = "7e1fb2cd9138af1d0f24e78477efd40a2a0fcd07"
       ; length = 4096
-      ; commit_date = "2020-01-01 00:00:00.000000Z"
       ; constraint_system_hash = "ABCDEF1234567890"
       ; identifying_hash = "ABCDEF1234567890"
       }

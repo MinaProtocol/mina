@@ -13,6 +13,7 @@ let Command = ../../Command/Base.dhall
 let Size = ../../Command/Size.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 
+
 let spec = DockerImage.ReleaseSpec::{
     service="leaderboard",
     step_key="leaderboard-docker-image"

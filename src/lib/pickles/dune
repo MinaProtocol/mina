@@ -3,9 +3,14 @@
  (name pickles)
  (public_name pickles)
  (modules_without_implementation
-   full_signature
-   type)
- (flags -warn-error +34+33+27)
+  full_signature
+  type
+  intf
+  pickles_intf)
+ (flags
+  (:standard -w +a-40..42-44
+             -warn-error +a-27)
+   -open Core_kernel)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -50,13 +55,12 @@
    pickles.limb_vector
    pickles_base
    kimchi_backend
-   mina_version
    base58_check
    codable
    random_oracle_input
    pickles.composition_types
    pickles.plonk_checks
-   pickles.one_hot_vector
+   pickles_base.one_hot_vector
    snarky_log
    group_map
    snarky_curve

@@ -5,7 +5,6 @@
  (libraries
    ;; opam libraries
    core
-   extlib
    sexplib0
    bin_prot.shape
    base.base_internalhash_types
@@ -28,7 +27,7 @@
    base58_check
    direction
    codable
-   mina_base_import
+   mina_base.import
    mina_numbers
    mina_stdlib
    data_hash_lib
