@@ -176,7 +176,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
             ~metadata:[ ("reason", `String "Already_in_frontier") ] ;
           [%log warn] ~metadata
             "Refusing to process the transition with hash $state_hash because \
-             is is already in the transition frontier" ;
+             it is already in the transition frontier" ;
           let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
             Cached.invalidate_with_failure cached_initially_validated_transition
           in

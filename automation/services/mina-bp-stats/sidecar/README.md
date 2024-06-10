@@ -12,7 +12,7 @@ The sidecar takes 2 approaches to configuration, a pair of envars, or a configur
 
 #### Envars
 - `MINA_BP_UPLOAD_URL` - The URL to upload block producer statistics to
-- `MINA_NODE_URL` - The URL that the sidecar will reach out to to get statistics from
+- `MINA_NODE_URL` - The URL that the sidecar will reach out to get statistics from
 
 #### Config File
 [config-file]: #config-file
