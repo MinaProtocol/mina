@@ -183,6 +183,10 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     assert (List.for_all locations ~f:Location.is_generic) ;
     get_raw_batch mdb locations
 
+  let remove { kvdb; depth; _ } location =
+    let key = Location.serialize ~ledger_depth:depth location in
+    Kvdb.remove kvdb ~key
+
   module Account_location = struct
     (** encodes a key, token_id pair as a location used as a database key, so
         we can find the account location associated with that key.

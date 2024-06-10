@@ -263,6 +263,15 @@ module Make (Inputs : Inputs_intf.S) = struct
           in
           if is_empty then None else Base.get ancestor location
 
+    let remove t location =
+      assert_is_attached t ;
+      let maps, _ancestor = maps_and_ancestor t in
+      match Map.find maps.accounts location with
+      | None ->
+          ()
+      | Some _account ->
+          failwith "masking_merkle_tree: remove not yet implemented"
+
     let self_find_or_batch_lookup self_find lookup_parent t ids =
       assert_is_attached t ;
       let maps, ancestor = maps_and_ancestor t in

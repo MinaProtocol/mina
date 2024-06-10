@@ -93,6 +93,8 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
 
     let get (T ((module Base), t)) = Base.get t
 
+    let remove (T ((module Base), t)) = Base.remove t
+
     let get_batch (T ((module Base), t)) = Base.get_batch t
 
     let get_uuid (T ((module Base), t)) = Base.get_uuid t
