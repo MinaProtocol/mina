@@ -1,13 +1,14 @@
 open Core_kernel
 
-(** Sync_status represent states interacting with peers in the coda protocol.
+(** Sync_status represent states interacting with peers in the Mina protocol.
     When the protocol is starting, the node should be in the CONNECT state
     trying to connect to a peer. Once it connects to a peer, the node should be
     in the LISTENING state waiting for peers to send a message to them. When
     the node receives a constant flow of messages, its state should be SYNCED.
     However, when the node is bootstrapping, its state is BOOTSTRAPPING. If it
-    hasn’t received messages for some time
-    (Mina_compile_config.inactivity_secs), then it is OFFLINE. *)
+    hasn’t received messages for some time (see [Mina_lib.offline_time]), then
+    it is OFFLINE.
+*)
 let to_string = function
   | `Connecting ->
       "Connecting"

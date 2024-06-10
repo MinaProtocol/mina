@@ -10,7 +10,7 @@ import (
 
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	ipld "github.com/ipfs/go-ipld-format"
 	logging "github.com/ipfs/go-log/v2"
 )
 
@@ -73,7 +73,12 @@ func (s *RootDownloadState) getTag() BitswapDataTag {
 }
 
 type BitswapState interface {
-	codanet.BitswapStorage
+	GetStatus(key [32]byte) (codanet.RootBlockStatus, error)
+	SetStatus(key [32]byte, value codanet.RootBlockStatus) error
+	DeleteStatus(key [32]byte) error
+	DeleteBlocks(keys [][32]byte) error
+	ViewBlock(key [32]byte, callback func([]byte) error) error
+	StoreDownloadedBlock(block blocks.Block) error
 	NodeDownloadParams() map[cid.Cid]map[root][]NodeIndex
 	RootDownloadStates() map[root]*RootDownloadState
 	MaxBlockSize() int
@@ -101,7 +106,7 @@ func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs Bitswa
 		bitswapLogger.Errorf("Tag %d is not supported by Bitswap downloader", tag)
 	}
 	if err := bs.SetStatus(root_, codanet.Partial); err != nil {
-		bitswapLogger.Debugf("Skipping download request for %s due to status: %w", codanet.BlockHashToCidSuffix(root_), err)
+		bitswapLogger.Debugf("Skipping download request for %s due to status: %s", codanet.BlockHashToCidSuffix(root_), err)
 		status, err := bs.GetStatus(root_)
 		if err == nil && status == codanet.Full {
 			bs.SendResourceUpdate(ipc.ResourceUpdateType_added, root_)
@@ -126,7 +131,7 @@ func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs Bitswa
 		remainingNodeCounter: 1,
 	}
 	handleError := func(err error) {
-		bitswapLogger.Errorf("Error initializing block download: %w", err)
+		bitswapLogger.Errorf("Error initializing block download: %s", err)
 		ClearRootDownloadState(bs, root_)
 	}
 	var rootBlock []byte
@@ -135,7 +140,7 @@ func kickStartRootDownload(root_ BitswapBlockLink, tag BitswapDataTag, bs Bitswa
 		copy(rootBlock, b)
 		return nil
 	}
-	if err := bs.ViewBlock(root_, rootBlockViewF); err != nil && err != blockstore.ErrNotFound {
+	if err := bs.ViewBlock(root_, rootBlockViewF); err != nil && err != (ipld.ErrNotFound{Cid: codanet.BlockHashToCid(root_)}) {
 		handleError(err)
 		return
 	}
@@ -246,6 +251,10 @@ func processDownloadedBlockStep(params map[root][]NodeIndex, block blocks.Block,
 func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 	bs.CheckInvariants()
 	id := block.Cid()
+	err := bs.StoreDownloadedBlock(block)
+	if err != nil {
+		bitswapLogger.Errorf("Failed to store block %s", id)
+	}
 	nodeDownloadParams := bs.NodeDownloadParams()
 	rootDownloadStates := bs.RootDownloadStates()
 	depthIndices := bs.DepthIndices()
@@ -307,10 +316,10 @@ func processDownloadedBlock(block blocks.Block, bs BitswapState) {
 			b, _ := blocks.NewBlockWithCid(blockBytes, childId)
 			blocksToProcess = append(blocksToProcess, b)
 		} else {
-			if err != blockstore.ErrNotFound {
+			if err != (ipld.ErrNotFound{Cid: codanet.BlockHashToCid(link)}) {
 				// we still schedule blocks for downloading
 				// this case should rarely happen in practice
-				bitswapLogger.Warnf("Failed to retrieve block %s from storage: %w", childId, err)
+				bitswapLogger.Warnf("Failed to retrieve block %s from storage: %s", childId, err)
 			}
 			toDownload = append(toDownload, childId)
 		}

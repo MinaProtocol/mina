@@ -3,7 +3,7 @@
  (public_name perf_histograms)
  (library_flags -linkall)
  (modules perf_histograms0 perf_histograms histogram rpc intf)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
 (libraries
    ;; opam libraries
    ppx_inline_test.config

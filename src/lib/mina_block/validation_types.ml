@@ -29,7 +29,7 @@ type ( 'time_received
       place). *)
    constraint
      'delta_block_chain =
-     [ `Delta_block_chain ] * (State_hash.t Non_empty_list.t, _) Truth.t
+     [ `Delta_block_chain ] * (State_hash.t Nonempty_list.t, _) Truth.t
    constraint
      'frontier_dependencies =
      [ `Frontier_dependencies ] * (unit, _) Truth.t
@@ -40,7 +40,8 @@ type fully_invalid =
   ( [ `Time_received ] * unit Truth.false_t
   , [ `Genesis_state ] * unit Truth.false_t
   , [ `Proof ] * unit Truth.false_t
-  , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.false_t
+  , [ `Delta_block_chain ]
+    * State_hash.t Mina_stdlib.Nonempty_list.t Truth.false_t
   , [ `Frontier_dependencies ] * unit Truth.false_t
   , [ `Staged_ledger_diff ] * unit Truth.false_t
   , [ `Protocol_versions ] * unit Truth.false_t )
@@ -50,7 +51,8 @@ type initial_valid =
   ( [ `Time_received ] * unit Truth.true_t
   , [ `Genesis_state ] * unit Truth.true_t
   , [ `Proof ] * unit Truth.true_t
-  , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+  , [ `Delta_block_chain ]
+    * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
   , [ `Frontier_dependencies ] * unit Truth.false_t
   , [ `Staged_ledger_diff ] * unit Truth.false_t
   , [ `Protocol_versions ] * unit Truth.true_t )
@@ -60,7 +62,8 @@ type almost_valid =
   ( [ `Time_received ] * unit Truth.true_t
   , [ `Genesis_state ] * unit Truth.true_t
   , [ `Proof ] * unit Truth.true_t
-  , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+  , [ `Delta_block_chain ]
+    * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
   , [ `Frontier_dependencies ] * unit Truth.true_t
   , [ `Staged_ledger_diff ] * unit Truth.false_t
   , [ `Protocol_versions ] * unit Truth.true_t )
@@ -70,7 +73,8 @@ type fully_valid =
   ( [ `Time_received ] * unit Truth.true_t
   , [ `Genesis_state ] * unit Truth.true_t
   , [ `Proof ] * unit Truth.true_t
-  , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+  , [ `Delta_block_chain ]
+    * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
   , [ `Frontier_dependencies ] * unit Truth.true_t
   , [ `Staged_ledger_diff ] * unit Truth.true_t
   , [ `Protocol_versions ] * unit Truth.true_t )
@@ -98,7 +102,8 @@ type fully_invalid_with_block =
   ( [ `Time_received ] * unit Truth.false_t
   , [ `Genesis_state ] * unit Truth.false_t
   , [ `Proof ] * unit Truth.false_t
-  , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.false_t
+  , [ `Delta_block_chain ]
+    * State_hash.t Mina_stdlib.Nonempty_list.t Truth.false_t
   , [ `Frontier_dependencies ] * unit Truth.false_t
   , [ `Staged_ledger_diff ] * unit Truth.false_t
   , [ `Protocol_versions ] * unit Truth.false_t )
@@ -108,7 +113,8 @@ type initial_valid_with_block =
   ( [ `Time_received ] * unit Truth.true_t
   , [ `Genesis_state ] * unit Truth.true_t
   , [ `Proof ] * unit Truth.true_t
-  , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+  , [ `Delta_block_chain ]
+    * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
   , [ `Frontier_dependencies ] * unit Truth.false_t
   , [ `Staged_ledger_diff ] * unit Truth.false_t
   , [ `Protocol_versions ] * unit Truth.true_t )
@@ -118,7 +124,8 @@ type almost_valid_with_block =
   ( [ `Time_received ] * unit Truth.true_t
   , [ `Genesis_state ] * unit Truth.true_t
   , [ `Proof ] * unit Truth.true_t
-  , [ `Delta_block_chain ] * State_hash.t Non_empty_list.t Truth.true_t
+  , [ `Delta_block_chain ]
+    * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
   , [ `Frontier_dependencies ] * unit Truth.true_t
   , [ `Staged_ledger_diff ] * unit Truth.false_t
   , [ `Protocol_versions ] * unit Truth.true_t )

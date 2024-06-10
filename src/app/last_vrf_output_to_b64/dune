@@ -1,0 +1,14 @@
+(executable
+ (package last_vrf_output_to_b64)
+ (name last_vrf_output_to_b64)
+ (public_name last_vrf_output_to_b64)
+ (libraries
+   ;; opam libraries
+   base64
+   core_kernel
+   hex
+   ;; local libraries
+ )
+ (preprocessor_deps ../../config.mlh)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_mina ppx_version)))

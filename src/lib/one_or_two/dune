@@ -12,7 +12,8 @@
   ppx_hash.runtime-lib
   sexplib0
   base.caml
-  )
+  ppx_version.runtime
+)
  (preprocess
   (pps ppx_base ppx_bin_prot ppx_version ppx_deriving.std ppx_deriving_yojson ppx_let))
  (instrumentation (backend bisect_ppx))

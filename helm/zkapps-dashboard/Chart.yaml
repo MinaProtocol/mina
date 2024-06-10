@@ -1,0 +1,11 @@
+apiVersion: v2
+name: zkapps-dashboard
+description: A Helm chart for Mina zkapps metrics
+type: application
+version: 0.1.2
+appVersion: "1.16.2"
+
+dependencies:
+  - name: postgresql
+    version: "*"
+    repository: "https://charts.bitnami.com/bitnami"

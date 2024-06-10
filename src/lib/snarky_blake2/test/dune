@@ -1,6 +1,6 @@
 (library
  (name snarky_blake2_tests)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries 
    base
