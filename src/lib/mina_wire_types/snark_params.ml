@@ -1,7 +1,6 @@
 module Tick = struct
   module Field = struct
     type t = Kimchi_pasta_basic.Fp.t
-
   end
 
   module Inner_curve = struct

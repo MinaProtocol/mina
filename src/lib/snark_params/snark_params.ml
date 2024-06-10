@@ -186,6 +186,7 @@ module Tick = struct
     let to_yojson = Kimchi_pasta_basic.Fp.to_yojson
 
     let of_yojson = Kimchi_pasta_basic.Fp.of_yojson
+
     let size_in_triples = Int.((size_in_bits + 2) / 3)
   end
 
