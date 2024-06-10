@@ -210,11 +210,110 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     }
 
-  let run network t =
-    let open Malleable_error.Let_syntax in
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.compiled
+  type network_config = Engine.Network_config.t
+
+  type setup =
+    { zkapp_command_create_accounts : Zkapp_command.t
+    ; zkapp_command_update_vk_proof : Zkapp_command.t
+    ; zkapp_command_update_vk_impossible : Zkapp_command.t
+    }
+
+  let setup (network_config : network_config) =
+    let open Async.Deferred.Let_syntax in
+    let get_key name =
+      Option.value_exn @@ Network_config.network_keypair name network_config
     in
+    let fish1 = get_key "fish1" in
+    let vk_proof = get_key "vk-proof" in
+    let vk_impossible = get_key "vk-impossible" in
+    let constraint_constants =
+      Network_config.constraint_constants network_config
+    in
+    let zkapp_command_create_accounts =
+      (* construct a Zkapp_command.t *)
+      let zkapp_keypairs =
+        List.init 3 ~f:(fun _ -> Signature_lib.Keypair.create ())
+      in
+      let amount = Currency.Amount.of_mina_int_exn 10 in
+      let nonce = Account.Nonce.zero in
+      let memo =
+        Signed_command_memo.create_from_string_exn "Zkapp create account"
+      in
+      let fee = Currency.Fee.of_nanomina_int_exn 20_000_000 in
+      let (zkapp_command_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t)
+          =
+        { sender = (fish1.keypair, nonce)
+        ; fee
+        ; fee_payer = None
+        ; amount
+        ; zkapp_account_keypairs = zkapp_keypairs
+        ; memo
+        ; new_zkapp_account = true
+        ; snapp_update = Account_update.Update.dummy
+        ; preconditions = None
+        ; authorization_kind = Signature
+        }
+      in
+      Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+        zkapp_command_spec
+    in
+    let%bind zkapp_command_update_vk_proof, zkapp_command_update_vk_impossible =
+      let snapp_update =
+        { Account_update.Update.dummy with
+          verification_key =
+            Zkapp_basic.Set_or_keep.Set
+              { data = Pickles.Side_loaded.Verification_key.dummy
+              ; hash = Zkapp_account.dummy_vk_hash ()
+              }
+        }
+      in
+      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
+      let amount = Currency.Amount.of_mina_int_exn 10 in
+      let memo = Signed_command_memo.create_from_string_exn "update vk proof" in
+      let (spec_proof : Transaction_snark.For_tests.Update_states_spec.t) =
+        { sender = (fish1.keypair, Account.Nonce.one)
+        ; fee
+        ; fee_payer = None
+        ; receivers = []
+        ; amount
+        ; zkapp_account_keypairs = [ vk_proof.keypair ]
+        ; memo
+        ; new_zkapp_account = false
+        ; snapp_update
+        ; current_auth = Signature
+        ; call_data = Snark_params.Tick.Field.zero
+        ; events = []
+        ; actions = []
+        ; preconditions = None
+        }
+      in
+      let spec_impossible =
+        { spec_proof with
+          zkapp_account_keypairs = [ vk_impossible.keypair ]
+        ; sender = (fish1.keypair, Account.Nonce.(succ one))
+        }
+      in
+      let%map vk_proof =
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_proof
+      and vk_impossible =
+        Transaction_snark.For_tests.update_states ~constraint_constants
+          spec_impossible
+      in
+      (vk_proof, vk_impossible)
+    in
+    Async.Deferred.return
+      { zkapp_command_create_accounts
+      ; zkapp_command_update_vk_proof
+      ; zkapp_command_update_vk_impossible
+      }
+
+  let run network t
+      { zkapp_command_create_accounts
+      ; zkapp_command_update_vk_proof
+      ; zkapp_command_update_vk_impossible
+      } =
+    let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
@@ -248,14 +347,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let timed5 =
       Core.String.Map.find_exn (Network.genesis_keypairs network) "timed5"
-    in
-    let vk_proof =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "vk-proof"
-    in
-    let vk_impossible =
-      Core.String.Map.find_exn
-        (Network.genesis_keypairs network)
-        "vk-impossible"
     in
     let sender = fish2.keypair in
     let receiver = fish1.keypair in
@@ -298,83 +389,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let raw_signature =
       Signed_command.sign_payload sender.private_key payload
       |> Signature.Raw.encode
-    in
-    let zkapp_command_create_accounts =
-      (* construct a Zkapp_command.t *)
-      let zkapp_keypairs =
-        List.init 3 ~f:(fun _ -> Signature_lib.Keypair.create ())
-      in
-      let constraint_constants = Network.constraint_constants network in
-      let amount = Currency.Amount.of_mina_int_exn 10 in
-      let nonce = Account.Nonce.zero in
-      let memo =
-        Signed_command_memo.create_from_string_exn "Zkapp create account"
-      in
-      let fee = Currency.Fee.of_nanomina_int_exn 20_000_000 in
-      let (zkapp_command_spec : Transaction_snark.For_tests.Deploy_snapp_spec.t)
-          =
-        { sender = (fish1.keypair, nonce)
-        ; fee
-        ; fee_payer = None
-        ; amount
-        ; zkapp_account_keypairs = zkapp_keypairs
-        ; memo
-        ; new_zkapp_account = true
-        ; snapp_update = Account_update.Update.dummy
-        ; preconditions = None
-        ; authorization_kind = Signature
-        }
-      in
-      Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-        zkapp_command_spec
-    in
-
-    let%bind zkapp_command_update_vk_proof, zkapp_command_update_vk_impossible =
-      let snapp_update =
-        { Account_update.Update.dummy with
-          verification_key =
-            Zkapp_basic.Set_or_keep.Set
-              { data = Pickles.Side_loaded.Verification_key.dummy
-              ; hash = Zkapp_account.dummy_vk_hash ()
-              }
-        }
-      in
-      let fee = Currency.Fee.of_nanomina_int_exn 1_000_000 in
-      let amount = Currency.Amount.of_mina_int_exn 10 in
-      let memo = Signed_command_memo.create_from_string_exn "update vk proof" in
-      let (spec_proof : Transaction_snark.For_tests.Update_states_spec.t) =
-        { sender = (fish1.keypair, Account.Nonce.one)
-        ; fee
-        ; fee_payer = None
-        ; receivers = []
-        ; amount
-        ; zkapp_account_keypairs = [ vk_proof.keypair ]
-        ; memo
-        ; new_zkapp_account = false
-        ; snapp_update
-        ; current_auth = Signature
-        ; call_data = Snark_params.Tick.Field.zero
-        ; events = []
-        ; actions = []
-        ; preconditions = None
-        }
-      in
-      let spec_impossible =
-        { spec_proof with
-          zkapp_account_keypairs = [ vk_impossible.keypair ]
-        ; sender = (fish1.keypair, Account.Nonce.(succ one))
-        }
-      in
-      let%map vk_proof =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_proof
-      and vk_impossible =
-        Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_impossible
-      in
-      (vk_proof, vk_impossible)
     in
     let wait_for_zkapp zkapp_command =
       let with_timeout =

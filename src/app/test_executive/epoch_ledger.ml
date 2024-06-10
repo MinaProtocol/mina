@@ -60,7 +60,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; proof_config = { proof_config_default with fork = Some fork_config }
     }
 
-  let run network t =
+  type network_config = Engine.Network_config.t
+
+  type setup = unit
+
+  let setup (_network_config : network_config) = Async.Deferred.return ()
+
+  let run network t () =
     let open Malleable_error.Let_syntax in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
