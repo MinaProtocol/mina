@@ -400,6 +400,8 @@ module Ledger = struct
 
     val index_of_account_exn : t -> account_id -> int
 
+    val remove : t -> Location.t -> unit
+
     (** meant to be a fast operation: the root hash is stored, rather
       than calculated dynamically
   *)

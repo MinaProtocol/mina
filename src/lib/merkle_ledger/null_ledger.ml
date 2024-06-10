@@ -105,6 +105,8 @@ end = struct
 
   let get_directory _ = None
 
+  let remove _ _ = failwith "remove: null ledgers cannot be mutated"
+
   let last_filled _t = None
 
   let close _t = ()
