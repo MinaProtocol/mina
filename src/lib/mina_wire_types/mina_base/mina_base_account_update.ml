@@ -2,7 +2,6 @@ module Authorization_kind = struct
   module V1 = struct
     (* field for Proof is a verification key hash *)
     type t = Signature | Proof of Snark_params.Tick.Field.t | None_given
-    [@@deriving yojson]
   end
 end
 
