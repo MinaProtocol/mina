@@ -2,9 +2,6 @@ module Tick = struct
   module Field = struct
     type t = Kimchi_pasta_basic.Fp.t
 
-    let to_yojson = Kimchi_pasta_basic.Fp.to_yojson
-
-    let of_yojson = Kimchi_pasta_basic.Fp.of_yojson
   end
 
   module Inner_curve = struct

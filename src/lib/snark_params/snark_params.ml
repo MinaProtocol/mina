@@ -183,10 +183,9 @@ module Tick = struct
     include Tick0.Field
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
-    let to_yojson = Mina_wire_types.Snark_params.Tick.Field.to_yojson
+    let to_yojson = Kimchi_pasta_basic.Fp.to_yojson
 
-    let of_yojson = Mina_wire_types.Snark_params.Tick.Field.of_yojson
-
+    let of_yojson = Kimchi_pasta_basic.Fp.of_yojson
     let size_in_triples = Int.((size_in_bits + 2) / 3)
   end
 
