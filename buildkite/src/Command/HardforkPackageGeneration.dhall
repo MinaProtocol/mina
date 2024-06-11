@@ -84,8 +84,8 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
           dirtyWhen = [ S.everything ]
         , path = "Release"
         , name = pipelineName
-        , tags = [ PipelineTag.Type.Release, PipelineTag.Type.Hardfork, PipelineTag.Type.Long ]
-        , mode = PipelineMode.Type.Stable
+        , tags = [ PipelineTag.Type.Release, PipelineTag.Type.Hardfork, PipelineTag.Type.Long, Pipeline.Type.PullRequest ]
+        , mode = PipelineMode.Type.PullRequest
         }
       , steps =
         [ Command.build
