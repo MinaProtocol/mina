@@ -166,8 +166,7 @@ module Make (Inputs : Inputs_intf.S) = struct
                 } )
 
     (** When [accumulated] is not configured, returns current [t.maps] and parent.
-
-                Otherwise, returns the [current] accumulator and [base]. *)
+        Otherwise, returns the [current] accumulator and [base]. *)
     let maps_and_ancestor t =
       actualize_accumulated t ;
       match t.accumulated with
