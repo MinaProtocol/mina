@@ -46,12 +46,14 @@ let dependsOn = \(debVersion : DebVersion) -> \(profile : Profiles.Type) ->
 let minimalDirtyWhen = [
   S.exactly "buildkite/src/Constants/DebianVersions" "dhall",
   S.exactly "buildkite/src/Constants/ContainerImages" "dhall",
-  S.exactly "buildkite/src/Command/MinaArtifact" "sh",
+  S.exactly "buildkite/src/Command/HardforkPackageGeneration" "dhall",
+  S.exactly "buildkite/src/Command/MinaArtifact" "dhall",
   S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact"),
   S.strictlyStart (S.contains "dockerfiles/stages"),
   S.exactly "scripts/rebuild-deb" "sh",
   S.exactly "scripts/release-docker" "sh",
   S.exactly "buildkite/scripts/build-artifact" "sh",
+  S.exactly "buildkite/scripts/build-hardfork-package" "sh",
   S.exactly "buildkite/scripts/check-compatibility" "sh",
   -- Snark profiler dirtyWhen
   S.exactly "buildkite/src/Jobs/Test/RunSnarkProfiler" "dhall",
