@@ -23,6 +23,7 @@ let Size = ./Size.dhall
 let Libp2p = ./Libp2pHelperBuild.dhall
 let DockerImage = ./DockerImage.dhall
 let DebianVersions = ../Constants/DebianVersions.dhall
+let DebianRepo = ../Constants/DebianRepo.dhall
 let Profiles = ../Constants/Profiles.dhall
 let Artifacts = ../Constants/Artifacts.dhall
 let Toolchain = ../Constants/Toolchain.dhall
@@ -133,6 +134,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
             , network = network_name
             , deb_codename = "${DebianVersions.lowerName debVersion}"
             , deb_profile = profile
+            , deb_repo = DebianRepo.Type.Local
             , step_key = "daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
             }
         , Command.build Command.Config::{
@@ -171,6 +173,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
             , network = network_name
             , deb_codename = "${DebianVersions.lowerName debVersion}"
             , deb_profile = profile
+            , deb_repo = DebianRepo.Type.Local
             , step_key = "archive-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
             }
         , DockerImage.generateStep
@@ -182,6 +185,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
               ]
             , service = "mina-rosetta"
             , network = network_name
+            , deb_repo = DebianRepo.Type.Local
             , deb_codename = "${DebianVersions.lowerName debVersion}"
             , step_key = "rosetta-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
             }
