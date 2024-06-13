@@ -89,6 +89,7 @@ module Make (Inputs : Inputs_intf.S) = struct
              This is used as a lookup cache. *)
     ; mutable accumulated : (accumulated_t[@sexp.opaque]) option
     ; mutable is_committing : bool
+    ; freed : Location.t Stack.t
     }
   [@@deriving sexp]
 
@@ -110,9 +111,12 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; accumulated = None
     ; maps = empty_maps ()
     ; is_committing = false
+    ; freed = Stack.create ()
     }
 
   let get_uuid { uuid; _ } = uuid
+
+  let _add_freed_location { freed; _ } location = Stack.push freed location
 
   module Attached = struct
     type parent = Base.t [@@deriving sexp]
@@ -663,6 +667,7 @@ module Make (Inputs : Inputs_intf.S) = struct
               ; current = acc.current
               } )
       ; is_committing = false
+      ; freed = Stack.create ()
       }
 
     let last_filled t =
