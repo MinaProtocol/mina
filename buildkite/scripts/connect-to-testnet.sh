@@ -24,7 +24,7 @@ esac
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
-apt-get install -y git apt-transport-https ca-certificates tzdata curl
+apt-get install -y git apt-transport-https ca-certificates tzdata curl gsutil
 
 git config --global --add safe.directory /workdir
 
