@@ -33,6 +33,10 @@ type input =
   ; genesis_ledger : Runtime_config.Ledger.t
   ; first_pass_ledger_hashes : Ledger_hash.t list [@default []]
   ; last_snarked_ledger_hash : Ledger_hash.t option [@default None]
+  ; target_epoch_ledger_hashes : (Ledger_hash.t * Ledger_hash.t) option
+        [@default None]
+  ; has_seen_staking_epoch_ledger_hash : bool * int64 [@default false, 0L]
+  ; has_seen_next_epoch_ledger_hash : bool * int64 [@default false, 0L]
   }
 [@@deriving yojson]
 
@@ -65,6 +69,23 @@ let create_ledger_as_list ledger =
   let%map accounts = Ledger.to_list ledger in
   List.map accounts ~f:(fun acc ->
       Genesis_ledger_helper.Accounts.Single.of_account acc None )
+
+module Epoch_ledger_hashes = struct
+  let has_seen_staking_epoch_ledger_hash = ref (false, 0L)
+
+  let has_seen_next_epoch_ledger_hash = ref (false, 0L)
+
+  let check_epoch_ledger_hashes ~target_epoch_ledger_hashes ~ledger_hash
+      ~global_slot =
+    match target_epoch_ledger_hashes with
+    | Some (staking, next) ->
+        if Ledger_hash.equal staking ledger_hash then
+          has_seen_staking_epoch_ledger_hash := (true, global_slot) ;
+        if Ledger_hash.equal next ledger_hash then
+          has_seen_next_epoch_ledger_hash := (true, global_slot)
+    | None ->
+        ()
+end
 
 module First_pass_ledger_hashes = struct
   (* ledger hashes after 1st pass, indexed by order of occurrence *)
@@ -136,7 +157,7 @@ let create_output ~target_epoch_ledgers_state_hash ~target_fork_state_hash
   ; target_epoch_data
   }
 
-let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
+let create_replayer_checkpoint ~ledger ~start_slot_since_genesis ~input :
     input Deferred.t =
   let%map accounts = create_ledger_as_list ledger in
   let genesis_ledger : Runtime_config.Ledger.t =
@@ -157,11 +178,19 @@ let create_replayer_checkpoint ~ledger ~start_slot_since_genesis :
   let last_snarked_ledger_hash =
     Some (First_pass_ledger_hashes.get_last_snarked_hash ())
   in
-  { target_epoch_ledgers_state_hash = None
-  ; start_slot_since_genesis
+  { input with
+    start_slot_since_genesis
   ; genesis_ledger
   ; first_pass_ledger_hashes
   ; last_snarked_ledger_hash
+  ; has_seen_staking_epoch_ledger_hash =
+      ( if fst !Epoch_ledger_hashes.has_seen_staking_epoch_ledger_hash then
+        !Epoch_ledger_hashes.has_seen_staking_epoch_ledger_hash
+      else input.has_seen_staking_epoch_ledger_hash )
+  ; has_seen_next_epoch_ledger_hash =
+      ( if fst !Epoch_ledger_hashes.has_seen_next_epoch_ledger_hash then
+        !Epoch_ledger_hashes.has_seen_next_epoch_ledger_hash
+      else input.has_seen_next_epoch_ledger_hash )
   }
 
 (* map from global slots (since genesis) to state hash, ledger hash, snarked ledger hash triples *)
@@ -603,7 +632,7 @@ let try_slot ~logger pool slot =
 
 let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
     ~max_canonical_slot ~checkpoint_output_folder_opt ~checkpoint_file_prefix
-    ~migration_mode =
+    ~migration_mode ~input =
   if
     migration_mode
     || Int64.( <= ) last_global_slot_since_genesis max_canonical_slot
@@ -612,7 +641,7 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
     let start_slot_since_genesis = Int64.succ last_global_slot_since_genesis in
     let%map replayer_checkpoint =
       let%map input =
-        create_replayer_checkpoint ~ledger ~start_slot_since_genesis
+        create_replayer_checkpoint ~ledger ~start_slot_since_genesis ~input
       in
       input_to_yojson input |> Yojson.Safe.pretty_to_string
     in
@@ -1232,7 +1261,7 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
               let write_checkpoint_file ~checkpoint_output_folder_opt
                   ~checkpoint_file_prefix ~migration_mode () =
                 let write_checkpoint () =
-                  write_replayer_checkpoint ~logger ~ledger
+                  write_replayer_checkpoint ~logger ~ledger ~input
                     ~last_global_slot_since_genesis ~max_canonical_slot
                     ~checkpoint_output_folder_opt ~checkpoint_file_prefix
                     ~migration_mode
@@ -1314,6 +1343,11 @@ let main ~input_file ~output_file_opt ~migration_mode ~archive_uri
                             (* the current ledger may become a snarked ledger *)
                             First_pass_ledger_hashes.add ~migration_mode
                               (Ledger.merkle_root ledger) ;
+                            Epoch_ledger_hashes.check_epoch_ledger_hashes
+                              ~target_epoch_ledger_hashes:
+                                input.target_epoch_ledger_hashes
+                              ~ledger_hash:(Ledger.merkle_root ledger)
+                              ~global_slot:last_global_slot_since_genesis ;
                             let%bind () =
                               update_staking_epoch_data ~logger pool
                                 ~last_block_id ~ledger ~staking_epoch_ledger
