@@ -64,4 +64,4 @@ $SUDO apt-get install --yes --allow-downgrades "${debs[@]}"
 
 
 # Cleaning up
-source ./scripts/debian/aptly.sh stop  --clean
+source ./scripts/debian/aptly.sh stop
