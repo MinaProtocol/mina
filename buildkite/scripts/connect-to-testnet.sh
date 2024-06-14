@@ -30,7 +30,7 @@ git config --global --add safe.directory /workdir
 
 source buildkite/scripts/export-git-env-vars.sh
 
-source buildkite/scripts/debian/install.sh "" "mina-${TESTNET_VERSION_NAME}" 0 "amd64"
+source buildkite/scripts/debian/install.sh "mina-${TESTNET_VERSION_NAME}" 0 "amd64"
 
 # Remove lockfile if present
 rm ~/.mina-config/.mina-lock ||:
