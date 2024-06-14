@@ -7,7 +7,7 @@ if [[ $# -ne 3 ]]; then
     exit 1
 fi
 
-TESTNET_VERSION_NAME="berkeley"
+TESTNET_VERSION_NAME="devnet"
 TESTNET_NAME=$1
 WAIT_BETWEEN_POLLING_GRAPHQL=$2
 WAIT_AFTER_FINAL_CHECK=$3
@@ -30,7 +30,7 @@ git config --global --add safe.directory /workdir
 
 source buildkite/scripts/export-git-env-vars.sh
 
-source buildkite/scripts/debian/install.sh "mina-${TESTNET_VERSION_NAME}" "amd64"
+source buildkite/scripts/debian/install.sh "" "mina-${TESTNET_VERSION_NAME}" 0 "amd64"
 
 # Remove lockfile if present
 rm ~/.mina-config/.mina-lock ||:
