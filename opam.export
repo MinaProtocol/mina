@@ -39,6 +39,7 @@ roots: [
   "sexp_diff_kernel.v0.14.0"
   "utop.2.9.1"
   "yojson.1.7.0"
+  "cid.0.1.0"
 ]
 installed: [
   "alcotest.1.1.0"
