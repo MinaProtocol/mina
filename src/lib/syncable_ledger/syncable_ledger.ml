@@ -156,6 +156,10 @@ module type S = sig
   val merkle_path_at_addr : 'a t -> addr -> merkle_path Or_error.t
 
   val get_account_at_addr : 'a t -> addr -> account Or_error.t
+
+  val waiting_parents : 'a t -> int Int.Table.t * int Int.Table.t
+
+  val waiting_content : 'a t -> int Int.Table.t * int Int.Table.t
 end
 
 (*
@@ -351,6 +355,67 @@ end = struct
           None
   end
 
+  module Waiting : sig
+    type 'a t
+
+    val create : unit -> 'a t
+
+    val clear : 'a t -> unit
+
+    val add_exn : 'a t -> key:Addr.t -> data:'a -> unit
+
+    val find : 'a t -> Addr.t -> 'a option
+
+    val find_exn : 'a t -> Addr.t -> 'a
+
+    val remove : 'a t -> Addr.t -> unit
+
+    val added_and_removed : 'a t -> int Int.Table.t * int Int.Table.t
+  end = struct
+    type 'a t =
+      { table : 'a Addr.Table.t
+      ; added : int Int.Table.t
+      ; removed : int Int.Table.t
+      }
+
+    let create () =
+      { table = Addr.Table.create ()
+      ; added = Int.Table.create ()
+      ; removed = Int.Table.create ()
+      }
+
+    let clear { table; added; removed } =
+      Addr.Table.clear table ; Int.Table.clear added ; Int.Table.clear removed
+
+    let add_exn { table; added; removed = _ } ~key ~data =
+      Addr.Table.add_exn table ~key ~data ;
+      Int.Table.update added (Addr.depth key) ~f:(function
+        | None ->
+            1
+        | Some x ->
+            x + 1 )
+
+    let find { table; added = _; removed = _ } addr = Addr.Table.find table addr
+
+    let find_exn { table; added = _; removed = _ } addr =
+      Addr.Table.find_exn table addr
+
+    let remove { table; added; removed } addr =
+      Addr.Table.remove table addr ;
+      Int.Table.update added (Addr.depth addr) ~f:(function
+        | None ->
+            0
+        | Some x ->
+            x - 1 ) ;
+      Int.Table.update removed (Addr.depth addr) ~f:(function
+        | None ->
+            1
+        | Some x ->
+            x + 1 )
+
+    let added_and_removed { added; removed; table = _ } = (added, removed)
+  end
+
   type 'a t =
     { mutable desired_root : Root_hash.t option
     ; mutable auxiliary_data : 'a option
@@ -363,13 +428,19 @@ end = struct
         (Root_hash.t * query * answer Envelope.Incoming.t) Linear_pipe.Writer.t
     ; queries : (Root_hash.t * query) Linear_pipe.Writer.t
     ; query_reader : (Root_hash.t * query) Linear_pipe.Reader.t
-    ; waiting_parents : Hash.t Addr.Table.t
+    ; waiting_parents : Hash.t Waiting.t
           (** Addresses we are waiting for the children of, and the expected
               hash of the node with the address. *)
-    ; waiting_content : Hash.t Addr.Table.t
+    ; waiting_content : Hash.t Waiting.t
     ; mutable validity_listener :
         [ `Ok | `Target_changed of Root_hash.t option * Root_hash.t ] Ivar.t
     }
+
+  let waiting_parents { waiting_parents; _ } =
+    Waiting.added_and_removed waiting_parents
+
+  let waiting_content { waiting_content; _ } =
+    Waiting.added_and_removed waiting_content
 
   let t_of_sexp _ = failwith "t_of_sexp: not implemented"
 
@@ -393,7 +464,7 @@ end = struct
         ; ("hash", Hash.to_yojson expected)
         ]
       "Expecting children parent $parent_address, expected: $hash" ;
-    Addr.Table.add_exn t.waiting_parents ~key:parent_addr ~data:expected
+    Waiting.add_exn t.waiting_parents ~key:parent_addr ~data:expected
 
   let expect_content : 'a t -> Addr.t -> Hash.t -> unit =
    fun t addr expected ->
@@ -401,7 +472,7 @@ end = struct
       ~metadata:
         [ ("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected) ]
       "Expecting content addr $address, expected: $hash" ;
-    Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
+    Waiting.add_exn t.waiting_content ~key:addr ~data:expected
 
   (** Given an address and the accounts below that address, fill in the tree
       with them. *)
@@ -412,12 +483,12 @@ end = struct
       -> [ `Success
          | `Hash_mismatch of Hash.t * Hash.t  (** expected hash, actual *) ] =
    fun t addr content ->
-    let expected = Addr.Table.find_exn t.waiting_content addr in
+    let expected = Waiting.find_exn t.waiting_content addr in
     (* TODO #444 should we batch all the updates and do them at the end? *)
     (* We might write the wrong data to the underlying ledger here, but if so
        we'll requeue the address and it'll be overwritten. *)
     MT.set_all_accounts_rooted_at_exn t.tree addr content ;
-    Addr.Table.remove t.waiting_content addr ;
+    Waiting.remove t.waiting_content addr ;
     [%log' trace t.logger]
       ~metadata:
         [ ("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected) ]
@@ -452,7 +523,7 @@ end = struct
     in
     let expected =
       Option.value_exn ~message:"Forgot to wait for a node"
-        (Addr.Table.find t.waiting_parents parent_addr)
+        (Waiting.find t.waiting_parents parent_addr)
     in
     let merged_hash =
       (* Height here is the height of the things we're merging, so one less than
@@ -469,7 +540,7 @@ end = struct
         [ (la, lh); (ra, rh) ]
         |> List.filter ~f:(Tuple2.uncurry should_fetch_children)
       in
-      Addr.Table.remove t.waiting_parents parent_addr ;
+      Waiting.remove t.waiting_parents parent_addr ;
       `Good subtrees_to_fetch )
     else `Hash_mismatch (expected, merged_hash)
 
@@ -525,10 +596,10 @@ end = struct
     (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
     let actual = complete_with_empties content_hash height (MT.depth t.tree) in
     if Hash.equal actual rh then (
-      Addr.Table.clear t.waiting_parents ;
+      Waiting.clear t.waiting_parents ;
       (* We should use this information to set the empty account slots empty and
          start syncing at the content root. See #1972. *)
-      Addr.Table.clear t.waiting_content ;
+      Waiting.clear t.waiting_content ;
       handle_node t (Addr.root ()) rh ;
       `Success )
     else `Hash_mismatch (rh, actual)
@@ -744,8 +815,8 @@ end = struct
       ; answer_writer = aw
       ; queries = qw
       ; query_reader = qr
-      ; waiting_parents = Addr.Table.create ()
-      ; waiting_content = Addr.Table.create ()
+      ; waiting_parents = Waiting.create ()
+      ; waiting_content = Waiting.create ()
       ; validity_listener = Ivar.create ()
       }
     in

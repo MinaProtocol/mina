@@ -120,8 +120,17 @@ type t =
   ; in_memory_reverse_structured_log_messages_for_integration_test :
       (int * string list * bool) ref
   ; vrf_evaluation_state : Block_producer.Vrf_evaluation_state.t
+  ; bootstrap_stats_fetcher :
+      (   unit
+       -> (int Int.Table.t * int Int.Table.t)
+          * (int Int.Table.t * int Int.Table.t) )
+      option
+      ref
   }
 [@@deriving fields]
+
+let bootstrap_stats t =
+  match !(t.bootstrap_stats_fetcher) with None -> None | Some f -> Some (f ())
 
 let vrf_evaluation_state t = t.vrf_evaluation_state
 
@@ -1486,6 +1495,7 @@ let create ?wallets (config : Config.t) =
             @@ start_filtered_log
                  in_memory_reverse_structured_log_messages_for_integration_test
                  config.start_filtered_logs ;
+          let bootstrap_stats_fetcher = ref None in
           let%bind prover =
             Monitor.try_with ~here:[%here]
               ~rest:
@@ -2021,7 +2031,7 @@ let create ?wallets (config : Config.t) =
               ~producer_transition_reader ~most_recent_valid_block
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ()
+              ~notify_online ~bootstrap_stats_fetcher ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -2281,6 +2291,7 @@ let create ?wallets (config : Config.t) =
             ; in_memory_reverse_structured_log_messages_for_integration_test
             ; vrf_evaluation_state =
                 Block_producer.Vrf_evaluation_state.create ()
+            ; bootstrap_stats_fetcher
             } ) )
 
 let net { components = { net; _ }; _ } = net

@@ -119,7 +119,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
     ~verified_transition_writer ~clear_reader ~transition_reader_ref
     ~transition_writer_ref ~consensus_local_state ~frontier_w
     ~initial_root_transition ~persistent_root ~persistent_frontier
-    ~best_seen_transition ~catchup_mode =
+    ~best_seen_transition ~catchup_mode ~bootstrap_stats_fetcher =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
@@ -153,7 +153,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
        ~trust_system ~verifier ~network ~consensus_local_state
        ~transition_reader:!transition_reader_ref ~persistent_frontier
        ~persistent_root ~initial_root_transition ~best_seen_transition
-       ~catchup_mode )
+       ~catchup_mode ~bootstrap_stats_fetcher )
     (fun (new_frontier, collected_transitions) ->
       Strict_pipe.Writer.kill !transition_writer_ref ;
       start_transition_frontier_controller
@@ -341,7 +341,8 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
     ~producer_transition_writer_ref ~clear_reader ~verified_transition_writer
     ~transition_reader_ref ~transition_writer_ref
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
-    ~consensus_local_state ~catchup_mode ~notify_online =
+    ~consensus_local_state ~catchup_mode ~notify_online ~bootstrap_stats_fetcher
+    =
   let open Context in
   [%log info] "Initializing transition router" ;
   let%bind () =
@@ -376,7 +377,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~verified_transition_writer ~clear_reader ~transition_reader_ref
         ~consensus_local_state ~transition_writer_ref ~frontier_w
         ~persistent_root ~persistent_frontier ~initial_root_transition
-        ~catchup_mode ~best_seen_transition:best_tip
+        ~catchup_mode ~best_seen_transition:best_tip ~bootstrap_stats_fetcher
   | best_tip, Some frontier -> (
       match best_tip with
       | Some best_tip
@@ -407,7 +408,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
             ~clear_reader ~transition_reader_ref ~consensus_local_state
             ~transition_writer_ref ~frontier_w ~persistent_root
             ~persistent_frontier ~initial_root_transition ~catchup_mode
-            ~best_seen_transition:(Some best_tip)
+            ~best_seen_transition:(Some best_tip) ~bootstrap_stats_fetcher
       | _ ->
           if Option.is_some best_tip then
             [%log info]
@@ -517,7 +518,8 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
     ~producer_transition_reader
     ~most_recent_valid_block:
       (most_recent_valid_block_reader, most_recent_valid_block_writer)
-    ~get_completed_work ~catchup_mode ~notify_online () =
+    ~get_completed_work ~catchup_mode ~notify_online ~bootstrap_stats_fetcher ()
+    =
   let open Context in
   [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
@@ -597,7 +599,7 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
           ~catchup_mode ~producer_transition_writer_ref ~clear_reader
           ~verified_transition_writer ~transition_reader_ref
           ~transition_writer_ref ~most_recent_valid_block_writer
-          ~consensus_local_state ~notify_online
+          ~consensus_local_state ~notify_online ~bootstrap_stats_fetcher
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
       let valid_transition_reader1, valid_transition_reader2 =
@@ -664,7 +666,7 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
                           ~consensus_local_state ~frontier_w ~persistent_root
                           ~persistent_frontier ~initial_root_transition
                           ~best_seen_transition:(Some enveloped_transition)
-                          ~catchup_mode )
+                          ~catchup_mode ~bootstrap_stats_fetcher )
                       else Deferred.unit
                   | None ->
                       Deferred.unit
