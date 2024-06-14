@@ -44,7 +44,7 @@ function start_aptly() {
 
     aptly snapshot create $__component from repo $__repo
 
-    aptly publish snapshot -distribution=$__distribution -skip-signing $__component -architectures="amd64,i386"
+    aptly publish snapshot -distribution=$__distribution -skip-signing $__component -architectures="amd64"
 
     if [ $__background = 1 ]; then
         aptly serve -listen localhost:8080 &
