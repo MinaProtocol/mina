@@ -13,7 +13,7 @@ fi
 
 DEBS=$1
 USE_SUDO=${2:-0}
-ARCH=$3
+ARCH=${3:-""}
 
 
 if [ "$USE_SUDO" == "1" ]; then
