@@ -606,9 +606,9 @@ module Protocol_circuits = struct
     Genesis_constants.(Proof_level.Full, Constraint_constants.compiled)
 
   let print_hash print expected digest : unit =
-    if print then Format.printf "expected:\n%s\n\n" expected ;
-    Format.printf "obtained:\n%s\n" digest ;
-    ()
+    if print then (
+      Format.printf "expected:\n%s\n" expected ;
+      Format.printf "obtained:\n%s\n" digest )
 
   let blockchain () : unit =
     let expected = "36786c300e37c2a2f1341ad6374aa113" in

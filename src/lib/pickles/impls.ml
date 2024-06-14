@@ -128,6 +128,8 @@ module Step = struct
     in
     let typ = Typ.transport typ ~there:to_data ~back:of_data in
     Spec.ETyp.T (typ, (fun x -> of_data (f x)), fun x -> f_inv (to_data x))
+
+  module Async_promise = Async_generic (Promise)
 end
 
 module Wrap = struct

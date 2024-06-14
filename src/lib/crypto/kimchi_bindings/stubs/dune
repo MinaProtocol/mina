@@ -1,20 +1,11 @@
 ;; src/ contains no dune-related files
+;; kimchi-stubs-vendors contains the vendors for Kimchi stubs
 
-(data_only_dirs src)
+(data_only_dirs src kimchi-stubs-vendors)
 
 ;; Ignore target if it exists locally
 
-(dirs :standard \ target)
-
-;; we first create a `dune-build-root` file that contains the dune workspace root
-
-(rule
- (target dune-build-root)
- (deps
-  ; no sandbox, we want the path to the _build directory
-  (sandbox none))
- (action
-  (system "printf \"%s\" $(realpath %{workspace_root}/..) > %{target}")))
+(dirs :standard .cargo \ target)
 
 ;;
 ;; Rules to set the optimisation flags for the rust compiler.
@@ -55,6 +46,8 @@
   Cargo.toml
   rust-toolchain.toml
   (source_tree src)
+  (source_tree kimchi-stubs-vendors)
+  (source_tree .cargo)
   (source_tree ../../proof-systems)
   (env_var MARLIN_PLONK_STUBS))
  (locks /cargo-lock) ;; lock for rustup
@@ -62,14 +55,14 @@
   (progn
    (setenv
     CARGO_TARGET_DIR
-    "%{read:dune-build-root}/cargo_kimchi_stubs"
+    "%{read:../dune-build-root}/cargo_kimchi_stubs"
     (setenv
      RUSTFLAGS
      %{read:rustflags.sexp}
-     (run cargo build --release)))
+     (run cargo build --release --offline)))
    (run
     cp
-    %{read:dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a
+    %{read:../dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a
     .))))
 
 ;; this is used by nix
@@ -153,6 +146,8 @@
   Cargo.toml
   rust-toolchain.toml
   (source_tree src)
+  (source_tree kimchi-stubs-vendors)
+  (source_tree .cargo)
   (source_tree ../../proof-systems)
   (env_var MARLIN_PLONK_STUBS))
  (locks /cargo-lock) ;; lock for rustup
@@ -162,8 +157,8 @@
    (run rm -f ./Cargo.lock)
    (setenv
     CARGO_TARGET_DIR
-    "%{read:dune-build-root}/cargo_kimchi_bindgen"
-    (run cargo run %{targets}))
+    "%{read:../dune-build-root}/cargo_kimchi_bindgen"
+    (run cargo run %{targets} --offline))
    (run ocamlformat -i %{targets}))))
 
 ;; this is used by nix
