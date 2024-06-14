@@ -85,8 +85,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; depth : int
     ; mutable maps : maps_t
           (* If present, contains maps containing changes both for this mask
-             and for a few ancestors.
-             This is used as a lookup cache. *)
+             and for a few ancestors. This is used as a lookup cache. *)
     ; mutable accumulated : (accumulated_t[@sexp.opaque]) option
     ; mutable is_committing : bool
     ; freed : Location.t Stack.t
@@ -116,7 +115,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   let get_uuid { uuid; _ } = uuid
 
-  let _add_freed_location { freed; _ } location = Stack.push freed location
+  let add_freed_location { freed; _ } location = Stack.push freed location
 
   module Attached = struct
     type parent = Base.t [@@deriving sexp]
@@ -522,6 +521,8 @@ module Make (Inputs : Inputs_intf.S) = struct
                when allocating a location *)
         ; locations = Map.remove t.maps.locations account_id
         } ;
+      (* save newly unused location to local stack *)
+      add_freed_location t location ;
       (* reuse location if possible *)
       Option.iter t.current_location ~f:(fun curr_loc ->
           if Location.equal location curr_loc then
@@ -540,6 +541,16 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
           self_set_hash t addr hash )
+
+    (* One does not need to worry about the account being present in more than
+       one base *)
+    let[@warning "-32"] remove_account t account =
+      let maps, _ancestor = maps_and_ancestor t in
+      match Map.find maps.locations (Account.identifier account) with
+      | Some location ->
+          remove_account_and_update_hashes t location
+      | None ->
+          failwith "remove_account: recursive call not yet implemented"
 
     let set_account_unsafe t location account =
       assert_is_attached t ;
@@ -992,11 +1003,16 @@ module Make (Inputs : Inputs_intf.S) = struct
           | None -> (
               (* not in parent, create new location *)
               let maybe_location =
-                match last_filled t with
-                | None ->
-                    Some (first_location ~ledger_depth:t.depth)
-                | Some loc ->
-                    Location.next loc
+                (* first try to reuse one the reusable locations if one exists *)
+                match Stack.pop t.freed with
+                | Some _ as opt_loc ->
+                    opt_loc
+                | None -> (
+                    match last_filled t with
+                    | None ->
+                        Some (first_location ~ledger_depth:t.depth)
+                    | Some loc ->
+                        Location.next loc )
               in
               match maybe_location with
               | None ->
