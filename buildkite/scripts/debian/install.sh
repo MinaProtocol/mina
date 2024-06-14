@@ -13,6 +13,7 @@ fi
 
 DEBS=$1
 USE_SUDO=${2:-0}
+ARCH=$3
 
 
 if [ "$USE_SUDO" == "1" ]; then
@@ -52,7 +53,7 @@ $SUDO apt-get update
 $SUDO apt-get install -y aptly
 
 # Start aptly
-source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background
+source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --arch $ARCH --clean --background
 
 # Install debians
 echo "Installing mina packages: $DEBS"
