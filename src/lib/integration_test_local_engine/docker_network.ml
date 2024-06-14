@@ -52,6 +52,7 @@ module Node = struct
     | _ ->
         failwith "get_container_index_from_service_name: bad service name"
 
+  
   let dump_archive_data ~logger (t : t) ~data_file =
     let service_name = t.config.service_id in
     match t.config.postgres_connection_uri with
@@ -76,6 +77,14 @@ module Node = struct
     Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:13 cwd "docker"
       [ "logs"; container_id ]
 
+  let list_files ~logger container_id ~root =
+    let open Malleable_error.Let_syntax in
+    [%log info] "Listing files ( container: %s)" container_id ;
+    let%bind files =
+      run_in_container container_id
+        ~cmd:[ "ls"; root; ] in
+    return (files |> String.split ~on:'\n')
+ 
   let dump_mina_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
     let%bind container_id = get_container_id t.config.service_id in

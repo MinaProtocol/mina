@@ -24,7 +24,7 @@ module Coverage_manager = struct
              let%bind () = Node.stop pod in
              [%log' info t.logger] "Mina process in '$pod' killed."
                ~metadata:[ ("pod", `String pod_id) ] ;
-             let%bind files_in_root = Node.list_files pod root in
+             let%bind files_in_root = Node.list_files pod ~root in
              [%log' debug t.logger] "Listing files in  '$pod' '$list'"
                ~metadata:
                  [ ("pod", `String pod_id)

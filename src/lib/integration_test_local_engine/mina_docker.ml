@@ -4,6 +4,7 @@ open Currency
 open Signature_lib
 open Mina_base
 open Integration_test_lib
+open Coverage_manager
 
 let docker_swarm_version = "3.8"
 
@@ -32,6 +33,7 @@ module Network_config = struct
 
   type t =
     { debug_arg : bool
+    ; generate_code_coverage: bool
     ; genesis_keypairs :
         (Network_keypair.t Core.String.Map.t
         [@to_yojson
@@ -47,6 +49,7 @@ module Network_config = struct
   [@@deriving to_yojson]
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
+      ~(generate_code_coverage:bool)
       ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
       =
     let _ = cli_inputs in
@@ -553,6 +556,7 @@ module Network_config = struct
     in
     { debug_arg = debug
     ; genesis_keypairs
+    ; generate_code_coverage
     ; constants
     ; docker =
         { docker_swarm_version
@@ -648,6 +652,7 @@ module Network_manager = struct
     ; services_by_id : Docker_network.Service_to_deploy.t Core.String.Map.t
     ; mutable deployed : bool
     ; genesis_keypairs : Network_keypair.t Core.String.Map.t
+    ; generate_code_coverage : bool
     }
 
   let get_current_running_stacks =
@@ -1008,6 +1013,7 @@ module Network_manager = struct
       ; services_by_id
       ; deployed = false
       ; genesis_keypairs = network_config.genesis_keypairs
+      ; generate_code_coverage = network_config.generate_code_coverage
       }
     in
     [%log info] "Initializing docker swarm" ;
@@ -1094,7 +1100,20 @@ module Network_manager = struct
     let%bind () = File_system.remove_dir t.docker_dir in
     Deferred.unit
 
-  let destroy t =
+  let tear_down t network =
+    if t.generate_code_coverage then
+      let open Malleable_error.Let_syntax in
+      let coverage_manager = Coverage_manager.create ~logger:t.logger in
+      let%bind _ =
+        Coverage_manager.download_coverage_data_from_containers coverage_manager
+          ~nodes:(Docker_network.all_nodes network)
+      in
+      Malleable_error.ok_unit
+    else Malleable_error.ok_unit
+    
+  let destroy t network =
+    let open Malleable_error.Let_syntax in
+    let%bind () = tear_down t network in
     Deferred.Or_error.try_with ~here:[%here] (fun () -> destroy t)
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 end

@@ -114,10 +114,10 @@ module Node = struct
     let _ = Util.write_to_file target_file content in
     Malleable_error.return ()
 
-  let list_files node folder =
+  let list_files node ~root =
     let open Malleable_error.Let_syntax in
     let%map folder_content =
-      run_in_container node ~container_id:"mina" ~cmd:[ "ls"; folder ]
+      run_in_container node ~container_id:"mina" ~cmd:[ "ls"; root ]
     in
     String.split folder_content ~on:'\n'
 

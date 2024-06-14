@@ -405,7 +405,7 @@ let main inputs =
         [%log trace] "executing test" ;
         let%bind result = T.run network dsl in
         let open Malleable_error.Let_syntax in
-        let%bind () = Engine.Network_manager.tear_down net_manager network in
+        let%bind () = Engine.Network_manager.destroy net_manager network in
         Malleable_error.return result )
   in
 
