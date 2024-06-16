@@ -1,0 +1,32 @@
+{
+    "submodules": [
+        {
+            "name":"proof-systems", 
+            "branches":{
+                "develop":"develop",
+                "berkeley":"berkeley"
+            },
+            "pipeline":"Crypto Pipeline",
+            "token":"${WEBHOOK_SUBMODULE_TOKEN}"
+        }
+    ],
+    "github": {
+        "branches":{
+            "master" : "compatible",
+            "compatible" : "develop"
+        },
+        "dryrun": false,
+        "token":"${WEBHOOK_APP_TOKEN}",
+        "username":"${WEBHOOK_APP_USER}",
+        "repo":"${WEBHOOK_APP_REPO}",
+        "secret":"${WEBHOOK_APP_GITHUB_SECRET}"
+    },
+   "pr": {
+        "assignees": ["dkijania"],
+        "draft": false
+   },
+    "buildkite": {
+        "token":"...",
+        "org": "mina-foundation"
+    }
+}
