@@ -1,4 +1,12 @@
-(* test_mask.ml -- tests Merkle mask connected to underlying Merkle tree *)
+(* Testing
+   -------
+
+   Component: Merkle masks
+   Subject: Test Merkle mask connected to underlying Merkle tree
+   Invocation: \
+      dune exec src/lib/merkle_ledger_tests/main.exe -- \
+      test "Mask with underlying Merkle tree"
+*)
 
 open Core
 open Test_stubs
@@ -79,8 +87,7 @@ module Make (Test : Test_intf) = struct
     add_direction 0 false []
 
   let test_section_name =
-    Printf.sprintf "Test mask connected to underlying Merkle tree (depth:%d)"
-      Test.depth
+    Printf.sprintf "Mask with underlying Merkle tree (depth:%d)" Test.depth
 
   let test_stack = Stack.create ()
 

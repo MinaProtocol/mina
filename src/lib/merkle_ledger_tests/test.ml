@@ -3,7 +3,7 @@
 
    Component: Merkle ledger
    Subject: Test databases
-   Invocation: dune exec src/lib/merkle_ledger_tests/main.exe -- test "Db"
+   Invocation: dune exec src/lib/merkle_ledger_tests/main.exe -- test "Databases"
 *)
 
 open Core
@@ -80,5 +80,4 @@ let test_db () =
 
 let tests =
   let open Alcotest in
-  [ ("Db", [ test_case "Databases have equivalent hash values" `Quick test_db ])
-  ]
+  [ ("Databases", [ test_case "equivalent hash values" `Quick test_db ]) ]

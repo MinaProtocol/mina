@@ -1,3 +1,12 @@
+(* Testing
+   -------
+
+   Component: In memory database
+   Subject: Merkle ledger tests for in-memory database
+   Invocation: \
+     dune exec src/lib/merkle_ledger_tests/main.exe -- test "In-memory db"
+*)
+
 open Core
 open Test_stubs
 module Intf = Merkle_ledger.Intf
@@ -27,8 +36,7 @@ end
 module Make (Test : Test_intf) = struct
   module MT = Test.MT
 
-  let test_section_name =
-    Printf.sprintf "Test functor on in-mem db (depth %d)" Test.depth
+  let test_section_name = Printf.sprintf "In-memory db (depth %d)" Test.depth
 
   let test_stack = Stack.create ()
 
