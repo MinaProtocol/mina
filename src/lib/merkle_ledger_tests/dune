@@ -2,39 +2,56 @@
  (name merkle_ledger_tests)
  (public_name merkle_ledger_tests)
  (library_flags -linkall)
+ (modules (:standard \ "main"))
  (libraries
    ;; opam libraries
-   core
-   extlib
-   sexplib0
-   bin_prot.shape
-   base.base_internalhash_types
-   base.caml
-   core_kernel.uuid
-   core.uuid
-   ppx_inline_test.config
-   result
-   async_kernel
-   async_unix
-   async
-   core_kernel
-   ;; local libraries
-   merkle_ledger
-   merkle_mask
-   mina_base
-   signature_lib
-   currency
-   base58_check
-   direction
-   codable
-   mina_numbers
-   data_hash_lib
-   key_value_database
-   merkle_address
-)
+  alcotest
+  async
+  async_kernel
+  async_unix
+  base.base_internalhash_types
+  base.caml
+  bin_prot.shape
+  core
+  core.uuid
+  core_kernel
+  core_kernel.uuid
+  extlib
+  ppx_inline_test.config
+  result
+  sexplib0
+  ;; local libraries
+  base58_check
+  codable
+  currency
+  data_hash_lib
+  direction
+  key_value_database
+  merkle_address
+  merkle_ledger
+  merkle_mask
+  mina_base
+  mina_numbers
+  signature_lib
+  )
  (preprocess
   (pps ppx_version ppx_jane ppx_compare ppx_deriving.show ppx_deriving_yojson))
  (instrumentation (backend bisect_ppx))
  (inline_tests
   (libraries rocks))
  (synopsis "Testing account databases"))
+
+
+(tests
+ (names main)
+ (flags
+  (:standard -warn-error +a)
+  -open
+  Merkle_ledger_tests)
+ (libraries
+  alcotest
+  merkle_ledger_tests)
+ (modules main)
+ (action (run % {test}))
+ (instrumentation
+  (backend bisect_ppx)))
