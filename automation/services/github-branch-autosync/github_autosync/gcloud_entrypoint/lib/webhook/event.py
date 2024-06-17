@@ -10,7 +10,7 @@ class WebHookEvent:
         self.request = flask_request
 
     def info(self):
-        return GithubPayloadInfo(self.request)
+        return GithubPayloadInfo(self.request.json)
 
     def verify_signature(self, config):
         """Verify that the payload was sent from GitHub by validating SHA256.
