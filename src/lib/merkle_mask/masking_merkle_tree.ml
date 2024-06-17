@@ -1003,11 +1003,16 @@ module Make (Inputs : Inputs_intf.S) = struct
           | None -> (
               (* not in parent, create new location *)
               let maybe_location =
-                match last_filled t with
-                | None ->
-                    Some (first_location ~ledger_depth:t.depth)
-                | Some loc ->
-                    Location.next loc
+                (* first try to reuse one the reusable locations if one exists *)
+                match Stack.pop t.freed with
+                | Some _ as opt_loc ->
+                    opt_loc
+                | None -> (
+                    match last_filled t with
+                    | None ->
+                        Some (first_location ~ledger_depth:t.depth)
+                    | Some loc ->
+                        Location.next loc )
               in
               match maybe_location with
               | None ->

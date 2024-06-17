@@ -185,6 +185,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
 
   let remove { kvdb; depth; _ } location =
     let key = Location.serialize ~ledger_depth:depth location in
+    (* rehash something *)
     Kvdb.remove kvdb ~key
 
   module Account_location = struct
