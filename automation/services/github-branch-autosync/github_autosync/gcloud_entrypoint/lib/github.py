@@ -274,6 +274,8 @@ class Repository:
             print(f"{self.dryrun_suffix} name: '{branch_ref_name}'")
             print(f"{self.dryrun_suffix} head: '{from_branch_sha}'")
         else:
+            print(f"{branch_ref_name} -> {from_branch_sha}")
+
             self.inner.create_git_ref(branch_ref_name, from_branch_sha)
 
     def compare(self, left_branch_ref, right_branch_ref):

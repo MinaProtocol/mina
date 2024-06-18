@@ -71,6 +71,7 @@ def handle_incoming_comment(payload_info, configuration):
                   f"those changes...")
 
             new_branch = f"{configuration.github.merge_branch_prefix}_{incoming_branch}_to_{stable_branch}"
+            print(f"creating porting branch: '{new_branch}' from '{stable_branch}'")
             github_api.create_new_branch(new_branch,stable_branch)
             print(f"new porting branch: '{new_branch}' created.")
             porting_branches.append((new_branch,stable_branch,incoming_branch))
