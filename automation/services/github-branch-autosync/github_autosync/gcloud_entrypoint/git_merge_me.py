@@ -25,7 +25,7 @@ def handle_request(request, configuration=None):
     print(f"DEBUG: incoming branch {event.info().incoming_branch}")
 
     if event.is_push_event():
-        print("Push event detected. It might be a push from merge branch")
+        print(f"Push event detected. It might be a push from merge branch {configuration.github.merge_branch_prefix} in {event.info().incoming_branch}")
         if configuration.github.merge_branch_prefix in event.info().incoming_branch:
             handle_incoming_push(event.info().incoming_branch, configuration)
         else:
