@@ -59,6 +59,7 @@ echo "Installing mina packages: $DEBS"
 echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | $SUDO tee /etc/apt/sources.list.d/mina.list
 
 $SUDO apt-get update --yes
+$SUDO apt-get remove "${debs[@]}"
 $SUDO apt-get install --yes --allow-downgrades "${debs[@]}"
 
 
