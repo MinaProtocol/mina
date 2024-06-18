@@ -1,6 +1,5 @@
 """ Main module for handling incoming GitHub webhook event"""
-from parse import parse
-
+import re
 from .lib import WebHookEvent, config, GithubApi
 
 
@@ -91,9 +90,12 @@ def handle_incoming_push(merge_branch, configuration):
 
     github_api = GithubApi(configuration.github)
 
-    format_str = configuration.github.merge_branch_prefix + "_{}_to_{}"
-    print(f"DEBUG: {format_str} {merge_branch}")
-    original_branch, stable_branch = parse(format_str, merge_branch)
+    pattern = re.compile(f"{configuration.github.merge_branch_prefix}_(?P<head>.*)_to_(?P<base>.*)")
+    match = pattern.match("port_ci/master/move_merges_cleanly_check_from_berk_to_master_to_develop")
+    original_branch = match.group("head")
+    stable_branch = match.group("base")
+
+    print(f"DEBUG: {original_branch} {stable_branch}")
 
     if github_api.repository().any_pulls(merge_branch, stable_branch):
         print("PR already exists. exiting")
