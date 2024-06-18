@@ -147,10 +147,12 @@ class GithubApi:
 ## {branch} 
 
 ```
-git fetch
-git checkout {base}
-git merge {conflicting_branch}
-(Resolve conflict)
+git fetch && git checkout {base} && git merge {conflicting_branch}
+```
+
+Resolve conflict and then 
+
+```
 git push
 ```  
     """

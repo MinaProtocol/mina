@@ -91,7 +91,7 @@ def handle_incoming_push(merge_branch, configuration):
     github_api = GithubApi(configuration.github)
 
     pattern = re.compile(f"{configuration.github.merge_branch_prefix}_(?P<head>.*)_to_(?P<base>.*)")
-    match = pattern.match("port_ci/master/move_merges_cleanly_check_from_berk_to_master_to_develop")
+    match = pattern.match(merge_branch)
     original_branch = match.group("head")
     stable_branch = match.group("base")
 
