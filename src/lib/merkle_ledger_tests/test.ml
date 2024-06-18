@@ -2,7 +2,7 @@
    -------
 
    Component: Merkle ledger
-   Subject: Test databases
+   Subject: Database integration testing
    Invocation: dune exec src/lib/merkle_ledger_tests/main.exe -- test "Databases"
 *)
 
@@ -79,5 +79,5 @@ let test_db () =
               assert (Hash.equal binary_hash db_hash) ) ) )
 
 let tests =
-  let open Alcotest in
-  [ ("Databases", [ test_case "equivalent hash values" `Quick test_db ]) ]
+  [ ("Databases", [ Alcotest.test_case "equivalent hash values" `Quick test_db ])
+  ]

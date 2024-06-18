@@ -325,8 +325,8 @@ module Make (Test : Test_intf) = struct
   let () =
     add_test
       "when database is full, \
-       set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) "
-      (fun () ->
+       set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) \
+       = accounts " (fun () ->
         Test.with_instance (fun mdb ->
             let max_height = Int.min (MT.depth mdb) 5 in
             populate_db mdb max_height ;
