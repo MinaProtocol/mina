@@ -14,10 +14,10 @@ class GithubPayloadInfo(object):
     @property
     def incoming_branch(self):
         """
-            Gets full branch id (/refs/head/{})
+            Gets full branch id (refs/head/{})
         """
         branch_id = self.data["ref"]
-        return str.split(branch_id, "/")[2]
+        return str.replace(branch_id, "refs/head/", "")
 
     @property
     def comment_body(self):

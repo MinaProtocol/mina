@@ -23,6 +23,7 @@ def handle_request(request, configuration=None):
 
     print(f"DEBUG: is comment event {event.is_comment_event()}")
     print(f"DEBUG: is push event {event.is_push_event()}")
+    print(f"DEBUG: incoming branch {event.info().incoming_branch}")
 
     if event.is_push_event():
         print("Push event detected. It might be a push from merge branch")
@@ -91,7 +92,7 @@ def handle_incoming_push(merge_branch, configuration):
     github_api = GithubApi(configuration.github)
 
     format_str = configuration.github.merge_branch_prefix + "_{}_to_{}"
-
+    print(f"DEBUG: {format_str} {merge_branch}")
     original_branch, stable_branch = parse(format_str, merge_branch)
 
     if github_api.repository().any_pulls(merge_branch, stable_branch):
