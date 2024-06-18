@@ -63,8 +63,8 @@ def handle_incoming_commit_push_in_stable_branches(source_branch,configuration):
     if cmp.status == "identical":
         print(f"'{target_branch}' and '{source_branch}' branches are identical. No action to perform.")
         return
-    if cmp.status == "behind":
-        print(f"'{target_branch}' is behind '{source_branch}'. creating PR ...")
+    if cmp.status in ["behind","diverged"]:
+        print(f"'{target_branch}' is behind or diverged to '{source_branch}'. creating PR ...")
         pr = github.create_pull_request(
             draft=configuration.pr.draft,
             labels=["sync"],
@@ -75,6 +75,8 @@ def handle_incoming_commit_push_in_stable_branches(source_branch,configuration):
             assignees=configuration.pr.assignees
         )
         print(f'Pull request created: {pr.title}')
+        print('triggering build')
+        pr.create_issue_comment("!ci-build-me")
 
     if cmp.status == "ahead":
         print(f"'{target_branch}' is ahead of '{source_branch}'. No action to perform.")

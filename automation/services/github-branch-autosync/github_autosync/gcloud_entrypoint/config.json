@@ -15,6 +15,7 @@
             "master" : "compatible",
             "compatible" : "develop"
         },
+        "merge_branch_prefix": "merge/port",
         "dryrun": false,
         "token":"${WEBHOOK_APP_TOKEN}",
         "username":"${WEBHOOK_APP_USER}",

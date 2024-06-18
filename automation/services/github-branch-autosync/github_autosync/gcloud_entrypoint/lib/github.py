@@ -93,6 +93,19 @@ class GithubApi:
             timeout=60)
         return "Able to merge" not in res.text
 
+    def merge(self, base, head, message):
+        """
+            Merges head branch to base branch
+
+            Parameters:
+                message:
+                base (string): base branch name
+                head (string): head branch name
+                commit (string): commit message
+
+        """
+        self.repository().merge(base, head, message)
+
     def create_new_branch(self, branch_name, from_branch):
         """
             Creates new branch
@@ -127,23 +140,19 @@ class GithubApi:
           Template for issue comment after conflict in PR is detected
         """
         content = alert_header + """
-<table>
-  <tr>
-    <th>Pull request name</th>
-    <th> Porting branch name</th>
-    <th> Conflicting branch </th>
-  </tr>
 """
-        for (url, base, branch) in data:
+        for (base, branch, conflicting_branch) in data:
             content = content + f"""
-   <tr>
-        <td> <a href="{url}"> {url} </a> </td>
-        <td> {base}  </td>
-        <td> {branch} </td>
-    </tr>
-    """
-        content = content + """
-</table>
+  
+## {branch} 
+
+```
+git fetch
+git checkout {base}
+git merge {conflicting_branch}
+(Resolve conflict)
+git push
+```  
     """
         return content
 
@@ -167,7 +176,10 @@ class GithubApi:
         separator = ", "
         body = body_prefix + "\n" + separator.join(assignee_tags)
         return self.repository().create_pull(title=title, body=body, base=base, head=head, draft=draft,
-                                      assignees=assignees, labels=labels)
+                                             assignees=assignees, labels=labels)
+
+    def comment(self, pr):
+        pass
 
 
 class Repository:
@@ -189,17 +201,37 @@ class Repository:
     def get_branches(self):
         return self.inner.get_branches()
 
-    def get_pulls_from(self, head, open, draft):
+    def any_pulls(self, head, base):
         """
             Get prs with given head and  state
 
             Parameters:
                 head (string): head branch name
-                open (Bool): is opened
-                draft (Bool): is draft PR
+                base (Bool): base branch
         """
-        state = "open" if open else "closed"
-        return filter(lambda x: x.draft == draft and x.head.ref == head, self.inner.get_pulls(state, head))
+        return any(filter(lambda x: x.head.ref == head and x.base.ref == base,self.inner.get_pulls()))
+
+    def get_pull(self, head, base):
+        """
+            Get prs with given head and  state
+
+            Parameters:
+                head (string): head branch name
+                base (Bool): base branch
+        """
+        pulls = filter(lambda x: x.head.ref == head and x.base.ref == base,self.inner.get_pulls())
+        return pulls[0] if any(pulls) else None
+
+    def get_pull_from(self, head):
+        """
+            Get prs with given head and  state
+
+            Parameters:
+                head (string): head branch name
+                base (Bool): base branch
+        """
+        pulls = list(filter(lambda x: x.head.ref == head,self.inner.get_pulls()))
+        return pulls[0] if any(pulls) else None
 
     def get_pull_by_id(self, id):
         """
@@ -209,6 +241,12 @@ class Repository:
                 id (int): pull request id
         """
         return self.inner.get_pull(id)
+
+    def merge(self, base, head, message):
+        if self.dryrun:
+            print(f'{self.dryrun_suffix} Merge {head} to {base} with message {message}')
+        else:
+            self.inner.merge(base, head, message)
 
     def create_pull(self, title, body, base, head, draft, assignees, labels):
         if self.dryrun:

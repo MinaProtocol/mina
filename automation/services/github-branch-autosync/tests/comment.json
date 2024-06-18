@@ -9,8 +9,8 @@
     "html_url": "https://github.com/MinaProtocol/mina/pull/15750",
     "id": 2355981618,
     "node_id": "PR_kwDOBtRfTs5ynvb2",
-    "number": 15750,
-    "title": "Merge pull request #15415 from MinaProtocol/berkeley",
+    "number": 15754,
+    "title": "Properly use MINA_BUILD_MAINNET flag",
     "user": {
       "login": "dkijania",
       "id": 20424186,

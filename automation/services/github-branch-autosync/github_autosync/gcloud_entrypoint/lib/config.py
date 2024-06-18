@@ -52,6 +52,7 @@ class SubModule:
 @dataclass(frozen=True)
 class Github:
     dryrun: bool
+    merge_branch_prefix: str
     token: str
     username: str
     repo: str
@@ -60,6 +61,7 @@ class Github:
 
     def all_branches(self):
         return set(self.branches.keys()).union(set(self.branches.values()))
+
 
 '''
 Specific settings for PR creation (if there is necessity to do it based on current repo situation).
