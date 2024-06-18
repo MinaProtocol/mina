@@ -12,6 +12,20 @@ class WebHookEvent:
     def info(self):
         return GithubPayloadInfo(self.request.json)
 
+    @staticmethod
+    def verify_signature_header(repo,config,signature_header,data):
+        secret_token = config.get_secret_token_for_repo(repo)
+
+        if secret_token is None:
+            raise HTTPException(f"cannot find secret token in configuration for incoming repository {repo}")
+
+        if not signature_header:
+            raise HTTPException("x-hub-signature-256 header is missing!")
+        hash_object = hmac.new(secret_token.encode('utf-8'), msg=data, digestmod=hashlib.sha256)
+        expected_signature = "sha256=" + hash_object.hexdigest()
+        if not hmac.compare_digest(expected_signature, signature_header):
+            raise HTTPException(f"Request signatures didn't match! {expected_signature} vs {signature_header}")
+
     def verify_signature(self, config):
         """Verify that the payload was sent from GitHub by validating SHA256.
         
@@ -25,17 +39,7 @@ class WebHookEvent:
         payload_body = self.request.data
         signature_header = self.request.headers['x-hub-signature-256']
         repo = self.info().repository
-        secret_token = config.get_secret_token_for_repo(repo)
-
-        if secret_token is None:
-            raise HTTPException(f"cannot find secret token in configuration for incoming repository {repo}")
-
-        if not signature_header:
-            raise HTTPException("x-hub-signature-256 header is missing!")
-        hash_object = hmac.new(secret_token.encode('utf-8'), msg=payload_body, digestmod=hashlib.sha256)
-        expected_signature = "sha256=" + hash_object.hexdigest()
-        if not hmac.compare_digest(expected_signature, signature_header):
-            raise HTTPException("Request signatures didn't match!")
+        WebHookEvent.verify_signature_header(repo, config, signature_header,payload_body)
 
     def is_push_event(self):
         """ Verifies if request is push gitHub event """
@@ -43,4 +47,4 @@ class WebHookEvent:
 
     def is_comment_event(self):
         """ Verifies if request is comment gitHub event """
-        return "comment" == self.request.headers.get("X-GitHub-Event", "")
+        return "issue_comment" == self.request.headers.get("X-GitHub-Event", "")

@@ -15,9 +15,14 @@ def handle_request(request, configuration=None):
     """
     event = WebHookEvent(request)
     if configuration is None:
+        print("loading configuration")
         configuration = config.load('config.json')
 
+    print("verifying signature")
     event.verify_signature(configuration)
+
+    print(f"DEBUG: is comment event {event.is_comment_event()}")
+    print(f"DEBUG: is push event {event.is_push_event()}")
 
     if event.is_push_event():
         print("Push event detected. It might be a push from merge branch")
@@ -26,6 +31,7 @@ def handle_request(request, configuration=None):
         else:
             print("incoming branch is not a merge branch")
     elif event.is_comment_event() and event.info().comment_body.strip() == "!help-merge-me":
+        print("!help-merge-me command event detected")
         handle_incoming_comment(event.info(), configuration)
     else:
         print(f"not applicable event")

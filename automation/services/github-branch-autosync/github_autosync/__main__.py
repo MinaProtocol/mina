@@ -7,7 +7,7 @@ import sys
 from github_autosync.gcloud_entrypoint.lib.config import *
 from github_autosync.gcloud_entrypoint.git_merge_me import handle_incoming_comment,handle_incoming_push
 from github_autosync.gcloud_entrypoint.stable_branch import handle_incoming_commit_push_in_stable_branches
-from github_autosync.gcloud_entrypoint.lib import GithubPayloadInfo, config
+from github_autosync.gcloud_entrypoint.lib import GithubPayloadInfo, config, WebHookEvent
 
 main = argparse.ArgumentParser()
 
@@ -15,8 +15,10 @@ subparsers = main.add_subparsers(dest="subparser")
 
 verify = subparsers.add_parser('verify')
 verify.add_argument('--payload', "-p", type=str, help='test file from github webhook push event', required=False)
+verify.add_argument('--config', "-c", type=str, help='test file from github webhook push event', required=False)
 verify.add_argument('--secret', "-s", type=str, help='secret for calculating signature', required=False)
-verify.add_argument('--incoming_signature', "-i", type=str, help='payload signature', required=False)
+verify.add_argument('--incoming-signature', "-i", type=str, help='payload signature', required=False)
+verify.add_argument('--repository', "-r", type=str, help='test file from github webhook push event', required=False)
 
 help_merge_me = subparsers.add_parser('help-merge-me')
 
@@ -31,9 +33,9 @@ help_merge_me_push.add_argument('--incoming-branch', "-i", type=str, help='branc
 help_merge_me_push.add_argument('--config', "-c", type=str, help='configuration file', required=True)
 
 
-verify = subparsers.add_parser('sync')
-verify.add_argument('--incoming-branch', "-i", type=str, help='branch which received change', required=True)
-verify.add_argument('--config', "-c", type=str, help='configuration file', required=True)
+sync = subparsers.add_parser('sync')
+sync.add_argument('--incoming-branch', "-i", type=str, help='branch which received change', required=True)
+sync.add_argument('--config', "-c", type=str, help='configuration file', required=True)
 
 args = main.parse_args()
 
@@ -41,10 +43,10 @@ if args.subparser == "verify":
     if not os.path.isfile(args.payload):
         sys.exit(f'cannot find test file {args.payload}')
 
-    with open(args.payload, encoding="utf-8") as file:
-        data = json.load(file)
-        json_payload = json.dumps(data)
-        #verify_signature(json_payload, args.secret, "sha=" + args.incoming_signature)
+    with open(args.payload, "rb") as file:
+        data = file.read()
+        configuration = config.load(args.config)
+        WebHookEvent.verify_signature_header(args.repository,configuration,args.incoming_signature,data)
 
 elif args.subparser == "help-merge-me":
     if args.help_merge_me == "comment":
