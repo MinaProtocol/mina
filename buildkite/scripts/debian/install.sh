@@ -47,6 +47,11 @@ else
   done
 fi
 
+debs_with_version=()
+for i in "${debs[@]}"; do
+   debs_with_version+=("${i}_${MINA_DEB_VERSION}")
+done
+
 # Install aptly
 $SUDO apt-get update 
 $SUDO apt-get install -y aptly
@@ -60,7 +65,7 @@ echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | $SU
 
 $SUDO apt-get update --yes
 $SUDO apt-get remove "${debs[@]}"
-$SUDO apt-get install --yes --allow-downgrades "${debs[@]}"
+$SUDO apt-get install --yes --allow-downgrades "${debs_with_version[@]}"
 
 
 
