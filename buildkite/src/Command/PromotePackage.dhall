@@ -104,6 +104,21 @@ let promoteDebianStep = \(spec : PromoteDebianSpec.Type) ->
         `if` = spec.`if`
       }
 
+let promoteDebianVerificationStep = \(spec : PromoteDebianSpec.Type) ->
+    let name = if spec.remove_profile_from_name then "${Package.debianName spec.package Profiles.Type.Standard spec.network}" else (Package.debianName spec.package spec.profile spec.network)
+    in
+    Command.build
+      Command.Config::{
+        commands = [
+          Cmd.run "./scripts/debian/verify.sh --package ${name} --version ${spec.new_version} --codename ${DebianVersions.lowerName spec.codename}  --channel ${DebianChannel.lowerName spec.to_channel}"
+        ],
+        label = "Debian: ${spec.step_key}",
+        key = spec.step_key,
+        target = Size.Small,
+        depends_on = spec.deps,
+        `if` = spec.`if`
+      }
+
 let promoteDockerStep = \(spec : PromoteDockerSpec.Type) ->
     let old_tag = Artifact.dockerTag spec.name spec.version spec.codename spec.profile spec.network False
     let new_tag = Artifact.dockerTag spec.name spec.new_tag spec.codename spec.profile spec.network spec.remove_profile_from_name
@@ -121,8 +136,24 @@ let promoteDockerStep = \(spec : PromoteDockerSpec.Type) ->
         `if` = spec.`if`
       }
 
+let promoteDockerVerificationStep = \(spec : PromoteDockerSpec.Type) ->
+    let new_tag = Artifact.dockerTag spec.name spec.new_tag spec.codename spec.profile spec.network spec.remove_profile_from_name
+    let repo = if spec.publish then "docker.io/minaprotocol" else "gcr.io/o1labs-192920"
+    in
+    Command.build
+      Command.Config::{
+        commands = [
+          Cmd.run "docker pull ${repo}/${Artifact.dockerName spec.name}:${new_tag}"
+        ],
+        label = "Docker: ${spec.step_key}",
+        key = spec.step_key,
+        target = Size.Small,
+        depends_on = spec.deps,
+        `if` = spec.`if`
+      }
 
-let pipeline : List PromoteDebianSpec.Type -> 
+
+let promotePipeline : List PromoteDebianSpec.Type -> 
    List PromoteDockerSpec.Type -> 
    DebianVersions.DebVersion -> 
    PipelineMode.Type -> 
@@ -159,11 +190,53 @@ let pipeline : List PromoteDebianSpec.Type ->
         },
       steps = steps
     }
+
+let verifyPipeline : List PromoteDebianSpec.Type -> 
+   List PromoteDockerSpec.Type -> 
+   DebianVersions.DebVersion -> 
+   PipelineMode.Type -> 
+   Pipeline.Config.Type =   
+  \(debians_spec : List PromoteDebianSpec.Type) -> 
+  \(dockers_spec : List PromoteDockerSpec.Type) -> 
+  \(debVersion: DebianVersions.DebVersion) -> 
+  \(mode: PipelineMode.Type) ->
+     
+    let steps = 
+        (List/map
+            PromoteDebianSpec.Type
+            Command.Type
+            (\(spec: PromoteDebianSpec.Type ) -> promoteDebianVerificationStep spec )
+            debians_spec
+        )
+         #
+         (List/map
+            PromoteDockerSpec.Type
+            Command.Type
+            (\(spec: PromoteDockerSpec.Type ) -> promoteDockerVerificationStep spec )
+            dockers_spec
+          )
+    in
+    --- tags are empty on purpose not to allow run job from automatically triggered pipelines
+    Pipeline.Config::{
+      spec =
+        JobSpec::{
+          dirtyWhen = DebianVersions.dirtyWhen debVersion,
+          path = "Release",
+          name = "VerifyPackage",
+          tags = []: List PipelineTag.Type,
+          mode = mode
+        },
+      steps = steps
+    }
+
 in
 
 { promoteDebianStep = promoteDebianStep
   , promoteDockerStep = promoteDockerStep
-  , pipeline = pipeline
+  , promoteDebianVerificationStep = promoteDebianVerificationStep
+  , promoteDockerVerificationStep = promoteDockerVerificationStep
+  , promotePipeline = promotePipeline
+  , verifyPipeline = verifyPipeline
   , PromoteDebianSpec = PromoteDebianSpec 
   , PromoteDockerSpec = PromoteDockerSpec
 }
