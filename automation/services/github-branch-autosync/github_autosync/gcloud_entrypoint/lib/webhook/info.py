@@ -16,8 +16,11 @@ class GithubPayloadInfo(object):
         """
             Gets full branch id (refs/heads/{})
         """
-        branch_id = self.data["ref"]
-        return str.replace(branch_id, "refs/heads/", "")
+        if "ref" in self.data:
+            branch_id = self.data["ref"]
+            return str.replace(branch_id, "refs/heads/", "")
+        else:
+            return None
 
     @property
     def comment_body(self):
