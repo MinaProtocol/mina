@@ -398,8 +398,7 @@ module Make (Test : Test_intf) = struct
               let account_ids = Account_id.gen_accounts num_accounts in
               let balances = gen_values Balance.gen num_accounts in
               let base_accounts =
-                List.map2_exn account_ids balances ~f:(fun public_key balance ->
-                    Account.create public_key balance )
+                List.map2_exn account_ids balances ~f:Account.create
               in
               List.iter base_accounts ~f:(fun account ->
                   ignore @@ create_new_account_exn mask1 account ) ;
@@ -652,8 +651,8 @@ module Make (Test : Test_intf) = struct
 
   let () =
     add_test
-      "set account in parent doesn't remove masked copy if mask is still dirty \
-       for said account" (fun () ->
+      "setting account in parent doesn't remove masked copy if mask is still \
+       dirty for said account" (fun () ->
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             let k = Account_id.gen_accounts 1 |> List.hd_exn in
