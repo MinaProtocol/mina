@@ -188,6 +188,10 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     (* rehash something *)
     Kvdb.remove kvdb ~key
 
+  let remove_location = remove
+
+  let remove_account _ _ = invalid_arg "remove_account: not yet implemented"
+
   module Account_location = struct
     (** encodes a key, token_id pair as a location used as a database key, so
         we can find the account location associated with that key.
