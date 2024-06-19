@@ -49,7 +49,7 @@ fi
 
 debs_with_version=()
 for i in "${debs[@]}"; do
-   debs_with_version+=("${i}=${MINA_DEB_VERSION}_amd64")
+   debs_with_version+=("${i}=${MINA_DEB_VERSION}")
 done
 
 # Install aptly
@@ -62,6 +62,10 @@ source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $
 # Install debians
 echo "Installing mina packages: $DEBS"
 echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | $SUDO tee /etc/apt/sources.list.d/mina.list
+
+for i in "${debs_with_version[@]}"; do
+   aptly package show $i
+done
 
 $SUDO apt-get update --yes
 $SUDO apt-get remove --yes "${debs[@]}"
