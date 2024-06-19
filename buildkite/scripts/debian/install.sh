@@ -49,7 +49,7 @@ fi
 
 debs_with_version=()
 for i in "${debs[@]}"; do
-   debs_with_version+=("${i}_${MINA_DEB_VERSION}_amd64")
+   debs_with_version+=("${i}=${MINA_DEB_VERSION}_amd64")
 done
 
 # Install aptly
