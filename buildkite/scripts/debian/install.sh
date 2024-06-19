@@ -63,10 +63,6 @@ source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $
 echo "Installing mina packages: $DEBS"
 echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | $SUDO tee /etc/apt/sources.list.d/mina.list
 
-for i in "${debs_with_version[@]}"; do
-   aptly package show $i
-done
-
 $SUDO apt-get update --yes
 $SUDO apt-get remove --yes "${debs[@]}"
 $SUDO apt-get install --yes --allow-downgrades "${debs_with_version[@]}"
