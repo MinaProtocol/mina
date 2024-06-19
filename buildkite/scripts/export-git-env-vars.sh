@@ -6,6 +6,7 @@ echo "Exporting Variables: "
 export MINA_REPO="https://github.com/MinaProtocol/mina.git"
 
 function find_most_recent_numeric_tag() {
+    git fetch --tags
     TAG=$(git describe --always --abbrev=0 $1 | sed 's!/!-!g; s!_!-!g; s!#!-!g')
     if [[ $TAG != [0-9]* ]]; then
         TAG=$(find_most_recent_numeric_tag $TAG~)
@@ -54,10 +55,10 @@ export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 
 
 # Determine the packages to build (mainnet y/N)
 case $GITBRANCH in
-    compatible|master|release/1*) # whitelist of branches that are "mainnet-like"
-      MINA_BUILD_MAINNET=true ;;
+    compatible|master|release-automation-testing/*|release/1*|release/3*) # whitelist of branches that are "mainnet-like"
+      export MINA_BUILD_MAINNET=true ;;
     *) # Other branches
-      MINA_BUILD_MAINNET=false ;;
+      export MINA_BUILD_MAINNET=false ;;
 esac
 
 echo "Publishing on release channel \"${RELEASE}\""

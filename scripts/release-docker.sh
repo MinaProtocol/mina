@@ -73,6 +73,7 @@ IMAGE="--build-arg image=${IMAGE}"
       case "${DEB_BUILD_FLAGS}" in 
         *instrumented)
           DOCKER_DEB_SUFFIX="--build-arg deb_suffix=instrumented"
+          BUILD_FLAG_SUFFIX="-instrumented"
           ;;
         *)
           ;;
@@ -82,6 +83,7 @@ IMAGE="--build-arg image=${IMAGE}"
       case "${DEB_BUILD_FLAGS}" in 
         *instrumented)
           DOCKER_DEB_SUFFIX="--build-arg deb_suffix=${DEB_PROFILE}-instrumented"
+          BUILD_FLAG_SUFFIX="-instrumented"
           ;;
         *)
           DOCKER_DEB_SUFFIX="--build-arg deb_suffix=${DEB_PROFILE}"
@@ -168,18 +170,18 @@ if [[ -z "${MINA_REPO}" ]]; then
 fi
 
 DOCKER_REGISTRY="gcr.io/o1labs-192920"
-TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}"
+TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}${BUILD_FLAG_SUFFIX}"
 # friendly, predictable tag
 GITHASH=$(git rev-parse --short=7 HEAD)
-HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}"
+HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${BUILD_FLAG_SUFFIX}"
 BUILD_NETWORK="--network=host"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo ${EXTRA} | tr -d '"')
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
-  cat $DOCKERFILE_PATH | docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $BRANCH $REPO $extra_build_args -t "$TAG" -
+  cat $DOCKERFILE_PATH | docker build $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $extra_build_args -t "$TAG" -
 else
-  docker build $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
+  docker build $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $extra_build_args $DOCKER_CONTEXT -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
 if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
