@@ -1,4 +1,0 @@
-<*.{ml,mli}>: package(bytes), package(bigarray), package(ctypes.stubs)
-<*.{cma,cmxa}>: use_sodium_stubs
-<libsodium_stubs.*>: use_sodium
-<*.c>: use_ctypes, use_sodium
