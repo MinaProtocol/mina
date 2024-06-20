@@ -986,11 +986,28 @@ module Make (Inputs : Inputs_intf.S) = struct
       let current_location t = t.current_location
     end
 
-    (* leftmost location *)
-    let first_location ~ledger_depth =
-      Location.Account
-        ( Addr.of_directions
-        @@ List.init ledger_depth ~f:(fun _ -> Direction.Left) )
+    let leftmost_available_slot t =
+      match last_filled t with
+      | None ->
+          let loc =
+            let path_to_leftmost_slot =
+              List.init t.depth ~f:(fun _ -> Direction.Left)
+            in
+            Location.Account (Addr.of_directions path_to_leftmost_slot)
+          in
+          Some loc
+      | Some loc ->
+          Location.next loc
+
+    (* Finds the next available location in the following order of priority:
+       - reuse a freed location, due to previously removed data; or
+       - use the leftmost available slot *)
+    let next_fillable t =
+      match Stack.pop t.freed with
+      | Some _ as opt_loc ->
+          opt_loc
+      | None ->
+          leftmost_available_slot t
 
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t account_id account =
@@ -1004,25 +1021,12 @@ module Make (Inputs : Inputs_intf.S) = struct
               Ok (`Existed, location)
           | None -> (
               (* not in parent, create new location *)
-              let maybe_location =
-                (* first try to reuse one the reusable locations if one exists *)
-                match Stack.pop t.freed with
-                | Some _ as opt_loc ->
-                    opt_loc
-                | None -> (
-                    match last_filled t with
-                    | None ->
-                        Some (first_location ~ledger_depth:t.depth)
-                    | Some loc ->
-                        Location.next loc )
-              in
-              match maybe_location with
+              match next_fillable t with
               | None ->
                   Or_error.error_string "Db_error.Out_of_leaves"
               | Some location ->
                   (* `set` calls `self_set_location`, which updates
-                     the current location
-                  *)
+                     the current location *)
                   set t location account ;
                   Ok (`Added, location) ) )
       | Some location ->
