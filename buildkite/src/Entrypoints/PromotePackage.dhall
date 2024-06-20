@@ -104,7 +104,101 @@ let promote_artifacts =
 
   let pipelineType = Pipeline.build 
     (
-      PromotePackage.pipeline 
+      PromotePackage.promotePipeline 
+          (debians_spec)
+          (dockers_spec)
+          (DebianVersions.DebVersion.Bullseye)
+          (PipelineMode.Type.Stable)
+    )
+  in pipelineType.pipeline
+
+let verify_artifacts = 
+  \(debians: List Package.Type) ->
+  \(dockers: List Artifact.Type) ->
+  \(new_version: Text ) ->
+  \(profile: Profile.Type) ->
+  \(network: Network.Type) ->
+  \(codenames: List DebianVersions.DebVersion ) ->
+  \(to_channel: DebianChannel.Type ) ->
+  \(tag: Text ) ->
+  \(remove_profile_from_name: Bool) ->
+  \(publish: Bool) ->
+
+  let debians_spec =
+      List/map 
+      Package.Type
+      (List PromotePackage.PromoteDebianSpec.Type)
+      (\(debian: Package.Type) -> 
+        List/map
+        DebianVersions.DebVersion
+        PromotePackage.PromoteDebianSpec.Type
+        (\(codename: DebianVersions.DebVersion) -> 
+          PromotePackage.PromoteDebianSpec::{
+            profile = profile
+            , package = debian
+            , new_version = new_version
+            , network = network
+            , codename = codename
+            , to_channel = to_channel
+            , remove_profile_from_name = remove_profile_from_name
+            , step_key = "verify-promote-debian-${Package.lowerName debian}-${DebianVersions.lowerName codename}-${DebianChannel.lowerName to_channel}"
+          }
+        )
+        codenames
+        
+      )
+      debians
+  in 
+
+  let debians_spec = 
+      Prelude.List.fold
+        (List PromotePackage.PromoteDebianSpec.Type)
+        debians_spec
+        (List PromotePackage.PromoteDebianSpec.Type)
+        (\(a : List PromotePackage.PromoteDebianSpec.Type) -> \(b : List PromotePackage.PromoteDebianSpec.Type) -> a # b)
+        ([] : List PromotePackage.PromoteDebianSpec.Type)
+
+  in
+
+  let dockers_spec = 
+      List/map 
+      Artifact.Type
+      (List PromotePackage.PromoteDockerSpec.Type)
+      (\(docker: Artifact.Type) -> 
+        List/map
+        DebianVersions.DebVersion
+        PromotePackage.PromoteDockerSpec.Type
+        (\(codename: DebianVersions.DebVersion) -> 
+          PromotePackage.PromoteDockerSpec::{
+              profile = profile
+              , name = docker
+              , codename = codename
+              , new_tag = new_version
+              , network = network
+              , publish = publish
+              , remove_profile_from_name = remove_profile_from_name
+              , step_key = "verify-tag-${Artifact.lowerName docker}-${DebianVersions.lowerName codename}-docker"
+          }
+        )
+        codenames
+      )
+      dockers
+
+  in
+
+  let dockers_spec = 
+      Prelude.List.fold
+        (List PromotePackage.PromoteDockerSpec.Type)
+        dockers_spec
+        (List PromotePackage.PromoteDockerSpec.Type)
+        (\(a : List PromotePackage.PromoteDockerSpec.Type) -> \(b : List PromotePackage.PromoteDockerSpec.Type) -> a # b)
+        ([] : List PromotePackage.PromoteDockerSpec.Type)
+
+  in
+
+  let pipelineType = Pipeline.build 
+    (
+      PromotePackage.verifyPipeline 
           (debians_spec)
           (dockers_spec)
           (DebianVersions.DebVersion.Bullseye)
@@ -113,5 +207,6 @@ let promote_artifacts =
   in pipelineType.pipeline
 
 in {
-  promote_artifacts = promote_artifacts
+  promote_artifacts = promote_artifacts,
+  verify_artifacts = verify_artifacts
 }

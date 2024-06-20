@@ -59,12 +59,12 @@ module Hash = struct
    * important impossible to create an account such that (merge a b = hash_account account) *)
 
   let hash_account account =
-    Md5.digest_string ("0" ^ Format.sprintf !"%{sexp: Account.t}" account)
+    Md5.digest_string (Format.sprintf !"0%{sexp: Account.t}" account)
 
   let merge ~height a b =
     let res =
       Md5.digest_string
-        (sprintf "test_ledger_%d:" height ^ Md5.to_hex a ^ Md5.to_hex b)
+        (sprintf "test_ledger_%d:%s%s" height (Md5.to_hex a) (Md5.to_hex b))
     in
     res
 
