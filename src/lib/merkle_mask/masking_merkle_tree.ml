@@ -523,16 +523,22 @@ module Make (Inputs : Inputs_intf.S) = struct
                when allocating a location *)
         ; locations = Map.remove t.maps.locations account_id
         } ;
-      (* save newly unused location to local stack *)
-      add_freed_location t location ;
-      (* reuse location if possible *)
-      Option.iter t.current_location ~f:(fun curr_loc ->
-          if Location.equal location curr_loc then
-            match Location.prev location with
-            | Some prev_loc ->
-                t.current_location <- Some prev_loc
-            | None ->
-                t.current_location <- None ) ;
+      let () =
+        match t.current_location with
+        | Some curr_loc ->
+            if Location.equal location curr_loc then
+              match Location.prev location with
+              | Some prev_loc ->
+                  t.current_location <- Some prev_loc
+              | None ->
+                  t.current_location <- None
+            else
+              (* save newly unused location to local stack *)
+              add_freed_location t location
+        | None ->
+            (* no current location indicates no insertion ever occurred *)
+            ()
+      in
       (* update hashes *)
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.empty_account in
