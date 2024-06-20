@@ -65,7 +65,9 @@ def handle_incoming_comment(payload_info, configuration):
 
     porting_branches = []
 
+    print(f"DEBUG: {branches}")
     for stable_branch in branches:
+        print(f"checking for merging conflict between {stable_branch} and {incoming_branch}")
         if github_api.has_merge_conflict(stable_branch,incoming_branch):
             print(f"branches {incoming_branch} and {stable_branch} have a merge conflict! creating porting branch to address "
                   f"those changes...")
@@ -80,7 +82,8 @@ def handle_incoming_comment(payload_info, configuration):
         pull.create_issue_comment(github_api.comment_conflict(porting_branches,
                                                               f"Hello, @{pull.user.login} {len(porting_branches)} new  created to help "
                                                               f"you port this change to {target_branch}. Please follow steps to resolve conflict for each mainline branch. PRs will be created automatically after you push merge to porting branches"))
-
+    else:
+        pull.create_issue_comment(f"everything is good. No conflicts against {branches} detected")
 
 def handle_incoming_push(merge_branch, configuration):
     """
