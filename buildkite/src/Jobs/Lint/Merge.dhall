@@ -48,9 +48,9 @@ Pipeline.build
         },
       Command.build
         Command.Config::{
-          commands = [ Cmd.run "buildkite/scripts/merges-cleanly.sh berkeley"]
-          , label = "Check merges cleanly into berkeley"
-          , key = "clean-merge-berkeley"
+          commands = [ Cmd.run "buildkite/scripts/merges-cleanly.sh master"]
+          , label = "Check merges cleanly into master"
+          , key = "clean-merge-master"
           , target = Size.Small
           , docker = Some Docker::{
               image = (../../Constants/ContainerImages.dhall).toolchainBase
