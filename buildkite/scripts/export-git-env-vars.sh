@@ -20,43 +20,10 @@ export MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=bullseye}
 
 [[ -n "$BUILDKITE_BRANCH" ]] && export GITBRANCH=$(echo "$BUILDKITE_BRANCH" | sed 's!/!-!g; s!_!-!g')
 
-if [[ -n "${THIS_COMMIT_TAG}" ]]; then # If the commit is tagged
-    export MINA_DEB_VERSION="${GITTAG}-${GITHASH}"
-    export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')"
-else
-    export MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
-    export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')"
-fi
-
-
-# Determine deb repo to use
-case $GITBRANCH in
-    master)
-        RELEASE=stable ;;
-    compatible|master|release*) # whitelist of branches that can be tagged
-        case "${THIS_COMMIT_TAG}" in
-          *alpha*) # any tag including the string `alpha`
-            RELEASE=alpha ;;
-          *beta*) # any tag including the string `beta`
-            RELEASE=beta ;;
-          *devnet*)
-            RELEASE=devnet ;;
-          ?*) # Any other non-empty tag. ? matches a single character and * matches 0 or more characters.
-            #RELEASE=stable ;;
-            RELEASE=unstable ;;
-          "") # No tag
-            RELEASE=unstable ;;
-          *) # The above set of cases should be exhaustive, if they're not then still set RELEASE=unstable
-            RELEASE=unstable
-            echo "git tag --points-at HEAD may have failed, falling back to unstable. Value: \"$(git tag --points-at HEAD)\""
-            ;;
-        esac ;;
-    *)
-        RELEASE=unstable ;;
-esac
+export MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
+export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')"
+RELEASE=unstable
 
 echo "Publishing on release channel \"${RELEASE}\" based on branch \"${GITBRANCH}\" and tag \"${THIS_COMMIT_TAG}\""
 [[ -n ${THIS_COMMIT_TAG} ]] && export MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"
 export MINA_DEB_RELEASE="${RELEASE}"
-
-set -x
