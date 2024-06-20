@@ -300,15 +300,15 @@ module Ledger_inner = struct
     List.fold_until accounts ~init ~f ~finish
 
   let create_new_account_exn t account_id account =
-    let action, _ =
-      get_or_create_account t account_id account |> Or_error.ok_exn
-    in
-    if [%equal: [ `Existed | `Added ]] action `Existed then
-      failwith
-        (sprintf
-           !"Could not create a new account with pk \
-             %{sexp:Public_key.Compressed.t}: Account already exists"
-           (Account_id.public_key account_id) )
+    match get_or_create_account t account_id account |> Or_error.ok_exn with
+    | `Added, _ ->
+        ()
+    | `Existed, _ ->
+        failwith
+          (sprintf
+             !"Could not create a new account with pk \
+               %{sexp:Public_key.Compressed.t}: Account already exists"
+             (Account_id.public_key account_id) )
 
   let create_new_account t account_id account =
     Or_error.try_with (fun () -> create_new_account_exn t account_id account)
