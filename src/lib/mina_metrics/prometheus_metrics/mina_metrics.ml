@@ -1306,6 +1306,10 @@ module Transition_frontier = struct
     let help = "total amount of currency in root snarked ledger" in
     Gauge.v "root_snarked_ledger_total_currency" ~help ~namespace ~subsystem
 
+  let best_tip_num_accounts : Gauge.t =
+    let help = "# of accounts at the best tip" in
+    Gauge.v "best_tip_num_accounts" ~help ~namespace ~subsystem
+
   (* TODO:
      let root_staged_ledger_accounts : Gauge.t =
        let help = "# of accounts in transition frontier root staged ledger" in

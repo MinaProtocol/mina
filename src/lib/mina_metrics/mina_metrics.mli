@@ -423,6 +423,8 @@ module Transition_frontier : sig
   val root_snarked_ledger_accounts : Gauge.t
 
   val root_snarked_ledger_total_currency : Gauge.t
+
+  val best_tip_num_accounts : Gauge.t
 end
 
 module Catchup : sig
