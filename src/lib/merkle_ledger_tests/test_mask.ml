@@ -608,32 +608,61 @@ module Make (Test : Test_intf) = struct
               && Int.equal parent_num_accounts mask_num_accounts_before
               && Int.equal parent_num_accounts mask_num_accounts_after ) ) )
 
+  let gen_accounts ~num_accounts =
+    let account_ids = Account_id.gen_accounts num_accounts in
+    let balances =
+      Quickcheck.random_value
+        (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
+    in
+    List.map2_exn account_ids balances ~f:Account.create
+
   let () =
+    let num_accounts = 5 in
+    let accounts = gen_accounts ~num_accounts in
     add_test "addition and deletion works" (fun () ->
         Test.with_instances (fun maskable mask ->
-            let _m = maskable and _msk = mask in
             let attached_mask = Maskable.register_mask maskable mask in
-            let num_accounts = 5 in
-            let account_ids = Account_id.gen_accounts num_accounts in
-            let balances =
-              Quickcheck.random_value
-                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-            in
-            let accounts =
-              List.map2_exn account_ids balances ~f:Account.create
-            in
-
             (* add accounts to mask *)
             List.iter accounts ~f:(fun account ->
                 ignore @@ create_new_account_exn attached_mask account ) ;
             let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
             [%test_eq: Int.t] num_accounts mask_num_accounts ;
 
+            (* Remove num_accounts*)
             let accounts_to_be_deleted =
               assert (num_accounts > 1) ;
-              List.tl accounts
+              List.tl_exn accounts
             in
-            List.iter accounts_to_be_deleted ~f:(fun account -> ()) ) )
+            List.iter accounts_to_be_deleted
+              ~f:(Mask.Attached.remove_account attached_mask) ;
+            let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
+            [%test_eq: Int.t] mask_num_accounts 1 ) )
+
+  (* This test exposes some internal invariants wrt to the interaction between
+     removal and additions.
+  *)
+  let () =
+    let num_accounts = 8 in
+    let half = num_accounts / 2 in
+    assert (half > 1) ;
+    let initial_accounts = gen_accounts ~num_accounts:half in
+    let additional_accounts = gen_accounts ~num_accounts:half in
+    add_test "addition reuses just removed location" (fun () ->
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            (* add accounts to mask *)
+            List.iter initial_accounts ~f:(fun account ->
+                ignore @@ create_new_account_exn attached_mask account ) ;
+            let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
+            [%test_eq: Int.t] num_accounts mask_num_accounts ;
+
+            (* Remove num_accounts*)
+            let accounts_to_be_deleted = initial_accounts in
+            List.iter accounts_to_be_deleted ~f:(fun account ->
+                Mask.Attached.remove_account attached_mask account ;
+                Mask.Attached.get_ ) ;
+            let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
+            [%test_eq: Int.t] mask_num_accounts half ) )
 
   let () =
     add_test "mask reparenting works" (fun () ->
