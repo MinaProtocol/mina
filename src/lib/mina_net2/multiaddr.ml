@@ -39,6 +39,7 @@ let valid_as_peer t =
 
 let of_file_contents contents : t list =
   String.split ~on:'\n' contents
+  |> List.map ~f:String.strip
   |> List.filter ~f:(fun s ->
          if valid_as_peer s then true
          else if String.is_empty s then false
