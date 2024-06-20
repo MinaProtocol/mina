@@ -10,6 +10,7 @@ module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions
+module Precomputed_block_writer = Subscriptions.Precomputed_block_writer
 module Snark_worker_lib = Snark_worker
 module Timeout = Timeout_lib.Core_time
 
@@ -104,8 +105,7 @@ type t =
       Daemon_rpcs.Types.Status.Next_producer_timing.t option
   ; subscriptions : Coda_subscriptions.t
   ; sync_status : Sync_status.t Mina_incremental.Status.Observer.t
-  ; precomputed_block_writer :
-      ([ `Path of string ] option * [ `Log ] option) ref
+  ; precomputed_block_writer : Precomputed_block_writer.t ref
   ; block_production_status :
       [ `Producing | `Producing_in_ms of float | `Free ] ref
   ; in_memory_reverse_structured_log_messages_for_integration_test :
@@ -1986,11 +1986,41 @@ let create ?wallets (config : Config.t) =
               Archive_client.run ~logger:config.logger
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
                 archive_process_port ) ;
+          (* Local block writing *)
           let precomputed_block_writer =
+            let file =
+              try
+                Option.map config.precomputed_blocks_file ~f:(fun path ->
+                    match Core.Unix.(lstat path).st_kind with
+                    | S_REG ->
+                        path
+                    | _ ->
+                        [%log' error config.logger]
+                          ~metadata:[ ("path", `String path) ]
+                          "$path is not a regular Unix file. Local precomputed \
+                           block appending disabled." ;
+                        failwith "No precomputed block appending" )
+              with _ -> None
+            in
+            let dir =
+              try
+                Option.map config.precomputed_blocks_dir ~f:(fun path ->
+                    match Core.Unix.(lstat path).st_kind with
+                    | S_DIR ->
+                        path
+                    | _ ->
+                        [%log' error config.logger]
+                          ~metadata:[ ("path", `String path) ]
+                          "$path is not a regular Unix directory. Local \
+                           precomputed block dumping disabled." ;
+                        failwith "No precomputed block dumping" )
+              with _ -> None
+            in
             ref
-              ( Option.map config.precomputed_blocks_path ~f:(fun path ->
-                    `Path path )
-              , if config.log_precomputed_blocks then Some `Log else None )
+              { Precomputed_block_writer.file
+              ; dir
+              ; log = config.log_precomputed_blocks
+              }
           in
           let subscriptions =
             Coda_subscriptions.create ~logger:config.logger
