@@ -12,8 +12,6 @@ let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
-
 in
 
 Pipeline.build
@@ -30,7 +28,6 @@ Pipeline.build
           commands = [ Cmd.run "buildkite/scripts/merges-cleanly.sh compatible"]
           , label = "Check merges cleanly into compatible"
           , key = "clean-merge-compatible"
-          , soft_fail = Some (B/SoftFail.Boolean True)
           , target = Size.Small
           , docker = Some Docker::{
               image = (../../Constants/ContainerImages.dhall).toolchainBase
