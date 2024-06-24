@@ -1606,6 +1606,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             let implicit_account_creation_fee (t : t) =
               t.account_update.data.implicit_account_creation_fee
 
+            let delete_account _t = Boolean._false
+            (* t.account_update.data.delete_account *)
+
             let increment_nonce (t : t) = t.account_update.data.increment_nonce
 
             let check_authorization ~will_succeed ~commitment
