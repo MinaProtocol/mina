@@ -9,8 +9,7 @@ let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 let Profiles = ../../Constants/Profiles.dhall
 let Dockers = ../../Constants/DockerVersions.dhall
 
---let dependsOn = Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "daemon-berkeley"
-let dependsOn :  List { name : Text, key : Text } = []
+let dependsOn = Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "daemon-berkeley"
 
 in Pipeline.build Pipeline.Config::{
   spec =
