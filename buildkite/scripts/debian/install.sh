@@ -2,6 +2,12 @@
 
 echo "ARGS COUNT IS" 
 echo $#
+echo $0
+echo $1
+echo $2
+echo $3
+echo "0000000000000"
+
 if [[ $# -gt 2 ]] || [[ $# -lt 1 ]]; then
     echo "Usage: $0 '<debians>' '[use-sudo]'"
     exit 1
