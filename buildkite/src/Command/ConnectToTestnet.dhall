@@ -4,7 +4,7 @@ let B = ../External/Buildkite.dhall
 let Command = ./Base.dhall
 let Docker = ./Docker/Type.dhall
 let Size = ./Size.dhall
-let RunInToolchain = ../../Command/RunInToolchain.dhall
+let RunInToolchain = ./RunInToolchain.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
