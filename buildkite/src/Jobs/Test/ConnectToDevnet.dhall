@@ -10,6 +10,7 @@ let Profiles = ../../Constants/Profiles.dhall
 let Dockers = ../../Constants/DockerVersions.dhall
 
 -- let dependsOn = Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "daemon-berkeley"
+let dependsOn = []
 
 in Pipeline.build Pipeline.Config::{
   spec =
@@ -25,6 +26,6 @@ in Pipeline.build Pipeline.Config::{
     tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
   },
   steps = [
-    ConnectToTestnet.step [] "devnet" "40s" "2m" (B/SoftFail.Boolean True)
+    ConnectToTestnet.step dependsOn "devnet" "40s" "2m" (B/SoftFail.Boolean True)
   ]
 }
