@@ -7,9 +7,9 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 let Profiles = ../../Constants/Profiles.dhall
-let Dockers = ../../Constants/DockerVersions.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let dependsOn = Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "daemon-berkeley"
+let dependsOn = DebianVersions.dependsOn DebianVersions.DebVersion.Bullseye Profiles.Type.Standard
 
 in Pipeline.build Pipeline.Config::{
   spec =
