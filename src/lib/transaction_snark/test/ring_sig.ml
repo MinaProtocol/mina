@@ -213,6 +213,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                 ; may_use_token = No
                 ; use_full_commitment = false
                 ; authorization_kind = Signature
+                ; delete_account = false
                 }
             ; authorization = Signature Signature.dummy
             }
@@ -229,6 +230,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                 ; call_depth = 0
                 ; increment_nonce = false
                 ; implicit_account_creation_fee = true
+                ; delete_account = false
                 ; preconditions =
                     { Account_update.Preconditions.network =
                         Zkapp_precondition.Protocol_state.accept

@@ -379,7 +379,10 @@ module Ledger = struct
     (** the ledger should not be used after calling [close] *)
     val close : t -> unit
 
-    (** for account locations in the ledger, the last (rightmost) filled location *)
+    (* TODO: With removal this  *)
+
+    (** for account locations in the ledger, the last (rightmost) filled
+    location *)
     val last_filled : t -> Location.t option
 
     val get_uuid : t -> Uuid.t

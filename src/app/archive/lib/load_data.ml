@@ -438,7 +438,7 @@ let get_account_update_body ~pool body_id =
            ; implicit_account_creation_fee
            ; may_use_token
            ; authorization_kind
-           ; verification_key_hash_id
+           ; verification_key_hash_id (* ; delete_account *)
            } =
     query_db ~f:(fun db -> Processor.Zkapp_account_update_body.load db body_id)
   in
@@ -629,6 +629,7 @@ let get_account_update_body ~pool body_id =
       ; implicit_account_creation_fee
       ; may_use_token
       ; authorization_kind
+      ; delete_account = false
       }
       : Account_update.Body.Simple.t )
 
