@@ -45,7 +45,7 @@ module type Inputs_intf = sig
   val set_location_batch :
        last_location:Location.t
     -> Base.t
-    -> (Account_id.t * Location.t) Non_empty_list.t
+    -> (Account_id.t * Location.t) Mina_stdlib.Nonempty_list.t
     -> unit
 end
 
@@ -151,16 +151,16 @@ end = struct
          locations_and_hashes )
 
   let compute_last_index addresses =
-    Non_empty_list.map addresses
+    Mina_stdlib.Nonempty_list.map addresses
       ~f:(Fn.compose Inputs.Location.Addr.to_int Inputs.Location.to_path_exn)
-    |> Non_empty_list.max_elt ~compare:Int.compare
+    |> Mina_stdlib.Nonempty_list.max_elt ~compare:Int.compare
 
   let set_raw_addresses t addresses_and_accounts =
     let ledger_depth = Inputs.ledger_depth t in
-    Option.iter (Non_empty_list.of_list_opt addresses_and_accounts)
+    Option.iter (Mina_stdlib.Nonempty_list.of_list_opt addresses_and_accounts)
       ~f:(fun nonempty_addresses_and_accounts ->
         let key_locations =
-          Non_empty_list.map nonempty_addresses_and_accounts
+          Mina_stdlib.Nonempty_list.map nonempty_addresses_and_accounts
             ~f:(fun (address, account) ->
               (Inputs.Account.identifier account, address) )
         in
@@ -173,7 +173,8 @@ end = struct
           in
           let foreign_last_index =
             compute_last_index
-              (Non_empty_list.map nonempty_addresses_and_accounts ~f:fst)
+              (Mina_stdlib.Nonempty_list.map nonempty_addresses_and_accounts
+                 ~f:fst )
           in
           let max_index_in_all_accounts =
             Option.value_map current_last_index ~default:foreign_last_index

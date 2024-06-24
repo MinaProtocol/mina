@@ -1,4 +1,5 @@
 let Prelude = ../External/Prelude.dhall
+let B = ../External/Buildkite.dhall
 
 let Command = ./Base.dhall
 let Docker = ./Docker/Type.dhall
@@ -8,6 +9,8 @@ let RunInToolchain = ../Command/RunInToolchain.dhall
 
 let Cmd = ../Lib/Cmds.dhall
 let SelectFiles = ../Lib/SelectFiles.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 in
 
@@ -38,10 +41,6 @@ in
       Command.Config::{
         commands =
             [
-              -- Download test dependencies
-              Cmd.run "artifact-cache-helper.sh test_executive.exe && chmod +x test_executive.exe",
-              Cmd.run "artifact-cache-helper.sh logproc.exe && chmod +x logproc.exe",
-
               -- Execute test based on BUILD image
               Cmd.run "MINA_DEB_CODENAME=bullseye ; source ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/run-test-executive.sh ${testName}"
             ],

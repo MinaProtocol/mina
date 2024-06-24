@@ -1,3 +1,4 @@
 (* Note this value needs to be consistent across nodes to prevent spurious bans.
    see comment in transaction_pool.ml for more details. *)
 [%%define pool_max_size 3000]
+[%%undef zkapp_cmd_limit]

@@ -52,8 +52,7 @@ module type Inputs_intf = sig
          t
       -> get_state:
            (Mina_base.State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-      -> ( Transaction.t
-         , Transaction_witness.t
+      -> ( Transaction_witness.t
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
@@ -102,8 +101,7 @@ module type Lib_intf = sig
     (**Jobs that have not been assigned yet*)
     val all_unseen_works :
          t
-      -> ( Transaction.t
-         , Transaction_witness.t
+      -> ( Transaction_witness.t
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
@@ -111,8 +109,7 @@ module type Lib_intf = sig
 
     val remove :
          t
-      -> ( Transaction.t
-         , Transaction_witness.t
+      -> ( Transaction_witness.t
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
@@ -120,8 +117,7 @@ module type Lib_intf = sig
 
     val set :
          t
-      -> ( Transaction.t
-         , Transaction_witness.t
+      -> ( Transaction_witness.t
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
@@ -131,16 +127,10 @@ module type Lib_intf = sig
   val get_expensive_work :
        snark_pool:Snark_pool.t
     -> fee:Fee.t
-    -> ( Transaction.t
-       , Transaction_witness.t
-       , Ledger_proof.t )
-       Snark_work_lib.Work.Single.Spec.t
+    -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
        One_or_two.t
        list
-    -> ( Transaction.t
-       , Transaction_witness.t
-       , Ledger_proof.t )
-       Snark_work_lib.Work.Single.Spec.t
+    -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
        One_or_two.t
        list
 
@@ -194,8 +184,7 @@ module type Make_selection_method_intf = functor
   Selection_method_intf
     with type staged_ledger := Inputs.Staged_ledger.t
      and type work :=
-      ( Inputs.Transaction.t
-      , Inputs.Transaction_witness.t
+      ( Inputs.Transaction_witness.t
       , Inputs.Ledger_proof.t )
       Snark_work_lib.Work.Single.Spec.t
      and type snark_pool := Inputs.Snark_pool.t

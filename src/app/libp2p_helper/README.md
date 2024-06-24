@@ -1,8 +1,10 @@
-# mina go-libp2p helper
+# Mina `go-libp2p` Helper
 
-## libp2p_helper hints
+## Contrubution
 
-## building
+After changing the `go.mod` or `go.sum` please run the `nix build mina#libp2p_helper` and follow the instructions in order to resolve possible hash mismatch.
+
+## Building
 
 ### Makefile
 
@@ -18,7 +20,7 @@ $ bazel build src:codanet
 $ bazel build src/libp2p_helper
 ```
 
-#### using as an external repo
+#### Using as an external repo
 
 Add a repository rule to your root WORKSPACE(.bazel) file to import this repo.  For example, if you embed this repo as a git submodule:
 
@@ -34,7 +36,7 @@ file. Change the line: `load("//bzl/libp2p:deps.bzl",
 "libp2p_bootstrap")` to use the fully-qualified label, e.g.
 `load("@libp2p_helper//bzl/libp2p:deps.bzl", "libp2p_bootstrap")`.
 
-#### maintenance
+#### Maintenance
 
 Install [Gazelle](https://github.com/bazelbuild/bazel-gazelle).
 
@@ -51,12 +53,12 @@ See [Go Protocol buffers - avoiding
 conflicts](https://github.com/bazelbuild/rules_go/blob/master/proto/core.rst#avoiding-conflicts): [Option 2: Use pre-generated .pb.go files](https://github.com/bazelbuild/rules_go/blob/master/proto/core.rst#option-2-use-pre-generated-pb-go-files).
 for more info.
 
-# How it works
+## How it works
 
 libp2p_helper serves as a middleware between libp2p and Ocaml process. They communicate using a number of internal messages.
 Below we enumerate all message types along with description of how Helper handles the message.
 
-## config_msg.go
+### config_msg.go
 
 Messages serving to configure libp2p helper.
 
@@ -79,7 +81,7 @@ Messages serving to configure libp2p helper.
     * Sets a node status
     * Node status is a bytestring without particular structure (as of the libp2p_helper's view)
 
-## peer_msg.go
+### peer_msg.go
 
 Messages to add a new peer or get information about existing peers.
 
@@ -96,7 +98,7 @@ Messages to add a new peer or get information about existing peers.
  * listPeers
     * Return a list of peer information for each open connection
 
-## pubsub_msg.go
+### pubsub_msg.go
 
 Messages to interact with pubsub protocol.
 
@@ -119,7 +121,7 @@ Messages to interact with pubsub protocol.
     * Performs the action under app-global `ValidatorMutex`
     * Logs an error if validation has already timed out
 
-## stream_msg.go
+### stream_msg.go
 
 Messages to open, maintain and send messages to streams towards other peers (connected directly to our node).
 

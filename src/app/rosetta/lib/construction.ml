@@ -7,7 +7,7 @@ module Get_options_metadata =
       bestChain(maxLength: 5) {
         transactions {
           userCommands {
-            fee
+            fee @ppxCustom(module: "Scalars.UInt64")
           }
         }
       }
@@ -17,16 +17,8 @@ module Get_options_metadata =
       }
 
       account(publicKey: $sender, token: $token_id) {
-        balance {
-          blockHeight
-          stateHash
+        inferredNonce
         }
-        nonce
-      }
-      daemonStatus {
-        chainId
-      }
-      initialPeers
      }
 |}]
 
@@ -40,7 +32,7 @@ module Send_payment =
                   {from: $from, to:$to_, token:$token, amount:$amount,
                   fee:$fee, validUntil: $validUntil, memo: $memo, nonce:$nonce}) {
       payment {
-        hash
+        hash @ppxCustom(module: "Scalars.String_json")
       }
   }}
   |}]
@@ -57,7 +49,7 @@ mutation ($sender: PublicKey!,
   sendDelegation(signature: {rawSignature: $signature}, input:
     {from: $sender, to: $receiver, fee: $fee, memo: $memo, nonce: $nonce}) {
     delegation {
-      hash
+      hash @ppxCustom(module: "Scalars.String_json")
     }
   }
 }
@@ -77,12 +69,12 @@ module Public_key = Signature_lib.Public_key
 module Signed_command_payload = Mina_base.Signed_command_payload
 module User_command = Mina_base.User_command
 module Signed_command = Mina_base.Signed_command
-module Transaction_hash = Mina_base.Transaction_hash
+module Transaction_hash = Mina_transaction.Transaction_hash
 
 module Options = struct
   type t =
     { sender : Public_key.Compressed.t
-    ; token_id : Unsigned.UInt64.t
+    ; token_id : string
     ; receiver : Public_key.Compressed.t
     ; valid_until : Unsigned_extended.UInt32.t option
     ; memo : string option
@@ -101,7 +93,7 @@ module Options = struct
 
   let to_json t =
     { Raw.sender = Public_key.Compressed.to_base58_check t.sender
-    ; token_id = Unsigned.UInt64.to_string t.token_id
+    ; token_id = t.token_id
     ; receiver = Public_key.Compressed.to_base58_check t.receiver
     ; valid_until =
         Option.map ~f:Unsigned_extended.UInt32.to_string t.valid_until
@@ -112,13 +104,13 @@ module Options = struct
   let of_json r =
     Raw.of_yojson r
     |> Result.map_error ~f:(fun e ->
-           Errors.create ~context:"Options of_json" (`Json_parse (Some e)))
+           Errors.create ~context:"Options of_json" (`Json_parse (Some e)) )
     |> Result.bind ~f:(fun (r : Raw.t) ->
            let open Result.Let_syntax in
            let error which e =
-              Errors.create
-                ~context:("Options of_json bad public key (" ^ which ^ ")")
-                (`Json_parse (Some (Core_kernel.Error.to_string_hum e)))
+             Errors.create
+               ~context:("Options of_json bad public key (" ^ which ^ ")")
+               (`Json_parse (Some (Core_kernel.Error.to_string_hum e)))
            in
            let%bind sender =
              Public_key.Compressed.of_base58_check r.sender
@@ -129,12 +121,12 @@ module Options = struct
              |> Result.map_error ~f:(error "receiver")
            in
            { sender
-           ; token_id = Unsigned.UInt64.of_string r.token_id
+           ; token_id = r.token_id
            ; receiver
            ; valid_until =
                Option.map ~f:Unsigned_extended.UInt32.of_string r.valid_until
            ; memo = r.memo
-           })
+           } )
 end
 
 (* TODO: unify handling of json between this and Options (above) and everything else in rosetta *)
@@ -142,7 +134,7 @@ module Metadata_data = struct
   type t =
     { sender : string
     ; nonce : Unsigned_extended.UInt32.t
-    ; token_id : Unsigned_extended.UInt64.t
+    ; token_id : string
     ; receiver : string
     ; account_creation_fee : Unsigned_extended.UInt64.t option [@default None]
     ; valid_until : Unsigned_extended.UInt32.t option [@default None]
@@ -164,7 +156,7 @@ module Metadata_data = struct
   let of_json r =
     of_yojson r
     |> Result.map_error ~f:(fun e ->
-           Errors.create ~context:"Options of_json" (`Json_parse (Some e)))
+           Errors.create ~context:"Options of_json" (`Json_parse (Some e)) )
 end
 
 module Derive = struct
@@ -203,7 +195,8 @@ module Derive = struct
           Some
             (User_command_info.account_id
                (`Pk (Public_key.Compressed.to_base58_check pk_compressed))
-               (Option.value ~default:Amount_of.Token_id.default token_id))
+               (`Token_id
+                 (Option.value ~default:Amount_of.Token_id.default token_id) ) )
       ; metadata = None
       }
   end
@@ -217,7 +210,7 @@ module Metadata = struct
     module T (M : Monad_fail.S) = struct
       type 'gql t =
         { gql :
-               ?token_id:Unsigned.UInt64.t
+               ?token_id:string
             -> address:Public_key.Compressed.t
             -> receiver:Public_key.Compressed.t
             -> unit
@@ -238,25 +231,27 @@ module Metadata = struct
       { gql =
           (fun ?token_id:_ ~address ~receiver () ->
             Graphql.query
-              Get_options_metadata.(make @@ makeVariables
-                 ~sender:
-                   (`String (Public_key.Compressed.to_base58_check address))
-                   (* for now, nonce is based on the fee payer's account using the default token,
-                      per @mrmr1993
-                   *)
-                 ~token_id:
-                   (`String Mina_base.Token_id.(default |> to_string))
-                   (* WAS:
-                      ( match token_id with
-                      | Some x ->
-                          `String (Unsigned.UInt64.to_string x)
-                      | None ->
-                          `Null )
-                   *)
-                 ~receiver_key:
-                   (`String (Public_key.Compressed.to_base58_check receiver))
-                 ())
-              graphql_uri)
+              Get_options_metadata.(
+                make
+                @@ makeVariables
+                     ~sender:
+                       (`String (Public_key.Compressed.to_base58_check address))
+                       (* for now, nonce is based on the fee payer's account using the default token,
+                          per @mrmr1993
+                       *)
+                     ~token_id:
+                       (`String Mina_base.Token_id.(default |> to_string))
+                       (* WAS:
+                          ( match token_id with
+                          | Some x ->
+                              `String (Unsigned.UInt64.to_string x)
+                          | None ->
+                              `Null )
+                       *)
+                     ~receiver_key:
+                       (`String (Public_key.Compressed.to_base58_check receiver))
+                     ())
+              graphql_uri )
       ; validate_network_choice = Network.Validate_choice.Real.validate
       ; lift = Deferred.return
       }
@@ -277,6 +272,7 @@ module Metadata = struct
     val ( / ) : t -> t -> t
   end
 
+  (* Invariant: fees is not empty *)
   let suggest_fee (type a) (module F : Field_like with type t = a) fees =
     let len = Array.length fees in
     let med = fees.(len / 2) in
@@ -320,15 +316,14 @@ module Metadata = struct
             M.fail
               (Errors.create
                  (`Account_not_found
-                   (Public_key.Compressed.to_base58_check options.sender)))
+                   (Public_key.Compressed.to_base58_check options.sender) ) )
         | Some account ->
             M.return account
       in
+      (* this metadata is for building a transaction, so let's return the
+         inferred nonce of the account *)
       let nonce =
-        Option.map
-          ~f:(fun nonce -> Unsigned.UInt32.of_string nonce)
-          account.nonce
-        |> Option.value ~default:Unsigned.UInt32.zero
+        Option.value ~default:Unsigned.UInt32.zero account.inferredNonce
       in
       (* suggested fee *)
       (* Take the median of all the fees in blocks and add a bit extra using
@@ -340,7 +335,7 @@ module Metadata = struct
               let a =
                 Array.fold chain ~init:[] ~f:(fun fees block ->
                     Array.fold block.transactions.userCommands ~init:fees
-                      ~f:(fun fees cmd -> cmd.fee :: fees))
+                      ~f:(fun fees cmd -> cmd.fee :: fees) )
                 |> Array.of_list
               in
               Array.sort a ~compare:Unsigned_extended.UInt64.compare ;
@@ -348,13 +343,17 @@ module Metadata = struct
           | None ->
               M.fail (Errors.create `Chain_info_missing)
         in
-        Amount_of.mina
-          (suggest_fee
-             ( module struct
-               include Unsigned_extended.UInt64
-               include Infix
-             end )
-             fees)
+        if Array.is_empty fees then
+          Amount_of.mina
+            (Mina_currency.Fee.to_uint64 Signed_command.minimum_fee)
+        else
+          Amount_of.mina
+            (suggest_fee
+               ( module struct
+                 include Unsigned_extended.UInt64
+                 include Infix
+               end )
+               fees )
       in
       (* minimum fee : Pull this from the compile constants *)
       let amount_metadata =
@@ -363,12 +362,10 @@ module Metadata = struct
             , Amount.to_yojson
                 (Amount_of.mina
                    (Mina_currency.Fee.to_uint64
-                      Mina_compile_config.minimum_user_command_fee)) )
+                      Mina_currency.Fee.minimum_user_command_fee ) ) )
           ]
       in
-      let receiver_exists =
-        Option.is_some res.receiver
-      in
+      let receiver_exists = Option.is_some res.receiver in
       let constraint_constants =
         Genesis_constants.Constraint_constants.compiled
       in
@@ -380,9 +377,8 @@ module Metadata = struct
               else
                 Some
                   (Mina_currency.Fee.to_uint64
-                     constraint_constants.account_creation_fee) )
-            ~valid_until:options.valid_until
-            ~memo:options.memo
+                     constraint_constants.account_creation_fee ) )
+            ~valid_until:options.valid_until ~memo:options.memo
           |> Metadata_data.to_yojson
       ; suggested_fee =
           [ { suggested_fee with metadata = Some amount_metadata } ]
@@ -395,14 +391,17 @@ end
 
 module Preprocess = struct
   module Metadata = struct
-    type t = { valid_until : Unsigned_extended.UInt32.t option [@default None]; memo: string option [@default None] }
+    type t =
+      { valid_until : Unsigned_extended.UInt32.t option [@default None]
+      ; memo : string option [@default None]
+      }
     [@@deriving yojson]
 
     let of_json r =
       of_yojson r
       |> Result.map_error ~f:(fun e ->
              Errors.create ~context:"Preprocess metadata of_json"
-               (`Json_parse (Some e)))
+               (`Json_parse (Some e)) )
   end
 
   module Env = struct
@@ -421,7 +420,7 @@ module Preprocess = struct
   module Impl (M : Monad_fail.S) = struct
     let lift_reason_validation_to_errors ~(env : Env.T(M).t) t =
       Result.map_error t ~f:(fun reasons ->
-          Errors.create (`Operations_not_valid reasons))
+          Errors.create (`Operations_not_valid reasons) )
       |> env.lift
 
     let handle ~(env : Env.T(M).t) (req : Construction_preprocess_request.t) =
@@ -440,7 +439,7 @@ module Preprocess = struct
       let key (`Pk pk) =
         Public_key.Compressed.of_base58_check pk
         |> Result.map_error ~f:(fun _ ->
-               Errors.create `Public_key_format_not_valid)
+               Errors.create `Public_key_format_not_valid )
         |> env.lift
       in
       let%bind sender =
@@ -453,11 +452,16 @@ module Preprocess = struct
           Some
             (Options.to_json
                { Options.sender
-               ; token_id = partial_user_command.User_command_info.Partial.token
+               ; token_id =
+                   ( match
+                       partial_user_command.User_command_info.Partial.token
+                     with
+                   | `Token_id s ->
+                       s )
                ; receiver
                ; valid_until = Option.bind ~f:(fun m -> m.valid_until) metadata
                ; memo = Option.bind ~f:(fun m -> m.memo) metadata
-               })
+               } )
       ; required_public_keys = []
       }
   end
@@ -483,7 +487,7 @@ module Payloads = struct
   module Impl (M : Monad_fail.S) = struct
     let lift_reason_validation_to_errors ~(env : Env.T(M).t) t =
       Result.map_error t ~f:(fun reasons ->
-          Errors.create (`Operations_not_valid reasons))
+          Errors.create (`Operations_not_valid reasons) )
       |> env.lift
 
     let handle ~(env : Env.T(M).t) (req : Construction_payloads_request.t) =
@@ -496,34 +500,34 @@ module Payloads = struct
             M.fail
               (Errors.create
                  ~context:"Metadata is required for payloads request"
-                 (`Json_parse None))
+                 (`Json_parse None) )
       in
       let%bind partial_user_command =
         User_command_info.of_operations ?valid_until:metadata.valid_until
-        ?memo:metadata.memo
-          req.operations
+          ?memo:metadata.memo req.operations
         |> lift_reason_validation_to_errors ~env
       in
       let%bind () =
         let (`Pk pk) = partial_user_command.User_command_info.Partial.source in
         Public_key.Compressed.of_base58_check pk
         |> Result.map_error ~f:(fun _ ->
-               Errors.create ~context:"compression" `Public_key_format_not_valid)
+               Errors.create ~context:"compression" `Public_key_format_not_valid )
         |> Result.bind ~f:(fun pk ->
                Result.of_option (Public_key.decompress pk)
                  ~error:
                    (Errors.create ~context:"decompression"
-                      `Public_key_format_not_valid))
+                      `Public_key_format_not_valid ) )
         |> Result.map ~f:Rosetta_coding.Coding.of_public_key
-        |> Result.map ~f:ignore
-        |> env.lift
+        |> Result.map ~f:ignore |> env.lift
       in
       let%bind user_command_payload =
         User_command_info.Partial.to_user_command_payload ~nonce:metadata.nonce
           partial_user_command
         |> env.lift
       in
-      let random_oracle_input = Signed_command.to_input user_command_payload in
+      let random_oracle_input =
+        Signed_command.to_input_legacy user_command_payload
+      in
       let%map unsigned_transaction_string =
         { Transaction.Unsigned.random_oracle_input
         ; command = partial_user_command
@@ -542,9 +546,9 @@ module Payloads = struct
                 Some
                   (User_command_info.account_id
                      partial_user_command.User_command_info.Partial.source
-                     partial_user_command.User_command_info.Partial.token)
+                     partial_user_command.User_command_info.Partial.token )
             ; hex_bytes = Hex.Safe.to_hex unsigned_transaction_string
-            ; signature_type = Some "schnorr_poseidon"
+            ; signature_type = Some `Schnorr_poseidon
             }
           ]
       }
@@ -585,8 +589,7 @@ module Combine = struct
       let%bind signature =
         match req.signatures with
         | s :: _ ->
-            Transaction.Signature.decode s.hex_bytes
-            |> env.lift
+            Transaction.Signature.decode s.hex_bytes |> env.lift
         | _ ->
             M.fail (Errors.create `Signature_missing)
       in
@@ -614,8 +617,7 @@ module Parse = struct
     module T (M : Monad_fail.S) = struct
       type t =
         { verify_payment_signature :
-               network_identifier:Rosetta_models.Network_identifier.t
-            -> payment:Transaction.Unsigned.Rendered.Payment.t
+               payment:Transaction.Unsigned.Rendered.Payment.t
             -> signature:Mina_base.Signature.t
             -> unit
             -> (bool, Errors.t) M.t
@@ -628,7 +630,7 @@ module Parse = struct
 
     let real : Real.t =
       { verify_payment_signature =
-          (fun ~network_identifier ~payment ~signature () ->
+          (fun ~payment ~signature () ->
             let open Deferred.Result in
             let open Deferred.Result.Let_syntax in
             let parse_pk ~which s =
@@ -642,56 +644,60 @@ module Parse = struct
                          (sprintf
                             "Parsing verify_payment_signature, bad %s public \
                              key"
-                            which)
-                       (`Json_parse (Some (Core_kernel.Error.to_string_hum e))))
+                            which )
+                       (`Json_parse (Some (Core_kernel.Error.to_string_hum e))) )
             in
-            let%bind source_pk = parse_pk ~which:"source" payment.from in
+            let%bind fee_payer_pk = parse_pk ~which:"source" payment.from in
             let%bind receiver_pk = parse_pk ~which:"receiver" payment.to_ in
             let body =
               Signed_command_payload.Body.Payment
-                { source_pk
-                ; receiver_pk
-                ; token_id = Mina_base.Token_id.of_uint64 payment.token
+                { receiver_pk
                 ; amount = Mina_currency.Amount.of_uint64 payment.amount
                 }
             in
-            let fee_payer_pk = source_pk in
-            let fee_token = Mina_base.Token_id.default in
             let fee = Mina_currency.Fee.of_uint64 payment.fee in
             let signer = fee_payer_pk in
             let valid_until =
               Option.map payment.valid_until
-                ~f:Mina_numbers.Global_slot.of_uint32
+                ~f:Mina_numbers.Global_slot_since_genesis.of_uint32
             in
             let nonce = payment.nonce in
             let%map memo =
               match payment.memo with
-              | None -> return User_command_info.Signed_command_memo.empty
-              | Some str ->
-                (match
-                  User_command_info.Signed_command_memo.create_from_string str
-                 with
-                 | Error _ -> fail (Errors.create `Memo_invalid )
-                 | Ok m -> return m)
+              | None ->
+                  return User_command_info.Signed_command_memo.empty
+              | Some str -> (
+                  match
+                    User_command_info.Signed_command_memo.create_from_string str
+                  with
+                  | Error _ ->
+                      fail (Errors.create `Memo_invalid)
+                  | Ok m ->
+                      return m )
             in
             let payload =
-              Signed_command_payload.create ~fee ~fee_token ~fee_payer_pk ~nonce
+              Signed_command_payload.create ~fee ~fee_payer_pk ~nonce
                 ~valid_until ~memo ~body
             in
-            (* choose signature verification based on network *)
-            let signature_kind : Mina_signature_kind.t =
-              if String.equal network_identifier.network "mainnet" then
-                Mainnet
-              else Testnet
-            in
-            Option.is_some @@
-              Signed_command.create_with_signature_checked ~signature_kind
-                signature signer payload )
+            Option.is_some
+            @@ Signed_command.create_with_signature_checked signature signer
+                 payload )
       ; lift = Deferred.return
       }
   end
 
   module Impl (M : Monad_fail.S) = struct
+    let check_sufficient_fee (type a)
+        (payment : a -> Transaction.Unsigned.Rendered.Payment.t option)
+        (transaction : a) : (unit, Errors.t) Result.t =
+      match payment transaction with
+      | Some pay ->
+          if Transaction.Unsigned.Rendered.Payment.is_fee_sufficient pay then
+            Ok ()
+          else Result.fail @@ Errors.create `Transaction_submit_fee_small
+      | None ->
+          Ok ()
+
     let handle ~(env : Env.T(M).t) (req : Construction_parse_request.t) =
       let open M.Let_syntax in
       let%bind json =
@@ -700,16 +706,20 @@ module Parse = struct
       in
       let%map operations, account_identifier_signers, meta =
         let meta_of_command (cmd : User_command_info.Partial.t) =
-          { Preprocess.Metadata.memo = cmd.memo
-          ; valid_until = cmd.valid_until
-          }
+          { Preprocess.Metadata.memo = cmd.memo; valid_until = cmd.valid_until }
         in
         match req.signed with
         | true ->
             let%bind signed_rendered_transaction =
               Transaction.Signed.Rendered.of_yojson json
               |> Result.map_error ~f:(fun e ->
-                     Errors.create (`Json_parse (Some e)))
+                     Errors.create (`Json_parse (Some e)) )
+              |> env.lift
+            in
+            let%bind () =
+              check_sufficient_fee
+                Transaction.Signed.Rendered.(fun a -> a.payment)
+                signed_rendered_transaction
               |> env.lift
             in
             let%bind signed_transaction =
@@ -721,8 +731,7 @@ module Parse = struct
               | Some payment ->
                   (* Only perform signature validation on payments. *)
                   let%bind res =
-                    env.verify_payment_signature
-                      ~network_identifier:req.network_identifier ~payment
+                    env.verify_payment_signature ~payment
                       ~signature:signed_transaction.signature ()
                   in
                   if res then M.return ()
@@ -735,27 +744,38 @@ module Parse = struct
             , [ User_command_info.account_id signed_transaction.command.source
                   signed_transaction.command.token
               ]
-            , meta_of_command signed_transaction.command)
+            , meta_of_command signed_transaction.command )
         | false ->
-            let%map unsigned_transaction =
+            let%bind unsigned_rendered_transaction =
               Transaction.Unsigned.Rendered.of_yojson json
               |> Result.map_error ~f:(fun e ->
-                     Errors.create (`Json_parse (Some e)))
-              |> Result.bind ~f:Transaction.Unsigned.of_rendered
+                     Errors.create (`Json_parse (Some e)) )
+              |> env.lift
+            in
+            let%bind () =
+              check_sufficient_fee
+                Transaction.Unsigned.Rendered.(fun a -> a.payment)
+                unsigned_rendered_transaction
+              |> env.lift
+            in
+            let%map unsigned_transaction =
+              Transaction.Unsigned.of_rendered unsigned_rendered_transaction
               |> env.lift
             in
             ( User_command_info.to_operations ~failure_status:None
                 unsigned_transaction.command
             , []
-            , meta_of_command unsigned_transaction.command)
+            , meta_of_command unsigned_transaction.command )
       in
       { Construction_parse_response.operations
       ; signers = []
       ; account_identifier_signers
       ; metadata =
-        match (meta.memo, meta.valid_until) with
-        | None, None -> None
-        | _ -> Some (Preprocess.Metadata.to_yojson meta)
+          ( match (meta.memo, meta.valid_until) with
+          | None, None ->
+              None
+          | _ ->
+              Some (Preprocess.Metadata.to_yojson meta) )
       }
   end
 
@@ -794,12 +814,12 @@ module Hash = struct
         let (`Pk pk) = signed_transaction.command.source in
         Public_key.Compressed.of_base58_check pk
         |> Result.map_error ~f:(fun _ ->
-               Errors.create ~context:"compression" `Public_key_format_not_valid)
+               Errors.create ~context:"compression" `Public_key_format_not_valid )
         |> Result.bind ~f:(fun pk ->
                Result.of_option (Public_key.decompress pk)
                  ~error:
                    (Errors.create ~context:"decompression"
-                      `Public_key_format_not_valid))
+                      `Public_key_format_not_valid ) )
         |> Result.map_error ~f:(fun _ -> Errors.create `Malformed_public_key)
         |> env.lift
       in
@@ -829,28 +849,24 @@ end
 module Submit = struct
   module Sql = struct
     module Transaction_exists = struct
-      type t =
-        { nonce: int64
-        ; source: string
-        ; receiver: string
-        ; amount: int64
-        ; fee: int64
+      type params =
+        { nonce : int64
+        ; source : string
+        ; receiver : string
+        ; amount : string
+        ; fee : string
         }
       [@@deriving hlist]
 
-      let typ =
-        let open Archive_lib.Processor.Caqti_type_spec in
-        let spec =
-          Caqti_type.[int64; string; string; int64; int64]
-        in
-        let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
-        let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+      let params_typ =
+        let open Mina_caqti.Type_spec in
+        let spec = Caqti_type.[ int64; string; string; string; string ] in
+        let encode t = Ok (hlist_to_tuple spec (params_to_hlist t)) in
+        let decode t = Ok (params_of_hlist (tuple_to_hlist spec t)) in
         Caqti_type.custom ~encode ~decode (to_rep spec)
 
       let query =
-        Caqti_request.find_opt
-          typ
-          Caqti_type.string
+        Caqti_request.find_opt params_typ Caqti_type.string
           {sql| SELECT uc.id FROM user_commands uc
                 INNER JOIN public_keys AS pks ON pks.id = uc.source_id
                 INNER JOIN public_keys AS pkr ON pkr.id = uc.receiver_id
@@ -860,19 +876,19 @@ module Submit = struct
                 AND uc.amount = $4
                 AND uc.fee = $5 |sql}
 
-      let run (module Conn : Caqti_async.CONNECTION) ~nonce ~source ~receiver ~amount ~fee =
+      let run (module Conn : Caqti_async.CONNECTION) ~nonce ~source ~receiver
+          ~amount ~fee =
         let open Unsigned_extended in
-        Conn.find_opt
-          query
-          { nonce = (UInt32.to_int64 nonce)
+        Conn.find_opt query
+          { nonce = UInt32.to_int64 nonce
           ; source
           ; receiver
-          ; amount = (UInt64.to_int64 amount)
-          ; fee = (UInt64.to_int64 fee) }
+          ; amount = UInt64.to_string amount
+          ; fee = UInt64.to_string fee
+          }
         |> Deferred.Result.map ~f:Option.is_some
     end
   end
-
 
   module Env = struct
     module T (M : Monad_fail.S) = struct
@@ -893,7 +909,7 @@ module Submit = struct
             -> signature:string
             -> unit
             -> ('gql_delegation, Errors.t) M.t
-        ; db_transaction_exists:
+        ; db_transaction_exists :
                nonce:Unsigned_extended.UInt32.t
             -> source:string
             -> receiver:string
@@ -922,33 +938,38 @@ module Submit = struct
         { gql_payment =
             (fun ~payment ~signature () ->
               Graphql.query_and_catch
-                Send_payment.(make @@ makeVariables ~from:(`String payment.from)
-                   ~to_:(`String payment.to_) ~token:(uint64 payment.token)
-                   ~amount:(uint64 payment.amount) ~fee:(uint64 payment.fee)
-                   ?validUntil:(Option.map ~f:uint32 payment.valid_until)
-                   ?memo:payment.memo ~nonce:(uint32 payment.nonce) ~signature
-                   ())
-                graphql_uri)
+                Send_payment.(
+                  make
+                  @@ makeVariables ~from:(`String payment.from)
+                       ~to_:(`String payment.to_) ~token:(`String payment.token)
+                       ~amount:(uint64 payment.amount) ~fee:(uint64 payment.fee)
+                       ?validUntil:(Option.map ~f:uint32 payment.valid_until)
+                       ?memo:payment.memo ~nonce:(uint32 payment.nonce)
+                       ~signature ())
+                graphql_uri )
         ; gql_delegation =
             (fun ~delegation ~signature () ->
               Graphql.query
-                Send_delegation.(make @@ makeVariables ~sender:(`String delegation.delegator)
-                   ~receiver:(`String delegation.new_delegate)
-                   ~fee:
-                     (uint64 delegation.fee)
-                   (* TODO: Enable these when graphql supports sending validUntil for these transactions *)
-                   (* ?validUntil:(Option.map ~f:uint32 delegation.valid_until) *)
-                   ?memo:delegation.memo ~nonce:(uint32 delegation.nonce)
-                   ~signature ())
-                graphql_uri)
-        ; db_transaction_exists = (fun ~nonce ~source ~receiver ~amount ~fee ->
-          Sql.Transaction_exists.run db ~nonce ~source ~receiver ~amount ~fee |> Errors.Lift.sql )
+                Send_delegation.(
+                  make
+                  @@ makeVariables ~sender:(`String delegation.delegator)
+                       ~receiver:(`String delegation.new_delegate)
+                       ~fee:(uint64 delegation.fee)
+                         (* TODO: Enable these when graphql supports sending validUntil for these transactions *)
+                         (* ?validUntil:(Option.map ~f:uint32 delegation.valid_until) *)
+                       ?memo:delegation.memo ~nonce:(uint32 delegation.nonce)
+                       ~signature ())
+                graphql_uri )
+        ; db_transaction_exists =
+            (fun ~nonce ~source ~receiver ~amount ~fee ->
+              Sql.Transaction_exists.run db ~nonce ~source ~receiver ~amount
+                ~fee
+              |> Errors.Lift.sql )
         ; lift = Deferred.return
         }
   end
 
   module Impl (M : Monad_fail.S) = struct
-
     (* HACK: Sometimes we get bad nonce submit errors but they're really
      * duplicates. The daemon doesn't store enough information to tell the
      * difference. In order to disambiguate, we'll keep a cache of recent 100
@@ -960,20 +981,17 @@ module Submit = struct
 
       type t = { buf : Transaction.Signed.t option array; mutable idx : int }
 
-      let create () =
-        { buf = Array.init size ~f:(fun _i -> None)
-        ; idx = 0
-        }
+      let create () = { buf = Array.init size ~f:(fun _i -> None); idx = 0 }
 
       let add t txn =
-        t.buf.(t.idx) <- Some txn;
-        t.idx <- ((t.idx + 1) mod size)
+        t.buf.(t.idx) <- Some txn ;
+        t.idx <- (t.idx + 1) mod size
 
       let find t txn =
-        Array.find t.buf ~f:(fun x -> [%equal: Transaction.Signed.t option] (Some txn) x)
+        Array.find t.buf ~f:(fun x ->
+            [%equal: Transaction.Signed.t option] (Some txn) x )
 
-      let mem t txn =
-        Option.is_some (find t txn)
+      let mem t txn = Option.is_some (find t txn)
     end
 
     let submitted_cache = lazy (Cache.create ())
@@ -985,7 +1003,7 @@ module Submit = struct
            , 'gql_create_token
            , 'gql_create_token_account
            , 'gql_mint_tokens )
-           Env.T(M).t) (req : Construction_submit_request.t) =
+           Env.T(M).t ) (req : Construction_submit_request.t) =
       let open M.Let_syntax in
       let%bind json =
         try M.return (Yojson.Safe.from_string req.signed_transaction)
@@ -997,52 +1015,48 @@ module Submit = struct
         |> env.lift
       in
       let%bind txn =
-        Transaction.Signed.of_rendered signed_transaction
-        |> env.lift
+        Transaction.Signed.of_rendered signed_transaction |> env.lift
       in
       let%map hash =
         match
-          ( signed_transaction.payment
-          , signed_transaction.stake_delegation
-          , signed_transaction.create_token
-          , signed_transaction.create_token_account
-          , signed_transaction.mint_tokens )
+          (signed_transaction.payment, signed_transaction.stake_delegation)
         with
-        | Some payment, None, None, None, None ->
-            (
+        | Some payment, None -> (
             match%bind
-            env.gql_payment ~payment ~signature:signed_transaction.signature
-              ()
+              env.gql_payment ~payment ~signature:signed_transaction.signature
+                ()
             with
             | `Successful res ->
-               let cache = Lazy.force submitted_cache in
-               Cache.add cache txn;
-               M.return res.Send_payment.sendPayment.payment.hash
-            | `Failed e ->
-               let cache = Lazy.force submitted_cache in
-               if
-                 ([%equal: Errors.Variant.t] (Errors.kind e) `Transaction_submit_bad_nonce) &&
-                   Cache.mem cache txn
-               then
-                 M.fail (Errors.create `Transaction_submit_duplicate)
-               else
-                 (
-                 let cmd = txn.command in
-                 match%bind
-                   env.db_transaction_exists
-                     ~nonce:txn.nonce
-                     ~source:(let (`Pk s) = cmd.source in s)
-                     ~receiver:(let (`Pk r) = cmd.receiver in r)
-                     ~amount:
-                        (Option.value
-                          ~default:Unsigned_extended.UInt64.zero cmd.amount)
-                     ~fee:cmd.fee
-                 with
-                 | true ->
-                   M.fail (Errors.create `Transaction_submit_duplicate)
-                 | false ->
-                   M.fail e ) )
-        | None, Some delegation, None, None, None ->
+                let cache = Lazy.force submitted_cache in
+                Cache.add cache txn ;
+                M.return res.Send_payment.sendPayment.payment.hash
+            | `Failed e -> (
+                let cache = Lazy.force submitted_cache in
+                if
+                  [%equal: Errors.Variant.t] (Errors.kind e)
+                    `Transaction_submit_bad_nonce
+                  && Cache.mem cache txn
+                then M.fail (Errors.create `Transaction_submit_duplicate)
+                else
+                  let cmd = txn.command in
+                  match%bind
+                    env.db_transaction_exists ~nonce:txn.nonce
+                      ~source:
+                        (let (`Pk s) = cmd.source in
+                         s )
+                      ~receiver:
+                        (let (`Pk r) = cmd.receiver in
+                         r )
+                      ~amount:
+                        (Option.value ~default:Unsigned_extended.UInt64.zero
+                           cmd.amount )
+                      ~fee:cmd.fee
+                  with
+                  | true ->
+                      M.fail (Errors.create `Transaction_submit_duplicate)
+                  | false ->
+                      M.fail e ) )
+        | None, Some delegation ->
             let%map res =
               env.gql_delegation ~delegation
                 ~signature:signed_transaction.signature ()
@@ -1051,9 +1065,8 @@ module Submit = struct
         | _ ->
             M.fail
               (Errors.create
-                 ~context:
-                   "Must have one of payment, stakeDelegation"
-                 (`Json_parse None))
+                 ~context:"Must have one of payment, stakeDelegation"
+                 (`Json_parse None) )
       in
       Transaction_identifier_response.create
         (Transaction_identifier.create hash)
@@ -1063,16 +1076,12 @@ module Submit = struct
   module Mock = Impl (Result)
 end
 
-let router
-  ~get_graphql_uri_or_error ~(with_db:(db:(module Caqti_async.CONNECTION) ->
- (Yojson.Safe.t, [> `App of Errors.t ]) Deferred.Result.t) ->
-('a, [> `Page_not_found ]) Deferred.Result.t)
- ~logger
-  (route : string list) body =
+let router ~get_graphql_uri_or_error ~with_db ~logger (route : string list) body
+    =
   [%log debug] "Handling /construction/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
   let open Deferred.Result.Let_syntax in
-  [%log info] "Construction query" ~metadata:[("query",body)];
+  [%log info] "Construction query" ~metadata:[ ("query", body) ] ;
   match route with
   | [ "derive" ] ->
       let%bind req =
@@ -1149,17 +1158,17 @@ let router
       in
       Transaction_identifier_response.to_yojson res
   | [ "submit" ] ->
-    let%bind graphql_uri = get_graphql_uri_or_error () in
-    with_db (fun ~db ->
-        let%bind req =
-          Errors.Lift.parse ~context:"Request"
-          @@ Construction_submit_request.of_yojson body
-          |> Errors.Lift.wrap
-        in
-        let%map res =
-          Submit.Real.handle ~env:(Submit.Env.real ~db ~graphql_uri) req
-          |> Errors.Lift.wrap
-        in
-        Transaction_identifier_response.to_yojson res)
+      let%bind graphql_uri = get_graphql_uri_or_error () in
+      with_db (fun ~db ->
+          let%bind req =
+            Errors.Lift.parse ~context:"Request"
+            @@ Construction_submit_request.of_yojson body
+            |> Errors.Lift.wrap
+          in
+          let%map res =
+            Submit.Real.handle ~env:(Submit.Env.real ~db ~graphql_uri) req
+            |> Errors.Lift.wrap
+          in
+          Transaction_identifier_response.to_yojson res )
   | _ ->
       Deferred.Result.fail `Page_not_found

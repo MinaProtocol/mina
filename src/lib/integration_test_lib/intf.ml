@@ -12,7 +12,13 @@ type metrics_t =
   }
 
 type best_chain_block =
-  { state_hash : string; command_transaction_count : int; creator_pk : string }
+  { state_hash : string
+  ; command_transaction_count : int
+  ; creator_pk : string
+  ; height : Mina_numbers.Length.t
+  ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+  ; global_slot_since_hard_fork : Mina_numbers.Global_slot_since_hard_fork.t
+  }
 
 (* TODO: malleable error -> or error *)
 
@@ -60,7 +66,11 @@ module Engine = struct
       val dump_archive_data :
         logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t
 
-      val run_replayer : logger:Logger.t -> t -> string Malleable_error.t
+      val run_replayer :
+           ?start_slot_since_genesis:int
+        -> logger:Logger.t
+        -> t
+        -> string Malleable_error.t
 
       val dump_mina_logs :
         logger:Logger.t -> t -> log_file:string -> unit Malleable_error.t
@@ -187,12 +197,18 @@ module Dsl = struct
       ; global_slot : int
       ; snarked_ledgers_generated : int
       ; blocks_generated : int
+      ; num_transition_frontier_loaded_from_persistence : int
+      ; num_persisted_frontier_loaded : int
+      ; num_persisted_frontier_fresh_boot : int
+      ; num_bootstrap_required : int
+      ; num_persisted_frontier_dropped : int
       ; node_initialization : bool String.Map.t
       ; gossip_received : Gossip_state.t String.Map.t
       ; best_tips_by_node : State_hash.t String.Map.t
       ; blocks_produced_by_node : State_hash.t list String.Map.t
       ; blocks_seen_by_node : State_hash.Set.t String.Map.t
-      ; blocks_including_txn : State_hash.Set.t Transaction_hash.Map.t
+      ; blocks_including_txn :
+          State_hash.Set.t Mina_transaction.Transaction_hash.Map.t
       }
 
     val listen :
@@ -220,6 +236,9 @@ module Dsl = struct
       | Signed_command_to_be_included_in_frontier
       | Ledger_proofs_emitted_since_genesis
       | Block_height_growth
+      | Zkapp_to_be_included_in_frontier
+      | Persisted_frontier_loaded
+      | Transition_frontier_loaded_from_persistence
 
     val wait_condition_id : t -> wait_condition_id
 
@@ -240,12 +259,20 @@ module Dsl = struct
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
 
     val signed_command_to_be_included_in_frontier :
-         txn_hash:Transaction_hash.t
+         txn_hash:Mina_transaction.Transaction_hash.t
       -> node_included_in:[ `Any_node | `Node of Engine.Network.Node.t ]
       -> t
 
     val ledger_proofs_emitted_since_genesis :
       test_config:Test_config.t -> num_proofs:int -> t
+
+    val zkapp_to_be_included_in_frontier :
+      has_failures:bool -> zkapp_command:Mina_base.Zkapp_command.t -> t
+
+    val persisted_frontier_loaded : Engine.Network.Node.t -> t
+
+    val transition_frontier_loaded_from_persistence :
+      fresh_data:bool -> sync_needed:bool -> t
   end
 
   module type S = sig

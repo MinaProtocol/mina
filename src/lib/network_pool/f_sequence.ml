@@ -600,6 +600,20 @@ let iter = C.iter
 
 let find = C.find
 
+let findi t ~f =
+  match
+    C.fold t ~init:(`Not_found 0) ~f:(fun acc x ->
+        match acc with
+        | `Not_found i ->
+            if f x then `Found i else `Not_found (i + 1)
+        | `Found i ->
+            `Found i )
+  with
+  | `Not_found _ ->
+      None
+  | `Found i ->
+      Some i
+
 let to_seq : 'e t -> 'e Sequence.t = fun t -> Sequence.unfold ~init:t ~f:uncons
 
 let sexp_of_t : ('e -> Sexp.t) -> 'e t -> Sexp.t =

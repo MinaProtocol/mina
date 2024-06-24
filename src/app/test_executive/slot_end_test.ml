@@ -28,21 +28,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       requires_graphql = true
     ; genesis_ledger =
-        [ { Test_Account.account_name = "receiver-key"
-          ; balance = "9999999"
-          ; timing = Untimed
-          }
-        ; { account_name = "sender-1-key"; balance = "0"; timing = Untimed }
-        ; { account_name = "sender-2-key"; balance = "0"; timing = Untimed }
-        ; { account_name = "sender-3-key"; balance = "0"; timing = Untimed }
-        ; { account_name = "snark-node-key"; balance = "0"; timing = Untimed }
+        (let open Test_account in
+        [ create ~account_name:"receiver-key" ~balance:"9999999" ()
+        ; create ~account_name:"sender-1-key" ~balance:"0" ()
+        ; create ~account_name:"sender-2-key" ~balance:"0" ()
+        ; create ~account_name:"sender-3-key" ~balance:"0" ()
+        ; create ~account_name:"snark-node-key" ~balance:"0" ()
         ]
         @ List.init num_extra_keys ~f:(fun i ->
-              { Test_Account.account_name =
-                  sprintf "%s-%d" sender_account_prefix i
-              ; balance = "1000"
-              ; timing = Untimed
-              } )
+              create
+                ~account_name:(sprintf "%s-%d" sender_account_prefix i)
+                ~balance:"1000" () ))
     ; block_producers =
         [ { node_name = "receiver"; account_name = "receiver-key" }
         ; { node_name = "sender-1"; account_name = "sender-1-key" }
@@ -68,9 +64,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; slot_chain_end = Some slot_chain_end
     }
 
-  let fee = Currency.Fee.of_int 10_000_000
+  let fee = Currency.Fee.of_nanomina_int_exn 10_000_000
 
-  let amount = Currency.Amount.of_int 10_000_000
+  let amount = Currency.Amount.of_nanomina_int_exn 10_000_000
 
   let tx_delay_ms = 5000
 
@@ -111,7 +107,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Wait_condition.nodes_to_initialize (String.Map.data all_nodes))
     in
     let genesis_timestamp =
-      Block_time.to_time
+      Block_time.to_time_exn
       @@ Block_time.of_int64
            (Network.genesis_constants network).protocol.genesis_state_timestamp
     in
@@ -119,8 +115,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Time.add genesis_timestamp
         (Time.Span.of_ms @@ float_of_int (num_slots * window_ms))
     in
-    let slot_tx_end = Mina_numbers.Global_slot.of_int slot_tx_end in
-    let slot_chain_end = Mina_numbers.Global_slot.of_int slot_chain_end in
+    let slot_tx_end =
+      Mina_numbers.Global_slot_since_hard_fork.of_int slot_tx_end
+    in
+    let slot_chain_end =
+      Mina_numbers.Global_slot_since_hard_fork.of_int slot_chain_end
+    in
     let%bind () =
       section_hard "spawn transaction sending"
         (let num_payments = num_slots * window_ms / tx_delay_ms in
@@ -160,11 +160,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section "blocks produced before slot_tx_end"
         ( ok_if_true "only empty blocks were produced before slot_tx_end"
         @@ List.exists blocks ~f:(fun block ->
-               Mina_numbers.Global_slot.(
-                 of_uint32 block.slot_since_genesis < slot_tx_end)
+               Mina_numbers.Global_slot_since_hard_fork.(
+                 block.slot < slot_tx_end)
                && ( block.command_transaction_count <> 0
                   || block.snark_work_count <> 0
-                  || block.coinbase <> 0 ) ) )
+                  || Currency.Amount.(block.coinbase <> zero) ) ) )
     in
     let%bind () =
       section "blocks produced after slot_tx_end"
@@ -172,28 +172,29 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              let msg =
                Printf.sprintf
                  "non-empty block after slot_tx_end. block slot since genesis: \
-                  %s, txn count: %d, snark work count: %d, coinbase: %d"
-                 (Mina_numbers.Global_slot.to_string block.slot_since_genesis)
+                  %s, txn count: %d, snark work count: %d, coinbase: %s"
+                 (Mina_numbers.Global_slot_since_hard_fork.to_string block.slot)
                  block.command_transaction_count block.snark_work_count
-                 block.coinbase
+                 (Currency.Amount.to_string block.coinbase)
              in
              ok_if_true msg
-               ( Mina_numbers.Global_slot.(
-                   of_uint32 block.slot_since_genesis < slot_tx_end)
+               ( Mina_numbers.Global_slot_since_hard_fork.(
+                   block.slot < slot_tx_end)
                || block.command_transaction_count = 0
-                  && block.snark_work_count = 0 && block.coinbase = 0 ) ) )
+                  && block.snark_work_count = 0
+                  && Currency.Amount.(block.coinbase = zero) ) ) )
     in
     let%bind () =
       section "blocks produced before slot_chain_end"
         ( ok_if_true "no block produced before slot_chain_end"
         @@ List.exists blocks ~f:(fun block ->
-               Mina_numbers.Global_slot.(
-                 of_uint32 block.slot_since_genesis < slot_chain_end) ) )
+               Mina_numbers.Global_slot_since_hard_fork.(
+                 block.slot < slot_chain_end) ) )
     in
     section "no blocks produced after slot_chain_end"
       ( ok_if_true "blocks produced after slot_chain_end"
       @@ not
       @@ List.exists blocks ~f:(fun block ->
-             Mina_numbers.Global_slot.(
-               of_uint32 block.slot_since_genesis >= slot_chain_end) ) )
+             Mina_numbers.Global_slot_since_hard_fork.(
+               block.slot >= slot_chain_end) ) )
 end

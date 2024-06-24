@@ -6,11 +6,15 @@
  (libraries
    ;; opam libraries
    base
+   async.async_command
    async_kernel
+   async_unix
    async
+   core_kernel
    core
    base.caml
    ;; local libraries
+   bounded_types
    cli_lib
    signature_lib
    secrets

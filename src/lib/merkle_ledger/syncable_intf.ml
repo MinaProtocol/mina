@@ -30,6 +30,4 @@ module type S = sig
   val get_all_accounts_rooted_at_exn : t -> addr -> (addr * account) list
 
   val merkle_root : t -> root_hash
-
-  val make_space_for : t -> int -> unit
 end
