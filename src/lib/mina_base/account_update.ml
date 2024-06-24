@@ -1818,3 +1818,5 @@ let implicit_account_creation_fee (t : t) : bool =
   t.body.implicit_account_creation_fee
 
 let increment_nonce (t : t) : bool = t.body.increment_nonce
+
+let delete_account (_t : t) = false (* t.body.delete_account *)

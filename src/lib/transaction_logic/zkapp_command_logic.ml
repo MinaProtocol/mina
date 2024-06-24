@@ -350,6 +350,8 @@ module type Account_update_intf = sig
 
   val implicit_account_creation_fee : t -> bool
 
+  val delete_account : t -> bool
+
   val check_authorization :
        will_succeed:bool
     -> commitment:transaction_commitment
