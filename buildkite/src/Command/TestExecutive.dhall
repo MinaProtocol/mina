@@ -15,27 +15,6 @@ let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 in
 
 {
-  build = \(duneProfile : Text) ->
-    Command.build
-      Command.Config::{
-        commands =
-            -- Build test executive binary
-            RunInToolchain.runInToolchainStretch [
-              "DUNE_PROFILE=${duneProfile}"
-            ] "./buildkite/scripts/build-test-executive.sh"
-            
-            #
-            
-            [
-              -- Cache test-executive binary
-              Cmd.run "artifact-cache-helper.sh test_executive.exe --upload",
-              Cmd.run "artifact-cache-helper.sh logproc.exe --upload"
-            ],
-        label = "Build test-executive",
-        key = "build-test-executive",
-        target = Size.XLarge
-      },
-
   execute = \(testName : Text) -> \(dependsOn : List Command.TaggedKey.Type) ->
     Command.build
       Command.Config::{
