@@ -10,7 +10,7 @@ let Profiles = ../../Constants/Profiles.dhall
 let Dockers = ../../Constants/DockerVersions.dhall
 
 -- let dependsOn = Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "daemon-berkeley"
-let dependsOn = []
+let dependsOn : List DependencyType = []
 
 in Pipeline.build Pipeline.Config::{
   spec =
