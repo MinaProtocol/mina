@@ -1,13 +1,5 @@
 #!/bin/bash
 
-echo "ARGS COUNT IS" 
-echo $#
-echo $0
-echo $1
-echo $2
-echo $3
-echo "0000000000000"
-
 if [[ $# -gt 2 ]] || [[ $# -lt 1 ]]; then
     echo "Usage: $0 '<debians>' '[use-sudo]'"
     exit 1
@@ -20,8 +12,6 @@ fi
 
 DEBS=$1
 USE_SUDO=${2:-0}
-ARCH=${3:-""}
-
 
 if [ "$USE_SUDO" == "1" ]; then
    SUDO="sudo"
@@ -60,7 +50,7 @@ $SUDO apt-get update
 $SUDO apt-get install -y aptly
 
 # Start aptly
-source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --arch $ARCH --clean --background
+source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background
 
 # Install debians
 echo "Installing mina packages: $DEBS"
