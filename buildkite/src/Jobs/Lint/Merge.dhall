@@ -12,6 +12,8 @@ let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+
 in
 
 Pipeline.build
