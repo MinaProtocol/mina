@@ -4,11 +4,11 @@ let B = ../External/Buildkite.dhall
 let Command = ./Base.dhall
 let Docker = ./Docker/Type.dhall
 let Size = ./Size.dhall
+let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let Cmd = ../Lib/Cmds.dhall in
-let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 { step = \(dependsOn : List Command.TaggedKey.Type) 
     -> \(testnet : Text) 
