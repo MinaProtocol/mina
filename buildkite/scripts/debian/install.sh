@@ -1,6 +1,7 @@
 #!/bin/bash
 
-
+echo "ARGS COUNT IS" 
+echo $#
 if [[ $# -gt 2 ]] || [[ $# -lt 1 ]]; then
     echo "Usage: $0 '<debians>' '[use-sudo]'"
     exit 1
