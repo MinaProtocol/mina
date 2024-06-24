@@ -120,7 +120,7 @@ let
         done
       '') package.outputs);
 
-      # Derivation which has all Mina's dependencies in it, and creates an empty output if the command succeds.
+      # Derivation which has all Mina's dependencies in it, and creates an empty output if the command succeeds.
       # Useful for unit tests.
       runMinaCheck = { name ? "check", extraInputs ? [ ], extraArgs ? { } }:
         check:
