@@ -25,9 +25,9 @@ source buildkite/scripts/export-git-env-vars.sh
 source buildkite/scripts/debian/install.sh "mina-${TESTNET_VERSION_NAME}" 1
 
 # Remove lockfile if present
-rm ~/.mina-config/.mina-lock ||:
+sudo rm ~/.mina-config/.mina-lock ||:
 
-mkdir -p /root/libp2p-keys/
+sudo mkdir -p /root/libp2p-keys/
 # Pre-generated random password for this quick test
 export MINA_LIBP2P_PASS=eithohShieshichoh8uaJ5iefo1reiRudaekohG7AeCeib4XuneDet2uGhu7lahf
 mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key
