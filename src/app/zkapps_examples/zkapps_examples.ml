@@ -292,6 +292,7 @@ module Account_update_under_construction = struct
              ; verification_key_hash =
                  Option.value ~default:dummy_vk_hash t.vk_hash
              } )
+        ; delete_account = Boolean.false_
         }
       in
       let calls =
@@ -715,7 +716,8 @@ let mk_update_body ?(token_id = Token_id.default)
     ?(use_full_commitment = false)
     ?(may_use_token = Account_update.May_use_token.No)
     ?(authorization_kind = Account_update.Authorization_kind.Signature)
-    ?(implicit_account_creation_fee = false) public_key =
+    ?(implicit_account_creation_fee = false) ?(delete_account = false)
+    public_key =
   { Account_update.Body.public_key
   ; update
   ; token_id
@@ -729,6 +731,7 @@ let mk_update_body ?(token_id = Token_id.default)
   ; may_use_token
   ; authorization_kind
   ; implicit_account_creation_fee
+  ; delete_account
   }
 
 module Deploy_account_update = struct

@@ -160,12 +160,12 @@ module Rpcs = struct
       include Master
     end)
 
-    module V2 = struct
+    module V3 = struct
       module T = struct
         type query = State_hash.Stable.V1.t
 
         type response =
-          ( Staged_ledger.Scan_state.Stable.V2.t
+          ( Staged_ledger.Scan_state.Stable.V3.t
           * Ledger_hash.Stable.V1.t
           * Pending_coinbase.Stable.V2.t
           * Mina_state.Protocol_state.Value.Stable.V2.t list )

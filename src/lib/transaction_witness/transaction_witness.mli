@@ -7,16 +7,16 @@ module Zkapp_command_segment_witness : sig
 
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t =
         { global_first_pass_ledger : Sparse_ledger.Stable.V2.t
         ; global_second_pass_ledger : Sparse_ledger.Stable.V2.t
         ; local_state_init :
             ( ( Token_id.Stable.V2.t
-              , Zkapp_command.Call_forest.With_hashes.Stable.V1.t )
+              , Zkapp_command.Call_forest.With_hashes.Stable.V2.t )
               Stack_frame.Stable.V1.t
             , ( ( ( Token_id.Stable.V2.t
-                  , Zkapp_command.Call_forest.With_hashes.Stable.V1.t )
+                  , Zkapp_command.Call_forest.With_hashes.Stable.V2.t )
                   Stack_frame.Stable.V1.t
                 , Stack_frame.Digest.Stable.V1.t )
                 With_hash.t
@@ -31,7 +31,7 @@ module Zkapp_command_segment_witness : sig
             , Transaction_status.Failure.Collection.Stable.V1.t )
             Mina_transaction_logic.Zkapp_command_logic.Local_state.Stable.V1.t
         ; start_zkapp_command :
-            ( Zkapp_command.Stable.V1.t
+            ( Zkapp_command.Stable.V2.t
             , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
             , bool )
             Mina_transaction_logic.Zkapp_command_logic.Start_data.Stable.V1.t
@@ -47,9 +47,9 @@ end
 
 [%%versioned:
 module Stable : sig
-  module V2 : sig
+  module V3 : sig
     type t =
-      { transaction : Mina_transaction.Transaction.Stable.V2.t
+      { transaction : Mina_transaction.Transaction.Stable.V3.t
       ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
       ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
       ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t

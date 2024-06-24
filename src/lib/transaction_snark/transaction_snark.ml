@@ -1122,7 +1122,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           let unhash (h : Stack_frame.Digest.Checked.t)
               (frame :
                 ( Mina_base.Token_id.Stable.V2.t
-                , Mina_base.Zkapp_command.Call_forest.With_hashes.Stable.V1.t
+                , Mina_base.Zkapp_command.Call_forest.With_hashes.Stable.V2.t
                 )
                 Stack_frame.Stable.V1.t
                 V.t ) : t =
@@ -1606,7 +1606,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             let implicit_account_creation_fee (t : t) =
               t.account_update.data.implicit_account_creation_fee
 
-            let delete_account _t = Boolean._false
+            let delete_account _t = Boolean.false_
             (* t.account_update.data.delete_account *)
 
             let increment_nonce (t : t) = t.account_update.data.increment_nonce
@@ -4343,6 +4343,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; use_full_commitment =
               (if sender_is_the_same_as_fee_payer then true else false)
           ; implicit_account_creation_fee = false
+          ; delete_account = false
           ; may_use_token = No
           ; authorization_kind = Signature
           }
@@ -4411,6 +4412,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       }
                   ; use_full_commitment = true
                   ; implicit_account_creation_fee = false
+                  ; delete_account = false
                   ; may_use_token = No
                   ; authorization_kind
                   }
@@ -4457,6 +4459,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     }
                 ; use_full_commitment
                 ; implicit_account_creation_fee = false
+                ; delete_account = false
                 ; may_use_token = No
                 ; authorization_kind
                 }
@@ -4749,6 +4752,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               ; preconditions = Account_update.Preconditions.accept
               ; use_full_commitment = true
               ; implicit_account_creation_fee = false
+              ; delete_account = false
               ; may_use_token = No
               ; authorization_kind = Proof (With_hash.hash vk)
               }
@@ -5123,6 +5127,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 }
             ; use_full_commitment = false
             ; implicit_account_creation_fee = false
+            ; delete_account = false
             ; may_use_token = No
             ; authorization_kind = Signature
             }
@@ -5147,6 +5152,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 }
             ; use_full_commitment = false
             ; implicit_account_creation_fee = false
+            ; delete_account = false
             ; may_use_token = No
             ; authorization_kind = Proof (With_hash.hash vk)
             }

@@ -645,6 +645,7 @@ module Account_update_body_components = struct
         }
     ; use_full_commitment = t.use_full_commitment
     ; implicit_account_creation_fee = false
+    ; delete_account = false
     ; may_use_token = t.may_use_token
     ; authorization_kind = t.authorization_kind
     }
@@ -1658,6 +1659,7 @@ let mk_account_update_body ~pk ~vk : Account_update.Body.Simple.t =
   ; preconditions = Account_update.Preconditions.accept
   ; use_full_commitment = true
   ; implicit_account_creation_fee = false
+  ; delete_account = false
   ; may_use_token = Account_update.May_use_token.No
   ; authorization_kind = Proof (With_hash.hash vk)
   }

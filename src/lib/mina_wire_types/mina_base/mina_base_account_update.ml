@@ -99,6 +99,26 @@ module Body = struct
       ; authorization_kind : Authorization_kind.V1.t
       }
   end
+
+  module V2 = struct
+    type t =
+      { public_key : Public_key.Compressed.V1.t
+      ; token_id : Mina_base_token_id.V2.t
+      ; update : Update.V1.t
+      ; balance_change :
+          (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
+      ; increment_nonce : bool
+      ; events : Events'.V1.t
+      ; actions : Events'.V1.t
+      ; call_data : Pickles.Backend.Tick.Field.V1.t
+      ; preconditions : Preconditions.V1.t
+      ; use_full_commitment : bool
+      ; implicit_account_creation_fee : bool
+      ; may_use_token : May_use_token.V1.t
+      ; authorization_kind : Authorization_kind.V1.t
+      ; delete_account : bool
+      }
+  end
 end
 
 module Fee_payer = struct
@@ -110,4 +130,8 @@ end
 
 module V1 = struct
   type t = { body : Body.V1.t; authorization : Mina_base_control.V2.t }
+end
+
+module V2 = struct
+  type t = { body : Body.V2.t; authorization : Mina_base_control.V2.t }
 end

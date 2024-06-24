@@ -75,13 +75,22 @@ let gen = Gen.to_signed_command gen_signed
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     type t =
-      (Signed_command.Stable.V2.t, Zkapp_command.Stable.V1.t) Poly.Stable.V2.t
+      (Signed_command.Stable.V2.t, Zkapp_command.Stable.V2.t) Poly.Stable.V2.t
     [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
   end
+
+  (* TODO: Uncomment *)
+  (* module V2 = struct
+   *   type t =
+   *     (Signed_command.Stable.V2.t, Zkapp_command.Stable.V1.t) Poly.Stable.V2.t
+   *   [@@deriving sexp, compare, equal, hash, yojson]
+   * 
+   *   let to_latest = Fn.id
+   * end *)
 end]
 
 let to_base64 : t -> string = function
@@ -140,6 +149,16 @@ end
 module Verifiable = struct
   [%%versioned
   module Stable = struct
+    module V3 = struct
+      type t =
+        ( Signed_command.Stable.V2.t
+        , Zkapp_command.Verifiable.Stable.V2.t )
+        Poly.Stable.V2.t
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t =
         ( Signed_command.Stable.V2.t
@@ -306,15 +325,25 @@ module Valid = struct
 
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
         ( Signed_command.With_valid_signature.Stable.V2.t
-        , Zkapp_command.Valid.Stable.V1.t )
+        , Zkapp_command.Valid.Stable.V2.t )
         Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
+
+    (* module V2 = struct
+     *   type t =
+     *     ( Signed_command.With_valid_signature.Stable.V2.t
+     *     , Zkapp_command.Valid.Stable.V1.t )
+     *     Poly.Stable.V2.t
+     *   [@@deriving sexp, compare, equal, hash, yojson]
+     * 
+     *   let to_latest = Fn.id
+     * end *)
   end]
 
   module Gen = Gen_make (Signed_command.With_valid_signature)

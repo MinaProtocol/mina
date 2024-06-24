@@ -10,10 +10,6 @@ open Currency
 open Pickles_types
 module Digest = Random_oracle.Digest
 
-module type Type = sig
-  type t
-end
-
 module Authorization_kind = struct
   [%%versioned
   module Stable = struct
@@ -1111,6 +1107,30 @@ module Body = struct
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t =
+          { public_key : Public_key.Compressed.Stable.V1.t
+          ; token_id : Token_id.Stable.V2.t
+          ; update : Update.Stable.V1.t
+          ; balance_change :
+              (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          ; increment_nonce : bool
+          ; events : Events'.Stable.V1.t
+          ; actions : Events'.Stable.V1.t
+          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+          ; call_depth : int
+          ; preconditions : Preconditions.Stable.V1.t
+          ; use_full_commitment : bool
+          ; implicit_account_creation_fee : bool
+          ; may_use_token : May_use_token.Stable.V1.t
+          ; authorization_kind : Authorization_kind.Stable.V1.t
+          ; delete_account : bool
+          }
+        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
@@ -1146,6 +1166,7 @@ module Body = struct
         ~implicit_account_creation_fee:!.bool
         ~may_use_token:!.May_use_token.deriver ~call_depth:!.int
         ~authorization_kind:!.Authorization_kind.deriver
+        ~delete_account:!.bool
       |> finish "AccountUpdateBody" ~t_toplevel_annots
 
     let dummy : t =
@@ -1163,12 +1184,37 @@ module Body = struct
       ; implicit_account_creation_fee = false
       ; may_use_token = No
       ; authorization_kind = None_given
+      ; delete_account = false
       }
   end
 
   module Simple = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t =
+          { public_key : Public_key.Compressed.Stable.V1.t
+          ; token_id : Token_id.Stable.V2.t
+          ; update : Update.Stable.V1.t
+          ; balance_change :
+              (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          ; increment_nonce : bool
+          ; events : Events'.Stable.V1.t
+          ; actions : Events'.Stable.V1.t
+          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+          ; call_depth : int
+          ; preconditions : Preconditions.Stable.V1.t
+          ; use_full_commitment : bool
+          ; implicit_account_creation_fee : bool
+          ; may_use_token : May_use_token.Stable.V1.t
+          ; authorization_kind : Authorization_kind.Stable.V1.t
+          ; delete_account : bool
+          }
+        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
@@ -1189,13 +1235,36 @@ module Body = struct
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
-        let to_latest = Fn.id
+        let to_latest = Fn.id (* TODO:  *)
       end
     end]
   end
 
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t = Mina_wire_types.Mina_base.Account_update.Body.V2.t =
+        { public_key : Public_key.Compressed.Stable.V1.t
+        ; token_id : Token_id.Stable.V2.t
+        ; update : Update.Stable.V1.t
+        ; balance_change :
+            (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        ; increment_nonce : bool
+        ; events : Events'.Stable.V1.t
+        ; actions : Events'.Stable.V1.t
+        ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+        ; preconditions : Preconditions.Stable.V1.t
+        ; use_full_commitment : bool
+        ; implicit_account_creation_fee : bool
+        ; may_use_token : May_use_token.Stable.V1.t
+        ; authorization_kind : Authorization_kind.Stable.V1.t
+        ; delete_account : bool
+        }
+      [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Body.V1.t =
         { public_key : Public_key.Compressed.Stable.V1.t
@@ -1215,7 +1284,7 @@ module Body = struct
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
 
-      let to_latest = Fn.id
+      let to_latest = Fn.id (* TODO:  *)
     end
   end]
 
@@ -1233,6 +1302,7 @@ module Body = struct
     ; implicit_account_creation_fee = p.implicit_account_creation_fee
     ; may_use_token = p.may_use_token
     ; authorization_kind = p.authorization_kind
+    ; delete_account = p.delete_account
     }
 
   let of_graphql_repr
@@ -1250,6 +1320,7 @@ module Body = struct
        ; may_use_token
        ; call_depth = _
        ; authorization_kind
+       ; delete_account
        } :
         Graphql_repr.t ) : t =
     { public_key
@@ -1265,6 +1336,7 @@ module Body = struct
     ; implicit_account_creation_fee
     ; may_use_token
     ; authorization_kind
+    ; delete_account
     }
 
   let to_graphql_repr
@@ -1281,6 +1353,7 @@ module Body = struct
        ; implicit_account_creation_fee
        ; may_use_token
        ; authorization_kind
+       ; delete_account
        } :
         t ) ~call_depth : Graphql_repr.t =
     { Graphql_repr.public_key
@@ -1297,6 +1370,7 @@ module Body = struct
     ; may_use_token
     ; call_depth
     ; authorization_kind
+    ; delete_account
     }
 
   module Fee_payer = struct
@@ -1377,6 +1451,7 @@ module Body = struct
     ; implicit_account_creation_fee = true
     ; may_use_token = No
     ; authorization_kind = Signature
+    ; delete_account = false
     }
 
   let to_simple_fee_payer (t : Fee_payer.t) : Simple.t =
@@ -1410,6 +1485,7 @@ module Body = struct
     ; may_use_token = No
     ; call_depth = 0
     ; authorization_kind = Signature
+    ; delete_account = false
     }
 
   let to_fee_payer_exn (t : t) : Fee_payer.t =
@@ -1462,6 +1538,7 @@ module Body = struct
       ; implicit_account_creation_fee : Boolean.var
       ; may_use_token : May_use_token.Checked.t
       ; authorization_kind : Authorization_kind.Checked.t
+      ; delete_account : Boolean.var
       }
     [@@deriving annot, hlist, fields]
 
@@ -1479,6 +1556,7 @@ module Body = struct
          ; implicit_account_creation_fee
          ; may_use_token
          ; authorization_kind
+         ; delete_account
          } :
           t ) =
       List.reduce_exn ~f:Random_oracle_input.Chunked.append
@@ -1499,6 +1577,7 @@ module Body = struct
             ((implicit_account_creation_fee :> Field.Var.t), 1)
         ; May_use_token.Checked.to_input may_use_token
         ; Authorization_kind.Checked.to_input authorization_kind
+        ; Random_oracle_input.Chunked.packed ((delete_account :> Field.Var.t), 1)
         ]
 
     let digest ?chain (t : t) =
@@ -1521,6 +1600,7 @@ module Body = struct
       ; Impl.Boolean.typ
       ; May_use_token.typ
       ; Authorization_kind.typ
+      ; Impl.Boolean.typ
       ]
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -1539,6 +1619,7 @@ module Body = struct
     ; implicit_account_creation_fee = true
     ; may_use_token = No
     ; authorization_kind = None_given
+    ; delete_account = false
     }
 
   let to_input
@@ -1555,6 +1636,7 @@ module Body = struct
        ; implicit_account_creation_fee
        ; may_use_token
        ; authorization_kind
+       ; delete_account
        } :
         t ) =
     List.reduce_exn ~f:Random_oracle_input.Chunked.append
@@ -1572,6 +1654,7 @@ module Body = struct
           (field_of_bool implicit_account_creation_fee, 1)
       ; May_use_token.to_input may_use_token
       ; Authorization_kind.to_input authorization_kind
+      ; Random_oracle_input.Chunked.packed (field_of_bool delete_account, 1)
       ]
 
   let digest ?chain (t : t) =
@@ -1600,7 +1683,9 @@ module Body = struct
     and use_full_commitment = Quickcheck.Generator.bool
     and implicit_account_creation_fee = Quickcheck.Generator.bool
     and may_use_token = May_use_token.gen
+    and delete_account = Quickcheck.Generator.bool
     and authorization_kind = Authorization_kind.gen in
+
     { public_key
     ; token_id
     ; update
@@ -1614,6 +1699,7 @@ module Body = struct
     ; implicit_account_creation_fee
     ; may_use_token
     ; authorization_kind
+    ; delete_account
     }
 
   let gen_with_events_and_actions =
@@ -1630,6 +1716,7 @@ module Body = struct
     and use_full_commitment = Quickcheck.Generator.bool
     and implicit_account_creation_fee = Quickcheck.Generator.bool
     and may_use_token = May_use_token.gen
+    and delete_account = Quickcheck.Generator.bool
     and authorization_kind = Authorization_kind.gen in
     { public_key
     ; token_id
@@ -1644,6 +1731,7 @@ module Body = struct
     ; implicit_account_creation_fee
     ; may_use_token
     ; authorization_kind
+    ; delete_account
     }
 end
 
@@ -1651,6 +1739,17 @@ module T = struct
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        (** An account update in a zkApp transaction *)
+        type t =
+          { body : Body.Graphql_repr.Stable.V2.t
+          ; authorization : Control.Stable.V2.t
+          }
+        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         (** An account update in a zkApp transaction *)
         type t =
@@ -1675,6 +1774,16 @@ module T = struct
   module Simple = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t =
+          { body : Body.Simple.Stable.V2.t
+          ; authorization : Control.Stable.V2.t
+          }
+        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
           { body : Body.Simple.Stable.V1.t
@@ -1689,6 +1798,15 @@ module T = struct
 
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      (** A account_update to a zkApp transaction *)
+      type t = Mina_wire_types.Mina_base.Account_update.V2.t =
+        { body : Body.Stable.V2.t; authorization : Control.Stable.V2.t }
+      [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       (** A account_update to a zkApp transaction *)
       type t = Mina_wire_types.Mina_base.Account_update.V1.t =
@@ -1819,4 +1937,4 @@ let implicit_account_creation_fee (t : t) : bool =
 
 let increment_nonce (t : t) : bool = t.body.increment_nonce
 
-let delete_account (_t : t) = false (* t.body.delete_account *)
+let delete_account (t : t) = t.body.delete_account

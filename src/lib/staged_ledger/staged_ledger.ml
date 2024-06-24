@@ -4724,7 +4724,7 @@ let%test_module "staged ledger tests" =
               let diff : Staged_ledger_diff.t =
                 let pre_diff :
                     Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.Stable
-                    .V2
+                    .V3
                     .t =
                   { completed_works = []
                   ; commands = cmds
@@ -4784,6 +4784,7 @@ let%test_module "staged ledger tests" =
         ; implicit_account_creation_fee = false
         ; may_use_token = Account_update.May_use_token.No
         ; authorization_kind = authorization
+        ; delete_account = false
         }
         []
 
