@@ -34,8 +34,8 @@
    data_hash_lib
    mina_numbers
    snark_params
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    pasta_bindings
    pickles
    pickles_types

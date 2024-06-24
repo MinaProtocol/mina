@@ -48,8 +48,8 @@
    crypto_params
    kimchi_bindings
    kimchi_backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    pasta_bindings
    zkapp_command_builder
    transaction_snark_tests

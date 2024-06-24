@@ -21,8 +21,8 @@
   with_hash
   data_hash_lib
   kimchi_backend
-  kimchi_backend.pasta
-  kimchi_backend.pasta.basic
+  kimchi_pasta
+  kimchi_pasta.basic
   pickles
   pickles_types
   random_oracle_input
