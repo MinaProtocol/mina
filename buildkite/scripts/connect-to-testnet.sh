@@ -30,9 +30,9 @@ sudo rm ~/.mina-config/.mina-lock ||:
 sudo mkdir -p /root/libp2p-keys/
 
 # Set permissions on the keypair so the daemon doesn't complain
-chmod -R 0700 /root/libp2p-keys/
+sudo chmod -R 0700 /root/libp2p-keys/
 # Pre-generated random password for this quick test
-export MINA_LIBP2P_PASS=eithohShieshichoh8uaJ5iefo1reiRudaekohG7AeCeib4XuneDet2uGhu7lahf
+sudo export MINA_LIBP2P_PASS=eithohShieshichoh8uaJ5iefo1reiRudaekohG7AeCeib4XuneDet2uGhu7lahf
 sudo mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key
 
 # Restart in the background
