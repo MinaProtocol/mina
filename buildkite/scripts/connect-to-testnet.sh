@@ -38,7 +38,7 @@ sudo MINA_LIBP2P_PASS=eithohShieshichoh8uaJ5iefo1reiRudaekohG7AeCeib4XuneDet2uGh
 sudo MINA_LIBP2P_PASS=eithohShieshichoh8uaJ5iefo1reiRudaekohG7AeCeib4XuneDet2uGhu7lahf \
     TESTNET_NAME=$TESTNET_NAME \
   bash -c "mina daemon \
-  --peer-list-url \"https://storage.googleapis.com/seed-lists/$TESTNET_NAME_seeds.txt\" \
+  --peer-list-url \"https://storage.googleapis.com/seed-lists/${TESTNET_NAME}_seeds.txt\" \
   --libp2p-keypair \"/root/libp2p-keys/key\" \
   --seed &" # -background
 
