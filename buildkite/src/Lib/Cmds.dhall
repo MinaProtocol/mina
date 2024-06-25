@@ -29,7 +29,11 @@ let module = \(environment : List Text) ->
   let Cmd = { line: Text, readable: Optional Text }
   let run : Text -> Cmd =
     \(script: Text) -> { line = script, readable = Some script }
-
+  
+  let chain : List Text -> Cmd = 
+    \(chainOfCommands: List Text) ->
+      run (Text/concatSep " && " chainOfCommands)
+  
   let quietly : Text -> Cmd =
     \(script: Text) -> { line = script, readable = None Text }
   let true : Cmd = quietly "true"
@@ -95,6 +99,7 @@ let module = \(environment : List Text) ->
   , CacheSetupCmd = CacheSetupCmd
   , quietly = quietly
   , run = run
+  , chain = chain
   , true = true
   , false = false
   , runInDocker = runInDocker
