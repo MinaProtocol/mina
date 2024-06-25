@@ -60,7 +60,7 @@ done
 # Check that the daemon has connected to peers and is still up after 2 mins
 sleep $WAIT_AFTER_FINAL_CHECK
 
-peer_retries = 24
+peer_retries=24
 for ((i=1;i<=$peer_retries;i++)); do
   sleep 10
   peer_count=$(sudo mina advanced get-peers | wc -l)
