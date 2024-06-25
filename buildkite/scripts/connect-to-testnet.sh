@@ -32,11 +32,10 @@ sudo mkdir -p /root/libp2p-keys/
 # Set permissions on the keypair so the daemon doesn't complain
 sudo chmod -R 0700 /root/libp2p-keys/
 # Pre-generated random password for this quick test
-export MINA_LIBP2P_PASS=eithohShieshichoh8uaJ5iefo1reiRudaekohG7AeCeib4XuneDet2uGhu7lahf
 sudo MINA_LIBP2P_PASS=eithohShieshichoh8uaJ5iefo1reiRudaekohG7AeCeib4XuneDet2uGhu7lahf mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key
 
 # Restart in the background
-sudo mina daemon \
+sudo MINA_LIBP2P_PASS=eithohShieshichoh8uaJ5iefo1reiRudaekohG7AeCeib4XuneDet2uGhu7lahf mina daemon \
   --peer-list-url "https://storage.googleapis.com/seed-lists/${TESTNET_NAME}_seeds.txt" \
   --libp2p-keypair "/root/libp2p-keys/key" \
 & # -background
