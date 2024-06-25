@@ -35,11 +35,11 @@ sudo chmod -R 0700 /root/libp2p-keys/
 sudo MINA_LIBP2P_PASS=eithohShieshichoh8uaJ5iefo1reiRudaekohG7AeCeib4XuneDet2uGhu7lahf mina libp2p generate-keypair --privkey-path /root/libp2p-keys/key
 
 # Restart in the background
-sudo MINA_LIBP2P_PASS=eithohShieshichoh8uaJ5iefo1reiRudaekohG7AeCeib4XuneDet2uGhu7lahf mina daemon \
+sudo MINA_LIBP2P_PASS=eithohShieshichoh8uaJ5iefo1reiRudaekohG7AeCeib4XuneDet2uGhu7lahf \
+  bash -c 'mina daemon \
   --peer-list-url "https://storage.googleapis.com/seed-lists/${TESTNET_NAME}_seeds.txt" \
   --libp2p-keypair "/root/libp2p-keys/key" \
-  --seed
-& # -background
+  --seed &' # -background
 
 # Attempt to connect to the GraphQL client every 10s for up to 8 minutes
 num_status_retries=24
@@ -65,4 +65,3 @@ else
     echo "No peers found"
     exit 1
 fi
-
