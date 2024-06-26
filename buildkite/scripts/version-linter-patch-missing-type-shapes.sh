@@ -21,9 +21,7 @@ function checkout_and_dump() {
     git checkout $__commit
     git submodule sync
     git submodule update --init --recursive
-    export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
-    export GO=/usr/lib/go/bin/go
-    eval $(opam env)
+    source ~/.profile
     dune exec src/app/cli/src/mina.exe internal dump-type-shapes > ${__commit:0:7}-type-shapes.txt
 }
 
