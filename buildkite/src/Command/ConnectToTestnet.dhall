@@ -4,6 +4,7 @@ let B = ../External/Buildkite.dhall
 let Command = ./Base.dhall
 let Docker = ./Docker/Type.dhall
 let Size = ./Size.dhall
+let RunInToolchain = ./RunInToolchain.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
@@ -16,13 +17,9 @@ let Cmd = ../Lib/Cmds.dhall in
     -> \(soft_fail: B/SoftFail)
     -> Command.build
         Command.Config::{
-          commands = [
-            Cmd.runInDocker
-              Cmd.Docker::{
-                image = (../Constants/ContainerImages.dhall).ubuntu2004
-              }
-              "./buildkite/scripts/connect-to-testnet.sh ${testnet} ${wait_between_graphql_poll} ${wait_before_final_check}"
-          ],
+          commands =
+            RunInToolchain.runInToolchain ([]: List Text)
+              "./buildkite/scripts/connect-to-testnet.sh ${testnet} ${wait_between_graphql_poll} ${wait_before_final_check}",
           label = "Connect to ${testnet}",
           soft_fail = Some soft_fail,
           key = "connect-to-${testnet}",

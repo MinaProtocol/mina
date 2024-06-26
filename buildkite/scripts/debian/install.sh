@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 if [[ $# -gt 2 ]] || [[ $# -lt 1 ]]; then
     echo "Usage: $0 '<debians>' '[use-sudo]'"
     exit 1
@@ -13,7 +12,6 @@ fi
 
 DEBS=$1
 USE_SUDO=${2:-0}
-
 
 if [ "$USE_SUDO" == "1" ]; then
    SUDO="sudo"
@@ -70,4 +68,4 @@ $SUDO apt-get install --yes --allow-downgrades "${debs_with_version[@]}"
 
 
 # Cleaning up
-source ./scripts/debian/aptly.sh stop  --clean
+source ./scripts/debian/aptly.sh stop --clean

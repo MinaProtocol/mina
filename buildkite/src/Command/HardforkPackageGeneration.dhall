@@ -87,7 +87,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
         , name = pipelineName
         , tags = [ PipelineTag.Type.Release, PipelineTag.Type.Hardfork, PipelineTag.Type.Long ]
         , mode = PipelineMode.Type.Stable
-        }
+      }
       , steps =
         [ Command.build
             Command.Config::{
