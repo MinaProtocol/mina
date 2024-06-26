@@ -58,7 +58,7 @@ func (Rows) Generate(r *rand.Rand, size int) reflect.Value {
 		row, pk := randRow(r)
 		res = append(res, row)
 		if pk != nil {
-			wl[*pk] = true
+			wl[*pk] = struct{}{}
 		}
 	}
 	return reflect.ValueOf(Rows{res, wl})
@@ -67,7 +67,7 @@ func (Rows) Generate(r *rand.Rand, size int) reflect.Value {
 func TestProcessRow(t *testing.T) {
 	f := func(rows Rows) bool {
 		actual := processRows(rows.rows)
-		res := reflect.DeepEqual(map[Pk]unit(rows.expected), map[Pk]unit(actual))
+		res := reflect.DeepEqual(Whitelist(rows.expected), Whitelist(actual))
 		if !res {
 			t.Logf("expected: %s", rows.expected)
 			t.Logf("actual: %s", actual)

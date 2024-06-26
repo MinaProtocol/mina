@@ -51,16 +51,21 @@ func testSubmitH(maxAttempt int, initWl Whitelist) (*ObjectsToSave, *SubmitH, *t
 	log := logging.Logger("delegation backend test")
 	app := new(App)
 	app.Log = log
-	app.Save = func(objs ObjectsToSave) {
-		for path, value := range objs {
+	app.Save = func(submittedAt time.Time, meta MetaToBeSaved, blockHash BlockDataHash, submitter Pk, blockData []byte) error {
+		toSave, err := ToObjectsToSave(submittedAt, meta, blockHash, submitter, blockData)
+		if err != nil {
+			return err
+		}
+		for path, value := range toSave {
 			storage[path] = value
 		}
+		return nil
 	}
 	counter, tm := newTestAttemptCounter(1)
 	app.SubmitCounter = counter
 	app.Now = tm.Now
 	wlMvar := new(WhitelistMVar)
-	wlMvar.Replace(&initWl)
+	wlMvar.Replace(initWl)
 	app.Whitelist = wlMvar
 	return &storage, app.NewSubmitH(), tm
 }
@@ -149,7 +154,7 @@ func TestPkLimitExceeded(t *testing.T) {
 		t.FailNow()
 	}
 	otherSubmitter := mkPk()
-	_, sh, _ := testSubmitH(1, Whitelist{req.Submitter: true, otherSubmitter: true})
+	_, sh, _ := testSubmitH(1, Whitelist{req.Submitter: struct{}{}, otherSubmitter: struct{}{}})
 	rep := sh.testRequest(body)
 	if rep.Code != 200 {
 		t.Logf("Unexpected failure: %v", rep)
@@ -182,14 +187,14 @@ func TestSuccess(t *testing.T) {
 			t.Logf("failed decoding test file %s", f)
 			t.FailNow()
 		}
-		objs, sh, tm := testSubmitH(1, Whitelist{req.Submitter: true})
+		objs, sh, tm := testSubmitH(1, Whitelist{req.Submitter: struct{}{}})
 		rep := sh.testRequest(body)
 		if rep.Code != 200 {
 			t.Logf("Failed testing %s: %v", f, rep)
 			t.FailNow()
 		}
 		bhStr := req.GetBlockDataHash()
-		paths := makePaths(tm.Now(), bhStr, req.Submitter)
+		paths := MakePaths(tm.Now(), BlockDataHash(bhStr), req.Submitter)
 		var meta MetaToBeSaved
 		meta.CreatedAt = req.Data.CreatedAt.Format(time.RFC3339)
 		meta.PeerId = req.Data.PeerId
@@ -213,7 +218,7 @@ func Test40x(t *testing.T) {
 		t.Log("failed decoding test file")
 		t.FailNow()
 	}
-	_, sh, tm := testSubmitH(1, Whitelist{req.Submitter: true})
+	_, sh, tm := testSubmitH(1, Whitelist{req.Submitter: struct{}{}})
 	//2. Malformed JSON
 	if rep := sh.testRequest([]byte("{}")); rep.Code != 400 {
 		t.Logf("Empty json test failed: %v", rep)

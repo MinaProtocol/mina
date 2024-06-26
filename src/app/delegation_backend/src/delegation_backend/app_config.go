@@ -38,31 +38,37 @@ func LoadEnv(log logging.EventLogger) AppConfig {
 		if err != nil {
 			log.Fatalf("Error loading config file: %s", err)
 		}
-	} else {
-		networkName := os.Getenv("CONFIG_NETWORK_NAME")
-		if networkName == "" {
-			log.Fatal("missing NETWORK_NAME environment variable")
+		if config.InMemory == (config.Aws != nil) {
+			log.Fatal("Exactly one of 'aws' and 'in_memory' should be set in config")
 		}
-
+		if (len(config.Whitelist) == 0) == (config.GsheetId == "") {
+			log.Fatal("Exactly one of 'whitelist' and 'gsheet_id' should be set in config")
+		}
+	} else {
 		gsheetId := os.Getenv("CONFIG_GSHEET_ID")
 		if gsheetId == "" {
-			log.Fatal("missing GSHEET_ID environment variable")
+			log.Fatal("missing CONFIG_GSHEET_ID environment variable")
+		}
+
+		awsPrefix := os.Getenv("CONFIG_AWS_PREFIX")
+		if awsPrefix == "" {
+			log.Fatal("missing CONFIG_AWS_PREFIX environment variable")
 		}
 
 		awsRegion := os.Getenv("CONFIG_AWS_REGION")
 		if awsRegion == "" {
-			log.Fatal("missing AWS_REGION environment variable")
+			log.Fatal("missing CONFIG_AWS_REGION environment variable")
 		}
 
 		awsAccountId := os.Getenv("CONFIG_AWS_ACCOUNT_ID")
 		if awsAccountId == "" {
-			log.Fatal("missing AWS_ACCOUNT_ID environment variable")
+			log.Fatal("missing CONFIG_AWS_ACCOUNT_ID environment variable")
 		}
 
 		config = AppConfig{
-			NetworkName: networkName,
-			GsheetId:    gsheetId,
-			Aws: AwsConfig{
+			GsheetId: gsheetId,
+			Aws: &AwsConfig{
+				Prefix:    awsPrefix,
 				Region:    awsRegion,
 				AccountId: awsAccountId,
 			},
@@ -80,15 +86,21 @@ func LoadEnv(log logging.EventLogger) AppConfig {
 type AwsConfig struct {
 	Region    string `json:"region"`
 	AccountId string `json:"account_id"`
+	Prefix    string `json:"prefix"`
 }
 
 type AppConfig struct {
-	Aws         AwsConfig `json:"aws"`
-	NetworkName string    `json:"network_name"`
-	GsheetId    string    `json:"gsheet_id"`
+	Aws       *AwsConfig `json:"aws"`
+	GsheetId  string     `json:"gsheet_id"`
+	Whitelist []string   `json:"whitelist"`
+	InMemory  bool       `json:"in_memory"`
 }
 
 type AwsCredentials struct {
 	AccessKeyId     string `json:"access_key_id"`
 	SecretAccessKey string `json:"secret_access_key"`
+}
+
+func (config *AwsConfig) GetBucketName() string {
+	return config.AccountId + "-block-producers-uptime"
 }

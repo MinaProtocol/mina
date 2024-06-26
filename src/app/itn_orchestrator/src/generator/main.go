@@ -45,6 +45,7 @@ func main() {
 	flag.IntVar(&p.Rounds, "rounds", 4, "number of rounds to run experiment")
 	flag.IntVar(&p.StopsPerRound, "round-stops", 2, "number of stops to perform within round")
 	flag.IntVar(&p.Gap, "gap", 180, "gap between related transactions, seconds")
+	flag.IntVar(&p.ZkappSoftLimit, "zkapp-soft-limit", -2, "soft limit for number of zkapps to be taken to a block (-2 for no-op, -1 for reset, >=0 for setting a value)")
 	flag.StringVar(&mode, "mode", "default", "mode of generation")
 	flag.StringVar(&p.FundKeyPrefix, "fund-keys-dir", "./fund-keys", "Dir for generated fund key prefixes")
 	flag.StringVar(&p.PasswordEnv, "password-env", "", "Name of environment variable to read privkey password from")
@@ -144,7 +145,6 @@ func main() {
 		}
 	}
 	writeComment("Generated with: " + strings.Join(os.Args, " "))
-	writeComment("Funding keys for the experiment")
 	writeCommand := func(cmd lib.GeneratedCommand) {
 		comment := cmd.Comment()
 		if comment != "" {
@@ -155,8 +155,14 @@ func main() {
 			os.Exit(3)
 		}
 	}
+	if p.ZkappSoftLimit > -2 {
+		writeCommand(lib.Discovery(lib.DiscoveryParams{}))
+		writeComment(fmt.Sprintf("Setting zkapp soft limit to %d", p.ZkappSoftLimit))
+		writeCommand(lib.ZkappSoftLimit(-1, "participant", p.ZkappSoftLimit))
+	}
 	cmds := []lib.GeneratedCommand{}
 	fundCmds := []lib.FundParams{}
+	writeComment("Funding keys for the experiment")
 	for r := 0; r < p.Rounds; r++ {
 		round := p.Generate(r)
 		cmds = append(cmds, round.Commands...)

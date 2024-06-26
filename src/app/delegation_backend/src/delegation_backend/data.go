@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/btcsuite/btcutil/base58"
@@ -128,14 +129,18 @@ func (boe *BufferOrError) Write(b []byte) {
 	}
 }
 
+type MiniMetaToBeSaved struct {
+	RemoteAddr         string `json:"remote_addr"`
+	Submitter          Pk     `json:"submitter"`
+	GraphqlControlPort int    `json:"graphql_control_port,omitempty"`
+}
+
 type MetaToBeSaved struct {
+	MiniMetaToBeSaved
 	CreatedAt          string  `json:"created_at"`
 	PeerId             string  `json:"peer_id"`
 	SnarkWork          *Base64 `json:"snark_work,omitempty"`
-	RemoteAddr         string  `json:"remote_addr"`
-	Submitter          Pk      `json:"submitter"`  // is base58check-encoded submitter's public key
 	BlockHash          string  `json:"block_hash"` // is base58check-encoded hash of a block
-	GraphqlControlPort int     `json:"graphql_control_port,omitempty"`
 	BuiltWithCommitSha string  `json:"built_with_commit_sha,omitempty"`
 }
 
@@ -189,19 +194,22 @@ func (req submitRequestData) MakeSignPayload() ([]byte, error) {
 	return signPayload.Buf.Bytes(), signPayload.Err
 }
 
-func (req submitRequest) MakeMetaToBeSaved(remoteAddr string) ([]byte, error) {
-	meta := MetaToBeSaved{
+func (req submitRequest) MakeMetaToBeSaved(remoteAddr string) MetaToBeSaved {
+	if ix := strings.IndexRune(remoteAddr, ':'); ix != -1 {
+		remoteAddr = remoteAddr[:ix]
+	}
+	return MetaToBeSaved{
+		MiniMetaToBeSaved: MiniMetaToBeSaved{
+			RemoteAddr:         remoteAddr,
+			Submitter:          req.Submitter,
+			GraphqlControlPort: req.Data.GraphqlControlPort,
+		},
 		CreatedAt:          req.Data.CreatedAt.Format(time.RFC3339),
 		PeerId:             req.Data.PeerId,
 		SnarkWork:          req.Data.SnarkWork,
-		RemoteAddr:         remoteAddr,
 		BlockHash:          req.GetBlockDataHash(),
-		Submitter:          req.Submitter,
-		GraphqlControlPort: req.Data.GraphqlControlPort,
 		BuiltWithCommitSha: req.Data.BuiltWithCommitSha,
 	}
-
-	return json.Marshal(meta)
 }
 
 func (req submitRequest) CheckRequiredFields() bool {

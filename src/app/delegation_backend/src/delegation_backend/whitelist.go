@@ -2,21 +2,20 @@ package delegation_backend
 
 import "sync"
 
-type unit = interface{}
-type Whitelist map[Pk]unit
+type Whitelist map[Pk]struct{}
 
 type WhitelistMVar struct {
 	whitelistMutex sync.RWMutex
-	whitelistSet   *Whitelist
+	whitelistSet   Whitelist
 }
 
-func (mvar *WhitelistMVar) Replace(wl *Whitelist) {
+func (mvar *WhitelistMVar) Replace(wl Whitelist) {
 	mvar.whitelistMutex.Lock()
 	defer mvar.whitelistMutex.Unlock()
 	mvar.whitelistSet = wl
 }
 
-func (mvar *WhitelistMVar) ReadWhitelist() (wl *Whitelist) {
+func (mvar *WhitelistMVar) ReadWhitelist() (wl Whitelist) {
 	mvar.whitelistMutex.RLock()
 	defer mvar.whitelistMutex.RUnlock()
 	return mvar.whitelistSet
