@@ -18,8 +18,8 @@
    graphql-async
    ;;local libraries
    pickles
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    bounded_types
    random_oracle
    mina_runtime_config
