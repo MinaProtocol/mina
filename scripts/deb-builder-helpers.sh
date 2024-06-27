@@ -314,11 +314,11 @@ build_daemon_deb() {
 
   ##################################### BERKELEY PACKAGE #######################################
   echo "------------------------------------------------------------"
-  echo "--- Building Mina Berkeley testnet signatures deb without keys:"
+  echo "--- Building Mina Devnet testnet signatures deb without keys:"
 
   create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
 
-  copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
+  copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
 
   build_deb "${MINA_DEB_NAME}"
 
