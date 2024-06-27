@@ -14,7 +14,7 @@ let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
 let dependsOn = [
-  { name = "MinaArtifactBullseye", key = "daemon-berkeley-bullseye-docker-image" }
+  { name = "MinaArtifactBullseye", key = "daemon-devnet-bullseye-docker-image" }
 ]
 
 in Pipeline.build Pipeline.Config::{

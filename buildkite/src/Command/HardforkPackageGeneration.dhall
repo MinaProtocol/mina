@@ -135,7 +135,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
             , deb_codename = "${DebianVersions.lowerName debVersion}"
             , deb_profile = profile
             , deb_repo = DebianRepo.Type.Local
-            , step_key = "daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
+            , step_key = "daemon-devnet-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image"
             }
         , Command.build Command.Config::{
             commands = [
@@ -147,7 +147,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
             , label = "Assert corrupted packaged artifacts are unverifiable"
             , key = "assert-unverify-corrupted-packaged-artifacts"
             , target = Size.XLarge
-            , depends_on = [{ name = pipelineName, key = "daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image" }]
+            , depends_on = [{ name = pipelineName, key = "daemon-devnet-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image" }]
             , `if` = None B/If
             }
         , Command.build Command.Config::{
@@ -159,7 +159,7 @@ let pipeline : Spec.Type -> Pipeline.Config.Type =
             , label = "Verify packaged artifacts"
             , key = "verify-packaged-artifacts"
             , target = Size.XLarge
-            , depends_on = [{ name = pipelineName, key = "daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image" }]
+            , depends_on = [{ name = pipelineName, key = "daemon-devnet-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image" }]
             , `if` = None B/If
             }
         , DockerImage.generateStep

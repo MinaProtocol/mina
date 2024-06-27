@@ -52,13 +52,13 @@ esac
 # Add suffix to debian to distinguish different profiles (mainnet/devnet/lightnet)
 case "${DUNE_PROFILE}" in
   devnet|mainnet)
-    MINA_DEB_NAME="mina-berkeley"
+    MINA_DEB_NAME="mina-devnet"
     DEB_SUFFIX=""
    ;;
   *)
     # use dune profile as suffix but replace underscore to dashes so deb builder won't complain
     _SUFFIX=${DUNE_PROFILE//_/-}
-    MINA_DEB_NAME="mina-berkeley-${_SUFFIX}"
+    MINA_DEB_NAME="mina-devnet-${_SUFFIX}"
     DEB_SUFFIX="-${_SUFFIX}"
     ;;
 esac

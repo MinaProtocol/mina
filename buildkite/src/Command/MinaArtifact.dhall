@@ -41,12 +41,12 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
           DockerImage.ReleaseSpec::{
             deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,
             service="mina-daemon",
-            network="berkeley",
+            network="devnet",
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_profile=profile,
             build_flags=buildFlags,
             deb_repo = DebianRepo.Type.Local,
-            step_key="daemon-berkeley-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment buildFlags}-docker-image"
+            step_key="daemon-devnet-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}${BuildFlags.toLabelSegment buildFlags}-docker-image"
           },
 
         TestExecutive = 
