@@ -322,9 +322,6 @@ module Sql = struct
         ; sequence_no : int
         ; status : string
         ; failure_reason : string option
-        ; fee_payer : string
-        ; source : string
-        ; receiver : string
         ; state_hash : string
         ; chain_status : string
         ; height : int64
@@ -343,19 +340,10 @@ module Sql = struct
           ; "buc.sequence_no"
           ; "buc.status"
           ; "buc.failure_reason"
-          ; "pk_payer.value as fee_payer"
-          ; "pk_source.value as source"
-          ; "pk_receiver.value as receiver"
           ; "b.state_hash"
           ; "b.chain_status"
           ; "b.height"
           ]
-
-      let fee_payer t = `Pk t.fee_payer
-
-      let receiver t = `Pk t.receiver
-
-      let source t = `Pk t.source
 
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
@@ -366,9 +354,6 @@ module Sql = struct
             ; int
             ; string
             ; option string
-            ; string
-            ; string
-            ; string
             ; string
             ; string
             ; int64
@@ -399,14 +384,10 @@ module Sql = struct
           [%string "'%{Mina_base.Token_id.(to_string default)}'"]
         in
         let filters =
-          let address_fields =
-            [ "pk_source.value"; "pk_payer.value"; "pk_receiver.value" ]
-          in
           sql_filters ~block_height_field:"b.height" ~txn_hash_field:"u.hash"
-            ~account_identifier_fields:
-              (List.map ~f:(fun field -> (field, default_token)) address_fields)
-            ~op_status_field:"buc.status" ~address_fields ~op_type_filters
-            operator
+            ~account_identifier_fields:[ ("pk.value", default_token) ]
+            ~op_status_field:"buc.status" ~address_fields:[ "pk.value" ]
+            ~op_type_filters operator
         in
         [%string
           {sql|
@@ -414,19 +395,22 @@ module Sql = struct
             FROM user_commands u
             INNER JOIN blocks_user_commands buc
               ON buc.user_command_id = u.id
-            INNER JOIN public_keys pk_payer
-              ON pk_payer.id = u.fee_payer_id
-            INNER JOIN public_keys pk_source
-              ON pk_source.id = u.source_id
-            INNER JOIN public_keys pk_receiver
-              ON pk_receiver.id = u.receiver_id
+            INNER JOIN public_keys pk
+              ON pk.id = u.fee_payer_id
+                OR (buc.status = 'applied' AND (pk.id = u.source_id OR pk.id = u.receiver_id))
             INNER JOIN blocks b
               ON buc.block_id = b.id
             WHERE %{filters}
           |sql}]
     end
 
-    type t = { command : Cte.t; account_creation_fee_paid : int64 option }
+    type t =
+      { command : Cte.t
+      ; fee_payer : string
+      ; source : string
+      ; receiver : string
+      ; account_creation_fee_paid : int64 option
+      }
     [@@deriving hlist, fields]
 
     let fields =
@@ -435,18 +419,24 @@ module Sql = struct
         ; "u.sequence_no"
         ; "u.status"
         ; "u.failure_reason"
-        ; "fee_payer"
-        ; "u.source"
-        ; "u.receiver"
         ; "u.state_hash"
         ; "u.chain_status"
         ; "u.height"
+        ; "pk_payer.value as fee_payer"
+        ; "pk_source.value as source"
+        ; "pk_receiver.value as receiver"
         ; "ac.creation_fee"
         ]
 
+    let fee_payer t = `Pk t.fee_payer
+
+    let receiver t = `Pk t.receiver
+
+    let source t = `Pk t.source
+
     let typ =
       Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-        Caqti_type.[ Cte.typ; option int64 ]
+        Caqti_type.[ Cte.typ; string; string; string; option int64 ]
 
     let query_string ~offset ~limit op_type operator =
       let fields = String.concat ~sep:"," [ "id_count.total_count"; fields ] in
@@ -468,6 +458,12 @@ module Sql = struct
             SELECT %{fields}
             FROM id_count,
                 (SELECT * FROM user_command_info ORDER BY block_id, id, sequence_no LIMIT %{limit} OFFSET %{offset}) AS u
+            INNER JOIN public_keys pk_payer
+              ON pk_payer.id = u.fee_payer_id
+            INNER JOIN public_keys pk_source
+              ON pk_source.id = u.source_id
+            INNER JOIN public_keys pk_receiver
+              ON pk_receiver.id = u.receiver_id
             /* Account creation fees are attributed to the first successful command in the
               block that mentions the account with the following LEFT JOINs */
             LEFT JOIN account_identifiers ai_receiver
@@ -564,9 +560,9 @@ module Sql = struct
       in
       let info =
         { Commands_common.User_command_info.kind
-        ; fee_payer = Cte.fee_payer command
-        ; source = Cte.source command
-        ; receiver = Cte.receiver command
+        ; fee_payer = fee_payer t
+        ; source = source t
+        ; receiver = receiver t
         ; fee_token = `Token_id fee_token
         ; token = `Token_id token
         ; nonce = Unsigned.UInt32.of_int64 uc.nonce
