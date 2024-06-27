@@ -2,11 +2,11 @@
  (name test_util)
  (public_name test_util)
  (library_flags -linkall)
- (inline_tests)
  (libraries
    ;; opam libraries
    core_kernel
    base.caml
+   bin_prot
    ;; local libraries
    snark_params
    fold_lib

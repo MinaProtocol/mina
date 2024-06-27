@@ -3,7 +3,7 @@ let Prelude = ../External/Prelude.dhall
 let Command = ./Base.dhall
 let Docker = ./Docker/Type.dhall
 let Size = ./Size.dhall
-
+let Toolchain = ../Constants/Toolchain.dhall
 let Cmd = ../Lib/Cmds.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
@@ -14,7 +14,7 @@ let commands = \(debVersion : DebianVersions.DebVersion) ->
     Cmd.run "chmod -R 777 src/libp2p_ipc",
     Cmd.runInDocker
       Cmd.Docker::{
-        image = DebianVersions.toolchainImage debVersion,
+        image = Toolchain.image debVersion,
         extraEnv = [ "GO=/usr/lib/go/bin/go" ]
       }
       "make libp2p_helper",

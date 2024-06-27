@@ -1,0 +1,29 @@
+(library
+ (name zkapps_big_circuit)
+ (libraries
+  ;; opam libraries
+  core_kernel
+  ;; local libraries
+  crypto_params
+  currency
+  pasta_bindings
+  kimchi_backend
+  kimchi_backend_common
+  kimchi_pasta
+  kimchi_backend.pasta.basic
+  kimchi_backend.pasta.constraint_system
+  mina_base
+  pickles
+  pickles.backend
+  pickles_types
+  random_oracle
+  snarky.backendless
+  snark_params
+  sgn
+  signature_lib
+  tuple_lib
+  zkapps_examples)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

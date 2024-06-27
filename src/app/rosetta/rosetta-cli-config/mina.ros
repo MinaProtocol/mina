@@ -1,0 +1,236 @@
+// Workflow used to create new accounts
+create_account(1){
+  create{
+    network = {
+      "network":"PLACEHOLDER_NETWORK_NAME",
+      "blockchain":"mina"
+    };
+    key = generate_key({"curve_type": "pallas"});
+    account = derive({
+      "network_identifier": {{network}},
+      "public_key": {{key.public_key}}
+    });
+
+    // If the account is not saved, the key will be lost!
+    save_account({
+      "account_identifier": {{account.account_identifier}},
+      "keypair": {{key}}
+    });
+  }
+}
+
+// Workflow used to generate payment transactions
+payment(10){
+  payment_dry_run{
+    payment_dry_run.network = {
+      "network":"PLACEHOLDER_NETWORK_NAME",
+      "blockchain":"mina"
+    };
+    
+    currency = {
+      "symbol":"MINA",
+      "decimals":9
+    };
+
+    max_fee = "4000000000"; // no less than 1 MINA + 1 MINA (account creation fee)
+    max_recipient_value = "100000000000"; // 100 MINA
+    min_required_value = {{max_recipient_value}} + {{max_fee}};
+    
+    sender = find_balance({
+      "minimum_balance":{
+        "value": {{min_required_value}},
+        "currency": {{currency}}
+      }
+    });
+
+    recipient_amount = random_number({"minimum": "1", "maximum": {{max_recipient_value}}});
+    print_message({"recipient_amount":{{recipient_amount}}});
+
+    recipient = find_balance({
+      "not_account_identifier":[{{sender.account_identifier}}],
+      "minimum_balance":{
+        "value": "0",
+        "currency": {{currency}}
+      },
+      "create_limit": 100,
+      "create_probability": 50
+    });
+
+    sender_amount = 0 - {{recipient_amount}};
+    sender_fee = 0 - {{max_fee}};    
+
+    // The valid_until field must be provided explicitely until the
+    // default value is fixed
+    // See https://github.com/coinbase/rosetta-sdk-go/pull/457
+    payment_dry_run.preprocess_metadata={"valid_until": "4294967295"};
+    payment_dry_run.confirmation_depth = "1";
+    payment_dry_run.dry_run = true;
+    payment_dry_run.operations = [
+      {
+        "operation_identifier":{"index":0},
+        "type":"fee_payment",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value": {{sender_fee}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":1},
+        "type":"payment_source_dec",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value":{{sender_amount}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":2},
+        "related_operations":[{"index":1}],
+        "type": "payment_receiver_inc",
+        "account":{{recipient.account_identifier}},
+        "amount":{
+          "value":{{recipient_amount}},
+          "currency":{{currency}}
+        }
+      }
+    ];
+
+    print_message("done payment dry run");
+  },
+  payment{
+    suggested_fee = find_currency_amount({
+      "currency":{{currency}},
+      "amounts":{{payment_dry_run.suggested_fee}}
+    });
+    print_message({"suggested_fee":{{suggested_fee.value}}});
+    
+    sender_fee = 0 - {{suggested_fee.value}};
+
+    payment.preprocess_metadata={"valid_until": "4294967295"};
+    payment.network = {{payment_dry_run.network}};
+    payment.confirmation_depth = {{payment_dry_run.confirmation_depth}};
+    payment.operations = [
+      {
+        "operation_identifier":{"index":0},
+        "type":"fee_payment",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value": {{sender_fee}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":1},
+        "type":"payment_source_dec",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value":{{sender_amount}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":2},
+        "related_operations":[{"index":1}],
+        "type": "payment_receiver_inc",
+        "account":{{recipient.account_identifier}},
+        "amount":{
+          "value":{{recipient_amount}},
+          "currency":{{currency}}
+        }
+      }
+    ];
+  }
+}
+
+// Workflow used to generate delegation transactions
+delegation(10){
+  delegation_dry_run{
+    delegation_dry_run.network = {
+      "network":"PLACEHOLDER_NETWORK_NAME",
+      "blockchain":"mina"
+    };
+    
+    currency = {
+      "symbol":"MINA",
+      "decimals":9
+    };
+
+    max_fee = "2000000000";
+
+    sender = find_balance({
+      "minimum_balance":{
+        "value": {{max_fee}},
+        "currency": {{currency}}
+      }
+    });
+
+    recipient = find_balance({
+      "not_account_identifier":[
+        {{sender.account_identifier}}
+      ],
+      "minimum_balance":{
+        "value": "1",
+        "currency": {{currency}}
+      }
+    });
+
+    sender_fee = 0 - {{max_fee}};
+
+    delegation_dry_run.preprocess_metadata={"valid_until": "4294967295"};
+    delegation_dry_run.confirmation_depth = "1";
+    delegation_dry_run.dry_run = true;
+    delegation_dry_run.operations = [
+      {
+        "operation_identifier":{"index":0},
+        "type":"fee_payment",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value": {{sender_fee}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":1},
+        "type":"delegate_change",
+        "account":{{sender.account_identifier}},
+        "metadata": {
+            "delegate_change_target": {{recipient.account_identifier.address}}
+        }
+      }
+    ];
+
+    print_message("done delegation dry run");
+  },
+  delegation{
+    suggested_fee = find_currency_amount({
+      "currency":{{currency}},
+      "amounts":{{delegation_dry_run.suggested_fee}}
+    });
+    print_message({"suggested_fee":{{suggested_fee.value}}});
+    sender_fee = 0 - {{suggested_fee.value}};
+
+    delegation.preprocess_metadata={"valid_until": "4294967295"};
+    delegation.network = {{delegation_dry_run.network}};
+    delegation.confirmation_depth = {{delegation_dry_run.confirmation_depth}};
+    delegation.operations = [
+      {
+        "operation_identifier":{"index":0},
+        "type":"fee_payment",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value": {{sender_fee}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":1},
+        "type":"delegate_change",
+        "account":{{sender.account_identifier}},
+        "metadata": {
+            "delegate_change_target": {{recipient.account_identifier.address}}
+        }
+      }
+    ];
+  }
+}

@@ -22,7 +22,8 @@ let pred_to_yojson _f _x = `String "<opaque>"
 let sexp_opaque_to_yojson _f _x = `String "<opaque>"
 
 module Claimed_knowledge = struct
-  type 'key t = [ `All | `Some of 'key list | `Call of 'key pred [@sexp.opaque] ]
+  type 'key t =
+    [ `All | `Some of 'key list | `Call of ('key pred[@sexp.opaque]) ]
   [@@deriving sexp_of, to_yojson]
 
   let to_yojson f t =

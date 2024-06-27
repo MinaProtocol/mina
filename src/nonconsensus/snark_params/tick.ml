@@ -29,17 +29,16 @@ open Snarkette
 module Field = struct
   open Core_kernel
 
-  [%%versioned_asserted
+  [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = Pasta.Fp.t [@@deriving equal, compare, yojson, sexp, hash]
+      type t = Pasta.Fp.t [@version_asserted] [@@deriving equal, compare, yojson, sexp, hash]
 
       let to_latest x = x
     end
 
-    module Tests = struct end
   end]
 
   include Pasta.Fp
@@ -89,7 +88,7 @@ module Inner_curve = struct
     *)
     type t = Pasta.Fq.t [@@deriving bin_io_unversioned, sexp]
 
-    type _unused = unit constraint t = Tock.Field.t
+    let (_ : (t, Tock.Field.t) Type_equal.t) = Type_equal.T
 
     let size = Pasta.Fq.order
 

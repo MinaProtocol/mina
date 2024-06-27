@@ -2,12 +2,14 @@ let S = ../../Lib/SelectFiles.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
+let PipelineTag = ../../Pipeline/Tag.dhall
 
 let CheckGraphQLSchema = ../../Command/CheckGraphQLSchema.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
+let Profiles = ../../Constants/Profiles.dhall
 
-let dependsOn = [
-    { name = "MinaArtifactBullseye", key = "build-deb-pkg" }
-]
+let dependsOn = DebianVersions.dependsOn DebianVersions.DebVersion.Bullseye Profiles.Type.Standard
+
 
 in Pipeline.build Pipeline.Config::{
   spec =
@@ -18,7 +20,8 @@ in Pipeline.build Pipeline.Config::{
       S.strictly (S.contains "Makefile")
     ],
     path = "Test",
-    name = "CheckGraphQLSchema"
+    name = "CheckGraphQLSchema", 
+    tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
   },
   steps = [
     CheckGraphQLSchema.step dependsOn

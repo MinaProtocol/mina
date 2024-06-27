@@ -2,7 +2,7 @@ apiVersion: v2
 name: snark-worker
 description: A Helm chart for Mina Protocol's SNARK worker nodes
 type: application
-version: 1.0.7
+version: 1.0.9
 appVersion: 1.16.0
 annotations:
   artifacthub.io/changes: |

@@ -2,7 +2,7 @@
  (name rc_pool)
  (public_name rc_pool)
  (library_flags -linkall)
- (inline_tests)
+ (inline_tests (flags -verbose -show-counts))
  (libraries core_kernel)
  (preprocess
   (pps ppx_version ppx_jane ppx_compare))

@@ -5,8 +5,7 @@ module Work = Transaction_snark_work.Statement
 (* TODO: best tip table should be a separate extension *)
 
 module T = struct
-  type view = { removed_work: Work.t list }
-  [@@deriving sexp]
+  type view = { removed_work : Work.t list } [@@deriving sexp]
 
   type t =
     { mutable refcount_map : int Work.Map.t
@@ -19,6 +18,8 @@ module T = struct
               for the last 10 blocks in the best chain.
           *)
     }
+
+  let name = "snark_pool_refcount"
 
   let get_work = Staged_ledger.Scan_state.all_work_statements_exn
 
@@ -61,8 +62,7 @@ module T = struct
   let handle_diffs t frontier diffs_with_mutants =
     let open Diff.Full.With_mutant in
     let removals =
-      List.fold diffs_with_mutants ~init:[]
-      ~f:(fun removals -> function
+      List.fold diffs_with_mutants ~init:[] ~f:(fun removals -> function
         | E (New_node (Full breadcrumb), _) ->
             let scan_state =
               Breadcrumb.staged_ledger breadcrumb |> Staged_ledger.scan_state
@@ -107,9 +107,7 @@ module T = struct
             removals )
     in
     let removed_work = List.concat removals in
-    if not (List.is_empty removed_work) then
-      Some {removed_work}
-    else None
+    if not (List.is_empty removed_work) then Some { removed_work } else None
 end
 
 include T

@@ -64,9 +64,9 @@ variable "plain_node_count" {
 }
 
 locals {
-  testnet_name = "gossipqa"
-  mina_image = "minaprotocol/mina-daemon:1.3.1beta1-metrics-gossip-data-collection-92db0c6-focal-devnet"
-  mina_archive_image = "minaprotocol/mina-archive:1.3.1beta1-metrics-gossip-data-collection-92db0c6-focal"
+  testnet_name = "gossipqa_TEST"
+  mina_image = "minaprotocol/mina-daemon:1.3.2alpha1-develop-665edf8-bullseye-devnet"
+  mina_archive_image = "minaprotocol/mina-archive:1.3.2alpha1-develop-665edf8-bullseye"
   seed_region = "us-central1"
   seed_zone = "us-central1-c"
 
@@ -103,7 +103,8 @@ module "gossipqa" {
   use_embedded_runtime_config = false
 
   archive_node_count  = 3
-  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/fd3980820fb82c7355af49462ffefe6718800b77/src/app/archive/create_schema.sql"
+  mina_archive_schema = "create_schema.sql"
+  mina_archive_schema_aux_files = ["https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql", "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/zkapp_tables.sql"]
 
   archive_configs       = [
     {

@@ -10,7 +10,7 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 # Generate the JSON file containing the unencrypted keys
 tmpdir="$(mktemp -d)"
 cd "$tmpdir"
-"$SCRIPTPATH"/../_build/default/src/lib/mina_base/gen/gen.exe
+"$SCRIPTPATH"/../_build/default/src/lib/key_gen/gen/gen.exe
 jsonpath="$tmpdir/sample_keypairs.json"
 
 cd "$SCRIPTPATH/.."

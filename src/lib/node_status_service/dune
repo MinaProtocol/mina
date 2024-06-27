@@ -1,10 +1,11 @@
 (library
   (name node_status_service)
   (public_name node_status_service)
-  (inline_tests)
+  (inline_tests (flags -verbose -show-counts))
  (libraries
    ;; opam libraries
    core
+   core.linux_ext
    cohttp-async
    async
    core_kernel
@@ -12,6 +13,7 @@
    async_kernel
    uri
    integers
+   base.caml
    ;; local libraries
    network_peer
    mina_base
@@ -31,7 +33,8 @@
    mina_block
    mina_state
    consensus
+   o1trace
    )
-  (preprocess (pps ppx_jane ppx_deriving.std ppx_coda ppx_version))
+  (preprocess (pps ppx_jane ppx_deriving.std ppx_mina ppx_version))
   (instrumentation (backend bisect_ppx))
   (synopsis "Node status service library for collect data from nodes"))

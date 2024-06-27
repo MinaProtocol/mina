@@ -1,0 +1,78 @@
+ARG image=debian:bullseye
+FROM ${image} AS production
+ARG deb_codename=bullseye
+ARG deb_version
+ARG deb_release=unstable
+ARG network=mainnet
+
+ARG psql_version=13
+
+ENV DEBIAN_FRONTEND noninteractive
+
+# We do not install the below platform-specific dependencies,
+# and instead assume that apt will install the proper deps based on the package definition.
+# The packages are noted here just for clarity/documentation.
+# Stretch-only Deps:
+#    libffi6
+#    libprocps6
+#    libjemalloc1
+# Buster-only Deps:
+#    libffi7
+#    libprocps7
+#    libjemalloc2
+# Bullseye/Focal-only Deps:
+#    libffi7
+#    libprocps8
+#    libjemalloc2
+
+# --- Dependencies across many platforms
+RUN apt-get update --quiet --yes \
+  && apt-get upgrade --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends \
+    apt-utils \
+    apt-transport-https \
+    curl \
+    ca-certificates \
+    build-essential \
+    dnsutils \
+    dumb-init \
+    gettext \
+    gnupg2 \
+    libgmp10 \
+    libgomp1 \
+    libssl1.1 \
+    tzdata \
+    jq \
+    sudo \
+    wget \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install google-cloud-sdk for GCLOUD_UPLOAD feature
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+  && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
+  && apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends google-cloud-sdk kubectl google-cloud-sdk-gke-gcloud-auth-plugin \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
+
+
+# --- Install Postgresql
+RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
+    && echo deb https://apt-archive.postgresql.org/pub/repos/apt/ "$deb_codename"-pgdg-archive main | tee /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update -y \
+    && apt-get install -y \
+       postgresql-"$psql_version" \
+       postgresql-client-"$psql_version"
+
+# --- Generate en_US.UTF-8 locale to allow use of O(1) Labs DB dumps
+RUN locale-gen en_US.UTF-8
+
+# jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
+RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename " \
+  && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+  && apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --allow-downgrades -o Dpkg::Options::="--force-overwrite" "mina-test-suite=$deb_version" "mina-$network=$deb_version" \ 
+  && rm -rf /var/lib/apt/lists/*
+
+ENTRYPOINT ["sleep","infinity"]

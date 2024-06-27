@@ -13,7 +13,8 @@
      `mount-buildkite-agent`: Bool,
      `mount-workdir`: Bool,
      privileged: Bool,
-     environment: List Text
+     environment: List Text,
+     user: Optional Text
   },
   default = {
     shell = Some ["/bin/sh", "-e", "-c"],
@@ -21,6 +22,7 @@
     `mount-buildkite-agent` = False,
     `mount-workdir` = False,
     privileged = False,
-    environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]
+    environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ],
+    user = None Text
   }
 }

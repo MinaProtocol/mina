@@ -208,6 +208,8 @@ module State : sig
     end
   end]
 
+  val map : ('a1, 'a2) t -> f1:('a1 -> 'b1) -> f2:('a2 -> 'b2) -> ('b1, 'b2) t
+
   module Hash : sig
     type t = Digestif.SHA256.t
   end
@@ -291,12 +293,19 @@ val view_jobs_with_position :
  * promoted to the merge jobs yet*)
 val base_jobs_on_latest_tree : ('merge, 'base) State.t -> 'base list
 
+(** All the base jobs that are part of a tree before the latest tree
+    index is 0-based, 0 is the next-to-latest tree
+*)
+val base_jobs_on_earlier_tree :
+  ('merge, 'base) State.t -> index:int -> 'base list
+
 (** Returns true only if the next 'd that could be enqueued is
 on a new tree*)
 val next_on_new_tree : ('merge, 'base) State.t -> bool
 
-(** All the 'ds (in the order in which they were added) for which scan results are yet to computed*)
-val pending_data : ('merge, 'base) State.t -> 'base list
+(** All the 'ds (in the order in which they were added) for each tree for which
+    scan results are yet to computed*)
+val pending_data : ('merge, 'base) State.t -> 'base list list
 
 (**update tree level metrics*)
 val update_metrics : ('merge, 'base) State.t -> unit Or_error.t

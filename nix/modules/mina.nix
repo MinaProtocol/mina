@@ -66,9 +66,9 @@ inputs:
           type = nullOr path;
           default = null;
         };
-        discovery-keypair = lib.mkOption {
-          type = nullOr path;
-          default = null;
+        libp2p-keypair = lib.mkOption {
+          type = path;
+          default = "/root/libp2p-keys/key";
         };
 
         waitForRpc = lib.mkOption {
@@ -114,7 +114,7 @@ inputs:
           ${arg "external-ip"} \
           ${arg "protocol-version"} \
           ${arg "block-producer-key"} \
-          ${arg "discovery-keypair"} \
+          ${arg "libp2p-keypair"} \
           ${
             optionalString cfg.generate-genesis-proof
             "--generate-genesis-proof true"
