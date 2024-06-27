@@ -428,9 +428,7 @@ module Network_config = struct
       ^ "/src/app/archive/"
     in
     let mina_archive_schema_aux_files =
-      [ mina_archive_base_url ^ "create_schema.sql"
-      ; mina_archive_base_url ^ "zkapp_tables.sql"
-      ]
+      [ mina_archive_base_url ^ "create_schema.sql" ]
     in
     let genesis_keypairs =
       List.fold genesis_accounts_and_keys ~init:String.Map.empty
