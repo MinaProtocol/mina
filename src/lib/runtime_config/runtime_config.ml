@@ -1587,7 +1587,7 @@ let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
 
 let slot_tx_end_or_default, slot_chain_end_or_default =
   let f compile get_runtime t =
-    Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
+    Option.map ~f:Mina_numbers.Global_slot_since_genesis.of_int
     @@ Option.value_map t.daemon ~default:compile ~f:(fun daemon ->
            Option.merge compile ~f:(fun _c r -> r) @@ get_runtime daemon )
   in

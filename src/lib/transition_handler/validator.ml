@@ -31,15 +31,15 @@ let validate_transition ~context:(module Context : CONTEXT) ~frontier
   let root_breadcrumb = Transition_frontier.root frontier in
   let transition_data = With_hash.data transition in
   let block_slot =
-    Consensus.Data.Consensus_state.curr_global_slot
+    Consensus.Data.Consensus_state.global_slot_since_genesis
     @@ Protocol_state.consensus_state @@ Header.protocol_state
     @@ Mina_block.header transition_data
   in
   let%bind () =
     match slot_chain_end with
     | Some slot_chain_end
-      when Mina_numbers.Global_slot_since_hard_fork.(
-             block_slot >= slot_chain_end) ->
+      when Mina_numbers.Global_slot_since_genesis.(block_slot >= slot_chain_end)
+      ->
         [%log info] "Block after slot_chain_end, rejecting" ;
         Result.fail `Block_after_after_stop_slot
     | None | Some _ ->
@@ -48,8 +48,7 @@ let validate_transition ~context:(module Context : CONTEXT) ~frontier
   let%bind () =
     match slot_tx_end with
     | Some slot_tx_end
-      when Mina_numbers.Global_slot_since_hard_fork.(block_slot >= slot_tx_end)
-      ->
+      when Mina_numbers.Global_slot_since_genesis.(block_slot >= slot_tx_end) ->
         [%log info] "Block after slot_tx_end, validating it is empty" ;
         let staged_ledger_diff =
           Body.staged_ledger_diff @@ body transition_data
@@ -242,8 +241,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
                     , `String "not empty staged ledger diff after slot_tx_end"
                     )
                   ; ( "block_slot"
-                    , Mina_numbers.Global_slot_since_hard_fork.to_yojson
-                      @@ Consensus.Data.Consensus_state.curr_global_slot
+                    , Mina_numbers.Global_slot_since_genesis.to_yojson
+                      @@ Consensus.Data.Consensus_state
+                         .global_slot_since_genesis
                       @@ Protocol_state.consensus_state @@ Header.protocol_state
                       @@ Mina_block.header @@ transition )
                   ]
@@ -256,8 +256,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
                   [ ("state_hash", State_hash.to_yojson transition_hash)
                   ; ("reason", `String "block after slot_chain_end")
                   ; ( "block_slot"
-                    , Mina_numbers.Global_slot_since_hard_fork.to_yojson
-                      @@ Consensus.Data.Consensus_state.curr_global_slot
+                    , Mina_numbers.Global_slot_since_genesis.to_yojson
+                      @@ Consensus.Data.Consensus_state
+                         .global_slot_since_genesis
                       @@ Protocol_state.consensus_state @@ Header.protocol_state
                       @@ Mina_block.header @@ transition )
                   ]

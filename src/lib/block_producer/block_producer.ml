@@ -168,18 +168,17 @@ let generate_next_state ~zkapp_cmd_limit ~constraint_constants
     ~winner_pk ~scheduled_time ~log_block_creation ~block_reward_threshold
     ~zkapp_cmd_limit_hardcap ~slot_tx_end ~slot_chain_end =
   let open Interruptible.Let_syntax in
-  let global_slot_since_hard_fork =
-    Consensus.Data.Block_data.global_slot block_data
+  let global_slot_since_genesis =
+    Consensus.Data.Block_data.global_slot_since_genesis block_data
   in
   match slot_chain_end with
   | Some slot_chain_end
-    when Mina_numbers.Global_slot_since_hard_fork.(
-           global_slot_since_hard_fork >= slot_chain_end) ->
+    when Mina_numbers.Global_slot_since_genesis.(
+           global_slot_since_genesis >= slot_chain_end) ->
       [%log info] "Reached slot_chain_end $slot_chain_end, not producing blocks"
         ~metadata:
           [ ( "slot_chain_end"
-            , Mina_numbers.Global_slot_since_hard_fork.to_yojson slot_chain_end
-            )
+            , Mina_numbers.Global_slot_since_genesis.to_yojson slot_chain_end )
           ] ;
       Interruptible.return None
   | None | Some _ -> (
@@ -212,13 +211,13 @@ let generate_next_state ~zkapp_cmd_limit ~constraint_constants
           let diff =
             match slot_tx_end with
             | Some slot_tx_end
-              when Mina_numbers.Global_slot_since_hard_fork.(
-                     global_slot_since_hard_fork >= slot_tx_end) ->
+              when Mina_numbers.Global_slot_since_genesis.(
+                     global_slot_since_genesis >= slot_tx_end) ->
                 [%log info]
                   "Reached slot_tx_end $slot_tx_end, producing empty block"
                   ~metadata:
                     [ ( "slot_tx_end"
-                      , Mina_numbers.Global_slot_since_hard_fork.to_yojson
+                      , Mina_numbers.Global_slot_since_genesis.to_yojson
                           slot_tx_end )
                     ] ;
                 Result.return
@@ -1097,10 +1096,26 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
             let new_global_slot = epoch_data_for_vrf.global_slot in
             let log_if_slot_diff_is_less_than =
               let current_global_slot =
-                Consensus.Data.Consensus_time.(
-                  to_global_slot
-                    (of_time_exn ~constants:consensus_constants
-                       (Block_time.now time_controller) ))
+                let open Mina_numbers in
+                let global_slots_since_hard_fork =
+                  let global_slot_since_hard_fork =
+                    Consensus.Data.Consensus_time.(
+                      to_global_slot
+                        (of_time_exn ~constants:consensus_constants
+                           (Block_time.now time_controller) ))
+                  in
+                  Option.value_exn
+                  @@ Global_slot_since_hard_fork.(
+                       diff global_slot_since_hard_fork zero)
+                in
+                let open Mina_numbers in
+                Global_slot_since_genesis.add
+                  ( match constraint_constants.fork with
+                  | None ->
+                      Global_slot_since_genesis.zero
+                  | Some { global_slot_since_genesis; _ } ->
+                      global_slot_since_genesis )
+                  global_slots_since_hard_fork
               in
               fun ~diff_limit ~every ~message -> function
                 | None ->
@@ -1109,8 +1124,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     let slot_diff =
                       let open Mina_numbers in
                       Option.map ~f:Global_slot_span.to_int
-                      @@ Global_slot_since_hard_fork.diff slot
-                           current_global_slot
+                      @@ Global_slot_since_genesis.diff slot current_global_slot
                     in
                     Option.iter slot_diff ~f:(fun slot_diff' ->
                         if slot_diff' <= diff_limit && slot_diff' mod every = 0

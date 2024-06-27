@@ -231,7 +231,8 @@ module Compact_display = struct
                     ; global_slot =
                         Mina_state.Protocol_state.consensus_state
                           t.state.protocol_state
-                        |> Consensus.Data.Consensus_state.curr_global_slot
+                        |> Consensus.Data.Consensus_state
+                           .global_slot_since_genesis
                     }
                 in
                 { state; peers = Set.length t.peer_ids } ) )
