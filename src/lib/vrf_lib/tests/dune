@@ -24,13 +24,13 @@
    snarky.backendless
    bitstring_lib
    crypto_params
-   backend
+   pickles.backend
    kimchi_backend
    kimchi_bindings
    kimchi_types
    pasta_bindings
    kimchi_pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta.basic
    snarky_field_extensions
    tuple_lib
    genesis_constants

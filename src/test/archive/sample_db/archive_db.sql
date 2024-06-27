@@ -9878,4 +9878,3 @@ ALTER TABLE ONLY public.zkapp_verification_keys
 --
 -- PostgreSQL database dump complete
 --
-

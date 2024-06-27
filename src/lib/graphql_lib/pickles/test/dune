@@ -13,8 +13,8 @@
   core_kernel
   sexplib0
   ; local libraries
-  kimchi_backend.pasta
-  kimchi_backend.pasta.basic
+  kimchi_pasta
+  kimchi_pasta.basic
   graphql_basic_scalars
   pasta_bindings
   pickles

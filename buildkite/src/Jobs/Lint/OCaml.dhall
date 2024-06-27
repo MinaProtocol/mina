@@ -1,12 +1,9 @@
-let Prelude = ../../External/Prelude.dhall
-
 let S = ../../Lib/SelectFiles.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
-let Cmd = ../../Lib/Cmds.dhall
-
 let Pipeline = ../../Pipeline/Dsl.dhall
+
 let PipelineTag = ../../Pipeline/Tag.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
@@ -25,7 +22,8 @@ in  Pipeline.build
 
           let dirtyDhallDirCompiles =
                   assert
-                : S.compile [ dirtyDhallDir ] ≡ "^buildkite/src/Jobs/Lint/OCaml"
+                :     S.compile [ dirtyDhallDir ]
+                  ===  "^buildkite/src/Jobs/Lint/OCaml"
 
           in  JobSpec::{
               , dirtyWhen =

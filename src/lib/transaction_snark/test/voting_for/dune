@@ -14,8 +14,8 @@
    ;; local libraries
    mina_base.import
    pickles.backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    pickles
    transaction_snark
    snark_params
