@@ -184,7 +184,7 @@ module Sql = struct
       ; success : string option
       ; address : string option
       }
-    [@@deriving hlist]
+    [@@deriving hlist, to_yojson]
 
     let typ =
       let open Mina_caqti.Type_spec in
@@ -314,231 +314,213 @@ module Sql = struct
   end
 
   module User_commands = struct
-    module Extras = struct
+    module Cte = struct
       type t =
-        { fee_payer : string
+        { id : int
+        ; signed_command : Archive_lib.Processor.User_command.Signed_command.t
+        ; block_id : int
+        ; sequence_no : int
+        ; status : string
+        ; failure_reason : string option
+        ; fee_payer : string
         ; source : string
         ; receiver : string
-        ; status : string option
-        ; failure_reason : string option
-        ; account_creation_fee_paid : int64 option
         ; state_hash : string
+        ; chain_status : string
         ; height : int64
         }
-      [@@deriving fields, hlist]
+      [@@deriving hlist, fields]
+
+      let fields' =
+        List.map
+          ( "id"
+          :: Archive_lib.Processor.User_command.Signed_command.Fields.names )
+          ~f:(fun n -> "u." ^ n)
 
       let fields =
-        String.concat ~sep:","
-          [ "pk_payer.value as fee_payer"
-          ; "pk_source.value as source"
-          ; "pk_receiver.value as receiver"
+        String.concat ~sep:"," @@ fields'
+        @ [ "buc.block_id"
+          ; "buc.sequence_no"
           ; "buc.status"
           ; "buc.failure_reason"
-          ; "ac.creation_fee"
+          ; "pk_payer.value as fee_payer"
+          ; "pk_source.value as source"
+          ; "pk_receiver.value as receiver"
           ; "b.state_hash"
+          ; "b.chain_status"
           ; "b.height"
           ]
 
       let fee_payer t = `Pk t.fee_payer
 
-      let source t = `Pk t.source
-
       let receiver t = `Pk t.receiver
+
+      let source t = `Pk t.source
 
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
           Caqti_type.
-            [ string
-            ; string
+            [ int
+            ; Archive_lib.Processor.User_command.Signed_command.typ
+            ; int
+            ; int
             ; string
             ; option string
-            ; option string
-            ; option int64
+            ; string
+            ; string
+            ; string
+            ; string
             ; string
             ; int64
             ]
-    end
 
-    type t =
-      { id : int
-      ; signed_command : Archive_lib.Processor.User_command.Signed_command.t
-      ; extras : Extras.t
-      }
-    [@@deriving hlist]
-
-    let typ =
-      Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-        Caqti_type.
-          [ int
-          ; Archive_lib.Processor.User_command.Signed_command.typ
-          ; Extras.typ
-          ]
-
-    let fields =
-      String.concat ~sep:","
-      @@ List.map Archive_lib.Processor.User_command.Signed_command.Fields.names
-           ~f:(fun n -> "u." ^ n)
-
-    let query ~offset ~limit op_type operator =
-      let fields =
-        String.concat ~sep:","
-          [ "id_count.total_count"; "u.id"; fields; Extras.fields ]
-      in
-      let op_type_filters =
-        Option.map op_type ~f:(function
-          | `Fee_payment ->
-              "TRUE" (* fees are always paid *)
-          | `Payment_source_dec | `Payment_receiver_inc ->
-              [%string "u.command_type = 'payment'"]
-          | `Delegate_change ->
-              [%string "u.command_type = 'delegation'"]
-          | `Fee_payer_dec
-          | `Account_creation_fee_via_payment
-          | `Account_creation_fee_via_fee_payer
-          | `Account_creation_fee_via_fee_receiver
-          | `Create_token
-          | `Mint_tokens
-          | `Zkapp_fee_payer_dec
-          | `Zkapp_balance_update
-          | `Fee_receiver_inc
-          | `Coinbase_inc ->
-              "FALSE" )
-      in
-      let filters =
-        sql_filters ~block_height_field:"b.height" ~txn_hash_field:"u.hash"
-          ~account_identifier_fields:
-            [ ("pk_source.value", "token_source.value")
-            ; ("pk_payer.value", "token_fee_payer.value")
-            ; ("pk_receiver.value", "token_receiver.value")
-            ]
-          ~op_status_field:"buc.status"
-          ~address_fields:
+      let query_string operator op_type =
+        let op_type_filters =
+          Option.map op_type ~f:(function
+            | `Fee_payment ->
+                "TRUE" (* fees are always paid *)
+            | `Payment_source_dec | `Payment_receiver_inc ->
+                [%string "u.command_type = 'payment'"]
+            | `Delegate_change ->
+                [%string "u.command_type = 'delegation'"]
+            | `Fee_payer_dec
+            | `Account_creation_fee_via_payment
+            | `Account_creation_fee_via_fee_payer
+            | `Account_creation_fee_via_fee_receiver
+            | `Create_token
+            | `Mint_tokens
+            | `Zkapp_fee_payer_dec
+            | `Zkapp_balance_update
+            | `Fee_receiver_inc
+            | `Coinbase_inc ->
+                "FALSE" )
+        in
+        let default_token =
+          [%string "'%{Mina_base.Token_id.(to_string default)}'"]
+        in
+        let filters =
+          let address_fields =
             [ "pk_source.value"; "pk_payer.value"; "pk_receiver.value" ]
-          ~op_type_filters operator
-      in
-      let offset = offset_sql offset in
-      let limit = limit_sql limit in
-      Caqti_request.collect Params.typ
-        Caqti_type.(tup2 int64 typ)
+          in
+          sql_filters ~block_height_field:"b.height" ~txn_hash_field:"u.hash"
+            ~account_identifier_fields:
+              (List.map ~f:(fun field -> (field, default_token)) address_fields)
+            ~op_status_field:"buc.status" ~address_fields ~op_type_filters
+            operator
+        in
         [%string
           {sql|
-          WITH filtered_ids AS (
-            SELECT DISTINCT u.id
+            SELECT DISTINCT ON (buc.block_id, buc.user_command_id, buc.sequence_no) %{fields}
             FROM user_commands u
             INNER JOIN blocks_user_commands buc
               ON buc.user_command_id = u.id
             INNER JOIN public_keys pk_payer
               ON pk_payer.id = u.fee_payer_id
-            INNER JOIN account_identifiers ai_fee_payer
-              ON pk_payer.id = ai_fee_payer.public_key_id
             INNER JOIN public_keys pk_source
               ON pk_source.id = u.source_id
-            INNER JOIN account_identifiers ai_source
-              ON pk_source.id = ai_source.public_key_id
             INNER JOIN public_keys pk_receiver
               ON pk_receiver.id = u.receiver_id
-            LEFT JOIN account_identifiers ai_receiver
-              ON ai_receiver.public_key_id = pk_receiver.id
+            INNER JOIN blocks b
+              ON buc.block_id = b.id
+            WHERE %{filters}
+          |sql}]
+    end
+
+    type t = { command : Cte.t; account_creation_fee_paid : int64 option }
+    [@@deriving hlist, fields]
+
+    let fields =
+      String.concat ~sep:"," @@ Cte.fields'
+      @ [ "u.block_id"
+        ; "u.sequence_no"
+        ; "u.status"
+        ; "u.failure_reason"
+        ; "fee_payer"
+        ; "u.source"
+        ; "u.receiver"
+        ; "u.state_hash"
+        ; "u.chain_status"
+        ; "u.height"
+        ; "ac.creation_fee"
+        ]
+
+    let typ =
+      Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+        Caqti_type.[ Cte.typ; option int64 ]
+
+    let query_string ~offset ~limit op_type operator =
+      let fields = String.concat ~sep:"," [ "id_count.total_count"; fields ] in
+      let offset = offset_sql offset in
+      let limit = limit_sql limit in
+      [%string
+        {sql|
+          WITH
+            canonical_blocks AS (SELECT * FROM blocks WHERE chain_status = 'canonical'),
+            max_canonical_height AS (SELECT MAX(height) as max_height FROM canonical_blocks),
+            pending_blocks AS (SELECT b.* FROM blocks b, max_canonical_height WHERE height > max_height AND chain_status = 'pending'),
+            blocks AS (SELECT * FROM canonical_blocks UNION ALL SELECT * FROM pending_blocks),
+            user_command_info AS (
+              %{Cte.query_string operator op_type}
+            ),
+            id_count AS (
+              SELECT COUNT(*) AS total_count FROM user_command_info
+            )
+            SELECT %{fields}
+            FROM id_count,
+                (SELECT * FROM user_command_info ORDER BY block_id, id, sequence_no LIMIT %{limit} OFFSET %{offset}) AS u
             /* Account creation fees are attributed to the first successful command in the
-              block that mentions the account with the following LEFT JOIN */
+              block that mentions the account with the following LEFT JOINs */
+            LEFT JOIN account_identifiers ai_receiver
+              ON ai_receiver.public_key_id = u.receiver_id
             LEFT JOIN accounts_created ac
-              ON buc.block_id = ac.block_id
+              ON u.block_id = ac.block_id
               AND ai_receiver.id = ac.account_identifier_id
-              AND buc.status = 'applied'
-              AND buc.sequence_no =
+              AND u.status = 'applied'
+              AND u.sequence_no =
                 (SELECT LEAST(
                     (SELECT min(bic2.sequence_no)
                     FROM blocks_internal_commands bic2
                     INNER JOIN internal_commands ic2
                         ON bic2.internal_command_id = ic2.id
                     WHERE ic2.receiver_id = u.receiver_id
-                        AND bic2.block_id = buc.block_id
+                        AND bic2.block_id = u.block_id
                         AND bic2.status = 'applied'),
                     (SELECT min(buc2.sequence_no)
                       FROM blocks_user_commands buc2
                       INNER JOIN user_commands uc2
                         ON buc2.user_command_id = uc2.id
                       WHERE uc2.receiver_id = u.receiver_id
-                        AND buc2.block_id = buc.block_id
+                        AND buc2.block_id = u.block_id
                         AND buc2.status = 'applied')))
-            LEFT JOIN tokens token_receiver
-              ON ai_receiver.token_id = token_receiver.id
-            INNER JOIN tokens token_source
-              ON ai_source.token_id = token_source.id
-            INNER JOIN tokens token_fee_payer
-              ON ai_fee_payer.token_id = token_fee_payer.id
-            INNER JOIN blocks b
-              ON buc.block_id = b.id
-            WHERE %{filters}),
-          id_count AS (
-            SELECT COUNT(*) AS total_count FROM filtered_ids
-          )
-          SELECT DISTINCT ON (u.id) %{fields}
-          FROM id_count, user_commands u
-          INNER JOIN blocks_user_commands buc
-            ON buc.user_command_id = u.id
-          INNER JOIN public_keys pk_payer
-            ON pk_payer.id = u.fee_payer_id
-          INNER JOIN account_identifiers ai_fee_payer
-            ON pk_payer.id = ai_fee_payer.public_key_id
-          INNER JOIN public_keys pk_source
-            ON pk_source.id = u.source_id
-          INNER JOIN account_identifiers ai_source
-            ON pk_source.id = ai_source.public_key_id
-          INNER JOIN public_keys pk_receiver
-            ON pk_receiver.id = u.receiver_id
-          LEFT JOIN account_identifiers ai_receiver
-            ON ai_receiver.public_key_id = pk_receiver.id
-          /* Account creation fees are attributed to the first successful command in the
-            block that mentions the account with the following LEFT JOIN */
-          LEFT JOIN accounts_created ac
-            ON buc.block_id = ac.block_id
-            AND ai_receiver.id = ac.account_identifier_id
-            AND buc.status = 'applied'
-            AND buc.sequence_no =
-              (SELECT LEAST(
-                  (SELECT min(bic2.sequence_no)
-                  FROM blocks_internal_commands bic2
-                  INNER JOIN internal_commands ic2
-                      ON bic2.internal_command_id = ic2.id
-                  WHERE ic2.receiver_id = u.receiver_id
-                      AND bic2.block_id = buc.block_id
-                      AND bic2.status = 'applied'),
-                  (SELECT min(buc2.sequence_no)
-                    FROM blocks_user_commands buc2
-                    INNER JOIN user_commands uc2
-                      ON buc2.user_command_id = uc2.id
-                    WHERE uc2.receiver_id = u.receiver_id
-                      AND buc2.block_id = buc.block_id
-                      AND buc2.status = 'applied')))
-          LEFT JOIN tokens token_receiver
-            ON ai_receiver.token_id = token_receiver.id
-          INNER JOIN tokens token_source
-            ON ai_source.token_id = token_source.id
-          INNER JOIN tokens token_fee_payer
-            ON ai_fee_payer.token_id = token_fee_payer.id
-          INNER JOIN blocks b
-            ON buc.block_id = b.id
-          WHERE u.id IN (SELECT id FROM filtered_ids ORDER BY id LIMIT %{limit} OFFSET %{offset})
-          ORDER BY u.id, CASE WHEN b.chain_status = 'canonical' THEN 1 WHEN b.chain_status = 'orphaned' THEN 2 END
+            ORDER BY u.block_id, u.id, u.sequence_no
         |sql}]
 
-    let run (module Conn : Caqti_async.CONNECTION) ~offset ~limit input =
+    let run (module Conn : Caqti_async.CONNECTION) ~logger ~offset ~limit input
+        =
       let open Deferred.Result.Let_syntax in
       let params = Params.of_query input in
-      match%map
-        Conn.collect_list
-          (query ~offset ~limit
-             Transaction_query.(input.filter.Filter.op_type)
-             input.operator )
-          params
-      with
+      let query_string =
+        query_string ~offset ~limit
+          Transaction_query.(input.filter.Filter.op_type)
+          input.operator
+      in
+      [%log debug] "Running SQL query $query with $params"
+        ~metadata:
+          [ ("query", `String query_string)
+          ; ("params", Params.to_yojson params)
+          ] ;
+      let query =
+        Caqti_request.collect Params.typ
+          Caqti_type.(tup2 int64 typ)
+          query_string
+      in
+      match%map Conn.collect_list query params with
       | [] ->
           (0L, [])
       | (total_count, _) :: _ as user_commands ->
           (total_count, List.map user_commands ~f:snd)
 
-    let to_info { signed_command = uc; extras; _ } =
+    let to_info ({ command = { signed_command = uc; _ } as command; _ } as t) =
       let open Result.Let_syntax in
       let%bind kind =
         match
@@ -561,9 +543,9 @@ module Sql = struct
       let fee_token = Mina_base.Token_id.(to_string default) in
       let token = Mina_base.Token_id.(to_string default) in
       let%map failure_status =
-        match Extras.failure_reason extras with
+        match Cte.failure_reason command with
         | None -> (
-            match Extras.account_creation_fee_paid extras with
+            match account_creation_fee_paid t with
             | None ->
                 Result.return
                 @@ `Applied
@@ -582,9 +564,9 @@ module Sql = struct
       in
       let info =
         { Commands_common.User_command_info.kind
-        ; fee_payer = Extras.fee_payer extras
-        ; source = Extras.source extras
-        ; receiver = Extras.receiver extras
+        ; fee_payer = Cte.fee_payer command
+        ; source = Cte.source command
+        ; receiver = Cte.receiver command
         ; fee_token = `Token_id fee_token
         ; token = `Token_id token
         ; nonce = Unsigned.UInt32.of_int64 uc.nonce
@@ -597,8 +579,8 @@ module Sql = struct
         }
       in
       { User_command_info.info
-      ; block_hash = Extras.state_hash extras
-      ; block_height = Extras.height extras
+      ; block_hash = Cte.state_hash command
+      ; block_height = Cte.height command
       }
   end
 
@@ -981,7 +963,7 @@ module Sql = struct
     end)
   end
 
-  let run (module Conn : Caqti_async.CONNECTION) query =
+  let run (module Conn : Caqti_async.CONNECTION) ~logger query =
     let module Result = struct
       include Result
 
@@ -997,7 +979,7 @@ module Sql = struct
     let offset = query.Transaction_query.offset in
     let limit = query.limit in
     let%bind user_commands_count, raw_user_commands =
-      User_commands.run ~offset ~limit (module Conn) query
+      User_commands.run ~logger ~offset ~limit (module Conn) query
       |> Errors.Lift.sql ~context:"Finding user commands with transaction query"
     in
     let offset =
@@ -1062,9 +1044,10 @@ module Specific = struct
     (* But for tests, we want things to go fast *)
     module Mock = T (Result)
 
-    let real : db:(module Caqti_async.CONNECTION) -> 'gql Real.t =
-     fun ~db ->
-      { db_transactions = Sql.run db
+    let real :
+        logger:Logger.t -> db:(module Caqti_async.CONNECTION) -> 'gql Real.t =
+     fun ~logger ~db ->
+      { db_transactions = Sql.run ~logger db
       ; validate_network_choice = Network.Validate_choice.Real.validate
       }
 
@@ -1144,7 +1127,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /search/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
-  [%log info] "Search query" ~metadata:[ ("query", body) ] ;
+  [%log info] "Search $query" ~metadata:[ ("query", body) ] ;
   match route with
   | [ "transactions" ] ->
       with_db (fun ~db ->
@@ -1154,7 +1137,9 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
             |> Errors.Lift.wrap
           in
           let%map res =
-            Specific.Real.handle ~graphql_uri ~env:(Specific.Env.real ~db) req
+            Specific.Real.handle ~graphql_uri
+              ~env:(Specific.Env.real ~logger ~db)
+              req
             |> Errors.Lift.wrap
           in
           Search_transactions_response.to_yojson res )
