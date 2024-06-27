@@ -17,7 +17,7 @@ in  { executeCloud =
                     [ Cmd.run
                         "MINA_DEB_CODENAME=bullseye ; source ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/run-test-executive-cloud.sh ${testName}"
                     , Cmd.run
-                        "buildkite/scripts/upload-partial-coverage-data.sh ${key} dev"
+                        "buildkite/scripts/upload-partial-coverage-data.sh ${key} release"
                     ]
                   , artifact_paths =
                     [ SelectFiles.exactly "." "${testName}.cloud.test.log" ]
@@ -37,7 +37,7 @@ in  { executeCloud =
                     [ Cmd.run
                         "MINA_DEB_CODENAME=bullseye ; source ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/run-test-executive-local.sh ${testName}"
                     , Cmd.run
-                        "buildkite/scripts/upload-partial-coverage-data.sh ${key} dev"
+                        "buildkite/scripts/upload-partial-coverage-data.sh ${key} release"
                     ]
                   , artifact_paths =
                     [ SelectFiles.exactly "." "${testName}.local.test.log" ]

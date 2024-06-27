@@ -53,5 +53,6 @@ source buildkite/scripts/debian/install.sh "mina-test-executive"
 mina-test-executive local "$TEST_NAME" \
   --mina-image "$MINA_IMAGE" \
   --archive-image "$ARCHIVE_IMAGE" \
+  --generate-code-coverage true \
   | tee "$TEST_NAME.local.test.log" \
   | mina-logproc -i inline -f '!(.level in ["Debug", "Spam"])'
