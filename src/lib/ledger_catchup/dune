@@ -62,10 +62,10 @@
    transaction_snark_work
    pickles
    snark_params
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    o1trace
    mina_net2
    internal_tracing
-   runtime_config
+   mina_runtime_config
 ))
