@@ -33,7 +33,7 @@ module Network_config = struct
 
   type t =
     { debug_arg : bool
-    ; generate_code_coverage: bool
+    ; generate_code_coverage : bool
     ; genesis_keypairs :
         (Network_keypair.t Core.String.Map.t
         [@to_yojson
@@ -49,9 +49,8 @@ module Network_config = struct
   [@@deriving to_yojson]
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
-      ~(generate_code_coverage:bool)
-      ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
-      =
+      ~(generate_code_coverage : bool) ~(test_config : Test_config.t)
+      ~(images : Test_config.Container_images.t) =
     let _ = cli_inputs in
     let ({ genesis_ledger
          ; epoch_data
@@ -1110,7 +1109,7 @@ module Network_manager = struct
       in
       Malleable_error.ok_unit
     else Malleable_error.ok_unit
-    
+
   let destroy t network =
     let open Malleable_error.Let_syntax in
     let%bind () = tear_down t network in

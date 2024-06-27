@@ -18,23 +18,28 @@ module Coverage_manager = struct
     let root = "/root/.mina-config" in
     [%log' info t.logger] "Generating test coverage data..." ;
     nodes |> Map.to_alist
-      |> Malleable_error.List.fold ~init:[] ~f:(fun acc (id, node) ->
-             let%bind container_id = get_container_id id in
-             let%bind () = Node.stop node in
-             let%bind files_in_root = Node.list_files ~logger:t.logger id ~root in
-             let%bind coverage_files =
-               files_in_root
-               |> List.filter ~f:(String.is_substring ~substring:".coverage")
-               |> Malleable_error.List.map ~f:(fun coverage_file ->
-                      [%log' info t.logger]
-                        "Downloading coverage file to ($file) from $pod'."
-                        ~metadata:
-                          [ ("file", `String coverage_file)
-                          ; ("container", `String container_id)
-                          ] ;
-                      let%bind _ = run_in_container container_id ~cmd:[] in
-                      Malleable_error.return "coverage_file")
-    in
-       Malleable_error.return (acc @ coverage_files)
-   )
+    |> Malleable_error.List.fold ~init:[] ~f:(fun acc (_id, node) ->
+           let%bind () = Node.stop node in
+           let container_id = Node.id node in
+           let%bind files_in_root =
+             Node.list_files ~logger:t.logger node ~root
+           in
+           let%bind coverage_files =
+             files_in_root
+             |> List.filter ~f:(String.is_substring ~substring:".coverage")
+             |> Malleable_error.List.map ~f:(fun coverage_file ->
+                    [%log' info t.logger]
+                      "Downloading coverage file to ($file) from $pod'."
+                      ~metadata:
+                        [ ("file", `String coverage_file)
+                        ; ("container", `String container_id)
+                        ] ;
+                    let%bind _ =
+                      Node.copy_file_from_container node
+                        (Printf.sprintf "%s/%s" root coverage_file)
+                        coverage_file
+                    in
+                    Malleable_error.return coverage_file )
+           in
+           Malleable_error.return (acc @ coverage_files) )
 end
