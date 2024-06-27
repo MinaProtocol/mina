@@ -2,7 +2,7 @@
 
 # Helper script to include when building deb archives.
 
-echo "--- Setting up the envrionment to build debian packages..."
+echo "--- Setting up the environment to build debian packages..."
 
 set -euo pipefail
 
