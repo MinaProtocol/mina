@@ -59,7 +59,7 @@ fi
 
 # Determine the packages to build (mainnet y/N)
 case $GITBRANCH in
-    compatible|master|release-automation-testing/*|release/1*|release/3*) # whitelist of branches that are "mainnet-like"
+    compatible|master|release/1*|release/3*) # whitelist of branches that are "mainnet-like"
       export MINA_BUILD_MAINNET=true ;;
     *) # Other branches
       export MINA_BUILD_MAINNET=false ;;
