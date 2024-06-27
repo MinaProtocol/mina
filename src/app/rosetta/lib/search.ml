@@ -585,98 +585,96 @@ module Sql = struct
   end
 
   module Internal_commands = struct
-    module Filtered_ids_cte = struct
-      type t = { command_id : int; block_id : int } [@@deriving hlist]
+    module Filtered_commands_cte = struct
+      type t =
+        { internal_command_id : int
+        ; raw_internal_command : Archive_lib.Processor.Internal_command.t
+        ; receiver : string
+        ; coinbase_receiver : string option
+        ; sequence_no : int
+        ; secondary_sequence_no : int
+        ; block_id : int
+        ; block_hash : string
+        ; block_height : int64
+        }
+      [@@deriving hlist, fields]
+
+      let fields' =
+        String.concat ~sep:","
+        @@ List.map
+             ~f:(fun n -> "i." ^ n)
+             Archive_lib.Processor.Internal_command.Fields.names
 
       let fields =
-        String.concat ~sep:"," [ "i.id as command_id"; "b.id as block_id" ]
+        String.concat ~sep:","
+          [ "i.id"
+          ; fields'
+          ; "pk.value as receiver"
+          ; "cri.coinbase_receiver"
+          ; "bic.sequence_no"
+          ; "bic.secondary_sequence_no"
+          ; "bic.block_id"
+          ; "b.state_hash"
+          ; "b.height"
+          ]
+
+      let receiver t = `Pk t.receiver
+
+      let coinbase_receiver t =
+        Option.map ~f:(fun pk -> `Pk pk) t.coinbase_receiver
 
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-          Caqti_type.[ int; int ]
+          Caqti_type.
+            [ int
+            ; Archive_lib.Processor.Internal_command.typ
+            ; string
+            ; option string
+            ; int
+            ; int
+            ; int
+            ; string
+            ; int64
+            ]
 
       let query_string filters =
         [%string
           {sql|
-            SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no)
-              %{fields}
+            SELECT DISTINCT ON (bic.block_id, bic.internal_command_id, bic.sequence_no, bic.secondary_sequence_no) %{fields}
             FROM internal_commands i
             INNER JOIN blocks_internal_commands bic
               ON bic.internal_command_id = i.id
             INNER JOIN public_keys pk
               ON pk.id = i.receiver_id
-            INNER JOIN account_identifiers ai
-              ON ai.public_key_id = receiver_id
-            LEFT JOIN accounts_created ac
-              ON ac.account_identifier_id = ai.id
-              AND ac.block_id = bic.block_id
-              AND bic.sequence_no =
-                  (SELECT LEAST(
-                      (SELECT min(bic2.sequence_no)
-                      FROM blocks_internal_commands bic2
-                      INNER JOIN internal_commands ic2
-                          ON bic2.internal_command_id = ic2.id
-                      WHERE ic2.receiver_id = i.receiver_id
-                          AND bic2.block_id = bic.block_id
-                          AND bic2.status = 'applied'),
-                      (SELECT min(buc2.sequence_no)
-                        FROM blocks_user_commands buc2
-                        INNER JOIN user_commands uc2
-                          ON buc2.user_command_id = uc2.id
-                        WHERE uc2.receiver_id = i.receiver_id
-                          AND buc2.block_id = bic.block_id
-                          AND buc2.status = 'applied')))
-            INNER JOIN tokens t
-              ON t.id = ai.token_id
             INNER JOIN blocks b
               ON bic.block_id = b.id
-            WHERE b.chain_status <> 'orphaned' AND %{filters}
-            ORDER BY i.hash, i.command_type, bic.sequence_no, bic.secondary_sequence_no,
-                      CASE
-                      WHEN b.chain_status = 'canonical' THEN 1
-                      WHEN b.chain_status = 'pending' THEN 2
-                      END        
+            LEFT JOIN coinbase_receiver_info cri
+              ON bic.block_id = cri.block_id
+                AND bic.internal_command_id = cri.internal_command_id
+                AND bic.sequence_no = cri.sequence_no
+                AND bic.secondary_sequence_no = cri.secondary_sequence_no
+            WHERE %{filters}
         |sql}]
     end
 
-    module Extras = struct
-      type t = { block_hash : string; block_height : int64 }
-      [@@deriving fields, hlist]
-
-      let fields = String.concat ~sep:"," [ "b.state_hash"; "b.height" ]
-
-      let typ =
-        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-          Caqti_type.[ string; int64 ]
-    end
-
     type t =
-      { internal_command : Rosetta_lib_block.Sql.Internal_commands.Cte.t
-      ; extras : Extras.t
-      ; coinbase_receiver : string option
+      { internal_command : Filtered_commands_cte.t
+      ; receiver_account_creation_fee_paid : int64 option
       }
-    [@@deriving hlist]
+    [@@deriving hlist, fields]
 
     let fields =
-      String.concat ~sep:","
-        [ Rosetta_lib_block.Sql.Internal_commands.Cte.fields
-        ; Extras.fields
-        ; "coinbase_receiver_pk.value as coinbase_receiver"
-        ]
-
-    let coinbase_receiver t =
-      Option.map ~f:(fun pk -> `Pk pk) t.coinbase_receiver
+      String.concat ~sep:"," [ Filtered_commands_cte.fields; "ac.creation_fee" ]
 
     let typ =
       Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-        Caqti_type.
-          [ Rosetta_lib_block.Sql.Internal_commands.Cte.typ
-          ; Extras.typ
-          ; option string
-          ]
+        Caqti_type.[ Filtered_commands_cte.typ; option int64 ]
 
     let query_string ~offset ~limit op_type operator =
-      let fields = String.concat ~sep:"," [ "id_count.total_count"; fields ] in
+      let fields =
+        String.concat ~sep:","
+          [ "id_count.total_count"; "i.*"; "ac.creation_fee" ]
+      in
       let op_type_filters =
         Option.map op_type ~f:(function
           | `Coinbase_inc ->
@@ -700,61 +698,68 @@ module Sql = struct
           | `Zkapp_balance_update ->
               "FALSE" )
       in
+      let default_token =
+        [%string "'%{Mina_base.Token_id.(to_string default)}'"]
+      in
       let filters =
+        let address_fields = [ "pk.value"; "cri.coinbase_receiver" ] in
         sql_filters ~block_height_field:"b.height" ~txn_hash_field:"i.hash"
-          ~account_identifier_fields:[ ("pk.value", "t.value") ]
-          ~op_status_field:"bic.status" ~address_fields:[ "pk.value" ]
-          ~op_type_filters operator
+          ~account_identifier_fields:
+            (List.map ~f:(fun field -> (field, default_token)) address_fields)
+          ~op_status_field:"bic.status" ~address_fields ~op_type_filters
+          operator
       in
       let offset = offset_sql offset in
       let limit = limit_sql limit in
       [%string
         {sql|
-            WITH filtered_ids AS (%{Filtered_ids_cte.query_string filters}),
+            WITH canonical_blocks AS (SELECT * FROM blocks WHERE chain_status = 'canonical'),
+            max_canonical_height AS (SELECT MAX(height) as max_height FROM canonical_blocks),
+            pending_blocks AS (SELECT b.* FROM blocks b, max_canonical_height WHERE height > max_height AND chain_status = 'pending'),
+            blocks AS (SELECT * FROM canonical_blocks UNION ALL SELECT * FROM pending_blocks),
+            coinbase_receiver_info AS (
+                SELECT bic.block_id, bic.internal_command_id, bic.sequence_no, bic.secondary_sequence_no, coinbase_receiver_pk.value as coinbase_receiver
+                FROM blocks_internal_commands bic
+                INNER JOIN internal_commands ic ON bic.internal_command_id = ic.id
+                INNER JOIN blocks_internal_commands bic_coinbase_receiver
+                    ON bic.block_id = bic_coinbase_receiver.block_id
+                        AND (bic.internal_command_id <> bic_coinbase_receiver.internal_command_id
+                            OR bic.sequence_no <> bic_coinbase_receiver.sequence_no
+                            OR bic.secondary_sequence_no <> bic_coinbase_receiver.secondary_sequence_no)
+                INNER JOIN internal_commands ic_coinbase_receiver
+                    ON ic.command_type = 'fee_transfer_via_coinbase'
+                        AND ic_coinbase_receiver.command_type = 'coinbase'
+                        AND ic_coinbase_receiver.id = bic_coinbase_receiver.internal_command_id
+                INNER JOIN public_keys coinbase_receiver_pk ON ic_coinbase_receiver.receiver_id = coinbase_receiver_pk.id
+            ),
+            internal_commands_info AS (%{Filtered_commands_cte.query_string filters}),
             id_count AS (
-              SELECT COUNT(*) AS total_count FROM filtered_ids
+              SELECT COUNT(*) AS total_count FROM internal_commands_info
             )
-            SELECT DISTINCT ON (i.id, i.hash, i.command_type, bic.block_id, bic.sequence_no, bic.secondary_sequence_no)
-                  %{fields}
-            FROM id_count, (SELECT * FROM filtered_ids ORDER BY command_id, block_id LIMIT %{limit} OFFSET %{offset}) AS filtered_ids
-            INNER JOIN internal_commands i
-                ON filtered_ids.command_id = i.id
-            INNER JOIN blocks_internal_commands bic
-              ON i.id = bic.internal_command_id AND filtered_ids.block_id = bic.block_id
-            INNER JOIN public_keys pk
-              ON pk.id = i.receiver_id
-            INNER JOIN account_identifiers ai
+            SELECT %{fields}
+            FROM id_count, (SELECT * FROM internal_commands_info ORDER BY block_id, id, sequence_no, secondary_sequence_no LIMIT %{limit} OFFSET %{offset}) i
+            LEFT JOIN account_identifiers ai
               ON ai.public_key_id = receiver_id
             LEFT JOIN accounts_created ac
               ON ac.account_identifier_id = ai.id
-              AND ac.block_id = bic.block_id
-              AND bic.sequence_no =
+              AND ac.block_id = i.block_id
+              AND i.sequence_no =
                   (SELECT LEAST(
                       (SELECT min(bic2.sequence_no)
                       FROM blocks_internal_commands bic2
                       INNER JOIN internal_commands ic2
                           ON bic2.internal_command_id = ic2.id
                       WHERE ic2.receiver_id = i.receiver_id
-                          AND bic2.block_id = bic.block_id
+                          AND bic2.block_id = i.block_id
                           AND bic2.status = 'applied'),
                       (SELECT min(buc2.sequence_no)
                         FROM blocks_user_commands buc2
                         INNER JOIN user_commands uc2
                           ON buc2.user_command_id = uc2.id
                         WHERE uc2.receiver_id = i.receiver_id
-                          AND buc2.block_id = bic.block_id
+                          AND buc2.block_id = i.block_id
                           AND buc2.status = 'applied')))
-            INNER JOIN tokens t
-              ON t.id = ai.token_id
-            INNER JOIN blocks b
-              ON bic.block_id = b.id
-            LEFT JOIN internal_commands ic_coinbase_receiver
-              ON i.command_type = 'fee_transfer_via_coinbase'
-                AND ic_coinbase_receiver.command_type = 'coinbase'
-                AND ic_coinbase_receiver.id IN (SELECT internal_command_id FROM blocks_internal_commands WHERE block_id = filtered_ids.block_id)
-            LEFT JOIN public_keys coinbase_receiver_pk
-              ON ic_coinbase_receiver.receiver_id = coinbase_receiver_pk.id
-            ORDER BY i.id, i.hash, i.command_type, bic.block_id, bic.sequence_no, bic.secondary_sequence_no
+            ORDER BY i.block_id, i.id, i.sequence_no, i.secondary_sequence_no
           |sql}]
 
     let run (module Conn : Caqti_async.CONNECTION) ~offset ~limit input =
@@ -773,15 +778,25 @@ module Sql = struct
       | (total_count, _) :: _ as internal_commands ->
           (total_count, List.map internal_commands ~f:snd)
 
-    let to_info (t : t) =
+    let to_info ({ internal_command; _ } as t : t) =
       let open Result.Let_syntax in
       let%map info =
         Rosetta_lib_block.Sql.Internal_commands.Cte.to_info
-          ~coinbase_receiver:(coinbase_receiver t) t.internal_command
+          ~coinbase_receiver:
+            (Filtered_commands_cte.coinbase_receiver internal_command)
+          { Rosetta_lib_block.Sql.Internal_commands.Cte.internal_command_id =
+              internal_command.internal_command_id
+          ; raw_internal_command = internal_command.raw_internal_command
+          ; receiver = internal_command.receiver
+          ; sequence_no = internal_command.sequence_no
+          ; secondary_sequence_no = internal_command.secondary_sequence_no
+          ; receiver_account_creation_fee_paid =
+              receiver_account_creation_fee_paid t
+          }
       in
       { Internal_command_info.info
-      ; block_hash = t.extras.Extras.block_hash
-      ; block_height = t.extras.Extras.block_height
+      ; block_hash = internal_command.block_hash
+      ; block_height = internal_command.block_height
       }
   end
 

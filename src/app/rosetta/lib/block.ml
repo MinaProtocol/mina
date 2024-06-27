@@ -391,41 +391,15 @@ module Sql = struct
 
   module Internal_commands = struct
     module Cte = struct
-      module Extras = struct
-        type t =
-          { receiver_account_creation_fee_paid : int64 option
-          ; receiver : string
-          ; sequence_no : int
-          ; secondary_sequence_no : int
-          }
-        [@@deriving hlist, fields]
-
-        let fields =
-          String.concat ~sep:","
-            [ "ac.creation_fee"
-            ; "pk.value as receiver"
-            ; "bic.sequence_no"
-            ; "bic.secondary_sequence_no"
-            ]
-
-        let receiver t = `Pk t.receiver
-
-        let typ =
-          Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-            Caqti_type.[ option int64; string; int; int ]
-      end
-
       type t =
         { internal_command_id : int
         ; raw_internal_command : Archive_lib.Processor.Internal_command.t
-        ; internal_command_extras : Extras.t
+        ; receiver_account_creation_fee_paid : int64 option
+        ; receiver : string
+        ; sequence_no : int
+        ; secondary_sequence_no : int
         }
-      [@@deriving hlist]
-
-      let typ =
-        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-          Caqti_type.
-            [ int; Archive_lib.Processor.Internal_command.typ; Extras.typ ]
+      [@@deriving hlist, fields]
 
       let fields' =
         String.concat ~sep:","
@@ -433,7 +407,28 @@ module Sql = struct
              ~f:(fun n -> "i." ^ n)
              Archive_lib.Processor.Internal_command.Fields.names
 
-      let fields = String.concat ~sep:"," [ "i.id"; fields'; Extras.fields ]
+      let fields =
+        String.concat ~sep:","
+          [ "i.id"
+          ; fields'
+          ; "ac.creation_fee"
+          ; "pk.value as receiver"
+          ; "bic.sequence_no"
+          ; "bic.secondary_sequence_no"
+          ]
+
+      let receiver t = `Pk t.receiver
+
+      let typ =
+        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+          Caqti_type.
+            [ int
+            ; Archive_lib.Processor.Internal_command.typ
+            ; option int64
+            ; string
+            ; int
+            ; int
+            ]
 
       let query =
         [%string
@@ -472,8 +467,7 @@ module Sql = struct
           AND t.value = ?
       |}]
 
-      let to_info ~coinbase_receiver
-          { raw_internal_command = ic; internal_command_extras = extras; _ } =
+      let to_info ~coinbase_receiver ({ raw_internal_command = ic; _ } as t) =
         let open Result.Let_syntax in
         let%map kind =
           match ic.Archive_lib.Processor.Internal_command.command_type with
@@ -497,15 +491,15 @@ module Sql = struct
         (* internal commands always use the default token *)
         let token_id = Mina_base.Token_id.(to_string default) in
         { Internal_command_info.kind
-        ; receiver = Extras.receiver extras
+        ; receiver = receiver t
         ; receiver_account_creation_fee_paid =
             Option.map
-              (Extras.receiver_account_creation_fee_paid extras)
+              (receiver_account_creation_fee_paid t)
               ~f:Unsigned.UInt64.of_int64
         ; fee = Unsigned.UInt64.of_string ic.fee
         ; token = `Token_id token_id
-        ; sequence_no = Extras.sequence_no extras
-        ; secondary_sequence_no = Extras.secondary_sequence_no extras
+        ; sequence_no = sequence_no t
+        ; secondary_sequence_no = secondary_sequence_no t
         ; hash = ic.hash
         ; coinbase_receiver
         }
