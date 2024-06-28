@@ -11,11 +11,11 @@ recommended 16GB) and then run the following:
 ```bash
 cat dockerfiles/Dockerfile-mina-rosetta \
     | docker build -t mina-rosetta:v2.0.0 \
-        --build-arg "network=berkeley" \
+        --build-arg "network=devnet" \
         --build-arg "image=debian:bullseye" \
         --build-arg "deb_codename=bullseye" \
-        --build-arg "deb_release=berkeley" \
-        --build-arg "deb_version=2.0.0berkeley-rc1-1551e2f" -
+        --build-arg "deb_release=devnet" \
+        --build-arg "deb_version=2.0.0devnet-rc1-1551e2f" -
 ```
 
 This creates an image (`mina-rosetta:v2.0.0`) based on Debian Bullseye that
