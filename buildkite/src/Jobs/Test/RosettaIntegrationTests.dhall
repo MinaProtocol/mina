@@ -51,7 +51,7 @@ in  Pipeline.build
                   ([] : List Text)
                   "./src/test/archive/sample_db/archive_db.sql"
                   Artifacts.Type.Rosetta
-                  ".buildkite/scripts/rosetta-indexer-test.sh"
+                  "./buildkite/scripts/rosetta-indexer-test.sh"
               ]
             , label = "Rosetta integration tests Bullseye"
             , key = "rosetta-integration-tests-bullseye"
