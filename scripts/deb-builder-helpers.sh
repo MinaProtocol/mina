@@ -297,8 +297,6 @@ build_daemon_deb() {
   ##################################### END MAINNET PACKAGE #######################################
 
   ##################################### DEVNET PACKAGE #######################################
-  if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
-  then
 
     echo "------------------------------------------------------------"
     echo "--- Building testnet signatures deb without keys:"
@@ -309,21 +307,8 @@ build_daemon_deb() {
 
     build_deb mina-devnet
 
-  fi # only builds on mainnet-like branches
   ##################################### END DEVNET PACKAGE #######################################
 
-  ##################################### BERKELEY PACKAGE #######################################
-  echo "------------------------------------------------------------"
-  echo "--- Building Mina Devnet testnet signatures deb without keys:"
-
-  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
-
-  copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
-
-  build_deb "${MINA_DEB_NAME}"
-
-}
-##################################### END BERKELEY PACKAGE #######################################
 
 ##################################### ARCHIVE PACKAGE ##########################################
 build_archive_deb () {
