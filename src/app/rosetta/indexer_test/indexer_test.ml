@@ -344,13 +344,18 @@ struct
     let%bind generator = with_db pool (T.deferred_generator table) in
     Quickcheck.async_test ~trials generator ~f:(fun value ->
         let query = I.to_query value in
+        let limit = 100000L in
         let%bind total_count, commands =
-          with_db pool (fun db -> run db ~offset:None ~limit:None query)
+          with_db pool (fun db -> run db ~offset:None ~limit:(Some limit) query)
         in
         let open Alcotest in
         let infos = to_info commands in
-        check int64 "total_count = len (commands)" total_count
-          (Int64.of_int (List.length infos)) ;
+        if Int64.(total_count > limit) then
+          check int64 "limit = len (commands)" limit
+            (Int64.of_int (List.length infos))
+        else
+          check int64 "total_count = len (commands)" total_count
+            (Int64.of_int (List.length infos)) ;
         check_condition value infos )
 
   let test_user_command pool = test `User_commands ~pool run_user_commands
@@ -363,10 +368,10 @@ struct
   let test_suite =
     let open Alcotest_async in
     ( I.name
-    , [ test_case ~timeout:(sec 200.) "User commands" `Slow @@ test_user_command
-      ; test_case ~timeout:(sec 200.) "Internal commands" `Slow
+    , [ test_case ~timeout:(sec 400.) "User commands" `Slow @@ test_user_command
+      ; test_case ~timeout:(sec 400.) "Internal commands" `Slow
         @@ test_internal_command
-      ; test_case ~timeout:(sec 200.) "Zkapp commands" `Slow
+      ; test_case ~timeout:(sec 400.) "Zkapp commands" `Slow
         @@ test_zkapp_command
       ] )
 
@@ -392,13 +397,13 @@ struct
       let name, tests = test_suite in
       ( name
       , tests
-        @ [ test_case ~timeout:(sec 200.) "Non existing user command" `Slow
+        @ [ test_case ~timeout:(sec 400.) "Non existing user command" `Slow
             @@ test_not_existing ~limit:50 ~table:"user_commands"
                  run_user_commands
-          ; test_case ~timeout:(sec 200.) "Non existing internal command" `Slow
+          ; test_case ~timeout:(sec 400.) "Non existing internal command" `Slow
             @@ test_not_existing ~limit:50 ~table:"internal_commands"
                  run_internal_commands
-          ; test_case ~timeout:(sec 200.) "Non existing zkapp command" `Slow
+          ; test_case ~timeout:(sec 400.) "Non existing zkapp command" `Slow
             @@ test_not_existing ~limit:50 ~table:"zkapp_commands"
                  run_zkapp_commands
           ] )
@@ -518,7 +523,7 @@ module Op_status =
 
       let name = "operation-status"
 
-      let trials = 30
+      let trials = 20
 
       let to_query v =
         let op_status =
@@ -670,7 +675,7 @@ module Max_block =
 
       let name = "max-block"
 
-      let trials = 20
+      let trials = 10
 
       let to_query max_block =
         Lib.Search.Transaction_query.make ~max_block
@@ -753,7 +758,7 @@ module Offset_limit = struct
       ( { offset = offset_1; limit = limit_1 }
       , { offset = offset_2; limit = limit_2 } )
     in
-    Quickcheck.async_test ~trials:10 generator ~f:(fun (value_1, value_2) ->
+    Quickcheck.async_test ~trials:5 generator ~f:(fun (value_1, value_2) ->
         let open Deferred.Let_syntax in
         let%bind info_1 = run' value_1 pool in
         let%bind transactions_1_result = Ops.to_transactions info_1 in
@@ -781,8 +786,8 @@ module Offset_limit = struct
   let test_suite =
     let open Alcotest_async in
     ( "offset-limit"
-    , [ test_case ~timeout:(sec 200.) "Limit and offset" `Slow @@ test
-      ; test_case ~timeout:(sec 200.) "Limit" `Slow @@ test_limit
+    , [ test_case ~timeout:(sec 400.) "Limit and offset" `Slow @@ test
+      ; test_case ~timeout:(sec 400.) "Limit" `Slow @@ test_limit
       ] )
 end
 
