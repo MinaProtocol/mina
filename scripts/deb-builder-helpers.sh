@@ -294,9 +294,9 @@ build_daemon_deb() {
     build_deb mina-mainnet
 
   fi # only builds on mainnet-like branches
-  ##################################### END MAINNET PACKAGE #######################################
+ ##################################### END MAINNET PACKAGE #######################################
 
-  ##################################### DEVNET PACKAGE #######################################
+##################################### DEVNET PACKAGE #######################################
 
     echo "------------------------------------------------------------"
     echo "--- Building testnet signatures deb without keys:"
@@ -306,8 +306,8 @@ build_daemon_deb() {
     copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
 
     build_deb mina-devnet
-
-  ##################################### END DEVNET PACKAGE #######################################
+}
+##################################### END DEVNET PACKAGE #######################################
 
 
 ##################################### ARCHIVE PACKAGE ##########################################
