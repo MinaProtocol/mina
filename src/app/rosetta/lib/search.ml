@@ -797,36 +797,31 @@ module Sql = struct
   end
 
   module Zkapp_commands = struct
-    module Extras = struct
-      type t = { block_hash : string; block_height : int64 }
-      [@@deriving fields, hlist]
-
-      let fields = String.concat ~sep:"," [ "b.state_hash"; "b.height" ]
-
-      let typ =
-        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-          Caqti_type.[ string; int64 ]
-    end
-
     type t =
       { zkapp_command : Rosetta_lib_block.Sql.Zkapp_commands.t
-      ; extras : Extras.t
+      ; block_id : int
+      ; block_hash : string
+      ; block_height : int64
       }
     [@@deriving hlist]
 
     let fields =
       String.concat ~sep:","
-        [ Rosetta_lib_block.Sql.Zkapp_commands.fields; Extras.fields ]
+        [ Rosetta_lib_block.Sql.Zkapp_commands.fields
+        ; "bzc.block_id"
+        ; "b.state_hash"
+        ; "b.height"
+        ]
 
     let typ =
       Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-        [ Rosetta_lib_block.Sql.Zkapp_commands.typ; Extras.typ ]
+        Caqti_type.
+          [ Rosetta_lib_block.Sql.Zkapp_commands.typ; int; string; int64 ]
 
-    let filtered_ids_cte_string ~filters =
+    let cte_query_string filters =
       [%string
         {sql|
-          filtered_ids AS (
-            SELECT DISTINCT zc.id
+            SELECT %{fields}
             FROM zkapp_commands zc
             INNER JOIN blocks_zkapp_commands bzc
               ON zc.id = bzc.zkapp_command_id
@@ -851,52 +846,32 @@ module Sql = struct
             INNER JOIN tokens token_update_body
               ON token_update_body.id = ai_update_body.token_id
             WHERE %{filters}
-          )
         |sql}]
 
-    let count_cte_string =
-      {sql|
-        id_count AS (
-          SELECT COUNT(*) AS total_count FROM filtered_ids
-        )
-      |sql}
-
     let query_string ~offset ~limit ~filters =
-      let fields = String.concat ~sep:"," [ "id_count.total_count"; fields ] in
+      let fields = String.concat ~sep:"," [ "id_count.total_count"; "zc.*" ] in
       let ctes_string =
         String.concat ~sep:","
-          [ filtered_ids_cte_string ~filters; count_cte_string ]
+          [ "canonical_blocks AS (SELECT * FROM blocks WHERE chain_status = \
+             'canonical')"
+          ; "max_canonical_height AS (SELECT MAX(height) as max_height FROM \
+             canonical_blocks)"
+          ; "pending_blocks AS (SELECT b.* FROM blocks b, max_canonical_height \
+             WHERE height > max_height AND chain_status = 'pending')"
+          ; "blocks AS (SELECT * FROM canonical_blocks UNION ALL SELECT * FROM \
+             pending_blocks)"
+          ; [%string "zkapp_commands_info AS (%{cte_query_string filters})"]
+          ; "id_count AS (SELECT COUNT(DISTINCT (id,block_id,sequence_no)) AS \
+             total_count FROM zkapp_commands_info)"
+          ]
       in
       [%string
         {sql|
           WITH %{ctes_string}
-          SELECT
-          %{fields}
-          FROM id_count, zkapp_commands zc
-          INNER JOIN blocks_zkapp_commands bzc
-            ON zc.id = bzc.zkapp_command_id
-          INNER JOIN zkapp_fee_payer_body zfpb
-            ON zc.zkapp_fee_payer_body_id = zfpb.id
-          INNER JOIN public_keys pk_fee_payer
-            ON zfpb.public_key_id = pk_fee_payer.id
-          INNER JOIN account_identifiers ai_fee_payer
-            ON pk_fee_payer.id = ai_fee_payer.public_key_id
-          INNER JOIN tokens token_fee_payer
-            ON ai_fee_payer.token_id = token_fee_payer.id
-          INNER JOIN blocks b
-            ON bzc.block_id = b.id
-          LEFT JOIN zkapp_account_update zau
-            ON zau.id = ANY (zc.zkapp_account_updates_ids)
-          INNER JOIN zkapp_account_update_body zaub
-            ON zaub.id = zau.body_id
-          INNER JOIN account_identifiers ai_update_body
-            ON zaub.account_identifier_id = ai_update_body.id
-          INNER JOIN public_keys pk_update_body
-            ON ai_update_body.public_key_id = pk_update_body.id
-          INNER JOIN tokens token_update_body
-            ON token_update_body.id = ai_update_body.token_id
-          WHERE zc.id IN (SELECT id FROM filtered_ids ORDER BY id LIMIT %{limit} OFFSET %{offset})
-          ORDER BY zc.id
+          SELECT %{fields}
+          FROM id_count, zkapp_commands_info zc
+          ORDER BY block_id, id, sequence_no
+          LIMIT %{limit} OFFSET %{offset}
         |sql}]
 
     let query ~offset ~limit op_type operator =
@@ -955,22 +930,24 @@ module Sql = struct
 
       type info = Zkapp_command_info.t
 
-      let command_id { zkapp_command; _ } = zkapp_command.zkapp_command_id
+      let is_same_command t_1 t_2 =
+        t_1.block_id = t_2.block_id
+        && t_1.zkapp_command.zkapp_command_id
+           = t_2.zkapp_command.zkapp_command_id
+        && t_1.zkapp_command.zkapp_command_extras.sequence_no
+           = t_2.zkapp_command.zkapp_command_extras.sequence_no
 
       let to_account_update_info command =
         Rosetta_lib_block.Sql.Zkapp_commands.to_account_update_info
           command.zkapp_command
 
       let account_updates_and_command_to_info account_updates
-          { zkapp_command; extras } =
+          { zkapp_command; block_hash; block_height } =
         let info =
           Rosetta_lib_block.Sql.Zkapp_commands
           .account_updates_and_command_to_info account_updates zkapp_command
         in
-        { Zkapp_command_info.info
-        ; block_hash = extras.block_hash
-        ; block_height = extras.block_height
-        }
+        { Zkapp_command_info.info; block_hash; block_height }
     end)
   end
 

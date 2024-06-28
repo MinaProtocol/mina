@@ -672,7 +672,7 @@ module Sql = struct
            ON token_update_body.id = ai_update_body.token_id
          WHERE bzc.block_id = ?
           AND (token_update_body.value = ? OR token_update_body.id IS NULL)
-         ORDER BY zc.id
+         ORDER BY zc.id, bzc.sequence_no
       |}]
 
     let query =
@@ -688,7 +688,7 @@ module Sql = struct
 
       type info
 
-      val command_id : command -> int
+      val is_same_command : command -> command -> bool
 
       val to_account_update_info : command -> account_update_info option
 
@@ -698,7 +698,7 @@ module Sql = struct
     struct
       let to_command_info' command =
         let rec f pending_account_updates = function
-          | command' :: t when M.command_id command' = M.command_id command ->
+          | command' :: t when M.is_same_command command' command ->
               let account_update_info' = M.to_account_update_info command' in
               let pending_account_updates' =
                 Option.value_map account_update_info'
@@ -782,7 +782,10 @@ module Sql = struct
 
       type info = Zkapp_command_info.t
 
-      let command_id t = t.zkapp_command_id
+      let is_same_command t_1 t_2 =
+        t_1.zkapp_command_id = t_2.zkapp_command_id
+        && t_1.zkapp_command_extras.sequence_no
+           = t_2.zkapp_command_extras.sequence_no
 
       let to_account_update_info = to_account_update_info
 
