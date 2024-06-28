@@ -5,6 +5,8 @@ type async_pool = (Caqti_async.connection, Caqti_error.t) Caqti_async.Pool.t
 
 type pool = { uri : Uri.t; pool : async_pool }
 
+let logger = Logger.create ()
+
 let archive_uri_arg =
   let pool =
     let parse s =
@@ -56,17 +58,17 @@ type _ info_t =
 let run_user_commands db ~offset ~limit query =
   Deferred.Result.map ~f:(fun (c, commands) ->
       (c, List.map commands ~f:(fun command -> User_command command)) )
-  @@ Lib.Search.Sql.User_commands.run db ~offset ~limit query
+  @@ Lib.Search.Sql.User_commands.run db ~logger ~offset ~limit query
 
 let run_internal_commands db ~offset ~limit query =
   Deferred.Result.map ~f:(fun (c, commands) ->
       (c, List.map commands ~f:(fun command -> Internal_command command)) )
-  @@ Lib.Search.Sql.Internal_commands.run db ~offset ~limit query
+  @@ Lib.Search.Sql.Internal_commands.run db ~logger ~offset ~limit query
 
 let run_zkapp_commands db ~offset ~limit query =
   Deferred.Result.map ~f:(fun (c, commands) ->
       (c, List.map commands ~f:(fun command -> Zkapp_command command)) )
-  @@ Lib.Search.Sql.Zkapp_commands.run db ~offset ~limit query
+  @@ Lib.Search.Sql.Zkapp_commands.run db ~logger ~offset ~limit query
 
 module Test_values = struct
   module T = struct
@@ -722,7 +724,7 @@ module Offset_limit = struct
     with_db pool (fun db ->
         Deferred.Result.map_error ~f:(fun _ ->
             Caqti_error.(request_failed ~uri:Uri.empty ~query:"" (Msg "")) )
-        @@ Lib.Search.Sql.run db (to_query ~offset ~limit) )
+        @@ Lib.Search.Sql.run ~logger db (to_query ~offset ~limit) )
 
   let run' { offset; limit } = run ~offset ~limit
 

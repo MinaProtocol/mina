@@ -302,6 +302,16 @@ module Sql = struct
     in
     [%string "%{block_filter} AND (%{filters'})"]
 
+  let request_to_string ?params req =
+    let buffer = Buffer.create 128 in
+    let ppf = Format.formatter_of_buffer buffer in
+    let () =
+      Option.value_map params ~default:(Caqti_request.pp ppf req)
+        ~f:(fun params -> Caqti_request.pp_with_param ppf (req, params))
+    in
+    let () = Format.pp_print_flush ppf () in
+    Buffer.contents buffer
+
   module Block_extras = struct
     type t = { block_hash : string; block_height : int64 }
     [@@deriving hlist, fields]
@@ -500,16 +510,13 @@ module Sql = struct
           Transaction_query.(input.filter.Filter.op_type)
           input.operator
       in
-      [%log debug] "Running SQL query $query with $params"
-        ~metadata:
-          [ ("query", `String query_string)
-          ; ("params", Params.to_yojson params)
-          ] ;
       let query =
         Caqti_request.collect Params.typ
           Caqti_type.(tup2 int64 typ)
           query_string
       in
+      [%log debug] "Running SQL query $query"
+        ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
       match%map Conn.collect_list query params with
       | [] ->
           (0L, [])
@@ -758,17 +765,17 @@ module Sql = struct
             ORDER BY i.block_id, i.id, i.sequence_no, i.secondary_sequence_no
           |sql}]
 
-    let run (module Conn : Caqti_async.CONNECTION) ~offset ~limit input =
+    let run (module Conn : Caqti_async.CONNECTION) ~logger ~offset ~limit input
+        =
       let open Deferred.Result.Let_syntax in
       let params = Params.of_query input in
       let query =
-        query_string ~offset ~limit input.filter.op_type input.operator
+        Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ)
+        @@ query_string ~offset ~limit input.filter.op_type input.operator
       in
-      match%map
-        Conn.collect_list
-          (Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ) query)
-          params
-      with
+      [%log debug] "Running SQL query $query"
+        ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
+      match%map Conn.collect_list query params with
       | [] ->
           (0L, [])
       | (total_count, _) :: _ as internal_commands ->
@@ -910,14 +917,14 @@ module Sql = struct
       Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ)
       @@ query_string ~offset ~limit ~filters
 
-    let run (module Conn : Caqti_async.CONNECTION) ~offset ~limit input =
+    let run (module Conn : Caqti_async.CONNECTION) ~logger ~offset ~limit input
+        =
       let open Deferred.Result.Let_syntax in
       let params = Params.of_query input in
-      match%map
-        Conn.collect_list
-          (query ~offset ~limit input.filter.op_type input.operator)
-          params
-      with
+      let query = query ~offset ~limit input.filter.op_type input.operator in
+      [%log debug] "Running SQL query $query"
+        ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
+      match%map Conn.collect_list query params with
       | [] ->
           (0L, [])
       | (total_count, _) :: _ as res ->
@@ -979,7 +986,7 @@ module Sql = struct
           Int64.(max 0L (limit - user_commands_count)) )
     in
     let%bind internal_commands_count, raw_internal_commands =
-      Internal_commands.run (module Conn) ~offset ~limit query
+      Internal_commands.run (module Conn) ~logger ~offset ~limit query
       |> Errors.Lift.sql ~context:"Finding internal commands within block"
     in
     let offset =
@@ -991,7 +998,7 @@ module Sql = struct
           Int64.(max 0L (limit - user_commands_count)) )
     in
     let%bind zkapp_commands_count, raw_zkapp_commands =
-      Zkapp_commands.run (module Conn) ~offset ~limit query
+      Zkapp_commands.run (module Conn) ~logger ~offset ~limit query
       |> Errors.Lift.sql ~context:"Finding zkapp commands within block"
     in
     let%bind internal_commands =
@@ -1115,7 +1122,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /search/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
-  [%log info] "Search $query" ~metadata:[ ("query", body) ] ;
+  [%log info] "Search $params" ~metadata:[ ("params", body) ] ;
   match route with
   | [ "transactions" ] ->
       with_db (fun ~db ->
