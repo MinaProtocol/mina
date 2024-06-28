@@ -5360,48 +5360,46 @@ index 135235db65..459befd8ec 100644
              [%log error]
                ~metadata:[ ("error", `String (Caqti_error.show e)) ]
 diff --git a/src/app/rosetta/lib/search.ml b/src/app/rosetta/lib/search.ml
-index a4d16f4921..97f6eea093 100644
+index 105281933a..cdc9c88de4 100644
 --- a/src/app/rosetta/lib/search.ml
 +++ b/src/app/rosetta/lib/search.ml
-@@ -418,8 +418,8 @@ module Sql = struct
-       in
-       let offset = offset_sql offset in
-       let limit = limit_sql limit in
--      Caqti_request.collect Params.typ
--        Caqti_type.(tup2 int64 typ)
-+      Mina_caqti.collect_req Params.typ
-+        Caqti_type.(t2 int64 typ)
-         [%string
-           {sql|
-           WITH filtered_ids AS (
-@@ -523,7 +523,7 @@ module Sql = struct
-           ORDER BY u.id, CASE WHEN b.chain_status = 'canonical' THEN 1 WHEN b.chain_status = 'orphaned' THEN 2 END
+@@ -501,8 +501,7 @@ module Sql = struct
+             ORDER BY u.block_id, u.id, u.sequence_no
          |sql}]
  
--    let run (module Conn : Caqti_async.CONNECTION) ~offset ~limit input =
-+    let run (module Conn : Mina_caqti.CONNECTION) ~offset ~limit input =
+-    let run (module Conn : Caqti_async.CONNECTION) ~logger ~offset ~limit input
+-        =
++    let run (module Conn : Mina_caqti.CONNECTION) ~logger ~offset ~limit input =
        let open Deferred.Result.Let_syntax in
        let params = Params.of_query input in
-       match%map
-@@ -775,7 +775,7 @@ module Sql = struct
-             ORDER BY i.id, i.hash, i.command_type, bic.block_id, bic.sequence_no, bic.secondary_sequence_no
+       let query_string =
+@@ -511,9 +510,7 @@ module Sql = struct
+           input.operator
+       in
+       let query =
+-        Caqti_request.collect Params.typ
+-          Caqti_type.(tup2 int64 typ)
+-          query_string
++        Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ) query_string
+       in
+       [%log debug] "Running SQL query $query"
+         ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
+@@ -765,12 +762,11 @@ module Sql = struct
+             ORDER BY i.block_id, i.id, i.sequence_no, i.secondary_sequence_no
            |sql}]
  
--    let run (module Conn : Caqti_async.CONNECTION) ~offset ~limit input =
-+    let run (module Conn : Mina_caqti.CONNECTION) ~offset ~limit input =
+-    let run (module Conn : Caqti_async.CONNECTION) ~logger ~offset ~limit input
+-        =
++    let run (module Conn : Mina_caqti.CONNECTION) ~logger ~offset ~limit input =
        let open Deferred.Result.Let_syntax in
        let params = Params.of_query input in
        let query =
-@@ -783,7 +783,7 @@ module Sql = struct
+-        Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ)
++        Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ)
+         @@ query_string ~offset ~limit input.filter.op_type input.operator
        in
-       match%map
-         Conn.collect_list
--          (Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ) query)
-+          (Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ) query)
-           params
-       with
-       | [] ->
-@@ -939,10 +939,10 @@ module Sql = struct
+       [%log debug] "Running SQL query $query"
+@@ -914,11 +910,10 @@ module Sql = struct
            ~address_fields:[ "pk_fee_payer.value"; "pk_update_body.value" ]
            ~op_type_filters operator
        in
@@ -5409,29 +5407,21 @@ index a4d16f4921..97f6eea093 100644
 +      Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ)
        @@ query_string ~offset ~limit ~filters
  
--    let run (module Conn : Caqti_async.CONNECTION) ~offset ~limit input =
-+    let run (module Conn : Mina_caqti.CONNECTION) ~offset ~limit input =
+-    let run (module Conn : Caqti_async.CONNECTION) ~logger ~offset ~limit input
+-        =
++    let run (module Conn : Mina_caqti.CONNECTION) ~logger ~offset ~limit input =
        let open Deferred.Result.Let_syntax in
        let params = Params.of_query input in
-       match%map
-@@ -981,7 +981,7 @@ module Sql = struct
+       let query = query ~offset ~limit input.filter.op_type input.operator in
+@@ -958,7 +953,7 @@ module Sql = struct
      end)
    end
  
--  let run (module Conn : Caqti_async.CONNECTION) query =
-+  let run (module Conn : Mina_caqti.CONNECTION) query =
+-  let run (module Conn : Caqti_async.CONNECTION) ~logger query =
++  let run (module Conn : Mina_caqti.CONNECTION) ~logger query =
      let module Result = struct
        include Result
  
-@@ -1062,7 +1062,7 @@ module Specific = struct
-     (* But for tests, we want things to go fast *)
-     module Mock = T (Result)
- 
--    let real : db:(module Caqti_async.CONNECTION) -> 'gql Real.t =
-+    let real : db:(module Mina_caqti.CONNECTION) -> 'gql Real.t =
-      fun ~db ->
-       { db_transactions = Sql.run db
-       ; validate_network_choice = Network.Validate_choice.Real.validate
 diff --git a/src/app/swap_bad_balances/sql.ml b/src/app/swap_bad_balances/sql.ml
 index 82ec136a10..bd85672b7e 100644
 --- a/src/app/swap_bad_balances/sql.ml
