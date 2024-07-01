@@ -349,7 +349,8 @@ build_archive_deb () {
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-replayer"
   cp ./default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILDDIR}/usr/local/bin/mina-swap-bad-balances"
 
-
+  cp ../src/app/archive/create_schema.sql "${BUILDDIR}/etc/mina/archive"
+  
   build_deb "$ARCHIVE_DEB"
 
 }
