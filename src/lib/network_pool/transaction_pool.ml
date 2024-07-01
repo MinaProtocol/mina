@@ -308,6 +308,27 @@ struct
 
     module Batcher = Batcher.Transaction_pool
 
+    module Lru_cache = struct
+      let max_size = 2048
+
+      module T = struct
+        type t = User_command.t list [@@deriving hash]
+      end
+
+      module Q = Hash_queue.Make (Int)
+
+      type t = unit Q.t
+
+      let add t h =
+        if not (Q.mem t h) then (
+          if Q.length t >= max_size then ignore (Q.dequeue_front t : 'a option) ;
+          Q.enqueue_back_exn t h () ;
+          `Already_mem false )
+        else (
+          ignore (Q.lookup_and_move_to_back t h : unit option) ;
+          `Already_mem true )
+    end
+
     module Mutex = struct
       open Async
 
@@ -413,6 +434,7 @@ struct
 
     type t =
       { mutable pool : Indexed_pool.t
+      ; recently_seen : (Lru_cache.t[@sexp.opaque])
       ; locally_generated_uncommitted :
           ( Transaction_hash.User_command_with_valid_signature.t
           , Time.t * [ `Batch of int ] )
@@ -833,6 +855,7 @@ struct
         ; logger
         ; batcher = Batcher.create config.verifier
         ; best_tip_diff_relay = None
+        ; recently_seen = Lru_cache.Q.create ()
         ; best_tip_ledger = None
         ; verification_key_table = Vk_refcount_table.create ()
         }
@@ -1083,7 +1106,20 @@ struct
           , Intf.Verification_error.t )
           Deferred.Result.t =
         let open Deferred.Result.Let_syntax in
+        let is_sender_local =
+          Envelope.Sender.(equal Local) (Envelope.Incoming.sender diff)
+        in
         let open Intf.Verification_error in
+        let%bind () =
+          (* TODO: we should probably remove this -- the libp2p gossip cache should cover this already (#11704) *)
+          let (`Already_mem already_mem) =
+            Lru_cache.add t.recently_seen (Lru_cache.T.hash diff.data)
+          in
+          Deferred.return
+          @@ Result.ok_if_true
+               ((not already_mem) || is_sender_local)
+               ~error:Recently_seen
+        in
         let%bind () =
           let well_formedness_errors =
             List.fold (Envelope.Incoming.data diff) ~init:[]
