@@ -137,6 +137,8 @@ module type S = sig
         [@@deriving sexp, equal, bin_io, yojson, version, compare, hash]
 
         include Gen_intf with type t := t
+
+        val path_to_type : string
       end
 
       module V2 = Latest

@@ -11,6 +11,8 @@ module type Full = sig
           ; fee_token : Token_id.Stable.V2.t
           }
         [@@deriving bin_io, sexp, compare, equal, yojson, version, hash]
+
+        val path_to_type : string
       end
 
       module Latest = V2
@@ -55,6 +57,8 @@ module type Full = sig
     module V2 : sig
       type t = private Single.Stable.V2.t One_or_two.Stable.V1.t
       [@@deriving bin_io, sexp, compare, equal, yojson, version, hash]
+
+      val path_to_type : string
     end
 
     module Latest = V2

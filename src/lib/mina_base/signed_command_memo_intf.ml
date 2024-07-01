@@ -15,6 +15,8 @@ module type S = sig
       type nonrec t = t
       [@@deriving bin_io, sexp, equal, compare, hash, yojson, version]
 
+      val path_to_type : string
+
       module With_all_version_tags : Bin_prot.Binable.S with type t = t
     end
 
