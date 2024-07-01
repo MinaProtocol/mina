@@ -16,6 +16,7 @@ echo " Includes mina daemon, archive-node, rosetta, generate keypair for devnet"
 echo "--- Prepare debian packages"
 echo $@
 echo "PRINTING OUT THE PACKAGE ENV" 
+env
 ./scripts/rebuild-deb.sh $@
 
 echo "--- Git diff after build is complete:"

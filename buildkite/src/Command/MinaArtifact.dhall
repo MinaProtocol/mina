@@ -60,7 +60,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
         BatchTxn = 
           DockerImage.ReleaseSpec::{
             deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,            service="mina-batch-txn",
-            network="berkeley",
+            network="devnet",
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_repo = DebianRepo.Type.Local,
             step_key="batch-txn-${DebianVersions.lowerName debVersion}-docker-image"
@@ -88,7 +88,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
         Rosetta = 
           DockerImage.ReleaseSpec::{
             deps=DebianVersions.dependsOnStep debVersion profile buildFlags step_dep_name,            service="mina-rosetta",
-            network="berkeley",
+            network="devnet",
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_repo = DebianRepo.Type.Local,
             step_key="rosetta-${DebianVersions.lowerName debVersion}${BuildFlags.toLabelSegment buildFlags}-docker-image"
@@ -109,7 +109,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> Profiles.Type -
             deb_codename="${DebianVersions.lowerName debVersion}",
             deb_repo = DebianRepo.Type.Local,
             step_key="test-suite-${DebianVersions.lowerName debVersion}${Profiles.toLabelSegment profile}-docker-image",
-            network="berkeley"
+            network="devnet"
           }
       } artifact
 in 
