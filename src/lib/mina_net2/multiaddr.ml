@@ -39,12 +39,15 @@ let valid_as_peer t =
 
 let of_file_contents contents : t list =
   String.split ~on:'\n' contents
-  |> List.map ~f:String.strip
-  |> List.filter ~f:(fun s ->
-         if valid_as_peer s then true
-         else if String.is_empty s then false
-         else (
-           [%log' error (Logger.create ())]
-             "Invalid peer $peer found in peers list"
-             ~metadata:[ ("peer", `String s) ] ;
-           false ) )
+  |> List.filter_map
+       ~f:
+         (Fn.compose
+            (fun s ->
+              if valid_as_peer s then Some s
+              else if String.is_empty s then None
+              else (
+                [%log' error (Logger.create ())]
+                  "Invalid peer $peer found in peers list"
+                  ~metadata:[ ("peer", `String s) ] ;
+                None ) )
+            String.strip )
