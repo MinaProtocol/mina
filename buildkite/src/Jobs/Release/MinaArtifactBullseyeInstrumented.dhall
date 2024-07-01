@@ -14,6 +14,6 @@ Pipeline.build
     (ArtifactPipelines.pipeline 
         ArtifactPipelines.MinaBuildSpec::{
             artifacts = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ],
-            buildFlags = BuildFlags.Type.Instrumented,
+            buildFlags = BuildFlags.Type.Instrumented
         }
     )

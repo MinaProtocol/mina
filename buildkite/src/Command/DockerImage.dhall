@@ -60,7 +60,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
     let buildDockerCmd = "./scripts/release-docker.sh" ++
               " --service ${spec.service}" ++
               " --version ${spec.version}" ++
-              " --network devnet" ++
+              " --network ${spec.network}" ++
               " --branch ${spec.branch}" ++
               " --deb-codename ${spec.deb_codename}" ++
               " --deb-repo ${DebianRepo.address spec.deb_repo}" ++
