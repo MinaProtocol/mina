@@ -51,7 +51,7 @@ esac
 
 # Add suffix to debian to distinguish different profiles (mainnet/devnet/lightnet)
 case "${DUNE_PROFILE}" in
-  mainnet)
+  mainnet|devnet)
     MINA_DEB_NAME="mina-devnet"
     DEB_SUFFIX=""
    ;;
