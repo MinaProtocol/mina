@@ -133,7 +133,7 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
         if ndx mod 2 = 0 then account else snappify_account account )
   in
   let fee_payer_keypair = List.hd_exn new_keypairs in
-  let ledger = Ledger.create ~depth:ledger_depth () in
+  let ledger = Ledger.create_ephemeral ~depth:ledger_depth () in
   List.iter2_exn account_ids accounts ~f:(fun acct_id acct ->
       match Ledger.get_or_create_account ledger acct_id acct with
       | Error err ->
