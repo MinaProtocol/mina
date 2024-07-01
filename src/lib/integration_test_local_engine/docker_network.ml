@@ -76,6 +76,20 @@ module Node = struct
     Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:13 cwd "docker"
       [ "logs"; container_id ]
 
+  let copy_file_from_container (t : t) src_file dest_file =
+    let%bind.Deferred cwd = Unix.getcwd () in
+    let open Malleable_error.Let_syntax in
+    let%bind container_id = get_container_id t.config.service_id in
+    Integration_test_lib.Util.run_cmd_or_hard_error ~exit_code:13 cwd "docker"
+      [ "cp"; Printf.sprintf "%s:%s" container_id src_file; dest_file ]
+
+  let list_files ~logger (t : t) ~root =
+    let open Malleable_error.Let_syntax in
+    let%bind container_id = get_container_id t.config.service_id in
+    [%log info] "Listing files ( container: %s)" container_id ;
+    let%bind files = run_in_container container_id ~cmd:[ "ls"; root ] in
+    return (files |> String.split ~on:'\n')
+
   let dump_mina_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
     let%bind container_id = get_container_id t.config.service_id in
