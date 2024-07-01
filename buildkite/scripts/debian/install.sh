@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -x
 
 if [[ $# -gt 2 ]] || [[ $# -lt 1 ]]; then
     echo "Usage: $0 '<debians>' '[use-sudo]'"
