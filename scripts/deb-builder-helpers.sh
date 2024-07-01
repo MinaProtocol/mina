@@ -51,7 +51,7 @@ esac
 
 # Add suffix to debian to distinguish different profiles (mainnet/devnet/lightnet)
 case "${DUNE_PROFILE}" in
-  devnet|mainnet)
+  mainnet)
     MINA_DEB_NAME="mina-devnet"
     DEB_SUFFIX=""
    ;;
@@ -64,7 +64,7 @@ case "${DUNE_PROFILE}" in
 esac
 
 
-#ADd suffix to debian to distinguish instrumented packages
+#Add suffix to debian to distinguish instrumented packages
 if [[ -v DUNE_INSTRUMENT_WITH ]]; then
     INSTRUMENTED_SUFFIX=instrumented
     MINA_DEB_NAME="${MINA_DEB_NAME}-${INSTRUMENTED_SUFFIX}"
