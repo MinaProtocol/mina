@@ -16,27 +16,23 @@ def set_error():
   global exit_code
   exit_code=1
 
-def parse_stats (output) :
-
+def parse_stats(output) :
     print(output)
-
-    lines = output.split ('\n')
+    lines = output.split('\n')
 
     stats = []
 
-    for line in lines :
-        if line == '' :
+    for line in lines:
+        if line == '':
             continue
 
         compile = 'Generated zkapp transactions with (?P<updates>\d+) updates and (?P<proof>\d+) proof updates in (?P<time>[0-9]*[.]?[0-9]+) secs'
-
         match = re.match(compile, line)
 
-        if match :
+        if match:
             updates = int(match.group('updates'))
             proof = int(match.group('proof'))
             time = float(match.group('time'))
-
             stats.append((updates, proof, time))
        
     return stats
@@ -67,7 +63,6 @@ if __name__ == "__main__":
     #TODO: add code to check against some threshold
     print(stats)
     
-
     if not process_exit_code == 0:
         print('non-zero exit code from program, failing build')
         sys.exit(process_exit_code)
