@@ -4,9 +4,9 @@ open Mina_base
 module Common = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
-        { scan_state : Staged_ledger.Scan_state.Stable.V2.t
+        { scan_state : Staged_ledger.Scan_state.Stable.V3.t
         ; pending_coinbase : Pending_coinbase.Stable.V2.t
         }
 
@@ -31,10 +31,10 @@ end
 module Historical = struct
   [%%versioned
   module Stable = struct
-    module V3 = struct
+    module V4 = struct
       type t =
         { transition : Mina_block.Validated.Stable.V2.t
-        ; common : Common.Stable.V2.t
+        ; common : Common.Stable.V3.t
         ; staged_ledger_target_ledger_hash : Ledger_hash.Stable.V1.t
         }
 
@@ -67,21 +67,21 @@ end
 module Limited = struct
   [%%versioned
   module Stable = struct
-    module V3 = struct
+    module V4 = struct
       type t =
         { transition : Mina_block.Validated.Stable.V2.t
         ; protocol_states :
             Mina_state.Protocol_state.Value.Stable.V2.t
             Mina_base.State_hash.With_state_hashes.Stable.V1.t
             list
-        ; common : Common.Stable.V2.t
+        ; common : Common.Stable.V3.t
         }
 
       let to_yojson { transition; protocol_states = _; common } =
         `Assoc
           [ ("transition", Mina_block.Validated.Stable.V2.to_yojson transition)
           ; ("protocol_states", `String "<opaque>")
-          ; ("common", Common.Stable.V2.to_yojson common)
+          ; ("common", Common.Stable.V3.to_yojson common)
           ]
 
       let to_latest = Fn.id
@@ -110,8 +110,8 @@ module Minimal = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
-      type t = { hash : State_hash.Stable.V1.t; common : Common.Stable.V2.t }
+    module V3 = struct
+      type t = { hash : State_hash.Stable.V1.t; common : Common.Stable.V3.t }
       [@@driving to_yojson]
 
       let to_latest = Fn.id

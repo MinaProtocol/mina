@@ -93,6 +93,10 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
 
     let get (T ((module Base), t)) = Base.get t
 
+    let remove_location (T ((module Base), t)) = Base.remove_location t
+
+    let remove_account (T ((module Base), t)) = Base.remove_account t
+
     let get_batch (T ((module Base), t)) = Base.get_batch t
 
     let get_uuid (T ((module Base), t)) = Base.get_uuid t

@@ -85,10 +85,10 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; depth : int
     ; mutable maps : maps_t
           (* If present, contains maps containing changes both for this mask
-             and for a few ancestors.
-             This is used as a lookup cache. *)
+             and for a few ancestors. This is used as a lookup cache. *)
     ; mutable accumulated : (accumulated_t[@sexp.opaque]) option
     ; mutable is_committing : bool
+    ; freed : Location.t Stack.t
     }
   [@@deriving sexp]
 
@@ -110,9 +110,12 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; accumulated = None
     ; maps = empty_maps ()
     ; is_committing = false
+    ; freed = Stack.create ()
     }
 
   let get_uuid { uuid; _ } = uuid
+
+  let add_freed_location { freed; _ } location = Stack.push freed location
 
   module Attached = struct
     type parent = Base.t [@@deriving sexp]
@@ -166,8 +169,7 @@ module Make (Inputs : Inputs_intf.S) = struct
                 } )
 
     (** When [accumulated] is not configured, returns current [t.maps] and parent.
-
-                Otherwise, returns the [current] accumulator and [base]. *)
+        Otherwise, returns the [current] accumulator and [base]. *)
     let maps_and_ancestor t =
       actualize_accumulated t ;
       match t.accumulated with
@@ -262,6 +264,17 @@ module Make (Inputs : Inputs_intf.S) = struct
                 Addr.is_further_right ~than:current_address address
           in
           if is_empty then None else Base.get ancestor location
+
+    let remove t location =
+      assert_is_attached t ;
+      let maps, _ancestor = maps_and_ancestor t in
+      match Map.find maps.accounts location with
+      | None ->
+          ()
+      | Some _account ->
+          failwith "masking_merkle_tree: remove not yet implemented"
+
+    let remove_location = remove
 
     let self_find_or_batch_lookup self_find lookup_parent t ids =
       assert_is_attached t ;
@@ -510,14 +523,22 @@ module Make (Inputs : Inputs_intf.S) = struct
                when allocating a location *)
         ; locations = Map.remove t.maps.locations account_id
         } ;
-      (* reuse location if possible *)
-      Option.iter t.current_location ~f:(fun curr_loc ->
-          if Location.equal location curr_loc then
-            match Location.prev location with
-            | Some prev_loc ->
-                t.current_location <- Some prev_loc
-            | None ->
-                t.current_location <- None ) ;
+      let () =
+        match t.current_location with
+        | Some curr_loc ->
+            if Location.equal location curr_loc then
+              match Location.prev location with
+              | Some prev_loc ->
+                  t.current_location <- Some prev_loc
+              | None ->
+                  t.current_location <- None
+            else
+              (* save newly unused location to local stack *)
+              add_freed_location t location
+        | None ->
+            (* no current location indicates no insertion ever occurred *)
+            ()
+      in
       (* update hashes *)
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.empty_account in
@@ -528,6 +549,16 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
           self_set_hash t addr hash )
+
+    (* One does not need to worry about the account being present in more than
+       one base *)
+    let[@warning "-32"] remove_account t account =
+      let maps, _ancestor = maps_and_ancestor t in
+      match Map.find maps.locations (Account.identifier account) with
+      | Some location ->
+          remove_account_and_update_hashes t location
+      | None ->
+          failwith "remove_account: recursive call not yet implemented"
 
     let set_account_unsafe t location account =
       assert_is_attached t ;
@@ -655,6 +686,7 @@ module Make (Inputs : Inputs_intf.S) = struct
               ; current = acc.current
               } )
       ; is_committing = false
+      ; freed = Stack.create ()
       }
 
     let last_filled t =
@@ -960,11 +992,28 @@ module Make (Inputs : Inputs_intf.S) = struct
       let current_location t = t.current_location
     end
 
-    (* leftmost location *)
-    let first_location ~ledger_depth =
-      Location.Account
-        ( Addr.of_directions
-        @@ List.init ledger_depth ~f:(fun _ -> Direction.Left) )
+    let leftmost_available_slot t =
+      match last_filled t with
+      | None ->
+          let loc =
+            let path_to_leftmost_slot =
+              List.init t.depth ~f:(fun _ -> Direction.Left)
+            in
+            Location.Account (Addr.of_directions path_to_leftmost_slot)
+          in
+          Some loc
+      | Some loc ->
+          Location.next loc
+
+    (* Finds the next available location in the following order of priority:
+       - reuse a freed location, due to previously removed data; or
+       - use the leftmost available slot *)
+    let next_fillable t =
+      match Stack.pop t.freed with
+      | Some _ as opt_loc ->
+          opt_loc
+      | None ->
+          leftmost_available_slot t
 
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t account_id account =
@@ -978,20 +1027,12 @@ module Make (Inputs : Inputs_intf.S) = struct
               Ok (`Existed, location)
           | None -> (
               (* not in parent, create new location *)
-              let maybe_location =
-                match last_filled t with
-                | None ->
-                    Some (first_location ~ledger_depth:t.depth)
-                | Some loc ->
-                    Location.next loc
-              in
-              match maybe_location with
+              match next_fillable t with
               | None ->
                   Or_error.error_string "Db_error.Out_of_leaves"
               | Some location ->
                   (* `set` calls `self_set_location`, which updates
-                     the current location
-                  *)
+                     the current location *)
                   set t location account ;
                   Ok (`Added, location) ) )
       | Some location ->

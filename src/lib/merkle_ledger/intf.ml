@@ -235,7 +235,8 @@ module type SYNCABLE = sig
   val set_batch_accounts : t -> (addr * account) list -> unit
 
   (** Get all of the accounts that are in a subtree of the underlying Merkle
-    tree rooted at `address`. The accounts are ordered by their addresses. *)
+      tree rooted at `address`. The accounts are ordered by their addresses.
+   *)
   val get_all_accounts_rooted_at_exn : t -> addr -> (addr * account) list
 
   val merkle_root : t -> root_hash
@@ -332,8 +333,8 @@ module Ledger = struct
       t -> init:'accum -> f:(Addr.t -> 'accum -> account -> 'accum) -> 'accum
 
     (** the set of [account_id]s are ledger elements to skip during the fold,
-      because they're in a mask
-  *)
+        because they're in a mask
+     *)
     val foldi_with_ignored_accounts :
          t
       -> account_id_set
@@ -341,9 +342,9 @@ module Ledger = struct
       -> f:(Addr.t -> 'accum -> account -> 'accum)
       -> 'accum
 
-    (** fold over accounts until stop condition reached when calling [f]; calls [finish] for
-     result
- *)
+    (** fold over accounts until stop condition reached when calling [f]; calls
+        [finish] for result
+     *)
     val fold_until :
          t
       -> init:'accum
@@ -378,7 +379,10 @@ module Ledger = struct
     (** the ledger should not be used after calling [close] *)
     val close : t -> unit
 
-    (** for account locations in the ledger, the last (rightmost) filled location *)
+    (* TODO: With removal this  *)
+
+    (** for account locations in the ledger, the last (rightmost) filled
+    location *)
     val last_filled : t -> Location.t option
 
     val get_uuid : t -> Uuid.t
@@ -400,9 +404,13 @@ module Ledger = struct
 
     val index_of_account_exn : t -> account_id -> int
 
+    val remove_location : t -> Location.t -> unit
+
+    val remove_account : t -> account -> unit
+
     (** meant to be a fast operation: the root hash is stored, rather
-      than calculated dynamically
-  *)
+        than calculated dynamically
+     *)
     val merkle_root : t -> root_hash
 
     val merkle_path : t -> Location.t -> Path.t
@@ -419,8 +427,8 @@ module Ledger = struct
     val get_hash_batch_exn : t -> Location.t list -> hash list
 
     (** Triggers when the ledger has been detached and should no longer be
-      accessed.
-  *)
+        Accessed.
+     *)
     val detached_signal : t -> unit Async_kernel.Deferred.t
   end
 
