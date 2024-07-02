@@ -21,7 +21,6 @@
 
 [%%define print_versioned_types false]
 
-[%%define download_snark_keys true]
 [%%define generate_genesis_proof false]
 
 [%%define test_full_epoch false]

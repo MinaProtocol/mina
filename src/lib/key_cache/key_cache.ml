@@ -9,9 +9,7 @@ module Spec = struct
     | S3 of { bucket_prefix : string; install_path : string }
 end
 
-[%%inject "may_download", download_snark_keys]
-
-let may_download = ref may_download
+let may_download = ref false
 
 let set_downloads_enabled b = may_download := b
 
