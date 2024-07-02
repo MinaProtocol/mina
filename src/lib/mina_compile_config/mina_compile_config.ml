@@ -6,7 +6,7 @@
     tests and production.
 *)
 
-[%%inject "curve_size", curve_size]
+let curve_size = 255
 
 [%%inject "genesis_ledger", genesis_ledger]
 
