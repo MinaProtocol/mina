@@ -57,13 +57,7 @@ module Make (Inputs : Inputs_intf) = struct
             | Error _e ->
                 let urs = Urs.create (Unsigned.Size_t.of_int degree) in
                 let (_ : (unit, Error.t) Result.t) =
-                  Key_cache.Sync.write
-                    (List.filter specs ~f:(function
-                      | On_disk _ ->
-                          true
-                      | S3 _ ->
-                          false ) )
-                    store () urs
+                  Key_cache.Sync.write specs store () urs
                 in
                 urs
           in
