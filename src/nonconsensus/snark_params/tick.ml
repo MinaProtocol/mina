@@ -12,18 +12,6 @@
 
 open Snarkette
 
-[%%if curve_size = 255]
-
-(* only size we should be building nonconsensus code for *)
-
-[%%else]
-
-[%%show curve_size]
-
-[%%error "invalid value for \"curve_size\""]
-
-[%%endif]
-
 [%%inject "ledger_depth", ledger_depth]
 
 module Field = struct
