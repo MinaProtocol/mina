@@ -2888,30 +2888,30 @@ index 135235db65..07b14fb095 100644
              [%log error]
                ~metadata:[ ("error", `String (Caqti_error.show e)) ]
 diff --git a/src/app/rosetta/lib/search.ml b/src/app/rosetta/lib/search.ml
-index a4d16f4921..31e44a46aa 100644
+index 105281933a..7ba1a9e357 100644
 --- a/src/app/rosetta/lib/search.ml
 +++ b/src/app/rosetta/lib/search.ml
-@@ -418,8 +418,8 @@ module Sql = struct
+@@ -511,9 +511,7 @@ module Sql = struct
+           input.operator
        in
-       let offset = offset_sql offset in
-       let limit = limit_sql limit in
--      Caqti_request.collect Params.typ
--        Caqti_type.(tup2 int64 typ)
-+      Mina_caqti.collect_req Params.typ
-+        Caqti_type.(t2 int64 typ)
-         [%string
-           {sql|
-           WITH filtered_ids AS (
-@@ -783,7 +783,7 @@ module Sql = struct
+       let query =
+-        Caqti_request.collect Params.typ
+-          Caqti_type.(tup2 int64 typ)
+-          query_string
++        Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ) query_string
        in
-       match%map
-         Conn.collect_list
--          (Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ) query)
-+          (Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ) query)
-           params
-       with
-       | [] ->
-@@ -939,7 +939,7 @@ module Sql = struct
+       [%log debug] "Running SQL query $query"
+         ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
+@@ -770,7 +768,7 @@ module Sql = struct
+       let open Deferred.Result.Let_syntax in
+       let params = Params.of_query input in
+       let query =
+-        Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ)
++        Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ)
+         @@ query_string ~offset ~limit input.filter.op_type input.operator
+       in
+       [%log debug] "Running SQL query $query"
+@@ -914,7 +912,7 @@ module Sql = struct
            ~address_fields:[ "pk_fee_payer.value"; "pk_update_body.value" ]
            ~op_type_filters operator
        in
@@ -2919,7 +2919,7 @@ index a4d16f4921..31e44a46aa 100644
 +      Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ)
        @@ query_string ~offset ~limit ~filters
  
-     let run (module Conn : Caqti_async.CONNECTION) ~offset ~limit input =
+     let run (module Conn : Caqti_async.CONNECTION) ~logger ~offset ~limit input
 diff --git a/src/app/swap_bad_balances/sql.ml b/src/app/swap_bad_balances/sql.ml
 index 82ec136a10..d8d6172857 100644
 --- a/src/app/swap_bad_balances/sql.ml
