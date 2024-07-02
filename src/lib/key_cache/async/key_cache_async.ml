@@ -50,9 +50,7 @@ let read spec { Disk_storable.to_string; read = r; write = w } k =
       match s with
       | Spec.On_disk { directory; should_write } ->
           let%map res = (on_disk to_string r w directory).read k in
-          (res, if should_write then `Locally_generated else `Cache_hit)
-      | S3 _ ->
-          Deferred.Or_error.errorf "Downloading from S3 is disabled" )
+          (res, if should_write then `Locally_generated else `Cache_hit) )
 
 let write spec { Disk_storable.to_string; read = r; write = w } k v =
   let%map errs =
@@ -64,8 +62,6 @@ let write spec { Disk_storable.to_string; read = r; write = w } k v =
                 let%bind () = Unix.mkdir ~p:() directory in
                 (on_disk to_string r w directory).write k v
               else Deferred.Or_error.return ()
-          | S3 { bucket_prefix = _; install_path = _ } ->
-              Deferred.Or_error.return ()
         in
         match%map res with Error e -> Some e | Ok () -> None )
   in

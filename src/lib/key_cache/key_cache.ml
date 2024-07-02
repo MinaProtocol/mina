@@ -4,9 +4,7 @@ open Async_kernel
 [%%import "/src/config.mlh"]
 
 module Spec = struct
-  type t =
-    | On_disk of { directory : string; should_write : bool }
-    | S3 of { bucket_prefix : string; install_path : string }
+  type t = On_disk of { directory : string; should_write : bool }
 end
 
 module T (M : sig
