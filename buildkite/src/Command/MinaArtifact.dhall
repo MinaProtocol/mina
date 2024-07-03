@@ -59,8 +59,7 @@ let docker_step
                   , build_flags = buildFlags
                   , deb_repo = DebianRepo.Type.Local
                   , step_key =
-                      "daemon-devnet
-                      
+                      "daemon-devnet\
                       -${DebianVersions.lowerName
                                            debVersion}${Profiles.toLabelSegment
                                                           profile}${BuildFlags.toLabelSegment
