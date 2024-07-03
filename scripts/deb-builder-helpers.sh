@@ -173,6 +173,7 @@ copy_common_daemon_configs() {
 
   cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ./default/src/app/rosetta/indexer_test/indexer_test.exe "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
   cp ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/rosetta/archive"
   cp -r ../genesis_ledgers/* ${BUILDDIR}/etc/mina/rosetta/genesis_ledgers/
 
@@ -272,7 +273,7 @@ build_functional_test_suite_deb() {
 
   # Binaries
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
-
+  
   build_deb mina-test-suite
 
 }
@@ -334,7 +335,8 @@ build_archive_deb () {
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-replayer"
   cp ./default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILDDIR}/usr/local/bin/mina-swap-bad-balances"
 
-
+  cp ../src/app/archive/create_schema.sql "${BUILDDIR}/etc/mina/archive"
+  
   build_deb "$ARCHIVE_DEB"
 
 }

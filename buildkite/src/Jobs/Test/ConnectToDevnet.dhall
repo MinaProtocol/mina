@@ -1,11 +1,17 @@
 let S = ../../Lib/SelectFiles.dhall
+
 let B = ../../External/Buildkite.dhall
+
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
+
 let Pipeline = ../../Pipeline/Dsl.dhall
+
 let PipelineTag = ../../Pipeline/Tag.dhall
 
 let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
+
 let Profiles = ../../Constants/Profiles.dhall
 let DebianVersions = ../../Constants/DebianVersions.dhall
 

@@ -18,9 +18,9 @@
    pickles
    pickles.backend
    pickles_base
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
-   kimchi_backend.common
+   kimchi_pasta
+   kimchi_pasta.basic
+   kimchi_backend_common
    kimchi_backend
    cache_dir
    transaction_snark

@@ -1,5 +1,6 @@
-let Prelude = ../External/Prelude.dhall
-let Profiles = ./Profiles.dhall
+let Network
+    : Type
+    = < Devnet | Mainnet | Berkeley >
 
 let Network: Type  = < Devnet | Mainnet >
 

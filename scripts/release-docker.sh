@@ -74,6 +74,7 @@ case "${DEB_PROFILE}" in
       case "${DEB_BUILD_FLAGS}" in 
         *instrumented)
           DOCKER_DEB_SUFFIX="--build-arg deb_suffix=instrumented"
+          BUILD_FLAG_SUFFIX="-instrumented"
           ;;
         *)
           ;;
@@ -86,6 +87,7 @@ case "${DEB_PROFILE}" in
       case "${DEB_BUILD_FLAGS}" in 
         *instrumented)
           DOCKER_DEB_SUFFIX="--build-arg deb_suffix=${DEB_PROFILE}-instrumented"
+          BUILD_FLAG_SUFFIX="-instrumented"
           ;;
         *)
           DOCKER_DEB_SUFFIX="--build-arg deb_suffix=${DEB_PROFILE}"
@@ -172,10 +174,10 @@ if [[ -z "${MINA_REPO}" ]]; then
 fi
 
 DOCKER_REGISTRY="gcr.io/o1labs-192920"
-TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}"
+TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}${BUILD_FLAG_SUFFIX}"
 # friendly, predictable tag
 GITHASH=$(git rev-parse --short=7 HEAD)
-HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}"
+HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${BUILD_FLAG_SUFFIX}"
 BUILD_NETWORK="--network=host"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build

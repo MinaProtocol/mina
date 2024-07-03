@@ -16,12 +16,12 @@
    mina_base.import
    pickles
    pickles.backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    transaction_snark
    snark_params
    data_hash_lib
-   genesis_proof
+   coda_genesis_proof
    bounded_types
    mina_ledger
    mina_base
@@ -42,7 +42,7 @@
    test_util
    consensus
    one_or_two
-   genesis_ledger
+   coda_genesis_ledger
    snarky.backendless
    mina_transaction_logic
    mina_wire_types
