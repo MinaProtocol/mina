@@ -19,8 +19,8 @@
    mina_transaction
    mina_transaction_logic
    kimchi_backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    sgn
    with_hash
    ppx_version.runtime

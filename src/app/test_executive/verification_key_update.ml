@@ -71,13 +71,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let vk, prover =
-    let `VK vk, `Prover prover =
-      Transaction_snark.For_tests.create_trivial_snapp
-        ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
-    in
-    let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk) in
-    (Async.Deferred.return vk, prover)
+  let `VK vk, `Prover prover =
+    Transaction_snark.For_tests.create_trivial_snapp
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
 
   let config =
     let open Test_config in
@@ -159,7 +155,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind.Async.Deferred account_update2, _ =
       trivial_prover2 ~handler:Trivial_rule2.handler ()
     in
-    let zkapp_prover_and_vk = (prover, vk) in
 
     let update_vk (vk : Side_loaded_verification_key.t) : Account_update.t =
       let body (vk : Side_loaded_verification_key.t) : Account_update.Body.t =
@@ -396,22 +391,22 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let%bind invalid_update_vk_perm_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             ~zkapp_prover_and_vk spec_invalid_proof
+             spec_invalid_proof
       in
       let%bind invalid_update_vk_perm_impossible =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             ~zkapp_prover_and_vk spec_invalid_impossible
+             spec_invalid_impossible
       in
       let%bind update_vk_perm_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             ~zkapp_prover_and_vk spec_proof
+             spec_proof
       in
       let%map update_vk_perm_impossible =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             ~zkapp_prover_and_vk spec_impossible
+             spec_impossible
       in
       ( invalid_update_vk_perm_proof
       , invalid_update_vk_perm_impossible
@@ -464,17 +459,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let%bind failed_update_vk_signature_1 =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             ~zkapp_prover_and_vk spec_failed_signature_1
+             spec_failed_signature_1
       in
       let%bind failed_update_vk_signature_2 =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             ~zkapp_prover_and_vk spec_failed_signature_2
+             spec_failed_signature_2
       in
       let%map update_vk_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             ~zkapp_prover_and_vk spec_proof
+             spec_proof
       in
       ( failed_update_vk_signature_1
       , failed_update_vk_signature_2
