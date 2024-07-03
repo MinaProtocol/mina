@@ -35,7 +35,7 @@ let config : Pipeline.Config.Type = Pipeline.Config::{
       key = "monorepo-${mode}-${filter}",
       target = Size.Small,
       docker = Some Docker::{
-        image = (./Constants/ContainerImages.dhall).minaToolchain,
+        image = (./Constants/ContainerImages.dhall).toolchainBase,
         environment = ["BUILDKITE_AGENT_ACCESS_TOKEN"]
       }
     }
