@@ -75,7 +75,7 @@ let assert_filehash_equal ~file ~hash ~logger =
   else
     let%map () = Unix.rename ~src:file ~dst:(file ^ ".incorrect-hash") in
     [%log error]
-      "Verification failure: downloaded $file and expected SHA3-256 = \
+      "Verification failure: downloaded $path and expected SHA3-256 = \
        $expected_hash but it had $computed_hash"
       ~metadata:
         [ ("path", `String file)
