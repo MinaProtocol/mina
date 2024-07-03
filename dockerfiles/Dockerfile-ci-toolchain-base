@@ -1,0 +1,17 @@
+FROM codaprotocol/ci-toolchain-base:v6 as base
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN rm /etc/apt/sources.list
+
+RUN printf "deb http://pl.archive.ubuntu.com/ubuntu/ focal main restricted \
+\ndeb http://pl.archive.ubuntu.com/ubuntu/ focal-updates main restricted \
+\ndeb http://pl.archive.ubuntu.com/ubuntu/ focal universe \
+\ndeb http://pl.archive.ubuntu.com/ubuntu/ focal-updates universe \
+\n" > /etc/apt/sources.list
+
+RUN apt-get upgrade --quiet --yes \
+    && apt-get update --quiet --yes \
+    && apt-get install --quiet --yes --no-install-recommends \
+        git-lfs \
+    && rm -rf /var/lib/apt/lists/*

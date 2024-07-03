@@ -36,7 +36,7 @@ Pipeline.build
         label = "Check all CI Dhall entrypoints",
         key = "check-dhall",
         target = Size.Small,
-        docker = Some Docker::{ image = (../../Constants/ContainerImages.dhall).toolchainBase }
+        docker = Some Docker::{ image = (../../Constants/ContainerImages.dhall).minaToolchain }
       }
     ]
   }
