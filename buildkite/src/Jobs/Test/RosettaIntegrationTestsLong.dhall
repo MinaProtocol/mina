@@ -27,7 +27,7 @@ in  Pipeline.build
         , dirtyWhen = dirtyWhen
         , path = "Test"
         , name = "RosettaIntegrationTestsLong"
-        , mode = PipelineMode.Type.Stable,
+        , mode = PipelineMode.Type.Stable
         , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test, PipelineTag.Type.Stable ]
         }
       , steps =
