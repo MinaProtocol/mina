@@ -96,24 +96,6 @@ let PromoteDockerSpec = {
   }
 }
 
-
-let promoteDebianStep = \(spec : PromoteDebianSpec.Type) ->
-    let package_name : Text = Package.debianName spec.package spec.profile spec.network
-    let new_name = if spec.remove_profile_from_name then "--new-name ${Package.debianName spec.package Profiles.Type.Standard spec.network}" else ""
-    in 
-    Command.build
-      Command.Config::{
-        commands = Toolchain.runner DebianVersions.DebVersion.Bullseye [
-            "AWS_ACCESS_KEY_ID",
-            "AWS_SECRET_ACCESS_KEY"
-        ] "./buildkite/scripts/promote-deb.sh --package ${package_name} --version ${spec.version}  --new-version ${spec.new_version}  --architecture ${spec.architecture}  --codename ${DebianVersions.lowerName spec.codename}  --from-component ${DebianChannel.lowerName spec.from_channel}  --to-component ${DebianChannel.lowerName spec.to_channel} ${new_name}",
-        label = "Debian: ${spec.step_key}",
-        key = spec.step_key,
-        target = Size.XLarge,
-        depends_on = spec.deps,
-        `if` = spec.`if`
-      }
-
 let promoteDebianStep =
           \(spec : PromoteDebianSpec.Type)
       ->  let package_name
