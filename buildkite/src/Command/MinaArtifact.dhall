@@ -59,10 +59,10 @@ let docker_step
                   , build_flags = buildFlags
                   , deb_repo = DebianRepo.Type.Local
                   , step_key =
-                       "daemon-devnet-${DebianVersions.lowerName	                      
-                                           debVersion}${Profiles.toLabelSegment	                      daemon-devnet
-                                                          profile}${BuildFlags.toLabelSegment	                      -${DebianVersions.lowerName debVersion}
-                                                                      buildFlags}-docker-image"	                       ${Profiles.toLabelSegment profile}
+                      "daemon-devnet-${DebianVersions.lowerName
+                                           debVersion}${Profiles.toLabelSegment
+                                                          profile}${BuildFlags.toLabelSegment
+                                                                      buildFlags}-docker-image"
                   
                   }
                 , TestExecutive = DockerImage.ReleaseSpec::{
