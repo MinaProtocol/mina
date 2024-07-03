@@ -27,7 +27,7 @@ in  Pipeline.build
           ]
         , path = "Lint"
         , name = "Xrefcheck"
-        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint ]
+        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint, PipelineTag.Type.Stable ]
         }
       , steps =
         [ Command.build

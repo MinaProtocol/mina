@@ -30,7 +30,7 @@ in  Pipeline.build
           ]
         , path = "Release"
         , name = "LeaderboardArtifact"
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
+        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release, PipelineTag.Type.Stable ]
         }
       , steps =
         [ Command.build

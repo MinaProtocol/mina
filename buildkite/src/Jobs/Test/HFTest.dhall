@@ -33,7 +33,7 @@ in  Pipeline.build
         , path = "Test"
         , name = "HFTest"
         , mode = PipelineMode.Type.Stable
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test, PipelineTag.Type.Stable ]
         }
       , steps =
         [ Command.build

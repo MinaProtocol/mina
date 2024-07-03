@@ -47,7 +47,7 @@ in  Pipeline.build
               , dirtyWhen = unitDirtyWhen
               , path = "Test"
               , name = "RosettaUnitTest"
-              , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+              , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test, PipelineTag.Type.Stable ]
               }
       , steps = [ buildTestCmd "dev" "src/app/rosetta" Size.Small ]
       }

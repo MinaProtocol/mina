@@ -6,6 +6,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineMode = ../../Pipeline/Mode.dhall
 
+let PipelineTag = ../../Pipeline/Tag.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
@@ -25,7 +27,8 @@ in  Pipeline.build
         , dirtyWhen = dirtyWhen
         , path = "Test"
         , name = "RosettaIntegrationTestsLong"
-        , mode = PipelineMode.Type.Stable
+        , mode = PipelineMode.Type.Stable,
+        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test, PipelineTag.Type.Stable ]
         }
       , steps =
         [ Command.build

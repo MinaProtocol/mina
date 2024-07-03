@@ -25,7 +25,7 @@ in  Pipeline.build
           ]
         , path = "Release"
         , name = "HelmRelease"
-        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Release ]
+        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Release, PipelineTag.Type.Stable ]
         }
       , steps =
         [ Command.build

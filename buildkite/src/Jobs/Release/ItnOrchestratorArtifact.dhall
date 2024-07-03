@@ -36,7 +36,7 @@ in  Pipeline.build
           ]
         , path = "Release"
         , name = "ItnOrchestratorArtifact"
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
+        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release, PipelineTag.Type.Stable ]
         }
       , steps = [ DockerImage.generateStep spec ]
       }

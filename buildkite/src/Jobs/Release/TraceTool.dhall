@@ -23,7 +23,7 @@ in  Pipeline.build
           ]
         , path = "Release"
         , name = "TraceTool"
-        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Release ]
+        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Release, PipelineTag.Type.Stable ]
         }
       , steps =
         [ Command.build

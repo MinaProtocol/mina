@@ -47,7 +47,7 @@ in  Pipeline.build
               , dirtyWhen = unitDirtyWhen
               , path = "Test"
               , name = "ZkappsExamplesTest"
-              , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Test ]
+              , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Test, PipelineTag.Type.Stable ]
               }
       , steps = [ buildTestCmd "dev" Size.XLarge ]
       }
