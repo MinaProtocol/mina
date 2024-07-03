@@ -9,7 +9,7 @@ let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let Cmd = ../Lib/Cmds.dhall
 
-{ step = \(dependsOn : List Command.TaggedKey.Type) 
+in { step = \(dependsOn : List Command.TaggedKey.Type)
     -> \(testnet : Text) 
     -> \(wait_between_graphql_poll : Text) 
     -> \(wait_before_final_check: Text )
