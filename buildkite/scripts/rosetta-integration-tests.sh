@@ -250,10 +250,16 @@ if [[ "$MODE" == "full" ]]; then
   send_zkapp_transactions &
 fi
 
+mina client status --json
 next_block_time=$(mina client status --json | jq '.next_block_production.timing[1].time' | tr -d '"') curr_time=$(date +%s%N | cut -b1-13)
 sleep_time=$((($next_block_time - $curr_time) / 1000))
-echo "Sleeping for ${sleep_time}s until next block is created..."
-sleep ${sleep_time}
+# Check if sleep_time is negative
+if [ $sleep_time -lt 0 ]; then
+    echo "Sleep time is negative. Skipping sleep..."
+else
+    echo "Sleeping for ${sleep_time}s until next block is created..."
+    sleep $sleep_time
+fi
 
 # Mina Rosetta Checks (spec construction data perf)
 echo "============ ROSETTA CLI: VALIDATE CONF FILE ${ROSETTA_CONFIGURATION_FILE} =============="

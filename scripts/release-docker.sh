@@ -68,7 +68,6 @@ IMAGE="--build-arg image=${IMAGE}"
 # - hardfork
 # - lightnet
 # - hardfork-instrumented
-echo "AAAAAAAAAAAAAAAA ${DEB_PROFILE}"
 case "${DEB_PROFILE}" in
     standard)
       case "${DEB_BUILD_FLAGS}" in 
