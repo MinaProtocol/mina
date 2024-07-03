@@ -251,7 +251,7 @@ if [[ "$MODE" == "full" ]]; then
 fi
 
 mina client status --json
-next_block_time=$(mina client status --json | jq '.next_block_production.timing[1].time' | tr -d '"') curr_time=$(date +%s%N | cut -b1-13)
+next_block_time=$(mina client status --json | jq '.next_block_production.timing[1]' | tr -d '"') curr_time=$(date +%s%N | cut -b1-13)
 sleep_time=$((($next_block_time - $curr_time) / 1000))
 echo "Sleeping for ${sleep_time}s until next block is created..."
 sleep $sleep_time
