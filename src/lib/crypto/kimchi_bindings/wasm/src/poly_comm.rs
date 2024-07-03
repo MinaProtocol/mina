@@ -29,6 +29,10 @@ macro_rules! impl_poly_comm {
             impl [<Wasm $field_name:camel PolyComm>] {
                 #[wasm_bindgen(constructor)]
                 pub fn new(unshifted: WasmVector<$WasmG>, shifted: Option<$WasmG>) -> Self {
+                    assert!(
+                        shifted.is_none(),
+                        "mina#14628: Shifted commitments are deprecated and must not be used"
+                    );
                     WasmPolyComm { unshifted, shifted }
                 }
 
@@ -45,12 +49,12 @@ macro_rules! impl_poly_comm {
 
             impl From<PolyComm<$G>> for WasmPolyComm {
                 fn from(x: PolyComm<$G>) -> Self {
-                    let PolyComm {unshifted, shifted} = x;
+                    let PolyComm { elems } = x;
                     let unshifted: Vec<$WasmG> =
-                        unshifted.into_iter().map(|x| x.into()).collect();
+                        elems.into_iter().map(|x| x.into()).collect();
                     WasmPolyComm {
                         unshifted: unshifted.into(),
-                        shifted: shifted.map(|x| x.into()),
+                        shifted: None
                     }
                 }
             }
@@ -58,10 +62,10 @@ macro_rules! impl_poly_comm {
             impl From<&PolyComm<$G>> for WasmPolyComm {
                 fn from(x: &PolyComm<$G>) -> Self {
                     let unshifted: Vec<$WasmG> =
-                        x.unshifted.iter().map(|x| x.into()).collect();
+                        x.elems.iter().map(|x| x.into()).collect();
                     WasmPolyComm {
                         unshifted: unshifted.into(),
-                        shifted: x.shifted.map(|x| x.into()),
+                        shifted: None,
                     }
                 }
             }
@@ -69,18 +73,24 @@ macro_rules! impl_poly_comm {
             impl From<WasmPolyComm> for PolyComm<$G> {
                 fn from(x: WasmPolyComm) -> Self {
                     let WasmPolyComm {unshifted, shifted} = x;
+                    assert!(
+                        shifted.is_none(),
+                        "mina#14628: Shifted commitments are deprecated and must not be used"
+                    );
                     PolyComm {
-                        unshifted: (*unshifted).iter().map(|x| { (*x).into() }).collect(),
-                        shifted: shifted.map(|x| x.into()),
+                        elems: (*unshifted).iter().map(|x| { (*x).into() }).collect(),
                     }
                 }
             }
 
             impl From<&WasmPolyComm> for PolyComm<$G> {
                 fn from(x: &WasmPolyComm) -> Self {
+                    assert!(
+                        x.shifted.is_none(),
+                        "mina#14628: Shifted commitments are deprecated and must not be used"
+                    );
                     PolyComm {
-                        unshifted: x.unshifted.iter().map(|x| { (*x).into() }).collect(),
-                        shifted: x.shifted.map(|x| x.into()),
+                        elems: x.unshifted.iter().map(|x| { (*x).into() }).collect(),
                     }
                 }
             }

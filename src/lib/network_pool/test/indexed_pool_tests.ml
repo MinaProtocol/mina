@@ -728,7 +728,8 @@ let gen_accounts_and_transactions =
   (accounts_map senders, shuffled)
 
 let transactions_from_many_senders_no_nonce_gaps () =
-  Quickcheck.test gen_accounts_and_transactions ~f:(fun (account_map, txns) ->
+  Quickcheck.test ~trials:1000 gen_accounts_and_transactions
+    ~f:(fun (account_map, txns) ->
       let pool =
         pool_of_transactions ~init:empty ~account_map txns |> rem_lowest_fee 5
       in
@@ -739,7 +740,8 @@ let transactions_from_many_senders_no_nonce_gaps () =
       assert_pool_consistency pool )
 
 let revalidation_drops_nothing_unless_ledger_changed () =
-  Quickcheck.test gen_accounts_and_transactions ~f:(fun (account_map, txns) ->
+  Quickcheck.test ~trials:1000 gen_accounts_and_transactions
+    ~f:(fun (account_map, txns) ->
       let pool = pool_of_transactions ~init:empty ~account_map txns in
       let pool', dropped =
         Indexed_pool.revalidate pool ~logger `Entire_pool (fun aid ->
@@ -779,7 +781,7 @@ let apply_transactions txns accounts =
 let txn_hash = Transaction_hash.User_command_with_valid_signature.hash
 
 let application_invalidates_applied_transactions () =
-  Quickcheck.test
+  Quickcheck.test ~trials:1000
     (let open Quickcheck.Generator.Let_syntax in
     let%bind accounts, txns = gen_accounts_and_transactions in
     (* Simulate application of some transactions in order to invalidate them. *)

@@ -23,10 +23,10 @@
   snarky.backendless
   key_cache
   hex
-  kimchi_backend.common
-  kimchi_backend.pasta
-  kimchi_backend.pasta.basic
-  kimchi_backend.pasta.constraint_system
+  kimchi_backend_common
+  kimchi_pasta
+  kimchi_pasta.basic
+  kimchi_pasta.constraint_system
   pickles_types
   sponge
   snarky.intf))

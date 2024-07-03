@@ -1,7 +1,6 @@
-let MinaArtifact = ../../Command/MinaArtifact.dhall
-
-let DebianVersions = ../../Constants/DebianVersions.dhall
+let HardforkPackageGeneration = ../../Command/HardforkPackageGeneration.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-in  Pipeline.build (MinaArtifact.hardforkPipeline DebianVersions.DebVersion.Bullseye)
+in  Pipeline.build
+      (HardforkPackageGeneration.pipeline HardforkPackageGeneration.Spec::{=})

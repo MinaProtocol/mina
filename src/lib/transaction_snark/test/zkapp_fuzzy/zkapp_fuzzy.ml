@@ -8,6 +8,8 @@ let logger = Logger.create ()
 
 let `VK vk, `Prover prover = Lazy.force U.trivial_zkapp
 
+let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
+
 let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
   let fee_payer_keypairs =
     Array.init num_of_fee_payers ~f:(fun _ -> Keypair.create ())

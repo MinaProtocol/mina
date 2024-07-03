@@ -36,6 +36,7 @@ let () =
     (Time.Span.to_string_hum (Time.diff after before))
 
 let () =
-  Lazy.force Blockchain_snark_instance.Proof.verification_key
+  Async.Thread_safe.block_on_async_exn (fun () ->
+      Lazy.force Blockchain_snark_instance.Proof.verification_key )
   |> Pickles.Verification_key.to_yojson |> Yojson.Safe.to_string
   |> Format.print_string

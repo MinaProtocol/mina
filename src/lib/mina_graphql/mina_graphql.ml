@@ -2056,7 +2056,7 @@ module Queries = struct
                        expensive proof generation step if we don't have one
                        available.
                     *)
-                    Proof.blockchain_dummy )
+                    Lazy.force Proof.blockchain_dummy )
             }
         ; hash
         } )
@@ -2569,8 +2569,8 @@ module Queries = struct
         let configured_name =
           let open Option.Let_syntax in
           let cfg = Mina_lib.runtime_config mina in
-          let%bind ledger = cfg.ledger in
-          ledger.name
+          let%bind daemon = cfg.daemon in
+          daemon.network_id
         in
         "mina:"
         ^ Option.value ~default:Mina_compile_config.network_id configured_name
