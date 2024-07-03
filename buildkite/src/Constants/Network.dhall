@@ -1,6 +1,6 @@
 let Network
     : Type
-    = < Devnet | Mainnet | Berkeley >
+    = < Devnet | Mainnet >
 
 let Network: Type  = < Devnet | Mainnet >
 
