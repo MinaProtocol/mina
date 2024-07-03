@@ -27,8 +27,6 @@ SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
 
 SUGGESTED_DEPS="jq, curl, wget"
 
-ARCHIVE_MIGRATION_DEPS="jq, google-cloud-sdk"
-
 TEST_EXECUTIVE_DEPS=", mina-logproc, python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, terraform, helm"
 
 case "${MINA_DEB_CODENAME}" in
@@ -347,25 +345,6 @@ build_archive_deb () {
   build_deb "$ARCHIVE_DEB"
 
 }
-
-##################################### ARCHIVE MIGRATION PACKAGE ##########################################
-build_archive_migration_deb () {
-
-  ARCHIVE_MIGRATION_DEB=mina-archive-migration${DEB_SUFFIX}
-
-  echo "------------------------------------------------------------"
-  echo "--- Building archive migration deb"
-
-  create_control_file "$ARCHIVE_MIGRATION_DEB" "${ARCHIVE_DEPS} ,${ARCHIVE_MIGRATION_DEPS} ,${SUGGESTED_DEPS}" 'Berkeley Archive Migration And Verification Tools' "mina-logproc"
-
-  cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
-  cp ./default/src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-verifier"
-  cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-migration-replayer"
-  cp ../scripts/archive/migration/mina-berkeley-migration-script "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-script"
-  
-  build_deb "$ARCHIVE_MIGRATION_DEB"
-}
-##################################### END ARCHIVE MIGRATION PACKAGE ######################################
 
 ##################################### ZKAPP TEST TXN #######################################
 build_zkapp_test_transaction_deb () {

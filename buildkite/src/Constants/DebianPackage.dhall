@@ -1,6 +1,6 @@
-let Package : Type  = < Daemon | DaemonDevnet | DaemonLightnet | Archive | ArchiveMigration | TestExecutive | BatchTxn | LogProc | ZkappTestTransaction | FunctionalTestSuite >
+let Package : Type  = < Daemon | DaemonDevnet | DaemonLightnet | Archive  | TestExecutive | BatchTxn | LogProc | ZkappTestTransaction | FunctionalTestSuite >
 
-let MainPackages = [ Package.Daemon , Package.DaemonDevnet , Package.Archive , Package.ArchiveMigration , Package.LogProc ]
+let MainPackages = [ Package.Daemon , Package.DaemonDevnet , Package.Archive , Package.LogProc ]
 
 let AuxiliaryPackages = [ Package.DaemonLightnet , Package.TestExecutive , Package.BatchTxn , Package.ZkappTestTransaction , Package.FunctionalTestSuite ]
 
@@ -11,7 +11,6 @@ let capitalName = \(package : Package) ->
     , DaemonDevnet = "DaemonDevnet"
     , DaemonLightnet = "DaemonLightnet"
     , Archive = "Archive"
-    , ArchiveMigration = "ArchiveMigration"
     , TestExecutive = "TestExecutive"
     , BatchTxn = "BatchTxn"
     , LogProc = "Logproc"
@@ -25,7 +24,6 @@ let lowerName = \(package : Package) ->
     , DaemonDevnet = "daemon_devnet"
     , DaemonLightnet = "daemon_lightnet"
     , Archive = "archive"
-    , ArchiveMigration = "archive_migration"
     , TestExecutive = "test_executive"
     , BatchTxn = "batch_txn"
     , LogProc = "logproc"
@@ -39,7 +37,6 @@ let debianName = \(package : Package) ->
     , DaemonDevnet = "mina-devnet"
     , DaemonLightnet = "mina-berkeley-lightnet"
     , Archive = "mina-archive"
-    , ArchiveMigration = "mina-archive-migration"
     , TestExecutive = "mina-test-executive"
     , BatchTxn = "mina-batch-txn"
     , LogProc = "mina-logproc" 
