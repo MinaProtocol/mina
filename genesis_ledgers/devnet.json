@@ -18,12 +18,12 @@
     "staking": {
       "seed": "2vbdR3vZUxh8NFnsnrefko7YCiLUKNPUbQpqSQAFXFijtTjd3531",
       "hash": "jxvdSnpgWjjERJFdcYNxChJ9F39v4tGrNSzDcaQXuXeJnicrYEP",
-      "s3_data_hash": "84a349f6dd12c76b694b283975885994bcfb9117c3f41fa941e0229da3ce2a33"
+      "s3_data_hash": "5a83ae9a875a2e1c5dd433c28a4a94b4db2064ae36e6bf1e272821afc33e2315"
     },
     "next": {
       "seed": "2vaduyGw7uST2rT1HmvSxjrkZX26XnFvu4NJvCebMmLzoWaQtdGT",
       "hash": "jxjmYHK1tnGy5S6CDaLDTRrDbw17DmtEd6Jnw3L86QSsLm15w5g",
-      "s3_data_hash": "094ceb7c580ef53be0bf2385698fd8d2faebf91fdd8542c076df649aa261b94e"
+      "s3_data_hash": "64eb4ec47fb58df64e7e2a67bb60f1d00c54a11684ceae64efb562583e9a4362"
     }
   }
 }
