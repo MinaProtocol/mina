@@ -111,8 +111,8 @@ module Network_config = struct
     assoc
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
-     ~(generate_code_coverage : bool) ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
-      =
+      ~(generate_code_coverage : bool) ~(test_config : Test_config.t)
+      ~(images : Test_config.Container_images.t) =
     let ({ requires_graphql
          ; genesis_ledger
          ; epoch_data
@@ -131,6 +131,7 @@ module Network_config = struct
          ; txpool_max_size
          ; slot_tx_end
          ; slot_chain_end
+         ; network_id
          }
           : Test_config.t ) =
       test_config
@@ -244,6 +245,7 @@ module Network_config = struct
             ; zkapp_cmd_limit_hardcap = None
             ; slot_tx_end
             ; slot_chain_end
+            ; network_id
             }
       ; genesis =
           Some
@@ -426,9 +428,7 @@ module Network_config = struct
       ^ "/src/app/archive/"
     in
     let mina_archive_schema_aux_files =
-      [ mina_archive_base_url ^ "create_schema.sql"
-      ; mina_archive_base_url ^ "zkapp_tables.sql"
-      ]
+      [ mina_archive_base_url ^ "create_schema.sql" ]
     in
     let genesis_keypairs =
       List.fold genesis_accounts_and_keys ~init:String.Map.empty

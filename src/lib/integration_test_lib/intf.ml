@@ -118,7 +118,7 @@ module Engine = struct
 
     val deploy : t -> Network.t Malleable_error.t
 
-    val tear_down : t -> Network.t -> unit Malleable_error.t
+    val destroy : t -> Network.t -> unit Malleable_error.t
 
     val cleanup : t -> unit Deferred.t
   end

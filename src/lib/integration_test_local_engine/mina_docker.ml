@@ -4,6 +4,7 @@ open Currency
 open Signature_lib
 open Mina_base
 open Integration_test_lib
+open Coverage_manager
 
 let docker_swarm_version = "3.8"
 
@@ -32,6 +33,7 @@ module Network_config = struct
 
   type t =
     { debug_arg : bool
+    ; generate_code_coverage : bool
     ; genesis_keypairs :
         (Network_keypair.t Core.String.Map.t
         [@to_yojson
@@ -47,8 +49,8 @@ module Network_config = struct
   [@@deriving to_yojson]
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
-      ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
-      =
+      ~(generate_code_coverage : bool) ~(test_config : Test_config.t)
+      ~(images : Test_config.Container_images.t) =
     let _ = cli_inputs in
     let ({ genesis_ledger
          ; epoch_data
@@ -67,6 +69,7 @@ module Network_config = struct
          ; txpool_max_size
          ; slot_tx_end
          ; slot_chain_end
+         ; network_id
          ; _
          }
           : Test_config.t ) =
@@ -166,6 +169,7 @@ module Network_config = struct
             ; zkapp_cmd_limit_hardcap = None
             ; slot_tx_end
             ; slot_chain_end
+            ; network_id
             }
       ; genesis =
           Some
@@ -300,9 +304,7 @@ module Network_config = struct
       ^ "/src/app/archive/"
     in
     let mina_archive_schema_aux_files =
-      [ sprintf "%screate_schema.sql" mina_archive_base_url
-      ; sprintf "%szkapp_tables.sql" mina_archive_base_url
-      ]
+      [ sprintf "%screate_schema.sql" mina_archive_base_url ]
     in
     let genesis_keypairs =
       List.fold genesis_accounts_and_keys ~init:String.Map.empty
@@ -369,7 +371,6 @@ module Network_config = struct
               ~image:Postgres_config.postgres_image ~ports:[ postgres_port ]
               ~volumes:
                 [ Postgres_config.postgres_create_schema_volume
-                ; Postgres_config.postgres_zkapp_schema_volume
                 ; Postgres_config.postgres_entrypoint_volume
                 ]
               ~config
@@ -551,6 +552,7 @@ module Network_config = struct
     in
     { debug_arg = debug
     ; genesis_keypairs
+    ; generate_code_coverage
     ; constants
     ; docker =
         { docker_swarm_version
@@ -646,6 +648,7 @@ module Network_manager = struct
     ; services_by_id : Docker_network.Service_to_deploy.t Core.String.Map.t
     ; mutable deployed : bool
     ; genesis_keypairs : Network_keypair.t Core.String.Map.t
+    ; generate_code_coverage : bool
     }
 
   let get_current_running_stacks =
@@ -1006,6 +1009,7 @@ module Network_manager = struct
       ; services_by_id
       ; deployed = false
       ; genesis_keypairs = network_config.genesis_keypairs
+      ; generate_code_coverage = network_config.generate_code_coverage
       }
     in
     [%log info] "Initializing docker swarm" ;
@@ -1092,7 +1096,20 @@ module Network_manager = struct
     let%bind () = File_system.remove_dir t.docker_dir in
     Deferred.unit
 
-  let destroy t =
+  let tear_down t network =
+    if t.generate_code_coverage then
+      let open Malleable_error.Let_syntax in
+      let coverage_manager = Coverage_manager.create ~logger:t.logger in
+      let%bind _ =
+        Coverage_manager.download_coverage_data_from_containers coverage_manager
+          ~nodes:(Docker_network.all_nodes network)
+      in
+      Malleable_error.ok_unit
+    else Malleable_error.ok_unit
+
+  let destroy t network =
+    let open Malleable_error.Let_syntax in
+    let%bind () = tear_down t network in
     Deferred.Or_error.try_with ~here:[%here] (fun () -> destroy t)
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 end
