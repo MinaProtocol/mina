@@ -17,6 +17,7 @@ Pipeline.build
             artifacts = [ Artifacts.Type.Daemon , Artifacts.Type.Archive, Artifacts.Type.BatchTxn,
                         Artifacts.Type.Rosetta , Artifacts.Type.ZkappTestTransaction ],
             networks = [ Network.Type.Devnet, Network.Type.Mainnet ],
-            additionalTags = [ PipelineTag.Type.Stable ]
+            additionalTags = [ PipelineTag.Type.Stable ],
+            prefix = "MinaArtifactMainnet"
         }
     )
