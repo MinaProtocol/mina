@@ -271,7 +271,7 @@ build_functional_test_suite_deb() {
 ##################################### END TEST SUITE PACKAGE #######################################
 
 ##################################### MAINNET PACKAGE #######################################
-build_mainnet_daemon_deb() {
+build_daemon_mainnet_deb() {
  
   echo "------------------------------------------------------------"
   echo "--- Building mainnet deb without keys:"
@@ -285,7 +285,7 @@ build_mainnet_daemon_deb() {
 ##################################### END MAINNET PACKAGE #######################################
 
 ##################################### DEVNET PACKAGE #######################################
-build_devnet_daemon_deb() {
+build_daemon_devnet_deb() {
   
   echo "------------------------------------------------------------"
   echo "--- Building testnet signatures deb without keys:"
@@ -299,7 +299,7 @@ build_devnet_daemon_deb() {
 ##################################### END DEVNET PACKAGE #######################################
 
 ##################################### BERKELEY PACKAGE #######################################
-build_daemon_deb() {
+build_daemon_berkeley_deb() {
   
   echo "------------------------------------------------------------"
   echo "--- Building Mina Berkeley testnet signatures deb without keys:"
