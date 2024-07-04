@@ -295,7 +295,7 @@ build_devnet_daemon_deb() {
   copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
 
   build_deb mina-devnet
-
+}
 ##################################### END DEVNET PACKAGE #######################################
 
 ##################################### BERKELEY PACKAGE #######################################
