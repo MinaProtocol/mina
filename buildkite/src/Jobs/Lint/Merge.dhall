@@ -35,7 +35,7 @@ in  Pipeline.build
             , key = "clean-merge-compatible"
             , target = Size.Small
             , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).toolchainBase
+              , image = (../../Constants/ContainerImages.dhall).minaToolchain
               }
             }
         , Command.build
@@ -46,7 +46,7 @@ in  Pipeline.build
             , key = "clean-merge-develop"
             , target = Size.Small
             , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).toolchainBase
+              , image = (../../Constants/ContainerImages.dhall).minaToolchain
               }
             }
         , Command.build
@@ -57,7 +57,7 @@ in  Pipeline.build
             , key = "clean-merge-master"
             , target = Size.Small
             , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).toolchainBase
+              , image = (../../Constants/ContainerImages.dhall).minaToolchain
               }
             }
         , Command.build
@@ -70,7 +70,7 @@ in  Pipeline.build
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
             , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).toolchainBase
+              , image = (../../Constants/ContainerImages.dhall).minaToolchain
               }
             }
         , Command.build
@@ -83,7 +83,7 @@ in  Pipeline.build
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
             , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).toolchainBase
+              , image = (../../Constants/ContainerImages.dhall).minaToolchain
               }
             }
         , Command.build
@@ -96,7 +96,7 @@ in  Pipeline.build
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
             , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).toolchainBase
+              , image = (../../Constants/ContainerImages.dhall).minaToolchain
               }
             }
         , Command.build
@@ -108,7 +108,7 @@ in  Pipeline.build
             , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
             , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).toolchainBase
+              , image = (../../Constants/ContainerImages.dhall).minaToolchain
               }
             }
         , Command.build
@@ -118,7 +118,7 @@ in  Pipeline.build
             , key = "pr"
             , target = Size.Small
             , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).toolchainBase
+              , image = (../../Constants/ContainerImages.dhall).minaToolchain
               }
             }
         ]
