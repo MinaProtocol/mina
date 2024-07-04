@@ -52,7 +52,7 @@ in  Pipeline.build
             , key = "lint"
             , target = Size.Small
             , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).minaToolchain
+              , image = (../../Constants/ContainerImages.dhall).toolchainBase
               }
             }
         ]
