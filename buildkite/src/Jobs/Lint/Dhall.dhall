@@ -21,7 +21,11 @@ in  Pipeline.build
           [ S.contains "buildkite/src", S.exactly "buildkite/Makefile" "" ]
         , path = "Lint"
         , name = "Dhall"
-        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint, PipelineTag.Type.Stable ]
+        , tags =
+          [ PipelineTag.Type.Fast
+          , PipelineTag.Type.Lint
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps =
         [ Command.build

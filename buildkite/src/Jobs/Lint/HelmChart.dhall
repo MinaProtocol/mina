@@ -26,7 +26,11 @@ in  Pipeline.build
           ]
         , path = "Lint"
         , name = "HelmChart"
-        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Lint, PipelineTag.Type.Stable ]
+        , tags =
+          [ PipelineTag.Type.Fast
+          , PipelineTag.Type.Lint
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps =
         [ Command.build

@@ -296,7 +296,11 @@ let pipeline
                                        spec.debVersion}${Profiles.toSuffixUppercase
                                                            spec.profile}${BuildFlags.toSuffixUppercase
                                                                             spec.buildFlags}"
-                , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release, PipelineTag.Type.Stable ]
+                , tags =
+                  [ PipelineTag.Type.Long
+                  , PipelineTag.Type.Release
+                  , PipelineTag.Type.Stable
+                  ]
                 , mode = spec.mode
                 }
               , steps = steps

@@ -21,7 +21,11 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "EmergencyHfTest"
-        , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Test, PipelineTag.Type.Stable ]
+        , tags =
+          [ PipelineTag.Type.Fast
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps =
         [ Command.build

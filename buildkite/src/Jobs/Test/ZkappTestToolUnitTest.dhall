@@ -49,7 +49,11 @@ in  Pipeline.build
               , dirtyWhen = unitDirtyWhen
               , path = "Test"
               , name = "ZkappTestToolUnitTest"
-              , tags = [ PipelineTag.Type.Fast, PipelineTag.Type.Test, PipelineTag.Type.Stable ]
+              , tags =
+                [ PipelineTag.Type.Fast
+                , PipelineTag.Type.Test
+                , PipelineTag.Type.Stable
+                ]
               }
       , steps =
         [ buildTestCmd "dev" "src/app/zkapp_test_transaction" Size.Small ]

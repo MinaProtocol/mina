@@ -26,7 +26,11 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "ReplayerTest"
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test, PipelineTag.Type.Stable ]
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps = [ ReplayerTest.step dependsOn ]
       }

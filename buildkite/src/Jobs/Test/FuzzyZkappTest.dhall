@@ -58,7 +58,11 @@ in  Pipeline.build
               , dirtyWhen = unitDirtyWhen
               , path = "Test"
               , name = "FuzzyZkappTest"
-              , tags = [ PipelineTag.Type.VeryLong, PipelineTag.Type.Test, PipelineTag.Type.Stable ]
+              , tags =
+                [ PipelineTag.Type.VeryLong
+                , PipelineTag.Type.Test
+                , PipelineTag.Type.Stable
+                ]
               , mode = PipelineMode.Type.Stable
               }
       , steps =

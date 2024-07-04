@@ -50,7 +50,11 @@ in  Pipeline.build
               , dirtyWhen = unitDirtyWhen
               , path = "Test"
               , name = "DaemonUnitTest"
-              , tags = [ PipelineTag.Type.VeryLong, PipelineTag.Type.Test, PipelineTag.Type.Stable ]
+              , tags =
+                [ PipelineTag.Type.VeryLong
+                , PipelineTag.Type.Test
+                , PipelineTag.Type.Stable
+                ]
               }
       , steps = [ buildTestCmd "dev" "src/lib" Size.XLarge ]
       }

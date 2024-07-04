@@ -28,7 +28,11 @@ in  Pipeline.build
         , path = "Test"
         , name = "RosettaIntegrationTestsLong"
         , mode = PipelineMode.Type.Stable
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test, PipelineTag.Type.Stable ]
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps =
         [ Command.build
