@@ -25,6 +25,8 @@ cd "${SCRIPTPATH}/../_build"
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
 
+SUGGESTED_DEPS="jq, curl, wget"
+
 TEST_EXECUTIVE_DEPS=", mina-logproc, python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, terraform, helm"
 
 case "${MINA_DEB_CODENAME}" in
@@ -341,8 +343,6 @@ build_archive_deb () {
   cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
   cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
   
-  cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
-  
   mkdir -p "${BUILDDIR}/etc/mina/archive"
   cp ../scripts/archive/download-missing-blocks.sh "${BUILDDIR}/etc/mina/archive"
   
@@ -355,25 +355,6 @@ build_archive_deb () {
   build_deb "$ARCHIVE_DEB"
 
 }
-
-##################################### ARCHIVE PACKAGE ##########################################
-build_archive_migration_deb () {
-ARCHIVE_MIGRATION_DEB=mina-archive-migration${DEB_SUFFIX}
-
-  echo "------------------------------------------------------------"
-  echo "--- Building archive migration deb"
-
-  create_control_file "$ARCHIVE_MIGRATION_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
-
-  cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
-  cp ./default/src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-verifier"
-  cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-migration-replayer"
-  cp ../scripts/archive/migration/berkeley_migration.sh "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-script"
-  
-  build_deb "$ARCHIVE_MIGRATION_DEB"
-}
-##################################### END ARCHIVE PACKAGE ######################################
 
 ##################################### ZKAPP TEST TXN #######################################
 build_zkapp_test_transaction_deb () {
