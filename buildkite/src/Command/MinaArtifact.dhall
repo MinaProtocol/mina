@@ -215,7 +215,7 @@ let MinaBuildSpec = {
     networks: List Network.Type,
     toolchainSelectMode: Toolchain.SelectionMode,
     mode: PipelineMode.Type,
-    additionalTags: List PipelineTag.Type
+    tags: List PipelineTag.Type
   },
   default = {
     prefix = "MinaArtifact",
@@ -225,7 +225,7 @@ let MinaBuildSpec = {
     networks = [ Network.Type.Berkeley ],
     toolchainSelectMode = Toolchain.SelectionMode.ByDebian,
     mode = PipelineMode.Type.PullRequest,
-    additionalTags = [] : List PipelineTag.Type
+    tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
   }
 }
 
@@ -374,7 +374,7 @@ let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type =
           dirtyWhen = DebianVersions.dirtyWhen spec.debVersion,
           path = "Release",
           name = "${spec.prefix}${DebianVersions.capitalName spec.debVersion}${Profiles.toSuffixUppercase spec.profile}",
-          tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ] # spec.additionalTags,
+          tags = spec.tags,
           mode = spec.mode
         },
       steps = steps # docker_commands spec

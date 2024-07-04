@@ -17,7 +17,8 @@ Pipeline.build
             artifacts = [ Artifacts.Type.Daemon , Artifacts.Type.Archive , Artifacts.Type.BatchTxn , Artifacts.Type.Rosetta , Artifacts.Type.ZkappTestTransaction ],
             debVersion = DebianVersions.DebVersion.Buster,
             networks = [ Network.Type.Devnet, Network.Type.Mainnet ],
-            additionalTags = [ PipelineTag.Type.Stable ],
+            tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release, PipelineTag.Type.Stable ],
+            mode = PipelineMode.Type.Stable,
             prefix = "MinaArtifactMainnet"
         }
     )
