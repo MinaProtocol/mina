@@ -15,8 +15,7 @@ let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
 let commands =
-      [ 
-      , Cmd.run "git config --global --add safe.directory /workdir"
+      [ Cmd.run "git config --global --add safe.directory /workdir"
       , Cmd.run "./scripts/lint_codeowners.sh"
       , Cmd.run "./scripts/lint_rfcs.sh"
       , Cmd.run "make check-snarky-submodule"
