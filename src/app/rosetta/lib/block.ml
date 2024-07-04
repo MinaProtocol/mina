@@ -594,32 +594,32 @@ module Sql = struct
     end
 
     module Zkapp_account_update = struct
-      module Extras = struct
-        type t = string
-
-        let fields = "pk_update_body.value as account"
-
-        let account t = `Pk t
-
-        let typ = Caqti_type.string
-      end
-
       type t =
         { body : Archive_lib.Processor.Zkapp_account_update_body.t
-        ; extras : Extras.t
+        ; account : string
+        ; token : string
         }
       [@@deriving hlist]
 
-      let fields' =
+      let fields =
         String.concat ~sep:","
         @@ List.map Archive_lib.Processor.Zkapp_account_update_body.Fields.names
              ~f:(fun n -> "zaub." ^ n)
+        @ [ "pk_update_body.value as account"
+          ; "token_update_body.value as token"
+          ]
 
-      let fields = String.concat ~sep:"," [ fields'; Extras.fields ]
+      let account t = `Pk t.account
+
+      let token t = `Token_id t.token
 
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-          [ Archive_lib.Processor.Zkapp_account_update_body.typ; Extras.typ ]
+          Caqti_type.
+            [ Archive_lib.Processor.Zkapp_account_update_body.typ
+            ; string
+            ; string
+            ]
     end
 
     type t =
@@ -730,10 +730,7 @@ module Sql = struct
 
     let to_account_update_info
         { zkapp_command_extras = cmd_extras; zkapp_account_update; _ } =
-      Option.map zkapp_account_update
-        ~f:(fun { body = upd; extras = upd_extras } ->
-          (* TODO: check if this holds *)
-          let token = Mina_base.Token_id.(to_string default) in
+      Option.map zkapp_account_update ~f:(fun upd ->
           let status =
             match cmd_extras.Extras.status with
             | "applied" ->
@@ -741,31 +738,29 @@ module Sql = struct
             | _ ->
                 `Failed
           in
+          let body = upd.body in
           { Zkapp_account_update_info.authorization_kind =
-              upd
+              body
                 .Archive_lib.Processor.Zkapp_account_update_body
                  .authorization_kind
-          ; account = Zkapp_account_update.Extras.account upd_extras
-          ; balance_change = upd.balance_change
-          ; increment_nonce = upd.increment_nonce
-          ; may_use_token = upd.may_use_token
-          ; call_depth = Unsigned.UInt64.of_int upd.call_depth
-          ; use_full_commitment = upd.use_full_commitment
+          ; account = Zkapp_account_update.account upd
+          ; balance_change = body.balance_change
+          ; increment_nonce = body.increment_nonce
+          ; may_use_token = body.may_use_token
+          ; call_depth = Unsigned.UInt64.of_int body.call_depth
+          ; use_full_commitment = body.use_full_commitment
           ; status
-          ; token = `Token_id token
+          ; token = Zkapp_account_update.token upd
           } )
 
     let account_updates_and_command_to_info account_updates
         { zkapp_command = cmd; zkapp_command_extras = cmd_extras; _ } =
-      (* TODO: check if this holds *)
-      let token = Mina_base.Token_id.(to_string default) in
       { Commands_common.Zkapp_command_info.fee =
           Unsigned.UInt64.of_string @@ cmd_extras.Extras.fee
       ; fee_payer = Extras.fee_payer cmd_extras
       ; valid_until =
           Option.map ~f:Unsigned.UInt32.of_int64 cmd_extras.valid_until
       ; nonce = Unsigned.UInt32.of_int64 cmd_extras.nonce
-      ; token = `Token_id token
       ; sequence_no = cmd_extras.sequence_no
       ; memo = (if String.equal cmd.memo "" then None else Some cmd.memo)
       ; hash = cmd.hash
@@ -874,7 +869,6 @@ module Sql = struct
                              other )
                         `Invariant_violation )
              in
-             (* TODO: do we want to mention tokens at all here? *)
              let fee_token = Mina_base.Token_id.(to_string default) in
              let token = Mina_base.Token_id.(to_string default) in
              let%map failure_status =

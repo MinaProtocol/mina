@@ -476,7 +476,7 @@ module Account_identifier = struct
 
         let of_zkapp_command_info { Lib.Search.Zkapp_command_info.info; _ } =
           Deferred.return
-          @@ (info.fee_payer, info.token)
+          @@ (info.fee_payer, `Token_id Rosetta_lib.Amount_of.Token_id.default)
              :: List.map info.account_updates ~f:(fun { account; token; _ } ->
                     (account, token) )
 

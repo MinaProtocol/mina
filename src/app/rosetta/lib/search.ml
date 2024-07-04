@@ -836,10 +836,6 @@ module Sql = struct
               ON zc.zkapp_fee_payer_body_id = zfpb.id
             INNER JOIN public_keys pk_fee_payer
               ON zfpb.public_key_id = pk_fee_payer.id
-            INNER JOIN account_identifiers ai_fee_payer
-              ON pk_fee_payer.id = ai_fee_payer.public_key_id
-            INNER JOIN tokens token_fee_payer
-              ON ai_fee_payer.token_id = token_fee_payer.id
             INNER JOIN blocks b
               ON bzc.block_id = b.id
             LEFT JOIN zkapp_account_update zau
@@ -868,17 +864,19 @@ module Sql = struct
           ; "blocks AS (SELECT * FROM canonical_blocks UNION ALL SELECT * FROM \
              pending_blocks)"
           ; [%string "zkapp_commands_info AS (%{cte_query_string filters})"]
-          ; "id_count AS (SELECT COUNT(DISTINCT (id,block_id,sequence_no)) AS \
-             total_count FROM zkapp_commands_info)"
+          ; "zkapp_commands_ids AS (SELECT DISTINCT id, block_id, sequence_no \
+             FROM zkapp_commands_info)"
+          ; "id_count AS (SELECT COUNT(*) AS total_count FROM \
+             zkapp_commands_ids)"
           ]
       in
       [%string
         {sql|
           WITH %{ctes_string}
           SELECT %{fields}
-          FROM id_count, zkapp_commands_info zc
+          FROM id_count, (SELECT * FROM zkapp_commands_ids ORDER BY block_id, id, sequence_no LIMIT %{limit} OFFSET %{offset}) as ids
+          INNER JOIN zkapp_commands_info zc ON ids.id = zc.id AND ids.block_id = zc.block_id AND ids.sequence_no = zc.sequence_no
           ORDER BY block_id, id, sequence_no
-          LIMIT %{limit} OFFSET %{offset}
         |sql}]
 
     let query ~offset ~limit op_type operator =
@@ -905,9 +903,12 @@ module Sql = struct
               "FALSE" )
       in
       let filters =
+        let default_token =
+          [%string "'%{Mina_base.Token_id.(to_string default)}'"]
+        in
         sql_filters ~block_height_field:"b.height" ~txn_hash_field:"zc.hash"
           ~account_identifier_fields:
-            [ ("pk_fee_payer.value", "token_fee_payer.value")
+            [ ("pk_fee_payer.value", default_token)
             ; ("pk_update_body.value", "token_update_body.value")
             ]
           ~op_status_field:"bzc.status"
