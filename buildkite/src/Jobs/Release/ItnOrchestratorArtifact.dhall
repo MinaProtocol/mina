@@ -14,13 +14,17 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let DebianRepo = ../../Constants/DebianRepo.dhall
 
-let spec = DockerImage.ReleaseSpec::{
-    service="itn-orchestrator",
-    step_key="itn-orchestrator-docker-image",
-    network="devnet",
-    deb_repo = DebianRepo.Type.Local,
-    deps = DebianVersions.dependsOn DebianVersions.DebVersion.Bullseye Profiles.Type.Standard
-}
+let spec =
+      DockerImage.ReleaseSpec::{
+      , service = "itn-orchestrator"
+      , step_key = "itn-orchestrator-docker-image"
+      , network = "devnet"
+      , deb_repo = DebianRepo.Type.Local
+      , deps =
+          DebianVersions.dependsOn
+            DebianVersions.DebVersion.Bullseye
+            Profiles.Type.Standard
+      }
 
 in  Pipeline.build
       Pipeline.Config::{

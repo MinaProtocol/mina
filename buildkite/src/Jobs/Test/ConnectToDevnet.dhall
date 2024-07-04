@@ -13,24 +13,33 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
+
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let dependsOn = DebianVersions.dependsOn DebianVersions.DebVersion.Bullseye Profiles.Type.Standard
+let dependsOn =
+      DebianVersions.dependsOn
+        DebianVersions.DebVersion.Bullseye
+        Profiles.Type.Standard
 
-in Pipeline.build Pipeline.Config::{
-  spec =
-    JobSpec::{
-    dirtyWhen = [
-      S.strictlyStart (S.contains "src"),
-      S.exactly "buildkite/scripts/connect-to-testnet" "sh",
-      S.exactly "buildkite/src/Jobs/Test/ConnectToDevnet" "dhall",
-      S.exactly "buildkite/src/Command/ConnectToTestnet" "dhall"
-    ],
-    path = "Test",
-    name = "ConnectToDevnet",
-    tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
-  },
-  steps = [
-    ConnectToTestnet.step dependsOn "devnet" "40s" "2m" (B/SoftFail.Boolean True)
-  ]
-}
+in  Pipeline.build
+      Pipeline.Config::{
+      , spec = JobSpec::{
+        , dirtyWhen =
+          [ S.strictlyStart (S.contains "src")
+          , S.exactly "buildkite/scripts/connect-to-testnet" "sh"
+          , S.exactly "buildkite/src/Jobs/Test/ConnectToDevnet" "dhall"
+          , S.exactly "buildkite/src/Command/ConnectToTestnet" "dhall"
+          ]
+        , path = "Test"
+        , name = "ConnectToDevnet"
+        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+        }
+      , steps =
+        [ ConnectToTestnet.step
+            dependsOn
+            "devnet"
+            "40s"
+            "2m"
+            (B/SoftFail.Boolean True)
+        ]
+      }

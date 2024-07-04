@@ -34,67 +34,67 @@ let Size = ./Size.dhall
 
 let Cmd = ../Lib/Cmds.dhall
 
-let PromoteDebianSpec = {
-  Type = {
-    deps: List Command.TaggedKey.Type,
-    package: Package.Type,
-    version: Text,
-    new_version: Text,
-    architecture: Text,
-    network: Network.Type,
-    codename: DebianVersions.DebVersion,
-    from_channel: DebianChannel.Type,
-    to_channel: DebianChannel.Type,
-    profile: Profiles.Type,
-    remove_profile_from_name: Bool,
-    step_key: Text,
-    `if`: Optional B/If
-  },
-  default = {
-    deps = [] : List Command.TaggedKey.Type,
-    package = Package.Type.LogProc,
-    version = "",
-    new_version = "",
-    architecture = "amd64",
-    network = Network.Type.Devnet,
-    codename = DebianVersions.DebVersion.Bullseye,
-    from_channel = DebianChannel.Type.Unstable,
-    to_channel = DebianChannel.Type.Nightly,
-    profile = Profiles.Type.Standard,
-    remove_profile_from_name = False,
-    step_key = "promote-debian-package",
-    `if` = None B/If
-  }
-}
+let PromoteDebianSpec =
+      { Type =
+          { deps : List Command.TaggedKey.Type
+          , package : Package.Type
+          , version : Text
+          , new_version : Text
+          , architecture : Text
+          , network : Network.Type
+          , codename : DebianVersions.DebVersion
+          , from_channel : DebianChannel.Type
+          , to_channel : DebianChannel.Type
+          , profile : Profiles.Type
+          , remove_profile_from_name : Bool
+          , step_key : Text
+          , if : Optional B/If
+          }
+      , default =
+          { deps = [] : List Command.TaggedKey.Type
+          , package = Package.Type.LogProc
+          , version = ""
+          , new_version = ""
+          , architecture = "amd64"
+          , network = Network.Type.Devnet
+          , codename = DebianVersions.DebVersion.Bullseye
+          , from_channel = DebianChannel.Type.Unstable
+          , to_channel = DebianChannel.Type.Nightly
+          , profile = Profiles.Type.Standard
+          , remove_profile_from_name = False
+          , step_key = "promote-debian-package"
+          , if = None B/If
+          }
+      }
 
-let PromoteDockerSpec = {
-  Type = {
-    deps: List Command.TaggedKey.Type,
-    name: Artifact.Type,
-    version: Text,
-    profile: Profiles.Type,
-    codename: DebianVersions.DebVersion,
-    new_tag: Text,
-    network: Network.Type,
-    step_key: Text,
-    `if`: Optional B/If,
-    publish: Bool,
-    remove_profile_from_name: Bool
-  },
-  default = {
-    deps = [] : List Command.TaggedKey.Type,
-    name = Artifact.Type.Daemon,
-    version = "",
-    new_tag = "",
-    step_key = "promote-docker",
-    profile = Profiles.Type.Standard,
-    network = Network.Type.Devnet,
-    codename = DebianVersions.DebVersion.Bullseye,
-    `if` = None B/If,
-    publish = False,
-    remove_profile_from_name = False
-  }
-}
+let PromoteDockerSpec =
+      { Type =
+          { deps : List Command.TaggedKey.Type
+          , name : Artifact.Type
+          , version : Text
+          , profile : Profiles.Type
+          , codename : DebianVersions.DebVersion
+          , new_tag : Text
+          , network : Network.Type
+          , step_key : Text
+          , if : Optional B/If
+          , publish : Bool
+          , remove_profile_from_name : Bool
+          }
+      , default =
+          { deps = [] : List Command.TaggedKey.Type
+          , name = Artifact.Type.Daemon
+          , version = ""
+          , new_tag = ""
+          , step_key = "promote-docker"
+          , profile = Profiles.Type.Standard
+          , network = Network.Type.Devnet
+          , codename = DebianVersions.DebVersion.Bullseye
+          , if = None B/If
+          , publish = False
+          , remove_profile_from_name = False
+          }
+      }
 
 let promoteDebianStep =
           \(spec : PromoteDebianSpec.Type)
