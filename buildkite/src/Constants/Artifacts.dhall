@@ -15,7 +15,6 @@ let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.BatchTxn , Art
 let AllButTests =
       [ Artifact.Daemon
       , Artifact.Archive
-      , Artifact.ArchiveMigration
       , Artifact.BatchTxn
       , Artifact.TestExecutive
       , Artifact.Rosetta
@@ -102,7 +101,6 @@ let dockerTag =
                     "${version_and_codename}-${Network.lowerName
                                                  network}${profile_part}"
                 , Archive = "${version_and_codename}"
-                , ArchiveMigration = "${version_and_codename}"
                 , TestExecutive = "${version_and_codename}"
                 , BatchTxn = "${version_and_codename}"
                 , Rosetta = "${version_and_codename}"
