@@ -141,7 +141,8 @@ let docker_step
                                 "daemon-${Network.lowerName
                                             n}-${DebianVersions.lowerName
                                                    debVersion}${Profiles.toLabelSegment
-                                                                  profile}-docker-image"
+                                                                  profile}${BuildFlags.toLabelSegment
+                                                                              buildFlags}--docker-image"
                             }
                       )
                       networks
@@ -155,7 +156,8 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , step_key =
                         "test-executive-${DebianVersions.lowerName
-                                            debVersion}-docker-image"
+                                            debVersion}${BuildFlags.toLabelSegment
+                                                           buildFlags}--docker-image"
                     }
                   ]
                 , BatchTxn =
@@ -169,7 +171,8 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , step_key =
                         "batch-txn-${DebianVersions.lowerName
-                                       debVersion}-docker-image"
+                                       debVersion}${BuildFlags.toLabelSegment
+                                                      buildFlags}--docker-image"
                     }
                   ]
                 , Archive =
@@ -183,7 +186,8 @@ let docker_step
                     , step_key =
                         "archive-${DebianVersions.lowerName
                                      debVersion}${Profiles.toLabelSegment
-                                                    profile}-docker-image"
+                                                    profile}${BuildFlags.toLabelSegment
+                                                                buildFlags}--docker-image"
                     }
                   ]
                 , ArchiveMigration =
@@ -196,7 +200,8 @@ let docker_step
                     , deb_profile = profile
                     , step_key =
                         "archive-migration-${DebianVersions.lowerName
-                                               debVersion}-docker-image"
+                                               debVersion}${BuildFlags.toLabelSegment
+                                                              buildFlags}--docker-image"
                     }
                   ]
                 , Rosetta =
@@ -210,7 +215,8 @@ let docker_step
                     , deb_codename = "${DebianVersions.lowerName debVersion}"
                     , step_key =
                         "rosetta-${DebianVersions.lowerName
-                                     debVersion}-docker-image"
+                                     debVersion}${BuildFlags.toLabelSegment
+                                                    buildFlags}--docker-image"
                     }
                   ]
                 , ZkappTestTransaction =
@@ -224,7 +230,8 @@ let docker_step
                     , step_key =
                         "zkapp-test-transaction-${DebianVersions.lowerName
                                                     debVersion}${Profiles.toLabelSegment
-                                                                   profile}-docker-image"
+                                                                   profile}${BuildFlags.toLabelSegment
+                                                                               buildFlags}--docker-image"
                     }
                   ]
                 , FunctionalTestSuite =
@@ -238,7 +245,8 @@ let docker_step
                     , step_key =
                         "test-suite-${DebianVersions.lowerName
                                         debVersion}${Profiles.toLabelSegment
-                                                       profile}-docker-image"
+                                                       profile}${BuildFlags.toLabelSegment
+                                                                   buildFlags}--docker-image"
                     , network = "berkeley"
                     }
                   ]
