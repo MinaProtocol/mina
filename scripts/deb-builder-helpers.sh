@@ -219,7 +219,7 @@ build_keypair_deb() {
   cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
   cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
 
-  build_deb mina-generate-keypaird
+  build_deb mina-generate-keypair
 }
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
 
