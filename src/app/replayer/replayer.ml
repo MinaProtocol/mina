@@ -634,7 +634,7 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
 
 let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
     ~checkpoint_interval ~checkpoint_output_folder_opt ~checkpoint_file_prefix
-    ~genesis_dir_opt ~log_json ~log_level ~file_log_level () =
+    ~genesis_dir_opt ~log_json ~log_level () =
   Cli_lib.Stdout_log.setup log_json log_level ;
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
