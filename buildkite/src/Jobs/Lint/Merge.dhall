@@ -34,9 +34,6 @@ in  Pipeline.build
             , label = "Check merges cleanly into compatible"
             , key = "clean-merge-compatible"
             , target = Size.Small
-            , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).minaToolchain
-              }
             }
         , Command.build
             Command.Config::{
@@ -45,9 +42,6 @@ in  Pipeline.build
             , label = "Check merges cleanly into develop"
             , key = "clean-merge-develop"
             , target = Size.Small
-            , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).minaToolchain
-              }
             }
         , Command.build
             Command.Config::{
@@ -56,9 +50,6 @@ in  Pipeline.build
             , label = "Check merges cleanly into master"
             , key = "clean-merge-master"
             , target = Size.Small
-            , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).minaToolchain
-              }
             }
         , Command.build
             Command.Config::{
