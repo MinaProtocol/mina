@@ -324,7 +324,7 @@ let docker_commands : MinaBuildSpec.Type -> List Command.Type =
               spec.artifacts
       
       
-      let flatten_docker_steps = 
+      let flattened_docker_steps = 
            Prelude.List.fold
               (List DockerImage.ReleaseSpec.Type)
               docker_steps
@@ -337,7 +337,7 @@ let docker_commands : MinaBuildSpec.Type -> List Command.Type =
             DockerImage.ReleaseSpec.Type
             Command.Type
             (\(s: DockerImage.ReleaseSpec.Type) -> DockerImage.generateStep s)
-            flatten_docker_steps)
+            flattened_docker_steps)
 
 
 let pipeline : MinaBuildSpec.Type -> Pipeline.Config.Type = 
