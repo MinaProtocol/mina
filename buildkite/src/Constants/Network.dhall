@@ -33,6 +33,6 @@ let foldMinaBuildMainnetEnv =
         if List/any Network requiresMainnetBuild networks then
             "MINA_BUILD_MAINNET=true"
         else 
-            "MINA_BUILD_MAINNET=true"
+            "MINA_BUILD_MAINNET=false"
 
 in  { Type = Network, capitalName = capitalName, lowerName = lowerName, requiresMainnetBuild = requiresMainnetBuild, foldMinaBuildMainnetEnv = foldMinaBuildMainnetEnv}
