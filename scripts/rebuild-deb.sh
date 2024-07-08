@@ -17,7 +17,7 @@ if [ $# -eq 0 ]
     build_archive_deb
     build_archive_migration_deb
     build_batch_txn_deb
-    build_daemon_deb
+    build_daemon_berkeley_deb
     build_mainnet_daemon_deb
     build_devnet_daemon_deb
     build_test_executive_deb
