@@ -2,6 +2,8 @@
 
 # Script collects binaries and keys and builds deb archives.
 
+set -eo pipefail
+
 source scripts/deb-builder-helpers.sh
 
 # always build log proc since it is often an dependency
