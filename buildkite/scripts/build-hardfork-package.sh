@@ -44,7 +44,7 @@ sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth"
 
 case "${NETWORK_NAME}" in
   mainnet)
-    MINA_BUILD_MAINNET=true ./buildkite/scripts/build-artifact.sh
+    MINA_BUILD_MAINNET=1 ./buildkite/scripts/build-artifact.sh
     ;;
   *)
     ./buildkite/scripts/build-artifact.sh
@@ -80,9 +80,6 @@ echo "--- Build hardfork package for Debian ${MINA_DEB_CODENAME}"
 RUNTIME_CONFIG_JSON=new_config.json LEDGER_TARBALLS="$(echo hardfork_ledgers/*.tar.gz)" ./scripts/create_hardfork_deb.sh
 mkdir -p /tmp/artifacts
 cp _build/mina*.deb /tmp/artifacts/.
-
-echo "--- Upload debs to amazon s3 repo"
-make publish_debs
 
 echo "--- Git diff after build is complete:"
 git diff --exit-code -- .

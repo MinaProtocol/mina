@@ -1670,7 +1670,10 @@ let%test_module "account timing check" =
         , create_timed_account_spec.snapp_update
         , zkapp_keypair )
       in
-      return (ledger_init_state, zkapp_command)
+
+      return
+        ( ledger_init_state
+        , Async.Thread_safe.block_on_async_exn (fun () -> zkapp_command) )
 
     let%test_unit "zkApp command, timed account creation, min_balance > balance"
         =
@@ -2258,7 +2261,9 @@ let%test_module "account timing check" =
       in
       let gen =
         Quickcheck.Generator.return
-          (ledger_init_state, create_timed_account_zkapp_command)
+          ( ledger_init_state
+          , Async.Thread_safe.block_on_async_exn (fun () ->
+                create_timed_account_zkapp_command ) )
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           Async.Quickcheck.async_test

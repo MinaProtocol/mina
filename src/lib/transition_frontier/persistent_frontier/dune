@@ -11,7 +11,6 @@
    async_kernel
    base.caml
    sexplib0
-   extlib
    async_unix
    ;;local libraries
    bounded_types
@@ -51,8 +50,8 @@
    sgn_type
    currency
    mina_numbers
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    mina_wire_types
    internal_tracing
  )

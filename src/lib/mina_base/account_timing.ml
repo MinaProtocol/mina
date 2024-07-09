@@ -158,8 +158,6 @@ let to_input t =
      ; Amount.to_input vesting_increment
     |]
 
-[%%ifdef consensus_mechanism]
-
 type var =
   ( Boolean.var
   , Global_slot_since_genesis.Checked.var
@@ -310,5 +308,3 @@ let if_ b ~(then_ : var) ~(else_ : var) =
 let deriver obj =
   let open Fields_derivers_zkapps in
   iso_record ~to_record ~of_record As_record.deriver obj
-
-[%%endif]

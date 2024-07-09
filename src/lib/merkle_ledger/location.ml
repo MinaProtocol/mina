@@ -1,4 +1,3 @@
-open Core
 open Unsigned
 
 (* add functions to library module Bigstring so we can derive hash for the type t below *)
@@ -6,11 +5,9 @@ module Bigstring = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = Core_kernel.Bigstring.Stable.V1.t [@@deriving sexp, compare]
+      type t = Bigstring.Stable.V1.t [@@deriving sexp, compare]
 
       let to_latest = Fn.id
-
-      let equal = Bigstring.equal
 
       let hash t = Bigstring.to_string t |> String.hash
 
@@ -20,15 +17,14 @@ module Bigstring = struct
       include Bounded_types.String.Of_stringable (struct
         type nonrec t = t
 
-        let of_string s = Core_kernel.Bigstring.of_string s
+        let of_string s = Bigstring.of_string s
 
-        let to_string s = Core_kernel.Bigstring.to_string s
+        let to_string s = Bigstring.to_string s
       end)
     end
   end]
 
-  [%%define_locally
-  Bigstring.(get, length, equal, create, to_string, set, blit, sub)]
+  [%%define_locally Bigstring.(get, length, create, to_string, set, blit, sub)]
 
   include Hashable.Make (Stable.Latest)
 end
@@ -53,14 +49,18 @@ module T = struct
     let hash ~ledger_depth depth = UInt8.of_int (ledger_depth - depth)
   end
 
+  [@@@warning "-4"] (* disabled because of deriving sexp *)
+
   type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
   [@@deriving hash, sexp, compare]
 
-  let is_generic = function Generic _ -> true | _ -> false
+  [@@@warning "+4"]
 
-  let is_account = function Account _ -> true | _ -> false
+  let is_generic = function Generic _ -> true | Account _ | Hash _ -> false
 
-  let is_hash = function Hash _ -> true | _ -> false
+  let is_account = function Account _ -> true | Generic _ | Hash _ -> false
+
+  let is_hash = function Hash _ -> true | Account _ | Generic _ -> false
 
   let height ~ledger_depth : t -> int = function
     | Generic _ ->
@@ -172,7 +172,7 @@ module T = struct
     match location with
     | Hash addr ->
         loop addr
-    | _ ->
+    | Account _ | Generic _ ->
         failwith "can only get merkle path dependencies of a hash location"
 
   type location = t [@@deriving sexp, compare]

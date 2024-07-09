@@ -65,22 +65,29 @@ let combine_evaluations (type f) t ~crs_max_degree ~(mul : f -> f -> f) ~add
     ~shifted_pow:(fun deg x -> pow x (crs_max_degree - deg))
     ~mul ~add ~one ~evaluation_point ~xi
 
-open Plonk_types.Poly_comm
-
-let combine_split_commitments _t ~scale_and_add ~init:i ~xi (type n)
+let combine_split_commitments _t ~scale_and_add ~init:i ~xi
+    ~reduce_without_degree_bound ~reduce_with_degree_bound (type n)
     (without_degree_bound : (_, n) Vector.t) with_degree_bound =
   let flat =
-    List.concat_map (Vector.to_list without_degree_bound) ~f:Array.to_list
-    @ List.concat_map (Vector.to_list with_degree_bound)
-        ~f:(fun { With_degree_bound.unshifted; shifted } ->
-          Array.to_list unshifted @ [ shifted ] )
+    List.concat_map
+      (Vector.to_list without_degree_bound)
+      ~f:reduce_without_degree_bound
+    @ List.concat_map
+        (Vector.to_list with_degree_bound)
+        ~f:reduce_with_degree_bound
   in
-  match List.rev flat with
-  | [] ->
-      failwith "combine_split_commitments: empty"
-  | init :: comms ->
-      List.fold_left comms ~init:(i init) ~f:(fun acc p ->
-          scale_and_add ~acc ~xi p )
+  let rec go = function
+    | [] ->
+        failwith "combine_split_commitments: empty"
+    | init :: comms -> (
+        match i init with
+        | None ->
+            go comms
+        | Some init ->
+            List.fold_left comms ~init ~f:(fun acc p ->
+                scale_and_add ~acc ~xi p ) )
+  in
+  go (List.rev flat)
 
 let combine_split_evaluations (type f f')
     ~(mul_and_add : acc:f' -> xi:f' -> f -> f') ~init:(i : f -> f') ~(xi : f')

@@ -25,7 +25,7 @@
    mina_transaction
    mina_transaction_logic
    hash_prefix_states
-   kimchi_backend.common
+   kimchi_backend_common
    kimchi_backend
    with_hash
    bitstring_lib
@@ -60,13 +60,15 @@
    test_util
    transaction_witness
    mina_ledger
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    merkle_ledger
    mina_base.util
    ppx_version.runtime
    logger
    zkapp_command_builder
+   snark_keys_header
+   mina_version
  )
  (preprocess
   (pps ppx_snarky ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))

@@ -2,13 +2,7 @@
 
 open Core_kernel
 open Mina_base_util
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
-
 open Signature_lib
 module Impl = Pickles.Impls.Step
 open Mina_numbers
@@ -63,8 +57,6 @@ module Authorization_kind = struct
            [| (f is_signed, 1); (f is_proved, 1) |] )
         (Random_oracle_input.Chunked.field verification_key_hash)
 
-    [%%ifdef consensus_mechanism]
-
     module Checked = struct
       type t =
         { is_signed : Boolean.var
@@ -96,8 +88,6 @@ module Authorization_kind = struct
       Fields.make_creator obj ~is_signed:!.bool ~is_proved:!.bool
         ~verification_key_hash:!.verification_key_hash
       |> finish "AuthorizationKindStructured" ~t_toplevel_annots
-
-    [%%endif]
   end
 
   let to_control_tag : t -> Control.Tag.t = function
@@ -143,14 +133,10 @@ module Authorization_kind = struct
 
   let to_input x = Structured.to_input (to_structured x)
 
-  [%%ifdef consensus_mechanism]
-
   module Checked = Structured.Checked
 
   let typ =
     Structured.typ |> Typ.transport ~there:to_structured ~back:of_structured_exn
-
-  [%%endif]
 end
 
 module May_use_token = struct
@@ -907,8 +893,8 @@ module Update = struct
                    } ) )
       ; Set_or_keep.typ ~dummy:Permissions.empty Permissions.typ
       ; Set_or_keep.optional_typ
-          (Data_as_hash.optional_typ ~hash:Zkapp_account.hash_zkapp_uri
-             ~non_preimage:(Zkapp_account.hash_zkapp_uri_opt None)
+          (Data_as_hash.lazy_optional_typ ~hash:Zkapp_account.hash_zkapp_uri
+             ~non_preimage:(lazy (Zkapp_account.hash_zkapp_uri_opt None))
              ~dummy_value:"" )
           ~to_option:Fn.id ~of_option:Fn.id
       ; Set_or_keep.typ ~dummy:Account.Token_symbol.default
@@ -1629,6 +1615,36 @@ module Body = struct
     ; may_use_token
     ; authorization_kind
     }
+
+  let gen_with_events_and_actions =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map public_key = Public_key.Compressed.gen
+    and token_id = Token_id.gen
+    and update = Update.gen ()
+    and balance_change = Currency.Amount.Signed.gen
+    and increment_nonce = Quickcheck.Generator.bool
+    and events = return [ [| Field.zero |]; [| Field.zero |] ]
+    and actions = return [ [| Field.zero |]; [| Field.zero |] ]
+    and call_data = Field.gen
+    and preconditions = Preconditions.gen
+    and use_full_commitment = Quickcheck.Generator.bool
+    and implicit_account_creation_fee = Quickcheck.Generator.bool
+    and may_use_token = May_use_token.gen
+    and authorization_kind = Authorization_kind.gen in
+    { public_key
+    ; token_id
+    ; update
+    ; balance_change
+    ; increment_nonce
+    ; events
+    ; actions
+    ; call_data
+    ; preconditions
+    ; use_full_commitment
+    ; implicit_account_creation_fee
+    ; may_use_token
+    ; authorization_kind
+    }
 end
 
 module T = struct
@@ -1693,6 +1709,12 @@ module T = struct
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%map body = Body.gen and authorization = Control.gen_with_dummies in
+    { body; authorization }
+
+  let gen_with_events_and_actions : t Quickcheck.Generator.t =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map body = Body.gen_with_events_and_actions
+    and authorization = Control.gen_with_dummies in
     { body; authorization }
 
   let quickcheck_generator : t Quickcheck.Generator.t = gen

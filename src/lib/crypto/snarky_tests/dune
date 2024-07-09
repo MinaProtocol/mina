@@ -34,9 +34,9 @@
   kimchi_types
   pasta_bindings
   kimchi_backend
-  kimchi_backend.pasta
-  kimchi_backend.pasta.basic
-  kimchi_pasta_constraint_system
+  kimchi_pasta
+  kimchi_pasta.basic
+  kimchi_pasta.constraint_system
   bitstring_lib
   snarky.intf
   pickles.backend
@@ -54,7 +54,7 @@
   random_oracle_input
   pickles.composition_types
   pickles.plonk_checks
-  pickles.one_hot_vector
+  pickles_base.one_hot_vector
   snarky_log
   group_map
   snarky_curve
@@ -62,7 +62,7 @@
   snark_keys_header
   tuple_lib
   promise
-  kimchi_backend.common
+  kimchi_backend_common
   ppx_version.runtime
   qcheck-core
   qcheck-alcotest

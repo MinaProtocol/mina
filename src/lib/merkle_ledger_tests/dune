@@ -2,42 +2,54 @@
  (name merkle_ledger_tests)
  (public_name merkle_ledger_tests)
  (library_flags -linkall)
+ (flags
+  (:standard -warn-error +a)
+   -open Core_kernel )
+ (modules (:standard \ "main"))
+ (preprocess (pps ppx_version ppx_jane ppx_compare ppx_deriving.show ppx_deriving_yojson))
  (libraries
-   ;; opam libraries
-   core
-   extlib
-   sexplib0
-   bin_prot.shape
-   base.base_internalhash_types
-   base.caml
-   core_kernel.uuid
-   core.uuid
-   ppx_inline_test.config
-   result
+   ; Opam
+   alcotest
+   async
    async_kernel
    async_unix
-   async
+   base.base_internalhash_types
+   base.caml
+   bin_prot.shape
+   core
+   core.uuid
    core_kernel
-   ;; local libraries
+   core_kernel.uuid
+   result
+   sexplib0
+   ; Mina
+   base58_check
    bounded_types
+   codable
+   currency
+   data_hash_lib
+   direction
+   key_value_database
+   merkle_address
    merkle_ledger
    merkle_mask
    mina_base
-   signature_lib
-   currency
-   base58_check
-   direction
-   codable
-   mina_base_import
+   mina_base.import
    mina_numbers
    mina_stdlib
-   data_hash_lib
-   key_value_database
-   merkle_address
    ppx_version.runtime
- )
- (preprocess
-  (pps ppx_version ppx_jane ppx_compare ppx_deriving.show ppx_deriving_yojson))
+   signature_lib )
+ (instrumentation (backend bisect_ppx)) )
+
+(tests
+ (names main)
+ (flags
+  (:standard -warn-error +a)
+   -open Merkle_ledger_tests )
+ (modules main)
+ (libraries
+   alcotest
+   merkle_ledger_tests )
+ (action (run %{test}))
  (instrumentation (backend bisect_ppx))
- (inline_tests (flags -verbose -show-counts))
- (synopsis "Testing account databases"))
+ )

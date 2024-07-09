@@ -1,3 +1,5 @@
+(* versioned_module.ml -- modules with versioned types *)
+
 open Core_kernel
 open Ppxlib
 open Versioned_util
@@ -841,7 +843,7 @@ let version_type ~version_option ~all_version_tagged ~top_version_tag
              (struct ... end)
 
            and we add the tag for the current version by
-           shadowing the the bin_io functions from that include
+           shadowing the bin_io functions from that include
 
            that way, the serialized data gets all version tags
 

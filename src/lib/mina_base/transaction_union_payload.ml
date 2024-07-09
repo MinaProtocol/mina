@@ -4,13 +4,7 @@
 
 open Core_kernel
 open Currency
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
-
 open Signature_lib
 module Tag = Transaction_union_tag
 
@@ -82,8 +76,6 @@ module Body = struct
     in
     { tag; source_pk; receiver_pk; token_id; amount }
 
-  [%%ifdef consensus_mechanism]
-
   type var =
     ( Tag.Unpacked.var
     , Public_key.Compressed.var
@@ -130,8 +122,6 @@ module Body = struct
         |]
   end
 
-  [%%endif]
-
   let to_input_legacy { tag; source_pk; receiver_pk; token_id; amount } =
     assert (Token_id.equal token_id Token_id.default) ;
     Array.reduce_exn ~f:Random_oracle.Input.Legacy.append
@@ -176,8 +166,6 @@ module Payload_common = struct
     Poly.t
   [@@deriving sexp]
 
-  [%%ifdef consensus_mechanism]
-
   module Checked = struct
     type value = t
 
@@ -215,8 +203,6 @@ module Payload_common = struct
       ]
       ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_of_hlist:of_hlist
-
-  [%%endif]
 end
 
 type t = (Payload_common.t, Body.t) Signed_command_payload.Poly.t
@@ -243,8 +229,6 @@ let gen =
   let%bind common = Signed_command_payload.Common.gen in
   let%map body = Body.gen ~fee:common.fee in
   Signed_command_payload.Poly.{ common; body }
-
-[%%ifdef consensus_mechanism]
 
 type var = (Payload_common.Checked.t, Body.var) Signed_command_payload.Poly.t
 
@@ -273,8 +257,6 @@ module Checked = struct
     ; body = Body.Checked.constant body
     }
 end
-
-[%%endif]
 
 let to_input_legacy ({ common; body } : t) =
   Random_oracle.Input.Legacy.append

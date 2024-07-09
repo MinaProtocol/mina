@@ -3,9 +3,14 @@
  (name pickles)
  (public_name pickles)
  (modules_without_implementation
-   full_signature
-   type)
- (flags -warn-error +34+33+27)
+  full_signature
+  type
+  intf
+  pickles_intf)
+ (flags
+  (:standard -w +a-40..42-44
+             -warn-error +a-27)
+   -open Core_kernel)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -36,9 +41,9 @@
    kimchi_bindings
    kimchi_types
    pasta_bindings
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
-   kimchi_backend.pasta.constraint_system
+   kimchi_pasta
+   kimchi_pasta.basic
+   kimchi_pasta.constraint_system
    bitstring_lib
    snarky.intf
    pickles.backend
@@ -50,13 +55,12 @@
    pickles.limb_vector
    pickles_base
    kimchi_backend
-   mina_version
    base58_check
    codable
    random_oracle_input
    pickles.composition_types
    pickles.plonk_checks
-   pickles.one_hot_vector
+   pickles_base.one_hot_vector
    snarky_log
    group_map
    snarky_curve
@@ -64,7 +68,7 @@
    snark_keys_header
    tuple_lib
    promise
-   kimchi_backend.common
+   kimchi_backend_common
    logger
    internal_tracing.context_logger
    ppx_version.runtime
