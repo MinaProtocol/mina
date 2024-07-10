@@ -142,7 +142,7 @@ let docker_step
                                             n}-${DebianVersions.lowerName
                                                    debVersion}${Profiles.toLabelSegment
                                                                   profile}${BuildFlags.toLabelSegment
-                                                                              buildFlags}--docker-image"
+                                                                              buildFlags}-docker-image"
                             }
                       )
                       networks
