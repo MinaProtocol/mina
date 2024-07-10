@@ -313,4 +313,3 @@ let pipeline
               }
 
 in  { pipeline = pipeline, MinaBuildSpec = MinaBuildSpec }
-)

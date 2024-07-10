@@ -25,7 +25,6 @@ let requiresMainnetBuild =
 let foldMinaBuildMainnetEnv =
           \(networks : List Network)
       ->        if List/any Network requiresMainnetBuild networks
-)
 
           then  "MINA_BUILD_MAINNET=true"
 
