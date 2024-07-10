@@ -4,12 +4,15 @@ use paste::paste;
 use poly_commitment::SRS as _;
 use poly_commitment::{
     commitment::{b_poly_coefficients, caml::CamlPolyComm},
+    lagrange_cache,
     srs::SRS,
 };
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
+    path::PathBuf,
+    str::FromStr
 };
 
 macro_rules! impl_srs {
@@ -104,6 +107,20 @@ macro_rules! impl_srs {
                     unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
                 let domain = EvaluationDomain::<$F>::new(1 << (log2_size as usize)).expect("invalid domain size");
                 ptr.add_lagrange_basis(domain);
+            }
+
+            #[ocaml_gen::func]
+            #[ocaml::func]
+            pub fn [<$name:snake _add_lagrange_basis_with_cache>](
+                srs: $name,
+                log2_size: ocaml::Int,
+                path: String,
+            ) {
+                let ptr: &mut poly_commitment::srs::SRS<$G> =
+                    unsafe { &mut *(std::sync::Arc::as_ptr(&srs) as *mut _) };
+                let domain = EvaluationDomain::<$F>::new(1 << (log2_size as usize)).expect("invalid domain size");
+                let cache = lagrange_cache::FileCache::new(PathBuf::from_str(&(path as String)).expect("unable to create lagrange cache dir"));
+                ptr.add_lagrange_basis_with_cache(domain, &cache);
             }
 
             #[ocaml_gen::func]

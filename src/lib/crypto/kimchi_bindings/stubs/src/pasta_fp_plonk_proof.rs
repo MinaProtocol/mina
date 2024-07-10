@@ -311,12 +311,12 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     use kimchi::circuits::{
         constraints::ConstraintSystem,
         gate::{CircuitGate, Connect},
-        polynomials::foreign_field_mul,
+        polynomials::{foreign_field_mul, foreign_field_common::BigUintForeignFieldHelpers},
         wires::Wire,
     };
     use num_bigint::BigUint;
     use num_bigint::RandBigInt;
-    use o1_utils::{foreign_field::BigUintForeignFieldHelpers, FieldHelpers};
+    use o1_utils::FieldHelpers;
     use poly_commitment::srs::{endos, SRS};
     use rand::{rngs::StdRng, SeedableRng};
 
@@ -468,11 +468,13 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
 ) {
     use ark_ff::Zero;
     use kimchi::circuits::{
-        constraints::ConstraintSystem, gate::CircuitGate, polynomials::range_check, wires::Wire,
+        constraints::ConstraintSystem, gate::CircuitGate, polynomials::{range_check, foreign_field_common::BigUintForeignFieldHelpers}, wires::Wire,
+
     };
     use num_bigint::BigUint;
     use num_bigint::RandBigInt;
-    use o1_utils::{foreign_field::BigUintForeignFieldHelpers, BigUintFieldHelpers};
+    use o1_utils::BigUintFieldHelpers;
+
     use poly_commitment::srs::{endos, SRS};
     use rand::{rngs::StdRng, SeedableRng};
 
