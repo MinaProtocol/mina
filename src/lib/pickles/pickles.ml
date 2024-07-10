@@ -315,7 +315,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let srs = Tock.Keypair.load_urs () in
       List.iter [ 0; 1; 2 ] ~f:(fun i ->
           Kimchi_bindings.Protocol.SRS.Fq.add_lagrange_basis_with_cache srs 
-            (Domain.log2_size (Common.wrap_domains ~proofs_verified:i).h) "/tmp/lagrange_cache" ) 
+            (Domain.log2_size (Common.wrap_domains ~proofs_verified:i).h) "/tmp/" ) 
 
   end
 

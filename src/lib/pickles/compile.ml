@@ -995,7 +995,7 @@ module Side_loaded = struct
   
   let srs_precomputation_with_cache () : unit =
     let srs = Tock.Keypair.load_urs () in
-    let cache_path = "/tmp/lagrange_cache" in
+    let cache_path = "/tmp/" in
     List.iter [ 0; 1; 2 ] ~f:(fun i ->
         Kimchi_bindings.Protocol.SRS.Fq.add_lagrange_basis_with_cache srs 
           (Domain.log2_size (Common.wrap_domains ~proofs_verified:i).h) cache_path)
