@@ -950,7 +950,7 @@ module Sql = struct
           command.zkapp_command
 
       let account_updates_and_command_to_info account_updates
-          { zkapp_command; block_hash; block_height } =
+          { zkapp_command; block_hash; block_height; _ } =
         let info =
           Rosetta_lib_block.Sql.Zkapp_commands
           .account_updates_and_command_to_info account_updates zkapp_command
