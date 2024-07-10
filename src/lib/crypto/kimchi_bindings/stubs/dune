@@ -142,7 +142,6 @@
   (= %{env:MARLIN_PLONK_STUBS=n} n))
  (mode promote)
  (deps
-  ../../../../.ocamlformat
   Cargo.toml
   rust-toolchain.toml
   (source_tree src)
@@ -157,9 +156,9 @@
    (run rm -f ./Cargo.lock)
    (setenv
     CARGO_TARGET_DIR
-    "%{read:../dune-build-root}/cargo_kimchi_bindgen"
+    "%{read:dune-build-root}/cargo_kimchi_bindgen"
     (run cargo run %{targets} --offline))
-   (run ocamlformat -i %{targets}))))
+   )))
 
 ;; this is used by nix
 
@@ -169,9 +168,7 @@
   (<> %{env:MARLIN_PLONK_STUBS=n} n))
  (mode promote)
  (deps
-  ../../../../.ocamlformat
   (env_var MARLIN_PLONK_STUBS))
  (action
   (progn
-   (run %{env:MARLIN_PLONK_STUBS=n}/bin/wires_15_stubs %{targets})
-   (run ocamlformat -i %{targets}))))
+   (run %{env:MARLIN_PLONK_STUBS=n}/bin/wires_15_stubs %{targets}))))
