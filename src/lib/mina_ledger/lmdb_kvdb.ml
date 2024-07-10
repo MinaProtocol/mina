@@ -1,4 +1,3 @@
-(* open Merkle_ledger *)
 open Core_kernel
 
 module Kvdb = struct
