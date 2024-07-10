@@ -142,7 +142,7 @@ let docker_step
                                             n}-${DebianVersions.lowerName
                                                    debVersion}${Profiles.toLabelSegment
                                                                   profile}${BuildFlags.toLabelSegment
-                                                                              buildFlags}-docker-image"
+                                                                              buildFlags}--docker-image"
                             }
                       )
                       networks
@@ -157,7 +157,7 @@ let docker_step
                     , step_key =
                         "test-executive-${DebianVersions.lowerName
                                             debVersion}${BuildFlags.toLabelSegment
-                                                           buildFlags}-docker-image"
+                                                           buildFlags}--docker-image"
                     }
                   ]
                 , BatchTxn =
@@ -187,7 +187,7 @@ let docker_step
                         "archive-${DebianVersions.lowerName
                                      debVersion}${Profiles.toLabelSegment
                                                     profile}${BuildFlags.toLabelSegment
-                                                                buildFlags}--docker-image"
+                                                                buildFlags}-docker-image"
                     }
                   ]
                 , ArchiveMigration =
@@ -216,7 +216,7 @@ let docker_step
                     , step_key =
                         "rosetta-${DebianVersions.lowerName
                                      debVersion}${BuildFlags.toLabelSegment
-                                                    buildFlags}--docker-image"
+                                                    buildFlags}-docker-image"
                     }
                   ]
                 , ZkappTestTransaction =
@@ -313,3 +313,4 @@ let pipeline
               }
 
 in  { pipeline = pipeline, MinaBuildSpec = MinaBuildSpec }
+)
