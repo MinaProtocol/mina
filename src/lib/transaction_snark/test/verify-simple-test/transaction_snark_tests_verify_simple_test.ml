@@ -32,7 +32,7 @@ let%test_module "Simple verifies test" =
   ( module struct
     let () = Backtrace.elide := false
 
-    let () = Pickles.Side_loaded.srs_precomputation ()
+    let () = Pickles.Side_loaded.srs_precomputation_with_cache ()
 
     let%test_unit "Verifies" =
       Or_error.ok_exn

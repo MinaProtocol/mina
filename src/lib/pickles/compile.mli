@@ -151,6 +151,9 @@ module Side_loaded : sig
   val in_prover : ('var, 'value, 'n1, 'n2) Tag.t -> Verification_key.t -> unit
 
   val srs_precomputation : unit -> unit
+
+  val srs_precomputation_with_cache : unit -> unit
+
 end
 
 type ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic =

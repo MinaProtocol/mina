@@ -77,7 +77,7 @@ module Worker_state = struct
   let create { logger; proof_level; constraint_constants; _ } : t Deferred.t =
     match proof_level with
     | Full ->
-        Pickles.Side_loaded.srs_precomputation () ;
+        Pickles.Side_loaded.srs_precomputation_with_cache () ;
         Deferred.return
           (let module M = struct
              module T = Transaction_snark.Make (struct

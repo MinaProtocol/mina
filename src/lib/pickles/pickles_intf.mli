@@ -386,6 +386,8 @@ module type S = sig
     val in_prover : ('var, 'value, 'n1, 'n2) Tag.t -> Verification_key.t -> unit
 
     val srs_precomputation : unit -> unit
+
+    val srs_precomputation_with_cache : unit -> unit
   end
 
   (** This compiles a series of inductive rules defining a set into a proof

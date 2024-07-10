@@ -310,6 +310,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
       List.iter [ 0; 1; 2 ] ~f:(fun i ->
           Kimchi_bindings.Protocol.SRS.Fq.add_lagrange_basis srs
             (Domain.log2_size (Common.wrap_domains ~proofs_verified:i).h) )
+
+    let srs_precomputation_with_cache () : unit =
+      let srs = Tock.Keypair.load_urs () in
+      List.iter [ 0; 1; 2 ] ~f:(fun i ->
+          Kimchi_bindings.Protocol.SRS.Fq.add_lagrange_basis_with_cache srs 
+            (Domain.log2_size (Common.wrap_domains ~proofs_verified:i).h) "/tmp/lagrange_cache" ) 
+
   end
 
   let compile_with_wrap_main_override_promise =
