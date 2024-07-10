@@ -2,6 +2,7 @@ open Core
 open Signature_lib
 open Merkle_ledger
 open Mina_base
+open Lmdb_kvdb
 
 module Ledger_inner = struct
   module Location_at_depth : Merkle_ledger.Location_intf.S =
@@ -26,8 +27,7 @@ module Ledger_inner = struct
     include Hashable.Make_binable (Arg) [@@deriving sexp, compare, hash, yojson]
   end
 
-  module Kvdb : Intf.Key_value_database with type config := string =
-    Rocksdb.Database
+  module Kvdb : Intf.Key_value_database with type config := string = Kvdb
 
   module Storage_locations : Intf.Storage_locations = struct
     let key_value_db_dir = "mina_key_value_db"
