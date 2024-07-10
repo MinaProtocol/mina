@@ -187,7 +187,7 @@ let docker_step
                         "archive-${DebianVersions.lowerName
                                      debVersion}${Profiles.toLabelSegment
                                                     profile}${BuildFlags.toLabelSegment
-                                                                buildFlags}--docker-image"
+                                                                buildFlags}-docker-image"
                     }
                   ]
                 , ArchiveMigration =
@@ -216,7 +216,7 @@ let docker_step
                     , step_key =
                         "rosetta-${DebianVersions.lowerName
                                      debVersion}${BuildFlags.toLabelSegment
-                                                    buildFlags}--docker-image"
+                                                    buildFlags}-docker-image"
                     }
                   ]
                 , ZkappTestTransaction =
