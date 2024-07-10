@@ -1,0 +1,7 @@
+(executables
+ (names ocaml_rust_caller)
+ (libraries alcotest callable_rust threads.posix))
+
+(rule
+ (alias  runtest)
+ (action (run ./ocaml_rust_caller.exe)))

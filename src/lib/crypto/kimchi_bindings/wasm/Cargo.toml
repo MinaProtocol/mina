@@ -15,7 +15,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 # Strictly enforcing 0.2.87
-wasm-bindgen = { version = "=0.2.87" }
+wasm-bindgen = { version = "=0.2.90" }
 console_error_panic_hook = { version = "0.1.6" }
 web-sys = { version = "0.3.35", features = [
   "Window",

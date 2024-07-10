@@ -158,7 +158,7 @@
    (setenv
     CARGO_TARGET_DIR
     "%{read:../dune-build-root}/cargo_kimchi_bindgen"
-    (run cargoasddasdasdarun! %{targets} --offline))
+    (run cargo run %{targets} --offline))
    (run ocamlformat -i %{targets}))))
 
 ;; this is used by nix
