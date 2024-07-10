@@ -68,7 +68,7 @@ IMAGE="--build-arg image=${IMAGE}"
 # - hardfork
 # - lightnet
 # - hardfork-instrumented
-  case "${DEB_PROFILE}" in
+case "${DEB_PROFILE}" in
     standard)
       case "${DEB_BUILD_FLAGS}" in 
         *instrumented)
@@ -78,6 +78,9 @@ IMAGE="--build-arg image=${IMAGE}"
         *)
           ;;
       esac
+      ;;
+    lightnet)
+      DOCKER_DEB_SUFFIX="--build-arg deb_suffix=lightnet"
       ;;
     *)
       case "${DEB_BUILD_FLAGS}" in 
@@ -90,7 +93,7 @@ IMAGE="--build-arg image=${IMAGE}"
           ;;
       esac
       ;;
-  esac
+esac
 
 # Debug prints for visability
 # Substring removal to cut the --build-arg arguments on the = so that the output is exactly the input flags https://wiki.bash-hackers.org/syntax/pe#substring_removal

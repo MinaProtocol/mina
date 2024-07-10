@@ -53,16 +53,16 @@ let docker_step
                         buildFlags
                         step_dep_name
                   , service = "mina-daemon"
-                  , network = "berkeley"
+                  , network = "devnet"
                   , deb_codename = "${DebianVersions.lowerName debVersion}"
                   , deb_profile = profile
                   , build_flags = buildFlags
                   , deb_repo = DebianRepo.Type.Local
                   , step_key =
-                      "daemon-berkeley-${DebianVersions.lowerName
-                                           debVersion}${Profiles.toLabelSegment
-                                                          profile}${BuildFlags.toLabelSegment
-                                                                      buildFlags}-docker-image"
+                      "daemon-devnet-${DebianVersions.lowerName
+                                         debVersion}${Profiles.toLabelSegment
+                                                        profile}${BuildFlags.toLabelSegment
+                                                                    buildFlags}-docker-image"
                   }
                 , TestExecutive = DockerImage.ReleaseSpec::{
                   , deps =
@@ -86,7 +86,7 @@ let docker_step
                         buildFlags
                         step_dep_name
                   , service = "mina-batch-txn"
-                  , network = "berkeley"
+                  , network = "devnet"
                   , deb_codename = "${DebianVersions.lowerName debVersion}"
                   , deb_repo = DebianRepo.Type.Local
                   , step_key =
@@ -134,7 +134,7 @@ let docker_step
                         buildFlags
                         step_dep_name
                   , service = "mina-rosetta"
-                  , network = "berkeley"
+                  , network = "devnet"
                   , deb_codename = "${DebianVersions.lowerName debVersion}"
                   , deb_repo = DebianRepo.Type.Local
                   , step_key =
@@ -172,7 +172,7 @@ let docker_step
                       "test-suite-${DebianVersions.lowerName
                                       debVersion}${Profiles.toLabelSegment
                                                      profile}-docker-image"
-                  , network = "berkeley"
+                  , network = "devnet"
                   }
                 }
                 artifact

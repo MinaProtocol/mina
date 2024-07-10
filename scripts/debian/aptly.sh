@@ -25,36 +25,37 @@ check_required aptly
 check_required jq
 check_required gsutil
 
-
 function start_aptly() {
     local __distribution=$1
     local __debs=$2
     local __background=$3
     local __clean=$4
     local __component=$5
+    local __arch=$6
     local __repo="$__distribution-$__component"
 
     if [ $__clean = 1 ]; then
         rm -rf ~/.aptly
     fi
     
-    aptly repo create -component $__component -distribution $__distribution  $__repo
+    aptly repo create -component $__component -distribution $__distribution $__repo
 
     aptly repo add $__repo $__debs
 
     aptly snapshot create $__component from repo $__repo
 
-    aptly publish snapshot -distribution=$__distribution -skip-signing $__component
+    if [ -n "$__arch" ]; then
+        aptly publish snapshot -distribution=$__distribution -skip-signing -architectures=$__arch $__component
+    else
+        aptly publish snapshot -distribution=$__distribution -skip-signing $__component
+    fi
 
     if [ $__background = 1 ]; then
         aptly serve -listen localhost:8080 &
     else 
         aptly serve -listen localhost:8080
     fi
-
-    
 }
-
 
 # cli
 
@@ -65,13 +66,14 @@ function start_help(){
     echo ""
     echo "Parameters:"
     echo ""
-    echo "  -b, --background  The Docker name (mina-berkeley, mina-archive etc.)"
+    echo "  -b, --background  The Docker name (mina-devnet, mina-archive etc.)"
     echo "  -c, --codename    The Codename for debian repository"
     echo "  -d, --debians     The Debian(s) to be available in aptly. Supports regular expression"
     echo "  -m, --component   The Component for debian repository. For example: unstable"
     echo "  -l, --clean       Removes existing aptly installation"
+    echo "  -a, --arch        List of architectures (comma separated)"
     echo ""
-    echo "Example: $0  start --background --codename focal --debs *.deb --component unstable "
+    echo "Example: $0  start --background --codename focal --debs *.deb --component unstable --arch amd64,i386"
     echo ""
     exit 0
 }
@@ -86,7 +88,7 @@ function start(){
     local __background=0
     local __clean=0
     local __component="unstable"
-    
+    local __arch=""
 
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
@@ -114,6 +116,10 @@ function start(){
                 __clean=1
                 shift;
             ;;
+            -a | --arch )
+                __arch=${2:?$error_message}
+                shift 2;
+            ;;
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
@@ -126,8 +132,8 @@ function start(){
         $__debs \
         $__background \
         $__clean \
-        $__component
-
+        $__component \
+        "$__arch"
 }
 
 function stop_help(){
@@ -145,7 +151,6 @@ function stop_help(){
 }
 
 function stop(){
-    
     local __clean=0
     
     while [ ${#} -gt 0 ]; do
@@ -179,8 +184,8 @@ function main_help(){
     echo "Commands:"
     echo ""
     printf "  %-23s %s\n" "help" "show help menu and commands";
-    printf "  %-23s %s\n" "start" "start aptly deamon serving debian packages";
-    printf "  %-23s %s\n" "stop" "stops and clean up aptly installation";
+    printf "  %-23s %s\n" "start" "start aptly daemon serving debian packages";
+    printf "  %-23s %s\n" "stop" "stops and cleans up aptly installation";
     echo ""
     exit "${1:-0}";
 }

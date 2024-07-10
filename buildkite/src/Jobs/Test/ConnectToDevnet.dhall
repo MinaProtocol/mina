@@ -14,13 +14,12 @@ let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let dependsOn =
-      Dockers.dependsOn
-        Dockers.Type.Bullseye
+      DebianVersions.dependsOn
+        DebianVersions.DebVersion.Bullseye
         Profiles.Type.Standard
-        "daemon-berkeley"
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -28,17 +27,17 @@ in  Pipeline.build
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
           , S.exactly "buildkite/scripts/connect-to-testnet" "sh"
-          , S.exactly "buildkite/src/Jobs/Test/ConnectToBerkeley" "dhall"
+          , S.exactly "buildkite/src/Jobs/Test/ConnectToDevnet" "dhall"
           , S.exactly "buildkite/src/Command/ConnectToTestnet" "dhall"
           ]
         , path = "Test"
-        , name = "ConnectToBerkeley"
+        , name = "ConnectToDevnet"
         , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
         }
       , steps =
         [ ConnectToTestnet.step
             dependsOn
-            "berkeley"
+            "devnet"
             "40s"
             "2m"
             (B/SoftFail.Boolean True)
