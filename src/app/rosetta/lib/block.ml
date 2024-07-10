@@ -391,41 +391,15 @@ module Sql = struct
 
   module Internal_commands = struct
     module Cte = struct
-      module Extras = struct
-        type t =
-          { receiver_account_creation_fee_paid : int64 option
-          ; receiver : string
-          ; sequence_no : int
-          ; secondary_sequence_no : int
-          }
-        [@@deriving hlist, fields]
-
-        let fields =
-          String.concat ~sep:","
-            [ "ac.creation_fee"
-            ; "pk.value as receiver"
-            ; "bic.sequence_no"
-            ; "bic.secondary_sequence_no"
-            ]
-
-        let receiver t = `Pk t.receiver
-
-        let typ =
-          Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-            Caqti_type.[ option int64; string; int; int ]
-      end
-
       type t =
         { internal_command_id : int
         ; raw_internal_command : Archive_lib.Processor.Internal_command.t
-        ; internal_command_extras : Extras.t
+        ; receiver_account_creation_fee_paid : int64 option
+        ; receiver : string
+        ; sequence_no : int
+        ; secondary_sequence_no : int
         }
-      [@@deriving hlist]
-
-      let typ =
-        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-          Caqti_type.
-            [ int; Archive_lib.Processor.Internal_command.typ; Extras.typ ]
+      [@@deriving hlist, fields]
 
       let fields' =
         String.concat ~sep:","
@@ -433,7 +407,28 @@ module Sql = struct
              ~f:(fun n -> "i." ^ n)
              Archive_lib.Processor.Internal_command.Fields.names
 
-      let fields = String.concat ~sep:"," [ "i.id"; fields'; Extras.fields ]
+      let fields =
+        String.concat ~sep:","
+          [ "i.id"
+          ; fields'
+          ; "ac.creation_fee"
+          ; "pk.value as receiver"
+          ; "bic.sequence_no"
+          ; "bic.secondary_sequence_no"
+          ]
+
+      let receiver t = `Pk t.receiver
+
+      let typ =
+        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+          Caqti_type.
+            [ int
+            ; Archive_lib.Processor.Internal_command.typ
+            ; option int64
+            ; string
+            ; int
+            ; int
+            ]
 
       let query =
         [%string
@@ -472,8 +467,7 @@ module Sql = struct
           AND t.value = ?
       |}]
 
-      let to_info ~coinbase_receiver
-          { raw_internal_command = ic; internal_command_extras = extras; _ } =
+      let to_info ~coinbase_receiver ({ raw_internal_command = ic; _ } as t) =
         let open Result.Let_syntax in
         let%map kind =
           match ic.Archive_lib.Processor.Internal_command.command_type with
@@ -497,15 +491,15 @@ module Sql = struct
         (* internal commands always use the default token *)
         let token_id = Mina_base.Token_id.(to_string default) in
         { Internal_command_info.kind
-        ; receiver = Extras.receiver extras
+        ; receiver = receiver t
         ; receiver_account_creation_fee_paid =
             Option.map
-              (Extras.receiver_account_creation_fee_paid extras)
+              (receiver_account_creation_fee_paid t)
               ~f:Unsigned.UInt64.of_int64
         ; fee = Unsigned.UInt64.of_string ic.fee
         ; token = `Token_id token_id
-        ; sequence_no = Extras.sequence_no extras
-        ; secondary_sequence_no = Extras.secondary_sequence_no extras
+        ; sequence_no = sequence_no t
+        ; secondary_sequence_no = secondary_sequence_no t
         ; hash = ic.hash
         ; coinbase_receiver
         }
@@ -600,32 +594,32 @@ module Sql = struct
     end
 
     module Zkapp_account_update = struct
-      module Extras = struct
-        type t = string
-
-        let fields = "pk_update_body.value as account"
-
-        let account t = `Pk t
-
-        let typ = Caqti_type.string
-      end
-
       type t =
         { body : Archive_lib.Processor.Zkapp_account_update_body.t
-        ; extras : Extras.t
+        ; account : string
+        ; token : string
         }
       [@@deriving hlist]
 
-      let fields' =
+      let fields =
         String.concat ~sep:","
         @@ List.map Archive_lib.Processor.Zkapp_account_update_body.Fields.names
              ~f:(fun n -> "zaub." ^ n)
+        @ [ "pk_update_body.value as account"
+          ; "token_update_body.value as token"
+          ]
 
-      let fields = String.concat ~sep:"," [ fields'; Extras.fields ]
+      let account t = `Pk t.account
+
+      let token t = `Token_id t.token
 
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-          [ Archive_lib.Processor.Zkapp_account_update_body.typ; Extras.typ ]
+          Caqti_type.
+            [ Archive_lib.Processor.Zkapp_account_update_body.typ
+            ; string
+            ; string
+            ]
     end
 
     type t =
@@ -678,7 +672,7 @@ module Sql = struct
            ON token_update_body.id = ai_update_body.token_id
          WHERE bzc.block_id = ?
           AND (token_update_body.value = ? OR token_update_body.id IS NULL)
-         ORDER BY zc.id
+         ORDER BY zc.id, bzc.sequence_no
       |}]
 
     let query =
@@ -694,7 +688,7 @@ module Sql = struct
 
       type info
 
-      val command_id : command -> int
+      val is_same_command : command -> command -> bool
 
       val to_account_update_info : command -> account_update_info option
 
@@ -704,7 +698,7 @@ module Sql = struct
     struct
       let to_command_info' command =
         let rec f pending_account_updates = function
-          | command' :: t when M.command_id command' = M.command_id command ->
+          | command' :: t when M.is_same_command command' command ->
               let account_update_info' = M.to_account_update_info command' in
               let pending_account_updates' =
                 Option.value_map account_update_info'
@@ -736,10 +730,7 @@ module Sql = struct
 
     let to_account_update_info
         { zkapp_command_extras = cmd_extras; zkapp_account_update; _ } =
-      Option.map zkapp_account_update
-        ~f:(fun { body = upd; extras = upd_extras } ->
-          (* TODO: check if this holds *)
-          let token = Mina_base.Token_id.(to_string default) in
+      Option.map zkapp_account_update ~f:(fun upd ->
           let status =
             match cmd_extras.Extras.status with
             | "applied" ->
@@ -747,31 +738,29 @@ module Sql = struct
             | _ ->
                 `Failed
           in
+          let body = upd.body in
           { Zkapp_account_update_info.authorization_kind =
-              upd
+              body
                 .Archive_lib.Processor.Zkapp_account_update_body
                  .authorization_kind
-          ; account = Zkapp_account_update.Extras.account upd_extras
-          ; balance_change = upd.balance_change
-          ; increment_nonce = upd.increment_nonce
-          ; may_use_token = upd.may_use_token
-          ; call_depth = Unsigned.UInt64.of_int upd.call_depth
-          ; use_full_commitment = upd.use_full_commitment
+          ; account = Zkapp_account_update.account upd
+          ; balance_change = body.balance_change
+          ; increment_nonce = body.increment_nonce
+          ; may_use_token = body.may_use_token
+          ; call_depth = Unsigned.UInt64.of_int body.call_depth
+          ; use_full_commitment = body.use_full_commitment
           ; status
-          ; token = `Token_id token
+          ; token = Zkapp_account_update.token upd
           } )
 
     let account_updates_and_command_to_info account_updates
         { zkapp_command = cmd; zkapp_command_extras = cmd_extras; _ } =
-      (* TODO: check if this holds *)
-      let token = Mina_base.Token_id.(to_string default) in
       { Commands_common.Zkapp_command_info.fee =
           Unsigned.UInt64.of_string @@ cmd_extras.Extras.fee
       ; fee_payer = Extras.fee_payer cmd_extras
       ; valid_until =
           Option.map ~f:Unsigned.UInt32.of_int64 cmd_extras.valid_until
       ; nonce = Unsigned.UInt32.of_int64 cmd_extras.nonce
-      ; token = `Token_id token
       ; sequence_no = cmd_extras.sequence_no
       ; memo = (if String.equal cmd.memo "" then None else Some cmd.memo)
       ; hash = cmd.hash
@@ -788,7 +777,10 @@ module Sql = struct
 
       type info = Zkapp_command_info.t
 
-      let command_id t = t.zkapp_command_id
+      let is_same_command t_1 t_2 =
+        t_1.zkapp_command_id = t_2.zkapp_command_id
+        && t_1.zkapp_command_extras.sequence_no
+           = t_2.zkapp_command_extras.sequence_no
 
       let to_account_update_info = to_account_update_info
 
@@ -877,7 +869,6 @@ module Sql = struct
                              other )
                         `Invariant_violation )
              in
-             (* TODO: do we want to mention tokens at all here? *)
              let fee_token = Mina_base.Token_id.(to_string default) in
              let token = Mina_base.Token_id.(to_string default) in
              let%map failure_status =
