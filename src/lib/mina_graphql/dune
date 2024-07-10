@@ -32,8 +32,8 @@
    exit_handlers
    file_system
    itn_crypto
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    mina_base.util
    mina_ledger
    block_producer

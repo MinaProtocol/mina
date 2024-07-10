@@ -35,8 +35,8 @@
    random_oracle
    o1trace
    mina_base.import
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    with_hash
    snarky.backendless
    internal_tracing
