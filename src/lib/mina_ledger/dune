@@ -6,7 +6,6 @@
  (preprocess (pps ppx_version ppx_let ppx_custom_printf ppx_base ppx_deriving_yojson ppx_inline_test ppx_assert))
  (libraries
    ;; opam libraries
-   rocks
    lmdb
    integers
    async_kernel
