@@ -6,7 +6,7 @@ module Kvdb = struct
     { mutable lmdb :
         ((Bigstring.t, Bigstring.t, [ `Uni ]) Lmdb.Map.t[@sexp.opaque])
     ; path : string
-    ; uuid : Uuid.t
+    ; uuid : (Uuid.t[@sexp.opaque])
     }
   [@@deriving sexp]
 
@@ -27,12 +27,15 @@ module Kvdb = struct
 
   let close t = Lmdb.Env.close (Lmdb.Map.env t.lmdb)
 
-  let create_checkpoint t name =
+  let make_checkpoint t name =
     let env = Lmdb.Map.env t.lmdb in
     close t ;
-    (* TODO coppy the file here *)
+    FileUtil.cp ~recurse:true [ t.path ] name ;
     t.lmdb <-
-      Lmdb.Map.open_existing Nodup ~key:trivial_conv ~value:trivial_conv env ;
+      Lmdb.Map.open_existing Nodup ~key:trivial_conv ~value:trivial_conv env
+
+  let create_checkpoint t name =
+    make_checkpoint t name ;
     let new_db =
       Lmdb.Map.open_existing Nodup ~key:trivial_conv ~value:trivial_conv
         (Lmdb.Env.create Ro name)
@@ -43,9 +46,6 @@ module Kvdb = struct
         name_to_uuid name
         (* Can this be the same, if not what can I use instead of the path? *)
     }
-
-  (* AFAICT this can be a no-op because it doesn't return a handle so why copy? *)
-  let make_checkpoint _t _name = ()
 
   let get t ~key =
     try Some (Lmdb.Map.get t.lmdb key) with Not_found_s _ -> None

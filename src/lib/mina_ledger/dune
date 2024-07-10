@@ -18,6 +18,7 @@
    base.base_internalhash_types
    async
    core_kernel.uuid
+   core.uuid
    ppx_inline_test.config
    ;; local libraries
    bounded_types
@@ -55,4 +56,5 @@
    with_hash
    ppx_version.runtime
    direction
+   fileutils
 ))
