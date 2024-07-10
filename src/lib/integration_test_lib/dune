@@ -26,7 +26,6 @@
    ppx_inline_test.config
    async_unix
    stdio
-   extlib
    sexp_diff_kernel
    ;; local libraries
    key_gen
@@ -62,4 +61,5 @@
    transition_handler
    snark_worker
    one_or_two
+   error_json
 ))

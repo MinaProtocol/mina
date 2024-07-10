@@ -2,13 +2,7 @@
 
 open Core_kernel
 open Mina_base
-
-[%%ifdef consensus_mechanism]
-
 open Snark_params.Tick
-
-[%%endif]
-
 module Wire_types = Mina_wire_types.Mina_state.Protocol_state
 
 module Make_sig (A : Wire_types.Types.S) = struct
@@ -97,8 +91,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     type value = Value.t [@@deriving sexp, yojson]
 
-    [%%ifdef consensus_mechanism]
-
     type var =
       ( State_hash.var
       , Blockchain_state.var
@@ -170,8 +162,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       ; next_epoch_data = C.next_epoch_data_var cs
       }
 
-    [%%endif]
-
     let hash s =
       Random_oracle.hash ~init:Hash_prefix.protocol_state_body
         (Random_oracle.pack_input (to_input s))
@@ -213,11 +203,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   type value = Value.t [@@deriving sexp, yojson]
 
-  [%%ifdef consensus_mechanism]
-
   type var = (State_hash.var, Body.var) Poly.t
-
-  [%%endif]
 
   module Proof = Proof
   module Hash = State_hash
@@ -258,8 +244,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       { Poly.Stable.Latest.body = { Body.Poly.blockchain_state; _ }; _ } =
     Blockchain_state.snarked_ledger_hash blockchain_state
 
-  [%%ifdef consensus_mechanism]
-
   let create_var = create'
 
   let typ ~constraint_constants =
@@ -290,8 +274,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       genesis state*)
     State_hash.if_ is_genesis ~then_:state_hash
       ~else_:state.body.genesis_state_hash
-
-  [%%endif]
 
   let hashes = hashes_abstract ~hash_body:Body.hash
 

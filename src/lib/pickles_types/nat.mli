@@ -1,4 +1,4 @@
-(** Representation of naturals for Pickles *)
+(** Representation of naturals for Pickles with Peano encoding *)
 
 (** {1 Type definitions} *)
 

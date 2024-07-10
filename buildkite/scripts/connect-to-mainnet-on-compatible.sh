@@ -3,7 +3,7 @@
 set -eo pipefail
 
 case "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" in
-    compatible|release-automation-testing/*|release/*)
+    compatible|release/*)
       ;;
     *) 
       echo "Not pulling against compatible or not in release branch. Therefore, not running the connect test"
@@ -23,10 +23,7 @@ git config --global --add safe.directory /workdir
 
 source buildkite/scripts/export-git-env-vars.sh
 
-echo "Installing mina daemon package: mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
-echo "deb [trusted=yes] http://packages.o1test.net bullseye $MINA_DEB_RELEASE" | tee /etc/apt/sources.list.d/mina.list
-apt-get update
-apt-get install --allow-downgrades -y "mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
+source buildkite/scripts/debian/install.sh "mina-${TESTNET_VERSION_NAME}"
 
 # Remove lockfile if present
 rm ~/.mina-config/.mina-lock ||:

@@ -3,6 +3,7 @@ mina:
   runtimeConfig:
   generateGenesisProof: true
   logPrecomputedBlocks: true
+  startFilteredLogs: []
   logTxnPoolGossip: false
   maxConnections: 200
   image: gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet

@@ -27,6 +27,7 @@ locals {
       // TODO: Change this to a better name
       seedPeers          = var.additional_peers
       logLevel           = var.log_level
+      startFilteredLogs    = var.start_filtered_logs
       logSnarkWorkGossip = var.log_snark_work_gossip
       logTxnPoolGossip = var.log_txn_pool_gossip
       ports = {
@@ -75,6 +76,7 @@ locals {
     logLevel             = var.log_level
     logSnarkWorkGossip   = var.log_snark_work_gossip
     logPrecomputedBlocks = var.log_precomputed_blocks
+    startFilteredLogs    = var.start_filtered_logs
     logTxnPoolGossip = var.log_txn_pool_gossip
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     # seedPeersURL         = var.seed_peers_url

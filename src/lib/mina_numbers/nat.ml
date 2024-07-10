@@ -6,8 +6,6 @@ include Intf
 module Intf = Intf
 open Snark_bits
 
-[%%ifdef consensus_mechanism]
-
 module Make_checked
     (N : Unsigned_extended.S)
     (Bits : Bits_intf.Convertible_bits with type t := N.t) =
@@ -181,8 +179,6 @@ struct
   let zero = Field.Var.constant Field.zero
 end
 
-[%%endif]
-
 open Snark_params.Tick
 
 module Make (N : sig
@@ -196,9 +192,6 @@ end)
 struct
   type t = N.t [@@deriving sexp, compare, hash, yojson]
 
-  (* can't be automatically derived *)
-  let dhall_type = Ppx_dhall_type.Dhall_type.Text
-
   let max_value = N.max_int
 
   include Comparable.Make (N)
@@ -209,14 +202,10 @@ struct
 
   let to_field n = Bigint.to_field (Bigint.of_bignum_bigint (N.to_bigint n))
 
-  [%%ifdef consensus_mechanism]
-
   module Checked = Make_checked (N) (Bits)
 
   (* warning: this typ does not work correctly with the generic if_ *)
   let typ = Checked.typ
-
-  [%%endif]
 
   module Bits = Bits
 

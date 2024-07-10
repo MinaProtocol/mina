@@ -18,13 +18,13 @@
    uri
    async.async_command
    ;; local libraries
-   consensus_vrf
+   consensus.vrf
    mina_wire_types
    bounded_types
    mina_base
    mina_base.import
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    pasta_bindings
    pickles
    pickles_types

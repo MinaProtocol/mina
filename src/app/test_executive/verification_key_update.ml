@@ -132,6 +132,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              constraint_constants )
         ~choices:(fun ~self:_ -> [ Trivial_rule1.rule ])
     in
+    let%bind.Async.Deferred vk1 =
+      Pickles.Side_loaded.Verification_key.of_compiled tag1
+    in
     let tag2, _, _, Pickles.Provers.[ trivial_prover2 ] =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
@@ -143,8 +146,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              constraint_constants )
         ~choices:(fun ~self:_ -> [ Trivial_rule2.rule ])
     in
-    let vk1 = Pickles.Side_loaded.Verification_key.of_compiled tag1 in
-    let vk2 = Pickles.Side_loaded.Verification_key.of_compiled tag2 in
+    let%bind.Async.Deferred vk2 =
+      Pickles.Side_loaded.Verification_key.of_compiled tag2
+    in
     let%bind.Async.Deferred account_update1, _ =
       trivial_prover1 ~handler:Trivial_rule1.handler ()
     in
@@ -199,7 +203,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (* TODO: This is a pain. *)
       { body = body vk; authorization = Signature Signature.dummy }
     in
-    let zkapp_command_create_accounts =
+    let%bind zkapp_command_create_accounts =
       let memo =
         Signed_command_memo.create_from_string_exn "Zkapp create account"
       in
@@ -216,7 +220,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; authorization_kind = Signature
         }
       in
-      Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
+      Malleable_error.lift
+      @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
     in
     let call_forest_to_zkapp ~call_forest ~nonce : Zkapp_command.t =
       let memo = Signed_command_memo.empty in
@@ -382,19 +387,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; snapp_update = snapp_update_impossible
         }
       in
-      let%map invalid_update_vk_perm_proof =
+
+      let%bind invalid_update_vk_perm_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_invalid_proof
-      and invalid_update_vk_perm_impossible =
+      in
+      let%bind invalid_update_vk_perm_impossible =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_invalid_impossible
-      and update_vk_perm_proof =
+      in
+      let%bind update_vk_perm_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_proof
-      and update_vk_perm_impossible =
+      in
+      let%map update_vk_perm_impossible =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_impossible
@@ -447,15 +456,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; current_auth = Proof
         }
       in
-      let%map failed_update_vk_signature_1 =
+      let%bind failed_update_vk_signature_1 =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_failed_signature_1
-      and failed_update_vk_signature_2 =
+      in
+      let%bind failed_update_vk_signature_2 =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_failed_signature_2
-      and update_vk_proof =
+      in
+      let%map update_vk_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_proof

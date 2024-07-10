@@ -321,14 +321,14 @@ let initialize t ~root_data =
 
 let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
     ~parent_hashes =
-  let f h = Some_key.Some_key (Arcs h) in
+  let f h = Rocks.Key.Some_key (Arcs h) in
   let values =
     get_batch t.db ~keys:(Some_key Root :: List.map parent_hashes ~f)
   in
   let populate res parent_hash arc_opt =
     let%bind.Result () = res in
     match arc_opt with
-    | Some (Some_key.Some_key_value (Arcs _, (data : State_hash.t list))) ->
+    | Some (Key.Some_key_value (Arcs _, (data : State_hash.t list))) ->
         State_hash.Table.set arcs_cache ~key:parent_hash ~data ;
         Result.return ()
     | _ ->

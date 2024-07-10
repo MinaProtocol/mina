@@ -7,16 +7,6 @@
 
 (dirs :standard .cargo \ target)
 
-;; we first create a `dune-build-root` file that contains the dune workspace root
-
-(rule
- (target dune-build-root)
- (deps
-  ; no sandbox, we want the path to the _build directory
-  (sandbox none))
- (action
-  (system "printf \"%s\" $(realpath %{workspace_root}/..) > %{target}")))
-
 ;;
 ;; Rules to set the optimisation flags for the rust compiler.
 ;;
@@ -65,14 +55,14 @@
   (progn
    (setenv
     CARGO_TARGET_DIR
-    "%{read:dune-build-root}/cargo_kimchi_stubs"
+    "%{read:../dune-build-root}/cargo_kimchi_stubs"
     (setenv
      RUSTFLAGS
      %{read:rustflags.sexp}
      (run cargo build --release --offline)))
    (run
     cp
-    %{read:dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a
+    %{read:../dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a
     .))))
 
 ;; this is used by nix
@@ -167,7 +157,7 @@
    (run rm -f ./Cargo.lock)
    (setenv
     CARGO_TARGET_DIR
-    "%{read:dune-build-root}/cargo_kimchi_bindgen"
+    "%{read:../dune-build-root}/cargo_kimchi_bindgen"
     (run cargo run %{targets} --offline))
    (run ocamlformat -i %{targets}))))
 

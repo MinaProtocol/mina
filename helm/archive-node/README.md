@@ -18,7 +18,7 @@ The following table lists the configurable parameters of the `archive-node` char
 Parameter | Description
 --- | ---
 `testnetName` | Mina protocol testnet name to deploy to
-`coda.seedPeers` | peers to bootstrap the the archive node's Mina daemon 
+`coda.seedPeers` | peers to bootstrap the archive node's Mina daemon 
 `archive.fullame` | name identifier of archive node pod
 
 ### Optional Settings

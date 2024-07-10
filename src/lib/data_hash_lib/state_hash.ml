@@ -13,18 +13,7 @@ end)
 
 let dummy = of_hash Outside_hash_image.t
 
-[%%ifdef consensus_mechanism]
-
 let zero = dummy
-
-[%%else]
-
-(* in the nonconsensus world, we don't have the Pedersen machinery available,
-   so just inline the value for zero
-*)
-let zero = Field.of_string "0"
-
-[%%endif]
 
 let raw_hash_bytes = to_bytes
 

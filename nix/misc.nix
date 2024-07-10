@@ -48,7 +48,7 @@ final: prev: {
       outputs = [ "out" ];
 
       nativeBuildInputs = with final; [ which perl ];
-      buildInputs = with final; [ google-gflags ];
+      buildInputs = with final; [ gflags ];
 
       postPatch = ''
         # Hack to fix typos

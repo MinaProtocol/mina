@@ -1,8 +1,13 @@
 #!/bin/bash
-set -eo pipefail
+set -eox pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 source "${SCRIPTPATH}/export-git-env-vars.sh"
+
+DOWNLOAD_FOLDER=_build
+
+source buildkite/scripts/download-artifact-from-cache.sh \
+  $DOWNLOAD_FOLDER $MINA_DEB_CODENAME -r
 
 # check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
@@ -11,7 +16,7 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
 fi
 
 source scripts/publish-deb.sh \
-  --names '_build/mina-*.deb' \
+  --names "${DOWNLOAD_FOLDER}/mina-*.deb" \
   --release $MINA_DEB_RELEASE \
   --version $MINA_DEB_VERSION \
   --codename $MINA_DEB_CODENAME  

@@ -20,15 +20,14 @@
    genesis_constants
    data_hash_lib
    kimchi_backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    mina_ledger
    merkle_ledger
    mina_base
    mina_base.import
    mina_numbers
    mina_wire_types
-   ppx_dhall_type
    mina_state
    snark_params
    unsigned_extended
@@ -44,4 +43,4 @@
    )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_custom_printf ppx_sexp_conv ppx_let ppx_deriving_yojson
-                  ppx_fields_conv ppx_dhall_type ppx_version ppx_compare)))
+                  ppx_fields_conv ppx_version ppx_compare)))

@@ -13,6 +13,8 @@
    base64
    yojson
    integers
+   ppx_deriving_yojson.runtime
+   result
    ;; local libraries
    bounded_types
    logger
@@ -39,8 +41,8 @@
    transaction_protocol_state
    coda_genesis_ledger
    pickles_types
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    cache_dir
    data_hash_lib
    mina_numbers
@@ -56,7 +58,7 @@
    zkapps_examples
    )
   (library_flags -linkall)
-  (inline_tests (flags -verbose -show-counts))
+  (inline_tests (flags -verbose -show-counts) (deps proof_cache.json))
   (preprocess
     (pps ppx_mina ppx_snarky ppx_version ppx_jane ppx_sexp_conv))
   (instrumentation (backend bisect_ppx)))
