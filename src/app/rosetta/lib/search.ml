@@ -184,7 +184,7 @@ module Sql = struct
       ; success : string option
       ; address : string option
       }
-    [@@deriving hlist]
+    [@@deriving hlist, to_yojson]
 
     let typ =
       let open Mina_caqti.Type_spec in
@@ -302,6 +302,16 @@ module Sql = struct
     in
     [%string "%{block_filter} AND (%{filters'})"]
 
+  let request_to_string ?params req =
+    let buffer = Buffer.create 128 in
+    let ppf = Format.formatter_of_buffer buffer in
+    let () =
+      Option.value_map params ~default:(Caqti_request.pp ppf req)
+        ~f:(fun params -> Caqti_request.pp_with_param ppf (req, params))
+    in
+    let () = Format.pp_print_flush ppf () in
+    Buffer.contents buffer
+
   module Block_extras = struct
     type t = { block_hash : string; block_height : int64 }
     [@@deriving hlist, fields]
@@ -314,231 +324,206 @@ module Sql = struct
   end
 
   module User_commands = struct
-    module Extras = struct
+    module Cte = struct
       type t =
-        { fee_payer : string
-        ; source : string
-        ; receiver : string
-        ; status : string option
+        { id : int
+        ; signed_command : Archive_lib.Processor.User_command.Signed_command.t
+        ; block_id : int
+        ; sequence_no : int
+        ; status : string
         ; failure_reason : string option
-        ; account_creation_fee_paid : int64 option
         ; state_hash : string
+        ; chain_status : string
         ; height : int64
         }
-      [@@deriving fields, hlist]
+      [@@deriving hlist, fields]
+
+      let fields' =
+        List.map
+          ( "id"
+          :: Archive_lib.Processor.User_command.Signed_command.Fields.names )
+          ~f:(fun n -> "u." ^ n)
 
       let fields =
-        String.concat ~sep:","
-          [ "pk_payer.value as fee_payer"
-          ; "pk_source.value as source"
-          ; "pk_receiver.value as receiver"
+        String.concat ~sep:"," @@ fields'
+        @ [ "buc.block_id"
+          ; "buc.sequence_no"
           ; "buc.status"
           ; "buc.failure_reason"
-          ; "ac.creation_fee"
           ; "b.state_hash"
+          ; "b.chain_status"
           ; "b.height"
           ]
-
-      let fee_payer t = `Pk t.fee_payer
-
-      let source t = `Pk t.source
-
-      let receiver t = `Pk t.receiver
 
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
           Caqti_type.
-            [ string
-            ; string
+            [ int
+            ; Archive_lib.Processor.User_command.Signed_command.typ
+            ; int
+            ; int
             ; string
             ; option string
-            ; option string
-            ; option int64
+            ; string
             ; string
             ; int64
             ]
-    end
 
-    type t =
-      { id : int
-      ; signed_command : Archive_lib.Processor.User_command.Signed_command.t
-      ; extras : Extras.t
-      }
-    [@@deriving hlist]
-
-    let typ =
-      Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-        Caqti_type.
-          [ int
-          ; Archive_lib.Processor.User_command.Signed_command.typ
-          ; Extras.typ
-          ]
-
-    let fields =
-      String.concat ~sep:","
-      @@ List.map Archive_lib.Processor.User_command.Signed_command.Fields.names
-           ~f:(fun n -> "u." ^ n)
-
-    let query ~offset ~limit op_type operator =
-      let fields =
-        String.concat ~sep:","
-          [ "id_count.total_count"; "u.id"; fields; Extras.fields ]
-      in
-      let op_type_filters =
-        Option.map op_type ~f:(function
-          | `Fee_payment ->
-              "TRUE" (* fees are always paid *)
-          | `Payment_source_dec | `Payment_receiver_inc ->
-              [%string "u.command_type = 'payment'"]
-          | `Delegate_change ->
-              [%string "u.command_type = 'delegation'"]
-          | `Fee_payer_dec
-          | `Account_creation_fee_via_payment
-          | `Account_creation_fee_via_fee_payer
-          | `Account_creation_fee_via_fee_receiver
-          | `Create_token
-          | `Mint_tokens
-          | `Zkapp_fee_payer_dec
-          | `Zkapp_balance_update
-          | `Fee_receiver_inc
-          | `Coinbase_inc ->
-              "FALSE" )
-      in
-      let filters =
-        sql_filters ~block_height_field:"b.height" ~txn_hash_field:"u.hash"
-          ~account_identifier_fields:
-            [ ("pk_source.value", "token_source.value")
-            ; ("pk_payer.value", "token_fee_payer.value")
-            ; ("pk_receiver.value", "token_receiver.value")
-            ]
-          ~op_status_field:"buc.status"
-          ~address_fields:
-            [ "pk_source.value"; "pk_payer.value"; "pk_receiver.value" ]
-          ~op_type_filters operator
-      in
-      let offset = offset_sql offset in
-      let limit = limit_sql limit in
-      Caqti_request.collect Params.typ
-        Caqti_type.(tup2 int64 typ)
+      let query_string operator op_type =
+        let op_type_filters =
+          Option.map op_type ~f:(function
+            | `Fee_payment ->
+                "TRUE" (* fees are always paid *)
+            | `Payment_source_dec | `Payment_receiver_inc ->
+                [%string "u.command_type = 'payment'"]
+            | `Delegate_change ->
+                [%string "u.command_type = 'delegation'"]
+            | `Fee_payer_dec
+            | `Account_creation_fee_via_payment
+            | `Account_creation_fee_via_fee_payer
+            | `Account_creation_fee_via_fee_receiver
+            | `Create_token
+            | `Mint_tokens
+            | `Zkapp_fee_payer_dec
+            | `Zkapp_balance_update
+            | `Fee_receiver_inc
+            | `Coinbase_inc ->
+                "FALSE" )
+        in
+        let default_token =
+          [%string "'%{Mina_base.Token_id.(to_string default)}'"]
+        in
+        let filters =
+          sql_filters ~block_height_field:"b.height" ~txn_hash_field:"u.hash"
+            ~account_identifier_fields:[ ("pk.value", default_token) ]
+            ~op_status_field:"buc.status" ~address_fields:[ "pk.value" ]
+            ~op_type_filters operator
+        in
         [%string
           {sql|
-          WITH filtered_ids AS (
-            SELECT DISTINCT u.id
+            SELECT DISTINCT ON (buc.block_id, buc.user_command_id, buc.sequence_no) %{fields}
             FROM user_commands u
             INNER JOIN blocks_user_commands buc
               ON buc.user_command_id = u.id
+            INNER JOIN public_keys pk
+              ON pk.id = u.fee_payer_id
+                OR (buc.status = 'applied' AND (pk.id = u.source_id OR pk.id = u.receiver_id))
+            INNER JOIN blocks b
+              ON buc.block_id = b.id
+            WHERE %{filters}
+          |sql}]
+    end
+
+    type t =
+      { command : Cte.t
+      ; fee_payer : string
+      ; source : string
+      ; receiver : string
+      ; account_creation_fee_paid : int64 option
+      }
+    [@@deriving hlist, fields]
+
+    let fields =
+      String.concat ~sep:"," @@ Cte.fields'
+      @ [ "u.block_id"
+        ; "u.sequence_no"
+        ; "u.status"
+        ; "u.failure_reason"
+        ; "u.state_hash"
+        ; "u.chain_status"
+        ; "u.height"
+        ; "pk_payer.value as fee_payer"
+        ; "pk_source.value as source"
+        ; "pk_receiver.value as receiver"
+        ; "ac.creation_fee"
+        ]
+
+    let fee_payer t = `Pk t.fee_payer
+
+    let receiver t = `Pk t.receiver
+
+    let source t = `Pk t.source
+
+    let typ =
+      Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
+        Caqti_type.[ Cte.typ; string; string; string; option int64 ]
+
+    let query_string ~offset ~limit op_type operator =
+      let fields = String.concat ~sep:"," [ "id_count.total_count"; fields ] in
+      let offset = offset_sql offset in
+      let limit = limit_sql limit in
+      [%string
+        {sql|
+          WITH
+            canonical_blocks AS (SELECT * FROM blocks WHERE chain_status = 'canonical'),
+            max_canonical_height AS (SELECT MAX(height) as max_height FROM canonical_blocks),
+            pending_blocks AS (SELECT b.* FROM blocks b, max_canonical_height WHERE height > max_height AND chain_status = 'pending'),
+            blocks AS (SELECT * FROM canonical_blocks UNION ALL SELECT * FROM pending_blocks),
+            user_command_info AS (
+              %{Cte.query_string operator op_type}
+            ),
+            id_count AS (
+              SELECT COUNT(*) AS total_count FROM user_command_info
+            )
+            SELECT %{fields}
+            FROM id_count,
+                (SELECT * FROM user_command_info ORDER BY block_id, id, sequence_no LIMIT %{limit} OFFSET %{offset}) AS u
             INNER JOIN public_keys pk_payer
               ON pk_payer.id = u.fee_payer_id
-            INNER JOIN account_identifiers ai_fee_payer
-              ON pk_payer.id = ai_fee_payer.public_key_id
             INNER JOIN public_keys pk_source
               ON pk_source.id = u.source_id
-            INNER JOIN account_identifiers ai_source
-              ON pk_source.id = ai_source.public_key_id
             INNER JOIN public_keys pk_receiver
               ON pk_receiver.id = u.receiver_id
-            LEFT JOIN account_identifiers ai_receiver
-              ON ai_receiver.public_key_id = pk_receiver.id
             /* Account creation fees are attributed to the first successful command in the
-              block that mentions the account with the following LEFT JOIN */
+              block that mentions the account with the following LEFT JOINs */
+            LEFT JOIN account_identifiers ai_receiver
+              ON ai_receiver.public_key_id = u.receiver_id
             LEFT JOIN accounts_created ac
-              ON buc.block_id = ac.block_id
+              ON u.block_id = ac.block_id
               AND ai_receiver.id = ac.account_identifier_id
-              AND buc.status = 'applied'
-              AND buc.sequence_no =
+              AND u.status = 'applied'
+              AND u.sequence_no =
                 (SELECT LEAST(
                     (SELECT min(bic2.sequence_no)
                     FROM blocks_internal_commands bic2
                     INNER JOIN internal_commands ic2
                         ON bic2.internal_command_id = ic2.id
                     WHERE ic2.receiver_id = u.receiver_id
-                        AND bic2.block_id = buc.block_id
+                        AND bic2.block_id = u.block_id
                         AND bic2.status = 'applied'),
                     (SELECT min(buc2.sequence_no)
                       FROM blocks_user_commands buc2
                       INNER JOIN user_commands uc2
                         ON buc2.user_command_id = uc2.id
                       WHERE uc2.receiver_id = u.receiver_id
-                        AND buc2.block_id = buc.block_id
+                        AND buc2.block_id = u.block_id
                         AND buc2.status = 'applied')))
-            LEFT JOIN tokens token_receiver
-              ON ai_receiver.token_id = token_receiver.id
-            INNER JOIN tokens token_source
-              ON ai_source.token_id = token_source.id
-            INNER JOIN tokens token_fee_payer
-              ON ai_fee_payer.token_id = token_fee_payer.id
-            INNER JOIN blocks b
-              ON buc.block_id = b.id
-            WHERE %{filters}),
-          id_count AS (
-            SELECT COUNT(*) AS total_count FROM filtered_ids
-          )
-          SELECT DISTINCT ON (u.id) %{fields}
-          FROM id_count, user_commands u
-          INNER JOIN blocks_user_commands buc
-            ON buc.user_command_id = u.id
-          INNER JOIN public_keys pk_payer
-            ON pk_payer.id = u.fee_payer_id
-          INNER JOIN account_identifiers ai_fee_payer
-            ON pk_payer.id = ai_fee_payer.public_key_id
-          INNER JOIN public_keys pk_source
-            ON pk_source.id = u.source_id
-          INNER JOIN account_identifiers ai_source
-            ON pk_source.id = ai_source.public_key_id
-          INNER JOIN public_keys pk_receiver
-            ON pk_receiver.id = u.receiver_id
-          LEFT JOIN account_identifiers ai_receiver
-            ON ai_receiver.public_key_id = pk_receiver.id
-          /* Account creation fees are attributed to the first successful command in the
-            block that mentions the account with the following LEFT JOIN */
-          LEFT JOIN accounts_created ac
-            ON buc.block_id = ac.block_id
-            AND ai_receiver.id = ac.account_identifier_id
-            AND buc.status = 'applied'
-            AND buc.sequence_no =
-              (SELECT LEAST(
-                  (SELECT min(bic2.sequence_no)
-                  FROM blocks_internal_commands bic2
-                  INNER JOIN internal_commands ic2
-                      ON bic2.internal_command_id = ic2.id
-                  WHERE ic2.receiver_id = u.receiver_id
-                      AND bic2.block_id = buc.block_id
-                      AND bic2.status = 'applied'),
-                  (SELECT min(buc2.sequence_no)
-                    FROM blocks_user_commands buc2
-                    INNER JOIN user_commands uc2
-                      ON buc2.user_command_id = uc2.id
-                    WHERE uc2.receiver_id = u.receiver_id
-                      AND buc2.block_id = buc.block_id
-                      AND buc2.status = 'applied')))
-          LEFT JOIN tokens token_receiver
-            ON ai_receiver.token_id = token_receiver.id
-          INNER JOIN tokens token_source
-            ON ai_source.token_id = token_source.id
-          INNER JOIN tokens token_fee_payer
-            ON ai_fee_payer.token_id = token_fee_payer.id
-          INNER JOIN blocks b
-            ON buc.block_id = b.id
-          WHERE u.id IN (SELECT id FROM filtered_ids ORDER BY id LIMIT %{limit} OFFSET %{offset})
-          ORDER BY u.id, CASE WHEN b.chain_status = 'canonical' THEN 1 WHEN b.chain_status = 'orphaned' THEN 2 END
+            ORDER BY u.block_id, u.id, u.sequence_no
         |sql}]
 
-    let run (module Conn : Caqti_async.CONNECTION) ~offset ~limit input =
+    let run (module Conn : Caqti_async.CONNECTION) ~logger ~offset ~limit input
+        =
       let open Deferred.Result.Let_syntax in
       let params = Params.of_query input in
-      match%map
-        Conn.collect_list
-          (query ~offset ~limit
-             Transaction_query.(input.filter.Filter.op_type)
-             input.operator )
-          params
-      with
+      let query_string =
+        query_string ~offset ~limit
+          Transaction_query.(input.filter.Filter.op_type)
+          input.operator
+      in
+      let query =
+        Caqti_request.collect Params.typ
+          Caqti_type.(tup2 int64 typ)
+          query_string
+      in
+      [%log debug] "Running SQL query $query"
+        ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
+      match%map Conn.collect_list query params with
       | [] ->
           (0L, [])
       | (total_count, _) :: _ as user_commands ->
           (total_count, List.map user_commands ~f:snd)
 
-    let to_info { signed_command = uc; extras; _ } =
+    let to_info ({ command = { signed_command = uc; _ } as command; _ } as t) =
       let open Result.Let_syntax in
       let%bind kind =
         match
@@ -561,9 +546,9 @@ module Sql = struct
       let fee_token = Mina_base.Token_id.(to_string default) in
       let token = Mina_base.Token_id.(to_string default) in
       let%map failure_status =
-        match Extras.failure_reason extras with
+        match Cte.failure_reason command with
         | None -> (
-            match Extras.account_creation_fee_paid extras with
+            match account_creation_fee_paid t with
             | None ->
                 Result.return
                 @@ `Applied
@@ -582,9 +567,9 @@ module Sql = struct
       in
       let info =
         { Commands_common.User_command_info.kind
-        ; fee_payer = Extras.fee_payer extras
-        ; source = Extras.source extras
-        ; receiver = Extras.receiver extras
+        ; fee_payer = fee_payer t
+        ; source = source t
+        ; receiver = receiver t
         ; fee_token = `Token_id fee_token
         ; token = `Token_id token
         ; nonce = Unsigned.UInt32.of_int64 uc.nonce
@@ -597,104 +582,102 @@ module Sql = struct
         }
       in
       { User_command_info.info
-      ; block_hash = Extras.state_hash extras
-      ; block_height = Extras.height extras
+      ; block_hash = Cte.state_hash command
+      ; block_height = Cte.height command
       }
   end
 
   module Internal_commands = struct
-    module Filtered_ids_cte = struct
-      type t = { command_id : int; block_id : int } [@@deriving hlist]
+    module Filtered_commands_cte = struct
+      type t =
+        { internal_command_id : int
+        ; raw_internal_command : Archive_lib.Processor.Internal_command.t
+        ; receiver : string
+        ; coinbase_receiver : string option
+        ; sequence_no : int
+        ; secondary_sequence_no : int
+        ; block_id : int
+        ; block_hash : string
+        ; block_height : int64
+        }
+      [@@deriving hlist, fields]
+
+      let fields' =
+        String.concat ~sep:","
+        @@ List.map
+             ~f:(fun n -> "i." ^ n)
+             Archive_lib.Processor.Internal_command.Fields.names
 
       let fields =
-        String.concat ~sep:"," [ "i.id as command_id"; "b.id as block_id" ]
+        String.concat ~sep:","
+          [ "i.id"
+          ; fields'
+          ; "pk.value as receiver"
+          ; "cri.coinbase_receiver"
+          ; "bic.sequence_no"
+          ; "bic.secondary_sequence_no"
+          ; "bic.block_id"
+          ; "b.state_hash"
+          ; "b.height"
+          ]
+
+      let receiver t = `Pk t.receiver
+
+      let coinbase_receiver t =
+        Option.map ~f:(fun pk -> `Pk pk) t.coinbase_receiver
 
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-          Caqti_type.[ int; int ]
+          Caqti_type.
+            [ int
+            ; Archive_lib.Processor.Internal_command.typ
+            ; string
+            ; option string
+            ; int
+            ; int
+            ; int
+            ; string
+            ; int64
+            ]
 
       let query_string filters =
         [%string
           {sql|
-            SELECT DISTINCT ON (i.hash,i.command_type,bic.sequence_no,bic.secondary_sequence_no)
-              %{fields}
+            SELECT DISTINCT ON (bic.block_id, bic.internal_command_id, bic.sequence_no, bic.secondary_sequence_no) %{fields}
             FROM internal_commands i
             INNER JOIN blocks_internal_commands bic
               ON bic.internal_command_id = i.id
             INNER JOIN public_keys pk
               ON pk.id = i.receiver_id
-            INNER JOIN account_identifiers ai
-              ON ai.public_key_id = receiver_id
-            LEFT JOIN accounts_created ac
-              ON ac.account_identifier_id = ai.id
-              AND ac.block_id = bic.block_id
-              AND bic.sequence_no =
-                  (SELECT LEAST(
-                      (SELECT min(bic2.sequence_no)
-                      FROM blocks_internal_commands bic2
-                      INNER JOIN internal_commands ic2
-                          ON bic2.internal_command_id = ic2.id
-                      WHERE ic2.receiver_id = i.receiver_id
-                          AND bic2.block_id = bic.block_id
-                          AND bic2.status = 'applied'),
-                      (SELECT min(buc2.sequence_no)
-                        FROM blocks_user_commands buc2
-                        INNER JOIN user_commands uc2
-                          ON buc2.user_command_id = uc2.id
-                        WHERE uc2.receiver_id = i.receiver_id
-                          AND buc2.block_id = bic.block_id
-                          AND buc2.status = 'applied')))
-            INNER JOIN tokens t
-              ON t.id = ai.token_id
             INNER JOIN blocks b
               ON bic.block_id = b.id
-            WHERE b.chain_status <> 'orphaned' AND %{filters}
-            ORDER BY i.hash, i.command_type, bic.sequence_no, bic.secondary_sequence_no,
-                      CASE
-                      WHEN b.chain_status = 'canonical' THEN 1
-                      WHEN b.chain_status = 'pending' THEN 2
-                      END        
+            LEFT JOIN coinbase_receiver_info cri
+              ON bic.block_id = cri.block_id
+                AND bic.internal_command_id = cri.internal_command_id
+                AND bic.sequence_no = cri.sequence_no
+                AND bic.secondary_sequence_no = cri.secondary_sequence_no
+            WHERE %{filters}
         |sql}]
     end
 
-    module Extras = struct
-      type t = { block_hash : string; block_height : int64 }
-      [@@deriving fields, hlist]
-
-      let fields = String.concat ~sep:"," [ "b.state_hash"; "b.height" ]
-
-      let typ =
-        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-          Caqti_type.[ string; int64 ]
-    end
-
     type t =
-      { internal_command : Rosetta_lib_block.Sql.Internal_commands.Cte.t
-      ; extras : Extras.t
-      ; coinbase_receiver : string option
+      { internal_command : Filtered_commands_cte.t
+      ; receiver_account_creation_fee_paid : int64 option
       }
-    [@@deriving hlist]
+    [@@deriving hlist, fields]
 
     let fields =
-      String.concat ~sep:","
-        [ Rosetta_lib_block.Sql.Internal_commands.Cte.fields
-        ; Extras.fields
-        ; "coinbase_receiver_pk.value as coinbase_receiver"
-        ]
-
-    let coinbase_receiver t =
-      Option.map ~f:(fun pk -> `Pk pk) t.coinbase_receiver
+      String.concat ~sep:"," [ Filtered_commands_cte.fields; "ac.creation_fee" ]
 
     let typ =
       Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-        Caqti_type.
-          [ Rosetta_lib_block.Sql.Internal_commands.Cte.typ
-          ; Extras.typ
-          ; option string
-          ]
+        Caqti_type.[ Filtered_commands_cte.typ; option int64 ]
 
     let query_string ~offset ~limit op_type operator =
-      let fields = String.concat ~sep:"," [ "id_count.total_count"; fields ] in
+      let fields =
+        String.concat ~sep:","
+          [ "id_count.total_count"; "i.*"; "ac.creation_fee" ]
+      in
       let op_type_filters =
         Option.map op_type ~f:(function
           | `Coinbase_inc ->
@@ -718,122 +701,134 @@ module Sql = struct
           | `Zkapp_balance_update ->
               "FALSE" )
       in
+      let default_token =
+        [%string "'%{Mina_base.Token_id.(to_string default)}'"]
+      in
       let filters =
+        let address_fields = [ "pk.value"; "cri.coinbase_receiver" ] in
         sql_filters ~block_height_field:"b.height" ~txn_hash_field:"i.hash"
-          ~account_identifier_fields:[ ("pk.value", "t.value") ]
-          ~op_status_field:"bic.status" ~address_fields:[ "pk.value" ]
-          ~op_type_filters operator
+          ~account_identifier_fields:
+            (List.map ~f:(fun field -> (field, default_token)) address_fields)
+          ~op_status_field:"bic.status" ~address_fields ~op_type_filters
+          operator
       in
       let offset = offset_sql offset in
       let limit = limit_sql limit in
       [%string
         {sql|
-            WITH filtered_ids AS (%{Filtered_ids_cte.query_string filters}),
+            WITH canonical_blocks AS (SELECT * FROM blocks WHERE chain_status = 'canonical'),
+            max_canonical_height AS (SELECT MAX(height) as max_height FROM canonical_blocks),
+            pending_blocks AS (SELECT b.* FROM blocks b, max_canonical_height WHERE height > max_height AND chain_status = 'pending'),
+            blocks AS (SELECT * FROM canonical_blocks UNION ALL SELECT * FROM pending_blocks),
+            coinbase_receiver_info AS (
+                SELECT bic.block_id, bic.internal_command_id, bic.sequence_no, bic.secondary_sequence_no, coinbase_receiver_pk.value as coinbase_receiver
+                FROM blocks_internal_commands bic
+                INNER JOIN internal_commands ic ON bic.internal_command_id = ic.id
+                INNER JOIN blocks_internal_commands bic_coinbase_receiver
+                    ON bic.block_id = bic_coinbase_receiver.block_id
+                        AND (bic.internal_command_id <> bic_coinbase_receiver.internal_command_id
+                            OR bic.sequence_no <> bic_coinbase_receiver.sequence_no
+                            OR bic.secondary_sequence_no <> bic_coinbase_receiver.secondary_sequence_no)
+                INNER JOIN internal_commands ic_coinbase_receiver
+                    ON ic.command_type = 'fee_transfer_via_coinbase'
+                        AND ic_coinbase_receiver.command_type = 'coinbase'
+                        AND ic_coinbase_receiver.id = bic_coinbase_receiver.internal_command_id
+                INNER JOIN public_keys coinbase_receiver_pk ON ic_coinbase_receiver.receiver_id = coinbase_receiver_pk.id
+            ),
+            internal_commands_info AS (%{Filtered_commands_cte.query_string filters}),
             id_count AS (
-              SELECT COUNT(*) AS total_count FROM filtered_ids
+              SELECT COUNT(*) AS total_count FROM internal_commands_info
             )
-            SELECT DISTINCT ON (i.id, i.hash, i.command_type, bic.block_id, bic.sequence_no, bic.secondary_sequence_no)
-                  %{fields}
-            FROM id_count, (SELECT * FROM filtered_ids ORDER BY command_id, block_id LIMIT %{limit} OFFSET %{offset}) AS filtered_ids
-            INNER JOIN internal_commands i
-                ON filtered_ids.command_id = i.id
-            INNER JOIN blocks_internal_commands bic
-              ON i.id = bic.internal_command_id AND filtered_ids.block_id = bic.block_id
-            INNER JOIN public_keys pk
-              ON pk.id = i.receiver_id
-            INNER JOIN account_identifiers ai
+            SELECT %{fields}
+            FROM id_count, (SELECT * FROM internal_commands_info ORDER BY block_id, id, sequence_no, secondary_sequence_no LIMIT %{limit} OFFSET %{offset}) i
+            LEFT JOIN account_identifiers ai
               ON ai.public_key_id = receiver_id
             LEFT JOIN accounts_created ac
               ON ac.account_identifier_id = ai.id
-              AND ac.block_id = bic.block_id
-              AND bic.sequence_no =
+              AND ac.block_id = i.block_id
+              AND i.sequence_no =
                   (SELECT LEAST(
                       (SELECT min(bic2.sequence_no)
                       FROM blocks_internal_commands bic2
                       INNER JOIN internal_commands ic2
                           ON bic2.internal_command_id = ic2.id
                       WHERE ic2.receiver_id = i.receiver_id
-                          AND bic2.block_id = bic.block_id
+                          AND bic2.block_id = i.block_id
                           AND bic2.status = 'applied'),
                       (SELECT min(buc2.sequence_no)
                         FROM blocks_user_commands buc2
                         INNER JOIN user_commands uc2
                           ON buc2.user_command_id = uc2.id
                         WHERE uc2.receiver_id = i.receiver_id
-                          AND buc2.block_id = bic.block_id
+                          AND buc2.block_id = i.block_id
                           AND buc2.status = 'applied')))
-            INNER JOIN tokens t
-              ON t.id = ai.token_id
-            INNER JOIN blocks b
-              ON bic.block_id = b.id
-            LEFT JOIN internal_commands ic_coinbase_receiver
-              ON i.command_type = 'fee_transfer_via_coinbase'
-                AND ic_coinbase_receiver.command_type = 'coinbase'
-                AND ic_coinbase_receiver.id IN (SELECT internal_command_id FROM blocks_internal_commands WHERE block_id = filtered_ids.block_id)
-            LEFT JOIN public_keys coinbase_receiver_pk
-              ON ic_coinbase_receiver.receiver_id = coinbase_receiver_pk.id
-            ORDER BY i.id, i.hash, i.command_type, bic.block_id, bic.sequence_no, bic.secondary_sequence_no
+            ORDER BY i.block_id, i.id, i.sequence_no, i.secondary_sequence_no
           |sql}]
 
-    let run (module Conn : Caqti_async.CONNECTION) ~offset ~limit input =
+    let run (module Conn : Caqti_async.CONNECTION) ~logger ~offset ~limit input
+        =
       let open Deferred.Result.Let_syntax in
       let params = Params.of_query input in
       let query =
-        query_string ~offset ~limit input.filter.op_type input.operator
+        Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ)
+        @@ query_string ~offset ~limit input.filter.op_type input.operator
       in
-      match%map
-        Conn.collect_list
-          (Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ) query)
-          params
-      with
+      [%log debug] "Running SQL query $query"
+        ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
+      match%map Conn.collect_list query params with
       | [] ->
           (0L, [])
       | (total_count, _) :: _ as internal_commands ->
           (total_count, List.map internal_commands ~f:snd)
 
-    let to_info (t : t) =
+    let to_info ({ internal_command; _ } as t : t) =
       let open Result.Let_syntax in
       let%map info =
         Rosetta_lib_block.Sql.Internal_commands.Cte.to_info
-          ~coinbase_receiver:(coinbase_receiver t) t.internal_command
+          ~coinbase_receiver:
+            (Filtered_commands_cte.coinbase_receiver internal_command)
+          { Rosetta_lib_block.Sql.Internal_commands.Cte.internal_command_id =
+              internal_command.internal_command_id
+          ; raw_internal_command = internal_command.raw_internal_command
+          ; receiver = internal_command.receiver
+          ; sequence_no = internal_command.sequence_no
+          ; secondary_sequence_no = internal_command.secondary_sequence_no
+          ; receiver_account_creation_fee_paid =
+              receiver_account_creation_fee_paid t
+          }
       in
       { Internal_command_info.info
-      ; block_hash = t.extras.Extras.block_hash
-      ; block_height = t.extras.Extras.block_height
+      ; block_hash = internal_command.block_hash
+      ; block_height = internal_command.block_height
       }
   end
 
   module Zkapp_commands = struct
-    module Extras = struct
-      type t = { block_hash : string; block_height : int64 }
-      [@@deriving fields, hlist]
-
-      let fields = String.concat ~sep:"," [ "b.state_hash"; "b.height" ]
-
-      let typ =
-        Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-          Caqti_type.[ string; int64 ]
-    end
-
     type t =
       { zkapp_command : Rosetta_lib_block.Sql.Zkapp_commands.t
-      ; extras : Extras.t
+      ; block_id : int
+      ; block_hash : string
+      ; block_height : int64
       }
     [@@deriving hlist]
 
     let fields =
       String.concat ~sep:","
-        [ Rosetta_lib_block.Sql.Zkapp_commands.fields; Extras.fields ]
+        [ Rosetta_lib_block.Sql.Zkapp_commands.fields
+        ; "bzc.block_id"
+        ; "b.state_hash"
+        ; "b.height"
+        ]
 
     let typ =
       Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-        [ Rosetta_lib_block.Sql.Zkapp_commands.typ; Extras.typ ]
+        Caqti_type.
+          [ Rosetta_lib_block.Sql.Zkapp_commands.typ; int; string; int64 ]
 
-    let filtered_ids_cte_string ~filters =
+    let cte_query_string filters =
       [%string
         {sql|
-          filtered_ids AS (
-            SELECT DISTINCT zc.id
+            SELECT %{fields}
             FROM zkapp_commands zc
             INNER JOIN blocks_zkapp_commands bzc
               ON zc.id = bzc.zkapp_command_id
@@ -841,10 +836,6 @@ module Sql = struct
               ON zc.zkapp_fee_payer_body_id = zfpb.id
             INNER JOIN public_keys pk_fee_payer
               ON zfpb.public_key_id = pk_fee_payer.id
-            INNER JOIN account_identifiers ai_fee_payer
-              ON pk_fee_payer.id = ai_fee_payer.public_key_id
-            INNER JOIN tokens token_fee_payer
-              ON ai_fee_payer.token_id = token_fee_payer.id
             INNER JOIN blocks b
               ON bzc.block_id = b.id
             LEFT JOIN zkapp_account_update zau
@@ -858,52 +849,34 @@ module Sql = struct
             INNER JOIN tokens token_update_body
               ON token_update_body.id = ai_update_body.token_id
             WHERE %{filters}
-          )
         |sql}]
 
-    let count_cte_string =
-      {sql|
-        id_count AS (
-          SELECT COUNT(*) AS total_count FROM filtered_ids
-        )
-      |sql}
-
     let query_string ~offset ~limit ~filters =
-      let fields = String.concat ~sep:"," [ "id_count.total_count"; fields ] in
+      let fields = String.concat ~sep:"," [ "id_count.total_count"; "zc.*" ] in
       let ctes_string =
         String.concat ~sep:","
-          [ filtered_ids_cte_string ~filters; count_cte_string ]
+          [ "canonical_blocks AS (SELECT * FROM blocks WHERE chain_status = \
+             'canonical')"
+          ; "max_canonical_height AS (SELECT MAX(height) as max_height FROM \
+             canonical_blocks)"
+          ; "pending_blocks AS (SELECT b.* FROM blocks b, max_canonical_height \
+             WHERE height > max_height AND chain_status = 'pending')"
+          ; "blocks AS (SELECT * FROM canonical_blocks UNION ALL SELECT * FROM \
+             pending_blocks)"
+          ; [%string "zkapp_commands_info AS (%{cte_query_string filters})"]
+          ; "zkapp_commands_ids AS (SELECT DISTINCT id, block_id, sequence_no \
+             FROM zkapp_commands_info)"
+          ; "id_count AS (SELECT COUNT(*) AS total_count FROM \
+             zkapp_commands_ids)"
+          ]
       in
       [%string
         {sql|
           WITH %{ctes_string}
-          SELECT
-          %{fields}
-          FROM id_count, zkapp_commands zc
-          INNER JOIN blocks_zkapp_commands bzc
-            ON zc.id = bzc.zkapp_command_id
-          INNER JOIN zkapp_fee_payer_body zfpb
-            ON zc.zkapp_fee_payer_body_id = zfpb.id
-          INNER JOIN public_keys pk_fee_payer
-            ON zfpb.public_key_id = pk_fee_payer.id
-          INNER JOIN account_identifiers ai_fee_payer
-            ON pk_fee_payer.id = ai_fee_payer.public_key_id
-          INNER JOIN tokens token_fee_payer
-            ON ai_fee_payer.token_id = token_fee_payer.id
-          INNER JOIN blocks b
-            ON bzc.block_id = b.id
-          LEFT JOIN zkapp_account_update zau
-            ON zau.id = ANY (zc.zkapp_account_updates_ids)
-          INNER JOIN zkapp_account_update_body zaub
-            ON zaub.id = zau.body_id
-          INNER JOIN account_identifiers ai_update_body
-            ON zaub.account_identifier_id = ai_update_body.id
-          INNER JOIN public_keys pk_update_body
-            ON ai_update_body.public_key_id = pk_update_body.id
-          INNER JOIN tokens token_update_body
-            ON token_update_body.id = ai_update_body.token_id
-          WHERE zc.id IN (SELECT id FROM filtered_ids ORDER BY id LIMIT %{limit} OFFSET %{offset})
-          ORDER BY zc.id
+          SELECT %{fields}
+          FROM id_count, (SELECT * FROM zkapp_commands_ids ORDER BY block_id, id, sequence_no LIMIT %{limit} OFFSET %{offset}) as ids
+          INNER JOIN zkapp_commands_info zc ON ids.id = zc.id AND ids.block_id = zc.block_id AND ids.sequence_no = zc.sequence_no
+          ORDER BY block_id, id, sequence_no
         |sql}]
 
     let query ~offset ~limit op_type operator =
@@ -930,9 +903,12 @@ module Sql = struct
               "FALSE" )
       in
       let filters =
+        let default_token =
+          [%string "'%{Mina_base.Token_id.(to_string default)}'"]
+        in
         sql_filters ~block_height_field:"b.height" ~txn_hash_field:"zc.hash"
           ~account_identifier_fields:
-            [ ("pk_fee_payer.value", "token_fee_payer.value")
+            [ ("pk_fee_payer.value", default_token)
             ; ("pk_update_body.value", "token_update_body.value")
             ]
           ~op_status_field:"bzc.status"
@@ -942,14 +918,14 @@ module Sql = struct
       Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ)
       @@ query_string ~offset ~limit ~filters
 
-    let run (module Conn : Caqti_async.CONNECTION) ~offset ~limit input =
+    let run (module Conn : Caqti_async.CONNECTION) ~logger ~offset ~limit input
+        =
       let open Deferred.Result.Let_syntax in
       let params = Params.of_query input in
-      match%map
-        Conn.collect_list
-          (query ~offset ~limit input.filter.op_type input.operator)
-          params
-      with
+      let query = query ~offset ~limit input.filter.op_type input.operator in
+      [%log debug] "Running SQL query $query"
+        ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
+      match%map Conn.collect_list query params with
       | [] ->
           (0L, [])
       | (total_count, _) :: _ as res ->
@@ -962,26 +938,28 @@ module Sql = struct
 
       type info = Zkapp_command_info.t
 
-      let command_id { zkapp_command; _ } = zkapp_command.zkapp_command_id
+      let is_same_command t_1 t_2 =
+        t_1.block_id = t_2.block_id
+        && t_1.zkapp_command.zkapp_command_id
+           = t_2.zkapp_command.zkapp_command_id
+        && t_1.zkapp_command.zkapp_command_extras.sequence_no
+           = t_2.zkapp_command.zkapp_command_extras.sequence_no
 
       let to_account_update_info command =
         Rosetta_lib_block.Sql.Zkapp_commands.to_account_update_info
           command.zkapp_command
 
       let account_updates_and_command_to_info account_updates
-          { zkapp_command; extras } =
+          { zkapp_command; block_hash; block_height; _ } =
         let info =
           Rosetta_lib_block.Sql.Zkapp_commands
           .account_updates_and_command_to_info account_updates zkapp_command
         in
-        { Zkapp_command_info.info
-        ; block_hash = extras.block_hash
-        ; block_height = extras.block_height
-        }
+        { Zkapp_command_info.info; block_hash; block_height }
     end)
   end
 
-  let run (module Conn : Caqti_async.CONNECTION) query =
+  let run (module Conn : Caqti_async.CONNECTION) ~logger query =
     let module Result = struct
       include Result
 
@@ -997,7 +975,7 @@ module Sql = struct
     let offset = query.Transaction_query.offset in
     let limit = query.limit in
     let%bind user_commands_count, raw_user_commands =
-      User_commands.run ~offset ~limit (module Conn) query
+      User_commands.run ~logger ~offset ~limit (module Conn) query
       |> Errors.Lift.sql ~context:"Finding user commands with transaction query"
     in
     let offset =
@@ -1009,7 +987,7 @@ module Sql = struct
           Int64.(max 0L (limit - user_commands_count)) )
     in
     let%bind internal_commands_count, raw_internal_commands =
-      Internal_commands.run (module Conn) ~offset ~limit query
+      Internal_commands.run (module Conn) ~logger ~offset ~limit query
       |> Errors.Lift.sql ~context:"Finding internal commands within block"
     in
     let offset =
@@ -1021,7 +999,7 @@ module Sql = struct
           Int64.(max 0L (limit - user_commands_count)) )
     in
     let%bind zkapp_commands_count, raw_zkapp_commands =
-      Zkapp_commands.run (module Conn) ~offset ~limit query
+      Zkapp_commands.run (module Conn) ~logger ~offset ~limit query
       |> Errors.Lift.sql ~context:"Finding zkapp commands within block"
     in
     let%bind internal_commands =
@@ -1062,9 +1040,10 @@ module Specific = struct
     (* But for tests, we want things to go fast *)
     module Mock = T (Result)
 
-    let real : db:(module Caqti_async.CONNECTION) -> 'gql Real.t =
-     fun ~db ->
-      { db_transactions = Sql.run db
+    let real :
+        logger:Logger.t -> db:(module Caqti_async.CONNECTION) -> 'gql Real.t =
+     fun ~logger ~db ->
+      { db_transactions = Sql.run ~logger db
       ; validate_network_choice = Network.Validate_choice.Real.validate
       }
 
@@ -1144,7 +1123,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /search/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
-  [%log info] "Search query" ~metadata:[ ("query", body) ] ;
+  [%log info] "Search $params" ~metadata:[ ("params", body) ] ;
   match route with
   | [ "transactions" ] ->
       with_db (fun ~db ->
@@ -1154,7 +1133,9 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
             |> Errors.Lift.wrap
           in
           let%map res =
-            Specific.Real.handle ~graphql_uri ~env:(Specific.Env.real ~db) req
+            Specific.Real.handle ~graphql_uri
+              ~env:(Specific.Env.real ~logger ~db)
+              req
             |> Errors.Lift.wrap
           in
           Search_transactions_response.to_yojson res )
