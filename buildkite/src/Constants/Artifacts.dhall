@@ -1,6 +1,7 @@
 let Prelude = ../External/Prelude.dhall
 let Text/concatSep = Prelude.Text.concatSep
 let Profiles = ./Profiles.dhall
+let Network = ./Network.dhall
 
 let Artifact : Type  = < Daemon | Archive | ArchiveMigration | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
 
@@ -47,10 +48,9 @@ let dockerName = \(artifact : Artifact) ->
     , FunctionalTestSuite = "mina-test-suite"
   } artifact
 
-
-let toDebianName = \(artifact : Artifact) ->
+let toDebianName = \(artifact : Artifact) -> \(network: Network.Type) ->
   merge {
-    Daemon = "daemon"
+    Daemon = "daemon_${Network.lowerName network}"
     , Archive = "archive"
     , ArchiveMigration  = "archive_migration"
     , TestExecutive = "test_executive"
@@ -60,14 +60,42 @@ let toDebianName = \(artifact : Artifact) ->
     , FunctionalTestSuite = "functional_test_suite"
   } artifact
 
-let toDebianNames = \(artifacts : List Artifact) -> 
-    let text = Prelude.List.map
+let toDebianNames = \(artifacts : List Artifact) -> \(networks: List Network.Type) ->
+    
+    let list_of_list_of_debians = Prelude.List.map
         Artifact
-        Text
-        (\(a: Artifact) ->  toDebianName a )
+        (List Text)
+        (\(a: Artifact) ->  
+            merge {
+              Daemon = 
+                  (Prelude.List.map
+                  Network.Type
+                  Text
+                  (\(n: Network.Type) -> "daemon_${Network.lowerName n}" )
+                  networks)
+              , Archive = ["archive"]
+              , ArchiveMigration  = ["archive_migration"]
+              , TestExecutive = ["test_executive"]
+              , BatchTxn = ["batch_txn"]
+              , Rosetta = [""] 
+              , ZkappTestTransaction = ["zkapp_test_transaction"]
+              , FunctionalTestSuite = ["functional_test_suite"]
+            } a
+         )
         artifacts
-    in      
-    Text/concatSep " " text
+    in
+
+    -- Flattens list
+    let items = Prelude.List.fold
+        (List Text)
+        list_of_list_of_debians
+        (List Text)
+        (\(x : List Text) -> \(y : List Text) ->  x # y)
+        ([]: List Text)
+
+    in 
+
+    Text/concatSep " " items
 in
 
 {
