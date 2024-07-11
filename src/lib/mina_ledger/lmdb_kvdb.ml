@@ -14,7 +14,8 @@ module Kvdb = struct
 
   (* TODO is this good enough? what other data can I use to make it more trustably unique? *)
   let name_to_uuid name =
-    String.to_array name |> Array.map ~f:Char.to_int |> Random.State.make
+    Array.init (String.length name) (fun i -> Char.to_int (String.get name i))
+    |> Random.State.make
     |> Uuid.create_random
 
   let create (conf : string) =
