@@ -55,9 +55,9 @@ module Kvdb = struct
 
   let get_batch t ~keys = List.map keys ~f:(fun key -> get t ~key)
 
-  let remove t ~key = Lmdb.Map.remove t.lmdb key
-  (* TODO LMDB raises Not_found here if the keys doesn't exist,
-     make sure that's the same as rocksdb *)
+  let remove t ~key = 
+    try Lmdb.Map.remove t.lmdb key
+    with Not_found (* LMDB raises Not_found when the key is absent *) -> ()
 
   let set_batch t ?(remove_keys = []) ~key_data_pairs =
     List.iter remove_keys ~f:(fun key -> remove t ~key) ;
