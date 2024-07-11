@@ -14,9 +14,9 @@ module Kvdb = struct
 
   (* TODO is this good enough? what other data can I use to make it more trustably unique? *)
   let name_to_uuid name =
-    Array.init (String.length name) (fun i -> Char.to_int (String.get name i))
-    |> Random.State.make
-    |> Uuid.create_random
+    Array.init (String.length name) ~f:(fun i ->
+        Char.to_int (String.get name i) )
+    |> Random.State.make |> Uuid.create_random
 
   let create (conf : string) =
     let lmdb =
@@ -48,16 +48,15 @@ module Kvdb = struct
     }
 
   let get t ~key =
-    try Some (Lmdb.Map.get t.lmdb key) with Not_found_s _ -> None
-  (* | Not_found -> None *)
-  (* TODO does Not_found_s subsume Not_found ? if not how do I get the compiler to let me do this? *)
+    try[@alert "-deprecated"] Some (Lmdb.Map.get t.lmdb key)
+    with Not_found -> None
 
   let set t ~key ~data = Lmdb.Map.set t.lmdb key data
 
   let get_batch t ~keys = List.map keys ~f:(fun key -> get t ~key)
 
-  let remove t ~key = 
-    try Lmdb.Map.remove t.lmdb key
+  let remove t ~key =
+    try[@alert "-deprecated"] Lmdb.Map.remove t.lmdb key
     with Not_found (* LMDB raises Not_found when the key is absent *) -> ()
 
   let set_batch t ?(remove_keys = []) ~key_data_pairs =
@@ -75,22 +74,22 @@ module Kvdb = struct
          (0, init) t.lmdb
 
   let fold_until t ~init ~f ~finish =
-    Lmdb.Cursor.go Ro t.lmdb
-      Lmdb.Cursor.(
-        fun cursor ->
-          let entry : Bigstring.t * Bigstring.t = first cursor in
-          let rec handle acc (k, v) =
-            match f acc ~key:k ~data:v with
-            | Continue_or_stop.Continue acc_new -> (
-                match next cursor with
-                | exception Not_found_s _ ->
-                    finish acc_new
-                | ent ->
-                    handle acc_new ent )
-            | Continue_or_stop.Stop res ->
-                res
-          in
-          handle init entry)
+    (Lmdb.Cursor.go Ro t.lmdb
+       Lmdb.Cursor.(
+         fun cursor ->
+           let entry : Bigstring.t * Bigstring.t = first cursor in
+           let rec handle acc (k, v) =
+             match f acc ~key:k ~data:v with
+             | Continue_or_stop.Continue acc_new -> (
+                 match next cursor with
+                 | exception Not_found ->
+                     finish acc_new
+                 | ent ->
+                     handle acc_new ent )
+             | Continue_or_stop.Stop res ->
+                 res
+           in
+           handle init entry) [@alert "-deprecated"] )
 
   let get_uuid t = t.uuid
 end
