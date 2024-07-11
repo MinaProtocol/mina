@@ -307,8 +307,11 @@
         # Main user-facing binaries.
         packages = rec {
           inherit (ocamlPackages)
-            mina experiment devnet mainnet mina_tests mina-ocaml-format
-            mina_client_sdk test_executive with-instrumentation;
+            mina devnet mainnet mina_tests mina-ocaml-format mina_client_sdk
+            test_executive with-instrumentation;
+          # Granular nix
+          inherit (ocamlPackages)
+            src exes all default all-tested pkgs all-exes files tested info dune-description base-libs;
           inherit (pkgs)
             libp2p_helper kimchi_bindings_stubs snarky_js leaderboard validation
             trace-tool zkapp-cli;
@@ -316,7 +319,6 @@
             mina-image-slim mina-image-full mina-archive-image-full
             mina-image-instr-full;
           mina-deb = debianPackages.mina;
-          default = mina;
         };
 
         # Pure dev shell, from which you can build Mina yourself manually, or hack on it.
