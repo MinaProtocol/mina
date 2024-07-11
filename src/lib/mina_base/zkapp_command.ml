@@ -707,12 +707,6 @@ module T = struct
           end
         end]
 
-        let check (t : t) : unit =
-          List.iter t.account_updates ~f:(fun p ->
-              assert (
-                Account_update.May_use_token.equal
-                  p.elt.account_update.body.may_use_token No ) )
-
         let of_graphql_repr (t : Graphql_repr.t) : t =
           { fee_payer = t.fee_payer
           ; memo = t.memo
@@ -808,7 +802,7 @@ module T = struct
           (struct
             type nonrec t = t
 
-            let of_binable t = Wire.check t ; of_wire t
+            let of_binable t = of_wire t
 
             let to_binable = to_wire
           end)
@@ -1576,21 +1570,20 @@ let arg_query_string x =
   Fields_derivers_zkapps.Test.Loop.json_to_string_gql @@ to_json x
 
 let dummy =
-  lazy
-    (let account_update : Account_update.t =
-       { body = Account_update.Body.dummy
-       ; authorization = Control.dummy_of_tag Signature
-       }
-     in
-     let fee_payer : Account_update.Fee_payer.t =
-       { body = Account_update.Body.Fee_payer.dummy
-       ; authorization = Signature.dummy
-       }
-     in
-     { fee_payer
-     ; account_updates = Call_forest.cons account_update []
-     ; memo = Signed_command_memo.empty
-     } )
+  let account_update : Account_update.t =
+    { body = Account_update.Body.dummy
+    ; authorization = Control.dummy_of_tag Signature
+    }
+  in
+  let fee_payer : Account_update.Fee_payer.t =
+    { body = Account_update.Body.Fee_payer.dummy
+    ; authorization = Signature.dummy
+    }
+  in
+  { fee_payer
+  ; account_updates = Call_forest.cons account_update []
+  ; memo = Signed_command_memo.empty
+  }
 
 module Make_update_group (Input : sig
   type global_state
