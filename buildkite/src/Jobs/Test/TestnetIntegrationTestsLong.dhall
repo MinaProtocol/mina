@@ -18,7 +18,7 @@ let dependsOn =
         Dockers.dependsOn
           Dockers.Type.Bullseye
           Profiles.Type.Standard
-          "daemon-berkeley"
+          "daemon-devnet"
       # Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "archive"
 
 in  Pipeline.build
