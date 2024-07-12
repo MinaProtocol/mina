@@ -37,6 +37,5 @@ kimchi_backend/
 │   ├── poly_comm.ml
 │   ├── scale_round.ml
 │   ├── var.ml
-│   ├── version.ml
 └── kimchi_backend.ml
 ```

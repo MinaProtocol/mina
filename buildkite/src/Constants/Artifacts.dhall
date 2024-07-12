@@ -78,8 +78,9 @@ let dockerName =
 
 let toDebianName =
           \(artifact : Artifact)
+      ->  \(network : Network.Type)
       ->  merge
-            { Daemon = "daemon"
+            { Daemon = "daemon_${Network.lowerName network}"
             , Archive = "archive"
             , ArchiveMigration = "archive_migration"
             , TestExecutive = "test_executive"
@@ -92,14 +93,42 @@ let toDebianName =
 
 let toDebianNames =
           \(artifacts : List Artifact)
-      ->  let text =
+      ->  \(networks : List Network.Type)
+      ->  let list_of_list_of_debians =
                 Prelude.List.map
                   Artifact
-                  Text
-                  (\(a : Artifact) -> toDebianName a)
+                  (List Text)
+                  (     \(a : Artifact)
+                    ->  merge
+                          { Daemon =
+                              Prelude.List.map
+                                Network.Type
+                                Text
+                                (     \(n : Network.Type)
+                                  ->  "daemon_${Network.lowerName n}"
+                                )
+                                networks
+                          , Archive = [ "archive" ]
+                          , ArchiveMigration = [ "archive_migration" ]
+                          , TestExecutive = [ "test_executive" ]
+                          , BatchTxn = [ "batch_txn" ]
+                          , Rosetta = [ "" ]
+                          , ZkappTestTransaction = [ "zkapp_test_transaction" ]
+                          , FunctionalTestSuite = [ "functional_test_suite" ]
+                          }
+                          a
+                  )
                   artifacts
 
-          in  Text/concatSep " " text
+          let items =
+                Prelude.List.fold
+                  (List Text)
+                  list_of_list_of_debians
+                  (List Text)
+                  (\(x : List Text) -> \(y : List Text) -> x # y)
+                  ([] : List Text)
+
+          in  Text/concatSep " " items
 
 let dockerTag =
           \(artifact : Artifact)
