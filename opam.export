@@ -12,6 +12,7 @@ roots: [
   "check_opam_switch.~dev"
   "core_extended.v0.14.0"
   "extlib.1.7.8"
+  "fileutils.0.6.4"
   "graphql-async.0.13.0"
   "graphql-cohttp.0.13.0"
   "graphql-lwt.0.13.0"

@@ -3,10 +3,9 @@
  (public_name mina_ledger)
  (inline_tests (flags -verbose -show-counts))
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_let ppx_custom_printf ppx_base ppx_deriving_yojson ppx_inline_test ppx_assert))
+ (preprocess (pps ppx_mina ppx_version ppx_let ppx_custom_printf ppx_base ppx_deriving_yojson ppx_inline_test ppx_assert))
  (libraries
    ;; opam libraries
-   lmdb
    integers
    async_kernel
    base.caml
@@ -21,6 +20,9 @@
    core.uuid
    ppx_inline_test.config
    ;; local libraries
+   logger
+   lmdb
+   rocksdb
    bounded_types
    mina_wire_types
    sgn
@@ -32,7 +34,6 @@
    pickles_types
    mina_base.import
    o1trace
-   rocksdb
    random_oracle
    currency
    genesis_constants
