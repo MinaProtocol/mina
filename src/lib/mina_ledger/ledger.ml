@@ -26,8 +26,7 @@ module Ledger_inner = struct
     include Hashable.Make_binable (Arg) [@@deriving sexp, compare, hash, yojson]
   end
 
-  module Kvdb : Intf.Key_value_database with type config := string =
-  Both.Db
+  module Kvdb : Intf.Key_value_database with type config := string = Both.Db
   (* Lmdb_kvdb.Kvdb *)
   (* Rocksdb.Database *)
 
