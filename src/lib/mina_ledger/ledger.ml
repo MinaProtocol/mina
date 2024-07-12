@@ -27,8 +27,8 @@ module Ledger_inner = struct
   end
 
   module Kvdb : Intf.Key_value_database with type config := string =
-    Lmdb_kvdb.Kvdb
-  (* Both.Db *)
+  Both.Db
+  (* Lmdb_kvdb.Kvdb *)
   (* Rocksdb.Database *)
 
   module Storage_locations : Intf.Storage_locations = struct
