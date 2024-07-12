@@ -302,7 +302,7 @@ build_daemon_devnet_deb() {
 
   copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
 
-  build_deb mina-devnet
+  build_deb  "${MINA_DEB_NAME}"
 }
 ##################################### END DEVNET PACKAGE #######################################
 
