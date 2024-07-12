@@ -29,6 +29,7 @@ use poly_commitment::commitment::{CommitmentCurve, PolyComm};
 use poly_commitment::evaluation_proof::OpeningProof;
 use std::array;
 use std::convert::TryInto;
+use poly_commitment::lagrange_cache;
 
 #[ocaml_gen::func]
 #[ocaml::func]
@@ -42,7 +43,9 @@ pub fn caml_pasta_fq_plonk_proof_create(
     {
         let ptr: &mut poly_commitment::srs::SRS<Pallas> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
-        ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
+        let cache_dir = String::from("/tmp");
+        let cache = lagrange_cache::FileCache::new(std::path::PathBuf::from(cache_dir));
+        ptr.add_lagrange_basis_with_cache(index.as_ref().0.cs.domain.d1, &cache);
     }
     let prev = if prev_challenges.is_empty() {
         Vec::new()

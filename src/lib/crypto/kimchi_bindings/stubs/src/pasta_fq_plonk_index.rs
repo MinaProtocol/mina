@@ -15,6 +15,8 @@ use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
 };
+use poly_commitment::lagrange_cache;
+use std::path::PathBuf;
 
 /// Boxed so that we don't store large proving indexes in the OCaml heap.
 #[derive(ocaml_gen::CustomType)]
@@ -91,7 +93,9 @@ pub fn caml_pasta_fq_plonk_index_create(
     {
         let ptr: &mut poly_commitment::srs::SRS<Pallas> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-        ptr.add_lagrange_basis(cs.domain.d1);
+        let cache_dir = String::from("/tmp");
+        let cache = lagrange_cache::FileCache::new(PathBuf::from(cache_dir));
+        ptr.add_lagrange_basis_with_cache(cs.domain.d1, &cache);
     }
 
     // create index

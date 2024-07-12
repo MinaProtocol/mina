@@ -223,7 +223,9 @@ pub fn caml_pasta_fp_plonk_verifier_index_create(
     {
         let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
-        ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
+        let cache_dir = String::from("/tmp");
+        let cache = poly_commitment::lagrange_cache::FileCache::new(std::path::PathBuf::from(cache_dir));
+        ptr.add_lagrange_basis_with_cache(index.as_ref().0.cs.domain.d1, &cache);
     }
     let verifier_index = index.as_ref().0.verifier_index();
     verifier_index.into()

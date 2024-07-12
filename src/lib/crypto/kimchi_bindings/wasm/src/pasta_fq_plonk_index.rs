@@ -146,7 +146,9 @@ pub fn caml_pasta_fq_plonk_index_create(
         {
             let ptr: &mut poly_commitment::srs::SRS<GAffine> =
                 unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-            ptr.add_lagrange_basis(cs.domain.d1);
+            let cache_dir = String::from("/tmp");
+            let cache = poly_commitment::lagrange_cache::FileCache::new(std::path::PathBuf::from(cache_dir));
+            ptr.add_lagrange_basis_with_cache(cs.domain.d1, &cache);
         }
 
         let mut index =
