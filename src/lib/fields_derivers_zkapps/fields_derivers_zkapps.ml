@@ -359,6 +359,7 @@ module Make (Schema : Graphql_intf.Schema) = struct
       ~sgn:!.sign_deriver
     |> finish "BalanceChange"
          ~t_toplevel_annots:Currency.Signed_poly.t_toplevel_annots
+    |> Fields_derivers_js.Js_layout.(of_layout @@ leaf_type (Custom "Int64"))
 
   let to_json obj x = !(obj#to_json) @@ !(obj#contramap) x
 
