@@ -44,8 +44,18 @@ module Params = struct
       * max_signed_commands_per_block
 end
 
+(* Sample data used for computing RAM usage *)
+module type Sample = sig
+  val generated_zkapps : Mina_base.Zkapp_command.t list
+
+  val vk :
+    ( Mina_base.Side_loaded_verification_key.t
+    , Snark_params.Tick.Field.t )
+    With_hash.t
+end
+
 (* dummy values used for computing RAM usage benchmarking *)
-module Values = struct
+module Values (S : Sample) = struct
   let bin_copy (type a) ~(bin_class : a Bin_prot.Type_class.t) (x : a) =
     let size = bin_class.writer.size x in
     let buf = Bigstring.create size in
@@ -171,25 +181,12 @@ module Values = struct
     Signature_lib.Public_key.compress (keypair ()).public_key
 
   let verification_key : unit -> Mina_base.Verification_key_wire.t =
-    let vk =
-      let `VK vk, `Prover _ =
-        Transaction_snark.For_tests.create_trivial_snapp
-          ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-          ()
-      in
-      vk
-    in
-    fun () ->
-      bin_copy ~bin_class:Mina_base.Verification_key_wire.Stable.Latest.bin_t vk
+   fun () ->
+    bin_copy ~bin_class:Mina_base.Verification_key_wire.Stable.Latest.bin_t S.vk
 
   let side_loaded_proof : unit -> Pickles.Side_loaded.Proof.t =
     let proof =
-      let num_updates = 1 in
-      let _ledger, zkapp_commands =
-        Snark_profiler_lib.create_ledger_and_zkapps ~min_num_updates:num_updates
-          ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
-      in
-      let cmd = List.hd_exn zkapp_commands in
+      let cmd = List.hd_exn S.generated_zkapps in
       let update =
         List.nth_exn (Mina_base.Zkapp_command.all_account_updates_list cmd) 1
       in
@@ -443,7 +440,23 @@ module Values = struct
     (ledger_proof (), sok_message ())
 end
 
-module Sizes = struct
+type size_params =
+  { side_loaded_proof : int
+  ; ledger_proof : int
+  ; one_priced_proof : int
+  ; two_priced_proof : int
+  ; signed_command : int
+  ; zkapp_command : int
+  ; ledger_mask : int
+  ; zkapp_command_base_work : int
+  ; signed_command_base_work : int
+  ; merge_work : int
+  }
+[@@deriving sexp]
+
+module Sizes (S : Sample) = struct
+  module Values = Values (S)
+
   let count (type a) (x : a) =
     Obj.(reachable_words @@ repr x) * (Sys.word_size / 8)
 
@@ -468,20 +481,6 @@ module Sizes = struct
   let signed_command_base_work = count @@ Values.signed_command_base_work ()
 
   let merge_work = count @@ Values.merge_work ()
-
-  type size_params =
-    { side_loaded_proof : int
-    ; ledger_proof : int
-    ; one_priced_proof : int
-    ; two_priced_proof : int
-    ; signed_command : int
-    ; zkapp_command : int
-    ; ledger_mask : int
-    ; zkapp_command_base_work : int
-    ; signed_command_base_work : int
-    ; merge_work : int
-    }
-  [@@deriving sexp]
 
   let pre_fix =
     { side_loaded_proof
@@ -616,7 +615,7 @@ let serial_bench (type a) ~(name : string)
   ; hash = Timer.average hash_timer
   }
 
-let compute_ram_usage (sizes : Sizes.size_params) =
+let compute_ram_usage (sizes : size_params) =
   let format_gb size = Int.to_float size /. (1024.0 **. 3.0) in
   (*
   let format_kb size = (Int.to_float size /. 1024.0) in
@@ -720,12 +719,32 @@ let compute_ram_usage (sizes : Sizes.size_params) =
   Printf.printf "TOTAL: %fGB\n" (format_gb total_size)
 
 let () =
+  Async.Thread_safe.block_on_async_exn
+  @@ fun () ->
+  let%bind.Async_kernel.Deferred _, generated_zkapps =
+    let num_updates = 1 in
+    Snark_profiler_lib.create_ledger_and_zkapps ~min_num_updates:num_updates
+      ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
+  in
+  let%map.Async_kernel.Deferred vk =
+    let `VK vk, `Prover _ =
+      Transaction_snark.For_tests.create_trivial_snapp
+        ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
+    in
+    vk
+  in
+  let module Sizes = Sizes (struct
+    let generated_zkapps = generated_zkapps
+
+    let vk = vk
+  end) in
+  let module Values = Sizes.Values in
   print_header "PRE FIX SIZES" ;
-  Printf.printf !"%{sexp: Sizes.size_params}\n" Sizes.pre_fix ;
+  Printf.printf !"%{sexp: size_params}\n" Sizes.pre_fix ;
   compute_ram_usage Sizes.pre_fix ;
   Printf.printf "\n" ;
   print_header "POST FIX SIZES" ;
-  Printf.printf !"%{sexp: Sizes.size_params}\n" Sizes.post_fix ;
+  Printf.printf !"%{sexp: size_params}\n" Sizes.post_fix ;
   compute_ram_usage Sizes.post_fix ;
   Printf.printf "\n" ;
   let side_loaded_proof_serial_times =
