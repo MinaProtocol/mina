@@ -47,7 +47,7 @@ struct
     let lvs = L.get_batch l ~keys in
     let rvs = R.get_batch r ~keys in
     if lvs = rvs then lvs
-    else if List.length lvs = List.length rvs then (
+    else (
       (List.iter
         (fun (key,(lv,rv)) ->
           match lv,rv with
@@ -66,12 +66,6 @@ struct
         )
         (List.combine keys (List.combine lvs rvs))
       );
-      [%log fatal] "length was the same" ;
-      failwith "get_batch failed" )
-    else (
-      [%log fatal] "length was different $l $r"
-        ~metadata:
-          [ ("lv", `Int (List.length lvs)); ("rv", `Int (List.length rvs)) ] ;
       failwith "get_batch failed" )
 
   let set (l, r) ~key ~data =
@@ -83,7 +77,15 @@ struct
   let set_batch (l, r) ?remove_keys ~key_data_pairs =
     [%log info] "calling set_batch" ;
     L.set_batch l ?remove_keys ~key_data_pairs ;
-    R.set_batch r ?remove_keys ~key_data_pairs
+    R.set_batch r ?remove_keys ~key_data_pairs;
+    match remove_keys with
+      | None -> ()
+      | Some(keys) -> if not (L.get_batch l ~keys = R.get_batch r ~keys)
+        then ([%log fatal] "set_batch broke on remove keys"; exit 1)
+      ;
+    let keys = List.map fst key_data_pairs in
+    if not (L.get_batch l ~keys = R.get_batch r ~keys)
+      then ([%log fatal] "set_batch broke on key_data_pairs"; exit 1)
 
   let to_alist (l, r) =
     let lv = L.to_alist l in
