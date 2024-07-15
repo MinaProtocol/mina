@@ -619,7 +619,7 @@ module Make (Test : Test_intf) = struct
   let () =
     let num_accounts = 5 in
     let accounts = gen_accounts ~num_accounts in
-    add_test "addition and deletion works" (fun () ->
+    add_test "addition then deletion works" (fun () ->
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             (* add accounts to mask *)
@@ -654,13 +654,30 @@ module Make (Test : Test_intf) = struct
             List.iter initial_accounts ~f:(fun account ->
                 ignore @@ create_new_account_exn attached_mask account ) ;
             let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
-            [%test_eq: Int.t] num_accounts mask_num_accounts ;
+            [%test_eq: Int.t] half mask_num_accounts ;
 
             (* Remove num_accounts*)
             let accounts_to_be_deleted = initial_accounts in
-            List.iter accounts_to_be_deleted ~f:(fun account ->
-                Mask.Attached.remove_account attached_mask account ;
-                Mask.Attached.get_ ) ;
+            ignore
+            @@ List.iter2 accounts_to_be_deleted additional_accounts
+                 ~f:(fun account_to_delete account_to_add ->
+                   let loc1 =
+                     Option.value_exn
+                       (Mask.Attached.location_of_account attached_mask
+                          (Account.identifier account_to_delete) )
+                   in
+                   ignore
+                   @@ Mask.Attached.remove_account attached_mask
+                        account_to_delete ;
+                   let id = Account.identifier account_to_add in
+                   ignore
+                   @@ Mask.Attached.get_or_create_account attached_mask id
+                        account_to_add ;
+                   let loc2 =
+                     Option.value_exn
+                       (Mask.Attached.location_of_account attached_mask id)
+                   in
+                   [%test_eq: Mask.Location.t] loc1 loc2 ) ;
             let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
             [%test_eq: Int.t] mask_num_accounts half ) )
 
