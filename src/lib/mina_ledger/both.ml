@@ -46,7 +46,16 @@ struct
   let get_batch (l, r) ~keys =
     let lvs = L.get_batch l ~keys in
     let rvs = R.get_batch r ~keys in
-    if lvs = rvs then lvs else failwith "get_batch"
+    if lvs = rvs
+        then lvs
+        else
+          (if List.length lvs = List.length rvs
+            then  ([%log fatal] "length was the same";
+              failwith "get_batch failed")
+            else ([%log fatal] "length was different $l $r"
+              ~metadata:[ ("lv", `Int (List.length lvs)); ("rv", `Int (List.length rvs)) ] ;
+              failwith "get_batch failed"
+              ))
 
   let set (l, r) ~key ~data =
     [%log info] "calling set $key $data"
