@@ -9,6 +9,8 @@ open Core
 module Make (Inputs : Inputs_intf.S) = struct
   open Inputs
   module Location = Location
+
+  (* Free_list depends on this module alias. Change with care. *)
   module Addr = Location.Addr
 
   (** Invariant is that parent is None in unattached mask and `Some` in the
@@ -45,6 +47,62 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; locations = Map.merge_skewed ~combine base.locations locations
     }
 
+  module Free_list = struct
+    include Set.Make (Addr)
+
+    (* [remove_all_contiguous set addr] removes all addresses contiguous from
+       [a] in decreasing order.
+
+       @return  a set where all such addresses have been removed, and the first
+       address not in set, if any
+    *)
+    let rec remove_all_contiguous set addr =
+      if mem set addr then
+        let set = remove set addr in
+        let addr = Addr.prev addr in
+        match addr with
+        | None ->
+            (set, addr)
+        | Some addr ->
+            remove_all_contiguous set addr
+      else (set, Some addr)
+
+    module Location = struct
+      (* The free list should only contain addresses that locate accounts *)
+      let add set = function
+        | Location.Account addr ->
+            add set addr
+        | Generic _bigstring ->
+            invalid_arg "Free_list.add_location: cannot add generic"
+        | Hash _ ->
+            invalid_arg "Free_list.add_location: cannot add hash"
+
+      let account addr = Location.Account addr
+
+      let top = max_elt
+
+      let pop set =
+        Option.map ~f:(fun addr -> (account addr, remove set addr)) (top set)
+
+      let _top set = Option.map ~f:account (top set)
+
+      let[@warning "-32"] mem set = function
+        | Location.Account addr ->
+            mem set addr
+        | Generic _ | Hash _ ->
+            false
+
+      let remove_all_contiguous set = function
+        | Location.Account addr ->
+            let set, addr = remove_all_contiguous set addr in
+            (set, Option.map ~f:account addr)
+        | Generic _bigstring ->
+            invalid_arg "Free_list.add_location: cannot add generic"
+        | Hash _ ->
+            invalid_arg "Free_list.add_location: cannot add hash"
+    end
+  end
+
   (** Structure managing cache accumulated since the "base" ledger.
 
     Its purpose is to optimize lookups through a few consequitive masks
@@ -77,18 +135,23 @@ module Make (Inputs : Inputs_intf.S) = struct
           *)
     }
 
+  (* Available locations for allocations are tracked using 2 fields:
+     1. [current_location] is the fill frontier, that is, on the right of this
+       location, all locations are available
+     2. [freed]
+  *)
   type t =
     { uuid : Uuid.Stable.V1.t
     ; mutable parent : Parent.t
     ; detached_parent_signal : Detached_parent_signal.t
     ; mutable current_location : Location.t option
+    ; mutable freed : Free_list.t
     ; depth : int
     ; mutable maps : maps_t
           (* If present, contains maps containing changes both for this mask
              and for a few ancestors. This is used as a lookup cache. *)
     ; mutable accumulated : (accumulated_t[@sexp.opaque]) option
     ; mutable is_committing : bool
-    ; freed : Location.t Stack.t
     }
   [@@deriving sexp]
 
@@ -110,12 +173,14 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; accumulated = None
     ; maps = empty_maps ()
     ; is_committing = false
-    ; freed = Stack.create ()
+    ; freed = Free_list.empty
     }
 
   let get_uuid { uuid; _ } = uuid
 
-  let add_freed_location { freed; _ } location = Stack.push freed location
+  (* A little helper to mutate the {!val:freed} field *)
+  let add_freed_location t location =
+    t.freed <- Free_list.Location.add t.freed location
 
   module Attached = struct
     type parent = Base.t [@@deriving sexp]
@@ -264,17 +329,6 @@ module Make (Inputs : Inputs_intf.S) = struct
                 Addr.is_further_right ~than:current_address address
           in
           if is_empty then None else Base.get ancestor location
-
-    let remove t location =
-      assert_is_attached t ;
-      let maps, _ancestor = maps_and_ancestor t in
-      match Map.find maps.accounts location with
-      | None ->
-          ()
-      | Some _account ->
-          failwith "masking_merkle_tree: remove not yet implemented"
-
-    let remove_location = remove
 
     let self_find_or_batch_lookup self_find lookup_parent t ids =
       assert_is_attached t ;
@@ -507,9 +561,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           Base.merkle_root ancestor
 
-    let remove_account_and_update_hashes t location =
-      (* remove account and key from tables *)
-      let account = Option.value_exn (Map.find t.maps.accounts location) in
+    let remove_account_location_update_hashes t account location =
       let account_id = Account.identifier account in
       t.maps <-
         { t.maps with
@@ -529,7 +581,14 @@ module Make (Inputs : Inputs_intf.S) = struct
             if Location.equal location curr_loc then
               match Location.prev location with
               | Some prev_loc ->
-                  t.current_location <- Some prev_loc
+                  (* On removal, if the account is at the fill frontier, we need to
+                     remove all contiguous freed locations next to this
+                     frontier. *)
+                  let freed, opt_loc =
+                    Free_list.Location.remove_all_contiguous t.freed prev_loc
+                  in
+                  t.freed <- freed ;
+                  t.current_location <- opt_loc
               | None ->
                   t.current_location <- None
             else
@@ -549,6 +608,22 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
           self_set_hash t addr hash )
+
+    let remove_account_and_update_hashes t location =
+      (* remove account and key from tables *)
+      let account = Option.value_exn (Map.find t.maps.accounts location) in
+      remove_account_location_update_hashes t account location
+
+    let remove t location =
+      assert_is_attached t ;
+      let maps, _ancestor = maps_and_ancestor t in
+      match Map.find maps.accounts location with
+      | None ->
+          ()
+      | Some account ->
+          remove_account_location_update_hashes t account location
+
+    let remove_location = remove
 
     (* One does not need to worry about the account being present in more than
        one base *)
@@ -686,7 +761,7 @@ module Make (Inputs : Inputs_intf.S) = struct
               ; current = acc.current
               } )
       ; is_committing = false
-      ; freed = Stack.create ()
+      ; freed = Free_list.empty
       }
 
     let last_filled t =
@@ -1008,10 +1083,11 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* Finds the next available location in the following order of priority:
        - reuse a freed location, due to previously removed data; or
        - use the leftmost available slot *)
-    let next_fillable t =
-      match Stack.pop t.freed with
-      | Some _ as opt_loc ->
-          opt_loc
+    let pop_next_fillable t =
+      match Free_list.Location.pop t.freed with
+      | Some (loc, freed) ->
+          t.freed <- freed ;
+          Some loc
       | None ->
           leftmost_available_slot t
 
@@ -1027,7 +1103,7 @@ module Make (Inputs : Inputs_intf.S) = struct
               Ok (`Existed, location)
           | None -> (
               (* not in parent, create new location *)
-              match next_fillable t with
+              match pop_next_fillable t with
               | None ->
                   Or_error.error_string "Db_error.Out_of_leaves"
               | Some location ->
