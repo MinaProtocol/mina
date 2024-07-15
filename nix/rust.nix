@@ -5,7 +5,7 @@ let
     prev.makeRustPlatform {
       cargo = rust;
       rustc = rust;
-      # override stdenv.targetPlatform here, if neccesary
+      # override stdenv.targetPlatform here, if necessary
     };
   toolchainHashes = {
     "1.72" = "sha256-dxE7lmCFWlq0nl/wKcmYvpP9zqQbBitAQgZ1zx9Ooik=";
