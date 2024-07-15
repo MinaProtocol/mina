@@ -48,6 +48,24 @@ struct
     let rvs = R.get_batch r ~keys in
     if lvs = rvs then lvs
     else if List.length lvs = List.length rvs then (
+      (List.iter
+        (fun (key,(lv,rv)) ->
+          match lv,rv with
+            | None,None -> ()
+            | Some(_),None -> [%log fatal] "Rocksdb missing entry at $key"
+              ~metadata:[("key",log_bs key)];
+            | None,Some(_) -> [%log fatal] "LMDB missing entry at $key"
+              ~metadata:[("key",log_bs key)];
+            | Some(l),Some(r) ->
+              (if l != r then [%log fatal] "Discrepency at $key of $l vs $r"
+              ~metadata:
+              [("key",log_bs key)
+              ;("l",log_bs l)
+              ;("r",log_bs r)
+              ];)
+        )
+        (List.combine keys (List.combine lvs rvs))
+      );
       [%log fatal] "length was the same" ;
       failwith "get_batch failed" )
     else (
