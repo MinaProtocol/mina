@@ -188,10 +188,6 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     (* rehash something *)
     Kvdb.remove kvdb ~key
 
-  let remove_location = remove
-
-  let remove_account _ _ = invalid_arg "remove_account: not yet implemented"
-
   module Account_location = struct
     (** encodes a key, token_id pair as a location used as a database key, so
         we can find the account location associated with that key.
@@ -248,6 +244,25 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         =
       ( Location.serialize ~ledger_depth location
       , Location.serialize ~ledger_depth last_account_location )
+
+    module Free_list = struct
+      let id = "free_list"
+
+      let key = lazy (Location.build_generic (Bigstring.of_string id))
+
+      let get mdb =
+        let key = Lazy.force key in
+        let _ledger_depth = mdb.depth in
+        match get_generic mdb key with
+        | None ->
+            failwith "no data"
+        | Some _data ->
+            failwith "free_list serialization: not yet implemented"
+    end
+
+    let remove_location = remove
+
+    let remove_account _ _ = invalid_arg "remove_account: not yet implemented"
 
     let increment_last_account_location mdb =
       let location = last_location_key () in
