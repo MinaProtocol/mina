@@ -355,8 +355,8 @@ module Make (Schema : Graphql_intf.Schema) = struct
         ~of_string:sign_of_string
     in
     let ( !. ) = ( !. ) ~t_fields_annots:Currency.Signed_poly.t_fields_annots in
-    let balance_change obj =
-      Currency.Signed_poly.Fields.make_creator obj ~magnitude:!.amount
+    let balance_change obj' =
+      Currency.Signed_poly.Fields.make_creator obj' ~magnitude:!.amount
         ~sgn:!.sign_deriver
       |> finish "BalanceChange"
            ~t_toplevel_annots:Currency.Signed_poly.t_toplevel_annots
