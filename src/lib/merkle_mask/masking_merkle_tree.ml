@@ -47,61 +47,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; locations = Map.merge_skewed ~combine base.locations locations
     }
 
-  module Free_list = struct
-    include Set.Make (Addr)
-
-    (* [remove_all_contiguous set addr] removes all addresses contiguous from
-       [a] in decreasing order.
-
-       @return  a set where all such addresses have been removed, and the first
-       address not in set, if any
-    *)
-    let rec remove_all_contiguous set addr =
-      if mem set addr then
-        let set = remove set addr in
-        let addr = Addr.prev addr in
-        match addr with
-        | None ->
-            (set, addr)
-        | Some addr ->
-            remove_all_contiguous set addr
-      else (set, Some addr)
-
-    module Location = struct
-      (* The free list should only contain addresses that locate accounts *)
-      let add set = function
-        | Location.Account addr ->
-            add set addr
-        | Generic _bigstring ->
-            invalid_arg "Free_list.add_location: cannot add generic"
-        | Hash _ ->
-            invalid_arg "Free_list.add_location: cannot add hash"
-
-      let account addr = Location.Account addr
-
-      let top = max_elt
-
-      let pop set =
-        Option.map ~f:(fun addr -> (account addr, remove set addr)) (top set)
-
-      let _top set = Option.map ~f:account (top set)
-
-      let[@warning "-32"] mem set = function
-        | Location.Account addr ->
-            mem set addr
-        | Generic _ | Hash _ ->
-            false
-
-      let remove_all_contiguous set = function
-        | Location.Account addr ->
-            let set, addr = remove_all_contiguous set addr in
-            (set, Option.map ~f:account addr)
-        | Generic _bigstring ->
-            invalid_arg "Free_list.add_location: cannot add generic"
-        | Hash _ ->
-            invalid_arg "Free_list.add_location: cannot add hash"
-    end
-  end
+  module Free_list = Merkle_ledger.Free_list.Make (Location)
 
   (** Structure managing cache accumulated since the "base" ledger.
 
