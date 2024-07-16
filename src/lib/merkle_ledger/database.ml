@@ -245,12 +245,14 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       ( Location.serialize ~ledger_depth location
       , Location.serialize ~ledger_depth last_account_location )
 
+    [@@@warning "-60"] (* TODO: Remove annotation *)
+
     module Free_list = struct
       let id = "free_list"
 
       let key = lazy (Location.build_generic (Bigstring.of_string id))
 
-      let get mdb =
+      let _get mdb =
         let key = Lazy.force key in
         let _ledger_depth = mdb.depth in
         match get_generic mdb key with
@@ -260,9 +262,9 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
             failwith "free_list serialization: not yet implemented"
     end
 
-    let remove_location = remove
+    let _remove_location = remove
 
-    let remove_account _ _ = invalid_arg "remove_account: not yet implemented"
+    let _remove_account _ _ = invalid_arg "remove_account: not yet implemented"
 
     let increment_last_account_location mdb =
       let location = last_location_key () in
@@ -703,4 +705,8 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   let merkle_path_at_index_exn t index =
     let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
     merkle_path_at_addr_exn t addr
+
+  let remove_location _ _ = failwith "not yet implemented"
+
+  let remove_account _ _ = failwith "not yet implemented"
 end
