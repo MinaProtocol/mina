@@ -308,17 +308,24 @@ end
 
 include T
 
+let genesis_state_timestamp_string = Node_config.genesis_state_timestamp
+let k = Node_config.k
+let slots_per_epoch = Node_config.slots_per_epoch
+let slots_per_sub_window = Node_config.slots_per_sub_window
+let grace_period_slots = Node_config.grace_period_slots
+let delta = Node_config.delta
+let pool_max_size = Node_config.pool_max_size
 let compiled : t =
   { protocol =
-      { k = Node_config.k
-      ; slots_per_epoch = Node_config.slots_per_epoch
-      ; slots_per_sub_window = Node_config.slots_per_sub_window
-      ; grace_period_slots = Node_config.grace_period_slots
-      ; delta = Node_config.delta
+      { k
+      ; slots_per_epoch
+      ; slots_per_sub_window
+      ; grace_period_slots
+      ; delta
       ; genesis_state_timestamp =
-          genesis_timestamp_of_string Node_config.genesis_state_timestamp |> of_time
+          genesis_timestamp_of_string genesis_state_timestamp_string |> of_time
       }
-  ; txpool_max_size = Node_config.pool_max_size
+  ; txpool_max_size = pool_max_size
   ; num_accounts = None
   ; zkapp_proof_update_cost = Mina_compile_config.zkapp_proof_update_cost
   ; zkapp_signed_single_update_cost =
