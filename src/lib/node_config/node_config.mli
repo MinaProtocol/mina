@@ -56,3 +56,5 @@ val network: string
 val zkapp_cmd_limit: int option
 val slot_tx_end: int option
 val slot_chain_end: int option
+
+val scan_state_tps_goal_x10: int option

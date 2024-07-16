@@ -108,3 +108,4 @@
 [%%undef zkapp_cmd_limit]
 [%%undef slot_tx_end]
 [%%undef slot_chain_end]
+[%%undef scan_state_tps_goal_x10]

@@ -57,15 +57,15 @@
 [%%inject "itn_features", itn_features]
 
 [%%ifndef compaction_interval]
-let compaction_interval_ms = None
+let compaction_interval = None
 [%%else]
 [%%inject "compaction_interval", compaction_interval]
-let compaction_interval_ms = Some compaction_interval
+let compaction_interval = Some compaction_interval
 [%%endif]
 
 [%%inject "network", network]
 
-[%%inject "vrf_poll_interval_ms", vrf_poll_interval]
+[%%inject "vrf_poll_interval", vrf_poll_interval]
 
 
 
@@ -90,4 +90,12 @@ let slot_chain_end : int option = None
 [%%else]
 [%%inject "slot_chain_end", slot_chain_end]
 let slot_chain_end = Some slot_chain_end
+[%%endif]
+
+
+[%%ifndef scan_state_tps_goal_x10]
+let scan_state_tps_goal_x10 : int option = None
+[%%else]
+[%%inject "scan_state_tps_goal_x10", scan_state_tps_goal_x10]
+let scan_state_tps_goal_x10 = Some scan_state_tps_goal_x10
 [%%endif]
