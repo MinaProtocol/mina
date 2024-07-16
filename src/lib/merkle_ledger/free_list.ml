@@ -9,6 +9,8 @@ module type S = sig
 
   val empty : t
 
+  val size : t -> int
+
   module Location : sig
     val add : t -> location -> t
 
@@ -25,6 +27,8 @@ end
 module Make (L : Location_intf.S) : S with type location = L.t = struct
   module Addr = L.Addr
   include Set.Make (L.Addr)
+
+  let size = length
 
   type location = L.t
 
@@ -45,6 +49,14 @@ module Make (L : Location_intf.S) : S with type location = L.t = struct
           remove_all_contiguous set addr
     else (set, Some addr)
 
+  (* This could be made more efficient, especially if we stored the size of the
+     set.
+
+     We'd just have to allocate the bigstring of <size> * <addr size> and
+     iterate once.
+
+     Instead, iterate 3x (to_list, List.map, Bigstring.concat).
+  *)
   let serialize ~ledger_depth t =
     to_list t |> List.map ~f:(Addr.serialize ~ledger_depth) |> Bigstring.concat
 
