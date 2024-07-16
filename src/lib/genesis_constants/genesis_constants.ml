@@ -145,31 +145,6 @@ module Constraint_constants = struct
         Core_kernel.Int.ceil_log2
           (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
 
-      [%%ifndef fork_blockchain_length]
-
-      let fork = None
-
-      [%%else]
-
-      [%%inject "fork_blockchain_length", fork_blockchain_length]
-
-      [%%inject "fork_state_hash", fork_state_hash]
-
-      [%%inject "fork_global_slot_since_genesis", fork_genesis_slot]
-
-      let fork =
-        Some
-          { Fork_constants.state_hash =
-              Data_hash_lib.State_hash.of_base58_check_exn fork_state_hash
-          ; blockchain_length =
-              Mina_numbers.Length.of_int fork_blockchain_length
-          ; global_slot_since_genesis =
-              Mina_numbers.Global_slot_since_genesis.of_int
-                fork_global_slot_since_genesis
-          }
-
-      [%%endif]
-
       let compiled =
         { sub_windows_per_window
         ; ledger_depth
@@ -182,7 +157,7 @@ module Constraint_constants = struct
         ; supercharged_coinbase_factor
         ; account_creation_fee =
             Currency.Fee.of_mina_string_exn account_creation_fee_string
-        ; fork
+        ; fork = None
         }
     end :
       sig
