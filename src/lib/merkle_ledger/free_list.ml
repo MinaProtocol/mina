@@ -5,6 +5,8 @@ module type S = sig
 
   val serialize : ledger_depth:int -> t -> Bigstring.t
 
+  val deserialize : ledger_depth:int -> Bigstring.t -> t
+
   val empty : t
 
   module Location : sig
@@ -45,6 +47,19 @@ module Make (L : Location_intf.S) : S with type location = L.t = struct
 
   let serialize ~ledger_depth t =
     to_list t |> List.map ~f:(Addr.serialize ~ledger_depth) |> Bigstring.concat
+
+  let byte_count_of_bits n = (n / 8) + min 1 (n % 8)
+
+  let deserialize ~ledger_depth bs =
+    let bitsize = 8 * byte_count_of_bits ledger_depth in
+    let rec read acc pos =
+      if pos > Bigstring.length bs then acc
+      else
+        let data = Bigstring.sub bs ~pos ~len:bitsize in
+        let path = Addr.of_byte_string (Bigstring.to_string data) in
+        read (path :: acc) (pos + bitsize)
+    in
+    read [] 0 |> of_list
 
   module Location = struct
     (* The free list should only contain addresses that locate accounts *)
