@@ -19,20 +19,19 @@ let enumerate_unique_leaves_combinations max_depth =
 
 let freelist_testable = Alcotest.testable F.pp F.equal
 
+let gen max_depth =
+  let open Quickcheck.Generator.Let_syntax in
+  let%bind ledger_depth = Int.gen_incl 1 max_depth in
+  let%map free_list = F.gen ~ledger_depth in
+  (ledger_depth, free_list)
+
 let test_de_serializaion =
   Alcotest.test_case "serialization/deserialization" `Quick (fun () ->
-      Quickcheck.test (Int.gen_incl 1 5) ~f:(fun ledger_depth ->
-          let freed =
-            List.fold_left ~init:F.empty
-              (enumerate_unique_leaves_combinations ledger_depth)
-              ~f:(fun freelist directions ->
-                let a = A.of_directions directions in
-                F.Location.add freelist (L.Account a) )
-          in
-          let bs = F.serialize ~ledger_depth freed in
+      Quickcheck.test (gen 5) ~f:(fun (ledger_depth, free_list) ->
+          let bs = F.serialize ~ledger_depth free_list in
           let deserialized = F.deserialize ~ledger_depth bs in
           Alcotest.check freelist_testable
-            "serialized and deserialized free lists are the same" freed
+            "serialized and deserialized free lists are the same" free_list
             deserialized ) )
 
 let tests = [ ("free list", [ test_de_serializaion ]) ]
