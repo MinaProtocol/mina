@@ -16,7 +16,7 @@ let Size = ../../Command/Size.dhall
 
 let dependsOn =
       [ { name = "MinaArtifactBullseye"
-        , key = "daemon-berkeley-bullseye-docker-image"
+        , key = "daemon-devnet-bullseye-docker-image"
         }
       ]
 
