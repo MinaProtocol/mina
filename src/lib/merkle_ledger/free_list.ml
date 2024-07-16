@@ -13,6 +13,8 @@ module type S = sig
 
   val pp : Format.formatter -> t -> unit
 
+  val gen : ledger_depth:int -> t Quickcheck.Generator.t
+
   module Location : sig
     val add : t -> location -> t
 
@@ -36,7 +38,7 @@ module Make (L : Location_intf.S) : S with type location = L.t = struct
   let size = length
 
   let pp ppf set =
-    Format.fprintf ppf "@[<hov>[%a]@]"
+    Format.fprintf ppf "@[<hov>[ %a]@]"
       (fun ppf set -> iter set ~f:(Format.fprintf ppf "%a;@ " Addr.pp))
       set
 
@@ -85,6 +87,12 @@ module Make (L : Location_intf.S) : S with type location = L.t = struct
     in
     let addrs = read [] 0 in
     of_list addrs
+
+  let gen ~ledger_depth =
+    let path_gen = Direction.gen_list ledger_depth in
+    let addr_gen = Quickcheck.Generator.map path_gen ~f:Addr.of_directions in
+    let addrs = Quickcheck.Generator.list addr_gen in
+    Quickcheck.Generator.map addrs ~f:of_list
 
   module Location = struct
     (* The free list should only contain addresses that locate accounts *)
