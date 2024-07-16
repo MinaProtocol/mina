@@ -17,42 +17,54 @@ struct
 
   type t = L.t * R.t [@@deriving sexp]
 
-  let validate ((l,r) : t) (label : string) =
-    let label () = [%log fatal] "Validation failure in $label"
-      ~metadata:[("label",`String label)] in
+  let validate ((l, r) : t) (label : string) =
+    let label () =
+      [%log fatal] "Validation failure in $label"
+        ~metadata:[ ("label", `String label) ]
+    in
     Lmdb.Cursor.go Ro l.lmdb (fun cursor ->
-      R.fold_until r
-        ~init:(try Some(Lmdb.Cursor.first cursor) with
-            | Not_found [@alert "-deprecated"] -> (label ();[%log fatal] "LMDB empty";exit 1)
-              )
-        ~f:(fun lmdb_state ~key ~data ->
-            let (key' , data' ) = match lmdb_state with
-                | Some((key' , data')) -> ( key' , data')
-                | None -> (label ();[%log fatal] "Validation error in $label : LMDB missing data";exit 1)
+        R.fold_until r
+          ~init:
+            ( try Some (Lmdb.Cursor.first cursor)
+              with (Not_found [@alert "-deprecated"]) ->
+                label () ;
+                [%log fatal] "LMDB empty" ;
+                exit 1 )
+          ~f:(fun lmdb_state ~key ~data ->
+            let key', data' =
+              match lmdb_state with
+              | Some (key', data') ->
+                  (key', data')
+              | None ->
+                  label () ;
+                  [%log fatal] "Validation error in $label : LMDB missing data" ;
+                  exit 1
             in
-            if key != key' || data != data' then
-            (label ();
+            if key != key' || data != data' then (
+              label () ;
               [%log fatal] "Validation failed with lmdb $lk $lv rocksdb $rk $rv"
-              ~metadata:
-                  [("lk",log_bs key')
-                  ;("lv",log_bs data')
-                  ;("rk",log_bs key)
-                  ;("rv",log_bs data)
-                  ]
-              ;exit 1);
-            try Continue (Some(Lmdb.Cursor.next cursor)) with
-              | Not_found [@alert "-deprecated"] -> Continue(None)
-          )
-        ~finish:(fun lmdb_state -> match lmdb_state with
-          | None -> ()
-          | Some(_) -> (label ();[%log fatal] "LMDB had extra data";exit 1)
-        )
-    )
+                ~metadata:
+                  [ ("lk", log_bs key')
+                  ; ("lv", log_bs data')
+                  ; ("rk", log_bs key)
+                  ; ("rv", log_bs data)
+                  ] ;
+              exit 1 ) ;
+            try Continue (Some (Lmdb.Cursor.next cursor))
+            with (Not_found [@alert "-deprecated"]) -> Continue None )
+          ~finish:(fun lmdb_state ->
+            match lmdb_state with
+            | None ->
+                ()
+            | Some _ ->
+                label () ;
+                [%log fatal] "LMDB had extra data" ;
+                exit 1 ) )
 
   let create conf =
     let l = L.create conf in
     let r = R.create conf in
-    validate (l,r) "creation";
+    validate (l, r) "creation" ;
     (l, r)
   (* this check isn't really practical
      let ll = L.to_alist l in
@@ -78,24 +90,23 @@ struct
     let rvs = R.get_batch r ~keys in
     if lvs = rvs then lvs
     else (
-      (List.iter
-        (fun (key,(lv,rv)) ->
-          match lv,rv with
-            | None,None -> ()
-            | Some(_),None -> [%log fatal] "Rocksdb missing entry at $key"
-              ~metadata:[("key",log_bs key)];
-            | None,Some(_) -> [%log fatal] "LMDB missing entry at $key"
-              ~metadata:[("key",log_bs key)];
-            | Some(l),Some(r) ->
-              (if l != r then [%log fatal] "Discrepency at $key of $l vs $r"
-              ~metadata:
-              [("key",log_bs key)
-              ;("l",log_bs l)
-              ;("r",log_bs r)
-              ];)
-        )
-        (List.combine keys (List.combine lvs rvs))
-      );
+      List.iter
+        (fun (key, (lv, rv)) ->
+          match (lv, rv) with
+          | None, None ->
+              ()
+          | Some _, None ->
+              [%log fatal] "Rocksdb missing entry at $key"
+                ~metadata:[ ("key", log_bs key) ]
+          | None, Some _ ->
+              [%log fatal] "LMDB missing entry at $key"
+                ~metadata:[ ("key", log_bs key) ]
+          | Some l, Some r ->
+              if l != r then
+                [%log fatal] "Discrepency at $key of $l vs $r"
+                  ~metadata:
+                    [ ("key", log_bs key); ("l", log_bs l); ("r", log_bs r) ] )
+        (List.combine keys (List.combine lvs rvs)) ;
       failwith "get_batch failed" )
 
   let set (l, r) ~key ~data =
@@ -107,8 +118,8 @@ struct
   let set_batch (l, r) ?remove_keys ~key_data_pairs =
     [%log info] "calling set_batch" ;
     L.set_batch l ?remove_keys ~key_data_pairs ;
-    R.set_batch r ?remove_keys ~key_data_pairs;
-    validate (l,r) "set_batch"
+    R.set_batch r ?remove_keys ~key_data_pairs ;
+    validate (l, r) "set_batch"
 
   let to_alist (l, r) =
     let lv = L.to_alist l in
@@ -120,7 +131,7 @@ struct
   let create_checkpoint (l, r) name =
     let lr = L.create_checkpoint l name in
     let rr = R.create_checkpoint r name in
-    validate (lr,rr) "checkpoint";
+    validate (lr, rr) "checkpoint" ;
     (lr, rr)
 
   let make_checkpoint (l, r) name =
