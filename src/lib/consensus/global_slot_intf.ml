@@ -1,5 +1,4 @@
 module type Full = sig
-  [%%import "/src/config.mlh"]
 
   open Core_kernel
 
