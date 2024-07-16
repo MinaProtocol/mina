@@ -252,15 +252,44 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
 
       let key = lazy (Location.build_generic (Bigstring.of_string id))
 
+      module F = Free_list.Make (Location)
+
+      (* TODO: Make the function used or remove it *)
+
       let _get mdb =
         let key = Lazy.force key in
-        let _ledger_depth = mdb.depth in
+        let ledger_depth = mdb.depth in
         match get_generic mdb key with
         | None ->
-            failwith "no data"
-        | Some _data ->
-            failwith "free_list serialization: not yet implemented"
+            Result.return F.empty
+        | Some data ->
+            Result.return @@ F.deserialize ~ledger_depth data
+
+      let set mdb t =
+        let key = Lazy.force key in
+        let ledger_depth = mdb.depth in
+        let data = F.serialize ~ledger_depth t in
+        set_raw mdb key data
+
+      (* TODO: For now this reuses the the [Out_of_leaves] error to signal that
+         the free list does not have any empty slots.
+      *)
+      let allocate mdb =
+        let key = Lazy.force key in
+        match get_generic mdb key with
+        | None ->
+            Result.fail Db_error.Out_of_leaves
+        | Some data -> (
+            let ledger_depth = mdb.depth in
+            let free_list = F.deserialize ~ledger_depth data in
+            match F.Location.pop free_list with
+            | Some (loc, free_list) ->
+                set mdb free_list ; Result.return loc
+            | None ->
+                Result.fail Db_error.Out_of_leaves )
     end
+
+    (* TODO: Make the code used or remove it  *)
 
     let _remove_location = remove
 
@@ -291,9 +320,15 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
                      next_account_location ) )
 
     let allocate mdb key =
-      let location_result = increment_last_account_location mdb in
-      Result.map location_result ~f:(fun location ->
-          set mdb key location ; location )
+      let open Result.Let_syntax in
+      let%bind location =
+        match Free_list.allocate mdb with
+        | Ok _ as loc ->
+            loc
+        | Error _ ->
+            increment_last_account_location mdb
+      in
+      set mdb key location ; Result.return location
 
     let last_location mdb =
       last_location_key () |> get_raw mdb
@@ -561,12 +596,17 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
     set mdb (Location.Account addr) account
 
+  (* FIXME:  This is false with removal *)
   let num_accounts t =
     match Account_location.last_location_address t with
     | None ->
         0
     | Some addr ->
         Addr.to_int addr + 1
+
+  let remove_location _ _ = failwith "not yet implemented"
+
+  let remove_account _ _ = failwith "not yet implemented"
 
   let to_list mdb =
     let num_accounts = num_accounts mdb in
@@ -705,8 +745,4 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   let merkle_path_at_index_exn t index =
     let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
     merkle_path_at_addr_exn t addr
-
-  let remove_location _ _ = failwith "not yet implemented"
-
-  let remove_account _ _ = failwith "not yet implemented"
 end
