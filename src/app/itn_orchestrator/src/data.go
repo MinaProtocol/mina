@@ -7,18 +7,21 @@ import (
 	"time"
 
 	"github.com/Khan/genqlient/graphql"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	logging "github.com/ipfs/go-log/v2"
 )
 
-type MetaToBeSaved struct {
-	CreatedAt          string `json:"created_at"`
-	PeerId             string `json:"peer_id"`
-	SnarkWork          string `json:"snark_work,omitempty"`
+type MiniMetaToBeSaved struct {
 	GraphqlControlPort uint16 `json:"graphql_control_port,omitempty"`
 	RemoteAddr         string `json:"remote_addr"`
-	Submitter          string `json:"submitter"`  // is base58check-encoded submitter's public key
-	BlockHash          string `json:"block_hash"` // is base58check-encoded hash of a block
+	Submitter          string `json:"submitter"` // is base58check-encoded submitter's public key
+}
+
+type MetaToBeSaved struct {
+	MiniMetaToBeSaved
+	CreatedAt string `json:"created_at"`
+	PeerId    string `json:"peer_id"`
+	SnarkWork string `json:"snark_work,omitempty"`
+	BlockHash string `json:"block_hash"` // is base58check-encoded hash of a block
 }
 
 type RawParams map[string]json.RawMessage
@@ -38,15 +41,10 @@ type NodeEntry struct {
 	LastStatusCode  *int
 }
 
-type AwsContext struct {
-	Client     *s3.Client
-	BucketName *string
-	Prefix     string
-}
-
 type Config struct {
 	Ctx                context.Context
-	AwsContext         AwsContext
+	AwsContext         *AwsContext
+	OnlineURL          string
 	Sk                 ed25519.PrivateKey
 	Log                logging.StandardLogger
 	MinaExec           string

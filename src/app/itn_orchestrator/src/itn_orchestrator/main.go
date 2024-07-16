@@ -79,16 +79,17 @@ type AppConfig struct {
 	LogLevel         zapcore.Level `json:",omitempty"`
 	LogFile          string        `json:",omitempty"`
 	Key              itn_json_types.Ed25519Privkey
-	Aws              AwsConfig `json:"aws"`
-	FundDaemonPorts  []string  `json:",omitempty"`
-	MinaExec         string    `json:",omitempty"`
+	Aws              *AwsConfig `json:"aws,omitempty"`
+	OnlineURL        string     `json:"onlineURL,omitempty"`
+	FundDaemonPorts  []string   `json:",omitempty"`
+	MinaExec         string     `json:",omitempty"`
 	SlotDurationMs   int
 	GenesisTimestamp itn_json_types.Time
 	ControlExec      string `json:",omitempty"`
 }
 
-func GetBucketName(config AppConfig) string {
-	return config.Aws.AccountId + "-block-producers-uptime"
+func (config *AwsConfig) GetBucketName() string {
+	return config.AccountId + "-block-producers-uptime"
 }
 
 func loadAppConfig() (res AppConfig) {
@@ -109,6 +110,10 @@ func loadAppConfig() (res AppConfig) {
 		os.Stderr.WriteString(fmt.Sprintf("failed to decode config %s: %v", configFilename, err))
 		os.Exit(3)
 		return
+	}
+	if (res.Aws == nil) == (res.OnlineURL == "") {
+		os.Stderr.WriteString("Neither aws nor online url configured")
+		os.Exit(11)
 	}
 	return
 }
@@ -177,6 +182,20 @@ func outputF(outCache outCacheT, log logging.StandardLogger, step int) func(stri
 		}
 	}
 }
+
+func (awsConf *AwsConfig) load(ctx context.Context, log logging.StandardLogger) *lib.AwsContext {
+	awsCredentialsFile := os.Getenv("AWS_CREDENTIALS_FILE")
+	if awsCredentialsFile != "" {
+		loadAwsCredentials(awsCredentialsFile, log)
+	}
+	awsRuntimeConfig, err := config.LoadDefaultConfig(ctx, config.WithRegion(awsConf.Region))
+	if err != nil {
+		log.Fatalf("Error loading AWS configuration: %v", err)
+	}
+	client := s3.NewFromConfig(awsRuntimeConfig)
+	return &lib.AwsContext{Client: client, BucketName: aws.String(awsConf.GetBucketName()), Prefix: awsConf.Prefix}
+}
+
 func main() {
 	appConfig := loadAppConfig()
 	logging.SetupLogging(logging.Config{
@@ -188,19 +207,12 @@ func main() {
 	})
 	log := logging.Logger("itn orchestrator")
 	log.Infof("Launching logging: %v", logging.GetSubsystems())
-
-	awsCredentialsFile := os.Getenv("AWS_CREDENTIALS_FILE")
-	if awsCredentialsFile != "" {
-		loadAwsCredentials(awsCredentialsFile, log)
-	}
 	ctx := context.Background()
-	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(appConfig.Aws.Region))
-	if err != nil {
-		log.Fatalf("Error loading AWS configuration: %v", err)
+	var awsctx *lib.AwsContext
+	if appConfig.Aws != nil {
+		awsctx = appConfig.Aws.load(ctx, log)
 	}
-	client := s3.NewFromConfig(awsCfg)
 	nodeData := make(map[lib.NodeAddress]lib.NodeEntry)
-	awsctx := lib.AwsContext{Client: client, BucketName: aws.String(GetBucketName(appConfig)), Prefix: appConfig.Aws.Prefix}
 	config := lib.Config{
 		Ctx:              ctx,
 		AwsContext:       awsctx,
@@ -212,6 +224,7 @@ func main() {
 		SlotDurationMs:   appConfig.SlotDurationMs,
 		GenesisTimestamp: time.Time(appConfig.GenesisTimestamp),
 		ControlExec:      appConfig.ControlExec,
+		OnlineURL:        appConfig.OnlineURL,
 	}
 	if config.MinaExec == "" {
 		config.MinaExec = "mina"
@@ -231,7 +244,7 @@ func main() {
 	var actionAccum []lib.ActionIO
 	handlePrevAction := func() {
 		log.Infof("Performing steps %s (%d-%d)", prevAction.Name(), step-len(actionAccum), step-1)
-		err = prevAction.RunMany(config, actionAccum)
+		err := prevAction.RunMany(config, actionAccum)
 		if err != nil {
 			log.Errorf("Error running steps %d-%d: %v", step-len(actionAccum), step-1, err)
 			os.Exit(9)

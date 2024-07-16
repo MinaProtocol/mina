@@ -8,10 +8,11 @@ import (
 const MAX_SUBMIT_PAYLOAD_SIZE = 50000000 // max payload size in bytes
 const REQUESTS_PER_PK_HOURLY = 120
 const DELEGATION_BACKEND_LISTEN_TO = ":8080"
-const TIME_DIFF_DELTA time.Duration = -5 * 60 * 1000000000 // -5m
-const WHITELIST_REFRESH_INTERVAL = 10 * 60 * 1000000000    // 10m
+const TIME_DIFF_DELTA time.Duration = -5 * time.Minute // -5m
+const WHITELIST_REFRESH_INTERVAL = 10 * time.Minute    // 10m
 const DELEGATION_WHITELIST_LIST = "Form Responses 1"
 const DELEGATION_WHITELIST_COLUMN = "E"
+const IN_MEMORY_KEEP_INTERVAL = 20 * time.Minute
 
 var PK_PREFIX = [...]byte{1, 1}
 var SIG_PREFIX = [...]byte{1}
@@ -22,10 +23,6 @@ func NetworkId() uint8 {
 		return 1
 	}
 	return 0
-}
-
-func GetBucketName(config AppConfig) string {
-	return config.Aws.AccountId + "-block-producers-uptime"
 }
 
 const PK_LENGTH = 33  // one field element (32B) + 1 bit (encoded as full byte)
