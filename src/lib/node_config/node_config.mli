@@ -40,7 +40,6 @@ val supercharged_coinbase_factor: int
 val time_offsets: bool
 val plugins: bool
 val genesis_ledger: string
-
 val genesis_state_timestamp: string
 val block_window_duration: int
 val integration_tests: bool
@@ -48,3 +47,12 @@ val force_updates: bool
 val download_snark_keys: bool
 val generate_genesis_proof: bool
 val itn_features: bool
+
+val compaction_interval: int option
+val vrf_poll_interval: int
+val network: string
+
+
+val zkapp_cmd_limit: int option
+val slot_tx_end: int option
+val slot_chain_end: int option

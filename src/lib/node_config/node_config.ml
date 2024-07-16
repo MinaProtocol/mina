@@ -55,3 +55,39 @@
 [%%inject "download_snark_keys", download_snark_keys]
 [%%inject "generate_genesis_proof", generate_genesis_proof]
 [%%inject "itn_features", itn_features]
+
+[%%ifndef compaction_interval]
+let compaction_interval_ms = None
+[%%else]
+[%%inject "compaction_interval", compaction_interval]
+let compaction_interval_ms = Some compaction_interval
+[%%endif]
+
+[%%inject "network", network]
+
+[%%inject "vrf_poll_interval_ms", vrf_poll_interval]
+
+
+
+[%%ifndef zkapp_cmd_limit]
+let zkapp_cmd_limit = None
+[%%else]
+[%%inject "zkapp_cmd_limit", zkapp_cmd_limit]
+let zkapp_cmd_limit = Some zkapp_cmd_limit
+[%%endif]
+
+
+
+[%%ifndef slot_tx_end]
+let slot_tx_end : int option = None
+[%%else]
+[%%inject "slot_tx_end", slot_tx_end]
+let slot_tx_end = Some slot_tx_end
+[%%endif]
+
+[%%ifndef slot_chain_end]
+let slot_chain_end : int option = None
+[%%else]
+[%%inject "slot_chain_end", slot_chain_end]
+let slot_chain_end = Some slot_chain_end
+[%%endif]
