@@ -6,6 +6,7 @@ echo "Exporting Variables: "
 export MINA_REPO="https://github.com/MinaProtocol/mina.git"
 
 function find_most_recent_numeric_tag() {
+    git fetch --tags
     TAG=$(git describe --always --abbrev=0 $1 | sed 's!/!-!g; s!_!-!g; s!#!-!g')
     if [[ $TAG != [0-9]* ]]; then
         TAG=$(find_most_recent_numeric_tag $TAG~)
@@ -48,21 +49,10 @@ else
   export GITTAG=$(find_most_recent_numeric_tag HEAD)
 fi
 
-if [[ -n "${THIS_COMMIT_TAG}" ]]; then # If the commit is tagged
-    export MINA_DEB_VERSION="${GITTAG}-${GITHASH}"
-else
-    export MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
-fi
 
-export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g; s!#!-!g')"
-
-# Determine the packages to build (mainnet y/N)
-case $GITBRANCH in
-    compatible|master|release/1*) # whitelist of branches that are "mainnet-like"
-      MINA_BUILD_MAINNET=true ;;
-    *) # Other branches
-      MINA_BUILD_MAINNET=false ;;
-esac
+export MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
+export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')"
+export RELEASE=unstable
 
 echo "Publishing on release channel \"${RELEASE}\""
 [[ -n ${THIS_COMMIT_TAG} ]] && export MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"

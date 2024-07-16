@@ -13,10 +13,10 @@
    kimchi_types
    pasta_bindings
    kimchi_backend
-   kimchi_backend.common
+   kimchi_backend_common
    kimchi_pasta
-   kimchi_backend.pasta.basic
-   kimchi_pasta_constraint_system
+   kimchi_pasta.basic
+   kimchi_pasta.constraint_system
    mina_metrics.none
    run_in_thread.fake
    snarky.backendless
