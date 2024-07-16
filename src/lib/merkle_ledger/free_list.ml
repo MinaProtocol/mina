@@ -1,5 +1,5 @@
 module type S = sig
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, equal]
 
   type location
 
@@ -10,6 +10,8 @@ module type S = sig
   val empty : t
 
   val size : t -> int
+
+  val pp : Format.formatter -> t -> unit
 
   module Location : sig
     val add : t -> location -> t
@@ -26,16 +28,22 @@ end
 
 module Make (L : Location_intf.S) : S with type location = L.t = struct
   module Addr = L.Addr
+
+  type location = L.t
+
   include Set.Make (L.Addr)
 
   let size = length
 
-  type location = L.t
+  let pp ppf set =
+    Format.fprintf ppf "@[<hov>[%a]@]"
+      (fun ppf set -> iter set ~f:(Format.fprintf ppf "%a;@ " Addr.pp))
+      set
 
   (* [remove_all_contiguous set addr] removes all addresses contiguous from
-     [a] in decreasing order.
+     [a] in decreasing order according to {!val:Location.Addr.prev}.
 
-     @return  a set where all such addresses have been removed, and the first
+     @return  a free list where all such addresses have been removed, and the first
      address not in set, if any
   *)
   let rec remove_all_contiguous set addr =
@@ -60,18 +68,23 @@ module Make (L : Location_intf.S) : S with type location = L.t = struct
   let serialize ~ledger_depth t =
     to_list t |> List.map ~f:(Addr.serialize ~ledger_depth) |> Bigstring.concat
 
+  (* [byte_count_of_bits n] returns how many bytes we need to represent [n] bits *)
   let byte_count_of_bits n = (n / 8) + min 1 (n % 8)
 
+  (* [deserialize] *)
   let deserialize ~ledger_depth bs =
-    let bitsize = 8 * byte_count_of_bits ledger_depth in
+    let bitsize = byte_count_of_bits ledger_depth in
+    let len = Bigstring.length bs in
     let rec read acc pos =
-      if pos > Bigstring.length bs then acc
+      if pos >= len then acc
       else
         let data = Bigstring.sub bs ~pos ~len:bitsize in
         let path = Addr.of_byte_string (Bigstring.to_string data) in
-        read (path :: acc) (pos + bitsize)
+        let addr = Addr.slice path 0 ledger_depth in
+        read (addr :: acc) (pos + bitsize)
     in
-    read [] 0 |> of_list
+    let addrs = read [] 0 in
+    of_list addrs
 
   module Location = struct
     (* The free list should only contain addresses that locate accounts *)
