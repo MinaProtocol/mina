@@ -5498,29 +5498,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "ENUM",
-          "name": "Encoding",
-          "description": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": [
-            {
-              "name": "JSON",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "BASE64",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "possibleTypes": null
-        },
-        {
           "kind": "INPUT_OBJECT",
           "name": "VrfEvaluationInput",
           "description": "The witness to a vrf evaluation",
@@ -15360,34 +15337,6 @@
               "description":
                 "The signature kind that this daemon instance is using",
               "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "protocolState",
-              "description":
-                "Get the current protocol state, optionally encoded in Base64",
-              "args": [
-                {
-                  "name": "encoding",
-                  "description": "Encoding format (JSON or BASE64)",
-                  "type": {
-                    "kind": "ENUM",
-                    "name": "Encoding",
-                    "ofType": null
-                  },
-                  "defaultValue": null
-                }
-              ],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
