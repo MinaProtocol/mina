@@ -78,45 +78,6 @@ let to_alist t : (Bigstring.t * Bigstring.t) list =
   in
   loop []
 
-let foldi :
-       t
-    -> init:'a
-    -> f:(int -> 'a -> key:Bigstring.t -> data:Bigstring.t -> 'a)
-    -> 'a =
- fun t ~init ~f ->
-  let iterator = Rocks.Iterator.create t.db in
-  let rec loop i accum =
-    if Rocks.Iterator.is_valid iterator then (
-      let key = copy_bigstring (Rocks.Iterator.get_key iterator) in
-      let data = copy_bigstring (Rocks.Iterator.get_value iterator) in
-      Rocks.Iterator.next iterator ;
-      loop (i + 1) (f i accum ~key ~data) )
-    else accum
-  in
-  loop 0 init
-
-let fold_until :
-       t
-    -> init:'a
-    -> f:
-         (   'a
-          -> key:Bigstring.t
-          -> data:Bigstring.t
-          -> ('a, 'b) Continue_or_stop.t )
-    -> finish:('a -> 'b)
-    -> 'b =
- fun t ~init ~f ~finish ->
-  let iterator = Rocks.Iterator.create t.db in
-  let rec loop accum =
-    if Rocks.Iterator.is_valid iterator then (
-      let key = copy_bigstring (Rocks.Iterator.get_key iterator) in
-      let data = copy_bigstring (Rocks.Iterator.get_value iterator) in
-      Rocks.Iterator.next iterator ;
-      match f accum ~key ~data with Stop _ -> accum | Continue v -> loop v )
-    else accum
-  in
-  finish @@ loop init
-
 let to_bigstring = Bigstring.of_string
 
 let%test_unit "get_batch" =

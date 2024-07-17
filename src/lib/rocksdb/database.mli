@@ -8,7 +8,7 @@ type t = { uuid : uuid; db : (Rocks.t[@sexp.opaque]) } [@@deriving sexp]
 
 type db := t
 
-(** [create dirname] creates a database contained in [dirname]. 
+(** [create dirname] creates a database contained in [dirname].
 
     @param dirname will be created if it does not exist
  *)
@@ -21,7 +21,7 @@ val get_batch : t -> keys:key list -> data option list
 val set : t -> key:key -> data:data -> unit
 
 (** Any key present both in [remove_keys] and [key_data_pairs] will be absent
-    from the database. 
+    from the database.
 
     @param remove_keys defaults to [[]]
 *)
@@ -39,19 +39,6 @@ val make_checkpoint : t -> string -> unit
 val create_checkpoint : t -> string -> t
 
 val get_uuid : t -> uuid
-
-val foldi :
-     t
-  -> init:'a
-  -> f:(int -> 'a -> key:Bigstring.t -> data:Bigstring.t -> 'a)
-  -> 'a
-
-val fold_until :
-     t
-  -> init:'a
-  -> f:('a -> key:Bigstring.t -> data:Bigstring.t -> ('a, 'b) Continue_or_stop.t)
-  -> finish:('a -> 'b)
-  -> 'b
 
 module Batch : sig
   type t = Rocks.WriteBatch.t
