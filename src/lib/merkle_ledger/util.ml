@@ -157,7 +157,6 @@ end = struct
 
   let set_raw_addresses t addresses_and_accounts =
     let ledger_depth = Inputs.ledger_depth t in
-    assert (Inputs.Base.is_compact t) ;
     Option.iter (Mina_stdlib.Nonempty_list.of_list_opt addresses_and_accounts)
       ~f:(fun nonempty_addresses_and_accounts ->
         let key_locations =
@@ -190,6 +189,7 @@ end = struct
   (* TODO: When we do batch on a database, we should add accounts, locations and hashes
      simultaneously for full atomicity. *)
   let set_batch t locations_and_accounts =
+    assert (Inputs.Base.is_compact t) ;
     set_raw_addresses t locations_and_accounts ;
     Inputs.set_raw_account_batch t locations_and_accounts ;
     set_hash_batch t
