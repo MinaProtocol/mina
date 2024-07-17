@@ -1,5 +1,4 @@
 module type Full = sig
-
   open Core_kernel
 
   module Poly : sig

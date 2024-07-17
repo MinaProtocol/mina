@@ -6,10 +6,9 @@ open Signature_lib
 open Init
 module YJ = Yojson.Safe
 
-let () = 
+let () =
   if Node_config.record_async_backtraces then
     Async.Scheduler.set_record_backtraces true
-
 
 type mina_initialization =
   { mina : Mina_lib.t
@@ -47,10 +46,11 @@ let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
 
 let plugin_flag =
   if Node_config.plugins then
-      let open Command.Param in
-      flag "--load-plugin" ~aliases:[ "load-plugin" ] (listed string)
-        ~doc:
-          "PATH The path to load a .cmxs plugin from. May be passed multiple times"
+    let open Command.Param in
+    flag "--load-plugin" ~aliases:[ "load-plugin" ] (listed string)
+      ~doc:
+        "PATH The path to load a .cmxs plugin from. May be passed multiple \
+         times"
   else Command.Param.return []
 
 let load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level config_files =
@@ -1654,7 +1654,7 @@ let audit_type_shapes : Command.t =
          if !bad > 0 then Core.exit 1 ) )
 
 (*NOTE A previous version of this function included compile time ppx that didn't compile, and was never
- evaluated under any build profile
+  evaluated under any build profile
 *)
 let ensure_testnet_id_still_good _ = Deferred.unit
 

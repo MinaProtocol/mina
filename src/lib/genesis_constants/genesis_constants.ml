@@ -16,6 +16,7 @@ module Proof_level = struct
         failwithf "unrecognised proof level %s" s ()
 
   let compiled = of_string Node_config.proof_level
+
   let for_unit_tests = Check
 end
 
@@ -81,7 +82,6 @@ module Constraint_constants = struct
   *)
   include (
     struct
-
       (** All the proofs before the last [work_delay] blocks must be
             completed to add transactions. [work_delay] is the minimum number
             of blocks and will increase if the throughput is less.
@@ -93,41 +93,55 @@ module Constraint_constants = struct
               completing the proofs.
         *)
 
-      let transaction_capacity_log_2 = 
-        match (Node_config.scan_state_with_tps_goal, Node_config.scan_state_tps_goal_x10) with
-          | (true, Some tps_goal_x10) ->
+      let transaction_capacity_log_2 =
+        match
+          ( Node_config.scan_state_with_tps_goal
+          , Node_config.scan_state_tps_goal_x10 )
+        with
+        | true, Some tps_goal_x10 ->
             let max_coinbases = 2 in
 
             (* block_window_duration is in milliseconds, so divide by 1000 divide
                by 10 again because we have tps * 10
             *)
-            let max_user_commands_per_block = tps_goal_x10 * Node_config.block_window_duration / (1000 * 10) in
+            let max_user_commands_per_block =
+              tps_goal_x10 * Node_config.block_window_duration / (1000 * 10)
+            in
 
-            (** Log of the capacity of transactions per transition.
+            (* Log of the capacity of transactions per transition.
                   - 1 will only work if we don't have prover fees.
                   - 2 will work with prover fees, but not if we want a transaction
                     included in every block.
                   - At least 3 ensures a transaction per block and the staged-ledger
                     unit tests pass.
-              *)
-             1 + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
+            *)
+            1
+            + Core_kernel.Int.ceil_log2
+                (max_user_commands_per_block + max_coinbases)
+        | _ -> (
+            match Node_config.scan_state_transaction_capacity_log_2 with
+            | Some a ->
+                a
+            | None ->
+                failwith
+                  "scan_state_transaction_capacity_log_2 must be set if \
+                   scan_state_with_tps_goal is false" )
 
-          | _ ->  match Node_config.scan_state_transaction_capacity_log_2 with
-              | Some a -> a
-              | None -> failwith "scan_state_transaction_capacity_log_2 must be set if scan_state_with_tps_goal is false"
-
-      let supercharged_coinbase_factor = Node_config.supercharged_coinbase_factor
+      let supercharged_coinbase_factor =
+        Node_config.supercharged_coinbase_factor
 
       let pending_coinbase_depth =
         Core_kernel.Int.ceil_log2
-          (((transaction_capacity_log_2 + 1) * (Node_config.scan_state_work_delay + 1)) + 1)
+          ( (transaction_capacity_log_2 + 1)
+            * (Node_config.scan_state_work_delay + 1)
+          + 1 )
 
       let compiled =
         { sub_windows_per_window = Node_config.sub_windows_per_window
         ; ledger_depth = Node_config.ledger_depth
         ; work_delay = Node_config.scan_state_work_delay
         ; block_window_duration_ms = Node_config.block_window_duration
-        ; transaction_capacity_log_2 = transaction_capacity_log_2
+        ; transaction_capacity_log_2
         ; pending_coinbase_depth
         ; coinbase_amount =
             Currency.Amount.of_mina_string_exn Node_config.coinbase
@@ -311,12 +325,19 @@ end
 include T
 
 let genesis_state_timestamp_string = Node_config.genesis_state_timestamp
+
 let k = Node_config.k
+
 let slots_per_epoch = Node_config.slots_per_epoch
+
 let slots_per_sub_window = Node_config.slots_per_sub_window
+
 let grace_period_slots = Node_config.grace_period_slots
+
 let delta = Node_config.delta
+
 let pool_max_size = Node_config.pool_max_size
+
 let compiled : t =
   { protocol =
       { k
