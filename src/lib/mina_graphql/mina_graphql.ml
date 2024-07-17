@@ -2613,14 +2613,12 @@ module Queries = struct
             in
             let encoded =
               match encoding_opt with
-              | Some `JSON ->
-                  Mina_state.Protocol_state.value_to_yojson protocol_state
-                  |> Yojson.Safe.to_string
               | Some `BASE64 ->
                   Bin_prot.Writer.to_string
                     Mina_state.Protocol_state.Value.Stable.V2.bin_t.writer
                     protocol_state
                   |> Base64.encode_exn
+              | Some `JSON 
               | None ->
                   (* Default to JSON if no encoding is specified *)
                   Mina_state.Protocol_state.value_to_yojson protocol_state
