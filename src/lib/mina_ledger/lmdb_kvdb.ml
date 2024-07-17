@@ -91,7 +91,7 @@ module Kvdb = struct
       ()
 
   let to_alist t =
-    Lmdb.Cursor.fold_left ~f:(fun xs k v -> List.cons (k, v) xs) [] t.lmdb
+    Lmdb.Cursor.fold_right ~f:(fun k v xs -> List.cons (k, v) xs) t.lmdb []
   (* TODO this feels like a bad idea performance wise *)
 
   let foldi t ~init ~f =

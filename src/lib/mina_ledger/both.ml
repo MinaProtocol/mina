@@ -12,70 +12,49 @@ struct
     `String
       (Option.fold ~none:"None" ~some:Core_kernel.Bigstring.to_string optbs)
 
+  (*
   let log_db db =
     `List (List.map (fun (k, v) -> `List [ log_bs k; log_bs v ]) db)
+      *)
 
   type t = L.t * R.t [@@deriving sexp]
 
   module Maps = Map.Make (Core_kernel.Bigstring)
 
   let validate_no_dups_lmdb (l : L.t) (label : string) =
-    Lmdb.Cursor.go Ro l.lmdb Lmdb.Cursor.(fun cursor ->
-        match first cursor with
-          | exception Not_found [@alert "-deprecated"] -> ()
-          | (k_first,_) ->
-            [%log info] "First key $key" ~metadata:[("key",log_bs k_first)];
-            let rec check_dups k m = (
-              let m' = (match Maps.find k m with
-                | exception Not_found -> Maps.add k 1 m
-                | n -> [%log info] "duplicate found"; Maps.add k (n+1) m
-              ) in
-              match fst @@ next cursor with
-                | exception Not_found [@alert "-deprecated"] -> [%log info] "No dups in lmdb"
+    Lmdb.Cursor.go Ro l.lmdb
+      Lmdb.Cursor.(
+        fun cursor ->
+          match first cursor with
+          | ((exception Not_found) [@alert "-deprecated"]) ->
+              ()
+          | k_first, _ ->
+              [%log info] "First key $key" ~metadata:[ ("key", log_bs k_first) ] ;
+              let rec check_dups k m =
+                let m' =
+                  match Maps.find k m with
+                  | exception Not_found ->
+                      Maps.add k 1 m
+                  | n ->
+                      [%log info] "duplicate found" ;
+                      Maps.add k (n + 1) m
+                in
+                match fst @@ next cursor with
+                | ((exception Not_found) [@alert "-deprecated"]) ->
+                    [%log info] "No dups in lmdb"
                 | k_next ->
-                  if k = k_next then ([%log fatal] "Found a duplicate $label"
-                    ~metadata:[("label",`String label)]; exit 1
-                  );
-              if k_next < k then ([%log info] "Key DECREASED $key" ~metadata:[("key",log_bs k_next)]);
-              if k_next > k then ([%log info] "Key increased $key" ~metadata:[("key",log_bs k_next)]);
-              if k_next = k_first then ([%log fatal] "Key looped to first";exit 1);
-                  check_dups k_next m')
-            in check_dups k_first Maps.empty
+                    if k = k_next then (
+                      [%log fatal] "Found a duplicate $label"
+                        ~metadata:[ ("label", `String label) ] ;
+                      exit 1 ) ;
+                    if k_next = k_first then (
+                      [%log fatal] "Key looped to first" ;
+                      exit 1 ) ;
+                    check_dups k_next m'
+              in
+              check_dups k_first Maps.empty)
 
-      )
-
-  let validate ((l, r) : t) (label : string) =
-    L.foldi l ~init:() ~f:(fun _ _ ~key ~data ->
-        match R.get r ~key with
-        | None ->
-            [%log fatal] "Missing entry in rocksdb" ;
-            exit 1
-        | Some r_data ->
-            if r_data <> data then (
-              [%log fatal] "validate_l $label , $key $ldata $rdata"
-                ~metadata:
-                  [ ("label", `String label)
-                  ; ("key", log_bs key)
-                  ; ("ldata", log_bs data)
-                  ; ("rdata", log_bs r_data)
-                  ] ;
-              exit 1 ) ) ;
-    List.iter (fun (key,data) ->
-        if L.get l ~key <> Some data then (
-          [%log fatal] "validate_r $label"
-            ~metadata:[ ("label", `String label) ] ;
-        exit 1 ))
-        (R.to_alist r);
-    validate_no_dups_lmdb l label;
-    let l_len : int = L.foldi l ~init:0 ~f:(fun _ i ~key:_ ~data:_ -> i+1) in
-    let r_len : int = R.foldi r ~init:0 ~f:(fun _ i ~key:_ ~data:_ -> i+1) in
-    if l_len <> r_len then ([%log fatal] "database sizes differ $l $r"
-        ~metadata:[("l",`Int l_len);("r",`Int r_len)]
-        ; exit 1)
-
-
-      (*
-  let validate_1 ((l, r) : t) (label : string) =
+  let validate_order ((l, r) : t) (label : string) =
     let label () =
       [%log fatal] "Validation failure in $label"
         ~metadata:[ ("label", `String label) ]
@@ -84,7 +63,7 @@ struct
         R.fold_until r
           ~init:
             ( try Some (Lmdb.Cursor.first cursor)
-              with (Not_found [@alert "-deprecated"]) -> None)
+              with (Not_found [@alert "-deprecated"]) -> None )
           ~f:(fun lmdb_state ~key ~data ->
             let key', data' =
               match lmdb_state with
@@ -111,13 +90,49 @@ struct
             match lmdb_state with
             | None ->
                 ()
-            | Some (key , data) ->
+            | Some (key, data) ->
                 label () ;
                 let rd = R.get r ~key in
-                [%log fatal] "Validation error LMDB had extra data $key $data , $rd"
-              ~metadata:[("key",log_bs key);("data",log_bs data);("rd",log_opt_bs rd)];
+                [%log fatal]
+                  "Validation error LMDB had extra data $key $data , $rd"
+                  ~metadata:
+                    [ ("key", log_bs key)
+                    ; ("data", log_bs data)
+                    ; ("rd", log_opt_bs rd)
+                    ] ;
                 exit 1 ) )
-  *)
+
+  let validate ((l, r) : t) (label : string) =
+    L.foldi l ~init:() ~f:(fun _ _ ~key ~data ->
+        match R.get r ~key with
+        | None ->
+            [%log fatal] "Missing entry in rocksdb" ;
+            exit 1
+        | Some r_data ->
+            if r_data <> data then (
+              [%log fatal] "validate_l $label , $key $ldata $rdata"
+                ~metadata:
+                  [ ("label", `String label)
+                  ; ("key", log_bs key)
+                  ; ("ldata", log_bs data)
+                  ; ("rdata", log_bs r_data)
+                  ] ;
+              exit 1 ) ) ;
+    List.iter
+      (fun (key, data) ->
+        if L.get l ~key <> Some data then (
+          [%log fatal] "validate_r $label"
+            ~metadata:[ ("label", `String label) ] ;
+          exit 1 ) )
+      (R.to_alist r) ;
+    validate_no_dups_lmdb l label ;
+    let l_len : int = L.foldi l ~init:0 ~f:(fun _ i ~key:_ ~data:_ -> i + 1) in
+    let r_len : int = R.foldi r ~init:0 ~f:(fun _ i ~key:_ ~data:_ -> i + 1) in
+    if l_len <> r_len then (
+      [%log fatal] "database sizes differ $l $r"
+        ~metadata:[ ("l", `Int l_len); ("r", `Int r_len) ] ;
+      exit 1 ) ;
+    validate_order (l, r) label
 
   let create conf =
     let l = L.create conf in
@@ -174,11 +189,9 @@ struct
     R.set r ~key ~data
 
   let set_batch (l, r) ?remove_keys ~key_data_pairs =
-    [%log info] "calling set_batch" ;
     validate (l, r) "pre_set_batch" ;
     L.set_batch l ?remove_keys ~key_data_pairs ;
     R.set_batch r ?remove_keys ~key_data_pairs ;
-    [%log info] "adding data $db" ~metadata:[ ("db", log_db key_data_pairs) ] ;
     validate (l, r) "set_batch"
   (* validate (l, r) "set_batch" *)
 
