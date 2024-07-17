@@ -91,39 +91,10 @@ let
     [ zlib bzip2 gmp openssl libffi ]
     ++ lib.optional (!(stdenv.isDarwin && stdenv.isAarch64)) jemalloc;
 
-  base-libs =
-    let deps = pkgs.lib.getAttrs (builtins.attrNames implicit-deps) scope;
-    in pkgs.stdenv.mkDerivation {
-      name = "mina-base-libs";
-      phases = [ "installPhase" ];
-      buildInputs = builtins.attrValues deps;
-      installPhase = ''
-        mkdir -p $out/lib/ocaml/${scope.ocaml.version}/site-lib/stublibs $out/nix-support $out/bin
-        {
-          echo -n 'export OCAMLPATH=$'
-          echo -n '{OCAMLPATH-}$'
-          echo '{OCAMLPATH:+:}'"$out/lib/ocaml/${scope.ocaml.version}/site-lib"
-          echo -n 'export CAML_LD_LIBRARY_PATH=$'
-          echo -n '{CAML_LD_LIBRARY_PATH-}$'
-          echo '{CAML_LD_LIBRARY_PATH:+:}'"$out/lib/ocaml/${scope.ocaml.version}/site-lib/stublibs"
-        } > $out/nix-support/setup-hook
-        for input in $buildInputs; do
-          [ ! -d "$input/lib/ocaml/${scope.ocaml.version}/site-lib" ] || {
-            find "$input/lib/ocaml/${scope.ocaml.version}/site-lib" -maxdepth 1 -mindepth 1 -not -name stublibs | while read d; do
-              ln -s "$d" "$out/lib/ocaml/${scope.ocaml.version}/site-lib/"
-            done
-          }
-          [ ! -d "$input/lib/ocaml/${scope.ocaml.version}/site-lib/stublibs" ] || cp -Rs "$input/lib/ocaml/${scope.ocaml.version}/site-lib/stublibs"/* "$out/lib/ocaml/${scope.ocaml.version}/site-lib/stublibs/"
-          [ ! -d "$input/bin" ] || cp -Rs $input/bin/* $out/bin
-          [ ! -f "$input/nix-support/propagated-build-inputs" ] || { cat "$input/nix-support/propagated-build-inputs" | sed -r 's/\s//g'; echo ""; } >> $out/nix-support/propagated-build-inputs.draft
-          echo $input >> $out/nix-support/propagated-build-inputs.ref
-        done
-        sort $out/nix-support/propagated-build-inputs.draft | uniq | grep -vE '^$' > $out/nix-support/propagated-build-inputs.draft.unique
-        sort $out/nix-support/propagated-build-inputs.ref | uniq | grep -vE '^$' > $out/nix-support/propagated-build-inputs.ref.unique
-        comm -2 -3 $out/nix-support/propagated-build-inputs.{draft,ref}.unique > $out/nix-support/propagated-build-inputs
-        rm $out/nix-support/propagated-build-inputs.*
-      '';
-    };
+  dune-nix = inputs.dune-nix.lib.${pkgs.system};
+
+  base-libs = dune-nix.squashOpamNixDeps scope.ocaml.version
+    (pkgs.lib.attrVals (builtins.attrNames implicit-deps) scope);
 
   dune-description = pkgs.stdenv.mkDerivation {
     pname = "dune-description";
@@ -147,26 +118,16 @@ let
     '';
   };
 
-  pathFilter = import ./granular/filter.nix { inherit pkgs; };
-  util = import ./granular/util.nix { inherit pkgs pathFilter; };
-  depsNonpromoted =
-    import ./granular/deps-nonpromoted.nix { inherit pkgs util; };
-  deps = import ./granular/deps.nix { inherit pkgs util depsNonpromoted; };
-  show = import ./granular/show.nix { inherit pkgs deps; };
-  vm = import ./granular/vm.nix { inherit pkgs util; };
-  output =
-    import ./granular/output.nix { inherit pkgs util pathFilter deps show; };
-
   duneDescLoaded = builtins.fromJSON (builtins.readFile dune-description);
-  info = import ./granular/info.nix { inherit pkgs util; } duneDescLoaded;
-  allDeps = deps.allDeps info;
+  info = dune-nix.info duneDescLoaded;
+  allDeps = dune-nix.allDeps info;
   commonOverrides = {
     DUNE_PROFILE = "dev";
     buildInputs = [ base-libs ] ++ external-libs;
     nativeBuildInputs = [ ];
   };
   packageHasSrcApp =
-    util.packageHasUnit ({ src, ... }: pkgs.lib.hasPrefix "src/app/" src);
+    dune-nix.packageHasUnit ({ src, ... }: pkgs.lib.hasPrefix "src/app/" src);
   sqlSchemaFiles = with inputs.nix-filter.lib;
     filter {
       root = ../src/app/archive;
@@ -174,7 +135,7 @@ let
     };
 
   granularBase =
-    output.outputs' commonOverrides ./.. allDeps info packageHasSrcApp;
+    dune-nix.outputs' commonOverrides ./.. allDeps info packageHasSrcApp;
   vmOverlays = let
     cmdLineTest = ''
       mina --version
@@ -187,20 +148,21 @@ let
       ./tests.exe --mina-path mina
     '';
   in [
-    (vm.testWithVm { } "mina_net2" [ pkgs.libp2p_helper ])
-    (vm.testWithVm { } "__src-lib-mina_net2-tests__" [ pkgs.libp2p_helper ])
+    (dune-nix.testWithVm { } "mina_net2" [ pkgs.libp2p_helper ])
+    (dune-nix.testWithVm { } "__src-lib-mina_net2-tests__"
+      [ pkgs.libp2p_helper ])
     (self:
-      vm.testWithVm' cmdLineTest { } "__src-test-command_line_tests__" [
+      dune-nix.testWithVm' cmdLineTest { } "__src-test-command_line_tests__" [
         self.pkgs.cli
         pkgs.libp2p_helper
       ] self)
-    (vm.testWithVm { } "__src-lib-staged_ledger-test__" [ ])
+    (dune-nix.testWithVm { } "__src-lib-staged_ledger-test__" [ ])
   ];
   granularCustom = _: super:
     let
       makefileTest = pkg:
         let src = info.pseudoPackages."${pkg}";
-        in util.makefileTest ./.. pkg src;
+        in dune-nix.makefileTest ./.. pkg src;
       marlinPlonkStubs = {
         MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
       };
@@ -258,13 +220,12 @@ let
 
   # We merge overlays in a cutsom way because pkgs.lib.composeManyExtensions
   # uses `//` for update instead of recursiveUpdate
-  granularOverlay =
-  self: _:
+  granularOverlay = self: _:
     let
       base = granularBase self;
       overlays = [ granularCustom ] ++ vmOverlays;
-    in builtins.foldl' (super: f: pkgs.lib.recursiveUpdate super (f self super)) base
-    overlays;
+    in builtins.foldl' (super: f: pkgs.lib.recursiveUpdate super (f self super))
+    base overlays;
 
   overlay = self: super:
     let

@@ -21,8 +21,13 @@
   inputs.opam-nix.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.inputs.opam-repository.follows = "opam-repository";
 
+  inputs.dune-nix.url = "github:o1-labs/dune-nix";
+  inputs.dune-nix.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.dune-nix.inputs.flake-utils.follows = "utils";
+
   inputs.describe-dune.url = "github:o1-labs/describe-dune";
   inputs.describe-dune.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.describe-dune.inputs.flake-utils.follows = "utils";
 
   inputs.o1-opam-repository.url = "github:o1-labs/opam-repository";
   inputs.o1-opam-repository.flake = false;
@@ -311,7 +316,8 @@
             test_executive with-instrumentation;
           # Granular nix
           inherit (ocamlPackages)
-            src exes all default all-tested pkgs all-exes files tested info dune-description base-libs;
+            src exes all default all-tested pkgs all-exes files tested info
+            dune-description base-libs;
           inherit (pkgs)
             libp2p_helper kimchi_bindings_stubs snarky_js leaderboard validation
             trace-tool zkapp-cli;
