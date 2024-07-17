@@ -43,7 +43,7 @@
    block_time
    pipe_lib
    signature_lib
-   runtime_config
+   mina_runtime_config
    trust_system
    protocol_version
    transition_frontier_base

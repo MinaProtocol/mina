@@ -63,8 +63,6 @@ module Index = struct
   let fold ~ledger_depth t =
     Fold.group3 ~default:false (fold_bits ~ledger_depth t)
 
-  [%%ifdef consensus_mechanism]
-
   module Unpacked = struct
     type var = Tick.Boolean.var list
 
@@ -79,8 +77,6 @@ module Index = struct
         (Typ.list ~length:ledger_depth Boolean.typ)
         ~there:(to_bits ~ledger_depth) ~back:of_bits
   end
-
-  [%%endif]
 end
 
 module Nonce = Account_nonce
@@ -163,8 +159,6 @@ module Token_symbol = struct
   let to_input (x : t) =
     Random_oracle_input.Chunked.packed (to_field x, num_bits)
 
-  [%%ifdef consensus_mechanism]
-
   type var = Field.Var.t
 
   let range_check (t : var) =
@@ -196,8 +190,6 @@ module Token_symbol = struct
   let var_to_input (x : var) = Random_oracle_input.Chunked.packed (x, num_bits)
 
   let if_ = Tick.Run.Field.if_
-
-  [%%endif]
 end
 
 (* the `token_symbol` describes a token id owned by the account id
@@ -379,8 +371,6 @@ let crypto_hash_prefix = Hash_prefix.account
 let crypto_hash t =
   Random_oracle.hash ~init:crypto_hash_prefix
     (Random_oracle.pack_input (to_input t))
-
-[%%ifdef consensus_mechanism]
 
 type var =
   ( Public_key.Compressed.var
@@ -607,8 +597,6 @@ module Checked = struct
           account.permissions.access ~signature_verifies
 end
 
-[%%endif]
-
 let digest = crypto_hash
 
 let empty =
@@ -627,7 +615,7 @@ let empty =
   ; zkapp = None
   }
 
-let empty_digest = digest empty
+let empty_digest = lazy (digest empty)
 
 let create account_id balance =
   let public_key = Account_id.public_key account_id in

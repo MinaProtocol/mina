@@ -2098,14 +2098,14 @@ module Make_str (A : Wire_types.Concrete) = struct
         let open Basic in
         let module M = H4.T (Pickles.Tag) in
         let s = Basic.spec t in
-        let prev_should_verify =
+        let prev_must_verify =
           match proof_level with
           | Genesis_constants.Proof_level.Full ->
               true
           | _ ->
               false
         in
-        let b = Boolean.var_of_value prev_should_verify in
+        let b = Boolean.var_of_value prev_must_verify in
         match t with
         | Proved ->
             { identifier = "proved"
@@ -3270,14 +3270,14 @@ module Make_str (A : Wire_types.Concrete) = struct
       (s1, s2)
 
     let rule ~proof_level self : _ Pickles.Inductive_rule.t =
-      let prev_should_verify =
+      let prev_must_verify =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
             true
         | _ ->
             false
       in
-      let b = Boolean.var_of_value prev_should_verify in
+      let b = Boolean.var_of_value prev_must_verify in
       { identifier = "merge"
       ; prevs = [ self; self ]
       ; main =
@@ -3318,6 +3318,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~constraint_constants:
         (Genesis_constants.Constraint_constants.to_snark_keys_header
            constraint_constants )
+      ~commit:Mina_version.commit_id
       ~choices:(fun ~self ->
         let zkapp_command x =
           Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
@@ -3335,9 +3336,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       val verify : (t * Sok_message.t) list -> unit Or_error.t Async.Deferred.t
 
-      val id : Pickles.Verification_key.Id.t Lazy.t
+      val id : Pickles.Verification_key.Id.t Async.Deferred.t Lazy.t
 
-      val verification_key : Pickles.Verification_key.t Lazy.t
+      val verification_key : Pickles.Verification_key.t Async.Deferred.t Lazy.t
 
       val verify_against_digest : t -> unit Or_error.t Async.Deferred.t
 
@@ -4193,9 +4194,13 @@ module Make_str (A : Wire_types.Concrete) = struct
         let%map (), (), proof = trivial_prover ?handler stmt in
         ((), (), Pickles.Side_loaded.Proof.of_proof proof)
       in
-      let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
-      ( `VK (With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk)
-      , `Prover trivial_prover )
+      let vk =
+        let%map.Async.Deferred vk =
+          Pickles.Side_loaded.Verification_key.of_compiled tag
+        in
+        With_hash.of_data ~hash_data:Zkapp_account.digest_vk vk
+      in
+      (`VK vk, `Prover trivial_prover)
 
     let%test_unit "creating trivial zkapps with different nonces makes unique \
                    verification keypairs" =
@@ -4224,9 +4229,11 @@ module Make_str (A : Wire_types.Concrete) = struct
       let `VK vk_a, `Prover prover_a =
         create_trivial_snapp ~unique_id:0 ~constraint_constants ()
       in
+      let vk_a = Async.Thread_safe.block_on_async_exn (fun () -> vk_a) in
       let `VK vk_b, `Prover prover_b =
         create_trivial_snapp ~unique_id:1 ~constraint_constants ()
       in
+      let vk_b = Async.Thread_safe.block_on_async_exn (fun () -> vk_b) in
       assert (
         not
           ([%equal:
@@ -4582,6 +4589,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let `VK vk, `Prover _trivial_prover =
         create_trivial_snapp ~constraint_constants ()
       in
+      let%map.Async.Deferred vk = vk in
       (* only allow timing on a single new snapp account
          balance changes for other new snapp accounts are just the account creation fee
       *)
@@ -4712,6 +4720,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         | None ->
             create_trivial_snapp ~constraint_constants ()
       in
+      let%bind.Async.Deferred vk = vk in
       let ( `Zkapp_command { Zkapp_command.fee_payer; memo; _ }
           , `Sender_account_update _
           , `Proof_zkapp_command _
@@ -4740,7 +4749,8 @@ module Make_str (A : Wire_types.Concrete) = struct
               ; may_use_token = No
               ; authorization_kind = Proof (With_hash.hash vk)
               }
-          ; authorization = Control.Proof Mina_base.Proof.blockchain_dummy
+          ; authorization =
+              Control.Proof (Lazy.force Mina_base.Proof.blockchain_dummy)
           }
       in
       let account_update_digest_with_selected_chain =
@@ -4864,6 +4874,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             in
             (prover, vk)
       in
+      let%bind.Async.Deferred vk = vk in
       let ( `Zkapp_command ({ Zkapp_command.fee_payer; memo; _ } as p)
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
@@ -4888,7 +4899,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         List.zip_exn snapp_zkapp_command spec.zkapp_account_keypairs
       in
       let%map.Async.Deferred snapp_zkapp_command =
-        Async.Deferred.List.map snapp_zkapp_command_keypairs
+        Async.Deferred.List.map ~how:`Sequential snapp_zkapp_command_keypairs
           ~f:(fun
                ( ( (snapp_account_update, simple_snapp_account_update)
                  , tx_statement )
@@ -5054,6 +5065,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let `VK vk, `Prover trivial_prover =
         create_trivial_snapp ~constraint_constants ()
       in
+      let%bind.Async.Deferred vk = vk in
       let _v =
         let id =
           Public_key.compress sender.public_key
@@ -5135,7 +5147,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; may_use_token = No
             ; authorization_kind = Proof (With_hash.hash vk)
             }
-        ; authorization = Proof Mina_base.Proof.transaction_dummy
+        ; authorization = Proof (Lazy.force Mina_base.Proof.transaction_dummy)
         }
       in
       let memo = Signed_command_memo.empty in

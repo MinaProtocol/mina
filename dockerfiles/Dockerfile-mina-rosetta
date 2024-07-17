@@ -4,6 +4,7 @@ ARG deb_codename=focal
 ARG deb_version
 ARG deb_release=unstable
 ARG network=mainnet
+ARG deb_repo="http://packages.o1test.net"
 
 ARG psql_version=15
 # Golang version number used to detemine tarball name
@@ -96,7 +97,7 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
 # Mina daemon package
 # jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
-    && echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+    && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
     && apt-get update --quiet --yes \
     && apt-get install --quiet --yes --allow-downgrades "mina-$network=$deb_version" "mina-archive=$deb_version" "mina-zkapp-test-transaction=$deb_version" \
     && rm -rf /var/lib/apt/lists/*

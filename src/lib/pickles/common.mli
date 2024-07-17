@@ -1,5 +1,3 @@
-open Pickles_types
-
 val wrap_domains : proofs_verified:int -> Import.Domains.Stable.V2.t
 
 val actual_wrap_domain_size :
@@ -15,7 +13,7 @@ val actual_wrap_domain_size :
 val when_profiling : 'a -> 'a -> 'a
 
 (** [time label f] times function [f] and prints the measured time to [stdout]
-    prepended with [label], when profiling is set (see {!val:when_profiling}). 
+    prepended with [label], when profiling is set (see {!val:when_profiling}).
 
     Otherwise, it just runs [f].
  *)
@@ -38,22 +36,20 @@ val bits_to_bytes : bool list -> string
 val finite_exn : 'a Kimchi_types.or_infinity -> 'a * 'a
 
 val ft_comm :
-     add:('a -> 'a -> 'a)
-  -> scale:('a -> 'b -> 'a)
-  -> endoscale:('a -> 'c -> 'a)
-  -> negate:('a -> 'a)
-  -> verification_key:'a Pickles_types.Plonk_verification_key_evals.t
-  -> alpha:'c
+     add:('comm -> 'comm -> 'comm)
+  -> scale:('comm -> 'scalar -> 'comm)
+  -> negate:('comm -> 'comm)
+  -> verification_key:'comm array Pickles_types.Plonk_verification_key_evals.t
   -> plonk:
        ( 'd
        , 'e
-       , 'b
+       , 'scalar
        , 'g
        , 'f
        , 'bool )
        Import.Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t
-  -> t_comm:'a array
-  -> 'a
+  -> t_comm:'comm array
+  -> 'comm
 
 val dlog_pcs_batch :
      'total Pickles_types.Nat.t
@@ -65,7 +61,7 @@ val combined_evaluation :
   -> xi:'f Snarky_backendless.Cvar.t
   -> ( 'f Snarky_backendless.Cvar.t
      , 'f Snarky_backendless.Cvar.t Snarky_backendless.Snark_intf.Boolean0.t )
-     Pickles_types.Plonk_types.Opt.t
+     Pickles_types.Opt.t
      array
      list
   -> 'f Snarky_backendless.Cvar.t
@@ -98,6 +94,7 @@ module Lookup_parameters : sig
   val tock_zero : (Impls.Wrap.Field.t, Impls.Wrap.Field.t) zero_value
 end
 
+(** Inner Product Argument *)
 module Ipa : sig
   type 'a challenge :=
     ( Import.Challenge.Constant.t Import.Scalar_challenge.t
@@ -146,21 +143,27 @@ end
 
 val hash_messages_for_next_step_proof :
      app_state:('a -> Kimchi_pasta.Basic.Fp.Stable.Latest.t Core_kernel.Array.t)
-  -> ( Backend.Tock.Curve.Affine.t
+  -> ( Backend.Tock.Curve.Affine.t array
+     (* the type for the verification key *)
      , 'a
+     (* the state of the application *)
      , ( Kimchi_pasta.Basic.Fp.Stable.Latest.t
          * Kimchi_pasta.Basic.Fp.Stable.Latest.t
-       , 'b )
+       , 'n )
        Pickles_types.Vector.t
-     , ( (Kimchi_pasta.Basic.Fp.Stable.Latest.t, 'c) Pickles_types.Vector.t
-       , 'b )
-       Pickles_types.Vector.t )
+     (* challenge polynomial commitments. We use the full parameter type to
+        restrict the size of the vector to be the same than the one for the next
+        parameter which are the bulletproof challenges *)
+     , ( (Kimchi_pasta.Basic.Fp.Stable.Latest.t, 'm) Pickles_types.Vector.t
+       , 'n
+       (* size of the vector *) )
+       Pickles_types.Vector.t
+     (* bulletproof challenges *) )
      Import.Types.Step.Proof_state.Messages_for_next_step_proof.t
   -> (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.t
 
 val tick_public_input_of_statement :
      max_proofs_verified:'a Pickles_types.Nat.t
-  -> feature_flags:Plonk_types.Opt.Flag.t Plonk_types.Features.t
   -> ( ( ( Impls.Step.Challenge.Constant.t
          , Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
          , Impls.Step.Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
@@ -191,15 +194,14 @@ val tick_public_input_of_statement :
   -> Backend.Tick.Field.Vector.elt list
 
 val tock_public_input_of_statement :
-     ( Limb_vector.Challenge.Constant.t
+     feature_flags:
+       Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.Full.t
+  -> ( Limb_vector.Challenge.Constant.t
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
        option
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
-       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-       .Lookup
-       .t
        option
      , bool
      , ( Limb_vector.Constant.Hex64.t
@@ -222,15 +224,14 @@ val tock_public_input_of_statement :
   -> Backend.Tock.Field.Vector.elt list
 
 val tock_unpadded_public_input_of_statement :
-     ( Limb_vector.Challenge.Constant.t
+     feature_flags:
+       Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.Full.t
+  -> ( Limb_vector.Challenge.Constant.t
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
        option
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
-       Composition_types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit
-       .Lookup
-       .t
        option
      , bool
      , ( Limb_vector.Constant.Hex64.t

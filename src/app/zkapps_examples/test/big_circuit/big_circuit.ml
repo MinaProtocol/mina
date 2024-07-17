@@ -31,7 +31,8 @@ let tag, _cache, _p_module, Pickles.Provers.[ prover ] =
       [ Zkapps_big_circuit.rule ~num_constraints pk_compressed ] )
 
 let vk : Side_loaded_verification_key.t =
-  Pickles.Side_loaded.Verification_key.of_compiled tag
+  Async.Thread_safe.block_on_async_exn (fun () ->
+      Pickles.Side_loaded.Verification_key.of_compiled tag )
 
 let vk_hash = Mina_base.Verification_key_wire.digest_vk vk
 

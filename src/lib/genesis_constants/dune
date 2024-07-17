@@ -23,8 +23,8 @@
    mina_compile_config
    pickles.backend
    snark_keys_header
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    test_util
    ppx_version.runtime
  )

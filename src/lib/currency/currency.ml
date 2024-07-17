@@ -4,14 +4,8 @@ open Core_kernel
 open Snark_bits
 open Snark_params
 open Tick
-
-[%%ifdef consensus_mechanism]
-
 open Bitstring_lib
 open Let_syntax
-
-[%%endif]
-
 open Intf
 
 (** [Currency_oveflow] is being thrown to signal an overflow
@@ -45,8 +39,6 @@ end
 module Make_str (A : Wire_types.Concrete) = struct
   module Signed_poly = Signed_poly
 
-  [%%ifdef consensus_mechanism]
-
   module Signed_var = struct
     type 'mag repr = ('mag, Sgn.var) Signed_poly.t
 
@@ -54,8 +46,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     type nonrec 'mag t =
       { repr : 'mag repr; mutable value : Field.Var.t option }
   end
-
-  [%%endif]
 
   module Make (Unsigned : sig
     include Unsigned_extended.S
@@ -66,8 +56,6 @@ module Make_str (A : Wire_types.Concrete) = struct
   end) (M : sig
     val length : int
   end) : sig
-    [%%ifdef consensus_mechanism]
-
     include
       S
         with type t = Unsigned.t
@@ -78,15 +66,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     val pack_var : var -> Field.Var.t
 
-    [%%else]
-
-    include
-      S
-        with type t = Unsigned.t
-         and type Signed.signed_fee := (Unsigned.t, Sgn.t) Signed_poly.t
-
-    [%%endif]
-
     val scale : t -> int -> t option
   end = struct
     let max_int = Unsigned.max_int
@@ -94,9 +73,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     let length_in_bits = M.length
 
     type t = Unsigned.t [@@deriving sexp, compare, hash]
-
-    (* can't be automatically derived *)
-    let dhall_type = Ppx_dhall_type.Dhall_type.Text
 
     [%%define_locally
     Unsigned.(to_uint64, of_uint64, of_int, to_int, of_string, to_string)]
@@ -180,8 +156,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     module B = Bits.Vector.Make (Vector)
 
     include (B : Bits_intf.Convertible_bits with type t := t)
-
-    [%%ifdef consensus_mechanism]
 
     type var = Field.Var.t
 
@@ -352,8 +326,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       Typ.transport
         (Typ { typ with check = range_check })
         ~there:to_field ~back:of_field
-
-    [%%endif]
 
     let zero = Unsigned.zero
 
@@ -548,8 +520,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let of_fee = Fn.id
 
-      [%%ifdef consensus_mechanism]
-
       type signed_fee = t
 
       let magnitude_to_field = to_field
@@ -721,11 +691,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
         let of_fee = Fn.id
       end
-
-      [%%endif]
     end
-
-    [%%ifdef consensus_mechanism]
 
     module Checked = struct
       module N = Mina_numbers.Nat.Make_checked (Unsigned) (B)
@@ -921,8 +887,6 @@ module Make_str (A : Wire_types.Concrete) = struct
                             num (to_mina_string num) ) )) )
         end )
     end
-
-    [%%endif]
   end
 
   let currency_length = 64
@@ -947,7 +911,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         type t = Unsigned_extended.UInt64.Stable.V1.t
         [@@deriving sexp, compare, hash, equal]
 
-        [%%define_from_scope to_yojson, of_yojson, dhall_type]
+        [%%define_from_scope to_yojson, of_yojson]
 
         let to_latest = Fn.id
       end
@@ -978,13 +942,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             [@@@with_all_version_tags]
 
             type t = A.t [@@deriving sexp, compare, hash, equal, yojson]
-
-            (* not automatically derived *)
-            val dhall_type : Ppx_dhall_type.Dhall_type.t
           end
         end]
-
-        [%%ifdef consensus_mechanism]
 
         (* Give a definition to var, it will be hidden at the interface level *)
         include
@@ -994,17 +953,9 @@ module Make_str (A : Wire_types.Concrete) = struct
               Pickles.Impls.Step.Impl.Internal_Basic.field
               Snarky_backendless.Cvar.t
 
-        [%%else]
-
-        include Basic with type t := Stable.Latest.t
-
-        [%%endif]
-
         include Arithmetic_intf with type t := t
 
         include Codable.S with type t := t
-
-        [%%ifdef consensus_mechanism]
 
         module Signed :
           Signed_intf
@@ -1013,15 +964,6 @@ module Make_str (A : Wire_types.Concrete) = struct
              and type signed_fee := Fee.Signed.t
              and type Checked.signed_fee_var := Fee.Signed.Checked.t
 
-        [%%else]
-
-        module Signed :
-          Signed_intf
-            with type magnitude := t
-             and type signed_fee := Fee.Signed.t
-
-        [%%endif]
-
         (* TODO: Delete these functions *)
 
         val of_fee : Fee.t -> t
@@ -1029,8 +971,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         val to_fee : t -> Fee.t
 
         val add_fee : t -> Fee.t -> t option
-
-        [%%ifdef consensus_mechanism]
 
         module Checked : sig
           include
@@ -1052,8 +992,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           end
         end
 
-        [%%endif]
-
         val add_signed_flagged : t -> Signed.t -> t * [ `Overflow of bool ]
       end
     end
@@ -1069,20 +1007,12 @@ module Make_str (A : Wire_types.Concrete) = struct
             let length = currency_length
           end)
 
-      [%%ifdef consensus_mechanism]
-
       include (
         T :
           module type of T
             with type var = T.var
              and module Signed = T.Signed
              and module Checked := T.Checked )
-
-      [%%else]
-
-      include (T : module type of T with module Signed = T.Signed)
-
-      [%%endif]
 
       [%%versioned
       module Stable = struct
@@ -1094,7 +1024,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           type t = Unsigned_extended.UInt64.Stable.V1.t
           [@@deriving sexp, compare, hash, equal, yojson]
 
-          [%%define_from_scope to_yojson, of_yojson, dhall_type]
+          [%%define_from_scope to_yojson, of_yojson]
 
           let to_latest = Fn.id
         end
@@ -1105,8 +1035,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       let to_fee (fee : t) : Fee.t = fee
 
       let add_fee (t : t) (fee : Fee.t) = add t (of_fee fee)
-
-      [%%ifdef consensus_mechanism]
 
       module Checked = struct
         include T.Checked
@@ -1121,8 +1049,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           let of_field : Field.Var.t -> var = Fn.id
         end
       end
-
-      [%%endif]
     end
 
     include Make_str (struct
@@ -1139,21 +1065,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         [@@deriving sexp, compare, equal, hash, yojson]
 
         let to_latest = Fn.id
-
-        (* can't be automatically derived *)
-        let dhall_type = Ppx_dhall_type.Dhall_type.Text
       end
     end]
 
-    [%%ifdef consensus_mechanism]
-
     include (Amount : Basic with type t := t with type var = Amount.var)
-
-    [%%else]
-
-    include (Amount : Basic with type t := t)
-
-    [%%endif]
 
     let to_amount = Fn.id
 
@@ -1170,8 +1085,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     let ( + ) = add_amount
 
     let ( - ) = sub_amount
-
-    [%%ifdef consensus_mechanism]
 
     module Checked = struct
       include Amount.Checked
@@ -1202,8 +1115,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let ( - ) = sub_amount
     end
-
-    [%%endif]
   end
 
   module Fee_rate = struct
@@ -1291,8 +1202,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let%test_module "sub_flagged module" =
     ( module struct
-      [%%ifdef consensus_mechanism]
-
       open Tick
 
       module type Sub_flagged_S = sig
@@ -1344,8 +1253,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%test_unit "fee sub_flagged" = run_test (module Fee)
 
       let%test_unit "amount sub_flagged" = run_test (module Amount)
-
-      [%%endif]
     end )
 end
 

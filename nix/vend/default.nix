@@ -14,7 +14,7 @@ buildGoModule {
     sha256 = "112p9dz9by2h2m3jha2bv1bvzn2a86bpg1wphgmf9gksjpwy835l";
   };
 
-  vendorSha256 = null;
+  vendorHash = null;
 
   meta = with lib; {
     homepage = "https://github.com/c00w/vend";

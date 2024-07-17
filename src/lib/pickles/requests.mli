@@ -1,3 +1,7 @@
+(** The snarky request types that the step and wrap circuits use to get
+    non-deterministic witness data from the prover.
+*)
+
 open Pickles_types
 
 module Step : sig
@@ -23,7 +27,7 @@ module Step : sig
           ( prev_values
           , local_signature )
           Hlist.H2.T(Inductive_rule.Previous_proof_statement.Constant).t
-          -> unit Snarky_backendless.Request.t
+          -> unit Promise.t Snarky_backendless.Request.t
       | Proof_with_datas :
           ( prev_values
           , local_signature
@@ -31,7 +35,7 @@ module Step : sig
           Hlist.H3.T(Per_proof_witness.Constant.No_app_state).t
           Snarky_backendless.Request.t
       | Wrap_index :
-          Backend.Tock.Curve.Affine.t Plonk_verification_key_evals.t
+          Backend.Tock.Curve.Affine.t array Plonk_verification_key_evals.t
           Snarky_backendless.Request.t
       | App_state : statement Snarky_backendless.Request.t
       | Return_value : return_value -> unit Snarky_backendless.Request.t

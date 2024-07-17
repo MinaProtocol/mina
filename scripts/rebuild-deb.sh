@@ -2,6 +2,8 @@
 
 # Script collects binaries and keys and builds deb archives.
 
+set -eo pipefail
+
 source scripts/deb-builder-helpers.sh
 
 # always build log proc since it is often an dependency
@@ -15,7 +17,9 @@ if [ $# -eq 0 ]
     build_archive_deb
     build_archive_migration_deb
     build_batch_txn_deb
-    build_daemon_deb
+    build_daemon_berkeley_deb
+    build_mainnet_daemon_deb
+    build_devnet_daemon_deb
     build_test_executive_deb
     build_functional_test_suite_deb
     build_zkapp_test_transaction_deb
@@ -87,7 +91,7 @@ if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
 then
   echo "---- Built all packages including mainnet, devnet, and the sidecar"
 else
-  echo "---- Not a mainnet-like branch, only built berkeley and beyond packages"  
+  echo "---- Not a mainnet-like branch, only built berkeley and beyond packages"
 fi
 
 ls -lh mina*.deb

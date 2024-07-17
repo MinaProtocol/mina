@@ -1,5 +1,5 @@
-(** Implementing structure with pre-defined length *)
-(* TODO: Check if that's adequate *)
+(** Implementing vectors with pre-defined length. For a fixed length version, see
+    {!Vector} *)
 
 (** {2 Type definitions} *)
 
@@ -52,5 +52,6 @@ module With_length (N : Nat.Intf) : S with type 'a t = ('a, N.n) at_most
 val of_vector :
   'a 'n 'm. ('a, 'n) Vector.vec -> ('n, 'm) Nat.Lte.t -> ('a, 'm) t
 
-(** [to_vector m] transforms [m] into a vector *)
+(** [to_vector m] transforms [m] into a vector whose length is forgotten at the
+    type level and only contains runtime data *)
 val to_vector : 'a 'n. ('a, 'n) t -> 'a Vector.e
