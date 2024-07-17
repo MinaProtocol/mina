@@ -800,11 +800,13 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let set_batch_accounts t addresses_and_accounts =
       assert_is_attached t ;
+      assert (Free_list.is_empty t.freed) ;
       set_batch_accounts t addresses_and_accounts
 
     (* set accounts in mask *)
     let set_all_accounts_rooted_at_exn t address (accounts : Account.t list) =
       assert_is_attached t ;
+      assert (Free_list.is_empty t.freed) ;
       set_all_accounts_rooted_at_exn t address accounts
 
     let token_owner t tid =
