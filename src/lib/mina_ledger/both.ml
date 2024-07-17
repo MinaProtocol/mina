@@ -68,12 +68,9 @@ struct
         (R.to_alist r);
     validate_no_dups_lmdb l label;
     let l_len : int = L.foldi l ~init:0 ~f:(fun _ i ~key:_ ~data:_ -> i+1) in
-    let r_len_alt = List.length (R.to_alist r) in
-    R.foldi r ~init:() ~f:(fun _ _ ~key:_ ~data:_ -> [%log fatal] "foldi works";exit 1);
-    R.fold_until r ~init:() ~f:(fun _ ~key:_ ~data:_ -> [%log fatal] "fold_until works";exit 1) ~finish:(fun () -> ());
-    if r_len_alt > 0 then [%log info] "both folds ignored all the data";
-    if l_len <> r_len_alt then ([%log fatal] "database sizes differ $l $r"
-        ~metadata:[("l",`Int l_len);("r",`Int r_len_alt)]
+    let r_len : int = R.foldi r ~init:0 ~f:(fun _ i ~key:_ ~data:_ -> i+1) in
+    if l_len <> r_len then ([%log fatal] "database sizes differ $l $r"
+        ~metadata:[("l",`Int l_len);("r",`Int r_len)]
         ; exit 1)
 
 
