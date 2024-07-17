@@ -82,15 +82,16 @@ module Make (Inputs : Inputs_intf.S) = struct
     }
 
   (* Available locations for allocations are tracked using 2 fields:
-     1. [current_location] is the fill frontier, that is, on the right of this
-       location, all locations are available
-     2. [freed]
+     1. [fill_frontier] is the fill frontier, that is, on the right of this
+        location, all locations are available
+     2. [freed] represents all available locations in  [0, fill_frontier].
+        Locations are added to this only after having been removed.
   *)
   type t =
     { uuid : Uuid.Stable.V1.t
     ; mutable parent : Parent.t
     ; detached_parent_signal : Detached_parent_signal.t
-    ; mutable current_location : Location.t option
+    ; mutable fill_frontier : Location.t option
     ; mutable freed : Free_list.t
     ; depth : int
     ; mutable maps : maps_t
@@ -114,7 +115,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     { uuid = Uuid_unix.create ()
     ; parent = Error __LOC__
     ; detached_parent_signal = Async.Ivar.create ()
-    ; current_location = None
+    ; fill_frontier = None
     ; depth
     ; accumulated = None
     ; maps = empty_maps ()
@@ -233,17 +234,27 @@ module Make (Inputs : Inputs_intf.S) = struct
             locations = Map.set maps.locations ~key:account_id ~data:location
           } ) ;
 
-      (* if [location] was in free list, make sure to remove it *)
-      t.freed <- Free_list.Location.remove t.freed location ;
-      (* if account is at a hitherto-unused location, that
-         becomes the current location
-      *)
-      match t.current_location with
-      | None ->
-          t.current_location <- Some location
-      | Some loc ->
-          if Location.( > ) location loc then
-            t.current_location <- Some location
+      if Free_list.Location.mem t.freed location then
+        (* if [location] was in free list, make sure to remove it *)
+        t.freed <- Free_list.Location.remove t.freed location
+      else
+        (* if account is at a hitherto-unused location, that
+           becomes the current location
+        *)
+        match t.fill_frontier with
+        | None ->
+            t.fill_frontier <- Some location
+        | Some loc ->
+            if Location.( > ) location loc then (
+              (* This somehow implicitly used to assume that location = loc + 1, otherwise
+                 we could already have a ledger with holes. Let's put that in *)
+              assert (
+                match Location.next loc with
+                | None ->
+                    false
+                | Some loc ->
+                    Location.equal location loc ) ;
+              t.fill_frontier <- Some location )
 
     let self_set_account t location account =
       update_maps t ~f:(fun maps ->
@@ -269,12 +280,12 @@ module Make (Inputs : Inputs_intf.S) = struct
           Some account
       | None ->
           let is_empty =
-            match t.current_location with
+            match t.fill_frontier with
             | None ->
                 true
-            | Some current_location ->
+            | Some fill_frontier ->
                 let address = Location.to_path_exn location in
-                let current_address = Location.to_path_exn current_location in
+                let current_address = Location.to_path_exn fill_frontier in
                 Addr.is_further_right ~than:current_address address
           in
           if is_empty then None else Base.get ancestor location
@@ -308,10 +319,10 @@ module Make (Inputs : Inputs_intf.S) = struct
         let res =
           if Option.is_none res then
             let is_empty =
-              Option.value_map ~default:true t.current_location
-                ~f:(fun current_location ->
+              Option.value_map ~default:true t.fill_frontier
+                ~f:(fun fill_frontier ->
                   let address = Location.to_path_exn id in
-                  let current_address = Location.to_path_exn current_location in
+                  let current_address = Location.to_path_exn fill_frontier in
                   Addr.is_further_right ~than:current_address address )
             in
             Option.some_if is_empty None
@@ -324,17 +335,17 @@ module Make (Inputs : Inputs_intf.S) = struct
     let empty_hash =
       Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
 
-    let self_path_get_hash ~hashes ~current_location height address =
+    let self_path_get_hash ~hashes ~fill_frontier height address =
       match Map.find hashes address with
       | Some hash ->
           Some hash
       | None ->
           let is_empty =
-            match current_location with
+            match fill_frontier with
             | None ->
                 true
-            | Some current_location ->
-                let current_address = Location.to_path_exn current_location in
+            | Some fill_frontier ->
+                let current_address = Location.to_path_exn fill_frontier in
                 Addr.is_further_right ~than:current_address address
           in
           if is_empty then Some (empty_hash height) else None
@@ -348,26 +359,26 @@ module Make (Inputs : Inputs_intf.S) = struct
         let%map.Option rest = self_path_impl ~element ~depth parent_address in
         el :: rest
 
-    let self_merkle_path ~hashes ~current_location =
+    let self_merkle_path ~hashes ~fill_frontier =
       let element height address =
         let sibling = Addr.sibling address in
         let dir = Location.last_direction address in
         let%map.Option sibling_hash =
-          self_path_get_hash ~hashes ~current_location height sibling
+          self_path_get_hash ~hashes ~fill_frontier height sibling
         in
         Direction.map dir ~left:(`Left sibling_hash) ~right:(`Right sibling_hash)
       in
       self_path_impl ~element
 
-    let self_wide_merkle_path ~hashes ~current_location =
+    let self_wide_merkle_path ~hashes ~fill_frontier =
       let element height address =
         let sibling = Addr.sibling address in
         let dir = Location.last_direction address in
         let%bind.Option sibling_hash =
-          self_path_get_hash ~hashes ~current_location height sibling
+          self_path_get_hash ~hashes ~fill_frontier height sibling
         in
         let%map.Option self_hash =
-          self_path_get_hash ~hashes ~current_location height address
+          self_path_get_hash ~hashes ~fill_frontier height address
         in
         Direction.map dir
           ~left:(`Left (self_hash, sibling_hash))
@@ -422,7 +433,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       let maps, ancestor = maps_and_ancestor t in
       match
         self_merkle_path ~depth:t.depth ~hashes:maps.hashes
-          ~current_location:t.current_location address
+          ~fill_frontier:t.fill_frontier address
       with
       | Some path ->
           path
@@ -444,7 +455,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       let self_paths =
         List.map locations ~f:(fun location ->
             let address = Location.to_path_exn location in
-            self_lookup ~hashes:maps.hashes ~current_location:t.current_location
+            self_lookup ~hashes:maps.hashes ~fill_frontier:t.fill_frontier
               ~depth:t.depth address
             |> Option.value_map
                  ~default:(Either.Second (location, address))
@@ -525,7 +536,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         ; locations = Map.remove t.maps.locations account_id
         } ;
       let () =
-        match t.current_location with
+        match t.fill_frontier with
         | Some curr_loc ->
             if Location.equal location curr_loc then
               match Location.prev location with
@@ -537,9 +548,9 @@ module Make (Inputs : Inputs_intf.S) = struct
                     Free_list.Location.remove_all_contiguous t.freed prev_loc
                   in
                   t.freed <- freed ;
-                  t.current_location <- opt_loc
+                  t.fill_frontier <- opt_loc
               | None ->
-                  t.current_location <- None
+                  t.fill_frontier <- None
             else
               (* save newly unused location to local stack *)
               add_freed_location t location
@@ -699,7 +710,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       { uuid = Uuid_unix.create ()
       ; parent = Ok (get_parent t)
       ; detached_parent_signal = Async.Ivar.create ()
-      ; current_location = t.current_location
+      ; fill_frontier = t.fill_frontier
       ; depth = t.depth
       ; maps = t.maps
       ; accumulated =
@@ -717,9 +728,9 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       Option.value_map
         (Base.last_filled (get_parent t))
-        ~default:t.current_location
+        ~default:t.fill_frontier
         ~f:(fun parent_loc ->
-          match t.current_location with
+          match t.fill_frontier with
           | None ->
               Some parent_loc
           | Some our_loc -> (
@@ -773,7 +784,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             self_set_hash t (Location.to_path_exn location) hash )
 
       let set_location_batch ~last_location t account_to_location_list =
-        t.current_location <- Some last_location ;
+        t.fill_frontier <- Some last_location ;
         Mina_stdlib.Nonempty_list.iter account_to_location_list
           ~f:(fun (key, data) -> self_set_location t key data)
 
@@ -829,7 +840,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let num_accounts t =
       assert_is_attached t ;
-      match t.current_location with
+      match t.fill_frontier with
       | None ->
           0
       | Some location -> (
@@ -1013,7 +1024,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         assert_is_attached t ;
         Option.is_some (Map.find t.maps.hashes addr)
 
-      let current_location t = t.current_location
+      let fill_frontier t = t.fill_frontier
     end
 
     let leftmost_available_slot t =
@@ -1040,7 +1051,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           leftmost_available_slot t
 
-    (* NB: updates the mutable current_location field in t *)
+    (* NB: updates the mutable fill_frontier field in t *)
     let get_or_create_account t account_id account =
       assert_is_attached t ;
       let maps, ancestor = maps_and_ancestor t in
@@ -1069,7 +1080,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     assert (Option.is_none (Async.Ivar.peek t.detached_parent_signal)) ;
     assert (Int.equal t.depth (Base.depth parent)) ;
     t.parent <- Ok parent ;
-    t.current_location <- Attached.last_filled t ;
+    t.fill_frontier <- Attached.last_filled t ;
     (* If [t.accumulated] isn't empty, then this mask had a parent before
        and now we just reparent it (which may only happen if both old and new parents
         have the same merkle root (and some masks in between may have been removed),
