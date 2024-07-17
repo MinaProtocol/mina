@@ -229,32 +229,21 @@ module Make (Inputs : Inputs_intf.S) = struct
       self_set_hash t address hash
 
     let self_set_location t account_id location =
+      (* This function is only correct when the free list is empty *)
+      assert (Free_list.is_empty t.freed) ;
       update_maps t ~f:(fun maps ->
           { maps with
             locations = Map.set maps.locations ~key:account_id ~data:location
           } ) ;
 
-      if Free_list.Location.mem t.freed location then
-        (* if [location] was in free list, make sure to remove it *)
-        t.freed <- Free_list.Location.remove t.freed location
-      else
-        (* if account is at a hitherto-unused location, that
-           becomes the current location
-        *)
-        match t.fill_frontier with
-        | None ->
-            t.fill_frontier <- Some location
-        | Some loc ->
-            if Location.( > ) location loc then (
-              (* This somehow implicitly used to assume that location = loc + 1, otherwise
-                 we could already have a ledger with holes. Let's put that in *)
-              assert (
-                match Location.next loc with
-                | None ->
-                    false
-                | Some loc ->
-                    Location.equal location loc ) ;
-              t.fill_frontier <- Some location )
+      (* if account is at a hitherto-unused location, that
+         becomes the current location
+      *)
+      match t.fill_frontier with
+      | None ->
+          t.fill_frontier <- Some location
+      | Some loc ->
+          if Location.( > ) location loc then t.fill_frontier <- Some location
 
     let self_set_account t location account =
       update_maps t ~f:(fun maps ->
