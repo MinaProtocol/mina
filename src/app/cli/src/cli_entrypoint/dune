@@ -78,4 +78,4 @@
    itn_logger
  )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_mina ppx_version ppx_here ppx_let ppx_sexp_conv ppx_optcomp ppx_deriving_yojson)))
+ (preprocess (pps ppx_mina ppx_version ppx_here ppx_let ppx_sexp_conv ppx_deriving_yojson)))

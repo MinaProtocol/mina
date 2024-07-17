@@ -1,7 +1,5 @@
 (* bits.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Fold_lib
 open Bitstring_lib

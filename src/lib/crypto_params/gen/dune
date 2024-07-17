@@ -30,6 +30,6 @@
    kimchi_backend
  )
  (preprocess
-  (pps ppx_version ppx_bin_prot ppx_optcomp ppxlib.metaquot))
+  (pps ppx_version ppx_bin_prot ppxlib.metaquot))
  (instrumentation (backend bisect_ppx))
  (modes native))

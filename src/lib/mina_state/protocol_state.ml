@@ -160,16 +160,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       ; next_epoch_data = C.next_epoch_data_var cs
       }
 
-      (*
-  [%%if call_logger]
-
-  let hash s =
-    Mina_debug.Call_logger.record_call "Protocol_state.hash" ;
-    hash s
-
-  [%%endif]
-  *)
-
     let hash s =
       if Node_config.call_logger then
         Mina_debug.Call_logger.record_call "Protocol_state.hash";
