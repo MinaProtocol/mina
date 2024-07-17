@@ -17,7 +17,7 @@ let gen max_depth =
   let%map free_list = F.gen ~ledger_depth in
   (ledger_depth, free_list)
 
-let test_de_serializaion =
+let test_de_serialization =
   Alcotest.test_case "serialization/deserialization" `Quick (fun () ->
       Quickcheck.test (gen 5) ~f:(fun (ledger_depth, free_list) ->
           let bs = F.serialize ~ledger_depth free_list in
@@ -27,4 +27,4 @@ let test_de_serializaion =
             "serialized and deserialized free lists are the same" free_list
             deserialized ) )
 
-let tests = [ ("free list", [ test_de_serializaion ]) ]
+let tests = [ ("free list", [ test_de_serialization ]) ]
