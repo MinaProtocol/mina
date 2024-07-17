@@ -150,13 +150,33 @@ end = struct
       (compute_affected_locations_and_hashes t locations_and_hashes
          locations_and_hashes )
 
-  let compute_last_index addresses =
-    Mina_stdlib.Nonempty_list.map addresses
-      ~f:(Fn.compose Inputs.Location.Addr.to_int Inputs.Location.to_path_exn)
-    |> Mina_stdlib.Nonempty_list.max_elt ~compare:Int.compare
+  let to_addr loc =
+    Inputs.Location.Addr.to_int (Inputs.Location.to_path_exn loc)
+
+  (* Compute the biggest location contained in this list *)
+  let compute_last_index nonempty_addresses_and_accounts =
+    let init =
+      to_addr
+        (fst (Mina_stdlib.Nonempty_list.head nonempty_addresses_and_accounts))
+    in
+    List.fold_left
+      (Mina_stdlib.Nonempty_list.tail nonempty_addresses_and_accounts) ~init
+      ~f:(fun m (loc, _) -> Int.max m (to_addr loc))
+
+  let compute_new_last_location t nonempty_addresses_and_accounts =
+    let ledger_depth = Inputs.ledger_depth t in
+    let current_last_index = Option.map (Inputs.Base.max_filled t) ~f:to_addr in
+    let foreign_last_index =
+      compute_last_index nonempty_addresses_and_accounts
+    in
+    let max_index_in_all_accounts =
+      Option.value_map current_last_index ~default:foreign_last_index
+        ~f:(fun max_index -> Int.max max_index foreign_last_index)
+    in
+    Inputs.Location.(
+      Account (Addr.of_int_exn ~ledger_depth max_index_in_all_accounts))
 
   let set_raw_addresses t addresses_and_accounts =
-    let ledger_depth = Inputs.ledger_depth t in
     Option.iter (Mina_stdlib.Nonempty_list.of_list_opt addresses_and_accounts)
       ~f:(fun nonempty_addresses_and_accounts ->
         let key_locations =
@@ -164,26 +184,9 @@ end = struct
             ~f:(fun (address, account) ->
               (Inputs.Account.identifier account, address) )
         in
-        let new_last_location =
-          let current_last_index =
-            let open Option.Let_syntax in
-            let%map last_location = Inputs.Base.max_filled t in
-            Inputs.Location.Addr.to_int
-            @@ Inputs.Location.to_path_exn last_location
-          in
-          let foreign_last_index =
-            compute_last_index
-              (Mina_stdlib.Nonempty_list.map nonempty_addresses_and_accounts
-                 ~f:fst )
-          in
-          let max_index_in_all_accounts =
-            Option.value_map current_last_index ~default:foreign_last_index
-              ~f:(fun max_index -> Int.max max_index foreign_last_index)
-          in
-          Inputs.Location.(
-            Account (Addr.of_int_exn ~ledger_depth max_index_in_all_accounts))
+        let last_location =
+          compute_new_last_location t nonempty_addresses_and_accounts
         in
-        let last_location = new_last_location in
         Inputs.set_location_batch ~last_location t key_locations )
 
   (* TODO: When we do batch on a database, we should add accounts, locations and hashes
