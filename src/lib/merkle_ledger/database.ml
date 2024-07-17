@@ -339,9 +339,11 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       Option.map (last_location mdb) ~f:Location.to_path_exn
   end
 
-  let get_at_index_exn mdb index =
+  let get_at_index mdb index =
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
-    get mdb (Location.Account addr) |> Option.value_exn
+    get mdb (Location.Account addr)
+
+  let get_at_index_exn mdb index = get_at_index mdb index |> Option.value_exn
 
   let all_accounts (t : t) =
     match Account_location.last_location_address t with
@@ -349,7 +351,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         Sequence.empty
     | Some last_addr ->
         Sequence.range ~stop:`inclusive 0 (Addr.to_int last_addr)
-        |> Sequence.map ~f:(fun i -> get_at_index_exn t i)
+        |> Sequence.filter_map ~f:(fun i -> get_at_index t i)
 
   (** The tokens associated with each public key.
 
