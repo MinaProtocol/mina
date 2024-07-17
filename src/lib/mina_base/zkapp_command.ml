@@ -707,12 +707,6 @@ module T = struct
           end
         end]
 
-        let check (t : t) : unit =
-          List.iter t.account_updates ~f:(fun p ->
-              assert (
-                Account_update.May_use_token.equal
-                  p.elt.account_update.body.may_use_token No ) )
-
         let of_graphql_repr (t : Graphql_repr.t) : t =
           { fee_payer = t.fee_payer
           ; memo = t.memo
@@ -808,7 +802,7 @@ module T = struct
           (struct
             type nonrec t = t
 
-            let of_binable t = Wire.check t ; of_wire t
+            let of_binable t = of_wire t
 
             let to_binable = to_wire
           end)
