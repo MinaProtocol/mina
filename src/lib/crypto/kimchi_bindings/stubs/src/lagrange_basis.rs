@@ -16,6 +16,7 @@ impl WithLagrangeBasis<Vesta> for SRS<Vesta> {
         if use_cache {
             add_lagrange_basis_with_cache(self, domain, cache::get_vesta_file_cache());
         } else {
+            println!("NOT USING LAGRANGE CACHE");
             self.add_lagrange_basis(domain);
         }
     }
