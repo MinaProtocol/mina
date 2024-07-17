@@ -11,17 +11,14 @@ let
     hasPrefix last getAttrs filterAttrs optionalAttrs makeBinPath optionalString
     escapeShellArg;
 
-  external-repo =
-    opam-nix.makeOpamRepoRec "${src}/src/external"; # Pin external packages
-  repos = [ external-repo inputs.opam-repository ];
+  repos = with inputs; [ o1-opam-repository opam-repository ];
 
   export = opam-nix.importOpam "${src}/opam.export";
-  external-packages = pkgs.lib.getAttrs [ "sodium" "base58" ]
-    (builtins.mapAttrs (_: pkgs.lib.last) (opam-nix.listRepo external-repo));
 
+  # Dependencies required by every Mina package:
   # Packages which are `installed` in the export.
   # These are all the transitive ocaml dependencies of Mina.
-  export-installed = builtins.removeAttrs
+  implicit-deps = builtins.removeAttrs
     (opam-nix.opamListToQuery export.installed) ["check_opam_switch"];
 
   # Extra packages which are not in opam.export but useful for development, such as an LSP server.
@@ -42,13 +39,6 @@ let
     xdg = dune;
   };
 
-  # Dependencies required by every Mina package
-  implicit-deps = export-installed // external-packages;
-
-  # Pins from opam.export
-  pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg)
-    (builtins.removeAttrs export.package.section ["check_opam_switch"]);
-
   implicit-deps-overlay = self: super:
     (if pkgs.stdenv.isDarwin then {
       async_ssl = super.async_ssl.overrideAttrs
@@ -64,18 +54,22 @@ let
         (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
 
       # Can't find sodium-static and ctypes
-      sodium = super.sodium.overrideAttrs (_: {
+      sodium = super.sodium.overrideAttrs {
         NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
         propagatedBuildInputs = [ pkgs.sodium-static ];
         preBuild = ''
           export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
         '';
-      });
+      };
+
+      rocksdb_stubs = super.rocksdb_stubs.overrideAttrs {
+        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
+      };
     };
 
   scope = opam-nix.applyOverlays (opam-nix.__overlays ++ [ implicit-deps-overlay ])
     (opam-nix.defsToScope pkgs { }
-      ((opam-nix.queryToDefs repos (extra-packages // implicit-deps)) // pins));
+      (opam-nix.queryToDefs repos (extra-packages // implicit-deps)));
 
   installedPackageNames =
     map (x: (opam-nix.splitNameVer x).name) (builtins.attrNames implicit-deps);
