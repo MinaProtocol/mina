@@ -25,7 +25,7 @@ let buildTestCmd
                 Command.Config::{
                 , commands =
                     RunInToolchain.runInToolchain
-                      [ "DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN" ]
+                      [ "DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN", "USE_LAGRANGE_CACHE=true" ]
                       "buildkite/scripts/unit-test.sh ${profile} ${path} && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
                 , label = "${profile} unit-tests"
                 , key = command_key
