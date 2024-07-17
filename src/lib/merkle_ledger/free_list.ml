@@ -24,6 +24,8 @@ module type S = sig
   module Location : sig
     val add : t -> location -> t
 
+    val remove : t -> location -> t
+
     val pop : t -> (location * t) option
 
     val top : t -> location option
@@ -39,13 +41,13 @@ module Make (L : Location_intf.S) : S with type location = L.t = struct
 
   type location = L.t
 
-  include Set.Make (L.Addr)
+  module Set = Set.Make (L.Addr)
 
-  let size = length
+  let size = Set.length
 
   let pp ppf set =
     Format.fprintf ppf "@[<hov>[ %a]@]"
-      (fun ppf set -> iter set ~f:(Format.fprintf ppf "%a;@ " Addr.pp))
+      (fun ppf set -> Set.iter set ~f:(Format.fprintf ppf "%a;@ " Addr.pp))
       set
 
   (* [remove_all_contiguous set addr] removes all addresses contiguous from
@@ -55,8 +57,8 @@ module Make (L : Location_intf.S) : S with type location = L.t = struct
      address not in set, if any
   *)
   let rec remove_all_contiguous set addr =
-    if mem set addr then
-      let set = remove set addr in
+    if Set.mem set addr then
+      let set = Set.remove set addr in
       let addr = Addr.prev addr in
       match addr with
       | None ->
@@ -74,7 +76,9 @@ module Make (L : Location_intf.S) : S with type location = L.t = struct
      Instead, iterate 3x (to_list, List.map, Bigstring.concat).
   *)
   let serialize ~ledger_depth t =
-    to_list t |> List.map ~f:(Addr.serialize ~ledger_depth) |> Bigstring.concat
+    Set.to_list t
+    |> List.map ~f:(Addr.serialize ~ledger_depth)
+    |> Bigstring.concat
 
   (* [byte_count_of_bits n] returns how many bytes we need to represent [n] bits *)
   let byte_count_of_bits n = (n / 8) + min 1 (n % 8)
@@ -92,46 +96,49 @@ module Make (L : Location_intf.S) : S with type location = L.t = struct
         read (addr :: acc) (pos + bitsize)
     in
     let addrs = read [] 0 in
-    of_list addrs
+    Set.of_list addrs
 
   let gen ~ledger_depth =
     let path_gen = Direction.gen_list ledger_depth in
     let addr_gen = Quickcheck.Generator.map path_gen ~f:Addr.of_directions in
     let addrs = Quickcheck.Generator.list addr_gen in
-    Quickcheck.Generator.map addrs ~f:of_list
+    Quickcheck.Generator.map addrs ~f:Set.of_list
+
+  let top = Set.max_elt
 
   module Location = struct
-    (* The free list should only contain addresses that locate accounts *)
-    let add set = function
+    let lift_exn fname f = function
       | L.Account addr ->
-          add set addr
+          f addr
       | Generic _bigstring ->
-          invalid_arg "Free_list.add_location: cannot add generic"
+          let msg = Printf.sprintf "%s: cannot handle generic location" fname in
+          invalid_arg msg
       | Hash _ ->
-          invalid_arg "Free_list.add_location: cannot add hash"
+          let msg = Printf.sprintf "%s: cannot handle hash location " fname in
+          invalid_arg msg
+
+    (* The free list should only contain addresses that locate accounts *)
+    let add set loc = lift_exn "Free_list.add" (Set.add set) loc
+
+    let remove set loc = lift_exn "Free_list.remove" (Set.remove set) loc
 
     let account addr = L.Account addr
 
-    let top = max_elt
-
     let pop set =
-      Option.map ~f:(fun addr -> (account addr, remove set addr)) (top set)
+      Option.map ~f:(fun addr -> (account addr, Set.remove set addr)) (top set)
 
     let top set = Option.map ~f:account (top set)
 
-    let mem set = function
-      | L.Account addr ->
-          mem set addr
-      | Generic _ | Hash _ ->
-          false
+    let mem set loc = lift_exn "Free_list.mem" (Set.mem set) loc
 
-    let remove_all_contiguous set = function
-      | L.Account addr ->
-          let set, addr = remove_all_contiguous set addr in
-          (set, Option.map ~f:account addr)
-      | Generic _bigstring ->
-          invalid_arg "Free_list.add_location: cannot add generic"
-      | Hash _ ->
-          invalid_arg "Free_list.add_location: cannot add hash"
+    let remove_all_contiguous set loc =
+      let set, addr =
+        lift_exn "Free_list.remove_all_contiguous"
+          (remove_all_contiguous set)
+          loc
+      in
+      (set, Option.map ~f:account addr)
   end
+
+  include Set
 end
