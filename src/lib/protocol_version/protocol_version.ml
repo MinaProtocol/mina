@@ -1,7 +1,5 @@
 (* protocol_version.ml *)
 
-[%%import "/src/config.mlh"]
-
 (* see RFC 0049 for details *)
 
 open Core_kernel
@@ -47,11 +45,9 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let to_string t = sprintf "%u.%u.%u" t.transaction t.network t.patch
 
-  [%%inject "current_transaction", protocol_version_transaction]
-
-  [%%inject "current_network", protocol_version_network]
-
-  [%%inject "current_patch", protocol_version_patch]
+  let current_transaction = Node_config.protocol_version_transaction
+  let current_network = Node_config.protocol_version_network
+  let current_patch = Node_config.protocol_version_patch
 
   let current =
     { transaction = current_transaction
