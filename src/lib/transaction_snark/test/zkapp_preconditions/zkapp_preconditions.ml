@@ -310,6 +310,7 @@ let%test_module "Protocol state precondition tests" =
                         ; use_full_commitment = false
                         ; may_use_token = No
                         ; authorization_kind = Signature
+                        ; delete_account = false
                         }
                         (*To be updated later*)
                     ; authorization = Control.Signature Signature.dummy
@@ -343,6 +344,7 @@ let%test_module "Protocol state precondition tests" =
                         ; use_full_commitment = true
                         ; may_use_token = No
                         ; authorization_kind = Signature
+                        ; delete_account = false
                         }
                     ; authorization =
                         Control.Signature Signature.dummy
@@ -906,6 +908,7 @@ let%test_module "Account precondition tests" =
                     ; use_full_commitment = false
                     ; may_use_token = No
                     ; authorization_kind = Signature
+                    ; delete_account = false
                     }
                     (*To be updated later*)
                 ; authorization = Control.Signature Signature.dummy
@@ -937,6 +940,7 @@ let%test_module "Account precondition tests" =
                     ; use_full_commitment = true
                     ; may_use_token = No
                     ; authorization_kind = Signature
+                    ; delete_account = false
                     }
                 ; authorization =
                     Control.Signature Signature.dummy (*To be updated later*)
