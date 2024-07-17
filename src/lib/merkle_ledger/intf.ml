@@ -184,23 +184,6 @@ module type Key_value_database = sig
 
   (** An association list, sorted by key *)
   val to_alist : t -> (Bigstring.t * Bigstring.t) list
-
-  val foldi :
-       t
-    -> init:'a
-    -> f:(int -> 'a -> key:Bigstring.t -> data:Bigstring.t -> 'a)
-    -> 'a
-
-  val fold_until :
-       t
-    -> init:'a
-    -> f:
-         (   'a
-          -> key:Bigstring.t
-          -> data:Bigstring.t
-          -> ('a, 'b) Continue_or_stop.t )
-    -> finish:('a -> 'b)
-    -> 'b
 end
 
 module type Storage_locations = sig
