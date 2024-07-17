@@ -19,29 +19,6 @@ struct
 
   module Maps = Map.Make (Core_kernel.Bigstring)
 
-  let validate ((l, r) : t) (label : string) =
-    L.foldi l ~init:() ~f:(fun _ _ ~key ~data ->
-        match R.get r ~key with
-        | None ->
-            [%log fatal] "Missing entry in rocksdb" ;
-            exit 1
-        | Some r_data ->
-            if r_data <> data then (
-              [%log fatal] "validate_l $label , $key $ldata $rdata"
-                ~metadata:
-                  [ ("label", `String label)
-                  ; ("key", log_bs key)
-                  ; ("ldata", log_bs data)
-                  ; ("rdata", log_bs r_data)
-                  ] ;
-              exit 1 ) ) ;
-    R.foldi r ~init:() ~f:(fun _ _ ~key ~data ->
-        if L.get l ~key <> Some data then (
-          [%log fatal] "validate_r $label"
-            ~metadata:[ ("label", `String label) ] ;
-          exit 1 ) )
-
-  (*
   let validate_no_dups_lmdb (l : L.t) (label : string) =
     Lmdb.Cursor.go Ro l.lmdb Lmdb.Cursor.(fun cursor ->
         match first cursor with
@@ -66,10 +43,42 @@ struct
             in check_dups k_first Maps.empty
 
       )
-    *)
 
-  (*
   let validate ((l, r) : t) (label : string) =
+    L.foldi l ~init:() ~f:(fun _ _ ~key ~data ->
+        match R.get r ~key with
+        | None ->
+            [%log fatal] "Missing entry in rocksdb" ;
+            exit 1
+        | Some r_data ->
+            if r_data <> data then (
+              [%log fatal] "validate_l $label , $key $ldata $rdata"
+                ~metadata:
+                  [ ("label", `String label)
+                  ; ("key", log_bs key)
+                  ; ("ldata", log_bs data)
+                  ; ("rdata", log_bs r_data)
+                  ] ;
+              exit 1 ) ) ;
+    List.iter (fun (key,data) ->
+        if L.get l ~key <> Some data then (
+          [%log fatal] "validate_r $label"
+            ~metadata:[ ("label", `String label) ] ;
+        exit 1 ))
+        (R.to_alist r);
+    validate_no_dups_lmdb l label;
+    let l_len : int = L.foldi l ~init:0 ~f:(fun _ i ~key:_ ~data:_ -> i+1) in
+    let r_len_alt = List.length (R.to_alist r) in
+    R.foldi r ~init:() ~f:(fun _ _ ~key:_ ~data:_ -> [%log fatal] "foldi works";exit 1);
+    R.fold_until r ~init:() ~f:(fun _ ~key:_ ~data:_ -> [%log fatal] "fold_until works";exit 1) ~finish:(fun () -> ());
+    if r_len_alt > 0 then [%log info] "both folds ignored all the data";
+    if l_len <> r_len_alt then ([%log fatal] "database sizes differ $l $r"
+        ~metadata:[("l",`Int l_len);("r",`Int r_len_alt)]
+        ; exit 1)
+
+
+      (*
+  let validate_1 ((l, r) : t) (label : string) =
     let label () =
       [%log fatal] "Validation failure in $label"
         ~metadata:[ ("label", `String label) ]
@@ -111,7 +120,7 @@ struct
                 [%log fatal] "Validation error LMDB had extra data $key $data , $rd"
               ~metadata:[("key",log_bs key);("data",log_bs data);("rd",log_opt_bs rd)];
                 exit 1 ) )
-    *)
+  *)
 
   let create conf =
     let l = L.create conf in
