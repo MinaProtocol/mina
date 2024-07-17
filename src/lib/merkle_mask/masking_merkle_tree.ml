@@ -232,6 +232,9 @@ module Make (Inputs : Inputs_intf.S) = struct
           { maps with
             locations = Map.set maps.locations ~key:account_id ~data:location
           } ) ;
+
+      (* if [location] was in free list, make sure to remove it *)
+      t.freed <- Free_list.Location.remove t.freed location ;
       (* if account is at a hitherto-unused location, that
          becomes the current location
       *)
