@@ -25,7 +25,7 @@ module type Inputs_intf = sig
 
     val get : t -> Location.t -> Account.t option
 
-    val last_filled : t -> Location.t option
+    val max_filled : t -> Location.t option
   end
 
   val get_hash : Base.t -> Location.t -> Hash.t
@@ -165,7 +165,7 @@ end = struct
         let new_last_location =
           let current_last_index =
             let open Option.Let_syntax in
-            let%map last_location = Inputs.Base.last_filled t in
+            let%map last_location = Inputs.Base.max_filled t in
             Inputs.Location.Addr.to_int
             @@ Inputs.Location.to_path_exn last_location
           in

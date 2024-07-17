@@ -379,8 +379,8 @@ module Ledger = struct
     (** the ledger should not be used after calling [close] *)
     val close : t -> unit
 
-    (** for account locations in the ledger, the last (rightmost) filled location *)
-    val last_filled : t -> Location.t option
+    (** for account locations in the ledger, the biggest filled location *)
+    val max_filled : t -> Location.t option
 
     val get_uuid : t -> Uuid.t
 

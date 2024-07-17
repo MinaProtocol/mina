@@ -103,7 +103,7 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
 
     let get_directory (T ((module Base), t)) = Base.get_directory t
 
-    let last_filled (T ((module Base), t)) = Base.last_filled t
+    let max_filled (T ((module Base), t)) = Base.max_filled t
 
     let close (T ((module Base), t)) = Base.close t
 

@@ -288,7 +288,7 @@ module Make (Test : Test_intf) = struct
             populate_db mdb max_height ;
             let accounts = random_accounts max_height |> dedup_accounts in
             let (last_location : MT.Location.t) =
-              MT.last_filled mdb |> Option.value_exn
+              MT.max_filled mdb |> Option.value_exn
             in
             let accounts_with_addresses =
               List.folding_map accounts ~init:last_location
@@ -314,7 +314,7 @@ module Make (Test : Test_intf) = struct
               + List.length accounts
             in
             let actual_last_location =
-              to_int (MT.last_filled mdb |> Option.value_exn)
+              to_int (MT.max_filled mdb |> Option.value_exn)
             in
             [%test_result: int] ~expect:expected_last_location
               actual_last_location

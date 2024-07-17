@@ -25,7 +25,7 @@ module type Inputs_intf = sig
 
     val get : t -> Location.t -> Account.t option
 
-    val last_filled : t -> Location.t option
+    val max_filled : t -> Location.t option
   end
 
   val get_hash : Base.t -> Location.t -> Hash.t

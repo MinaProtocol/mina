@@ -713,10 +713,10 @@ module Make (Inputs : Inputs_intf.S) = struct
       ; freed = Free_list.empty
       }
 
-    let last_filled t =
+    let max_filled t =
       assert_is_attached t ;
       Option.value_map
-        (Base.last_filled (get_parent t))
+        (Base.max_filled (get_parent t))
         ~default:t.fill_frontier
         ~f:(fun parent_loc ->
           match t.fill_frontier with
@@ -735,8 +735,8 @@ module Make (Inputs : Inputs_intf.S) = struct
               | Account _, (Generic _ | Hash _)
               | (Generic _ | Hash _), (Generic _ | Hash _) ->
                   failwith
-                    "last_filled: expected account locations for the parent \
-                     and mask" ) )
+                    "max_filled: expected account locations for the parent and \
+                     mask" ) )
 
     let drop_accumulated t = t.accumulated <- None
 
@@ -755,7 +755,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
         let get = get
 
-        let last_filled = last_filled
+        let max_filled = max_filled
       end
 
       let ledger_depth = depth
@@ -1019,7 +1019,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     end
 
     let leftmost_available_slot t =
-      match last_filled t with
+      match max_filled t with
       | None ->
           let loc =
             let path_to_leftmost_slot =
@@ -1071,7 +1071,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     assert (Option.is_none (Async.Ivar.peek t.detached_parent_signal)) ;
     assert (Int.equal t.depth (Base.depth parent)) ;
     t.parent <- Ok parent ;
-    t.fill_frontier <- Attached.last_filled t ;
+    t.fill_frontier <- Attached.max_filled t ;
     (* If [t.accumulated] isn't empty, then this mask had a parent before
        and now we just reparent it (which may only happen if both old and new parents
         have the same merkle root (and some masks in between may have been removed),

@@ -488,7 +488,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   let location_of_account_batch t keys =
     List.zip_exn keys (Account_location.get_batch t keys)
 
-  let last_filled t = Account_location.last_location t
+  let max_filled t = Account_location.last_location t
 
   let token_owners (t : t) : Account_id.Set.t =
     Tokens.Owner.all_owners t
@@ -514,7 +514,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
 
       let get = get
 
-      let last_filled = last_filled
+      let max_filled = max_filled
     end
 
     let get_hash = get_hash
