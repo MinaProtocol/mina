@@ -15,6 +15,8 @@ module type S = sig
 
   val empty : t
 
+  val is_empty : t -> bool
+
   val size : t -> int
 
   val pp : Format.formatter -> t -> unit
