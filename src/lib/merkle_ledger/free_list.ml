@@ -1,7 +1,13 @@
 module type S = sig
-  type t [@@deriving sexp, equal]
+  type t
 
   type location
+
+  val equal : t -> t -> bool
+
+  val sexp_of_t : t -> Sexp.t
+
+  val t_of_sexp : Sexp.t -> t
 
   val serialize : ledger_depth:int -> t -> Bigstring.t
 
