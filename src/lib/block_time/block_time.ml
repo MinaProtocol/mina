@@ -37,7 +37,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let zero = UInt64.zero
 
     module Controller = struct
-
       type t = unit -> Time.Span.t [@@deriving sexp]
 
       (* NB: All instances are identical by construction (see basic below). *)

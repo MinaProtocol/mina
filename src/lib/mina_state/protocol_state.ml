@@ -162,7 +162,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let hash s =
       if Node_config.call_logger then
-        Mina_debug.Call_logger.record_call "Protocol_state.hash";
+        Mina_debug.Call_logger.record_call "Protocol_state.hash" ;
       Random_oracle.hash ~init:Hash_prefix.protocol_state_body
         (Random_oracle.pack_input (to_input s))
       |> State_body_hash.of_hash
@@ -294,7 +294,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       | Some hash ->
           hash
     else state.body.genesis_state_hash
-
 
   let negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
       ~consensus_constants ~genesis_body_reference =

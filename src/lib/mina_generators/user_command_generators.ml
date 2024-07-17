@@ -4,7 +4,6 @@
    Zkapp_command
 *)
 
-
 open Core_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger

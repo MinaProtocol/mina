@@ -4,8 +4,6 @@
     tests and production.
 *)
 
-
-
 let curve_size = Node_config.curve_size
 
 let genesis_ledger = Node_config.genesis_ledger
@@ -59,14 +57,12 @@ let max_action_elements = 100
 
 let network_id = Node_config.network
 
-
 let zkapp_cmd_limit = Node_config.zkapp_cmd_limit
 
 let zkapp_cmd_limit_hardcap = 128
 
 let zkapps_disabled = false
 
-
 let slot_tx_end : int option = Node_config.slot_tx_end
-let slot_chain_end : int option = Node_config.slot_chain_end
 
+let slot_chain_end : int option = Node_config.slot_chain_end

@@ -213,12 +213,9 @@ module Make_str (A : Wire_types.Concrete) = struct
     let var_of_t t : var =
       List.map (Fold.to_list @@ fold t) ~f:Boolean.var_of_value
 
-
-    let warn_improper_transport () = 
-          if String.equal Node_config.proof_level "check" 
-            then ()
-          else printf "WARNING: improperly transporting staged-ledger-hash\n"
-      
+    let warn_improper_transport () =
+      if String.equal Node_config.proof_level "check" then ()
+      else printf "WARNING: improperly transporting staged-ledger-hash\n"
 
     let typ : (var, value) Typ.t =
       Typ.transport (Typ.list ~length:length_in_bits Boolean.typ)
