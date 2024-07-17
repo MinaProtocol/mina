@@ -13,7 +13,7 @@ val grace_period_slots: int
 
 
 val scan_state_with_tps_goal: bool
-val scan_state_transaction_capacity_log_2: int
+val scan_state_transaction_capacity_log_2: int option
 val scan_state_work_delay: int
 
 val debug_logs: bool

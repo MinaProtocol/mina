@@ -112,7 +112,9 @@ module Constraint_constants = struct
               *)
              1 + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
 
-          | _ -> Node_config.scan_state_transaction_capacity_log_2
+          | _ ->  match Node_config.scan_state_transaction_capacity_log_2 with
+              | Some a -> a
+              | None -> failwith "scan_state_transaction_capacity_log_2 must be set if scan_state_with_tps_goal is false"
 
       let supercharged_coinbase_factor = Node_config.supercharged_coinbase_factor
 
@@ -125,7 +127,7 @@ module Constraint_constants = struct
         ; ledger_depth = Node_config.ledger_depth
         ; work_delay = Node_config.scan_state_work_delay
         ; block_window_duration_ms = Node_config.block_window_duration
-        ; transaction_capacity_log_2 = Node_config.scan_state_transaction_capacity_log_2
+        ; transaction_capacity_log_2 = transaction_capacity_log_2
         ; pending_coinbase_depth
         ; coinbase_amount =
             Currency.Amount.of_mina_string_exn Node_config.coinbase

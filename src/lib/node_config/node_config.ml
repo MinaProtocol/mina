@@ -20,7 +20,14 @@
 [%%inject "grace_period_slots", grace_period_slots]
 
 [%%inject "scan_state_with_tps_goal", scan_state_with_tps_goal]
+
+[%%ifndef scan_state_transaction_capacity_log_2]
+let scan_state_transaction_capacity_log_2 : int option = None
+[%%else]
 [%%inject "scan_state_transaction_capacity_log_2", scan_state_transaction_capacity_log_2]
+let scan_state_transaction_capacity_log_2 = Some scan_state_transaction_capacity_log_2
+[%%endif]
+
 [%%inject "scan_state_work_delay", scan_state_work_delay]
 
 
