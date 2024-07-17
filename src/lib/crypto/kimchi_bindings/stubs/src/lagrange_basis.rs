@@ -11,8 +11,12 @@ pub trait WithLagrangeBasis<G: AffineCurve> {
 
 impl WithLagrangeBasis<Vesta> for SRS<Vesta> {
     fn with_lagrange_basis(&mut self, domain: D<<Vesta as AffineCurve>::ScalarField>) {
-        let use_cache =
-            env::var("USE_LAGRANGE_CACHE").unwrap_or_else(|_| "false".to_string()) == "true";
+        let use_cache = {
+            let use_cache_var = env::var("USE_LAGRANGE_CACHE");
+            println!("USE_LAGRANGE_CACHE value: {:?}", use_cache_var);
+            let _ = use_cache_var.unwrap_or_else(|_| "false".to_string()) == "true";
+            true
+        };
         if use_cache {
             add_lagrange_basis_with_cache(self, domain, cache::get_vesta_file_cache());
         } else {
@@ -24,8 +28,12 @@ impl WithLagrangeBasis<Vesta> for SRS<Vesta> {
 
 impl WithLagrangeBasis<Pallas> for SRS<Pallas> {
     fn with_lagrange_basis(&mut self, domain: D<<Pallas as AffineCurve>::ScalarField>) {
-        let use_cache =
-            env::var("USE_LAGRANGE_CACHE").unwrap_or_else(|_| "false".to_string()) == "true";
+        let use_cache = {
+            let use_cache_var = env::var("USE_LAGRANGE_CACHE");
+            println!("USE_LAGRANGE_CACHE value: {:?}", use_cache_var);
+            let _ = use_cache_var.unwrap_or_else(|_| "false".to_string()) == "true";
+            true
+        };
         if use_cache {
             add_lagrange_basis_with_cache(self, domain, cache::get_pallas_file_cache());
         } else {

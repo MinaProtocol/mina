@@ -30,6 +30,7 @@ time dune runtest "src/app/print_blockchain_snark_vk" --profile="${profile}" -j1
 export ERROR_ON_PROOF=true
 
 export USE_LAGRANGE_CACHE=true
+echo "The value of USE_LAGRANGE_CACHE is in the dev unit test script is $USE_LAGRANGE_CACHE"
 
 # Note: By attempting a re-run on failure here, we can avoid rebuilding and
 # skip running all of the tests that have already succeeded, since dune will
