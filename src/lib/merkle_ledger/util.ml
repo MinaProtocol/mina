@@ -26,6 +26,8 @@ module type Inputs_intf = sig
     val get : t -> Location.t -> Account.t option
 
     val max_filled : t -> Location.t option
+
+    val is_compact : t -> bool
   end
 
   val get_hash : Base.t -> Location.t -> Hash.t
@@ -155,6 +157,7 @@ end = struct
 
   let set_raw_addresses t addresses_and_accounts =
     let ledger_depth = Inputs.ledger_depth t in
+    assert (Inputs.Base.is_compact t) ;
     Option.iter (Mina_stdlib.Nonempty_list.of_list_opt addresses_and_accounts)
       ~f:(fun nonempty_addresses_and_accounts ->
         let key_locations =

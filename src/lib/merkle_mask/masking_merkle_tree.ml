@@ -738,6 +738,10 @@ module Make (Inputs : Inputs_intf.S) = struct
                     "max_filled: expected account locations for the parent and \
                      mask" ) )
 
+    let is_compact t =
+      assert_is_attached t ;
+      Free_list.is_empty t.freed && Base.is_compact (get_parent t)
+
     let drop_accumulated t = t.accumulated <- None
 
     include Merkle_ledger.Util.Make (struct
@@ -756,6 +760,8 @@ module Make (Inputs : Inputs_intf.S) = struct
         let get = get
 
         let max_filled = max_filled
+
+        let is_compact = is_compact
       end
 
       let ledger_depth = depth

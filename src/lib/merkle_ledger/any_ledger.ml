@@ -105,6 +105,8 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
 
     let max_filled (T ((module Base), t)) = Base.max_filled t
 
+    let is_compact (T ((module Base), t)) = Base.is_compact t
+
     let close (T ((module Base), t)) = Base.close t
 
     let get_or_create_account (T ((module Base), t)) =

@@ -183,7 +183,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     assert (List.for_all locations ~f:Location.is_generic) ;
     get_raw_batch mdb locations
 
-  let remove { kvdb; depth; _ } location =
+  let _remove { kvdb; depth; _ } location =
     let key = Location.serialize ~ledger_depth:depth location in
     (* rehash something *)
     Kvdb.remove kvdb ~key
@@ -254,9 +254,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
 
       module F = Free_list.Make (Location)
 
-      (* TODO: Make the function used or remove it *)
-
-      let _get mdb =
+      let get mdb =
         let key = Lazy.force key in
         let ledger_depth = mdb.depth in
         match get_generic mdb key with
@@ -287,13 +285,11 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
                 set mdb free_list ; Result.return loc
             | None ->
                 Result.fail Db_error.Out_of_leaves )
+
+      let is_empty mdb = Result.map (get mdb) ~f:F.is_empty
+
+      let _size mdb = Result.map (get mdb) ~f:F.size
     end
-
-    (* TODO: Make the code used or remove it  *)
-
-    let _remove_location = remove
-
-    let _remove_account _ _ = invalid_arg "remove_account: not yet implemented"
 
     let increment_last_account_location mdb =
       let location = last_location_key () in
@@ -319,6 +315,9 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
                        (Location.serialize ~ledger_depth next_account_location) ;
                      next_account_location ) )
 
+    (* TODO: This is okay as long as we do not have concurrent accesses. Same
+       as before.
+    *)
     let allocate mdb key =
       let open Result.Let_syntax in
       let%bind location =
@@ -490,6 +489,13 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
 
   let max_filled t = Account_location.last_location t
 
+  let is_compact mdb =
+    match Account_location.Free_list.is_empty mdb with
+    | Ok bool ->
+        bool
+    | Error _ ->
+        false
+
   let token_owners (t : t) : Account_id.Set.t =
     Tokens.Owner.all_owners t
     |> Sequence.fold ~init:Account_id.Set.empty ~f:(fun acc (_, owner) ->
@@ -515,6 +521,8 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       let get = get
 
       let max_filled = max_filled
+
+      let is_compact = is_compact
     end
 
     let get_hash = get_hash

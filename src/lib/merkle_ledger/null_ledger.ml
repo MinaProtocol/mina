@@ -113,6 +113,8 @@ end = struct
 
   let max_filled _t = None
 
+  let is_compact _t = true
+
   let close _t = ()
 
   let get_or_create_account _t =

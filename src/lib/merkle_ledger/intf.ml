@@ -382,6 +382,13 @@ module Ledger = struct
     (** for account locations in the ledger, the biggest filled location *)
     val max_filled : t -> Location.t option
 
+    (* [is_compact t] returns [true] the fill interval, i.e, all locations
+       until [max_filled] are filled.
+
+       In that case, it is safe to allocate from [max_filled + 1].
+    *)
+    val is_compact : t -> bool
+
     val get_uuid : t -> Uuid.t
 
     (** return Some [directory] for ledgers that use a file system, else None *)
