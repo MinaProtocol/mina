@@ -1,10 +1,10 @@
 (* Testing
    -------
 
-   Component: In memory database
-   Subject: Merkle ledger tests for in-memory database
+   Component: On-disk database
+   Subject: Merkle ledger tests for on-disk database
    Invocation: \
-     dune exec src/lib/merkle_ledger_tests/main.exe -- test "In-memory db"
+     dune exec src/lib/merkle_ledger_tests/main.exe -- test "On-disk"
 *)
 
 open Core
@@ -36,7 +36,7 @@ end
 module Make (Test : Test_intf) = struct
   module MT = Test.MT
 
-  let test_section_name = Printf.sprintf "In-memory db (depth %d)" Test.depth
+  let test_section_name = Printf.sprintf "On-disk db (depth %d)" Test.depth
 
   let test_stack = Stack.create ()
 
@@ -287,6 +287,7 @@ module Make (Test : Test_intf) = struct
             let max_height = Int.min (MT.depth mdb - 1) 3 in
             populate_db mdb max_height ;
             let accounts = random_accounts max_height |> dedup_accounts in
+            assert (MT.is_compact mdb) ;
             let (last_location : MT.Location.t) =
               MT.max_filled mdb |> Option.value_exn
             in
