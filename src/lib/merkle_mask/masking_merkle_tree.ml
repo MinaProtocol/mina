@@ -568,6 +568,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.empty_account in
       let merkle_path = merkle_path t location in
+      (* FIXME: Instead of creating a list then iterating over it we could do a
+         single iteration pass. *)
       let addresses_and_hashes =
         addresses_and_hashes_from_merkle_path_exn merkle_path account_address
           account_hash
