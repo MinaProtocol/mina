@@ -269,6 +269,9 @@ module Make (Inputs : Inputs_intf.S) = struct
           Some account
       | None ->
           let is_empty =
+            (* The location does not mark an account, maybe it has been freed *)
+            Free_list.Location.mem t.freed location
+            ||
             match t.fill_frontier with
             | None ->
                 true
