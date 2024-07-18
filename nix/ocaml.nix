@@ -123,6 +123,7 @@ let
   allDeps = dune-nix.allDeps info;
   commonOverrides = {
     DUNE_PROFILE = "dev";
+    USE_LAGRANGE_CACHE = "true";
     buildInputs = [ base-libs ] ++ external-libs;
     nativeBuildInputs = [ ];
   };
