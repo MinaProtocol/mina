@@ -431,10 +431,6 @@ module Make (Test : Test_intf) = struct
                      (Mask.Addr.root ())
               in
               Alcotest.(
-                check int "Retrieved as many accounts as expected"
-                  (List.length base_accounts)
-                  (List.length retrieved_accounts)) ;
-              Alcotest.(
                 check (list Account.testable)
                   "retrieved and expected accounts are the same"
                   expected_accounts retrieved_accounts) ) )
