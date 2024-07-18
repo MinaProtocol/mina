@@ -14,7 +14,12 @@ module Depth = struct
   let depth = 4
 end
 
-module Location = Merkle_ledger.Location.T
+module Location = struct
+  include Merkle_ledger.Location.T
+
+  let testable =
+    Alcotest.testable (fun ppf loc -> Sexp.pp ppf (sexp_of_t loc)) equal
+end
 
 module Location_binable = struct
   module Arg = struct
