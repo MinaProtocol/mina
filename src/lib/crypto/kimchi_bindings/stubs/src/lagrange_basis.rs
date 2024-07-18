@@ -3,7 +3,6 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as D};
 use cache::LagrangeCache;
 use mina_curves::pasta::{Pallas, Vesta};
 use poly_commitment::{commitment::CommitmentCurve, srs::SRS};
-use std::env;
 
 pub trait WithLagrangeBasis<G: AffineCurve> {
     fn with_lagrange_basis(&mut self, domain: D<G::ScalarField>);
@@ -11,24 +10,22 @@ pub trait WithLagrangeBasis<G: AffineCurve> {
 
 impl WithLagrangeBasis<Vesta> for SRS<Vesta> {
     fn with_lagrange_basis(&mut self, domain: D<<Vesta as AffineCurve>::ScalarField>) {
-        let use_cache = env::var("USE_LAGRANGE_CACHE").unwrap_or_else(|_| "false".to_string()) == "true";
-        if use_cache {
-            add_lagrange_basis_with_cache(self, domain, cache::get_vesta_file_cache());
-        } else {
-            eprintln!("NOT USING LAGRANGE CACHE FOR VESTA");
+        let cache_dir = std::env::var("LAGRANGE_CACHE_DIR").unwrap_or_else(|_| "".to_string());
+        if cache_dir == "" {
             self.add_lagrange_basis(domain);
+        } else {
+            add_lagrange_basis_with_cache(self, domain, cache::get_vesta_file_cache());
         }
     }
 }
 
 impl WithLagrangeBasis<Pallas> for SRS<Pallas> {
     fn with_lagrange_basis(&mut self, domain: D<<Pallas as AffineCurve>::ScalarField>) {
-        let use_cache = env::var("USE_LAGRANGE_CACHE").unwrap_or_else(|_| "false".to_string()) == "true";
-        if use_cache {
-            add_lagrange_basis_with_cache(self, domain, cache::get_pallas_file_cache());
-        } else {
-            eprintln!("NOT USING LAGRANGE CACHE FOR PALLAS");
+        let cache_dir = std::env::var("LAGRANGE_CACHE_DIR").unwrap_or_else(|_| "".to_string());
+        if cache_dir == "" {
             self.add_lagrange_basis(domain);
+        } else {
+            add_lagrange_basis_with_cache(self, domain, cache::get_pallas_file_cache());
         }
     }
 }
@@ -174,7 +171,9 @@ mod cache {
     // explicitly called.
 
     static VESTA_FILE_CACHE: Lazy<FileCache<Vesta>> = Lazy::new(|| {
-        let cache_dir = PathBuf::from_str("/tmp/lagrange_basis/vesta")
+        let mut cache_dir_str = std::env::var("LAGRANGE_CACHE_DIR").unwrap_or_else(|_| "".to_string());
+        cache_dir_str.push_str("/vesta");
+        let cache_dir = PathBuf::from_str(&cache_dir_str)
             .expect("Failed to create vesta lagrange cache");
         if !cache_dir.exists() {
             eprintln!("Creating cache directory: {:?}", cache_dir);
@@ -188,7 +187,9 @@ mod cache {
     }
 
     static PALLAS_FILE_CACHE: Lazy<FileCache<Pallas>> = Lazy::new(|| {
-        let cache_dir = PathBuf::from_str("/tmp/lagrange_basis/pallas")
+        let mut cache_dir_str = std::env::var("LAGRANGE_CACHE_DIR").unwrap_or_else(|_| "".to_string());
+        cache_dir_str.push_str("/pallas");
+        let cache_dir = PathBuf::from_str(&cache_dir_str)
             .expect("Failed to create pallas lagrange cache");
         if !cache_dir.exists() {
             eprintln!("Creating cache directory: {:?}", cache_dir);
