@@ -288,7 +288,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
 
       let is_empty mdb = Result.map (get mdb) ~f:F.is_empty
 
-      let _size mdb = Result.map (get mdb) ~f:F.size
+      let size mdb = Result.map (get mdb) ~f:F.size
     end
 
     let increment_last_account_location mdb =
@@ -606,17 +606,17 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
     set mdb (Location.Account addr) account
 
-  (* FIXME:  This is false with removal *)
   let num_accounts t =
     match Account_location.last_location_address t with
     | None ->
         0
     | Some addr ->
-        Addr.to_int addr + 1
-
-  let remove_location _ _ = failwith "not yet implemented"
+        let freed_size = Account_location.Free_list.size t |> Result.ok_exn in
+        Addr.to_int addr + 1 - freed_size
 
   let remove_account _ _ = failwith "not yet implemented"
+
+  let remove_location _ _ = failwith "not yet implemented"
 
   let to_list mdb =
     let num_accounts = num_accounts mdb in
