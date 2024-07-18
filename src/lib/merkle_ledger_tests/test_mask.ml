@@ -633,7 +633,7 @@ module Make (Test : Test_intf) = struct
   let () =
     let num_accounts = 5 in
     let accounts = gen_accounts ~num_accounts in
-    add_test "addition then deletion works" (fun () ->
+    add_test "simple addition then deletion works" (fun () ->
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             (* add accounts to mask *)
@@ -652,8 +652,38 @@ module Make (Test : Test_intf) = struct
             let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
             [%test_eq: Int.t] mask_num_accounts 1 ) )
 
+  (* delete an existing account and returns the location where it was stored *)
+  let delete mask account =
+    let loc =
+      Option.value_exn
+        (Mask.Attached.location_of_account mask (Account.identifier account))
+    in
+    ignore @@ Mask.Attached.remove_account mask account ;
+    loc
+
+  let add_new_account mask account =
+    let id = Account.identifier account in
+    let ret = Mask.Attached.get_or_create_account mask id account in
+    match ret with
+    | Ok (`Added, loc) ->
+        loc
+    | Ok (`Existed, _loc) ->
+        let msg =
+          Format.asprintf "account_id %a was expected to be absent" Sexp.pp
+            (Account_id.sexp_of_t id)
+        in
+        failwith msg
+    | Error _ ->
+        let msg =
+          Format.asprintf "error adding account id %a" Sexp.pp
+            (Account_id.sexp_of_t id)
+        in
+        failwith msg
+
   (* This test exposes some internal invariants wrt to the interaction between
      removal and additions.
+
+     The allocator should prioritize reusing freed locations over others
   *)
   let () =
     let num_accounts = 8 in
@@ -661,7 +691,7 @@ module Make (Test : Test_intf) = struct
     assert (half > 1) ;
     let initial_accounts = gen_accounts ~num_accounts:half in
     let additional_accounts = gen_accounts ~num_accounts:half in
-    add_test "addition reuses just removed location" (fun () ->
+    add_test "allocator prioritizes freed locations" (fun () ->
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             (* add accounts to mask *)
@@ -671,29 +701,49 @@ module Make (Test : Test_intf) = struct
             [%test_eq: Int.t] half mask_num_accounts ;
 
             (* Remove num_accounts*)
-            let accounts_to_be_deleted = initial_accounts in
-            ignore
-            @@ List.iter2 accounts_to_be_deleted additional_accounts
-                 ~f:(fun account_to_delete account_to_add ->
-                   let loc1 =
-                     Option.value_exn
-                       (Mask.Attached.location_of_account attached_mask
-                          (Account.identifier account_to_delete) )
-                   in
-                   ignore
-                   @@ Mask.Attached.remove_account attached_mask
-                        account_to_delete ;
-                   let id = Account.identifier account_to_add in
-                   ignore
-                   @@ Mask.Attached.get_or_create_account attached_mask id
-                        account_to_add ;
-                   let loc2 =
-                     Option.value_exn
-                       (Mask.Attached.location_of_account attached_mask id)
-                   in
-                   [%test_eq: Mask.Location.t] loc1 loc2 ) ;
+            (let accounts_to_be_deleted = initial_accounts in
+             ignore
+             @@ List.iter2 accounts_to_be_deleted additional_accounts
+                  ~f:(fun account_to_delete account_to_add ->
+                    let loc1 = delete attached_mask account_to_delete in
+                    let loc2 = add_new_account attached_mask account_to_add in
+                    let loc3 =
+                      Option.value_exn
+                        (Mask.Attached.location_of_account attached_mask
+                           (Account.identifier account_to_add) )
+                    in
+                    [%test_eq: Mask.Location.t] loc1 loc2 ;
+                    [%test_eq: Mask.Location.t] loc3 loc2 ) ) ;
             let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
-            [%test_eq: Int.t] mask_num_accounts half ) )
+            Alcotest.(
+              check int "mask contains only non-removed accounts"
+                mask_num_accounts half) ) )
+
+  let () =
+    let name = "allocator reuse location closest to fill frontier first" in
+    let num_accounts = 8 in
+    let half = num_accounts / 2 in
+    assert (half > 1) ;
+    let initial_accounts = gen_accounts ~num_accounts:half in
+    let additional_accounts = gen_accounts ~num_accounts:half in
+    add_test name (fun () ->
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            (* add accounts to mask *)
+            List.iter initial_accounts ~f:(fun account ->
+                ignore @@ create_new_account_exn attached_mask account ) ;
+            let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
+            [%test_eq: Int.t] half mask_num_accounts ;
+
+            let accounts_to_be_deleted = initial_accounts in
+            let deleted_locs =
+              List.map accounts_to_be_deleted ~f:(delete attached_mask)
+              |> List.sort ~compare:Test.Location.compare
+            in
+            let added_locs =
+              List.map additional_accounts ~f:(add_new_account attached_mask)
+            in
+            [%test_eq: Test.Location.t list] deleted_locs added_locs ) )
 
   let () =
     add_test "mask reparenting works" (fun () ->
