@@ -14,8 +14,7 @@ source ~/.profile
 
 export MINA_LIBP2P_PASS="naughty blue worm"
 export NO_JS_BUILD=1 # skip some JS targets which have extra implicit dependencies
-export USE_LAGRANGE_CACHE=true
-echo "The value of USE_LAGRANGE_CACHE is in the dev unit test script is $USE_LAGRANGE_CACHE"
+export USE_LAGRANGE_CACHE="/tmp/lagrange-cache"
 
 echo "--- Make build"
 export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go

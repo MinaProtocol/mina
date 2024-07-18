@@ -11,24 +11,24 @@ pub trait WithLagrangeBasis<G: AffineCurve> {
 
 impl WithLagrangeBasis<Vesta> for SRS<Vesta> {
     fn with_lagrange_basis(&mut self, domain: D<<Vesta as AffineCurve>::ScalarField>) {
-        let use_cache = env::var("USE_LAGRANGE_CACHE").unwrap_or_else(|_| "false".to_string()) == "true";
-        if use_cache {
-            add_lagrange_basis_with_cache(self, domain, cache::get_vesta_file_cache());
-        } else {
-            eprintln!("NOT USING LAGRANGE CACHE FOR VESTA");
-            self.add_lagrange_basis(domain);
+        match env::var("LAGRANGE_CACHE_DIR") {
+            Ok(_) => add_lagrange_basis_with_cache(self, domain, cache::get_vesta_file_cache()),
+            Err(_) => {
+                eprintln!("NOT USING LAGRANGE CACHE FOR VESTA");
+                self.add_lagrange_basis(domain);
+            }
         }
     }
 }
 
 impl WithLagrangeBasis<Pallas> for SRS<Pallas> {
     fn with_lagrange_basis(&mut self, domain: D<<Pallas as AffineCurve>::ScalarField>) {
-        let use_cache = env::var("USE_LAGRANGE_CACHE").unwrap_or_else(|_| "false".to_string()) == "true";
-        if use_cache {
-            add_lagrange_basis_with_cache(self, domain, cache::get_pallas_file_cache());
-        } else {
-            eprintln!("NOT USING LAGRANGE CACHE FOR PALLAS");
-            self.add_lagrange_basis(domain);
+        match env::var("LAGRANGE_CACHE_DIR") {
+            Ok(_) => add_lagrange_basis_with_cache(self, domain, cache::get_pallas_file_cache()),
+            Err(_) => {
+                eprintln!("NOT USING LAGRANGE CACHE FOR PALLAS");
+                self.add_lagrange_basis(domain);
+            }
         }
     }
 }
@@ -58,9 +58,8 @@ mod cache {
     use mina_curves::pasta::{Pallas, Vesta};
     use once_cell::sync::Lazy;
     use poly_commitment::PolyComm;
-    use std::str::FromStr;
     use std::{
-        fs,
+        env, fs,
         fs::File,
         marker::PhantomData,
         path::{Path, PathBuf},
@@ -172,10 +171,10 @@ mod cache {
 
     // The following two caches are all that we need for mina tests. These will not be initialized unless they are
     // explicitly called.
-
     static VESTA_FILE_CACHE: Lazy<FileCache<Vesta>> = Lazy::new(|| {
-        let cache_dir = PathBuf::from_str("/tmp/lagrange_basis/vesta")
-            .expect("Failed to create vesta lagrange cache");
+        let cache_base_dir: String =
+            env::var("LAGRANGE_CACHE_DIR").expect("LAGRANGE_CACHE_DIR missing in env");
+        let cache_dir = PathBuf::from(format!("{}/vesta", cache_base_dir));
         if !cache_dir.exists() {
             eprintln!("Creating cache directory: {:?}", cache_dir);
             fs::create_dir_all(&cache_dir).unwrap();
@@ -188,8 +187,9 @@ mod cache {
     }
 
     static PALLAS_FILE_CACHE: Lazy<FileCache<Pallas>> = Lazy::new(|| {
-        let cache_dir = PathBuf::from_str("/tmp/lagrange_basis/pallas")
-            .expect("Failed to create pallas lagrange cache");
+        let cache_base_dir: String =
+            env::var("LAGRANGE_CACHE_DIR").expect("LAGRANGE_CACHE_DIR missing in env");
+        let cache_dir = PathBuf::from(format!("{}/pallas", cache_base_dir));
         if !cache_dir.exists() {
             eprintln!("Creating cache directory: {:?}", cache_dir);
             fs::create_dir_all(&cache_dir).unwrap();
