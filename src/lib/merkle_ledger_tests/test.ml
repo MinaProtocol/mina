@@ -79,5 +79,5 @@ let test_db () =
               assert (Hash.equal binary_hash db_hash) ) ) )
 
 let tests =
-  [ ("Databases", [ Alcotest.test_case "equivalent hash values" `Quick test_db ])
+  [ ("Databases", [ Alcotest.test_case "equivalent hash values" `Slow test_db ])
   ]

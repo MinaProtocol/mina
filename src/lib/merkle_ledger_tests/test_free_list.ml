@@ -18,7 +18,7 @@ let gen max_depth =
   (ledger_depth, free_list)
 
 let test_de_serialization =
-  Alcotest.test_case "serialization/deserialization" `Quick (fun () ->
+  Alcotest.test_case "serialization/deserialization" `Slow (fun () ->
       Quickcheck.test (gen 5) ~f:(fun (ledger_depth, free_list) ->
           let bs = F.serialize ~ledger_depth free_list in
           let deserialized = F.deserialize ~ledger_depth bs in
