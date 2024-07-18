@@ -450,11 +450,8 @@ module Make (Test : Test_intf) = struct
       let name = Printf.sprintf "add 2^%d accounts" Test.depth in
       add_test name (fun () ->
           let num_accounts = 1 lsl Test.depth in
-          let account_ids = Account_id.gen_accounts num_accounts in
-          let balances =
-            Quickcheck.random_value
-              (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-          in
+          let account_ids = Account_id.genval.many num_accounts in
+          let balances = Balance.genval.many num_accounts in
           let accounts = List.map2_exn account_ids balances ~f:Account.create in
           Test.with_instance (fun mdb ->
               List.iter accounts ~f:(fun account ->
@@ -471,11 +468,8 @@ module Make (Test : Test_intf) = struct
     add_test "fold over account balances" (fun () ->
         Test.with_instance (fun mdb ->
             let num_accounts = 5 in
-            let account_ids = Account_id.gen_accounts num_accounts in
-            let balances =
-              Quickcheck.random_value
-                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-            in
+            let account_ids = Account_id.genval.many num_accounts in
+            let balances = Balance.genval.many num_accounts in
             let total =
               List.fold balances ~init:0 ~f:(fun accum balance ->
                   Balance.to_nanomina_int balance + accum )
@@ -497,14 +491,10 @@ module Make (Test : Test_intf) = struct
             Test.with_instance (fun mdb ->
                 let num_accounts = 5 in
                 let some_num = 3 in
-                let account_ids = Account_id.gen_accounts num_accounts in
+                let account_ids = Account_id.genval.many num_accounts in
                 let some_account_ids = List.take account_ids some_num in
                 let last_account_id = List.hd_exn (List.rev some_account_ids) in
-                let balances =
-                  Quickcheck.random_value
-                    (Quickcheck.Generator.list_with_length num_accounts
-                       Balance.gen )
-                in
+                let balances = Balance.genval.many num_accounts in
                 let some_balances = List.take balances some_num in
                 let total =
                   List.fold some_balances ~init:0 ~f:(fun accum balance ->

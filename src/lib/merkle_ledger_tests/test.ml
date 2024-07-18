@@ -60,7 +60,7 @@ let test_db () =
   in
   Quickcheck.test ~trials:5 ~sexp_of:[%sexp_of: Balance.t list]
     gen_non_zero_balances ~f:(fun balances ->
-      let account_ids = Account_id.gen_accounts num_accounts in
+      let account_ids = Account_id.genval.many num_accounts in
       let accounts = List.map2_exn account_ids balances ~f:Account.create in
       DB.with_ledger ~depth:Depth.depth ~f:(fun db ->
           List.iter accounts ~f:(fun account ->

@@ -98,9 +98,7 @@ module Make (Test : Test_intf) = struct
 
   let dummy_location = Test.Location.Account dummy_address
 
-  let dummy_account =
-    let account = Quickcheck.random_value Account.gen in
-    { account with token_id = Token_id.default }
+  let dummy_account = Account.genval.one ()
 
   let create_new_account_exn mask account =
     let public_key = Account.identifier account in
@@ -274,12 +272,8 @@ module Make (Test : Test_intf) = struct
                 dummy_account ;
               (* Make some accounts *)
               let num_accounts = (1 lsl Test.depth) - 1 in
-              let gen_values gen =
-                Quickcheck.random_value
-                  (Quickcheck.Generator.list_with_length num_accounts gen)
-              in
-              let account_ids = Account_id.gen_accounts num_accounts in
-              let balances = gen_values Balance.gen in
+              let account_ids = Account_id.genval.many num_accounts in
+              let balances = Balance.genval.many num_accounts in
               let accounts =
                 List.map2_exn account_ids balances ~f:(fun public_key balance ->
                     Account.create public_key balance )
@@ -362,12 +356,8 @@ module Make (Test : Test_intf) = struct
           Test.with_instances (fun maskable mask ->
               let attached_mask = Maskable.register_mask maskable mask in
               let num_accounts = 1 lsl Test.depth in
-              let gen_values gen =
-                Quickcheck.random_value
-                  (Quickcheck.Generator.list_with_length num_accounts gen)
-              in
-              let account_ids = Account_id.gen_accounts num_accounts in
-              let balances = gen_values Balance.gen in
+              let account_ids = Account_id.genval.many num_accounts in
+              let balances = Balance.genval.many num_accounts in
               let accounts =
                 List.map2_exn account_ids balances ~f:(fun public_key balance ->
                     Account.create public_key balance )
@@ -391,12 +381,8 @@ module Make (Test : Test_intf) = struct
           (* see similar test in test_database *)
           Test.with_chain (fun _ ~mask:mask1 ~mask_as_base:_ ~mask2 ->
               let num_accounts = 1 lsl Test.depth in
-              let gen_values gen list_length =
-                Quickcheck.random_value
-                  (Quickcheck.Generator.list_with_length list_length gen)
-              in
-              let account_ids = Account_id.gen_accounts num_accounts in
-              let balances = gen_values Balance.gen num_accounts in
+              let account_ids = Account_id.genval.many num_accounts in
+              let balances = Balance.genval.many num_accounts in
               let base_accounts =
                 List.map2_exn account_ids balances ~f:Account.create
               in
@@ -412,7 +398,7 @@ module Make (Test : Test_intf) = struct
                 |> (Fn.flip List.take) num_subset
                 |> List.unzip
               in
-              let subset_balances = gen_values Balance.gen num_subset in
+              let subset_balances = Balance.genval.many num_subset in
               let subset_updated_accounts =
                 List.map2_exn subset_accounts subset_balances
                   ~f:(fun account balance ->
@@ -450,7 +436,40 @@ module Make (Test : Test_intf) = struct
             let num_accounts_parent = 5 in
             let num_accounts_mask = 5 in
             let num_accounts = num_accounts_parent + num_accounts_mask in
-            let account_ids = Account_id.gen_accounts num_accounts in
+            let account_ids = Account_id.genval.many num_accounts in
+            let balances = Balance.genval.many num_accounts in
+            let accounts =
+              List.map2_exn account_ids balances ~f:Account.create
+            in
+            let total =
+              List.fold balances ~init:0 ~f:(fun accum balance ->
+                  Balance.to_nanomina_int balance + accum )
+            in
+            let parent_accounts, mask_accounts =
+              List.split_n accounts num_accounts_parent
+            in
+            (* add accounts to parent *)
+            List.iter parent_accounts ~f:(fun account ->
+                ignore @@ parent_create_new_account_exn maskable account ) ;
+            (* add accounts to mask *)
+            List.iter mask_accounts ~f:(fun account ->
+                ignore @@ create_new_account_exn attached_mask account ) ;
+            (* folding over mask also folds over maskable *)
+            let retrieved_total =
+              Mask.Attached.foldi attached_mask ~init:0
+                ~f:(fun _addr total account ->
+                  Balance.to_nanomina_int (Account.balance account) + total )
+            in
+            assert (Int.equal retrieved_total total) ) )
+
+  let () =
+    add_test "getting an account after removing it returns nothing" (fun () ->
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            let num_accounts_parent = 5 in
+            let num_accounts_mask = 5 in
+            let num_accounts = num_accounts_parent + num_accounts_mask in
+            let account_ids = Account_id.genval.many num_accounts in
             let balances =
               Quickcheck.random_value
                 (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
@@ -484,7 +503,7 @@ module Make (Test : Test_intf) = struct
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             let num_accounts = 10 in
-            let account_ids = Account_id.gen_accounts num_accounts in
+            let account_ids = Account_id.genval.many num_accounts in
             (* parent balances all non-zero *)
             let balances =
               List.init num_accounts ~f:(fun n ->
@@ -526,7 +545,7 @@ module Make (Test : Test_intf) = struct
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             let num_accounts = 10 in
-            let account_ids = Account_id.gen_accounts num_accounts in
+            let account_ids = Account_id.genval.many num_accounts in
             (* parent balances all non-zero *)
             let balances =
               List.init num_accounts ~f:(fun n ->
@@ -564,7 +583,7 @@ module Make (Test : Test_intf) = struct
         Test.with_instances (fun maskable mask ->
             let open Mask.Attached in
             let ledger = Maskable.register_mask maskable mask in
-            let key = List.nth_exn (Account_id.gen_accounts 1) 0 in
+            let key = Account_id.genval.one () in
             let start_hash = merkle_root ledger in
             match
               get_or_create_account ledger key Account.empty |> Or_error.ok_exn
@@ -575,19 +594,18 @@ module Make (Test : Test_intf) = struct
             | `Added, _new_loc ->
                 [%test_eq: Hash.t] start_hash (merkle_root ledger) ) )
 
+  let gen_accounts ~num_accounts =
+    let account_ids = Account_id.genval.many num_accounts in
+    let balances = Balance.genval.many num_accounts in
+    List.map2_exn account_ids balances ~f:Account.create
+
   let () =
     add_test "num_accounts for unique keys in mask and parent" (fun () ->
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             let num_accounts = 5 in
-            let account_ids = Account_id.gen_accounts num_accounts in
-            let balances =
-              Quickcheck.random_value
-                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-            in
-            let accounts =
-              List.map2_exn account_ids balances ~f:Account.create
-            in
+            let accounts = gen_accounts ~num_accounts in
+
             (* add accounts to mask *)
             List.iter accounts ~f:(fun account ->
                 ignore @@ create_new_account_exn attached_mask account ) ;
@@ -607,14 +625,6 @@ module Make (Test : Test_intf) = struct
               Mina_stdlib.List.Length.Compare.(accounts = parent_num_accounts)
               && Int.equal parent_num_accounts mask_num_accounts_before
               && Int.equal parent_num_accounts mask_num_accounts_after ) ) )
-
-  let gen_accounts ~num_accounts =
-    let account_ids = Account_id.gen_accounts num_accounts in
-    let balances =
-      Quickcheck.random_value
-        (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-    in
-    List.map2_exn account_ids balances ~f:Account.create
 
   let () =
     let num_accounts = 5 in
@@ -685,7 +695,7 @@ module Make (Test : Test_intf) = struct
     add_test "mask reparenting works" (fun () ->
         Test.with_chain (fun base ~mask:m1 ~mask_as_base ~mask2:m2 ->
             let num_accounts = 3 in
-            let account_ids = Account_id.gen_accounts num_accounts in
+            let account_ids = Account_id.genval.many num_accounts in
             let balances =
               Quickcheck.random_value
                 (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
@@ -728,7 +738,7 @@ module Make (Test : Test_intf) = struct
        dirty for said account" (fun () ->
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
-            let k = Account_id.gen_accounts 1 |> List.hd_exn in
+            let k = Account_id.genval.one () in
             let acct1 = Account.create k (Balance.of_nanomina_int_exn 10) in
             let loc =
               Mask.Attached.get_or_create_account attached_mask k acct1
