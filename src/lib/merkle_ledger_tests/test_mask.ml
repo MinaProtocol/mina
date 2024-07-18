@@ -423,10 +423,14 @@ module Make (Test : Test_intf) = struct
                 @@ Mask.Attached.get_all_accounts_rooted_at_exn mask2
                      (Mask.Addr.root ())
               in
-              assert (
-                Stdlib.List.compare_lengths base_accounts retrieved_accounts = 0 ) ;
-              assert (
-                List.equal Account.equal expected_accounts retrieved_accounts ) ) )
+              Alcotest.(
+                check int "Retrieved as many accounts as expected"
+                  (List.length base_accounts)
+                  (List.length retrieved_accounts)) ;
+              Alcotest.(
+                check (list Account.testable)
+                  "retrieved and expected accounts are the same"
+                  expected_accounts retrieved_accounts) ) )
 
   let () =
     add_test "fold of addition over account balances in parent and mask"
