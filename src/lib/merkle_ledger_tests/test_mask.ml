@@ -640,18 +640,19 @@ module Make (Test : Test_intf) = struct
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             (* add accounts to mask *)
-            List.iter accounts ~f:(fun account ->
-                ignore @@ create_new_account_exn attached_mask account ) ;
+            let locs =
+              List.map accounts ~f:(create_new_account_exn attached_mask)
+            in
             let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
             [%test_eq: Int.t] num_accounts mask_num_accounts ;
 
             (* Remove num_accounts*)
-            let accounts_to_be_deleted =
+            let locs_to_be_deleted =
               assert (num_accounts > 1) ;
-              List.tl_exn accounts
+              List.tl_exn locs
             in
-            List.iter accounts_to_be_deleted
-              ~f:(Mask.Attached.remove_account attached_mask) ;
+            List.iter locs_to_be_deleted
+              ~f:(Mask.Attached.remove_location attached_mask) ;
             let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
             [%test_eq: Int.t] mask_num_accounts 1 ) )
 
@@ -661,27 +662,8 @@ module Make (Test : Test_intf) = struct
       Option.value_exn
         (Mask.Attached.location_of_account mask (Account.identifier account))
     in
-    ignore @@ Mask.Attached.remove_account mask account ;
+    Mask.Attached.remove_location mask loc ;
     loc
-
-  let add_new_account mask account =
-    let id = Account.identifier account in
-    let ret = Mask.Attached.get_or_create_account mask id account in
-    match ret with
-    | Ok (`Added, loc) ->
-        loc
-    | Ok (`Existed, _loc) ->
-        let msg =
-          Format.asprintf "account_id %a was expected to be absent" Sexp.pp
-            (Account_id.sexp_of_t id)
-        in
-        failwith msg
-    | Error _ ->
-        let msg =
-          Format.asprintf "error adding account id %a" Sexp.pp
-            (Account_id.sexp_of_t id)
-        in
-        failwith msg
 
   (* This test exposes some internal invariants wrt to the interaction between
      removal and additions.
@@ -709,7 +691,9 @@ module Make (Test : Test_intf) = struct
              @@ List.iter2 accounts_to_be_deleted additional_accounts
                   ~f:(fun account_to_delete account_to_add ->
                     let loc1 = delete attached_mask account_to_delete in
-                    let loc2 = add_new_account attached_mask account_to_add in
+                    let loc2 =
+                      create_new_account_exn attached_mask account_to_add
+                    in
                     let loc3 =
                       Option.value_exn
                         (Mask.Attached.location_of_account attached_mask
@@ -744,7 +728,8 @@ module Make (Test : Test_intf) = struct
               |> List.sort ~compare:Test.Location.compare
             in
             let added_locs =
-              List.map additional_accounts ~f:(add_new_account attached_mask)
+              List.map additional_accounts
+                ~f:(create_new_account_exn attached_mask)
             in
             [%test_eq: Test.Location.t list] deleted_locs added_locs ) )
 
@@ -755,7 +740,7 @@ module Make (Test : Test_intf) = struct
             let account = Account.genval.one () in
             let loc = parent_create_new_account_exn maskable account in
             let attached_mask = Maskable.register_mask maskable mask in
-            Mask.Attached.remove_account attached_mask account ;
+            Mask.Attached.remove_location attached_mask loc ;
             let acct_opt = Mask.Attached.get attached_mask loc in
             Alcotest.(
               check (option Account.testable)
