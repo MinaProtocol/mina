@@ -3,7 +3,7 @@ module type S = sig
 
   type location
 
-  val equal : t -> t -> bool
+  (** {2 Serializers}*)
 
   val sexp_of_t : t -> Sexp.t
 
@@ -13,15 +13,21 @@ module type S = sig
 
   val deserialize : ledger_depth:int -> Bigstring.t -> t
 
+  (** {2 Pretty-printers} *)
+
+  val pp : Format.formatter -> t -> unit
+
+  (** {2 Test generators }*)
+
+  val gen : ledger_depth:int -> t Quickcheck.Generator.t
+
   val empty : t
+
+  val equal : t -> t -> bool
 
   val is_empty : t -> bool
 
   val size : t -> int
-
-  val pp : Format.formatter -> t -> unit
-
-  val gen : ledger_depth:int -> t Quickcheck.Generator.t
 
   module Location : sig
     val add : t -> location -> t
