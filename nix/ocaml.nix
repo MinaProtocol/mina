@@ -93,6 +93,12 @@ let
 
   dune-nix = inputs.dune-nix.lib.${pkgs.system};
 
+  LAGRANGE_CACHE_DIR = fetchTarball {
+    url =
+      "https://storage.googleapis.com/o1labs-ci-test-data/lagrange_basis_mina_berkeley_4.tgz";
+    sha256 = "0sd9zfap78qsyx1cd1i3n98dlqk53pi8wj3bav9iq5qk6rcqn3zd";
+  };
+
   base-libs = dune-nix.squashOpamNixDeps scope.ocaml.version
     (pkgs.lib.attrVals (builtins.attrNames implicit-deps) scope);
 
@@ -123,7 +129,7 @@ let
   allDeps = dune-nix.allDeps info;
   commonOverrides = {
     DUNE_PROFILE = "dev";
-    USE_LAGRANGE_CACHE = "true";
+    inherit LAGRANGE_CACHE_DIR;
     buildInputs = [ base-libs ] ++ external-libs;
     nativeBuildInputs = [ ];
   };
