@@ -859,7 +859,6 @@ module Make (Inputs : Inputs_intf.S) = struct
               failwith "Expected mask current location to represent an account"
           )
 
-    (* TODO: What happens if account_id has been removed from mask ? *)
     let location_of_account t account_id =
       assert_is_attached t ;
       let maps, ancestor = maps_and_ancestor t in
