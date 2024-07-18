@@ -295,6 +295,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           in
           if is_empty then None else Base.get ancestor location
 
+    (* TODO: Filter out freed locations before sending to parent *)
     let self_find_or_batch_lookup self_find lookup_parent t ids =
       assert_is_attached t ;
       let maps, ancestor = maps_and_ancestor t in
@@ -695,6 +696,21 @@ module Make (Inputs : Inputs_intf.S) = struct
         ; token_owners = Token_id.Map.empty
         ; locations = Account_id.Map.empty
         } ;
+      (* We might write data over accounts that were previously freed - this
+         should be transmitted by the parents so that the free list of the
+         child is alway a newer version of the one from the parent.
+
+         It assumes we never write to the parent when it has at least a child.
+
+         In that we just need to copy the free list of the child to the one of
+         the parent.
+
+         However in the child we might have newly freed location, so we need to
+         "erase" these ones from the parent. These are locations that are in the
+         child but *not* in the parent.
+
+         Erase = FL(C) \ FL(P)
+      *)
       Base.set_batch parent account_data ;
       Debug_assert.debug_assert (fun () ->
           [%test_result: Hash.t]
