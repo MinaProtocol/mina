@@ -487,8 +487,9 @@ module Make (Inputs : Inputs_intf.S) = struct
        along the path from the account address to root *)
     let addresses_and_hashes_from_merkle_path_exn merkle_path starting_address
         starting_hash : (Addr.t * Hash.t) list =
-      let get_addresses_hashes height accum node =
-        let last_address, last_hash = List.hd_exn accum in
+      (* The accum list is never empty by construction *)
+      let[@warning "-8"] get_addresses_hashes height
+          ((last_address, last_hash) :: _ as accum) node =
         let next_address = Addr.parent_exn last_address in
         let next_hash =
           match node with
