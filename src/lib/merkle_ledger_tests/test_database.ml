@@ -287,7 +287,7 @@ module Make (Test : Test_intf) = struct
             let max_height = Int.min (MT.depth mdb - 1) 3 in
             populate_db mdb max_height ;
             let accounts = random_accounts max_height |> dedup_accounts in
-            assert (MT.is_compact mdb) ;
+            Alcotest.(check bool "db is compact" true (MT.is_compact mdb)) ;
             let (last_location : MT.Location.t) =
               MT.max_filled mdb |> Option.value_exn
             in
