@@ -1115,8 +1115,11 @@ module Make (Inputs : Inputs_intf.S) = struct
     assert (Result.is_error t.parent) ;
     assert (Option.is_none (Async.Ivar.peek t.detached_parent_signal)) ;
     assert (Int.equal t.depth (Base.depth parent)) ;
+    let is_reparenting = has_parent t in
     t.parent <- Ok parent ;
     t.fill_frontier <- Attached.max_filled t ;
+    (* FIXME: Should really come from the parent, this is incorrect *)
+    if not is_reparenting then t.freed <- Free_list.empty ;
     (* If [t.accumulated] isn't empty, then this mask had a parent before
        and now we just reparent it (which may only happen if both old and new parents
         have the same merkle root (and some masks in between may have been removed),
