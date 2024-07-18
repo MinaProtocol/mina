@@ -29,11 +29,17 @@ module Make (Inputs : Inputs_intf.S) = struct
     let t_of_sexp (_ : Sexp.t) : t = Async.Ivar.create ()
   end
 
+  [@@@warning "-4"]
+
+  type account_location = Deleted | Allocated of Location.t [@@deriving sexp]
+
+  [@@@warning "+4"]
+
   type maps_t =
     { accounts : Account.t Location_binable.Map.t
     ; token_owners : Account_id.t Token_id.Map.t
     ; hashes : Hash.t Addr.Map.t
-    ; locations : Location.t Account_id.Map.t
+    ; locations : account_location Account_id.Map.t
     }
   [@@deriving sexp]
 
@@ -233,7 +239,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert (Free_list.is_empty t.freed) ;
       update_maps t ~f:(fun maps ->
           { maps with
-            locations = Map.set maps.locations ~key:account_id ~data:location
+            locations =
+              Map.set maps.locations ~key:account_id ~data:(Allocated location)
           } ) ;
 
       (* if account is at a hitherto-unused location, that
@@ -257,6 +264,12 @@ module Make (Inputs : Inputs_intf.S) = struct
           { maps with
             token_owners =
               Map.set maps.token_owners ~key:token_id ~data:account_id
+          } )
+
+    let mark_deleted t account_id =
+      update_maps t ~f:(fun maps ->
+          { maps with
+            locations = Map.set maps.locations ~key:account_id ~data:Deleted
           } )
 
     (* a read does a lookup in the account_tbl; if that fails, delegate to
@@ -582,11 +595,15 @@ module Make (Inputs : Inputs_intf.S) = struct
        one base *)
     let[@warning "-32"] remove_account t account =
       let maps, _ancestor = maps_and_ancestor t in
-      match Map.find maps.locations (Account.identifier account) with
-      | Some location ->
+      let id = Account.identifier account in
+      match Map.find maps.locations id with
+      | Some (Allocated location) ->
           remove_account_and_update_hashes t location
+      | Some Deleted ->
+          ()
       | None ->
-          failwith "remove_account: recursive call not yet implemented"
+          mark_deleted t id
+    (* It might be present in a parent, just remember that it's been removed *)
 
     let set_account_unsafe t location account =
       assert_is_attached t ;
@@ -623,11 +640,18 @@ module Make (Inputs : Inputs_intf.S) = struct
       @@ let%bind.Option location =
            Map.find t.maps.locations (Account.identifier account)
          in
-         let%bind.Option existing_account = Map.find t.maps.accounts location in
-         let%map.Option () =
-           Option.some_if (Account.equal account existing_account) ()
-         in
-         remove_account_and_update_hashes t location
+         match location with
+         | Allocated location ->
+             let%bind.Option existing_account =
+               Map.find t.maps.accounts location
+             in
+             let%map.Option () =
+               Option.some_if (Account.equal account existing_account) ()
+             in
+             remove_account_and_update_hashes t location
+         | Deleted ->
+             (* FIXME: Check this *)
+             Some ()
 
     let is_committing t = t.is_committing
 
@@ -850,20 +874,26 @@ module Make (Inputs : Inputs_intf.S) = struct
               failwith "Expected mask current location to represent an account"
           )
 
+    (* TODO: What happens if account_id has been removed from mask ? *)
     let location_of_account t account_id =
       assert_is_attached t ;
       let maps, ancestor = maps_and_ancestor t in
       let mask_result = Map.find maps.locations account_id in
       match mask_result with
-      | Some _ ->
-          mask_result
+      | Some (Allocated loc) ->
+          Some loc
+      | Some Deleted ->
+          None
       | None ->
           Base.location_of_account ancestor account_id
 
     let location_of_account_batch t =
       self_find_or_batch_lookup
         (fun ~maps id ->
-          (id, Option.map ~f:Option.some @@ Map.find maps.locations id) )
+          ( id
+          , Option.map
+              ~f:(function Deleted -> None | Allocated loc -> Some loc)
+              (Map.find maps.locations id) ) )
         Base.location_of_account_batch t
 
     (* Adds specified accounts to the mask by loading them from parent ledger.
@@ -1050,27 +1080,33 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           leftmost_available_slot t
 
+    let allocate_new t account =
+      match pop_next_fillable t with
+      | None ->
+          Or_error.error_string "Db_error.Out_of_leaves"
+      | Some location ->
+          (* `set` calls `self_set_location`, which updates
+             the current location *)
+          set t location account ;
+          Ok (`Added, location)
+
     (* NB: updates the mutable fill_frontier field in t *)
     let get_or_create_account t account_id account =
       assert_is_attached t ;
       let maps, ancestor = maps_and_ancestor t in
       match Map.find maps.locations account_id with
-      | None -> (
+      | Some Deleted | None -> (
           (* not in mask, maybe in parent *)
           match Base.location_of_account ancestor account_id with
           | Some location ->
-              Ok (`Existed, location)
-          | None -> (
-              (* not in parent, create new location *)
-              match pop_next_fillable t with
-              | None ->
-                  Or_error.error_string "Db_error.Out_of_leaves"
-              | Some location ->
-                  (* `set` calls `self_set_location`, which updates
-                     the current location *)
-                  set t location account ;
-                  Ok (`Added, location) ) )
-      | Some location ->
+              (* If that's feasible reuse the same location *)
+              if Free_list.Location.mem t.freed location then (
+                t.freed <- Free_list.Location.remove t.freed location ;
+                Ok (`Existed, location) )
+              else allocate_new t account
+          | None ->
+              (* not in parent, create new location *) allocate_new t account )
+      | Some (Allocated location) ->
           Ok (`Existed, location)
   end
 
