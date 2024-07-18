@@ -97,6 +97,10 @@ end = struct
 
   let set _t = failwith "set: null ledgers cannot be mutated"
 
+  let remove_location _ _ = ()
+
+  let remove_account _ _ = ()
+
   let get _t _loc = None
 
   let get_batch _t locs = List.map locs ~f:(fun loc -> (loc, None))
@@ -104,12 +108,6 @@ end = struct
   let get_uuid t = t.uuid
 
   let get_directory _ = None
-
-  let remove_location _ _ =
-    failwith "remove_location: null ledgers cannot be mutated"
-
-  let remove_account _ _ =
-    failwith "remove_account: null ledgers cannot be mutated"
 
   let max_filled _t = None
 
