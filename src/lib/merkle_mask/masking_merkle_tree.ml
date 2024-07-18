@@ -129,11 +129,9 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; freed = Free_list.empty
     }
 
-  let get_uuid { uuid; _ } = uuid
+  let has_parent { parent; _ } = Result.is_ok parent
 
-  (* A little helper to mutate the {!val:freed} field *)
-  let add_freed_location t location =
-    t.freed <- Free_list.Location.add t.freed location
+  let get_uuid { uuid; _ } = uuid
 
   module Attached = struct
     type parent = Base.t [@@deriving sexp]
@@ -153,7 +151,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         Uuid.t * (* Location where null was set*) string
 
     let unset_parent ?(trigger_signal = true) ~loc t =
-      assert (Result.is_ok t.parent) ;
+      assert (has_parent t) ;
       t.parent <- Error loc ;
       if trigger_signal then (
         t.accumulated <- None ;
