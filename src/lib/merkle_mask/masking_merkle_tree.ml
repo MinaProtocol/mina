@@ -866,7 +866,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           (id, Option.map ~f:Option.some @@ Map.find maps.locations id) )
         Base.location_of_account_batch t
 
-    (* Adds specified accounts to the mask by laoding them from parent ledger.
+    (* Adds specified accounts to the mask by loading them from parent ledger.
 
        Could be useful for transaction processing when to pre-populate mask with the
        accounts used in processing a transaction (or a block) to ensure there are not loaded
