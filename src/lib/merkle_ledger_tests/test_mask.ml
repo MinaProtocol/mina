@@ -77,6 +77,13 @@ module Make (Test : Test_intf) = struct
   module Maskable = Test.Maskable
   module Mask = Test.Mask
 
+  module Location = struct
+    include Test.Location
+
+    let testable =
+      Alcotest.testable (fun ppf loc -> Sexp.pp ppf (sexp_of_t loc)) equal
+  end
+
   let directions =
     let rec add_direction count b accum =
       if count >= Test.depth then accum
@@ -744,6 +751,26 @@ module Make (Test : Test_intf) = struct
               List.map additional_accounts ~f:(add_new_account attached_mask)
             in
             [%test_eq: Test.Location.t list] deleted_locs added_locs ) )
+
+  let () =
+    let name = "information after removal from mask should be empty" in
+    add_test name (fun () ->
+        Test.with_instances (fun maskable mask ->
+            let account = Account.genval.one () in
+            let loc = parent_create_new_account_exn maskable account in
+            let attached_mask = Maskable.register_mask maskable mask in
+            Mask.Attached.remove_account attached_mask account ;
+            let acct_opt = Mask.Attached.get attached_mask loc in
+            Alcotest.(
+              check (option Account.testable)
+                "location after removal should be empty" None acct_opt) ;
+            let loc_opt =
+              Mask.Attached.location_of_account attached_mask
+                (Account.identifier account)
+            in
+            Alcotest.(
+              check (option Location.testable)
+                "location of account after removal should be empty" None loc_opt) ) )
 
   let () =
     add_test "mask reparenting works" (fun () ->
