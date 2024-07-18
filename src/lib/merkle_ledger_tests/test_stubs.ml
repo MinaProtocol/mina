@@ -30,6 +30,9 @@ module Account = struct
   type key = Mina_base.Account.Key.Stable.Latest.t
   [@@deriving bin_io_unversioned, sexp, equal, compare, hash]
 
+  let testable =
+    Alcotest.testable (fun ppf account -> Sexp.pp ppf (sexp_of_t account)) equal
+
   (* use Account items needed *)
   let empty = Mina_base.Account.empty
 
