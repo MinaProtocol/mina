@@ -366,11 +366,10 @@ let
           "genesis"
           "sample"
           "batch_txn_tool"
-          "berkeley_migration"
         ];
 
         installPhase = ''
-          mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin $berkeley_migration/bin
+          mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
           # TODO uncomment when genesis is generated above
           # mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
           pushd _build/default
@@ -392,12 +391,6 @@ let
           cp src/app/replayer/replayer.exe $berkeley_migration/bin/mina-migration-replayer
           cp src/app/berkeley_migration/berkeley_migration.exe $berkeley_migration/bin/mina-berkeley-migration
           cp src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe $berkeley_migration/bin/mina-berkeley-migration-verifier
-<<<<<<< HEAD
-=======
-          cp ${
-            ../scripts/archive/migration/mina-berkeley-migration-script
-          } $berkeley_migration/bin/mina-berkeley-migration-script
->>>>>>> origin/georgeee/format-nix
           cp src/app/swap_bad_balances/swap_bad_balances.exe $archive/bin/mina-swap-bad-balances
           cp -R _doc/_html $out/share/doc/html
           # cp src/lib/mina_base/sample_keypairs.json $sample/share/mina
