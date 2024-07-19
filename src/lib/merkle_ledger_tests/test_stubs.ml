@@ -64,6 +64,9 @@ module Hash = struct
 
   include T
 
+  let testable =
+    Alcotest.testable (fun ppf account -> Sexp.pp ppf (sexp_of_t account)) equal
+
   include Codable.Make_base58_check (struct
     type t = T.t [@@deriving bin_io_unversioned]
 
