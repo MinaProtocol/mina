@@ -188,6 +188,55 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     (* rehash something *)
     Kvdb.remove kvdb ~key
 
+  module Free_list = struct
+    let id = "free_list"
+
+    let key = lazy (Location.build_generic (Bigstring.of_string id))
+
+    module F = Free_list.Make (Location)
+
+    let get mdb =
+      let key = Lazy.force key in
+      let ledger_depth = mdb.depth in
+      match get_generic mdb key with
+      | None ->
+          Result.return F.empty
+      | Some data ->
+          Result.return @@ F.deserialize ~ledger_depth data
+
+    let set mdb t =
+      let key = Lazy.force key in
+      let ledger_depth = mdb.depth in
+      let data = F.serialize ~ledger_depth t in
+      set_raw mdb key data
+
+    let add mdb loc =
+      let open Result.Let_syntax in
+      let%map freelist = get mdb in
+      set mdb (F.Location.add freelist loc)
+
+    (* TODO: For now this reuses the the [Out_of_leaves] error to signal that
+       the free list does not have any empty slots.
+    *)
+    let allocate mdb =
+      let key = Lazy.force key in
+      match get_generic mdb key with
+      | None ->
+          Result.fail Db_error.Out_of_leaves
+      | Some data -> (
+          let ledger_depth = mdb.depth in
+          let free_list = F.deserialize ~ledger_depth data in
+          match F.Location.pop free_list with
+          | Some (loc, free_list) ->
+              set mdb free_list ; Result.return loc
+          | None ->
+              Result.fail Db_error.Out_of_leaves )
+
+    let is_empty mdb = Result.map (get mdb) ~f:F.is_empty
+
+    let size mdb = Result.map (get mdb) ~f:F.size
+  end
+
   module Account_location = struct
     (** encodes a key, token_id pair as a location used as a database key, so
         we can find the account location associated with that key.
@@ -247,57 +296,6 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       ( Location.serialize ~ledger_depth location
       , Location.serialize ~ledger_depth last_account_location )
 
-    [@@@warning "-60"] (* TODO: Remove annotation *)
-
-    module Free_list = struct
-      let id = "free_list"
-
-      let key = lazy (Location.build_generic (Bigstring.of_string id))
-
-      module F = Free_list.Make (Location)
-
-      let get mdb =
-        let key = Lazy.force key in
-        let ledger_depth = mdb.depth in
-        match get_generic mdb key with
-        | None ->
-            Result.return F.empty
-        | Some data ->
-            Result.return @@ F.deserialize ~ledger_depth data
-
-      let set mdb t =
-        let key = Lazy.force key in
-        let ledger_depth = mdb.depth in
-        let data = F.serialize ~ledger_depth t in
-        set_raw mdb key data
-
-      let add mdb loc =
-        let open Result.Let_syntax in
-        let%map freelist = get mdb in
-        set mdb (F.Location.add freelist loc)
-
-      (* TODO: For now this reuses the the [Out_of_leaves] error to signal that
-         the free list does not have any empty slots.
-      *)
-      let allocate mdb =
-        let key = Lazy.force key in
-        match get_generic mdb key with
-        | None ->
-            Result.fail Db_error.Out_of_leaves
-        | Some data -> (
-            let ledger_depth = mdb.depth in
-            let free_list = F.deserialize ~ledger_depth data in
-            match F.Location.pop free_list with
-            | Some (loc, free_list) ->
-                set mdb free_list ; Result.return loc
-            | None ->
-                Result.fail Db_error.Out_of_leaves )
-
-      let is_empty mdb = Result.map (get mdb) ~f:F.is_empty
-
-      let size mdb = Result.map (get mdb) ~f:F.size
-    end
-
     let increment_last_account_location mdb =
       let location = last_location_key () in
       let ledger_depth = mdb.depth in
@@ -322,20 +320,6 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
                        (Location.serialize ~ledger_depth next_account_location) ;
                      next_account_location ) )
 
-    (* TODO: This is okay as long as we do not have concurrent accesses. Same
-       as before.
-    *)
-    let allocate mdb key =
-      let open Result.Let_syntax in
-      let%bind location =
-        match Free_list.allocate mdb with
-        | Ok _ as loc ->
-            loc
-        | Error _ ->
-            increment_last_account_location mdb
-      in
-      set mdb key location ; Result.return location
-
     let last_location mdb =
       last_location_key () |> get_raw mdb
       |> Option.bind ~f:(fun data ->
@@ -344,6 +328,18 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     let last_location_address mdb =
       Option.map (last_location mdb) ~f:Location.to_path_exn
   end
+
+  let allocate mdb key =
+    let open Result.Let_syntax in
+    let%bind location =
+      match Free_list.allocate mdb with
+      | Ok _ as loc ->
+          loc
+      | Error _ ->
+          Account_location.increment_last_account_location mdb
+    in
+    Account_location.set mdb key location ;
+    Result.return location
 
   let get_at_index mdb index =
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
@@ -497,11 +493,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   let max_filled t = Account_location.last_location t
 
   let is_compact mdb =
-    match Account_location.Free_list.is_empty mdb with
-    | Ok bool ->
-        bool
-    | Error _ ->
-        false
+    match Free_list.is_empty mdb with Ok bool -> bool | Error _ -> false
 
   let token_owners (t : t) : Account_id.Set.t =
     Tokens.Owner.all_owners t
@@ -618,13 +610,13 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     | None ->
         0
     | Some addr ->
-        let freed_size = Account_location.Free_list.size t |> Result.ok_exn in
+        let freed_size = Free_list.size t |> Result.ok_exn in
         Addr.to_int addr + 1 - freed_size
 
   let remove_location mdb loc =
     match get mdb loc with
     | Some account ->
-        Account_location.Free_list.add mdb loc |> Result.ok_or_failwith ;
+        Free_list.add mdb loc |> Result.ok_or_failwith ;
         Account_location.remove mdb (Account.identifier account) ;
         remove mdb loc
     | None ->
@@ -653,7 +645,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   let get_or_create_account mdb account_id account =
     match Account_location.get mdb account_id with
     | Error Db_error.Account_location_not_found -> (
-        match Account_location.allocate mdb account_id with
+        match allocate mdb account_id with
         | Ok location ->
             set mdb location account ;
             Tokens.add_account mdb account_id ;
