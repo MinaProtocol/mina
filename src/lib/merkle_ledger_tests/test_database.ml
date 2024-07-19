@@ -219,10 +219,10 @@ module Make (Test : Test_intf) = struct
 
   let () =
     add_test "allocation reuses freed locations in decreasing order" (fun () ->
-        let n = 5 in
-        let accounts_1 = Account.genval.many n
-        and accounts_2 = Account.genval.many n in
         Test.with_instance (fun mdb ->
+            let n = min 4 (1 lsl MT.depth mdb) in
+            let accounts_1 = Account.genval.many n
+            and accounts_2 = Account.genval.many n in
             let locs_1 = List.map accounts_1 ~f:(create_new_account_exn mdb) in
             List.iter locs_1 ~f:(MT.remove_location mdb) ;
             let locs_2 = List.map accounts_2 ~f:(create_new_account_exn mdb) in
@@ -231,6 +231,18 @@ module Make (Test : Test_intf) = struct
                 "decreasing order and allocated order are the same"
                 (List.sort locs_1 ~compare:(fun x y -> Location.compare y x))
                 locs_2) ) )
+
+  let () =
+    add_test "num_accounts behaves correctly with removals" (fun () ->
+        Test.with_instance (fun mdb ->
+            let n = min 4 (1 lsl MT.depth mdb) in
+            let accounts = Account.genval.many n in
+            let locs = List.map accounts ~f:(create_new_account_exn mdb) in
+            List.iteri locs ~f:(fun i loc ->
+                MT.remove_location mdb loc ;
+                Alcotest.(check int)
+                  "num account is correct" (MT.num_accounts mdb)
+                  (n - i - 1) ) ) )
 
   let () =
     add_test
