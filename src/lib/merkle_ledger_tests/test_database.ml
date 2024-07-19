@@ -36,6 +36,13 @@ end
 module Make (Test : Test_intf) = struct
   module MT = Test.MT
 
+  module Location = struct
+    include Test.Location
+
+    let testable =
+      Alcotest.testable (fun ppf loc -> Sexp.pp ppf (sexp_of_t loc)) equal
+  end
+
   let test_section_name = Printf.sprintf "On-disk db (depth %d)" Test.depth
 
   let test_stack = Stack.create ()
@@ -193,6 +200,41 @@ module Make (Test : Test_intf) = struct
             let acc_opt = MT.get mdb loc in
             Alcotest.(check (option Account.testable))
               "no account at removed location" None acc_opt ) )
+
+  let () =
+    add_test "account creation reuses freed location" (fun () ->
+        let[@warning "-8"] [ account1; account2; account3 ] =
+          Account.genval.many 3
+        in
+        Test.with_instance (fun mdb ->
+            let loc = create_new_account_exn mdb account1 in
+
+            MT.remove_account mdb (Account.identifier account1) ;
+            let loc2 = create_new_account_exn mdb account2 in
+            Alcotest.check Location.testable
+              "newly freed location by remove_account is used for allocation"
+              loc loc2 ;
+
+            MT.remove_location mdb loc2 ;
+            let loc3 = create_new_account_exn mdb account3 in
+            Alcotest.check Location.testable
+              "newly freed location by remove_location is used for allocation"
+              loc loc3 ) )
+
+  let () =
+    add_test "allocation reuses freed locations in decreasing order" (fun () ->
+        let n = 5 in
+        let accounts_1 = Account.genval.many n
+        and accounts_2 = Account.genval.many n in
+        Test.with_instance (fun mdb ->
+            let locs_1 = List.map accounts_1 ~f:(create_new_account_exn mdb) in
+            List.iter locs_1 ~f:(MT.remove_location mdb) ;
+            let locs_2 = List.map accounts_2 ~f:(create_new_account_exn mdb) in
+            Alcotest.(
+              check (list Location.testable)
+                "decreasing order and allocated order are the same"
+                (List.sort locs_1 ~compare:(fun x y -> Location.compare y x))
+                locs_2) ) )
 
   let () =
     add_test
