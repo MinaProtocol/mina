@@ -124,7 +124,8 @@ module Make (Test : Test_intf) = struct
             List.iter accounts ~f:(fun account ->
                 ignore @@ create_new_account_exn mdb account ) ;
             let result = MT.num_accounts mdb in
-            [%test_eq: int] result num_initial_accounts ) )
+            Alcotest.(check int)
+              "num accounts is equal to length" num_initial_accounts result ) )
 
   let () =
     add_test "no update on get_or_create_acount if key already exists"
@@ -146,13 +147,13 @@ module Make (Test : Test_intf) = struct
               MT.get_or_create_account mdb account_id account'
               |> Or_error.ok_exn
             in
-            assert (
-              [%equal: Test.Location.t] location location'
-              && (match action with `Existed -> true | `Added -> false)
-              && not
-                   (Mina_base.Account.equal
-                      (Option.value_exn (MT.get mdb location))
-                      account' ) ) ) )
+            Alcotest.(check Location.testable)
+              "same location" location location' ;
+            assert (match action with `Existed -> true | `Added -> false) ;
+            Alcotest.(
+              check (neg Account.testable) "same accounts"
+                (Option.value_exn (MT.get mdb location))
+                account') ) )
 
   let () =
     add_test "get_or_create_account t account = location_of_account account.key"
@@ -175,7 +176,8 @@ module Make (Test : Test_intf) = struct
                    let location' =
                      MT.location_of_account mdb account_id |> Option.value_exn
                    in
-                   assert ([%equal: Test.Location.t] location location') ) ) )
+                   Alcotest.(check Location.testable)
+                     "identical locations" location location' ) ) )
 
   let () =
     add_test "get after remove location returns None" (fun () ->
@@ -245,7 +247,7 @@ module Make (Test : Test_intf) = struct
                   (n - i - 1) ) ) )
 
   let () =
-    add_test
+    add_qtest
       "set_inner_hash_at_addr_exn(address,hash); \
        get_inner_hash_at_addr_exn(address) = hash" (fun () ->
         let random_hash =
@@ -301,7 +303,8 @@ module Make (Test : Test_intf) = struct
                 in
                 MT.set_batch_accounts mdb addresses_and_accounts ;
                 let new_merkle_root = MT.merkle_root mdb in
-                assert (Hash.equal old_merkle_root new_merkle_root) ) ) )
+                Alcotest.check Hash.testable "identical merkle roots"
+                  old_merkle_root new_merkle_root ) ) )
 
   let () =
     add_qtest "set_batch_accounts would change the merkle root" (fun () ->
@@ -318,11 +321,8 @@ module Make (Test : Test_intf) = struct
                   MT.Addr.of_directions padded_directions
                 in
                 let num_accounts = 1 lsl (depth - MT.Addr.depth address) in
-                let accounts =
-                  Quickcheck.random_value
-                    (Quickcheck.Generator.list_with_length num_accounts
-                       Account.gen )
-                in
+                let accounts = Account.genval.many num_accounts in
+
                 if not @@ List.is_empty accounts then
                   let addresses =
                     List.rev
@@ -350,7 +350,9 @@ module Make (Test : Test_intf) = struct
                     let old_merkle_root = MT.merkle_root mdb in
                     MT.set_batch_accounts mdb new_addresses_and_accounts ;
                     let new_merkle_root = MT.merkle_root mdb in
-                    assert (not @@ Hash.equal old_merkle_root new_merkle_root) ) ) ) )
+                    Alcotest.(check (not Hash.testable))
+                      "merkle roots are different" old_merkle_root
+                      new_merkle_root ) ) ) )
 
   let () =
     add_test "key by key account retrieval after set_batch_accounts works"
@@ -379,7 +381,8 @@ module Make (Test : Test_intf) = struct
                   MT.location_of_account mdb aid |> Option.value_exn
                 in
                 let queried_account = MT.get mdb location |> Option.value_exn in
-                assert (Account.equal queried_account account) ) ;
+                Alcotest.(check Account.testable)
+                  "equal accounts" queried_account account ) ;
             let to_int =
               Fn.compose MT.Location.Addr.to_int MT.Location.to_path_exn
             in
@@ -390,11 +393,8 @@ module Make (Test : Test_intf) = struct
             let actual_last_location =
               to_int (MT.max_filled mdb |> Option.value_exn)
             in
-            [%test_result: int] ~expect:expected_last_location
-              actual_last_location
-              ~message:
-                (sprintf "(expected_location: %i) (actual_location: %i)"
-                   expected_last_location actual_last_location ) ) )
+            Alcotest.(check int)
+              "location is the same" expected_last_location actual_last_location ) )
 
   let () =
     add_qtest
@@ -425,7 +425,8 @@ module Make (Test : Test_intf) = struct
                   List.map ~f:snd
                   @@ MT.get_all_accounts_rooted_at_exn mdb address
                 in
-                assert (List.equal Account.equal accounts result) ) ) )
+                Alcotest.(check (list Account.testable))
+                  "identical accounts" accounts result ) ) )
 
   let () =
     add_test "create_empty doesn't modify the hash" (fun () ->
@@ -440,7 +441,8 @@ module Make (Test : Test_intf) = struct
                 failwith
                   "create_empty with empty ledger somehow already has that key?"
             | `Added, _ ->
-                [%test_eq: Hash.t] start_hash (merkle_root ledger) ) )
+                Alcotest.check Hash.testable "hash hasn't changed" start_hash
+                  (merkle_root ledger) ) )
 
   let () =
     add_test "get_at_index_exn t (index_of_account_exn t public_key) = account"
@@ -450,14 +452,14 @@ module Make (Test : Test_intf) = struct
             let accounts = random_accounts max_height |> dedup_accounts in
             List.iter accounts ~f:(fun account ->
                 ignore @@ create_new_account_exn mdb account ) ;
-            assert (
-              Sequence.of_list accounts
-              |> Sequence.for_all ~f:(fun account ->
-                     let indexed_account =
-                       MT.index_of_account_exn mdb (Account.identifier account)
-                       |> MT.get_at_index_exn mdb
-                     in
-                     Account.equal account indexed_account ) ) ) )
+
+            List.iter accounts ~f:(fun account ->
+                let indexed_account =
+                  MT.index_of_account_exn mdb (Account.identifier account)
+                  |> MT.get_at_index_exn mdb
+                in
+                Alcotest.(check Account.testable)
+                  "identical accounts" account indexed_account ) ) )
 
   let test_subtree_range mdb ~f max_height =
     populate_db mdb max_height ;
@@ -473,10 +475,11 @@ module Make (Test : Test_intf) = struct
                 let account = Quickcheck.random_value Account.gen in
                 MT.set_at_index_exn mdb index account ;
                 let result = MT.get_at_index_exn mdb index in
-                assert (Account.equal account result) ) ) )
+                Alcotest.(check Account.testable)
+                  "identical accounts" account result ) ) )
 
   let () =
-    add_test "implied_root(account) = root_hash" (fun () ->
+    add_qtest "implied_root(account) = root_hash" (fun () ->
         Test.with_instance (fun mdb ->
             let depth = MT.depth mdb in
             let max_height = Int.min depth 5 in
@@ -515,7 +518,9 @@ module Make (Test : Test_intf) = struct
             List.iter accounts ~f:(fun account ->
                 ignore (create_new_account_exn mdb account : Test.Location.t) ) ;
             let expect = MT.to_list_sequential mdb in
-            [%test_result: Account.t list] accounts ~expect ) )
+            Alcotest.(
+              check (list Account.testable) "accounts in db are the one put in"
+                accounts expect) ) )
 
   let () =
     if Test.depth <= 8 then
@@ -533,9 +538,8 @@ module Make (Test : Test_intf) = struct
                 List.map ~f:snd
                 @@ MT.get_all_accounts_rooted_at_exn mdb (MT.Addr.root ())
               in
-              assert (
-                Stdlib.List.compare_lengths accounts retrieved_accounts = 0 ) ;
-              assert (List.equal Account.equal accounts retrieved_accounts) ) )
+              Alcotest.(check (list Account.testable))
+                "identical accounts" accounts retrieved_accounts ) )
 
   let () =
     add_test "fold over account balances" (fun () ->
@@ -556,7 +560,7 @@ module Make (Test : Test_intf) = struct
               MT.foldi mdb ~init:0 ~f:(fun _addr total account ->
                   Balance.to_nanomina_int (Account.balance account) + total )
             in
-            assert (Int.equal retrieved_total total) ) )
+            Alcotest.(check int) "retrieved same total" total retrieved_total ) )
 
   let () =
     add_test "fold_until over account balances" (fun () ->
@@ -590,7 +594,7 @@ module Make (Test : Test_intf) = struct
                       else Continue new_total )
                     ~finish:(fun total -> total)
                 in
-                assert (Int.equal retrieved_total total) ) ) )
+                Alcotest.(check int) "same total" total retrieved_total ) ) )
 
   let tests =
     let actual_tests = Stack.fold test_stack ~f:(fun l t -> t :: l) ~init:[] in
