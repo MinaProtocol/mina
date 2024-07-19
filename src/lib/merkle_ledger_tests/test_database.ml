@@ -209,7 +209,8 @@ module Make (Test : Test_intf) = struct
                 let address = MT.Addr.of_directions direction in
                 MT.set_inner_hash_at_addr_exn mdb address random_hash ;
                 let result = MT.get_inner_hash_at_addr_exn mdb address in
-                assert (Hash.equal result random_hash) ) ) )
+                Alcotest.check Hash.testable "get(set(hash)) = hash" result
+                  random_hash ) ) )
 
   let random_accounts max_height =
     let num_accounts = 1 lsl max_height in
