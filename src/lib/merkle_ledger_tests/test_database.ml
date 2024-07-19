@@ -173,6 +173,26 @@ module Make (Test : Test_intf) = struct
                    assert ([%equal: Test.Location.t] location location') ) ) )
 
   let () =
+    add_test "get after remove location returns None" (fun () ->
+        let account = Account.genval.one () in
+        Test.with_instance (fun mdb ->
+            let loc = create_new_account_exn mdb account in
+            MT.remove_location mdb loc ;
+            let acc_opt = MT.get mdb loc in
+            Alcotest.(check (option Account.testable))
+              "no account at removed location" None acc_opt ) )
+
+  let () =
+    add_test "get after remove account returns None" (fun () ->
+        let account = Account.genval.one () in
+        Test.with_instance (fun mdb ->
+            let loc = create_new_account_exn mdb account in
+            MT.remove_account mdb (Account.identifier account) ;
+            let acc_opt = MT.get mdb loc in
+            Alcotest.(check (option Account.testable))
+              "no account at removed location" None acc_opt ) )
+
+  let () =
     add_test
       "set_inner_hash_at_addr_exn(address,hash); \
        get_inner_hash_at_addr_exn(address) = hash" (fun () ->
