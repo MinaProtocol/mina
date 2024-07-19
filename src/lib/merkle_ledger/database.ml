@@ -183,7 +183,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     assert (List.for_all locations ~f:Location.is_generic) ;
     get_raw_batch mdb locations
 
-  let _remove { kvdb; depth; _ } location =
+  let remove { kvdb; depth; _ } location =
     let key = Location.serialize ~ledger_depth:depth location in
     (* rehash something *)
     Kvdb.remove kvdb ~key
@@ -268,6 +268,11 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         let ledger_depth = mdb.depth in
         let data = F.serialize ~ledger_depth t in
         set_raw mdb key data
+
+      let add mdb loc =
+        let open Result.Let_syntax in
+        let%map freelist = get mdb in
+        set mdb (F.Location.add freelist loc)
 
       (* TODO: For now this reuses the the [Out_of_leaves] error to signal that
          the free list does not have any empty slots.
@@ -614,9 +619,16 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         let freed_size = Account_location.Free_list.size t |> Result.ok_exn in
         Addr.to_int addr + 1 - freed_size
 
-  let remove_account _ _ = failwith "not yet implemented"
+  let remove_location mdb loc =
+    Account_location.Free_list.add mdb loc |> Result.ok_or_failwith ;
+    remove mdb loc
 
-  let remove_location _ _ = failwith "not yet implemented"
+  let remove_account mdb account_id =
+    match location_of_account mdb account_id with
+    | Some loc ->
+        remove_location mdb loc
+    | None ->
+        (* It's already absent *) ()
 
   let to_list mdb =
     let num_accounts = num_accounts mdb in
