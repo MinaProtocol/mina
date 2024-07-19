@@ -78,7 +78,7 @@ module Make (Test : Test_intf) = struct
         Test.with_instance (fun mdb ->
             let account = Quickcheck.random_value Account.gen in
             let location = create_new_account_exn mdb account in
-            [%test_eq: Account.t]
+            Alcotest.check Account.testable "both locations are equal"
               (Option.value_exn (MT.get mdb location))
               account ) )
 
@@ -92,14 +92,10 @@ module Make (Test : Test_intf) = struct
               MT.location_of_account mdb (Account.identifier account)
               |> Option.value_exn
             in
-            assert (
-              MT.Location.equal location location'
-              &&
-              match (MT.get mdb location, MT.get mdb location') with
-              | Some acct, Some acct' ->
-                  Account.equal acct acct'
-              | _, _ ->
-                  false ) ) )
+            Alcotest.check Location.testable "same locations" location location' ;
+            Alcotest.(
+              check (option Account.testable) "same accounts at locations"
+                (MT.get mdb location) (MT.get mdb location')) ) )
 
   let dedup_accounts accounts =
     List.dedup_and_sort accounts ~compare:(fun account1 account2 ->
