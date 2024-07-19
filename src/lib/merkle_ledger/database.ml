@@ -213,6 +213,8 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
           Location.parse ~ledger_depth:mdb.depth location_bin
           |> Result.map_error ~f:(fun () -> Db_error.Malformed_database)
 
+    let remove mdb key = remove mdb (build_location key)
+
     let get_batch mdb keys =
       let parse_location bin =
         match Location.parse ~ledger_depth:mdb.depth bin with
@@ -620,8 +622,13 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         Addr.to_int addr + 1 - freed_size
 
   let remove_location mdb loc =
-    Account_location.Free_list.add mdb loc |> Result.ok_or_failwith ;
-    remove mdb loc
+    match get mdb loc with
+    | Some account ->
+        Account_location.Free_list.add mdb loc |> Result.ok_or_failwith ;
+        Account_location.remove mdb (Account.identifier account) ;
+        remove mdb loc
+    | None ->
+        ()
 
   let remove_account mdb account_id =
     match location_of_account mdb account_id with
