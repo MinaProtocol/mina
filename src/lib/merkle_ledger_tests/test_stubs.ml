@@ -4,11 +4,16 @@ module Random_value = struct
   module Q = Quickcheck
   module G = Q.Generator
 
-  type 'a t = { one : unit -> 'a; many : int -> 'a list }
+  type 'a t =
+    { one : ?seed:Q.seed -> unit -> 'a; many : ?seed:Q.seed -> int -> 'a list }
 
+  (* The default seed value below might not be what we always want. I think
+     that covers many cases of single random value generation. *)
   let mk gen =
-    { one = (fun () -> Q.random_value gen)
-    ; many = (fun n -> Q.random_value @@ G.list_with_length n gen)
+    { one = (fun ?(seed = `Nondeterministic) () -> Q.random_value ~seed gen)
+    ; many =
+        (fun ?(seed = `Nondeterministic) n ->
+          Q.random_value ~seed @@ G.list_with_length n gen )
     }
 end
 
