@@ -43,15 +43,17 @@ module Make (Test : Test_intf) = struct
   let add_test ?(speed = `Quick) name f =
     Alcotest.test_case name speed f |> Stack.push test_stack
 
-  let test_non_existing_account_is_none () =
-    Test.with_instance (fun mdb ->
-        Quickcheck.test
-          (MT.For_tests.gen_account_location ~ledger_depth:(MT.depth mdb))
-          ~f:(fun location -> assert (Option.is_none (MT.get mdb location))) )
+  let add_qtest = add_test ~speed:`Slow
 
   let () =
-    add_test "getting a non existing account returns None"
-      test_non_existing_account_is_none
+    add_qtest "getting a non existing account returns None" (fun () ->
+        Test.with_instance (fun mdb ->
+            Quickcheck.test
+              (MT.For_tests.gen_account_location ~ledger_depth:(MT.depth mdb))
+              ~f:(fun location ->
+                Alcotest.(
+                  check (option Account.testable) "account does not exist" None
+                    (MT.get mdb location)) ) ) )
 
   let create_new_account_exn mdb account =
     let public_key = Account.identifier account in
@@ -228,7 +230,7 @@ module Make (Test : Test_intf) = struct
                MT.set mdb location account )
 
   let () =
-    add_test
+    add_qtest
       "set_batch_accounts all_accounts doesn't change already full database "
       (fun () ->
         Test.with_instance (fun mdb ->
@@ -251,7 +253,7 @@ module Make (Test : Test_intf) = struct
                 assert (Hash.equal old_merkle_root new_merkle_root) ) ) )
 
   let () =
-    add_test "set_batch_accounts would change the merkle root" (fun () ->
+    add_qtest "set_batch_accounts would change the merkle root" (fun () ->
         Test.with_instance (fun mdb ->
             let depth = MT.depth mdb in
             let max_height = Int.min 5 depth in
@@ -344,7 +346,7 @@ module Make (Test : Test_intf) = struct
                    expected_last_location actual_last_location ) ) )
 
   let () =
-    add_test
+    add_qtest
       "when database is full, \
        set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) \
        = accounts " (fun () ->
