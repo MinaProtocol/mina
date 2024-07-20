@@ -715,6 +715,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
          Erase = FL(C) \ FL(P)
       *)
+      Base.set_freed parent (Free_list.Location.to_list t.freed) ;
       Base.set_batch parent account_data ;
       Debug_assert.debug_assert (fun () ->
           [%test_result: Hash.t]
