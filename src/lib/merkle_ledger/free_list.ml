@@ -41,6 +41,8 @@ module type S = sig
     val mem : t -> location -> bool
 
     val remove_all_contiguous : t -> location -> t * location option
+
+    val of_list : location list -> t
   end
 end
 
@@ -138,6 +140,8 @@ module Make (L : Location_intf.S) : S with type location = L.t = struct
     let top set = Option.map ~f:account (top set)
 
     let mem set loc = lift_exn "Free_list.mem" (Set.mem set) loc
+
+    let of_list locs = List.map locs ~f:(lift_exn "id" Fn.id) |> Set.of_list
 
     let remove_all_contiguous set loc =
       let set, addr =
