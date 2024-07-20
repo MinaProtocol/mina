@@ -591,6 +591,10 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           ()
 
+    let set_freed t locs =
+      let freed = Free_list.Location.of_list locs in
+      t.freed <- freed
+
     let set_account_unsafe t location account =
       assert_is_attached t ;
       self_set_account t location account ;

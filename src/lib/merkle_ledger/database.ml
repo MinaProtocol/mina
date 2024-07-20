@@ -629,6 +629,10 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     | None ->
         (* It's already absent *) ()
 
+  let set_freed mdb l =
+    let freed = Free_list.F.Location.of_list l in
+    Free_list.set mdb freed
+
   let to_list mdb =
     let num_accounts = num_accounts mdb in
     Async.Deferred.List.init ~how:`Parallel num_accounts ~f:(fun i ->

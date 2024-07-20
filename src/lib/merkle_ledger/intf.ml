@@ -412,6 +412,8 @@ module Ledger = struct
 
     val remove_account : t -> account_id -> unit
 
+    val set_freed : t -> Location.t list -> unit
+
     (** meant to be a fast operation: the root hash is stored, rather
         than calculated dynamically
      *)

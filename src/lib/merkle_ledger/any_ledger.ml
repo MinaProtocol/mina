@@ -97,6 +97,8 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
 
     let remove_account (T ((module Base), t)) = Base.remove_account t
 
+    let set_freed (T ((module Base), t)) = Base.set_freed t
+
     let get_batch (T ((module Base), t)) = Base.get_batch t
 
     let get_uuid (T ((module Base), t)) = Base.get_uuid t
