@@ -350,7 +350,7 @@ module Make (Test : Test_intf) = struct
                     let old_merkle_root = MT.merkle_root mdb in
                     MT.set_batch_accounts mdb new_addresses_and_accounts ;
                     let new_merkle_root = MT.merkle_root mdb in
-                    Alcotest.(check (not Hash.testable))
+                    Alcotest.(check (neg3 Hash.testable))
                       "merkle roots are different" old_merkle_root
                       new_merkle_root ) ) ) )
 

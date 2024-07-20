@@ -29,11 +29,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let t_of_sexp (_ : Sexp.t) : t = Async.Ivar.create ()
   end
 
-  [@@@warning "-4"]
-
-  type account_location = Deleted | Allocated of Location.t [@@deriving sexp]
-
-  [@@@warning "+4"]
+  type account_location = Location.t [@@deriving sexp]
 
   type maps_t =
     { accounts : Account.t Location_binable.Map.t
@@ -223,6 +219,24 @@ module Make (Inputs : Inputs_intf.S) = struct
           acc.current <- f acc.current ;
           acc.next <- f acc.next )
 
+    module Freed = struct
+      let add t loc = t.freed <- Free_list.Location.add t.freed loc
+
+      let _remove t loc = t.freed <- Free_list.Location.remove t.freed loc
+
+      let mem t loc = Free_list.Location.mem t.freed loc
+    end
+
+    (* A location is free if
+       - the fill interval is empty, aka all locations are available
+       - the location is outside of the fill interval
+       - it is within the fill interval and it has been freed
+    *)
+    let is_free t loc =
+      Option.is_none t.fill_frontier
+      || Location.( > ) loc (Option.value_exn t.fill_frontier)
+      || Freed.mem t loc
+
     let self_set_hash t address hash =
       update_maps t ~f:(fun maps ->
           { maps with hashes = Map.set maps.hashes ~key:address ~data:hash } )
@@ -237,8 +251,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert (Free_list.is_empty t.freed) ;
       update_maps t ~f:(fun maps ->
           { maps with
-            locations =
-              Map.set maps.locations ~key:account_id ~data:(Allocated location)
+            locations = Map.set maps.locations ~key:account_id ~data:location
           } ) ;
 
       (* if account is at a hitherto-unused location, that
@@ -264,14 +277,6 @@ module Make (Inputs : Inputs_intf.S) = struct
               Map.set maps.token_owners ~key:token_id ~data:account_id
           } )
 
-    module Freed = struct
-      let add t loc = t.freed <- Free_list.Location.add t.freed loc
-
-      let remove t loc = t.freed <- Free_list.Location.remove t.freed loc
-
-      let mem t loc = Free_list.Location.mem t.freed loc
-    end
-
     (* a read does a lookup in the account_tbl; if that fails, delegate to
        parent *)
     let get t location =
@@ -283,7 +288,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           let is_empty =
             (* The location does not mark an account for this mask, maybe it has been freed *)
-            Free_list.Location.mem t.freed location
+            Freed.mem t location
             ||
             match t.fill_frontier with
             | None ->
@@ -538,9 +543,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         ; token_owners =
             Token_id.Map.remove t.maps.token_owners
               (Account_id.derive_token_id ~owner:account_id)
-        ; locations =
-            (* Mark the location as deleted *)
-            Map.set t.maps.locations ~key:account_id ~data:Deleted
+        ; locations = Map.remove t.maps.locations account_id
         } ;
       let () =
         match t.fill_frontier with
@@ -630,18 +633,11 @@ module Make (Inputs : Inputs_intf.S) = struct
       @@ let%bind.Option location =
            Map.find t.maps.locations (Account.identifier account)
          in
-         match location with
-         | Allocated location ->
-             let%bind.Option existing_account =
-               Map.find t.maps.accounts location
-             in
-             let%map.Option () =
-               Option.some_if (Account.equal account existing_account) ()
-             in
-             remove_account_and_update_hashes t location
-         | Deleted ->
-             (* FIXME: Check this *)
-             Some ()
+         let%bind.Option existing_account = Map.find t.maps.accounts location in
+         let%map.Option () =
+           Option.some_if (Account.equal account existing_account) ()
+         in
+         remove_account_and_update_hashes t location
 
     let is_committing t = t.is_committing
 
@@ -885,14 +881,16 @@ module Make (Inputs : Inputs_intf.S) = struct
       let maps, ancestor = maps_and_ancestor t in
       let mask_result = Map.find maps.locations account_id in
       match mask_result with
-      | Some (Allocated loc) ->
-          Some loc
-      | Some Deleted ->
-          None
-      | None ->
+      | Some _ as locopt ->
+          locopt
+      | None -> (
           (* This account was never touched by this mask, let's see whether the
              parent knows anything about it *)
-          Base.location_of_account ancestor account_id
+          match Base.location_of_account ancestor account_id with
+          | Some loc as locopt ->
+              if is_free t loc then None else locopt
+          | None ->
+              None )
 
     let remove_account t account =
       match location_of_account t account with
@@ -904,10 +902,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let location_of_account_batch t =
       self_find_or_batch_lookup
         (fun ~maps id ->
-          ( id
-          , Option.map
-              ~f:(function Deleted -> None | Allocated loc -> Some loc)
-              (Map.find maps.locations id) ) )
+          (id, Option.map ~f:Option.some @@ Map.find maps.locations id) )
         Base.location_of_account_batch t
 
     (* Adds specified accounts to the mask by loading them from parent ledger.
@@ -1109,17 +1104,17 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       let maps, ancestor = maps_and_ancestor t in
       match Map.find maps.locations account_id with
-      | Some Deleted -> (
-          (* not in mask, maybe in parent *)
-          match Base.location_of_account ancestor account_id with
-          | Some location ->
-              if Freed.mem t location then (
-                (* If that's feasible reuse the same location as the parent *)
-                Freed.remove t location ;
-                Ok (`Existed, location) )
-              else allocate_new t account
-          | None ->
-              (* not in parent, create new location *) allocate_new t account )
+      (* | Some Deleted -> (
+       *     (\* not in mask, maybe in parent *\)
+       *     match Base.location_of_account ancestor account_id with
+       *     | Some location ->
+       *         if Freed.mem t location then (
+       *           (\* If that's feasible reuse the same location as the parent *\)
+       *           Freed.remove t location ;
+       *           Ok (`Existed, location) )
+       *         else allocate_new t account
+       *     | None ->
+       *         (\* not in parent, create new location *\) allocate_new t account ) *)
       | None -> (
           (* not in mask, maybe in parent *)
           match Base.location_of_account ancestor account_id with
@@ -1127,7 +1122,7 @@ module Make (Inputs : Inputs_intf.S) = struct
               Ok (`Existed, location)
           | None ->
               (* not in parent, create new location *) allocate_new t account )
-      | Some (Allocated location) ->
+      | Some location ->
           Ok (`Existed, location)
   end
 
