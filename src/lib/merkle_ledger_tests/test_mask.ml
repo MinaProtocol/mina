@@ -156,7 +156,8 @@ module Make (Test : Test_intf) = struct
             assert (Option.is_some mask_result) ;
             let maskable_account = Option.value_exn maskable_result in
             let mask_account = Option.value_exn mask_result in
-            [%test_eq: Account.t] maskable_account mask_account ) )
+            Alcotest.(check Account.testable)
+              "identical accounts" maskable_account mask_account ) )
 
   let compare_maskable_mask_hashes ?(check_hash_in_mask = false) maskable mask
       addr =
@@ -336,7 +337,8 @@ module Make (Test : Test_intf) = struct
             let attached_mask = Maskable.register_mask maskable mask in
             let mask_merkle_root = Mask.Attached.merkle_root attached_mask in
             let maskable_merkle_root = Maskable.merkle_root maskable in
-            [%test_eq: Hash.t] mask_merkle_root maskable_merkle_root ) )
+            Alcotest.check Hash.testable "mask and parent's roots are equal"
+              mask_merkle_root maskable_merkle_root ) )
 
   let () =
     add_test "mask and parent agree on Merkle root after set" (fun () ->
@@ -599,7 +601,8 @@ module Make (Test : Test_intf) = struct
                 failwith
                   "create_empty with empty ledger somehow already has that key?"
             | `Added, _new_loc ->
-                [%test_eq: Hash.t] start_hash (merkle_root ledger) ) )
+                Alcotest.check Hash.testable "hash is untouched" start_hash
+                  (merkle_root ledger) ) )
 
   let gen_accounts ~num_accounts =
     let account_ids = Account_id.genval.many num_accounts in
@@ -644,7 +647,8 @@ module Make (Test : Test_intf) = struct
               List.map accounts ~f:(create_new_account_exn attached_mask)
             in
             let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
-            [%test_eq: Int.t] num_accounts mask_num_accounts ;
+            Alcotest.(check int)
+              "identical account counts" num_accounts mask_num_accounts ;
 
             (* Remove num_accounts*)
             let locs_to_be_deleted =
@@ -654,7 +658,7 @@ module Make (Test : Test_intf) = struct
             List.iter locs_to_be_deleted
               ~f:(Mask.Attached.remove_location attached_mask) ;
             let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
-            [%test_eq: Int.t] mask_num_accounts 1 ) )
+            Alcotest.(check int) "identical account number" mask_num_accounts 1 ) )
 
   (* delete an existing account and returns the location where it was stored *)
   let delete mask account =
@@ -683,24 +687,26 @@ module Make (Test : Test_intf) = struct
             List.iter initial_accounts ~f:(fun account ->
                 ignore @@ create_new_account_exn attached_mask account ) ;
             let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
-            [%test_eq: Int.t] half mask_num_accounts ;
+            Alcotest.(check int) "all accounts created" half mask_num_accounts ;
 
             (* Remove num_accounts*)
-            (let accounts_to_be_deleted = initial_accounts in
-             ignore
-             @@ List.iter2 accounts_to_be_deleted additional_accounts
-                  ~f:(fun account_to_delete account_to_add ->
-                    let loc1 = delete attached_mask account_to_delete in
-                    let loc2 =
-                      create_new_account_exn attached_mask account_to_add
-                    in
-                    let loc3 =
-                      Option.value_exn
-                        (Mask.Attached.location_of_account attached_mask
-                           (Account.identifier account_to_add) )
-                    in
-                    [%test_eq: Mask.Location.t] loc1 loc2 ;
-                    [%test_eq: Mask.Location.t] loc3 loc2 ) ) ;
+            let accounts_to_be_deleted = initial_accounts in
+            ignore
+            @@ List.iter2 accounts_to_be_deleted additional_accounts
+                 ~f:(fun account_to_delete account_to_add ->
+                   let loc1 = delete attached_mask account_to_delete in
+                   let loc2 =
+                     create_new_account_exn attached_mask account_to_add
+                   in
+                   let loc3 =
+                     Option.value_exn
+                       (Mask.Attached.location_of_account attached_mask
+                          (Account.identifier account_to_add) )
+                   in
+                   Alcotest.check Location.testable
+                     "deleted location has been reused" loc1 loc2 ;
+                   Alcotest.check Location.testable "location_of_account agrees"
+                     loc2 loc3 ) ;
             let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
             Alcotest.(
               check int "mask contains only non-removed accounts"
@@ -720,7 +726,7 @@ module Make (Test : Test_intf) = struct
             List.iter initial_accounts ~f:(fun account ->
                 ignore @@ create_new_account_exn attached_mask account ) ;
             let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
-            [%test_eq: Int.t] half mask_num_accounts ;
+            Alcotest.(check int) "all accounts created" half mask_num_accounts ;
 
             let accounts_to_be_deleted = initial_accounts in
             let deleted_locs =
@@ -731,7 +737,9 @@ module Make (Test : Test_intf) = struct
               List.map additional_accounts
                 ~f:(create_new_account_exn attached_mask)
             in
-            [%test_eq: Test.Location.t list] deleted_locs added_locs ) )
+            Alcotest.(check (list Location.testable))
+              "deleted locations have been reused in order" deleted_locs
+              added_locs ) )
 
   let () =
     let name = "information after removal from mask should be empty" in
@@ -744,7 +752,8 @@ module Make (Test : Test_intf) = struct
             let acct_opt = Mask.Attached.get attached_mask loc in
             Alcotest.(
               check (option Account.testable)
-                "location after removal should be empty" None acct_opt) ;
+                "account after removal should be empty" None acct_opt) ;
+
             let loc_opt =
               Mask.Attached.location_of_account attached_mask
                 (Account.identifier account)
@@ -773,24 +782,22 @@ module Make (Test : Test_intf) = struct
                 let locs = [ (loc1, a1); (loc2, a2); (loc3, a3) ] in
                 (* all accounts are here *)
                 List.iter locs ~f:(fun (loc, a) ->
-                    [%test_result: Account.t option]
-                      ~message:"All accounts are accessible from m2"
-                      ~expect:(Some a) (Mask.Attached.get m2 loc) ) ;
-                [%test_result: Account.t option] ~message:"a1 is in base"
-                  ~expect:(Some a1) (Test.Base.get base loc1) ;
+                    Alcotest.(check (option Account.testable))
+                      "All accounts are accessible from m2" (Some a)
+                      (Mask.Attached.get m2 loc) ) ;
+
+                Alcotest.(check (option Account.testable))
+                  "a1 is in base" (Some a1) (Test.Base.get base loc1) ;
                 Mask.Attached.commit m1 ;
-                [%test_result: Account.t option] ~message:"a2 is in base"
-                  ~expect:(Some a2) (Test.Base.get base loc2) ;
+                Alcotest.(check (option Account.testable))
+                  "a2 is in base" (Some a2) (Test.Base.get base loc2) ;
                 Maskable.remove_and_reparent_exn mask_as_base m1 ;
-                [%test_result: Account.t option] ~message:"a1 is in base"
-                  ~expect:(Some a1) (Test.Base.get base loc1) ;
-                [%test_result: Account.t option] ~message:"a2 is in base"
-                  ~expect:(Some a2) (Test.Base.get base loc2) ;
+
                 (* all accounts are still here *)
                 List.iter locs ~f:(fun (loc, a) ->
-                    [%test_result: Account.t option]
-                      ~message:"All accounts are accessible from m2"
-                      ~expect:(Some a) (Mask.Attached.get m2 loc) )
+                    Alcotest.(check (option Account.testable))
+                      "All accounts are accessible from m2" (Some a)
+                      (Mask.Attached.get m2 loc) )
             | _ ->
                 failwith "unexpected" ) )
 
@@ -808,8 +815,8 @@ module Make (Test : Test_intf) = struct
             in
             let acct2 = Account.create k (Balance.of_nanomina_int_exn 5) in
             Maskable.set maskable loc acct2 ;
-            [%test_result: Account.t]
-              ~message:"account in mask should be unchanged" ~expect:acct1
+            Alcotest.(check Account.testable)
+              "account in mask should be unchanged" acct1
               (Mask.Attached.get attached_mask loc |> Option.value_exn) ) )
 
   let tests =
@@ -920,8 +927,8 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
   (* test runner *)
   let with_instances f =
     let db = Base_db.create ~depth:Depth.depth () in
-    [%test_result: Int.t] ~message:"Base_db num accounts should start at zero"
-      ~expect:0 (Base_db.num_accounts db) ;
+    Alcotest.(check int)
+      "Base_db.num_accounts starts at zero" 0 (Base_db.num_accounts db) ;
     let maskable = Any_base.cast (module Base_db) db in
     let mask = Mask.create ~depth:Depth.depth () in
     f maskable mask
