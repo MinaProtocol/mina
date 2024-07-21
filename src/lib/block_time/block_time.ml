@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params
 open Tick
@@ -39,8 +37,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
     let zero = UInt64.zero
 
     module Controller = struct
-      [%%if time_offsets]
-
       type t = unit -> Time.Span.t [@@deriving sexp]
 
       (* NB: All instances are identical by construction (see basic below). *)
@@ -100,24 +96,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
             offset
 
       let get_time_offset ~logger = basic ~logger ()
-
-      [%%else]
-
-      type t = unit [@@deriving sexp, equal, compare]
-
-      let create () = ()
-
-      let basic ~logger:_ = ()
-
-      let disable_setting_offset () = ()
-
-      let enable_setting_offset () = ()
-
-      let set_time_offset _ = failwith "Cannot mutate the time offset"
-
-      let get_time_offset _ = Core_kernel.Time.Span.of_int_sec 0
-
-      [%%endif]
     end
 
     module B = Bits
@@ -195,15 +173,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       if Int64.(t_int64 < zero) then failwith "converting to negative timestamp" ;
       Time.of_span_since_epoch (Time.Span.of_ms (Int64.to_float t_int64))
 
-    [%%if time_offsets]
-
     let now offset = of_time (Time.sub (Time.now ()) (offset ()))
-
-    [%%else]
-
-    let now _ = of_time (Time.now ())
-
-    [%%endif]
 
     let field_var_to_unpacked (x : Tick.Field.Var.t) =
       Tick.Field.Checked.unpack ~length:64 x
@@ -249,17 +219,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
       (* convert to milliseconds *)
       Int64.(int64_ns / 1_000_000L) |> UInt64.of_int64
 
-    [%%if time_offsets]
-
     let to_system_time (offset : Controller.t) (t : t) =
       of_span_since_epoch
         Span.(to_span_since_epoch t + of_time_span (offset ()))
-
-    [%%else]
-
-    let to_system_time (_offset : Controller.t) (t : t) = t
-
-    [%%endif]
 
     let to_string_system_time_exn (offset : Controller.t) (t : t) : string =
       to_system_time offset t |> to_string_exn

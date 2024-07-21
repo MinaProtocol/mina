@@ -54,5 +54,4 @@
    transition_frontier_base
  )
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../config.mlh)
- (preprocess (pps ppx_mina ppx_version ppx_let ppx_optcomp ppx_custom_printf ppx_compare)))
+ (preprocess (pps ppx_mina ppx_version ppx_let ppx_custom_printf ppx_compare)))

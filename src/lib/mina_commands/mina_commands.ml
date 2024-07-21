@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core
 open Async
 open Signature_lib

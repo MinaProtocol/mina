@@ -28,8 +28,6 @@
     implementation.
 *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Currency
 open Snark_params

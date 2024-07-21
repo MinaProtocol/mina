@@ -4,15 +4,13 @@
    Zkapp_command
 *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 include User_command.Gen
 
 (* using Precomputed_values depth introduces a cyclic dependency *)
-[%%inject "ledger_depth", ledger_depth]
+let ledger_depth = Node_config.ledger_depth
 
 let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
     ?num_keypairs ?max_account_updates ?max_token_updates ?account_state_tbl ?vk

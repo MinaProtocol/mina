@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Utils
 
 module Types : sig

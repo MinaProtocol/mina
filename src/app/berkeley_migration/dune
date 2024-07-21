@@ -46,6 +46,5 @@
    cli_lib
    mina_version
    )
- (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_mina h_list.ppx ppx_jane)))

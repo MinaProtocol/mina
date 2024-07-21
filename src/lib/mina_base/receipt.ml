@@ -1,7 +1,5 @@
 (* receipt.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 module B58_lib = Base58_check
 open Snark_params.Tick

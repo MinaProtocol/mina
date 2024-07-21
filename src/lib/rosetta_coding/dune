@@ -13,7 +13,6 @@
    snark_params
    signature_lib
 )
- (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_optcomp ppx_assert ppx_let ppx_inline_test))
+ (preprocess (pps ppx_version ppx_assert ppx_let ppx_inline_test))
  (synopsis "Encoders and decoders for Rosetta"))
