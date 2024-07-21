@@ -129,6 +129,7 @@
 (package (name mina_transaction))
 (package (name mina_user_error))
 (package (name mina_version))
+(package (name mina_version_compiled))
 (package (name mina_wire_types))
 (package (name missing_blocks_auditor))
 (package (name monad_lib))

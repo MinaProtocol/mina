@@ -133,21 +133,10 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
         if ndx mod 2 = 0 then account else snappify_account account )
   in
   let fee_payer_keypair = List.hd_exn new_keypairs in
-  let ledger = Ledger.create ~depth:ledger_depth () in
-  List.iter2_exn account_ids accounts ~f:(fun acct_id acct ->
-      match Ledger.get_or_create_account ledger acct_id acct with
-      | Error err ->
-          failwithf
-            "zkapp_command: error adding account for account id: %s, error: \
-             %s@."
-            (Account_id.to_yojson acct_id |> Yojson.Safe.to_string)
-            (Error.to_string_hum err) ()
-      | Ok (`Existed, _) ->
-          failwithf "zkapp_command: account for account id already exists: %s@."
-            (Account_id.to_yojson acct_id |> Yojson.Safe.to_string)
-            ()
-      | Ok (`Added, _) ->
-          () ) ;
+  let ledger = Ledger.create_ephemeral ~depth:ledger_depth () in
+  Ledger.set_batch_accounts ledger
+    (List.mapi accounts ~f:(fun i account ->
+         (Ledger.Addr.of_int_exn ~ledger_depth i, account) ) ) ;
   (* to keep track of account states across transactions *)
   let account_state_tbl =
     Option.value account_state_tbl ~default:(Account_id.Table.create ())

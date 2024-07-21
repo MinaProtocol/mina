@@ -85,6 +85,7 @@ let foldi :
     -> 'a =
  fun t ~init ~f ->
   let iterator = Rocks.Iterator.create t.db in
+  Rocks.Iterator.seek_to_first iterator ;
   let rec loop i accum =
     if Rocks.Iterator.is_valid iterator then (
       let key = copy_bigstring (Rocks.Iterator.get_key iterator) in
@@ -107,6 +108,7 @@ let fold_until :
     -> 'b =
  fun t ~init ~f ~finish ->
   let iterator = Rocks.Iterator.create t.db in
+  Rocks.Iterator.seek_to_first iterator ;
   let rec loop accum =
     if Rocks.Iterator.is_valid iterator then (
       let key = copy_bigstring (Rocks.Iterator.get_key iterator) in

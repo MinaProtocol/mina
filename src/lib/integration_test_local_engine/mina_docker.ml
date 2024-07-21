@@ -302,9 +302,7 @@ module Network_config = struct
       ^ "/src/app/archive/"
     in
     let mina_archive_schema_aux_files =
-      [ sprintf "%screate_schema.sql" mina_archive_base_url
-      ; sprintf "%szkapp_tables.sql" mina_archive_base_url
-      ]
+      [ sprintf "%screate_schema.sql" mina_archive_base_url ]
     in
     let genesis_keypairs =
       List.fold genesis_accounts_and_keys ~init:String.Map.empty
@@ -371,7 +369,6 @@ module Network_config = struct
               ~image:Postgres_config.postgres_image ~ports:[ postgres_port ]
               ~volumes:
                 [ Postgres_config.postgres_create_schema_volume
-                ; Postgres_config.postgres_zkapp_schema_volume
                 ; Postgres_config.postgres_entrypoint_volume
                 ]
               ~config

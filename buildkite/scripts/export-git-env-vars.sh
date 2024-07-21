@@ -51,15 +51,8 @@ fi
 
 
 export MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
-export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g; s!#!-!g')"
-
-# Determine the packages to build (mainnet y/N)
-case $GITBRANCH in
-    compatible|master|release-automation-testing/*|release/1*|release/3*) # whitelist of branches that are "mainnet-like"
-      export MINA_BUILD_MAINNET=true ;;
-    *) # Other branches
-      export MINA_BUILD_MAINNET=false ;;
-esac
+export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}-${MINA_DEB_CODENAME}" | sed 's!/!-!g; s!_!-!g')"
+export RELEASE=unstable
 
 echo "Publishing on release channel \"${RELEASE}\""
 [[ -n ${THIS_COMMIT_TAG} ]] && export MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"
