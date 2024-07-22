@@ -2664,6 +2664,7 @@ module Queries = struct
     ; blockchain_verification_key
     ; network_id
     ; signature_kind
+    ; protocol_state
     ]
 
   module Itn = struct
