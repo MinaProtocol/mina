@@ -14,9 +14,9 @@ let Tag
       | TearDown
       | Lint
       | Release
-      | Hardfork
       | Test
       | Toolchain
+      | Hardfork
       | Stable
       >
 
