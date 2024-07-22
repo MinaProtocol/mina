@@ -85,7 +85,7 @@ The persistent frontier is an on-disk, limited representation of a frontier, alo
 
 The persistent frontier receives a notification every time diffs are applied to the full frontier. When this notification is received, the persistent frontier writes any diffs that were applied into a diff buffer. At a later point in time, this diff buffer is flushed, and all of the recorded diffs are performed against the persistent frontier's database. All diffs are processed in the buffer, but the auxiliary root data stored in the persistent frontier is only updated 1 time per flush.
 
-![](./res/persistent_frontier_concurrency.dot.png)
+![](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/persistent_frontier_concurrency.dot.png)
 
 #### Diff Buffer Flush Rules
 
@@ -126,7 +126,7 @@ TODO
 
 The transition frontier combines together the full frontier, persistent frontier, root history, and extensions into a single interface. It configures the root history to contain at most `2*k` previous roots, giving a total span of `3*k` blocks in the chains stored at any given time. This is done so that nodes can serve bootstrap requests (proofs of finality) to nodes within `2*k` blocks of the best tip.
 
-![](./res/transition_frontier_diagram.conv.tex.png)
+![](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/transition_frontier_diagram.conv.tex.png)
 
 ## Code Directory
 
