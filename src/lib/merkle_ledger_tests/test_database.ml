@@ -194,7 +194,7 @@ module Make (Test : Test_intf) = struct
         let account = Account.genval.one () in
         Test.with_instance (fun mdb ->
             let loc = create_new_account_exn mdb account in
-            MT.remove_account mdb (Account.identifier account) ;
+            MT.remove_account mdb account ;
             let acc_opt = MT.get mdb loc in
             Alcotest.(check (option Account.testable))
               "no account at removed location" None acc_opt ) )
@@ -207,7 +207,7 @@ module Make (Test : Test_intf) = struct
         Test.with_instance (fun mdb ->
             let loc = create_new_account_exn mdb account1 in
 
-            MT.remove_account mdb (Account.identifier account1) ;
+            MT.remove_account mdb account1 ;
             let loc2 = create_new_account_exn mdb account2 in
             Alcotest.check Location.testable
               "newly freed location by remove_account is used for allocation"

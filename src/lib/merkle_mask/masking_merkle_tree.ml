@@ -893,7 +893,8 @@ module Make (Inputs : Inputs_intf.S) = struct
               None )
 
     let remove_account t account =
-      match location_of_account t account with
+      let id = Account.identifier account in
+      match location_of_account t id with
       | Some location ->
           remove_location t location
       | None ->

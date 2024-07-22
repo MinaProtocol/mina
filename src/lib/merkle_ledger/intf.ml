@@ -410,7 +410,7 @@ module Ledger = struct
 
     val remove_location : t -> Location.t -> unit
 
-    val remove_account : t -> account_id -> unit
+    val remove_account : t -> account -> unit
 
     val set_freed : t -> Location.t list -> unit
 

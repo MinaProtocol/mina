@@ -622,7 +622,8 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     | None ->
         ()
 
-  let remove_account mdb account_id =
+  let remove_account mdb account =
+    let account_id = Account.identifier account in
     match location_of_account mdb account_id with
     | Some loc ->
         remove_location mdb loc
