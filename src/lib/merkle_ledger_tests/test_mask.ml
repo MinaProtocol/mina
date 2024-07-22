@@ -660,6 +660,29 @@ module Make (Test : Test_intf) = struct
             let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
             Alcotest.(check int) "identical account number" mask_num_accounts 1 ) )
 
+  let () =
+    add_test "remove on parent is signaled to child" (fun () ->
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            let num_accounts = 5 in
+
+            let accounts' = gen_accounts ~num_accounts in
+            let locs_parents =
+              List.map ~f:(parent_create_new_account_exn maskable) accounts'
+            in
+            let accounts = gen_accounts ~num_accounts in
+            ignore
+            @@ List.iter2 locs_parents accounts
+                 ~f:(Mask.Attached.set attached_mask) ;
+
+            List.iter locs_parents ~f:(fun loc ->
+                Maskable.remove_location maskable loc ;
+                (* location removed from the parent should be free in the child
+                   as well *)
+                Alcotest.(check (option Account.testable))
+                  "location is free" None
+                  (Mask.Attached.get attached_mask loc) ) ) )
+
   (* delete an existing account and returns the location where it was stored *)
   let delete mask account =
     let loc =
