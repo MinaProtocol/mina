@@ -1,9 +1,9 @@
 (library
- (name mina_version_normal)
+ (name mina_version_compiled)
  (libraries core_kernel base)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
- (public_name mina_version.normal)
+ (public_name mina_version_compiled)
  (implements mina_version))
 
 (rule
@@ -12,4 +12,4 @@
    (sandbox none)
    (:< gen.sh)
    (universe))
- (action (run %{<} %{targets})))
+ (action (run bash %{<} %{targets})))
