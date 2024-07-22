@@ -70,7 +70,6 @@ let toDebianNames = \(artifacts : List Artifact) -> \(networks: List Network.Typ
                   (\(n: Network.Type) -> "daemon_${Network.lowerName n}" )
                   networks)
               , Archive = ["archive"]
-              , ArchiveMigration  = ["archive_migration"]
               , TestExecutive = ["test_executive"]
               , BatchTxn = ["batch_txn"]
               , Rosetta = [""] 
