@@ -75,6 +75,9 @@ module type S = sig
     (** called when parent sets an account; update local state *)
     val parent_set_notify : t -> account -> unit
 
+    (** called when parent removes an account; update local state *)
+    val parent_remove_notify : t -> account -> unit
+
     (* makes new mask instance with copied tables, re-use parent *)
     val copy : t -> t
 

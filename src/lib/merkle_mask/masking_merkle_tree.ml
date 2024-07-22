@@ -639,6 +639,18 @@ module Make (Inputs : Inputs_intf.S) = struct
          in
          remove_account_and_update_hashes t location
 
+    let parent_remove_notify t account =
+      match Map.find t.maps.locations (Account.identifier account) with
+      | None ->
+          ()
+      | Some location -> (
+          match Map.find t.maps.accounts location with
+          | Some existing_account ->
+              if Account.equal account existing_account then
+                remove_account_location_update_hashes t account location
+          | None ->
+              assert false )
+
     let is_committing t = t.is_committing
 
     (* as for accounts, we see if we have it in the mask, else delegate to
