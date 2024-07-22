@@ -330,7 +330,7 @@ let main inputs =
     in
     Monitor.try_with ~here:[%here] ~extract_exn:false (fun () ->
         let open Malleable_error.Let_syntax in
-        let%bind network, net_manager, dsl =
+        let%bind network, dsl =
           let lift ?exit_code =
             Deferred.bind ~f:(Malleable_error.or_hard_error ?exit_code)
           in
@@ -361,7 +361,7 @@ let main inputs =
           let (`Don't_call_in_tests dsl) =
             Dsl.create ~logger ~network ~event_router ~network_state_reader
           in
-          (network, net_manager, dsl)
+          (network, dsl)
         in
         [%log trace] "initializing network abstraction" ;
         let%bind () = Engine.Network.initialize_infra ~logger network in
@@ -403,10 +403,7 @@ let main inputs =
         let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
         [%log info] "Daemons started" ;
         [%log trace] "executing test" ;
-        let%bind result = T.run network dsl in
-        let open Malleable_error.Let_syntax in
-        let%bind () = Engine.Network_manager.destroy net_manager network in
-        Malleable_error.return result )
+        T.run network dsl )
   in
 
   let exit_reason, test_result =
