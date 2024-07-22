@@ -21,8 +21,9 @@ let
 
   # Packages which are `installed` in the export.
   # These are all the transitive ocaml dependencies of Mina.
-  export-installed = builtins.removeAttrs
-    (opam-nix.opamListToQuery export.installed) ["check_opam_switch"];
+  export-installed =
+    builtins.removeAttrs (opam-nix.opamListToQuery export.installed)
+    [ "check_opam_switch" ];
 
   # Extra packages which are not in opam.export but useful for development, such as an LSP server.
   extra-packages = with implicit-deps; {
@@ -47,33 +48,36 @@ let
 
   # Pins from opam.export
   pins = builtins.mapAttrs (name: pkg: { inherit name; } // pkg)
-    (builtins.removeAttrs export.package.section ["check_opam_switch"]);
+    (builtins.removeAttrs export.package.section [ "check_opam_switch" ]);
 
   implicit-deps-overlay = self: super:
     (if pkgs.stdenv.isDarwin then {
-      async_ssl = super.async_ssl.overrideAttrs
-        { NIX_CFLAGS_COMPILE = "-Wno-implicit-function-declaration -Wno-incompatible-function-pointer-types"; };
-    } else {}) //
-    {
-      # https://github.com/Drup/ocaml-lmdb/issues/41
-      lmdb = super.lmdb.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
+      async_ssl = super.async_ssl.overrideAttrs {
+        NIX_CFLAGS_COMPILE =
+          "-Wno-implicit-function-declaration -Wno-incompatible-function-pointer-types";
+      };
+    } else
+      { }) // {
+        # https://github.com/Drup/ocaml-lmdb/issues/41
+        lmdb = super.lmdb.overrideAttrs
+          (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
 
-      # Doesn't have an explicit dependency on ctypes-foreign
-      ctypes = super.ctypes.overrideAttrs
-        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
+        # Doesn't have an explicit dependency on ctypes-foreign
+        ctypes = super.ctypes.overrideAttrs
+          (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
 
-      # Can't find sodium-static and ctypes
-      sodium = super.sodium.overrideAttrs (_: {
-        NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
-        propagatedBuildInputs = [ pkgs.sodium-static ];
-        preBuild = ''
-          export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
-        '';
-      });
-    };
+        # Can't find sodium-static and ctypes
+        sodium = super.sodium.overrideAttrs (_: {
+          NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
+          propagatedBuildInputs = [ pkgs.sodium-static ];
+          preBuild = ''
+            export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
+          '';
+        });
+      };
 
-  scope = opam-nix.applyOverlays (opam-nix.__overlays ++ [ implicit-deps-overlay ])
+  scope =
+    opam-nix.applyOverlays (opam-nix.__overlays ++ [ implicit-deps-overlay ])
     (opam-nix.defsToScope pkgs { }
       ((opam-nix.queryToDefs repos (extra-packages // implicit-deps)) // pins));
 
@@ -99,11 +103,9 @@ let
 
       # Make a script wrapper around a binary, setting all the necessary environment variables and adding necessary tools to PATH.
       # Also passes the version information to the executable.
-      wrapMina = let
-        commit_sha1 = inputs.self.sourceInfo.rev or "<dirty>";
-        commit_date = inputs.flockenzeit.lib.RFC-5322 inputs.self.sourceInfo.lastModified or 0;
+      wrapMina = let commit_sha1 = inputs.self.sourceInfo.rev or "<dirty>";
       in package:
-      { deps ? [ pkgs.gnutar pkgs.gzip ], }:
+      { deps ? [ pkgs.gnutar pkgs.gzip ] }:
       pkgs.runCommand "${package.name}-release" {
         buildInputs = [ pkgs.makeBinaryWrapper pkgs.xorg.lndir ];
         outputs = package.outputs;
@@ -114,15 +116,13 @@ let
           wrapProgram "$i" \
             --prefix PATH : ${makeBinPath deps} \
             --set MINA_LIBP2P_HELPER_PATH ${pkgs.libp2p_helper}/bin/mina-libp2p_helper \
-            --set MINA_COMMIT_SHA1 ${escapeShellArg commit_sha1} \
-            --set MINA_COMMIT_DATE ${escapeShellArg commit_date} \
-            --set MINA_BRANCH "''${MINA_BRANCH-<unknown due to nix build>}"
+            --set MINA_COMMIT_SHA1 ${escapeShellArg commit_sha1}
         done
       '') package.outputs);
 
       # Derivation which has all Mina's dependencies in it, and creates an empty output if the command succeds.
       # Useful for unit tests.
-      runMinaCheck = { name ? "check", extraInputs ? [ ], extraArgs ? { } }:
+      runMinaCheck = { name ? "check", extraInputs ? [ ], extraArgs ? { }, }:
         check:
         self.mina-dev.overrideAttrs (oa:
           {
@@ -132,8 +132,7 @@ let
             outputs = [ "out" ];
             installPhase = "touch $out";
           } // extraArgs);
-    in 
-    {
+    in {
       # Some "core" Mina executables, without the version info.
       mina-dev = pkgs.stdenv.mkDerivation ({
         pname = "mina";
@@ -188,7 +187,7 @@ let
           fd . --type executable -x bash -c "patchShebangs {}"
           export -n patchShebangs isScript
           # Get the mina version at runtime, from the wrapper script. Used to prevent rebuilding everything every time commit info changes.
-          sed -i "s/default_implementation [^)]*/default_implementation $MINA_VERSION_IMPLEMENTATION/" src/lib/mina_version/dune
+          sed -i "s/mina_version_compiled/mina_version.runtime/g" src/app/cli/src/dune src/app/rosetta/dune src/app/archive/dune
         '';
 
         buildPhase = ''
@@ -305,7 +304,8 @@ let
       mina_tests = runMinaCheck {
         name = "tests";
         extraArgs = {
-          MINA_LIBP2P_HELPER_PATH = "${pkgs.libp2p_helper}/bin/mina-libp2p_helper";
+          MINA_LIBP2P_HELPER_PATH =
+            "${pkgs.libp2p_helper}/bin/mina-libp2p_helper";
           MINA_LIBP2P_PASS = "naughty blue worm";
           MINA_PRIVKEY_PASS = "naughty blue worm";
           TZDIR = "${pkgs.tzdata}/share/zoneinfo";

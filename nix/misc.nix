@@ -28,13 +28,9 @@ final: prev: {
 
   rocksdb511 = final.stdenv.mkDerivation (_:
     let
-      buildAndInstallFlags = [
-        "USE_RTTI=1"
-        "DEBUG_LEVEL=0"
-        "DISABLE_WARNING_AS_ERROR=1"
-      ];
-    in
-    {
+      buildAndInstallFlags =
+        [ "USE_RTTI=1" "DEBUG_LEVEL=0" "DISABLE_WARNING_AS_ERROR=1" ];
+    in {
       pname = "rocksdb";
       version = "5.11.3";
 
@@ -64,38 +60,34 @@ final: prev: {
       # ${if enableLite then "LIBNAME" else null} = "librocksdb_lite";
       # ${if enableLite then "CXXFLAGS" else null} = "-DROCKSDB_LITE=1";
 
-      buildFlags = buildAndInstallFlags ++ [
-        "static_lib"
-      ];
+      buildFlags = buildAndInstallFlags ++ [ "static_lib" ];
 
-      installFlags = buildAndInstallFlags ++ [
-        "INSTALL_PATH=\${out}"
-        "install-static"
-      ];
+      installFlags = buildAndInstallFlags
+        ++ [ "INSTALL_PATH=\${out}" "install-static" ];
 
       enableParallelBuilding = true;
 
       meta = with final.lib; {
-        homepage = http://rocksdb.org;
-        description = "A library that provides an embeddable, persistent key-value store for fast storage";
+        homepage = "http://rocksdb.org";
+        description =
+          "A library that provides an embeddable, persistent key-value store for fast storage";
         license = licenses.bsd3;
         platforms = platforms.all;
         maintainers = with maintainers; [ adev wkennington ];
       };
-  });
+    });
 
   # Jobs/Lint/ValidationService
   # Jobs/Test/ValidationService
-  validation = ((final.mix-to-nix.override {
+  validation = (final.mix-to-nix.override {
     beamPackages = final.beam.packagesWith final.erlangR23; # todo: jose
   }).mixToNix {
     src = ../src/app/validation;
     # todo: think about fixhexdep overlay
     # todo: dialyze
-    overlay = (final: prev: {
+    overlay = final: prev: {
       goth = prev.goth.overrideAttrs
         (o: { preConfigure = "sed -i '/warnings_as_errors/d' mix.exs"; });
-    });
-  });
-
+    };
+  };
 }
