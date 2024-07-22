@@ -103,7 +103,6 @@ let toDebianNames =
                                 )
                                 networks
                           , Archive = [ "archive" ]
-                          , ArchiveMigration = [ "archive_migration" ]
                           , TestExecutive = [ "test_executive" ]
                           , BatchTxn = [ "batch_txn" ]
                           , Rosetta = [ "" ]
