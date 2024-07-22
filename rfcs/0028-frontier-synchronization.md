@@ -15,7 +15,7 @@ This design centers around a new synchronization cycle for the frontier which cr
 
 #### Diagram
 
-![](res/frontier_synchronization.conv.tex.png)
+![](https://github.com/MinaProtocol/mina-resources/blob/main/rfcs/res/frontier_synchronization.conv.tex.png)
 
 #### Frontier Synchronization Cycle
 
