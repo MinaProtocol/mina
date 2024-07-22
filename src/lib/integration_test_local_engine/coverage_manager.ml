@@ -17,8 +17,8 @@ module Coverage_manager = struct
     let open Docker_network in
     let root = "/root/.mina-config" in
     [%log' info t.logger] "Generating test coverage data..." ;
-    nodes |> Map.to_alist
-    |> Malleable_error.List.fold ~init:[] ~f:(fun acc (_id, node) ->
+    let%bind coverage_files =  nodes |> Map.to_alist
+    |> Malleable_error.List.map ~f:(fun (_id, node) ->
            let%bind () = Node.stop node in
            let container_id = Node.id node in
            let%bind files_in_root =
@@ -39,7 +39,10 @@ module Coverage_manager = struct
                         (Printf.sprintf "%s/%s" root coverage_file)
                         coverage_file
                     in
-                    Malleable_error.return coverage_file )
-           in
-           Malleable_error.return (acc @ coverage_files) )
+                    Malleable_error.return coverage_file
+              ) in
+          Malleable_error.return coverage_files
+     ) in
+
+      Malleable_error.return (List.concat coverage_files )
 end
