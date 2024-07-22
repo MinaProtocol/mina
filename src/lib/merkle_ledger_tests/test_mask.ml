@@ -665,17 +665,15 @@ module Make (Test : Test_intf) = struct
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             let num_accounts = 5 in
-
-            let accounts' = gen_accounts ~num_accounts in
-            let locs_parents =
-              List.map ~f:(parent_create_new_account_exn maskable) accounts'
-            in
             let accounts = gen_accounts ~num_accounts in
+            let locs =
+              List.map ~f:(parent_create_new_account_exn maskable) accounts
+            in
+            (* set up same accounts at same location in mask *)
             ignore
-            @@ List.iter2 locs_parents accounts
-                 ~f:(Mask.Attached.set attached_mask) ;
+            @@ List.iter2 locs accounts ~f:(Mask.Attached.set attached_mask) ;
 
-            List.iter locs_parents ~f:(fun loc ->
+            List.iter locs ~f:(fun loc ->
                 Maskable.remove_location maskable loc ;
                 (* location removed from the parent should be free in the child
                    as well *)
