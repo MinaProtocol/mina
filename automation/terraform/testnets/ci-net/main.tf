@@ -62,6 +62,12 @@ variable "ci_artifact_path" {
   default = "/tmp"
 }
 
+variable "create_libp2p_files" {
+  type        = bool
+  description = "Whether to create LibP2P peer ID files"
+  default     = true
+}
+
 locals {
   seed_region = "us-west1"
   seed_zone   = "us-west1-b"
@@ -72,6 +78,8 @@ module "ci_testnet" {
   source = "../../modules/o1-testnet"
 
   artifact_path = var.ci_artifact_path
+
+  create_libp2p_files = var.create_libp2p_files
 
   # TODO: remove obsolete cluster_name var + cluster region
   cluster_name   = "mina-integration-west1"
