@@ -73,8 +73,7 @@ module Network_config = struct
           : Test_config.t ) =
       test_config
     in
-    let git_commit = Mina_version.commit_id_short in
-    let stack_name = "it-" ^ git_commit ^ "-" ^ test_name in
+    let stack_name = "it-" ^ test_name in
     let key_names_list =
       List.map genesis_ledger ~f:(fun acct -> acct.account_name)
     in
