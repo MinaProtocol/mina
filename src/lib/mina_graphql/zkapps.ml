@@ -1,9 +1,10 @@
 open Core
 open Async
 open Mina_transaction
+open Re2
 
 let send_zkapp_command mina zkapp_command =
-  let replace_error_message error_msg =
+  let update_error_message error_msg =
     (* Define the pattern to match and the replacement message *)
     let pattern =
       Re2.create_exn "Verification_failed \\(Invalid_proof \"In progress\"\\)"
@@ -33,8 +34,7 @@ let send_zkapp_command mina zkapp_command =
           Ok cmd_with_hash
       | Error e ->
           let original_error_msg = Error.to_string_hum e in
-          let meaningful_error_msg = replace_error_message original_error_msg in
-          Error (sprintf "Couldn't send zkApp command: %s" meaningful_error_msg)
-      )
+          let updated_error_msg = update_error_message original_error_msg in
+          Error (sprintf "Couldn't send zkApp command: %s" updated_error_msg) )
   | `Bootstrapping ->
       return (Error "Daemon is bootstrapping")
