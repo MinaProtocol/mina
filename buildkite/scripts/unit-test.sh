@@ -94,5 +94,4 @@ time dune runtest "${path}" --profile="${profile}" -j16 || \
  time dune runtest "${path}" --profile="${profile}" -j16 || \
  (./scripts/link-coredumps.sh && false))
 
-new_checksum = $(compute_checksum "$LAGRANGE_CACHE_DIR")
 upload_cache_if_changed "$LAGRANGE_CACHE_GC_BUCKET" "$LAGRANGE_CACHE_GC_OBJECT" "$LAGRANGE_CACHE_DIR" "$old_checksum"
