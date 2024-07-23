@@ -22,6 +22,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
   end]
 
+  include Comparable.Make (Stable.V2)
+
   let create = Fields.create
 
   let of_string_exn s =
@@ -65,12 +67,13 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let compatible_with_daemon (t : t) =
     (* patch not considered for compatibility *)
-    t.transaction = current.transaction && t.network = current.network
+    Int.equal t.transaction current.transaction
+    && Int.equal t.network current.network
 
   (* when an external transition is deserialized, might contain
      negative numbers
   *)
-  let is_valid t = t.transaction >= 1 && t.network >= 0 && t.patch >= 0
+  let is_valid t = Int.(t.transaction >= 1 && t.network >= 0 && t.patch >= 0)
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

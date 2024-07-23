@@ -20,6 +20,10 @@ let%test_module "Valid_while precondition tests" =
 
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
+    let zkapp_prover_and_vk = (zkapp_prover, vk)
+
+    let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
+
     let snapp_update : Account_update.Update.t =
       { Account_update.Update.dummy with
         app_state =
@@ -71,8 +75,7 @@ let%test_module "Valid_while precondition tests" =
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
                     Transaction_snark.For_tests.update_states
-                      ~zkapp_prover_and_vk:(zkapp_prover, vk)
-                      ~constraint_constants
+                      ~zkapp_prover_and_vk ~constraint_constants
                       (create_spec specs new_kp global_slot)
                   in
                   U.check_zkapp_command_with_merges_exn ~global_slot ledger
@@ -95,8 +98,7 @@ let%test_module "Valid_while precondition tests" =
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
                     Transaction_snark.For_tests.update_states
-                      ~zkapp_prover_and_vk:(zkapp_prover, vk)
-                      ~constraint_constants
+                      ~zkapp_prover_and_vk ~constraint_constants
                       (create_spec specs new_kp global_slot)
                   in
                   U.check_zkapp_command_with_merges_exn
@@ -422,6 +424,8 @@ let%test_module "Account precondition tests" =
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let zkapp_prover_and_vk = (zkapp_prover, vk)
+
+    let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 
     let constraint_constants = U.constraint_constants
 

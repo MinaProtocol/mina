@@ -90,8 +90,7 @@ import_dump_first_time () {
 	echo "Fetching newest schema from "
 
 	wget -nv "${CREATE_SCRIPT_URI}"/create_schema.sql
-	wget -nv "${CREATE_SCRIPT_URI}"/zkapp_tables.sql
-	
+		
 	ARCHIVE_SQL=create_schema.sql
 
 	echo "Creating schema and importing archive dump";

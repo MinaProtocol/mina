@@ -48,8 +48,6 @@ let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
   in
   Blake2.to_hex b2
 
-[%%inject "daemon_expiry", daemon_expiry]
-
 [%%if plugins]
 
 let plugin_flag =
@@ -160,9 +158,12 @@ let setup_daemon logger =
     flag "--block-producer-key" ~aliases:[ "block-producer-key" ]
       ~doc:
         (sprintf
-           "KEYFILE Private key file for the block producer. You cannot \
+           "DEPRECATED: Use environment variable `MINA_BP_PRIVKEY` instead. \
+            Private key file for the block producer. Providing this flag or \
+            the environment variable will enable block production. You cannot \
             provide both `block-producer-key` and `block-producer-pubkey`. \
-            (default: don't produce blocks). %s"
+            (default: use environment variable `MINA_BP_PRIVKEY`, if provided, \
+            or else don't produce any blocks) %s"
            receiver_key_warning )
       (optional string)
   and block_production_pubkey =
@@ -172,8 +173,8 @@ let setup_daemon logger =
         (sprintf
            "PUBLICKEY Public key for the associated private key that is being \
             tracked by this daemon. You cannot provide both \
-            `block-producer-key` and `block-producer-pubkey`. (default: don't \
-            produce blocks). %s"
+            `block-producer-key` (or `MINA_BP_PRIVKEY`) and \
+            `block-producer-pubkey`. (default: don't produce blocks) %s"
            receiver_key_warning )
       (optional public_key_compressed)
   and block_production_password =
@@ -369,7 +370,7 @@ let setup_daemon logger =
          work in a block (default: true)"
       (optional bool)
   and libp2p_keypair =
-    flag "--libp2p-keypair" ~aliases:[ "libp2p-keypair" ] (required string)
+    flag "--libp2p-keypair" ~aliases:[ "libp2p-keypair" ] (optional string)
       ~doc:
         "KEYFILE Keypair (generated from `mina libp2p generate-keypair`) to \
          use with libp2p discovery"
@@ -494,6 +495,11 @@ let setup_daemon logger =
       ~aliases:[ "log-precomputed-blocks" ]
       (optional_with_default false bool)
       ~doc:"true|false Include precomputed blocks in the log (default: false)"
+  and start_filtered_logs =
+    flag "--start-filtered-logs" (listed string)
+      ~doc:
+        "LOG-FILTER Include filtered logs for the given filter. May be passed \
+         multiple times"
   and block_reward_threshold =
     flag "--minimum-block-reward" ~aliases:[ "minimum-block-reward" ]
       ~doc:
@@ -641,13 +647,7 @@ let setup_daemon logger =
             (Internal_tracing.For_logger.json_lines_rotate_transport
                ~directory:(conf_dir ^ "/internal-tracing")
                () ) ;
-        let version_metadata =
-          [ ("commit", `String Mina_version.commit_id)
-          ; ("branch", `String Mina_version.branch)
-          ; ("commit_date", `String Mina_version.commit_date)
-          ; ("marlin_commit", `String Mina_version.marlin_commit_id)
-          ]
-        in
+        let version_metadata = [ ("commit", `String Mina_version.commit_id) ] in
         [%log info]
           "Mina daemon is booting up; built with commit $commit on branch \
            $branch"
@@ -655,20 +655,6 @@ let setup_daemon logger =
         let%bind () =
           Mina_lib.Conf_dir.check_and_set_lockfile ~logger conf_dir
         in
-        if not @@ String.equal daemon_expiry "never" then (
-          [%log info] "Daemon will expire at $exp"
-            ~metadata:[ ("exp", `String daemon_expiry) ] ;
-          let tm =
-            (* same approach as in Genesis_constants.genesis_state_timestamp *)
-            let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
-            Core.Time.of_string_gen
-              ~if_no_timezone:(`Use_this_one default_timezone) daemon_expiry
-          in
-          Clock.run_at tm
-            (fun () ->
-              [%log info] "Daemon has expired, shutting down" ;
-              Core.exit 0 )
-            () ) ;
         [%log info] "Booting may take several seconds, please wait" ;
         let wallets_disk_location = conf_dir ^/ "wallets" in
         let%bind wallets =
@@ -679,23 +665,28 @@ let setup_daemon logger =
         in
         let%bind libp2p_keypair =
           let libp2p_keypair_old_format =
-            match Mina_net2.Keypair.of_string libp2p_keypair with
-            | Ok kp ->
-                Some kp
-            | Error _ ->
-                if String.contains libp2p_keypair ',' then
-                  [%log warn]
-                    "I think -libp2p-keypair is in the old format, but I \
-                     failed to parse it! Using it as a path..." ;
-                None
+            Option.bind libp2p_keypair ~f:(fun libp2p_keypair ->
+                match Mina_net2.Keypair.of_string libp2p_keypair with
+                | Ok kp ->
+                    Some kp
+                | Error _ ->
+                    if String.contains libp2p_keypair ',' then
+                      [%log warn]
+                        "I think -libp2p-keypair is in the old format, but I \
+                         failed to parse it! Using it as a path..." ;
+                    None )
           in
-          Option.value_map
-            ~default:(fun () ->
-              Secrets.Libp2p_keypair.Terminal_stdin.read_exn
-                ~should_prompt_user:false ~which:"libp2p keypair" libp2p_keypair
-              )
-            ~f:(Fn.compose const Deferred.return)
-            libp2p_keypair_old_format ()
+          match libp2p_keypair_old_format with
+          | Some kp ->
+              return (Some kp)
+          | None -> (
+              match libp2p_keypair with
+              | None ->
+                  return None
+              | Some s ->
+                  Secrets.Libp2p_keypair.Terminal_stdin.read_exn
+                    ~should_prompt_user:false ~which:"libp2p keypair" s
+                  |> Deferred.map ~f:Option.some )
         in
         let%bind () =
           let version_filename = conf_dir ^/ "mina.version" in
@@ -975,21 +966,39 @@ let setup_daemon logger =
                   Unix.putenv ~key:Secrets.Keypair.env ~data:password )
             block_production_password ;
           let%bind block_production_keypair =
-            match (block_production_key, block_production_pubkey) with
-            | Some _, Some _ ->
+            match
+              ( block_production_key
+              , block_production_pubkey
+              , Sys.getenv "MINA_BP_PRIVKEY" )
+            with
+            | Some _, Some _, _ ->
                 Mina_user_error.raise
                   "You cannot provide both `block-producer-key` and \
                    `block_production_pubkey`"
-            | None, None ->
+            | None, Some _, Some _ ->
+                Mina_user_error.raise
+                  "You cannot provide both `MINA_BP_PRIVKEY` and \
+                   `block_production_pubkey`"
+            | None, None, None ->
                 Deferred.return None
-            | Some sk_file, _ ->
+            | None, None, Some base58_privkey ->
+                let kp =
+                  Private_key.of_base58_check_exn base58_privkey
+                  |> Keypair.of_private_key_exn
+                in
+                Deferred.return (Some kp)
+            (* CLI argument takes precedence over env variable *)
+            | Some sk_file, None, (Some _ | None) ->
+                [%log warn]
+                  "`block-producer-key` is deprecated. Please set \
+                   `MINA_BP_PRIVKEY` environment variable instead." ;
                 let%map kp =
                   Secrets.Keypair.Terminal_stdin.read_exn
                     ~should_prompt_user:false ~which:"block producer keypair"
                     sk_file
                 in
                 Some kp
-            | _, Some tracked_pubkey ->
+            | None, Some tracked_pubkey, None ->
                 let%map kp =
                   Secrets.Wallets.get_tracked_keypair ~logger
                     ~which:"block producer keypair"
@@ -1391,10 +1400,11 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~work_reassignment_wait ~archive_process_location
                  ~log_block_creation ~precomputed_values ~start_time
                  ?precomputed_blocks_path ~log_precomputed_blocks
-                 ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
-                 ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
-                 ~node_status_url ~graphql_control_port:itn_graphql_port
-                 ~simplified_node_stats () )
+                 ~start_filtered_logs ~upload_blocks_to_gcloud
+                 ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
+                 ~uptime_send_node_commit ~stop_time ~node_status_url
+                 ~graphql_control_port:itn_graphql_port ~simplified_node_stats
+                 () )
           in
           { mina
           ; client_trustlist
@@ -1773,6 +1783,52 @@ let internal_commands logger =
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
                  failwith "early EOF while reading sexp" ) ) )
+  ; ( "run-snark-worker-single"
+    , Command.async
+        ~summary:"Run snark-worker on a sexp provided on a single line of stdin"
+        (let open Command.Let_syntax in
+        let%map_open filename =
+          flag "--file" (required string)
+            ~doc:"File containing the s-expression of the snark work to execute"
+        in
+        fun () ->
+          let open Deferred.Let_syntax in
+          let logger = Logger.create () in
+          Parallel.init_master () ;
+          match%bind
+            Reader.with_file filename ~f:(fun reader ->
+                [%log info] "Created reader for %s" filename ;
+                Reader.read_sexp reader )
+          with
+          | `Ok sexp -> (
+              let%bind worker_state =
+                Snark_worker.Prod.Inputs.Worker_state.create
+                  ~proof_level:Genesis_constants.Proof_level.compiled
+                  ~constraint_constants:
+                    Genesis_constants.Constraint_constants.compiled ()
+              in
+              let sok_message =
+                { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
+                ; prover = Quickcheck.random_value Public_key.Compressed.gen
+                }
+              in
+              let spec =
+                [%of_sexp:
+                  ( Transaction_witness.t
+                  , Ledger_proof.t )
+                  Snark_work_lib.Work.Single.Spec.t] sexp
+              in
+              match%map
+                Snark_worker.Prod.Inputs.perform_single worker_state
+                  ~message:sok_message spec
+              with
+              | Ok _ ->
+                  [%log info] "Successfully worked"
+              | Error err ->
+                  [%log error] "Work didn't work: $err"
+                    ~metadata:[ ("err", Error_json.error_to_yojson err) ] )
+          | `Eof ->
+              failwith "early EOF while reading sexp") )
   ; ( "run-verifier"
     , Command.async
         ~summary:"Run verifier on a proof provided on a single line of stdin"
@@ -2006,9 +2062,7 @@ let print_version_help coda_exe version =
   in
   List.iter lines ~f:(Core.printf "%s\n%!")
 
-let print_version_info () =
-  Core.printf "Commit %s on branch %s\n" Mina_version.commit_id
-    Mina_version.branch
+let print_version_info () = Core.printf "Commit %s\n" Mina_version.commit_id
 
 let () =
   Random.self_init () ;

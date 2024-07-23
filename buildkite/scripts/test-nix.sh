@@ -43,9 +43,11 @@ fi
 # run chown to the current user to fix it
 chown -R "${USER}" /workdir
 
+nix-env -i git-lfs
+
 git config --global --add safe.directory /workdir
 
-git fetch
+git fetch origin $1:$1
 # Nix has issue when performing operations on detached head
 # On Ci machine it spit out issues like:
 # fatal: reference is not a tree: ....

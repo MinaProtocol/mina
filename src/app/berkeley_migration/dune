@@ -25,7 +25,7 @@
    archive_lib
    block_time
    consensus
-   consensus_vrf
+   consensus.vrf
    currency
    genesis_constants
    genesis_ledger_helper
@@ -39,11 +39,13 @@
    mina_wire_types
    one_or_two
    protocol_version
-   runtime_config
+   mina_runtime_config
    signature_lib
    unsigned_extended
    with_hash
- )
+   cli_lib
+   mina_version
+   )
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_mina ppx_let ppx_hash ppx_compare ppx_sexp_conv h_list.ppx)))
+ (preprocess (pps ppx_version ppx_mina h_list.ppx ppx_jane)))

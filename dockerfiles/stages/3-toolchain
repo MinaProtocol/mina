@@ -22,6 +22,7 @@ RUN apt-get update --yes \
     apt-transport-https \
     apt-utils \
     awscli \
+    ca-certificates \
     cmake \
     fakeroot \
     gnupg2 \
@@ -53,6 +54,16 @@ RUN apt-get update --yes \
     zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
 
+# -- Debian Bullseye python dependencies (largely installed above from apt)
+# Ocaml lints tool `scripts/require-ppxs.py` requires python3 sexpdata
+# but debian stretch does not have this package, so only install in bullseye
+RUN test "$deb_codename" = "bullseye" \
+      && apt-get update --yes \
+      && apt-get install --yes --no-install-recommends \
+          python3-sexpdata python3-pip \
+      && pip install readchar \
+      || exit 0
+
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
 RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
@@ -64,21 +75,21 @@ RUN curl -sL https://download.docker.com/linux/static/stable/x86_64/docker-${DOC
     | tar --extract --gzip --strip-components 1 --directory=/usr/bin --file=-
 
 # --- Terraform tools
-RUN wget -O- https://apt.releases.hashicorp.com/gpg | \
+RUN curl -fsSL https://apt.releases.hashicorp.com/gpg | \
     gpg --dearmor | \
-    sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg \
-    gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint \
-    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
-    https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
-    sudo tee /etc/apt/sources.list.d/hashicorp.list \
-    sudo apt-get update \
-    sudo apt-get install terraform
+    sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg && \
+    gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint && \
+    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
+    sudo tee /etc/apt/sources.list.d/hashicorp.list && \
+    sudo apt-get update && \
+    sudo apt-get install -y terraform
 
 # --- Google Cloud tools
-RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
-    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
-    && apt-get update --yes \
-    && apt-get install --yes google-cloud-sdk kubectl \
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | \
+    tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+    && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | \
+    gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
+    && apt-get update -y && apt-get install google-cloud-sdk kubectl -y \
     && rm -rf /var/lib/apt/lists/*
 
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
@@ -91,7 +102,7 @@ RUN curl https://baltocdn.com/helm/signing.asc | apt-key add - \
     && rm -rf /var/lib/apt/lists/*
 
 # --- yarn + nodejs, pinned version
-RUN curl -sL https://deb.nodesource.com/setup_16.x | bash - \
+RUN curl -sL https://deb.nodesource.com/setup_20.x | bash - \
     && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - \
     && echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list \
     && apt update --yes \

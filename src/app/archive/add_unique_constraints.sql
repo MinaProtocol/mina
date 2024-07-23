@@ -1,2 +1,0 @@
-ALTER TABLE zkapp_field_array ADD CONSTRAINT zkapp_field_array_element_ids_key UNIQUE (element_ids);
-ALTER TABLE zkapp_events      ADD CONSTRAINT zkapp_events_element_ids_key      UNIQUE (element_ids);

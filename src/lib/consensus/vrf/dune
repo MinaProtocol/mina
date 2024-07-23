@@ -17,8 +17,8 @@
    ;; local libraries
    mina_wire_types
    mina_base.util
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    genesis_constants
    bounded_types
    crypto_params

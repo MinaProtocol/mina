@@ -11,7 +11,6 @@
 [%%import "/src/config/supercharged_coinbase_factor/one.mlh"]
 
 (* custom consensus parameters for the testnet release *)
-[%%define consensus_mechanism "proof_of_stake"]
 [%%define k 290]
 [%%define delta 0]
 [%%define slots_per_epoch 7140]
@@ -27,7 +26,7 @@
 
 [%%define genesis_ledger "testnet_postake"]
 
-[%%define genesis_state_timestamp "2020-09-16 03:15:00-07:00"]
+[%%define genesis_state_timestamp "2021-09-24T00:00:00Z"]
 [%%define block_window_duration 180000]
 
 [%%define integration_tests false]
@@ -36,11 +35,10 @@
 [%%define download_snark_keys false]
 [%%define generate_genesis_proof false]
 
-[%%define itn_features true]
+[%%define itn_features false]
 
 [%%define print_versioned_types false]
 
-[%%define daemon_expiry "2024-12-10 14:00:00-07:00"]
 [%%define test_full_epoch false]
 [%%import "/src/config/fork.mlh"]
 [%%import "/src/config/features/public_testnet.mlh"]

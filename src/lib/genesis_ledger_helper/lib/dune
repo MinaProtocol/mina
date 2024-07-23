@@ -31,8 +31,8 @@
    pickles.backend
    logger
    snark_params
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    ppx_inline_test.config
    inline_test_quiet_logs
  )

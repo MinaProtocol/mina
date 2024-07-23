@@ -59,12 +59,12 @@ module Hash = struct
    * important impossible to create an account such that (merge a b = hash_account account) *)
 
   let hash_account account =
-    Md5.digest_string ("0" ^ Format.sprintf !"%{sexp: Account.t}" account)
+    Md5.digest_string (Format.sprintf !"0%{sexp: Account.t}" account)
 
   let merge ~height a b =
     let res =
       Md5.digest_string
-        (sprintf "test_ledger_%d:" height ^ Md5.to_hex a ^ Md5.to_hex b)
+        (sprintf "test_ledger_%d:%s%s" height (Md5.to_hex a) (Md5.to_hex b))
     in
     res
 
@@ -128,6 +128,17 @@ struct
   let remove t ~key = Bigstring_frozen.Table.remove t.table key
 
   let make_checkpoint _ _ = ()
+
+  let foldi t ~init ~f =
+    let i = ref (-1) in
+    let f ~key ~data accum = incr i ; f !i accum ~key ~data in
+    Bigstring_frozen.Table.fold t.table ~init ~f
+
+  (* Relying on {!val:to_alist} is probably enough for testing purposes. *)
+  let fold_until t ~init ~f ~finish =
+    let f accum (key, data) = f accum ~key ~data in
+    let alist = to_alist t in
+    List.fold_until alist ~init ~f ~finish
 end
 
 module Storage_locations : Intf.Storage_locations = struct

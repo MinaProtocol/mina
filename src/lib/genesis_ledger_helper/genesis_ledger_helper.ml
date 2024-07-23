@@ -112,7 +112,8 @@ module Ledger = struct
         ; List.to_string balances ~f:(fun (i, balance) ->
               sprintf "%i %s" i (Currency.Balance.to_string balance) )
         ; (* Distinguish ledgers when the hash function is different. *)
-          Snark_params.Tick.Field.to_string Mina_base.Account.empty_digest
+          Snark_params.Tick.Field.to_string
+            (Lazy.force Mina_base.Account.empty_digest)
         ; (* Distinguish ledgers when the account record layout has changed. *)
           Bin_prot.Writer.to_string Mina_base.Account.Stable.Latest.bin_writer_t
             Mina_base.Account.empty
@@ -234,32 +235,10 @@ module Ledger = struct
       Tar.filename_without_extension @@ Filename.basename filename
     in
     let dirname = genesis_dir ^/ dirname in
-    (* remove dir if it exists *)
-    let%bind () =
-      if%bind file_exists ~follow_symlinks:true dirname then (
-        [%log trace] "Genesis ledger dir $path already exists, removing"
-          ~metadata:[ ("path", `String dirname) ] ;
-        let rec remove_dir dir =
-          let%bind files = Sys.ls_dir dir in
-          let%bind () =
-            Deferred.List.iter files ~f:(fun file ->
-                let file = dir ^/ file in
-                remove file )
-          in
-          Unix.rmdir dir
-        and remove file =
-          match%bind Sys.is_directory file with
-          | `Yes ->
-              remove_dir file
-          | _ ->
-              Unix.unlink file
-        in
-        remove dirname )
-      else Deferred.unit
+    let%bind () = File_system.create_dir ~clear_if_exists:true dirname in
+    let%map.Deferred.Or_error () =
+      Tar.extract ~root:dirname ~file:filename ()
     in
-    let%bind () = Unix.mkdir ~p:() dirname in
-    let open Deferred.Or_error.Let_syntax in
-    let%map () = Tar.extract ~root:dirname ~file:filename () in
     let (packed : Genesis_ledger.Packed.t) =
       match accounts with
       | Some accounts ->
@@ -325,12 +304,38 @@ module Ledger = struct
         ; ("path", `String tar_path)
         ; ("dir", `String dirname)
         ] ;
-    let open Deferred.Or_error.Let_syntax in
-    let%map () = Tar.create ~root:dirname ~file:tar_path ~directory:"." () in
+    (* This sleep for 5s is a hack for rocksdb. It seems like rocksdb would need some
+       time to stablize *)
+    let%bind () = after (Time.Span.of_int_sec 5) in
+    let%map.Deferred.Or_error () =
+      Tar.create ~root:dirname ~file:tar_path ~directory:"." ()
+    in
     tar_path
 
   let padded_accounts_from_runtime_config_opt ~logger ~proof_level
-      ~ledger_name_prefix (config : Runtime_config.Ledger.t) =
+      ~ledger_name_prefix ?overwrite_version (config : Runtime_config.Ledger.t)
+      =
+    let patch_accounts_version accounts_with_keys =
+      match overwrite_version with
+      | Some version ->
+          List.map accounts_with_keys ~f:(fun (key, account) ->
+              let patched_account =
+                Mina_base.Account.Poly.
+                  { account with
+                    permissions =
+                      Mina_base.Permissions.Poly.
+                        { account.permissions with
+                          set_verification_key =
+                            ( fst account.permissions.set_verification_key
+                            , version )
+                        }
+                  }
+              in
+              (key, patched_account) )
+      | None ->
+          accounts_with_keys
+    in
+
     let add_genesis_winner_account accounts =
       (* We allow configurations to explicitly override adding the genesis
          winner, so that we can guarantee a certain ledger layout for
@@ -367,7 +372,10 @@ module Ledger = struct
       | Hash ->
           None
       | Accounts accounts ->
-          Some (lazy (add_genesis_winner_account (Accounts.to_full accounts)))
+          Some
+            ( lazy
+              (patch_accounts_version
+                 (add_genesis_winner_account (Accounts.to_full accounts)) ) )
       | Named name -> (
           match Genesis_ledger.fetch_ledger name with
           | Some (module M) ->
@@ -408,12 +416,12 @@ module Ledger = struct
     end) )
 
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      ?(ledger_name_prefix = "genesis_ledger") (config : Runtime_config.Ledger.t)
-      =
+      ?(ledger_name_prefix = "genesis_ledger") ?overwrite_version
+      (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
         let padded_accounts_opt =
           padded_accounts_from_runtime_config_opt ~logger ~proof_level
-            ~ledger_name_prefix config
+            ~ledger_name_prefix ?overwrite_version config
         in
         let open Deferred.Let_syntax in
         let%bind tar_path =
@@ -727,15 +735,16 @@ module Genesis_proof = struct
     let b, id =
       match (inputs.blockchain_proof_system_id, inputs.proof_level) with
       | Some id, _ ->
-          (None, id)
+          (None, Deferred.return id)
       | None, Full ->
           let ((_, (module B)) as b) =
             Genesis_proof.blockchain_snark_state inputs
           in
           (Some b, Lazy.force B.Proof.id)
       | _ ->
-          (None, Pickles.Verification_key.Id.dummy ())
+          (None, Deferred.return @@ Pickles.Verification_key.Id.dummy ())
     in
+    let%bind id = id in
     let base_hash =
       Base_hash.create ~id
         ~state_hash:
@@ -765,7 +774,7 @@ module Genesis_proof = struct
     let%bind found_proof =
       match%bind find_file ~logger ~base_hash ~genesis_dir with
       | Some file -> (
-          match%map load file with
+          match%bind load file with
           | Ok genesis_proof ->
               let b =
                 lazy
@@ -785,10 +794,10 @@ module Genesis_proof = struct
                        Lazy.force @@ Genesis_proof.digests (module T) (module B)
                       )
               in
-              let blockchain_proof_system_id =
+              let%map blockchain_proof_system_id =
                 match inputs.blockchain_proof_system_id with
                 | Some id ->
-                    id
+                    Deferred.return id
                 | None ->
                     let _, (module B) = Lazy.force b in
                     Lazy.force B.Proof.id
@@ -815,7 +824,7 @@ module Genesis_proof = struct
                   [ ("path", `String file)
                   ; ("error", Error_json.error_to_yojson err)
                   ] ;
-              None )
+              return None )
       | None ->
           return None
     in
@@ -943,7 +952,7 @@ let print_config ~logger config =
     ~metadata
 
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~proof_level (config : Runtime_config.t) =
+    ~proof_level ?overwrite_version (config : Runtime_config.t) =
   print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
   let genesis_constants = Genesis_constants.compiled in
@@ -1003,6 +1012,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   let%bind genesis_ledger, ledger_config, ledger_file =
     Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+      ?overwrite_version
       (Option.value config.ledger
          ~default:
            { base = Named Mina_compile_config.genesis_ledger
@@ -1037,12 +1047,13 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   (proof_inputs, config)
 
-let init_from_config_file ?genesis_dir ~logger ~proof_level
+let init_from_config_file ?genesis_dir ~logger ~proof_level ?overwrite_version
     (config : Runtime_config.t) :
     (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
   let%map inputs, config =
-    inputs_from_config_file ?genesis_dir ~logger ~proof_level config
+    inputs_from_config_file ?genesis_dir ~logger ~proof_level ?overwrite_version
+      config
   in
   let values = Genesis_proof.create_values_no_proof inputs in
   (values, config)

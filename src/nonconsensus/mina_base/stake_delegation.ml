@@ -1,1 +1,0 @@
-../../lib/mina_base/stake_delegation.ml

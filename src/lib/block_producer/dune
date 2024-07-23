@@ -65,11 +65,11 @@
    pickles
    snark_params
    kimchi_backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    internal_tracing
    mina_networking
-   runtime_config
+   mina_runtime_config
  )
  (preprocess
   (pps ppx_mina ppx_version ppx_jane ppx_register_event))

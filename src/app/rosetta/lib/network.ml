@@ -515,19 +515,18 @@ let router ~get_graphql_uri_or_error ~logger ~with_db (route : string list) body
       Network_list_response.to_yojson res
   | [ "status" ] ->
       let%bind graphql_uri = get_graphql_uri_or_error () in
-      with_db (fun ~db ->
-          let%bind network =
-            Errors.Lift.parse ~context:"Request"
-            @@ Network_request.of_yojson body
-            |> Errors.Lift.wrap
-          in
-          let%map res =
+      let%bind network =
+        Errors.Lift.parse ~context:"Request" @@ Network_request.of_yojson body
+        |> Errors.Lift.wrap
+      in
+      let%bind res =
+        with_db (fun ~db ->
             Status.Real.handle ~graphql_uri
               ~env:(Status.Env.real ~graphql_uri ~db)
               network
-            |> Errors.Lift.wrap
-          in
-          Network_status_response.to_yojson res )
+            |> Errors.Lift.wrap )
+      in
+      return @@ Network_status_response.to_yojson res
   | [ "options" ] ->
       let%bind network =
         Errors.Lift.parse ~context:"Request" @@ Network_request.of_yojson body
