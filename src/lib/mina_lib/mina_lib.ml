@@ -464,6 +464,16 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
   let offline_shutdown_delay = Time.Span.of_min 25. in
   let after_genesis =
     let genesis_timestamp =
+      (* Horrifyingly, this completely disregards the timestamp from the
+         runtime config. In practice, this means that we've been crashing for
+         any date after the launch of devnet (2021-09-24T00:00:00Z).
+
+         That said, the logic below is also unsafe: we should wait for the
+         network to come up and attempt to contact the seeds when we expect
+         them to be available, otherwise we'll be left with no peers. It would
+         be safest to replace this with `let after_genesis () = false in`, or
+         equivalently to remove the conditional below entirely.
+      *)
       Genesis_constants.(
         genesis_timestamp_of_string genesis_state_timestamp_string)
     in
@@ -1505,12 +1515,46 @@ module type Itn_settable = sig
   val set_itn_logger_data : t -> daemon_port:int -> unit Deferred.Or_error.t
 end
 
+let rec wait_until_3_minutes_before_genesis ~logger ~genesis_timestamp () =
+  let continue_at_timestamp =
+    Time.sub genesis_timestamp (Time.Span.of_min 3.)
+  in
+  if Time.(( >= ) (now ())) continue_at_timestamp then return ()
+  else
+    let max_sleep_delay = Time.Span.of_min 3. in
+    let time_until_genesis = Time.diff continue_at_timestamp (Time.now ()) in
+    let sleep_delay = Time.Span.min max_sleep_delay time_until_genesis in
+    let timer =
+      (* Start the timer ASAP, but don't wait for it until we've logged for the
+         user.
+      *)
+      Async.after sleep_delay
+    in
+    [%log info] "Node started before genesis time $time. Sleeping for $delay"
+      ~metadata:
+        [ ( "time"
+          , `String
+              (Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+                 genesis_timestamp ) )
+        ; ("delay", `String (Time.Span.to_string_hum sleep_delay))
+        ] ;
+    let%bind () = timer in
+    wait_until_3_minutes_before_genesis ~genesis_timestamp ~logger ()
+
 let create ?wallets (config : Config.t) =
   let module Context = (val context config) in
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
+  let%bind () =
+    if config.is_seed then Async.return ()
+    else
+      wait_until_3_minutes_before_genesis ~logger:config.logger
+        ~genesis_timestamp:
+          (Block_time.to_time_exn consensus_constants.genesis_state_timestamp)
+        ()
+  in
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
           =
