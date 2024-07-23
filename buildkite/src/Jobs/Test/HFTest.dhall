@@ -50,7 +50,7 @@ in  Pipeline.build
             , target = Size.Small
             , soft_fail = Some (B/SoftFail.Boolean True)
             , docker = None Docker.Type
-            , timeout_in_minutes = Some +420
+            , timeout_in_minutes = Some 420
             }
         ]
       }
