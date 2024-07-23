@@ -12,9 +12,68 @@ path=$2
 
 source ~/.profile
 
+# Functions to help persist and restore the lagrange basis cache
+
+#!/bin/bash
+
+# Load configuration
+source config.sh
+
+# Function to create cache directory
+create_cache_dir() {
+  local cache_dir=$1
+  mkdir -p "$cache_dir"
+}
+
+# Function to compute checksum
+compute_checksum() {
+  local cache_dir=$1
+  find "$cache_dir" -type f -exec md5sum {} + | sort -k 2 | md5sum | awk '{ print $1 }'
+}
+
+# Function to download and extract cache
+restore_cache() {
+  local bucket_name=$1
+  local object_name=$2
+  local cache_dir=$3
+
+  if gcloud storage cp "gs://$bucket_name/$object_name" lagrange_cache.tar.gz; then
+    tar -xzf lagrange_cache.tar.gz -C "$cache_dir"
+    echo "Cache restored from GCS."
+  else
+    echo "No cache found. Starting with a fresh cache."
+  fi
+}
+
+# Function to upload cache if changed
+upload_cache_if_changed() {
+  local bucket_name=$1
+  local object_name=$2
+  local cache_dir=$3
+  local old_checksum=$4
+
+  new_checksum=$(compute_checksum "$cache_dir")
+
+  if [ "$old_checksum" != "$new_checksum" ]; then
+    tar -czf lagrange_cache.tar.gz -C "$cache_dir" .
+    gcloud storage cp lagrange_cache.tar.gz "gs://$bucket_name/$object_name"
+    echo "Cache has changed. Updated cache saved to GCS."
+  else
+    echo "Cache has not changed. No update needed."
+  fi
+}
+
 export MINA_LIBP2P_PASS="naughty blue worm"
 export NO_JS_BUILD=1 # skip some JS targets which have extra implicit dependencies
+
 export USE_LAGRANGE_CACHE="/tmp/lagrange-cache"
+export LAGRANGE_CACHE_GC_BUCKET="o1labs-ci-test-data"
+export LAGRANGE_CACHE_GC_OBJECT="lagrange-cache.tar.gz"
+
+create_cache_dir "$USE_LAGRANGE_CACHE"
+restore_cache "$LAGRANGE_CACHE_GC_BUCKET" "$LAGRANGE_CACHE_GC_OBJECT" "$LAGRANGE_CACHE_DIR"
+old_checksum=$(compute_checksum "$LAGRANGE_CACHE_DIR")
+
 
 echo "--- Make build"
 export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go
@@ -40,3 +99,6 @@ time dune runtest "${path}" --profile="${profile}" -j16 || \
  echo "--- Retrying failed unit tests" && \
  time dune runtest "${path}" --profile="${profile}" -j16 || \
  (./scripts/link-coredumps.sh && false))
+
+new_checksum = $(compute_checksum "$LAGRANGE_CACHE_DIR")
+upload_cache_if_changed "$LAGRANGE_CACHE_GC_BUCKET" "$LAGRANGE_CACHE_GC_OBJECT" "$LAGRANGE_CACHE_DIR" "$old_checksum"
