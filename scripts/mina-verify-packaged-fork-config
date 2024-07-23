@@ -2,8 +2,8 @@
 
 set -eo pipefail
 
-if [ $# -lt 2 ]; then
-    echo "Usage: $0 <network-name> <fork-config.json> <working-dir>"
+if [ $# -lt 3 ]; then
+    echo "Usage: $0 <network-name> <fork-config.json> <working-dir> <optional: precomputed block prefix>"
     cat <<EOF
 This script is used to validate that an installed package is correct
 according to an exported fork_config.json file.
@@ -39,9 +39,10 @@ EOF
 fi
 
 source_build_fallback() {
-    if [ ! -e "$1" ]; then
-        if [ ! -e "$2" ]; then
-            echo "Error: did not find useable $1 or $2" >&2
+    v=$(command -v "$1")
+    if [ ! -x "$v" ]; then
+        if [ ! -x "$2" ]; then
+            echo "Error: program not found in PATH (as $1) or relative to cwd (as $2)" >&2
             exit 1
         else
             echo "$2"
@@ -51,11 +52,11 @@ source_build_fallback() {
     fi
 }
 
-MINA_EXE=${MINA_EXE:-$(source_build_fallback "$(command -v mina)" ./_build/default/src/app/cli/src/mina.exe)}
-MINA_GENESIS_EXE=${MINA_GENESIS_EXE:-$(source_build_fallback "$(command -v mina-create-genesis)" ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe)}
-MINA_LEGACY_GENESIS_EXE=${MINA_LEGACY_GENESIS_EXE:-$(source_build_fallback "$(command -v mina-create-legacy-genesis)" ./runtime_genesis_ledger_of_mainnet.exe)}
-CREATE_RUNTIME_CONFIG=${CREATE_RUNTIME_CONFIG:-$(source_build_fallback "$(command -v mina-hf-create-runtime-config)" ./scripts/hardfork/create_runtime_config.sh)}
-GSUTIL=${GSUTIL:-$(source_build_fallback "$(command -v gsutil)" false)}
+MINA_EXE=${MINA_EXE:-$(source_build_fallback mina ./_build/default/src/app/cli/src/mina.exe)}
+MINA_GENESIS_EXE=${MINA_GENESIS_EXE:-$(source_build_fallback mina-create-genesis ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe)}
+MINA_LEGACY_GENESIS_EXE=${MINA_LEGACY_GENESIS_EXE:-$(source_build_fallback mina-create-legacy-genesis ./runtime_genesis_ledger_of_mainnet.exe)}
+CREATE_RUNTIME_CONFIG=${CREATE_RUNTIME_CONFIG:-$(source_build_fallback mina-hf-create-runtime-config ./scripts/hardfork/create_runtime_config.sh)}
+GSUTIL=${GSUTIL:-$(source_build_fallback gsutil false)}
 
 if [[ -e "$PRECOMPUTED_FORK_BLOCK"  && ! -x "$GSUTIL" ]]; then
     echo "Error: gsutil is required when PRECOMPUTED_FORK_BLOCK is nonexistent path"
@@ -88,7 +89,11 @@ fork_block_length=$(jq -r '.proof.fork.blockchain_length' "$2")
 # Put the fork block where we want it, fetch it from gcloud if necessary
 if [ ! -e "$PRECOMPUTED_FORK_BLOCK" ]; then
     if [ "$PRECOMPUTED_FORK_BLOCK" = "" ]; then
-        PRECOMPUTED_FORK_BLOCK="gs://mina_network_block_data/$1-$fork_block_length-$fork_block_state_hash.json"
+        prefix=$4
+        if [ "$prefix" = "" ]; then
+            prefix="gs://mina_network_block_data/$1"
+        fi
+        PRECOMPUTED_FORK_BLOCK="$prefix-$fork_block_length-$fork_block_state_hash.json"
     fi
     "$GSUTIL" cp "$PRECOMPUTED_FORK_BLOCK" "$workdir/precomputed_fork_block.json"
 else

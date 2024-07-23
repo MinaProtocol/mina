@@ -1,5 +1,5 @@
 (tests
- (names test_fix_domains pickles_test_optional_custom_gates)
+ (names test_fix_domains pickles_test_optional_custom_gates lookup_range_check)
  (libraries
   ;; opam libraries
   alcotest
@@ -23,9 +23,9 @@
   kimchi_bindings
   kimchi_types
   pasta_bindings
-  kimchi_backend.pasta
-  kimchi_backend.pasta.basic
-  kimchi_backend.pasta.constraint_system
+  kimchi_pasta
+  kimchi_pasta.basic
+  kimchi_pasta.constraint_system
   bitstring_lib
   snarky.intf
   pickles.backend
@@ -35,7 +35,6 @@
   sponge
   pickles
   pickles.pseudo
-  composition_types
   pickles.limb_vector
   pickles_base
   kimchi_backend
@@ -45,7 +44,7 @@
   random_oracle_input
   pickles.composition_types
   pickles.plonk_checks
-  pickles.one_hot_vector
+  pickles_base.one_hot_vector
   snarky_log
   group_map
   snarky_curve
@@ -53,7 +52,7 @@
   snark_keys_header
   tuple_lib
   promise
-  kimchi_backend.common
+  kimchi_backend_common
   logger
   internal_tracing.context_logger
   ppx_version.runtime

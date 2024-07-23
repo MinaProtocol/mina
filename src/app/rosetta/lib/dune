@@ -28,8 +28,8 @@
   mina_base.import
   graphql_lib
   interpolator_lib
-  kimchi_backend.pasta
-  kimchi_backend.pasta.basic
+  kimchi_pasta
+  kimchi_pasta.basic
   pickles
   random_oracle_input
   unsigned_extended
@@ -62,6 +62,7 @@
    ppx_mina
    ppx_compare
    ppx_deriving.show
+   ppx_deriving.make
    ppx_deriving_yojson
    ppx_inline_test
    ppx_assert
@@ -75,5 +76,7 @@
    ppx_custom_printf
    h_list.ppx
    graphql_ppx
+   ppx_string
+   ppx_fields_conv
    --
    %{read-lines:../../../graphql-ppx-config.inc})))

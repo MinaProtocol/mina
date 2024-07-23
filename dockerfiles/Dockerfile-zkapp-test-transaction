@@ -5,6 +5,7 @@ FROM ${image}
 ARG deb_version
 ARG deb_codename=bullseye
 ARG deb_release=unstable
+ARG deb_repo="http://packages.o1test.net"
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $deb_codename $deb_release $deb_version"
@@ -26,7 +27,7 @@ RUN apt-get -y update \
     && rm -rf /var/lib/apt/lists/*
 
 # Snapp test transaction package
-RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get -y update \
   || sleep 10s && apt-get -y update \
   || sleep 10s && apt-get -y update \

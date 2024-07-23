@@ -17,11 +17,12 @@ val wrap_main :
        Wrap_verifier.index'
      , 'branches )
      Pickles_types.Vector.t
-     Core_kernel.Lazy.t
+     Promise.t
+     Lazy.t
      (* All the commitments, include commitments to optional gates, saved in a
         vector of size ['branches] *)
   -> (int, 'branches) Pickles_types.Vector.t
-  -> (Import.Domains.t, 'branches) Pickles_types.Vector.t
+  -> (Import.Domains.t, 'branches) Pickles_types.Vector.t Promise.t
   -> srs:Kimchi_bindings.Protocol.SRS.Fp.t
   -> (module Pickles_types.Nat.Add.Intf with type n = 'max_proofs_verified)
   -> ('max_proofs_verified, 'max_local_max_proofs_verifieds) Requests.Wrap.t
@@ -47,3 +48,5 @@ val wrap_main :
            , Wrap_main_inputs.Impl.Field.t )
            Import.Types.Wrap.Statement.In_circuit.t
         -> unit )
+       Promise.t
+       Lazy.t

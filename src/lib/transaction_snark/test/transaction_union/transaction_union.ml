@@ -2042,6 +2042,8 @@ let%test_module "legacy transactions using zkApp accounts" =
 
     let `VK vk, `Prover _zkapp_prover = Lazy.force U.trivial_zkapp
 
+    let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
+
     let account ledger pk =
       let location =
         Option.value_exn

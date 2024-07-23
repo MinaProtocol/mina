@@ -8,8 +8,8 @@
    ;; local libraries
    mina_base
    kimchi_backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    pickles
    pickles.backend
    pickles_types

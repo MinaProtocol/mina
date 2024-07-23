@@ -67,6 +67,7 @@ module Network_config = struct
          ; txpool_max_size
          ; slot_tx_end
          ; slot_chain_end
+         ; network_id
          ; _
          }
           : Test_config.t ) =
@@ -166,6 +167,7 @@ module Network_config = struct
             ; zkapp_cmd_limit_hardcap = None
             ; slot_tx_end
             ; slot_chain_end
+            ; network_id
             }
       ; genesis =
           Some
@@ -300,9 +302,7 @@ module Network_config = struct
       ^ "/src/app/archive/"
     in
     let mina_archive_schema_aux_files =
-      [ sprintf "%screate_schema.sql" mina_archive_base_url
-      ; sprintf "%szkapp_tables.sql" mina_archive_base_url
-      ]
+      [ sprintf "%screate_schema.sql" mina_archive_base_url ]
     in
     let genesis_keypairs =
       List.fold genesis_accounts_and_keys ~init:String.Map.empty
@@ -369,7 +369,6 @@ module Network_config = struct
               ~image:Postgres_config.postgres_image ~ports:[ postgres_port ]
               ~volumes:
                 [ Postgres_config.postgres_create_schema_volume
-                ; Postgres_config.postgres_zkapp_schema_volume
                 ; Postgres_config.postgres_entrypoint_volume
                 ]
               ~config
@@ -890,7 +889,7 @@ module Network_manager = struct
 
   let poll_until_stack_deployed ~logger =
     let poll_interval = Time.Span.of_sec 15.0 in
-    let max_polls = 20 (* 5 mins *) in
+    let max_polls = 60 (* 15 mins *) in
     let get_service_statuses () =
       let%bind output =
         Util.run_cmd_exn "/" "docker"

@@ -172,10 +172,6 @@ let of_yojson json =
 let block_filename_regexp ~network =
   Str.regexp (sprintf "%s-[0-9]+-.+\\.json" network)
 
-let bar ?data ~total label =
-  let open Progress.Line in
-  list [ const label; spinner (); bar ?data total; eta total; count_to total ]
-
 let parse_filename filename =
   let open Option.Let_syntax in
   let rest, ext = Filename.split_extension filename in
@@ -224,20 +220,20 @@ let concrete_fetch_batch ~logger ~bucket ~network targets ~local_path =
           ~stdin:gsutil_input ()
       in
       don't_wait_for
-        (Progress.with_reporter
-           (bar ~data:`Latest ~total:num_missing_targets "Downloading blocks")
-           (fun f ->
-             let rec progress_loop () =
-               let%bind existing = list_directory ~network ~path:local_path in
-               let downloaded_targets =
-                 Set.length (Set.inter missing_targets existing)
-               in
-               f downloaded_targets ;
-               let%bind () = after (Time.Span.of_sec 10.0) in
-               if Deferred.is_determined gsutil_process then Deferred.unit
-               else progress_loop ()
-             in
-             progress_loop () ) ) ;
+        (let rec progress_loop () =
+           let%bind existing = list_directory ~network ~path:local_path in
+           let downloaded_targets =
+             Set.length (Set.inter missing_targets existing)
+           in
+           [%log info] "%d/%d files downloaded (%%%f)" downloaded_targets
+             num_missing_targets
+             Float.(
+               100.0 * of_int downloaded_targets / of_int num_missing_targets) ;
+           let%bind () = after (Time.Span.of_sec 10.0) in
+           if Deferred.is_determined gsutil_process then Deferred.unit
+           else progress_loop ()
+         in
+         progress_loop () ) ;
       match%map gsutil_process with
       | Ok _ ->
           [%log info] "Finished downloading precomputed blocks"
