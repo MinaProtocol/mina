@@ -65,7 +65,7 @@ variable "ci_artifact_path" {
 variable "create_libp2p_files" {
   type        = bool
   description = "Whether to create LibP2P peer ID files"
-  default     = true
+  default     = false
 }
 
 locals {
