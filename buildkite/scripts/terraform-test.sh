@@ -5,7 +5,7 @@ function test_single_terraform_config {
     cd $1
 
     terraform init
-    terraform plan
+    terraform plan -var="create_libp2p_files=true"
 
     RET=$?
 
