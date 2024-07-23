@@ -13,12 +13,6 @@ path=$2
 source ~/.profile
 
 # Functions to help persist and restore the lagrange basis cache
-
-#!/bin/bash
-
-# Load configuration
-source config.sh
-
 # Function to create cache directory
 create_cache_dir() {
   local cache_dir=$1
@@ -66,11 +60,11 @@ upload_cache_if_changed() {
 export MINA_LIBP2P_PASS="naughty blue worm"
 export NO_JS_BUILD=1 # skip some JS targets which have extra implicit dependencies
 
-export USE_LAGRANGE_CACHE="/tmp/lagrange-cache"
+export LAGRANGE_CACHE_DIR="/tmp/lagrange-cache"
 export LAGRANGE_CACHE_GC_BUCKET="o1labs-ci-test-data"
 export LAGRANGE_CACHE_GC_OBJECT="lagrange-cache.tar.gz"
 
-create_cache_dir "$USE_LAGRANGE_CACHE"
+create_cache_dir "$LAGRANGE_CACHE_DIR"
 restore_cache "$LAGRANGE_CACHE_GC_BUCKET" "$LAGRANGE_CACHE_GC_OBJECT" "$LAGRANGE_CACHE_DIR"
 old_checksum=$(compute_checksum "$LAGRANGE_CACHE_DIR")
 
