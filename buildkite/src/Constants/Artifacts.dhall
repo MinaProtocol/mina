@@ -99,7 +99,7 @@ let toDebianNames =
                                 Network.Type
                                 Text
                                 (     \(n : Network.Type)
-                                  ->  "daemon_${Network.lowerName n}"
+                                  ->  toDebianName a n
                                 )
                                 networks
                           , Archive = [ "archive" ]
@@ -152,17 +152,6 @@ let dockerTag =
                 , FunctionalTestSuite = "${version_and_codename}"
                 }
                 artifact
-
-let toDebianNames =
-          \(artifacts : List Artifact)
-      ->  let text =
-                Prelude.List.map
-                  Artifact
-                  Text
-                  (\(a : Artifact) -> toDebianName a)
-                  artifacts
-
-          in  Text/concatSep " " text
 
 in  { Type = Artifact
     , capitalName = capitalName
