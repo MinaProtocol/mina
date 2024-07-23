@@ -2,6 +2,7 @@ open Core
 open Async
 open Mina_base
 open Mina_transaction
+open Re2
 module Ledger = Mina_ledger.Ledger
 open Signature_lib
 open Currency
@@ -367,6 +368,18 @@ module Mutations = struct
         return (Error "Daemon is bootstrapping")
 
   let internal_send_zkapp_commands mina zkapp_commands =
+    let update_error_message error_msg =
+      (* Define the pattern to match and the replacement message *)
+      let pattern =
+        Re2.create_exn "Verification_failed \\(Invalid_proof \"In progress\"\\)"
+      in
+      let replacement =
+        "Stale verification key detected. Please make sure that deployed \
+         verification key reflects zkApp changes."
+      in
+      (* Replace the matched pattern with the replacement message *)
+      Re2.replace_exn pattern ~f:(fun _ -> replacement) error_msg
+    in
     match Mina_commands.setup_and_submit_zkapp_commands mina zkapp_commands with
     | `Active f -> (
         match%map f with
@@ -385,9 +398,10 @@ module Mutations = struct
             in
             Ok cmds_with_hash
         | Error e ->
-            Error
-              (sprintf "Couldn't send zkApp commands: %s"
-                 (Error.to_string_hum e) ) )
+            let original_error_msg = Error.to_string_hum e in
+            let updated_error_msg = update_error_message original_error_msg in
+            Error (sprintf "Couldn't send zkApp commands: %s" updated_error_msg)
+        )
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
