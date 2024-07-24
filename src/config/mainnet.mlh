@@ -105,3 +105,4 @@
 [%%define zkapp_cmd_limit 24]
 [%%undef slot_tx_end]
 [%%undef slot_chain_end]
+[%%undef scan_state_transaction_capacity_log_2]
