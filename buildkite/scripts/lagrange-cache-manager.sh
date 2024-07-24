@@ -59,9 +59,8 @@ upload_cache_if_changed() {
 
 # Function to display usage
 usage() {
-  echo "Usage: $0 {authenticate|create_cache_dir|restore_cache|upload_cache_if_changed} args"
+  echo "Usage: $0 {create_cache_dir|restore_cache|upload_cache_if_changed} args"
   echo "Commands:"
-  echo "  authenticate key_file"
   echo "  create_cache_dir cache_dir"
   echo "  restore_cache bucket_name cache_dir"
   echo "  upload_cache_if_changed bucket_name cache_dir"
@@ -78,9 +77,6 @@ main() {
   shift
 
   case "$command" in
-    authenticate)
-      authenticate "$@"
-      ;;
     create_cache_dir)
       create_cache_dir "$@"
       ;;
