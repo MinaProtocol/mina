@@ -8,6 +8,8 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
 
+let Cmd = ../../Lib/Cmds.dhall
+
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
@@ -28,7 +30,7 @@ let buildTestCmd
                 , commands =
                   [ Cmd.run
                       "buildkite/scripts/lagrange-cache-manager.sh create_cache_dir ${lagrange_cache_dir}"
-                    Cmd.run
+                  , Cmd.run
                       "buildkite/scripts/lagrange-cache-manager.sh restore_cache ${lagrange_cache_bucket} ${lagrange_cache_dir}"
                   ]
                   # RunInToolchain.runInToolchain
