@@ -31,8 +31,8 @@ restore_cache() {
   local object_name=$2
   local cache_dir=$3
 
-  if gsutil cp "gs://$bucket_name/$object_name" lagrange_cache.tar.gz; then
-    tar -xzf lagrange_cache.tar.gz -C "$cache_dir"
+  if gsutil cp "gs://$bucket_name/$object_name" "$object_name"; then
+    tar -xzf "$object_name" -C "$cache_dir"
     echo "Cache restored from GCS."
   else
     echo "No cache found. Starting with a fresh cache."
@@ -49,8 +49,8 @@ upload_cache_if_changed() {
   new_checksum=$(compute_checksum "$cache_dir")
 
   if [ "$old_checksum" != "$new_checksum" ]; then
-    tar -czf lagrange_cache.tar.gz -C "$cache_dir" .
-    gsutil cp lagrange_cache.tar.gz "gs://$bucket_name/$object_name"
+    tar -czf "$object_name" -C "$cache_dir" .
+    gsutil cp "$object_name" "gs://$bucket_name"
     echo "Cache has changed. Updated cache saved to GCS."
   else
     echo "Cache has not changed. No update needed."
