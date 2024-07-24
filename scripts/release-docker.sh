@@ -188,21 +188,7 @@ fi
 
 if [[ -z "$NOUPLOAD" ]] || [[ "$NOUPLOAD" -eq 0 ]]; then
 
-  function check_if_docker_exists () {
-    set +eo pipefail
-    docker pull $1
-    RESULT=$?
-    if [ $RESULT == 0 ]; then
-      echo "Fatal error: $1 already exists"
-      exit 1
-    fi
-    set -eo pipefail
-  }
-
   # push to GCR
-  check_if_docker_exists ${TAG}
-  check_if_docker_exists ${HASHTAG}
-
   docker push "${TAG}"
   # retag and push again to GCR
   docker tag "${TAG}" "${HASHTAG}"
