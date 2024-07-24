@@ -160,7 +160,7 @@ let pipeline
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
                     , service = Artifacts.dockerName Artifacts.Type.Daemon
-                    , network = Some network_name
+                    , network = network_name
                     , deb_codename = "${DebianVersions.lowerName debVersion}"
                     , deb_profile = profile
                     , deb_repo = DebianRepo.Type.Local
@@ -215,7 +215,7 @@ let pipeline
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
                     , service = Artifacts.dockerName Artifacts.Type.Archive
-                    , network = Some network_name
+                    , network = network_name
                     , deb_codename = "${DebianVersions.lowerName debVersion}"
                     , deb_profile = profile
                     , deb_repo = DebianRepo.Type.Local
@@ -229,7 +229,7 @@ let pipeline
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
                     , service = Artifacts.dockerName Artifacts.Type.Rosetta
-                    , network = Some network_name
+                    , network = network_name
                     , deb_repo = DebianRepo.Type.Local
                     , deb_codename = "${DebianVersions.lowerName debVersion}"
                     , step_key =

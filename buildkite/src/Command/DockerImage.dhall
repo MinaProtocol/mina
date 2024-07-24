@@ -1,7 +1,5 @@
 -- Execute Docker artifact release script according to build scoped DOCKER_DEPLOY_ENV
 
-let Prelude = ../External/Prelude.dhall
-
 let B = ../External/Buildkite.dhall
 
 let B/If = B.definitions/commandStep/properties/if/Type
@@ -25,7 +23,7 @@ let DebianRepo = ../Constants/DebianRepo.dhall
 let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
-          , network : Optional Text
+          , network : Text
           , service : Text
           , version : Text
           , branch : Text
@@ -42,7 +40,7 @@ let ReleaseSpec =
           }
       , default =
           { deps = [] : List Command.TaggedKey.Type
-          , network = None Text
+          , network = "devnet"
           , version = "\\\${MINA_DOCKER_TAG}"
           , service = Artifacts.dockerName Artifacts.Type.Daemon
           , branch = "\\\${BUILDKITE_BRANCH}"
@@ -63,18 +61,10 @@ let generateStep =
           \(spec : ReleaseSpec.Type)
       ->  let exportMinaDebCmd = "export MINA_DEB_CODENAME=${spec.deb_codename}"
 
-          let networkArg =
-                Prelude.Optional.fold
-                  Text
-                  spec.network
-                  Text
-                  (\(network : Text) -> " --network ${network}")
-                  ""
-
           let buildDockerCmd =
                     "./scripts/release-docker.sh"
                 ++  " --service ${spec.service}"
-                ++  networkArg
+                ++  " --network ${spec.network}"
                 ++  " --version ${spec.version}"
                 ++  " --branch ${spec.branch}"
                 ++  " --deb-codename ${spec.deb_codename}"

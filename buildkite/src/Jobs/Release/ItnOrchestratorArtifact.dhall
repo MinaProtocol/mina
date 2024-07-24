@@ -18,7 +18,7 @@ let spec =
       DockerImage.ReleaseSpec::{
       , service = "itn-orchestrator"
       , step_key = "itn-orchestrator-docker-image"
-      , network = Some "berkeley"
+      , network = "berkeley"
       , deb_repo = DebianRepo.Type.Local
       , deps =
           DebianVersions.dependsOn

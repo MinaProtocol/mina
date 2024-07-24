@@ -132,7 +132,7 @@ let docker_step
                             , deps = deps
                             , service =
                                 Artifacts.dockerName Artifacts.Type.Daemon
-                            , network = Some (Network.lowerName n)
+                            , network = Network.lowerName n
                             , deb_codename =
                                 "${DebianVersions.lowerName debVersion}"
                             , deb_profile = profile
@@ -166,7 +166,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = Artifacts.dockerName Artifacts.Type.BatchTxn
-                    , network = Some (Network.lowerName Network.Type.Berkeley)
+                    , network = Network.lowerName Network.Type.Berkeley
                     , deb_codename = "${DebianVersions.lowerName debVersion}"
                     , deb_profile = profile
                     , build_flags = buildFlags
@@ -211,7 +211,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = Artifacts.dockerName Artifacts.Type.Rosetta
-                    , network = Some (Network.lowerName Network.Type.Berkeley)
+                    , network = Network.lowerName Network.Type.Berkeley
                     , build_flags = buildFlags
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = profile
