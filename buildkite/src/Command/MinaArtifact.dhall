@@ -243,6 +243,7 @@ let docker_step
                     , deps = deps
                     , service =
                         Artifacts.dockerName Artifacts.Type.FunctionalTestSuite
+                    , network = Network.lowerName Network.Type.Berkeley
                     , deb_codename = "${DebianVersions.lowerName debVersion}"
                     , build_flags = buildFlags
                     , deb_repo = DebianRepo.Type.Local
