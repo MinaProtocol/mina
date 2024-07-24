@@ -42,10 +42,13 @@ upload_cache_if_changed() {
   # Create a list of files currently in the cache directory, restricted to pallas and vesta directories
   local_files=$(find "$cache_dir/pallas" "$cache_dir/vesta" -type f | sed 's#^'$cache_dir'/##')
 
+  echo "Local cache files: $local_files"
+
   # Find new or changed files by comparing the lists
   while IFS= read -r file; do
     if ! echo "$bucket_files" | grep -qxF "$file"; then
       local_path="$cache_dir/$file"
+      echo "Uploading $local_path to GCS."
       if ! gsutil cp "$local_path" "gs://$bucket_name/$file"; then
         echo "Failed to upload $local_path to GCS." >&2
         return 0
