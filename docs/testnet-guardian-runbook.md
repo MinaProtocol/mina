@@ -50,7 +50,7 @@ Some strings to look for: `Received a block`, `apply_diff block info`, `Number o
 
 Publish the multiaddresses of the seed nodes on `#QA-net details` channel for the rest of the team to connect to the QA-net.
 Seeds nodes can be looked up here: https://console.cloud.google.com/compute. Usually there are two seed nodes per tesnet, click on the seed node instance to go to the page that has details about the instance required to ssh into it.
-<img src="res/gcloud_ssh.png" alt="ssh info" width="300"/>
+<img src="https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/gcloud_ssh.png" alt="ssh info" width="300"/>
 
 `docker exec -it <container> /bin/bash` into coda-daemon container and follow [this](#multiaddress) to get the multiaddress of the node. These are then published on the website (https://codaprotocol.com/docs/getting-started) for users to connect to the testnet.
 

@@ -281,7 +281,7 @@ mutation MyMutation {
 }
 ```
 
-Send the generated graphQL object to the local daemon via GraphiQL interface at http://localhost:3085/graphql ![Screenshot](res/deploy-zkapp.png)
+Send the generated graphQL object to the local daemon via GraphiQL interface at http://localhost:3085/graphql ![Screenshot](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/deploy-zkapp.png)
 
 
 After the transaction is sent and included in a block, a new zkapp account with the verification of the test smart contract gets created. The account information can be queried through the graphQL `account` query.
@@ -345,7 +345,7 @@ Query result:
   }
 }
 ```
-![Screenshot](res/account-after-deploy.png)
+![Screenshot](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/account-after-deploy.png)
 
 #### 2. Update zkapp state
 
@@ -544,7 +544,7 @@ Result of the query
   }
 }
 ```
-![Screenshot](res/account-after-state-update.png)
+![Screenshot](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/account-after-state-update.png)
 
 #### 3. Update Account Permissions
 
@@ -770,4 +770,4 @@ Result of the query
   }
 }
 ```
-![Screenshot](res/account-after-setting-permissions.png)
+![Screenshot](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/account-after-setting-permissions.png)
