@@ -22,7 +22,9 @@ let buildTestCmd
       ->  \(path : Text)
       ->  \(cmd_target : Size)
       ->  let command_key = "unit-test-${profile}"
+
           let lagrange_cache_dir = "/tmp/lagrange-cache"
+
           let lagrange_cache_bucket = "o1labs-ci-test-data"
 
           in  Command.build
