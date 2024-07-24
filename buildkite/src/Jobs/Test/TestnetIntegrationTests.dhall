@@ -46,7 +46,11 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "TestnetIntegrationTests"
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         , mode = PipelineMode.Type.Stable
         }
       , steps =

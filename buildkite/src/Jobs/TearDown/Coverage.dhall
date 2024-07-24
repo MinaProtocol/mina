@@ -16,9 +16,9 @@ in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen = [ S.everything ]
-        , path = "Test"
+        , path = "TearDown"
         , tags = [ PipelineTag.Type.TearDown ]
-        , name = "CoverageTearDown"
+        , name = "Coverage"
         }
       , steps =
         [ Command.build
