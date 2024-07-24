@@ -31,7 +31,7 @@ restore_cache() {
   local object_name=$2
   local cache_dir=$3
 
-  if gcloud storage cp "gs://$bucket_name/$object_name" lagrange_cache.tar.gz; then
+  if gsutil cp "gs://$bucket_name/$object_name" lagrange_cache.tar.gz; then
     tar -xzf lagrange_cache.tar.gz -C "$cache_dir"
     echo "Cache restored from GCS."
   else
@@ -50,7 +50,7 @@ upload_cache_if_changed() {
 
   if [ "$old_checksum" != "$new_checksum" ]; then
     tar -czf lagrange_cache.tar.gz -C "$cache_dir" .
-    gcloud storage cp lagrange_cache.tar.gz "gs://$bucket_name/$object_name"
+    gsutil cp lagrange_cache.tar.gz "gs://$bucket_name/$object_name"
     echo "Cache has changed. Updated cache saved to GCS."
   else
     echo "Cache has not changed. No update needed."
@@ -78,6 +78,8 @@ dune build "${path}" --profile="${profile}" -j16
 
 echo "--- Check for changes to verification keys"
 time dune runtest "src/app/print_blockchain_snark_vk" --profile="${profile}" -j16
+
+upload_cache_if_changed "$LAGRANGE_CACHE_GC_BUCKET" "$LAGRANGE_CACHE_GC_OBJECT" "$LAGRANGE_CACHE_DIR" "$old_checksum"
 
 # Turn on the proof-cache assertion, so that CI will fail if the proofs need to
 # be updated.
