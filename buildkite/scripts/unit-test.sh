@@ -64,6 +64,7 @@ export LAGRANGE_CACHE_DIR="/tmp/lagrange-cache"
 export LAGRANGE_CACHE_GC_BUCKET="o1labs-ci-test-data"
 export LAGRANGE_CACHE_GC_OBJECT="lagrange-cache.tar.gz"
 
+gcloud auth activate-service-account --key-file=$GCLOUD_KEYFILE
 create_cache_dir "$LAGRANGE_CACHE_DIR"
 restore_cache "$LAGRANGE_CACHE_GC_BUCKET" "$LAGRANGE_CACHE_GC_OBJECT" "$LAGRANGE_CACHE_DIR"
 old_checksum=$(compute_checksum "$LAGRANGE_CACHE_DIR")
