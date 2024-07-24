@@ -14,8 +14,8 @@ restore_cache() {
 
   echo "Restoring cache from bucket: gs://$bucket_name"
   
-  if gcloud storage cp -r "gs://$bucket_name/pallas/*" "$cache_dir/pallas/" && \
-     gcloud storage cp -r "gs://$bucket_name/vesta/*" "$cache_dir/vesta/"; then
+  if gsutil cp -r "gs://$bucket_name/pallas/*" "$cache_dir/pallas/" && \
+     gsutil cp -r "gs://$bucket_name/vesta/*" "$cache_dir/vesta/"; then
     echo "Cache restored from GCS."
   else
     echo "No cache found. Starting with a fresh cache."
@@ -26,7 +26,7 @@ restore_cache() {
 list_gcs_files() {
   local bucket_name=$1
   local prefix=$2
-  gcloud storage ls -r "gs://$bucket_name/$prefix/**" 2>/dev/null | sed 's#gs://'$bucket_name'/##' || true
+  gsutil ls -r "gs://$bucket_name/$prefix/**" 2>/dev/null | sed 's#gs://'$bucket_name'/##' || true
 }
 
 # Function to upload only new or changed files, preserving the directory structure
@@ -46,7 +46,7 @@ upload_cache_if_changed() {
   while IFS= read -r file; do
     if ! echo "$bucket_files" | grep -qxF "$file"; then
       local_path="$cache_dir/$file"
-      if ! gcloud storage cp "$local_path" "gs://$bucket_name/$file"; then
+      if ! gsutil cp "$local_path" "gs://$bucket_name/$file"; then
         echo "Failed to upload $local_path to GCS." >&2
         return 0
       fi
