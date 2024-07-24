@@ -45,17 +45,17 @@ in  Pipeline.build
             , commands =
               [ Cmd.run
                   "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
+              , RunWithPostgres.runInDockerWithPostgresConn
+                  ([] : List Text)
+                  "./src/test/archive/sample_db/archive_db.sql"
+                  Artifacts.Type.Rosetta
+                  "./buildkite/scripts/rosetta-indexer-test.sh"
               , Cmd.runInDocker
                   Cmd.Docker::{
                   , image =
                       "gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}"
                   }
                   "buildkite/scripts/rosetta-integration-tests-fast.sh"
-              , RunWithPostgres.runInDockerWithPostgresConn
-                  ([] : List Text)
-                  "./src/test/archive/sample_db/archive_db.sql"
-                  Artifacts.Type.Rosetta
-                  "./buildkite/scripts/rosetta-indexer-test.sh"
               ]
             , label = "Rosetta integration tests Bullseye"
             , key = "rosetta-integration-tests-bullseye"

@@ -472,7 +472,13 @@ module Account_identifier = struct
 
         let of_internal_command_info
             { Lib.Search.Internal_command_info.info; _ } =
-          Deferred.return [ (info.receiver, info.token) ]
+          Deferred.return
+          @@ (info.receiver, info.token)
+             :: ( Option.to_list
+                @@ Option.map
+                     ~f:(fun coinbase_receiver ->
+                       (coinbase_receiver, info.token) )
+                     info.coinbase_receiver )
 
         let of_zkapp_command_info { Lib.Search.Zkapp_command_info.info; _ } =
           Deferred.return
@@ -605,7 +611,8 @@ module Address = struct
 
         let of_internal_command_info
             { Lib.Search.Internal_command_info.info; _ } =
-          Deferred.return [ info.receiver ]
+          Deferred.return
+          @@ (info.receiver :: Option.to_list info.coinbase_receiver)
 
         let of_zkapp_command_info { Lib.Search.Zkapp_command_info.info; _ } =
           Deferred.return
