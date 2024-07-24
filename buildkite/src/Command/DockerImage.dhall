@@ -1,5 +1,7 @@
 -- Execute Docker artifact release script according to build scoped DOCKER_DEPLOY_ENV
 
+let Prelude = ../External/Prelude.dhall
+
 let B = ../External/Buildkite.dhall
 
 let B/If = B.definitions/commandStep/properties/if/Type
@@ -9,6 +11,8 @@ let Command = ./Base.dhall
 let Size = ./Size.dhall
 
 let Profiles = ../Constants/Profiles.dhall
+
+let Artifacts = ../Constants/Artifacts.dhall
 
 let BuildFlags = ../Constants/BuildFlags.dhall
 
@@ -21,7 +25,7 @@ let DebianRepo = ../Constants/DebianRepo.dhall
 let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
-          , network : Text
+          , network : Optional Text
           , service : Text
           , version : Text
           , branch : Text
@@ -38,9 +42,9 @@ let ReleaseSpec =
           }
       , default =
           { deps = [] : List Command.TaggedKey.Type
-          , network = "devnet"
+          , network = None Text
           , version = "\\\${MINA_DOCKER_TAG}"
-          , service = "\\\${MINA_SERVICE}"
+          , service = Artifacts.dockerName Artifacts.Type.Daemon
           , branch = "\\\${BUILDKITE_BRANCH}"
           , repo = "\\\${BUILDKITE_REPO}"
           , deb_codename = "bullseye"
@@ -59,11 +63,19 @@ let generateStep =
           \(spec : ReleaseSpec.Type)
       ->  let exportMinaDebCmd = "export MINA_DEB_CODENAME=${spec.deb_codename}"
 
+          let networkArg =
+                Prelude.Optional.fold
+                  Text
+                  spec.network
+                  Text
+                  (\(network : Text) -> " --network ${network}")
+                  ""
+
           let buildDockerCmd =
                     "./scripts/release-docker.sh"
                 ++  " --service ${spec.service}"
+                ++  networkArg
                 ++  " --version ${spec.version}"
-                ++  " --network ${spec.network}"
                 ++  " --branch ${spec.branch}"
                 ++  " --deb-codename ${spec.deb_codename}"
                 ++  " --deb-repo ${DebianRepo.address spec.deb_repo}"
