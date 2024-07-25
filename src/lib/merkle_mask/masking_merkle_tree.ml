@@ -83,21 +83,21 @@ module Make (Inputs : Inputs_intf.S) = struct
           *)
     }
 
-  (* Available locations for allocations are tracked using 2 fields:
-     1. [fill_frontier] is the fill frontier, that is, on the right of this
-        location, all locations are available
-     2. [freed] represents all available locations in  [0, fill_frontier].
-        Locations are added to this only after having been removed.
-  *)
   type t =
     { uuid : Uuid.Stable.V1.t
     ; mutable parent : Parent.t
     ; detached_parent_signal : Detached_parent_signal.t
+          (* Available locations for allocations are tracked using 2 fields:
+             1. [fill_frontier] is the fill frontier, that is, on the right of this
+                location, all locations are available
+             2. [freed] represents all available locations in  [0, fill_frontier].
+                Locations are added to this only after having been removed.
+          *)
     ; mutable fill_frontier : Location.t option
     ; mutable freed : Free_list.t
-    ; depth : int
+    ; depth : (* depth of Merkle tree *) int
     ; mutable maps : maps_t
-          (* If present, contains maps containing changes both for this mask
+          (* If present, [accumulated] contains maps containing changes both for this mask
              and for a few ancestors. This is used as a lookup cache. *)
     ; mutable accumulated : (accumulated_t[@sexp.opaque]) option
     ; mutable is_committing : bool
