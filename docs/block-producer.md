@@ -4,4 +4,4 @@
 ## Block production Scheduling
 [block-production-scheduling]: #block-production-scheduling
 
-![](res/block_production_fsm.png)
+![](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/block_production_fsm.png)

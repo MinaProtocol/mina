@@ -11,9 +11,9 @@ The staged ledger has been suffering from scope creep for some time now. As we a
 ## Detailed design
 [detailed-design]: #detailed-design
 
-[Full architecture](../docs/res/all_data_structures.dot.png)
+[Full architecture](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/all_data_structures.dot.png)
 
-![](../docs/res/ledger_builder_data_structures.dot.png)
+![](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/ledger_builder_data_structures.dot.png)
 
 ### `Merkle_ledger`
 
