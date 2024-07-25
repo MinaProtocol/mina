@@ -1,9 +1,9 @@
 (library
- (name mina_version_compiled)
+ (name mina_version_normal)
  (libraries core_kernel base)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version))
- (public_name mina_version_compiled)
+ (public_name mina_version.normal)
  (implements mina_version))
 
 (rule
