@@ -187,7 +187,7 @@ let
           fd . --type executable -x bash -c "patchShebangs {}"
           export -n patchShebangs isScript
           # Get the mina version at runtime, from the wrapper script. Used to prevent rebuilding everything every time commit info changes.
-          sed -i "s/mina_version_compiled/mina_version.runtime/g" src/app/cli/src/dune src/app/rosetta/dune src/app/archive/dune
+          sed -i "s/default_implementation [^)]*/default_implementation $MINA_VERSION_IMPLEMENTATION/" src/lib/mina_version/dune
         '';
 
         buildPhase = ''
