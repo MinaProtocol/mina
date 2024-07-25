@@ -62,7 +62,9 @@
   cache_dir
   snarky.backendless
   bounded_types
-  block_time)
+  block_time
+  mina_version_compiled
+ )
  (instrumentation
   (backend bisect_ppx))
  (preprocess
