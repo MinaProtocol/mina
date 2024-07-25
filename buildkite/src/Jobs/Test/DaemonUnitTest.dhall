@@ -30,17 +30,20 @@ let buildTestCmd
           in  Command.build
                 Command.Config::{
                 , commands =
-                  [ Cmd.run
-                      "buildkite/scripts/lagrange-cache-manager.sh create_cache_dir ${lagrange_cache_dir}"
-                  , Cmd.run
-                      "buildkite/scripts/lagrange-cache-manager.sh restore_cache ${lagrange_cache_bucket} ${lagrange_cache_dir}"
-                  ]
-                  # RunInToolchain.runInToolchain
-                      [ "DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN", "LAGRANGE_CACHE_DIR=${lagrange_cache_dir}" ]
-                      "buildkite/scripts/unit-test.sh ${profile} ${path} && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
-                  # [ Cmd.run
-                      "buildkite/scripts/lagrange-cache-manager.sh upload_cache_if_changed ${lagrange_cache_bucket} ${lagrange_cache_dir}"
-                    ]
+                      [ Cmd.run
+                          "buildkite/scripts/lagrange-cache-manager.sh create_cache_dir ${lagrange_cache_dir}"
+                      , Cmd.run
+                          "buildkite/scripts/lagrange-cache-manager.sh restore_cache ${lagrange_cache_bucket} ${lagrange_cache_dir}"
+                      ]
+                    # RunInToolchain.runInToolchain
+                        [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
+                        , "COVERALLS_TOKEN"
+                        , "LAGRANGE_CACHE_DIR=${lagrange_cache_dir}"
+                        ]
+                        "buildkite/scripts/unit-test.sh ${profile} ${path} && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
+                    # [ Cmd.run
+                          "buildkite/scripts/lagrange-cache-manager.sh upload_cache_if_changed ${lagrange_cache_bucket} ${lagrange_cache_dir}"
+                      ]
                 , label = "${profile} unit-tests"
                 , key = command_key
                 , target = cmd_target
