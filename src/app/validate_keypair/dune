@@ -9,7 +9,7 @@
    async
    async_unix
    ;; local libraries
-   mina_version
+   mina_version_compiled
    bounded_types
    cli_lib
  )
