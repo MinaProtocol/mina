@@ -659,6 +659,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let parent_remove_notify t account =
       match Map.find t.maps.locations (Account.identifier account) with
       | None ->
+          (* Inform that the location is free *)
           ()
       | Some location -> (
           match Map.find t.maps.accounts location with
@@ -666,6 +667,9 @@ module Make (Inputs : Inputs_intf.S) = struct
               if Account.equal account existing_account then
                 remove_account_location_update_hashes t account location
           | None ->
+              (* If we have a loc -> account binding in maps.accounts, there
+                 needs to be an account -> loc association in the
+                 maps.location *)
               assert false )
 
     let is_committing t = t.is_committing
