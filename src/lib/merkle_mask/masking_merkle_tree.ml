@@ -64,7 +64,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     Structure maintains two caches: [current] and [next], with the former
     being always a superset of a latter and [next] always being superset of mask's contents
     from [maps] field. These two caches are being rotated according to a certain rule
-    to ensure that no much more memory is used within accumulator as compared to the case
+    to ensure that not much more memory is used within accumulator as compared to the case
     when [accumulated = None] for all masks.
 
     Garbage-collection/rotation mechanism for [next] and [current] is based on idea to set
@@ -597,6 +597,23 @@ module Make (Inputs : Inputs_intf.S) = struct
     let set_freed t locs =
       let freed = Free_list.Location.of_list locs in
       t.freed <- freed
+
+    (* FIXME: Makes this more efficient. Avoid the back and forth betwee lists
+       and sets *)
+    let get_freed t =
+      let freed =
+        match Base.get_freed (get_parent t) with
+        | [] ->
+            t.freed
+        | freed ->
+            let freed' =
+              Map.fold t.maps.accounts ~init:[] ~f:(fun ~key ~data:_ acc ->
+                  if List.mem freed key ~equal:Location.equal then acc
+                  else key :: acc )
+            in
+            Free_list.union t.freed (Free_list.Location.of_list freed')
+      in
+      Free_list.Location.to_list freed
 
     let set_account_unsafe t location account =
       assert_is_attached t ;

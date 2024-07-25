@@ -29,6 +29,10 @@ module type S = sig
 
   val size : t -> int
 
+  val diff : t -> t -> t
+
+  val union : t -> t -> t
+
   module Location : sig
     val add : t -> location -> t
 

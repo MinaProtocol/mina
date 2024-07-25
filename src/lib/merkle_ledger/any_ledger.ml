@@ -99,6 +99,8 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
 
     let set_freed (T ((module Base), t)) = Base.set_freed t
 
+    let get_freed (T ((module Base), t)) = Base.get_freed t
+
     let get_batch (T ((module Base), t)) = Base.get_batch t
 
     let get_uuid (T ((module Base), t)) = Base.get_uuid t

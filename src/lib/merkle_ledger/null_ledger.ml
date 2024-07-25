@@ -103,6 +103,8 @@ end = struct
 
   let set_freed _ _ = ()
 
+  let get_freed _ = []
+
   let get _t _loc = None
 
   let get_batch _t locs = List.map locs ~f:(fun loc -> (loc, None))
