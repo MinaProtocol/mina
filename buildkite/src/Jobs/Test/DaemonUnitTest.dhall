@@ -23,7 +23,7 @@ let buildTestCmd
       ->  \(cmd_target : Size)
       ->  let command_key = "unit-test-${profile}"
 
-          let lagrange_cache_dir = "/tmp/lagrange-cache"
+          let lagrange_cache_dir = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
 
           let lagrange_cache_bucket = "o1labs-ci-test-data"
 
@@ -38,7 +38,7 @@ let buildTestCmd
                     # RunInToolchain.runInToolchain
                         [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
                         , "COVERALLS_TOKEN"
-                        , "LAGRANGE_CACHE_DIR=${lagrange_cache_dir}"
+                        , "LAGRANGE_CACHE_DIR=/workdir"
                         ]
                         "buildkite/scripts/unit-test.sh ${profile} ${path} && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
                     # [ Cmd.run
