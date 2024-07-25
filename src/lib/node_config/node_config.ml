@@ -153,3 +153,110 @@ let scan_state_tps_goal_x10 : int option = None
 let scan_state_tps_goal_x10 = Some scan_state_tps_goal_x10
 
 [%%endif]
+
+(*
+let load_config_file filename =
+  let open Deferred.Or_error.Let_syntax in
+  Monitor.try_with_join_or_error ~here:[%here] (fun () ->
+      let%map json = load_config_json filename in
+      match Runtime_config.of_yojson json with
+      | Ok config ->
+          Ok config
+      | Error err ->
+          Or_error.error_string err )
+
+*)
+
+type t = {
+    ledger_depth : int
+  ; curve_size : int
+  ; coinbase : string
+  ; k : int
+  ; delta : int
+  ; slots_per_epoch : int
+  ; slots_per_sub_window : int
+  ; sub_windows_per_window : int
+  ; grace_period_slots : int
+  ; scan_state_with_tps_goal : bool
+  ; scan_state_transaction_capacity_log_2 : int option
+  ; scan_state_work_delay : int
+  ; debug_logs : bool
+  ; call_logger : bool
+  ; cache_exceptions : bool
+  ; record_async_backtraces : bool
+  ; proof_level : string
+  ; pool_max_size : int
+  ; account_creation_fee_int : string
+  ; default_transaction_fee : string
+  ; default_snark_worker_fee : string
+  ; minimum_user_command_fee : string
+  ; protocol_version_transaction : int
+  ; protocol_version_network : int
+  ; protocol_version_patch : int
+  ; supercharged_coinbase_factor : int
+  ; time_offsets : bool
+  ; plugins : bool
+  ; genesis_ledger : string
+  ; genesis_state_timestamp : string
+  ; block_window_duration : int
+  ; integration_tests : bool
+  ; force_updates : bool
+  ; download_snark_keys : bool
+  ; generate_genesis_proof : bool
+  ; itn_features : bool
+  ; compaction_interval : int option
+  ; vrf_poll_interval : int
+  ; network : string
+  ; zkapp_cmd_limit : int option
+  ; slot_tx_end : int option
+  ; slot_chain_end : int option
+  ; scan_state_tps_goal_x10 : int option
+} [@@deriving to_yojson, of_yojson]
+
+let config: t = 
+  { ledger_depth
+  ; curve_size
+  ; coinbase
+  ; k
+  ; delta
+  ; slots_per_epoch
+  ; slots_per_sub_window
+  ; sub_windows_per_window
+  ; grace_period_slots
+  ; scan_state_with_tps_goal
+  ; scan_state_transaction_capacity_log_2
+  ; scan_state_work_delay
+  ; debug_logs
+  ; call_logger
+  ; cache_exceptions
+  ; record_async_backtraces
+  ; proof_level
+  ; pool_max_size
+  ; account_creation_fee_int
+  ; default_transaction_fee
+  ; default_snark_worker_fee
+  ; minimum_user_command_fee
+  ; protocol_version_transaction
+  ; protocol_version_network
+  ; protocol_version_patch
+  ; supercharged_coinbase_factor
+  ; time_offsets
+  ; plugins
+  ; genesis_ledger
+  ; genesis_state_timestamp
+  ; block_window_duration
+  ; integration_tests
+  ; force_updates
+  ; download_snark_keys
+  ; generate_genesis_proof
+  ; itn_features
+  ; compaction_interval
+  ; vrf_poll_interval
+  ; network
+  ; zkapp_cmd_limit
+  ; slot_tx_end
+  ; slot_chain_end
+  ; scan_state_tps_goal_x10
+  }
+
+let () = to_yojson config |> Yojson.Safe.pretty_to_string |> print_endline
