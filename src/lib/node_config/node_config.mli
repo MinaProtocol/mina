@@ -52,8 +52,6 @@ val genesis_state_timestamp : string
 
 val block_window_duration : int
 
-val integration_tests : bool
-
 val force_updates : bool
 
 val download_snark_keys : bool

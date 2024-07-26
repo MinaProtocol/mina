@@ -72,8 +72,6 @@ let scan_state_transaction_capacity_log_2 =
 
 [%%inject "block_window_duration", block_window_duration]
 
-[%%inject "integration_tests", integration_tests]
-
 [%%inject "force_updates", force_updates]
 
 [%%inject "download_snark_keys", download_snark_keys]
