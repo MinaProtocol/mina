@@ -45,5 +45,5 @@ in  Pipeline.build
           , PipelineTag.Type.Stable
           ]
         }
-      , steps = [ TestExecutive.executeCloud "hard-fork" dependsOn ]
+      , steps = [ TestExecutive.executeLocal "hard-fork" dependsOn ]
       }
