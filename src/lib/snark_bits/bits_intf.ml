@@ -1,7 +1,5 @@
 (* bits_intf.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Fold_lib
 
 module type Basic = sig
