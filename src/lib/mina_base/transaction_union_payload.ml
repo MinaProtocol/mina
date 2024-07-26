@@ -1,7 +1,4 @@
 (* transaction_union_payload.ml *)
-
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Currency
 open Snark_params.Tick

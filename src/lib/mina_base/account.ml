@@ -1,7 +1,5 @@
 (* account.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base_util
 open Snark_params

@@ -118,6 +118,7 @@
 (package (name mina_metrics))
 (package (name mina_net2))
 (package (name mina_networking))
+(package (name mina_node_config))
 (package (name mina_numbers))
 (package (name mina_plugins))
 (package (name mina_runtime_config))

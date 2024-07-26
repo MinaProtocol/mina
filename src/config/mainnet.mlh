@@ -1,14 +1,67 @@
 [%%define ledger_depth 35]
-[%%import "/src/config/curve/medium.mlh"]
-[%%import "/src/config/coinbase/realistic.mlh"]
-[%%import "/src/config/scan_state/point2tps.mlh"]
-[%%import "/src/config/debug_level/some.mlh"]
-[%%import "/src/config/proof_level/full.mlh"]
-[%%import "/src/config/txpool_size.mlh"]
-[%%import "/src/config/account_creation_fee/realistic.mlh"]
-[%%import "/src/config/amount_defaults/realistic.mlh"]
-[%%import "/src/config/protocol_version/current.mlh"]
-[%%import "/src/config/supercharged_coinbase_factor/one.mlh"]
+
+(*BEGIN src/config/curve/medium.mlh*)
+[%%define curve_size 255]
+(*END src/config/curve/medium.mlh*)
+
+
+(*BEGIN src/config/coinbase/realistic.mlh*)
+[%%define coinbase "720"]
+(*END src/config/coinbase/realistic.mlh*)
+
+
+(*BEGIN src/config/scan_state/point2tps.mlh*)
+[%%define scan_state_with_tps_goal true]
+(* 0.2TPS * 10 *)
+[%%define scan_state_tps_goal_x10 2]
+[%%define scan_state_work_delay 2]
+(*END src/config/scan_state/point2tps.mlh*)
+
+
+(*BEGIN src/config/debug_level/some.mlh*)
+[%%define debug_logs false]
+[%%define call_logger false]
+[%%define cache_exceptions true]
+[%%define record_async_backtraces false]
+(*END src/config/debug_level/some.mlh*)
+
+
+(*BEGIN src/config/proof_level/full.mlh*)
+[%%define proof_level "full"]
+(*END src/config/proof_level/full.mlh*)
+
+
+(*BEGIN src/config/txpool_size.mlh*)
+(* Note this value needs to be consistent across nodes to prevent spurious bans.
+   see comment in transaction_pool.ml for more details. *)
+[%%define pool_max_size 3000]
+[%%undef zkapp_cmd_limit]
+(*END src/config/txpool_size.mlh*)
+
+
+(*BEGIN src/config/account_creation_fee/realistic.mlh*)
+[%%define account_creation_fee_int "1.0"]
+(*END src/config/account_creation_fee/realistic.mlh*)
+
+
+(*BEGIN src/config/amount_defaults/realistic.mlh*)
+[%%define default_transaction_fee "0.25"]
+[%%define default_snark_worker_fee "0.1"]
+[%%define minimum_user_command_fee "0.001"]
+(*END src/config/amount_defaults/realistic.mlh*)
+
+
+(*BEGIN src/config/protocol_version/current.mlh*)
+(* transaction >= 1, network >= 0, patch >= 0 *)
+[%%define protocol_version_transaction 3]
+[%%define protocol_version_network 0]
+[%%define protocol_version_patch 0]
+(*END src/config/protocol_version/current.mlh*)
+
+
+(*BEGIN src/config/supercharged_coinbase_factor/one.mlh*)
+[%%define supercharged_coinbase_factor 1]
+(*END src/config/supercharged_coinbase_factor/one.mlh*)
 
 (* custom consensus parameters for the mainnet release *)
 [%%define k 290]
@@ -17,34 +70,39 @@
 [%%define slots_per_sub_window 7]
 [%%define sub_windows_per_window 11]
 [%%define grace_period_slots 2160]
-
 [%%define record_async_backtraces false]
 [%%define time_offsets true]
 [%%define cache_exceptions false]
-
 [%%define plugins false]
-
 [%%define genesis_ledger "testnet_postake"]
-
 [%%define genesis_state_timestamp "2020-09-16 03:15:00-07:00"]
 [%%define block_window_duration 180000]
-
 [%%define integration_tests false]
 [%%define force_updates false]
-
 [%%define download_snark_keys false]
 [%%define generate_genesis_proof false]
-
 [%%define itn_features false]
-
 [%%define print_versioned_types false]
-
 [%%define test_full_epoch false]
-[%%import "/src/config/fork.mlh"]
-[%%import "/src/config/features/mainnet.mlh"]
+
+(*BEGIN src/config/fork.mlh*)
+[%%undef fork_blockchain_length]
+[%%undef fork_state_hash]
+[%%undef fork_global_slot_since_genesis]
+[%%undef zkapp_cmd_limit]
+[%%undef slot_tx_end]
+[%%undef slot_chain_end]
+(*END src/config/fork.mlh*)
+
+
+(*BEGIN src/config/features/mainnet.mlh*)
+[%%define network "mainnet"]
+(*END src/config/features/mainnet.mlh*)
+
 (* 2*block_window_duration *)
 [%%define compaction_interval 360000]
 [%%define vrf_poll_interval 5000]
 [%%define zkapp_cmd_limit 24]
 [%%undef slot_tx_end]
 [%%undef slot_chain_end]
+[%%undef scan_state_transaction_capacity_log_2]
