@@ -6,10 +6,6 @@ open Signature_lib
 open Init
 module YJ = Yojson.Safe
 
-let () =
-  if Node_config.record_async_backtraces then
-    Async.Scheduler.set_record_backtraces true
-
 type mina_initialization =
   { mina : Mina_lib.t
   ; client_trustlist : Unix.Cidr.t list option

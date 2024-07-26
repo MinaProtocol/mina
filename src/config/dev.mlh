@@ -34,7 +34,6 @@
 
 (*BEGIN src/config/debug_level/some.mlh*)
 [%%define cache_exceptions true]
-[%%define record_async_backtraces false]
 (*END src/config/debug_level/some.mlh*)
 
 

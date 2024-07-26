@@ -24,8 +24,6 @@ val scan_state_work_delay : int
 
 val cache_exceptions : bool
 
-val record_async_backtraces : bool
-
 val proof_level : string
 
 val pool_max_size : int

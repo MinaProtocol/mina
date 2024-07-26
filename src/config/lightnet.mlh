@@ -20,7 +20,6 @@
 
 (*BEGIN src/config/debug_level/some.mlh*)
 [%%define cache_exceptions true]
-[%%define record_async_backtraces false]
 (*END src/config/debug_level/some.mlh*)
 
 
@@ -68,7 +67,6 @@
 [%%define slots_per_sub_window 7]
 [%%define sub_windows_per_window 11]
 [%%define grace_period_slots 200]
-[%%define record_async_backtraces false]
 [%%define time_offsets true]
 [%%define cache_exceptions false]
 [%%define plugins false]
