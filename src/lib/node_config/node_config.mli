@@ -66,8 +66,6 @@ val force_updates : bool
 
 val download_snark_keys : bool
 
-val generate_genesis_proof : bool
-
 val itn_features : bool
 
 val compaction_interval : int option

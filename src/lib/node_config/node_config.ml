@@ -86,8 +86,6 @@ let scan_state_transaction_capacity_log_2 =
 
 [%%inject "download_snark_keys", download_snark_keys]
 
-[%%inject "generate_genesis_proof", generate_genesis_proof]
-
 [%%inject "itn_features", itn_features]
 
 [%%ifndef compaction_interval]
