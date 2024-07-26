@@ -13,10 +13,7 @@ impl WithLagrangeBasis<Vesta> for SRS<Vesta> {
     fn with_lagrange_basis(&mut self, domain: D<<Vesta as AffineCurve>::ScalarField>) {
         match env::var("LAGRANGE_CACHE_DIR") {
             Ok(_) => add_lagrange_basis_with_cache(self, domain, cache::get_vesta_file_cache()),
-            Err(_) => {
-                eprintln!("NOT USING LAGRANGE CACHE FOR VESTA");
-                self.add_lagrange_basis(domain);
-            }
+            Err(_) => self.add_lagrange_basis(domain),
         }
     }
 }
@@ -25,10 +22,7 @@ impl WithLagrangeBasis<Pallas> for SRS<Pallas> {
     fn with_lagrange_basis(&mut self, domain: D<<Pallas as AffineCurve>::ScalarField>) {
         match env::var("LAGRANGE_CACHE_DIR") {
             Ok(_) => add_lagrange_basis_with_cache(self, domain, cache::get_pallas_file_cache()),
-            Err(_) => {
-                eprintln!("NOT USING LAGRANGE CACHE FOR PALLAS");
-                self.add_lagrange_basis(domain);
-            }
+            Err(_) => self.add_lagrange_basis(domain),
         }
     }
 }
@@ -137,10 +131,8 @@ mod cache {
                     "Error decoding lagrange cache file {:?}",
                     cache_key
                 ));
-                eprintln!("Loaded lagrange basis from cache {:?}", cache_key);
                 Some(basis)
             } else {
-                eprintln!("Missing lagrange basis cache file {:?}", cache_key);
                 None
             }
         }
@@ -153,14 +145,12 @@ mod cache {
         ) {
             let cache_key = self.lagrange_basis_cache_key(srs_length, domain);
             if Path::exists(&cache_key) {
-                eprintln!("Lagrange basis cache file {:?} already exists", cache_key);
                 return;
             } else {
                 let mut f = File::create(cache_key.clone()).expect(&format!(
                     "Error creating lagrabnge basis cache file {:?}",
                     cache_key
                 ));
-                eprintln!("Caching lagrange basis to file {:?}", cache_key);
                 rmp_serde::encode::write(&mut f, basis).expect(&format!(
                     "Error encoding lagrange basis to file {:?}",
                     cache_key
@@ -176,7 +166,6 @@ mod cache {
             env::var("LAGRANGE_CACHE_DIR").expect("LAGRANGE_CACHE_DIR missing in env");
         let cache_dir = PathBuf::from(format!("{}/vesta", cache_base_dir));
         if !cache_dir.exists() {
-            eprintln!("Creating cache directory: {:?}", cache_dir);
             fs::create_dir_all(&cache_dir).unwrap();
         }
         FileCache::new(cache_dir)
@@ -191,7 +180,6 @@ mod cache {
             env::var("LAGRANGE_CACHE_DIR").expect("LAGRANGE_CACHE_DIR missing in env");
         let cache_dir = PathBuf::from(format!("{}/pallas", cache_base_dir));
         if !cache_dir.exists() {
-            eprintln!("Creating cache directory: {:?}", cache_dir);
             fs::create_dir_all(&cache_dir).unwrap();
         }
         FileCache::new(cache_dir)
