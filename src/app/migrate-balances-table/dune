@@ -19,6 +19,5 @@
    logger
    bounded_types
  )
- (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_let)))
