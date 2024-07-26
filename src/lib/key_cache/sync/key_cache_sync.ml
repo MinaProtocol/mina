@@ -86,11 +86,7 @@ let read spec { Disk_storable.to_string; read = r; write = w } k =
         | Spec.On_disk { directory; should_write } ->
             ( (on_disk to_string r w directory).read k
             , if should_write then `Locally_generated else `Cache_hit )
-        | S3 _ when not (may_download ()) ->
-            (Or_error.errorf "Downloading from S3 is disabled", `Cache_hit)
-        | S3 { bucket_prefix; install_path } ->
-            Unix.mkdir_p install_path ;
-            ((s3 to_string r ~bucket_prefix ~install_path).read k, `Cache_hit)
+        | S3 _  -> Or_error.errorf "Downloading from S3 is disabled", `Cache_hit
       in
       let%map.Or_error res = res in
       (res, cache_hit) )

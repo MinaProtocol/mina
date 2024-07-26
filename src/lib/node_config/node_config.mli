@@ -52,8 +52,6 @@ val genesis_state_timestamp : string
 
 val block_window_duration : int
 
-val download_snark_keys : bool
-
 val itn_features : bool
 
 val compaction_interval : int option

@@ -72,8 +72,6 @@ let scan_state_transaction_capacity_log_2 =
 
 [%%inject "block_window_duration", block_window_duration]
 
-[%%inject "download_snark_keys", download_snark_keys]
-
 [%%inject "itn_features", itn_features]
 
 [%%ifndef compaction_interval]
