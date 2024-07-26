@@ -3,8 +3,6 @@ open Core
 open Async
 open Mina_state
 
-(* TODO: refactor to do compile time selection *)
-
 let use_dummy_values = String.equal Node_config.proof_level "full" |> not
 
 module type S = sig
@@ -66,18 +64,6 @@ module Inputs = struct
     Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
       ~genesis_epoch_data ~constraint_constants ~consensus_constants
       ~genesis_body_reference
-end
-
-module Dummy = struct
-  let loc = Ppxlib.Location.none
-
-  let compiled_values = None
-end
-
-module Make_real () = struct
-  let loc = Ppxlib.Location.none
-
-  let compiled_values = None
 end
 
 let main () =
