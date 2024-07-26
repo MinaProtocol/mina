@@ -44,8 +44,6 @@ val protocol_version_patch : int
 
 val supercharged_coinbase_factor : int
 
-val time_offsets : bool
-
 val plugins : bool
 
 val genesis_ledger : string

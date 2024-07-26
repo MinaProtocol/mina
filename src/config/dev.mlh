@@ -74,7 +74,6 @@
 [%%define supercharged_coinbase_factor 1]
 (*END src/config/supercharged_coinbase_factor/one.mlh*)
 
-[%%define time_offsets true]
 [%%define plugins true]
 [%%define genesis_ledger "test"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
