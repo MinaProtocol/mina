@@ -92,8 +92,8 @@ let read spec { Disk_storable.to_string; read = r; write = w } k =
       | Spec.On_disk { directory; should_write } ->
           let%map res = (on_disk to_string r w directory).read k in
           (res, if should_write then `Locally_generated else `Cache_hit)
-      | S3 _ -> Deferred.Or_error.errorf "Downloading from S3 is disabled"
-  )
+      | S3 _ ->
+          Deferred.Or_error.errorf "Downloading from S3 is disabled" )
 
 let write spec { Disk_storable.to_string; read = r; write = w } k v =
   let%map errs =

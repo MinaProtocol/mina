@@ -130,11 +130,11 @@ let main () =
           ; genesis_body_reference
           ; consensus_constants
           ; protocol_state_with_hashes
-          ; constraint_system_digests = [%e[%expr None]]
-          ; blockchain_proof_system_id = [%e[%expr None]]
+          ; constraint_system_digests = [%e [%expr None]]
+          ; blockchain_proof_system_id = [%e [%expr None]]
           })
 
-      let compiled = [%e[%expr None]]]
+      let compiled = [%e [%expr None]]]
   in
   Pprintast.top_phrase fmt (Ptop_def structure) ;
   exit 0
