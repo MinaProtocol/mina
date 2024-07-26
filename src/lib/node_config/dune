@@ -1,8 +1,6 @@
-(executable
- (package mina_node_config)
+(library
  (name node_config)
  (public_name mina_node_config)
- (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_deriving_yojson ppx_base ppx_optcomp))
+ (preprocess (pps ppx_version ppx_deriving_yojson ppx_base))
 )
