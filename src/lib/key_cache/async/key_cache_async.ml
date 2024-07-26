@@ -25,47 +25,6 @@ let on_disk to_string read write prefix =
   in
   { read; write }
 
-let s3 to_string read ~bucket_prefix ~install_path =
-  let read k =
-    let label = to_string k in
-    let uri_string = bucket_prefix ^/ label in
-    let file_path = install_path ^/ label in
-    let open Deferred.Or_error.Let_syntax in
-    let logger = Logger.create () in
-    [%log trace] "Downloading key to key cache"
-      ~metadata:
-        [ ("url", `String uri_string); ("local_file_path", `String file_path) ] ;
-    let%bind result =
-      Monitor.try_with_join_or_error ~here:[%here] (fun () ->
-          Process.run ~prog:"curl"
-            ~args:
-              [ "--fail"
-              ; "--silent"
-              ; "--show-error"
-              ; "-o"
-              ; file_path
-              ; uri_string
-              ]
-            ()
-          |> Deferred.Result.map_error ~f:(fun err ->
-                 [%log debug] "Could not download key to key cache"
-                   ~metadata:
-                     [ ("url", `String uri_string)
-                     ; ("local_file_path", `String file_path)
-                     ] ;
-                 err ) )
-    in
-    [%log trace] "Downloaded key to key cache"
-      ~metadata:
-        [ ("url", `String uri_string)
-        ; ("local_file_path", `String file_path)
-        ; ("result", `String result)
-        ] ;
-    read k ~path:file_path
-  in
-  let write _ _ = Deferred.Or_error.return () in
-  { read; write }
-
 module Disk_storable = struct
   include Disk_storable (Deferred.Or_error)
 
