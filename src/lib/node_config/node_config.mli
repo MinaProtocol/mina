@@ -22,10 +22,6 @@ val scan_state_transaction_capacity_log_2 : int option
 
 val scan_state_work_delay : int
 
-val debug_logs : bool
-
-val call_logger : bool
-
 val cache_exceptions : bool
 
 val record_async_backtraces : bool

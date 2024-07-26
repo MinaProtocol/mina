@@ -19,8 +19,6 @@
 
 
 (*BEGIN src/config/debug_level/some.mlh*)
-[%%define debug_logs false]
-[%%define call_logger false]
 [%%define cache_exceptions true]
 [%%define record_async_backtraces false]
 (*END src/config/debug_level/some.mlh*)

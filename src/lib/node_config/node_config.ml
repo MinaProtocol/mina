@@ -42,10 +42,6 @@ let scan_state_transaction_capacity_log_2 =
 
 [%%inject "scan_state_work_delay", scan_state_work_delay]
 
-[%%inject "debug_logs", debug_logs]
-
-[%%inject "call_logger", call_logger]
-
 [%%inject "cache_exceptions", cache_exceptions]
 
 [%%inject "record_async_backtraces", record_async_backtraces]
