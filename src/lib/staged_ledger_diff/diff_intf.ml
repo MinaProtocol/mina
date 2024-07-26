@@ -70,11 +70,11 @@ module type Full = sig
     [@@deriving equal, compare, sexp, yojson]
 
     module Stable : sig
-      module V2 : sig
+      module V3 : sig
         type t [@@deriving equal, compare, sexp, yojson, bin_io, version]
       end
     end
-    with type V2.t = t
+    with type V3.t = t
   end
 
   module Pre_diff_with_at_most_one_coinbase : sig
@@ -83,11 +83,11 @@ module type Full = sig
     [@@deriving equal, compare, sexp, yojson]
 
     module Stable : sig
-      module V2 : sig
+      module V3 : sig
         type t [@@deriving equal, compare, sexp, yojson, bin_io, version]
       end
     end
-    with type V2.t = t
+    with type V3.t = t
   end
 
   module Diff : sig
@@ -97,27 +97,27 @@ module type Full = sig
     [@@deriving equal, compare, sexp, yojson]
 
     module Stable : sig
-      module V2 : sig
+      module V3 : sig
         type t [@@deriving equal, compare, sexp, bin_io, yojson, version]
       end
     end
-    with type V2.t = t
+    with type V3.t = t
   end
 
   type t = { diff : Diff.t }
   [@@deriving equal, compare, sexp, compare, yojson, fields]
 
   module Stable : sig
-    module V2 : sig
-      type t = { diff : Diff.Stable.V2.t }
+    module V3 : sig
+      type t = { diff : Diff.Stable.V3.t }
       [@@deriving equal, compare, sexp, compare, yojson, bin_io, version]
 
       val to_latest : t -> t
     end
 
-    module Latest = V2
+    module Latest = V3
   end
-  with type V2.t = t
+  with type V3.t = t
 
   module With_valid_signatures_and_proofs : sig
     type pre_diff_with_at_most_two_coinbase =

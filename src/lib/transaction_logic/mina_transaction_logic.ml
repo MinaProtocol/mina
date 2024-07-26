@@ -61,11 +61,11 @@ module Transaction_applied = struct
   module Zkapp_command_applied = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
+      module V2 = struct
         type t =
           { accounts :
               (Account_id.Stable.V2.t * Account.Stable.V2.t option) list
-          ; command : Zkapp_command.Stable.V1.t With_status.Stable.V2.t
+          ; command : Zkapp_command.Stable.V2.t With_status.Stable.V2.t
           ; new_accounts : Account_id.Stable.V2.t list
           }
         [@@deriving sexp, to_yojson]
@@ -78,10 +78,10 @@ module Transaction_applied = struct
   module Command_applied = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V3 = struct
         type t =
           | Signed_command of Signed_command_applied.Stable.V2.t
-          | Zkapp_command of Zkapp_command_applied.Stable.V1.t
+          | Zkapp_command of Zkapp_command_applied.Stable.V2.t
         [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
@@ -124,9 +124,9 @@ module Transaction_applied = struct
   module Varying = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V3 = struct
         type t =
-          | Command of Command_applied.Stable.V2.t
+          | Command of Command_applied.Stable.V3.t
           | Fee_transfer of Fee_transfer_applied.Stable.V2.t
           | Coinbase of Coinbase_applied.Stable.V2.t
         [@@deriving sexp, to_yojson]
@@ -138,10 +138,10 @@ module Transaction_applied = struct
 
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
         { previous_hash : Ledger_hash.Stable.V1.t
-        ; varying : Varying.Stable.V2.t
+        ; varying : Varying.Stable.V3.t
         }
       [@@deriving sexp, to_yojson]
 
@@ -1918,11 +1918,8 @@ module Make (L : Ledger_intf.S) :
 
   let update_action_state action_state actions ~txn_global_slot
       ~last_action_slot =
-    let action_state', last_action_slot' =
-      M.update_action_state action_state actions ~txn_global_slot
-        ~last_action_slot
-    in
-    (action_state', last_action_slot')
+    M.update_action_state action_state actions ~txn_global_slot
+      ~last_action_slot
 
   (* apply zkapp command fee payer's while stubbing out the second pass ledger
      CAUTION: If you use the intermediate local states, you MUST update the
@@ -2796,6 +2793,7 @@ module For_tests = struct
                 ; authorization_kind =
                     ( if use_full_commitment then Signature
                     else Proof Zkapp_basic.F.zero )
+                ; delete_account = false
                 }
             ; authorization =
                 ( if use_full_commitment then Signature Signature.dummy
@@ -2821,6 +2819,7 @@ module For_tests = struct
                 ; use_full_commitment = false
                 ; implicit_account_creation_fee = true
                 ; authorization_kind = None_given
+                ; delete_account = false
                 }
             ; authorization = None_given
             }

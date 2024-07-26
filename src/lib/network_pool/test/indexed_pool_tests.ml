@@ -544,6 +544,7 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
                 ; use_full_commitment = not double_increment_sender
                 ; implicit_account_creation_fee = false
                 ; authorization_kind = None_given
+                ; delete_account = false
                 }
             ; authorization = None_given
             }
@@ -566,6 +567,7 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
                 ; implicit_account_creation_fee = false
                 ; use_full_commitment = not increment_receiver
                 ; authorization_kind = None_given
+                ; delete_account = false
                 }
             ; authorization = None_given
             }

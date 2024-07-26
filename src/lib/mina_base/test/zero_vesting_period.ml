@@ -142,6 +142,7 @@ let mk_zkapp_with_vesting_period n =
             },
             "use_full_commitment": true,
             "implicit_account_creation_fee": false,
+            "delete_account": false,
             "may_use_token": [ "No" ],
             "authorization_kind": [ "Signature" ]
           },
@@ -250,6 +251,7 @@ let mk_zkapp_with_vesting_period n =
             },
             "use_full_commitment": false,
             "implicit_account_creation_fee": false,
+            "delete_account": false,
             "may_use_token": [
               "No"
             ],
