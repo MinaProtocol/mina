@@ -289,12 +289,41 @@ let docker_commands
                 )
                 flattened_docker_steps
 
+let publish_to_debian_repo =
+          \(spec : MinaBuildSpec.Type)
+      ->  Command.build
+            Command.Config::{
+            , commands =
+                Toolchain.select
+                  spec.toolchainSelectMode
+                  spec.debVersion
+                  [ "AWS_ACCESS_KEY_ID"
+                  , "AWS_SECRET_ACCESS_KEY"
+                  , "MINA_DEB_CODENAME=${DebianVersions.lowerName
+                                           spec.debVersion}"
+                  ]
+                  "./buildkite/scripts/publish-deb.sh"
+            , label =
+                "Publish Mina for ${DebianVersions.capitalName
+                                      spec.debVersion} ${Profiles.toSuffixUppercase
+                                                           spec.profile}"
+            , key = "publish-deb-pkg"
+            , depends_on =
+                DebianVersions.dependsOnStep
+                  spec.debVersion
+                  spec.profile
+                  spec.buildFlags
+                  "build"
+            , target = Size.Small
+            }
+
 let pipeline
     : MinaBuildSpec.Type -> Pipeline.Config.Type
     =     \(spec : MinaBuildSpec.Type)
       ->  let steps =
                 [ Libp2p.step spec.debVersion spec.buildFlags
                 , build_artifacts spec
+                , publish_to_debian_repo spec
                 ]
 
           in  Pipeline.Config::{
