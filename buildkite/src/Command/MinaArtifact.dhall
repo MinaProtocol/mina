@@ -208,20 +208,27 @@ let docker_step
                     }
                   ]
                 , Rosetta =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.dockerName Artifacts.Type.Rosetta
-                    , network = Network.lowerName Network.Type.Berkeley
-                    , build_flags = buildFlags
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_profile = profile
-                    , deb_codename = "${DebianVersions.lowerName debVersion}"
-                    , step_key =
-                        "rosetta-${DebianVersions.lowerName
-                                     debVersion}${BuildFlags.toLabelSegment
-                                                    buildFlags}-docker-image"
-                    }
-                  ]
+                    Prelude.List.map
+                      Network.Type
+                      DockerImage.ReleaseSpec.Type
+                      (     \(n : Network.Type)
+                        ->  DockerImage.ReleaseSpec::{
+                            , deps = deps
+                            , service =
+                                Artifacts.dockerName Artifacts.Type.Rosetta
+                            , network = Network.lowerName n
+                            , deb_codename =
+                                "${DebianVersions.lowerName debVersion}"
+                            , deb_profile = profile
+                            , deb_repo = DebianRepo.Type.Local
+                            , step_key =
+                                "rosetta-${Network.lowerName
+                                             n}-${DebianVersions.lowerName
+                                                    debVersion}${Profiles.toLabelSegment
+                                                                   profile}-docker-image"
+                            }
+                      )
+                      networks
                 , ZkappTestTransaction =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
