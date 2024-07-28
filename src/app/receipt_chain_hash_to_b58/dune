@@ -15,6 +15,5 @@
    pickles_types
    snark_params
  )
- (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version)))

@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core
 open Async
 open Mina_base
@@ -8,11 +6,9 @@ open Signature_lib
 open Init
 module YJ = Yojson.Safe
 
-[%%if record_async_backtraces]
-
-let () = Async.Scheduler.set_record_backtraces true
-
-[%%endif]
+let () =
+  if Node_config.record_async_backtraces then
+    Async.Scheduler.set_record_backtraces true
 
 type mina_initialization =
   { mina : Mina_lib.t
@@ -48,19 +44,14 @@ let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
   in
   Blake2.to_hex b2
 
-[%%if plugins]
-
 let plugin_flag =
-  let open Command.Param in
-  flag "--load-plugin" ~aliases:[ "load-plugin" ] (listed string)
-    ~doc:
-      "PATH The path to load a .cmxs plugin from. May be passed multiple times"
-
-[%%else]
-
-let plugin_flag = Command.Param.return []
-
-[%%endif]
+  if Node_config.plugins then
+    let open Command.Param in
+    flag "--load-plugin" ~aliases:[ "load-plugin" ] (listed string)
+      ~doc:
+        "PATH The path to load a .cmxs plugin from. May be passed multiple \
+         times"
+  else Command.Param.return []
 
 let load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level config_files =
   let%bind config_jsons =
@@ -1662,78 +1653,10 @@ let audit_type_shapes : Command.t =
          Core.printf "good shapes:\n\t%d\nbad shapes:\n\t%d\n%!" !good !bad ;
          if !bad > 0 then Core.exit 1 ) )
 
-[%%if force_updates]
-
-let rec ensure_testnet_id_still_good logger =
-  let open Cohttp_async in
-  let recheck_soon = 0.1 in
-  let recheck_later = 1.0 in
-  let try_later hrs =
-    Async.Clock.run_after (Time.Span.of_hr hrs)
-      (fun () -> don't_wait_for @@ ensure_testnet_id_still_good logger)
-      ()
-  in
-  let soon_minutes = Int.of_float (60.0 *. recheck_soon) in
-  match%bind
-    Monitor.try_with_or_error ~here:[%here] (fun () ->
-        Client.get (Uri.of_string "http://updates.o1test.net/testnet_id") )
-  with
-  | Error e ->
-      [%log error]
-        "Exception while trying to fetch testnet_id: $error. Trying again in \
-         $retry_minutes minutes"
-        ~metadata:
-          [ ("error", Error_json.error_to_yojson e)
-          ; ("retry_minutes", `Int soon_minutes)
-          ] ;
-      try_later recheck_soon ;
-      Deferred.unit
-  | Ok (resp, body) -> (
-      if resp.status <> `OK then (
-        [%log error]
-          "HTTP response status $HTTP_status while getting testnet id, \
-           checking again in $retry_minutes minutes."
-          ~metadata:
-            [ ("HTTP_status", `String (Cohttp.Code.string_of_status resp.status))
-            ; ("retry_minutes", `Int soon_minutes)
-            ] ;
-        try_later recheck_soon ;
-        Deferred.unit )
-      else
-        let%bind body_string = Body.to_string body in
-        let valid_ids =
-          String.split ~on:'\n' body_string
-          |> List.map ~f:(Fn.compose Git_sha.of_string String.strip)
-        in
-        (* Maybe the Git_sha.of_string is a bit gratuitous *)
-        let finish local_id remote_ids =
-          let str x = Git_sha.sexp_of_t x |> Sexp.to_string in
-          eprintf
-            "The version for the testnet has changed, and this client (version \
-             %s) is no longer compatible. Please download the latest Mina \
-             software!\n\
-             Valid versions:\n\
-             %s\n"
-            ( local_id |> Option.map ~f:str
-            |> Option.value ~default:"[COMMIT_SHA1 not set]" )
-            remote_ids ;
-          exit 13
-        in
-        match commit_id with
-        | None ->
-            finish None body_string
-        | Some sha ->
-            if
-              List.exists valid_ids ~f:(fun remote_id ->
-                  Git_sha.equal sha remote_id )
-            then ( try_later recheck_later ; Deferred.unit )
-            else finish commit_id body_string )
-
-[%%else]
-
+(*NOTE A previous version of this function included compile time ppx that didn't compile, and was never
+  evaluated under any build profile
+*)
 let ensure_testnet_id_still_good _ = Deferred.unit
-
-[%%endif]
 
 let snark_hashes =
   let module Hashes = struct
