@@ -139,6 +139,7 @@ mina-batch-txn)
   ;;
 mina-rosetta)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
+  VERSION="${VERSION}-${NETWORK##*=}"
   ;;
 mina-zkapp-test-transaction)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-zkapp-test-transaction"

@@ -12,8 +12,16 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let Network = ../../Constants/Network.dhall
+
+let Artifacts = ../../Constants/Artifacts.dhall
+
 let dependsOn =
-      Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "archive"
+      Dockers.dependsOn
+        Dockers.Type.Bullseye
+        (None Network.Type)
+        Profiles.Type.Standard
+        Artifacts.Type.Archive
 
 in  Pipeline.build
       Pipeline.Config::{
