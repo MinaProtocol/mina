@@ -143,7 +143,60 @@ module Subscriptions = struct
   let commands = [ new_sync_update; new_block; chain_reorganization ]
 end
 
-module Mutations = struct
+let find_identity ~public_key mina =
+  Result.of_option
+    (Secrets.Wallets.find_identity (Mina_lib.wallets mina) ~needle:public_key)
+    ~error:
+      "Couldn't find an unlocked key for specified `sender`. Did you unlock \
+       the account you're making a transaction from?"
+
+let create_user_command_input ~fee ~fee_payer_pk ~nonce_opt ~valid_until ~memo
+    ~signer ~body ~sign_choice : (User_command_input.t, string) result =
+  let open Result.Let_syntax in
+  (* TODO: We should put a more sensible default here. *)
+  let valid_until =
+    Option.map ~f:Mina_numbers.Global_slot_since_genesis.of_uint32 valid_until
+  in
+  let%bind fee =
+    Utils.result_of_exn Currency.Fee.of_uint64 fee
+      ~error:(sprintf "Invalid `fee` provided.")
+  in
+  let%bind () =
+    Result.ok_if_true
+      Currency.Fee.(fee >= Signed_command.minimum_fee)
+      ~error:
+        (* IMPORTANT! Do not change the content of this error without
+         * updating Rosetta's construction API to handle the changes *)
+        (sprintf
+           !"Invalid user command. Fee %s is less than the minimum fee, %s."
+           (Currency.Fee.to_mina_string fee)
+           (Currency.Fee.to_mina_string Signed_command.minimum_fee) )
+  in
+  let%map memo =
+    Option.value_map memo ~default:(Ok Signed_command_memo.empty)
+      ~f:(fun memo ->
+        Utils.result_of_exn Signed_command_memo.create_from_string_exn memo
+          ~error:"Invalid `memo` provided." )
+  in
+  User_command_input.create ~signer ~fee ~fee_payer_pk ?nonce:nonce_opt
+    ~valid_until ~memo ~body ~sign_choice ()
+
+let make_signed_user_command ~signature ~nonce_opt ~signer ~memo ~fee
+    ~fee_payer_pk ~valid_until ~body =
+  let open Deferred.Result.Let_syntax in
+  let%bind signature = signature |> Deferred.return in
+  let%map user_command_input =
+    create_user_command_input ~nonce_opt ~signer ~memo ~fee ~fee_payer_pk
+      ~valid_until ~body
+      ~sign_choice:(User_command_input.Sign_choice.Signature signature)
+    |> Deferred.return
+  in
+  user_command_input
+
+module Mutations (Context : sig
+  val commit_id : string
+end) =
+struct
   open Schema
 
   let create_account_resolver { ctx = t; _ } () password =
@@ -172,7 +225,7 @@ module Mutations = struct
       ~args:Arg.[ arg "filter" ~typ:(non_null (list (non_null string))) ]
       ~resolve:(fun { ctx = t; _ } () filter ->
         Result.is_ok
-        @@ Mina_lib.start_filtered_log ~commit_id:"not specified" t filter )
+        @@ Mina_lib.start_filtered_log ~commit_id:Context.commit_id t filter )
 
   let create_account =
     io_field "createAccount"
@@ -496,56 +549,6 @@ module Mutations = struct
                 return @@ Result.map_error applied_ok ~f:Error.to_string_hum ) )
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
-
-  let find_identity ~public_key mina =
-    Result.of_option
-      (Secrets.Wallets.find_identity (Mina_lib.wallets mina) ~needle:public_key)
-      ~error:
-        "Couldn't find an unlocked key for specified `sender`. Did you unlock \
-         the account you're making a transaction from?"
-
-  let create_user_command_input ~fee ~fee_payer_pk ~nonce_opt ~valid_until ~memo
-      ~signer ~body ~sign_choice : (User_command_input.t, string) result =
-    let open Result.Let_syntax in
-    (* TODO: We should put a more sensible default here. *)
-    let valid_until =
-      Option.map ~f:Mina_numbers.Global_slot_since_genesis.of_uint32 valid_until
-    in
-    let%bind fee =
-      Utils.result_of_exn Currency.Fee.of_uint64 fee
-        ~error:(sprintf "Invalid `fee` provided.")
-    in
-    let%bind () =
-      Result.ok_if_true
-        Currency.Fee.(fee >= Signed_command.minimum_fee)
-        ~error:
-          (* IMPORTANT! Do not change the content of this error without
-           * updating Rosetta's construction API to handle the changes *)
-          (sprintf
-             !"Invalid user command. Fee %s is less than the minimum fee, %s."
-             (Currency.Fee.to_mina_string fee)
-             (Currency.Fee.to_mina_string Signed_command.minimum_fee) )
-    in
-    let%map memo =
-      Option.value_map memo ~default:(Ok Signed_command_memo.empty)
-        ~f:(fun memo ->
-          Utils.result_of_exn Signed_command_memo.create_from_string_exn memo
-            ~error:"Invalid `memo` provided." )
-    in
-    User_command_input.create ~signer ~fee ~fee_payer_pk ?nonce:nonce_opt
-      ~valid_until ~memo ~body ~sign_choice ()
-
-  let make_signed_user_command ~signature ~nonce_opt ~signer ~memo ~fee
-      ~fee_payer_pk ~valid_until ~body =
-    let open Deferred.Result.Let_syntax in
-    let%bind signature = signature |> Deferred.return in
-    let%map user_command_input =
-      create_user_command_input ~nonce_opt ~signer ~memo ~fee ~fee_payer_pk
-        ~valid_until ~body
-        ~sign_choice:(User_command_input.Sign_choice.Signature signature)
-      |> Deferred.return
-    in
-    user_command_input
 
   let send_signed_user_command ~signature ~mina ~nonce_opt ~signer ~memo ~fee
       ~fee_payer_pk ~valid_until ~body =
@@ -2254,7 +2257,7 @@ struct
               Deferred.Result.fail "Signature field is missing"
         in
         let%bind user_command_input =
-          Mutations.make_signed_user_command ~nonce_opt ~signer:from ~memo ~fee
+          make_signed_user_command ~nonce_opt ~signer:from ~memo ~fee
             ~fee_payer_pk:from ~valid_until ~body ~signature
         in
         let%map user_command, _ =
@@ -2512,7 +2515,7 @@ struct
         @@
         let open Result.Let_syntax in
         let%map sk =
-          match%bind Mutations.find_identity ~public_key mina with
+          match%bind find_identity ~public_key mina with
           | `Keypair { private_key; _ } ->
               Ok private_key
           | `Hd_index _ ->
@@ -2732,11 +2735,13 @@ struct
 end
 
 let schema ~commit_id =
-  let module Q = Queries (struct
+  let module Ctx = struct
     let commit_id = commit_id
-  end) in
+  end in
+  let module Q = Queries (Ctx) in
+  let module M = Mutations (Ctx) in
   Graphql_async.Schema.(
-    schema Q.commands ~mutations:Mutations.commands
+    schema Q.commands ~mutations:M.commands
       ~subscriptions:Subscriptions.commands)
 
 let schema_limited ~commit_id =
@@ -2750,10 +2755,12 @@ let schema_limited ~commit_id =
       ~mutations:[] ~subscriptions:[])
 
 let schema_itn ~commit_id : (bool * Mina_lib.t) Schema.schema =
-  let module Q = Queries (struct
+  let module Ctx = struct
     let commit_id = commit_id
-  end) in
+  end in
+  let module Q = Queries (Ctx) in
+  let module M = Mutations (Ctx) in
   if Mina_compile_config.itn_features then
     Graphql_async.Schema.(
-      schema Q.Itn.commands ~mutations:Mutations.Itn.commands ~subscriptions:[])
+      schema Q.Itn.commands ~mutations:M.Itn.commands ~subscriptions:[])
   else Graphql_async.Schema.(schema [] ~mutations:[] ~subscriptions:[])
