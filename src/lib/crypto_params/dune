@@ -10,15 +10,15 @@
    bin_prot.shape
    sexplib0
    ;; local libraries
-   kimchi_pasta
-   kimchi_pasta.basic
-   pickles.backend
-   snarky.backendless
-   cache_dir
    group_map
    pickles
-   tuple_lib
-   kimchi_backend
+   cache_dir
+   ;; kimchi_pasta
+   ;; kimchi_pasta.basic
+   ;; pickles.backend
+   ;; snarky.backendless
+   ;; tuple_lib
+   ;; kimchi_backend
  )
  (preprocess
   (pps ppx_version ppx_jane h_list.ppx))
@@ -30,4 +30,4 @@
  (deps
   (:< gen/gen.exe))
  (action
-  (run %{<} %{targets})))
+   (run %{<} %{targets})))
