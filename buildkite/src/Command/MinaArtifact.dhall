@@ -190,20 +190,6 @@ let docker_step
                                                                 buildFlags}-docker-image"
                     }
                   ]
-                , ArchiveMigration =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = "mina-archive-migration"
-                    , deb_codename = "${DebianVersions.lowerName debVersion}"
-                    , build_flags = buildFlags
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_profile = profile
-                    , step_key =
-                        "archive-migration-${DebianVersions.lowerName
-                                               debVersion}${BuildFlags.toLabelSegment
-                                                              buildFlags}--docker-image"
-                    }
-                  ]
                 , Rosetta =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps

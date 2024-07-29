@@ -44,12 +44,3 @@
   internal_tracing.context_logger
   ppx_version.runtime
   bounded_types))
-
-(rule
- (targets version.ml)
- (deps
-  (:< gen_version.sh)
-  (source_tree ../../proof-systems)
-  (sandbox none))
- (action
-  (run %{<} %{targets})))

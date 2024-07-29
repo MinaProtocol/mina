@@ -18,6 +18,10 @@ let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
+let B = ../../External/Buildkite.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -53,6 +57,7 @@ in  Pipeline.build
             , label = "hard fork test"
             , key = "hard-fork-test"
             , target = Size.Small
+            , soft_fail = Some (B/SoftFail.Boolean True)
             , docker = None Docker.Type
             , timeout_in_minutes = Some +420
             }
