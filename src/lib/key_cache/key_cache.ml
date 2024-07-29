@@ -7,12 +7,6 @@ module Spec = struct
     | S3 of { bucket_prefix : string; install_path : string }
 end
 
-let may_download = ref Node_config.download_snark_keys
-
-let set_downloads_enabled b = may_download := b
-
-let may_download () = !may_download
-
 module T (M : sig
   type _ t
 end) =

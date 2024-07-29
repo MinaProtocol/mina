@@ -161,8 +161,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       }
 
     let hash s =
-      if Node_config.call_logger then
-        Mina_debug.Call_logger.record_call "Protocol_state.hash" ;
       Random_oracle.hash ~init:Hash_prefix.protocol_state_body
         (Random_oracle.pack_input (to_input s))
       |> State_body_hash.of_hash
