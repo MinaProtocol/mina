@@ -21,6 +21,8 @@ module type S = sig
 
   val create_new_account : t -> Account_id.t -> Account.t -> unit Or_error.t
 
+  val delete_existing_account : t -> Account_id.t -> unit Or_error.t
+
   val merkle_root : t -> Ledger_hash.t
 
   val with_ledger : depth:int -> f:(t -> 'a) -> 'a

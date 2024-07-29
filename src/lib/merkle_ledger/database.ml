@@ -240,7 +240,8 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       ( Location.serialize ~ledger_depth location
       , Location.serialize ~ledger_depth last_account_location )
 
-    let increment_last_account_location mdb =
+    let modify_last_account_location mdb (action : [ `Increment | `Decrement ])
+        =
       let location = last_location_key () in
       let ledger_depth = mdb.depth in
       match get_generic mdb location with
@@ -256,16 +257,27 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
           match Location.parse ~ledger_depth:mdb.depth prev_location with
           | Error () ->
               Error Db_error.Malformed_database
-          | Ok prev_account_location ->
-              Location.next prev_account_location
-              |> Result.of_option ~error:Db_error.Out_of_leaves
-              |> Result.map ~f:(fun next_account_location ->
-                     set_raw mdb location
-                       (Location.serialize ~ledger_depth next_account_location) ;
-                     next_account_location ) )
+          | Ok prev_head_location -> (
+              match action with
+              | `Increment ->
+                  Location.next prev_head_location
+                  |> Result.of_option ~error:Db_error.Out_of_leaves
+                  |> Result.map ~f:(fun next_account_location ->
+                         set_raw mdb location
+                           (Location.serialize ~ledger_depth
+                              next_account_location ) ;
+                         next_account_location )
+              | `Decrement ->
+                  Location.prev prev_head_location
+                  |> Result.of_option ~error:Db_error.Out_of_leaves
+                  |> Result.map ~f:(fun prev_account_location ->
+                         set_raw mdb location
+                           (Location.serialize ~ledger_depth
+                              prev_account_location ) ;
+                         prev_account_location ) ) )
 
     let allocate mdb key =
-      let location_result = increment_last_account_location mdb in
+      let location_result = modify_last_account_location mdb `Increment in
       Result.map location_result ~f:(fun location ->
           set mdb key location ; location )
 
@@ -570,6 +582,39 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
     | Ok location ->
         Ok (`Existed, location)
+
+  let delete_account_exn mdb account_id =
+    match Account_location.get mdb account_id with
+    | Error
+        ( Db_error.Account_location_not_found
+        | Db_error.Malformed_database
+        | Db_error.Out_of_leaves ) ->
+        ()
+    | Ok location -> (
+        (* TODO add some proper error handline and error reporting here *)
+
+        (* obtain the last location of the current ledger *)
+        let last_location =
+          Account_location.last_location mdb |> Option.value_exn
+        in
+        let last_account = get mdb last_location |> Option.value_exn in
+
+        (* decrement the last location index and modify where the last location key points in the kvdb *)
+        let status =
+          Account_location.modify_last_account_location mdb `Decrement
+        in
+
+        match status with
+        | Ok _ ->
+            (* only remove ledger entry on success *)
+
+            (* swap the deleted location with the most recent account *)
+            set mdb location last_account ;
+
+            (* remove the additional copy of the most recent account *)
+            delete_raw mdb last_location
+        | Error _ ->
+            failwith "delete_account_exn: failed to update last location" )
 
   let iteri t ~f =
     match Account_location.last_location_address t with

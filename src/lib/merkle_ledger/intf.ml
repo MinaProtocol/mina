@@ -129,12 +129,15 @@ module type Account = sig
 
   type balance
 
+  (*type created *)
+
   val token : t -> token_id
 
   val identifier : t -> account_id
 
   val balance : t -> balance
 
+  (* val created : t -> created option *)
   val empty : t
 end
 
@@ -257,6 +260,7 @@ module Inputs = struct
         with type token_id := Token_id.t
          and type account_id := Account_id.t
          and type balance := Balance.t
+    (* and type created := Time.t . *)
 
     module Hash : Hash with type account := Account.t
 
@@ -374,6 +378,9 @@ module Ledger = struct
       -> account_id
       -> account
       -> ([ `Added | `Existed ] * Location.t) Or_error.t
+
+    (* This removes entries in the merkle ledger and updates hashes *)
+    val delete_account_exn : t -> account_id -> unit
 
     (** the ledger should not be used after calling [close] *)
     val close : t -> unit

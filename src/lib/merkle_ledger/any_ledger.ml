@@ -106,6 +106,8 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
     let get_or_create_account (T ((module Base), t)) =
       Base.get_or_create_account t
 
+    let delete_account_exn (T ((module Base), t)) = Base.delete_account_exn t
+
     let location_of_account (T ((module Base), t)) = Base.location_of_account t
 
     let location_of_account_batch (T ((module Base), t)) =
