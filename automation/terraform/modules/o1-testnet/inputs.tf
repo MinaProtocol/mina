@@ -30,6 +30,13 @@ variable "artifact_path" {
   default = "/tmp"
 }
 
+# Variable to control file creation
+variable "create_libp2p_files" {
+  description = "Whether to create LibP2P peer ID files"
+  type        = bool
+  default     = false
+}
+
 variable "mina_image" {
   type    = string
   default = "gcr.io/o1labs-192920/mina-daemon:1.2.0beta8-5b35b27-devnet"
