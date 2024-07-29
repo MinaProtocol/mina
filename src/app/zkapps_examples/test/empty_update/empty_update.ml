@@ -16,8 +16,11 @@ let pk_compressed = Public_key.compress pk
 
 let account_id = Account_id.create pk_compressed Token_id.default
 
+let logger = (* No internal logging in unit tests *) Logger.null ()
+
 let tag, _, p_module, Pickles.Provers.[ prover ] =
-  Zkapps_examples.compile () ~cache:Cache_dir.cache ~auxiliary_typ:Impl.Typ.unit
+  Zkapps_examples.compile () ~logger ~cache:Cache_dir.cache
+    ~auxiliary_typ:Impl.Typ.unit
     ~branches:(module Nat.N1)
     ~max_proofs_verified:(module Nat.N0)
     ~name:"empty_update"

@@ -38,6 +38,8 @@ let snark_module =
       let constraint_constants = constraint_constants
 
       let proof_level = proof_level
+
+      let logger = (* No internal logging in unit tests *) Logger.null ()
     end) : Transaction_snark.S )
 
 let genesis_state_body =

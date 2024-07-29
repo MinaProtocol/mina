@@ -6,7 +6,8 @@ module Make
     end)
     (Max_proofs_verified : Pickles_types.Nat.Add.Intf_transparent) : sig
   val f :
-       ?handler:
+       logger:Logger.t
+    -> ?handler:
          (   Snarky_backendless.Request.request
           -> Snarky_backendless.Request.response )
     -> proof_cache:Proof_cache.t option

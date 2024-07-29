@@ -11,6 +11,8 @@ module Account_info () = struct
   let account_id = Account_id.create public_key token_id
 end
 
+let logger = (* No internal logging in unit tests *) Logger.null ()
+
 module Circuits (Account_info : sig
   val public_key : Signature_lib.Public_key.Compressed.t
 end) =
@@ -43,7 +45,7 @@ struct
     }
 
   let tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
-    Zkapps_examples.compile ~auxiliary_typ:Typ.unit
+    Zkapps_examples.compile ~logger ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N0)
       ~name:"custom gates" ~constraint_constants

@@ -124,7 +124,8 @@ let verify_one ~srs
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main :
     type proofs_verified self_branches prev_vars prev_values var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value max_proofs_verified local_branches local_signature.
-       (module Requests.Step.S
+       logger:Logger.t
+    -> (module Requests.Step.S
           with type local_signature = local_signature
            and type local_branches = local_branches
            and type statement = a_value
@@ -182,7 +183,7 @@ let step_main :
            Types.Step.Statement.t
            Promise.t )
        Staged.t =
- fun (module Req) max_proofs_verified ~self_branches ~local_signature
+ fun ~logger (module Req) max_proofs_verified ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length
      ~proofs_verified ~lte ~public_input ~auxiliary_typ ~basic ~known_wrap_keys
      ~self rule ->
@@ -278,7 +279,6 @@ let step_main :
   in
   let main () : _ Types.Step.Statement.t Promise.t =
     let open Impls.Step in
-    let logger = Internal_tracing_context_logger.get () in
     let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
                                          with type n = max_proofs_verified )
     in

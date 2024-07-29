@@ -15,11 +15,13 @@ let rec sexp_to_sexp : Sexp.t -> Sexplib0.Sexp.t = function
 
 let () = ignore sexp_to_sexp
 
+let logger = (* No internal logging in unit tests *) Logger.null ()
+
 let main (spec_path : string) =
   let module Inputs = Snark_worker.Prod.Inputs in
   let%bind spec = Reader.load_sexp_exn spec_path Inputs.single_spec_of_sexp in
   let%bind worker =
-    Inputs.Worker_state.create
+    Inputs.Worker_state.create ~logger
       ~constraint_constants:Genesis_constants.Constraint_constants.compiled
       ~proof_level:Full ()
   in

@@ -84,7 +84,8 @@ type ( 'a_var
     val_to_field_elem rule]
 *)
 val create :
-     index:int
+     logger:Logger.t
+  -> index:int
   -> self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
   -> wrap_domains:Import.Domains.t
   -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t

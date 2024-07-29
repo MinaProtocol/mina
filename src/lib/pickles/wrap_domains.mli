@@ -10,7 +10,8 @@ module Make
     (Auxiliary_var : Poly_types.T0)
     (Auxiliary_value : Poly_types.T0) : sig
   val f_debug :
-       ('a, 'b, 'c) Full_signature.t
+       logger:Logger.t
+    -> ('a, 'b, 'c) Full_signature.t
     -> 'd
     -> ('e, 'b) Hlist.Length.t
     -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t

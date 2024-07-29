@@ -17,9 +17,8 @@ module Instance = struct
         -> t
 end
 
-let verify_heterogenous (ts : Instance.t list) =
+let verify_heterogenous ~logger (ts : Instance.t list) =
   let module Tick_field = Backend.Tick.Field in
-  let logger = Internal_tracing_context_logger.get () in
   [%log internal] "Verify_heterogenous"
     ~metadata:[ ("count", `Int (List.length ts)) ] ;
   let tick_field : _ Plonk_checks.field = (module Tick_field) in
@@ -236,16 +235,16 @@ let verify_heterogenous (ts : Instance.t list) =
   in
   [%log internal] "Compute_batch_verify_inputs_done" ;
   [%log internal] "Dlog_check_batch_verify" ;
-  let%map dlog_check = batch_verify batch_verify_inputs in
+  let%map dlog_check = batch_verify ~logger batch_verify_inputs in
   [%log internal] "Dlog_check_batch_verify_done" ;
   Common.time "dlog_check" (fun () -> check (lazy "dlog_check", dlog_check)) ;
   result ()
 
-let verify (type a n) ?chunking_data
+let verify ~logger (type a n) ?chunking_data
     (max_proofs_verified : (module Nat.Intf with type n = n))
     (a_value : (module Intf.Statement_value with type t = a))
     (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
-  verify_heterogenous
+  verify_heterogenous ~logger
     (List.map ts ~f:(fun (x, p) ->
          Instance.T (max_proofs_verified, a_value, chunking_data, key, x, p) )
     )

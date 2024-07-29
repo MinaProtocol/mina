@@ -12,6 +12,7 @@ type t =
   ; verify_transaction_snarks :
          (Ledger_proof.Prod.t * Mina_base.Sok_message.t) list
       -> unit Or_error.t Or_error.t Deferred.t
+  ; logger : Logger.t
   }
 
 type invalid = Common.invalid [@@deriving bin_io_unversioned, to_yojson]
@@ -20,12 +21,14 @@ let invalid_to_error = Common.invalid_to_error
 
 type ledger_proof = Ledger_proof.t
 
-let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
+let create ~logger ?enable_internal_tracing:_ ?internal_trace_filename:_
     ~proof_level ~constraint_constants ~pids:_ ~conf_dir:_ ~commit_id:_ () =
   let module T = Transaction_snark.Make (struct
     let constraint_constants = constraint_constants
 
     let proof_level = proof_level
+
+    let logger = logger
   end) in
   let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
     let tag = T.tag
@@ -33,11 +36,13 @@ let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
     let constraint_constants = constraint_constants
 
     let proof_level = proof_level
+
+    let logger = logger
   end) in
   let verify_blockchain_snarks chains =
     match proof_level with
     | Genesis_constants.Proof_level.Full ->
-        B.Proof.verify
+        B.Proof.verify ~logger
           (List.map chains ~f:(fun snark ->
                ( Blockchain_snark.Blockchain.state snark
                , Blockchain_snark.Blockchain.proof snark ) ) )
@@ -79,6 +84,7 @@ let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
     ; verify_blockchain_snarks
     ; verification_key = B.Proof.verification_key
     ; verify_transaction_snarks
+    ; logger
     }
 
 let verify_blockchain_snarks { verify_blockchain_snarks; _ } chains =
@@ -87,7 +93,7 @@ let verify_blockchain_snarks { verify_blockchain_snarks; _ } chains =
 (* N.B.: Valid_assuming is never returned, in fact; we assert a return type
    containing Valid_assuming to match the expected type
 *)
-let verify_commands { proof_level; _ }
+let verify_commands { proof_level; logger; _ }
     (cs : User_command.Verifiable.t With_status.t list) :
     [ `Valid of Mina_base.User_command.Valid.t
     | `Valid_assuming of
@@ -136,7 +142,7 @@ let verify_commands { proof_level; _ }
               [] )
       in
       let%map all_verified =
-        Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ to_verify
+        Pickles.Side_loaded.verify ~logger ~typ:Zkapp_statement.typ to_verify
       in
       Ok
         (List.map cs ~f:(function

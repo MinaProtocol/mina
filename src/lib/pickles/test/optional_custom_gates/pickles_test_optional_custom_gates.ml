@@ -21,6 +21,8 @@ let () = Pickles.Backend.Tick.Keypair.set_urs_info []
 
 let () = Pickles.Backend.Tock.Keypair.set_urs_info []
 
+let logger = (* No internal logging in unit tests *) Logger.null ()
+
 (* Parameters *)
 let random_table_id = 1 + Random.State.int state 1_000
 
@@ -233,7 +235,8 @@ let main_body ~(feature_flags : _ Plonk_types.Features.t) () =
 
 let register_test name feature_flags1 feature_flags2 =
   let tag, _cache_handle, proof, Pickles.Provers.[ prove1; prove2 ] =
-    Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
+    Pickles.compile ~logger
+      ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N2)
       ~max_proofs_verified:(module Nat.N0)
@@ -276,7 +279,7 @@ let register_test name feature_flags1 feature_flags2 =
     in
     Or_error.ok_exn
       (Async.Thread_safe.block_on_async_exn (fun () ->
-           Proof.verify [ (public_input1, proof1) ] ) )
+           Proof.verify ~logger [ (public_input1, proof1) ] ) )
   in
   let test_prove2 () =
     let public_input2, (), proof2 =
@@ -284,7 +287,7 @@ let register_test name feature_flags1 feature_flags2 =
     in
     Or_error.ok_exn
       (Async.Thread_safe.block_on_async_exn (fun () ->
-           Proof.verify [ (public_input2, proof2) ] ) )
+           Proof.verify ~logger [ (public_input2, proof2) ] ) )
   in
   let open Alcotest in
   add_tests name

@@ -16,6 +16,8 @@ let%test_module "multisig_account" =
 
     let () = Transaction_snark.For_tests.set_proof_cache proof_cache
 
+    let logger = (* No internal logging in unit tests *) Logger.null ()
+
     let constraint_constants = U.constraint_constants
 
     module M_of_n_predicate = struct
@@ -219,7 +221,7 @@ let%test_module "multisig_account" =
                   ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
                   }
                 in
-                Pickles.compile () ~cache:Cache_dir.cache ~proof_cache
+                Pickles.compile () ~logger ~cache:Cache_dir.cache ~proof_cache
                   ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                   ~public_input:(Input Zkapp_statement.typ)
                   ~auxiliary_typ:Typ.unit

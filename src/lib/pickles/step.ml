@@ -29,7 +29,7 @@ struct
   end
 
   (* The prover corresponding to the given inductive rule. *)
-  let f
+  let f ~logger
       (type (* The maximum number of proofs verified by one of the proof systems verified by this rule :)
 
                In other words: each of the proofs verified by this rule comes from some pickles proof system.
@@ -81,7 +81,6 @@ struct
       * auxiliary_value
       * (int, prevs_length) Vector.t )
       Promise.t =
-    let logger = Internal_tracing_context_logger.get () in
     [%log internal] "Pickles_step_proof" ;
     let _ = auxiliary_typ in
     (* unused *)

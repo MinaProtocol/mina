@@ -41,16 +41,19 @@ module type Proof_intf = sig
 
   val id : Cache.Wrap.Key.Verification.t Deferred.t Lazy.t
 
-  val verify : (statement * t) list -> unit Or_error.t Deferred.t
+  val verify :
+    logger:Logger.t -> (statement * t) list -> unit Or_error.t Deferred.t
 
-  val verify_promise : (statement * t) list -> unit Or_error.t Promise.t
+  val verify_promise :
+    logger:Logger.t -> (statement * t) list -> unit Or_error.t Promise.t
 end
 
 type chunking_data = Verify.Instance.chunking_data =
   { num_chunks : int; domain_size : int; zk_rows : int }
 
 val verify_promise :
-     ?chunking_data:chunking_data
+     logger:Logger.t
+  -> ?chunking_data:chunking_data
   -> (module Nat.Intf with type n = 'n)
   -> (module Statement_value_intf with type t = 'a)
   -> Verification_key.t
@@ -132,12 +135,14 @@ module Side_loaded : sig
     -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
 
   val verify_promise :
-       typ:('var, 'value) Impls.Step.Typ.t
+       logger:Logger.t
+    -> typ:('var, 'value) Impls.Step.Typ.t
     -> (Verification_key.t * 'value * Proof.t) list
     -> unit Or_error.t Promise.t
 
   val verify :
-       typ:('var, 'value) Impls.Step.Typ.t
+       logger:Logger.t
+    -> typ:('var, 'value) Impls.Step.Typ.t
     -> (Verification_key.t * 'value * Proof.t) list
     -> unit Or_error.t Deferred.t
 
@@ -290,7 +295,8 @@ end
       system for proving membership in that set, with a prover corresponding
       to each inductive rule. *)
 val compile_with_wrap_main_override_promise :
-     ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
+     logger:Logger.t
+  -> ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
   -> ?cache:Key_cache.Spec.t list
   -> ?storables:Storables.t
   -> ?proof_cache:Proof_cache.t

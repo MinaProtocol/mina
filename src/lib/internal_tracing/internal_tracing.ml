@@ -252,5 +252,4 @@ module For_itn_logger = struct
     else []
 end
 
-module Context_logger = Internal_tracing_context_logger
 module Context_call = Internal_tracing_context_call

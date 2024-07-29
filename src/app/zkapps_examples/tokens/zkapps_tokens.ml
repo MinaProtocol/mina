@@ -622,10 +622,12 @@ module Rules = struct
   end
 end
 
+let logger = (* No internal logging in unit tests *) Logger.null ()
+
 module Transfer_recursive = struct
   let lazy_compiled =
     lazy
-      (Pickles.compile () ~cache:Cache_dir.cache
+      (Pickles.compile () ~logger ~cache:Cache_dir.cache
          ~override_wrap_domain:Pickles_base.Proofs_verified.N1
          ~public_input:(Input Rules.Transfer.Recursive.Statement.typ)
          ~auxiliary_typ:Impl.Typ.unit
@@ -658,7 +660,7 @@ end
 
 let lazy_compiled =
   lazy
-    (Zkapps_examples.compile () ~cache:Cache_dir.cache
+    (Zkapps_examples.compile () ~logger ~cache:Cache_dir.cache
        ~override_wrap_domain:Pickles_base.Proofs_verified.N1
        ~auxiliary_typ:Impl.Typ.unit
        ~branches:(module Nat.N3)
@@ -697,13 +699,13 @@ module P = struct
 
   let id_promise = lazy (failwith "not implemented")
 
-  let verify statements =
+  let verify ~logger statements =
     let module P : Proof_intf = (val Lazy.force p_module) in
-    P.verify statements
+    P.verify ~logger statements
 
-  let verify_promise statements =
+  let verify_promise ~logger statements =
     let module P : Proof_intf = (val Lazy.force p_module) in
-    P.verify_promise statements
+    P.verify_promise ~logger statements
 end
 
 let initialize_prover =

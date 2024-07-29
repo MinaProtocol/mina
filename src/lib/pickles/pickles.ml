@@ -53,8 +53,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let verify_promise = Verify.verify
 
-  let verify max_proofs_verified statement key proofs =
-    verify_promise max_proofs_verified statement key proofs
+  let verify ~logger max_proofs_verified statement key proofs =
+    verify_promise ~logger max_proofs_verified statement key proofs
     |> Promise.to_deferred
 
   (* This file (as you can see from the mli) defines a compiler which turns an inductive
@@ -264,7 +264,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let of_proof : _ Proof.t -> t = Wrap_hack.pad_proof
     end
 
-    let verify_promise (type t) ~(typ : (_, t) Impls.Step.Typ.t)
+    let verify_promise ~logger (type t) ~(typ : (_, t) Impls.Step.Typ.t)
         (ts : (Verification_key.t * t * Proof.t) list) =
       let m =
         ( module struct
@@ -300,9 +300,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 }
               in
               Verify.Instance.T (max_proofs_verified, m, None, vk, x, p) )
-          |> Verify.verify_heterogenous )
+          |> Verify.verify_heterogenous ~logger )
 
-    let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred
+    let verify ~logger ~typ ts =
+      verify_promise ~logger ~typ ts |> Promise.to_deferred
 
     let srs_precomputation () : unit =
       let srs = Tock.Keypair.load_urs () in
@@ -314,14 +315,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let compile_with_wrap_main_override_promise =
     Compile.compile_with_wrap_main_override_promise
 
-  let compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
+  let compile_promise ~logger ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
       ~max_proofs_verified ~name ?constraint_constants ~choices () =
-    compile_with_wrap_main_override_promise ?self ?cache ?storables ?proof_cache
-      ?disk_keys ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
-      ~branches ~max_proofs_verified ~name ?constraint_constants ~choices ()
+    compile_with_wrap_main_override_promise ~logger ?self ?cache ?storables
+      ?proof_cache ?disk_keys ?override_wrap_domain ?num_chunks ~public_input
+      ~auxiliary_typ ~branches ~max_proofs_verified ~name ?constraint_constants
+      ~choices ()
 
-  let compile ?self ?cache ?storables ?proof_cache ?disk_keys
+  let compile ~logger ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
       ~max_proofs_verified ~name ?constraint_constants ~choices () =
     let choices ~self =
@@ -344,7 +346,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       go choices
     in
     let self, cache_handle, proof_module, provers =
-      compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
+      compile_promise ~logger ?self ?cache ?storables ?proof_cache ?disk_keys
         ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
         ~max_proofs_verified ~name ?constraint_constants ~choices ()
     in
@@ -361,7 +363,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     in
     (self, cache_handle, proof_module, adjust_provers provers)
 
-  let compile_async ?self ?cache ?storables ?proof_cache ?disk_keys
+  let compile_async ~logger ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
       ~max_proofs_verified ~name ?constraint_constants ~choices () =
     let choices ~self =
@@ -389,7 +391,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       go choices
     in
     let self, cache_handle, proof_module, provers =
-      compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
+      compile_promise ~logger ?self ?cache ?storables ?proof_cache ?disk_keys
         ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
         ~max_proofs_verified ~name ?constraint_constants ~choices ()
     in
@@ -421,6 +423,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let () = Snarky_backendless.Snark0.set_eval_constraints true
 
+      let logger = (* No internal logging in unit tests *) Logger.null ()
+
       (* Currently, a circuit must have at least 1 of every type of constraint. *)
       let dummy_constraints () =
         Impl.(
@@ -451,7 +455,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       module No_recursion = struct
         let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Input Field.typ)
+              compile_promise () ~logger ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
@@ -481,7 +485,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+                 Proof.verify_promise ~logger [ (Field.Constant.zero, b0) ] ) ) ;
           (Field.Constant.zero, b0)
 
         let _example_input, _example_proof = example
@@ -490,7 +494,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       module No_recursion_return = struct
         let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Output Field.typ)
+              compile_promise () ~logger ~public_input:(Output Field.typ)
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
@@ -520,7 +524,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           assert (Field.Constant.(equal zero) res) ;
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (res, b0) ] ) ) ;
+                 Proof.verify_promise ~logger [ (res, b0) ] ) ) ;
           (res, b0)
 
         let _example_input, _example_proof = example
@@ -545,7 +549,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Input Field.typ)
+              compile_promise () ~logger ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
@@ -596,7 +600,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+                 Proof.verify_promise ~logger [ (Field.Constant.zero, b0) ] ) ) ;
           let (), (), b1 =
             Common.time "b1" (fun () ->
                 Promise.block_on_async_exn (fun () ->
@@ -606,7 +610,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.one, b1) ] ) ) ;
+                 Proof.verify_promise ~logger [ (Field.Constant.one, b1) ] ) ) ;
           (Field.Constant.one, b1)
 
         let _example_input, _example_proof = example
@@ -640,7 +644,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Input Field.typ)
+              compile_promise () ~logger ~public_input:(Input Field.typ)
                 ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
@@ -706,7 +710,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+                 Proof.verify_promise ~logger [ (Field.Constant.zero, b0) ] ) ) ;
           let (), (), b1 =
             Common.time "tree b1" (fun () ->
                 Promise.block_on_async_exn (fun () ->
@@ -727,7 +731,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let%test_unit "verify" =
         Or_error.ok_exn
           (Promise.block_on_async_exn (fun () ->
-               Tree_proof.Proof.verify_promise Tree_proof.examples ) )
+               Tree_proof.Proof.verify_promise ~logger Tree_proof.examples ) )
 
       module Tree_proof_return = struct
         type _ Snarky_backendless.Request.t +=
@@ -760,7 +764,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Output Field.typ)
+              compile_promise () ~logger ~public_input:(Output Field.typ)
                 ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
@@ -832,7 +836,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           assert (Field.Constant.(equal zero) s0) ;
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (s0, b0) ] ) ) ;
+                 Proof.verify_promise ~logger [ (s0, b0) ] ) ) ;
           let s1, (), b1 =
             Common.time "tree b1" (fun () ->
                 Promise.block_on_async_exn (fun () ->
@@ -854,13 +858,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let%test_unit "verify" =
         Or_error.ok_exn
           (Promise.block_on_async_exn (fun () ->
-               Tree_proof_return.Proof.verify_promise Tree_proof_return.examples )
-          )
+               Tree_proof_return.Proof.verify_promise ~logger
+                 Tree_proof_return.examples ) )
 
       module Add_one_return = struct
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
-              compile_promise ()
+              compile_promise () ~logger
                 ~public_input:(Input_and_output (Field.typ, Field.typ))
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
@@ -892,7 +896,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           assert (Field.Constant.(equal (of_int 43)) res) ;
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ ((input, res), b0) ] ) ) ;
+                 Proof.verify_promise ~logger [ ((input, res), b0) ] ) ) ;
           ((input, res), b0)
 
         let _example_input, _example_proof = example
@@ -901,7 +905,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       module Auxiliary_return = struct
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
-              compile_promise ()
+              compile_promise () ~logger
                 ~public_input:(Input_and_output (Field.typ, Field.typ))
                 ~auxiliary_typ:Field.typ
                 ~branches:(module Nat.N1)
@@ -950,7 +954,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           assert (Field.Constant.equal result result') ;
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ ((input, result), b0) ] ) ) ;
+                 Proof.verify_promise ~logger [ ((input, result), b0) ] ) ) ;
           ((input, result), b0)
 
         let _example_input, _example_proof = example
@@ -962,6 +966,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
       let () = Backtrace.elide := false
 
       let () = Snarky_backendless.Snark0.set_eval_constraints true
+
+      let logger = (* No internal logging in unit tests *) Logger.null ()
 
       module Statement = struct
         type t = unit
@@ -1130,11 +1136,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
           end in
           let proofs_verifieds = Vector.singleton 2 in
           let (T inner_step_data as step_data) =
-            Step_branch_data.create ~index:0 ~feature_flags ~num_chunks:1
-              ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
-              ~branches:Branches.n ~self ~public_input:(Input typ)
-              ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
-              rule ~wrap_domains ~proofs_verifieds ~chain_to:(Promise.return ())
+            Step_branch_data.create ~logger ~index:0 ~feature_flags
+              ~num_chunks:1 ~actual_feature_flags
+              ~max_proofs_verified:Max_proofs_verified.n ~branches:Branches.n
+              ~self ~public_input:(Input typ) ~auxiliary_typ:typ
+              A.to_field_elements A_value.to_field_elements rule ~wrap_domains
+              ~proofs_verifieds ~chain_to:(Promise.return ())
             (* TODO? *)
           in
           let step_domains = Vector.singleton inner_step_data.domains in
@@ -1297,7 +1304,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
               let step () =
                 let%bind.Promise step_pk = Lazy.force step_pk in
                 let%bind.Promise wrap_vk = Lazy.force wrap_vk in
-                S.f branch_data ~feature_flags ~prevs_length:prev_vars_length
+                S.f
+                  ~logger:
+                    ((* No internal logging in unit test *) Logger.null ())
+                  branch_data ~feature_flags ~prevs_length:prev_vars_length
                   ~self ~public_input:(Input typ) ~proof_cache:None
                   ~maxes:(module Maxes)
                   ~auxiliary_typ:Impls.Step.Typ.unit
@@ -1855,7 +1865,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         let verify ts =
           let%bind.Promise verification_key = Lazy.force verification_key in
-          verify_promise
+          verify_promise ~logger
             (module Max_proofs_verified)
             (module A_value)
             verification_key ts
@@ -1892,7 +1902,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Input Typ.unit)
+              compile_promise () ~logger ~public_input:(Input Typ.unit)
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
@@ -1938,7 +1948,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.is_error
           @@ Promise.block_on_async_exn (fun () ->
-                 Recurse_on_bad_proof.Proof.verify_promise [ ((), proof) ] )
+                 Recurse_on_bad_proof.Proof.verify_promise ~logger
+                   [ ((), proof) ] )
         with _ -> true
     end )
 
@@ -1990,6 +2001,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     ( module struct
       open Impls.Step
 
+      let logger = (* No internal logging in unit tests *) Logger.null ()
+
       (* Currently, a circuit must have at least 1 of every type of constraint. *)
       let dummy_constraints () =
         Impl.(
@@ -2020,7 +2033,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       module No_recursion = struct
         let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Input Field.typ)
+              compile_promise () ~logger ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
@@ -2050,7 +2063,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+                 Proof.verify_promise ~logger [ (Field.Constant.zero, b0) ] ) ) ;
           (Field.Constant.zero, b0)
 
         let example_input, example_proof = example
@@ -2059,7 +2072,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       module Fake_1_recursion = struct
         let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Input Field.typ)
+              compile_promise () ~logger ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
@@ -2089,7 +2102,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+                 Proof.verify_promise ~logger [ (Field.Constant.zero, b0) ] ) ) ;
           (Field.Constant.zero, b0)
 
         let example_input, example_proof = example
@@ -2098,7 +2111,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       module Fake_2_recursion = struct
         let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Input Field.typ)
+              compile_promise () ~logger ~public_input:(Input Field.typ)
                 ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
@@ -2129,7 +2142,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+                 Proof.verify_promise ~logger [ (Field.Constant.zero, b0) ] ) ) ;
           (Field.Constant.zero, b0)
 
         let example_input, example_proof = example
@@ -2164,7 +2177,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Input Field.typ)
+              compile_promise () ~logger ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
@@ -2230,7 +2243,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.one, b1) ] ) ) ;
+                 Proof.verify_promise ~logger [ (Field.Constant.one, b1) ] ) ) ;
           (Field.Constant.one, b1)
 
         let _example2 =
@@ -2251,7 +2264,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.one, b2) ] ) ) ;
+                 Proof.verify_promise ~logger [ (Field.Constant.one, b2) ] ) ) ;
           (Field.Constant.one, b2)
 
         let _example3 =
@@ -2272,7 +2285,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.one, b3) ] ) ) ;
+                 Proof.verify_promise ~logger [ (Field.Constant.one, b3) ] ) ) ;
           (Field.Constant.one, b3)
       end
     end )
@@ -2280,6 +2293,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
   let%test_module "side-loaded with feature flags" =
     ( module struct
       open Impls.Step
+
+      let logger = (* No internal logging in unit tests *) Logger.null ()
 
       [@@@warning "-60"]
 
@@ -2329,7 +2344,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       module No_recursion = struct
         let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Input Field.typ)
+              compile_promise () ~logger ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
@@ -2359,7 +2374,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+                 Proof.verify_promise ~logger [ (Field.Constant.zero, b0) ] ) ) ;
           (Field.Constant.zero, b0)
 
         let example_input, example_proof = example
@@ -2368,7 +2383,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       module Fake_1_recursion = struct
         let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Input Field.typ)
+              compile_promise () ~logger ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
@@ -2398,7 +2413,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+                 Proof.verify_promise ~logger [ (Field.Constant.zero, b0) ] ) ) ;
           (Field.Constant.zero, b0)
 
         let example_input, example_proof = example
@@ -2407,7 +2422,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       module Fake_2_recursion = struct
         let[@warning "-45"] tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Input Field.typ)
+              compile_promise () ~logger ~public_input:(Input Field.typ)
                 ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
@@ -2438,7 +2453,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
+                 Proof.verify_promise ~logger [ (Field.Constant.zero, b0) ] ) ) ;
           (Field.Constant.zero, b0)
 
         let example_input, example_proof = example
@@ -2476,7 +2491,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
         let[@warning "-45"] _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Input Field.typ)
+              compile_promise () ~logger ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
                 ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
@@ -2542,7 +2557,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.one, b1) ] ) ) ;
+                 Proof.verify_promise ~logger [ (Field.Constant.one, b1) ] ) ) ;
           (Field.Constant.one, b1)
 
         let _example2 =
@@ -2563,7 +2578,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.one, b2) ] ) ) ;
+                 Proof.verify_promise ~logger [ (Field.Constant.one, b2) ] ) ) ;
           (Field.Constant.one, b2)
 
         let _example3 =
@@ -2584,7 +2599,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           Or_error.ok_exn
             (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.one, b3) ] ) ) ;
+                 Proof.verify_promise ~logger [ (Field.Constant.one, b3) ] ) ) ;
           (Field.Constant.one, b3)
       end
     end )

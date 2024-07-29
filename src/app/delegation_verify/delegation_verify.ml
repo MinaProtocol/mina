@@ -47,7 +47,7 @@ let timestamp =
 let instantiate_verify_functions ~logger = function
   | None ->
       Deferred.return
-        (Verifier.verify_functions
+        (Verifier.verify_functions ~logger
            ~constraint_constants:Genesis_constants.Constraint_constants.compiled
            ~proof_level:Genesis_constants.Proof_level.compiled () )
   | Some config_file ->
@@ -74,7 +74,8 @@ let instantiate_verify_functions ~logger = function
       let constraint_constants =
         Precomputed_values.constraint_constants precomputed_values
       in
-      Verifier.verify_functions ~constraint_constants ~proof_level:Full ()
+      Verifier.verify_functions ~logger ~constraint_constants ~proof_level:Full
+        ()
 
 module Make_verifier (Source : Submission.Data_source) = struct
   let verify_transaction_snarks = Source.verify_transaction_snarks

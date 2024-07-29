@@ -1729,7 +1729,7 @@ let internal_commands logger =
           with
           | `Ok sexp -> (
               let%bind worker_state =
-                Snark_worker.Prod.Inputs.Worker_state.create
+                Snark_worker.Prod.Inputs.Worker_state.create ~logger
                   ~proof_level:Genesis_constants.Proof_level.compiled
                   ~constraint_constants:
                     Genesis_constants.Constraint_constants.compiled ()

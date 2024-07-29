@@ -75,6 +75,8 @@ let witness ~max_num_updates ?min_num_updates num_transactions repeats preeval
         num_transactions ~max_num_updates ?min_num_updates repeats preeval
         use_zkapps )
 
+let logger = (* No internal logging for tx snark profiler *) Logger.null ()
+
 let main ~max_num_updates ?min_num_updates num_transactions repeats preeval
     use_zkapps () =
   Test_util.with_randomness 123456789 (fun () ->
@@ -83,6 +85,8 @@ let main ~max_num_updates ?min_num_updates num_transactions repeats preeval
           Genesis_constants.Constraint_constants.compiled
 
         let proof_level = Genesis_constants.Proof_level.Full
+
+        let logger = logger
       end) in
       run
         ~user_command_profiler:(profile_user_command (module T))

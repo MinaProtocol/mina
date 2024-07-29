@@ -41,6 +41,5 @@
   snarky.intf
   promise
   logger
-  internal_tracing.context_logger
   ppx_version.runtime
   bounded_types))

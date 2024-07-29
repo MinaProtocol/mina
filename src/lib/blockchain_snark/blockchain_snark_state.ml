@@ -449,7 +449,8 @@ module type S = sig
   val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
 end
 
-let verify ts ~key = Pickles.verify (module Nat.N2) (module Statement) key ts
+let verify ~logger ts ~key =
+  Pickles.verify ~logger (module Nat.N2) (module Statement) key ts
 
 let constraint_system_digests ~proof_level ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
@@ -474,11 +475,13 @@ module Make (T : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val proof_level : Genesis_constants.Proof_level.t
+
+  val logger : Logger.t
 end) : S = struct
   open T
 
   let tag, cache_handle, p, Pickles.Provers.[ step ] =
-    Pickles.compile () ~cache:Cache_dir.cache ~public_input:(Input typ)
+    Pickles.compile () ~logger ~cache:Cache_dir.cache ~public_input:(Input typ)
       ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)

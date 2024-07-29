@@ -3,7 +3,8 @@ val step_main :
   'proofs_verified 'self_branches 'prev_vars 'prev_values 'var 'value 'a_var
   'a_value 'ret_var 'ret_value 'auxiliary_var 'auxiliary_value
   'max_proofs_verified 'local_branches 'local_signature.
-     (module Requests.Step.S
+     logger:Logger.t
+  -> (module Requests.Step.S
         with type auxiliary_value = 'auxiliary_value
          and type local_branches = 'local_branches
          and type local_signature = 'local_signature

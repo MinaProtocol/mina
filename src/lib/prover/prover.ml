@@ -91,6 +91,8 @@ module Worker_state = struct
           let constraint_constants = constraint_constants
 
           let proof_level = proof_level
+
+          let logger = logger
         end) in
         let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
           let tag = T.tag
@@ -98,6 +100,8 @@ module Worker_state = struct
           let constraint_constants = constraint_constants
 
           let proof_level = proof_level
+
+          let logger = logger
         end) in
         let%map.Async.Deferred (_ : Pickles.Dirty.t) =
           Pickles.Cache_handle.generate_or_load B.cache_handle
@@ -120,8 +124,6 @@ module Worker_state = struct
                   let txn_snark_statement, txn_snark_proof =
                     ledger_proof_opt next_state t
                   in
-                  Internal_tracing.Context_logger.with_logger (Some logger)
-                  @@ fun () ->
                   let%map.Async.Deferred (), (), proof =
                     B.step
                       ~handler:
@@ -150,7 +152,7 @@ module Worker_state = struct
             Internal_tracing.Context_call.with_call_id
             @@ fun () ->
             [%log internal] "Prover_verify" ;
-            let%map result = B.Proof.verify [ (state, proof) ] in
+            let%map result = B.Proof.verify ~logger [ (state, proof) ] in
             [%log internal] "Prover_verify_done" ;
             result
 

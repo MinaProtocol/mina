@@ -4,6 +4,9 @@ module Config = struct
   let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
   let proof_level = Genesis_constants.Proof_level.Full
+
+  let logger =
+    (* No internal logging in print_blockchain_snark *) Logger.null ()
 end
 
 let () = Format.eprintf "Generating transaction snark circuit..@."

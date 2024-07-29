@@ -15,11 +15,13 @@ module Instance : sig
 end
 
 val verify :
-     ?chunking_data:Instance.chunking_data
+     logger:Logger.t
+  -> ?chunking_data:Instance.chunking_data
   -> (module Pickles_types.Nat.Intf with type n = 'n)
   -> (module Intf.Statement_value with type t = 'a)
   -> Verification_key.t
   -> ('a * ('n, 'n) Proof.t) list
   -> unit Or_error.t Promise.t
 
-val verify_heterogenous : Instance.t list -> unit Or_error.t Promise.t
+val verify_heterogenous :
+  logger:Logger.t -> Instance.t list -> unit Or_error.t Promise.t

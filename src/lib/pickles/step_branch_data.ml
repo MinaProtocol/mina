@@ -73,7 +73,7 @@ type ( 'a_var
 (* Compile an inductive rule. *)
 let create
     (type branches max_proofs_verified var value a_var a_value ret_var ret_value)
-    ~index ~(self : (var, value, max_proofs_verified, branches) Tag.t)
+    ~logger ~index ~(self : (var, value, max_proofs_verified, branches) Tag.t)
     ~wrap_domains ~(feature_flags : Opt.Flag.t Plonk_types.Features.Full.t)
     ~num_chunks ~(actual_feature_flags : bool Plonk_types.Features.t)
     ~(max_proofs_verified : max_proofs_verified Nat.t)
@@ -181,7 +181,7 @@ let create
   in
   Timer.clock __LOC__ ;
   let step ~step_domains ~known_wrap_keys =
-    Step_main.step_main requests
+    Step_main.step_main ~logger requests
       (Nat.Add.create max_proofs_verified)
       rule
       ~basic:

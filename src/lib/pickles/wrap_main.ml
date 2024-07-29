@@ -81,7 +81,7 @@ let split_field (x : Field.t) : Field.t * Boolean.var =
   res
 
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
-let wrap_main
+let wrap_main ~logger
     (type max_proofs_verified branches prev_varss max_local_max_proofs_verifieds)
     ~num_chunks ~feature_flags
     (full_signature :
@@ -163,7 +163,6 @@ let wrap_main
           , _
           , Field.t )
           Types.Wrap.Statement.In_circuit.t ) ->
-      let logger = Internal_tracing_context_logger.get () in
       with_label __LOC__ (fun () ->
           let which_branch' =
             exists

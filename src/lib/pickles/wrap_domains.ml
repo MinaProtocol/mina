@@ -14,7 +14,7 @@ module Make
     (Auxiliary_var : T0)
     (Auxiliary_value : T0) =
 struct
-  let f_debug full_signature _num_choices choices_length ~feature_flags
+  let f_debug ~logger full_signature _num_choices choices_length ~feature_flags
       ~num_chunks ~max_proofs_verified =
     let num_choices = Hlist.Length.to_nat choices_length in
     let dummy_step_domains =
@@ -39,7 +39,7 @@ struct
     Timer.clock __LOC__ ;
     let srs = Backend.Tick.Keypair.load_urs () in
     let _, main =
-      Wrap_main.wrap_main ~feature_flags ~num_chunks ~srs full_signature
+      Wrap_main.wrap_main ~logger ~feature_flags ~num_chunks ~srs full_signature
         choices_length dummy_step_keys dummy_step_widths dummy_step_domains
         max_proofs_verified
     in
