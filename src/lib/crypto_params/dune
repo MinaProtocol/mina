@@ -24,10 +24,3 @@
   (pps ppx_version ppx_jane h_list.ppx))
  (instrumentation (backend bisect_ppx))
  (synopsis "Cryptographic parameters"))
-
-(rule
- (targets group_map_params.ml)
- (deps
-  (:< gen/gen.exe))
- (action
-  (run %{<} %{targets})))

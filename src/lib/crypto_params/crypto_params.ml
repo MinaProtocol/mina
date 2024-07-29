@@ -6,7 +6,11 @@ module Tock = struct
   module Full = Pickles.Impls.Wrap
   module Run = Pickles.Impls.Wrap
 
-  let group_map_params () = Lazy.force Group_map_params.params
+  let group_map_params () = Lazy.force @@ lazy (
+    Group_map.Params.create
+      (module Pickles.Backend.Tick.Field)
+      Pickles.Backend.Tick.Inner_curve.Params.{ a; b }
+  )
 
   include Full.Internal_Basic
   module Number = Snarky_backendless.Number.Make (Full.Internal_Basic)
