@@ -3,10 +3,10 @@ let Text/concatSep = Prelude.Text.concatSep
 let Profiles = ./Profiles.dhall
 let Network = ./Network.dhall
 
-let Artifact : Type  = < Daemon | Archive | ArchiveMigration | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
+let Artifact : Type  = < Daemon | Archive | TestExecutive | BatchTxn | Rosetta | ZkappTestTransaction | FunctionalTestSuite >
 
 
-let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.ArchiveMigration , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
+let AllButTests = [ Artifact.Daemon , Artifact.Archive , Artifact.BatchTxn , Artifact.TestExecutive , Artifact.Rosetta , Artifact.ZkappTestTransaction ]
 
 let Main = [ Artifact.Daemon , Artifact.Archive , Artifact.Rosetta ]
 
@@ -16,7 +16,6 @@ let capitalName = \(artifact : Artifact) ->
   merge {
     Daemon = "Daemon"
     , Archive = "Archive"
-    , ArchiveMigration = "ArchiveMigration"
     , TestExecutive = "TestExecutive"
     , BatchTxn = "BatchTxn"
     , Rosetta = "Rosetta"
@@ -28,7 +27,6 @@ let lowerName = \(artifact : Artifact) ->
   merge {
     Daemon = "daemon"
     , Archive = "archive"
-    , ArchiveMigration = "archive_migration"
     , TestExecutive = "test_executive"
     , BatchTxn = "batch_txn"
     , Rosetta = "rosetta"
@@ -41,7 +39,6 @@ let dockerName = \(artifact : Artifact) ->
     Daemon = "mina-daemon"
     , Archive = "mina-archive"
     , TestExecutive = "mina-test-executive"
-    , ArchiveMigration = "mina-archive-migration"
     , BatchTxn = "mina-batch-txn"
     , Rosetta = "mina-rosetta" 
     , ZkappTestTransaction = "mina-zkapp-test-transaction"
@@ -52,7 +49,6 @@ let toDebianName = \(artifact : Artifact) -> \(network: Network.Type) ->
   merge {
     Daemon = "daemon_${Network.lowerName network}"
     , Archive = "archive"
-    , ArchiveMigration  = "archive_migration"
     , TestExecutive = "test_executive"
     , BatchTxn = "batch_txn"
     , Rosetta = "" 
@@ -74,7 +70,6 @@ let toDebianNames = \(artifacts : List Artifact) -> \(networks: List Network.Typ
                   (\(n: Network.Type) -> "daemon_${Network.lowerName n}" )
                   networks)
               , Archive = ["archive"]
-              , ArchiveMigration  = ["archive_migration"]
               , TestExecutive = ["test_executive"]
               , BatchTxn = ["batch_txn"]
               , Rosetta = [""] 
