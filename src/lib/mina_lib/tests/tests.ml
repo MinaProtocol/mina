@@ -77,7 +77,7 @@ let%test_module "Epoch ledger sync tests" =
 
         let trust_system = trust_system
 
-        let commit_id = "not specified"
+        let commit_id = "not specified for unit test"
       end in
       return (module Context : CONTEXT)
 
@@ -92,7 +92,7 @@ let%test_module "Epoch ledger sync tests" =
           Verifier.create ~logger ~proof_level:precomputed_values.proof_level
             ~constraint_constants:precomputed_values.constraint_constants ~pids
             ~conf_dir:(Some (make_dirname "verifier"))
-            ~commit_id:"not specified" () )
+            ~commit_id:"not specified for unit tests" () )
 
     let make_empty_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.create

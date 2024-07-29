@@ -1,4 +1,5 @@
 use crate::arkworks::CamlFp;
+use crate::WithLagrangeBasis;
 use crate::{gate_vector::fp::CamlPastaFpPlonkGateVectorPtr, srs::fp::CamlFpSrs};
 use ark_poly::EvaluationDomain;
 use kimchi::circuits::lookup::runtime_tables::caml::CamlRuntimeTableCfg;
@@ -79,9 +80,7 @@ pub fn caml_pasta_fp_plonk_index_create(
         })
         .build()
     {
-        Err(e) => {
-            return Err(e.into())
-        }
+        Err(e) => return Err(e.into()),
         Ok(cs) => cs,
     };
 
@@ -92,7 +91,7 @@ pub fn caml_pasta_fp_plonk_index_create(
     {
         let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-        ptr.add_lagrange_basis(cs.domain.d1);
+        ptr.with_lagrange_basis(cs.domain.d1);
     }
 
     // create index
