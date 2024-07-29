@@ -30,6 +30,8 @@ let vk_and_prover =
   lazy
     (Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ())
 
+let logger = (* No internal logging in zkapp_test_transaction *) Logger.null ()
+
 let get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
     ~state_body zkapp_command =
   let second_pass_ledger =
@@ -128,6 +130,8 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t) =
     let constraint_constants = constraint_constants
 
     let proof_level = proof_level
+
+    let logger = logger
   end) in
   let%map _ =
     Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)
@@ -232,6 +236,8 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
     let constraint_constants = constraint_constants
 
     let proof_level = proof_level
+
+    let logger = logger
   end) in
   let%map _ =
     Async.Deferred.List.fold ~init:((), ()) (List.rev witnesses)

@@ -13,6 +13,8 @@ module type S = sig
   val compiled_values : Genesis_proof.t Async.Deferred.t option
 end
 
+let logger = (* No internal logging in precomputed values *) Logger.null ()
+
 let hashes =
   lazy
     (let constraint_constants =
@@ -68,6 +70,8 @@ module Inputs = struct
     Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
       ~genesis_epoch_data ~constraint_constants ~consensus_constants
       ~genesis_body_reference
+
+  let logger = logger
 end
 
 module Dummy = struct
@@ -113,6 +117,8 @@ module Make_real () = struct
            let tag = T.tag
 
            include Inputs
+
+           let logger = logger
          end) in
          let%map values =
            Genesis_proof.create_values

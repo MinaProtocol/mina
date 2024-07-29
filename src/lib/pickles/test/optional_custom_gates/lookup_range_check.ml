@@ -6,6 +6,8 @@ let () = Pickles.Backend.Tick.Keypair.set_urs_info []
 
 let () = Pickles.Backend.Tock.Keypair.set_urs_info []
 
+let logger = (* No internal logging in unit tests *) Logger.null ()
+
 let add_constraint c = assert_ { basic = c; annotation = None }
 
 let add_plonk_constraint c =
@@ -63,7 +65,8 @@ let constraint_constants =
 
 let test_range_check_lookup () =
   let _tag, _cache_handle, (module Proof), Pickles.Provers.[ prove ] =
-    Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
+    Pickles.compile ~logger
+      ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N0)
@@ -92,7 +95,7 @@ let test_range_check_lookup () =
   in
   Or_error.ok_exn
     (Async.Thread_safe.block_on_async_exn (fun () ->
-         Proof.verify [ (public_input, proof) ] ) )
+         Proof.verify ~logger [ (public_input, proof) ] ) )
 
 let () =
   let open Alcotest in

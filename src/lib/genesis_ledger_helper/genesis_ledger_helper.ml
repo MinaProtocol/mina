@@ -692,11 +692,11 @@ module Genesis_proof = struct
     ; genesis_body_reference
     }
 
-  let generate (inputs : Genesis_proof.Inputs.t) =
+  let generate ~logger (inputs : Genesis_proof.Inputs.t) =
     match inputs.proof_level with
     | Genesis_constants.Proof_level.Full ->
         Deferred.return
-        @@ Genesis_proof.create_values_no_proof
+        @@ Genesis_proof.create_values_no_proof ~logger
              { genesis_ledger = inputs.genesis_ledger
              ; genesis_epoch_data = inputs.genesis_epoch_data
              ; runtime_config = inputs.runtime_config
@@ -710,7 +710,7 @@ module Genesis_proof = struct
              ; genesis_body_reference = inputs.genesis_body_reference
              }
     | _ ->
-        Deferred.return (Genesis_proof.create_values_no_proof inputs)
+        Deferred.return (Genesis_proof.create_values_no_proof ~logger inputs)
 
   let store ~filename proof =
     (* TODO: Use [Writer.write_bin_prot]. *)
@@ -738,7 +738,7 @@ module Genesis_proof = struct
           (None, Deferred.return id)
       | None, Full ->
           let ((_, (module B)) as b) =
-            Genesis_proof.blockchain_snark_state inputs
+            Genesis_proof.blockchain_snark_state ~logger inputs
           in
           (Some b, Lazy.force B.Proof.id)
       | _ ->
@@ -782,7 +782,7 @@ module Genesis_proof = struct
                   | Some b ->
                       b
                   | None ->
-                      Genesis_proof.blockchain_snark_state inputs )
+                      Genesis_proof.blockchain_snark_state ~logger inputs )
               in
               let constraint_system_digests =
                 match inputs.constraint_system_digests with
@@ -884,7 +884,7 @@ module Genesis_proof = struct
           "No genesis proof file was found for $base_hash, generating a new \
            genesis proof"
           ~metadata:[ ("base_hash", Base_hash.to_yojson base_hash) ] ;
-        let%bind values = generate inputs in
+        let%bind values = generate ~logger inputs in
         let filename = genesis_dir ^/ filename ~base_hash in
         let%map () =
           match values.proof_data with
@@ -1055,7 +1055,7 @@ let init_from_config_file ?genesis_dir ~logger ~proof_level ?overwrite_version
     inputs_from_config_file ?genesis_dir ~logger ~proof_level ?overwrite_version
       config
   in
-  let values = Genesis_proof.create_values_no_proof inputs in
+  let values = Genesis_proof.create_values_no_proof ~logger inputs in
   (values, config)
 
 let upgrade_old_config ~logger filename json =

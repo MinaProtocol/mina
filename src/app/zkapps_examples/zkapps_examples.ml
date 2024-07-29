@@ -528,7 +528,8 @@ let wrap_main ~public_key ?token_id ?may_use_token f
 
 let compile :
     type auxiliary_var auxiliary_value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
-       ?self:
+       logger:Logger.t
+    -> ?self:
          ( Zkapp_statement.Checked.t
          , Zkapp_statement.t
          , max_proofs_verified
@@ -585,8 +586,9 @@ let compile :
            * auxiliary_value )
            Deferred.t )
          H3_2.T(Pickles.Prover).t =
- fun ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain ~auxiliary_typ
-     ~branches ~max_proofs_verified ~name ~constraint_constants ~choices () ->
+ fun ~logger ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain
+     ~auxiliary_typ ~branches ~max_proofs_verified ~name ~constraint_constants
+     ~choices () ->
   let vk_hash = ref None in
   let choices ~self =
     let rec go :
@@ -644,7 +646,7 @@ let compile :
     go (choices ~self)
   in
   let tag, cache_handle, proof, provers =
-    Pickles.compile_async () ?self ?cache ?proof_cache ?disk_keys
+    Pickles.compile_async () ~logger ?self ?cache ?proof_cache ?disk_keys
       ?override_wrap_domain ~public_input:(Output Zkapp_statement.typ)
       ~auxiliary_typ:Typ.(Prover_value.typ () * auxiliary_typ)
       ~branches ~max_proofs_verified ~name ~constraint_constants ~choices

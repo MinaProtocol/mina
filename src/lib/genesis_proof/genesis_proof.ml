@@ -201,13 +201,15 @@ let digests (module T : Transaction_snark.S)
   let%map blockchain_digests = B.constraint_system_digests in
   txn_digests @ blockchain_digests
 
-let blockchain_snark_state (inputs : Inputs.t) :
+let blockchain_snark_state ~logger (inputs : Inputs.t) :
     (module Transaction_snark.S)
     * (module Blockchain_snark.Blockchain_snark_state.S) =
   let module T = Transaction_snark.Make (struct
     let constraint_constants = inputs.constraint_constants
 
     let proof_level = inputs.proof_level
+
+    let logger = logger
   end) in
   let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
     let tag = T.tag
@@ -215,6 +217,8 @@ let blockchain_snark_state (inputs : Inputs.t) :
     let constraint_constants = inputs.constraint_constants
 
     let proof_level = inputs.proof_level
+
+    let logger = logger
   end) in
   ((module T), (module B))
 
@@ -237,7 +241,7 @@ let create_values txn b (t : Inputs.t) =
   ; proof_data = Some { blockchain_proof_system_id; genesis_proof }
   }
 
-let create_values_no_proof (t : Inputs.t) =
+let create_values_no_proof ~logger (t : Inputs.t) =
   { runtime_config = t.runtime_config
   ; constraint_constants = t.constraint_constants
   ; proof_level = t.proof_level
@@ -249,7 +253,7 @@ let create_values_no_proof (t : Inputs.t) =
   ; protocol_state_with_hashes = t.protocol_state_with_hashes
   ; constraint_system_digests =
       lazy
-        (let txn, b = blockchain_snark_state t in
+        (let txn, b = blockchain_snark_state ~logger t in
          Lazy.force (digests txn b) )
   ; proof_data = None
   }

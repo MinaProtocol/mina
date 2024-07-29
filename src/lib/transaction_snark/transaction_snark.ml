@@ -3509,14 +3509,14 @@ module Make_str (A : Wire_types.Concrete) = struct
           }
           init_stack pending_coinbase_stack_state handler
 
-  let verify (ts : (t * _) list) ~key =
+  let verify ~logger (ts : (t * _) list) ~key =
     if
       List.for_all ts ~f:(fun ({ statement; _ }, message) ->
           Sok_message.Digest.equal
             (Sok_message.digest message)
             statement.sok_digest )
     then
-      Pickles.verify
+      Pickles.verify ~logger
         (module Nat.N2)
         (module Statement.With_sok)
         key
@@ -3942,6 +3942,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     val constraint_constants : Genesis_constants.Constraint_constants.t
 
     val proof_level : Genesis_constants.Proof_level.t
+
+    val logger : Logger.t
   end) =
   struct
     open Inputs
@@ -3953,7 +3955,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         , p
         , Pickles.Provers.
             [ base; merge; opt_signed_opt_signed; opt_signed; proved ] ) =
-      system ~proof_level ~constraint_constants
+      system ~logger ~proof_level ~constraint_constants
 
     module Proof = (val p)
 
@@ -3962,7 +3964,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let verification_key = Proof.verification_key
 
     let verify_against_digest { statement; proof } =
-      Proof.verify [ (statement, proof) ]
+      Proof.verify ~logger [ (statement, proof) ]
 
     let verify ts =
       if
@@ -3970,7 +3972,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             Sok_message.Digest.equal (Sok_message.digest m)
               p.statement.sok_digest )
       then
-        Proof.verify
+        Proof.verify ~logger
           (List.map ts ~f:(fun ({ statement; proof }, _) -> (statement, proof)))
       else
         Async.return
@@ -4122,6 +4124,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   end
 
   module For_tests = struct
+    let logger = (* No internal logging in unit tests *) Logger.null ()
+
     module Spec = struct
       type t =
         { fee : Currency.Fee.t
@@ -4178,8 +4182,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; feature_flags = Pickles_types.Plonk_types.Features.none_bool
           }
         in
-        Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
-          ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
+        Pickles.compile () ~logger ~cache:Cache_dir.cache
+          ?proof_cache:!proof_cache ~public_input:(Input Zkapp_statement.typ)
+          ~auxiliary_typ:Typ.unit
           ~branches:(module Nat.N1)
           ~max_proofs_verified:(module Nat.N0)
           ~name:"trivial"
@@ -4212,12 +4217,12 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let%bind (), (), proof = prover stmt in
         let%bind () =
-          Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ
+          Pickles.Side_loaded.verify ~logger ~typ:Zkapp_statement.typ
             [ (valid_vk, stmt, proof) ]
           >>| Or_error.ok_exn
         in
         let%map invalid_verification =
-          Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ
+          Pickles.Side_loaded.verify ~logger ~typ:Zkapp_statement.typ
             [ (invalid_vk, stmt, proof) ]
         in
         assert (Or_error.is_error invalid_verification)

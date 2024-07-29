@@ -31,7 +31,7 @@ module Inputs = struct
       ; proof_level : Genesis_constants.Proof_level.t
       }
 
-    let create ~constraint_constants ~proof_level () =
+    let create ~logger ~constraint_constants ~proof_level () =
       let m =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
@@ -40,6 +40,8 @@ module Inputs = struct
                 let constraint_constants = constraint_constants
 
                 let proof_level = proof_level
+
+                let logger = logger
               end) : S )
         | Check | None ->
             None

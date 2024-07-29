@@ -19,9 +19,12 @@ let constraint_constants =
   ; fork = None
   }
 
+let logger = (* No internal logging in zkapp_test_transaction *) Logger.null ()
+
 let test () =
   let tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
-    Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
+    Pickles.compile ~logger
+      ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N0)
@@ -96,7 +99,8 @@ let test () =
   in
   let tag2, _cache_handle, recursive_proof, Pickles.Provers.[ recursive_prove ]
       =
-    Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
+    Pickles.compile ~logger
+      ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N1)
@@ -138,14 +142,14 @@ let test () =
     in
     Or_error.ok_exn
       (Async.Thread_safe.block_on_async_exn (fun () ->
-           Proof.verify [ (public_input, proof) ] ) ) ;
+           Proof.verify ~logger [ (public_input, proof) ] ) ) ;
     let public_input, (), proof =
       Async.Thread_safe.block_on_async_exn (fun () ->
           recursive_prove ~handler:(Requests.handler proof) () )
     in
     Or_error.ok_exn
       (Async.Thread_safe.block_on_async_exn (fun () ->
-           Recursive_proof.verify [ (public_input, proof) ] ) )
+           Recursive_proof.verify ~logger [ (public_input, proof) ] ) )
   in
   test_prove ()
 

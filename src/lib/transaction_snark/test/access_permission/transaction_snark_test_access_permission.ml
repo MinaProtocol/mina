@@ -18,6 +18,8 @@ let%test_module "Access permission tests" =
 
     let () = Backtrace.elide := false
 
+    let logger = (* No internal logging in unit tests *) Logger.null ()
+
     let sk = Quickcheck.random_value Private_key.gen
 
     let pk = Public_key.of_private_key_exn sk
@@ -27,7 +29,7 @@ let%test_module "Access permission tests" =
     let account_id = Account_id.create pk_compressed Token_id.default
 
     let tag, _, p_module, Pickles.Provers.[ prover ] =
-      Zkapps_examples.compile () ~cache:Cache_dir.cache ~proof_cache
+      Zkapps_examples.compile () ~logger ~cache:Cache_dir.cache ~proof_cache
         ~auxiliary_typ:Impl.Typ.unit
         ~branches:(module Nat.N1)
         ~max_proofs_verified:(module Nat.N0)

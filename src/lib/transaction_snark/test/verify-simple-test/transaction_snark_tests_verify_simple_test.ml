@@ -34,7 +34,9 @@ let%test_module "Simple verifies test" =
 
     let () = Pickles.Side_loaded.srs_precomputation ()
 
+    let logger = (* No internal logging in unit tests *) Logger.null ()
+
     let%test_unit "Verifies" =
       Or_error.ok_exn
-      @@ Async.Thread_safe.block_on_async_exn (fun () -> verify ())
+      @@ Async.Thread_safe.block_on_async_exn (fun () -> verify ~logger ())
   end )

@@ -287,7 +287,7 @@ include For_tests_only
 module Step_acc = Tock.Inner_curve.Affine
 
 (* The prover for wrapping a proof *)
-let wrap
+let wrap ~logger
     (type actual_proofs_verified max_proofs_verified
     max_local_max_proofs_verifieds ) ~proof_cache
     ~(max_proofs_verified : max_proofs_verified Nat.t)
@@ -311,7 +311,6 @@ let wrap
         , max_proofs_verified )
         Vector.t )
       P.Base.Step.t ) =
-  let logger = Internal_tracing_context_logger.get () in
   [%log internal] "Pickles_wrap_proof" ;
   let messages_for_next_wrap_proof =
     let module M =

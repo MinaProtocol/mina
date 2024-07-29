@@ -122,7 +122,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     (* Build the provers for the various rules. *)
     let tag1, _, _, Pickles.Provers.[ trivial_prover1 ] =
-      Zkapps_examples.compile () ~cache:Cache_dir.cache
+      Zkapps_examples.compile () ~logger ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
         ~branches:(module Pickles_types.Nat.N1)
         ~max_proofs_verified:(module Pickles_types.Nat.N0)
@@ -136,7 +136,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Pickles.Side_loaded.Verification_key.of_compiled tag1
     in
     let tag2, _, _, Pickles.Provers.[ trivial_prover2 ] =
-      Zkapps_examples.compile () ~cache:Cache_dir.cache
+      Zkapps_examples.compile () ~logger ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
         ~branches:(module Pickles_types.Nat.N1)
         ~max_proofs_verified:(module Pickles_types.Nat.N0)

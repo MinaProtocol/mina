@@ -100,6 +100,7 @@ let%test_unit "1-of-2" =
 
 (* test a snapp tx with a 3-account_update ring *)
 let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
+  let logger = (* No internal logging in unit tests *) Logger.null () in
   let proof_cache =
     Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
     @@ Yojson.Safe.from_file "proof_cache.json"
@@ -127,7 +128,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
           Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
           let spec = List.hd_exn specs in
           let tag, _, (module P), Pickles.Provers.[ ringsig_prover ] =
-            Pickles.compile () ~cache:Cache_dir.cache ~proof_cache
+            Pickles.compile () ~logger ~cache:Cache_dir.cache ~proof_cache
               ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
               ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N0)

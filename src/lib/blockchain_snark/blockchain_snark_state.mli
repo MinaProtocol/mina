@@ -21,7 +21,8 @@ type tag =
   Pickles.Tag.t
 
 val verify :
-     (Protocol_state.Value.t * Proof.t) list
+     logger:Logger.t
+  -> (Protocol_state.Value.t * Proof.t) list
   -> key:Pickles.Verification_key.t
   -> unit Or_error.t Async.Deferred.t
 
@@ -65,6 +66,8 @@ module Make (T : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val proof_level : Genesis_constants.Proof_level.t
+
+  val logger : Logger.t
 end) : S
 [@@warning "-67"]
 

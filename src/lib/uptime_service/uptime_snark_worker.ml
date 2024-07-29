@@ -17,12 +17,12 @@ module Worker_state = struct
 
   type t = (module S)
 
-  let create () : t Deferred.t =
+  let create ~logger () : t Deferred.t =
     Deferred.return
       (let module M = struct
          let perform_single (message, single_spec) =
            let%bind (worker_state : Prod.Worker_state.t) =
-             Prod.Worker_state.create
+             Prod.Worker_state.create ~logger
                ~constraint_constants:
                  Genesis_constants.Constraint_constants.compiled
                ~proof_level:Full ()
@@ -80,7 +80,7 @@ module Worker = struct
 
       let init_worker_state logger =
         [%log info] "Uptime SNARK worker started" ;
-        Worker_state.create ()
+        Worker_state.create ~logger ()
 
       let init_connection_state ~connection:_ ~worker_state:_ () = Deferred.unit
     end

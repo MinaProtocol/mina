@@ -2,6 +2,8 @@ open Core_kernel
 open Async
 module Prod = Snark_worker__Prod.Inputs
 
+let logger = (* No internal logging in standalone snark worker *) Logger.null ()
+
 let command =
   let open Command.Let_syntax in
   Command.async ~summary:"Run snark worker directly"
@@ -20,7 +22,7 @@ let command =
      fun () ->
        let open Async in
        let%bind worker_state =
-         Prod.Worker_state.create
+         Prod.Worker_state.create ~logger
            ~constraint_constants:Genesis_constants.Constraint_constants.compiled
            ~proof_level ()
        in

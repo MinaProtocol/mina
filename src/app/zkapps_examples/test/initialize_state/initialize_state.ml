@@ -21,11 +21,13 @@ let%test_module "Initialize state test" =
 
     let account_id = Account_id.create pk_compressed Token_id.default
 
+    let logger = (* No internal logging in unit tests *) Logger.null ()
+
     let ( tag
         , _
         , p_module
         , Pickles.Provers.[ initialize_prover; update_state_prover ] ) =
-      Zkapps_examples.compile () ~cache:Cache_dir.cache
+      Zkapps_examples.compile () ~logger ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
         ~branches:(module Nat.N2)
         ~max_proofs_verified:(module Nat.N0)

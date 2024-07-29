@@ -232,7 +232,7 @@ module Make (Inputs : Intf.Inputs_intf) :
       Genesis_constants.Constraint_constants.compiled
     in
     let%bind state =
-      Worker_state.create ~constraint_constants ~proof_level ()
+      Worker_state.create ~logger ~constraint_constants ~proof_level ()
     in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     (* retry interval with jitter *)

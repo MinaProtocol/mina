@@ -41,7 +41,8 @@ module type Full = sig
     Pickles.Tag.t
 
   val verify :
-       (t * Sok_message.t) list
+       logger:Logger.t
+    -> (t * Sok_message.t) list
     -> key:Pickles.Verification_key.t
     -> unit Or_error.t Async.Deferred.t
 
@@ -206,6 +207,8 @@ module type Full = sig
     val constraint_constants : Genesis_constants.Constraint_constants.t
 
     val proof_level : Genesis_constants.Proof_level.t
+
+    val logger : Logger.t
   end) : S
   [@@warning "-67"]
 

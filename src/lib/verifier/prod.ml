@@ -86,6 +86,8 @@ module Worker_state = struct
                let constraint_constants = constraint_constants
 
                let proof_level = proof_level
+
+               let logger = logger
              end)
 
              module B = Blockchain_snark_state.Make (struct
@@ -94,6 +96,8 @@ module Worker_state = struct
                let constraint_constants = constraint_constants
 
                let proof_level = proof_level
+
+               let logger = logger
              end)
 
              let verify_commands
@@ -119,7 +123,8 @@ module Worker_state = struct
                           [] )
                in
                let%map all_verified =
-                 Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ to_verify
+                 Pickles.Side_loaded.verify ~logger ~typ:Zkapp_statement.typ
+                   to_verify
                in
                List.map results ~f:(fun (id, result) ->
                    let result =
@@ -148,8 +153,6 @@ module Worker_state = struct
                    (id, result) )
 
              let verify_commands cs =
-               Internal_tracing.Context_logger.with_logger (Some logger)
-               @@ fun () ->
                Internal_tracing.Context_call.with_call_id
                @@ fun () ->
                [%log internal] "Verifier_verify_commands" ;
@@ -160,12 +163,10 @@ module Worker_state = struct
              let verify_blockchain_snarks = B.Proof.verify
 
              let verify_blockchain_snarks bs =
-               Internal_tracing.Context_logger.with_logger (Some logger)
-               @@ fun () ->
                Internal_tracing.Context_call.with_call_id
                @@ fun () ->
                [%log internal] "Verifier_verify_blockchain_snarks" ;
-               let%map result = verify_blockchain_snarks bs in
+               let%map result = verify_blockchain_snarks ~logger bs in
                [%log internal] "Verifier_verify_blockchain_snarks_done" ;
                result
 
@@ -181,8 +182,6 @@ module Worker_state = struct
                    failwith "Verifier crashed"
 
              let verify_transaction_snarks ts =
-               Internal_tracing.Context_logger.with_logger (Some logger)
-               @@ fun () ->
                Internal_tracing.Context_call.with_call_id
                @@ fun () ->
                [%log internal] "Verifier_verify_transaction_snarks" ;
@@ -239,6 +238,8 @@ module Worker_state = struct
                     let constraint_constants = constraint_constants
 
                     let proof_level = proof_level
+
+                    let logger = logger
                   end) in
                  let module B = Blockchain_snark_state.Make (struct
                    let tag = T.tag
@@ -246,6 +247,8 @@ module Worker_state = struct
                    let constraint_constants = constraint_constants
 
                    let proof_level = proof_level
+
+                   let logger = logger
                  end) in
                  Lazy.force B.Proof.verification_key )
 

@@ -97,9 +97,11 @@ module type Proof_intf = sig
 
   val id : Cache.Wrap.Key.Verification.t Deferred.t Lazy.t
 
-  val verify : (statement * t) list -> unit Or_error.t Deferred.t
+  val verify :
+    logger:Logger.t -> (statement * t) list -> unit Or_error.t Deferred.t
 
-  val verify_promise : (statement * t) list -> unit Or_error.t Promise.t
+  val verify_promise :
+    logger:Logger.t -> (statement * t) list -> unit Or_error.t Promise.t
 end
 
 module Prover = struct
@@ -337,7 +339,8 @@ struct
 
   let compile :
       type var value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
-         self:(var, value, max_proofs_verified, branches) Tag.t
+         logger:Logger.t
+      -> self:(var, value, max_proofs_verified, branches) Tag.t
       -> cache:Key_cache.Spec.t list
       -> storables:Storables.t
       -> proof_cache:Proof_cache.t option
@@ -378,7 +381,7 @@ struct
          * _
          * _
          * _ =
-   fun ~self ~cache
+   fun ~logger ~self ~cache
        ~storables:
          { step_storable; step_vk_storable; wrap_storable; wrap_vk_storable }
        ~proof_cache ?disk_keys ?override_wrap_domain ?override_wrap_main
@@ -519,8 +522,8 @@ struct
               Timer.clock __LOC__ ;
               let res =
                 Common.time "make step data" (fun () ->
-                    Step_branch_data.create ~index:!i ~feature_flags ~num_chunks
-                      ~actual_feature_flags:rule.feature_flags
+                    Step_branch_data.create ~logger ~index:!i ~feature_flags
+                      ~num_chunks ~actual_feature_flags:rule.feature_flags
                       ~max_proofs_verified:Max_proofs_verified.n
                       ~branches:Branches.n ~self ~public_input ~auxiliary_typ
                       Arg_var.to_field_elements Arg_value.to_field_elements rule
@@ -653,9 +656,9 @@ struct
       match override_wrap_main with
       | None ->
           let srs = Tick.Keypair.load_urs () in
-          Wrap_main.wrap_main ~num_chunks ~feature_flags ~srs full_signature
-            prev_varss_length step_vks proofs_verifieds all_step_domains
-            max_proofs_verified
+          Wrap_main.wrap_main ~logger ~num_chunks ~feature_flags ~srs
+            full_signature prev_varss_length step_vks proofs_verifieds
+            all_step_domains max_proofs_verified
       | Some { wrap_main; tweak_statement = _ } ->
           (* Instead of creating a proof using the pickles wrap circuit, we
              have been asked to create proof in an 'adversarial' way, where
@@ -768,8 +771,8 @@ struct
         let step ~proof_cache ~maxes handler next_state =
           let%bind.Promise wrap_vk = Lazy.force wrap_vk in
           let%bind.Promise step_pk = Lazy.force step_pk in
-          S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
-            ~self ~step_domains:all_step_domains
+          S.f ~logger ?handler branch_data next_state
+            ~prevs_length:prev_vars_length ~self ~step_domains:all_step_domains
             ~self_dlog_plonk_index:
               ((* TODO *) Plonk_verification_key_evals.map
                  ~f:(fun x -> [| x |])
@@ -815,9 +818,10 @@ struct
             in
             let%bind.Promise wrap_main = Lazy.force wrap_main in
             let%bind.Promise wrap_pk = Lazy.force wrap_pk in
-            Wrap.wrap ~proof_cache ~max_proofs_verified:Max_proofs_verified.n
-              ~feature_flags ~actual_feature_flags:b.feature_flags
-              full_signature.maxes wrap_requests ?tweak_statement
+            Wrap.wrap ~logger ~proof_cache
+              ~max_proofs_verified:Max_proofs_verified.n ~feature_flags
+              ~actual_feature_flags:b.feature_flags full_signature.maxes
+              wrap_requests ?tweak_statement
               ~dlog_plonk_index:
                 ((* TODO *) Plonk_verification_key_evals.map
                    ~f:(fun x -> [| x |])
@@ -946,7 +950,7 @@ module Side_loaded = struct
     let of_proof : _ Proof.t -> t = Wrap_hack.pad_proof
   end
 
-  let verify_promise (type t) ~(typ : (_, t) Impls.Step.Typ.t)
+  let verify_promise ~logger (type t) ~(typ : (_, t) Impls.Step.Typ.t)
       (ts : (Verification_key.t * t * Proof.t) list) =
     let m =
       ( module struct
@@ -981,9 +985,10 @@ module Side_loaded = struct
               }
             in
             Verify.Instance.T (max_proofs_verified, m, None, vk, x, p) )
-        |> Verify.verify_heterogenous )
+        |> Verify.verify_heterogenous ~logger )
 
-  let verify ~typ ts = verify_promise ~typ ts |> Promise.to_deferred
+  let verify ~logger ~typ ts =
+    verify_promise ~logger ~typ ts |> Promise.to_deferred
 
   let srs_precomputation () : unit =
     let srs = Tock.Keypair.load_urs () in
@@ -994,7 +999,8 @@ end
 
 let compile_with_wrap_main_override_promise :
     type var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
-       ?self:(var, value, max_proofs_verified, branches) Tag.t
+       logger:Logger.t
+    -> ?self:(var, value, max_proofs_verified, branches) Tag.t
     -> ?cache:Key_cache.Spec.t list
     -> ?storables:Storables.t
     -> ?proof_cache:Proof_cache.t
@@ -1050,7 +1056,7 @@ let compile_with_wrap_main_override_promise :
  (* This function is an adapter between the user-facing Pickles.compile API
     and the underlying Make(_).compile function which builds the circuits.
  *)
- fun ?self ?(cache = []) ?(storables = Storables.default) ?proof_cache
+ fun ~logger ?self ?(cache = []) ?(storables = Storables.default) ?proof_cache
      ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks
      ~public_input ~auxiliary_typ ~branches ~max_proofs_verified ~name
      ?constraint_constants ~choices () ->
@@ -1119,7 +1125,7 @@ let compile_with_wrap_main_override_promise :
         r :: conv_irs rs
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
-    M.compile ~self ~proof_cache ~cache ~storables ?disk_keys
+    M.compile ~logger ~self ~proof_cache ~cache ~storables ?disk_keys
       ?override_wrap_domain ?override_wrap_main ?num_chunks ~branches
       ~max_proofs_verified ~name ~public_input ~auxiliary_typ
       ?constraint_constants
@@ -1187,17 +1193,17 @@ let compile_with_wrap_main_override_promise :
 
     let verification_key = Lazy.map ~f:Promise.to_deferred wrap_vk
 
-    let verify_promise ts =
+    let verify_promise ~logger ts =
       let%bind.Promise chunking_data = chunking_data in
       let%bind.Promise verification_key = Lazy.force verification_key_promise in
-      verify_promise ?chunking_data
+      verify_promise ~logger ?chunking_data
         ( module struct
           include Max_proofs_verified
         end )
         (module Value)
         verification_key ts
 
-    let verify ts = verify_promise ts |> Promise.to_deferred
+    let verify ~logger ts = verify_promise ~logger ts |> Promise.to_deferred
   end in
   (self, cache_handle, (module P), provers)
 
@@ -1319,6 +1325,8 @@ end) =
 struct
   open Impls.Step
 
+  let logger = (* No internal logging in unit tests *) Logger.null ()
+
   let rule self : _ Inductive_rule.Promise.t =
     { identifier = "main"
     ; prevs = [ self; self ]
@@ -1351,7 +1359,7 @@ struct
     }
 
   let tag, _, p, ([ step ] : _ H3_2.T(Prover).t) =
-    compile_with_wrap_main_override_promise () ~override_wrap_main
+    compile_with_wrap_main_override_promise () ~logger ~override_wrap_main
       ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
       ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N2)
@@ -1367,7 +1375,7 @@ struct
   let%test "should not be able to verify invalid proof" =
     match
       Promise.block_on_async_exn (fun () ->
-          Proof.verify_promise [ proof_with_stmt ] )
+          Proof.verify_promise ~logger [ proof_with_stmt ] )
     with
     | Ok () ->
         false
@@ -1390,7 +1398,7 @@ struct
 
     let _tag, _, p, ([ step ] : _ H3_2.T(Prover).t) =
       Common.time "compile" (fun () ->
-          compile_with_wrap_main_override_promise ()
+          compile_with_wrap_main_override_promise () ~logger
             ~public_input:(Input Typ.unit) ~auxiliary_typ:Typ.unit
             ~branches:(module Nat.N1)
             ~max_proofs_verified:(module Nat.N2)
@@ -1435,6 +1443,6 @@ struct
       in
       Or_error.is_error
       @@ Promise.block_on_async_exn (fun () ->
-             Recurse_on_bad_proof.Proof.verify_promise [ ((), proof) ] )
+             Recurse_on_bad_proof.Proof.verify_promise ~logger [ ((), proof) ] )
     with _ -> true
 end

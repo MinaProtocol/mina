@@ -13,6 +13,8 @@ let%test_module "Composability test" =
   ( module struct
     let () = Base.Backtrace.elide := false
 
+    let logger = (* No internal logging in unit tests *) Logger.null ()
+
     let sk = Private_key.create ()
 
     let pk = Public_key.of_private_key_exn sk
@@ -66,7 +68,7 @@ let%test_module "Composability test" =
             ; add_prover
             ; add_and_call_prover
             ] ) =
-      Zkapps_examples.compile () ~cache:Cache_dir.cache
+      Zkapps_examples.compile () ~logger ~cache:Cache_dir.cache
         ~auxiliary_typ:(option_typ Zkapps_calls.Call_data.Output.typ)
         ~branches:(module Nat.N4)
         ~max_proofs_verified:(module Nat.N0)
