@@ -98,9 +98,7 @@ let toDebianNames =
                               Prelude.List.map
                                 Network.Type
                                 Text
-                                (     \(n : Network.Type)
-                                  ->  "daemon_${Network.lowerName n}"
-                                )
+                                (\(n : Network.Type) -> toDebianName a n)
                                 networks
                           , Archive = [ "archive" ]
                           , TestExecutive = [ "test_executive" ]
