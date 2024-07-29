@@ -57,4 +57,5 @@ export RELEASE=unstable
 
 echo "Publishing on release channel \"${RELEASE}\""
 [[ -n ${THIS_COMMIT_TAG} ]] && export MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"
+
 export MINA_DEB_RELEASE="${RELEASE}"
