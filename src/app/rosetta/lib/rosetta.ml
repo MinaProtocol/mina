@@ -7,7 +7,7 @@ let router ~graphql_uri
        ( (Caqti_async.connection, [> Caqti_error.connect ]) Caqti_async.Pool.t
        , [ `App of Errors.t ] )
        Deferred.Result.t
-       lazy_t ) ~logger route body =
+       lazy_t ) ~logger ~search_include_timestamp route body =
   let open Deferred.Result.Let_syntax in
   let get_graphql_uri_or_error () =
     match graphql_uri with
@@ -56,7 +56,7 @@ let router ~graphql_uri
           ~with_db:with_db'
     | "search" :: tl ->
         let%bind graphql_uri = get_graphql_uri_or_error () in
-        Search.router tl body ~graphql_uri ~logger ~with_db:with_db'
+        Search.router tl body ~graphql_uri ~logger ~with_db:with_db' ~search_include_timestamp
     | _ ->
         Deferred.return (Error `Page_not_found)
   with exn -> Deferred.return (Error (`Exception exn))
@@ -102,16 +102,17 @@ let pg_log_data ~logger ~pool : unit Deferred.t =
         ~metadata:[ ("error", `String (Errors.show err)) ] ;
       Deferred.unit
 
-let server_handler ~pool ~graphql_uri ~logger ~body _sock req =
+let server_handler ~pool ~graphql_uri ~logger ~body ~search_include_timestamp
+    _sock req =
   let uri = Cohttp_async.Request.uri req in
   let%bind body = Cohttp_async.Body.to_string body in
   let route = List.tl_exn (String.split ~on:'/' (Uri.path uri)) in
   let%bind result =
     match Yojson.Safe.from_string body with
     | body ->
-        router route body ~pool ~graphql_uri ~logger
+        router route body ~pool ~graphql_uri ~logger ~search_include_timestamp
     | exception Yojson.Json_error "Blank input data" ->
-        router route `Null ~pool ~graphql_uri ~logger
+        router route `Null ~pool ~graphql_uri ~logger ~search_include_timestamp
     | exception Yojson.Json_error err ->
         Errors.create ~context:"JSON in request malformed"
           (`Json_parse (Some err))
@@ -165,6 +166,9 @@ let command =
   and port =
     flag "--port" ~aliases:[ "port" ] ~doc:"Port to expose Rosetta server"
       (required int)
+  and search_include_timestamp =
+    flag "--include-timestamp" ~aliases:[ "include-timestamp" ]
+      ~doc:"Include timestamp in search transactions response" no_arg
   in
   let open Deferred.Let_syntax in
   fun () ->
@@ -223,7 +227,7 @@ let command =
                     env_var ~metadata ;
                   ignore (exit 1) ) )
         (Async.Tcp.Where_to_listen.bind_to All_addresses (On_port port))
-        (server_handler ~pool ~graphql_uri ~logger)
+        (server_handler ~pool ~graphql_uri ~logger ~search_include_timestamp)
     in
     [%log info]
       ~metadata:[ ("port", `Int port) ]

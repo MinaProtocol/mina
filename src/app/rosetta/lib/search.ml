@@ -90,24 +90,38 @@ module Make_info_with_block_id (Info : sig
   val dummies : t list
 end) =
 struct
-  type t = { info : Info.t; block_hash : string; block_height : int64 }
+  type t =
+    { info : Info.t
+    ; block_hash : string
+    ; block_height : int64
+    ; timestamp : string
+    }
   [@@deriving to_yojson]
 
   module T (M : Monad_fail.S) = struct
     include Info.T (M)
 
-    let to_indexer_transaction info =
+    let to_indexer_transaction ~search_include_timestamp info =
       let open M.Let_syntax in
       let%map transaction = to_transaction info.info in
       let block_identifier =
         Block_identifier.create info.block_height info.block_hash
       in
-      { Block_transaction.transaction; block_identifier }
+      Block_transaction.create
+        ?timestamp:
+          ( if search_include_timestamp then
+            Some (Int64.of_string info.timestamp)
+          else None )
+        block_identifier transaction
   end
 
   let dummies =
     List.map Info.dummies ~f:(fun info ->
-        { info; block_hash = "HASH"; block_height = 0L } )
+        { info
+        ; block_hash = "HASH"
+        ; block_height = 0L
+        ; timestamp = "1594937771"
+        } )
 end
 
 module Internal_command_info = Make_info_with_block_id (Internal_command_info)
@@ -139,13 +153,13 @@ module Transactions_info = struct
     module User_command_info_ops = User_command_info.T (M)
     module Zkapp_command_info_ops = Zkapp_command_info.T (M)
 
-    let to_transactions info =
+    let to_transactions ~search_include_timestamp info =
       let open M.Let_syntax in
       let%bind internal_transactions =
         List.fold info.internal_commands ~init:(M.return [])
           ~f:(fun acc' info ->
             let%bind transaction =
-              Internal_command_info_ops.to_indexer_transaction info
+              Internal_command_info_ops.to_indexer_transaction ~search_include_timestamp info
             in
             let%map acc = acc' in
             transaction :: acc )
@@ -154,7 +168,7 @@ module Transactions_info = struct
       let%bind user_transactions =
         List.fold info.user_commands ~init:(M.return []) ~f:(fun acc' info ->
             let%bind transaction =
-              User_command_info_ops.to_indexer_transaction info
+              User_command_info_ops.to_indexer_transaction ~search_include_timestamp info
             in
             let%map acc = acc' in
             transaction :: acc )
@@ -163,7 +177,7 @@ module Transactions_info = struct
       let%map zkapp_command_transactions =
         List.fold info.zkapp_commands ~init:(M.return []) ~f:(fun acc' cmd ->
             let%bind transaction =
-              Zkapp_command_info_ops.to_indexer_transaction cmd
+              Zkapp_command_info_ops.to_indexer_transaction ~search_include_timestamp cmd
             in
             let%map acc = acc' in
             transaction :: acc )
@@ -335,6 +349,7 @@ module Sql = struct
         ; state_hash : string
         ; chain_status : string
         ; height : int64
+        ; timestamp : string
         }
       [@@deriving hlist, fields]
 
@@ -353,6 +368,7 @@ module Sql = struct
           ; "b.state_hash"
           ; "b.chain_status"
           ; "b.height"
+          ; "b.timestamp"
           ]
 
       let typ =
@@ -367,6 +383,7 @@ module Sql = struct
             ; string
             ; string
             ; int64
+            ; string
             ]
 
       let query_string operator op_type =
@@ -584,6 +601,7 @@ module Sql = struct
       { User_command_info.info
       ; block_hash = Cte.state_hash command
       ; block_height = Cte.height command
+      ; timestamp = Cte.timestamp command
       }
   end
 
@@ -599,6 +617,7 @@ module Sql = struct
         ; block_id : int
         ; block_hash : string
         ; block_height : int64
+        ; timestamp : string
         }
       [@@deriving hlist, fields]
 
@@ -619,6 +638,7 @@ module Sql = struct
           ; "bic.block_id"
           ; "b.state_hash"
           ; "b.height"
+          ; "b.timestamp"
           ]
 
       let receiver t = `Pk t.receiver
@@ -638,6 +658,7 @@ module Sql = struct
             ; int
             ; string
             ; int64
+            ; string
             ]
 
       let query_string filters =
@@ -800,6 +821,7 @@ module Sql = struct
       { Internal_command_info.info
       ; block_hash = internal_command.block_hash
       ; block_height = internal_command.block_height
+      ; timestamp = internal_command.timestamp
       }
   end
 
@@ -809,6 +831,7 @@ module Sql = struct
       ; block_id : int
       ; block_hash : string
       ; block_height : int64
+      ; timestamp : string
       }
     [@@deriving hlist]
 
@@ -818,12 +841,18 @@ module Sql = struct
         ; "bzc.block_id"
         ; "b.state_hash"
         ; "b.height"
+        ; "b.timestamp"
         ]
 
     let typ =
       Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
         Caqti_type.
-          [ Rosetta_lib_block.Sql.Zkapp_commands.typ; int; string; int64 ]
+          [ Rosetta_lib_block.Sql.Zkapp_commands.typ
+          ; int
+          ; string
+          ; int64
+          ; string
+          ]
 
     let cte_query_string filters =
       [%string
@@ -950,12 +979,12 @@ module Sql = struct
           command.zkapp_command
 
       let account_updates_and_command_to_info account_updates
-          { zkapp_command; block_hash; block_height; _ } =
+          { zkapp_command; block_hash; block_height; timestamp; _ } =
         let info =
           Rosetta_lib_block.Sql.Zkapp_commands
           .account_updates_and_command_to_info account_updates zkapp_command
         in
-        { Zkapp_command_info.info; block_hash; block_height }
+        { Zkapp_command_info.info; block_hash; block_height; timestamp }
     end)
   end
 
@@ -1062,9 +1091,10 @@ module Specific = struct
     let handle :
            graphql_uri:Uri.t
         -> env:'gql Env.T(M).t
+        -> search_include_timestamp: bool
         -> Search_transactions_request.t
         -> (Search_transactions_response.t, Errors.t) M.t =
-     fun ~graphql_uri ~env req ->
+     fun ~graphql_uri ~env ~search_include_timestamp req ->
       let open M.Let_syntax in
       let%bind query = Query.of_search_transaction_request req in
       let%bind () =
@@ -1076,7 +1106,7 @@ module Specific = struct
         List.fold transactions_info.internal_commands ~init:(M.return [])
           ~f:(fun macc info ->
             let%bind transaction =
-              Internal_command_info_ops.to_indexer_transaction info
+              Internal_command_info_ops.to_indexer_transaction ~search_include_timestamp info
             in
             let%map acc = macc in
             transaction :: acc )
@@ -1086,7 +1116,7 @@ module Specific = struct
         List.fold transactions_info.user_commands ~init:(M.return [])
           ~f:(fun acc' cmd ->
             let%bind transaction =
-              User_command_info_ops.to_indexer_transaction cmd
+              User_command_info_ops.to_indexer_transaction ~search_include_timestamp cmd
             in
             let%map acc = acc' in
             transaction :: acc )
@@ -1096,7 +1126,7 @@ module Specific = struct
         List.fold transactions_info.zkapp_commands ~init:(M.return [])
           ~f:(fun acc' cmd ->
             let%bind transaction =
-              Zkapp_command_info_ops.to_indexer_transaction cmd
+              Zkapp_command_info_ops.to_indexer_transaction ~search_include_timestamp cmd
             in
             let%map acc = acc' in
             transaction :: acc )
@@ -1119,7 +1149,8 @@ module Specific = struct
   module Real = Impl (Deferred.Result)
 end
 
-let router ~graphql_uri ~logger ~with_db (route : string list) body =
+let router ~graphql_uri ~logger ~with_db ~search_include_timestamp
+    (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /search/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
@@ -1135,6 +1166,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
           let%map res =
             Specific.Real.handle ~graphql_uri
               ~env:(Specific.Env.real ~logger ~db)
+              ~search_include_timestamp
               req
             |> Errors.Lift.wrap
           in
