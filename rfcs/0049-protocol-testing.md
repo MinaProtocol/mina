@@ -122,7 +122,7 @@ Some of the metrics we want can be expressed as unit benchmarks, which are easy 
 
 Below is a diagram of the proposed testing architecture, showing a high level dataflow of the components involved in executing tests. Details are left abstract over where the tests will be running for now as the architecture is intended to remain the same, primarily swapping out the orchestra backend to change testing environments.
 
-![](res/abstract_testing_architecture.png)
+![](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/abstract_testing_architecture.png)
 
 ##### Orchestrator/Orchestra
 
