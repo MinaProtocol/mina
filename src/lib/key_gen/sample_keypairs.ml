@@ -1,41 +1,41 @@
 open Core_kernel
 open Signature_lib
 
-let kps =
+(* FIXME #2936: remove this "precomputed VRF keypair" *)
+(* This key is also at the start of all the release ledgers. It's needed to generate a valid genesis transition *)
+let genesis_winner =
+  let kp =
+    Keypair.of_private_key_exn
+      (Private_key.of_base58_check_exn
+         "EKFKgDtU3rcuFTVSEpmpXSkukjmX4cKefYREi6Sdsk7E7wsT7KRw" )
+  in
+  (Public_key.compress kp.public_key, kp.private_key)
+
+let generated_keypairs =
   lazy
     (let n = 1200 in
-     let generated_keypairs =
-       let sks =
-         Quickcheck.(
-           random_value ~seed:(`Deterministic "Coda_sample_keypairs")
-             (Generator.list_with_length n Private_key.gen))
-       in
-       List.map sks ~f:Keypair.of_private_key_exn
+     let sks =
+       Quickcheck.(
+         random_value ~seed:(`Deterministic "Coda_sample_keypairs")
+           (Generator.list_with_length n Private_key.gen))
      in
-     List.cons
-       (* FIXME #2936: remove this "precomputed VRF keypair" *)
-       (* This key is also at the start of all the release ledgers. It's needed to generate a valid genesis transition *)
-       (Keypair.of_private_key_exn
-          (Private_key.of_base58_check_exn
-             "EKFKgDtU3rcuFTVSEpmpXSkukjmX4cKefYREi6Sdsk7E7wsT7KRw" ) )
-       generated_keypairs )
+     List.map sks ~f:(function sk ->
+         let kp = Keypair.of_private_key_exn sk in
+         (Public_key.compress kp.public_key, kp.private_key) ) )
 
 let keypairs =
-  Lazy.map kps ~f:(fun a ->
-      Array.of_list_map a ~f:(fun kp ->
-          (Public_key.compress kp.public_key, kp.private_key) ) )
+  Lazy.map generated_keypairs ~f:(fun a ->
+      Array.of_list (List.cons genesis_winner a) )
 
 let main () =
   let json =
     `List
-      (List.map (Lazy.force kps) ~f:(fun kp ->
+      (List.map
+         (Array.to_list @@ Lazy.force keypairs)
+         ~f:(fun (pk, sk) ->
            `Assoc
-             [ ( "public_key"
-               , `String
-                   Public_key.(
-                     Compressed.to_base58_check (compress kp.public_key)) )
-             ; ( "private_key"
-               , `String (Private_key.to_base58_check kp.private_key) )
+             [ ("public_key", `String Public_key.(Compressed.to_base58_check pk))
+             ; ("private_key", `String (Private_key.to_base58_check sk))
              ] ) )
   in
   Out_channel.with_file "sample_keypairs.json" ~f:(fun json_file ->
