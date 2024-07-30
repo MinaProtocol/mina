@@ -4,12 +4,9 @@ open Signature_lib
 (* FIXME #2936: remove this "precomputed VRF keypair" *)
 (* This key is also at the start of all the release ledgers. It's needed to generate a valid genesis transition *)
 let genesis_winner =
-  let kp =
-    Keypair.of_private_key_exn
-      (Private_key.of_base58_check_exn
-         "EKFKgDtU3rcuFTVSEpmpXSkukjmX4cKefYREi6Sdsk7E7wsT7KRw" )
-  in
-  (Public_key.compress kp.public_key, kp.private_key)
+  Keypair.of_private_key_exn
+    (Private_key.of_base58_check_exn
+       "EKFKgDtU3rcuFTVSEpmpXSkukjmX4cKefYREi6Sdsk7E7wsT7KRw" )
 
 let generated_keypairs =
   lazy
@@ -19,13 +16,15 @@ let generated_keypairs =
          random_value ~seed:(`Deterministic "Coda_sample_keypairs")
            (Generator.list_with_length n Private_key.gen))
      in
-     List.map sks ~f:(function sk ->
-         let kp = Keypair.of_private_key_exn sk in
-         (Public_key.compress kp.public_key, kp.private_key) ) )
+     List.map sks ~f:Keypair.of_private_key_exn )
 
-let keypairs =
+let kps =
   Lazy.map generated_keypairs ~f:(fun a ->
       Array.of_list (List.cons genesis_winner a) )
+
+let keypairs =
+  Lazy.map kps ~f:(fun a ->
+      Array.map a ~f:(fun kp -> (kp.public_key, kp.private_key)) )
 
 let main () =
   let json =
@@ -34,7 +33,10 @@ let main () =
          (Array.to_list @@ Lazy.force keypairs)
          ~f:(fun (pk, sk) ->
            `Assoc
-             [ ("public_key", `String Public_key.(Compressed.to_base58_check pk))
+             [ ( "public_key"
+               , `String
+                   Public_key.(
+                     Compressed.to_base58_check @@ Public_key.compress pk) )
              ; ("private_key", `String (Private_key.to_base58_check sk))
              ] ) )
   in
