@@ -3,11 +3,7 @@ open Core
 open Async
 open Mina_state
 
-(* TODO: refactor to do compile time selection *)
-
 let use_dummy_values = String.equal Node_config.proof_level "full" |> not
-
-let generate_genesis_proof = Node_config.generate_genesis_proof
 
 module type S = sig
   val compiled_values : Genesis_proof.t Async.Deferred.t option
@@ -70,87 +66,11 @@ module Inputs = struct
       ~genesis_body_reference
 end
 
-module Dummy = struct
-  let loc = Ppxlib.Location.none
-
-  let base_proof_expr =
-    if generate_genesis_proof then
-      Some (Async.return [%expr Lazy.force Mina_base.Proof.blockchain_dummy])
-    else None
-
-  let compiled_values =
-    let open Inputs in
-    let open Staged_ledger_diff in
-    if generate_genesis_proof then
-      Some
-        (Async.return
-           { Genesis_proof.runtime_config = Runtime_config.default
-           ; constraint_constants
-           ; proof_level
-           ; genesis_constants
-           ; genesis_ledger = (module Test_genesis_ledger)
-           ; genesis_epoch_data
-           ; genesis_body_reference
-           ; consensus_constants
-           ; protocol_state_with_hashes
-           ; constraint_system_digests = hashes
-           ; proof_data = None
-           } )
-    else None
-end
-
-module Make_real () = struct
-  let loc = Ppxlib.Location.none
-
-  let compiled_values =
-    let open Inputs in
-    let open Staged_ledger_diff in
-    if generate_genesis_proof then
-      Some
-        (let%bind () = return () in
-         let module T = Transaction_snark.Make (Inputs) in
-         let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
-           let tag = T.tag
-
-           include Inputs
-         end) in
-         let%map values =
-           Genesis_proof.create_values
-             (module T)
-             (module B)
-             { runtime_config = Runtime_config.default
-             ; constraint_constants
-             ; proof_level = Full
-             ; genesis_constants
-             ; genesis_ledger = (module Test_genesis_ledger)
-             ; genesis_epoch_data
-             ; genesis_body_reference
-             ; consensus_constants
-             ; protocol_state_with_hashes
-             ; constraint_system_digests = None
-             ; blockchain_proof_system_id = None
-             }
-         in
-         values )
-    else None
-end
-
 let main () =
   let open Ppxlib.Ast_builder.Default in
   let target = (Sys.get_argv ()).(1) in
   let fmt = Format.formatter_of_out_channel (Out_channel.create target) in
   let loc = Ppxlib.Location.none in
-  let (module M) =
-    if use_dummy_values then (module Dummy : S) else (module Make_real () : S)
-  in
-  let%bind compiled_values =
-    match M.compiled_values with
-    | Some expr ->
-        let%map expr = expr in
-        Some expr
-    | None ->
-        Deferred.return None
-  in
   let structure =
     [%str
       module T = Genesis_proof.T
@@ -210,70 +130,11 @@ let main () =
           ; genesis_body_reference
           ; consensus_constants
           ; protocol_state_with_hashes
-          ; constraint_system_digests =
-              [%e
-                match compiled_values with
-                | Some { constraint_system_digests = hashes; _ } ->
-                    [%expr Some [%e hashes_to_expr ~loc (Lazy.force hashes)]]
-                | None ->
-                    [%expr None]]
-          ; blockchain_proof_system_id =
-              [%e
-                match compiled_values with
-                | Some
-                    { proof_data = Some { blockchain_proof_system_id = id; _ }
-                    ; _
-                    } ->
-                    [%expr Some [%e vk_id_to_expr ~loc id]]
-                | _ ->
-                    [%expr None]]
+          ; constraint_system_digests = None
+          ; blockchain_proof_system_id = None
           })
 
-      let compiled =
-        [%e
-          match compiled_values with
-          | Some compiled_values ->
-              [%expr
-                Some
-                  ( lazy
-                    (let inputs = Lazy.force compiled_inputs in
-                     { runtime_config = inputs.runtime_config
-                     ; constraint_constants = inputs.constraint_constants
-                     ; proof_level = inputs.proof_level
-                     ; genesis_constants = inputs.genesis_constants
-                     ; genesis_ledger = inputs.genesis_ledger
-                     ; genesis_epoch_data = inputs.genesis_epoch_data
-                     ; genesis_body_reference = inputs.genesis_body_reference
-                     ; consensus_constants = inputs.consensus_constants
-                     ; protocol_state_with_hashes =
-                         inputs.protocol_state_with_hashes
-                     ; constraint_system_digests =
-                         lazy [%e hashes_to_expr ~loc (Lazy.force hashes)]
-                     ; proof_data =
-                         [%e
-                           match compiled_values.proof_data with
-                           | Some proof_data ->
-                               [%expr
-                                 Some
-                                   { blockchain_proof_system_id =
-                                       [%expr
-                                         vk_id_to_expr ~loc
-                                           proof_data.blockchain_proof_system_id]
-                                   ; genesis_proof =
-                                       Core.Binable.of_string
-                                         (module Mina_base.Proof.Stable.Latest)
-                                         [%e
-                                           estring ~loc
-                                             (Binable.to_string
-                                                ( module Mina_base.Proof.Stable
-                                                         .Latest )
-                                                proof_data.genesis_proof )]
-                                   }]
-                           | None ->
-                               [%expr None]]
-                     } ) )]
-          | None ->
-              [%expr None]]]
+      let compiled = None]
   in
   Pprintast.top_phrase fmt (Ptop_def structure) ;
   exit 0

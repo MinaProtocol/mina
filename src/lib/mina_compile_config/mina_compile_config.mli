@@ -16,8 +16,6 @@ val block_window_duration_ms : int
 
 val vrf_poll_interval_ms : int
 
-val generate_genesis_proof : bool
-
 val network_id : string
 
 val zkapp_cmd_limit : int option
