@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 
 (* We re-export a constrained subset of prometheus to keep consumers of this
@@ -13,7 +11,7 @@ open Async_kernel
 
 let time_offset_sec = 1609459200.
 
-[%%inject "block_window_duration", block_window_duration]
+let block_window_duration = Node_config.block_window_duration
 
 (* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 module TextFormat_0_0_4 = struct

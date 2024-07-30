@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 module Bignum_bigint = Bigint
 open Core_kernel
 
@@ -242,6 +240,9 @@ module Make
 
   let verify ?signature_kind ((r, s) : Signature.t) (pk : Public_key.t)
       (m : Message.t) =
+    if Random.int 1000 = 0 then (
+      print_endline "SCHNORR BACKTRACE:" ;
+      Printexc.print_backtrace stdout ) ;
     let hash = Message.hash ?signature_kind in
     let e = hash ~public_key:pk ~r m in
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
@@ -250,17 +251,6 @@ module Make
         is_even ry && Field.equal rx r
     | exception _ ->
         false
-
-  [%%if call_logger]
-
-  let verify s pk m =
-    Mina_debug.Call_logger.record_call "Signature_lib.Schnorr.verify" ;
-    if Random.int 1000 = 0 then (
-      print_endline "SCHNORR BACKTRACE:" ;
-      Printexc.print_backtrace stdout ) ;
-    verify s pk m
-
-  [%%endif]
 
   module Checked = struct
     let to_bits x =

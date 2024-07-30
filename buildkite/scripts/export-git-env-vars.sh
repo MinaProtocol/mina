@@ -6,7 +6,8 @@ echo "Exporting Variables: "
 export MINA_REPO="https://github.com/MinaProtocol/mina.git"
 
 function find_most_recent_numeric_tag() {
-    git fetch --tags
+    # We use the --prune flag because we've had problems with buildkite agents getting conflicting results here
+    git fetch --tags --prune --prune-tags --force
     TAG=$(git describe --always --abbrev=0 $1 | sed 's!/!-!g; s!_!-!g; s!#!-!g')
     if [[ $TAG != [0-9]* ]]; then
         TAG=$(find_most_recent_numeric_tag $TAG~)
@@ -56,4 +57,5 @@ export RELEASE=unstable
 
 echo "Publishing on release channel \"${RELEASE}\""
 [[ -n ${THIS_COMMIT_TAG} ]] && export MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"
+
 export MINA_DEB_RELEASE="${RELEASE}"

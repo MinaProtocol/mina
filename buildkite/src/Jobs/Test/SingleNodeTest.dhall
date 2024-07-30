@@ -58,7 +58,11 @@ in  Pipeline.build
               , dirtyWhen = unitDirtyWhen
               , path = "Test"
               , name = "SingleNodeTest"
-              , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+              , tags =
+                [ PipelineTag.Type.Long
+                , PipelineTag.Type.Test
+                , PipelineTag.Type.Stable
+                ]
               }
       , steps = [ buildTestCmd Size.XLarge ]
       }

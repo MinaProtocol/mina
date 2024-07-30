@@ -36,8 +36,7 @@
    coda_genesis_ledger
    staged_ledger_diff
  )
- (preprocessor_deps ../../../config.mlh)
  (preprocess
-  (pps ppx_version ppx_optcomp ppx_let ppxlib.metaquot ppx_here))
+  (pps ppx_version ppx_let ppxlib.metaquot ppx_here))
  (instrumentation (backend bisect_ppx))
  (modes native))

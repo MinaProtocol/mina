@@ -1,7 +1,5 @@
 (* signed_command_memo.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params
 

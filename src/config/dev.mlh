@@ -26,16 +26,14 @@
 
 (*BEGIN src/config/scan_state/medium.mlh*)
 [%%define scan_state_with_tps_goal false]
+[%%undef scan_state_tps_goal_x10]
 [%%define scan_state_transaction_capacity_log_2 3]
 [%%define scan_state_work_delay 2]
 (*END src/config/scan_state/medium.mlh*)
 
 
 (*BEGIN src/config/debug_level/some.mlh*)
-[%%define debug_logs false]
-[%%define call_logger false]
 [%%define cache_exceptions true]
-[%%define record_async_backtraces false]
 (*END src/config/debug_level/some.mlh*)
 
 
@@ -76,15 +74,10 @@
 [%%define supercharged_coinbase_factor 1]
 (*END src/config/supercharged_coinbase_factor/one.mlh*)
 
-[%%define time_offsets true]
 [%%define plugins true]
 [%%define genesis_ledger "test"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
 [%%define block_window_duration 2000]
-[%%define integration_tests true]
-[%%define force_updates false]
-[%%define download_snark_keys false]
-[%%define generate_genesis_proof false]
 [%%define itn_features true]
 [%%define print_versioned_types false]
 [%%define test_full_epoch false]
