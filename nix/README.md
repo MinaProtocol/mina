@@ -604,7 +604,7 @@ happen when you try to build anything inside the pure shell. It happens because
 the stack size for every process is limited, and it is shared between the
 current environment, the argument list, and some other things. Therefore, if
 your environment takes up too much space, not enough is left for the arguments.
-The way to fix the error is to unset some of the bigger enviornment variables,
+The way to fix the error is to unset some of the bigger environment variables,
 perhaps with
 
 ```bash
