@@ -120,6 +120,7 @@ type t =
   ; in_memory_reverse_structured_log_messages_for_integration_test :
       (int * string list * bool) ref
   ; vrf_evaluation_state : Block_producer.Vrf_evaluation_state.t
+  ; commit_id : string
   }
 [@@deriving fields]
 
@@ -128,6 +129,8 @@ let vrf_evaluation_state t = t.vrf_evaluation_state
 let time_controller t = t.config.time_controller
 
 let subscription t = t.subscriptions
+
+let commit_id t = t.commit_id
 
 let peek_frontier frontier_broadcast_pipe =
   Broadcast_pipe.Reader.peek frontier_broadcast_pipe
@@ -1244,8 +1247,8 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
     let commit_id = commit_id
   end )
 
-let start ~commit_id t =
-  let commit_id_short = String.sub ~pos:0 ~len:8 commit_id in
+let start t =
+  let commit_id_short = String.sub ~pos:0 ~len:8 t.commit_id in
   let set_next_producer_timing timing consensus_state =
     let block_production_status, next_producer_timing =
       let generated_from_consensus_at :
@@ -1309,7 +1312,7 @@ let start ~commit_id t =
       (Keypair.And_compressed_pk.Set.is_empty t.config.block_production_keypairs)
   then
     Block_producer.run
-      ~context:(context ~commit_id t.config)
+      ~context:(context ~commit_id:t.commit_id t.config)
       ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
       ~set_next_producer_timing ~prover:t.processes.prover
       ~trust_system:t.config.trust_system
@@ -1340,7 +1343,7 @@ let start ~commit_id t =
             @@ Keypair.And_compressed_pk.Set.choose
                  t.config.block_production_keypairs
           in
-          Node_status_service.start_simplified ~commit_id
+          Node_status_service.start_simplified ~commit_id:t.commit_id
             ~logger:t.config.logger ~node_status_url ~network:t.components.net
             ~chain_id:t.config.chain_id
             ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
@@ -1350,8 +1353,8 @@ let start ~commit_id t =
                    .slot_duration_ms )
             ~block_producer_public_key_base58
         else
-          Node_status_service.start ~commit_id ~logger:t.config.logger
-            ~node_status_url ~network:t.components.net
+          Node_status_service.start ~commit_id:t.commit_id
+            ~logger:t.config.logger ~node_status_url ~network:t.components.net
             ~transition_frontier:t.components.transition_frontier
             ~sync_status:t.sync_status ~chain_id:t.config.chain_id
             ~addrs_and_ports:t.config.gossip_net_params.addrs_and_ports
@@ -1379,17 +1382,17 @@ let start ~commit_id t =
   stop_long_running_daemon t ;
   Snark_worker.start t
 
-let start_with_precomputed_blocks ~commit_id t blocks =
+let start_with_precomputed_blocks t blocks =
   let%bind () =
     Block_producer.run_precomputed
-      ~context:(context ~commit_id t.config)
+      ~context:(context ~commit_id:t.commit_id t.config)
       ~verifier:t.processes.verifier ~trust_system:t.config.trust_system
       ~time_controller:t.config.time_controller
       ~frontier_reader:t.components.transition_frontier
       ~transition_writer:t.pipes.producer_transition_writer
       ~precomputed_blocks:blocks
   in
-  start ~commit_id t
+  start t
 
 let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
   (* HACK: Pretend we're a remote peer so that we can rate limit
@@ -2289,6 +2292,7 @@ let create ~commit_id ?wallets (config : Config.t) =
             ; in_memory_reverse_structured_log_messages_for_integration_test
             ; vrf_evaluation_state =
                 Block_producer.Vrf_evaluation_state.create ()
+            ; commit_id
             } ) )
 
 let net { components = { net; _ }; _ } = net
@@ -2296,9 +2300,12 @@ let net { components = { net; _ }; _ } = net
 let runtime_config { config = { precomputed_values; _ }; _ } =
   Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values
 
-let start_filtered_log ~commit_id
-    ({ in_memory_reverse_structured_log_messages_for_integration_test; _ } : t)
-    (structured_log_ids : string list) =
+let start_filtered_log
+    ({ in_memory_reverse_structured_log_messages_for_integration_test
+     ; commit_id
+     ; _
+     } :
+      t ) (structured_log_ids : string list) =
   start_filtered_log ~commit_id
     in_memory_reverse_structured_log_messages_for_integration_test
     structured_log_ids

@@ -1470,8 +1470,8 @@ let daemon logger =
     (Command.Param.map (setup_daemon logger) ~f:(fun setup_daemon () ->
          (* Immediately disable updating the time offset. *)
          Block_time.Controller.disable_setting_offset () ;
-         let%bind coda = setup_daemon () in
-         let%bind () = Mina_lib.start ~commit_id:Mina_version.commit_id coda in
+         let%bind mina = setup_daemon () in
+         let%bind () = Mina_lib.start mina in
          [%log info] "Daemon ready. Clients can now connect" ;
          Async.never () ) )
 
@@ -1519,11 +1519,8 @@ let replay_blocks logger =
                    In_channel.close blocks_file ;
                    None )
          in
-         let%bind coda = setup_daemon () in
-         let%bind () =
-           Mina_lib.start_with_precomputed_blocks
-             ~commit_id:Mina_version.commit_id coda blocks
-         in
+         let%bind mina = setup_daemon () in
+         let%bind () = Mina_lib.start_with_precomputed_blocks mina blocks in
          [%log info]
            "Daemon is ready, replayed precomputed blocks. Clients can now \
             connect" ;
