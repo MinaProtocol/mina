@@ -2598,11 +2598,16 @@ struct
 
   let protocol_state =
     io_field "protocolState"
-      ~doc:"Get the current protocol state, optionally encoded in Base64"
+      ~doc:
+        "Get the protocol state for a given block, optionally encoded in Base64"
       ~typ:(non_null string)
       ~args:
         Arg.
-          [ arg "encoding" ~doc:"Encoding format (JSON or BASE64)"
+          [ arg "stateHash" ~doc:"The state hash of the desired block"
+              ~typ:string
+          ; arg "height"
+              ~doc:"The height of the desired block in the best chain" ~typ:int
+          ; arg "encoding" ~doc:"Encoding format (JSON or BASE64)"
               ~typ:
                 (enum "Encoding"
                    ~values:
@@ -2610,27 +2615,46 @@ struct
                      ; enum_value "BASE64" ~value:`BASE64
                      ] )
           ]
-      ~resolve:(fun { ctx = mina; _ } () encoding_opt ->
-        match Mina_lib.best_tip mina with
-        | `Active best_tip ->
-            let protocol_state =
-              Transition_frontier.Breadcrumb.protocol_state best_tip
-            in
-            let encoded =
-              match encoding_opt with
-              | Some `BASE64 ->
-                  Bin_prot.Writer.to_string
-                    Mina_state.Protocol_state.Value.Stable.V2.bin_t.writer
-                    protocol_state
-                  |> Base64.encode_exn
-              | Some `JSON | None ->
-                  (* Default to JSON if no encoding is specified *)
-                  Mina_state.Protocol_state.value_to_yojson protocol_state
-                  |> Yojson.Safe.to_string
-            in
-            return (Ok encoded)
-        | `Bootstrapping ->
-            return (Error "Node is bootstrapping") )
+      ~resolve:(fun { ctx = mina; _ } () state_hash_base58_opt height_opt
+                    encoding_opt ->
+        let open Deferred.Result.Let_syntax in
+        let%bind breadcrumb =
+          match (state_hash_base58_opt, height_opt) with
+          | None, None -> (
+              match Mina_lib.best_tip mina with
+              | `Active best_tip ->
+                  Deferred.Result.return best_tip
+              | `Bootstrapping ->
+                  Deferred.Result.fail "Node is bootstrapping" )
+          | Some state_hash_base58, None ->
+              let%bind state_hash =
+                Deferred.return (State_hash.of_base58_check state_hash_base58)
+                |> Deferred.Result.map_error ~f:Error.to_string_hum
+              in
+              Deferred.return
+                (Mina_lib.best_chain_block_by_state_hash mina state_hash)
+          | None, Some height ->
+              let height_uint32 = Unsigned.UInt32.of_int height in
+              Deferred.return
+                (Mina_lib.best_chain_block_by_height mina height_uint32)
+          | Some _, Some _ ->
+              Deferred.Result.fail
+                "Must provide exactly one of state hash, height"
+        in
+        let protocol_state =
+          Transition_frontier.Breadcrumb.protocol_state breadcrumb
+        in
+        Deferred.Result.return
+          ( match encoding_opt with
+          | Some `BASE64 ->
+              Bin_prot.Writer.to_string
+                Mina_state.Protocol_state.Value.Stable.V2.bin_t.writer
+                protocol_state
+              |> Base64.encode_exn
+          | Some `JSON | None ->
+              (* Default to JSON if no encoding is specified *)
+              Mina_state.Protocol_state.value_to_yojson protocol_state
+              |> Yojson.Safe.to_string ) )
 
   let commands =
     [ sync_status
