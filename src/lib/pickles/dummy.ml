@@ -7,19 +7,22 @@ open Common
 let _wrap_domains = Common.wrap_domains
 
 let evals =
+  let module R = Ro.Make (struct
+    let seed = ref 0
+  end) in
   lazy
     (let open Plonk_types in
     let e =
       Evals.map Evaluation_lengths.default ~f:(fun n ->
-          let a () = Array.create ~len:n (Ro.tock ()) in
+          let a () = Array.create ~len:n (R.tock ()) in
           (a (), a ()) )
     in
     let ex =
       { All_evals.With_public_input.evals = e
-      ; public_input = ([| Ro.tock () |], [| Ro.tock () |])
+      ; public_input = ([| R.tock () |], [| R.tock () |])
       }
     in
-    { All_evals.ft_eval1 = Ro.tock (); evals = ex })
+    { All_evals.ft_eval1 = R.tock (); evals = ex })
 
 let evals_combined =
   lazy
@@ -28,9 +31,13 @@ let evals_combined =
 
 module Ipa = struct
   module Wrap = struct
+    module R = Ro.Make (struct
+      let seed = ref 0
+    end)
+
     let challenges =
       Vector.init Tock.Rounds.n ~f:(fun _ ->
-          let prechallenge = Ro.scalar_chal () in
+          let prechallenge = R.scalar_chal () in
           { Bulletproof_challenge.prechallenge } )
 
     let challenges_computed =
@@ -43,9 +50,13 @@ module Ipa = struct
   end
 
   module Step = struct
+    module R = Ro.Make (struct
+      let seed = ref 0
+    end)
+
     let challenges =
       Vector.init Tick.Rounds.n ~f:(fun _ ->
-          let prechallenge = Ro.scalar_chal () in
+          let prechallenge = R.scalar_chal () in
           { Bulletproof_challenge.prechallenge } )
 
     let challenges_computed =
