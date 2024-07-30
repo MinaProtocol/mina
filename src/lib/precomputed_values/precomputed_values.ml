@@ -41,10 +41,7 @@ let for_unit_tests =
     ; genesis_body_reference
     ; consensus_constants = Lazy.force Consensus.Constants.for_unit_tests
     ; protocol_state_with_hashes
-    ; constraint_system_digests =
-        lazy
-          (List.map (Lazy.force hashes) ~f:(fun (x, y) ->
-               (x, Core.Md5.of_hex_exn (Core.Md5.to_hex y)) ) )
+    ; constraint_system_digests = hashes
     ; proof_data = None
     })
 
