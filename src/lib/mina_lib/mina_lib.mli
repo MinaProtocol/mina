@@ -44,6 +44,8 @@ val time_controller : t -> Block_time.Controller.t
 
 val subscription : t -> Mina_subscriptions.t
 
+val commit_id : t -> string
+
 val daemon_start_time : Time_ns.t
 
 (** Derived from local state (aka they may not reflect the latest public keys to which you've attempted to change *)
@@ -170,13 +172,10 @@ val transaction_pool : t -> Network_pool.Transaction_pool.t
 
 val snark_pool : t -> Network_pool.Snark_pool.t
 
-val start : commit_id:string -> t -> unit Deferred.t
+val start : t -> unit Deferred.t
 
 val start_with_precomputed_blocks :
-     commit_id:string
-  -> t
-  -> Block_producer.Precomputed.t Sequence.t
-  -> unit Deferred.t
+  t -> Block_producer.Precomputed.t Sequence.t -> unit Deferred.t
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 

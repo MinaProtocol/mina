@@ -255,10 +255,18 @@ module Transport = struct
 end
 
 module Consumer_registry = struct
-  type consumer = { processor : Processor.t; transport : Transport.t }
+  type consumer =
+    { processor : Processor.t
+    ; transport : Transport.t
+    ; commit_id : string option
+    }
 
   let default_consumer =
-    lazy { processor = Processor.raw (); transport = Transport.stdout () }
+    lazy
+      { processor = Processor.raw ()
+      ; transport = Transport.stdout ()
+      ; commit_id = None
+      }
 
   module Consumer_tbl = Hashtbl.Make (String)
 
@@ -268,8 +276,8 @@ module Consumer_registry = struct
 
   type id = string
 
-  let register ~(id : id) ~processor ~transport =
-    Consumer_tbl.add_multi t ~key:id ~data:{ processor; transport }
+  let register ?commit_id ~(id : id) ~processor ~transport () =
+    Consumer_tbl.add_multi t ~key:id ~data:{ processor; transport; commit_id }
 
   let rec broadcast_log_message ~id msg =
     let consumers =
@@ -282,8 +290,20 @@ module Consumer_registry = struct
     List.iter consumers ~f:(fun consumer ->
         let { processor = Processor.T ((module Processor), processor)
             ; transport = Transport.T ((module Transport), transport)
+            ; commit_id
             } =
           consumer
+        in
+        let commit_id' =
+          if Level.compare msg.Message.level Warn >= 0 then commit_id else None
+        in
+        let msg =
+          Option.value_map ~default:msg commit_id' ~f:(fun cid ->
+              let metadata =
+                String.Map.set ~key:"commit_id" ~data:(`String cid)
+                  msg.Message.metadata
+              in
+              { msg with metadata } )
         in
         match Processor.process processor msg with
         | Some str ->
