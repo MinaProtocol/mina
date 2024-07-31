@@ -441,6 +441,7 @@ module Sql = struct
         ; "u.state_hash"
         ; "u.chain_status"
         ; "u.height"
+        ; "u.timestamp"
         ; "pk_payer.value as fee_payer"
         ; "pk_source.value as source"
         ; "pk_receiver.value as receiver"
