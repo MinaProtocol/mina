@@ -3,6 +3,7 @@ use crate::{
     field_vector::fq::CamlFqVector,
     pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr,
     pasta_fq_plonk_verifier_index::CamlPastaFqPlonkVerifierIndex,
+    WithLagrangeBasis,
 };
 use ark_ec::AffineCurve;
 use ark_ff::One;
@@ -42,7 +43,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
     {
         let ptr: &mut poly_commitment::srs::SRS<Pallas> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
-        ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
+        ptr.with_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
     let prev = if prev_challenges.is_empty() {
         Vec::new()

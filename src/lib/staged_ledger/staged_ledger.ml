@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 (* Only show stdout for failed inline tests. *)
 open Inline_test_quiet_logs
 open Core_kernel
@@ -433,14 +431,6 @@ module T = struct
       (Scan_state.hash scan_state)
       (Ledger.merkle_root ledger)
       pending_coinbase_collection
-
-  [%%if call_logger]
-
-  let hash t =
-    Mina_debug.Call_logger.record_call "Staged_ledger.hash" ;
-    hash t
-
-  [%%endif]
 
   let ledger { ledger; _ } = ledger
 
@@ -2391,7 +2381,7 @@ let%test_module "staged ledger tests" =
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+            ~commit_id:"not specified for unit tests" () )
 
     let find_vk ledger =
       Zkapp_command.Verifiable.load_vk_from_ledger ~get:(Ledger.get ledger)
@@ -5172,7 +5162,7 @@ let%test_module "staged ledger tests" =
                           ~constraint_constants ~conf_dir:None
                           ~pids:
                             (Child_processes.Termination.create_pid_table ())
-                          ()
+                          ~commit_id:"not specified for unit tests" ()
                       in
                       match%map
                         Sl.apply ~constraint_constants ~global_slot !sl

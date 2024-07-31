@@ -225,7 +225,7 @@ I will assume the user who wishes to compile Lucy is familiar with not just OCam
 ```
 make build
 
-dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
+dune build src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 ```
 
 Once you've compiled the test executive executable binary, you can run the binary the same way as detailed in the section [Installing the mina-test-executive package and running directly in command-line](README.md#installing-the-mina-test-executive-package-and-running-directly-in-command-line).  The only difference is that you will have to provide the path to the binary instead of just typing `mina-test-executive`, because of course you won't have the debian package `mina-test-executive`.  The compiled executable will be at:

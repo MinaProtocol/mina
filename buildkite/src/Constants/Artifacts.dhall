@@ -12,7 +12,6 @@ let Artifact
     : Type
     = < Daemon
       | Archive
-      | ArchiveMigration
       | TestExecutive
       | BatchTxn
       | Rosetta
@@ -23,7 +22,6 @@ let Artifact
 let AllButTests =
       [ Artifact.Daemon
       , Artifact.Archive
-      , Artifact.ArchiveMigration
       , Artifact.BatchTxn
       , Artifact.TestExecutive
       , Artifact.Rosetta
@@ -39,7 +37,6 @@ let capitalName =
       ->  merge
             { Daemon = "Daemon"
             , Archive = "Archive"
-            , ArchiveMigration = "ArchiveMigration"
             , TestExecutive = "TestExecutive"
             , BatchTxn = "BatchTxn"
             , Rosetta = "Rosetta"
@@ -53,7 +50,6 @@ let lowerName =
       ->  merge
             { Daemon = "daemon"
             , Archive = "archive"
-            , ArchiveMigration = "archive_migration"
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
             , Rosetta = "rosetta"
@@ -68,7 +64,6 @@ let dockerName =
             { Daemon = "mina-daemon"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
-            , ArchiveMigration = "mina-archive-migration"
             , BatchTxn = "mina-batch-txn"
             , Rosetta = "mina-rosetta"
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
@@ -78,10 +73,10 @@ let dockerName =
 
 let toDebianName =
           \(artifact : Artifact)
+      ->  \(network : Network.Type)
       ->  merge
-            { Daemon = "daemon"
+            { Daemon = "daemon_${Network.lowerName network}"
             , Archive = "archive"
-            , ArchiveMigration = "archive_migration"
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
             , Rosetta = ""
@@ -92,14 +87,39 @@ let toDebianName =
 
 let toDebianNames =
           \(artifacts : List Artifact)
-      ->  let text =
+      ->  \(networks : List Network.Type)
+      ->  let list_of_list_of_debians =
                 Prelude.List.map
                   Artifact
-                  Text
-                  (\(a : Artifact) -> toDebianName a)
+                  (List Text)
+                  (     \(a : Artifact)
+                    ->  merge
+                          { Daemon =
+                              Prelude.List.map
+                                Network.Type
+                                Text
+                                (\(n : Network.Type) -> toDebianName a n)
+                                networks
+                          , Archive = [ "archive" ]
+                          , TestExecutive = [ "test_executive" ]
+                          , BatchTxn = [ "batch_txn" ]
+                          , Rosetta = [ "" ]
+                          , ZkappTestTransaction = [ "zkapp_test_transaction" ]
+                          , FunctionalTestSuite = [ "functional_test_suite" ]
+                          }
+                          a
+                  )
                   artifacts
 
-          in  Text/concatSep " " text
+          let items =
+                Prelude.List.fold
+                  (List Text)
+                  list_of_list_of_debians
+                  (List Text)
+                  (\(x : List Text) -> \(y : List Text) -> x # y)
+                  ([] : List Text)
+
+          in  Text/concatSep " " items
 
 let dockerTag =
           \(artifact : Artifact)
@@ -123,7 +143,6 @@ let dockerTag =
                     "${version_and_codename}-${Network.lowerName
                                                  network}${profile_part}"
                 , Archive = "${version_and_codename}"
-                , ArchiveMigration = "${version_and_codename}"
                 , TestExecutive = "${version_and_codename}"
                 , BatchTxn = "${version_and_codename}"
                 , Rosetta = "${version_and_codename}"

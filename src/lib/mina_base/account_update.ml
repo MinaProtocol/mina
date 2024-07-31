@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base_util
 open Snark_params.Tick
@@ -477,8 +475,17 @@ module May_use_token = struct
 
   let deriver obj =
     let open Fields_derivers_zkapps in
-    iso_record ~of_record:As_record.to_variant ~to_record:As_record.of_variant
-      As_record.deriver obj
+    let may_use_token =
+      iso_record ~of_record:As_record.to_variant ~to_record:As_record.of_variant
+        As_record.deriver
+    in
+    needs_custom_js
+      ~js_type:
+        (js_record
+           [ ("parentsOwnToken", js_layout bool)
+           ; ("inheritFromParent", js_layout bool)
+           ] )
+      ~name:"MayUseToken" may_use_token obj
 
   module Checked = struct
     type t = Boolean.var As_record.t
