@@ -171,7 +171,7 @@ copy_common_daemon_configs() {
 
   # --- Copy artifacts
   cp ../src/app/rosetta/scripts/* "${BUILDDIR}/etc/mina/rosetta/scripts"
-  cp ../scripts/archive/download-missing-blocks.sh "${BUILDDIR}/etc/mina/rosetta/scripts"
+  cp ../scripts/archive/missing-blocks-guardian.sh "${BUILDDIR}/etc/mina/rosetta/scripts"
 
   cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
