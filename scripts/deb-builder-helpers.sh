@@ -335,13 +335,14 @@ build_archive_deb () {
   cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
   
   mkdir -p "${BUILDDIR}/etc/mina/archive"
-  cp ../scripts/archive/download-missing-blocks.sh "${BUILDDIR}/etc/mina/archive"
+  cp ../scripts/archive/missing-blocks-guardian.sh "${BUILDDIR}/etc/mina/archive"
   
   cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-replayer"
   
   cp ../src/app/archive/create_schema.sql "${BUILDDIR}/etc/mina/archive"
-  
+  cp ../src/app/archive/drop_tables.sql "${BUILDDIR}/etc/mina/archive"
+
   build_deb "$ARCHIVE_DEB"
 
 }
