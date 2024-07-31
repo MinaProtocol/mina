@@ -84,7 +84,7 @@ let ( hash_signed_command_v1
               let dummy_auth =
                 match acct_update.authorization with
                 | Control.Proof _ ->
-                    Control.Proof Proof.transaction_dummy
+                    Control.Proof (Lazy.force Proof.transaction_dummy)
                 | Control.Signature _ ->
                     Control.Signature Signature.dummy
                 | Control.None_given ->
