@@ -17,7 +17,6 @@ module Unsigned = struct
         { to_ : public_key [@key "to"]
         ; from : public_key
         ; fee : Unsigned_extended.UInt64.t
-        ; token : string
         ; nonce : Unsigned_extended.UInt32.t
         ; memo : string option
         ; amount : Unsigned_extended.UInt64.t
@@ -66,8 +65,6 @@ module Unsigned = struct
 
   let un_pk (`Pk pk) = pk
 
-  let un_token_id (`Token_id id) = id
-
   let render_command ~nonce (command : User_command_info.Partial.t) =
     let open Result.Let_syntax in
     match command.kind with
@@ -84,7 +81,6 @@ module Unsigned = struct
           ; from = un_pk command.source
           ; fee = command.fee
           ; nonce
-          ; token = un_token_id command.token
           ; memo = command.memo
           ; amount
           ; valid_until = command.valid_until
@@ -135,8 +131,6 @@ module Unsigned = struct
     ; source = `Pk r.from
     ; kind = `Payment
     ; fee_payer = `Pk r.from
-    ; fee_token = `Token_id r.token
-    ; token = `Token_id r.token
     ; fee = r.fee
     ; amount = Some r.amount
     ; valid_until = r.valid_until
@@ -149,8 +143,6 @@ module Unsigned = struct
     ; source = `Pk r.delegator
     ; kind = `Delegation
     ; fee_payer = `Pk r.delegator
-    ; fee_token = `Token_id Token_id.(default |> to_string)
-    ; token = `Token_id Token_id.(default |> to_string)
     ; fee = r.fee
     ; amount = None
     ; valid_until = r.valid_until

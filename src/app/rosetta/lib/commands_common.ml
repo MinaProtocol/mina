@@ -2,7 +2,14 @@ open Core_kernel
 open Rosetta_lib
 open Rosetta_models
 
-let account_id = User_command_info.account_id
+let account_id ?(token_id : [ `Token_id of string ] option) (`Pk pk) =
+  { Account_identifier.address = pk
+  ; sub_account = None
+  ; metadata =
+      Some
+        ( Amount_of.Token.Id.encode_json_object
+        @@ Option.value ~default:Amount_of.Token.Id.default token_id )
+  }
 
 module Op = User_command_info.Op
 
@@ -84,15 +91,9 @@ module Internal_command_info = struct
                 { Operation.operation_identifier
                 ; related_operations
                 ; status
-                ; account =
-                    Some
-                      (account_id t.receiver
-                         (`Token_id Amount_of.Token_id.default) )
+                ; account = Some (account_id t.receiver)
                 ; _type = Operation_types.name `Coinbase_inc
-                ; amount =
-                    Some
-                      (Amount_of.token (`Token_id Amount_of.Token_id.default)
-                         t.fee )
+                ; amount = Some Amount_of.(mina t.fee)
                 ; coin_change = None
                 ; metadata = None
                 }
@@ -101,9 +102,9 @@ module Internal_command_info = struct
                 { Operation.operation_identifier
                 ; related_operations
                 ; status
-                ; account = Some (account_id t.receiver t.token)
+                ; account = Some (account_id t.receiver)
                 ; _type = Operation_types.name `Fee_receiver_inc
-                ; amount = Some (Amount_of.token t.token t.fee)
+                ; amount = Some Amount_of.(mina t.fee)
                 ; coin_change = None
                 ; metadata = None
                 }
@@ -125,10 +126,7 @@ module Internal_command_info = struct
               { Operation.operation_identifier
               ; related_operations
               ; status
-              ; account =
-                  Some
-                    (account_id coinbase_receiver
-                       (`Token_id Amount_of.Token_id.default) )
+              ; account = Some (account_id coinbase_receiver)
               ; _type = Operation_types.name `Fee_payer_dec
               ; amount = Some Amount_of.(negated (mina t.fee))
               ; coin_change = None
@@ -139,10 +137,7 @@ module Internal_command_info = struct
                 { Operation.operation_identifier
                 ; related_operations
                 ; status
-                ; account =
-                    Some
-                      (account_id t.receiver
-                         (`Token_id Amount_of.Token_id.default) )
+                ; account = Some (account_id t.receiver)
                 ; _type =
                     Operation_types.name `Account_creation_fee_via_fee_receiver
                 ; amount = Some Amount_of.(negated @@ mina account_creation_fee)
@@ -175,7 +170,7 @@ module Internal_command_info = struct
       ; receiver = `Pk "Eve"
       ; receiver_account_creation_fee_paid = None
       ; fee = Unsigned.UInt64.of_int 20_000_000_000
-      ; token = `Token_id Amount_of.Token_id.default
+      ; token = Amount_of.Token.Id.default
       ; sequence_no = 1
       ; secondary_sequence_no = 0
       ; hash = "COINBASE_1"
@@ -185,7 +180,7 @@ module Internal_command_info = struct
       ; receiver = `Pk "Alice"
       ; receiver_account_creation_fee_paid = None
       ; fee = Unsigned.UInt64.of_int 30_000_000_000
-      ; token = `Token_id Amount_of.Token_id.default
+      ; token = Amount_of.Token.Id.default
       ; sequence_no = 1
       ; secondary_sequence_no = 0
       ; hash = "FEE_TRANSFER"
@@ -229,7 +224,7 @@ module Zkapp_account_update_info = struct
     ; call_depth : Unsigned_extended.UInt64.t
     ; use_full_commitment : bool
     ; status : [ `Success | `Failed ]
-    ; token : [ `Token_id of string ]
+    ; token : Amount_of.Token.t
     }
   [@@deriving to_yojson, equal]
 
@@ -242,7 +237,7 @@ module Zkapp_account_update_info = struct
       ; call_depth = Unsigned.UInt64.of_int 10
       ; use_full_commitment = true
       ; status = `Success
-      ; token = `Token_id Amount_of.Token_id.default
+      ; token = Amount_of.Token.Mina
       }
     ; { authorization_kind = "NOK"
       ; account = `Pk "Alice"
@@ -252,7 +247,7 @@ module Zkapp_account_update_info = struct
       ; call_depth = Unsigned.UInt64.of_int 20
       ; use_full_commitment = false
       ; status = `Failed
-      ; token = `Token_id Amount_of.Token_id.default
+      ; token = Amount_of.Token.Mina
       }
     ]
 end
@@ -286,16 +281,17 @@ module Zkapp_command_info = struct
                  { Op.label = `Zkapp_account_update upd; related_to = None } )
           )
         ~f:(fun ~related_operations ~operation_identifier op ->
-          let default_token = `Token_id Amount_of.Token_id.default in
           match op.label with
           | `Zkapp_fee_payer_dec ->
               M.return
                 { Operation.operation_identifier
                 ; related_operations
                 ; status = Some (Operation_statuses.name `Success)
-                ; account = Some (account_id t.fee_payer default_token)
+                ; account =
+                    Some (account_id t.fee_payer)
+                    (* fee payments are always with the default token *)
                 ; _type = Operation_types.name `Zkapp_fee_payer_dec
-                ; amount = Some Amount_of.(negated @@ token default_token t.fee)
+                ; amount = Some Amount_of.(negated @@ mina t.fee)
                 ; coin_change = None
                 ; metadata = None
                 }
@@ -318,7 +314,10 @@ module Zkapp_command_info = struct
                 { Operation.operation_identifier
                 ; related_operations
                 ; status
-                ; account = Some (account_id upd.account upd.token)
+                ; account =
+                    Some
+                      (account_id upd.account
+                         ~token_id:(Amount_of.Token.token_id upd.token) )
                 ; _type = Operation_types.name `Zkapp_balance_update
                 ; amount
                 ; coin_change = None

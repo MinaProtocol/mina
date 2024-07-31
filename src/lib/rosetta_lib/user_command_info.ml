@@ -14,16 +14,18 @@ let pk_to_public_key ~context (`Pk pk) =
   |> Result.map_error ~f:(fun _ ->
          Errors.create ~context `Public_key_format_not_valid )
 
-let account_id (`Pk pk) (`Token_id token_id) =
+let account_id (`Pk pk) =
   { Account_identifier.address = pk
   ; sub_account = None
-  ; metadata = Some (Amount_of.Token_id.encode token_id)
+  ; metadata =
+      Some Amount_of.Token.Id.(encode_json_object default)
+      (* user commands always use the default token *)
   }
 
 let token_id_of_account (account : Account_identifier.t) =
-  let module Decoder = Amount_of.Token_id.T (Result) in
+  let module Decoder = Amount_of.Token.Id.T (Result) in
   Decoder.decode account.metadata
-  |> Result.map ~f:(Option.value ~default:Amount_of.Token_id.default)
+  |> Result.map ~f:(Option.value ~default:Amount_of.Token.Id.default)
   |> Result.ok
 
 module Op = struct
@@ -118,8 +120,6 @@ module Partial = struct
     ; fee_payer : [ `Pk of string ]
     ; source : [ `Pk of string ]
     ; receiver : [ `Pk of string ]
-    ; fee_token : [ `Token_id of string ]
-    ; token : [ `Token_id of string ]
     ; fee : Unsigned_extended.UInt64.t
     ; amount : Unsigned_extended.UInt64.t option
     ; valid_until : Unsigned_extended.UInt32.t option
@@ -189,8 +189,6 @@ let forget (t : t) : Partial.t =
   ; fee_payer = t.fee_payer
   ; source = t.source
   ; receiver = t.receiver
-  ; fee_token = t.fee_token
-  ; token = t.token
   ; fee = t.fee
   ; amount = t.amount
   ; valid_until = t.valid_until
@@ -248,30 +246,6 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
           V.fail Fee_payer_and_source_mismatch
       | None, _ | _, None ->
           V.fail Account_not_some
-    and token =
-      let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Payment_source_dec ops in
-      match account with
-      | Some account -> (
-          match token_id_of_account account with
-          | None ->
-              V.fail Incorrect_token_id
-          | Some token ->
-              V.return (`Token_id token) )
-      | None ->
-          V.fail Account_not_some
-    and fee_token =
-      let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payment ops in
-      match account with
-      | Some account -> (
-          match token_id_of_account account with
-          | Some token_id ->
-              V.return (`Token_id token_id)
-          | None ->
-              V.fail Incorrect_token_id )
-      | None ->
-          V.fail Account_not_some
     and account_b =
       let open Result.Let_syntax in
       let%bind { account; _ } = find_kind `Payment_receiver_inc ops in
@@ -309,8 +283,6 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
     ; fee_payer = `Pk account_a.address
     ; source = `Pk account_a.address
     ; receiver = `Pk account_b.address
-    ; fee_token
-    ; token (* TODO: Catch exception properly on these uint64 decodes *)
     ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount = Some (Unsigned.UInt64.of_string payment_amount_x.Amount.value)
     ; valid_until
@@ -332,18 +304,6 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
       let open Result.Let_syntax in
       let%bind { account; _ } = find_kind `Fee_payment ops in
       Option.value_map account ~default:(V.fail Account_not_some) ~f:V.return
-    and fee_token =
-      let open Result.Let_syntax in
-      let%bind { account; _ } = find_kind `Fee_payment ops in
-      match account with
-      | Some account -> (
-          match token_id_of_account account with
-          | Some token_id ->
-              V.return (`Token_id token_id)
-          | None ->
-              V.fail Incorrect_token_id )
-      | None ->
-          V.fail Account_not_some
     and account_b =
       let open Result.Let_syntax in
       let%bind { metadata; _ } = find_kind `Delegate_change ops in
@@ -375,11 +335,7 @@ let of_operations ?memo ?valid_until (ops : Operation.t list) :
     { Partial.kind = `Delegation
     ; fee_payer = `Pk account_a.address
     ; source = `Pk account_a.address
-    ; receiver = `Pk account_b
-    ; fee_token
-    ; token =
-        `Token_id Token_id.(default |> to_string)
-        (* only default token can be delegated *)
+    ; receiver = `Pk account_b (* only default token can be delegated *)
     ; fee = Unsigned.UInt64.of_string payment_amount_y.Amount.value
     ; amount = None
     ; valid_until
@@ -482,9 +438,9 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           ; status =
               status |> pending_or_success_only
               |> Option.map ~f:Operation_statuses.name
-          ; account = Some (account_id t.fee_payer t.fee_token)
+          ; account = Some (account_id t.fee_payer)
           ; _type = Operation_types.name `Fee_payment
-          ; amount = Some Amount_of.(negated @@ token t.fee_token t.fee)
+          ; amount = Some Amount_of.(negated @@ token Token.Mina t.fee)
           ; coin_change = None
           ; metadata
           }
@@ -492,11 +448,11 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           { Operation.operation_identifier
           ; related_operations
           ; status = Option.map ~f:Operation_statuses.name status
-          ; account = Some (account_id t.source t.token)
+          ; account = Some (account_id t.source)
           ; _type = Operation_types.name `Payment_source_dec
           ; amount =
               ( if did_fail then None
-              else Some Amount_of.(negated @@ token t.token amount) )
+              else Some Amount_of.(negated @@ token Token.Mina amount) )
           ; coin_change = None
           ; metadata
           }
@@ -504,10 +460,11 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           { Operation.operation_identifier
           ; related_operations
           ; status = Option.map ~f:Operation_statuses.name status
-          ; account = Some (account_id t.receiver t.token)
+          ; account = Some (account_id t.receiver)
           ; _type = Operation_types.name `Payment_receiver_inc
           ; amount =
-              (if did_fail then None else Some (Amount_of.token t.token amount))
+              ( if did_fail then None
+              else Some Amount_of.(token Token.Mina amount) )
           ; coin_change = None
           ; metadata
           }
@@ -515,7 +472,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           { Operation.operation_identifier
           ; related_operations
           ; status = Option.map ~f:Operation_statuses.name status
-          ; account = Some (account_id t.receiver t.token)
+          ; account = Some (account_id t.receiver)
           ; _type = Operation_types.name `Account_creation_fee_via_payment
           ; amount = Some Amount_of.(negated @@ mina account_creation_fee)
           ; coin_change = None
@@ -525,7 +482,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           { Operation.operation_identifier
           ; related_operations
           ; status = Option.map ~f:Operation_statuses.name status
-          ; account = Some (account_id t.fee_payer t.fee_token)
+          ; account = Some (account_id t.fee_payer)
           ; _type = Operation_types.name `Account_creation_fee_via_fee_payer
           ; amount = Some Amount_of.(negated @@ mina account_creation_fee)
           ; coin_change = None
@@ -535,8 +492,7 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
           { Operation.operation_identifier
           ; related_operations
           ; status = Option.map ~f:Operation_statuses.name status
-          ; account =
-              Some (account_id t.source (`Token_id Amount_of.Token_id.default))
+          ; account = Some (account_id t.source)
           ; _type = Operation_types.name `Delegate_change
           ; amount = None
           ; coin_change = None
@@ -559,10 +515,10 @@ let%test_unit "payment_round_trip" =
     { kind = `Payment (* default token *)
     ; fee_payer = `Pk "Alice"
     ; source = `Pk "Alice"
-    ; token = `Token_id Amount_of.Token_id.default
+    ; token = Amount_of.Token.Id.default
     ; fee = Unsigned.UInt64.of_int 2_000_000_000
     ; receiver = `Pk "Bob"
-    ; fee_token = `Token_id Amount_of.Token_id.default
+    ; fee_token = Amount_of.Token.Id.default
     ; nonce = Unsigned.UInt32.of_int 3
     ; amount = Some (Unsigned.UInt64.of_int 2_000_000_000)
     ; failure_status = None
@@ -583,10 +539,10 @@ let%test_unit "delegation_round_trip" =
     { kind = `Delegation
     ; fee_payer = `Pk "Alice"
     ; source = `Pk "Alice"
-    ; token = `Token_id Amount_of.Token_id.default
+    ; token = Amount_of.Token.Id.default
     ; fee = Unsigned.UInt64.of_int 1_000_000_000
     ; receiver = `Pk "Bob"
-    ; fee_token = `Token_id Amount_of.Token_id.default
+    ; fee_token = Amount_of.Token.Id.default
     ; nonce = Unsigned.UInt32.of_int 42
     ; amount = None
     ; failure_status = None
@@ -610,8 +566,8 @@ let dummies =
   [ { kind = `Payment (* default token *)
     ; fee_payer = `Pk "Alice"
     ; source = `Pk "Alice"
-    ; token = `Token_id Amount_of.Token_id.default
-    ; fee_token = `Token_id Amount_of.Token_id.default
+    ; token = Amount_of.Token.Id.default
+    ; fee_token = Amount_of.Token.Id.default
     ; fee = Unsigned.UInt64.of_int 2_000_000_000
     ; receiver = `Pk "Bob"
     ; nonce = Unsigned.UInt32.of_int 3
@@ -624,8 +580,8 @@ let dummies =
   ; { kind = `Payment (* new account created *)
     ; fee_payer = `Pk "Alice"
     ; source = `Pk "Alice"
-    ; token = `Token_id Amount_of.Token_id.default
-    ; fee_token = `Token_id Amount_of.Token_id.default
+    ; token = Amount_of.Token.Id.default
+    ; fee_token = Amount_of.Token.Id.default
     ; fee = Unsigned.UInt64.of_int 2_000_000_000
     ; receiver = `Pk "Bob"
     ; nonce = Unsigned.UInt32.of_int 3
@@ -642,8 +598,8 @@ let dummies =
   ; { kind = `Payment (* failed payment *)
     ; fee_payer = `Pk "Alice"
     ; source = `Pk "Alice"
-    ; token = `Token_id Amount_of.Token_id.default
-    ; fee_token = `Token_id Amount_of.Token_id.default
+    ; token = Amount_of.Token.Id.default
+    ; fee_token = Amount_of.Token.Id.default
     ; fee = Unsigned.UInt64.of_int 2_000_000_000
     ; receiver = `Pk "Bob"
     ; nonce = Unsigned.UInt32.of_int 3
@@ -659,7 +615,7 @@ let dummies =
     ; token = non_default_token
     ; fee = Unsigned.UInt64.of_int 2_000_000_000
     ; receiver = `Pk "Bob"
-    ; fee_token = `Token_id Amount_of.Token_id.default
+    ; fee_token = Amount_of.Token.Id.default
     ; nonce = Unsigned.UInt32.of_int 3
     ; amount = Some (Unsigned.UInt64.of_int 2_000_000_000)
     ; failure_status = Some (`Applied Account_creation_fees_paid.By_no_one)
@@ -670,7 +626,7 @@ let dummies =
   ; { kind = `Payment (* custom fee-token *)
     ; fee_payer = `Pk "Alice"
     ; source = `Pk "Alice"
-    ; token = `Token_id Amount_of.Token_id.default
+    ; token = Amount_of.Token.Id.default
     ; fee = Unsigned.UInt64.of_int 2_000_000_000
     ; receiver = `Pk "Bob"
     ; fee_token = non_default_token
@@ -684,8 +640,8 @@ let dummies =
   ; { kind = `Delegation
     ; fee_payer = `Pk "Alice"
     ; source = `Pk "Alice"
-    ; token = `Token_id Amount_of.Token_id.default
-    ; fee_token = `Token_id Amount_of.Token_id.default
+    ; token = Amount_of.Token.Id.default
+    ; fee_token = Amount_of.Token.Id.default
     ; fee = Unsigned.UInt64.of_int 2_000_000_000
     ; receiver = `Pk "Bob"
     ; nonce = Unsigned.UInt32.of_int 3

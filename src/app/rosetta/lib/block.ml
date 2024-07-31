@@ -440,7 +440,7 @@ module Sql = struct
            ON bic.internal_command_id = i.id
          INNER JOIN public_keys pk
            ON pk.id = i.receiver_id
-         INNER JOIN account_identifiers ai
+         LEFT JOIN account_identifiers ai
            ON ai.public_key_id = receiver_id
          LEFT JOIN accounts_created ac
            ON ac.account_identifier_id = ai.id
@@ -461,10 +461,10 @@ module Sql = struct
                      WHERE uc2.receiver_id = i.receiver_id
                        AND buc2.block_id = bic.block_id
                        AND buc2.status = 'applied')))
-         INNER JOIN tokens t
+         LEFT JOIN tokens t
            ON t.id = ai.token_id
          WHERE bic.block_id = ?
-          AND t.value = ?
+          AND (t.value IS NULL OR t.value = ?)
       |}]
 
       let to_info ~coinbase_receiver ({ raw_internal_command = ic; _ } as t) =
@@ -597,26 +597,31 @@ module Sql = struct
       type t =
         { body : Archive_lib.Processor.Zkapp_account_update_body.t
         ; account : string
-        ; token : string
+        ; token_id : string
+        ; token_symbol : string
         }
-      [@@deriving hlist]
+      [@@deriving hlist, fields]
 
       let fields =
         String.concat ~sep:","
         @@ List.map Archive_lib.Processor.Zkapp_account_update_body.Fields.names
              ~f:(fun n -> "zaub." ^ n)
         @ [ "pk_update_body.value as account"
-          ; "token_update_body.value as token"
+          ; "token_update_body.value as token_id"
+          ; "token_symbol.value as token_symbol"
           ]
 
       let account t = `Pk t.account
 
-      let token t = `Token_id t.token
+      let token t =
+        Amount_of.Token.Token
+          { id = `Token_id t.token_id; symbol = `Token_symbol t.token_symbol }
 
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
           Caqti_type.
             [ Archive_lib.Processor.Zkapp_account_update_body.typ
+            ; string
             ; string
             ; string
             ]
@@ -670,16 +675,22 @@ module Sql = struct
            ON ai_update_body.public_key_id = pk_update_body.id
          LEFT JOIN tokens token_update_body
            ON token_update_body.id = ai_update_body.token_id
+         LEFT JOIN public_keys token_owner_pk ON token_update_body.owner_public_key_id = token_owner_pk.id
+         INNER JOIN tokens default_token ON default_token.value = ?
+         LEFT JOIN account_identifiers token_owner_ai ON token_owner_pk.id = token_owner_ai.public_key_id AND default_token.id = token_owner_ai.token_id
+         LEFT JOIN accounts_accessed token_ac ON token_owner_ai.id = token_ac.account_identifier_id
+         LEFT JOIN token_symbols token_symbol ON token_ac.token_symbol_id = token_symbol.id
+         LEFT JOIN blocks token_block ON token_ac.block_id = token_block.id AND token_block.height <= b.height AND (b.chain_status = 'canonical' OR b.chain_status = 'pending')
          WHERE bzc.block_id = ?
-          AND (token_update_body.value = ? OR token_update_body.id IS NULL)
          ORDER BY zc.id, bzc.sequence_no
       |}]
 
     let query =
-      Caqti_request.collect Caqti_type.(tup2 int string) typ query_string
+      Caqti_request.collect Caqti_type.(tup2 string int) typ query_string
 
     let run (module Conn : Caqti_async.CONNECTION) id =
-      Conn.collect_list query (id, Mina_base.Token_id.(to_string default))
+      let (`Token_id token_id) = Amount_of.Token.Id.default in
+      Conn.collect_list query (token_id, id)
 
     module Make_common (M : sig
       type command
@@ -869,8 +880,8 @@ module Sql = struct
                              other )
                         `Invariant_violation )
              in
-             let fee_token = Mina_base.Token_id.(to_string default) in
-             let token = Mina_base.Token_id.(to_string default) in
+             (* user commands always use the default token *)
+             let token_id = Mina_base.Token_id.(to_string default) in
              let%map failure_status =
                match User_commands.Extras.failure_reason extras with
                | None -> (
@@ -895,8 +906,8 @@ module Sql = struct
              ; fee_payer = User_commands.Extras.fee_payer extras
              ; source = User_commands.Extras.source extras
              ; receiver = User_commands.Extras.receiver extras
-             ; fee_token = `Token_id fee_token
-             ; token = `Token_id token
+             ; fee_token = `Token_id token_id
+             ; token = `Token_id token_id
              ; nonce = Unsigned.UInt32.of_int64 uc.nonce
              ; amount = Option.map ~f:Unsigned.UInt64.of_string uc.amount
              ; fee = Unsigned.UInt64.of_string uc.fee
