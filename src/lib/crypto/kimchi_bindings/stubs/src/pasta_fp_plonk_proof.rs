@@ -4,6 +4,7 @@ use crate::{
     pasta_fp_plonk_index::{CamlPastaFpPlonkIndex, CamlPastaFpPlonkIndexPtr},
     pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex,
     srs::fp::CamlFpSrs,
+    WithLagrangeBasis,
 };
 use ark_ec::AffineCurve;
 use ark_ff::One;
@@ -47,7 +48,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
     {
         let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
-        ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
+        ptr.with_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
     let prev = if prev_challenges.is_empty() {
         Vec::new()
@@ -112,7 +113,7 @@ pub fn caml_pasta_fp_plonk_proof_create_and_verify(
     {
         let ptr: &mut poly_commitment::srs::SRS<Vesta> =
             unsafe { &mut *(std::sync::Arc::as_ptr(&index.as_ref().0.srs) as *mut _) };
-        ptr.add_lagrange_basis(index.as_ref().0.cs.domain.d1);
+        ptr.with_lagrange_basis(index.as_ref().0.cs.domain.d1);
     }
     let prev = if prev_challenges.is_empty() {
         Vec::new()
@@ -274,7 +275,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_lookup(
         .unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.add_lagrange_basis(cs.domain.d1);
+    ptr.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
@@ -438,7 +439,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_foreign_field_mul(
     let cs = ConstraintSystem::<Fp>::create(gates).build().unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.add_lagrange_basis(cs.domain.d1);
+    ptr.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
@@ -504,7 +505,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check(
     let cs = ConstraintSystem::<Fp>::create(gates).build().unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.add_lagrange_basis(cs.domain.d1);
+    ptr.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
@@ -576,7 +577,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_range_check0(
     let cs = ConstraintSystem::<Fp>::create(gates).build().unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.add_lagrange_basis(cs.domain.d1);
+    ptr.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
@@ -700,7 +701,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_ffadd(
         .unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.add_lagrange_basis(cs.domain.d1);
+    ptr.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
@@ -788,7 +789,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_xor(
         .unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.add_lagrange_basis(cs.domain.d1);
+    ptr.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);
@@ -881,7 +882,7 @@ pub fn caml_pasta_fp_plonk_proof_example_with_rot(
         .unwrap();
 
     let ptr: &mut SRS<Vesta> = unsafe { &mut *(std::sync::Arc::as_ptr(&srs.0) as *mut _) };
-    ptr.add_lagrange_basis(cs.domain.d1);
+    ptr.with_lagrange_basis(cs.domain.d1);
 
     let (endo_q, _endo_r) = endos::<Pallas>();
     let index = ProverIndex::<Vesta, OpeningProof<Vesta>>::create(cs, endo_q, srs.0);

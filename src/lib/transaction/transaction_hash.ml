@@ -1,8 +1,6 @@
 open Core_kernel
 open Mina_base
 
-[%%import "/src/config.mlh"]
-
 module T = struct
   include Blake2.Make ()
 end
@@ -107,8 +105,6 @@ let ( hash_signed_command_v1
   , hash_zkapp_command
   , hash_coinbase
   , hash_fee_transfer )
-
-[%%ifdef consensus_mechanism]
 
 let hash_command cmd =
   match cmd with
@@ -307,5 +303,3 @@ let%test_module "Transaction hashes" =
       in
       run_test ~transaction_id ~expected_hash
   end )
-
-[%%endif]

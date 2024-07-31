@@ -46,13 +46,12 @@
    gossip_net
    data_hash_lib
    mina_ledger
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
+   kimchi_pasta
+   kimchi_pasta.basic
    pickles
    protocol_version
    random_oracle
    transition_frontier_base
  )
  (instrumentation (backend bisect_ppx))
- (preprocessor_deps ../../config.mlh)
- (preprocess (pps ppx_mina ppx_version ppx_let ppx_optcomp ppx_custom_printf ppx_compare)))
+ (preprocess (pps ppx_mina ppx_version ppx_let ppx_custom_printf ppx_compare)))

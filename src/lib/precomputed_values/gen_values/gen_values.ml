@@ -1,22 +1,13 @@
-[%%import "/src/config.mlh"]
-
 open Ppxlib
 open Core
 open Async
 open Mina_state
 
 (* TODO: refactor to do compile time selection *)
-[%%if proof_level = "full"]
 
-let use_dummy_values = false
+let use_dummy_values = String.equal Node_config.proof_level "full" |> not
 
-[%%else]
-
-let use_dummy_values = true
-
-[%%endif]
-
-[%%inject "generate_genesis_proof", generate_genesis_proof]
+let generate_genesis_proof = Node_config.generate_genesis_proof
 
 module type S = sig
   val compiled_values : Genesis_proof.t Async.Deferred.t option

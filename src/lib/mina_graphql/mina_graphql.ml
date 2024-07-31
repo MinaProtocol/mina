@@ -2569,8 +2569,8 @@ module Queries = struct
         let configured_name =
           let open Option.Let_syntax in
           let cfg = Mina_lib.runtime_config mina in
-          let%bind ledger = cfg.ledger in
-          ledger.name
+          let%bind daemon = cfg.daemon in
+          daemon.network_id
         in
         "mina:"
         ^ Option.value ~default:Mina_compile_config.network_id configured_name
@@ -2590,6 +2590,42 @@ module Queries = struct
         | Other_network s ->
             (* Prefix string to disambiguate *)
             "other network: " ^ s )
+
+  let protocol_state =
+    io_field "protocolState"
+      ~doc:"Get the current protocol state, optionally encoded in Base64"
+      ~typ:(non_null string)
+      ~args:
+        Arg.
+          [ arg "encoding" ~doc:"Encoding format (JSON or BASE64)"
+              ~typ:
+                (enum "Encoding"
+                   ~values:
+                     [ enum_value "JSON" ~value:`JSON
+                     ; enum_value "BASE64" ~value:`BASE64
+                     ] )
+          ]
+      ~resolve:(fun { ctx = mina; _ } () encoding_opt ->
+        match Mina_lib.best_tip mina with
+        | `Active best_tip ->
+            let protocol_state =
+              Transition_frontier.Breadcrumb.protocol_state best_tip
+            in
+            let encoded =
+              match encoding_opt with
+              | Some `BASE64 ->
+                  Bin_prot.Writer.to_string
+                    Mina_state.Protocol_state.Value.Stable.V2.bin_t.writer
+                    protocol_state
+                  |> Base64.encode_exn
+              | Some `JSON | None ->
+                  (* Default to JSON if no encoding is specified *)
+                  Mina_state.Protocol_state.value_to_yojson protocol_state
+                  |> Yojson.Safe.to_string
+            in
+            return (Ok encoded)
+        | `Bootstrapping ->
+            return (Error "Node is bootstrapping") )
 
   let commands =
     [ sync_status
@@ -2628,6 +2664,7 @@ module Queries = struct
     ; blockchain_verification_key
     ; network_id
     ; signature_kind
+    ; protocol_state
     ]
 
   module Itn = struct

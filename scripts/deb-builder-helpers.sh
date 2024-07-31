@@ -25,6 +25,8 @@ cd "${SCRIPTPATH}/../_build"
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
 
+SUGGESTED_DEPS="jq, curl, wget"
+
 TEST_EXECUTIVE_DEPS=", mina-logproc, python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, terraform, helm"
 
 case "${MINA_DEB_CODENAME}" in
@@ -49,6 +51,7 @@ case "${MINA_DEB_CODENAME}" in
     ;;
 esac
 
+# Add suffix to debian to distinguish different profiles (mainnet/devnet/lightnet)
 case "${DUNE_PROFILE}" in
   devnet|mainnet)
     MINA_DEB_NAME="mina-berkeley"
@@ -61,6 +64,14 @@ case "${DUNE_PROFILE}" in
     DEB_SUFFIX="-${_SUFFIX}"
     ;;
 esac
+
+
+#ADd suffix to debian to distinguish instrumented packages
+if [[ -v DUNE_INSTRUMENT_WITH ]]; then
+    INSTRUMENTED_SUFFIX=instrumented
+    MINA_DEB_NAME="${MINA_DEB_NAME}-${INSTRUMENTED_SUFFIX}"
+    DEB_SUFFIX="${DEB_SUFFIX}-${INSTRUMENTED_SUFFIX}"
+fi 
 
 BUILDDIR="deb_build"
 
@@ -164,6 +175,7 @@ copy_common_daemon_configs() {
 
   cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ./default/src/app/rosetta/indexer_test/indexer_test.exe "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
   cp ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/rosetta/archive"
   cp -r ../genesis_ledgers/* ${BUILDDIR}/etc/mina/rosetta/genesis_ledgers/
 
@@ -204,21 +216,16 @@ copy_common_daemon_configs() {
 
 ##################################### GENERATE KEYPAIR PACKAGE #######################################
 build_keypair_deb() {
-  if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
-  then
+  echo "------------------------------------------------------------"
+  echo "--- Building generate keypair deb:"
 
-    echo "------------------------------------------------------------"
-    echo "--- Building generate keypair deb:"
+  create_control_file mina-generate-keypair "${SHARED_DEPS}" 'Utility to regenerate mina private public keys in new format' "${SUGGESTED_DEPS}"
 
-    create_control_file mina-generate-keypair "${SHARED_DEPS}" 'Utility to regenerate mina private public keys in new format'
+  # Binaries
+  cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
+  cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
 
-    # Binaries
-    cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
-    cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
-
-    build_deb mina-generate-keypair
-
-  fi # only builds on mainnet-like branches
+  build_deb mina-generate-keypair
 }
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
 
@@ -263,47 +270,43 @@ build_functional_test_suite_deb() {
 
   # Binaries
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
-
+  
   build_deb mina-test-suite
 
 }
 ##################################### END TEST SUITE PACKAGE #######################################
 
 ##################################### MAINNET PACKAGE #######################################
-build_daemon_deb() {
+build_daemon_mainnet_deb() {
  
-  if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
-  then
+  echo "------------------------------------------------------------"
+  echo "--- Building mainnet deb without keys:"
 
-    echo "------------------------------------------------------------"
-    echo "--- Building mainnet deb without keys:"
+  create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
-    create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
+  copy_common_daemon_configs mainnet mainnet 'mina-seed-lists/mainnet_seeds.txt'
 
-    copy_common_daemon_configs mainnet mainnet 'mina-seed-lists/mainnet_seeds.txt'
+  build_deb mina-mainnet
+}
+##################################### END MAINNET PACKAGE #######################################
 
-    build_deb mina-mainnet
+##################################### DEVNET PACKAGE #######################################
+build_daemon_devnet_deb() {
+  
+  echo "------------------------------------------------------------"
+  echo "--- Building testnet signatures deb without keys:"
 
-  fi # only builds on mainnet-like branches
-  ##################################### END MAINNET PACKAGE #######################################
+  create_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
-  ##################################### DEVNET PACKAGE #######################################
-  if ${MINA_BUILD_MAINNET} # only builds on mainnet-like branches
-  then
+  copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
 
-    echo "------------------------------------------------------------"
-    echo "--- Building testnet signatures deb without keys:"
+  build_deb mina-devnet
+}
+##################################### END DEVNET PACKAGE #######################################
 
-    copy_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network'
-
-    copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
-
-    build_deb mina-devnet
-
-  fi # only builds on mainnet-like branches
-  ##################################### END DEVNET PACKAGE #######################################
-
-  ##################################### BERKELEY PACKAGE #######################################
+##################################### BERKELEY PACKAGE #######################################
+build_daemon_berkeley_deb() {
+  
   echo "------------------------------------------------------------"
   echo "--- Building Mina Berkeley testnet signatures deb without keys:"
 
@@ -331,8 +334,6 @@ build_archive_deb () {
   cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
   cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
   
-  cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
-  
   mkdir -p "${BUILDDIR}/etc/mina/archive"
   cp ../scripts/archive/download-missing-blocks.sh "${BUILDDIR}/etc/mina/archive"
   
@@ -340,30 +341,11 @@ build_archive_deb () {
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-replayer"
   cp ./default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILDDIR}/usr/local/bin/mina-swap-bad-balances"
 
-
+  cp ../src/app/archive/create_schema.sql "${BUILDDIR}/etc/mina/archive"
+  
   build_deb "$ARCHIVE_DEB"
 
 }
-
-##################################### ARCHIVE PACKAGE ##########################################
-build_archive_migration_deb () {
-
-  ARCHIVE_MIGRATION_DEB=mina-archive-migration${DEB_SUFFIX}
-
-  echo "------------------------------------------------------------"
-  echo "--- Building archive migration deb"
-
-  create_control_file "$ARCHIVE_MIGRATION_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
-
-  cp ./default/src/app/berkeley_migration/berkeley_migration.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration"
-  cp ./default/src/app/berkeley_migration_verifier/berkeley_migration_verifier.exe "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-verifier"
-  cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-migration-replayer"
-  cp ../scripts/archive/migration/berkeley_migration.sh "${BUILDDIR}/usr/local/bin/mina-berkeley-migration-script"
-  
-  build_deb "$ARCHIVE_MIGRATION_DEB"
-}
-##################################### END ARCHIVE PACKAGE ######################################
 
 ##################################### ZKAPP TEST TXN #######################################
 build_zkapp_test_transaction_deb () {

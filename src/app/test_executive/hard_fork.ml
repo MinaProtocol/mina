@@ -299,7 +299,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Signed_command.sign_payload sender.private_key payload
       |> Signature.Raw.encode
     in
-    let zkapp_command_create_accounts =
+    let%bind.Async.Deferred zkapp_command_create_accounts =
       (* construct a Zkapp_command.t *)
       let zkapp_keypairs =
         List.init 3 ~f:(fun _ -> Signature_lib.Keypair.create ())
@@ -365,11 +365,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; sender = (fish1.keypair, Account.Nonce.(succ one))
         }
       in
-      let%map vk_proof =
+      let%bind vk_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_proof
-      and vk_impossible =
+      in
+      let%map vk_impossible =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_impossible

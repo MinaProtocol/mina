@@ -1,14 +1,19 @@
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+
 let PipelineTag = ../../Pipeline/Tag.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let ReplayerTest = ../../Command/ReplayerTest.dhall
+
 let Profiles = ../../Constants/Profiles.dhall
+
 let Dockers = ../../Constants/DockerVersions.dhall
 
-let dependsOn = Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "archive"
+let dependsOn =
+      Dockers.dependsOn Dockers.Type.Bullseye Profiles.Type.Standard "archive"
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -21,7 +26,11 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "ReplayerTest"
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps = [ ReplayerTest.step dependsOn ]
       }

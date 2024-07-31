@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 (* Only show stdout for failed inline tests. *)
 open Inline_test_quiet_logs
 open Core_kernel
@@ -429,18 +427,12 @@ module T = struct
       ; constraint_constants = _
       ; pending_coinbase_collection
       } : Staged_ledger_hash.t =
+    if Node_config.call_logger then
+      Mina_debug.Call_logger.record_call "Staged_ledger.hash" ;
     Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
       (Scan_state.hash scan_state)
       (Ledger.merkle_root ledger)
       pending_coinbase_collection
-
-  [%%if call_logger]
-
-  let hash t =
-    Mina_debug.Call_logger.record_call "Staged_ledger.hash" ;
-    hash t
-
-  [%%endif]
 
   let ledger { ledger; _ } = ledger
 
@@ -2383,6 +2375,8 @@ let%test_module "staged ledger tests" =
 
     let `VK vk, `Prover zkapp_prover =
       Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+
+    let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -4500,8 +4494,8 @@ let%test_module "staged ledger tests" =
             in
             let%map zkapp_command =
               Transaction_snark.For_tests.update_states
-                ~zkapp_prover_and_vk:(zkapp_prover, vk) ~constraint_constants
-                spec
+                ~zkapp_prover_and_vk:(zkapp_prover, Async.Deferred.return vk)
+                ~constraint_constants spec
             in
             let valid_zkapp_command =
               Zkapp_command.Valid.to_valid ~failed:false
@@ -4800,10 +4794,12 @@ let%test_module "staged ledger tests" =
             Transaction_snark.For_tests.create_trivial_snapp ~unique_id:0
               ~constraint_constants ()
           in
+          let%bind.Async.Deferred vk_a = vk_a in
           let `VK vk_b, `Prover _prover_b =
             Transaction_snark.For_tests.create_trivial_snapp ~unique_id:1
               ~constraint_constants ()
           in
+          let%bind.Async.Deferred vk_b = vk_b in
           let keymap =
             Public_key.Compressed.Map.of_alist_exn
               [ (a.public_key, privkey_a); (b.public_key, privkey_b) ]
@@ -4861,10 +4857,12 @@ let%test_module "staged ledger tests" =
             Transaction_snark.For_tests.create_trivial_snapp ~unique_id:0
               ~constraint_constants ()
           in
+          let%bind.Async.Deferred vk_a = vk_a in
           let `VK vk_b, `Prover _prover_b =
             Transaction_snark.For_tests.create_trivial_snapp ~unique_id:1
               ~constraint_constants ()
           in
+          let%bind.Async.Deferred vk_b = vk_b in
           let keymap =
             Public_key.Compressed.Map.of_alist_exn [ (a.public_key, privkey_a) ]
           in
@@ -4981,7 +4979,9 @@ let%test_module "staged ledger tests" =
                     l
                   in
                   let%bind zkapp_command =
-                    let zkapp_prover_and_vk = (zkapp_prover, vk) in
+                    let zkapp_prover_and_vk =
+                      (zkapp_prover, Async.Deferred.return vk)
+                    in
                     Transaction_snark.For_tests.update_states
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
@@ -5106,7 +5106,9 @@ let%test_module "staged ledger tests" =
                     Signature_lib.Public_key.compress
                       zkapp_account_keypair.public_key
                   in
-                  let zkapp_prover_and_vk = (zkapp_prover, vk) in
+                  let zkapp_prover_and_vk =
+                    (zkapp_prover, Async.Deferred.return vk)
+                  in
                   let%bind zkapp_command =
                     single_account_update
                       ~chain:Mina_signature_kind.(Other_network "invalid")

@@ -304,6 +304,9 @@ module Ledger = struct
         ; ("path", `String tar_path)
         ; ("dir", `String dirname)
         ] ;
+    (* This sleep for 5s is a hack for rocksdb. It seems like rocksdb would need some
+       time to stablize *)
+    let%bind () = after (Time.Span.of_int_sec 5) in
     let%map.Deferred.Or_error () =
       Tar.create ~root:dirname ~file:tar_path ~directory:"." ()
     in
@@ -732,15 +735,16 @@ module Genesis_proof = struct
     let b, id =
       match (inputs.blockchain_proof_system_id, inputs.proof_level) with
       | Some id, _ ->
-          (None, id)
+          (None, Deferred.return id)
       | None, Full ->
           let ((_, (module B)) as b) =
             Genesis_proof.blockchain_snark_state inputs
           in
           (Some b, Lazy.force B.Proof.id)
       | _ ->
-          (None, Pickles.Verification_key.Id.dummy ())
+          (None, Deferred.return @@ Pickles.Verification_key.Id.dummy ())
     in
+    let%bind id = id in
     let base_hash =
       Base_hash.create ~id
         ~state_hash:
@@ -770,7 +774,7 @@ module Genesis_proof = struct
     let%bind found_proof =
       match%bind find_file ~logger ~base_hash ~genesis_dir with
       | Some file -> (
-          match%map load file with
+          match%bind load file with
           | Ok genesis_proof ->
               let b =
                 lazy
@@ -790,10 +794,10 @@ module Genesis_proof = struct
                        Lazy.force @@ Genesis_proof.digests (module T) (module B)
                       )
               in
-              let blockchain_proof_system_id =
+              let%map blockchain_proof_system_id =
                 match inputs.blockchain_proof_system_id with
                 | Some id ->
-                    id
+                    Deferred.return id
                 | None ->
                     let _, (module B) = Lazy.force b in
                     Lazy.force B.Proof.id
@@ -820,7 +824,7 @@ module Genesis_proof = struct
                   [ ("path", `String file)
                   ; ("error", Error_json.error_to_yojson err)
                   ] ;
-              None )
+              return None )
       | None ->
           return None
     in

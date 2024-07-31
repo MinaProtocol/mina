@@ -92,39 +92,40 @@ module Step = struct
               header path ) )
 
   let read_or_generate ~prev_challenges cache ?(s_p = storable) k_p
-      ?(s_v = vk_storable) k_v typ return_typ main =
+      ?(s_v = vk_storable) k_v =
     let open Impls.Step in
     let pk =
       lazy
-        ( match
-            Common.time "step keypair read" (fun () ->
-                Key_cache.Sync.read cache s_p (Lazy.force k_p) )
-          with
-        | Ok (pk, dirty) ->
-            Common.time "step keypair create" (fun () -> (pk, dirty))
-        | Error _e ->
-            let r =
-              Common.time "stepkeygen" (fun () ->
-                  constraint_system ~input_typ:typ ~return_typ main
-                  |> Keypair.generate ~prev_challenges )
-            in
-            Timer.clock __LOC__ ;
-            ignore
-              ( Key_cache.Sync.write cache s_p (Lazy.force k_p) (Keypair.pk r)
-                : unit Or_error.t ) ;
-            (Keypair.pk r, `Generated_something) )
+        (let%map.Promise k_p = Lazy.force k_p in
+         match
+           Common.time "step keypair read" (fun () ->
+               Key_cache.Sync.read cache s_p k_p )
+         with
+         | Ok (pk, dirty) ->
+             Common.time "step keypair create" (fun () -> (pk, dirty))
+         | Error _e ->
+             let _, _, _, sys = k_p in
+             let r =
+               Common.time "stepkeygen" (fun () ->
+                   Keypair.generate ~prev_challenges sys )
+             in
+             Timer.clock __LOC__ ;
+             ignore
+               ( Key_cache.Sync.write cache s_p k_p (Keypair.pk r)
+                 : unit Or_error.t ) ;
+             (Keypair.pk r, `Generated_something) )
     in
     let vk =
       lazy
-        (let k_v = Lazy.force k_v in
+        (let%bind.Promise k_v = Lazy.force k_v in
          match
            Common.time "step vk read" (fun () ->
                Key_cache.Sync.read cache s_v k_v )
          with
          | Ok (vk, _) ->
-             (vk, `Cache_hit)
+             Promise.return (vk, `Cache_hit)
          | Error _e ->
-             let pk, c = Lazy.force pk in
+             let%map.Promise pk, c = Lazy.force pk in
              let vk = Backend.Tick.Keypair.vk pk in
              ignore (Key_cache.Sync.write cache s_v k_v vk : unit Or_error.t) ;
              (vk, c) )
@@ -227,12 +228,12 @@ module Wrap = struct
               header path ) )
 
   let read_or_generate ~prev_challenges cache ?(s_p = storable) k_p
-      ?(s_v = vk_storable) k_v typ return_typ main =
+      ?(s_v = vk_storable) k_v =
     let module Vk = Verification_key in
     let open Impls.Wrap in
     let pk =
       lazy
-        (let k = Lazy.force k_p in
+        (let%map.Promise k = Lazy.force k_p in
          match
            Common.time "wrap key read" (fun () ->
                Key_cache.Sync.read cache s_p k )
@@ -240,10 +241,10 @@ module Wrap = struct
          | Ok (pk, d) ->
              (pk, d)
          | Error _e ->
+             let _, _, sys = k in
              let r =
                Common.time "wrapkeygen" (fun () ->
-                   constraint_system ~input_typ:typ ~return_typ main
-                   |> Keypair.generate ~prev_challenges )
+                   Keypair.generate ~prev_challenges sys )
              in
              ignore
                ( Key_cache.Sync.write cache s_p k (Keypair.pk r)
@@ -252,12 +253,12 @@ module Wrap = struct
     in
     let vk =
       lazy
-        (let k_v = Lazy.force k_v in
+        (let%bind.Promise k_v = Lazy.force k_v in
          match Key_cache.Sync.read cache s_v k_v with
          | Ok (vk, d) ->
-             (vk, d)
+             Promise.return (vk, d)
          | Error _e ->
-             let pk, _dirty = Lazy.force pk in
+             let%map.Promise pk, _dirty = Lazy.force pk in
              let vk = Backend.Tock.Keypair.vk pk in
              let vk : Vk.t =
                { index = vk

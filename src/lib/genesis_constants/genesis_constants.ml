@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 
 module Proof_level = struct
@@ -17,9 +15,7 @@ module Proof_level = struct
     | s ->
         failwithf "unrecognised proof level %s" s ()
 
-  [%%inject "compiled", proof_level]
-
-  let compiled = of_string compiled
+  let compiled = of_string Node_config.proof_level
 
   let for_unit_tests = Check
 end
@@ -86,23 +82,6 @@ module Constraint_constants = struct
   *)
   include (
     struct
-      [%%ifdef consensus_mechanism]
-
-      [%%inject "sub_windows_per_window", sub_windows_per_window]
-
-      [%%else]
-
-      (* Invalid value, this should not be used by nonconsensus nodes. *)
-      let sub_windows_per_window = -1
-
-      [%%endif]
-
-      [%%inject "ledger_depth", ledger_depth]
-
-      [%%inject "coinbase_amount_string", coinbase]
-
-      [%%inject "account_creation_fee_string", account_creation_fee_int]
-
       (** All the proofs before the last [work_delay] blocks must be
             completed to add transactions. [work_delay] is the minimum number
             of blocks and will increase if the throughput is less.
@@ -114,84 +93,62 @@ module Constraint_constants = struct
               completing the proofs.
         *)
 
-      [%%inject "work_delay", scan_state_work_delay]
-
-      [%%inject "block_window_duration_ms", block_window_duration]
-
-      [%%if scan_state_with_tps_goal]
-
-      [%%inject "tps_goal_x10", scan_state_tps_goal_x10]
-
-      let max_coinbases = 2
-
-      (* block_window_duration is in milliseconds, so divide by 1000 divide
-         by 10 again because we have tps * 10
-      *)
-      let max_user_commands_per_block =
-        tps_goal_x10 * block_window_duration_ms / (1000 * 10)
-
-      (** Log of the capacity of transactions per transition.
-            - 1 will only work if we don't have prover fees.
-            - 2 will work with prover fees, but not if we want a transaction
-              included in every block.
-            - At least 3 ensures a transaction per block and the staged-ledger
-              unit tests pass.
-        *)
       let transaction_capacity_log_2 =
-        1
-        + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
+        match
+          ( Node_config.scan_state_with_tps_goal
+          , Node_config.scan_state_tps_goal_x10 )
+        with
+        | true, Some tps_goal_x10 ->
+            let max_coinbases = 2 in
 
-      [%%else]
+            (* block_window_duration is in milliseconds, so divide by 1000 divide
+               by 10 again because we have tps * 10
+            *)
+            let max_user_commands_per_block =
+              tps_goal_x10 * Node_config.block_window_duration / (1000 * 10)
+            in
 
-      [%%inject
-      "transaction_capacity_log_2", scan_state_transaction_capacity_log_2]
+            (* Log of the capacity of transactions per transition.
+                  - 1 will only work if we don't have prover fees.
+                  - 2 will work with prover fees, but not if we want a transaction
+                    included in every block.
+                  - At least 3 ensures a transaction per block and the staged-ledger
+                    unit tests pass.
+            *)
+            1
+            + Core_kernel.Int.ceil_log2
+                (max_user_commands_per_block + max_coinbases)
+        | _ -> (
+            match Node_config.scan_state_transaction_capacity_log_2 with
+            | Some a ->
+                a
+            | None ->
+                failwith
+                  "scan_state_transaction_capacity_log_2 must be set if \
+                   scan_state_with_tps_goal is false" )
 
-      [%%endif]
-
-      [%%inject "supercharged_coinbase_factor", supercharged_coinbase_factor]
+      let supercharged_coinbase_factor =
+        Node_config.supercharged_coinbase_factor
 
       let pending_coinbase_depth =
         Core_kernel.Int.ceil_log2
-          (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
-
-      [%%ifndef fork_blockchain_length]
-
-      let fork = None
-
-      [%%else]
-
-      [%%inject "fork_blockchain_length", fork_blockchain_length]
-
-      [%%inject "fork_state_hash", fork_state_hash]
-
-      [%%inject "fork_global_slot_since_genesis", fork_genesis_slot]
-
-      let fork =
-        Some
-          { Fork_constants.state_hash =
-              Data_hash_lib.State_hash.of_base58_check_exn fork_state_hash
-          ; blockchain_length =
-              Mina_numbers.Length.of_int fork_blockchain_length
-          ; global_slot_since_genesis =
-              Mina_numbers.Global_slot_since_genesis.of_int
-                fork_global_slot_since_genesis
-          }
-
-      [%%endif]
+          ( (transaction_capacity_log_2 + 1)
+            * (Node_config.scan_state_work_delay + 1)
+          + 1 )
 
       let compiled =
-        { sub_windows_per_window
-        ; ledger_depth
-        ; work_delay
-        ; block_window_duration_ms
+        { sub_windows_per_window = Node_config.sub_windows_per_window
+        ; ledger_depth = Node_config.ledger_depth
+        ; work_delay = Node_config.scan_state_work_delay
+        ; block_window_duration_ms = Node_config.block_window_duration
         ; transaction_capacity_log_2
         ; pending_coinbase_depth
         ; coinbase_amount =
-            Currency.Amount.of_mina_string_exn coinbase_amount_string
+            Currency.Amount.of_mina_string_exn Node_config.coinbase
         ; supercharged_coinbase_factor
         ; account_creation_fee =
-            Currency.Fee.of_mina_string_exn account_creation_fee_string
-        ; fork
+            Currency.Fee.of_mina_string_exn Node_config.account_creation_fee_int
+        ; fork = None
         }
     end :
       sig
@@ -367,19 +324,19 @@ end
 
 include T
 
-[%%inject "genesis_state_timestamp_string", genesis_state_timestamp]
+let genesis_state_timestamp_string = Node_config.genesis_state_timestamp
 
-[%%inject "k", k]
+let k = Node_config.k
 
-[%%inject "slots_per_epoch", slots_per_epoch]
+let slots_per_epoch = Node_config.slots_per_epoch
 
-[%%inject "slots_per_sub_window", slots_per_sub_window]
+let slots_per_sub_window = Node_config.slots_per_sub_window
 
-[%%inject "grace_period_slots", grace_period_slots]
+let grace_period_slots = Node_config.grace_period_slots
 
-[%%inject "delta", delta]
+let delta = Node_config.delta
 
-[%%inject "pool_max_size", pool_max_size]
+let pool_max_size = Node_config.pool_max_size
 
 let compiled : t =
   { protocol =

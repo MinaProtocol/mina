@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params.Tick
 open Zkapp_basic
@@ -10,14 +8,10 @@ module Event = struct
 
   let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.zkapp_event x
 
-  [%%ifdef consensus_mechanism]
-
   type var = Field.Var.t array
 
   let hash_var (x : Field.Var.t array) =
     Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_event x
-
-  [%%endif]
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck in
@@ -45,8 +39,6 @@ struct
   let hash (x : t) =
     (* fold_right so the empty hash is used at the end of the events *)
     List.fold_right ~init:empty_hash ~f:(Fn.flip push_event) x
-
-  [%%ifdef consensus_mechanism]
 
   type var = t Data_as_hash.t
 
@@ -92,8 +84,6 @@ struct
       (Data_as_hash.hash events) ;
     (hd, tl)
 
-  [%%endif]
-
   let deriver obj =
     let open Fields_derivers_zkapps in
     let events = list @@ array field (o ()) in
@@ -132,13 +122,9 @@ module Actions = struct
   let push_events (acc : Field.t) (events : t) : Field.t =
     push_hash acc (hash events)
 
-  [%%ifdef consensus_mechanism]
-
   let push_events_checked (x : Field.Var.t) (e : var) : Field.Var.t =
     Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_actions
       [| x; Data_as_hash.hash e |]
-
-  [%%endif]
 end
 
 module Zkapp_uri = struct
@@ -250,8 +236,6 @@ type t =
 
 let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
-[%%ifdef consensus_mechanism]
-
 module Checked = struct
   type t =
     ( Pickles.Impls.Step.Field.t Zkapp_state.V.t
@@ -361,8 +345,6 @@ let typ : (Checked.t, t) Typ.t =
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
-
-[%%endif]
 
 let zkapp_uri_to_input zkapp_uri =
   Random_oracle.Input.Chunked.field @@ hash_zkapp_uri zkapp_uri
