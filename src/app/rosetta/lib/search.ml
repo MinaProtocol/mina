@@ -329,17 +329,6 @@ module Sql = struct
     let () = Format.pp_print_flush ppf () in
     Buffer.contents buffer
 
-  module Block_extras = struct
-    type t = { block_hash : string; block_height : int64 }
-    [@@deriving hlist, fields]
-
-    let fields = String.concat ~sep:"," [ "b.state_hash"; "b.height" ]
-
-    let typ =
-      Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-        Caqti_type.[ string; int64 ]
-  end
-
   module User_commands = struct
     module Cte = struct
       type t =
