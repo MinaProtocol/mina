@@ -71,6 +71,12 @@ module User_command = Mina_base.User_command
 module Signed_command = Mina_base.Signed_command
 module Transaction_hash = Mina_transaction.Transaction_hash
 
+let account_id (`Pk pk) (`Token_id token_id) =
+  { Account_identifier.address = pk
+  ; sub_account = None
+  ; metadata = Some (Amount_of.Token.Id.encode_json_object token_id)
+  }
+
 module Options = struct
   type t =
     { sender : Public_key.Compressed.t
@@ -174,7 +180,7 @@ module Derive = struct
   end
 
   module Impl (M : Monad_fail.S) = struct
-    module Token_id_decode = Amount_of.Token_id.T (M)
+    module Token_id_decode = Amount_of.Token.Id.T (M)
 
     let handle ~(env : Env.T(M).t) (req : Construction_derive_request.t) =
       let open M.Let_syntax in
@@ -193,10 +199,10 @@ module Derive = struct
       { Construction_derive_response.address = None
       ; account_identifier =
           Some
-            (User_command_info.account_id
+            (account_id
                (`Pk (Public_key.Compressed.to_base58_check pk_compressed))
                (`Token_id
-                 (Option.value ~default:Amount_of.Token_id.default token_id) ) )
+                 (Option.value ~default:Amount_of.Token.Id.default token_id) ) )
       ; metadata = None
       }
   end
@@ -448,16 +454,12 @@ module Preprocess = struct
       let%map receiver =
         key partial_user_command.User_command_info.Partial.receiver
       in
+      let (`Token_id default_token_id) = Amount_of.Token.Id.default in
       { Construction_preprocess_response.options =
           Some
             (Options.to_json
                { Options.sender
-               ; token_id =
-                   ( match
-                       partial_user_command.User_command_info.Partial.token
-                     with
-                   | `Token_id s ->
-                       s )
+               ; token_id = default_token_id
                ; receiver
                ; valid_until = Option.bind ~f:(fun m -> m.valid_until) metadata
                ; memo = Option.bind ~f:(fun m -> m.memo) metadata
@@ -545,8 +547,7 @@ module Payloads = struct
             ; account_identifier =
                 Some
                   (User_command_info.account_id
-                     partial_user_command.User_command_info.Partial.source
-                     partial_user_command.User_command_info.Partial.token )
+                     partial_user_command.User_command_info.Partial.source )
             ; hex_bytes = Hex.Safe.to_hex unsigned_transaction_string
             ; signature_type = Some `Schnorr_poseidon
             }
@@ -741,9 +742,7 @@ module Parse = struct
             in
             ( User_command_info.to_operations ~failure_status:None
                 signed_transaction.command
-            , [ User_command_info.account_id signed_transaction.command.source
-                  signed_transaction.command.token
-              ]
+            , [ User_command_info.account_id signed_transaction.command.source ]
             , meta_of_command signed_transaction.command )
         | false ->
             let%bind unsigned_rendered_transaction =
@@ -941,7 +940,8 @@ module Submit = struct
                 Send_payment.(
                   make
                   @@ makeVariables ~from:(`String payment.from)
-                       ~to_:(`String payment.to_) ~token:(`String payment.token)
+                       ~to_:(`String payment.to_)
+                       ~token:Amount_of.Token.Id.(encode_json_string default)
                        ~amount:(uint64 payment.amount) ~fee:(uint64 payment.fee)
                        ?validUntil:(Option.map ~f:uint32 payment.valid_until)
                        ?memo:payment.memo ~nonce:(uint32 payment.nonce)

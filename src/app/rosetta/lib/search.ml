@@ -33,7 +33,7 @@ module Transaction_query = struct
   [@@deriving to_yojson, make]
 
   module T (M : Monad_fail.S) = struct
-    module Token_id = Amount_of.Token_id.T (M)
+    module Token_id = Amount_of.Token.Id.T (M)
 
     let of_search_transaction_request (req : Search_transactions_request.t) =
       let open M.Let_syntax in
@@ -49,7 +49,8 @@ module Transaction_query = struct
             let%bind token_id = Token_id.decode metadata in
             Option.value_map token_id
               ~default:(M.fail @@ Errors.create @@ `Exception "Invalid token_id")
-              ~f:(fun token_id -> M.return @@ Some { Filter.address; token_id }) )
+              ~f:(fun (`Token_id token_id) ->
+                M.return @@ Some { Filter.address; token_id } ) )
       in
       let op_status = req.status in
       let%map op_type =
