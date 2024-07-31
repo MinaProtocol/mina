@@ -246,6 +246,41 @@ module Make (Test : Test_intf) = struct
                   "num account is correct" (MT.num_accounts mdb)
                   (n - i - 1) ) ) )
 
+  (* Straightforward implemententation of Knuth-Fisher-Yates shuffle *)
+  let shuffle_array a =
+    for i = Array.length a - 1 downto 1 do
+      let tmp = a.(i) in
+      let j = Random.int (i + 1) in
+      a.(i) <- a.(j) ;
+      a.(j) <- tmp
+    done
+
+  let shuffle_list l =
+    let a = Array.of_list l in
+    shuffle_array a ; Array.to_list a
+
+  let () =
+    add_test "freed locations are returned in descending order" (fun () ->
+        Test.with_instance (fun mdb ->
+            let num_accounts = Int.pow 2 (Int.min 5 (MT.depth mdb - 1)) in
+            let accounts = Account.genval.many num_accounts in
+            let _locs = List.map ~f:(create_new_account_exn mdb) accounts in
+
+            let accounts_to_remove =
+              List.take (shuffle_list accounts) (num_accounts / 2)
+            in
+            List.iter accounts_to_remove ~f:(MT.remove_account mdb) ;
+            let freed_locs = MT.get_freed mdb |> Sequence.to_list in
+
+            let sorted_locs =
+              (* Sort in increasing order *)
+              List.sort ~compare:(Fn.flip Location.compare) freed_locs
+            in
+            Alcotest.(
+              check (list Location.testable)
+                "freed locations are sorted in descending order" sorted_locs
+                freed_locs) ) )
+
   let () =
     add_qtest
       "set_inner_hash_at_addr_exn(address,hash); \

@@ -80,8 +80,9 @@ module Make (Test : Test_intf) = struct
   module Location = struct
     include Test.Location
 
-    let testable =
-      Alcotest.testable (fun ppf loc -> Sexp.pp ppf (sexp_of_t loc)) equal
+    let pp ppf loc = Sexp.pp ppf (sexp_of_t loc)
+
+    let testable = Alcotest.testable pp equal
   end
 
   let directions =
@@ -680,6 +681,47 @@ module Make (Test : Test_intf) = struct
                 Alcotest.(check (option Account.testable))
                   "location is free" None
                   (Mask.Attached.get attached_mask loc) ) ) )
+
+  (* Straightforward implemententation of Knuth-Fisher-Yates shuffle *)
+  let shuffle_array a =
+    for i = Array.length a - 1 downto 1 do
+      let tmp = a.(i) in
+      let j = Random.int (i + 1) in
+      a.(i) <- a.(j) ;
+      a.(j) <- tmp
+    done
+
+  let shuffle_list l =
+    let a = Array.of_list l in
+    shuffle_array a ; Array.to_list a
+
+  let () =
+    add_test "freed locations are returned in descending order" (fun () ->
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            let num_accounts = Int.pow 2 (Int.min 5 (Test.depth - 1)) in
+            let accounts = gen_accounts ~num_accounts in
+            let _locs =
+              List.map ~f:(create_new_account_exn attached_mask) accounts
+            in
+
+            let accounts_to_remove =
+              List.take (shuffle_list accounts) (num_accounts / 2)
+            in
+            List.iter accounts_to_remove
+              ~f:(Mask.Attached.remove_account attached_mask) ;
+            let freed_locs =
+              Mask.Attached.get_freed attached_mask |> Sequence.to_list
+            in
+
+            let sorted_locs =
+              (* Sort in increasing order *)
+              List.sort ~compare:(fun x y -> Location.compare y x) freed_locs
+            in
+            Alcotest.(
+              check (list Location.testable)
+                "freed locations are sorted in descending order" sorted_locs
+                freed_locs) ) )
 
   (* delete an existing account and returns the location where it was stored *)
   let delete mask account =
