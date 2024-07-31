@@ -631,11 +631,12 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         (* It's already absent *) ()
 
   let set_freed mdb l =
-    let freed = Free_list.F.Location.of_list l in
+    let freed = Free_list.F.Location.of_sequence l in
     Free_list.set mdb freed
 
   let get_freed mdb =
-    Free_list.get mdb |> Result.ok_or_failwith |> Free_list.F.Location.to_list
+    Free_list.get mdb |> Result.ok_or_failwith
+    |> Free_list.F.Location.to_sequence
 
   let to_list mdb =
     let num_accounts = num_accounts mdb in

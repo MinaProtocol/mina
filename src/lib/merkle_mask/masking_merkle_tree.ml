@@ -595,25 +595,18 @@ module Make (Inputs : Inputs_intf.S) = struct
           ()
 
     let set_freed t locs =
-      let freed = Free_list.Location.of_list locs in
+      let freed = Free_list.Location.of_sequence locs in
       t.freed <- freed
 
     (* FIXME: Makes this more efficient. Avoid the back and forth betwee lists
        and sets *)
     let get_freed t =
-      let freed =
-        match Base.get_freed (get_parent t) with
-        | [] ->
-            t.freed
-        | freed ->
-            let freed' =
-              Map.fold t.maps.accounts ~init:[] ~f:(fun ~key ~data:_ acc ->
-                  if List.mem freed key ~equal:Location.equal then acc
-                  else key :: acc )
-            in
-            Free_list.union t.freed (Free_list.Location.of_list freed')
-      in
-      Free_list.Location.to_list freed
+      let base = Base.get_freed (get_parent t) in
+      let local = Free_list.Location.to_sequence t.freed in
+      if Sequence.is_empty base then local
+      else
+        Sequence.filter base ~f:(fun k -> not (Map.mem t.maps.accounts k))
+        |> Sequence.merge ~compare:(Fn.flip Location.compare) local
 
     let set_account_unsafe t location account =
       assert_is_attached t ;
@@ -744,7 +737,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
          Erase = FL(C) \ FL(P)
       *)
-      Base.set_freed parent (Free_list.Location.to_list t.freed) ;
+      Base.set_freed parent (Free_list.Location.to_sequence t.freed) ;
       Base.set_batch parent account_data ;
       Debug_assert.debug_assert (fun () ->
           [%test_result: Hash.t]

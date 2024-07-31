@@ -103,7 +103,7 @@ end = struct
 
   let set_freed _ _ = ()
 
-  let get_freed _ = []
+  let get_freed _ = Sequence.empty
 
   let get _t _loc = None
 
