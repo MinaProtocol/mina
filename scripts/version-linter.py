@@ -24,6 +24,7 @@ import io
 import sys
 import re
 import sexpdata
+import requests
 
 exit_code=0
 
