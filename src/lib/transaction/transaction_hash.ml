@@ -252,7 +252,6 @@ let%test_module "Transaction hashes" =
         | Error err ->
             failwithf "Error getting hash: %s" (Error.to_string_hum err) ()
       in
-      let _ = print_endline hash in
       String.equal hash expected_hash
 
     let%test "decode, recode v1 hashes" =
