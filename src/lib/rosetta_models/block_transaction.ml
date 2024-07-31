@@ -15,6 +15,17 @@ type t =
   }
 [@@deriving yojson { strict = false }, show, eq]
 
+let to_yojson ({ timestamp; _ } as t) =
+  let v = to_yojson t in
+  match (timestamp, v) with
+  | None, `Assoc l ->
+      (* Remove the timestamp field if it's not set, since it's not part of the
+         official spec *)
+      `Assoc (List.filter (fun (k, _) -> k <> "timestamp") l)
+  | Some _, _ | None, _ ->
+      v
+(* impossible *)
+
 (** BlockTransaction contains a populated Transaction and the BlockIdentifier that contains it.  *)
 let create ?(timestamp : int64 option) (block_identifier : Block_identifier.t)
     (transaction : Transaction.t) : t =
