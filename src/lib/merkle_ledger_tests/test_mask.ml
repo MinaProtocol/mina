@@ -715,13 +715,60 @@ module Make (Test : Test_intf) = struct
             in
 
             let sorted_locs =
-              (* Sort in increasing order *)
-              List.sort ~compare:(fun x y -> Location.compare y x) freed_locs
+              (* Sort in descending order *)
+              List.sort ~compare:(Fn.flip Location.compare) freed_locs
             in
             Alcotest.(
               check (list Location.testable)
                 "freed locations are sorted in descending order" sorted_locs
                 freed_locs) ) )
+
+  let () =
+    add_test "freed locations are returned in descending order (parents/mask)"
+      (fun () ->
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+
+            (* Add some accounts to mask and parent *)
+            let num_accounts = Int.pow 2 (Int.min 5 (Test.depth - 1)) / 2 in
+            let accounts_base = gen_accounts ~num_accounts in
+            let accounts_mask = gen_accounts ~num_accounts in
+            let _locs_base =
+              List.map ~f:(parent_create_new_account_exn maskable) accounts_base
+            in
+            let _locs_mask =
+              List.map ~f:(create_new_account_exn attached_mask) accounts_mask
+            in
+
+            (* Remove half the accounts in parent *)
+            let accounts_to_remove_base =
+              List.take (shuffle_list accounts_base) (num_accounts / 2)
+            in
+            List.iter accounts_to_remove_base
+              ~f:(Maskable.remove_account maskable) ;
+
+            (* Remove half the accounts in mask *)
+            let accounts_to_remove_mask =
+              List.take (shuffle_list accounts_mask) (num_accounts / 2)
+            in
+            List.iter accounts_to_remove_mask
+              ~f:(Mask.Attached.remove_account attached_mask) ;
+
+            (* Get free locations *)
+            let freed_locs =
+              Mask.Attached.get_freed attached_mask |> Sequence.to_list
+            in
+
+            (* Compute expected value *)
+            let sorted_locs =
+              (* Sort in descending order *)
+              List.sort ~compare:(Fn.flip Location.compare) freed_locs
+            in
+
+            Alcotest.(
+              check (list Location.testable)
+                "freed locations are sorted in descending order (parents/mask)"
+                sorted_locs freed_locs) ) )
 
   (* delete an existing account and returns the location where it was stored *)
   let delete mask account =
