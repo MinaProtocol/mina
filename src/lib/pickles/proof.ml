@@ -113,12 +113,10 @@ type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) With_data.t
 
 let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
     (most_recent_width : r Nat.t) ~domain_log2 : (w, h) t =
-  let module R = Ro.Make (struct
-    let seed = ref 0
-  end) in
+  let open Ro in
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
-  let tick_arr len = Array.init len ~f:(fun _ -> R.tick ()) in
+  let tick_arr len = Array.init len ~f:(fun _ -> tick ()) in
   let lengths = Commitment_lengths.default ~num_chunks:1 (* TODO *) in
   T
     { statement =
@@ -140,10 +138,10 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                     }
                 ; bulletproof_challenges = Dummy.Ipa.Step.challenges
                 ; plonk =
-                    { alpha = R.scalar_chal ()
-                    ; beta = R.chal ()
-                    ; gamma = R.chal ()
-                    ; zeta = R.scalar_chal ()
+                    { alpha = scalar_chal ()
+                    ; beta = chal ()
+                    ; gamma = chal ()
+                    ; zeta = scalar_chal ()
                     ; joint_combiner = None
                     ; feature_flags = Plonk_types.Features.none_bool
                     }
@@ -182,8 +180,8 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                    { lr =
                        Array.init (Nat.to_int Tock.Rounds.n) ~f:(fun _ ->
                            (g0, g0) )
-                   ; z_1 = R.tock ()
-                   ; z_2 = R.tock ()
+                   ; z_1 = Ro.tock ()
+                   ; z_2 = Ro.tock ()
                    ; delta = g0
                    ; challenge_polynomial_commitment = g0
                    }
@@ -198,11 +196,11 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
          in
          let ex =
            { Plonk_types.All_evals.With_public_input.public_input =
-               ([| R.tick () |], [| R.tick () |])
+               ([| tick () |], [| tick () |])
            ; evals = e
            }
          in
-         { ft_eval1 = R.tick (); evals = ex } )
+         { ft_eval1 = tick (); evals = ex } )
     }
 
 module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct

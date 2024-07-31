@@ -42,84 +42,83 @@ module Constant = struct
 
   let dummy : t Lazy.t =
     lazy
-      (let module R = Ro.Make (struct
-         let seed = ref @@ Random.bits ()
-       end) in
-      let one_chal = Challenge.Constant.dummy in
-      let alpha = R.scalar_chal () in
-      let beta = R.chal () in
-      let gamma = R.chal () in
-      let zeta = R.scalar_chal () in
-      let chals :
-          _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t =
-        { alpha = Common.Ipa.Wrap.endo_to_field alpha
-        ; beta = Challenge.Constant.to_tock_field beta
-        ; gamma = Challenge.Constant.to_tock_field gamma
-        ; zeta = Common.Ipa.Wrap.endo_to_field zeta
-        ; joint_combiner = None
-        ; feature_flags = Plonk_types.Features.none_bool
-        }
-      in
-      let evals =
-        Plonk_types.Evals.to_in_circuit
-          (Lazy.force Dummy.evals_combined).evals.evals
-      in
-      let env =
-        let module Env_bool = struct
-          type t = bool
+      (let one_chal = Challenge.Constant.dummy in
+       let open Ro in
+       let alpha = scalar_chal () in
+       let beta = chal () in
+       let gamma = chal () in
+       let zeta = scalar_chal () in
+       let chals :
+           _ Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
+           =
+         { alpha = Common.Ipa.Wrap.endo_to_field alpha
+         ; beta = Challenge.Constant.to_tock_field beta
+         ; gamma = Challenge.Constant.to_tock_field gamma
+         ; zeta = Common.Ipa.Wrap.endo_to_field zeta
+         ; joint_combiner = None
+         ; feature_flags = Plonk_types.Features.none_bool
+         }
+       in
+       let evals =
+         Plonk_types.Evals.to_in_circuit
+           (Lazy.force Dummy.evals_combined).evals.evals
+       in
+       let env =
+         let module Env_bool = struct
+           type t = bool
 
-          let true_ = true
+           let true_ = true
 
-          let false_ = false
+           let false_ = false
 
-          let ( &&& ) = ( && )
+           let ( &&& ) = ( && )
 
-          let ( ||| ) = ( || )
+           let ( ||| ) = ( || )
 
-          let any = List.exists ~f:Fn.id
-        end in
-        let module Env_field = struct
-          include Tock.Field
+           let any = List.exists ~f:Fn.id
+         end in
+         let module Env_field = struct
+           include Tock.Field
 
-          type bool = Env_bool.t
+           type bool = Env_bool.t
 
-          let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
-        end in
-        Plonk_checks.scalars_env
-          (module Env_bool)
-          (module Env_field)
-          ~srs_length_log2:Common.Max_degree.wrap_log2 ~zk_rows:3
-          ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
-          ~field_of_hex:
-            (Core_kernel.Fn.compose Tock.Field.of_bigint (fun x ->
-                 Kimchi_pasta.Pasta.Bigint256.of_hex_string x ) )
-          ~domain:
-            (Plonk_checks.domain
-               (module Tock.Field)
-               (wrap_domains ~proofs_verified:2).h ~shifts:Common.tock_shifts
-               ~domain_generator:Tock.Field.domain_generator )
-          chals evals
-      in
-      let plonk =
-        let module Field = struct
-          include Tock.Field
-        end in
-        Plonk_checks.derive_plonk (module Field) ~env ~shift chals evals
-        |> Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
-           .of_wrap
-             ~assert_none:(fun x -> assert (Option.is_none (Opt.to_option x)))
-             ~assert_false:(fun x -> assert (not x))
-      in
-      { deferred_values =
-          { plonk = { plonk with alpha; beta; gamma; zeta }
-          ; combined_inner_product = Shifted_value (R.tock ())
-          ; xi = Scalar_challenge.create one_chal
-          ; bulletproof_challenges = Dummy.Ipa.Wrap.challenges
-          ; b = Shifted_value (R.tock ())
-          }
-      ; should_finalize = false
-      ; sponge_digest_before_evaluations = Digest.Constant.dummy
-      } )
+           let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
+         end in
+         Plonk_checks.scalars_env
+           (module Env_bool)
+           (module Env_field)
+           ~srs_length_log2:Common.Max_degree.wrap_log2 ~zk_rows:3
+           ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
+           ~field_of_hex:
+             (Core_kernel.Fn.compose Tock.Field.of_bigint (fun x ->
+                  Kimchi_pasta.Pasta.Bigint256.of_hex_string x ) )
+           ~domain:
+             (Plonk_checks.domain
+                (module Tock.Field)
+                (wrap_domains ~proofs_verified:2).h ~shifts:Common.tock_shifts
+                ~domain_generator:Tock.Field.domain_generator )
+           chals evals
+       in
+       let plonk =
+         let module Field = struct
+           include Tock.Field
+         end in
+         Plonk_checks.derive_plonk (module Field) ~env ~shift chals evals
+         |> Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
+            .of_wrap
+              ~assert_none:(fun x -> assert (Option.is_none (Opt.to_option x)))
+              ~assert_false:(fun x -> assert (not x))
+       in
+       { deferred_values =
+           { plonk = { plonk with alpha; beta; gamma; zeta }
+           ; combined_inner_product = Shifted_value (tock ())
+           ; xi = Scalar_challenge.create one_chal
+           ; bulletproof_challenges = Dummy.Ipa.Wrap.challenges
+           ; b = Shifted_value (tock ())
+           }
+       ; should_finalize = false
+       ; sponge_digest_before_evaluations = Digest.Constant.dummy
+       } )
 end
 
 let typ ~wrap_rounds:_ : (t, Constant.t) Typ.t =
