@@ -1,37 +1,49 @@
 open Core_kernel
 open Rosetta_models
 
-module Token_id = struct
-  let default : string = Mina_base.Token_id.(to_string default)
+module Token = struct
+  module Id = struct
+    type t = [ `Token_id of string ] [@@deriving yojson, equal]
 
-  let is_default token_id = String.equal default token_id
+    let default : t = `Token_id Mina_base.Token_id.(to_string default)
 
-  let encode (token_id : string) = `Assoc [ ("token_id", `String token_id) ]
+    let is_default t = equal t default
 
-  module T (M : Monad_fail.S) = struct
-    let decode metadata =
-      match metadata with
-      | Some (`Assoc [ ("token_id", `String token_id) ])
-        when try
-               let (_ : Mina_base.Token_id.t) =
-                 Mina_base.Token_id.of_string token_id
-               in
-               true
-             with Failure _ -> false ->
-          M.return (Some token_id)
-      | Some bad ->
-          M.fail
-            (Errors.create
-               ~context:
-                 (sprintf
-                    "When metadata is provided for account identifiers, \
-                     acceptable format is exactly { \"token_id\": \
-                     <base58-encoded-field-element> }. You provided %s"
-                    (Yojson.Safe.pretty_to_string bad) )
-               (`Json_parse None) )
-      | None ->
-          M.return None
+    let encode_json_string (`Token_id token_id : t) = `String token_id
+
+    let encode_json_object token_id =
+      `Assoc [ ("token_id", encode_json_string token_id) ]
+
+    module T (M : Monad_fail.S) = struct
+      let decode metadata =
+        match metadata with
+        | Some (`Assoc [ ("token_id", `String token_id) ])
+          when try
+                 let (_ : Mina_base.Token_id.t) =
+                   Mina_base.Token_id.of_string token_id
+                 in
+                 true
+               with Failure _ -> false ->
+            M.return (Some (`Token_id token_id))
+        | Some bad ->
+            M.fail
+              (Errors.create
+                 ~context:
+                   (sprintf
+                      "When metadata is provided for account identifiers, \
+                       acceptable format is exactly { \"token_id\": \
+                       <base58-encoded-field-element> }. You provided %s"
+                      (Yojson.Safe.pretty_to_string bad) )
+                 (`Json_parse None) )
+        | None ->
+            M.return None
+    end
   end
+
+  type t = Mina | Token of { id : Id.t; symbol : [ `Token_symbol of string ] }
+  [@@deriving yojson, equal]
+
+  let token_id = function Mina -> Id.default | Token { id; _ } -> id
 end
 
 let negated (t : Amount.t) =
@@ -46,14 +58,16 @@ let mina total =
   ; metadata = None
   }
 
-let token (`Token_id (token_id : string)) total =
-  if Token_id.is_default token_id then mina total
-  else
-    { Amount.value = Unsigned.UInt64.to_string total
-    ; currency =
-        { Currency.symbol = "MINA+"
-        ; decimals = 9l
-        ; metadata = Some (Token_id.encode token_id)
-        }
-    ; metadata = None
-    }
+let token t total =
+  match t with
+  | Token.Mina ->
+      mina total
+  | Token { id = token_id; symbol = `Token_symbol token_symbol } ->
+      { Amount.value = Unsigned.UInt64.to_string total
+      ; currency =
+          { Currency.symbol = token_symbol
+          ; decimals = 9l
+          ; metadata = Some (Token.Id.encode_json_object token_id)
+          }
+      ; metadata = None
+      }
