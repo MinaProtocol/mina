@@ -769,6 +769,72 @@ module Make (Test : Test_intf) = struct
                 "freed locations are sorted in descending order (parents/mask)"
                 sorted_locs freed_locs) ) )
 
+  let () =
+    let num_accounts = Int.pow 2 (Int.min 5 (Test.depth - 1)) / 2 in
+    (* We will remvove the [remove num_remove_in_mask] last accounts from mask. *)
+    let num_remove_in_mask = 4 in
+    if num_accounts > num_remove_in_mask then
+      add_test "only valid free location (all of them!) are considered"
+        (fun () ->
+          Test.with_instances (fun maskable mask ->
+              (* Add some accounts to parent only *)
+              let accounts_base = gen_accounts ~num_accounts in
+
+              (* [locs_base] is a sorted list in increasing order of
+                 location.
+                 This is a guarantee of the allocation algorithm. *)
+              let locs_base =
+                List.map
+                  ~f:(parent_create_new_account_exn maskable)
+                  accounts_base
+              in
+
+              let attached_mask = Maskable.register_mask maskable mask in
+
+              (* Keep the [num_remove_in_mask] biggest locations *)
+              let rev_locs_base = List.rev locs_base in
+              let chosen = List.take rev_locs_base num_remove_in_mask in
+
+              (* Remove the last accounts from the child *)
+              List.iter ~f:(Mask.Attached.remove_location attached_mask) chosen ;
+
+              (* Removing the higher locs above should not create a free list *)
+              Alcotest.(
+                check (list Location.testable)
+                  "child (mask) has an empty free list" []
+                  (Mask.Attached.get_freed attached_mask |> Sequence.to_list)) ;
+
+              (* Let the highest loc live in parent. Remove the others. *)
+              let chosen_for_parent =
+                List.drop chosen (num_remove_in_mask - 1)
+              in
+              (* Remove chosen locations from the parent *)
+              List.iter chosen_for_parent ~f:(Maskable.remove_location maskable) ;
+
+              (* Removed locations from the parent should be visible *)
+              Alcotest.(
+                check (list Location.testable)
+                  "parent (maskable) has a free list" chosen_for_parent
+                  (Maskable.get_freed maskable |> Sequence.to_list)) ;
+
+              (* However, this should not have an effect on the child, since
+                 they were previously removed here. *)
+              Alcotest.(
+                check (list Location.testable)
+                  "child (mask) still has an empty free list" []
+                  (Mask.Attached.get_freed attached_mask |> Sequence.to_list)) ;
+
+              (* Re-map the highest location to another account in mask *)
+              Mask.Attached.set attached_mask (List.hd_exn chosen)
+                (List.hd_exn @@ gen_accounts ~num_accounts:1) ;
+
+              (* Removed locations from the parent should become visible since
+                 they are now in valid locations for the child *)
+              Alcotest.(
+                check (list Location.testable)
+                  "child (mask) now has a free list" chosen_for_parent
+                  (Mask.Attached.get_freed attached_mask |> Sequence.to_list)) ) )
+
   (* delete an existing account and returns the location where it was stored *)
   let delete mask account =
     let loc =
