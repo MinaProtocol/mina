@@ -222,7 +222,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     module Freed = struct
       let add t loc = t.freed <- Free_list.Location.add t.freed loc
 
-      let _remove t loc = t.freed <- Free_list.Location.remove t.freed loc
+      let remove t loc = t.freed <- Free_list.Location.remove t.freed loc
 
       let mem t loc = Free_list.Location.mem t.freed loc
     end
@@ -598,15 +598,39 @@ module Make (Inputs : Inputs_intf.S) = struct
       let freed = Free_list.Location.of_sequence locs in
       t.freed <- freed
 
-    (* FIXME: Makes this more efficient. Avoid the back and forth betwee lists
-       and sets *)
+    (* let is_in_frontier { fill_frontier; _ } optloc =
+     *   match (fill_frontier, optloc) with
+     *   | None, _ | _, None ->
+     *       false
+     *   | Some ubound, Some loc ->
+     *       Location.(loc <= ubound) *)
+
+    let is_allocated t loc = Map.mem t.maps.accounts loc
+
+    (* Get all freed locations from parent that are also valid in this context *)
+    let get_valid_parent_freed t =
+      match t.fill_frontier with
+      | None ->
+          (* We do not need any free locations from anyone, this mask represents
+             an empty ledger. *)
+          Sequence.empty
+      | Some frontier ->
+          let base = Base.get_freed (get_parent t) in
+          (* Some locations marked as free in the parent might have been reallocated
+             since the mask has been attached.
+
+             Some locations in the parent, might also be outside of this mask's
+             current fill frontier.
+
+             Discard them. *)
+          Sequence.filter base ~f:(fun loc ->
+              Location.(loc <= frontier) && not (is_allocated t loc) )
+
     let get_freed t =
-      let base = Base.get_freed (get_parent t) in
+      let base = get_valid_parent_freed t in
       let local = Free_list.Location.to_sequence t.freed in
       if Sequence.is_empty base then local
-      else
-        Sequence.filter base ~f:(fun k -> not (Map.mem t.maps.accounts k))
-        |> Sequence.merge ~compare:(Fn.flip Location.compare) local
+      else Sequence.merge ~compare:(Fn.flip Location.compare) base local
 
     let set_account_unsafe t location account =
       assert_is_attached t ;
@@ -1107,13 +1131,24 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (* Finds the next available location in the following order of priority:
        - reuse a freed location, due to previously removed data; or
-       - use the leftmost available slot *)
+       - use the leftmost available slot.
+    *)
     let pop_next_fillable t =
-      match Free_list.Location.pop t.freed with
-      | Some (loc, freed) ->
-          t.freed <- freed ;
-          Some loc
-      | None ->
+      match
+        (Free_list.Location.top t.freed, Sequence.hd (get_valid_parent_freed t))
+      with
+      | (Some loc_here as loch), (Some loc_there as loct) ->
+          if Location.(loc_here >= loc_there) then (
+            Freed.remove t loc_here ; loch )
+          else loct
+      | (Some loc as loc_here), None ->
+          (* The free location comes directly from this mask's free list. Update
+             it accordingly. *)
+          Freed.remove t loc ; loc_here
+      | None, (Some _ as loc_there) ->
+          (* The biggest free location comes from a parent, just return it. *)
+          loc_there
+      | None, None ->
           leftmost_available_slot t
 
     let allocate_new t account =
@@ -1160,8 +1195,10 @@ module Make (Inputs : Inputs_intf.S) = struct
     let is_reparenting = has_parent t in
     t.parent <- Ok parent ;
     t.fill_frontier <- Attached.max_filled t ;
-    (* FIXME: Should really come from the parent, this is incorrect *)
+
+    (* Starts the local free list as empty with the first parent registered. *)
     if not is_reparenting then t.freed <- Free_list.empty ;
+
     (* If [t.accumulated] isn't empty, then this mask had a parent before
        and now we just reparent it (which may only happen if both old and new parents
         have the same merkle root (and some masks in between may have been removed),
