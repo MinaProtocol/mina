@@ -2618,7 +2618,7 @@ struct
       ~resolve:(fun { ctx = mina; _ } () state_hash_base58_opt height_opt
                     encoding_opt ->
         let open Deferred.Result.Let_syntax in
-        let%bind breadcrumb =
+        let%map breadcrumb =
           match (state_hash_base58_opt, height_opt) with
           | None, None -> (
               match Mina_lib.best_tip mina with
@@ -2644,17 +2644,16 @@ struct
         let protocol_state =
           Transition_frontier.Breadcrumb.protocol_state breadcrumb
         in
-        Deferred.Result.return
-          ( match encoding_opt with
-          | Some `BASE64 ->
-              Bin_prot.Writer.to_string
-                Mina_state.Protocol_state.Value.Stable.V2.bin_t.writer
-                protocol_state
-              |> Base64.encode_exn
-          | Some `JSON | None ->
-              (* Default to JSON if no encoding is specified *)
-              Mina_state.Protocol_state.value_to_yojson protocol_state
-              |> Yojson.Safe.to_string ) )
+        match encoding_opt with
+        | Some `BASE64 ->
+            Bin_prot.Writer.to_string
+              Mina_state.Protocol_state.Value.Stable.V2.bin_t.writer
+              protocol_state
+            |> Base64.encode_exn
+        | Some `JSON | None ->
+            (* Default to JSON if no encoding is specified *)
+            Mina_state.Protocol_state.value_to_yojson protocol_state
+            |> Yojson.Safe.to_string )
 
   let commands =
     [ sync_status
