@@ -30,7 +30,7 @@ export MINA_LIBP2P_PASS=${MINA_LIBP2P_PASS:=''}
 export MINA_NETWORK=${MINA_NETWORK:=mainnet}
 export MINA_SUFFIX=${MINA_SUFFIX:=}
 export MINA_GENESIS_LEDGER_URL=${MINA_GENESIS_LEDGER_URL:=}
-export MINA_CONFIG_FILE="${MINA_CONFIG_FILE:=/etc/mina/rosetta/genesis_ledgers/${MINA_NETWORK}.json}"
+export MINA_CONFIG_FILE="${MINA_CONFIG_FILE:=/var/lib/coda/genesis_ledgers/${MINA_NETWORK}.json}"
 export MINA_CONFIG_DIR="${MINA_CONFIG_DIR:=/data/.mina-config}"
 export MINA_CLIENT_TRUSTLIST=${MINA_CLIENT_TRUSTLIST:=}
 export PEER_LIST_URL=${PEER_LIST_URL:=https://storage.googleapis.com/seed-lists/${MINA_NETWORK}_seeds.txt}
