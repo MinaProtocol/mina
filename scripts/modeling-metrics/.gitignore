@@ -1,0 +1,4 @@
+data/
+.direnv
+*auth*
+__pycache__
