@@ -316,22 +316,5 @@ let
       mina-ocaml-format = runMinaCheck { name = "ocaml-format"; } ''
         dune exec --profile=dev src/app/reformat/reformat.exe -- -path . -check
       '';
-
-      # Integration test executive
-      test_executive-dev = self.mina-dev.overrideAttrs (oa: {
-        pname = "mina-test_executive";
-        outputs = [ "out" ];
-
-        buildPhase = ''
-          dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe -j$NIX_BUILD_CORES
-        '';
-        installPhase = ''
-          mkdir -p $out/bin
-          mv _build/default/src/app/test_executive/test_executive.exe $out/bin/test_executive
-          mv _build/default/src/app/logproc/logproc.exe $out/bin/logproc
-        '';
-      });
-
-      test_executive = wrapMina self.test_executive-dev { };
     };
 in scope.overrideScope' overlay

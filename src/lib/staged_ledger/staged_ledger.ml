@@ -427,8 +427,6 @@ module T = struct
       ; constraint_constants = _
       ; pending_coinbase_collection
       } : Staged_ledger_hash.t =
-    if Node_config.call_logger then
-      Mina_debug.Call_logger.record_call "Staged_ledger.hash" ;
     Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
       (Scan_state.hash scan_state)
       (Ledger.merkle_root ledger)

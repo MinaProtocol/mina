@@ -28,8 +28,6 @@ let rpc_heartbeat_timeout_sec = 60.0
 
 let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
 
-let generate_genesis_proof = Node_config.generate_genesis_proof
-
 (** limits on Zkapp_command.t size
     10.26*np + 10.08*n2 + 9.14*n1 < 69.45
     where np: number of single proof updates
