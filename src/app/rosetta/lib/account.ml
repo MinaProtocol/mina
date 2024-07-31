@@ -11,7 +11,7 @@ module Scalars = Graphql_lib.Scalars
 module Get_balance =
 [%graphql
 {|
-    query get_balance($public_key: PublicKey!, $token_id: TokenId) {
+    query get_balance($public_key: PublicKey!, $token_id: TokenId!) {
       account(publicKey: $public_key, token: $token_id) {
         balance {
           blockHeight @ppxCustom(module: "Scalars.UInt32")
@@ -20,6 +20,19 @@ module Get_balance =
           total @ppxCustom(module: "Scalars.UInt64")
         }
         nonce @ppxCustom(module: "Scalars.String_json")
+      }
+      tokenOwner(tokenId: $token_id) {
+        tokenSymbol
+      }
+    }
+|}]
+
+module Get_token_symbol =
+[%graphql
+{|
+    query get_token_symbol($token_id: TokenId!) {
+      tokenOwner(tokenId: $token_id) {
+        tokenSymbol
       }
     }
 |}]
@@ -256,13 +269,20 @@ module Balance = struct
   module Env = struct
     (* All side-effects go in the env so we can mock them out later *)
     module T (M : Monad_fail.S) = struct
-      type 'gql t =
+      type ('gql_balance, 'gql_token_symbol) t =
         { gql :
-            ?token_id:string -> address:string -> unit -> ('gql, Errors.t) M.t
+               token_id:[ `Token_id of string ]
+            -> address:[ `Pk of string ]
+            -> unit
+            -> ('gql_balance, Errors.t) M.t
+        ; get_token_symbol :
+               token_id:[ `Token_id of string ]
+            -> unit
+            -> ('gql_token_symbol, Errors.t) M.t
         ; db_block_identifier_and_balance_info :
                block_query:Block_query.t
-            -> address:string
-            -> token_id:string
+            -> address:[ `Pk of string ]
+            -> token_id:[ `Token_id of string ]
             -> ( Block_identifier.t * Balance_info.t * Unsigned.UInt64.t
                , Errors.t )
                M.t
@@ -279,24 +299,28 @@ module Balance = struct
     (* But for tests, we want things to go fast *)
     module Mock = T (Result)
 
-    let real : with_db:_ -> graphql_uri:Uri.t -> 'gql Real.t =
+    let real :
+           with_db:_
+        -> graphql_uri:Uri.t
+        -> ('gql_balance, 'gql_token_symbol) Real.t =
      fun ~with_db ~graphql_uri ->
       { gql =
-          (fun ?token_id ~address () ->
+          (fun ~token_id:(`Token_id token_id) ~address:(`Pk address) () ->
             Graphql.query
               Get_balance.(
                 make
                 @@ makeVariables ~public_key:(`String address)
-                     ~token_id:
-                       ( match token_id with
-                       | Some s ->
-                           `String s
-                       | None ->
-                           `Null )
-                     ())
+                     ~token_id:(`String token_id) ())
+              graphql_uri )
+      ; get_token_symbol =
+          (fun ~token_id:(`Token_id token_id) () ->
+            Graphql.query
+              Get_token_symbol.(
+                make @@ makeVariables ~token_id:(`String token_id) ())
               graphql_uri )
       ; db_block_identifier_and_balance_info =
-          (fun ~block_query ~address ~token_id ->
+          (fun ~block_query ~address:(`Pk address)
+               ~token_id:(`Token_id token_id) ->
             with_db (fun ~db ->
                 let (module Conn : Caqti_async.CONNECTION) = db in
                 Sql.run (module Conn) ~block_query ~address ~token_id
@@ -308,9 +332,9 @@ module Balance = struct
     let dummy_block_identifier =
       Block_identifier.create (Int64.of_int_exn 4) "STATE_HASH_BLOCK"
 
-    let mock : 'gql Mock.t =
+    let mock : ('gql_balance, 'gql_token_symbol) Mock.t =
       { gql =
-          (fun ?token_id:_ ~address:_ () ->
+          (fun ~token_id:_ ~address:_ () ->
             (* TODO: Add variants to cover every branch *)
             Result.return
             @@ { Get_balance.account =
@@ -323,7 +347,12 @@ module Balance = struct
                          }
                      ; nonce = Some "2"
                      }
+               ; tokenOwner = None
                } )
+      ; get_token_symbol =
+          (fun ~token_id:_ () ->
+            (* TODO: Add variants to cover every branch *)
+            Result.return @@ { Get_token_symbol.tokenOwner = None } )
       ; db_block_identifier_and_balance_info =
           (fun ~block_query:_ ~address:_ ~token_id:_ ->
             let balance_info : Balance_info.t =
@@ -337,29 +366,29 @@ module Balance = struct
 
   module Impl (M : Monad_fail.S) = struct
     module E = Env.T (M)
-    module Token_id = Amount_of.Token_id.T (M)
+    module Token_id = Amount_of.Token.Id.T (M)
     module Query = Block_query.T (M)
 
     let handle :
            graphql_uri:Uri.t
-        -> env:'gql E.t
+        -> env:('gql_balance, 'gql_token_symbol) E.t
         -> Account_balance_request.t
         -> (Account_balance_response.t, Errors.t) M.t =
      fun ~graphql_uri ~env req ->
       let open M.Let_syntax in
       let address = req.account_identifier.address in
-      let%bind token_id = Token_id.decode req.account_identifier.metadata in
+      let%bind token_id_opt = Token_id.decode req.account_identifier.metadata in
+      let token_id =
+        Option.value ~default:Amount_of.Token.Id.default token_id_opt
+      in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
           ~graphql_uri
       in
-      let make_balance_amount ~liquid_balance ~total_balance =
+      let make_balance_amount ~liquid_balance ~total_balance ~token_symbol =
         let amount =
-          ( match token_id with
-          | None ->
-              Amount_of.mina
-          | Some token_id ->
-              Amount_of.token (`Token_id token_id) )
+          Amount_of.(
+            token (Token.Token { id = token_id; symbol = token_symbol }))
             total_balance
         in
         let locked_balance = Unsigned.UInt64.sub total_balance liquid_balance in
@@ -382,25 +411,46 @@ module Balance = struct
               , liquid_balance
               , total_balance
               , nonce
-              , created_via_historical_lookup ) =
+              , created_via_historical_lookup
+              , token_symbol ) =
+        let token_symbol symbol_of_owner token_owner =
+          Option.value_map token_owner
+            ~f:(fun t ->
+              let token_symbol = symbol_of_owner t in
+              `Token_symbol (Option.value token_symbol ~default:"") )
+            ~default:(`Token_symbol "MINA")
+        in
         match block_query with
         | Some _ ->
-            let%map block_identifier, { liquid_balance; total_balance }, nonce =
-              env.db_block_identifier_and_balance_info ~block_query ~address
-                ~token_id:
-                  (Option.value token_id
-                     ~default:Mina_base.Token_id.(to_string default) )
+            let%bind block_identifier, { liquid_balance; total_balance }, nonce
+                =
+              env.db_block_identifier_and_balance_info ~block_query
+                ~address:(`Pk address) ~token_id
+            in
+            let%map gql_response = env.get_token_symbol ~token_id () in
+            let token_symbol =
+              token_symbol
+                (fun { Get_token_symbol.tokenSymbol } -> tokenSymbol)
+                gql_response.Get_token_symbol.tokenOwner
             in
             ( block_identifier
             , Unsigned.UInt64.of_int64 liquid_balance
             , Unsigned.UInt64.of_int64 total_balance
             , Unsigned.UInt64.to_string nonce
-            , true )
+            , true
+            , token_symbol )
         | None -> (
-            let%bind gql_response = env.gql ?token_id ~address () in
+            let%bind gql_response =
+              env.gql ~token_id ~address:(`Pk address) ()
+            in
             let%bind account =
               Option.value_map gql_response.Get_balance.account ~f:M.return
                 ~default:(M.fail (Errors.create (`Account_not_found address)))
+            in
+            let token_symbol =
+              token_symbol
+                (fun { Get_balance.tokenSymbol } -> tokenSymbol)
+                gql_response.Get_balance.tokenOwner
             in
             match account with
             | { balance =
@@ -416,7 +466,9 @@ module Balance = struct
                     (Unsigned.UInt32.to_int64 blockHeight)
                     state_hash
                 in
-                M.return (block_identifier, liquid, total, nonce, false)
+
+                M.return
+                  (block_identifier, liquid, total, nonce, false, token_symbol)
             | _ ->
                 M.fail
                   (Errors.create
@@ -424,9 +476,9 @@ module Balance = struct
                        "Error getting balance from GraphQL (node still \
                         bootstrapping?)" ) ) )
       in
-
       { Account_balance_response.block_identifier
-      ; balances = [ make_balance_amount ~liquid_balance ~total_balance ]
+      ; balances =
+          [ make_balance_amount ~liquid_balance ~total_balance ~token_symbol ]
       ; metadata =
           Some
             (`Assoc
