@@ -43,7 +43,18 @@ def branch_commit(branch):
 def download_type_shapes(role,branch,sha1) :
   file=type_shape_file(sha1)
   print ('Downloading type shape file',file,'for',role,'branch',branch,'at commit',sha1)
-  result=subprocess.run(['wget','--no-clobber',f'https://storage.googleapis.com/mina-type-shapes/{file}'])
+  url = f'https://storage.googleapis.com/mina-type-shapes/{file}'
+  if r.status_code != 200:
+    print ("cannot fetch file reference from non-existing path: ${url}")
+    print ("looks like you need to generate it. Please use below steps")
+    print (f"git checkout ${sha1}")
+    print ("nix develop mina")
+    print (f"dune exec src/app/cli/src/mina.exe internal dump-type-shape > ${sha1}-type_shape.txt")
+    print ("gsutil cp gs://mina-type-shapes ${sha1}-type_shape.txt ")
+
+    exit -1
+  
+  result=subprocess.run(['wget','--no-clobber',url])
 
 def type_shape_file(sha1) :
   # created by buildkite build-artifact script
@@ -221,6 +232,10 @@ def check_type_shapes(pr_branch_dict,base_branch,base_type_dict,release_branch,r
         print ('    Type  :',pr_type)
         set_error()
     # not an error if the type was introduced in the base branch, and the type changed in PR branch
+
+def assert_commit(commit, desc):
+  if not commit: 
+    f"Empty commit detected when evaluating commit of {desc}"
 
 if __name__ == "__main__":
   if len(sys.argv) != 4 :
