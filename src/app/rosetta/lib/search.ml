@@ -159,7 +159,8 @@ module Transactions_info = struct
         List.fold info.internal_commands ~init:(M.return [])
           ~f:(fun acc' info ->
             let%bind transaction =
-              Internal_command_info_ops.to_indexer_transaction ~search_include_timestamp info
+              Internal_command_info_ops.to_indexer_transaction
+                ~search_include_timestamp info
             in
             let%map acc = acc' in
             transaction :: acc )
@@ -168,7 +169,8 @@ module Transactions_info = struct
       let%bind user_transactions =
         List.fold info.user_commands ~init:(M.return []) ~f:(fun acc' info ->
             let%bind transaction =
-              User_command_info_ops.to_indexer_transaction ~search_include_timestamp info
+              User_command_info_ops.to_indexer_transaction
+                ~search_include_timestamp info
             in
             let%map acc = acc' in
             transaction :: acc )
@@ -177,7 +179,8 @@ module Transactions_info = struct
       let%map zkapp_command_transactions =
         List.fold info.zkapp_commands ~init:(M.return []) ~f:(fun acc' cmd ->
             let%bind transaction =
-              Zkapp_command_info_ops.to_indexer_transaction ~search_include_timestamp cmd
+              Zkapp_command_info_ops.to_indexer_transaction
+                ~search_include_timestamp cmd
             in
             let%map acc = acc' in
             transaction :: acc )
@@ -1091,7 +1094,7 @@ module Specific = struct
     let handle :
            graphql_uri:Uri.t
         -> env:'gql Env.T(M).t
-        -> search_include_timestamp: bool
+        -> search_include_timestamp:bool
         -> Search_transactions_request.t
         -> (Search_transactions_response.t, Errors.t) M.t =
      fun ~graphql_uri ~env ~search_include_timestamp req ->
@@ -1106,7 +1109,8 @@ module Specific = struct
         List.fold transactions_info.internal_commands ~init:(M.return [])
           ~f:(fun macc info ->
             let%bind transaction =
-              Internal_command_info_ops.to_indexer_transaction ~search_include_timestamp info
+              Internal_command_info_ops.to_indexer_transaction
+                ~search_include_timestamp info
             in
             let%map acc = macc in
             transaction :: acc )
@@ -1116,7 +1120,8 @@ module Specific = struct
         List.fold transactions_info.user_commands ~init:(M.return [])
           ~f:(fun acc' cmd ->
             let%bind transaction =
-              User_command_info_ops.to_indexer_transaction ~search_include_timestamp cmd
+              User_command_info_ops.to_indexer_transaction
+                ~search_include_timestamp cmd
             in
             let%map acc = acc' in
             transaction :: acc )
@@ -1126,7 +1131,8 @@ module Specific = struct
         List.fold transactions_info.zkapp_commands ~init:(M.return [])
           ~f:(fun acc' cmd ->
             let%bind transaction =
-              Zkapp_command_info_ops.to_indexer_transaction ~search_include_timestamp cmd
+              Zkapp_command_info_ops.to_indexer_transaction
+                ~search_include_timestamp cmd
             in
             let%map acc = acc' in
             transaction :: acc )
@@ -1166,8 +1172,7 @@ let router ~graphql_uri ~logger ~with_db ~search_include_timestamp
           let%map res =
             Specific.Real.handle ~graphql_uri
               ~env:(Specific.Env.real ~logger ~db)
-              ~search_include_timestamp
-              req
+              ~search_include_timestamp req
             |> Errors.Lift.wrap
           in
           Search_transactions_response.to_yojson res )
