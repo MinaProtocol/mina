@@ -25,6 +25,7 @@ ENV OPAMREUSEBUILDDIR false
 # Limit logs for opam install errors to 20 lines per error
 ENV OPAMERRLOGLEN 20
 
+ENV GIT_LFS_SKIP_SMUDGE 1
 # --- Shallow clone the Mina repo, only focused on the given MINA_BRANCH
 # git will clone into an empty dir, but this also helps us set the workdir in advance
 RUN git clone \

@@ -36,9 +36,9 @@ module Sql = struct
           .transaction_capacity_log_2
 
     let query_pending =
-      Caqti_request.find_opt
-        Caqti_type.(tup3 string int64 string)
-        Caqti_type.(tup2 (tup4 int64 int64 int64 int64) int)
+      Mina_caqti.find_opt_req
+        Caqti_type.(t3 string int64 string)
+        Caqti_type.(t2 (t4 int64 int64 int64 int64) int)
         {sql|
   WITH RECURSIVE pending_chain AS (
 
@@ -87,9 +87,9 @@ module Sql = struct
 |sql}
 
     let query_canonical =
-      Caqti_request.find_opt
-        Caqti_type.(tup3 string int64 string)
-        Caqti_type.(tup2 (tup4 int64 int64 int64 int64) int)
+      Mina_caqti.find_opt_req
+        Caqti_type.(t3 string int64 string)
+        Caqti_type.(t2 (t4 int64 int64 int64 int64) int)
         {sql|
                 SELECT b.height,b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce,timing_id
 
@@ -108,7 +108,7 @@ module Sql = struct
                 LIMIT 1
 |sql}
 
-    let run (module Conn : Caqti_async.CONNECTION) ~requested_block_height
+    let run (module Conn : Mina_caqti.CONNECTION) ~requested_block_height
         ~address ~token_id =
       let open Deferred.Result.Let_syntax in
       let%bind has_canonical_height =
@@ -143,7 +143,7 @@ module Sql = struct
       ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       ~initial_minimum_balance
 
-  let find_current_balance (module Conn : Caqti_async.CONNECTION)
+  let find_current_balance (module Conn : Mina_caqti.CONNECTION)
       ~requested_block_global_slot_since_genesis ~last_relevant_command_info
       ?timing_id () =
     let open Deferred.Result.Let_syntax in
@@ -198,7 +198,7 @@ module Sql = struct
     let balance_info : Balance_info.t = { liquid_balance; total_balance } in
     Deferred.Result.return (balance_info, nonce)
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_query ~address ~token_id
+  let run (module Conn : Mina_caqti.CONNECTION) ~block_query ~address ~token_id
       =
     let open Deferred.Result.Let_syntax in
     (* First find the block referenced by the block identifier. Then
@@ -298,7 +298,7 @@ module Balance = struct
       ; db_block_identifier_and_balance_info =
           (fun ~block_query ~address ~token_id ->
             with_db (fun ~db ->
-                let (module Conn : Caqti_async.CONNECTION) = db in
+                let (module Conn : Mina_caqti.CONNECTION) = db in
                 Sql.run (module Conn) ~block_query ~address ~token_id
                 |> Errors.Lift.wrap )
             |> Deferred.Result.map_error ~f:(function `App e -> e) )

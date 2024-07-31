@@ -50,9 +50,13 @@ let result_opt ~f x =
   | None ->
       Result.return None
 
+let truncate_long_string s =
+  if String.length s > 100_000 then "... too long ..." else s
+
 let dump_on_error yojson x =
   Result.map_error x ~f:(fun str ->
-      str ^ "\n\nCould not parse JSON:\n" ^ Yojson.Safe.pretty_to_string yojson )
+      str ^ "\n\nCould not parse JSON:\n" ^ truncate_long_string
+      @@ Yojson.Safe.pretty_to_string yojson )
 
 let of_yojson_generic ~fields of_yojson json =
   dump_on_error json @@ of_yojson
