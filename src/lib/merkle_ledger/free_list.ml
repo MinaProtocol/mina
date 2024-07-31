@@ -46,9 +46,9 @@ module type S = sig
 
     val remove_all_contiguous : t -> location -> t * location option
 
-    val of_list : location list -> t
+    val of_sequence : location Sequence.t -> t
 
-    val to_list : t -> location list
+    val to_sequence : t -> location Sequence.t
   end
 end
 
@@ -57,6 +57,9 @@ module Make (L : Location_intf.S) : S with type location = L.t = struct
 
   type location = L.t
 
+  (* The set is built using the built-in Addr.compare. That means that, when iterating,
+     it will go from smallest to biggest.
+  *)
   module Set = Set.Make (L.Addr)
 
   let size = Set.length
@@ -147,9 +150,14 @@ module Make (L : Location_intf.S) : S with type location = L.t = struct
 
     let mem set loc = lift_exn "Free_list.mem" (Set.mem set) loc
 
-    let of_list locs = List.map locs ~f:(lift_exn "id" Fn.id) |> Set.of_list
+    let of_sequence locs = Sequence.fold locs ~f:add ~init:Set.empty
 
-    let to_list set = Set.to_list set |> List.map ~f:account
+    let to_sequence set =
+      (* We force the order to be "decreasing", that means in the reverse order
+         wrt comparison function given at functor call. Since the nominal order,
+         aka `Increasing, would be from smallest to biggest, we exactly want the
+         opposite. *)
+      Set.to_sequence ~order:`Decreasing set |> Sequence.map ~f:account
 
     let remove_all_contiguous set loc =
       let set, addr =
