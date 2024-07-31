@@ -14,6 +14,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val commit_id : string
 end
 
 type Structured_log_events.t += Block_produced
@@ -122,7 +124,7 @@ end = struct
 end
 
 (** Sends an error to the reporting service containing as many failed transactions as we can fit. *)
-let report_transaction_inclusion_failures ~logger failed_txns =
+let report_transaction_inclusion_failures ~commit_id ~logger failed_txns =
   let num_failures = List.length failed_txns in
   let count_size = Fn.compose String.length Yojson.Safe.to_string in
   let wrap_error failed_txns_json =
@@ -154,7 +156,7 @@ let report_transaction_inclusion_failures ~logger failed_txns =
           :: generate_errors remaining_failures
                (available_bytes - element_size - 1)
   in
-  Node_error_service.send_dynamic_report ~logger
+  Node_error_service.send_dynamic_report ~commit_id ~logger
     ~generate_error:(fun available_bytes ->
       (* subtract 2 bytes to account for empty string *)
       let base_error_size = count_size (wrap_error (`String "")) - 2 in
@@ -162,7 +164,7 @@ let report_transaction_inclusion_failures ~logger failed_txns =
       let leftover_bytes = available_bytes - base_error_size - 2 in
       wrap_error (`List (generate_errors failed_txns leftover_bytes)) )
 
-let generate_next_state ~zkapp_cmd_limit ~constraint_constants
+let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
     ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
     ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
     ~winner_pk ~scheduled_time ~log_block_creation ~block_reward_threshold
@@ -238,7 +240,7 @@ let generate_next_state ~zkapp_cmd_limit ~constraint_constants
                              if not (List.is_empty failed_txns) then
                                don't_wait_for
                                  (report_transaction_inclusion_failures ~logger
-                                    failed_txns ) ;
+                                    ~commit_id failed_txns ) ;
                              diff )
                       |> Result.map_error ~f:(fun err ->
                              Staged_ledger.Staged_ledger_error.Pre_diff err )
@@ -799,8 +801,9 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
             in
             [%log internal] "Generate_next_state" ;
             let%bind next_state_opt =
-              generate_next_state ~constraint_constants ~scheduled_time
-                ~block_data ~previous_protocol_state ~time_controller
+              generate_next_state ~commit_id ~constraint_constants
+                ~scheduled_time ~block_data ~previous_protocol_state
+                ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~log_block_creation
                 ~winner_pk:winner_pubkey ~block_reward_threshold
