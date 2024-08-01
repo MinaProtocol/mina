@@ -74,5 +74,3 @@ let compiled_inputs =
     ; constraint_system_digests = None
     ; blockchain_proof_system_id = None
     })
-
-let compiled = None
