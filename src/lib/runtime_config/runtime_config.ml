@@ -1591,29 +1591,3 @@ let slot_tx_end_or_default, slot_chain_end_or_default =
   in
   ( f Mina_compile_config.slot_tx_end (fun d -> d.slot_tx_end)
   , f Mina_compile_config.slot_chain_end (fun d -> d.slot_chain_end) )
-
-module Test_configs = struct
-  let bootstrap =
-    lazy
-      ( (* test_postake_bootstrap *)
-        {json|
-  { "daemon":
-      { "txpool_max_size": 3000 }
-  , "genesis":
-      { "k": 6
-      , "delta": 0
-      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
-  , "proof":
-      { "level": "none"
-      , "sub_windows_per_window": 8
-      , "ledger_depth": 6
-      , "work_delay": 2
-      , "block_window_duration_ms": 1500
-      , "transaction_capacity": {"2_to_the": 3}
-      , "coinbase_amount": "20"
-      , "supercharged_coinbase_factor": 2
-      , "account_creation_fee": "1" }
-  , "ledger": { "name": "test", "add_genesis_winner": false } }
-      |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
-end
