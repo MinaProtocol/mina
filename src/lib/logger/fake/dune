@@ -11,7 +11,6 @@
    base.base_internalhash_types
    ;; local libraries
    interpolator_lib
-   mina_compile_config
    ppx_version.runtime
    bounded_types
  )
