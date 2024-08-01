@@ -480,12 +480,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         ~key_data_pairs:(add_batch_create mdb pks_to_tokens)
   end
 
-  let location_of_account t key =
-    match Account_location.get t key with
-    | Error _ ->
-        None
-    | Ok location ->
-        Some location
+  let location_of_account t key = Result.ok @@ Account_location.get t key
 
   let location_of_account_batch t keys =
     List.zip_exn keys (Account_location.get_batch t keys)
