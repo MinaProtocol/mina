@@ -215,9 +215,10 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       let%map freelist = get mdb in
       set mdb (F.Location.add freelist loc)
 
-    (* TODO: For now this reuses the the [Out_of_leaves] error to signal that
-       the free list does not have any empty slots.
-    *)
+    (* FIXME: Use a dedicated error
+
+       For now this reuses the the [Out_of_leaves] error to signal that the free
+       list does not have any empty slots. *)
     let allocate mdb =
       let key = Lazy.force key in
       match get_generic mdb key with
@@ -689,8 +690,11 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         let last = Addr.to_int last_addr in
         Sequence.range ~stop:`inclusive 0 last
         (* filter out indices corresponding to ignored accounts *)
-        |> Sequence.filter ~f:(fun loc -> not (Int.Set.mem ignored_indices loc))
-        |> Sequence.map ~f:(get_at_index_exn t)
+        |> Sequence.filter ~f:(fun loc ->
+               not (Int.Set.mem ignored_indices loc) )
+        (* Also filter out empty locations, aka freed indexes. Ideally you
+           might want to filter the index before hitting the underlying DB. *)
+        |> Sequence.filter_map ~f:(get_at_index t)
         |> Sequence.foldi ~init ~f:f'
 
   let foldi t ~init ~f =
@@ -708,6 +712,12 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         Location.Hash (Location.to_path_exn location)
       else location
     in
+    (* The code below iterates a little bit more over the path than
+       necessary.
+
+       The goal is to avoid reading the database as much as possible. Here we
+       trade [List.length @@ Location.merkle_path_dependencies_exn location]
+       calls to [get_hash] for a single [get_hash_batch]. *)
     let dependency_locs, dependency_dirs =
       List.unzip (Location.merkle_path_dependencies_exn location)
     in
