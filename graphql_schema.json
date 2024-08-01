@@ -15375,7 +15375,7 @@
             {
               "name": "protocolState",
               "description":
-                "Get the current protocol state, optionally encoded in Base64",
+                "Get the protocol state for a given block, optionally encoded in Base64",
               "args": [
                 {
                   "name": "encoding",
@@ -15383,6 +15383,23 @@
                   "type": {
                     "kind": "ENUM",
                     "name": "Encoding",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "height",
+                  "description":
+                    "The height of the desired block in the best chain",
+                  "type": { "kind": "SCALAR", "name": "Int", "ofType": null },
+                  "defaultValue": null
+                },
+                {
+                  "name": "stateHash",
+                  "description": "The state hash of the desired block",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "String",
                     "ofType": null
                   },
                   "defaultValue": null
