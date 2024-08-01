@@ -287,10 +287,10 @@ build_rosetta_mainnet_deb() {
 }
 
 ##################################### ROSETTA MAINNET PACKAGE #######################################
-build_rosetta_testnet_deb() {
+build_rosetta_devnet_deb() {
  
   echo "------------------------------------------------------------"
-  echo "--- Building devnt rosetta deb"
+  echo "--- Building devnet rosetta deb"
 
   create_control_file mina-rosetta-devnet "${SHARED_DEPS}" 'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
 
