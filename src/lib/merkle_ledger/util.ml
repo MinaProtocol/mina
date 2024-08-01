@@ -170,8 +170,11 @@ end = struct
       compute_last_index nonempty_addresses_and_accounts
     in
     let max_index_in_all_accounts =
-      Option.value_map current_last_index ~default:foreign_last_index
-        ~f:(fun max_index -> Int.max max_index foreign_last_index)
+      match current_last_index with
+      | None ->
+          foreign_last_index
+      | Some idx ->
+          Int.max idx foreign_last_index
     in
     Inputs.Location.(
       Account (Addr.of_int_exn ~ledger_depth max_index_in_all_accounts))
