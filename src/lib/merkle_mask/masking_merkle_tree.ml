@@ -247,8 +247,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       self_set_hash t address hash
 
     let self_set_location t account_id location =
-      (* This function is only correct when the free list is empty *)
-      assert (Free_list.is_empty t.freed) ;
       update_maps t ~f:(fun maps ->
           { maps with
             locations = Map.set maps.locations ~key:account_id ~data:location
