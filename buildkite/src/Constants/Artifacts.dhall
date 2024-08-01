@@ -79,7 +79,7 @@ let toDebianName =
             , Archive = "archive"
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
-            , Rosetta = ""
+            , Rosetta = "rosetta_${Network.lowerName network}"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             }
@@ -105,7 +105,14 @@ let toDebianNames =
                           , Archive = [ "archive" ]
                           , TestExecutive = [ "test_executive" ]
                           , BatchTxn = [ "batch_txn" ]
-                          , Rosetta = [ "" ]
+                          , Rosetta =
+                              Prelude.List.map
+                                Network.Type
+                                Text
+                                (     \(n : Network.Type)
+                                  ->  "rosetta_${Network.lowerName n}"
+                                )
+                                networks
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
                           }

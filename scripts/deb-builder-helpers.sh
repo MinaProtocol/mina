@@ -299,7 +299,7 @@ build_rosetta_testnet_deb() {
   build_deb mina-rosetta-devnet
 }
 
-##################################### ROSETTA MAINNET PACKAGE #######################################
+##################################### ROSETTA BERKELEY PACKAGE #######################################
 build_rosetta_berkeley_deb() {
  
   echo "------------------------------------------------------------"
