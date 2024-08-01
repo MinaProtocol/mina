@@ -265,8 +265,6 @@ module Testnet_postake_many_producers = Register (Balances (struct
 end))
 
 module Test = Register (Balances (Test_ledger))
-module Fuzz = Register (Balances (Fuzz_ledger))
-module Release = Register (Balances (Release_ledger))
 
 module Unit_test_ledger = Make (struct
   include Test
