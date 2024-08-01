@@ -42,7 +42,16 @@ let%test_module "Epoch ledger sync tests" =
           { daemon = None
           ; genesis = None
           ; proof = None
-          ; ledger = None
+          ; ledger =
+              Some
+                { base = Named "test"
+                ; num_accounts = None
+                ; balances = []
+                ; hash = None
+                ; s3_data_hash = None
+                ; name = None
+                ; add_genesis_winner = None
+                }
           ; epoch_data = None
           }
         in
