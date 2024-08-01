@@ -685,8 +685,9 @@ module Make (Inputs : Inputs_intf.S) = struct
                 remove_account_location_update_hashes t account location
           | None ->
               (* If we have a loc -> account binding in maps.accounts, there
-                 needs to be an account -> loc association in the
-                 maps.location *)
+                 needs to be an account -> loc association in maps.location.
+
+                 Thus, this case should not occur. *)
               assert false )
 
     let is_committing t = t.is_committing
