@@ -231,7 +231,7 @@ module Make (Test : Test_intf) = struct
             Alcotest.(
               check (list Location.testable)
                 "decreasing order and allocated order are the same"
-                (List.sort locs_1 ~compare:(fun x y -> Location.compare y x))
+                (List.sort locs_1 ~compare:(Fn.flip Location.compare))
                 locs_2) ) )
 
   let () =
