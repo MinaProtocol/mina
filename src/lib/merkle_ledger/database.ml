@@ -204,6 +204,8 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       | Some data ->
           Result.return @@ F.deserialize ~ledger_depth data
 
+    let get_exn mdb = get mdb |> Result.ok_or_failwith
+
     let set mdb t =
       let key = Lazy.force key in
       let ledger_depth = mdb.depth in
@@ -630,9 +632,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     let freed = Free_list.F.Location.of_sequence l in
     Free_list.set mdb freed
 
-  let get_freed mdb =
-    Free_list.get mdb |> Result.ok_or_failwith
-    |> Free_list.F.Location.to_sequence
+  let get_freed mdb = Free_list.get_exn mdb |> Free_list.F.Location.to_sequence
 
   let to_list mdb =
     let num_accounts = num_accounts mdb in
