@@ -1,7 +1,9 @@
-open Pickles_types
+open Core_kernel
 
 let blockchain_proof () =
-  Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16
+  let decode = Core_kernel.Binable.of_string (module Pickles.Proof.Proofs_verified_2.Stable.Latest) in
+  decode @@ In_channel.with_file "test_fixtures/blockchain_proof" ~f:In_channel.input_all
 
 let transaction_proof () =
-  Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N0.n ~domain_log2:14
+  let decode = Core_kernel.Binable.of_string (module Pickles.Proof.Proofs_verified_2.Stable.Latest) in
+  decode @@ In_channel.with_file "test_fixtures/transaction_proof" ~f:In_channel.input_all
