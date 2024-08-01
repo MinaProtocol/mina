@@ -732,12 +732,20 @@ module Make (Test : Test_intf) = struct
             let num_accounts = Int.pow 2 (Int.min 5 (Test.depth - 1)) / 2 in
             let accounts_base = gen_accounts ~num_accounts in
             let accounts_mask = gen_accounts ~num_accounts in
-            let _locs_base =
+            let locs_base =
               List.map ~f:(parent_create_new_account_exn maskable) accounts_base
             in
-            let _locs_mask =
+
+            let locs_mask =
               List.map ~f:(create_new_account_exn attached_mask) accounts_mask
             in
+
+            (* The configuration above guarantees that parent's locations are
+               not reused *)
+            Alcotest.(check bool)
+              "All child locations are different from parent's" true
+              (List.for_all locs_mask ~f:(fun e ->
+                   not (List.mem locs_base e ~equal:Location.equal) ) ) ;
 
             (* Remove half the accounts in parent *)
             let accounts_to_remove_base =
@@ -753,7 +761,7 @@ module Make (Test : Test_intf) = struct
             List.iter accounts_to_remove_mask
               ~f:(Mask.Attached.remove_account attached_mask) ;
 
-            (* Get free locations *)
+            (* Get free valid locations for mask *)
             let freed_locs =
               Mask.Attached.get_freed attached_mask |> Sequence.to_list
             in
@@ -763,6 +771,12 @@ module Make (Test : Test_intf) = struct
               (* Sort in descending order *)
               List.sort ~compare:(Fn.flip Location.compare) freed_locs
             in
+
+            Alcotest.(check bool)
+              "freed locations representation size <= all freed locations" true
+              ( List.length accounts_to_remove_mask
+                + List.length accounts_to_remove_base
+              >= List.length freed_locs ) ;
 
             Alcotest.(
               check (list Location.testable)
