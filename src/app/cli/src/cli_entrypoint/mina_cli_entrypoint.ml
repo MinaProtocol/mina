@@ -1668,18 +1668,7 @@ let snark_hashes =
       let json = Cli_lib.Flag.json in
       let print = Core.printf "%s\n%!" in
       fun () ->
-        let hashes =
-          match Precomputed_values.compiled with
-          | Some compiled ->
-              (Lazy.force compiled).constraint_system_digests |> Lazy.force
-              |> List.map ~f:(fun (_constraint_system_id, digest) ->
-                     (* Throw away the constraint system ID to avoid changing the
-                        format of the output here.
-                     *)
-                     Md5.to_hex digest )
-          | None ->
-              []
-        in
+        let hashes = [] in
         if json then print (Yojson.Safe.to_string (Hashes.to_yojson hashes))
         else List.iter hashes ~f:print]
 
