@@ -769,6 +769,16 @@ module Make (Test : Test_intf) = struct
                 "freed locations are sorted in descending order (parents/mask)"
                 sorted_locs freed_locs) ) )
 
+  (* Combinator extension for Alcotest for Sequence.t.
+
+     This could probably go to a Mina library for testing, should we have one. *)
+  let seq (type a) (e : a Alcotest.testable) =
+    let open Alcotest in
+    let (module T) = e in
+    let equal = Sequence.equal T.equal
+    and pp ppf seq = (Fmt.Dump.seq T.pp) ppf (Sequence.to_seq seq) in
+    testable pp equal
+
   let () =
     let num_accounts = Int.pow 2 (Int.min 5 (Test.depth - 1)) / 2 in
     (* We will remvove the [remove num_remove_in_mask] last accounts from mask. *)
@@ -800,9 +810,9 @@ module Make (Test : Test_intf) = struct
 
               (* Removing the higher locs above should not create a free list *)
               Alcotest.(
-                check (list Location.testable)
-                  "child (mask) has an empty free list" []
-                  (Mask.Attached.get_freed attached_mask |> Sequence.to_list)) ;
+                check (seq Location.testable)
+                  "child (mask) has an empty free list" Sequence.empty
+                  (Mask.Attached.get_freed attached_mask)) ;
 
               (* Let the highest loc live in parent. Remove the others. *)
               let chosen_for_parent =
@@ -820,9 +830,9 @@ module Make (Test : Test_intf) = struct
               (* However, this should not have an effect on the child, since
                  they were previously removed here. *)
               Alcotest.(
-                check (list Location.testable)
-                  "child (mask) still has an empty free list" []
-                  (Mask.Attached.get_freed attached_mask |> Sequence.to_list)) ;
+                check (seq Location.testable)
+                  "child (mask) still has an empty free list" Sequence.empty
+                  (Mask.Attached.get_freed attached_mask)) ;
 
               (* Re-map the highest location to another account in mask *)
               Mask.Attached.set attached_mask (List.hd_exn chosen)
