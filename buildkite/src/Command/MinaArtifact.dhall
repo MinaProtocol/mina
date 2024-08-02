@@ -253,12 +253,7 @@ let docker_step : Artifacts.Type -> DebianVersions.DebVersion -> List Network.Ty
           ,
 
         TestExecutive = 
-          [DockerImage.ReleaseSpec::{
-            deps=DebianVersions.dependsOn debVersion profile,
-            service="mina-test-executive",
-            deb_codename="${DebianVersions.lowerName debVersion}",
-            step_key="test-executive-${DebianVersions.lowerName debVersion}-docker-image"
-          }],
+          []: List DockerImage.ReleaseSpec.Type,
 
         BatchTxn = 
           [DockerImage.ReleaseSpec::{
