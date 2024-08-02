@@ -20,7 +20,7 @@ let dependsOn =
       Dockers.dependsOn
         Dockers.Type.Bullseye
         Profiles.Type.Standard
-        "daemon-berkeley"
+        "daemon-devnet"
 
 in  Pipeline.build
       Pipeline.Config::{

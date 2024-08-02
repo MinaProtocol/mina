@@ -58,18 +58,18 @@ _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --confi
 echo "--- Create hardfork config"
 FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hardfork_ledger_hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
 
-existing_files=$(aws s3 ls s3://snark-keys.o1test.net/ | awk '{print $4}')
+existing_files=$(aws s3 ls s3://snark-keys-ro.o1test.net/ | awk '{print $4}')
 for file in hardfork_ledgers/*; do
   filename=$(basename "$file")
   
   if echo "$existing_files" | grep -q "$filename"; then
     echo "Info: $filename already exists in the bucket, packaging it instead."
     oldhash=$(openssl dgst -r -sha3-256 "$file" | awk '{print $1}')
-    aws s3 cp "s3://snark-keys.o1test.net/$filename" "$file"
+    aws s3 cp "s3://snark-keys-ro.o1test.net/$filename" "$file"
     newhash=$(openssl dgst -r -sha3-256 "$file" | awk '{print $1}')
     sed -i "s/$oldhash/$newhash/g" new_config.json 
   else
-    aws s3 cp --acl public-read "$file" s3://snark-keys.o1test.net/
+    aws s3 cp --acl public-read "$file" s3://snark-keys-ro.o1test.net/
   fi
 done
 

@@ -212,7 +212,7 @@ for file in "$workdir"/ledgers/*.tar.gz; do
     mkdir -p "$tardir"/{packaged,generated,web}
     tar -xzf "$file" -C "$tardir/generated"
     tar -xzf "$GENESIS_LEDGER_DIR/$tarname.tar.gz" -C "$tardir/packaged"
-    curl "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net/$tarname.tar.gz" | tar -xz -C "$tardir/web"
+    curl "https://s3-us-west-2.amazonaws.com/snark-keys-ro.o1test.net/$tarname.tar.gz" | tar -xz -C "$tardir/web"
 
     $ldb_cmd --hex --db="$tardir/packaged" scan > "$workdir/packaged.scan"
     $ldb_cmd --hex --db="$tardir/web" scan > "$workdir/web.scan"
