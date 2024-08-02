@@ -28,6 +28,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val commit_id : string
 end
 
 exception Snark_worker_error of int
@@ -168,14 +170,18 @@ val transaction_pool : t -> Network_pool.Transaction_pool.t
 
 val snark_pool : t -> Network_pool.Snark_pool.t
 
-val start : t -> unit Deferred.t
+val start : commit_id:string -> t -> unit Deferred.t
 
 val start_with_precomputed_blocks :
-  t -> Block_producer.Precomputed.t Sequence.t -> unit Deferred.t
+     commit_id:string
+  -> t
+  -> Block_producer.Precomputed.t Sequence.t
+  -> unit Deferred.t
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
-val create : ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
+val create :
+  commit_id:string -> ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
 
 val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 

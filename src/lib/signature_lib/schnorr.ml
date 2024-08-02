@@ -240,8 +240,6 @@ module Make
 
   let verify ?signature_kind ((r, s) : Signature.t) (pk : Public_key.t)
       (m : Message.t) =
-    if Node_config.call_logger then
-      Mina_debug.Call_logger.record_call "Signature_lib.Schnorr.verify" ;
     if Random.int 1000 = 0 then (
       print_endline "SCHNORR BACKTRACE:" ;
       Printexc.print_backtrace stdout ) ;

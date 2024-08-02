@@ -75,8 +75,8 @@ let assert_filehash_equal ~file ~hash ~logger =
   else
     let%map () = Unix.rename ~src:file ~dst:(file ^ ".incorrect-hash") in
     [%log error]
-      "Verification failure: downloaded $file and expected SHA3-256 = $hash \
-       but it had $computed_hash"
+      "Verification failure: downloaded $path and expected SHA3-256 = \
+       $expected_hash but it had $computed_hash"
       ~metadata:
         [ ("path", `String file)
         ; ("expected_hash", `String hash)
@@ -1011,18 +1011,14 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
           (str proof_level) (str compiled)
   in
   let%bind genesis_ledger, ledger_config, ledger_file =
-    Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
-      ?overwrite_version
-      (Option.value config.ledger
-         ~default:
-           { base = Named Mina_compile_config.genesis_ledger
-           ; num_accounts = None
-           ; balances = []
-           ; s3_data_hash = None
-           ; hash = None
-           ; name = None
-           ; add_genesis_winner = None
-           } )
+    match config.ledger with
+    | Some ledger ->
+        Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
+          ?overwrite_version ledger
+    | None ->
+        [%log fatal] "No ledger was provided in the runtime configuration" ;
+        Deferred.Or_error.errorf
+          "No ledger was provided in the runtime configuration"
   in
   [%log info] "Loaded genesis ledger from $ledger_file"
     ~metadata:[ ("ledger_file", `String ledger_file) ] ;
