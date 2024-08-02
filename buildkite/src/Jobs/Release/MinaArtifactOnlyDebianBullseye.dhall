@@ -6,8 +6,10 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let DebianChannel = ../../Constants/DebianChannel.dhall
+
 in  Pipeline.build
-      ( ArtifactPipelines.pipeline
+      ( ArtifactPipelines.onlyDebianPipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon
@@ -18,10 +20,8 @@ in  Pipeline.build
             , Artifacts.Type.ZkappTestTransaction
             , Artifacts.Type.FunctionalTestSuite
             ]
-          , tags =
-            [ PipelineTag.Type.Long
-            , PipelineTag.Type.Release
-            , PipelineTag.Type.Docker
-            ]
+          , tags = [ PipelineTag.Type.Debian ]
+          , channel = DebianChannel.Type.Experimental
+          , prefix = "MinaArtifactOnlyDebian"
           }
       )

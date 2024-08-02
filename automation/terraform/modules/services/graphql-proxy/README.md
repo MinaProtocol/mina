@@ -54,13 +54,18 @@ The manual commands to release each container are the following:
 
 *(From the root of the `MinaProtocol/mina` repository)*
 
-`./scripts/release-docker.sh -s mina-daemon -v <major>.<minor>.<patch> --extra-args "--build-arg deb_version=<MINA_VERSION>"`
+`./scripts/docker/release.sh -s mina-daemon -v <major>.<minor>.<patch> --deb_version=<MINA_VERSION>"`
+
+and 
+
+`./scripts/docker/release.sh -s mina-daemon -v <major>.<minor>.<patch> -  --deb_version=<DEB_VERSION> --deb_release=<mina package release channel, e.g. alpha>"`
+
 
 ### daemon Container
 
 *(From the root of the `MinaProtocol/mina/automation` repository)*
 
-`./scripts/release-docker.sh -s daemon -v <major>.<minor>.<patch> --extra-args "--build-arg base_image_tag=<docker tag created in first step>"`
+`./scripts/docker/release.sh -s daemon -v <major>.<minor>.<patch> `
 
 The `--extra-args` argument is for passing additional parameters directly to the `docker build` command. It is used here to pass the required Dockerfile variable `base_image_tag` but can also be used to override Dockerfile variables with default values like so `--build-arg deb_repo=release`
 
@@ -70,4 +75,4 @@ The Faucet Dockerfile lives in the `MinaProtocol/mina` repository [here](https:/
 
 *(From the root of the `MinaProtocol/mina` repository)*
 
-`./scripts/release-docker.sh -s graphql-public-proxy -v <major>.<minor>.<patch>`
+`./scripts/docker/release.sh -s graphql-public-proxy -v <major>.<minor>.<patch>`

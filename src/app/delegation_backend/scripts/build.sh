@@ -40,7 +40,8 @@ case "$1" in
       exit 1
     fi
     cd ../../..
-    scripts/release-docker.sh -s delegation-backend${1:6} -v "$VERSION"
+    scripts/docker/build.sh -s delegation-backend${1:6} -v "$VERSION"
+    scripts/docker/release.sh -s delegation-backend${1:6} -v "$VERSION"
     ;;
   "")
     cd src/cmd/delegation_backend

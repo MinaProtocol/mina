@@ -60,7 +60,7 @@ let generateStep =
       ->  let exportMinaDebCmd = "export MINA_DEB_CODENAME=${spec.deb_codename}"
 
           let buildDockerCmd =
-                    "./scripts/release-docker.sh"
+                    "./scripts/docker/build.sh"
                 ++  " --service ${spec.service}"
                 ++  " --version ${spec.version}"
                 ++  " --network ${spec.network}"
@@ -75,6 +75,20 @@ let generateStep =
                 ++  " --repo ${spec.repo}"
                 ++  " --extra-args \\\"${spec.extra_args}\\\""
 
+          let releaseDockerCmd =
+                    "./scripts/docker/release.sh"
+                ++  " --service ${spec.service}"
+                ++  " --version ${spec.version}"
+                ++  " --network ${spec.network}"
+                ++  " --branch ${spec.branch}"
+                ++  " --deb-codename ${spec.deb_codename}"
+                ++  " --deb-release ${spec.deb_release}"
+                ++  " --deb-version ${spec.deb_version}"
+                ++  " --deb-profile ${Profiles.lowerName spec.deb_profile}"
+                ++  " --deb-build-flags ${BuildFlags.lowerName
+                                            spec.build_flags}"
+                ++  " --repo ${spec.repo}"
+
           let commands =
                 merge
                   { PackagesO1Test =
@@ -83,6 +97,7 @@ let generateStep =
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                           ++  " && "
                           ++  buildDockerCmd
+                          ++  releaseDockerCmd
                         )
                     ]
                   , Local =
@@ -93,6 +108,7 @@ let generateStep =
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                           ++  " && "
                           ++  buildDockerCmd
+                          ++  releaseDockerCmd
                           ++  " && ./scripts/debian/aptly.sh stop"
                         )
                     ]

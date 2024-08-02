@@ -16,6 +16,8 @@ let Tag
       | Release
       | Test
       | Toolchain
+      | Docker
+      | Debian
       | Hardfork
       | Stable
       >
@@ -34,6 +36,8 @@ let toNatural
             , Toolchain = 8
             , Hardfork = 9
             , Stable = 10
+            , Debian = 11
+            , Docker = 12
             }
             tag
 
@@ -68,6 +72,8 @@ let capitalName =
             , Toolchain = "Toolchain"
             , Hardfork = "Hardfork"
             , Stable = "Stable"
+            , Docker = "Docker"
+            , Debian = "Debian"
             }
             tag
 
@@ -84,6 +90,8 @@ let lowerName =
             , Toolchain = "toolchain"
             , Hardfork = "hardfork"
             , Stable = "stable"
+            , Docker = "docker"
+            , Debian = "debian"
             }
             tag
 
