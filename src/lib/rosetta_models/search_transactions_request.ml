@@ -27,6 +27,9 @@ type t =
     address : string option [@default None]
   ; (* success is a synthetic condition populated by parsing network-specific operation statuses (using the mapping provided in `/network/options`).  *)
     success : bool option [@default None]
+  ; (* include_timestamp is an optional flag to include the timestamp of the block in the response.  *)
+    (* Warning: This field is not part of the official spec. *)
+    include_timestamp : bool option [@default None]
   }
 [@@deriving yojson { strict = false }, show, eq]
 
@@ -45,4 +48,5 @@ let create (network_identifier : Network_identifier.t) : t =
   ; _type = None
   ; address = None
   ; success = None
+  ; include_timestamp = None
   }
