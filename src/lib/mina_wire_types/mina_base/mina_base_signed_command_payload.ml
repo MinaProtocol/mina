@@ -55,6 +55,7 @@ module Body = struct
   end
 
   module V2 = struct
+    (* TODO sai make this V3, overwrite now to fix compile errors and revert *)
     type t =
       | Payment of Mina_base_payment_payload.V2.t
       | Stake_delegation of Mina_base_stake_delegation.V2.t

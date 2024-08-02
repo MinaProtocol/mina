@@ -669,9 +669,30 @@ module Update = struct
   end
 
   open Zkapp_basic
+  open Account_delete_payload.Stable
 
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t = Mina_wire_types.Mina_base.Account_update.Update.V2.t =
+        { app_state :
+            F.Stable.V1.t Set_or_keep.Stable.V1.t Zkapp_state.V.Stable.V1.t
+        ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; verification_key :
+            Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; permissions : Permissions.Stable.V2.t Set_or_keep.Stable.V1.t
+        ; zkapp_uri : Bounded_types.String.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; token_symbol :
+            Account.Token_symbol.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; timing : Timing_info.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; voting_for : State_hash.Stable.V1.t Set_or_keep.Stable.V1.t
+        ; account_deletion : V1.t Set_or_keep.Stable.V1.t
+        }
+      [@@deriving annot, compare, equal, sexp, hash, yojson, fields, hlist]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
       type t = Mina_wire_types.Mina_base.Account_update.Update.V1.t =
@@ -752,6 +773,7 @@ module Update = struct
        this generated update in tests, so the timing must be Keep
     *)
     let timing = Set_or_keep.Keep in
+    let%bind account_deletion = Set_or_keep.gen Account_delete_payload.gen in
     return
       ( { app_state
         ; delegate
@@ -761,6 +783,7 @@ module Update = struct
         ; token_symbol
         ; timing
         ; voting_for
+        ; account_deletion
         }
         : t )
 
@@ -783,6 +806,8 @@ module Update = struct
       ; token_symbol : Account.Token_symbol.var Set_or_keep.Checked.t
       ; timing : Timing_info.Checked.t Set_or_keep.Checked.t
       ; voting_for : State_hash.var Set_or_keep.Checked.t
+      ; account_deletion :
+          Account_delete_payload.Checked.t Set_or_keep.Checked.t
       }
     [@@deriving hlist]
 
@@ -795,6 +820,7 @@ module Update = struct
          ; token_symbol
          ; timing
          ; voting_for
+         ; account_deletion
          } :
           t ) =
       let open Random_oracle_input.Chunked in
@@ -812,6 +838,8 @@ module Update = struct
             ~f:Account.Token_symbol.var_to_input
         ; Set_or_keep.Checked.to_input timing ~f:Timing_info.Checked.to_input
         ; Set_or_keep.Checked.to_input voting_for ~f:State_hash.var_to_input
+        ; Set_or_keep.Checked.to_input account_deletion
+            ~f:Account_delete_payload.Checked.to_input
         ]
   end
 
@@ -825,6 +853,7 @@ module Update = struct
     ; token_symbol = Keep
     ; timing = Keep
     ; voting_for = Keep
+    ; account_deletion = Keep
     }
 
   let dummy = noop
@@ -838,6 +867,7 @@ module Update = struct
        ; token_symbol
        ; timing
        ; voting_for
+       ; account_deletion
        } :
         t ) =
     let open Random_oracle_input.Chunked in
@@ -862,6 +892,8 @@ module Update = struct
           ~f:Timing_info.to_input
       ; Set_or_keep.to_input voting_for ~dummy:State_hash.dummy
           ~f:State_hash.to_input
+      ; Set_or_keep.to_input account_deletion
+          ~dummy:Account_delete_payload.dummy ~f:Account_delete_payload.to_input
       ]
 
   let typ () : (Checked.t, t) Typ.t =
@@ -901,6 +933,8 @@ module Update = struct
           Account.Token_symbol.typ
       ; Set_or_keep.typ ~dummy:Timing_info.dummy Timing_info.typ
       ; Set_or_keep.typ ~dummy:State_hash.dummy State_hash.typ
+      ; Set_or_keep.typ ~dummy:Account_delete_payload.dummy
+          Account_delete_payload.typ
       ]
       ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -930,6 +964,8 @@ module Update = struct
          ~token_symbol:!.(Set_or_keep.deriver token_symbol)
          ~timing:!.(Set_or_keep.deriver Timing_info.deriver)
          ~voting_for:!.(Set_or_keep.deriver State_hash.deriver)
+         ~account_deletion:
+           !.(Set_or_keep.deriver Account_delete_payload.deriver)
          obj
 end
 
@@ -1111,6 +1147,29 @@ module Body = struct
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t =
+          { public_key : Public_key.Compressed.Stable.V1.t
+          ; token_id : Token_id.Stable.V2.t
+          ; update : Update.Stable.V2.t
+          ; balance_change :
+              (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          ; increment_nonce : bool
+          ; events : Events'.Stable.V1.t
+          ; actions : Events'.Stable.V1.t
+          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+          ; call_depth : int
+          ; preconditions : Preconditions.Stable.V1.t
+          ; use_full_commitment : bool
+          ; implicit_account_creation_fee : bool
+          ; may_use_token : May_use_token.Stable.V1.t
+          ; authorization_kind : Authorization_kind.Stable.V1.t
+          }
+        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
@@ -1131,6 +1190,7 @@ module Body = struct
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
+        (* todo sai figure out if this needs to be fixed *)
         let to_latest = Fn.id
       end
     end]
@@ -1169,6 +1229,29 @@ module Body = struct
   module Simple = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t =
+          { public_key : Public_key.Compressed.Stable.V1.t
+          ; token_id : Token_id.Stable.V2.t
+          ; update : Update.Stable.V2.t
+          ; balance_change :
+              (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          ; increment_nonce : bool
+          ; events : Events'.Stable.V1.t
+          ; actions : Events'.Stable.V1.t
+          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+          ; call_depth : int
+          ; preconditions : Preconditions.Stable.V1.t
+          ; use_full_commitment : bool
+          ; implicit_account_creation_fee : bool
+          ; may_use_token : May_use_token.Stable.V1.t
+          ; authorization_kind : Authorization_kind.Stable.V1.t
+          }
+        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
           { public_key : Public_key.Compressed.Stable.V1.t
@@ -1189,6 +1272,7 @@ module Body = struct
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
+        (* todo sai *)
         let to_latest = Fn.id
       end
     end]
@@ -1196,6 +1280,28 @@ module Body = struct
 
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t = Mina_wire_types.Mina_base.Account_update.Body.V2.t =
+        { public_key : Public_key.Compressed.Stable.V1.t
+        ; token_id : Token_id.Stable.V2.t
+        ; update : Update.Stable.V2.t
+        ; balance_change :
+            (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        ; increment_nonce : bool
+        ; events : Events'.Stable.V1.t
+        ; actions : Events'.Stable.V1.t
+        ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+        ; preconditions : Preconditions.Stable.V1.t
+        ; use_full_commitment : bool
+        ; implicit_account_creation_fee : bool
+        ; may_use_token : May_use_token.Stable.V1.t
+        ; authorization_kind : Authorization_kind.Stable.V1.t
+        }
+      [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Body.V1.t =
         { public_key : Public_key.Compressed.Stable.V1.t
@@ -1651,6 +1757,17 @@ module T = struct
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        (** An account update in a zkApp transaction *)
+        type t =
+          { body : Body.Graphql_repr.Stable.V2.t
+          ; authorization : Control.Stable.V2.t
+          }
+        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         (** An account update in a zkApp transaction *)
         type t =
@@ -1659,6 +1776,7 @@ module T = struct
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
+        (* sai todo *)
         let to_latest = Fn.id
       end
     end]
@@ -1675,6 +1793,16 @@ module T = struct
   module Simple = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t =
+          { body : Body.Simple.Stable.V2.t
+          ; authorization : Control.Stable.V2.t
+          }
+        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
           { body : Body.Simple.Stable.V1.t
@@ -1682,6 +1810,7 @@ module T = struct
           }
         [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
+        (* sai todo *)
         let to_latest = Fn.id
       end
     end]
@@ -1689,12 +1818,21 @@ module T = struct
 
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t = Mina_wire_types.Mina_base.Account_update.V2.t =
+        { body : Body.Stable.V2.t; authorization : Control.Stable.V2.t }
+      [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       (** A account_update to a zkApp transaction *)
       type t = Mina_wire_types.Mina_base.Account_update.V1.t =
         { body : Body.Stable.V1.t; authorization : Control.Stable.V2.t }
       [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
 
+      (*TODO sai fix this*)
       let to_latest = Fn.id
     end
   end]

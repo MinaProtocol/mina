@@ -511,6 +511,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         ; locations = Map.remove t.maps.locations account_id
         } ;
       (* reuse location if possible *)
+      (* maybe we can use a hashmap to make this operation O(1)? *)
       Option.iter t.current_location ~f:(fun curr_loc ->
           if Location.equal location curr_loc then
             match Location.prev location with

@@ -61,3 +61,4 @@ module User_command = User_command
 module Verification_key_wire = Verification_key_wire
 module With_stack_hash = With_stack_hash
 module With_status = With_status
+module Account_delete_payload = Account_delete_payload

@@ -161,6 +161,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     open Snark_params
     open Tick
 
+    type t = var
+
     let create key tid = (key, tid)
 
     let public_key (key, _tid) = key

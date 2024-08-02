@@ -44,3 +44,4 @@ module Protocol_constants_checked = Mina_base_protocol_constants_checked
 module State_hash = Mina_base_state_hash
 module Proof = Mina_base_proof
 module With_status = Mina_base_with_status
+module Account_delete_payload = Mina_base_account_delete_payload

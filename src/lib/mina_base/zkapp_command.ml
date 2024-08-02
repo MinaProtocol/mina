@@ -645,6 +645,17 @@ module Simple = struct
   (* For easily constructing values *)
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        { fee_payer : Account_update.Fee_payer.Stable.V1.t
+        ; account_updates : Account_update.Simple.Stable.V2.t list
+        ; memo : Signed_command_memo.Stable.V1.t
+        }
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
@@ -653,6 +664,7 @@ module Simple = struct
         }
       [@@deriving sexp, compare, equal, hash, yojson]
 
+      (* TODO sai modify this to convert to the latest version? *)
       let to_latest = Fn.id
     end
   end]
@@ -1496,9 +1508,9 @@ struct
 
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V1.t =
-        { zkapp_command : S.V1.t }
+    module V2 = struct
+      type t = Mina_wire_types.Mina_base.Zkapp_command.Valid.V2.t =
+        { zkapp_command : S.V2.t }
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
