@@ -6,8 +6,6 @@
 
 let curve_size = Node_config.curve_size
 
-let genesis_ledger = Node_config.genesis_ledger
-
 let default_transaction_fee_string = Node_config.default_transaction_fee
 
 let default_snark_worker_fee_string = Node_config.default_snark_worker_fee

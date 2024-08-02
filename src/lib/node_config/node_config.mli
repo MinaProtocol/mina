@@ -46,8 +46,6 @@ val supercharged_coinbase_factor : int
 
 val plugins : bool
 
-val genesis_ledger : string
-
 val genesis_state_timestamp : string
 
 val block_window_duration : int
