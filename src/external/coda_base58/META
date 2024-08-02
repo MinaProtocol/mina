@@ -1,6 +1,0 @@
-version = "0.1.0"
-description = "Base58 encoding library" 
-requires = "bytes"
-archive(byte) = "base58.cma"
-archive(native) = "base58.cmxa"
-exists_if = "base58.cma"
