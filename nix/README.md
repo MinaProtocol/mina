@@ -729,7 +729,7 @@ There are also a few derivations that help build a particular executable. These 
   - mapping from package name to an object containing information about all of the units defined by the package
   - object schema is the following:
      ```
-     { exe | lib | test : { public_name: string (optional), name: string, src: string, type: exe | lib | test, deps: [string] }
+     { exe | lib | test : { name:  { public_name: string (optional), name: string, src: string, type: exe | lib | test, deps: [string] } }
      ```
   - this object contains raw data extracted from dune files
   - `deps` contains opam library names exactly as defined by dune (ppx-related libraries are concatenated to `libraries`)
