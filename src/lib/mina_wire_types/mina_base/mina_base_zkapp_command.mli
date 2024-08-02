@@ -110,7 +110,7 @@ module Valid : sig
     end
   end
 
-  module V2 : sig
+  module V1 : sig
     type t = { zkapp_command : V2.t }
   end
 end

@@ -1322,6 +1322,86 @@ module Body = struct
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
 
       let to_latest = Fn.id
+
+      let of_simple (p : Simple.Stable.V1.t) : t =
+        { public_key = p.public_key
+        ; token_id = p.token_id
+        ; update = p.update
+        ; balance_change = p.balance_change
+        ; increment_nonce = p.increment_nonce
+        ; events = p.events
+        ; actions = p.actions
+        ; call_data = p.call_data
+        ; preconditions = p.preconditions
+        ; use_full_commitment = p.use_full_commitment
+        ; implicit_account_creation_fee = p.implicit_account_creation_fee
+        ; may_use_token = p.may_use_token
+        ; authorization_kind = p.authorization_kind
+        }
+
+      let of_graphql_repr
+          ({ public_key
+           ; token_id
+           ; update
+           ; balance_change
+           ; increment_nonce
+           ; events
+           ; actions
+           ; call_data
+           ; preconditions
+           ; use_full_commitment
+           ; implicit_account_creation_fee
+           ; may_use_token
+           ; call_depth = _
+           ; authorization_kind
+           } :
+            Graphql_repr.Stable.V1.t ) : t =
+        { public_key
+        ; token_id
+        ; update
+        ; balance_change
+        ; increment_nonce
+        ; events
+        ; actions
+        ; call_data
+        ; preconditions
+        ; use_full_commitment
+        ; implicit_account_creation_fee
+        ; may_use_token
+        ; authorization_kind
+        }
+
+      let to_graphql_repr
+          ({ public_key
+           ; token_id
+           ; update
+           ; balance_change
+           ; increment_nonce
+           ; events
+           ; actions
+           ; call_data
+           ; preconditions
+           ; use_full_commitment
+           ; implicit_account_creation_fee
+           ; may_use_token
+           ; authorization_kind
+           } :
+            t ) ~call_depth : Graphql_repr.Stable.V1.t =
+        { Graphql_repr.Stable.V1.public_key
+        ; token_id
+        ; update
+        ; balance_change
+        ; increment_nonce
+        ; events
+        ; actions
+        ; call_data
+        ; preconditions
+        ; use_full_commitment
+        ; implicit_account_creation_fee
+        ; may_use_token
+        ; call_depth
+        ; authorization_kind
+        }
     end
   end]
 
@@ -1834,6 +1914,16 @@ module T = struct
 
       (*TODO sai fix this*)
       let to_latest = Fn.id
+
+      let of_graphql_repr ({ body; authorization } : Graphql_repr.Stable.V1.t) :
+          t =
+        { authorization; body = Body.Stable.V1.of_graphql_repr body }
+
+      let to_graphql_repr ({ body; authorization } : t) ~call_depth :
+          Graphql_repr.Stable.V1.t =
+        { authorization
+        ; body = Body.Stable.V1.to_graphql_repr ~call_depth body
+        }
     end
   end]
 

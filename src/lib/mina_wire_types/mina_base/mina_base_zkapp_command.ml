@@ -109,7 +109,7 @@ module Valid = struct
     end
   end
 
-  module V2 = struct
+  module V1 = struct
     type t = { zkapp_command : V2.t }
   end
 end
