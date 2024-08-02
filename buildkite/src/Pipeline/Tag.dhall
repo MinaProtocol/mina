@@ -15,9 +15,10 @@ let Tag
       | Lint
       | Release
       | Test
+      | Stable
       | Toolchain
       | Hardfork
-      | Stable
+      | Promote
       >
 
 let toNatural
@@ -34,6 +35,7 @@ let toNatural
             , Toolchain = 8
             , Hardfork = 9
             , Stable = 10
+            , Promote = 11
             }
             tag
 
@@ -68,6 +70,7 @@ let capitalName =
             , Toolchain = "Toolchain"
             , Hardfork = "Hardfork"
             , Stable = "Stable"
+            , Promote = "Promote"
             }
             tag
 
@@ -84,6 +87,7 @@ let lowerName =
             , Toolchain = "toolchain"
             , Hardfork = "hardfork"
             , Stable = "stable"
+            , Promote = "promote"
             }
             tag
 

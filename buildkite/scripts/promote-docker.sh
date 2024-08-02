@@ -43,6 +43,8 @@ echo "Adding new tag ($TAG) for docker ${GCR_REPO}/${NAME}:${VERSION}"
 
 docker pull ${GCR_REPO}/${NAME}:${VERSION}
 
+source buildkite/scripts/export-git-env-vars.sh
+
 if [[ "$PUBLISH" -eq 1 ]]; then
   TARGET_REPO=docker.io/minaprotocol
   docker tag ${GCR_REPO}/${NAME}:${VERSION} ${TARGET_REPO}/${NAME}:${TAG}
