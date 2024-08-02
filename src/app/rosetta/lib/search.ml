@@ -1087,7 +1087,7 @@ module Specific = struct
         -> search_include_timestamp:bool
         -> Search_transactions_request.t
         -> (Search_transactions_response.t, Errors.t) M.t =
-     fun ~graphql_uri ~env ~search_include_timestamp req ->
+     fun ~graphql_uri ~env req ->
       let open M.Let_syntax in
       let%bind query = Query.of_search_transaction_request req in
       let%bind () =
@@ -1095,6 +1095,9 @@ module Specific = struct
           ~graphql_uri
       in
       let%bind transactions_info = env.db_transactions query in
+      let search_include_timestamp =
+        Option.value req.include_timestamp ~default:false
+      in
       let%bind internal_transactions =
         List.fold transactions_info.internal_commands ~init:(M.return [])
           ~f:(fun macc info ->
@@ -1145,8 +1148,7 @@ module Specific = struct
   module Real = Impl (Deferred.Result)
 end
 
-let router ~graphql_uri ~logger ~with_db ~search_include_timestamp
-    (route : string list) body =
+let router ~graphql_uri ~logger ~with_db (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /search/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
@@ -1162,7 +1164,7 @@ let router ~graphql_uri ~logger ~with_db ~search_include_timestamp
           let%map res =
             Specific.Real.handle ~graphql_uri
               ~env:(Specific.Env.real ~logger ~db)
-              ~search_include_timestamp req
+              req
             |> Errors.Lift.wrap
           in
           Search_transactions_response.to_yojson res )
