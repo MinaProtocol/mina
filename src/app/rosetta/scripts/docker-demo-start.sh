@@ -36,7 +36,7 @@ export MINA_POSTGRES_CONF=${MINA_POSTGRES_CONF:=/etc/mina/rosetta/scripts/postgr
 
 # Mina Archive variables
 export MINA_ARCHIVE_PORT=${MINA_ARCHIVE_PORT:=3086}
-export MINA_ARCHIVE_SQL_SCHEMA_PATH=${MINA_ARCHIVE_SQL_SCHEMA_PATH:=/etc/mina/rosetta/archive/create_schema.sql}
+export MINA_ARCHIVE_SQL_SCHEMA_PATH=${MINA_ARCHIVE_SQL_SCHEMA_PATH:=/etc/mina/archive/create_schema.sql}
 
 # Mina Rosetta variables
 # To interact with rosetta, use MINA_ROSETTA_ONLINE_PORT and MINA_ROSETTA_OFFLINE_PORT.

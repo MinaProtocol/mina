@@ -151,33 +151,12 @@ copy_common_daemon_configs() {
 
   # Copy shared binaries
   cp ../src/app/libp2p_helper/result/bin/libp2p_helper "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
-  # cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
   cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
   cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
   cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
 
   # Copy signature-based Binaries (based on signature type $2 passed into the function)
   cp ./default/src/app/cli/src/mina_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
-  
-  # Copy rosetta-based Binaries 
-  cp ./default/src/app/rosetta/rosetta_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
-  cp ./default/src/app/rosetta/ocaml-signer/signer_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
- 
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta"
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta/archive"
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta/genesis_ledgers"
-  mkdir -p "${BUILDDIR}/etc/mina/rosetta/scripts"
-
-  # --- Copy artifacts
-  cp ../src/app/rosetta/scripts/* "${BUILDDIR}/etc/mina/rosetta/scripts"
-  cp ../scripts/archive/missing-blocks-guardian.sh "${BUILDDIR}/etc/mina/rosetta/scripts"
-
-  cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
-  cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
-  cp ./default/src/app/rosetta/indexer_test/indexer_test.exe "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
-  cp ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/rosetta/archive"
-  cp -r ../genesis_ledgers/* ${BUILDDIR}/etc/mina/rosetta/genesis_ledgers/
 
   # Copy over Build Configs (based on $2)
   mkdir -p "${BUILDDIR}/etc/coda/build_config"
@@ -275,6 +254,64 @@ build_functional_test_suite_deb() {
 
 }
 ##################################### END TEST SUITE PACKAGE #######################################
+
+function copy_common_rosetta_configs () {
+ 
+  # Copy rosetta-based Binaries 
+  cp ./default/src/app/rosetta/rosetta_${1}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+  cp ./default/src/app/rosetta/ocaml-signer/signer_${1}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
+ 
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  mkdir -p "${BUILDDIR}/etc/mina/rosetta/scripts"
+
+  # --- Copy artifacts
+  cp ../src/app/rosetta/scripts/* "${BUILDDIR}/etc/mina/rosetta/scripts"
+  cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
+  cp ./default/src/app/rosetta/indexer_test/indexer_test.exe "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
+ 
+}
+
+##################################### ROSETTA MAINNET PACKAGE #######################################
+build_rosetta_mainnet_deb() {
+ 
+  echo "------------------------------------------------------------"
+  echo "--- Building mainnet rosetta deb"
+
+  create_control_file mina-rosetta-mainnet "${SHARED_DEPS}" 'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_configs "mainnet"
+  
+  build_deb mina-rosetta-mainnet
+}
+
+##################################### ROSETTA MAINNET PACKAGE #######################################
+build_rosetta_devnet_deb() {
+ 
+  echo "------------------------------------------------------------"
+  echo "--- Building devnet rosetta deb"
+
+  create_control_file mina-rosetta-devnet "${SHARED_DEPS}" 'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_configs "testnet"
+  
+  build_deb mina-rosetta-devnet
+}
+
+##################################### ROSETTA BERKELEY PACKAGE #######################################
+build_rosetta_berkeley_deb() {
+ 
+  echo "------------------------------------------------------------"
+  echo "--- Building rosetta berkeley deb"
+
+  create_control_file mina-rosetta-berkeley "${SHARED_DEPS}" 'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_configs "testnet"
+  
+  build_deb mina-rosetta-berkeley
+}
+
 
 ##################################### MAINNET PACKAGE #######################################
 build_daemon_mainnet_deb() {
