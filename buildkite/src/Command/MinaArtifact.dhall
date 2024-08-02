@@ -146,9 +146,8 @@ let docker_step
                             }
                       )
                       networks
-                , TestExecutive = 
-          		  []: List DockerImage.ReleaseSpec.Type,
-          		, BatchTxn =
+                , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
+                , BatchTxn =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = "mina-batch-txn"
