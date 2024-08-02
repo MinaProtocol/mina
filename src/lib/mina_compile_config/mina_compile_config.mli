@@ -1,7 +1,5 @@
 val curve_size : int
 
-val genesis_ledger : string
-
 val default_transaction_fee_string : string
 
 val default_snark_worker_fee_string : string
