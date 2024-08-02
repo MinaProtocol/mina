@@ -146,11 +146,7 @@ let docker_step
                             }
                       )
                       networks
-
-
-        , TestExecutive = 
-          []: List DockerImage.ReleaseSpec.Type
-                
+                , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
                 , BatchTxn =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
