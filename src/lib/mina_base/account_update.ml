@@ -1924,6 +1924,12 @@ module T = struct
         { authorization
         ; body = Body.Stable.V1.to_graphql_repr ~call_depth body
         }
+
+      module Checked = struct
+        type t = Body.Checked.t
+
+        let digest ?chain (t : t) = Body.Checked.digest ?chain t
+      end
     end
   end]
 
