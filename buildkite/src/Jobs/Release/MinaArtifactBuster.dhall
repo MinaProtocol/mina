@@ -13,7 +13,6 @@ in  Pipeline.build
             [ Artifacts.Type.Daemon
             , Artifacts.Type.Archive
             , Artifacts.Type.BatchTxn
-            , Artifacts.Type.TestExecutive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
             ]
