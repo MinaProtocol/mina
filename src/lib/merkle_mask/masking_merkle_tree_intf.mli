@@ -75,6 +75,9 @@ module type S = sig
     (** called when parent sets an account; update local state *)
     val parent_set_notify : t -> account -> unit
 
+    (** called when parent removes an account; update local state *)
+    val parent_remove_notify : t -> account -> unit
+
     (* makes new mask instance with copied tables, re-use parent *)
     val copy : t -> t
 
@@ -101,7 +104,8 @@ module type S = sig
 
       val address_in_mask : t -> Addr.t -> bool
 
-      val current_location : t -> Location.t option
+      (* The rightmost filled loction *)
+      val fill_frontier : t -> Location.t option
     end
   end
 

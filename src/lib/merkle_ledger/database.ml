@@ -183,6 +183,63 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     assert (List.for_all locations ~f:Location.is_generic) ;
     get_raw_batch mdb locations
 
+  let remove { kvdb; depth; _ } location =
+    let key = Location.serialize ~ledger_depth:depth location in
+    (* rehash something *)
+    Kvdb.remove kvdb ~key
+
+  module Free_list = struct
+    let id = "free_list"
+
+    let key = lazy (Location.build_generic (Bigstring.of_string id))
+
+    module F = Free_list.Make (Location)
+
+    let get mdb =
+      let key = Lazy.force key in
+      let ledger_depth = mdb.depth in
+      match get_generic mdb key with
+      | None ->
+          Result.return F.empty
+      | Some data ->
+          Result.return @@ F.deserialize ~ledger_depth data
+
+    let get_exn mdb = get mdb |> Result.ok_or_failwith
+
+    let set mdb t =
+      let key = Lazy.force key in
+      let ledger_depth = mdb.depth in
+      let data = F.serialize ~ledger_depth t in
+      set_raw mdb key data
+
+    let add mdb loc =
+      let open Result.Let_syntax in
+      let%map freelist = get mdb in
+      set mdb (F.Location.add freelist loc)
+
+    (* FIXME: Use a dedicated error
+
+       For now this reuses the the [Out_of_leaves] error to signal that the free
+       list does not have any empty slots. *)
+    let allocate mdb =
+      let key = Lazy.force key in
+      match get_generic mdb key with
+      | None ->
+          Result.fail Db_error.Out_of_leaves
+      | Some data -> (
+          let ledger_depth = mdb.depth in
+          let free_list = F.deserialize ~ledger_depth data in
+          match F.Location.pop free_list with
+          | Some (loc, free_list) ->
+              set mdb free_list ; Result.return loc
+          | None ->
+              Result.fail Db_error.Out_of_leaves )
+
+    let is_empty mdb = Result.map (get mdb) ~f:F.is_empty
+
+    let size mdb = Result.map (get mdb) ~f:F.size
+  end
+
   module Account_location = struct
     (** encodes a key, token_id pair as a location used as a database key, so
         we can find the account location associated with that key.
@@ -207,6 +264,8 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       | Some location_bin ->
           Location.parse ~ledger_depth:mdb.depth location_bin
           |> Result.map_error ~f:(fun () -> Db_error.Malformed_database)
+
+    let remove mdb key = remove mdb (build_location key)
 
     let get_batch mdb keys =
       let parse_location bin =
@@ -264,11 +323,6 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
                        (Location.serialize ~ledger_depth next_account_location) ;
                      next_account_location ) )
 
-    let allocate mdb key =
-      let location_result = increment_last_account_location mdb in
-      Result.map location_result ~f:(fun location ->
-          set mdb key location ; location )
-
     let last_location mdb =
       last_location_key () |> get_raw mdb
       |> Option.bind ~f:(fun data ->
@@ -278,9 +332,23 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       Option.map (last_location mdb) ~f:Location.to_path_exn
   end
 
-  let get_at_index_exn mdb index =
+  let allocate mdb key =
+    let open Result.Let_syntax in
+    let%bind location =
+      match Free_list.allocate mdb with
+      | Ok _ as loc ->
+          loc
+      | Error _ ->
+          Account_location.increment_last_account_location mdb
+    in
+    Account_location.set mdb key location ;
+    Result.return location
+
+  let get_at_index mdb index =
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
-    get mdb (Location.Account addr) |> Option.value_exn
+    get mdb (Location.Account addr)
+
+  let get_at_index_exn mdb index = get_at_index mdb index |> Option.value_exn
 
   let all_accounts (t : t) =
     match Account_location.last_location_address t with
@@ -288,7 +356,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         Sequence.empty
     | Some last_addr ->
         Sequence.range ~stop:`inclusive 0 (Addr.to_int last_addr)
-        |> Sequence.map ~f:(fun i -> get_at_index_exn t i)
+        |> Sequence.filter_map ~f:(fun i -> get_at_index t i)
 
   (** The tokens associated with each public key.
 
@@ -415,17 +483,15 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         ~key_data_pairs:(add_batch_create mdb pks_to_tokens)
   end
 
-  let location_of_account t key =
-    match Account_location.get t key with
-    | Error _ ->
-        None
-    | Ok location ->
-        Some location
+  let location_of_account t key = Result.ok @@ Account_location.get t key
 
   let location_of_account_batch t keys =
     List.zip_exn keys (Account_location.get_batch t keys)
 
-  let last_filled t = Account_location.last_location t
+  let max_filled t = Account_location.last_location t
+
+  let is_compact mdb =
+    match Free_list.is_empty mdb with Ok bool -> bool | Error _ -> false
 
   let token_owners (t : t) : Account_id.Set.t =
     Tokens.Owner.all_owners t
@@ -451,7 +517,9 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
 
       let get = get
 
-      let last_filled = last_filled
+      let max_filled = max_filled
+
+      let is_compact = is_compact
     end
 
     let get_hash = get_hash
@@ -540,7 +608,31 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     | None ->
         0
     | Some addr ->
-        Addr.to_int addr + 1
+        let freed_size = Free_list.size t |> Result.ok_exn in
+        Addr.to_int addr + 1 - freed_size
+
+  let remove_location mdb loc =
+    match get mdb loc with
+    | Some account ->
+        Free_list.add mdb loc |> Result.ok_or_failwith ;
+        Account_location.remove mdb (Account.identifier account) ;
+        remove mdb loc
+    | None ->
+        ()
+
+  let remove_account mdb account =
+    let account_id = Account.identifier account in
+    match location_of_account mdb account_id with
+    | Some loc ->
+        remove_location mdb loc
+    | None ->
+        (* It's already absent *) ()
+
+  let set_freed mdb l =
+    let freed = Free_list.F.Location.of_sequence l in
+    Free_list.set mdb freed
+
+  let get_freed mdb = Free_list.get_exn mdb |> Free_list.F.Location.to_sequence
 
   let to_list mdb =
     let num_accounts = num_accounts mdb in
@@ -558,7 +650,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   let get_or_create_account mdb account_id account =
     match Account_location.get mdb account_id with
     | Error Db_error.Account_location_not_found -> (
-        match Account_location.allocate mdb account_id with
+        match allocate mdb account_id with
         | Ok location ->
             set mdb location account ;
             Tokens.add_account mdb account_id ;
@@ -598,8 +690,11 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         let last = Addr.to_int last_addr in
         Sequence.range ~stop:`inclusive 0 last
         (* filter out indices corresponding to ignored accounts *)
-        |> Sequence.filter ~f:(fun loc -> not (Int.Set.mem ignored_indices loc))
-        |> Sequence.map ~f:(get_at_index_exn t)
+        |> Sequence.filter ~f:(fun loc ->
+               not (Int.Set.mem ignored_indices loc) )
+        (* Also filter out empty locations, aka freed indexes. Ideally you
+           might want to filter the index before hitting the underlying DB. *)
+        |> Sequence.filter_map ~f:(get_at_index t)
         |> Sequence.foldi ~init ~f:f'
 
   let foldi t ~init ~f =
@@ -617,6 +712,12 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         Location.Hash (Location.to_path_exn location)
       else location
     in
+    (* The code below iterates a little bit more over the path than
+       necessary.
+
+       The goal is to avoid reading the database as much as possible. Here we
+       trade [List.length @@ Location.merkle_path_dependencies_exn location]
+       calls to [get_hash] for a single [get_hash_batch]. *)
     let dependency_locs, dependency_dirs =
       List.unzip (Location.merkle_path_dependencies_exn location)
     in

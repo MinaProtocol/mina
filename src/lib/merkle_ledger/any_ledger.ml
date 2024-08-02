@@ -93,13 +93,23 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
 
     let get (T ((module Base), t)) = Base.get t
 
+    let remove_location (T ((module Base), t)) = Base.remove_location t
+
+    let remove_account (T ((module Base), t)) = Base.remove_account t
+
+    let set_freed (T ((module Base), t)) = Base.set_freed t
+
+    let get_freed (T ((module Base), t)) = Base.get_freed t
+
     let get_batch (T ((module Base), t)) = Base.get_batch t
 
     let get_uuid (T ((module Base), t)) = Base.get_uuid t
 
     let get_directory (T ((module Base), t)) = Base.get_directory t
 
-    let last_filled (T ((module Base), t)) = Base.last_filled t
+    let max_filled (T ((module Base), t)) = Base.max_filled t
+
+    let is_compact (T ((module Base), t)) = Base.is_compact t
 
     let close (T ((module Base), t)) = Base.close t
 

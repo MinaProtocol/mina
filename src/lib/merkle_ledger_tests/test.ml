@@ -14,7 +14,12 @@ module Depth = struct
   let depth = 4
 end
 
-module Location = Merkle_ledger.Location.T
+module Location = struct
+  include Merkle_ledger.Location.T
+
+  let testable =
+    Alcotest.testable (fun ppf loc -> Sexp.pp ppf (sexp_of_t loc)) equal
+end
 
 module Location_binable = struct
   module Arg = struct
@@ -45,6 +50,13 @@ end
 module DB = Database.Make (Inputs)
 module Binary_tree = Binary_tree.Make (Account) (Hash) (Depth)
 
+let enumerate_dir_combinations max_depth =
+  Sequence.range 0 (max_depth - 1)
+  |> Sequence.fold ~init:[ [] ] ~f:(fun acc _ ->
+         acc
+         @ List.map acc ~f:(List.cons Direction.Left)
+         @ List.map acc ~f:(List.cons Direction.Right) )
+
 let test_db () =
   let num_accounts = (1 lsl Depth.depth) - 1 in
   let gen_non_zero_balances =
@@ -53,16 +65,9 @@ let test_db () =
   in
   Quickcheck.test ~trials:5 ~sexp_of:[%sexp_of: Balance.t list]
     gen_non_zero_balances ~f:(fun balances ->
-      let account_ids = Account_id.gen_accounts num_accounts in
+      let account_ids = Account_id.genval.many num_accounts in
       let accounts = List.map2_exn account_ids balances ~f:Account.create in
       DB.with_ledger ~depth:Depth.depth ~f:(fun db ->
-          let enumerate_dir_combinations max_depth =
-            Sequence.range 0 (max_depth - 1)
-            |> Sequence.fold ~init:[ [] ] ~f:(fun acc _ ->
-                   acc
-                   @ List.map acc ~f:(List.cons Direction.Left)
-                   @ List.map acc ~f:(List.cons Direction.Right) )
-          in
           List.iter accounts ~f:(fun account ->
               let account_id = Account.identifier account in
               ignore @@ DB.get_or_create_account db account_id account ) ;
@@ -79,5 +84,5 @@ let test_db () =
               assert (Hash.equal binary_hash db_hash) ) ) )
 
 let tests =
-  [ ("Databases", [ Alcotest.test_case "equivalent hash values" `Quick test_db ])
+  [ ("Databases", [ Alcotest.test_case "equivalent hash values" `Slow test_db ])
   ]

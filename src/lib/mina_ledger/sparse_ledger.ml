@@ -36,7 +36,7 @@ let of_ledger_subset_exn_impl ~path_query ~path_add (oledger : Ledger.t) keys =
         let first_loc =
           Option.value_map ~f:next_location_exn
             ~default:(Ledger.Location.Account empty_address)
-            (Ledger.last_filled oledger)
+            (Ledger.max_filled oledger)
         in
         first_loc
         :: iterate_n ~f:next_location_exn first_loc (num_new_accounts - 1)

@@ -1,11 +1,30 @@
 open Core
 
+module Random_value = struct
+  module Q = Quickcheck
+  module G = Q.Generator
+
+  type 'a t =
+    { one : ?seed:Q.seed -> unit -> 'a; many : ?seed:Q.seed -> int -> 'a list }
+
+  (* The default seed value below might not be what we always want. I think
+     that covers many cases of single random value generation. *)
+  let mk gen =
+    { one = (fun ?(seed = `Nondeterministic) () -> Q.random_value ~seed gen)
+    ; many =
+        (fun ?(seed = `Nondeterministic) n ->
+          Q.random_value ~seed @@ G.list_with_length n gen )
+    }
+end
+
 module Balance = struct
   include Currency.Balance
 
   let to_int = to_nanomina_int
 
   let of_int = of_nanomina_int_exn
+
+  let genval = Random_value.mk gen
 end
 
 module Account = struct
@@ -15,6 +34,9 @@ module Account = struct
 
   type key = Mina_base.Account.Key.Stable.Latest.t
   [@@deriving bin_io_unversioned, sexp, equal, compare, hash]
+
+  let testable =
+    Alcotest.testable (fun ppf account -> Sexp.pp ppf (sexp_of_t account)) equal
 
   (* use Account items needed *)
   let empty = Mina_base.Account.empty
@@ -26,6 +48,8 @@ module Account = struct
   let key_gen = Mina_base.Account.key_gen
 
   let gen = Mina_base.Account.gen
+
+  let genval = Random_value.mk gen
 
   let create = Mina_base.Account.create
 
@@ -44,6 +68,9 @@ module Hash = struct
   end
 
   include T
+
+  let testable =
+    Alcotest.testable (fun ppf account -> Sexp.pp ppf (sexp_of_t account)) equal
 
   include Codable.Make_base58_check (struct
     type t = T.t [@@deriving bin_io_unversioned]
@@ -200,24 +227,14 @@ module Account_id = struct
     let%map pk = Key.gen in
     create pk Token_id.default
 
-  let gen_accounts num_accounts =
-    Quickcheck.random_value
-      (Quickcheck.Generator.list_with_length num_accounts gen)
+  let genval = Random_value.mk gen
 end
 
 module Base_inputs = struct
   module Key = Key
   module Account_id = Account_id
   module Token_id = Token_id
-
-  module Balance = struct
-    include Balance
-
-    let of_int = of_nanomina_int_exn
-
-    let to_int = to_nanomina_int
-  end
-
+  module Balance = Balance
   module Account = Account
   module Hash = Hash
 end

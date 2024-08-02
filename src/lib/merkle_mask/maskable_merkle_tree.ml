@@ -208,6 +208,33 @@ module Make (Inputs : Inputs_intf) = struct
                 (Uuid.to_string_hum uuid)
                 (Uuid.to_string_hum child_uuid) ) )
 
+  let remove_account t account =
+    Base.remove_account t account ;
+    let uuid = get_uuid t in
+    match Uuid.Table.find registered_masks uuid with
+    | None ->
+        ()
+    | Some masks ->
+        List.iter masks ~f:(fun mask ->
+            if not (Mask.Attached.is_committing mask) then (
+              Mask.Attached.parent_remove_notify mask account ;
+              Mask.Attached.drop_accumulated mask ;
+              (* TODO: Do we need that? *)
+              let child_uuid = Mask.Attached.get_uuid mask in
+              iter_descendants child_uuid ~f:Mask.Attached.drop_accumulated ;
+              [%log error]
+                "Update of an account in parent %s conflicted with an account \
+                 in mask %s"
+                (Uuid.to_string_hum uuid)
+                (Uuid.to_string_hum child_uuid) ) )
+
+  let remove_location t loc =
+    match Base.get t loc with
+    | Some account ->
+        remove_account t account
+    | None ->
+        ()
+
   let remove_and_reparent_exn t t_as_mask =
     let parent = Mask.Attached.get_parent t_as_mask in
     let merkle_root = Mask.Attached.merkle_root t_as_mask in

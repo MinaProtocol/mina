@@ -97,6 +97,14 @@ end = struct
 
   let set _t = failwith "set: null ledgers cannot be mutated"
 
+  let remove_location _ _ = ()
+
+  let remove_account _ _ = ()
+
+  let set_freed _ _ = ()
+
+  let get_freed _ = Sequence.empty
+
   let get _t _loc = None
 
   let get_batch _t locs = List.map locs ~f:(fun loc -> (loc, None))
@@ -105,7 +113,9 @@ end = struct
 
   let get_directory _ = None
 
-  let last_filled _t = None
+  let max_filled _t = None
+
+  let is_compact _t = true
 
   let close _t = ()
 

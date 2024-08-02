@@ -62,8 +62,7 @@ module type Test_intf = sig
 
   val with_instances : (Base.t -> Mask.t -> 'a) -> 'a
 
-  (** Here we provide a base ledger and two layers of attached masks
-          * one ontop another *)
+  (** Here we provide a base ledger and two layers of attached masks *)
   val with_chain :
        (   Base.t
         -> mask:Mask.Attached.t
@@ -76,6 +75,14 @@ end
 module Make (Test : Test_intf) = struct
   module Maskable = Test.Maskable
   module Mask = Test.Mask
+
+  module Location = struct
+    include Test.Location
+
+    let pp ppf loc = Sexp.pp ppf (sexp_of_t loc)
+
+    let testable = Alcotest.testable pp equal
+  end
 
   let directions =
     let rec add_direction count b accum =
@@ -98,9 +105,7 @@ module Make (Test : Test_intf) = struct
 
   let dummy_location = Test.Location.Account dummy_address
 
-  let dummy_account =
-    let account = Quickcheck.random_value Account.gen in
-    { account with token_id = Token_id.default }
+  let dummy_account = Account.genval.one ()
 
   let create_new_account_exn mask account =
     let public_key = Account.identifier account in
@@ -151,7 +156,8 @@ module Make (Test : Test_intf) = struct
             assert (Option.is_some mask_result) ;
             let maskable_account = Option.value_exn maskable_result in
             let mask_account = Option.value_exn mask_result in
-            [%test_eq: Account.t] maskable_account mask_account ) )
+            Alcotest.(check Account.testable)
+              "identical accounts" maskable_account mask_account ) )
 
   let compare_maskable_mask_hashes ?(check_hash_in_mask = false) maskable mask
       addr =
@@ -274,12 +280,8 @@ module Make (Test : Test_intf) = struct
                 dummy_account ;
               (* Make some accounts *)
               let num_accounts = (1 lsl Test.depth) - 1 in
-              let gen_values gen =
-                Quickcheck.random_value
-                  (Quickcheck.Generator.list_with_length num_accounts gen)
-              in
-              let account_ids = Account_id.gen_accounts num_accounts in
-              let balances = gen_values Balance.gen in
+              let account_ids = Account_id.genval.many num_accounts in
+              let balances = Balance.genval.many num_accounts in
               let accounts =
                 List.map2_exn account_ids balances ~f:(fun public_key balance ->
                     Account.create public_key balance )
@@ -335,7 +337,8 @@ module Make (Test : Test_intf) = struct
             let attached_mask = Maskable.register_mask maskable mask in
             let mask_merkle_root = Mask.Attached.merkle_root attached_mask in
             let maskable_merkle_root = Maskable.merkle_root maskable in
-            [%test_eq: Hash.t] mask_merkle_root maskable_merkle_root ) )
+            Alcotest.check Hash.testable "mask and parent's roots are equal"
+              mask_merkle_root maskable_merkle_root ) )
 
   let () =
     add_test "mask and parent agree on Merkle root after set" (fun () ->
@@ -362,12 +365,8 @@ module Make (Test : Test_intf) = struct
           Test.with_instances (fun maskable mask ->
               let attached_mask = Maskable.register_mask maskable mask in
               let num_accounts = 1 lsl Test.depth in
-              let gen_values gen =
-                Quickcheck.random_value
-                  (Quickcheck.Generator.list_with_length num_accounts gen)
-              in
-              let account_ids = Account_id.gen_accounts num_accounts in
-              let balances = gen_values Balance.gen in
+              let account_ids = Account_id.genval.many num_accounts in
+              let balances = Balance.genval.many num_accounts in
               let accounts =
                 List.map2_exn account_ids balances ~f:(fun public_key balance ->
                     Account.create public_key balance )
@@ -391,12 +390,8 @@ module Make (Test : Test_intf) = struct
           (* see similar test in test_database *)
           Test.with_chain (fun _ ~mask:mask1 ~mask_as_base:_ ~mask2 ->
               let num_accounts = 1 lsl Test.depth in
-              let gen_values gen list_length =
-                Quickcheck.random_value
-                  (Quickcheck.Generator.list_with_length list_length gen)
-              in
-              let account_ids = Account_id.gen_accounts num_accounts in
-              let balances = gen_values Balance.gen num_accounts in
+              let account_ids = Account_id.genval.many num_accounts in
+              let balances = Balance.genval.many num_accounts in
               let base_accounts =
                 List.map2_exn account_ids balances ~f:Account.create
               in
@@ -412,7 +407,7 @@ module Make (Test : Test_intf) = struct
                 |> (Fn.flip List.take) num_subset
                 |> List.unzip
               in
-              let subset_balances = gen_values Balance.gen num_subset in
+              let subset_balances = Balance.genval.many num_subset in
               let subset_updated_accounts =
                 List.map2_exn subset_accounts subset_balances
                   ~f:(fun account balance ->
@@ -437,10 +432,10 @@ module Make (Test : Test_intf) = struct
                 @@ Mask.Attached.get_all_accounts_rooted_at_exn mask2
                      (Mask.Addr.root ())
               in
-              assert (
-                Stdlib.List.compare_lengths base_accounts retrieved_accounts = 0 ) ;
-              assert (
-                List.equal Account.equal expected_accounts retrieved_accounts ) ) )
+              Alcotest.(
+                check (list Account.testable)
+                  "retrieved and expected accounts are the same"
+                  expected_accounts retrieved_accounts) ) )
 
   let () =
     add_test "fold of addition over account balances in parent and mask"
@@ -450,7 +445,40 @@ module Make (Test : Test_intf) = struct
             let num_accounts_parent = 5 in
             let num_accounts_mask = 5 in
             let num_accounts = num_accounts_parent + num_accounts_mask in
-            let account_ids = Account_id.gen_accounts num_accounts in
+            let account_ids = Account_id.genval.many num_accounts in
+            let balances = Balance.genval.many num_accounts in
+            let accounts =
+              List.map2_exn account_ids balances ~f:Account.create
+            in
+            let total =
+              List.fold balances ~init:0 ~f:(fun accum balance ->
+                  Balance.to_nanomina_int balance + accum )
+            in
+            let parent_accounts, mask_accounts =
+              List.split_n accounts num_accounts_parent
+            in
+            (* add accounts to parent *)
+            List.iter parent_accounts ~f:(fun account ->
+                ignore @@ parent_create_new_account_exn maskable account ) ;
+            (* add accounts to mask *)
+            List.iter mask_accounts ~f:(fun account ->
+                ignore @@ create_new_account_exn attached_mask account ) ;
+            (* folding over mask also folds over maskable *)
+            let retrieved_total =
+              Mask.Attached.foldi attached_mask ~init:0
+                ~f:(fun _addr total account ->
+                  Balance.to_nanomina_int (Account.balance account) + total )
+            in
+            assert (Int.equal retrieved_total total) ) )
+
+  let () =
+    add_test "getting an account after removing it returns nothing" (fun () ->
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            let num_accounts_parent = 5 in
+            let num_accounts_mask = 5 in
+            let num_accounts = num_accounts_parent + num_accounts_mask in
+            let account_ids = Account_id.genval.many num_accounts in
             let balances =
               Quickcheck.random_value
                 (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
@@ -484,7 +512,7 @@ module Make (Test : Test_intf) = struct
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             let num_accounts = 10 in
-            let account_ids = Account_id.gen_accounts num_accounts in
+            let account_ids = Account_id.genval.many num_accounts in
             (* parent balances all non-zero *)
             let balances =
               List.init num_accounts ~f:(fun n ->
@@ -526,7 +554,7 @@ module Make (Test : Test_intf) = struct
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             let num_accounts = 10 in
-            let account_ids = Account_id.gen_accounts num_accounts in
+            let account_ids = Account_id.genval.many num_accounts in
             (* parent balances all non-zero *)
             let balances =
               List.init num_accounts ~f:(fun n ->
@@ -564,7 +592,7 @@ module Make (Test : Test_intf) = struct
         Test.with_instances (fun maskable mask ->
             let open Mask.Attached in
             let ledger = Maskable.register_mask maskable mask in
-            let key = List.nth_exn (Account_id.gen_accounts 1) 0 in
+            let key = Account_id.genval.one () in
             let start_hash = merkle_root ledger in
             match
               get_or_create_account ledger key Account.empty |> Or_error.ok_exn
@@ -573,21 +601,21 @@ module Make (Test : Test_intf) = struct
                 failwith
                   "create_empty with empty ledger somehow already has that key?"
             | `Added, _new_loc ->
-                [%test_eq: Hash.t] start_hash (merkle_root ledger) ) )
+                Alcotest.check Hash.testable "hash is untouched" start_hash
+                  (merkle_root ledger) ) )
+
+  let gen_accounts ~num_accounts =
+    let account_ids = Account_id.genval.many num_accounts in
+    let balances = Balance.genval.many num_accounts in
+    List.map2_exn account_ids balances ~f:Account.create
 
   let () =
     add_test "num_accounts for unique keys in mask and parent" (fun () ->
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             let num_accounts = 5 in
-            let account_ids = Account_id.gen_accounts num_accounts in
-            let balances =
-              Quickcheck.random_value
-                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-            in
-            let accounts =
-              List.map2_exn account_ids balances ~f:Account.create
-            in
+            let accounts = gen_accounts ~num_accounts in
+
             (* add accounts to mask *)
             List.iter accounts ~f:(fun account ->
                 ignore @@ create_new_account_exn attached_mask account ) ;
@@ -609,10 +637,335 @@ module Make (Test : Test_intf) = struct
               && Int.equal parent_num_accounts mask_num_accounts_after ) ) )
 
   let () =
+    let num_accounts = 5 in
+    let accounts = gen_accounts ~num_accounts in
+    add_test "simple addition then deletion works" (fun () ->
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            (* add accounts to mask *)
+            let locs =
+              List.map accounts ~f:(create_new_account_exn attached_mask)
+            in
+            let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
+            Alcotest.(check int)
+              "identical account counts" num_accounts mask_num_accounts ;
+
+            (* Remove num_accounts*)
+            let locs_to_be_deleted =
+              assert (num_accounts > 1) ;
+              List.tl_exn locs
+            in
+            List.iter locs_to_be_deleted
+              ~f:(Mask.Attached.remove_location attached_mask) ;
+            let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
+            Alcotest.(check int) "identical account number" mask_num_accounts 1 ) )
+
+  let () =
+    add_test "remove on parent is signaled to child" (fun () ->
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            let num_accounts = 5 in
+            let accounts = gen_accounts ~num_accounts in
+            let locs =
+              List.map ~f:(parent_create_new_account_exn maskable) accounts
+            in
+            (* set up same accounts at same location in mask *)
+            ignore
+            @@ List.iter2 locs accounts ~f:(Mask.Attached.set attached_mask) ;
+
+            List.iter locs ~f:(fun loc ->
+                Maskable.remove_location maskable loc ;
+                (* location removed from the parent should be free in the child
+                   as well *)
+                Alcotest.(check (option Account.testable))
+                  "location is free" None
+                  (Mask.Attached.get attached_mask loc) ) ) )
+
+  (* Straightforward implemententation of Knuth-Fisher-Yates shuffle *)
+  let shuffle_array a =
+    for i = Array.length a - 1 downto 1 do
+      let tmp = a.(i) in
+      let j = Random.int (i + 1) in
+      a.(i) <- a.(j) ;
+      a.(j) <- tmp
+    done
+
+  let shuffle_list l =
+    let a = Array.of_list l in
+    shuffle_array a ; Array.to_list a
+
+  let () =
+    add_test "freed locations are returned in descending order" (fun () ->
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            let num_accounts = Int.pow 2 (Int.min 5 (Test.depth - 1)) in
+            let accounts = gen_accounts ~num_accounts in
+            let _locs =
+              List.map ~f:(create_new_account_exn attached_mask) accounts
+            in
+
+            let accounts_to_remove =
+              List.take (shuffle_list accounts) (num_accounts / 2)
+            in
+            List.iter accounts_to_remove
+              ~f:(Mask.Attached.remove_account attached_mask) ;
+            let freed_locs =
+              Mask.Attached.get_freed attached_mask |> Sequence.to_list
+            in
+
+            let sorted_locs =
+              (* Sort in descending order *)
+              List.sort ~compare:(Fn.flip Location.compare) freed_locs
+            in
+            Alcotest.(
+              check (list Location.testable)
+                "freed locations are sorted in descending order" sorted_locs
+                freed_locs) ) )
+
+  let () =
+    add_test "freed locations are returned in descending order (parents/mask)"
+      (fun () ->
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+
+            (* Add some accounts to mask and parent *)
+            let num_accounts = Int.pow 2 (Int.min 5 (Test.depth - 1)) / 2 in
+            let accounts_base = gen_accounts ~num_accounts in
+            let accounts_mask = gen_accounts ~num_accounts in
+            let locs_base =
+              List.map ~f:(parent_create_new_account_exn maskable) accounts_base
+            in
+
+            let locs_mask =
+              List.map ~f:(create_new_account_exn attached_mask) accounts_mask
+            in
+
+            (* The configuration above guarantees that parent's locations are
+               not reused *)
+            Alcotest.(check bool)
+              "All child locations are different from parent's" true
+              (List.for_all locs_mask ~f:(fun e ->
+                   not (List.mem locs_base e ~equal:Location.equal) ) ) ;
+
+            (* Remove half the accounts in parent *)
+            let accounts_to_remove_base =
+              List.take (shuffle_list accounts_base) (num_accounts / 2)
+            in
+            List.iter accounts_to_remove_base
+              ~f:(Maskable.remove_account maskable) ;
+
+            (* Remove half the accounts in mask *)
+            let accounts_to_remove_mask =
+              List.take (shuffle_list accounts_mask) (num_accounts / 2)
+            in
+            List.iter accounts_to_remove_mask
+              ~f:(Mask.Attached.remove_account attached_mask) ;
+
+            (* Get free valid locations for mask *)
+            let freed_locs =
+              Mask.Attached.get_freed attached_mask |> Sequence.to_list
+            in
+
+            (* Compute expected value *)
+            let sorted_locs =
+              (* Sort in descending order *)
+              List.sort ~compare:(Fn.flip Location.compare) freed_locs
+            in
+
+            Alcotest.(check bool)
+              "freed locations representation size <= all freed locations" true
+              ( List.length accounts_to_remove_mask
+                + List.length accounts_to_remove_base
+              >= List.length freed_locs ) ;
+
+            Alcotest.(
+              check (list Location.testable)
+                "freed locations are sorted in descending order (parents/mask)"
+                sorted_locs freed_locs) ) )
+
+  (* Combinator extension for Alcotest for Sequence.t.
+
+     This could probably go to a Mina library for testing, should we have one. *)
+  let seq (type a) (e : a Alcotest.testable) =
+    let open Alcotest in
+    let (module T) = e in
+    let equal = Sequence.equal T.equal
+    and pp ppf seq = (Fmt.Dump.seq T.pp) ppf (Sequence.to_seq seq) in
+    testable pp equal
+
+  let () =
+    let num_accounts = Int.pow 2 (Int.min 5 (Test.depth - 1)) / 2 in
+    (* We will remvove the [remove num_remove_in_mask] last accounts from mask. *)
+    let num_remove_in_mask = 4 in
+    if num_accounts > num_remove_in_mask then
+      add_test "only valid free location (all of them!) are considered"
+        (fun () ->
+          Test.with_instances (fun maskable mask ->
+              (* Add some accounts to parent only *)
+              let accounts_base = gen_accounts ~num_accounts in
+
+              (* [locs_base] is a sorted list in increasing order of
+                 location.
+                 This is a guarantee of the allocation algorithm. *)
+              let locs_base =
+                List.map
+                  ~f:(parent_create_new_account_exn maskable)
+                  accounts_base
+              in
+
+              let attached_mask = Maskable.register_mask maskable mask in
+
+              (* Keep the [num_remove_in_mask] biggest locations *)
+              let rev_locs_base = List.rev locs_base in
+              let chosen = List.take rev_locs_base num_remove_in_mask in
+
+              (* Remove the last accounts from the child *)
+              List.iter ~f:(Mask.Attached.remove_location attached_mask) chosen ;
+
+              (* Removing the higher locs above should not create a free list *)
+              Alcotest.(
+                check (seq Location.testable)
+                  "child (mask) has an empty free list" Sequence.empty
+                  (Mask.Attached.get_freed attached_mask)) ;
+
+              (* Let the highest loc live in parent. Remove the others. *)
+              let chosen_for_parent =
+                List.drop chosen (num_remove_in_mask - 1)
+              in
+              (* Remove chosen locations from the parent *)
+              List.iter chosen_for_parent ~f:(Maskable.remove_location maskable) ;
+
+              (* Removed locations from the parent should be visible *)
+              Alcotest.(
+                check (list Location.testable)
+                  "parent (maskable) has a free list" chosen_for_parent
+                  (Maskable.get_freed maskable |> Sequence.to_list)) ;
+
+              (* However, this should not have an effect on the child, since
+                 they were previously removed here. *)
+              Alcotest.(
+                check (seq Location.testable)
+                  "child (mask) still has an empty free list" Sequence.empty
+                  (Mask.Attached.get_freed attached_mask)) ;
+
+              (* Re-map the highest location to another account in mask *)
+              Mask.Attached.set attached_mask (List.hd_exn chosen)
+                (List.hd_exn @@ gen_accounts ~num_accounts:1) ;
+
+              (* Removed locations from the parent should become visible since
+                 they are now in valid locations for the child *)
+              Alcotest.(
+                check (list Location.testable)
+                  "child (mask) now has a free list" chosen_for_parent
+                  (Mask.Attached.get_freed attached_mask |> Sequence.to_list)) ) )
+
+  (* delete an existing account and returns the location where it was stored *)
+  let delete mask account =
+    let loc =
+      Option.value_exn
+        (Mask.Attached.location_of_account mask (Account.identifier account))
+    in
+    Mask.Attached.remove_location mask loc ;
+    loc
+
+  (* This test exposes some internal invariants wrt to the interaction between
+     removal and additions.
+
+     The allocator should prioritize reusing freed locations over others
+  *)
+  let () =
+    let num_accounts = 8 in
+    let half = num_accounts / 2 in
+    assert (half > 1) ;
+    let initial_accounts = gen_accounts ~num_accounts:half in
+    let additional_accounts = gen_accounts ~num_accounts:half in
+    add_test "allocator prioritizes freed locations" (fun () ->
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            (* add accounts to mask *)
+            List.iter initial_accounts ~f:(fun account ->
+                ignore @@ create_new_account_exn attached_mask account ) ;
+            let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
+            Alcotest.(check int) "all accounts created" half mask_num_accounts ;
+
+            (* Remove num_accounts*)
+            let accounts_to_be_deleted = initial_accounts in
+            ignore
+            @@ List.iter2 accounts_to_be_deleted additional_accounts
+                 ~f:(fun account_to_delete account_to_add ->
+                   let loc1 = delete attached_mask account_to_delete in
+                   let loc2 =
+                     create_new_account_exn attached_mask account_to_add
+                   in
+                   let loc3 =
+                     Option.value_exn
+                       (Mask.Attached.location_of_account attached_mask
+                          (Account.identifier account_to_add) )
+                   in
+                   Alcotest.check Location.testable
+                     "deleted location has been reused" loc1 loc2 ;
+                   Alcotest.check Location.testable "location_of_account agrees"
+                     loc2 loc3 ) ;
+            let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
+            Alcotest.(
+              check int "mask contains only non-removed accounts"
+                mask_num_accounts half) ) )
+
+  let () =
+    let name = "allocator reuse location closest to fill frontier first" in
+    let num_accounts = 8 in
+    let half = num_accounts / 2 in
+    assert (half > 1) ;
+    let initial_accounts = gen_accounts ~num_accounts:half in
+    let additional_accounts = gen_accounts ~num_accounts:half in
+    add_test name (fun () ->
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            (* add accounts to mask *)
+            List.iter initial_accounts ~f:(fun account ->
+                ignore @@ create_new_account_exn attached_mask account ) ;
+            let mask_num_accounts = Mask.Attached.num_accounts attached_mask in
+            Alcotest.(check int) "all accounts created" half mask_num_accounts ;
+
+            let accounts_to_be_deleted = initial_accounts in
+            let deleted_locs =
+              List.map accounts_to_be_deleted ~f:(delete attached_mask)
+              |> List.sort ~compare:Test.Location.compare
+            in
+            let added_locs =
+              List.map additional_accounts
+                ~f:(create_new_account_exn attached_mask)
+            in
+            Alcotest.(check (list Location.testable))
+              "deleted locations have been reused in order" deleted_locs
+              added_locs ) )
+
+  let () =
+    let name = "information after removal from mask should be empty" in
+    add_test name (fun () ->
+        Test.with_instances (fun maskable mask ->
+            let account = Account.genval.one () in
+            let loc = parent_create_new_account_exn maskable account in
+            let attached_mask = Maskable.register_mask maskable mask in
+            Mask.Attached.remove_location attached_mask loc ;
+            let acct_opt = Mask.Attached.get attached_mask loc in
+            Alcotest.(
+              check (option Account.testable)
+                "account after removal should be empty" None acct_opt) ;
+
+            let loc_opt =
+              Mask.Attached.location_of_account attached_mask
+                (Account.identifier account)
+            in
+            Alcotest.(
+              check (option Location.testable)
+                "location of account after removal should be empty" None loc_opt) ) )
+
+  let () =
     add_test "mask reparenting works" (fun () ->
         Test.with_chain (fun base ~mask:m1 ~mask_as_base ~mask2:m2 ->
             let num_accounts = 3 in
-            let account_ids = Account_id.gen_accounts num_accounts in
+            let account_ids = Account_id.genval.many num_accounts in
             let balances =
               Quickcheck.random_value
                 (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
@@ -628,24 +981,22 @@ module Make (Test : Test_intf) = struct
                 let locs = [ (loc1, a1); (loc2, a2); (loc3, a3) ] in
                 (* all accounts are here *)
                 List.iter locs ~f:(fun (loc, a) ->
-                    [%test_result: Account.t option]
-                      ~message:"All accounts are accessible from m2"
-                      ~expect:(Some a) (Mask.Attached.get m2 loc) ) ;
-                [%test_result: Account.t option] ~message:"a1 is in base"
-                  ~expect:(Some a1) (Test.Base.get base loc1) ;
+                    Alcotest.(check (option Account.testable))
+                      "All accounts are accessible from m2" (Some a)
+                      (Mask.Attached.get m2 loc) ) ;
+
+                Alcotest.(check (option Account.testable))
+                  "a1 is in base" (Some a1) (Test.Base.get base loc1) ;
                 Mask.Attached.commit m1 ;
-                [%test_result: Account.t option] ~message:"a2 is in base"
-                  ~expect:(Some a2) (Test.Base.get base loc2) ;
+                Alcotest.(check (option Account.testable))
+                  "a2 is in base" (Some a2) (Test.Base.get base loc2) ;
                 Maskable.remove_and_reparent_exn mask_as_base m1 ;
-                [%test_result: Account.t option] ~message:"a1 is in base"
-                  ~expect:(Some a1) (Test.Base.get base loc1) ;
-                [%test_result: Account.t option] ~message:"a2 is in base"
-                  ~expect:(Some a2) (Test.Base.get base loc2) ;
+
                 (* all accounts are still here *)
                 List.iter locs ~f:(fun (loc, a) ->
-                    [%test_result: Account.t option]
-                      ~message:"All accounts are accessible from m2"
-                      ~expect:(Some a) (Mask.Attached.get m2 loc) )
+                    Alcotest.(check (option Account.testable))
+                      "All accounts are accessible from m2" (Some a)
+                      (Mask.Attached.get m2 loc) )
             | _ ->
                 failwith "unexpected" ) )
 
@@ -655,7 +1006,7 @@ module Make (Test : Test_intf) = struct
        dirty for said account" (fun () ->
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
-            let k = Account_id.gen_accounts 1 |> List.hd_exn in
+            let k = Account_id.genval.one () in
             let acct1 = Account.create k (Balance.of_nanomina_int_exn 10) in
             let loc =
               Mask.Attached.get_or_create_account attached_mask k acct1
@@ -663,8 +1014,8 @@ module Make (Test : Test_intf) = struct
             in
             let acct2 = Account.create k (Balance.of_nanomina_int_exn 5) in
             Maskable.set maskable loc acct2 ;
-            [%test_result: Account.t]
-              ~message:"account in mask should be unchanged" ~expect:acct1
+            Alcotest.(check Account.testable)
+              "account in mask should be unchanged" acct1
               (Mask.Attached.get attached_mask loc |> Option.value_exn) ) )
 
   let tests =
@@ -775,8 +1126,8 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
   (* test runner *)
   let with_instances f =
     let db = Base_db.create ~depth:Depth.depth () in
-    [%test_result: Int.t] ~message:"Base_db num accounts should start at zero"
-      ~expect:0 (Base_db.num_accounts db) ;
+    Alcotest.(check int)
+      "Base_db.num_accounts starts at zero" 0 (Base_db.num_accounts db) ;
     let maskable = Any_base.cast (module Base_db) db in
     let mask = Mask.create ~depth:Depth.depth () in
     f maskable mask

@@ -9,6 +9,8 @@ open Core
 module Make (Inputs : Inputs_intf.S) = struct
   open Inputs
   module Location = Location
+
+  (* Free_list depends on this module alias. Change with care. *)
   module Addr = Location.Addr
 
   (** Invariant is that parent is None in unattached mask and `Some` in the
@@ -27,11 +29,13 @@ module Make (Inputs : Inputs_intf.S) = struct
     let t_of_sexp (_ : Sexp.t) : t = Async.Ivar.create ()
   end
 
+  type account_location = Location.t [@@deriving sexp]
+
   type maps_t =
     { accounts : Account.t Location_binable.Map.t
     ; token_owners : Account_id.t Token_id.Map.t
     ; hashes : Hash.t Addr.Map.t
-    ; locations : Location.t Account_id.Map.t
+    ; locations : account_location Account_id.Map.t
     }
   [@@deriving sexp]
 
@@ -44,6 +48,8 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; hashes = Map.merge_skewed ~combine base.hashes hashes
     ; locations = Map.merge_skewed ~combine base.locations locations
     }
+
+  module Free_list = Merkle_ledger.Free_list.Make (Location)
 
   (** Structure managing cache accumulated since the "base" ledger.
 
@@ -58,7 +64,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     Structure maintains two caches: [current] and [next], with the former
     being always a superset of a latter and [next] always being superset of mask's contents
     from [maps] field. These two caches are being rotated according to a certain rule
-    to ensure that no much more memory is used within accumulator as compared to the case
+    to ensure that not much more memory is used within accumulator as compared to the case
     when [accumulated = None] for all masks.
 
     Garbage-collection/rotation mechanism for [next] and [current] is based on idea to set
@@ -81,12 +87,18 @@ module Make (Inputs : Inputs_intf.S) = struct
     { uuid : Uuid.Stable.V1.t
     ; mutable parent : Parent.t
     ; detached_parent_signal : Detached_parent_signal.t
-    ; mutable current_location : Location.t option
-    ; depth : int
+          (* Available locations for allocations are tracked using 2 fields:
+             1. [fill_frontier] is the fill frontier, that is, on the right of this
+                location, all locations are available
+             2. [freed] represents all available locations in  [0, fill_frontier].
+                Locations are added to this only after having been removed.
+          *)
+    ; mutable fill_frontier : Location.t option
+    ; mutable freed : Free_list.t
+    ; depth : (* depth of Merkle tree *) int
     ; mutable maps : maps_t
-          (* If present, contains maps containing changes both for this mask
-             and for a few ancestors.
-             This is used as a lookup cache. *)
+          (* If present, [accumulated] contains maps containing changes both for this mask
+             and for a few ancestors. This is used as a lookup cache. *)
     ; mutable accumulated : (accumulated_t[@sexp.opaque]) option
     ; mutable is_committing : bool
     }
@@ -105,12 +117,15 @@ module Make (Inputs : Inputs_intf.S) = struct
     { uuid = Uuid_unix.create ()
     ; parent = Error __LOC__
     ; detached_parent_signal = Async.Ivar.create ()
-    ; current_location = None
+    ; fill_frontier = None
     ; depth
     ; accumulated = None
     ; maps = empty_maps ()
     ; is_committing = false
+    ; freed = Free_list.empty
     }
+
+  let has_parent { parent; _ } = Result.is_ok parent
 
   let get_uuid { uuid; _ } = uuid
 
@@ -132,7 +147,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         Uuid.t * (* Location where null was set*) string
 
     let unset_parent ?(trigger_signal = true) ~loc t =
-      assert (Result.is_ok t.parent) ;
+      assert (has_parent t) ;
       t.parent <- Error loc ;
       if trigger_signal then (
         t.accumulated <- None ;
@@ -166,8 +181,7 @@ module Make (Inputs : Inputs_intf.S) = struct
                 } )
 
     (** When [accumulated] is not configured, returns current [t.maps] and parent.
-
-                Otherwise, returns the [current] accumulator and [base]. *)
+        Otherwise, returns the [current] accumulator and [base]. *)
     let maps_and_ancestor t =
       actualize_accumulated t ;
       match t.accumulated with
@@ -205,6 +219,24 @@ module Make (Inputs : Inputs_intf.S) = struct
           acc.current <- f acc.current ;
           acc.next <- f acc.next )
 
+    module Freed = struct
+      let add t loc = t.freed <- Free_list.Location.add t.freed loc
+
+      let remove t loc = t.freed <- Free_list.Location.remove t.freed loc
+
+      let mem t loc = Free_list.Location.mem t.freed loc
+    end
+
+    (* A location is free if
+       - the fill interval is empty, aka all locations are available
+       - the location is outside of the fill interval
+       - it is within the fill interval and it has been freed
+    *)
+    let is_free t loc =
+      Option.is_none t.fill_frontier
+      || Location.( > ) loc (Option.value_exn t.fill_frontier)
+      || Freed.mem t loc
+
     let self_set_hash t address hash =
       update_maps t ~f:(fun maps ->
           { maps with hashes = Map.set maps.hashes ~key:address ~data:hash } )
@@ -219,15 +251,15 @@ module Make (Inputs : Inputs_intf.S) = struct
           { maps with
             locations = Map.set maps.locations ~key:account_id ~data:location
           } ) ;
+
       (* if account is at a hitherto-unused location, that
          becomes the current location
       *)
-      match t.current_location with
+      match t.fill_frontier with
       | None ->
-          t.current_location <- Some location
+          t.fill_frontier <- Some location
       | Some loc ->
-          if Location.( > ) location loc then
-            t.current_location <- Some location
+          if Location.( > ) location loc then t.fill_frontier <- Some location
 
     let self_set_account t location account =
       update_maps t ~f:(fun maps ->
@@ -253,16 +285,20 @@ module Make (Inputs : Inputs_intf.S) = struct
           Some account
       | None ->
           let is_empty =
-            match t.current_location with
+            (* The location does not mark an account for this mask, maybe it has been freed *)
+            Freed.mem t location
+            ||
+            match t.fill_frontier with
             | None ->
                 true
-            | Some current_location ->
+            | Some fill_frontier ->
                 let address = Location.to_path_exn location in
-                let current_address = Location.to_path_exn current_location in
+                let current_address = Location.to_path_exn fill_frontier in
                 Addr.is_further_right ~than:current_address address
           in
           if is_empty then None else Base.get ancestor location
 
+    (* TODO: Filter out freed locations before sending to parent *)
     let self_find_or_batch_lookup self_find lookup_parent t ids =
       assert_is_attached t ;
       let maps, ancestor = maps_and_ancestor t in
@@ -292,10 +328,10 @@ module Make (Inputs : Inputs_intf.S) = struct
         let res =
           if Option.is_none res then
             let is_empty =
-              Option.value_map ~default:true t.current_location
-                ~f:(fun current_location ->
+              Option.value_map ~default:true t.fill_frontier
+                ~f:(fun fill_frontier ->
                   let address = Location.to_path_exn id in
-                  let current_address = Location.to_path_exn current_location in
+                  let current_address = Location.to_path_exn fill_frontier in
                   Addr.is_further_right ~than:current_address address )
             in
             Option.some_if is_empty None
@@ -308,17 +344,17 @@ module Make (Inputs : Inputs_intf.S) = struct
     let empty_hash =
       Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
 
-    let self_path_get_hash ~hashes ~current_location height address =
+    let self_path_get_hash ~hashes ~fill_frontier height address =
       match Map.find hashes address with
       | Some hash ->
           Some hash
       | None ->
           let is_empty =
-            match current_location with
+            match fill_frontier with
             | None ->
                 true
-            | Some current_location ->
-                let current_address = Location.to_path_exn current_location in
+            | Some fill_frontier ->
+                let current_address = Location.to_path_exn fill_frontier in
                 Addr.is_further_right ~than:current_address address
           in
           if is_empty then Some (empty_hash height) else None
@@ -332,26 +368,26 @@ module Make (Inputs : Inputs_intf.S) = struct
         let%map.Option rest = self_path_impl ~element ~depth parent_address in
         el :: rest
 
-    let self_merkle_path ~hashes ~current_location =
+    let self_merkle_path ~hashes ~fill_frontier =
       let element height address =
         let sibling = Addr.sibling address in
         let dir = Location.last_direction address in
         let%map.Option sibling_hash =
-          self_path_get_hash ~hashes ~current_location height sibling
+          self_path_get_hash ~hashes ~fill_frontier height sibling
         in
         Direction.map dir ~left:(`Left sibling_hash) ~right:(`Right sibling_hash)
       in
       self_path_impl ~element
 
-    let self_wide_merkle_path ~hashes ~current_location =
+    let self_wide_merkle_path ~hashes ~fill_frontier =
       let element height address =
         let sibling = Addr.sibling address in
         let dir = Location.last_direction address in
         let%bind.Option sibling_hash =
-          self_path_get_hash ~hashes ~current_location height sibling
+          self_path_get_hash ~hashes ~fill_frontier height sibling
         in
         let%map.Option self_hash =
-          self_path_get_hash ~hashes ~current_location height address
+          self_path_get_hash ~hashes ~fill_frontier height address
         in
         Direction.map dir
           ~left:(`Left (self_hash, sibling_hash))
@@ -406,7 +442,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       let maps, ancestor = maps_and_ancestor t in
       match
         self_merkle_path ~depth:t.depth ~hashes:maps.hashes
-          ~current_location:t.current_location address
+          ~fill_frontier:t.fill_frontier address
       with
       | Some path ->
           path
@@ -428,7 +464,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       let self_paths =
         List.map locations ~f:(fun location ->
             let address = Location.to_path_exn location in
-            self_lookup ~hashes:maps.hashes ~current_location:t.current_location
+            self_lookup ~hashes:maps.hashes ~fill_frontier:t.fill_frontier
               ~depth:t.depth address
             |> Option.value_map
                  ~default:(Either.Second (location, address))
@@ -468,8 +504,9 @@ module Make (Inputs : Inputs_intf.S) = struct
        along the path from the account address to root *)
     let addresses_and_hashes_from_merkle_path_exn merkle_path starting_address
         starting_hash : (Addr.t * Hash.t) list =
-      let get_addresses_hashes height accum node =
-        let last_address, last_hash = List.hd_exn accum in
+      (* The accum list is never empty by construction *)
+      let[@warning "-8"] get_addresses_hashes height
+          ((last_address, last_hash) :: _ as accum) node =
         let next_address = Addr.parent_exn last_address in
         let next_hash =
           match node with
@@ -494,9 +531,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       | None ->
           Base.merkle_root ancestor
 
-    let remove_account_and_update_hashes t location =
-      (* remove account and key from tables *)
-      let account = Option.value_exn (Map.find t.maps.accounts location) in
+    let remove_account_location_update_hashes t account location =
       let account_id = Account.identifier account in
       t.maps <-
         { t.maps with
@@ -506,28 +541,94 @@ module Make (Inputs : Inputs_intf.S) = struct
         ; token_owners =
             Token_id.Map.remove t.maps.token_owners
               (Account_id.derive_token_id ~owner:account_id)
-            (* TODO : use stack database to save unused location, which can be used
-               when allocating a location *)
         ; locations = Map.remove t.maps.locations account_id
         } ;
-      (* reuse location if possible *)
-      Option.iter t.current_location ~f:(fun curr_loc ->
-          if Location.equal location curr_loc then
-            match Location.prev location with
-            | Some prev_loc ->
-                t.current_location <- Some prev_loc
-            | None ->
-                t.current_location <- None ) ;
+      let () =
+        match t.fill_frontier with
+        | Some curr_loc ->
+            if Location.equal location curr_loc then
+              match Location.prev location with
+              | Some prev_loc ->
+                  (* On removal, if the account is at the fill frontier, we need to
+                     remove all contiguous freed locations next to this
+                     frontier. *)
+                  let freed, opt_loc =
+                    Free_list.Location.remove_all_contiguous t.freed prev_loc
+                  in
+                  t.freed <- freed ;
+                  t.fill_frontier <- opt_loc
+              | None ->
+                  t.fill_frontier <- None
+            else
+              (* save newly unused location to local stack *)
+              Freed.add t location
+        | None ->
+            (* no current location indicates no insertion ever occurred *)
+            ()
+      in
       (* update hashes *)
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.empty_account in
       let merkle_path = merkle_path t location in
+      (* FIXME: Instead of creating a list then iterating over it we could do a
+         single iteration pass. *)
       let addresses_and_hashes =
         addresses_and_hashes_from_merkle_path_exn merkle_path account_address
           account_hash
       in
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
           self_set_hash t addr hash )
+
+    let remove_account_and_update_hashes t location =
+      (* remove account and key from tables *)
+      let account = Option.value_exn (Map.find t.maps.accounts location) in
+      remove_account_location_update_hashes t account location
+
+    let remove_location t location =
+      assert_is_attached t ;
+      match get t location with
+      | Some account ->
+          remove_account_location_update_hashes t account location
+      | None ->
+          ()
+
+    let set_freed t locs =
+      let freed = Free_list.Location.of_sequence locs in
+      t.freed <- freed
+
+    (* let is_in_frontier { fill_frontier; _ } optloc =
+     *   match (fill_frontier, optloc) with
+     *   | None, _ | _, None ->
+     *       false
+     *   | Some ubound, Some loc ->
+     *       Location.(loc <= ubound) *)
+
+    let is_allocated t loc = Map.mem t.maps.accounts loc
+
+    (* Get all freed locations from parent that are also valid in this context *)
+    let get_valid_parent_freed t =
+      match t.fill_frontier with
+      | None ->
+          (* We do not need any free locations from anyone, this mask represents
+             an empty ledger. *)
+          Sequence.empty
+      | Some frontier ->
+          let base = Base.get_freed (get_parent t) in
+          (* Some locations marked as free in the parent might have been reallocated
+             since the mask has been attached.
+
+             Some locations in the parent, might also be outside of this mask's
+             current fill frontier.
+
+             Discard them. *)
+          Sequence.filter base ~f:(fun loc ->
+              Location.(loc <= frontier) && not (is_allocated t loc) )
+
+    let get_freed t =
+      let base = get_valid_parent_freed t in
+      let local = Free_list.Location.to_sequence t.freed in
+      if Sequence.is_empty base then local
+      else Sequence.merge ~compare:(Fn.flip Location.compare) base local
 
     let set_account_unsafe t location account =
       assert_is_attached t ;
@@ -569,6 +670,23 @@ module Make (Inputs : Inputs_intf.S) = struct
            Option.some_if (Account.equal account existing_account) ()
          in
          remove_account_and_update_hashes t location
+
+    let parent_remove_notify t account =
+      match Map.find t.maps.locations (Account.identifier account) with
+      | None ->
+          (* Inform that the location is free *)
+          ()
+      | Some location -> (
+          match Map.find t.maps.accounts location with
+          | Some existing_account ->
+              if Account.equal account existing_account then
+                remove_account_location_update_hashes t account location
+          | None ->
+              (* If we have a loc -> account binding in maps.accounts, there
+                 needs to be an account -> loc association in maps.location.
+
+                 Thus, this case should not occur. *)
+              assert false )
 
     let is_committing t = t.is_committing
 
@@ -627,6 +745,22 @@ module Make (Inputs : Inputs_intf.S) = struct
         ; token_owners = Token_id.Map.empty
         ; locations = Account_id.Map.empty
         } ;
+      (* We might write data over accounts that were previously freed - this
+         should be transmitted by the parents so that the free list of the
+         child is alway a newer version of the one from the parent.
+
+         It assumes we never write to the parent when it has at least a child.
+
+         In that we just need to copy the free list of the child to the one of
+         the parent.
+
+         However in the child we might have newly freed location, so we need to
+         "erase" these ones from the parent. These are locations that are in the
+         child but *not* in the parent.
+
+         Erase = FL(C) \ FL(P)
+      *)
+      Base.set_freed parent (Free_list.Location.to_sequence t.freed) ;
       Base.set_batch parent account_data ;
       Debug_assert.debug_assert (fun () ->
           [%test_result: Hash.t]
@@ -644,7 +778,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       { uuid = Uuid_unix.create ()
       ; parent = Ok (get_parent t)
       ; detached_parent_signal = Async.Ivar.create ()
-      ; current_location = t.current_location
+      ; fill_frontier = t.fill_frontier
       ; depth = t.depth
       ; maps = t.maps
       ; accumulated =
@@ -655,15 +789,16 @@ module Make (Inputs : Inputs_intf.S) = struct
               ; current = acc.current
               } )
       ; is_committing = false
+      ; freed = Free_list.empty
       }
 
-    let last_filled t =
+    let max_filled t =
       assert_is_attached t ;
       Option.value_map
-        (Base.last_filled (get_parent t))
-        ~default:t.current_location
+        (Base.max_filled (get_parent t))
+        ~default:t.fill_frontier
         ~f:(fun parent_loc ->
-          match t.current_location with
+          match t.fill_frontier with
           | None ->
               Some parent_loc
           | Some our_loc -> (
@@ -679,8 +814,12 @@ module Make (Inputs : Inputs_intf.S) = struct
               | Account _, (Generic _ | Hash _)
               | (Generic _ | Hash _), (Generic _ | Hash _) ->
                   failwith
-                    "last_filled: expected account locations for the parent \
-                     and mask" ) )
+                    "max_filled: expected account locations for the parent and \
+                     mask" ) )
+
+    let is_compact t =
+      assert_is_attached t ;
+      Free_list.is_empty t.freed && Base.is_compact (get_parent t)
 
     let drop_accumulated t = t.accumulated <- None
 
@@ -699,7 +838,9 @@ module Make (Inputs : Inputs_intf.S) = struct
 
         let get = get
 
-        let last_filled = last_filled
+        let max_filled = max_filled
+
+        let is_compact = is_compact
       end
 
       let ledger_depth = depth
@@ -717,7 +858,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             self_set_hash t (Location.to_path_exn location) hash )
 
       let set_location_batch ~last_location t account_to_location_list =
-        t.current_location <- Some last_location ;
+        t.fill_frontier <- Some last_location ;
         Mina_stdlib.Nonempty_list.iter account_to_location_list
           ~f:(fun (key, data) -> self_set_location t key data)
 
@@ -773,7 +914,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let num_accounts t =
       assert_is_attached t ;
-      match t.current_location with
+      match t.fill_frontier with
       | None ->
           0
       | Some location -> (
@@ -789,10 +930,24 @@ module Make (Inputs : Inputs_intf.S) = struct
       let maps, ancestor = maps_and_ancestor t in
       let mask_result = Map.find maps.locations account_id in
       match mask_result with
-      | Some _ ->
-          mask_result
+      | Some _ as locopt ->
+          locopt
+      | None -> (
+          (* This account was never touched by this mask, let's see whether the
+             parent knows anything about it *)
+          match Base.location_of_account ancestor account_id with
+          | Some loc as locopt ->
+              if is_free t loc then None else locopt
+          | None ->
+              None )
+
+    let remove_account t account =
+      let id = Account.identifier account in
+      match location_of_account t id with
+      | Some location ->
+          remove_location t location
       | None ->
-          Base.location_of_account ancestor account_id
+          ()
 
     let location_of_account_batch t =
       self_find_or_batch_lookup
@@ -800,7 +955,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           (id, Option.map ~f:Option.some @@ Map.find maps.locations id) )
         Base.location_of_account_batch t
 
-    (* Adds specified accounts to the mask by laoding them from parent ledger.
+    (* Adds specified accounts to the mask by loading them from parent ledger.
 
        Could be useful for transaction processing when to pre-populate mask with the
        accounts used in processing a transaction (or a block) to ensure there are not loaded
@@ -957,43 +1112,77 @@ module Make (Inputs : Inputs_intf.S) = struct
         assert_is_attached t ;
         Option.is_some (Map.find t.maps.hashes addr)
 
-      let current_location t = t.current_location
+      let fill_frontier t = t.fill_frontier
     end
 
-    (* leftmost location *)
-    let first_location ~ledger_depth =
-      Location.Account
-        ( Addr.of_directions
-        @@ List.init ledger_depth ~f:(fun _ -> Direction.Left) )
+    let leftmost_available_slot t =
+      match max_filled t with
+      | None ->
+          let loc =
+            let path_to_leftmost_slot =
+              List.init t.depth ~f:(fun _ -> Direction.Left)
+            in
+            Location.Account (Addr.of_directions path_to_leftmost_slot)
+          in
+          Some loc
+      | Some loc ->
+          Location.next loc
 
-    (* NB: updates the mutable current_location field in t *)
+    (* Finds the next available location in the following order of priority:
+       - reuse a freed location, due to previously removed data; or
+       - use the leftmost available slot.
+    *)
+    let pop_next_fillable t =
+      match
+        (Free_list.Location.top t.freed, Sequence.hd (get_valid_parent_freed t))
+      with
+      | (Some loc_here as loch), (Some loc_there as loct) ->
+          if Location.(loc_here >= loc_there) then (
+            Freed.remove t loc_here ; loch )
+          else loct
+      | (Some loc as loc_here), None ->
+          (* The free location comes directly from this mask's free list. Update
+             it accordingly. *)
+          Freed.remove t loc ; loc_here
+      | None, (Some _ as loc_there) ->
+          (* The biggest free location comes from a parent, just return it. *)
+          loc_there
+      | None, None ->
+          leftmost_available_slot t
+
+    let allocate_new t account =
+      match pop_next_fillable t with
+      | None ->
+          Or_error.error_string "Db_error.Out_of_leaves"
+      | Some location ->
+          (* `set` calls `self_set_location`, which updates
+             the current location *)
+          set t location account ;
+          Ok (`Added, location)
+
+    (* NB: updates the mutable fill_frontier field in t *)
     let get_or_create_account t account_id account =
       assert_is_attached t ;
       let maps, ancestor = maps_and_ancestor t in
       match Map.find maps.locations account_id with
+      (* | Some Deleted -> (
+       *     (\* not in mask, maybe in parent *\)
+       *     match Base.location_of_account ancestor account_id with
+       *     | Some location ->
+       *         if Freed.mem t location then (
+       *           (\* If that's feasible reuse the same location as the parent *\)
+       *           Freed.remove t location ;
+       *           Ok (`Existed, location) )
+       *         else allocate_new t account
+       *     | None ->
+       *         (\* not in parent, create new location *\) allocate_new t account ) *)
       | None -> (
           (* not in mask, maybe in parent *)
           match Base.location_of_account ancestor account_id with
           | Some location ->
               Ok (`Existed, location)
-          | None -> (
-              (* not in parent, create new location *)
-              let maybe_location =
-                match last_filled t with
-                | None ->
-                    Some (first_location ~ledger_depth:t.depth)
-                | Some loc ->
-                    Location.next loc
-              in
-              match maybe_location with
-              | None ->
-                  Or_error.error_string "Db_error.Out_of_leaves"
-              | Some location ->
-                  (* `set` calls `self_set_location`, which updates
-                     the current location
-                  *)
-                  set t location account ;
-                  Ok (`Added, location) ) )
+          | None ->
+              (* not in parent, create new location *) allocate_new t account )
       | Some location ->
           Ok (`Existed, location)
   end
@@ -1002,8 +1191,13 @@ module Make (Inputs : Inputs_intf.S) = struct
     assert (Result.is_error t.parent) ;
     assert (Option.is_none (Async.Ivar.peek t.detached_parent_signal)) ;
     assert (Int.equal t.depth (Base.depth parent)) ;
+    let is_reparenting = has_parent t in
     t.parent <- Ok parent ;
-    t.current_location <- Attached.last_filled t ;
+    t.fill_frontier <- Attached.max_filled t ;
+
+    (* Starts the local free list as empty with the first parent registered. *)
+    if not is_reparenting then t.freed <- Free_list.empty ;
+
     (* If [t.accumulated] isn't empty, then this mask had a parent before
        and now we just reparent it (which may only happen if both old and new parents
         have the same merkle root (and some masks in between may have been removed),

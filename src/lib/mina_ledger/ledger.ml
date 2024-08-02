@@ -300,15 +300,15 @@ module Ledger_inner = struct
     List.fold_until accounts ~init ~f ~finish
 
   let create_new_account_exn t account_id account =
-    let action, _ =
-      get_or_create_account t account_id account |> Or_error.ok_exn
-    in
-    if [%equal: [ `Existed | `Added ]] action `Existed then
-      failwith
-        (sprintf
-           !"Could not create a new account with pk \
-             %{sexp:Public_key.Compressed.t}: Account already exists"
-           (Account_id.public_key account_id) )
+    match get_or_create_account t account_id account |> Or_error.ok_exn with
+    | `Added, _ ->
+        ()
+    | `Existed, _ ->
+        failwith
+          (sprintf
+             !"Could not create a new account with pk \
+               %{sexp:Public_key.Compressed.t}: Account already exists"
+             (Account_id.public_key account_id) )
 
   let create_new_account t account_id account =
     Or_error.try_with (fun () -> create_new_account_exn t account_id account)
@@ -374,33 +374,26 @@ include Ledger_inner
 include Mina_transaction_logic.Make (Ledger_inner)
 
 (* use mask to restore ledger after application *)
-let merkle_root_after_zkapp_command_exn ~constraint_constants ~global_slot
-    ~txn_state_view ledger zkapp_command =
+let merkle_root_after_command_exn ~command ledger =
   let mask = Mask.create ~depth:(depth ledger) () in
   let masked_ledger = register_mask ledger mask in
-  let _applied =
-    Or_error.ok_exn
-      (apply_zkapp_command_unchecked ~constraint_constants ~global_slot
-         ~state_view:txn_state_view masked_ledger
-         (Zkapp_command.Valid.forget zkapp_command) )
-  in
+  let _applied = Or_error.ok_exn (command masked_ledger) in
   let root = merkle_root masked_ledger in
   ignore (unregister_mask_exn ~loc:__LOC__ masked_ledger : unattached_mask) ;
   root
 
-(* use mask to restore ledger after application *)
+let merkle_root_after_zkapp_command_exn ~constraint_constants ~global_slot
+    ~txn_state_view ledger zkapp_command =
+  merkle_root_after_command_exn ledger ~command:(fun masked_ledger ->
+      apply_zkapp_command_unchecked ~constraint_constants ~global_slot
+        ~state_view:txn_state_view masked_ledger
+        (Zkapp_command.Valid.forget zkapp_command) )
+
 let merkle_root_after_user_command_exn ~constraint_constants ~txn_global_slot
     ledger cmd =
-  let mask = Mask.create ~depth:(depth ledger) () in
-  let masked_ledger = register_mask ledger mask in
-  let _applied =
-    Or_error.ok_exn
-      (apply_user_command ~constraint_constants ~txn_global_slot masked_ledger
-         cmd )
-  in
-  let root = merkle_root masked_ledger in
-  ignore (unregister_mask_exn ~loc:__LOC__ masked_ledger : unattached_mask) ;
-  root
+  merkle_root_after_command_exn ledger ~command:(fun masked_ledger ->
+      apply_user_command ~constraint_constants ~txn_global_slot masked_ledger
+        cmd )
 
 type init_state =
   ( Signature_lib.Keypair.t

@@ -7,5 +7,7 @@
 *)
 
 let () =
-  let tests = Test_database.tests @ Test.tests @ Test_mask.tests in
+  let tests =
+    Test_database.tests @ Test.tests @ Test_mask.tests @ Test_free_list.tests
+  in
   Alcotest.run "Merkle ledger" tests
