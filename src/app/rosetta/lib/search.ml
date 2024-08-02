@@ -380,10 +380,7 @@ module Sql = struct
                 [%string "u.command_type = 'delegation'"]
             | `Fee_payer_dec
             | `Account_creation_fee_via_payment
-            | `Account_creation_fee_via_fee_payer
             | `Account_creation_fee_via_fee_receiver
-            | `Create_token
-            | `Mint_tokens
             | `Zkapp_fee_payer_dec
             | `Zkapp_balance_update
             | `Fee_receiver_inc
@@ -690,13 +687,10 @@ module Sql = struct
           | `Account_creation_fee_via_fee_receiver ->
               "ac.creation_fee IS NOT NULL"
           | `Account_creation_fee_via_payment
-          | `Account_creation_fee_via_fee_payer
           | `Payment_source_dec
           | `Payment_receiver_inc
           | `Fee_payment
           | `Delegate_change
-          | `Create_token
-          | `Mint_tokens
           | `Zkapp_fee_payer_dec
           | `Zkapp_balance_update ->
               "FALSE" )
@@ -892,14 +886,11 @@ module Sql = struct
           | `Fee_receiver_inc
           | `Coinbase_inc
           | `Account_creation_fee_via_payment
-          | `Account_creation_fee_via_fee_payer
           | `Account_creation_fee_via_fee_receiver
           | `Payment_source_dec
           | `Payment_receiver_inc
           | `Fee_payment
-          | `Delegate_change
-          | `Create_token
-          | `Mint_tokens ->
+          | `Delegate_change ->
               "FALSE" )
       in
       let filters =
