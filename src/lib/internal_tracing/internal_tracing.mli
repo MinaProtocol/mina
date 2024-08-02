@@ -112,7 +112,8 @@ val register_toggle_callback : (bool -> unit Async_kernel.Deferred.t) -> unit
     The returned promise will be resolved when all the calls to the registered toggle
     callbacks have been resolved. *)
 val toggle :
-     logger:Logger.t
+     commit_id:string
+  -> logger:Logger.t
   -> ?force:bool
   -> [ `Enabled | `Disabled ]
   -> unit Async_kernel.Deferred.t

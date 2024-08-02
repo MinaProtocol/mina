@@ -21,6 +21,10 @@ val set_config :
   -> unit
 
 val send_dynamic_report :
-  logger:Logger.t -> generate_error:(int -> Yojson.Safe.t) -> unit Deferred.t
+     commit_id:string
+  -> logger:Logger.t
+  -> generate_error:(int -> Yojson.Safe.t)
+  -> unit Deferred.t
 
-val send_report : logger:Logger.t -> error:Error.t -> unit Deferred.t
+val send_report :
+  commit_id:string -> logger:Logger.t -> error:Error.t -> unit Deferred.t

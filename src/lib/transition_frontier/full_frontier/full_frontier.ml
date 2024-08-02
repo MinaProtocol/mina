@@ -965,7 +965,7 @@ module For_tests = struct
         Verifier.create ~logger ~proof_level ~constraint_constants
           ~conf_dir:None
           ~pids:(Child_processes.Termination.create_pid_table ())
-          () )
+          ~commit_id:"not specified for unit tests" () )
 
   module Genesis_ledger = (val precomputed_values.genesis_ledger)
 

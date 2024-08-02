@@ -1,6 +1,6 @@
 (library
  (name key_cache)
  (public_name key_cache)
- (libraries core_kernel async_kernel mina_node_config)
+ (libraries core_kernel async_kernel)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version)))

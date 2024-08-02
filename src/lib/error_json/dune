@@ -7,8 +7,6 @@
    yojson
    base
    sexplib
-   ;; local libraries
-   mina_version
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_deriving_yojson ppx_version)))

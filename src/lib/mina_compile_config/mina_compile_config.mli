@@ -1,7 +1,5 @@
 val curve_size : int
 
-val genesis_ledger : string
-
 val default_transaction_fee_string : string
 
 val default_snark_worker_fee_string : string
@@ -15,8 +13,6 @@ val compaction_interval_ms : int option
 val block_window_duration_ms : int
 
 val vrf_poll_interval_ms : int
-
-val generate_genesis_proof : bool
 
 val network_id : string
 

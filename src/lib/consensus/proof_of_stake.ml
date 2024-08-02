@@ -760,9 +760,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let eval = T.eval
 
       module Precomputed = struct
-        let keypairs = Lazy.force Key_gen.Sample_keypairs.keypairs
-
-        let genesis_winner = keypairs.(0)
+        let genesis_winner = Key_gen.Sample_keypairs.genesis_winner
 
         let genesis_stake_proof :
             genesis_epoch_ledger:Mina_ledger.Ledger.t Lazy.t -> Stake_proof.t =

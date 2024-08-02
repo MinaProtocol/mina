@@ -26,8 +26,9 @@ let graphql_error_to_string e =
 let query query_obj uri =
   let variables_string = Yojson.Basic.to_string query_obj#variables in
   let body_string =
-    Printf.sprintf {|{"query": "%s", "variables": %s}|} query_obj#query
-      variables_string
+    String.substr_replace_all ~pattern:"\n" ~with_:""
+    @@ Printf.sprintf {|{"query": "%s", "variables": %s}|} query_obj#query
+         variables_string
   in
   let open Deferred.Result.Let_syntax in
   let headers =

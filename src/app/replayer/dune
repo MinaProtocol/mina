@@ -61,6 +61,7 @@
    codable
    ppx_version.runtime
    cli_lib
+   mina_version
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_let ppx_sexp_conv

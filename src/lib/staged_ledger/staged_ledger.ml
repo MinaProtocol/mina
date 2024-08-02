@@ -427,8 +427,6 @@ module T = struct
       ; constraint_constants = _
       ; pending_coinbase_collection
       } : Staged_ledger_hash.t =
-    if Node_config.call_logger then
-      Mina_debug.Call_logger.record_call "Staged_ledger.hash" ;
     Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
       (Scan_state.hash scan_state)
       (Ledger.merkle_root ledger)
@@ -2383,7 +2381,7 @@ let%test_module "staged ledger tests" =
           Verifier.create ~logger ~proof_level ~constraint_constants
             ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
-            () )
+            ~commit_id:"not specified for unit tests" () )
 
     let find_vk ledger =
       Zkapp_command.Verifiable.load_vk_from_ledger ~get:(Ledger.get ledger)
@@ -5164,7 +5162,7 @@ let%test_module "staged ledger tests" =
                           ~constraint_constants ~conf_dir:None
                           ~pids:
                             (Child_processes.Termination.create_pid_table ())
-                          ()
+                          ~commit_id:"not specified for unit tests" ()
                       in
                       match%map
                         Sl.apply ~constraint_constants ~global_slot !sl

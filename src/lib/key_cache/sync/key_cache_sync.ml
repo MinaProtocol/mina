@@ -21,42 +21,6 @@ let on_disk to_string read write prefix =
   in
   { read; write }
 
-let s3 to_string read ~bucket_prefix ~install_path =
-  let read k =
-    let logger = Logger.create () in
-    let label = to_string k in
-    let uri_string = bucket_prefix ^/ label in
-    let file_path = install_path ^/ label in
-    let open Or_error.Let_syntax in
-    [%log trace] "Downloading key to key cache"
-      ~metadata:
-        [ ("url", `String uri_string); ("local_file_path", `String file_path) ] ;
-    let%bind () =
-      Result.map_error
-        (ksprintf Unix.system
-           "curl --fail --silent --show-error -o \"%s\" \"%s\"" file_path
-           uri_string ) ~f:(function
-        | `Exit_non_zero _ as e ->
-            Error.of_string (Unix.Exit.to_string_hum (Error e))
-        | `Signal s ->
-            Error.createf "died after receiving %s (signal number %d)"
-              (Signal.to_string s) (Signal.to_system_int s) )
-      |> Result.map_error ~f:(fun err ->
-             [%log trace] "Could not download key to key cache"
-               ~metadata:
-                 [ ("url", `String uri_string)
-                 ; ("local_file_path", `String file_path)
-                 ] ;
-             err )
-    in
-    [%log trace] "Downloaded key to key cache"
-      ~metadata:
-        [ ("url", `String uri_string); ("local_file_path", `String file_path) ] ;
-    read k ~path:file_path
-  in
-  let write _ _ = Or_error.return () in
-  { read; write }
-
 module Disk_storable = struct
   include Disk_storable (Or_error)
 
@@ -86,11 +50,8 @@ let read spec { Disk_storable.to_string; read = r; write = w } k =
         | Spec.On_disk { directory; should_write } ->
             ( (on_disk to_string r w directory).read k
             , if should_write then `Locally_generated else `Cache_hit )
-        | S3 _ when not (may_download ()) ->
+        | S3 _ ->
             (Or_error.errorf "Downloading from S3 is disabled", `Cache_hit)
-        | S3 { bucket_prefix; install_path } ->
-            Unix.mkdir_p install_path ;
-            ((s3 to_string r ~bucket_prefix ~install_path).read k, `Cache_hit)
       in
       let%map.Or_error res = res in
       (res, cache_hit) )
