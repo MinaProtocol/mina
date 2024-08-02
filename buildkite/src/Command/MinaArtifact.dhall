@@ -146,21 +146,9 @@ let docker_step
                             }
                       )
                       networks
-                , TestExecutive =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = "mina-test-executive"
-                    , deb_codename = "${DebianVersions.lowerName debVersion}"
-                    , deb_profile = profile
-                    , build_flags = buildFlags
-                    , deb_repo = DebianRepo.Type.Local
-                    , step_key =
-                        "test-executive-${DebianVersions.lowerName
-                                            debVersion}${BuildFlags.toLabelSegment
-                                                           buildFlags}--docker-image"
-                    }
-                  ]
-                , BatchTxn =
+                , TestExecutive = 
+          		  []: List DockerImage.ReleaseSpec.Type,
+          		, BatchTxn =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = "mina-batch-txn"
