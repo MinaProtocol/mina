@@ -67,7 +67,7 @@ For example: `/ip4/104.196.41.236/tcp/10001/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawR
 
 ##### Complete the challenges for the release
 
-Connect to the QA-net from your machine and complete the protocol/product related challenges for the release. This is to test the features required for the challenges are working and also, may help the testnet guardian prepare for the kind of questions the community may have after the release.
+Connect to the QA-net from your machine and complete the protocol/product related challenges for the release. This is to test whether the features required for the challenges are working and also, may help the testnet guardian prepare for the kind of questions the community may have after the release.
 Note: Any challenge that is resource intensive like "make most snark works" should ideally be part of the QA-net configuration. For example: run multiple snark workers with different keys and fees to verify if they have been included. Alternatively, the guardian could run a snark worker locally for a couple of hours and check how many of them were included.
 
 ##### Check docs
@@ -93,7 +93,7 @@ Maybe not, sometimes there could be unintended twists in the story and the testn
 | | Event | Action | Criticality | Owner(s)|
 |--|------|--------|-------------|--|
 |1| Unsuccessful build jobs. (We shouldn't be merging hotfixes before all the CI jobs are successful).| Sometimes rerunning the build job fixes it. For example, at times docker upload fails and passes on rerun. But if there are other code/ci config related issues then the QA-net cannot continue until the issue is either reverted or fixed. In the case of a hotfix for issues encountered during QA-net, the fix should be reverted| Blocker| |
-|2| Configuration/infra issues when deploying a QA-net | There are some troubleshooting notes in the notion document for the instructions to deploy a network. If that doesn't help then contact the any of the members listed in owners column for help | Blocker | Conner, Ahmad, Nathan|
+|2| Configuration/infra issues when deploying a QA-net | There are some troubleshooting notes in the notion document for the instructions to deploy a network. If that doesn't help then contact any of the members listed in owners column for help | Blocker | Conner, Ahmad, Nathan|
 | 3| Unstable Testnet* (criteria for an unstable testnet is listed below)| Create an issue describing the observed behavior. The protocol team would need to investigate the problem and provide a hotfix before proceeding further with the release | Blocker | Aneesha |
 | 4| Errors when completing the challenges| Create an issue describing the observed behavior. Might have to exclude the challenge that causes the error if it cannot be patched and tested within the QA-net phase. Let the marketing and communications team know | Major | Aneesha, Brandon, Christine|
 | 5 | Other errors/suspicious behavior observed when monitoring. These don't destabilize the testnet or affect the challenges | Create an issue describing the behavior | Minor | |

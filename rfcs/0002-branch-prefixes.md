@@ -6,7 +6,7 @@ Organize branches by categories of work using and standardizing prefixes.
 # Motivation
 [motivation]: #motivation
 
-As our repository continues to grow, so will our number of branches. As we begin to move towards having branches for releases, release candidates, bug fixes, and new features, and rfcs, we will need the ability to quickly understand which of these categories a given branch falls into. On top of this, categorizing by prefix will allow us to seperate name conflicts so that branch names will only conflict if the both the category and the name are the same.
+As our repository continues to grow, so will our number of branches. As we begin to move towards having branches for releases, release candidates, bug fixes, and new features, and rfcs, we will need the ability to quickly understand which of these categories a given branch falls into. On top of this, categorizing by prefix will allow us to separate name conflicts so that branch names will only conflict if the both the category and the name are the same.
 
 # Detailed design
 [detailed-design]: #detailed-design

@@ -24,7 +24,7 @@
 
 <br />
 
-The Mina zkApps dashboad is an auxiliary database that queries a Mina Archive DB on a schedule before saving the returned query results locally.
+The Mina zkApps dashboard is an auxiliary database that queries a Mina Archive DB on a schedule before saving the returned query results locally.
 This Helm chart installs the Mina protocol zkapps dashboard including the following components:
 
 - zkApp dashboard database (Postgresql)
