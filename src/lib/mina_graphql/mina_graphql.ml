@@ -1591,12 +1591,8 @@ module Mutations = struct
   end
 end
 
-module Queries (Context : sig
-  val commit_id : string
-end) =
-struct
+module Queries = struct
   open Schema
-  open Context
 
   (* helper for pooledUserCommands, pooledZkappCommands *)
   let get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt =
@@ -1762,15 +1758,14 @@ struct
              agrees with status; see issue #8251
         *)
         let%map { sync_status; _ } =
-          Mina_commands.get_status ~commit_id ~flag:`Performance mina
+          Mina_commands.get_status ~flag:`Performance mina
         in
         Ok sync_status )
 
   let daemon_status =
     io_field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
       ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun { ctx = mina; _ } () ->
-        Mina_commands.get_status ~commit_id ~flag:`Performance mina
-        >>| Result.return )
+        Mina_commands.get_status ~flag:`Performance mina >>| Result.return )
 
   let trust_status =
     field "trustStatus"
@@ -1796,7 +1791,7 @@ struct
     field "version" ~typ:string
       ~args:Arg.[]
       ~doc:"The version of the node (git commit hash)"
-      ~resolve:(fun _ _ -> Some commit_id)
+      ~resolve:(fun { ctx; _ } _ -> Some (Mina_lib.commit_id ctx))
 
   let get_filtered_log_entries =
     field "getFilteredLogEntries"
@@ -2753,29 +2748,21 @@ struct
   end
 end
 
-let schema ~commit_id =
-  let module Q = Queries (struct
-    let commit_id = commit_id
-  end) in
+let schema =
   Graphql_async.Schema.(
-    schema Q.commands ~mutations:Mutations.commands
+    schema Queries.commands ~mutations:Mutations.commands
       ~subscriptions:Subscriptions.commands)
 
-let schema_limited ~commit_id =
-  let module Q = Queries (struct
-    let commit_id = commit_id
-  end) in
+let schema_limited =
   (* including version because that's the default query *)
   Graphql_async.Schema.(
     schema
-      [ Q.daemon_status; Q.block; Q.version ]
+      [ Queries.daemon_status; Queries.block; Queries.version ]
       ~mutations:[] ~subscriptions:[])
 
-let schema_itn ~commit_id : (bool * Mina_lib.t) Schema.schema =
-  let module Q = Queries (struct
-    let commit_id = commit_id
-  end) in
+let schema_itn : (bool * Mina_lib.t) Schema.schema =
   if Mina_compile_config.itn_features then
     Graphql_async.Schema.(
-      schema Q.Itn.commands ~mutations:Mutations.Itn.commands ~subscriptions:[])
+      schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
+        ~subscriptions:[])
   else Graphql_async.Schema.(schema [] ~mutations:[] ~subscriptions:[])
