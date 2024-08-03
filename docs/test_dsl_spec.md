@@ -49,7 +49,7 @@ The `spawn` function communicates with the orchestrator to allocate and start a 
 val destroy : node -> unit test
 ```
 
-The `destroy` function communicates with the orchestrator to destroy nodes that have been created. If the node attempting to be destroyed is already dead due to a crash, the test execution will continue, but the crash will accumulated as an error. If the node attempting to be destroyed has been previously destroyed via this function, an error is accumulated. Any nodes that were spawned and are not destroyed by the end of a test will cause errors to be accumulated (we want all spawned nodes to be asserted to have not crashed or to be expected to crash by the end of the test).
+The `destroy` function communicates with the orchestrator to destroy nodes that have been created. If the node attempting to be destroyed is already dead due to a crash, the test execution will continue, but the crash will be accumulated as an error. If the node attempting to be destroyed has been previously destroyed via this function, an error is accumulated. Any nodes that were spawned and are not destroyed by the end of a test will cause errors to be accumulated (we want all spawned nodes to be asserted to have not crashed or to be expected to crash by the end of the test).
 
 ##### Concurrent Tasks
 
@@ -192,7 +192,7 @@ DSL.List.iter (left_partition @ right_partition) ~f:destroy
 
 ALTERNATIVE TEST: keep two partitions separate with a fixed topology, with 1-2 intermediate
 nodes bridging the networks, then take the other bridge offline temporarily and then have them
-rejoin the network without topologoical restrictions and see if the chains reconverge
+rejoin the network without topological restrictions and see if the chains reconverge
 
 ##### Basic Hard Fork Test
 
