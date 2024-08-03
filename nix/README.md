@@ -31,7 +31,7 @@ sh <(curl -L https://nixos.org/nix/install) --daemon
 ```
 
 You may also install Nix from your distribution's official repository;
-Note however that it is preferrable you get a relatively recent
+Note however that it is preferable you get a relatively recent
 version (⩾ 2.5), and the version from the repository may be rather old.
 
 **warning for macOS users**: macOS updates will often break your nix
