@@ -75,7 +75,7 @@ The name Samasika comes from the Sanskrit word, meaning small or succinct.
 
 <!-- /TOC depthTo:6 withLinks:1 updateOnSave:1 orderedList:0 -->
 
-# 1. Acknowledgements
+# 1. Acknowledgments
 
 This document would not exist without the help of the reviewers: [Jiawei Tang](https://github.com/ghost-not-in-the-shell), [Nathan Holland](https://github.com/nholland94), [Izaak Meckler](https://math.berkeley.edu/~izaak/), [Matthew Ryan](https://github.com/mrmr1993) and [Vanishree Rao](https://twitter.com/vanishree_rao).  Special thanks to Jiawei for many detailed discussions about Mina implementation of Ouroboros Samasika.
 
