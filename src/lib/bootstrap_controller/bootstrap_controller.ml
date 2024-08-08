@@ -456,6 +456,15 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                 , Some staged_ledger_construction_time
                 , result ) )
       in
+      let this_cycle =
+        { cycle_result = "running"
+        ; sync_ledger_time
+        ; staged_ledger_data_download_time
+        ; staged_ledger_construction_time
+        ; local_state_sync_required = false
+        ; local_state_sync_time = None
+        }
+      in
       Transition_frontier.Persistent_root.Instance.close
         temp_persistent_root_instance ;
       match staged_ledger_aux_result with
@@ -483,10 +492,8 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
           Writer.close sync_ledger_writer ;
           return
             (Error
-               { cycle_result = "failed to download and construct scan state"
-               ; sync_ledger_time
-               ; staged_ledger_data_download_time
-               ; staged_ledger_construction_time
+               { this_cycle with
+                 cycle_result = "failed to download and construct scan state"
                ; local_state_sync_required = false
                ; local_state_sync_time = None
                } )
@@ -545,10 +552,8 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
               Writer.close sync_ledger_writer ;
               return
                 (Error
-                   { cycle_result = "failed to synchronize local state"
-                   ; sync_ledger_time
-                   ; staged_ledger_data_download_time
-                   ; staged_ledger_construction_time
+                   { this_cycle with
+                     cycle_result = "failed to synchronize local state"
                    ; local_state_sync_required
                    ; local_state_sync_time = Some local_state_sync_time
                    } )
@@ -640,10 +645,8 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                               ~context:(module Context) ) ) )
               in
               let this_cycle =
-                { cycle_result = "success"
-                ; sync_ledger_time
-                ; staged_ledger_data_download_time
-                ; staged_ledger_construction_time
+                { this_cycle with
+                  cycle_result = "success"
                 ; local_state_sync_required
                 ; local_state_sync_time = Some local_state_sync_time
                 }
