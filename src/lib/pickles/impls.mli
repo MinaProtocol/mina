@@ -49,16 +49,14 @@ module Step : sig
                  Composition_types.Bulletproof_challenge.t
                , 'b )
                Pickles_types.Vector.t
-               Pickles_types.Hlist0.Id.t
              , Impl.field Snarky_backendless.Cvar.t
              , Impl.field Snarky_backendless.Cvar.t
                Snarky_backendless.Snark_intf.Boolean0.t )
              Composition_types.Step.Proof_state.Per_proof.In_circuit.t
            , 'a )
            Pickles_types.Vector.t
-         , Impl.field Snarky_backendless.Cvar.t Pickles_types.Hlist0.Id.t
-         , (Impl.field Snarky_backendless.Cvar.t, 'a) Pickles_types.Vector.t
-           Pickles_types.Hlist0.Id.t )
+         , Impl.field Snarky_backendless.Cvar.t
+         , (Impl.field Snarky_backendless.Cvar.t, 'a) Pickles_types.Vector.t )
          Import.Types.Step.Statement.t
        , ( ( ( Challenge.Constant.t
              , Challenge.Constant.t Composition_types.Scalar_challenge.t
@@ -68,24 +66,13 @@ module Step : sig
                  Composition_types.Bulletproof_challenge.t
                , 'b )
                Pickles_types.Vector.t
-               Pickles_types.Hlist0.Id.t
-             , ( Limb_vector.Constant.Hex64.t
-               , Composition_types.Digest.Limbs.n )
-               Pickles_types.Vector.vec
+             , Import.Types.Digest.Constant.t
              , bool )
              Composition_types.Step.Proof_state.Per_proof.In_circuit.t
            , 'a )
            Pickles_types.Vector.t
-         , ( Limb_vector.Constant.Hex64.t
-           , Composition_types.Digest.Limbs.n )
-           Pickles_types.Vector.vec
-           Pickles_types.Hlist0.Id.t
-         , ( ( Limb_vector.Constant.Hex64.t
-             , Composition_types.Digest.Limbs.n )
-             Pickles_types.Vector.vec
-           , 'a )
-           Pickles_types.Vector.t
-           Pickles_types.Hlist0.Id.t )
+         , Import.Types.Digest.Constant.t
+         , (Import.Types.Digest.Constant.t, 'a) Pickles_types.Vector.t )
          Import.Types.Step.Statement.t
        , Impl.field )
        Import.Spec.ETyp.t
@@ -157,7 +144,6 @@ module Wrap : sig
              Composition_types.Bulletproof_challenge.t
            , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
            Pickles_types.Vector.t
-           Pickles_types.Hlist0.Id.t
          , Impl.field Snarky_backendless.Cvar.t )
          Import.Types.Wrap.Statement.In_circuit.t
        , ( Limb_vector.Challenge.Constant.t
@@ -167,21 +153,14 @@ module Wrap : sig
          , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
            option
          , bool
-         , ( Limb_vector.Constant.Hex64.t
-           , Composition_types.Digest.Limbs.n )
-           Pickles_types.Vector.vec
-         , ( Limb_vector.Constant.Hex64.t
-           , Composition_types.Digest.Limbs.n )
-           Pickles_types.Vector.vec
-         , ( Limb_vector.Constant.Hex64.t
-           , Composition_types.Digest.Limbs.n )
-           Pickles_types.Vector.vec
+         , Import.Types.Digest.Constant.t
+         , Import.Types.Digest.Constant.t
+         , Import.Types.Digest.Constant.t
          , ( Limb_vector.Challenge.Constant.t
              Kimchi_backend_common.Scalar_challenge.t
              Composition_types.Bulletproof_challenge.t
            , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
            Pickles_types.Vector.t
-           Pickles_types.Hlist0.Id.t
          , Composition_types.Branch_data.t )
          Import.Types.Wrap.Statement.In_circuit.t
        , Wrap_impl.field )

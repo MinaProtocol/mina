@@ -936,11 +936,7 @@ module Wrap : sig
           representing it inside the circuit. *)
       val spec :
            'a Spec.impl
-        -> ( 'challenge1
-           , 'challenge2
-           , 'field1 Hlist0.Id.t
-           , 'field2 Hlist0.Id.t )
-           Lookup_parameters.t
+        -> ('challenge1, 'challenge2, 'field1, 'field2) Lookup_parameters.t
         -> Opt.Flag.t Plonk_types.Features.t
         -> ( ( 'field1
              , 'challenge1
@@ -986,15 +982,13 @@ module Wrap : sig
       (** Convert a statement (as structured data) into the flat data-based representation. *)
       val to_data :
            ('a, 'b, 'c, 'fp_opt, 'd, 'bool, 'e, 'e, 'e, 'f, 'g) t
-        -> option_map:
-             ('d -> f:('h -> ('h * unit) Hlist.HlistId.t) -> 'j Hlist0.Id.t)
+        -> option_map:('d -> f:('h -> ('h * unit) Hlist.HlistId.t) -> 'j)
         -> ('c, 'a, 'b, 'e, 'f, 'g, 'j, 'fp_opt2, 'bool) flat_repr
 
       (** Construct a statement (as structured data) from the flat data-based representation. *)
       val of_data :
            ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'fp option, 'bool) flat_repr
-        -> option_map:
-             ('g Hlist0.Id.t -> f:(('h * unit) Hlist.HlistId.t -> 'h) -> 'j)
+        -> option_map:('g -> f:(('h * unit) Hlist.HlistId.t -> 'h) -> 'j)
         -> ('b, 'c, 'a, 'fp_opt2, 'j, 'bool, 'd, 'd, 'd, 'e, 'f) t
     end
 
@@ -1351,7 +1345,6 @@ module Step : sig
                  Bulletproof_challenge.t
                , Backend.Tock.Rounds.n )
                Vector.t
-               Hlist0.Id.t
              , 'a Snarky_backendless.Cvar.t
              , 'a Snarky_backendless.Cvar.t
                Snarky_backendless__Snark_intf.Boolean0.t )
@@ -1363,8 +1356,7 @@ module Step : sig
                  Bulletproof_challenge.t
                , Backend.Tock.Rounds.n )
                Vector.t
-               Hlist0.Id.t
-             , (Limb_vector.Constant.Hex64.t, Digest.Limbs.n) Vector.t
+             , Digest.Constant.t
              , bool )
              In_circuit.t
            , 'a )
@@ -1406,7 +1398,6 @@ module Step : sig
                    Bulletproof_challenge.t
                  , Backend.Tock.Rounds.n )
                  Vector.t
-                 Hlist0.Id.t
                , 'f Snarky_backendless.Cvar.t
                , 'f Snarky_backendless.Cvar.t
                  Snarky_backendless__Snark_intf.Boolean0.t )
@@ -1422,13 +1413,12 @@ module Step : sig
                    Bulletproof_challenge.t
                  , Backend.Tock.Rounds.n )
                  Vector.t
-                 Hlist0.Id.t
-               , (Limb_vector.Constant.Hex64.t, Digest.Limbs.n) Vector.t
+               , Digest.Constant.t
                , bool )
                Per_proof.In_circuit.t
              , 'n )
              Vector.t
-           , (Limb_vector.Constant.Hex64.t, Digest.Limbs.n) Vector.t )
+           , Digest.Constant.t )
            t
          , 'f )
          Snarky_backendless.Typ.t
@@ -1446,13 +1436,7 @@ module Step : sig
     [@@deriving sexp, compare, yojson]
 
     val to_data :
-         ( ( ( 'a
-             , 'b
-             , 'c
-             , 'e Hlist0.Id.t
-             , 'f
-             , 'g )
-             Proof_state.Per_proof.In_circuit.t
+         ( ( ('a, 'b, 'c, 'e, 'f, 'g) Proof_state.Per_proof.In_circuit.t
            , 'h )
            Vector.t
          , 'i
@@ -1480,13 +1464,7 @@ module Step : sig
            Vector.t
          * ('i * ('j * unit)) )
          Hlist.HlistId.t
-      -> ( ( ( 'c
-             , 'd
-             , 'a
-             , 'e Hlist0.Id.t
-             , 'b
-             , 'f )
-             Proof_state.Per_proof.In_circuit.t
+      -> ( ( ('c, 'd, 'a, 'e, 'b, 'f) Proof_state.Per_proof.In_circuit.t
            , 'h )
            Vector.t
          , 'i

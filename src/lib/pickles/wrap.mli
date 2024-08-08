@@ -30,7 +30,6 @@ val wrap :
              Composition_types.Bulletproof_challenge.t
            , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
            Pickles_types.Vector.t
-           Pickles_types.Hlist0.Id.t
          , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t )
          Import.Types.Wrap.Statement.In_circuit.t
       -> unit )
@@ -53,7 +52,7 @@ val wrap :
            , bool
            , 'max_proofs_verified
              Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-           , (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.vec
+           , Import.Types.Digest.Constant.t
            , ( 'b
              , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
                , 'actual_proofs_verified )
@@ -82,9 +81,7 @@ val wrap :
            , bool
            , 'max_proofs_verified
              Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
-           , ( Limb_vector.Constant.Hex64.t
-             , Composition_types.Digest.Limbs.n )
-             Pickles_types.Vector.vec
+           , Import.Types.Digest.Constant.t
            , ( 'b
              , ( Kimchi_pasta.Pallas_based_plonk.Proof.G.Affine.Stable.V1.t
                , 'actual_proofs_verified )
