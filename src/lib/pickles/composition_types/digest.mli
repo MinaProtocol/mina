@@ -39,8 +39,7 @@ module Constant : sig
 
   val length : int
 
-  type t = Limb_vector.Constant.Hex64.t A.t
-  [@@deriving compare, sexp, yojson, hash, equal]
+  type t = Stable.Latest.t [@@deriving compare, sexp, yojson, hash, equal]
 
   val to_bits : vector -> bool list
 
