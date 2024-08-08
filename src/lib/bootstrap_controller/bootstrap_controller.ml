@@ -48,8 +48,8 @@ let opt_time_to_yojson = function
 (** An auxiliary data structure for collecting various metrics for boostrap controller. *)
 type bootstrap_cycle_stats =
   { cycle_result : string
-  ; sync_ledger_time : time
-  ; staged_ledger_data_download_time : time
+  ; sync_ledger_time : opt_time
+  ; staged_ledger_data_download_time : opt_time
   ; staged_ledger_construction_time : opt_time
   ; local_state_sync_required : bool
   ; local_state_sync_time : opt_time
@@ -458,8 +458,9 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
       in
       let this_cycle =
         { cycle_result = "running"
-        ; sync_ledger_time
-        ; staged_ledger_data_download_time
+        ; sync_ledger_time = Some sync_ledger_time
+        ; staged_ledger_data_download_time =
+            Some staged_ledger_data_download_time
         ; staged_ledger_construction_time
         ; local_state_sync_required = false
         ; local_state_sync_time = None
