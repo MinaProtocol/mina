@@ -350,14 +350,13 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
           (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
       (* step 2. Download scan state and pending coinbases. *)
       let%bind staged_ledger_aux_result =
-        let%bind staged_ledger_data_download_result =
+        match%bind
           use_time_deferred (set_staged_ledger_data_download_time this_cycle)
             ~f:(fun () ->
               Mina_networking
               .get_staged_ledger_aux_and_pending_coinbases_at_hash t.network
                 sender.peer_id hash )
-        in
-        match staged_ledger_data_download_result with
+        with
         | Error err ->
             Deferred.return (Error err)
         | Ok
