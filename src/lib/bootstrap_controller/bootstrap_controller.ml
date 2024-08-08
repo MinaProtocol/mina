@@ -246,6 +246,15 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
     Precomputed_values.genesis_constants precomputed_values
   in
   stage (fun () ->
+      let this_cycle =
+        { cycle_result = "running"
+        ; sync_ledger_time = None
+        ; staged_ledger_data_download_time = None
+        ; staged_ledger_construction_time = None
+        ; local_state_sync_required = false
+        ; local_state_sync_time = None
+        }
+      in
       let sync_ledger_pipe = "sync ledger pipe" in
       let sync_ledger_reader, sync_ledger_writer =
         create ~name:sync_ledger_pipe
@@ -455,15 +464,6 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                 ( staged_ledger_data_download_time
                 , Some staged_ledger_construction_time
                 , result ) )
-      in
-      let this_cycle =
-        { cycle_result = "running"
-        ; sync_ledger_time = None
-        ; staged_ledger_data_download_time = None
-        ; staged_ledger_construction_time = None
-        ; local_state_sync_required = false
-        ; local_state_sync_time = None
-        }
       in
       this_cycle.sync_ledger_time <- Some sync_ledger_time ;
       this_cycle.staged_ledger_data_download_time <-
