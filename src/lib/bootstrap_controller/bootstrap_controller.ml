@@ -56,6 +56,21 @@ type bootstrap_cycle_stats =
   }
 [@@deriving to_yojson]
 
+let set_sync_ledger_time self sync_ledger_time =
+  Mina_metrics.(
+    Counter.inc Bootstrap.root_snarked_ledger_sync_ms
+      Time.Span.(to_ms sync_ledger_time)) ;
+  self.sync_ledger_time <- Some sync_ledger_time
+
+let set_staged_ledger_data_download_time self staged_ledger_data_download_time =
+  self.staged_ledger_data_download_time <- Some staged_ledger_data_download_time
+
+let set_staged_ledger_construction_time self staged_ledger_construction_time =
+  self.staged_ledger_construction_time <- Some staged_ledger_construction_time
+
+let set_local_state_sync_time self local_state_sync_time =
+  self.local_state_sync_time <- Some local_state_sync_time
+
 let time_deferred deferred =
   let start_time = Time.now () in
   let%map result = deferred () in
@@ -307,13 +322,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
       in
       (* step 1. download snarked_ledger *)
       let%bind hash, sender, expected_staged_ledger_hash =
-        use_time_deferred
-          (fun sync_ledger_time ->
-            Mina_metrics.(
-              Counter.inc Bootstrap.root_snarked_ledger_sync_ms
-                Time.Span.(to_ms sync_ledger_time)) ;
-            this_cycle.sync_ledger_time <- Some sync_ledger_time )
-          ~f:(fun () ->
+        use_time_deferred (set_sync_ledger_time this_cycle) ~f:(fun () ->
             let root_sync_ledger =
               Sync_ledger.Db.create temp_snarked_ledger ~logger ~trust_system
             in
@@ -342,10 +351,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
       (* step 2. Download scan state and pending coinbases. *)
       let%bind staged_ledger_aux_result =
         let%bind staged_ledger_data_download_result =
-          use_time_deferred
-            (fun staged_ledger_data_download_time ->
-              this_cycle.staged_ledger_data_download_time <-
-                Some staged_ledger_data_download_time )
+          use_time_deferred (set_staged_ledger_data_download_time this_cycle)
             ~f:(fun () ->
               Mina_networking
               .get_staged_ledger_aux_and_pending_coinbases_at_hash t.network
@@ -436,9 +442,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                   let open Deferred.Let_syntax in
                   let%map construction_result =
                     use_time_deferred
-                      (fun staged_ledger_construction_time ->
-                        this_cycle.staged_ledger_construction_time <-
-                          Some staged_ledger_construction_time )
+                      (set_staged_ledger_construction_time this_cycle)
                       ~f:(fun () ->
                         let open Deferred.Let_syntax in
                         let temp_mask =
@@ -507,8 +511,6 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             (Error
                { this_cycle with
                  cycle_result = "failed to download and construct scan state"
-               ; local_state_sync_required = false
-               ; local_state_sync_time = None
                } )
       | Ok (scan_state, pending_coinbase, new_root, protocol_states) -> (
           let%bind () =
@@ -526,10 +528,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
           in
           (* step 4. Synchronize consensus local state if necessary *)
           let%bind local_state_sync_result =
-            use_time_deferred
-              (fun local_state_sync_time ->
-                this_cycle.local_state_sync_time <- Some local_state_sync_time
-                )
+            use_time_deferred (set_local_state_sync_time this_cycle)
               ~f:(fun () ->
                 match
                   Consensus.Hooks.required_local_state_sync
