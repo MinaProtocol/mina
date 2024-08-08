@@ -560,9 +560,7 @@ struct
       let module M =
         H4.Map (Branch_data) (E04 (Lazy_keys))
           (struct
-            let etyp =
-              Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-                ~wrap_rounds:Tock.Rounds.n
+            let etyp = Impls.Step.input ~proofs_verified:Max_proofs_verified.n
 
             let f (T b : _ Branch_data.t) =
               let open Impls.Step in

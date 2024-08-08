@@ -38,42 +38,45 @@ module Step : sig
     val typ : (t, Constant.t, Internal_Basic.field) Snarky_backendless.Typ.t
   end
 
+  type unfinalized_proof =
+    ( Challenge.Constant.t
+    , Challenge.Constant.t Import.Scalar_challenge.t
+    , Backend.Tock.Field.t Shifted_value.Type2.t
+    , ( Challenge.Constant.t Import.Scalar_challenge.t
+        Import.Types.Bulletproof_challenge.t
+      , Backend.Tock.Rounds.n )
+      Vector.t
+    , Digest.Constant.t
+    , bool )
+    Import.Types.Step.Proof_state.Per_proof.In_circuit.t
+
+  type 'proofs_verified statement =
+    ( (unfinalized_proof, 'proofs_verified) Vector.t
+    , Import.Types.Digest.Constant.t
+    , (Import.Types.Digest.Constant.t, 'proofs_verified) Vector.t )
+    Import.Types.Step.Statement.t
+
+  type unfinalized_proof_var =
+    ( Field.t
+    , Field.t Import.Scalar_challenge.t
+    , Other_field.t Shifted_value.Type2.t
+    , ( Field.t Import.Scalar_challenge.t Import.Types.Bulletproof_challenge.t
+      , Backend.Tock.Rounds.n )
+      Vector.t
+    , Field.t
+    , Boolean.var )
+    Import.Types.Step.Proof_state.Per_proof.In_circuit.t
+
+  type 'proofs_verified statement_var =
+    ( (unfinalized_proof_var, 'proofs_verified) Vector.t
+    , Impl.field Snarky_backendless.Cvar.t
+    , (Impl.field Snarky_backendless.Cvar.t, 'proofs_verified) Vector.t )
+    Import.Types.Step.Statement.t
+
   val input :
-       proofs_verified:'a Pickles_types.Nat.t
-    -> wrap_rounds:'b Pickles_types.Nat.t
-    -> ( ( ( ( Impl.Field.t
-             , Impl.Field.t Composition_types.Scalar_challenge.t
-             , Other_field.t Pickles_types.Shifted_value.Type2.t
-             , ( Impl.field Snarky_backendless.Cvar.t
-                 Kimchi_backend_common.Scalar_challenge.t
-                 Composition_types.Bulletproof_challenge.t
-               , 'b )
-               Pickles_types.Vector.t
-             , Impl.field Snarky_backendless.Cvar.t
-             , Impl.field Snarky_backendless.Cvar.t
-               Snarky_backendless.Snark_intf.Boolean0.t )
-             Composition_types.Step.Proof_state.Per_proof.In_circuit.t
-           , 'a )
-           Pickles_types.Vector.t
-         , Impl.field Snarky_backendless.Cvar.t
-         , (Impl.field Snarky_backendless.Cvar.t, 'a) Pickles_types.Vector.t )
-         Import.Types.Step.Statement.t
-       , ( ( ( Challenge.Constant.t
-             , Challenge.Constant.t Composition_types.Scalar_challenge.t
-             , Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
-             , ( Limb_vector.Challenge.Constant.t
-                 Kimchi_backend_common.Scalar_challenge.t
-                 Composition_types.Bulletproof_challenge.t
-               , 'b )
-               Pickles_types.Vector.t
-             , Import.Types.Digest.Constant.t
-             , bool )
-             Composition_types.Step.Proof_state.Per_proof.In_circuit.t
-           , 'a )
-           Pickles_types.Vector.t
-         , Import.Types.Digest.Constant.t
-         , (Import.Types.Digest.Constant.t, 'a) Pickles_types.Vector.t )
-         Import.Types.Step.Statement.t
+       proofs_verified:'proofs_verified Nat.t
+    -> ( 'proofs_verified statement_var
+       , 'proofs_verified statement
        , Impl.field )
        Import.Spec.ETyp.t
 

@@ -803,7 +803,6 @@ struct
                     , _next_statement_hashed ) =
       let (T (input, _conv, conv_inv)) =
         Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-          ~wrap_rounds:Tock.Rounds.n
       in
       let%bind.Promise main = branch_data.main ~step_domains in
       let%bind.Promise step_domains = step_domains in

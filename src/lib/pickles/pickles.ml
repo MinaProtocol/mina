@@ -1154,7 +1154,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           let step_keypair =
             let etyp =
               Impls.Step.input ~proofs_verified:Max_proofs_verified.n
-                ~wrap_rounds:Tock.Rounds.n
             in
             let open Impls.Step in
             let k_p =
@@ -1367,7 +1366,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       in
                       M.f prev_statement.messages_for_next_wrap_proof
                     in
-                    let prev_statement_with_hashes : _ Types.Step.Statement.t =
+                    let prev_statement_with_hashes : _ Impls.Step.statement =
                       { proof_state =
                           { prev_statement.proof_state with
                             messages_for_next_step_proof =
