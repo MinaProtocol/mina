@@ -1159,14 +1159,7 @@ struct
   let verify ~proofs_verified ~is_base_case ~sg_old ~sponge_after_index
       ~lookup_parameters ~feature_flags ~(proof : Wrap_proof.Checked.t) ~srs
       ~wrap_domain ~wrap_verification_key statement
-      (unfinalized :
-        ( _
-        , _
-        , _ Shifted_value.Type2.t
-        , _
-        , _
-        , _ )
-        Types.Step.Proof_state.Per_proof.In_circuit.t ) =
+      (unfinalized : Impls.Step.unfinalized_proof_var) =
     let public_input :
         [ `Field of Field.t | `Packed_bits of Field.t * int ] array =
       with_label "pack_statement" (fun () ->

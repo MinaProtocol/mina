@@ -163,23 +163,8 @@ val hash_messages_for_next_step_proof :
   -> Import.Types.Digest.Constant.t
 
 val tick_public_input_of_statement :
-     max_proofs_verified:'a Pickles_types.Nat.t
-  -> ( ( ( Impls.Step.Challenge.Constant.t
-         , Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
-         , Impls.Step.Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
-         , ( Limb_vector.Challenge.Constant.t
-             Kimchi_backend_common.Scalar_challenge.t
-             Composition_types.Bulletproof_challenge.t
-           , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
-           Pickles_types.Vector.t
-         , Import.Types.Digest.Constant.t
-         , bool )
-         Composition_types.Step.Proof_state.Per_proof.In_circuit.t
-       , 'a )
-       Pickles_types.Vector.t
-     , Import.Types.Digest.Constant.t
-     , (Import.Types.Digest.Constant.t, 'a) Pickles_types.Vector.t )
-     Import.Types.Step.Statement.t
+     max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
+  -> 'max_proofs_verified Impls.Step.statement
   -> Backend.Tick.Field.Vector.elt list
 
 val tock_public_input_of_statement :
