@@ -260,7 +260,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         Precomputed_values.genesis_constants precomputed_values
       in
       let constraint_constants = precomputed_values.constraint_constants in
-      let rec loop previous_cycles =
+      let main_loop () =
         let sync_ledger_pipe = "sync ledger pipe" in
         let sync_ledger_reader, sync_ledger_writer =
           create ~name:sync_ledger_pipe
@@ -504,16 +504,15 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                $state_hash from the peer or received faulty scan state: \
                $error. Retry bootstrap" ;
             Writer.close sync_ledger_writer ;
-            let this_cycle =
-              { cycle_result = "failed to download and construct scan state"
-              ; sync_ledger_time
-              ; staged_ledger_data_download_time
-              ; staged_ledger_construction_time
-              ; local_state_sync_required = false
-              ; local_state_sync_time = None
-              }
-            in
-            loop (this_cycle :: previous_cycles)
+            return
+              (Error
+                 { cycle_result = "failed to download and construct scan state"
+                 ; sync_ledger_time
+                 ; staged_ledger_data_download_time
+                 ; staged_ledger_construction_time
+                 ; local_state_sync_required = false
+                 ; local_state_sync_time = None
+                 } )
         | Ok (scan_state, pending_coinbase, new_root, protocol_states) -> (
             let%bind () =
               Trust_system.(
@@ -567,16 +566,15 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                   ~metadata:[ ("error", Error_json.error_to_yojson e) ]
                   "Local state sync failed: $error. Retry bootstrap" ;
                 Writer.close sync_ledger_writer ;
-                let this_cycle =
-                  { cycle_result = "failed to synchronize local state"
-                  ; sync_ledger_time
-                  ; staged_ledger_data_download_time
-                  ; staged_ledger_construction_time
-                  ; local_state_sync_required
-                  ; local_state_sync_time = Some local_state_sync_time
-                  }
-                in
-                loop (this_cycle :: previous_cycles)
+                return
+                  (Error
+                     { cycle_result = "failed to synchronize local state"
+                     ; sync_ledger_time
+                     ; staged_ledger_data_download_time
+                     ; staged_ledger_construction_time
+                     ; local_state_sync_required
+                     ; local_state_sync_time = Some local_state_sync_time
+                     } )
             | Ok () ->
                 (* step 5. Close the old frontier and reload a new one from disk. *)
                 let new_root_data : Transition_frontier.Root_data.Limited.t =
@@ -674,8 +672,16 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                   ; local_state_sync_time = Some local_state_sync_time
                   }
                 in
-                ( this_cycle :: previous_cycles
-                , (new_frontier, sorted_filtered_collected_transitions) ) )
+                Ok
+                  ( this_cycle
+                  , (new_frontier, sorted_filtered_collected_transitions) ) )
+      in
+      let rec loop previous_cycles =
+        match%bind main_loop () with
+        | Ok (this_cycle, res) ->
+            return (this_cycle :: previous_cycles, res)
+        | Error this_cycle ->
+            loop (this_cycle :: previous_cycles)
       in
       let%map time_elapsed, (cycles, result) = time_deferred (loop []) in
       [%log info] "Bootstrap completed in $time_elapsed: $bootstrap_stats"
