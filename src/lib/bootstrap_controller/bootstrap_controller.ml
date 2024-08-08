@@ -48,9 +48,9 @@ let opt_time_to_yojson = function
 (** An auxiliary data structure for collecting various metrics for boostrap controller. *)
 type bootstrap_cycle_stats =
   { cycle_result : string
-  ; sync_ledger_time : opt_time
-  ; staged_ledger_data_download_time : opt_time
-  ; staged_ledger_construction_time : opt_time
+  ; mutable sync_ledger_time : opt_time
+  ; mutable staged_ledger_data_download_time : opt_time
+  ; mutable staged_ledger_construction_time : opt_time
   ; local_state_sync_required : bool
   ; local_state_sync_time : opt_time
   }
@@ -458,14 +458,18 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
       in
       let this_cycle =
         { cycle_result = "running"
-        ; sync_ledger_time = Some sync_ledger_time
-        ; staged_ledger_data_download_time =
-            Some staged_ledger_data_download_time
-        ; staged_ledger_construction_time
+        ; sync_ledger_time = None
+        ; staged_ledger_data_download_time = None
+        ; staged_ledger_construction_time = None
         ; local_state_sync_required = false
         ; local_state_sync_time = None
         }
       in
+      this_cycle.sync_ledger_time <- Some sync_ledger_time ;
+      this_cycle.staged_ledger_data_download_time <-
+        Some staged_ledger_data_download_time ;
+      this_cycle.staged_ledger_construction_time <-
+        staged_ledger_construction_time ;
       Transition_frontier.Persistent_root.Instance.close
         temp_persistent_root_instance ;
       match staged_ledger_aux_result with
