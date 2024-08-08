@@ -58,7 +58,7 @@ type bootstrap_cycle_stats =
 
 let time_deferred deferred =
   let start_time = Time.now () in
-  let%map result = deferred in
+  let%map result = deferred () in
   let end_time = Time.now () in
   (Time.diff end_time start_time, result)
 
@@ -303,28 +303,28 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
       in
       (* step 1. download snarked_ledger *)
       let%bind sync_ledger_time, (hash, sender, expected_staged_ledger_hash) =
-        time_deferred
-          (let root_sync_ledger =
-             Sync_ledger.Db.create temp_snarked_ledger ~logger ~trust_system
-           in
-           don't_wait_for
-             (sync_ledger t
-                ~preferred:
-                  ( Option.to_list best_seen_transition
-                  |> List.filter_map ~f:(fun x ->
-                         match Envelope.Incoming.sender x with
-                         | Local ->
-                             None
-                         | Remote r ->
-                             Some r ) )
-                ~root_sync_ledger ~transition_graph ~sync_ledger_reader
-                ~genesis_constants ) ;
-           (* We ignore the resulting ledger returned here since it will always
-              * be the same as the ledger we started with because we are syncing
-              * a db ledger. *)
-           let%map _, data = Sync_ledger.Db.valid_tree root_sync_ledger in
-           Sync_ledger.Db.destroy root_sync_ledger ;
-           data )
+        time_deferred (fun () ->
+            let root_sync_ledger =
+              Sync_ledger.Db.create temp_snarked_ledger ~logger ~trust_system
+            in
+            don't_wait_for
+              (sync_ledger t
+                 ~preferred:
+                   ( Option.to_list best_seen_transition
+                   |> List.filter_map ~f:(fun x ->
+                          match Envelope.Incoming.sender x with
+                          | Local ->
+                              None
+                          | Remote r ->
+                              Some r ) )
+                 ~root_sync_ledger ~transition_graph ~sync_ledger_reader
+                 ~genesis_constants ) ;
+            (* We ignore the resulting ledger returned here since it will always
+               * be the same as the ledger we started with because we are syncing
+               * a db ledger. *)
+            let%map _, data = Sync_ledger.Db.valid_tree root_sync_ledger in
+            Sync_ledger.Db.destroy root_sync_ledger ;
+            data )
       in
       Mina_metrics.(
         Counter.inc Bootstrap.root_snarked_ledger_sync_ms
@@ -338,9 +338,10 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                , staged_ledger_aux_result ) =
         let%bind ( staged_ledger_data_download_time
                  , staged_ledger_data_download_result ) =
-          time_deferred
-            (Mina_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
-               t.network sender.peer_id hash )
+          time_deferred (fun () ->
+              Mina_networking
+              .get_staged_ledger_aux_and_pending_coinbases_at_hash t.network
+                sender.peer_id hash )
         in
         match staged_ledger_data_download_result with
         | Error err ->
@@ -426,34 +427,36 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                    * TODO: reorganize the code to avoid doing this twice (#3480) *)
                   let open Deferred.Let_syntax in
                   let%map staged_ledger_construction_time, construction_result =
-                    time_deferred
-                      (let open Deferred.Let_syntax in
-                      let temp_mask = Ledger.of_database temp_snarked_ledger in
-                      let%map result =
-                        Staged_ledger
-                        .of_scan_state_pending_coinbases_and_snarked_ledger
-                          ~logger
-                          ~snarked_local_state:
-                            Mina_block.(
-                              t.current_root |> Validation.block |> header
-                              |> Header.protocol_state
-                              |> Protocol_state.blockchain_state
-                              |> Blockchain_state.snarked_local_state)
-                          ~verifier ~constraint_constants ~scan_state
-                          ~snarked_ledger:temp_mask ~expected_merkle_root
-                          ~pending_coinbases ~get_state
-                      in
-                      ignore
-                        ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__
-                            temp_mask
-                          : Ledger.unattached_mask ) ;
-                      Result.map result
-                        ~f:
-                          (const
-                             ( scan_state
-                             , pending_coinbases
-                             , new_root
-                             , protocol_states ) ))
+                    time_deferred (fun () ->
+                        let open Deferred.Let_syntax in
+                        let temp_mask =
+                          Ledger.of_database temp_snarked_ledger
+                        in
+                        let%map result =
+                          Staged_ledger
+                          .of_scan_state_pending_coinbases_and_snarked_ledger
+                            ~logger
+                            ~snarked_local_state:
+                              Mina_block.(
+                                t.current_root |> Validation.block |> header
+                                |> Header.protocol_state
+                                |> Protocol_state.blockchain_state
+                                |> Blockchain_state.snarked_local_state)
+                            ~verifier ~constraint_constants ~scan_state
+                            ~snarked_ledger:temp_mask ~expected_merkle_root
+                            ~pending_coinbases ~get_state
+                        in
+                        ignore
+                          ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__
+                              temp_mask
+                            : Ledger.unattached_mask ) ;
+                        Result.map result
+                          ~f:
+                            (const
+                               ( scan_state
+                               , pending_coinbases
+                               , new_root
+                               , protocol_states ) ) )
                   in
                   Ok (staged_ledger_construction_time, construction_result) )
             in
@@ -519,35 +522,35 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
           (* step 4. Synchronize consensus local state if necessary *)
           let%bind ( local_state_sync_time
                    , (local_state_sync_required, local_state_sync_result) ) =
-            time_deferred
-              ( match
+            time_deferred (fun () ->
+                match
                   Consensus.Hooks.required_local_state_sync
                     ~constants:precomputed_values.consensus_constants
                     ~consensus_state ~local_state:consensus_local_state
                 with
-              | None ->
-                  [%log debug]
-                    ~metadata:
-                      [ ( "local_state"
-                        , Consensus.Data.Local_state.to_yojson
-                            consensus_local_state )
-                      ; ( "consensus_state"
-                        , Consensus.Data.Consensus_state.Value.to_yojson
-                            consensus_state )
-                      ]
-                    "Not synchronizing consensus local state" ;
-                  Deferred.return (false, Or_error.return ())
-              | Some sync_jobs ->
-                  [%log info] "Synchronizing consensus local state" ;
-                  let%map result =
-                    Consensus.Hooks.sync_local_state
-                      ~context:(module Context)
-                      ~local_state:consensus_local_state ~trust_system
-                      ~glue_sync_ledger:
-                        (Mina_networking.glue_sync_ledger t.network)
-                      sync_jobs
-                  in
-                  (true, result) )
+                | None ->
+                    [%log debug]
+                      ~metadata:
+                        [ ( "local_state"
+                          , Consensus.Data.Local_state.to_yojson
+                              consensus_local_state )
+                        ; ( "consensus_state"
+                          , Consensus.Data.Consensus_state.Value.to_yojson
+                              consensus_state )
+                        ]
+                      "Not synchronizing consensus local state" ;
+                    Deferred.return (false, Or_error.return ())
+                | Some sync_jobs ->
+                    [%log info] "Synchronizing consensus local state" ;
+                    let%map result =
+                      Consensus.Hooks.sync_local_state
+                        ~context:(module Context)
+                        ~local_state:consensus_local_state ~trust_system
+                        ~glue_sync_ledger:
+                          (Mina_networking.glue_sync_ledger t.network)
+                        sync_jobs
+                    in
+                    (true, result) )
           in
           match local_state_sync_result with
           | Error e ->
@@ -694,7 +697,9 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         | Error this_cycle ->
             loop (this_cycle :: previous_cycles)
       in
-      let%map time_elapsed, (cycles, result) = time_deferred (loop []) in
+      let%map time_elapsed, (cycles, result) =
+        time_deferred (fun () -> loop [])
+      in
       [%log info] "Bootstrap completed in $time_elapsed: $bootstrap_stats"
         ~metadata:
           [ ("time_elapsed", time_to_yojson time_elapsed)
