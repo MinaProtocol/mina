@@ -340,7 +340,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
         Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
           (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
       (* step 2. Download scan state and pending coinbases. *)
-      let%bind staged_ledger_construction_time, staged_ledger_aux_result =
+      let%bind staged_ledger_aux_result =
         let%bind staged_ledger_data_download_result =
           use_time_deferred
             (fun staged_ledger_data_download_time ->
@@ -353,7 +353,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
         in
         match staged_ledger_data_download_result with
         | Error err ->
-            Deferred.return (None, Error err)
+            Deferred.return (Error err)
         | Ok
             ( scan_state
             , expected_merkle_root
@@ -434,8 +434,12 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                    * frontier in order to verify the scan state we received.
                    * TODO: reorganize the code to avoid doing this twice (#3480) *)
                   let open Deferred.Let_syntax in
-                  let%map staged_ledger_construction_time, construction_result =
-                    time_deferred (fun () ->
+                  let%map construction_result =
+                    use_time_deferred
+                      (fun staged_ledger_construction_time ->
+                        this_cycle.staged_ledger_construction_time <-
+                          Some staged_ledger_construction_time )
+                      ~f:(fun () ->
                         let open Deferred.Let_syntax in
                         let temp_mask =
                           Ledger.of_database temp_snarked_ledger
@@ -466,16 +470,14 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                                , new_root
                                , protocol_states ) ) )
                   in
-                  Ok (staged_ledger_construction_time, construction_result) )
+                  Ok construction_result )
             in
             match staged_ledger_construction_result with
             | Error err ->
-                (None, Error err)
-            | Ok (staged_ledger_construction_time, result) ->
-                (Some staged_ledger_construction_time, result) )
+                Error err
+            | Ok result ->
+                result )
       in
-      this_cycle.staged_ledger_construction_time <-
-        staged_ledger_construction_time ;
       Transition_frontier.Persistent_root.Instance.close
         temp_persistent_root_instance ;
       match staged_ledger_aux_result with
