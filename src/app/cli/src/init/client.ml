@@ -864,7 +864,7 @@ let currency_in_ledger =
            Token_id.Table.create ()
          in
          List.iter accounts ~f:(fun (acct : Account.t) ->
-             let token_id = Account.token acct in
+             let token_id = Account.token_id acct in
              let balance = acct.balance |> Currency.Balance.to_uint64 in
              match Token_id.Table.find currency_tbl token_id with
              | None ->
