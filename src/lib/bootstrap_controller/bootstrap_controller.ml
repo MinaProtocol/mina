@@ -62,6 +62,10 @@ let time_deferred deferred =
   let end_time = Time.now () in
   (Time.diff end_time start_time, result)
 
+let use_time_deferred update ~f =
+  let%map diff, result = time_deferred f in
+  update diff ; result
+
 let worth_getting_root ({ context = (module Context); _ } as t) candidate =
   let module Context = struct
     include Context
@@ -302,8 +306,14 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
           temp_persistent_root_instance
       in
       (* step 1. download snarked_ledger *)
-      let%bind sync_ledger_time, (hash, sender, expected_staged_ledger_hash) =
-        time_deferred (fun () ->
+      let%bind hash, sender, expected_staged_ledger_hash =
+        use_time_deferred
+          (fun sync_ledger_time ->
+            Mina_metrics.(
+              Counter.inc Bootstrap.root_snarked_ledger_sync_ms
+                Time.Span.(to_ms sync_ledger_time)) ;
+            this_cycle.sync_ledger_time <- Some sync_ledger_time )
+          ~f:(fun () ->
             let root_sync_ledger =
               Sync_ledger.Db.create temp_snarked_ledger ~logger ~trust_system
             in
@@ -327,25 +337,23 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             data )
       in
       Mina_metrics.(
-        Counter.inc Bootstrap.root_snarked_ledger_sync_ms
-          Time.Span.(to_ms sync_ledger_time)) ;
-      Mina_metrics.(
         Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
           (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
       (* step 2. Download scan state and pending coinbases. *)
-      let%bind ( staged_ledger_data_download_time
-               , staged_ledger_construction_time
-               , staged_ledger_aux_result ) =
-        let%bind ( staged_ledger_data_download_time
-                 , staged_ledger_data_download_result ) =
-          time_deferred (fun () ->
+      let%bind staged_ledger_construction_time, staged_ledger_aux_result =
+        let%bind staged_ledger_data_download_result =
+          use_time_deferred
+            (fun staged_ledger_data_download_time ->
+              this_cycle.staged_ledger_data_download_time <-
+                Some staged_ledger_data_download_time )
+            ~f:(fun () ->
               Mina_networking
               .get_staged_ledger_aux_and_pending_coinbases_at_hash t.network
                 sender.peer_id hash )
         in
         match staged_ledger_data_download_result with
         | Error err ->
-            Deferred.return (staged_ledger_data_download_time, None, Error err)
+            Deferred.return (None, Error err)
         | Ok
             ( scan_state
             , expected_merkle_root
@@ -462,15 +470,10 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             in
             match staged_ledger_construction_result with
             | Error err ->
-                (staged_ledger_data_download_time, None, Error err)
+                (None, Error err)
             | Ok (staged_ledger_construction_time, result) ->
-                ( staged_ledger_data_download_time
-                , Some staged_ledger_construction_time
-                , result ) )
+                (Some staged_ledger_construction_time, result) )
       in
-      this_cycle.sync_ledger_time <- Some sync_ledger_time ;
-      this_cycle.staged_ledger_data_download_time <-
-        Some staged_ledger_data_download_time ;
       this_cycle.staged_ledger_construction_time <-
         staged_ledger_construction_time ;
       Transition_frontier.Persistent_root.Instance.close
