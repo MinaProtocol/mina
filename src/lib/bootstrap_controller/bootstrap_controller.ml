@@ -456,184 +456,181 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
       in
       Transition_frontier.Persistent_root.Instance.close
         temp_persistent_root_instance ;
-      match staged_ledger_aux_result with
+      let%bind.Deferred.Result ( scan_state
+                               , pending_coinbase
+                               , new_root
+                               , protocol_states ) =
+        match staged_ledger_aux_result with
+        | Error e ->
+            let%bind () =
+              Trust_system.(
+                record t.trust_system logger sender
+                  Actions.
+                    ( Outgoing_connection_error
+                    , Some
+                        ( "Can't find scan state from the peer or received \
+                           faulty scan state from the peer."
+                        , [] ) ))
+            in
+            [%log error]
+              ~metadata:
+                [ ("error", Error_json.error_to_yojson e)
+                ; ("state_hash", State_hash.to_yojson hash)
+                ; ( "expected_staged_ledger_hash"
+                  , Staged_ledger_hash.to_yojson expected_staged_ledger_hash )
+                ]
+              "Failed to find scan state for the transition with hash \
+               $state_hash from the peer or received faulty scan state: \
+               $error. Retry bootstrap" ;
+            Writer.close sync_ledger_writer ;
+            return
+              (Error
+                 { this_cycle with
+                   cycle_result = "failed to download and construct scan state"
+                 } )
+        | Ok res ->
+            return (Ok res)
+      in
+      let%bind () =
+        Trust_system.(
+          record t.trust_system logger sender
+            Actions.
+              ( Fulfilled_request
+              , Some ("Received valid scan state from peer", []) ))
+      in
+      let best_seen_block_with_hash, _ = t.best_seen_transition in
+      let consensus_state =
+        With_hash.data best_seen_block_with_hash
+        |> Mina_block.header |> Mina_block.Header.protocol_state
+        |> Protocol_state.consensus_state
+      in
+      (* step 4. Synchronize consensus local state if necessary *)
+      let%bind local_state_sync_result =
+        use_time_deferred (set_local_state_sync_time this_cycle) ~f:(fun () ->
+            match
+              Consensus.Hooks.required_local_state_sync
+                ~constants:precomputed_values.consensus_constants
+                ~consensus_state ~local_state:consensus_local_state
+            with
+            | None ->
+                [%log debug]
+                  ~metadata:
+                    [ ( "local_state"
+                      , Consensus.Data.Local_state.to_yojson
+                          consensus_local_state )
+                    ; ( "consensus_state"
+                      , Consensus.Data.Consensus_state.Value.to_yojson
+                          consensus_state )
+                    ]
+                  "Not synchronizing consensus local state" ;
+                Deferred.Or_error.return ()
+            | Some sync_jobs ->
+                this_cycle.local_state_sync_required <- true ;
+                [%log info] "Synchronizing consensus local state" ;
+                let%map result =
+                  Consensus.Hooks.sync_local_state
+                    ~context:(module Context)
+                    ~local_state:consensus_local_state ~trust_system
+                    ~glue_sync_ledger:
+                      (Mina_networking.glue_sync_ledger t.network)
+                    sync_jobs
+                in
+                result )
+      in
+      match local_state_sync_result with
       | Error e ->
-          let%bind () =
-            Trust_system.(
-              record t.trust_system logger sender
-                Actions.
-                  ( Outgoing_connection_error
-                  , Some
-                      ( "Can't find scan state from the peer or received \
-                         faulty scan state from the peer."
-                      , [] ) ))
-          in
           [%log error]
-            ~metadata:
-              [ ("error", Error_json.error_to_yojson e)
-              ; ("state_hash", State_hash.to_yojson hash)
-              ; ( "expected_staged_ledger_hash"
-                , Staged_ledger_hash.to_yojson expected_staged_ledger_hash )
-              ]
-            "Failed to find scan state for the transition with hash \
-             $state_hash from the peer or received faulty scan state: $error. \
-             Retry bootstrap" ;
+            ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+            "Local state sync failed: $error. Retry bootstrap" ;
           Writer.close sync_ledger_writer ;
           return
             (Error
                { this_cycle with
-                 cycle_result = "failed to download and construct scan state"
+                 cycle_result = "failed to synchronize local state"
                } )
-      | Ok (scan_state, pending_coinbase, new_root, protocol_states) -> (
+      | Ok () ->
+          (* step 5. Close the old frontier and reload a new one from disk. *)
+          let new_root_data : Transition_frontier.Root_data.Limited.t =
+            Transition_frontier.Root_data.Limited.create
+              ~transition:(Mina_block.Validated.lift new_root)
+              ~scan_state ~pending_coinbase ~protocol_states
+          in
           let%bind () =
-            Trust_system.(
-              record t.trust_system logger sender
-                Actions.
-                  ( Fulfilled_request
-                  , Some ("Received valid scan state from peer", []) ))
+            Transition_frontier.Persistent_frontier.reset_database_exn
+              persistent_frontier ~root_data:new_root_data
+              ~genesis_state_hash:
+                (State_hash.With_state_hashes.state_hash
+                   precomputed_values.protocol_state_with_hashes )
           in
-          let best_seen_block_with_hash, _ = t.best_seen_transition in
-          let consensus_state =
-            With_hash.data best_seen_block_with_hash
-            |> Mina_block.header |> Mina_block.Header.protocol_state
-            |> Protocol_state.consensus_state
+          (* TODO: lazy load db in persistent root to avoid unecessary opens like this *)
+          Transition_frontier.Persistent_root.(
+            with_instance_exn persistent_root ~f:(fun instance ->
+                Instance.set_root_state_hash instance
+                @@ Mina_block.Validated.state_hash
+                @@ Mina_block.Validated.lift new_root )) ;
+          let%map new_frontier =
+            let fail msg =
+              failwith
+                ( "failed to initialize transition frontier after \
+                   bootstrapping: " ^ msg )
+            in
+            Transition_frontier.load
+              ~context:(module Context)
+              ~retry_with_fresh_db:false ~verifier ~consensus_local_state
+              ~persistent_root ~persistent_frontier ~catchup_mode ()
+            >>| function
+            | Ok frontier ->
+                frontier
+            | Error (`Failure msg) ->
+                fail msg
+            | Error `Bootstrap_required ->
+                fail
+                  "bootstrap still required (indicates logical error in code)"
+            | Error `Persistent_frontier_malformed ->
+                fail "persistent frontier was malformed"
+            | Error `Snarked_ledger_mismatch ->
+                fail
+                  "this should not happen, because we just reset the \
+                   snarked_ledger"
           in
-          (* step 4. Synchronize consensus local state if necessary *)
-          let%bind local_state_sync_result =
-            use_time_deferred (set_local_state_sync_time this_cycle)
-              ~f:(fun () ->
-                match
-                  Consensus.Hooks.required_local_state_sync
-                    ~constants:precomputed_values.consensus_constants
-                    ~consensus_state ~local_state:consensus_local_state
-                with
-                | None ->
-                    [%log debug]
-                      ~metadata:
-                        [ ( "local_state"
-                          , Consensus.Data.Local_state.to_yojson
-                              consensus_local_state )
-                        ; ( "consensus_state"
-                          , Consensus.Data.Consensus_state.Value.to_yojson
-                              consensus_state )
-                        ]
-                      "Not synchronizing consensus local state" ;
-                    Deferred.Or_error.return ()
-                | Some sync_jobs ->
-                    this_cycle.local_state_sync_required <- true ;
-                    [%log info] "Synchronizing consensus local state" ;
-                    let%map result =
-                      Consensus.Hooks.sync_local_state
-                        ~context:(module Context)
-                        ~local_state:consensus_local_state ~trust_system
-                        ~glue_sync_ledger:
-                          (Mina_networking.glue_sync_ledger t.network)
-                        sync_jobs
-                    in
-                    result )
+          [%str_log info] Bootstrap_complete ;
+          let collected_transitions = Transition_cache.data transition_graph in
+          let logger =
+            Logger.extend logger
+              [ ("context", `String "Filter collected transitions in bootstrap")
+              ]
           in
-          match local_state_sync_result with
-          | Error e ->
-              [%log error]
-                ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-                "Local state sync failed: $error. Retry bootstrap" ;
-              Writer.close sync_ledger_writer ;
-              return
-                (Error
-                   { this_cycle with
-                     cycle_result = "failed to synchronize local state"
-                   } )
-          | Ok () ->
-              (* step 5. Close the old frontier and reload a new one from disk. *)
-              let new_root_data : Transition_frontier.Root_data.Limited.t =
-                Transition_frontier.Root_data.Limited.create
-                  ~transition:(Mina_block.Validated.lift new_root)
-                  ~scan_state ~pending_coinbase ~protocol_states
-              in
-              let%bind () =
-                Transition_frontier.Persistent_frontier.reset_database_exn
-                  persistent_frontier ~root_data:new_root_data
-                  ~genesis_state_hash:
-                    (State_hash.With_state_hashes.state_hash
-                       precomputed_values.protocol_state_with_hashes )
-              in
-              (* TODO: lazy load db in persistent root to avoid unecessary opens like this *)
-              Transition_frontier.Persistent_root.(
-                with_instance_exn persistent_root ~f:(fun instance ->
-                    Instance.set_root_state_hash instance
-                    @@ Mina_block.Validated.state_hash
-                    @@ Mina_block.Validated.lift new_root )) ;
-              let%map new_frontier =
-                let fail msg =
-                  failwith
-                    ( "failed to initialize transition frontier after \
-                       bootstrapping: " ^ msg )
+          let root_consensus_state =
+            Transition_frontier.(
+              Breadcrumb.consensus_state_with_hashes (root new_frontier))
+          in
+          let filtered_collected_transitions =
+            List.filter collected_transitions ~f:(fun incoming_transition ->
+                let transition =
+                  Envelope.Incoming.data incoming_transition
+                  |> Mina_block.Validation.block_with_hash
                 in
-                Transition_frontier.load
-                  ~context:(module Context)
-                  ~retry_with_fresh_db:false ~verifier ~consensus_local_state
-                  ~persistent_root ~persistent_frontier ~catchup_mode ()
-                >>| function
-                | Ok frontier ->
-                    frontier
-                | Error (`Failure msg) ->
-                    fail msg
-                | Error `Bootstrap_required ->
-                    fail
-                      "bootstrap still required (indicates logical error in \
-                       code)"
-                | Error `Persistent_frontier_malformed ->
-                    fail "persistent frontier was malformed"
-                | Error `Snarked_ledger_mismatch ->
-                    fail
-                      "this should not happen, because we just reset the \
-                       snarked_ledger"
-              in
-              [%str_log info] Bootstrap_complete ;
-              let collected_transitions =
-                Transition_cache.data transition_graph
-              in
-              let logger =
-                Logger.extend logger
-                  [ ( "context"
-                    , `String "Filter collected transitions in bootstrap" )
-                  ]
-              in
-              let root_consensus_state =
-                Transition_frontier.(
-                  Breadcrumb.consensus_state_with_hashes (root new_frontier))
-              in
-              let filtered_collected_transitions =
-                List.filter collected_transitions ~f:(fun incoming_transition ->
-                    let transition =
-                      Envelope.Incoming.data incoming_transition
-                      |> Mina_block.Validation.block_with_hash
-                    in
-                    Consensus.Hooks.equal_select_status `Take
-                    @@ Consensus.Hooks.select
-                         ~context:(module Context)
-                         ~existing:root_consensus_state
-                         ~candidate:
-                           (With_hash.map ~f:Mina_block.consensus_state
-                              transition ) )
-              in
-              [%log debug] "Sorting filtered transitions by consensus state"
-                ~metadata:[] ;
-              let sorted_filtered_collected_transitions =
-                O1trace.sync_thread "sorting_collected_transitions" (fun () ->
-                    List.sort filtered_collected_transitions
-                      ~compare:
-                        (Comparable.lift
-                           ~f:
-                             (Fn.compose Mina_block.Validation.block_with_hash
-                                Envelope.Incoming.data )
-                           (external_transition_compare
-                              ~context:(module Context) ) ) )
-              in
-              let this_cycle = { this_cycle with cycle_result = "success" } in
-              Ok
-                ( this_cycle
-                , (new_frontier, sorted_filtered_collected_transitions) ) ) )
+                Consensus.Hooks.equal_select_status `Take
+                @@ Consensus.Hooks.select
+                     ~context:(module Context)
+                     ~existing:root_consensus_state
+                     ~candidate:
+                       (With_hash.map ~f:Mina_block.consensus_state transition) )
+          in
+          [%log debug] "Sorting filtered transitions by consensus state"
+            ~metadata:[] ;
+          let sorted_filtered_collected_transitions =
+            O1trace.sync_thread "sorting_collected_transitions" (fun () ->
+                List.sort filtered_collected_transitions
+                  ~compare:
+                    (Comparable.lift
+                       ~f:
+                         (Fn.compose Mina_block.Validation.block_with_hash
+                            Envelope.Incoming.data )
+                       (external_transition_compare ~context:(module Context)) ) )
+          in
+          let this_cycle = { this_cycle with cycle_result = "success" } in
+          Ok (this_cycle, (new_frontier, sorted_filtered_collected_transitions)) )
 
 (** The entry point function for bootstrap controller. When bootstrap finished
     it would return a transition frontier with the root breadcrumb and a list
