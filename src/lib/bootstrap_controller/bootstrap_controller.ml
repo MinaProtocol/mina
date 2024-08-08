@@ -51,8 +51,8 @@ type bootstrap_cycle_stats =
   ; mutable sync_ledger_time : opt_time
   ; mutable staged_ledger_data_download_time : opt_time
   ; mutable staged_ledger_construction_time : opt_time
-  ; local_state_sync_required : bool
-  ; local_state_sync_time : opt_time
+  ; mutable local_state_sync_required : bool
+  ; mutable local_state_sync_time : opt_time
   }
 [@@deriving to_yojson]
 
@@ -525,9 +525,12 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             |> Protocol_state.consensus_state
           in
           (* step 4. Synchronize consensus local state if necessary *)
-          let%bind ( local_state_sync_time
-                   , (local_state_sync_required, local_state_sync_result) ) =
-            time_deferred (fun () ->
+          let%bind local_state_sync_result =
+            use_time_deferred
+              (fun local_state_sync_time ->
+                this_cycle.local_state_sync_time <- Some local_state_sync_time
+                )
+              ~f:(fun () ->
                 match
                   Consensus.Hooks.required_local_state_sync
                     ~constants:precomputed_values.consensus_constants
@@ -544,8 +547,9 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                               consensus_state )
                         ]
                       "Not synchronizing consensus local state" ;
-                    Deferred.return (false, Or_error.return ())
+                    Deferred.Or_error.return ()
                 | Some sync_jobs ->
+                    this_cycle.local_state_sync_required <- true ;
                     [%log info] "Synchronizing consensus local state" ;
                     let%map result =
                       Consensus.Hooks.sync_local_state
@@ -555,7 +559,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                           (Mina_networking.glue_sync_ledger t.network)
                         sync_jobs
                     in
-                    (true, result) )
+                    result )
           in
           match local_state_sync_result with
           | Error e ->
@@ -567,8 +571,6 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                 (Error
                    { this_cycle with
                      cycle_result = "failed to synchronize local state"
-                   ; local_state_sync_required
-                   ; local_state_sync_time = Some local_state_sync_time
                    } )
           | Ok () ->
               (* step 5. Close the old frontier and reload a new one from disk. *)
@@ -657,13 +659,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                            (external_transition_compare
                               ~context:(module Context) ) ) )
               in
-              let this_cycle =
-                { this_cycle with
-                  cycle_result = "success"
-                ; local_state_sync_required
-                ; local_state_sync_time = Some local_state_sync_time
-                }
-              in
+              let this_cycle = { this_cycle with cycle_result = "success" } in
               Ok
                 ( this_cycle
                 , (new_frontier, sorted_filtered_collected_transitions) ) ) )
