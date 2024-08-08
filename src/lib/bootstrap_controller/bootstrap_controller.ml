@@ -202,7 +202,7 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
 (** A helper function that wraps the calls to Sync_ledger and iterate through
     incoming transitions, add those to the transition_cache and calls
     [on_transition] function. *)
-let sync_ledger ({ context = (module Context); _ } as t) ~preferred
+let sync_ledger_core ({ context = (module Context); _ } as t) ~preferred
     ~root_sync_ledger ~transition_graph ~sync_ledger_reader ~genesis_constants =
   let open Context in
   let query_reader = Sync_ledger.Db.query_reader root_sync_ledger in
@@ -239,6 +239,17 @@ let sync_ledger ({ context = (module Context); _ } as t) ~preferred
         @@ on_transition t ~sender ~root_sync_ledger ~genesis_constants
              transition )
       else Deferred.unit )
+
+let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
+    ~sync_ledger_reader ~genesis_constants =
+  don't_wait_for
+    (sync_ledger_core t ~preferred ~root_sync_ledger ~transition_graph
+       ~sync_ledger_reader ~genesis_constants ) ;
+  (* We ignore the resulting ledger returned here since it will always be the
+     same as the ledger we started with because we are syncing a db ledger.
+  *)
+  let%map _, data = Sync_ledger.Db.valid_tree root_sync_ledger in
+  data
 
 let external_transition_compare ~context:(module Context : CONTEXT) =
   Comparable.lift
@@ -326,22 +337,19 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             let root_sync_ledger =
               Sync_ledger.Db.create temp_snarked_ledger ~logger ~trust_system
             in
-            don't_wait_for
-              (sync_ledger t
-                 ~preferred:
-                   ( Option.to_list best_seen_transition
-                   |> List.filter_map ~f:(fun x ->
-                          match Envelope.Incoming.sender x with
-                          | Local ->
-                              None
-                          | Remote r ->
-                              Some r ) )
-                 ~root_sync_ledger ~transition_graph ~sync_ledger_reader
-                 ~genesis_constants ) ;
-            (* We ignore the resulting ledger returned here since it will always
-               * be the same as the ledger we started with because we are syncing
-               * a db ledger. *)
-            let%map _, data = Sync_ledger.Db.valid_tree root_sync_ledger in
+            let%map data =
+              sync_ledger t
+                ~preferred:
+                  ( Option.to_list best_seen_transition
+                  |> List.filter_map ~f:(fun x ->
+                         match Envelope.Incoming.sender x with
+                         | Local ->
+                             None
+                         | Remote r ->
+                             Some r ) )
+                ~root_sync_ledger ~transition_graph ~sync_ledger_reader
+                ~genesis_constants
+            in
             Sync_ledger.Db.destroy root_sync_ledger ;
             data )
       in
@@ -505,7 +513,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
         |> Protocol_state.consensus_state
       in
       (* step 4. Synchronize consensus local state if necessary *)
-      let%bind local_state_sync_result =
+      let%bind.Deferred.Result () =
         use_time_deferred (set_local_state_sync_time this_cycle) ~f:(fun () ->
             match
               Consensus.Hooks.required_local_state_sync
@@ -527,110 +535,99 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             | Some sync_jobs ->
                 this_cycle.local_state_sync_required <- true ;
                 [%log info] "Synchronizing consensus local state" ;
-                let%map result =
-                  Consensus.Hooks.sync_local_state
-                    ~context:(module Context)
-                    ~local_state:consensus_local_state ~trust_system
-                    ~glue_sync_ledger:
-                      (Mina_networking.glue_sync_ledger t.network)
-                    sync_jobs
-                in
-                result )
-      in
-      match local_state_sync_result with
-      | Error e ->
-          [%log error]
-            ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-            "Local state sync failed: $error. Retry bootstrap" ;
-          Writer.close sync_ledger_writer ;
-          return
-            (Error
+                Consensus.Hooks.sync_local_state
+                  ~context:(module Context)
+                  ~local_state:consensus_local_state ~trust_system
+                  ~glue_sync_ledger:(Mina_networking.glue_sync_ledger t.network)
+                  sync_jobs )
+        |> Deferred.Result.map_error ~f:(fun e ->
+               [%log error]
+                 ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                 "Local state sync failed: $error. Retry bootstrap" ;
+               Writer.close sync_ledger_writer ;
                { this_cycle with
                  cycle_result = "failed to synchronize local state"
                } )
-      | Ok () ->
-          (* step 5. Close the old frontier and reload a new one from disk. *)
-          let new_root_data : Transition_frontier.Root_data.Limited.t =
-            Transition_frontier.Root_data.Limited.create
-              ~transition:(Mina_block.Validated.lift new_root)
-              ~scan_state ~pending_coinbase ~protocol_states
-          in
-          let%bind () =
-            Transition_frontier.Persistent_frontier.reset_database_exn
-              persistent_frontier ~root_data:new_root_data
-              ~genesis_state_hash:
-                (State_hash.With_state_hashes.state_hash
-                   precomputed_values.protocol_state_with_hashes )
-          in
-          (* TODO: lazy load db in persistent root to avoid unecessary opens like this *)
-          Transition_frontier.Persistent_root.(
-            with_instance_exn persistent_root ~f:(fun instance ->
-                Instance.set_root_state_hash instance
-                @@ Mina_block.Validated.state_hash
-                @@ Mina_block.Validated.lift new_root )) ;
-          let%map new_frontier =
-            let fail msg =
-              failwith
-                ( "failed to initialize transition frontier after \
-                   bootstrapping: " ^ msg )
+      in
+      (* step 5. Close the old frontier and reload a new one from disk. *)
+      let new_root_data : Transition_frontier.Root_data.Limited.t =
+        Transition_frontier.Root_data.Limited.create
+          ~transition:(Mina_block.Validated.lift new_root)
+          ~scan_state ~pending_coinbase ~protocol_states
+      in
+      let%bind () =
+        Transition_frontier.Persistent_frontier.reset_database_exn
+          persistent_frontier ~root_data:new_root_data
+          ~genesis_state_hash:
+            (State_hash.With_state_hashes.state_hash
+               precomputed_values.protocol_state_with_hashes )
+      in
+      (* TODO: lazy load db in persistent root to avoid unecessary opens like this *)
+      Transition_frontier.Persistent_root.(
+        with_instance_exn persistent_root ~f:(fun instance ->
+            Instance.set_root_state_hash instance
+            @@ Mina_block.Validated.state_hash
+            @@ Mina_block.Validated.lift new_root )) ;
+      let%map new_frontier =
+        let fail msg =
+          failwith
+            ( "failed to initialize transition frontier after bootstrapping: "
+            ^ msg )
+        in
+        Transition_frontier.load
+          ~context:(module Context)
+          ~retry_with_fresh_db:false ~verifier ~consensus_local_state
+          ~persistent_root ~persistent_frontier ~catchup_mode ()
+        >>| function
+        | Ok frontier ->
+            frontier
+        | Error (`Failure msg) ->
+            fail msg
+        | Error `Bootstrap_required ->
+            fail "bootstrap still required (indicates logical error in code)"
+        | Error `Persistent_frontier_malformed ->
+            fail "persistent frontier was malformed"
+        | Error `Snarked_ledger_mismatch ->
+            fail
+              "this should not happen, because we just reset the snarked_ledger"
+      in
+      [%str_log info] Bootstrap_complete ;
+      let collected_transitions = Transition_cache.data transition_graph in
+      let logger =
+        Logger.extend logger
+          [ ("context", `String "Filter collected transitions in bootstrap") ]
+      in
+      let root_consensus_state =
+        Transition_frontier.(
+          Breadcrumb.consensus_state_with_hashes (root new_frontier))
+      in
+      let filtered_collected_transitions =
+        List.filter collected_transitions ~f:(fun incoming_transition ->
+            let transition =
+              Envelope.Incoming.data incoming_transition
+              |> Mina_block.Validation.block_with_hash
             in
-            Transition_frontier.load
-              ~context:(module Context)
-              ~retry_with_fresh_db:false ~verifier ~consensus_local_state
-              ~persistent_root ~persistent_frontier ~catchup_mode ()
-            >>| function
-            | Ok frontier ->
-                frontier
-            | Error (`Failure msg) ->
-                fail msg
-            | Error `Bootstrap_required ->
-                fail
-                  "bootstrap still required (indicates logical error in code)"
-            | Error `Persistent_frontier_malformed ->
-                fail "persistent frontier was malformed"
-            | Error `Snarked_ledger_mismatch ->
-                fail
-                  "this should not happen, because we just reset the \
-                   snarked_ledger"
-          in
-          [%str_log info] Bootstrap_complete ;
-          let collected_transitions = Transition_cache.data transition_graph in
-          let logger =
-            Logger.extend logger
-              [ ("context", `String "Filter collected transitions in bootstrap")
-              ]
-          in
-          let root_consensus_state =
-            Transition_frontier.(
-              Breadcrumb.consensus_state_with_hashes (root new_frontier))
-          in
-          let filtered_collected_transitions =
-            List.filter collected_transitions ~f:(fun incoming_transition ->
-                let transition =
-                  Envelope.Incoming.data incoming_transition
-                  |> Mina_block.Validation.block_with_hash
-                in
-                Consensus.Hooks.equal_select_status `Take
-                @@ Consensus.Hooks.select
-                     ~context:(module Context)
-                     ~existing:root_consensus_state
-                     ~candidate:
-                       (With_hash.map ~f:Mina_block.consensus_state transition) )
-          in
-          [%log debug] "Sorting filtered transitions by consensus state"
-            ~metadata:[] ;
-          let sorted_filtered_collected_transitions =
-            O1trace.sync_thread "sorting_collected_transitions" (fun () ->
-                List.sort filtered_collected_transitions
-                  ~compare:
-                    (Comparable.lift
-                       ~f:
-                         (Fn.compose Mina_block.Validation.block_with_hash
-                            Envelope.Incoming.data )
-                       (external_transition_compare ~context:(module Context)) ) )
-          in
-          let this_cycle = { this_cycle with cycle_result = "success" } in
-          Ok (this_cycle, (new_frontier, sorted_filtered_collected_transitions)) )
+            Consensus.Hooks.equal_select_status `Take
+            @@ Consensus.Hooks.select
+                 ~context:(module Context)
+                 ~existing:root_consensus_state
+                 ~candidate:
+                   (With_hash.map ~f:Mina_block.consensus_state transition) )
+      in
+      [%log debug] "Sorting filtered transitions by consensus state"
+        ~metadata:[] ;
+      let sorted_filtered_collected_transitions =
+        O1trace.sync_thread "sorting_collected_transitions" (fun () ->
+            List.sort filtered_collected_transitions
+              ~compare:
+                (Comparable.lift
+                   ~f:
+                     (Fn.compose Mina_block.Validation.block_with_hash
+                        Envelope.Incoming.data )
+                   (external_transition_compare ~context:(module Context)) ) )
+      in
+      let this_cycle = { this_cycle with cycle_result = "success" } in
+      Ok (this_cycle, (new_frontier, sorted_filtered_collected_transitions)) )
 
 (** The entry point function for bootstrap controller. When bootstrap finished
     it would return a transition frontier with the root breadcrumb and a list
@@ -795,7 +792,7 @@ let%test_module "Bootstrap_controller tests" =
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
               let sync_deferred =
-                sync_ledger bootstrap ~root_sync_ledger ~transition_graph
+                sync_ledger_core bootstrap ~root_sync_ledger ~transition_graph
                   ~preferred:[] ~sync_ledger_reader
                   ~genesis_constants:Genesis_constants.compiled
               in
