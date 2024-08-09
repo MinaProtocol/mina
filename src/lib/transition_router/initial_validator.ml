@@ -234,18 +234,18 @@ end
 
 let validate ~logger ~trust_system ~verifier ~initialization_finish_signal
     ~precomputed_values =
+  let genesis_state_hash =
+    (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
+  in
+  let genesis_constants =
+    Precomputed_values.genesis_constants precomputed_values
+  in
+  let rejected_blocks_logger =
+    Logger.create ~id:Logger.Logger_id.rejected_blocks ()
+  in
+  let duplicate_checker = Duplicate_block_detector.create () in
   stage (fun ~transition_env ~time_received ~valid_cb ->
-      let genesis_state_hash =
-        (Precomputed_values.genesis_state_hashes precomputed_values).state_hash
-      in
-      let genesis_constants =
-        Precomputed_values.genesis_constants precomputed_values
-      in
-      let rejected_blocks_logger =
-        Logger.create ~id:Logger.Logger_id.rejected_blocks ()
-      in
       let open Deferred.Let_syntax in
-      let duplicate_checker = Duplicate_block_detector.create () in
       if Ivar.is_full initialization_finish_signal then (
         let blockchain_length =
           Envelope.Incoming.data transition_env
