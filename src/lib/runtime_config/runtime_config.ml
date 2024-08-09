@@ -639,7 +639,6 @@ module Accounts = struct
 
     let to_account (a : t) : Mina_base.Account.t =
       let open Signature_lib in
-      let open Mina_base.Account.Poly in
       let timing =
         let open Mina_base.Account_timing.Poly in
         match a.timing with

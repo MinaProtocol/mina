@@ -314,7 +314,7 @@ module For_tests = struct
         in
         let send_amount = Currency.Amount.of_nanomina_int_exn 1_000_000_001 in
         let sender_account_amount =
-          sender_account.Account.Poly.balance |> Currency.Balance.to_amount
+          sender_account.Account.balance |> Currency.Balance.to_amount
         in
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let sender_pk = Account.public_key sender_account in
