@@ -309,6 +309,9 @@ module Stable = struct
   end
 end]
 
+[%%define_locally
+Stable.Latest.(sexp_of_t, t_of_sexp, equal, to_yojson, of_yojson)]
+
 let to_poly
     { public_key
     ; token_id
