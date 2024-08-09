@@ -718,17 +718,17 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
             }
       }
 
-let initial_minimum_balance Poly.{ timing; _ } =
+let initial_minimum_balance { timing; _ } =
   match timing with
   | Timing.Untimed ->
       None
   | Timed t ->
       Some t.initial_minimum_balance
 
-let cliff_time Poly.{ timing; _ } =
+let cliff_time { timing; _ } =
   match timing with Timing.Untimed -> None | Timed t -> Some t.cliff_time
 
-let cliff_amount Poly.{ timing; _ } =
+let cliff_amount { timing; _ } =
   match timing with Timing.Untimed -> None | Timed t -> Some t.cliff_amount
 
 let vesting_increment Poly.{ timing; _ } =
