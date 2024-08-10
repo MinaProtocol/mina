@@ -22,16 +22,6 @@ end
 type Structured_log_events.t += Bootstrap_complete
   [@@deriving register_event { msg = "Bootstrap state: complete." }]
 
-type t =
-  { context : (module CONTEXT)
-  ; trust_system : Trust_system.t
-  ; verifier : Verifier.t
-  ; mutable best_seen_transition : Mina_block.initial_valid_block
-  ; mutable current_root : Mina_block.initial_valid_block
-  ; network : Mina_networking.t
-  ; mutable num_of_root_snarked_ledger_retargeted : int
-  }
-
 type time = Time.Span.t
 
 let time_to_yojson span =
@@ -56,6 +46,15 @@ type bootstrap_cycle_stats =
   }
 [@@deriving to_yojson]
 
+let default_cycle_stats () =
+  { cycle_result = "running"
+  ; sync_ledger_time = None
+  ; staged_ledger_data_download_time = None
+  ; staged_ledger_construction_time = None
+  ; local_state_sync_required = false
+  ; local_state_sync_time = None
+  }
+
 let set_sync_ledger_time self sync_ledger_time =
   Mina_metrics.(
     Counter.inc Bootstrap.root_snarked_ledger_sync_ms
@@ -70,6 +69,17 @@ let set_staged_ledger_construction_time self staged_ledger_construction_time =
 
 let set_local_state_sync_time self local_state_sync_time =
   self.local_state_sync_time <- Some local_state_sync_time
+
+type t =
+  { context : (module CONTEXT)
+  ; trust_system : Trust_system.t
+  ; verifier : Verifier.t
+  ; mutable best_seen_transition : Mina_block.initial_valid_block
+  ; mutable current_root : Mina_block.initial_valid_block
+  ; network : Mina_networking.t
+  ; mutable num_of_root_snarked_ledger_retargeted : int
+  ; cycle_stats : bootstrap_cycle_stats
+  }
 
 let time_deferred deferred =
   let start_time = Time.now () in
@@ -276,15 +286,6 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
     Precomputed_values.genesis_constants precomputed_values
   in
   stage (fun () ->
-      let this_cycle =
-        { cycle_result = "running"
-        ; sync_ledger_time = None
-        ; staged_ledger_data_download_time = None
-        ; staged_ledger_construction_time = None
-        ; local_state_sync_required = false
-        ; local_state_sync_time = None
-        }
-      in
       let sync_ledger_pipe = "sync ledger pipe" in
       let sync_ledger_reader, sync_ledger_writer =
         create ~name:sync_ledger_pipe
@@ -321,6 +322,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
         ; best_seen_transition = initial_root_transition
         ; current_root = initial_root_transition
         ; num_of_root_snarked_ledger_retargeted = 0
+        ; cycle_stats = default_cycle_stats ()
         }
       in
       let transition_graph = Transition_cache.create () in
@@ -333,7 +335,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
       in
       (* step 1. download snarked_ledger *)
       let%bind hash, sender, expected_staged_ledger_hash =
-        use_time_deferred (set_sync_ledger_time this_cycle) ~f:(fun () ->
+        use_time_deferred (set_sync_ledger_time t.cycle_stats) ~f:(fun () ->
             let root_sync_ledger =
               Sync_ledger.Db.create temp_snarked_ledger ~logger ~trust_system
             in
@@ -362,7 +364,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                                  , expected_merkle_root
                                  , pending_coinbases
                                  , protocol_states ) =
-          use_time_deferred (set_staged_ledger_data_download_time this_cycle)
+          use_time_deferred (set_staged_ledger_data_download_time t.cycle_stats)
             ~f:(fun () ->
               Mina_networking
               .get_staged_ledger_aux_and_pending_coinbases_at_hash t.network
@@ -437,8 +439,8 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             (* Construct the staged ledger before constructing the transition
              * frontier in order to verify the scan state we received.
              * TODO: reorganize the code to avoid doing this twice (#3480) *)
-            use_time_deferred (set_staged_ledger_construction_time this_cycle)
-              ~f:(fun () ->
+            use_time_deferred
+              (set_staged_ledger_construction_time t.cycle_stats) ~f:(fun () ->
                 let open Deferred.Let_syntax in
                 let temp_mask = Ledger.of_database temp_snarked_ledger in
                 let%map result =
@@ -493,7 +495,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             Writer.close sync_ledger_writer ;
             return
               (Error
-                 { this_cycle with
+                 { t.cycle_stats with
                    cycle_result = "failed to download and construct scan state"
                  } )
         | Ok res ->
@@ -514,7 +516,8 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
       in
       (* step 4. Synchronize consensus local state if necessary *)
       let%bind.Deferred.Result () =
-        use_time_deferred (set_local_state_sync_time this_cycle) ~f:(fun () ->
+        use_time_deferred (set_local_state_sync_time t.cycle_stats)
+          ~f:(fun () ->
             match
               Consensus.Hooks.required_local_state_sync
                 ~constants:precomputed_values.consensus_constants
@@ -533,7 +536,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                   "Not synchronizing consensus local state" ;
                 Deferred.Or_error.return ()
             | Some sync_jobs ->
-                this_cycle.local_state_sync_required <- true ;
+                t.cycle_stats.local_state_sync_required <- true ;
                 [%log info] "Synchronizing consensus local state" ;
                 Consensus.Hooks.sync_local_state
                   ~context:(module Context)
@@ -545,7 +548,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                  ~metadata:[ ("error", Error_json.error_to_yojson e) ]
                  "Local state sync failed: $error. Retry bootstrap" ;
                Writer.close sync_ledger_writer ;
-               { this_cycle with
+               { t.cycle_stats with
                  cycle_result = "failed to synchronize local state"
                } )
       in
@@ -626,8 +629,8 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                         Envelope.Incoming.data )
                    (external_transition_compare ~context:(module Context)) ) )
       in
-      let this_cycle = { this_cycle with cycle_result = "success" } in
-      Ok (this_cycle, (new_frontier, sorted_filtered_collected_transitions)) )
+      let cycle_stats = { t.cycle_stats with cycle_result = "success" } in
+      Ok (cycle_stats, (new_frontier, sorted_filtered_collected_transitions)) )
 
 (** The entry point function for bootstrap controller. When bootstrap finished
     it would return a transition frontier with the root breadcrumb and a list
@@ -746,6 +749,7 @@ let%test_module "Bootstrap_controller tests" =
       ; current_root = transition
       ; network
       ; num_of_root_snarked_ledger_retargeted = 0
+      ; cycle_stats = default_cycle_stats ()
       }
 
     let%test_unit "Bootstrap controller caches all transitions it is passed \
