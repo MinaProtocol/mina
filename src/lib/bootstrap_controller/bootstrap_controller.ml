@@ -70,6 +70,15 @@ let set_staged_ledger_construction_time self staged_ledger_construction_time =
 let set_local_state_sync_time self local_state_sync_time =
   self.local_state_sync_time <- Some local_state_sync_time
 
+module Stages = struct
+  type stage_1 =
+    { temp_persistent_root_instance : Persistent_root.Instance_type.t
+    ; hash : Frozen_ledger_hash.t
+    ; sender : Peer.t
+    ; expected_staged_ledger_hash : Staged_ledger_hash.t
+    }
+end
+
 type t =
   { context : (module CONTEXT)
   ; trust_system : Trust_system.t
@@ -331,7 +340,12 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
         Transition_frontier.Persistent_root.create_instance_exn persistent_root
       in
       (* step 1. download snarked_ledger *)
-      let%bind hash, sender, expected_staged_ledger_hash =
+      let%bind ({ temp_persistent_root_instance
+                ; hash
+                ; sender
+                ; expected_staged_ledger_hash
+                }
+                 : Stages.stage_1 ) =
         use_time_deferred (set_sync_ledger_time t.cycle_stats) ~f:(fun () ->
             let root_sync_ledger =
               let temp_snarked_ledger =
@@ -340,7 +354,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
               in
               Sync_ledger.Db.create temp_snarked_ledger ~logger ~trust_system
             in
-            let%map data =
+            let%map hash, sender, expected_staged_ledger_hash =
               sync_ledger t
                 ~preferred:
                   ( Option.to_list best_seen_transition
@@ -353,7 +367,12 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                 ~root_sync_ledger ~sync_ledger_reader ~genesis_constants
             in
             Sync_ledger.Db.destroy root_sync_ledger ;
-            data )
+            ( { temp_persistent_root_instance
+              ; hash
+              ; sender
+              ; expected_staged_ledger_hash
+              }
+              : Stages.stage_1 ) )
       in
       Mina_metrics.(
         Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
