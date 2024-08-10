@@ -341,33 +341,35 @@ let download_snarked_ledger ({ context = (module Context); _ } as t)
 let download_scan_state_and_pending_coinbases t
     ({ temp_persistent_root_instance; sender } : Stages.stage_1) =
   let open Deferred.Result.Let_syntax in
-  let%bind scan_state, expected_merkle_root, pending_coinbases, protocol_states
-      =
-    let hash =
-      State_hash.With_state_hashes.state_hash
-      @@ Mina_block.Validation.block_with_hash t.current_root
-    in
-    use_time_deferred (set_staged_ledger_data_download_time t.cycle_stats)
-      ~f:(fun () ->
+  use_time_deferred (set_staged_ledger_data_download_time t.cycle_stats)
+    ~f:(fun () ->
+      let%bind ( scan_state
+               , expected_merkle_root
+               , pending_coinbases
+               , protocol_states ) =
+        let hash =
+          State_hash.With_state_hashes.state_hash
+          @@ Mina_block.Validation.block_with_hash t.current_root
+        in
         Mina_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
-          t.network sender.peer_id hash )
-  in
-  let protocol_states =
-    List.map protocol_states
-      ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
-  in
-  let%map protocol_states =
-    Staged_ledger.Scan_state.check_required_protocol_states scan_state
-      ~protocol_states
-    |> Deferred.return
-  in
-  ( { temp_persistent_root_instance
-    ; scan_state
-    ; expected_merkle_root
-    ; pending_coinbases
-    ; protocol_states
-    }
-    : Stages.stage_2 )
+          t.network sender.peer_id hash
+      in
+      let protocol_states =
+        List.map protocol_states
+          ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
+      in
+      let%map protocol_states =
+        Staged_ledger.Scan_state.check_required_protocol_states scan_state
+          ~protocol_states
+        |> Deferred.return
+      in
+      ( { temp_persistent_root_instance
+        ; scan_state
+        ; expected_merkle_root
+        ; pending_coinbases
+        ; protocol_states
+        }
+        : Stages.stage_2 ) )
 
 let construct_root_staged_ledger ({ context = (module Context); _ } as t)
     ({ temp_persistent_root_instance
