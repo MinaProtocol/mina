@@ -93,6 +93,7 @@ module Stages = struct
     ; expected_merkle_root : Frozen_ledger_hash.t
     ; pending_coinbases : Pending_coinbase.t
     ; protocol_states : Protocol_state.value State_hash.With_state_hashes.t list
+    ; sender : Peer.t
     }
 
   type stage_3 =
@@ -312,6 +313,14 @@ let deferred_result_with ~setup ~f ~finally =
   let%map res = f for_f in
   finally for_finally ; res
 
+let deferred_result_bind_error x ~f =
+  match%bind x with
+  | Ok _ as x ->
+      return x
+  | Error e ->
+      let%map e = f e in
+      Error e
+
 let download_snarked_ledger ({ context = (module Context); _ } as t)
     ({ temp_persistent_root_instance
      ; best_seen_transition_peers
@@ -338,8 +347,10 @@ let download_snarked_ledger ({ context = (module Context); _ } as t)
       Sync_ledger.Db.destroy root_sync_ledger ;
       ({ temp_persistent_root_instance; sender } : Stages.stage_1) )
 
-let download_scan_state_and_pending_coinbases t
+let download_scan_state_and_pending_coinbases
+    ({ context = (module Context); _ } as t)
     ({ temp_persistent_root_instance; sender } : Stages.stage_1) =
+  let open Context in
   let open Deferred.Result.Let_syntax in
   use_time_deferred (set_staged_ledger_data_download_time t.cycle_stats)
     ~f:(fun () ->
@@ -368,8 +379,38 @@ let download_scan_state_and_pending_coinbases t
         ; expected_merkle_root
         ; pending_coinbases
         ; protocol_states
+        ; sender
         }
         : Stages.stage_2 ) )
+  |> deferred_result_bind_error ~f:(fun e ->
+         let open Deferred.Let_syntax in
+         let%map () =
+           Trust_system.(
+             record t.trust_system logger sender
+               Actions.
+                 ( Outgoing_connection_error
+                 , Some ("Can't find scan state from the peer.", []) ))
+         in
+         let expected_staged_ledger_hash =
+           t.current_root |> Mina_block.Validation.block |> Mina_block.header
+           |> Mina_block.Header.protocol_state
+           |> Protocol_state.blockchain_state
+           |> Blockchain_state.staged_ledger_hash
+         in
+         let state_hash =
+           State_hash.With_state_hashes.state_hash
+           @@ Mina_block.Validation.block_with_hash t.current_root
+         in
+         [%log error]
+           ~metadata:
+             [ ("error", Error_json.error_to_yojson e)
+             ; ("state_hash", State_hash.to_yojson state_hash)
+             ; ( "expected_staged_ledger_hash"
+               , Staged_ledger_hash.to_yojson expected_staged_ledger_hash )
+             ]
+           "Failed to find scan state for the transition with hash $state_hash \
+            from the peer: $error. Retry bootstrap" ;
+         { t.cycle_stats with cycle_result = "failed to download scan state" } )
 
 let construct_root_staged_ledger ({ context = (module Context); _ } as t)
     ({ temp_persistent_root_instance
@@ -377,6 +418,7 @@ let construct_root_staged_ledger ({ context = (module Context); _ } as t)
      ; expected_merkle_root
      ; pending_coinbases
      ; protocol_states
+     ; sender
      } :
       Stages.stage_2 ) =
   let open Context in
@@ -456,7 +498,7 @@ let construct_root_staged_ledger ({ context = (module Context); _ } as t)
                 ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ temp_mask
                   : Ledger.unattached_mask ) )
             ~f:(fun temp_mask ->
-              let%map (_ : _) =
+              let%bind (_ : _) =
                 Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
                   ~logger
                   ~snarked_local_state:
@@ -469,8 +511,47 @@ let construct_root_staged_ledger ({ context = (module Context); _ } as t)
                   ~snarked_ledger:temp_mask ~expected_merkle_root
                   ~pending_coinbases ~get_state
               in
-              ( { scan_state; pending_coinbases; new_root; protocol_states }
-                : Stages.stage_3 ) ) ) )
+              let%map.Deferred () =
+                Trust_system.(
+                  record t.trust_system logger sender
+                    Actions.
+                      ( Fulfilled_request
+                      , Some ("Received valid scan state from peer", []) ))
+              in
+              Ok
+                ( { scan_state; pending_coinbases; new_root; protocol_states }
+                  : Stages.stage_3 ) ) ) )
+  |> deferred_result_bind_error ~f:(fun e ->
+         let open Deferred.Let_syntax in
+         let%map () =
+           Trust_system.(
+             record t.trust_system logger sender
+               Actions.
+                 ( Outgoing_connection_error
+                 , Some ("Received faulty scan state from the peer.", []) ))
+         in
+         let expected_staged_ledger_hash =
+           t.current_root |> Mina_block.Validation.block |> Mina_block.header
+           |> Mina_block.Header.protocol_state
+           |> Protocol_state.blockchain_state
+           |> Blockchain_state.staged_ledger_hash
+         in
+         let state_hash =
+           State_hash.With_state_hashes.state_hash
+           @@ Mina_block.Validation.block_with_hash t.current_root
+         in
+         [%log error]
+           ~metadata:
+             [ ("error", Error_json.error_to_yojson e)
+             ; ("state_hash", State_hash.to_yojson state_hash)
+             ; ( "expected_staged_ledger_hash"
+               , Staged_ledger_hash.to_yojson expected_staged_ledger_hash )
+             ]
+           "Received faulty scan state when requesting $state_hash from the \
+            peer: $error. Retry bootstrap" ;
+         { t.cycle_stats with
+           cycle_result = "failed to download and construct scan state"
+         } )
 
 let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
     ~network ~consensus_local_state ~transition_reader ~best_seen_transition
@@ -534,8 +615,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             }
           in
           (* step 1. download snarked_ledger *)
-          let%bind ({ temp_persistent_root_instance = _; sender } as stage_1
-                     : Stages.stage_1 ) =
+          let%bind stage_1 =
             download_snarked_ledger t
               { temp_persistent_root_instance
               ; best_seen_transition_peers =
@@ -559,65 +639,15 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                                     ; protocol_states
                                     }
                                      : Stages.stage_3 ) =
-            let%bind staged_ledger_aux_result =
-              let%bind.Deferred.Result stage_2 =
-                download_scan_state_and_pending_coinbases t stage_1
-              in
-              (* step 3. Construct staged ledger from snarked ledger, scan state
-                 and pending coinbases. *)
-              (* Construct the staged ledger before constructing the transition
-               * frontier in order to verify the scan state we received.
-               * TODO: reorganize the code to avoid doing this twice (#3480) *)
-              construct_root_staged_ledger t stage_2
+            let%bind.Deferred.Result stage_2 =
+              download_scan_state_and_pending_coinbases t stage_1
             in
-            match staged_ledger_aux_result with
-            | Error e ->
-                let%bind () =
-                  Trust_system.(
-                    record t.trust_system logger sender
-                      Actions.
-                        ( Outgoing_connection_error
-                        , Some
-                            ( "Can't find scan state from the peer or received \
-                               faulty scan state from the peer."
-                            , [] ) ))
-                in
-                let expected_staged_ledger_hash =
-                  t.current_root |> Mina_block.Validation.block
-                  |> Mina_block.header |> Mina_block.Header.protocol_state
-                  |> Protocol_state.blockchain_state
-                  |> Blockchain_state.staged_ledger_hash
-                in
-                let state_hash =
-                  State_hash.With_state_hashes.state_hash
-                  @@ Mina_block.Validation.block_with_hash t.current_root
-                in
-                [%log error]
-                  ~metadata:
-                    [ ("error", Error_json.error_to_yojson e)
-                    ; ("state_hash", State_hash.to_yojson state_hash)
-                    ; ( "expected_staged_ledger_hash"
-                      , Staged_ledger_hash.to_yojson expected_staged_ledger_hash
-                      )
-                    ]
-                  "Failed to find scan state for the transition with hash \
-                   $state_hash from the peer or received faulty scan state: \
-                   $error. Retry bootstrap" ;
-                return
-                  (Error
-                     { t.cycle_stats with
-                       cycle_result =
-                         "failed to download and construct scan state"
-                     } )
-            | Ok res ->
-                let%bind () =
-                  Trust_system.(
-                    record t.trust_system logger sender
-                      Actions.
-                        ( Fulfilled_request
-                        , Some ("Received valid scan state from peer", []) ))
-                in
-                return (Ok res)
+            (* step 3. Construct staged ledger from snarked ledger, scan state
+               and pending coinbases. *)
+            (* Construct the staged ledger before constructing the transition
+             * frontier in order to verify the scan state we received.
+             * TODO: reorganize the code to avoid doing this twice (#3480) *)
+            construct_root_staged_ledger t stage_2
           in
           (* step 4. Synchronize consensus local state if necessary *)
           let%bind.Deferred.Result () =
