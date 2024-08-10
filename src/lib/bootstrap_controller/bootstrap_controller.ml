@@ -329,14 +329,14 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
       let temp_persistent_root_instance =
         Transition_frontier.Persistent_root.create_instance_exn persistent_root
       in
-      let temp_snarked_ledger =
-        Transition_frontier.Persistent_root.Instance.snarked_ledger
-          temp_persistent_root_instance
-      in
       (* step 1. download snarked_ledger *)
       let%bind hash, sender, expected_staged_ledger_hash =
         use_time_deferred (set_sync_ledger_time t.cycle_stats) ~f:(fun () ->
             let root_sync_ledger =
+              let temp_snarked_ledger =
+                Transition_frontier.Persistent_root.Instance.snarked_ledger
+                  temp_persistent_root_instance
+              in
               Sync_ledger.Db.create temp_snarked_ledger ~logger ~trust_system
             in
             let%map data =
@@ -442,7 +442,13 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             use_time_deferred
               (set_staged_ledger_construction_time t.cycle_stats) ~f:(fun () ->
                 let open Deferred.Let_syntax in
-                let temp_mask = Ledger.of_database temp_snarked_ledger in
+                let temp_mask =
+                  let temp_snarked_ledger =
+                    Transition_frontier.Persistent_root.Instance.snarked_ledger
+                      temp_persistent_root_instance
+                  in
+                  Ledger.of_database temp_snarked_ledger
+                in
                 let%map result =
                   Staged_ledger
                   .of_scan_state_pending_coinbases_and_snarked_ledger ~logger
