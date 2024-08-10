@@ -89,6 +89,15 @@ module Stages = struct
     ; expected_staged_ledger_hash : Staged_ledger_hash.t
     }
 
+  type stage_2 =
+    { temp_persistent_root_instance : Persistent_root.Instance_type.t
+    ; scan_state : Staged_ledger.Scan_state.t
+    ; expected_staged_ledger_hash : Staged_ledger_hash.t
+    ; expected_merkle_root : Frozen_ledger_hash.t
+    ; pending_coinbases : Pending_coinbase.t
+    ; protocol_states : Protocol_state.value State_hash.With_state_hashes.t list
+    }
+
   type stage_3 =
     { scan_state : Staged_ledger.Scan_state.t
     ; pending_coinbases : Pending_coinbase.t
@@ -336,6 +345,40 @@ let download_snarked_ledger ({ context = (module Context); _ } as t)
         }
         : Stages.stage_1 ) )
 
+let download_scan_state_and_pending_coinbases
+    ({ context = (module Context); _ } as t)
+    ({ temp_persistent_root_instance
+     ; hash
+     ; sender
+     ; expected_staged_ledger_hash
+     } :
+      Stages.stage_1 ) =
+  let open Deferred.Result.Let_syntax in
+  let%bind scan_state, expected_merkle_root, pending_coinbases, protocol_states
+      =
+    use_time_deferred (set_staged_ledger_data_download_time t.cycle_stats)
+      ~f:(fun () ->
+        Mina_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
+          t.network sender.peer_id hash )
+  in
+  let protocol_states =
+    List.map protocol_states
+      ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
+  in
+  let%map protocol_states =
+    Staged_ledger.Scan_state.check_required_protocol_states scan_state
+      ~protocol_states
+    |> Deferred.return
+  in
+  ( { temp_persistent_root_instance
+    ; expected_staged_ledger_hash
+    ; scan_state
+    ; expected_merkle_root
+    ; pending_coinbases
+    ; protocol_states
+    }
+    : Stages.stage_2 )
+
 let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
     ~network ~consensus_local_state ~transition_reader ~best_seen_transition
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
@@ -390,7 +433,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                 ; hash
                 ; sender
                 ; expected_staged_ledger_hash
-                }
+                } as stage_1
                  : Stages.stage_1 ) =
         download_snarked_ledger t
           { temp_persistent_root_instance
@@ -416,15 +459,15 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                                 }
                                  : Stages.stage_3 ) =
         let%bind staged_ledger_aux_result =
-          let%bind.Deferred.Result ( scan_state
-                                   , expected_merkle_root
-                                   , pending_coinbases
-                                   , protocol_states ) =
-            use_time_deferred
-              (set_staged_ledger_data_download_time t.cycle_stats) ~f:(fun () ->
-                Mina_networking
-                .get_staged_ledger_aux_and_pending_coinbases_at_hash t.network
-                  sender.peer_id hash )
+          let%bind.Deferred.Result ({ temp_persistent_root_instance
+                                    ; expected_staged_ledger_hash
+                                    ; scan_state
+                                    ; expected_merkle_root
+                                    ; pending_coinbases
+                                    ; protocol_states
+                                    }
+                                     : Stages.stage_2 ) =
+            download_scan_state_and_pending_coinbases t stage_1
           in
           O1trace.thread "construct_root_staged_ledger" (fun () ->
               let open Deferred.Or_error.Let_syntax in
@@ -453,15 +496,6 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                        received_staged_ledger_hash )
                 |> Result.map_error ~f:(fun _ ->
                        Error.of_string "received faulty scan state from peer" )
-                |> Deferred.return
-              in
-              let protocol_states =
-                List.map protocol_states
-                  ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
-              in
-              let%bind protocol_states =
-                Staged_ledger.Scan_state.check_required_protocol_states
-                  scan_state ~protocol_states
                 |> Deferred.return
               in
               let protocol_states_map =
