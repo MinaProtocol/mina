@@ -84,7 +84,6 @@ module Stages = struct
 
   type stage_1 =
     { temp_persistent_root_instance : Persistent_root.Instance_type.t
-    ; hash : Frozen_ledger_hash.t
     ; sender : Peer.t
     }
 
@@ -327,19 +326,23 @@ let download_snarked_ledger ({ context = (module Context); _ } as t)
         Sync_ledger.Db.create temp_snarked_ledger ~logger
           ~trust_system:t.trust_system
       in
-      let%map hash, sender =
+      let%map _, sender =
         sync_ledger t ~preferred:best_seen_transition_peers ~root_sync_ledger
           ~sync_ledger_reader ~genesis_constants
       in
       Sync_ledger.Db.destroy root_sync_ledger ;
-      ({ temp_persistent_root_instance; hash; sender } : Stages.stage_1) )
+      ({ temp_persistent_root_instance; sender } : Stages.stage_1) )
 
 let download_scan_state_and_pending_coinbases
     ({ context = (module Context); _ } as t)
-    ({ temp_persistent_root_instance; hash; sender } : Stages.stage_1) =
+    ({ temp_persistent_root_instance; sender } : Stages.stage_1) =
   let open Deferred.Result.Let_syntax in
   let%bind scan_state, expected_merkle_root, pending_coinbases, protocol_states
       =
+    let hash =
+      State_hash.With_state_hashes.state_hash
+      @@ Mina_block.Validation.block_with_hash t.current_root
+    in
     use_time_deferred (set_staged_ledger_data_download_time t.cycle_stats)
       ~f:(fun () ->
         Mina_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
@@ -412,7 +415,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
         Transition_frontier.Persistent_root.create_instance_exn persistent_root
       in
       (* step 1. download snarked_ledger *)
-      let%bind ({ temp_persistent_root_instance; hash; sender } as stage_1
+      let%bind ({ temp_persistent_root_instance; sender } as stage_1
                  : Stages.stage_1 ) =
         download_snarked_ledger t
           { temp_persistent_root_instance
@@ -572,10 +575,14 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
               |> Protocol_state.blockchain_state
               |> Blockchain_state.staged_ledger_hash
             in
+            let state_hash =
+              State_hash.With_state_hashes.state_hash
+              @@ Mina_block.Validation.block_with_hash t.current_root
+            in
             [%log error]
               ~metadata:
                 [ ("error", Error_json.error_to_yojson e)
-                ; ("state_hash", State_hash.to_yojson hash)
+                ; ("state_hash", State_hash.to_yojson state_hash)
                 ; ( "expected_staged_ledger_hash"
                   , Staged_ledger_hash.to_yojson expected_staged_ledger_hash )
                 ]
