@@ -626,10 +626,6 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
           don't_wait_for
             (transfer_while_writer_alive transition_reader sync_ledger_writer
                ~f:Fn.id ) ;
-          let temp_persistent_root_instance =
-            Transition_frontier.Persistent_root.create_instance_exn
-              persistent_root
-          in
           let initial_root_transition =
             initial_root_transition |> Mina_block.Validated.remember
             |> Mina_block.Validation.reset_frontier_dependencies_validation
@@ -647,47 +643,55 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             ; transition_graph = Transition_cache.create ()
             }
           in
-          let stage_0 =
-            ( { temp_persistent_root_instance
-              ; best_seen_transition_peers =
-                  Option.to_list best_seen_transition
-                  |> List.filter_map ~f:(fun x ->
-                         match Envelope.Incoming.sender x with
-                         | Local ->
-                             None
-                         | Remote r ->
-                             Some r )
-              ; sync_ledger_reader
-              }
-              : Stages.stage_0 )
-          in
-          ((t, stage_0), (sync_ledger_writer, temp_persistent_root_instance)) )
-        ~finally:(fun (sync_ledger_writer, temp_persistent_root_instance) ->
-          Writer.close sync_ledger_writer ;
-          Transition_frontier.Persistent_root.Instance.close
-            temp_persistent_root_instance )
-        ~f:(fun (t, stage_0) ->
-          (* step 1. download snarked_ledger *)
-          let%bind stage_1 = download_snarked_ledger t stage_0 in
-          Mina_metrics.(
-            Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
-              (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
-          (* step 2. Download scan state and pending coinbases. *)
-          let%bind.Deferred.Result stage_2 =
-            download_scan_state_and_pending_coinbases t stage_1
-          in
-          (* step 3. Construct staged ledger from snarked ledger, scan state
-             and pending coinbases. *)
-          (* Construct the staged ledger before constructing the transition
-           * frontier in order to verify the scan state we received.
-           * TODO: reorganize the code to avoid doing this twice (#3480) *)
+          ((t, sync_ledger_reader), sync_ledger_writer) )
+        ~finally:(fun sync_ledger_writer -> Writer.close sync_ledger_writer)
+        ~f:(fun (t, sync_ledger_reader) ->
           let%bind.Deferred.Result ({ scan_state
                                     ; pending_coinbases = pending_coinbase
                                     ; new_root
                                     ; protocol_states
                                     }
                                      : Stages.stage_3 ) =
-            construct_root_staged_ledger t stage_2
+            deferred_result_with
+              ~setup:(fun () ->
+                let temp_persistent_root_instance =
+                  Transition_frontier.Persistent_root.create_instance_exn
+                    persistent_root
+                in
+                let stage_0 =
+                  ( { temp_persistent_root_instance
+                    ; best_seen_transition_peers =
+                        Option.to_list best_seen_transition
+                        |> List.filter_map ~f:(fun x ->
+                               match Envelope.Incoming.sender x with
+                               | Local ->
+                                   None
+                               | Remote r ->
+                                   Some r )
+                    ; sync_ledger_reader
+                    }
+                    : Stages.stage_0 )
+                in
+                (stage_0, temp_persistent_root_instance) )
+              ~finally:(fun temp_persistent_root_instance ->
+                Transition_frontier.Persistent_root.Instance.close
+                  temp_persistent_root_instance )
+              ~f:(fun stage_0 ->
+                (* step 1. download snarked_ledger *)
+                let%bind stage_1 = download_snarked_ledger t stage_0 in
+                Mina_metrics.(
+                  Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
+                    (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
+                (* step 2. Download scan state and pending coinbases. *)
+                let%bind.Deferred.Result stage_2 =
+                  download_scan_state_and_pending_coinbases t stage_1
+                in
+                (* step 3. Construct staged ledger from snarked ledger, scan state
+                   and pending coinbases. *)
+                (* Construct the staged ledger before constructing the transition
+                 * frontier in order to verify the scan state we received.
+                 * TODO: reorganize the code to avoid doing this twice (#3480) *)
+                construct_root_staged_ledger t stage_2 )
           in
           (* step 4. Synchronize consensus local state if necessary *)
           let%bind.Deferred.Result () =
