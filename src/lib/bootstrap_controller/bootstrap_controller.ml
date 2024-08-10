@@ -86,13 +86,11 @@ module Stages = struct
     { temp_persistent_root_instance : Persistent_root.Instance_type.t
     ; hash : Frozen_ledger_hash.t
     ; sender : Peer.t
-    ; expected_staged_ledger_hash : Staged_ledger_hash.t
     }
 
   type stage_2 =
     { temp_persistent_root_instance : Persistent_root.Instance_type.t
     ; scan_state : Staged_ledger.Scan_state.t
-    ; expected_staged_ledger_hash : Staged_ledger_hash.t
     ; expected_merkle_root : Frozen_ledger_hash.t
     ; pending_coinbases : Pending_coinbase.t
     ; protocol_states : Protocol_state.value State_hash.With_state_hashes.t list
@@ -180,9 +178,6 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger
     t.current_root |> Mina_block.Validation.block |> Mina_block.header
     |> Mina_block.Header.protocol_state |> Protocol_state.blockchain_state
   in
-  let expected_staged_ledger_hash =
-    blockchain_state |> Blockchain_state.staged_ledger_hash
-  in
   let snarked_ledger_hash =
     blockchain_state |> Blockchain_state.snarked_ledger_hash
   in
@@ -194,9 +189,8 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger
       ~data:
         ( State_hash.With_state_hashes.state_hash
           @@ Mina_block.Validation.block_with_hash t.current_root
-        , sender
-        , expected_staged_ledger_hash )
-      ~equal:(fun (hash1, _, _) (hash2, _, _) -> State_hash.equal hash1 hash2)
+        , sender )
+      ~equal:(fun (hash1, _) (hash2, _) -> State_hash.equal hash1 hash2)
   with
   | `New ->
       t.num_of_root_snarked_ledger_retargeted <-
@@ -333,26 +327,16 @@ let download_snarked_ledger ({ context = (module Context); _ } as t)
         Sync_ledger.Db.create temp_snarked_ledger ~logger
           ~trust_system:t.trust_system
       in
-      let%map hash, sender, expected_staged_ledger_hash =
+      let%map hash, sender =
         sync_ledger t ~preferred:best_seen_transition_peers ~root_sync_ledger
           ~sync_ledger_reader ~genesis_constants
       in
       Sync_ledger.Db.destroy root_sync_ledger ;
-      ( { temp_persistent_root_instance
-        ; hash
-        ; sender
-        ; expected_staged_ledger_hash
-        }
-        : Stages.stage_1 ) )
+      ({ temp_persistent_root_instance; hash; sender } : Stages.stage_1) )
 
 let download_scan_state_and_pending_coinbases
     ({ context = (module Context); _ } as t)
-    ({ temp_persistent_root_instance
-     ; hash
-     ; sender
-     ; expected_staged_ledger_hash
-     } :
-      Stages.stage_1 ) =
+    ({ temp_persistent_root_instance; hash; sender } : Stages.stage_1) =
   let open Deferred.Result.Let_syntax in
   let%bind scan_state, expected_merkle_root, pending_coinbases, protocol_states
       =
@@ -371,7 +355,6 @@ let download_scan_state_and_pending_coinbases
     |> Deferred.return
   in
   ( { temp_persistent_root_instance
-    ; expected_staged_ledger_hash
     ; scan_state
     ; expected_merkle_root
     ; pending_coinbases
@@ -429,11 +412,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
         Transition_frontier.Persistent_root.create_instance_exn persistent_root
       in
       (* step 1. download snarked_ledger *)
-      let%bind ({ temp_persistent_root_instance
-                ; hash
-                ; sender
-                ; expected_staged_ledger_hash
-                } as stage_1
+      let%bind ({ temp_persistent_root_instance; hash; sender } as stage_1
                  : Stages.stage_1 ) =
         download_snarked_ledger t
           { temp_persistent_root_instance
@@ -460,7 +439,6 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                                  : Stages.stage_3 ) =
         let%bind staged_ledger_aux_result =
           let%bind.Deferred.Result ({ temp_persistent_root_instance
-                                    ; expected_staged_ledger_hash
                                     ; scan_state
                                     ; expected_merkle_root
                                     ; pending_coinbases
@@ -475,6 +453,12 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                 Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
                   (Staged_ledger.Scan_state.hash scan_state)
                   expected_merkle_root pending_coinbases
+              in
+              let expected_staged_ledger_hash =
+                t.current_root |> Mina_block.Validation.block
+                |> Mina_block.header |> Mina_block.Header.protocol_state
+                |> Protocol_state.blockchain_state
+                |> Blockchain_state.staged_ledger_hash
               in
               [%log debug]
                 ~metadata:
@@ -581,6 +565,12 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                         ( "Can't find scan state from the peer or received \
                            faulty scan state from the peer."
                         , [] ) ))
+            in
+            let expected_staged_ledger_hash =
+              t.current_root |> Mina_block.Validation.block |> Mina_block.header
+              |> Mina_block.Header.protocol_state
+              |> Protocol_state.blockchain_state
+              |> Blockchain_state.staged_ledger_hash
             in
             [%log error]
               ~metadata:
