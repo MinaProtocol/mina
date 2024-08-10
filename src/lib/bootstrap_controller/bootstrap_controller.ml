@@ -71,6 +71,17 @@ let set_local_state_sync_time self local_state_sync_time =
   self.local_state_sync_time <- Some local_state_sync_time
 
 module Stages = struct
+  type 'a stage_0 =
+    { temp_persistent_root_instance : Persistent_root.Instance_type.t
+    ; best_seen_transition_peers : Peer.t list
+    ; sync_ledger_reader :
+        ([< `Block of Mina_block.initial_valid_block Envelope.Incoming.t ]
+         * [< `Valid_cb of Mina_net2.Validation_callback.t option ]
+         as
+         'a )
+        Pipe_lib.Strict_pipe.Reader.t
+    }
+
   type stage_1 =
     { temp_persistent_root_instance : Persistent_root.Instance_type.t
     ; hash : Frozen_ledger_hash.t
@@ -287,14 +298,42 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
       else 1 )
     ~f:(With_hash.map ~f:Mina_block.consensus_state)
 
+let download_snarked_ledger ({ context = (module Context); _ } as t)
+    ({ temp_persistent_root_instance
+     ; best_seen_transition_peers
+     ; sync_ledger_reader
+     } :
+      _ Stages.stage_0 ) =
+  let open Context in
+  let genesis_constants =
+    Precomputed_values.genesis_constants precomputed_values
+  in
+  use_time_deferred (set_sync_ledger_time t.cycle_stats) ~f:(fun () ->
+      let root_sync_ledger =
+        let temp_snarked_ledger =
+          Transition_frontier.Persistent_root.Instance.snarked_ledger
+            temp_persistent_root_instance
+        in
+        Sync_ledger.Db.create temp_snarked_ledger ~logger
+          ~trust_system:t.trust_system
+      in
+      let%map hash, sender, expected_staged_ledger_hash =
+        sync_ledger t ~preferred:best_seen_transition_peers ~root_sync_ledger
+          ~sync_ledger_reader ~genesis_constants
+      in
+      Sync_ledger.Db.destroy root_sync_ledger ;
+      ( { temp_persistent_root_instance
+        ; hash
+        ; sender
+        ; expected_staged_ledger_hash
+        }
+        : Stages.stage_1 ) )
+
 let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
     ~network ~consensus_local_state ~transition_reader ~best_seen_transition
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
     =
   let open Context in
-  let genesis_constants =
-    Precomputed_values.genesis_constants precomputed_values
-  in
   stage (fun () ->
       let sync_ledger_pipe = "sync ledger pipe" in
       let sync_ledger_reader, sync_ledger_writer =
@@ -346,33 +385,18 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                 ; expected_staged_ledger_hash
                 }
                  : Stages.stage_1 ) =
-        use_time_deferred (set_sync_ledger_time t.cycle_stats) ~f:(fun () ->
-            let root_sync_ledger =
-              let temp_snarked_ledger =
-                Transition_frontier.Persistent_root.Instance.snarked_ledger
-                  temp_persistent_root_instance
-              in
-              Sync_ledger.Db.create temp_snarked_ledger ~logger ~trust_system
-            in
-            let%map hash, sender, expected_staged_ledger_hash =
-              sync_ledger t
-                ~preferred:
-                  ( Option.to_list best_seen_transition
-                  |> List.filter_map ~f:(fun x ->
-                         match Envelope.Incoming.sender x with
-                         | Local ->
-                             None
-                         | Remote r ->
-                             Some r ) )
-                ~root_sync_ledger ~sync_ledger_reader ~genesis_constants
-            in
-            Sync_ledger.Db.destroy root_sync_ledger ;
-            ( { temp_persistent_root_instance
-              ; hash
-              ; sender
-              ; expected_staged_ledger_hash
-              }
-              : Stages.stage_1 ) )
+        download_snarked_ledger t
+          { temp_persistent_root_instance
+          ; best_seen_transition_peers =
+              Option.to_list best_seen_transition
+              |> List.filter_map ~f:(fun x ->
+                     match Envelope.Incoming.sender x with
+                     | Local ->
+                         None
+                     | Remote r ->
+                         Some r )
+          ; sync_ledger_reader
+          }
       in
       Mina_metrics.(
         Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
