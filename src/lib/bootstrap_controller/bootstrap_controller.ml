@@ -88,6 +88,13 @@ module Stages = struct
     ; sender : Peer.t
     ; expected_staged_ledger_hash : Staged_ledger_hash.t
     }
+
+  type stage_3 =
+    { scan_state : Staged_ledger.Scan_state.t
+    ; pending_coinbases : Pending_coinbase.t
+    ; new_root : Mina_block.Validation.fully_valid_with_block
+    ; protocol_states : Protocol_state.value State_hash.With_state_hashes.t list
+    }
 end
 
 type t =
@@ -402,10 +409,12 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
         Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
           (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
       (* step 2. Download scan state and pending coinbases. *)
-      let%bind.Deferred.Result ( scan_state
-                               , pending_coinbase
-                               , new_root
-                               , protocol_states ) =
+      let%bind.Deferred.Result ({ scan_state
+                                ; pending_coinbases = pending_coinbase
+                                ; new_root
+                                ; protocol_states
+                                }
+                                 : Stages.stage_3 ) =
         let%bind staged_ledger_aux_result =
           let%bind.Deferred.Result ( scan_state
                                    , expected_merkle_root
@@ -518,10 +527,12 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                   Result.map result
                     ~f:
                       (const
-                         ( scan_state
-                         , pending_coinbases
-                         , new_root
-                         , protocol_states ) ) ) )
+                         ( { scan_state
+                           ; pending_coinbases
+                           ; new_root
+                           ; protocol_states
+                           }
+                           : Stages.stage_3 ) ) ) )
         in
         Transition_frontier.Persistent_root.Instance.close
           temp_persistent_root_instance ;
