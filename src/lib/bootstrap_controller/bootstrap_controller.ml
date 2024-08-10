@@ -71,14 +71,12 @@ let set_local_state_sync_time self local_state_sync_time =
   self.local_state_sync_time <- Some local_state_sync_time
 
 module Stages = struct
-  type 'a stage_0 =
+  type stage_0 =
     { temp_persistent_root_instance : Persistent_root.Instance_type.t
     ; best_seen_transition_peers : Peer.t list
     ; sync_ledger_reader :
-        ([< `Block of Mina_block.initial_valid_block Envelope.Incoming.t ]
-         * [< `Valid_cb of Mina_net2.Validation_callback.t option ]
-         as
-         'a )
+        ( [ `Block of Mina_block.initial_valid_block Envelope.Incoming.t ]
+        * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
         Pipe_lib.Strict_pipe.Reader.t
     }
 
@@ -326,7 +324,7 @@ let download_snarked_ledger ({ context = (module Context); _ } as t)
      ; best_seen_transition_peers
      ; sync_ledger_reader
      } :
-      _ Stages.stage_0 ) =
+      Stages.stage_0 ) =
   let open Context in
   let genesis_constants =
     Precomputed_values.genesis_constants precomputed_values
@@ -590,13 +588,6 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             Transition_frontier.Persistent_root.create_instance_exn
               persistent_root
           in
-          ( (sync_ledger_reader, temp_persistent_root_instance)
-          , (sync_ledger_writer, temp_persistent_root_instance) ) )
-        ~finally:(fun (sync_ledger_writer, temp_persistent_root_instance) ->
-          Writer.close sync_ledger_writer ;
-          Transition_frontier.Persistent_root.Instance.close
-            temp_persistent_root_instance )
-        ~f:(fun (sync_ledger_reader, temp_persistent_root_instance) ->
           let initial_root_transition =
             initial_root_transition |> Mina_block.Validated.remember
             |> Mina_block.Validation.reset_frontier_dependencies_validation
@@ -614,10 +605,8 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             ; transition_graph = Transition_cache.create ()
             }
           in
-          (* step 1. download snarked_ledger *)
-          let%bind stage_1 =
-            download_snarked_ledger t
-              { temp_persistent_root_instance
+          let stage_0 =
+            ( { temp_persistent_root_instance
               ; best_seen_transition_peers =
                   Option.to_list best_seen_transition
                   |> List.filter_map ~f:(fun x ->
@@ -628,7 +617,16 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                              Some r )
               ; sync_ledger_reader
               }
+              : Stages.stage_0 )
           in
+          ((t, stage_0), (sync_ledger_writer, temp_persistent_root_instance)) )
+        ~finally:(fun (sync_ledger_writer, temp_persistent_root_instance) ->
+          Writer.close sync_ledger_writer ;
+          Transition_frontier.Persistent_root.Instance.close
+            temp_persistent_root_instance )
+        ~f:(fun (t, stage_0) ->
+          (* step 1. download snarked_ledger *)
+          let%bind stage_1 = download_snarked_ledger t stage_0 in
           Mina_metrics.(
             Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
               (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
