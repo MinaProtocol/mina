@@ -238,57 +238,55 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
         | Error e ->
             return (received_bad_proof t sender e |> Fn.const `Ignored) )
 
+let handle_incoming_transition ({ context = (module Context); _ } as t)
+    ~root_sync_ledger =
+  let open Context in
+  let genesis_constants =
+    Precomputed_values.genesis_constants precomputed_values
+  in
+  stage
+  @@ fun (`Block incoming_transition, _) ->
+  let (transition, _) : Mina_block.initial_valid_block =
+    Envelope.Incoming.data incoming_transition
+  in
+  let previous_state_hash =
+    With_hash.data transition |> Mina_block.header
+    |> Mina_block.Header.protocol_state |> Protocol_state.previous_state_hash
+  in
+  let sender = Envelope.Incoming.remote_sender_exn incoming_transition in
+  Transition_cache.add t.transition_graph ~parent:previous_state_hash
+    incoming_transition ;
+  (* TODO: Efficiently limiting the number of green threads in #1337 *)
+  if
+    worth_getting_root t
+      (With_hash.map ~f:Mina_block.consensus_state transition)
+  then (
+    [%log trace] "Added the transition from sync_ledger_reader into cache"
+      ~metadata:
+        [ ( "state_hash"
+          , State_hash.to_yojson
+              (State_hash.With_state_hashes.state_hash transition) )
+        ; ( "external_transition"
+          , Mina_block.to_yojson (With_hash.data transition) )
+        ] ;
+
+    Deferred.ignore_m
+    @@ on_transition t ~sender ~root_sync_ledger ~genesis_constants transition )
+  else Deferred.unit
+
 (** A helper function that wraps the calls to Sync_ledger and iterate through
     incoming transitions, add those to the transition_cache and calls
     [on_transition] function. *)
-let sync_ledger_core ({ context = (module Context); _ } as t) ~preferred
-    ~root_sync_ledger ~sync_ledger_reader ~genesis_constants =
-  let open Context in
+let sync_ledger ({ context = (module Context); _ } as t) ~preferred
+    ~root_sync_ledger ~sync_ledger_reader =
   let query_reader = Sync_ledger.Db.query_reader root_sync_ledger in
   let response_writer = Sync_ledger.Db.answer_writer root_sync_ledger in
   Mina_networking.glue_sync_ledger ~preferred t.network query_reader
     response_writer ;
-  Reader.iter sync_ledger_reader ~f:(fun (`Block incoming_transition, _) ->
-      let (transition, _) : Mina_block.initial_valid_block =
-        Envelope.Incoming.data incoming_transition
-      in
-      let previous_state_hash =
-        With_hash.data transition |> Mina_block.header
-        |> Mina_block.Header.protocol_state
-        |> Protocol_state.previous_state_hash
-      in
-      let sender = Envelope.Incoming.remote_sender_exn incoming_transition in
-      Transition_cache.add t.transition_graph ~parent:previous_state_hash
-        incoming_transition ;
-      (* TODO: Efficiently limiting the number of green threads in #1337 *)
-      if
-        worth_getting_root t
-          (With_hash.map ~f:Mina_block.consensus_state transition)
-      then (
-        [%log trace] "Added the transition from sync_ledger_reader into cache"
-          ~metadata:
-            [ ( "state_hash"
-              , State_hash.to_yojson
-                  (State_hash.With_state_hashes.state_hash transition) )
-            ; ( "external_transition"
-              , Mina_block.to_yojson (With_hash.data transition) )
-            ] ;
-
-        Deferred.ignore_m
-        @@ on_transition t ~sender ~root_sync_ledger ~genesis_constants
-             transition )
-      else Deferred.unit )
-
-let sync_ledger t ~preferred ~root_sync_ledger ~sync_ledger_reader
-    ~genesis_constants =
-  don't_wait_for
-    (sync_ledger_core t ~preferred ~root_sync_ledger ~sync_ledger_reader
-       ~genesis_constants ) ;
-  (* We ignore the resulting ledger returned here since it will always be the
-     same as the ledger we started with because we are syncing a db ledger.
-  *)
-  let%map _, data = Sync_ledger.Db.valid_tree root_sync_ledger in
-  data
+  let handle_incoming_transition =
+    unstage @@ handle_incoming_transition t ~root_sync_ledger
+  in
+  Reader.iter sync_ledger_reader ~f:handle_incoming_transition
 
 let external_transition_compare ~context:(module Context : CONTEXT) =
   Comparable.lift
@@ -326,9 +324,6 @@ let download_snarked_ledger ({ context = (module Context); _ } as t)
      } :
       Stages.stage_0 ) =
   let open Context in
-  let genesis_constants =
-    Precomputed_values.genesis_constants precomputed_values
-  in
   use_time_deferred (set_sync_ledger_time t.cycle_stats) ~f:(fun () ->
       let root_sync_ledger =
         let temp_snarked_ledger =
@@ -338,10 +333,13 @@ let download_snarked_ledger ({ context = (module Context); _ } as t)
         Sync_ledger.Db.create temp_snarked_ledger ~logger
           ~trust_system:t.trust_system
       in
-      let%map _, sender =
-        sync_ledger t ~preferred:best_seen_transition_peers ~root_sync_ledger
-          ~sync_ledger_reader ~genesis_constants
-      in
+      don't_wait_for
+        (sync_ledger t ~preferred:best_seen_transition_peers ~root_sync_ledger
+           ~sync_ledger_reader ) ;
+      (* We ignore the resulting ledger returned here since it will always be the
+         same as the ledger we started with because we are syncing a db ledger.
+      *)
+      let%map _, (_, sender) = Sync_ledger.Db.valid_tree root_sync_ledger in
       Sync_ledger.Db.destroy root_sync_ledger ;
       ({ temp_persistent_root_instance; sender } : Stages.stage_1) )
 
@@ -947,9 +945,8 @@ let%test_module "Bootstrap_controller tests" =
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
               let sync_deferred =
-                sync_ledger_core bootstrap ~root_sync_ledger ~preferred:[]
+                sync_ledger bootstrap ~root_sync_ledger ~preferred:[]
                   ~sync_ledger_reader
-                  ~genesis_constants:Genesis_constants.compiled
               in
               let%bind () =
                 Deferred.List.iter branch ~f:(fun breadcrumb ->
