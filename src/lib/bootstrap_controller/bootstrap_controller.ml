@@ -383,6 +383,9 @@ let download_snarked_ledger ({ context = (module Context); _ } as t)
       let%map _, (_, sender) = Sync_ledger.Db.valid_tree root_sync_ledger in
       t.ledger_sync_state <- Ledger_sync_finished ;
       Sync_ledger.Db.destroy root_sync_ledger ;
+      Mina_metrics.(
+        Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
+          (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
       ({ temp_persistent_root_instance; sender } : Stages.stage_1) )
 
 let download_scan_state_and_pending_coinbases
@@ -799,9 +802,6 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
               ~f:(fun stage_0 ->
                 (* step 1. download snarked_ledger *)
                 let%bind stage_1 = download_snarked_ledger t stage_0 in
-                Mina_metrics.(
-                  Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
-                    (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
                 (* step 2. Download scan state and pending coinbases. *)
                 let%bind.Deferred.Result stage_2 =
                   download_scan_state_and_pending_coinbases t stage_1
