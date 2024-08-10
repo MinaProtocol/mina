@@ -100,6 +100,21 @@ module Stages = struct
     ; new_root : Mina_block.Validation.fully_valid_with_block
     ; protocol_states : Protocol_state.value State_hash.With_state_hashes.t list
     }
+
+  type pending_ledger_data =
+    { target_snarked_hash : Frozen_ledger_hash.t
+    ; state_hash : State_hash.t
+    ; peer : Peer.t
+    }
+
+  type syncing_ledger_data =
+    { root_sync_ledger : (State_hash.t * Peer.t) Sync_ledger.Db.t }
+
+  type ledger_sync_state =
+    | No_pending_ledger
+    | Pending_ledger of pending_ledger_data
+    | Syncing_ledger of syncing_ledger_data
+    | Ledger_sync_finished
 end
 
 type t =
@@ -112,6 +127,7 @@ type t =
   ; mutable num_of_root_snarked_ledger_retargeted : int
   ; cycle_stats : bootstrap_cycle_stats
   ; transition_graph : Transition_cache.t
+  ; mutable ledger_sync_state : Stages.ledger_sync_state
   }
 
 let time_deferred deferred =
@@ -155,15 +171,30 @@ let received_bad_proof ({ context = (module Context); _ } as t) host e =
 let done_syncing_root root_sync_ledger =
   Option.is_some (Sync_ledger.Db.peek_valid_tree root_sync_ledger)
 
-let should_sync ~root_sync_ledger t candidate_state =
-  (not @@ done_syncing_root root_sync_ledger)
-  && worth_getting_root t candidate_state
+let should_sync t candidate_state =
+  match t.ledger_sync_state with
+  | No_pending_ledger | Pending_ledger _ ->
+      worth_getting_root t candidate_state
+  | Syncing_ledger { root_sync_ledger } ->
+      (not @@ done_syncing_root root_sync_ledger)
+      && worth_getting_root t candidate_state
+  | Ledger_sync_finished ->
+      false
+
+let done_syncing_root t =
+  match t.ledger_sync_state with
+  | No_pending_ledger | Pending_ledger _ ->
+      false
+  | Syncing_ledger { root_sync_ledger } ->
+      done_syncing_root root_sync_ledger
+  | Ledger_sync_finished ->
+      true
 
 (** Update [Synced_ledger]'s target and [best_seen_transition] and [current_root] accordingly. *)
-let start_sync_job_with_peer ~sender ~root_sync_ledger
-    ({ context = (module Context); _ } as t) peer_best_tip peer_root =
+let start_sync_job_with_peer ~sender ({ context = (module Context); _ } as t)
+    peer_best_tip peer_root =
   let open Context in
-  let%bind () =
+  let%map () =
     Trust_system.(
       record t.trust_system logger sender
         Actions.
@@ -179,24 +210,37 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger
   let snarked_ledger_hash =
     blockchain_state |> Blockchain_state.snarked_ledger_hash
   in
-  return
-  @@
-  match
-    Sync_ledger.Db.new_goal root_sync_ledger
-      (Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash)
-      ~data:
-        ( State_hash.With_state_hashes.state_hash
-          @@ Mina_block.Validation.block_with_hash t.current_root
-        , sender )
-      ~equal:(fun (hash1, _) (hash2, _) -> State_hash.equal hash1 hash2)
-  with
-  | `New ->
-      t.num_of_root_snarked_ledger_retargeted <-
-        t.num_of_root_snarked_ledger_retargeted + 1 ;
-      `Syncing_new_snarked_ledger
-  | `Update_data ->
-      `Updating_root_transition
-  | `Repeat ->
+  match t.ledger_sync_state with
+  | No_pending_ledger | Pending_ledger _ ->
+      t.ledger_sync_state <-
+        Pending_ledger
+          { target_snarked_hash =
+              Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash
+          ; state_hash =
+              State_hash.With_state_hashes.state_hash
+              @@ Mina_block.Validation.block_with_hash t.current_root
+          ; peer = sender
+          } ;
+      `Enqueued_new_snark_ledger
+  | Syncing_ledger { root_sync_ledger } -> (
+      match
+        Sync_ledger.Db.new_goal root_sync_ledger
+          (Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash)
+          ~data:
+            ( State_hash.With_state_hashes.state_hash
+              @@ Mina_block.Validation.block_with_hash t.current_root
+            , sender )
+          ~equal:(fun (hash1, _) (hash2, _) -> State_hash.equal hash1 hash2)
+      with
+      | `New ->
+          t.num_of_root_snarked_ledger_retargeted <-
+            t.num_of_root_snarked_ledger_retargeted + 1 ;
+          `Syncing_new_snarked_ledger
+      | `Update_data ->
+          `Updating_root_transition
+      | `Repeat ->
+          `Ignored )
+  | Ledger_sync_finished ->
       `Ignored
 
 (** For each transition, this function would compare it with the existing one.
@@ -205,12 +249,12 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger
     the existing one, then reset the Sync_ledger's target by calling
     [start_sync_job_with_peer] function. *)
 let on_transition ({ context = (module Context); _ } as t) ~sender
-    ~root_sync_ledger ~genesis_constants candidate_transition =
+    ~genesis_constants candidate_transition =
   let open Context in
   let candidate_consensus_state =
     With_hash.map ~f:Mina_block.consensus_state candidate_transition
   in
-  if not @@ should_sync ~root_sync_ledger t candidate_consensus_state then
+  if not @@ should_sync t candidate_consensus_state then
     Deferred.return `Ignored
   else
     match%bind
@@ -232,47 +276,44 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
             peer_root_with_proof.data
         with
         | Ok (`Root root, `Best_tip best_tip) ->
-            if done_syncing_root root_sync_ledger then return `Ignored
-            else
-              start_sync_job_with_peer ~sender ~root_sync_ledger t best_tip root
+            if done_syncing_root t then return `Ignored
+            else start_sync_job_with_peer ~sender t best_tip root
         | Error e ->
             return (received_bad_proof t sender e |> Fn.const `Ignored) )
 
-let handle_incoming_transition ({ context = (module Context); _ } as t)
-    ~root_sync_ledger =
+let handle_incoming_transition ({ context = (module Context); _ } as t) =
   let open Context in
   let genesis_constants =
     Precomputed_values.genesis_constants precomputed_values
   in
-  stage
-  @@ fun (`Block incoming_transition, _) ->
-  let (transition, _) : Mina_block.initial_valid_block =
-    Envelope.Incoming.data incoming_transition
-  in
-  let previous_state_hash =
-    With_hash.data transition |> Mina_block.header
-    |> Mina_block.Header.protocol_state |> Protocol_state.previous_state_hash
-  in
-  let sender = Envelope.Incoming.remote_sender_exn incoming_transition in
-  Transition_cache.add t.transition_graph ~parent:previous_state_hash
-    incoming_transition ;
-  (* TODO: Efficiently limiting the number of green threads in #1337 *)
-  if
-    worth_getting_root t
-      (With_hash.map ~f:Mina_block.consensus_state transition)
-  then (
-    [%log trace] "Added the transition from sync_ledger_reader into cache"
-      ~metadata:
-        [ ( "state_hash"
-          , State_hash.to_yojson
-              (State_hash.With_state_hashes.state_hash transition) )
-        ; ( "external_transition"
-          , Mina_block.to_yojson (With_hash.data transition) )
-        ] ;
+  fun (`Block incoming_transition, _) ->
+    let (transition, _) : Mina_block.initial_valid_block =
+      Envelope.Incoming.data incoming_transition
+    in
+    let previous_state_hash =
+      With_hash.data transition |> Mina_block.header
+      |> Mina_block.Header.protocol_state |> Protocol_state.previous_state_hash
+    in
+    let sender = Envelope.Incoming.remote_sender_exn incoming_transition in
+    Transition_cache.add t.transition_graph ~parent:previous_state_hash
+      incoming_transition ;
+    (* TODO: Efficiently limiting the number of green threads in #1337 *)
+    if
+      worth_getting_root t
+        (With_hash.map ~f:Mina_block.consensus_state transition)
+    then (
+      [%log trace] "Added the transition from sync_ledger_reader into cache"
+        ~metadata:
+          [ ( "state_hash"
+            , State_hash.to_yojson
+                (State_hash.With_state_hashes.state_hash transition) )
+          ; ( "external_transition"
+            , Mina_block.to_yojson (With_hash.data transition) )
+          ] ;
 
-    Deferred.ignore_m
-    @@ on_transition t ~sender ~root_sync_ledger ~genesis_constants transition )
-  else Deferred.unit
+      Deferred.ignore_m @@ on_transition t ~sender ~genesis_constants transition
+      )
+    else Deferred.unit
 
 (** A helper function that wraps the calls to Sync_ledger and iterate through
     incoming transitions, add those to the transition_cache and calls
@@ -330,15 +371,26 @@ let download_snarked_ledger ({ context = (module Context); _ } as t)
           ~trust_system:t.trust_system
       in
       sync_ledger t ~preferred:best_seen_transition_peers ~root_sync_ledger ;
+      (* If there is a pending sync state, start syncing to it. *)
+      ( match t.ledger_sync_state with
+      | No_pending_ledger ->
+          ()
+      | Pending_ledger { target_snarked_hash; state_hash; peer } ->
+          ignore
+          @@ ( Sync_ledger.Db.new_goal root_sync_ledger target_snarked_hash
+                 ~data:(state_hash, peer) ~equal:(fun (hash1, _) (hash2, _) ->
+                   State_hash.equal hash1 hash2 )
+               : [ `New | `Repeat | `Update_data ] )
+      | Syncing_ledger _ | Ledger_sync_finished ->
+          assert false ) ;
+      t.ledger_sync_state <- Syncing_ledger { root_sync_ledger } ;
       don't_wait_for
-        (let handle_incoming_transition =
-           unstage @@ handle_incoming_transition t ~root_sync_ledger
-         in
-         Reader.iter sync_ledger_reader ~f:handle_incoming_transition ) ;
+        (Reader.iter sync_ledger_reader ~f:(handle_incoming_transition t)) ;
       (* We ignore the resulting ledger returned here since it will always be the
          same as the ledger we started with because we are syncing a db ledger.
       *)
       let%map _, (_, sender) = Sync_ledger.Db.valid_tree root_sync_ledger in
+      t.ledger_sync_state <- Ledger_sync_finished ;
       Sync_ledger.Db.destroy root_sync_ledger ;
       ({ temp_persistent_root_instance; sender } : Stages.stage_1) )
 
@@ -721,6 +773,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             ; num_of_root_snarked_ledger_retargeted = 0
             ; cycle_stats = default_cycle_stats ()
             ; transition_graph = Transition_cache.create ()
+            ; ledger_sync_state = No_pending_ledger
             }
           in
           ((t, sync_ledger_reader), sync_ledger_writer) )
@@ -899,6 +952,7 @@ let%test_module "Bootstrap_controller tests" =
       ; num_of_root_snarked_ledger_retargeted = 0
       ; cycle_stats = default_cycle_stats ()
       ; transition_graph = Transition_cache.create ()
+      ; ledger_sync_state = No_pending_ledger
       }
 
     let%test_unit "Bootstrap controller caches all transitions it is passed \
@@ -945,11 +999,8 @@ let%test_module "Bootstrap_controller tests" =
           Async.Thread_safe.block_on_async_exn (fun () ->
               sync_ledger bootstrap ~root_sync_ledger ~preferred:[] ;
               let sync_deferred =
-                let handle_incoming_transition =
-                  unstage
-                  @@ handle_incoming_transition bootstrap ~root_sync_ledger
-                in
-                Reader.iter sync_ledger_reader ~f:handle_incoming_transition
+                Reader.iter sync_ledger_reader
+                  ~f:(handle_incoming_transition bootstrap)
               in
               let%bind () =
                 Deferred.List.iter branch ~f:(fun breadcrumb ->
