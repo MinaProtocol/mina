@@ -79,6 +79,7 @@ type t =
   ; network : Mina_networking.t
   ; mutable num_of_root_snarked_ledger_retargeted : int
   ; cycle_stats : bootstrap_cycle_stats
+  ; transition_graph : Transition_cache.t
   }
 
 let time_deferred deferred =
@@ -213,7 +214,7 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
     incoming transitions, add those to the transition_cache and calls
     [on_transition] function. *)
 let sync_ledger_core ({ context = (module Context); _ } as t) ~preferred
-    ~root_sync_ledger ~transition_graph ~sync_ledger_reader ~genesis_constants =
+    ~root_sync_ledger ~sync_ledger_reader ~genesis_constants =
   let open Context in
   let query_reader = Sync_ledger.Db.query_reader root_sync_ledger in
   let response_writer = Sync_ledger.Db.answer_writer root_sync_ledger in
@@ -229,7 +230,7 @@ let sync_ledger_core ({ context = (module Context); _ } as t) ~preferred
         |> Protocol_state.previous_state_hash
       in
       let sender = Envelope.Incoming.remote_sender_exn incoming_transition in
-      Transition_cache.add transition_graph ~parent:previous_state_hash
+      Transition_cache.add t.transition_graph ~parent:previous_state_hash
         incoming_transition ;
       (* TODO: Efficiently limiting the number of green threads in #1337 *)
       if
@@ -250,11 +251,11 @@ let sync_ledger_core ({ context = (module Context); _ } as t) ~preferred
              transition )
       else Deferred.unit )
 
-let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
-    ~sync_ledger_reader ~genesis_constants =
+let sync_ledger t ~preferred ~root_sync_ledger ~sync_ledger_reader
+    ~genesis_constants =
   don't_wait_for
-    (sync_ledger_core t ~preferred ~root_sync_ledger ~transition_graph
-       ~sync_ledger_reader ~genesis_constants ) ;
+    (sync_ledger_core t ~preferred ~root_sync_ledger ~sync_ledger_reader
+       ~genesis_constants ) ;
   (* We ignore the resulting ledger returned here since it will always be the
      same as the ledger we started with because we are syncing a db ledger.
   *)
@@ -323,9 +324,9 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
         ; current_root = initial_root_transition
         ; num_of_root_snarked_ledger_retargeted = 0
         ; cycle_stats = default_cycle_stats ()
+        ; transition_graph = Transition_cache.create ()
         }
       in
-      let transition_graph = Transition_cache.create () in
       let temp_persistent_root_instance =
         Transition_frontier.Persistent_root.create_instance_exn persistent_root
       in
@@ -349,8 +350,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                              None
                          | Remote r ->
                              Some r ) )
-                ~root_sync_ledger ~transition_graph ~sync_ledger_reader
-                ~genesis_constants
+                ~root_sync_ledger ~sync_ledger_reader ~genesis_constants
             in
             Sync_ledger.Db.destroy root_sync_ledger ;
             data )
@@ -607,7 +607,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
               "this should not happen, because we just reset the snarked_ledger"
       in
       [%str_log info] Bootstrap_complete ;
-      let collected_transitions = Transition_cache.data transition_graph in
+      let collected_transitions = Transition_cache.data t.transition_graph in
       let logger =
         Logger.extend logger
           [ ("context", `String "Filter collected transitions in bootstrap") ]
@@ -762,6 +762,7 @@ let%test_module "Bootstrap_controller tests" =
       ; network
       ; num_of_root_snarked_ledger_retargeted = 0
       ; cycle_stats = default_cycle_stats ()
+      ; transition_graph = Transition_cache.create ()
       }
 
     let%test_unit "Bootstrap controller caches all transitions it is passed \
@@ -794,7 +795,6 @@ let%test_module "Bootstrap_controller tests" =
               Breadcrumb.validated_transition @@ root me.state.frontier)
             |> Mina_block.Validated.remember
           in
-          let transition_graph = Transition_cache.create () in
           let sync_ledger_reader, sync_ledger_writer =
             Pipe_lib.Strict_pipe.create ~name:"sync_ledger_reader" Synchronous
           in
@@ -808,8 +808,8 @@ let%test_module "Bootstrap_controller tests" =
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
               let sync_deferred =
-                sync_ledger_core bootstrap ~root_sync_ledger ~transition_graph
-                  ~preferred:[] ~sync_ledger_reader
+                sync_ledger_core bootstrap ~root_sync_ledger ~preferred:[]
+                  ~sync_ledger_reader
                   ~genesis_constants:Genesis_constants.compiled
               in
               let%bind () =
@@ -829,7 +829,7 @@ let%test_module "Bootstrap_controller tests" =
                       Transition_frontier.Breadcrumb.validated_transition ) )
           in
           let saved_transitions =
-            Transition_cache.data transition_graph
+            Transition_cache.data bootstrap.transition_graph
             |> List.map
                  ~f:
                    (Fn.compose Mina_block.Validation.block_with_hash
