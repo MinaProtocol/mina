@@ -278,15 +278,11 @@ let handle_incoming_transition ({ context = (module Context); _ } as t)
     incoming transitions, add those to the transition_cache and calls
     [on_transition] function. *)
 let sync_ledger ({ context = (module Context); _ } as t) ~preferred
-    ~root_sync_ledger ~sync_ledger_reader =
+    ~root_sync_ledger =
   let query_reader = Sync_ledger.Db.query_reader root_sync_ledger in
   let response_writer = Sync_ledger.Db.answer_writer root_sync_ledger in
   Mina_networking.glue_sync_ledger ~preferred t.network query_reader
-    response_writer ;
-  let handle_incoming_transition =
-    unstage @@ handle_incoming_transition t ~root_sync_ledger
-  in
-  Reader.iter sync_ledger_reader ~f:handle_incoming_transition
+    response_writer
 
 let external_transition_compare ~context:(module Context : CONTEXT) =
   Comparable.lift
@@ -333,9 +329,12 @@ let download_snarked_ledger ({ context = (module Context); _ } as t)
         Sync_ledger.Db.create temp_snarked_ledger ~logger
           ~trust_system:t.trust_system
       in
+      sync_ledger t ~preferred:best_seen_transition_peers ~root_sync_ledger ;
       don't_wait_for
-        (sync_ledger t ~preferred:best_seen_transition_peers ~root_sync_ledger
-           ~sync_ledger_reader ) ;
+        (let handle_incoming_transition =
+           unstage @@ handle_incoming_transition t ~root_sync_ledger
+         in
+         Reader.iter sync_ledger_reader ~f:handle_incoming_transition ) ;
       (* We ignore the resulting ledger returned here since it will always be the
          same as the ledger we started with because we are syncing a db ledger.
       *)
@@ -944,9 +943,13 @@ let%test_module "Bootstrap_controller tests" =
               ~logger ~trust_system
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
+              sync_ledger bootstrap ~root_sync_ledger ~preferred:[] ;
               let sync_deferred =
-                sync_ledger bootstrap ~root_sync_ledger ~preferred:[]
-                  ~sync_ledger_reader
+                let handle_incoming_transition =
+                  unstage
+                  @@ handle_incoming_transition bootstrap ~root_sync_ledger
+                in
+                Reader.iter sync_ledger_reader ~f:handle_incoming_transition
               in
               let%bind () =
                 Deferred.List.iter branch ~f:(fun breadcrumb ->
