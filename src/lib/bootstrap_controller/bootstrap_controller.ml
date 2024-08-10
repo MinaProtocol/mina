@@ -551,6 +551,48 @@ let construct_root_staged_ledger ({ context = (module Context); _ } as t)
            cycle_result = "failed to download and construct scan state"
          } )
 
+let synchronize_consensus_local_state ({ context = (module Context); _ } as t)
+    consensus_local_state =
+  let open Context in
+  use_time_deferred (set_local_state_sync_time t.cycle_stats) ~f:(fun () ->
+      let best_seen_block_with_hash, _ = t.best_seen_transition in
+      let consensus_state =
+        With_hash.data best_seen_block_with_hash
+        |> Mina_block.header |> Mina_block.Header.protocol_state
+        |> Protocol_state.consensus_state
+      in
+      match
+        Consensus.Hooks.required_local_state_sync
+          ~constants:precomputed_values.consensus_constants ~consensus_state
+          ~local_state:consensus_local_state
+      with
+      | None ->
+          [%log debug]
+            ~metadata:
+              [ ( "local_state"
+                , Consensus.Data.Local_state.to_yojson consensus_local_state )
+              ; ( "consensus_state"
+                , Consensus.Data.Consensus_state.Value.to_yojson consensus_state
+                )
+              ]
+            "Not synchronizing consensus local state" ;
+          Deferred.Or_error.return ()
+      | Some sync_jobs ->
+          t.cycle_stats.local_state_sync_required <- true ;
+          [%log info] "Synchronizing consensus local state" ;
+          Consensus.Hooks.sync_local_state
+            ~context:(module Context)
+            ~local_state:consensus_local_state ~trust_system:t.trust_system
+            ~glue_sync_ledger:(Mina_networking.glue_sync_ledger t.network)
+            sync_jobs )
+  |> Deferred.Result.map_error ~f:(fun e ->
+         [%log error]
+           ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+           "Local state sync failed: $error. Retry bootstrap" ;
+         { t.cycle_stats with
+           cycle_result = "failed to synchronize local state"
+         } )
+
 let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
     ~network ~consensus_local_state ~transition_reader ~best_seen_transition
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
@@ -649,47 +691,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
           in
           (* step 4. Synchronize consensus local state if necessary *)
           let%bind.Deferred.Result () =
-            use_time_deferred (set_local_state_sync_time t.cycle_stats)
-              ~f:(fun () ->
-                let best_seen_block_with_hash, _ = t.best_seen_transition in
-                let consensus_state =
-                  With_hash.data best_seen_block_with_hash
-                  |> Mina_block.header |> Mina_block.Header.protocol_state
-                  |> Protocol_state.consensus_state
-                in
-                match
-                  Consensus.Hooks.required_local_state_sync
-                    ~constants:precomputed_values.consensus_constants
-                    ~consensus_state ~local_state:consensus_local_state
-                with
-                | None ->
-                    [%log debug]
-                      ~metadata:
-                        [ ( "local_state"
-                          , Consensus.Data.Local_state.to_yojson
-                              consensus_local_state )
-                        ; ( "consensus_state"
-                          , Consensus.Data.Consensus_state.Value.to_yojson
-                              consensus_state )
-                        ]
-                      "Not synchronizing consensus local state" ;
-                    Deferred.Or_error.return ()
-                | Some sync_jobs ->
-                    t.cycle_stats.local_state_sync_required <- true ;
-                    [%log info] "Synchronizing consensus local state" ;
-                    Consensus.Hooks.sync_local_state
-                      ~context:(module Context)
-                      ~local_state:consensus_local_state ~trust_system
-                      ~glue_sync_ledger:
-                        (Mina_networking.glue_sync_ledger t.network)
-                      sync_jobs )
-            |> Deferred.Result.map_error ~f:(fun e ->
-                   [%log error]
-                     ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-                     "Local state sync failed: $error. Retry bootstrap" ;
-                   { t.cycle_stats with
-                     cycle_result = "failed to synchronize local state"
-                   } )
+            synchronize_consensus_local_state t consensus_local_state
           in
           (* step 5. Close the old frontier and reload a new one from disk. *)
           let new_root_data : Transition_frontier.Root_data.Limited.t =
