@@ -511,14 +511,14 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                    cycle_result = "failed to download and construct scan state"
                  } )
         | Ok res ->
+            let%bind () =
+              Trust_system.(
+                record t.trust_system logger sender
+                  Actions.
+                    ( Fulfilled_request
+                    , Some ("Received valid scan state from peer", []) ))
+            in
             return (Ok res)
-      in
-      let%bind () =
-        Trust_system.(
-          record t.trust_system logger sender
-            Actions.
-              ( Fulfilled_request
-              , Some ("Received valid scan state from peer", []) ))
       in
       let best_seen_block_with_hash, _ = t.best_seen_transition in
       let consensus_state =
