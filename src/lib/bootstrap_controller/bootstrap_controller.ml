@@ -593,6 +593,89 @@ let synchronize_consensus_local_state ({ context = (module Context); _ } as t)
            cycle_result = "failed to synchronize local state"
          } )
 
+let close_and_reload_frontier ({ context = (module Context); _ } as t)
+    ~consensus_local_state ~persistent_root ~persistent_frontier ~catchup_mode
+    ({ scan_state
+     ; pending_coinbases = pending_coinbase
+     ; new_root
+     ; protocol_states
+     } :
+      Stages.stage_3 ) =
+  let open Context in
+  let new_root_data : Transition_frontier.Root_data.Limited.t =
+    Transition_frontier.Root_data.Limited.create
+      ~transition:(Mina_block.Validated.lift new_root)
+      ~scan_state ~pending_coinbase ~protocol_states
+  in
+  let%bind () =
+    Transition_frontier.Persistent_frontier.reset_database_exn
+      persistent_frontier ~root_data:new_root_data
+      ~genesis_state_hash:
+        (State_hash.With_state_hashes.state_hash
+           precomputed_values.protocol_state_with_hashes )
+  in
+  (* TODO: lazy load db in persistent root to avoid unecessary opens like this *)
+  Transition_frontier.Persistent_root.(
+    with_instance_exn persistent_root ~f:(fun instance ->
+        Instance.set_root_state_hash instance
+        @@ Mina_block.Validated.state_hash
+        @@ Mina_block.Validated.lift new_root )) ;
+  let%map new_frontier =
+    let fail msg =
+      failwith
+        ("failed to initialize transition frontier after bootstrapping: " ^ msg)
+    in
+    Transition_frontier.load
+      ~context:(module Context)
+      ~retry_with_fresh_db:false ~verifier:t.verifier ~consensus_local_state
+      ~persistent_root ~persistent_frontier ~catchup_mode ()
+    >>| function
+    | Ok frontier ->
+        frontier
+    | Error (`Failure msg) ->
+        fail msg
+    | Error `Bootstrap_required ->
+        fail "bootstrap still required (indicates logical error in code)"
+    | Error `Persistent_frontier_malformed ->
+        fail "persistent frontier was malformed"
+    | Error `Snarked_ledger_mismatch ->
+        fail "this should not happen, because we just reset the snarked_ledger"
+  in
+  [%str_log info] Bootstrap_complete ;
+  let collected_transitions = Transition_cache.data t.transition_graph in
+  let logger =
+    Logger.extend logger
+      [ ("context", `String "Filter collected transitions in bootstrap") ]
+  in
+  let root_consensus_state =
+    Transition_frontier.(
+      Breadcrumb.consensus_state_with_hashes (root new_frontier))
+  in
+  let filtered_collected_transitions =
+    List.filter collected_transitions ~f:(fun incoming_transition ->
+        let transition =
+          Envelope.Incoming.data incoming_transition
+          |> Mina_block.Validation.block_with_hash
+        in
+        Consensus.Hooks.equal_select_status `Take
+        @@ Consensus.Hooks.select
+             ~context:(module Context)
+             ~existing:root_consensus_state
+             ~candidate:(With_hash.map ~f:Mina_block.consensus_state transition) )
+  in
+  [%log debug] "Sorting filtered transitions by consensus state" ~metadata:[] ;
+  let sorted_filtered_collected_transitions =
+    O1trace.sync_thread "sorting_collected_transitions" (fun () ->
+        List.sort filtered_collected_transitions
+          ~compare:
+            (Comparable.lift
+               ~f:
+                 (Fn.compose Mina_block.Validation.block_with_hash
+                    Envelope.Incoming.data )
+               (external_transition_compare ~context:(module Context)) ) )
+  in
+  (new_frontier, sorted_filtered_collected_transitions)
+
 let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
     ~network ~consensus_local_state ~transition_reader ~best_seen_transition
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
@@ -646,12 +729,7 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
           ((t, sync_ledger_reader), sync_ledger_writer) )
         ~finally:(fun sync_ledger_writer -> Writer.close sync_ledger_writer)
         ~f:(fun (t, sync_ledger_reader) ->
-          let%bind.Deferred.Result ({ scan_state
-                                    ; pending_coinbases = pending_coinbase
-                                    ; new_root
-                                    ; protocol_states
-                                    }
-                                     : Stages.stage_3 ) =
+          let%bind.Deferred.Result stage_3 =
             deferred_result_with
               ~setup:(fun () ->
                 let temp_persistent_root_instance =
@@ -698,90 +776,12 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             synchronize_consensus_local_state t consensus_local_state
           in
           (* step 5. Close the old frontier and reload a new one from disk. *)
-          let new_root_data : Transition_frontier.Root_data.Limited.t =
-            Transition_frontier.Root_data.Limited.create
-              ~transition:(Mina_block.Validated.lift new_root)
-              ~scan_state ~pending_coinbase ~protocol_states
-          in
-          let%bind () =
-            Transition_frontier.Persistent_frontier.reset_database_exn
-              persistent_frontier ~root_data:new_root_data
-              ~genesis_state_hash:
-                (State_hash.With_state_hashes.state_hash
-                   precomputed_values.protocol_state_with_hashes )
-          in
-          (* TODO: lazy load db in persistent root to avoid unecessary opens like this *)
-          Transition_frontier.Persistent_root.(
-            with_instance_exn persistent_root ~f:(fun instance ->
-                Instance.set_root_state_hash instance
-                @@ Mina_block.Validated.state_hash
-                @@ Mina_block.Validated.lift new_root )) ;
-          let%map new_frontier =
-            let fail msg =
-              failwith
-                ( "failed to initialize transition frontier after \
-                   bootstrapping: " ^ msg )
-            in
-            Transition_frontier.load
-              ~context:(module Context)
-              ~retry_with_fresh_db:false ~verifier ~consensus_local_state
-              ~persistent_root ~persistent_frontier ~catchup_mode ()
-            >>| function
-            | Ok frontier ->
-                frontier
-            | Error (`Failure msg) ->
-                fail msg
-            | Error `Bootstrap_required ->
-                fail
-                  "bootstrap still required (indicates logical error in code)"
-            | Error `Persistent_frontier_malformed ->
-                fail "persistent frontier was malformed"
-            | Error `Snarked_ledger_mismatch ->
-                fail
-                  "this should not happen, because we just reset the \
-                   snarked_ledger"
-          in
-          [%str_log info] Bootstrap_complete ;
-          let collected_transitions =
-            Transition_cache.data t.transition_graph
-          in
-          let logger =
-            Logger.extend logger
-              [ ("context", `String "Filter collected transitions in bootstrap")
-              ]
-          in
-          let root_consensus_state =
-            Transition_frontier.(
-              Breadcrumb.consensus_state_with_hashes (root new_frontier))
-          in
-          let filtered_collected_transitions =
-            List.filter collected_transitions ~f:(fun incoming_transition ->
-                let transition =
-                  Envelope.Incoming.data incoming_transition
-                  |> Mina_block.Validation.block_with_hash
-                in
-                Consensus.Hooks.equal_select_status `Take
-                @@ Consensus.Hooks.select
-                     ~context:(module Context)
-                     ~existing:root_consensus_state
-                     ~candidate:
-                       (With_hash.map ~f:Mina_block.consensus_state transition) )
-          in
-          [%log debug] "Sorting filtered transitions by consensus state"
-            ~metadata:[] ;
-          let sorted_filtered_collected_transitions =
-            O1trace.sync_thread "sorting_collected_transitions" (fun () ->
-                List.sort filtered_collected_transitions
-                  ~compare:
-                    (Comparable.lift
-                       ~f:
-                         (Fn.compose Mina_block.Validation.block_with_hash
-                            Envelope.Incoming.data )
-                       (external_transition_compare ~context:(module Context)) ) )
+          let%map res =
+            close_and_reload_frontier t ~consensus_local_state ~persistent_root
+              ~persistent_frontier ~catchup_mode stage_3
           in
           let cycle_stats = { t.cycle_stats with cycle_result = "success" } in
-          Ok (cycle_stats, (new_frontier, sorted_filtered_collected_transitions))
-          ) )
+          Ok (cycle_stats, res) ) )
 
 (** The entry point function for bootstrap controller. When bootstrap finished
     it would return a transition frontier with the root breadcrumb and a list
