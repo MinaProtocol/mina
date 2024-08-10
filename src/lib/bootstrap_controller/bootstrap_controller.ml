@@ -656,21 +656,21 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
              ~transition_reader ~best_seen_transition ~persistent_root
              ~persistent_frontier ~initial_root_transition ~catchup_mode
       in
-      let rec loop previous_cycles =
+      let rec loop () =
         match%bind main_loop () with
         | Ok (this_cycle, res) ->
-            return (this_cycle :: previous_cycles, res)
-        | Error this_cycle ->
-            loop (this_cycle :: previous_cycles)
+            return (this_cycle, res)
+        | Error stats ->
+            [%log info] "Bootstrap failed, retrying. Stats: $bootstrap_stats"
+              ~metadata:
+                [ ("bootstrap_stats", bootstrap_cycle_stats_to_yojson stats) ] ;
+            loop ()
       in
-      let%map time_elapsed, (cycles, result) =
-        time_deferred (fun () -> loop [])
-      in
+      let%map time_elapsed, (cycle_stats, result) = time_deferred loop in
       [%log info] "Bootstrap completed in $time_elapsed: $bootstrap_stats"
         ~metadata:
           [ ("time_elapsed", time_to_yojson time_elapsed)
-          ; ( "bootstrap_stats"
-            , `List (List.map ~f:bootstrap_cycle_stats_to_yojson cycles) )
+          ; ("bootstrap_stats", bootstrap_cycle_stats_to_yojson cycle_stats)
           ] ;
       Mina_metrics.(
         Gauge.set Bootstrap.bootstrap_time_ms
