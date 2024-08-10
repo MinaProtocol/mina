@@ -520,16 +520,16 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             in
             return (Ok res)
       in
-      let best_seen_block_with_hash, _ = t.best_seen_transition in
-      let consensus_state =
-        With_hash.data best_seen_block_with_hash
-        |> Mina_block.header |> Mina_block.Header.protocol_state
-        |> Protocol_state.consensus_state
-      in
       (* step 4. Synchronize consensus local state if necessary *)
       let%bind.Deferred.Result () =
         use_time_deferred (set_local_state_sync_time t.cycle_stats)
           ~f:(fun () ->
+            let best_seen_block_with_hash, _ = t.best_seen_transition in
+            let consensus_state =
+              With_hash.data best_seen_block_with_hash
+              |> Mina_block.header |> Mina_block.Header.protocol_state
+              |> Protocol_state.consensus_state
+            in
             match
               Consensus.Hooks.required_local_state_sync
                 ~constants:precomputed_values.consensus_constants
