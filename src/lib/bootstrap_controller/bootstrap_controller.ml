@@ -633,20 +633,20 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             Gauge.set Bootstrap.num_of_root_snarked_ledger_retargeted
               (Float.of_int t.num_of_root_snarked_ledger_retargeted)) ;
           (* step 2. Download scan state and pending coinbases. *)
+          let%bind.Deferred.Result stage_2 =
+            download_scan_state_and_pending_coinbases t stage_1
+          in
+          (* step 3. Construct staged ledger from snarked ledger, scan state
+             and pending coinbases. *)
+          (* Construct the staged ledger before constructing the transition
+           * frontier in order to verify the scan state we received.
+           * TODO: reorganize the code to avoid doing this twice (#3480) *)
           let%bind.Deferred.Result ({ scan_state
                                     ; pending_coinbases = pending_coinbase
                                     ; new_root
                                     ; protocol_states
                                     }
                                      : Stages.stage_3 ) =
-            let%bind.Deferred.Result stage_2 =
-              download_scan_state_and_pending_coinbases t stage_1
-            in
-            (* step 3. Construct staged ledger from snarked ledger, scan state
-               and pending coinbases. *)
-            (* Construct the staged ledger before constructing the transition
-             * frontier in order to verify the scan state we received.
-             * TODO: reorganize the code to avoid doing this twice (#3480) *)
             construct_root_staged_ledger t stage_2
           in
           (* step 4. Synchronize consensus local state if necessary *)
