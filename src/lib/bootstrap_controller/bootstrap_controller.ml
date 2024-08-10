@@ -74,10 +74,6 @@ module Stages = struct
   type stage_0 =
     { temp_persistent_root_instance : Persistent_root.Instance_type.t
     ; best_seen_transition_peers : Peer.t list
-    ; sync_ledger_reader :
-        ( [ `Block of Mina_block.initial_valid_block Envelope.Incoming.t ]
-        * [ `Valid_cb of Mina_net2.Validation_callback.t option ] )
-        Pipe_lib.Strict_pipe.Reader.t
     }
 
   type stage_1 =
@@ -355,10 +351,7 @@ let deferred_result_bind_error x ~f =
       Error e
 
 let download_snarked_ledger ({ context = (module Context); _ } as t)
-    ({ temp_persistent_root_instance
-     ; best_seen_transition_peers
-     ; sync_ledger_reader
-     } :
+    ({ temp_persistent_root_instance; best_seen_transition_peers } :
       Stages.stage_0 ) =
   let open Context in
   use_time_deferred (set_sync_ledger_time t.cycle_stats) ~f:(fun () ->
@@ -384,8 +377,6 @@ let download_snarked_ledger ({ context = (module Context); _ } as t)
       | Syncing_ledger _ | Ledger_sync_finished ->
           assert false ) ;
       t.ledger_sync_state <- Syncing_ledger { root_sync_ledger } ;
-      don't_wait_for
-        (Reader.iter sync_ledger_reader ~f:(handle_incoming_transition t)) ;
       (* We ignore the resulting ledger returned here since it will always be the
          same as the ledger we started with because we are syncing a db ledger.
       *)
@@ -776,9 +767,11 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
             ; ledger_sync_state = No_pending_ledger
             }
           in
-          ((t, sync_ledger_reader), sync_ledger_writer) )
+          don't_wait_for
+            (Reader.iter sync_ledger_reader ~f:(handle_incoming_transition t)) ;
+          (t, sync_ledger_writer) )
         ~finally:(fun sync_ledger_writer -> Writer.close sync_ledger_writer)
-        ~f:(fun (t, sync_ledger_reader) ->
+        ~f:(fun t ->
           let%bind.Deferred.Result stage_3 =
             deferred_result_with
               ~setup:(fun () ->
@@ -796,7 +789,6 @@ let main_loop ~context:(module Context : CONTEXT) ~trust_system ~verifier
                                    None
                                | Remote r ->
                                    Some r )
-                    ; sync_ledger_reader
                     }
                     : Stages.stage_0 )
                 in
