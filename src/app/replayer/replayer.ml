@@ -54,7 +54,7 @@ end
 
 let error_count = ref 0
 
-let constraint_constants = Genesis_constants.Compiled.Constraint_constants.t
+let constraint_constants = Genesis_constants_compiled.Constraint_constants.t
 
 let proof_level = Genesis_constants.Proof_level.Full
 

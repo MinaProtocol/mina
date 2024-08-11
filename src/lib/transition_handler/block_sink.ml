@@ -141,7 +141,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
       let transactions =
         Mina_block.transactions state
           ~constraint_constants:
-            Genesis_constants.Compiled.Constraint_constants.t
+            Genesis_constants_compiled.Constraint_constants.t
       in
       let exists_well_formedness_errors =
         List.exists transactions ~f:(fun txn ->

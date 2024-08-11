@@ -5,11 +5,11 @@ open Signature_lib
 open Mina_base
 open Mina_transaction
 
-let constraint_constants = Genesis_constants.Compiled.Constraint_constants.t
+let constraint_constants = Genesis_constants_compiled.Constraint_constants.t
 
-let genesis_constants = Genesis_constants.Compiled.t
+let genesis_constants = Genesis_constants_compiled.t
 
-let proof_level = Genesis_constants.Compiled.Proof_level.t
+let proof_level = Genesis_constants_compiled.Proof_level.t
 
 (* We're just profiling, so okay to monkey-patch here *)
 module Sparse_ledger = struct

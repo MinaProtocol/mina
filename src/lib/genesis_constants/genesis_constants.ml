@@ -381,5 +381,4 @@ module Make (Node_config : Node_config_intf.S) = struct
     }
 end
 
-module Compiled = Make (Node_config)
 module For_unit_tests = Make (Node_config_for_unit_tests)

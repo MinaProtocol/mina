@@ -24,7 +24,7 @@ module Worker_state = struct
            let%bind (worker_state : Prod.Worker_state.t) =
              Prod.Worker_state.create
                ~constraint_constants:
-                 Genesis_constants.Compiled.Constraint_constants.t
+                 Genesis_constants_compiled.Constraint_constants.t
                ~proof_level:Full ()
            in
            Prod.perform_single worker_state ~message single_spec

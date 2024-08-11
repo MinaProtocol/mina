@@ -408,7 +408,7 @@ module Mutations = struct
         in
         let%bind accounts = Ledger.to_list best_tip_ledger in
         let constraint_constants =
-          Genesis_constants.Compiled.Constraint_constants.t
+          Genesis_constants_compiled.Constraint_constants.t
         in
         let depth = constraint_constants.ledger_depth in
         let ledger = Ledger.create_ephemeral ~depth () in

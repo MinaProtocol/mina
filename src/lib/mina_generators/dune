@@ -19,6 +19,7 @@
    ;; local libraries
    bounded_types
    genesis_constants
+   genesis_constants.compiled
    sgn
    pickles_types
    pickles

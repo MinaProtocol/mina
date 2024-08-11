@@ -13,7 +13,6 @@
    sexplib0
    integers
    ;; local libraries
-   mina_node_config
    mina_node_config.intf
    mina_node_config.for_unit_tests
    mina_wire_types

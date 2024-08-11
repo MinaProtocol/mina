@@ -49,7 +49,7 @@ let command_run =
        [%log info] "Starting archive process; built with commit $commit"
          ~metadata:[ ("commit", `String Mina_version.commit_id) ] ;
        Archive_lib.Processor.setup_server ~metrics_server_port ~logger
-         ~constraint_constants:Genesis_constants.Compiled.Constraint_constants.t
+         ~constraint_constants:Genesis_constants_compiled.Constraint_constants.t
          ~postgres_address:postgres.value
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)

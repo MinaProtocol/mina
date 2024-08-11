@@ -464,8 +464,8 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
   let offline_shutdown_delay = Time.Span.of_min 25. in
   let after_genesis =
     let genesis_timestamp =
-      Genesis_constants.(
-        genesis_timestamp_of_string Compiled.genesis_state_timestamp_string)
+      Genesis_constants_compiled.(
+        genesis_timestamp_of_string genesis_state_timestamp_string)
     in
     fun () -> Time.(( >= ) (now ())) genesis_timestamp
   in

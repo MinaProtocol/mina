@@ -3,7 +3,7 @@ open Mina_base
 
 let `VK vk, `Prover p =
   Transaction_snark.For_tests.create_trivial_snapp
-    ~constraint_constants:Genesis_constants.Compiled.Constraint_constants.t ()
+    ~constraint_constants:Genesis_constants_compiled.Constraint_constants.t ()
 
 let { With_hash.data = vk; hash = _ } =
   Async.Thread_safe.block_on_async_exn (fun () -> vk)

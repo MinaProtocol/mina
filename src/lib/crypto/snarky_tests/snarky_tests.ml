@@ -603,7 +603,7 @@ end
 module Protocol_circuits = struct
   (* Full because we want to be sure nothing changes *)
   let proof_level, constraint_constants =
-    Genesis_constants.(Proof_level.Full, Compiled.Constraint_constants.t)
+    Genesis_constants_compiled.(Proof_level.Full, Constraint_constants.t)
 
   let print_hash print expected digest : unit =
     if print then (

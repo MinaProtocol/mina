@@ -5,9 +5,9 @@ include T
 let hashes =
   lazy
     (let constraint_constants =
-       Genesis_constants.Compiled.Constraint_constants.t
+       Genesis_constants_compiled.Constraint_constants.t
      in
-     let proof_level = Genesis_constants.Compiled.Proof_level.t in
+     let proof_level = Genesis_constants_compiled.Proof_level.t in
      let ts =
        Transaction_snark.constraint_system_digests ~constraint_constants ()
      in
@@ -49,9 +49,9 @@ let compiled_inputs =
   lazy
     (let open Staged_ledger_diff in
     let constraint_constants =
-      Genesis_constants.Compiled.Constraint_constants.t
+      Genesis_constants_compiled.Constraint_constants.t
     in
-    let genesis_constants = Genesis_constants.Compiled.t in
+    let genesis_constants = Genesis_constants_compiled.t in
     let genesis_epoch_data = Consensus.Genesis_epoch_data.compiled in
     let consensus_constants =
       Consensus.Constants.create ~constraint_constants
@@ -64,7 +64,7 @@ let compiled_inputs =
     in
     { Genesis_proof.Inputs.runtime_config = Runtime_config.default
     ; constraint_constants
-    ; proof_level = Genesis_constants.Compiled.Proof_level.t
+    ; proof_level = Genesis_constants_compiled.Proof_level.t
     ; genesis_constants
     ; genesis_ledger = (module Test_genesis_ledger)
     ; genesis_epoch_data

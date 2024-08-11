@@ -367,7 +367,7 @@ module Metadata = struct
       in
       let receiver_exists = Option.is_some res.receiver in
       let constraint_constants =
-        Genesis_constants.Compiled.Constraint_constants.t
+        Genesis_constants_compiled.Constraint_constants.t
       in
       { Construction_metadata_response.metadata =
           Metadata_data.create ~sender:options.Options.sender

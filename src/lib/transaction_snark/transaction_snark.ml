@@ -5012,7 +5012,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           , `Full_txn_commitment _full_commitment ) =
         create_zkapp_command
           ~constraint_constants:
-            Genesis_constants.Compiled.Constraint_constants.t
+            Genesis_constants_compiled.Constraint_constants.t
           (Multiple_transfers_spec.spec_of_t spec)
           ~update:spec.snapp_update ~receiver_update:spec.snapp_update
       in

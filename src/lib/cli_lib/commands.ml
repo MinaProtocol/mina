@@ -196,7 +196,7 @@ module Vrf = struct
       let open Deferred.Let_syntax in
       (* TODO-someday: constraint constants from config file. *)
       let constraint_constants =
-        Genesis_constants.Compiled.Constraint_constants.t
+        Genesis_constants_compiled.Constraint_constants.t
       in
       let%bind () =
         let password =
@@ -263,7 +263,7 @@ module Vrf = struct
       let open Deferred.Let_syntax in
       (* TODO-someday: constraint constants from config file. *)
       let constraint_constants =
-        Genesis_constants.Compiled.Constraint_constants.t
+        Genesis_constants_compiled.Constraint_constants.t
       in
       let%bind () =
         let password =
@@ -324,7 +324,7 @@ module Vrf = struct
       let open Deferred.Let_syntax in
       (* TODO-someday: constraint constants from config file. *)
       let constraint_constants =
-        Genesis_constants.Compiled.Constraint_constants.t
+        Genesis_constants_compiled.Constraint_constants.t
       in
       let lexbuf = Lexing.from_channel In_channel.stdin in
       let lexer = Yojson.init_lexer () in

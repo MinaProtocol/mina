@@ -295,7 +295,7 @@ let%test_module "account timing check" =
 
     (* user commands with timings *)
 
-    let constraint_constants = Genesis_constants.Compiled.Constraint_constants.t
+    let constraint_constants = Genesis_constants_compiled.Constraint_constants.t
 
     let keypairss, keypairs =
       (* these tests are based on relative balance/payment amounts, don't need to
@@ -361,7 +361,8 @@ let%test_module "account timing check" =
             stack_with_state
       in
       let supply_increase =
-        Mina_ledger.Ledger.Transaction_applied.supply_increase ~constraint_constants txn_applied
+        Mina_ledger.Ledger.Transaction_applied.supply_increase
+          ~constraint_constants txn_applied
         |> Or_error.ok_exn
       in
       Transaction_snark.check_transaction ~constraint_constants ~sok_message

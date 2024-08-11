@@ -808,7 +808,7 @@ let hash_ledger =
      fun () ->
        let process_accounts accounts =
          let constraint_constants =
-           Genesis_constants.Compiled.Constraint_constants.t
+           Genesis_constants_compiled.Constraint_constants.t
          in
          let packed_ledger =
            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
@@ -911,9 +911,9 @@ let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
          (* TODO: Allow these to be configurable. *)
-         let proof_level = Genesis_constants.Compiled.Proof_level.t in
+         let proof_level = Genesis_constants_compiled.Proof_level.t in
          let constraint_constants =
-           Genesis_constants.Compiled.Constraint_constants.t
+           Genesis_constants_compiled.Constraint_constants.t
          in
          let all =
            Transaction_snark.constraint_system_digests ~constraint_constants ()
