@@ -1915,7 +1915,7 @@ let%test_module _ =
       let trust_system = Trust_system.null () in
       let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
-          ~genesis_constants:Genesis_constants.compiled ~slot_tx_end
+          ~genesis_constants:Genesis_constants.for_unit_tests ~slot_tx_end
       in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
