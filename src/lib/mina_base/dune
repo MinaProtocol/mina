@@ -49,7 +49,6 @@
    block_time
    base58_check
    bignum_bigint
-   mina_compile_config
    codable
    crypto_params
    debug_assert
