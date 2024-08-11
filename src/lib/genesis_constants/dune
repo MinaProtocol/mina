@@ -22,7 +22,6 @@
    currency
    blake2
    data_hash_lib
-   mina_compile_config
    pickles.backend
    snark_keys_header
    kimchi_pasta

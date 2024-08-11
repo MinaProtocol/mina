@@ -368,16 +368,14 @@ module Make (Node_config : Node_config_intf.S) = struct
         }
     ; txpool_max_size = pool_max_size
     ; num_accounts = None
-    ; zkapp_proof_update_cost = Mina_compile_config.zkapp_proof_update_cost
+    ; zkapp_proof_update_cost = Node_config.zkapp_proof_update_cost
     ; zkapp_signed_single_update_cost =
-        Mina_compile_config.zkapp_signed_single_update_cost
-    ; zkapp_signed_pair_update_cost =
-        Mina_compile_config.zkapp_signed_pair_update_cost
-    ; zkapp_transaction_cost_limit =
-        Mina_compile_config.zkapp_transaction_cost_limit
-    ; max_event_elements = Mina_compile_config.max_event_elements
-    ; max_action_elements = Mina_compile_config.max_action_elements
-    ; zkapp_cmd_limit_hardcap = Mina_compile_config.zkapp_cmd_limit_hardcap
+        Node_config.zkapp_signed_single_update_cost
+    ; zkapp_signed_pair_update_cost = Node_config.zkapp_signed_pair_update_cost
+    ; zkapp_transaction_cost_limit = Node_config.zkapp_transaction_cost_limit
+    ; max_event_elements = Node_config.max_event_elements
+    ; max_action_elements = Node_config.max_action_elements
+    ; zkapp_cmd_limit_hardcap = Node_config.zkapp_cmd_limit_hardcap
     }
 end
 
