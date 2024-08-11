@@ -48,14 +48,6 @@
 (*END src/config/amount_defaults/realistic.mlh*)
 
 
-(*BEGIN src/config/protocol_version/current.mlh*)
-(* transaction >= 1, network >= 0, patch >= 0 *)
-[%%define protocol_version_transaction 3]
-[%%define protocol_version_network 0]
-[%%define protocol_version_patch 0]
-(*END src/config/protocol_version/current.mlh*)
-
-
 (*BEGIN src/config/supercharged_coinbase_factor/one.mlh*)
 [%%define supercharged_coinbase_factor 1]
 (*END src/config/supercharged_coinbase_factor/one.mlh*)
