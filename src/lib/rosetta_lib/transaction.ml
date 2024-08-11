@@ -27,7 +27,8 @@ module Unsigned = struct
 
       let is_fee_sufficient (payment : t) : bool =
         let open Currency.Fee in
-        of_uint64 payment.fee >= Mina_base.User_command.minimum_fee
+        of_uint64 payment.fee
+        >= Genesis_constants_compiled.t.minimum_user_command_fee
     end
 
     module Delegation = struct

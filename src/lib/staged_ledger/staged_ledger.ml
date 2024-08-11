@@ -4809,7 +4809,10 @@ let%test_module "staged ledger tests" =
               { status = Applied
               ; data =
                   mk_basic_zkapp_command ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee:
+                      (Fee.to_nanomina_int
+                         Genesis_constants.For_unit_tests.t
+                           .minimum_user_command_fee )
                     ~fee_payer_pk:a.public_key
                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 0)
                     [ mk_basic_node ~account:a ~authorization:Signature
@@ -4824,7 +4827,10 @@ let%test_module "staged ledger tests" =
               { status = Applied
               ; data =
                   mk_basic_zkapp_command ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee:
+                      (Fee.to_nanomina_int
+                         Genesis_constants.For_unit_tests.t
+                           .minimum_user_command_fee )
                     ~fee_payer_pk:a.public_key
                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 1)
                     [ mk_basic_node ~account:b ~authorization:Signature
@@ -4839,7 +4845,10 @@ let%test_module "staged ledger tests" =
               { status = Applied
               ; data =
                   mk_basic_zkapp_command ~prover:prover_a ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee:
+                      (Fee.to_nanomina_int
+                         Genesis_constants.For_unit_tests.t
+                           .minimum_user_command_fee )
                     ~fee_payer_pk:a.public_key
                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 2)
                     [ mk_basic_node ~account:a ~authorization:(Proof vk_a.hash)
@@ -4871,7 +4880,10 @@ let%test_module "staged ledger tests" =
               { status = Applied
               ; data =
                   mk_basic_zkapp_command ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee:
+                      (Fee.to_nanomina_int
+                         Genesis_constants.For_unit_tests.t
+                           .minimum_user_command_fee )
                     ~fee_payer_pk:a.public_key
                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 0)
                     [ mk_basic_node ~account:a ~authorization:Signature
@@ -4887,7 +4899,10 @@ let%test_module "staged ledger tests" =
                   Failed [ []; [ Account_nonce_precondition_unsatisfied ] ]
               ; data =
                   mk_basic_zkapp_command ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee:
+                      (Fee.to_nanomina_int
+                         Genesis_constants.For_unit_tests.t
+                           .minimum_user_command_fee )
                     ~fee_payer_pk:a.public_key
                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 1)
                     [ mk_basic_node ~account:a ~authorization:Signature
@@ -4908,7 +4923,10 @@ let%test_module "staged ledger tests" =
               { status = Applied
               ; data =
                   mk_basic_zkapp_command ~prover:prover_a ~keymap
-                    ~fee:(Fee.to_nanomina_int User_command.minimum_fee)
+                    ~fee:
+                      (Fee.to_nanomina_int
+                         Genesis_constants.For_unit_tests.t
+                           .minimum_user_command_fee )
                     ~fee_payer_pk:a.public_key
                     ~fee_payer_nonce:(Unsigned.UInt32.of_int 2)
                     [ mk_basic_node ~account:a ~authorization:(Proof vk_a.hash)

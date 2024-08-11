@@ -167,6 +167,7 @@ module Network_config = struct
             ; zkapp_cmd_limit_hardcap = None
             ; slot_tx_end
             ; slot_chain_end
+            ; minimum_user_command_fee = None
             ; network_id
             }
       ; genesis =

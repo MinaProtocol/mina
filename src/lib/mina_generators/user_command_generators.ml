@@ -81,7 +81,7 @@ let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
         vk
   in
   let%bind balances =
-    let min_cmd_fee = Mina_base.User_command.minimum_fee in
+    let min_cmd_fee = Genesis_constants_compiled.t.minimum_user_command_fee in
     let min_balance =
       Currency.Fee.to_nanomina_int min_cmd_fee
       |> Int.( + ) 100_000_000_000_000_000

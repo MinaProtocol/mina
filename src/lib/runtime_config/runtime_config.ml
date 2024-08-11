@@ -473,6 +473,7 @@ module Json_layout = struct
       ; zkapp_cmd_limit_hardcap : int option [@default None]
       ; slot_tx_end : int option [@default None]
       ; slot_chain_end : int option [@default None]
+      ; minimum_user_command_fee : Currency.Fee.t option
       ; network_id : string option [@default None]
       }
     [@@deriving yojson, fields]
@@ -1220,6 +1221,8 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap : int option [@default None]
     ; slot_tx_end : int option [@default None]
     ; slot_chain_end : int option [@default None]
+    ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t option
+          [@default None]
     ; network_id : string option [@default None]
     }
   [@@deriving bin_io_unversioned]
@@ -1260,6 +1263,9 @@ module Daemon = struct
     ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
     ; slot_chain_end =
         opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
+    ; minimum_user_command_fee =
+        opt_fallthrough ~default:t1.minimum_user_command_fee
+          t2.minimum_user_command_fee
     ; network_id = opt_fallthrough ~default:t1.network_id t2.network_id
     }
 
@@ -1272,6 +1278,9 @@ module Daemon = struct
     let%bind zkapp_transaction_cost_limit = Float.gen_incl 0.0 100.0 in
     let%bind max_event_elements = Int.gen_incl 0 100 in
     let%bind zkapp_cmd_limit_hardcap = Int.gen_incl 0 1000 in
+    let%bind minimum_user_command_fee =
+      Currency.Fee.(gen_incl one (of_mina_int_exn 10))
+    in
     let%map max_action_elements = Int.gen_incl 0 1000 in
     { txpool_max_size = Some txpool_max_size
     ; peer_list_url = None
@@ -1284,6 +1293,7 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
     ; slot_tx_end = None
     ; slot_chain_end = None
+    ; minimum_user_command_fee = Some minimum_user_command_fee
     ; network_id = None
     }
 end
