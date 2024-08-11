@@ -237,7 +237,7 @@ let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
 let is_disabled = function
   | Zkapp_command _ ->
-      Mina_compile_config.zkapps_disabled
+      Node_config_unconfigurable_constants.zkapps_disabled
   | _ ->
       false
 

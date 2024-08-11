@@ -26,3 +26,5 @@ let max_event_elements = 100
 let max_action_elements = 100
 
 let zkapp_cmd_limit_hardcap = 128
+
+let zkapps_disabled = false

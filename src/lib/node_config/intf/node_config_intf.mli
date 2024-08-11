@@ -21,6 +21,8 @@ module type Unconfigurable_constants = sig
   val max_action_elements : int
 
   val zkapp_cmd_limit_hardcap : int
+
+  val zkapps_disabled : bool
 end
 
 module type S = sig
