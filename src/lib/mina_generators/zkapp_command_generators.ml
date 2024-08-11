@@ -1738,10 +1738,13 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range
 
 let%test_module _ =
   ( module struct
-    module U = Transaction_snark_tests.Util
     open Signature_lib
 
-    let `VK vk, `Prover _ = Lazy.force U.trivial_zkapp
+    (* TODO: Should be For_unit_tests *)
+    let constraint_constants = Genesis_constants.Compiled.Constraint_constants.t
+
+    let `VK vk, `Prover _ =
+      Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
 
     let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 
