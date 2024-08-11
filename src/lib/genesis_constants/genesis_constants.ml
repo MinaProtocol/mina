@@ -401,4 +401,6 @@ include Make (Node_config)
 
 let compiled = t
 
-let for_unit_tests = compiled
+let for_unit_tests =
+  let module Unit_test_config = Make (Node_config_for_unit_tests) in
+  Unit_test_config.t
