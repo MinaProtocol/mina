@@ -131,10 +131,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let nonce = Fn.compose Payload.nonce payload
 
-  let default_fee =
-    Currency.Fee.of_mina_string_exn
-      Mina_compile_config.default_transaction_fee_string
-
   let signer { Poly.signer; _ } = signer
 
   let fee_token (_ : t) = Token_id.default

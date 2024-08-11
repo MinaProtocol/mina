@@ -118,8 +118,6 @@ module type S = sig
 
   val valid_until : t -> Global_slot_since_genesis.t
 
-  val default_fee : Currency.Fee.t
-
   val tag : t -> Transaction_union_tag.t
 
   val tag_string : t -> string

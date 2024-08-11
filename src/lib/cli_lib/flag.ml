@@ -356,7 +356,7 @@ let signed_command_common : signed_command_common Command.Param.t =
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
-           (Currency.Fee.to_mina_string Mina_base.Signed_command.default_fee)
+           Mina_compile_config.default_transaction_fee_string
            (Currency.Fee.to_mina_string
               Genesis_constants_compiled.t.minimum_user_command_fee ) )
       (optional txn_fee)
@@ -372,7 +372,11 @@ let signed_command_common : signed_command_common Command.Param.t =
       ~doc:"STRING Memo accompanying the transaction" (optional string)
   in
   { sender
-  ; fee = Option.value fee ~default:Mina_base.Signed_command.default_fee
+  ; fee =
+      Option.value fee
+        ~default:
+          (Currency.Fee.of_mina_string_exn
+             Mina_compile_config.default_transaction_fee_string )
   ; nonce
   ; memo
   }
@@ -403,7 +407,7 @@ module Signed_command = struct
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
-           (Currency.Fee.to_mina_string Mina_base.Signed_command.default_fee)
+           Mina_compile_config.default_transaction_fee_string
            (Currency.Fee.to_mina_string
               Genesis_constants_compiled.t.minimum_user_command_fee ) )
       (optional txn_fee)
