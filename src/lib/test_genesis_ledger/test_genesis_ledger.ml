@@ -3,5 +3,5 @@ include Genesis_ledger.Make (struct
 
   let directory = `Ephemeral
 
-  let depth = Genesis_constants.Constraint_constants.compiled.ledger_depth
+  let depth = Genesis_constants.Compiled.Constraint_constants.t.ledger_depth
 end)

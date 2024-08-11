@@ -16,7 +16,7 @@ let create_accounts port (privkey_path, key_prefix, num_accounts, fee, amount) =
   in
   let account_creation_fee_int =
     let constraint_constants =
-      Genesis_constants.Constraint_constants.compiled
+      Genesis_constants.Compiled.Constraint_constants.t
     in
     Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
   in

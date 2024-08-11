@@ -4369,7 +4369,7 @@ module Block = struct
         (* unit tests, no canonical block, can't mark any block as canonical *)
         Deferred.Result.return ()
     | Some (highest_canonical_block_id, greatest_canonical_height) ->
-        let k_int64 = Genesis_constants.k |> Int64.of_int in
+        let k_int64 = Genesis_constants.Compiled.k |> Int64.of_int in
         let%bind block = load (module Conn) ~id:block_id in
         if
           Int64.( > ) block.height
@@ -4729,7 +4729,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
   | None ->
       Deferred.unit
   | Some runtime_config -> (
-      let proof_level = Genesis_constants.Proof_level.compiled in
+      let proof_level = Genesis_constants.Compiled.Proof_level.t in
       let%bind precomputed_values =
         match%map
           Genesis_ledger_helper.init_from_config_file ~logger
@@ -4742,7 +4742,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
               (Error.to_string_hum err) ()
       in
       let constraint_constants =
-        Genesis_constants.Constraint_constants.compiled
+        Genesis_constants.Compiled.Constraint_constants.t
       in
       let ledger =
         Precomputed_values.genesis_ledger precomputed_values |> Lazy.force

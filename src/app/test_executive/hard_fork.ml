@@ -213,7 +213,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let constraint_constants =
-      Genesis_constants.Constraint_constants.compiled
+      Genesis_constants.Compiled.Constraint_constants.t
     in
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in

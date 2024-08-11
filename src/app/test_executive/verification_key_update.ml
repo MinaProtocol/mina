@@ -73,7 +73,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let `VK vk, `Prover prover =
     Transaction_snark.For_tests.create_trivial_snapp
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
+      ~constraint_constants:Genesis_constants.Compiled.Constraint_constants.t ()
 
   let config =
     let open Test_config in

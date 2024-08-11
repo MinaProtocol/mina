@@ -4223,7 +4223,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         assert (Or_error.is_error invalid_verification)
       in
       let constraint_constants =
-        Genesis_constants.Constraint_constants.compiled
+        Genesis_constants.For_unit_tests.Constraint_constants.t
       in
       let `VK vk_a, `Prover prover_a =
         create_trivial_snapp ~unique_id:0 ~constraint_constants ()
@@ -5011,7 +5011,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           , `Txn_commitment _commitment
           , `Full_txn_commitment _full_commitment ) =
         create_zkapp_command
-          ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+          ~constraint_constants:
+            Genesis_constants.Compiled.Constraint_constants.t
           (Multiple_transfers_spec.spec_of_t spec)
           ~update:spec.snapp_update ~receiver_update:spec.snapp_update
       in

@@ -218,7 +218,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
         List.is_empty
           (Mina_block.transactions
              ~constraint_constants:
-               Genesis_constants.Constraint_constants.compiled best_tip_block )
+               Genesis_constants.Compiled.Constraint_constants.t best_tip_block )
       then (
         [%log info]
           "No transactions in block, sending block without SNARK work to \
@@ -378,8 +378,9 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
       in
       let slot_duration_ms =
         Consensus.Configuration.t
-          ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-          ~protocol_constants:Genesis_constants.compiled.protocol
+          ~constraint_constants:
+            Genesis_constants.Compiled.Constraint_constants.t
+          ~protocol_constants:Genesis_constants.Compiled.t.protocol
         |> Consensus.Configuration.slot_duration |> Float.of_int
       in
       let make_slots_span min =

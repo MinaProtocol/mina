@@ -561,8 +561,9 @@ module T = struct
       ; init_stack = new_init_stack
       } )
 
-  let apply_single_transaction_second_pass ~connecting_ledger ledger
-      state_and_body_hash ~global_slot (pre_stmt : Pre_statement.t) =
+  let apply_single_transaction_second_pass ~constraint_constants
+      ~connecting_ledger ledger state_and_body_hash ~global_slot
+      (pre_stmt : Pre_statement.t) =
     let open Result.Let_syntax in
     let empty_local_state = Mina_state.Local_state.empty () in
     let second_pass_ledger_source_hash = Ledger.merkle_root ledger in
@@ -579,7 +580,8 @@ module T = struct
     let second_pass_ledger_target_hash = Ledger.merkle_root ledger in
     let%bind supply_increase =
       to_staged_ledger_or_error
-        (Ledger.Transaction_applied.supply_increase applied_txn)
+        (Ledger.Transaction_applied.supply_increase ~constraint_constants
+           applied_txn )
     in
     let%map () =
       let actual_status =
@@ -654,14 +656,14 @@ module T = struct
     in
     (List.rev res_rev, pending_coinbase_stack_state.pc.target)
 
-  let apply_transactions_second_pass ~yield ~global_slot ledger
-      state_and_body_hash pre_stmts =
+  let apply_transactions_second_pass ~constraint_constants ~yield ~global_slot
+      ledger state_and_body_hash pre_stmts =
     let open Deferred.Result.Let_syntax in
     let connecting_ledger = Ledger.merkle_root ledger in
     Mina_stdlib.Deferred.Result.List.map pre_stmts ~f:(fun pre_stmt ->
         let%bind result =
-          apply_single_transaction_second_pass ~connecting_ledger ~global_slot
-            ledger state_and_body_hash pre_stmt
+          apply_single_transaction_second_pass ~constraint_constants
+            ~connecting_ledger ~global_slot ledger state_and_body_hash pre_stmt
           |> Deferred.return
         in
         let%map () = yield () in
@@ -702,8 +704,8 @@ module T = struct
     in
     let first_pass_ledger_end = Ledger.merkle_root ledger in
     let%map txns_with_witnesses =
-      apply_transactions_second_pass ~yield ~global_slot ledger
-        state_and_body_hash (pre_stmts1 @ pre_stmts2)
+      apply_transactions_second_pass ~constraint_constants ~yield ~global_slot
+        ledger state_and_body_hash (pre_stmts1 @ pre_stmts2)
     in
     (txns_with_witnesses, updated_stack1, updated_stack2, first_pass_ledger_end)
 
@@ -2288,12 +2290,12 @@ include T
 
 module Test_helpers = struct
   let constraint_constants =
-    Genesis_constants.Constraint_constants.for_unit_tests
+    Genesis_constants.For_unit_tests.Constraint_constants.t
 
   let dummy_state_and_view ?global_slot () =
     let state =
       let consensus_constants =
-        let genesis_constants = Genesis_constants.for_unit_tests in
+        let genesis_constants = Genesis_constants.For_unit_tests.t in
         Consensus.Constants.create ~constraint_constants
           ~protocol_constants:genesis_constants.protocol
       in
@@ -2362,10 +2364,10 @@ let%test_module "staged ledger tests" =
     let coinbase_receiver =
       Public_key.compress coinbase_receiver_keypair.public_key
 
-    let proof_level = Genesis_constants.Proof_level.for_unit_tests
+    let proof_level = Genesis_constants.For_unit_tests.Proof_level.t
 
     let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+      Genesis_constants.For_unit_tests.Constraint_constants.t
 
     let zkapp_cmd_limit_hardcap = 200
 

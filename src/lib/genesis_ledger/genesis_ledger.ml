@@ -260,7 +260,8 @@ module Unit_test_ledger = Make (struct
 
   let directory = `Ephemeral
 
-  let depth = Genesis_constants.Constraint_constants.for_unit_tests.ledger_depth
+  let depth =
+    Genesis_constants.For_unit_tests.Constraint_constants.t.ledger_depth
 end)
 
 let for_unit_tests : Packed.t = (module Unit_test_ledger)

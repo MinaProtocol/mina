@@ -1443,7 +1443,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
             Signed.of_unsigned
               ( scale
                   (of_fee
-                     Genesis_constants.Constraint_constants.compiled
+                     Genesis_constants.Compiled.Constraint_constants.t
                        .account_creation_fee )
                   num_new_accounts
               |> Option.value_exn )) )
@@ -1485,7 +1485,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
               Signed.negate
                 (Signed.of_unsigned
                    (of_fee
-                      Genesis_constants.Constraint_constants.compiled
+                      Genesis_constants.Compiled.Constraint_constants.t
                         .account_creation_fee ) ))
           in
           gen_account_update_from ~no_account_precondition ?balance_change_range

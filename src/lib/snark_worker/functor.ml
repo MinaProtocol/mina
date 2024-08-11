@@ -229,7 +229,7 @@ module Make (Inputs : Intf.Inputs_intf) :
       ~proof_level daemon_address shutdown_on_disconnect =
     let constraint_constants =
       (* TODO: Make this configurable. *)
-      Genesis_constants.Constraint_constants.compiled
+      Genesis_constants.Compiled.Constraint_constants.t
     in
     let%bind state =
       Worker_state.create ~constraint_constants ~proof_level ()
@@ -380,7 +380,7 @@ module Make (Inputs : Intf.Inputs_intf) :
               !"Received signal to terminate. Aborting snark worker process" ;
             Core.exit 0 ) ;
         let proof_level =
-          Option.value ~default:Genesis_constants.Proof_level.compiled
+          Option.value ~default:Genesis_constants.Compiled.Proof_level.t
             proof_level
         in
         main

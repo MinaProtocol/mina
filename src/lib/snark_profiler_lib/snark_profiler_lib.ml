@@ -5,11 +5,11 @@ open Signature_lib
 open Mina_base
 open Mina_transaction
 
-let constraint_constants = Genesis_constants.Constraint_constants.compiled
+let constraint_constants = Genesis_constants.Compiled.Constraint_constants.t
 
-let genesis_constants = Genesis_constants.compiled
+let genesis_constants = Genesis_constants.Compiled.t
 
-let proof_level = Genesis_constants.Proof_level.compiled
+let proof_level = Genesis_constants.Compiled.Proof_level.t
 
 (* We're just profiling, so okay to monkey-patch here *)
 module Sparse_ledger = struct
@@ -813,7 +813,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
              in
              let supply_increase =
                Mina_ledger.Ledger.Transaction_applied.supply_increase
-                 applied_txn
+                 ~constraint_constants applied_txn
                |> Or_error.ok_exn
              in
              let () =
@@ -870,7 +870,7 @@ let generate_base_snarks_witness sparse_ledger0
              in
              let supply_increase =
                Mina_ledger.Ledger.Transaction_applied.supply_increase
-                 applied_txn
+                 ~constraint_constants applied_txn
                |> Or_error.ok_exn
              in
              let () =

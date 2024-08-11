@@ -1703,9 +1703,9 @@ let internal_commands logger =
                  [%log info] "Prover state being logged to %s" conf_dir ;
                  let%bind prover =
                    Prover.create ~commit_id:Mina_version.commit_id ~logger
-                     ~proof_level:Genesis_constants.Proof_level.compiled
+                     ~proof_level:Genesis_constants.Compiled.Proof_level.t
                      ~constraint_constants:
-                       Genesis_constants.Constraint_constants.compiled
+                       Genesis_constants.Compiled.Constraint_constants.t
                      ~pids:(Pid.Table.create ()) ~conf_dir ()
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
@@ -1731,9 +1731,9 @@ let internal_commands logger =
           | `Ok sexp -> (
               let%bind worker_state =
                 Snark_worker.Prod.Inputs.Worker_state.create
-                  ~proof_level:Genesis_constants.Proof_level.compiled
+                  ~proof_level:Genesis_constants.Compiled.Proof_level.t
                   ~constraint_constants:
-                    Genesis_constants.Constraint_constants.compiled ()
+                    Genesis_constants.Compiled.Constraint_constants.t ()
               in
               let sok_message =
                 { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
@@ -1847,9 +1847,9 @@ let internal_commands logger =
           in
           let%bind verifier =
             Verifier.create ~commit_id:Mina_version.commit_id ~logger
-              ~proof_level:Genesis_constants.Proof_level.compiled
+              ~proof_level:Genesis_constants.Compiled.Proof_level.t
               ~constraint_constants:
-                Genesis_constants.Constraint_constants.compiled
+                Genesis_constants.Compiled.Constraint_constants.t
               ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir) ()
           in
           let%bind result =
