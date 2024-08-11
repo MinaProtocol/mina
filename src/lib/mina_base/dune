@@ -69,7 +69,6 @@
    pickles.backend
    mina_signature_kind
    mina_base.util
-   mina_node_config
    kimchi_backend
    hex
    snark_bits
