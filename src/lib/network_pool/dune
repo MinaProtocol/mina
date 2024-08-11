@@ -47,7 +47,6 @@
    mina_transaction
    mina_state
    transaction_snark
-   transaction_snark_tests
    consensus
    network_peer
    currency
