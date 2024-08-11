@@ -250,32 +250,33 @@ module Without_config = struct
   include T
 end
 
-module Proof_level = struct
-  include Without_config.Proof_level
+module Make (Node_config : Node_config_intf.S) = struct
+  module Proof_level = struct
+    include Without_config.Proof_level
 
-  let compiled = of_string Node_config.proof_level
+    let compiled = of_string Node_config.proof_level
 
-  let for_unit_tests = Check
-end
+    let for_unit_tests = Check
+  end
 
-module Fork_constants = Without_config.Fork_constants
+  module Fork_constants = Without_config.Fork_constants
 
-(** Constants that affect the constraint systems for proofs (and thus also key
-    generation).
+  (** Constants that affect the constraint systems for proofs (and thus also key
+      generation).
 
-    Care must be taken to ensure that these match against the proving/
-    verification keys when [proof_level=Full], otherwise generated proofs will
-    be invalid.
-*)
-module Constraint_constants = struct
-  include Without_config.Constraint_constants
-
-  (* Generate the compile-time constraint constants, using a signature to hide
-     the optcomp constants that we import.
+      Care must be taken to ensure that these match against the proving/
+      verification keys when [proof_level=Full], otherwise generated proofs will
+      be invalid.
   *)
-  include (
-    struct
-      (** All the proofs before the last [work_delay] blocks must be
+  module Constraint_constants = struct
+    include Without_config.Constraint_constants
+
+    (* Generate the compile-time constraint constants, using a signature to hide
+       the optcomp constants that we import.
+    *)
+    include (
+      struct
+        (** All the proofs before the last [work_delay] blocks must be
             completed to add transactions. [work_delay] is the minimum number
             of blocks and will increase if the throughput is less.
             - If [work_delay = 0], all the work that was added to the scan
@@ -286,111 +287,118 @@ module Constraint_constants = struct
               completing the proofs.
         *)
 
-      let transaction_capacity_log_2 =
-        match
-          ( Node_config.scan_state_with_tps_goal
-          , Node_config.scan_state_tps_goal_x10 )
-        with
-        | true, Some tps_goal_x10 ->
-            let max_coinbases = 2 in
+        let transaction_capacity_log_2 =
+          match
+            ( Node_config.scan_state_with_tps_goal
+            , Node_config.scan_state_tps_goal_x10 )
+          with
+          | true, Some tps_goal_x10 ->
+              let max_coinbases = 2 in
 
-            (* block_window_duration is in milliseconds, so divide by 1000 divide
-               by 10 again because we have tps * 10
-            *)
-            let max_user_commands_per_block =
-              tps_goal_x10 * Node_config.block_window_duration / (1000 * 10)
-            in
+              (* block_window_duration is in milliseconds, so divide by 1000 divide
+                 by 10 again because we have tps * 10
+              *)
+              let max_user_commands_per_block =
+                tps_goal_x10 * Node_config.block_window_duration / (1000 * 10)
+              in
 
-            (* Log of the capacity of transactions per transition.
-                  - 1 will only work if we don't have prover fees.
-                  - 2 will work with prover fees, but not if we want a transaction
-                    included in every block.
-                  - At least 3 ensures a transaction per block and the staged-ledger
-                    unit tests pass.
-            *)
-            1
-            + Core_kernel.Int.ceil_log2
-                (max_user_commands_per_block + max_coinbases)
-        | _ -> (
-            match Node_config.scan_state_transaction_capacity_log_2 with
-            | Some a ->
-                a
-            | None ->
-                failwith
-                  "scan_state_transaction_capacity_log_2 must be set if \
-                   scan_state_with_tps_goal is false" )
+              (* Log of the capacity of transactions per transition.
+                    - 1 will only work if we don't have prover fees.
+                    - 2 will work with prover fees, but not if we want a transaction
+                      included in every block.
+                    - At least 3 ensures a transaction per block and the staged-ledger
+                      unit tests pass.
+              *)
+              1
+              + Core_kernel.Int.ceil_log2
+                  (max_user_commands_per_block + max_coinbases)
+          | _ -> (
+              match Node_config.scan_state_transaction_capacity_log_2 with
+              | Some a ->
+                  a
+              | None ->
+                  failwith
+                    "scan_state_transaction_capacity_log_2 must be set if \
+                     scan_state_with_tps_goal is false" )
 
-      let supercharged_coinbase_factor =
-        Node_config.supercharged_coinbase_factor
+        let supercharged_coinbase_factor =
+          Node_config.supercharged_coinbase_factor
 
-      let pending_coinbase_depth =
-        Core_kernel.Int.ceil_log2
-          ( (transaction_capacity_log_2 + 1)
-            * (Node_config.scan_state_work_delay + 1)
-          + 1 )
+        let pending_coinbase_depth =
+          Core_kernel.Int.ceil_log2
+            ( (transaction_capacity_log_2 + 1)
+              * (Node_config.scan_state_work_delay + 1)
+            + 1 )
 
-      let compiled =
-        { sub_windows_per_window = Node_config.sub_windows_per_window
-        ; ledger_depth = Node_config.ledger_depth
-        ; work_delay = Node_config.scan_state_work_delay
-        ; block_window_duration_ms = Node_config.block_window_duration
-        ; transaction_capacity_log_2
-        ; pending_coinbase_depth
-        ; coinbase_amount =
-            Currency.Amount.of_mina_string_exn Node_config.coinbase
-        ; supercharged_coinbase_factor
-        ; account_creation_fee =
-            Currency.Fee.of_mina_string_exn Node_config.account_creation_fee_int
-        ; fork = None
+        let compiled =
+          { sub_windows_per_window = Node_config.sub_windows_per_window
+          ; ledger_depth = Node_config.ledger_depth
+          ; work_delay = Node_config.scan_state_work_delay
+          ; block_window_duration_ms = Node_config.block_window_duration
+          ; transaction_capacity_log_2
+          ; pending_coinbase_depth
+          ; coinbase_amount =
+              Currency.Amount.of_mina_string_exn Node_config.coinbase
+          ; supercharged_coinbase_factor
+          ; account_creation_fee =
+              Currency.Fee.of_mina_string_exn
+                Node_config.account_creation_fee_int
+          ; fork = None
+          }
+      end :
+        sig
+          val compiled : t
+        end )
+
+    let for_unit_tests = compiled
+  end
+
+  include Without_config.Helpers
+  module Protocol = Without_config.Protocol
+  include Without_config.T
+
+  let genesis_state_timestamp_string = Node_config.genesis_state_timestamp
+
+  let k = Node_config.k
+
+  let slots_per_epoch = Node_config.slots_per_epoch
+
+  let slots_per_sub_window = Node_config.slots_per_sub_window
+
+  let grace_period_slots = Node_config.grace_period_slots
+
+  let delta = Node_config.delta
+
+  let pool_max_size = Node_config.pool_max_size
+
+  let t : t =
+    { protocol =
+        { k
+        ; slots_per_epoch
+        ; slots_per_sub_window
+        ; grace_period_slots
+        ; delta
+        ; genesis_state_timestamp =
+            genesis_timestamp_of_string genesis_state_timestamp_string
+            |> of_time
         }
-    end :
-      sig
-        val compiled : t
-      end )
-
-  let for_unit_tests = compiled
+    ; txpool_max_size = pool_max_size
+    ; num_accounts = None
+    ; zkapp_proof_update_cost = Mina_compile_config.zkapp_proof_update_cost
+    ; zkapp_signed_single_update_cost =
+        Mina_compile_config.zkapp_signed_single_update_cost
+    ; zkapp_signed_pair_update_cost =
+        Mina_compile_config.zkapp_signed_pair_update_cost
+    ; zkapp_transaction_cost_limit =
+        Mina_compile_config.zkapp_transaction_cost_limit
+    ; max_event_elements = Mina_compile_config.max_event_elements
+    ; max_action_elements = Mina_compile_config.max_action_elements
+    ; zkapp_cmd_limit_hardcap = Mina_compile_config.zkapp_cmd_limit_hardcap
+    }
 end
 
-include Without_config.Helpers
-module Protocol = Without_config.Protocol
-include Without_config.T
+include Make (Node_config)
 
-let genesis_state_timestamp_string = Node_config.genesis_state_timestamp
-
-let k = Node_config.k
-
-let slots_per_epoch = Node_config.slots_per_epoch
-
-let slots_per_sub_window = Node_config.slots_per_sub_window
-
-let grace_period_slots = Node_config.grace_period_slots
-
-let delta = Node_config.delta
-
-let pool_max_size = Node_config.pool_max_size
-
-let compiled : t =
-  { protocol =
-      { k
-      ; slots_per_epoch
-      ; slots_per_sub_window
-      ; grace_period_slots
-      ; delta
-      ; genesis_state_timestamp =
-          genesis_timestamp_of_string genesis_state_timestamp_string |> of_time
-      }
-  ; txpool_max_size = pool_max_size
-  ; num_accounts = None
-  ; zkapp_proof_update_cost = Mina_compile_config.zkapp_proof_update_cost
-  ; zkapp_signed_single_update_cost =
-      Mina_compile_config.zkapp_signed_single_update_cost
-  ; zkapp_signed_pair_update_cost =
-      Mina_compile_config.zkapp_signed_pair_update_cost
-  ; zkapp_transaction_cost_limit =
-      Mina_compile_config.zkapp_transaction_cost_limit
-  ; max_event_elements = Mina_compile_config.max_event_elements
-  ; max_action_elements = Mina_compile_config.max_action_elements
-  ; zkapp_cmd_limit_hardcap = Mina_compile_config.zkapp_cmd_limit_hardcap
-  }
+let compiled = t
 
 let for_unit_tests = compiled
