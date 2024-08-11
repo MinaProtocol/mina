@@ -1,4 +1,14 @@
+module type Version = sig
+  val protocol_version_transaction : int
+
+  val protocol_version_network : int
+
+  val protocol_version_patch : int
+end
+
 module type S = sig
+  include Version
+
   val ledger_depth : int
 
   val curve_size : int
@@ -36,12 +46,6 @@ module type S = sig
   val default_snark_worker_fee : string
 
   val minimum_user_command_fee : string
-
-  val protocol_version_transaction : int
-
-  val protocol_version_network : int
-
-  val protocol_version_patch : int
 
   val supercharged_coinbase_factor : int
 

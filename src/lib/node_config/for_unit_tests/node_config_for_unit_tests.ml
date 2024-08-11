@@ -1,8 +1,9 @@
-[@@@ocaml.text
-" This file consists of compile-time constants that are not in\n\
-\    Genesis_constants.\n\
-\    This file includes all of the constants defined at compile-time for both\n\
-\    tests and production.\n"]
+(** This file consists of compile-time constants that are not in Genesis_constants.
+    This file includes all of the constants defined at compile-time for both
+    tests and production.
+*)
+
+include Node_config_version
 
 let (ledger_depth : int) = (10 : int)
 
@@ -44,12 +45,6 @@ let (default_transaction_fee : string) = ("5" : string)
 let (default_snark_worker_fee : string) = ("1" : string)
 
 let (minimum_user_command_fee : string) = ("2" : string)
-
-let (protocol_version_transaction : int) = (3 : int)
-
-let (protocol_version_network : int) = (0 : int)
-
-let (protocol_version_patch : int) = (0 : int)
 
 let (supercharged_coinbase_factor : int) = (1 : int)
 

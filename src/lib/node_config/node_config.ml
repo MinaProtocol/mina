@@ -6,6 +6,8 @@
     tests and production.
 *)
 
+include Node_config_version
+
 [%%inject "ledger_depth", ledger_depth]
 
 [%%inject "curve_size", curve_size]
@@ -55,12 +57,6 @@ let scan_state_transaction_capacity_log_2 =
 [%%inject "default_snark_worker_fee", default_snark_worker_fee]
 
 [%%inject "minimum_user_command_fee", minimum_user_command_fee]
-
-[%%inject "protocol_version_transaction", protocol_version_transaction]
-
-[%%inject "protocol_version_network", protocol_version_network]
-
-[%%inject "protocol_version_patch", protocol_version_patch]
 
 [%%inject "supercharged_coinbase_factor", supercharged_coinbase_factor]
 
