@@ -229,7 +229,9 @@ let fee : t -> Currency.Fee.t = function
       Zkapp_command.fee p
 
 (* for filtering *)
-let minimum_fee = Currency.Fee.minimum_user_command_fee
+let minimum_fee =
+  Currency.Fee.of_mina_string_exn
+    Mina_compile_config.minimum_user_command_fee_string
 
 let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 

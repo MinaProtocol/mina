@@ -306,7 +306,9 @@ let setup_daemon logger =
         (sprintf
            "FEE Amount a worker wants to get compensated for generating a \
             snark proof (default: %d)"
-           (Currency.Fee.to_nanomina_int Currency.Fee.default_snark_worker_fee) )
+           ( Currency.Fee.to_nanomina_int
+           @@ Currency.Fee.of_mina_string_exn
+                Mina_compile_config.default_snark_worker_fee_string ) )
       (optional txn_fee)
   and work_reassignment_wait =
     flag "--work-reassignment-wait"
@@ -830,7 +832,10 @@ let setup_daemon logger =
               |> Option.map ~f:Currency.Fee.of_nanomina_int_exn
             in
             or_from_config json_to_currency_fee_option "snark-worker-fee"
-              ~default:Currency.Fee.default_snark_worker_fee snark_work_fee
+              ~default:
+                (Currency.Fee.of_mina_string_exn
+                   Mina_compile_config.default_snark_worker_fee_string )
+              snark_work_fee
           in
           let node_status_url =
             maybe_from_config YJ.Util.to_string_option "node-status-url"

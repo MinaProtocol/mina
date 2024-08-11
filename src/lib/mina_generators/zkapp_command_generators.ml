@@ -251,7 +251,7 @@ let gen_fee ?fee_range ~num_updates (account : Account.t) =
   let balance = account.balance in
   let lo_fee =
     Option.value_exn
-      Currency.Fee.(scale minimum_user_command_fee (num_updates * 2))
+      Currency.Fee.(scale Mina_base.User_command.minimum_fee (num_updates * 2))
   in
   let hi_fee = Option.value_exn Currency.Fee.(scale lo_fee 2) in
   assert (

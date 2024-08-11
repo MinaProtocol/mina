@@ -362,7 +362,7 @@ module Metadata = struct
             , Amount.to_yojson
                 (Amount_of.mina
                    (Mina_currency.Fee.to_uint64
-                      Mina_currency.Fee.minimum_user_command_fee ) ) )
+                      Mina_base.User_command.minimum_fee ) ) )
           ]
       in
       let receiver_exists = Option.is_some res.receiver in

@@ -117,6 +117,8 @@ module type S = sig
   (* for filtering *)
   val minimum_fee : Currency.Fee.t
 
+  val default_fee : Currency.Fee.t
+
   val has_insufficient_fee : t -> bool
 
   val tag : t -> Transaction_union_tag.t

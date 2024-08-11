@@ -1654,7 +1654,7 @@ let%test_module _ =
     let proof_level = precomputed_values.proof_level
 
     let minimum_fee =
-      Currency.Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee
+      Currency.Fee.to_nanomina_int Mina_base.User_command.minimum_fee
 
     let logger = Logger.create ()
 
