@@ -357,7 +357,8 @@ let signed_command_common : signed_command_common Command.Param.t =
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
            (Currency.Fee.to_mina_string Mina_base.Signed_command.default_fee)
-           (Currency.Fee.to_mina_string Mina_base.Signed_command.minimum_fee) )
+           (Currency.Fee.to_mina_string
+              Genesis_constants_compiled.t.minimum_user_command_fee ) )
       (optional txn_fee)
   and nonce =
     flag "--nonce" ~aliases:[ "nonce" ]
@@ -403,7 +404,8 @@ module Signed_command = struct
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
            (Currency.Fee.to_mina_string Mina_base.Signed_command.default_fee)
-           (Currency.Fee.to_mina_string Mina_base.Signed_command.minimum_fee) )
+           (Currency.Fee.to_mina_string
+              Genesis_constants_compiled.t.minimum_user_command_fee ) )
       (optional txn_fee)
 
   let valid_until =

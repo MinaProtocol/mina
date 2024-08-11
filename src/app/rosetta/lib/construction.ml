@@ -345,7 +345,8 @@ module Metadata = struct
         in
         if Array.is_empty fees then
           Amount_of.mina
-            (Mina_currency.Fee.to_uint64 Signed_command.minimum_fee)
+            (Mina_currency.Fee.to_uint64
+               Genesis_constants_compiled.t.minimum_user_command_fee )
         else
           Amount_of.mina
             (suggest_fee

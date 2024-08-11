@@ -12,7 +12,8 @@ let create_accounts port (privkey_path, key_prefix, num_accounts, fee, amount) =
   let pk_check_wait = Time.Span.of_sec 10. in
   let pk_check_timeout = Time.Span.of_min 30. in
   let min_fee =
-    Currency.Fee.to_nanomina_int Mina_base.Signed_command.minimum_fee
+    Currency.Fee.to_nanomina_int
+      Genesis_constants_compiled.t.minimum_user_command_fee
   in
   let account_creation_fee_int =
     let constraint_constants =
