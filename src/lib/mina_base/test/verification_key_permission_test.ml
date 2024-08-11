@@ -38,7 +38,7 @@ let update_vk_perm_with_different_version () =
   Quickcheck.test ~trials:10 auth_gen ~f:(fun auth ->
       match
         User_command.check_well_formedness
-          ~genesis_constants:Genesis_constants.for_unit_tests
+          ~genesis_constants:Genesis_constants.For_unit_tests.t
           (Zkapp_command (update_vk_perm_to_be ~auth:(auth, different_version)))
       with
       | Ok _ ->
@@ -52,7 +52,7 @@ let update_vk_perm_with_current_version () =
   Quickcheck.test ~trials:10 auth_gen ~f:(fun auth ->
       match
         User_command.check_well_formedness
-          ~genesis_constants:Genesis_constants.for_unit_tests
+          ~genesis_constants:Genesis_constants.For_unit_tests.t
           (Zkapp_command
              (update_vk_perm_to_be
                 ~auth:(auth, Mina_numbers.Txn_version.current) ) )

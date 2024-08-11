@@ -68,7 +68,7 @@ let%test_module "Epoch ledger sync tests" =
       in
       let constraint_constants = precomputed_values.constraint_constants in
       let consensus_constants =
-        let genesis_constants = Genesis_constants.for_unit_tests in
+        let genesis_constants = Genesis_constants.For_unit_tests.t in
         Consensus.Constants.create ~constraint_constants
           ~protocol_constants:genesis_constants.protocol
       in

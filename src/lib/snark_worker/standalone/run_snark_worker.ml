@@ -21,7 +21,7 @@ let command =
        let open Async in
        let%bind worker_state =
          Prod.Worker_state.create
-           ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+           ~constraint_constants:Genesis_constants.Compiled.Constraint_constants.t
            ~proof_level ()
        in
        let public_key = fst Key_gen.Sample_keypairs.genesis_winner in

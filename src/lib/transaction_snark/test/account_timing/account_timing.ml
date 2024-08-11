@@ -1231,7 +1231,7 @@ let%test_module "account timing check" =
             Option.value ~default:zero @@ Signed_command.amount cmd
           in
           let fee =
-            Currency.Fee.to_uint64 Currency.Fee.minimum_user_command_fee
+            Currency.Fee.to_uint64 Mina_base.User_command.minimum_fee
             |> of_uint64
           in
           let total = Option.value ~default:max_int (amount + fee) in
