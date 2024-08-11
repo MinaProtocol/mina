@@ -4,6 +4,7 @@
 *)
 
 include Node_config_version
+include Node_config_unconfigurable_constants
 
 let (ledger_depth : int) = (10 : int)
 
