@@ -63,6 +63,7 @@
    mina_base.import
    consensus
    genesis_constants
+   genesis_constants.compiled
    genesis_ledger_helper.lib
    mina_compile_config
    verifier

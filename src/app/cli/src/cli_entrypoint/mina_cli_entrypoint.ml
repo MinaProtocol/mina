@@ -99,7 +99,9 @@ let load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level config_files =
   let%bind precomputed_values =
     match%map
       Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
-        ~proof_level config
+        ~compiled_proof_level:Genesis_constants_compiled.Proof_level.t
+        ~constraint_constants:Genesis_constants_compiled.Constraint_constants.t
+        ~genesis_constants:Genesis_constants_compiled.t ~proof_level config
     with
     | Ok (precomputed_values, _) ->
         precomputed_values

@@ -4733,7 +4733,10 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
       let%bind precomputed_values =
         match%map
           Genesis_ledger_helper.init_from_config_file ~logger
-            ~proof_level:(Some proof_level) runtime_config
+            ~proof_level:(Some proof_level) ~compiled_proof_level:proof_level
+            ~constraint_constants:
+              Genesis_constants_compiled.Constraint_constants.t
+            ~genesis_constants:Genesis_constants_compiled.t runtime_config
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
