@@ -73,6 +73,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   in
   let unprocessed_transition_cache =
     Transition_handler.Unprocessed_transition_cache.create ~logger
+      ~cache_exceptions:Node_config.cache_exceptions
   in
   List.iter collected_transitions ~f:(fun t ->
       (* since the cache was just built, it's safe to assume
