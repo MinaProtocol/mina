@@ -4,7 +4,7 @@ echo "Exporting Variables: "
 
 export MINA_REPO="https://github.com/MinaProtocol/mina.git"
 
-function find_most_recent_numeric_tag () {
+function find_most_recent_numeric_tag() {
     # We use the --prune flag because we've had problems with buildkite agents getting conflicting results here
     git fetch --tags --prune --prune-tags --force
     TAG=$(git describe --always --abbrev=0 $1 | sed 's!/!-!g; s!_!-!g; s!#!-!g')
