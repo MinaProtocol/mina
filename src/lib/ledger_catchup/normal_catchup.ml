@@ -949,7 +949,7 @@ let%test_module "Ledger_catchup tests" =
       in
       let unprocessed_transition_cache =
         Transition_handler.Unprocessed_transition_cache.create ~logger
-          ~cache_exceptions:Node_config.cache_exceptions
+          ~cache_exceptions:true
       in
       run
         ~context:(module Context)

@@ -513,7 +513,7 @@ let%test_module "Transition_handler.Processor tests" =
                 let clean_up_catchup_scheduler = Ivar.create () in
                 let cache =
                   Unprocessed_transition_cache.create ~logger
-                    ~cache_exceptions:Node_config.cache_exceptions
+                    ~cache_exceptions:true
                 in
                 run
                   ~context:(module Context)
