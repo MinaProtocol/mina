@@ -456,7 +456,8 @@ let _create_ledger_and_zkapps_from_generator num_transactions :
   let cmd_infos, ledger =
     Quickcheck.random_value
       (Mina_generators.User_command_generators
-       .sequence_zkapp_command_with_ledger ~max_account_updates ~length ~vk () )
+       .sequence_zkapp_command_with_ledger ~max_account_updates ~length ~vk
+         ~constraint_constants ~genesis_constants () )
   in
   let zkapps =
     List.map cmd_infos ~f:(fun (user_cmd, _keypair, keymap) ->

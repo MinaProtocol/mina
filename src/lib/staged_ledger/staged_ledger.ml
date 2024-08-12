@@ -2366,6 +2366,8 @@ let%test_module "staged ledger tests" =
 
     let proof_level = Genesis_constants.For_unit_tests.Proof_level.t
 
+    let genesis_constants = Genesis_constants.For_unit_tests.t
+
     let constraint_constants =
       Genesis_constants.For_unit_tests.Constraint_constants.t
 
@@ -2934,7 +2936,8 @@ let%test_module "staged ledger tests" =
       let%bind zkapp_command_and_fee_payer_keypairs, ledger =
         Mina_generators.User_command_generators
         .sequence_zkapp_command_with_ledger ?ledger_init_state
-          ~max_token_updates:1 ~length:num_zkapps ~vk ?failure ()
+          ~max_token_updates:1 ~length:num_zkapps ~vk ?failure
+          ~constraint_constants ~genesis_constants ()
       in
       let zkapps =
         List.map zkapp_command_and_fee_payer_keypairs ~f:(function

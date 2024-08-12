@@ -19,7 +19,6 @@
    ;; local libraries
    bounded_types
    genesis_constants
-   genesis_constants.compiled
    sgn
    pickles_types
    pickles
@@ -27,7 +26,6 @@
    kimchi_pasta
    kimchi_pasta.basic
    mina_numbers
-   mina_compile_config
    zkapp_command_builder
    signature_lib
    mina_ledger

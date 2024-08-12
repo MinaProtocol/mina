@@ -16,7 +16,8 @@ let gen_apply_and_txn : (apply * Application_state.txn) Quickcheck.Generator.t =
     Genesis_constants.For_unit_tests.Constraint_constants.t
   in
   let%bind txn, _, _, validating_ledger =
-    User_command_generators.zkapp_command_with_ledger ()
+    User_command_generators.zkapp_command_with_ledger ~constraint_constants
+      ~genesis_constants:Genesis_constants.For_unit_tests.t ()
   in
   let%map global_slot = Global_slot_since_genesis.gen in
   let current_state_view = Test_helpers.dummy_state_view ~global_slot () in
