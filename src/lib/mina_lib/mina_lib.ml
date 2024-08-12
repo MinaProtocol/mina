@@ -456,19 +456,14 @@ exception Offline_shutdown
 
 exception Bootstrap_stuck_shutdown
 
-let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
-    ~transition_frontier_and_catchup_signal_incr ~online_status_incr
+let create_sync_status_observer ~logger ~genesis_timestamp ~is_seed ~demo_mode
+    ~net ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
   let open Mina_incremental.Status in
   let restart_delay = Time.Span.of_min 5. in
   let offline_shutdown_delay = Time.Span.of_min 25. in
-  let after_genesis =
-    let genesis_timestamp =
-      Genesis_constants_compiled.(
-        genesis_timestamp_of_string genesis_state_timestamp_string)
-    in
-    fun () -> Time.(( >= ) (now ())) genesis_timestamp
-  in
+  let genesis_timestamp = Genesis_constants.to_time genesis_timestamp in
+  let after_genesis () = Time.(( >= ) (now ())) genesis_timestamp in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
@@ -2244,8 +2239,11 @@ let create ~commit_id ?wallets (config : Config.t) =
                 return None
           in
           let sync_status =
-            create_sync_status_observer ~logger:config.logger ~net
-              ~is_seed:config.is_seed ~demo_mode:config.demo_mode
+            create_sync_status_observer ~logger:config.logger
+              ~genesis_timestamp:
+                config.precomputed_values.genesis_constants.protocol
+                  .genesis_state_timestamp
+              ~net ~is_seed:config.is_seed ~demo_mode:config.demo_mode
               ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:(Var.watch @@ of_broadcast_pipe online_status)
               ~first_connection_incr:

@@ -82,6 +82,9 @@ module Helpers = struct
   let of_time t =
     Time.to_span_since_epoch t |> Time.Span.to_ms |> Int64.of_float
 
+  let to_time t =
+    t |> Int64.to_float |> Time.Span.of_ms |> Time.of_span_since_epoch
+
   let validate_time time_str =
     match
       Result.try_with (fun () ->
@@ -258,6 +261,8 @@ module type S = sig
   val genesis_timestamp_of_string : string -> Time.t
 
   val of_time : Time.t -> int64
+
+  val to_time : int64 -> Time.t
 
   val validate_time : string option -> (int64, string) result
 
