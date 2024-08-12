@@ -15,7 +15,8 @@ end
 
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~time_controller ~collected_transitions ~frontier ~get_completed_work
-    ~network_transition_reader ~producer_transition_reader ~clear_reader =
+    ~network_transition_reader ~producer_transition_reader ~clear_reader
+    ~cache_exceptions =
   let open Context in
   let valid_transition_pipe_capacity = 50 in
   let start_time = Time.now () in
@@ -73,7 +74,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   in
   let unprocessed_transition_cache =
     Transition_handler.Unprocessed_transition_cache.create ~logger
-      ~cache_exceptions:Node_config.cache_exceptions
+      ~cache_exceptions
   in
   List.iter collected_transitions ~f:(fun t ->
       (* since the cache was just built, it's safe to assume

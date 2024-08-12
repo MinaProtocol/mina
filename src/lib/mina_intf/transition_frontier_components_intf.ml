@@ -325,6 +325,7 @@ module type Transition_router_intf = sig
   (** [sync_local_state] is `true` by default, may be set to `false` for tests *)
   val run :
        ?sync_local_state:bool
+    -> ?cache_exceptions:bool
     -> context:(module CONTEXT)
     -> trust_system:Trust_system.t
     -> verifier:Verifier.t

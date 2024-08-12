@@ -73,7 +73,8 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
     ~trust_system ~verifier ~network ~time_controller ~get_completed_work
     ~producer_transition_reader_ref ~producer_transition_writer_ref
     ~verified_transition_writer ~clear_reader ~collected_transitions
-    ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier =
+    ~cache_exceptions ~transition_reader_ref ~transition_writer_ref ~frontier_w
+    frontier =
   let open Context in
   [%str_log info] Starting_transition_frontier_controller ;
   let ( transition_frontier_controller_reader
@@ -105,7 +106,7 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
       ~trust_system ~verifier ~network ~time_controller ~collected_transitions
       ~frontier ~get_completed_work
       ~network_transition_reader:!transition_reader_ref
-      ~producer_transition_reader ~clear_reader
+      ~producer_transition_reader ~clear_reader ~cache_exceptions
   in
   Strict_pipe.Reader.iter new_verified_transition_reader
     ~f:
@@ -119,7 +120,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
     ~verified_transition_writer ~clear_reader ~transition_reader_ref
     ~transition_writer_ref ~consensus_local_state ~frontier_w
     ~initial_root_transition ~persistent_root ~persistent_frontier
-    ~best_seen_transition ~catchup_mode =
+    ~cache_exceptions ~best_seen_transition ~catchup_mode =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
@@ -161,8 +162,8 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
         ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_reader_ref ~producer_transition_writer_ref
         ~verified_transition_writer ~clear_reader ~collected_transitions
-        ~transition_reader_ref ~transition_writer_ref ~frontier_w new_frontier
-      )
+        ~cache_exceptions ~transition_reader_ref ~transition_writer_ref
+        ~frontier_w new_frontier )
 
 let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
     ~network ~verifier ~trust_system ~most_recent_valid_block_writer
@@ -339,7 +340,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
     ~is_seed ~is_demo_mode ~verifier ~trust_system ~time_controller
     ~get_completed_work ~frontier_w ~producer_transition_reader_ref
     ~producer_transition_writer_ref ~clear_reader ~verified_transition_writer
-    ~transition_reader_ref ~transition_writer_ref
+    ~transition_reader_ref ~transition_writer_ref ~cache_exceptions
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
     ~consensus_local_state ~catchup_mode ~notify_online =
   let open Context in
@@ -376,7 +377,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~verified_transition_writer ~clear_reader ~transition_reader_ref
         ~consensus_local_state ~transition_writer_ref ~frontier_w
         ~persistent_root ~persistent_frontier ~initial_root_transition
-        ~catchup_mode ~best_seen_transition:best_tip
+        ~cache_exceptions ~catchup_mode ~best_seen_transition:best_tip
   | best_tip, Some frontier -> (
       match best_tip with
       | Some best_tip
@@ -407,7 +408,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
             ~clear_reader ~transition_reader_ref ~consensus_local_state
             ~transition_writer_ref ~frontier_w ~persistent_root
             ~persistent_frontier ~initial_root_transition ~catchup_mode
-            ~best_seen_transition:(Some best_tip)
+            ~cache_exceptions ~best_seen_transition:(Some best_tip)
       | _ ->
           if Option.is_some best_tip then
             [%log info]
@@ -464,8 +465,8 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
             ~trust_system ~verifier ~network ~time_controller
             ~get_completed_work ~producer_transition_reader_ref
             ~producer_transition_writer_ref ~verified_transition_writer
-            ~clear_reader ~collected_transitions ~transition_reader_ref
-            ~transition_writer_ref ~frontier_w frontier )
+            ~cache_exceptions ~clear_reader ~collected_transitions
+            ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier )
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
@@ -509,10 +510,10 @@ let wait_till_genesis ~logger ~time_controller
 (* [sync_local_state] may be `false` for tests, where we want
    to set local state in the test
 *)
-let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
-    ~trust_system ~verifier ~network ~is_seed ~is_demo_mode ~time_controller
-    ~consensus_local_state ~persistent_root_location
-    ~persistent_frontier_location
+let run ?(sync_local_state = true) ?(cache_exceptions = false)
+    ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
+    ~is_seed ~is_demo_mode ~time_controller ~consensus_local_state
+    ~persistent_root_location ~persistent_frontier_location
     ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~network_transition_reader
     ~producer_transition_reader
     ~most_recent_valid_block:
@@ -589,7 +590,7 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
           ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
       let%map () =
-        initialize ~sync_local_state
+        initialize ~sync_local_state ~cache_exceptions
           ~context:(module Context)
           ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
           ~persistent_frontier ~persistent_root ~time_controller
@@ -658,7 +659,7 @@ let run ?(sync_local_state = true) ~context:(module Context : CONTEXT)
                           ~context:(module Context)
                           ~trust_system ~verifier ~network ~time_controller
                           ~get_completed_work ~producer_transition_reader_ref
-                          ~producer_transition_writer_ref
+                          ~producer_transition_writer_ref ~cache_exceptions
                           ~verified_transition_writer ~clear_reader
                           ~transition_reader_ref ~transition_writer_ref
                           ~consensus_local_state ~frontier_w ~persistent_root

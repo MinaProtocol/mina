@@ -328,7 +328,7 @@ let%test_module "Epoch ledger sync tests" =
         (* we're going to set and sync the epoch ledgers in the test
            so router should not do a sync
         *)
-        Transition_router.run ~sync_local_state:false
+        Transition_router.run ~sync_local_state:false ~cache_exceptions:true
           ~context:(module Context)
           ~trust_system:config.trust_system ~verifier ~network:mina_networking
           ~is_seed:config.is_seed ~is_demo_mode:false
