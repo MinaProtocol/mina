@@ -42,7 +42,6 @@
    child_processes
    verifier
    genesis_constants
-   genesis_constants.compiled
    mina_stdlib
    network_pool
    mina_net2
