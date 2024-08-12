@@ -138,11 +138,7 @@ let push sink (`Transition e, `Time_received tm, `Valid_cb cb) =
         | `Within_capacity ->
             Writer.write writer (`Transition e, `Time_received tm, `Valid_cb cb)
       in
-      let transactions =
-        Mina_block.transactions state
-          ~constraint_constants:
-            Genesis_constants_compiled.Constraint_constants.t
-      in
+      let transactions = Mina_block.transactions state ~constraint_constants in
       let exists_well_formedness_errors =
         List.exists transactions ~f:(fun txn ->
             match
