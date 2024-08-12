@@ -4850,7 +4850,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
           () )
 
 let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
-    pool =
+    ~block_window_duration_ms pool =
   match metrics_server_port with
   | None ->
       return ()
@@ -4862,9 +4862,7 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
       let%bind metric_server =
         Mina_metrics.Archive.create_archive_server ~port ~logger ()
       in
-      let interval =
-        Float.of_int (Mina_compile_config.block_window_duration_ms * 2)
-      in
+      let interval = Float.of_int (block_window_duration_ms * 2) in
       let rec go () =
         let%bind () =
           Metrics.update pool metric_server ~logger ~missing_blocks_width
@@ -4988,6 +4986,7 @@ let setup_server ~metrics_server_port
       |> don't_wait_for ;
       (*Update archive metrics*)
       create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
+        ~block_window_duration_ms:constraint_constants.block_window_duration_ms
         pool
       |> don't_wait_for ;
       [%log info] "Archive process ready. Clients can now connect" ;
