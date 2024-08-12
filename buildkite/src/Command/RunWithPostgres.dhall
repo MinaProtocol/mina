@@ -48,7 +48,9 @@ let runInDockerWithPostgresConn
               : Text
               = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
 
-          let minaDockerTag : Text = "\\\$MINA_DOCKER_TAG"
+          let minaDockerTag
+              : Text
+              = "\\\$MINA_DOCKER_TAG"
 
           in  Cmd.chain
                 [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
