@@ -277,7 +277,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       return
-      @@ Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
+      @@ Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+           zkapp_command_spec
     in
     let%bind zkapp_command_invalid_transfer_from_timed_account =
       let open Mina_base in
@@ -308,7 +309,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       return
-      @@ Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
+      @@ Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+           zkapp_command_spec
     in
     let%bind.Deferred zkapp_command_update_timing =
       let open Mina_base in
@@ -566,7 +568,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
               }
         }
       in
-      Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
+      Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+        zkapp_command_spec
     in
     let%bind.Deferred () =
       after (Time.Span.of_ms (float_of_int block_window_duration_ms))

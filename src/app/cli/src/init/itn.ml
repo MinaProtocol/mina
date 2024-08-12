@@ -15,10 +15,10 @@ let create_accounts port (privkey_path, key_prefix, num_accounts, fee, amount) =
     Currency.Fee.to_nanomina_int
       Genesis_constants_compiled.t.minimum_user_command_fee
   in
+  let constraint_constants =
+    Genesis_constants_compiled.Constraint_constants.t
+  in
   let account_creation_fee_int =
-    let constraint_constants =
-      Genesis_constants_compiled.Constraint_constants.t
-    in
     Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
   in
   if fee < min_fee then (
@@ -179,7 +179,8 @@ let create_accounts port (privkey_path, key_prefix, num_accounts, fee, amount) =
           }
         in
         fee_payer_current_nonce := Account.Nonce.succ !fee_payer_current_nonce ;
-        Transaction_snark.For_tests.multiple_transfers multispec )
+        Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+          multispec )
   in
   let zkapps_batches = List.chunks_of zkapps ~length:zkapps_per_block in
   Deferred.List.iter zkapps_batches ~f:(fun zkapps_batch ->

@@ -5004,15 +5004,14 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let multiple_transfers (spec : Multiple_transfers_spec.t) =
+    let multiple_transfers ~constraint_constants
+        (spec : Multiple_transfers_spec.t) =
       let ( `Zkapp_command zkapp_command
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment _commitment
           , `Full_txn_commitment _full_commitment ) =
-        create_zkapp_command
-          ~constraint_constants:
-            Genesis_constants_compiled.Constraint_constants.t
+        create_zkapp_command ~constraint_constants
           (Multiple_transfers_spec.spec_of_t spec)
           ~update:spec.snapp_update ~receiver_update:spec.snapp_update
       in

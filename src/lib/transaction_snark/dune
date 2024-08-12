@@ -35,7 +35,6 @@
    signature_lib
    mina_signature_kind
    genesis_constants
-   genesis_constants.compiled
    currency
    random_oracle
    snark_params

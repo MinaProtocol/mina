@@ -2045,7 +2045,8 @@ let%test_module _ =
         }
       in
       let zkapp_command =
-        Transaction_snark.For_tests.multiple_transfers test_spec
+        Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+          test_spec
       in
       let zkapp_command =
         Or_error.ok_exn
