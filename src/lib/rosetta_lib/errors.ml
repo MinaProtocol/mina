@@ -43,7 +43,7 @@ module Variant = struct
       `Transaction_submit_no_sender
     | `Transaction_submit_duplicate
     | `Transaction_submit_bad_nonce
-    | `Transaction_submit_fee_small
+    | `Transaction_submit_fee_small of string
     | `Transaction_submit_invalid_signature
     | `Transaction_submit_insufficient_balance
     | `Transaction_submit_expired ]
@@ -126,7 +126,7 @@ end = struct
         "Can't send transaction: A duplicate is detected"
     | `Transaction_submit_bad_nonce ->
         "Can't send transaction: Nonce invalid"
-    | `Transaction_submit_fee_small ->
+    | `Transaction_submit_fee_small _ ->
         "Can't send transaction: Fee too small"
     | `Transaction_submit_invalid_signature ->
         "Can't send transaction: Invalid signature"
@@ -206,7 +206,7 @@ end = struct
         None
     | `Transaction_submit_bad_nonce ->
         None
-    | `Transaction_submit_fee_small ->
+    | `Transaction_submit_fee_small _ ->
         None
     | `Transaction_submit_invalid_signature ->
         None
@@ -260,7 +260,7 @@ end = struct
         false
     | `Transaction_submit_bad_nonce ->
         false
-    | `Transaction_submit_fee_small ->
+    | `Transaction_submit_fee_small _ ->
         false
     | `Transaction_submit_invalid_signature ->
         false
@@ -326,12 +326,11 @@ end = struct
         "You must use the current nonce in your account in the ledger or one \
          that is inferred based on pending transactions in the transaction \
          pool."
-    | `Transaction_submit_fee_small ->
+    | `Transaction_submit_fee_small s ->
         sprintf
           "The minimum fee on transactions is %s . Please increase your fee to \
            at least this amount."
-          (Currency.Fee.to_mina_string
-             Genesis_constants_compiled.t.minimum_user_command_fee )
+          s
     | `Transaction_submit_invalid_signature ->
         "An invalid signature is attached to this transaction"
     | `Transaction_submit_insufficient_balance ->
@@ -420,7 +419,10 @@ module Transaction_submit = struct
       else if p "either different from inferred nonce" then
         Some `Transaction_submit_bad_nonce
       else if p "is less than the minimum fee" then
-        Some `Transaction_submit_fee_small
+        Some
+          (`Transaction_submit_fee_small
+            (Currency.Fee.to_mina_string
+               Genesis_constants_compiled.t.minimum_user_command_fee ) )
       else if p "Error: Invalid_signature" then
         Some `Transaction_submit_invalid_signature
       else if p "[\"Insufficient_funds\"]" then

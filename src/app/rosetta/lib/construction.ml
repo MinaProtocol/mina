@@ -696,7 +696,12 @@ module Parse = struct
       | Some pay ->
           if Transaction.Unsigned.Rendered.Payment.is_fee_sufficient pay then
             Ok ()
-          else Result.fail @@ Errors.create `Transaction_submit_fee_small
+          else
+            Result.fail
+            @@ Errors.create
+                 (`Transaction_submit_fee_small
+                   (Mina_currency.Fee.to_mina_string
+                      Genesis_constants_compiled.t.minimum_user_command_fee ) )
       | None ->
           Ok ()
 
