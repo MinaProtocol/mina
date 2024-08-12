@@ -239,7 +239,52 @@ end
 
 include T
 
-module Make (Node_config : Node_config_intf.S) = struct
+module type S = sig
+  module Proof_level : sig
+    include module type of Proof_level with type t = Proof_level.t
+
+    val t : t
+  end
+
+  module Fork_constants = Fork_constants
+
+  module Constraint_constants : sig
+    include
+      module type of Constraint_constants with type t = Constraint_constants.t
+
+    val t : t
+  end
+
+  val genesis_timestamp_of_string : string -> Time.t
+
+  val of_time : Time.t -> int64
+
+  val validate_time : string option -> (int64, string) result
+
+  val genesis_timestamp_to_string : int64 -> string
+
+  module Protocol = Protocol
+
+  include module type of T with type t = T.t
+
+  val genesis_state_timestamp_string : string
+
+  val k : int
+
+  val slots_per_epoch : int
+
+  val slots_per_sub_window : int
+
+  val grace_period_slots : int
+
+  val delta : int
+
+  val pool_max_size : int
+
+  val t : t
+end
+
+module Make (Node_config : Node_config_intf.S) : S = struct
   module Proof_level = struct
     include Proof_level
 
