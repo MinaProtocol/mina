@@ -7,6 +7,7 @@
    core_kernel
    ;; local libraries
    genesis_constants
+   genesis_constants.compiled
    mina_state
    coda_genesis_proof
    crypto_params

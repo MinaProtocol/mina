@@ -57,6 +57,16 @@ let compiled_inputs =
       Consensus.Constants.create ~constraint_constants
         ~protocol_constants:genesis_constants.protocol
     in
+    let module Test_genesis_ledger = struct
+      include Genesis_ledger.Make (struct
+        include Test_genesis_ledger
+
+        let directory = `Ephemeral
+
+        let depth =
+          Genesis_constants_compiled.Constraint_constants.t.ledger_depth
+      end)
+    end in
     let protocol_state_with_hashes =
       Mina_state.Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
         ~genesis_epoch_data ~constraint_constants ~consensus_constants
