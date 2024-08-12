@@ -34,8 +34,7 @@ let gen_account_precondition_from_account ?failure
   let open Quickcheck.Let_syntax in
   if no_account_precondition then return Zkapp_precondition.Account.accept
   else
-    let { Account.Poly.balance; nonce; delegate; receipt_chain_hash; zkapp; _ }
-        =
+    let { Account.balance; nonce; delegate; receipt_chain_hash; zkapp; _ } =
       account
     in
     (* choose constructor *)
@@ -241,7 +240,7 @@ let gen_account_precondition_from_account ?failure
           return predicate_account
     else
       (* Nonce *)
-      let { Account.Poly.nonce; _ } = account in
+      let { Account.nonce; _ } = account in
       match failure with
       | Some Invalid_account_precondition ->
           return @@ Zkapp_precondition.Account.nonce (Account.Nonce.succ nonce)
@@ -1557,7 +1556,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
         let receipt_chain_hash =
           Receipt.Chain_hash.cons_zkapp_command_commitment
             Mina_numbers.Index.zero receipt_elt
-            account.Account.Poly.receipt_chain_hash
+            account.Account.receipt_chain_hash
         in
         ({ account with receipt_chain_hash }, `Fee_payer) ) ;
   let account_updates =
@@ -1580,7 +1579,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                   in
                   Receipt.Chain_hash.cons_zkapp_command_commitment
                     account_update_index receipt_elt
-                    account.Account.Poly.receipt_chain_hash
+                    account.Account.receipt_chain_hash
                 in
                 ({ account with receipt_chain_hash }, role) )
       | Control.None_given ->
