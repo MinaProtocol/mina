@@ -34,6 +34,7 @@
    signature_lib
    child_processes
    genesis_constants
+   genesis_constants.compiled
    logger
    mina_base
    snark_worker

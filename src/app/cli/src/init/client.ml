@@ -514,7 +514,14 @@ let send_payment_graphql =
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
   let args =
-    Args.zip3 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
+    Args.zip3
+      (Cli_lib.Flag.signed_command_common
+         ~minimum_user_command_fee:
+           Genesis_constants_compiled.t.minimum_user_command_fee
+         ~default_transaction_fee:
+           (Currency.Fee.of_mina_string_exn
+              Mina_compile_config.default_transaction_fee_string ) )
+      receiver_flag amount_flag
   in
   Command.async ~summary:"Send payment to an address"
     (Cli_lib.Background_daemon.graphql_init args
@@ -542,7 +549,16 @@ let delegate_stake_graphql =
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
-  let args = Args.zip2 Cli_lib.Flag.signed_command_common receiver_flag in
+  let args =
+    Args.zip2
+      (Cli_lib.Flag.signed_command_common
+         ~minimum_user_command_fee:
+           Genesis_constants_compiled.t.minimum_user_command_fee
+         ~default_transaction_fee:
+           (Currency.Fee.of_mina_string_exn
+              Mina_compile_config.default_transaction_fee_string ) )
+      receiver_flag
+  in
   Command.async ~summary:"Delegate your stake to another public key"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun
@@ -2395,7 +2411,10 @@ let advanced =
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
     ; ("chain-id-inputs", chain_id_inputs)
     ; ("runtime-config", runtime_config)
-    ; ("vrf", Cli_lib.Commands.Vrf.command_group)
+    ; ( "vrf"
+      , Cli_lib.Commands.Vrf.command_group
+          ~constraint_constants:
+            Genesis_constants_compiled.Constraint_constants.t )
     ; ("thread-graph", thread_graph)
     ; ("print-signature-kind", signature_kind)
     ]

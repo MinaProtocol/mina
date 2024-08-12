@@ -226,11 +226,7 @@ module Make (Inputs : Intf.Inputs_intf) :
   let main
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
         with type Work.ledger_proof = Inputs.Ledger_proof.t ) ~logger
-      ~proof_level daemon_address shutdown_on_disconnect =
-    let constraint_constants =
-      (* TODO: Make this configurable. *)
-      Genesis_constants_compiled.Constraint_constants.t
-    in
+      ~proof_level ~constraint_constants daemon_address shutdown_on_disconnect =
     let%bind state =
       Worker_state.create ~constraint_constants ~proof_level ()
     in
@@ -342,7 +338,7 @@ module Make (Inputs : Intf.Inputs_intf) :
     in
     go ()
 
-  let command_from_rpcs
+  let command_from_rpcs ~proof_level:default_proof_level ~constraint_constants
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
         with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
     Command.async ~summary:"Snark worker"
@@ -380,12 +376,11 @@ module Make (Inputs : Intf.Inputs_intf) :
               !"Received signal to terminate. Aborting snark worker process" ;
             Core.exit 0 ) ;
         let proof_level =
-          Option.value ~default:Genesis_constants_compiled.Proof_level.t
-            proof_level
+          Option.value ~default:default_proof_level proof_level
         in
         main
           (module Rpcs_versioned)
-          ~logger ~proof_level daemon_port
+          ~logger ~proof_level ~constraint_constants daemon_port
           (Option.value ~default:true shutdown_on_disconnect))
 
   let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect =

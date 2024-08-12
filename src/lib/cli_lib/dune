@@ -25,7 +25,6 @@
   stdio
   ;; local libraries
   genesis_constants
-  genesis_constants.compiled
   random_oracle
   pickles
   mina_numbers
@@ -38,7 +37,6 @@
   rosetta_coding
   logger
   interpolator_lib
-  mina_compile_config
   snark_params
   pickles.backend
   consensus.vrf

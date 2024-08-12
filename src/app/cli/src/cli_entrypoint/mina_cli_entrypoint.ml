@@ -1679,7 +1679,10 @@ let snark_hashes =
         else List.iter hashes ~f:print]
 
 let internal_commands logger =
-  [ (Snark_worker.Intf.command_name, Snark_worker.command)
+  [ ( Snark_worker.Intf.command_name
+    , Snark_worker.command ~proof_level:Genesis_constants_compiled.Proof_level.t
+        ~constraint_constants:Genesis_constants_compiled.Constraint_constants.t
+    )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
     , Command.async
