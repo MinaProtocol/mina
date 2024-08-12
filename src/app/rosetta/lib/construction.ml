@@ -217,6 +217,7 @@ module Metadata = struct
             -> ('gql, Errors.t) M.t
         ; validate_network_choice :
                network_identifier:Network_identifier.t
+            -> minimum_user_command_fee:Mina_currency.Fee.t
             -> graphql_uri:Uri.t
             -> (unit, Errors.t) M.t
         ; lift : 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t
@@ -226,11 +227,14 @@ module Metadata = struct
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
-    let real : graphql_uri:Uri.t -> 'gql Real.t =
-     fun ~graphql_uri ->
+    let real :
+           graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
+        -> 'gql Real.t =
+     fun ~graphql_uri ~minimum_user_command_fee ->
       { gql =
           (fun ?token_id:_ ~address ~receiver () ->
-            Graphql.query
+            Graphql.query ~minimum_user_command_fee
               Get_options_metadata.(
                 make
                 @@ makeVariables
@@ -291,8 +295,8 @@ module Metadata = struct
     [%test_eq: int] sugg 700
 
   module Impl (M : Monad_fail.S) = struct
-    let handle ~graphql_uri ~(env : 'gql Env.T(M).t)
-        (req : Construction_metadata_request.t) =
+    let handle ~graphql_uri ~account_creation_fee ~minimum_user_command_fee
+        ~(env : 'gql Env.T(M).t) (req : Construction_metadata_request.t) =
       let open M.Let_syntax in
       let%bind req_options =
         match req.options with
@@ -308,7 +312,7 @@ module Metadata = struct
       in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~graphql_uri
+          ~minimum_user_command_fee ~graphql_uri
       in
       let%bind account =
         match res.Get_options_metadata.account with
@@ -344,9 +348,7 @@ module Metadata = struct
               M.fail (Errors.create `Chain_info_missing)
         in
         if Array.is_empty fees then
-          Amount_of.mina
-            (Mina_currency.Fee.to_uint64
-               Genesis_constants_compiled.t.minimum_user_command_fee )
+          Amount_of.mina (Mina_currency.Fee.to_uint64 minimum_user_command_fee)
         else
           Amount_of.mina
             (suggest_fee
@@ -362,24 +364,16 @@ module Metadata = struct
           [ ( "minimum_fee"
             , Amount.to_yojson
                 (Amount_of.mina
-                   (Mina_currency.Fee.to_uint64
-                      Genesis_constants_compiled.t.minimum_user_command_fee ) )
-            )
+                   (Mina_currency.Fee.to_uint64 minimum_user_command_fee) ) )
           ]
       in
       let receiver_exists = Option.is_some res.receiver in
-      let constraint_constants =
-        Genesis_constants_compiled.Constraint_constants.t
-      in
       { Construction_metadata_response.metadata =
           Metadata_data.create ~sender:options.Options.sender
             ~token_id:options.Options.token_id ~nonce ~receiver:options.receiver
             ~account_creation_fee:
               ( if receiver_exists then None
-              else
-                Some
-                  (Mina_currency.Fee.to_uint64
-                     constraint_constants.account_creation_fee ) )
+              else Some (Mina_currency.Fee.to_uint64 account_creation_fee) )
             ~valid_until:options.valid_until ~memo:options.memo
           |> Metadata_data.to_yojson
       ; suggested_fee =
@@ -689,23 +683,26 @@ module Parse = struct
   end
 
   module Impl (M : Monad_fail.S) = struct
-    let check_sufficient_fee (type a)
+    let check_sufficient_fee (type a) ~minimum_user_command_fee
         (payment : a -> Transaction.Unsigned.Rendered.Payment.t option)
         (transaction : a) : (unit, Errors.t) Result.t =
       match payment transaction with
       | Some pay ->
-          if Transaction.Unsigned.Rendered.Payment.is_fee_sufficient pay then
-            Ok ()
+          if
+            Transaction.Unsigned.Rendered.Payment.is_fee_sufficient
+              ~minimum_user_command_fee pay
+          then Ok ()
           else
             Result.fail
             @@ Errors.create
                  (`Transaction_submit_fee_small
-                   (Mina_currency.Fee.to_mina_string
-                      Genesis_constants_compiled.t.minimum_user_command_fee ) )
+                   (Mina_currency.Fee.to_mina_string minimum_user_command_fee)
+                   )
       | None ->
           Ok ()
 
-    let handle ~(env : Env.T(M).t) (req : Construction_parse_request.t) =
+    let handle ~minimum_user_command_fee ~(env : Env.T(M).t)
+        (req : Construction_parse_request.t) =
       let open M.Let_syntax in
       let%bind json =
         try M.return (Yojson.Safe.from_string req.transaction)
@@ -724,7 +721,7 @@ module Parse = struct
               |> env.lift
             in
             let%bind () =
-              check_sufficient_fee
+              check_sufficient_fee ~minimum_user_command_fee
                 Transaction.Signed.Rendered.(fun a -> a.payment)
                 signed_rendered_transaction
               |> env.lift
@@ -760,7 +757,7 @@ module Parse = struct
               |> env.lift
             in
             let%bind () =
-              check_sufficient_fee
+              check_sufficient_fee ~minimum_user_command_fee
                 Transaction.Unsigned.Rendered.(fun a -> a.payment)
                 unsigned_rendered_transaction
               |> env.lift
@@ -933,6 +930,7 @@ module Submit = struct
     let real :
            db:(module Caqti_async.CONNECTION)
         -> graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
         -> ( 'gql_payment
            , 'gql_delegation
            , 'gql_create_token
@@ -941,10 +939,10 @@ module Submit = struct
            Real.t =
       let uint64 x = `String (Unsigned.UInt64.to_string x) in
       let uint32 x = `String (Unsigned.UInt32.to_string x) in
-      fun ~db ~graphql_uri ->
+      fun ~db ~graphql_uri ~minimum_user_command_fee ->
         { gql_payment =
             (fun ~payment ~signature () ->
-              Graphql.query_and_catch
+              Graphql.query_and_catch ~minimum_user_command_fee
                 Send_payment.(
                   make
                   @@ makeVariables ~from:(`String payment.from)
@@ -956,7 +954,7 @@ module Submit = struct
                 graphql_uri )
         ; gql_delegation =
             (fun ~delegation ~signature () ->
-              Graphql.query
+              Graphql.query ~minimum_user_command_fee
                 Send_delegation.(
                   make
                   @@ makeVariables ~sender:(`String delegation.delegator)
@@ -1083,8 +1081,8 @@ module Submit = struct
   module Mock = Impl (Result)
 end
 
-let router ~get_graphql_uri_or_error ~with_db ~logger (route : string list) body
-    =
+let router ~get_graphql_uri_or_error ~with_db ~logger ~account_creation_fee
+    ~minimum_user_command_fee (route : string list) body =
   [%log debug] "Handling /construction/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
   let open Deferred.Result.Let_syntax in
@@ -1118,8 +1116,9 @@ let router ~get_graphql_uri_or_error ~with_db ~logger (route : string list) body
       in
       let%bind graphql_uri = get_graphql_uri_or_error () in
       let%map res =
-        Metadata.Real.handle ~graphql_uri
-          ~env:(Metadata.Env.real ~graphql_uri)
+        Metadata.Real.handle ~graphql_uri ~account_creation_fee
+          ~minimum_user_command_fee
+          ~env:(Metadata.Env.real ~graphql_uri ~minimum_user_command_fee)
           req
         |> Errors.Lift.wrap
       in
@@ -1151,7 +1150,8 @@ let router ~get_graphql_uri_or_error ~with_db ~logger (route : string list) body
         |> Errors.Lift.wrap
       in
       let%map res =
-        Parse.Real.handle ~env:Parse.Env.real req |> Errors.Lift.wrap
+        Parse.Real.handle ~minimum_user_command_fee ~env:Parse.Env.real req
+        |> Errors.Lift.wrap
       in
       Construction_parse_response.to_yojson res
   | [ "hash" ] ->
@@ -1173,7 +1173,9 @@ let router ~get_graphql_uri_or_error ~with_db ~logger (route : string list) body
             |> Errors.Lift.wrap
           in
           let%map res =
-            Submit.Real.handle ~env:(Submit.Env.real ~db ~graphql_uri) req
+            Submit.Real.handle
+              ~env:(Submit.Env.real ~db ~graphql_uri ~minimum_user_command_fee)
+              req
             |> Errors.Lift.wrap
           in
           Transaction_identifier_response.to_yojson res )

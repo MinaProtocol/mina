@@ -26,10 +26,8 @@
    rosetta_models
    mina_base
    currency
-   mina_compile_config
    unsigned_extended
    mina_base.import
-   genesis_constants.compiled
  )
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_mina ppx_version ppx_assert ppx_let ppx_sexp_conv

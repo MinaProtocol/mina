@@ -25,10 +25,9 @@ module Unsigned = struct
         }
       [@@deriving yojson]
 
-      let is_fee_sufficient (payment : t) : bool =
+      let is_fee_sufficient ~minimum_user_command_fee (payment : t) : bool =
         let open Currency.Fee in
-        of_uint64 payment.fee
-        >= Genesis_constants_compiled.t.minimum_user_command_fee
+        of_uint64 payment.fee >= minimum_user_command_fee
     end
 
     module Delegation = struct

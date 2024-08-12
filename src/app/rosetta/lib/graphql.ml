@@ -23,7 +23,7 @@ let graphql_error_to_string e =
   | e ->
       error_obj_to_string e
 
-let query query_obj uri =
+let query ~minimum_user_command_fee query_obj uri =
   let variables_string = Yojson.Basic.to_string query_obj#variables in
   let body_string =
     String.substr_replace_all ~pattern:"\n" ~with_:""
@@ -67,7 +67,8 @@ let query query_obj uri =
         (Errors.create ~context:"Empty response from Mina Daemon"
            (`Graphql_mina_query "Empty response") )
   | error, `Null ->
-      Errors.Transaction_submit.of_request_error (graphql_error_to_string error)
+      Errors.Transaction_submit.of_request_error ~minimum_user_command_fee
+        (graphql_error_to_string error)
       |> Option.value
            ~default:
              (Errors.create ~context:"Explicit error response from Mina Daemon"
@@ -83,7 +84,7 @@ let query query_obj uri =
                     (Exn.to_string e) ) ) ) )
   |> Deferred.return
 
-let query_and_catch query_obj uri =
+let query_and_catch ~minimum_user_command_fee query_obj uri =
   let open Deferred.Let_syntax in
-  let%map res = query query_obj uri in
+  let%map res = query ~minimum_user_command_fee query_obj uri in
   match res with Ok r -> Ok (`Successful r) | Error e -> Ok (`Failed e)

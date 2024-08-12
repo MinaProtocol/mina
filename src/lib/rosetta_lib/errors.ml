@@ -410,7 +410,7 @@ module Transaction_submit = struct
   (* This is a very hacky error message check from GraphQL right now.
    * We'll need to do some surgery on the daemon to properly pass errors through
    * GraphQL more explicitly *)
-  let of_request_error s =
+  let of_request_error ~minimum_user_command_fee s =
     let variant =
       let p pat = String.is_substring ~substring:pat s in
       if p "infer nonce for transaction from specified" then
@@ -421,8 +421,7 @@ module Transaction_submit = struct
       else if p "is less than the minimum fee" then
         Some
           (`Transaction_submit_fee_small
-            (Currency.Fee.to_mina_string
-               Genesis_constants_compiled.t.minimum_user_command_fee ) )
+            (Currency.Fee.to_mina_string minimum_user_command_fee) )
       else if p "Error: Invalid_signature" then
         Some `Transaction_submit_invalid_signature
       else if p "[\"Insufficient_funds\"]" then
