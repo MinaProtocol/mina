@@ -43,7 +43,6 @@
    with_hash
    signature_lib
    genesis_constants
-   genesis_constants.compiled
    transaction_snark_work
    coda_genesis_proof
    blake2

@@ -113,11 +113,8 @@ let payments block =
        | _ ->
            None )
 
-let account_ids_accessed t =
-  let transactions =
-    transactions
-      ~constraint_constants:Genesis_constants_compiled.Constraint_constants.t t
-  in
+let account_ids_accessed ~constraint_constants t =
+  let transactions = transactions ~constraint_constants t in
   List.map transactions ~f:(fun { data = txn; status } ->
       Mina_transaction.Transaction.account_access_statuses txn status )
   |> List.concat
