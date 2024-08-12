@@ -20,11 +20,11 @@ let block_window_duration_ms = Node_config.block_window_duration
 
 let vrf_poll_interval_ms = Node_config.vrf_poll_interval
 
-let rpc_handshake_timeout_sec = 60.0
+let rpc_handshake_timeout_sec = Node_config.rpc_handshake_timeout_sec
 
-let rpc_heartbeat_timeout_sec = 60.0
+let rpc_heartbeat_timeout_sec = Node_config.rpc_heartbeat_timeout_sec
 
-let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
+let rpc_heartbeat_send_every_sec = Node_config.rpc_heartbeat_send_every_sec
 
 let zkapp_proof_update_cost = Node_config.zkapp_proof_update_cost
 

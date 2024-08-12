@@ -23,6 +23,12 @@ module type Unconfigurable_constants = sig
   val zkapp_cmd_limit_hardcap : int
 
   val zkapps_disabled : bool
+
+  val rpc_handshake_timeout_sec : float
+
+  val rpc_heartbeat_timeout_sec : float
+
+  val rpc_heartbeat_send_every_sec : float
 end
 
 module type S = sig
