@@ -510,12 +510,34 @@ let rec pair_up = function
   | _ ->
       failwith "Expected even length list"
 
-let precomputed_values = Precomputed_values.compiled_inputs
-
 let state_body =
-  Mina_state.(
-    Lazy.map precomputed_values ~f:(fun values ->
-        values.protocol_state_with_hashes.data |> Protocol_state.body ))
+  lazy
+    (let constraint_constants =
+       Genesis_constants_compiled.Constraint_constants.t
+     in
+     let genesis_constants = Genesis_constants_compiled.t in
+     let genesis_epoch_data = Consensus.Genesis_epoch_data.compiled in
+     let consensus_constants =
+       Consensus.Constants.create ~constraint_constants
+         ~protocol_constants:genesis_constants.protocol
+     in
+     (* TODO: Do we really need to create a whole ledger just to compute this?
+        Probably not..
+     *)
+     let module Test_genesis_ledger = struct
+       include Genesis_ledger.Make (struct
+         include Test_genesis_ledger
+
+         let directory = `Ephemeral
+
+         let depth =
+           Genesis_constants_compiled.Constraint_constants.t.ledger_depth
+       end)
+     end in
+     Mina_state.Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
+       ~genesis_epoch_data ~constraint_constants ~consensus_constants
+       ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
+     |> With_hash.data |> Mina_state.Protocol_state.body )
 
 let curr_state_view = Lazy.map state_body ~f:Mina_state.Protocol_state.Body.view
 
