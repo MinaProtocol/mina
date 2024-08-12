@@ -2389,6 +2389,7 @@ struct
               | `Active breadcrumb -> (
                   let txn_stop_slot_opt =
                     Runtime_config.slot_tx_end_or_default runtime_config
+                      Mina_compile_config.slot_tx_end
                   in
                   match txn_stop_slot_opt with
                   | None ->

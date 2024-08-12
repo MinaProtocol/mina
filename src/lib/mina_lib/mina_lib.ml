@@ -1791,6 +1791,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           let slot_tx_end =
             Runtime_config.slot_tx_end_or_default
               config.Config.precomputed_values.runtime_config
+              Mina_compile_config.slot_tx_end
           in
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config ~verifier

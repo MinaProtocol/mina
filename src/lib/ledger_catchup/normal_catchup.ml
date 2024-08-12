@@ -530,9 +530,11 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
       "verification of proofs complete" ;
     let slot_tx_end =
       Runtime_config.slot_tx_end_or_default precomputed_values.runtime_config
+        Mina_compile_config.slot_tx_end
     in
     let slot_chain_end =
       Runtime_config.slot_chain_end_or_default precomputed_values.runtime_config
+        Mina_compile_config.slot_chain_end
     in
     fold_until (List.rev tvs) ~init:[]
       ~f:(fun acc transition ->

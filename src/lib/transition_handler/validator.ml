@@ -139,10 +139,12 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
           let slot_tx_end =
             Runtime_config.slot_tx_end_or_default
               precomputed_values.Precomputed_values.runtime_config
+              Mina_compile_config.slot_tx_end
           in
           let slot_chain_end =
             Runtime_config.slot_chain_end_or_default
               precomputed_values.runtime_config
+              Mina_compile_config.slot_chain_end
           in
           match
             validate_transition
