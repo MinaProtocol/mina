@@ -45,8 +45,6 @@ let scan_state_transaction_capacity_log_2 =
 
 [%%inject "scan_state_work_delay", scan_state_work_delay]
 
-[%%inject "cache_exceptions", cache_exceptions]
-
 [%%inject "proof_level", proof_level]
 
 [%%inject "pool_max_size", pool_max_size]

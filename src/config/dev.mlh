@@ -32,11 +32,6 @@
 (*END src/config/scan_state/medium.mlh*)
 
 
-(*BEGIN src/config/debug_level/some.mlh*)
-[%%define cache_exceptions true]
-(*END src/config/debug_level/some.mlh*)
-
-
 (*BEGIN src/config/proof_level/check.mlh*)
 [%%define proof_level "check"]
 (*END src/config/proof_level/check.mlh*)

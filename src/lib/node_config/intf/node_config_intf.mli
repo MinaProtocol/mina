@@ -60,8 +60,6 @@ module type S = sig
 
   val scan_state_work_delay : int
 
-  val cache_exceptions : bool
-
   val proof_level : string
 
   val pool_max_size : int

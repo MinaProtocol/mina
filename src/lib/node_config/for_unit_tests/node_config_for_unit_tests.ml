@@ -33,8 +33,6 @@ let scan_state_transaction_capacity_log_2 =
 
 let (scan_state_work_delay : int) = (2 : int)
 
-let (cache_exceptions : bool) = (true : bool)
-
 let (proof_level : string) = ("check" : string)
 
 let (pool_max_size : int) = (3000 : int)
