@@ -309,6 +309,7 @@ let%test_module "Archive node unit tests" =
           Strict_pipe.Writer.close writer ;
           let%bind () =
             Processor.run
+              ~genesis_constants:precomputed_values.genesis_constants
               ~constraint_constants:precomputed_values.constraint_constants pool
               reader ~logger ~delete_older_than:None
           in

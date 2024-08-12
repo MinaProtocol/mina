@@ -4362,14 +4362,15 @@ module Block = struct
       (state_hash, height)
 
   (* update chain_status for blocks now known to be canonical or orphaned *)
-  let update_chain_status (module Conn : CONNECTION) ~block_id =
+  let update_chain_status (module Conn : CONNECTION)
+      ~(genesis_constants : Genesis_constants.t) ~block_id =
     let open Deferred.Result.Let_syntax in
     match%bind get_highest_canonical_block_opt (module Conn) () with
     | None ->
         (* unit tests, no canonical block, can't mark any block as canonical *)
         Deferred.Result.return ()
     | Some (highest_canonical_block_id, greatest_canonical_height) ->
-        let k_int64 = Genesis_constants_compiled.k |> Int64.of_int in
+        let k_int64 = genesis_constants.protocol.k |> Int64.of_int in
         let%bind block = load (module Conn) ~id:block_id in
         if
           Int64.( > ) block.height
@@ -4529,8 +4530,9 @@ let retry ~f ~logger ~error_str retries =
   in
   go retries
 
-let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
-    ~delete_older_than ~accounts_accessed ~accounts_created ~tokens_used block =
+let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
+    ~hash ~delete_older_than ~accounts_accessed ~accounts_created ~tokens_used
+    block =
   let state_hash = hash block in
 
   (* the block itself is added in a single transaction with a transaction block
@@ -4575,7 +4577,9 @@ let add_block_aux ?(retries = 3) ~logger ~pool ~add_block ~hash
           (* update chain status for existing blocks *)
           let%bind () =
             Metrics.time ~label:"update_chain_status" (fun () ->
-                Block.update_chain_status (module Conn) ~block_id )
+                Block.update_chain_status
+                  (module Conn)
+                  ~genesis_constants ~block_id )
           in
           let%bind () =
             match delete_older_than with
@@ -4696,8 +4700,8 @@ let add_block_aux_extensional ~logger ?retries ~pool ~delete_older_than block =
     ~tokens_used:block.Extensional.Block.tokens_used block
 
 (* receive blocks from a daemon, write them to the database *)
-let run pool reader ~constraint_constants ~logger ~delete_older_than :
-    unit Deferred.t =
+let run pool reader ~genesis_constants ~constraint_constants ~logger
+    ~delete_older_than : unit Deferred.t =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier
         (Breadcrumb_added
@@ -4705,8 +4709,9 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than :
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
         let hash = State_hash.With_state_hashes.state_hash in
         match%bind
-          add_block_aux ~logger ~pool ~delete_older_than ~hash ~add_block
-            ~accounts_accessed ~accounts_created ~tokens_used block
+          add_block_aux ~logger ~genesis_constants ~pool ~delete_older_than
+            ~hash ~add_block ~accounts_accessed ~accounts_created ~tokens_used
+            block
         with
         | Error e ->
             let state_hash = hash block in
@@ -4724,19 +4729,17 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than :
 
 (* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
+    ~compiled:
+      ((module Genesis_constants_compiled : Genesis_constants.S) as compiled)
     pool =
   match runtime_config_opt with
   | None ->
       Deferred.unit
   | Some runtime_config -> (
-      let proof_level = Genesis_constants_compiled.Proof_level.t in
       let%bind precomputed_values =
         match%map
-          Genesis_ledger_helper.init_from_config_file ~logger
-            ~proof_level:(Some proof_level) ~compiled_proof_level:proof_level
-            ~constraint_constants:
-              Genesis_constants_compiled.Constraint_constants.t
-            ~genesis_constants:Genesis_constants_compiled.t runtime_config
+          Genesis_ledger_helper.init_from_config_file ~logger ~proof_level:None
+            ~compiled runtime_config
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
@@ -4872,9 +4875,11 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
       go ()
 
 (* for running the archive process *)
-let setup_server ~metrics_server_port ~constraint_constants ~logger
-    ~postgres_address ~server_port ~delete_older_than ~runtime_config_opt
-    ~missing_blocks_width =
+let setup_server ~metrics_server_port
+    ~compiled:
+      ((module Genesis_constants_compiled : Genesis_constants.S) as compiled)
+    ~logger ~postgres_address ~server_port ~delete_older_than
+    ~runtime_config_opt ~missing_blocks_width =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -4903,14 +4908,21 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
-      let%bind () = add_genesis_accounts pool ~logger ~runtime_config_opt in
-      run ~constraint_constants pool reader ~logger ~delete_older_than
+      let genesis_constants = Genesis_constants_compiled.t in
+      let constraint_constants =
+        Genesis_constants_compiled.Constraint_constants.t
+      in
+      let%bind () =
+        add_genesis_accounts pool ~logger ~compiled ~runtime_config_opt
+      in
+      run ~constraint_constants ~genesis_constants pool reader ~logger
+        ~delete_older_than
       |> don't_wait_for ;
       Strict_pipe.Reader.iter precomputed_block_reader
         ~f:(fun precomputed_block ->
           match%map
-            add_block_aux_precomputed ~logger ~pool ~constraint_constants
-              ~delete_older_than precomputed_block
+            add_block_aux_precomputed ~logger ~pool ~genesis_constants
+              ~constraint_constants ~delete_older_than precomputed_block
           with
           | Error e ->
               [%log warn]
@@ -4927,8 +4939,8 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
       Strict_pipe.Reader.iter extensional_block_reader
         ~f:(fun extensional_block ->
           match%map
-            add_block_aux_extensional ~logger ~pool ~delete_older_than
-              extensional_block
+            add_block_aux_extensional ~genesis_constants ~logger ~pool
+              ~delete_older_than extensional_block
           with
           | Error e ->
               [%log warn]

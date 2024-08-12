@@ -58,11 +58,8 @@ let%test_module "Epoch ledger sync tests" =
         match%map
           Genesis_ledger_helper.init_from_config_file
             ~genesis_dir:(make_dirname "genesis_dir")
-            ~compiled_proof_level:Genesis_constants.For_unit_tests.Proof_level.t
-            ~constraint_constants:
-              Genesis_constants.For_unit_tests.Constraint_constants.t
-            ~genesis_constants:Genesis_constants.For_unit_tests.t ~logger
-            ~proof_level:None runtime_config
+            ~compiled:(module Genesis_constants.For_unit_tests)
+            ~logger ~proof_level:None runtime_config
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
