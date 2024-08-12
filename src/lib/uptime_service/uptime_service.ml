@@ -194,9 +194,10 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
       send_uptime_data ~logger ~interruptor ~submitter_keypair ~url ~state_hash
         ~produced:true block_data
 
-let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
-    ~transition_frontier ~peer_id ~(submitter_keypair : Keypair.t)
-    ~snark_work_fee ~graphql_control_port ~built_with_commit_sha =
+let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
+    ~url ~snark_worker ~transition_frontier ~peer_id
+    ~(submitter_keypair : Keypair.t) ~snark_work_fee ~graphql_control_port
+    ~built_with_commit_sha =
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       (* expected during daemon boot, so not logging as error *)
@@ -216,9 +217,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
       let best_tip_block = Transition_frontier.Breadcrumb.block best_tip in
       if
         List.is_empty
-          (Mina_block.transactions
-             ~constraint_constants:
-               Genesis_constants_compiled.Constraint_constants.t best_tip_block )
+          (Mina_block.transactions ~constraint_constants best_tip_block)
       then (
         [%log info]
           "No transactions in block, sending block without SNARK work to \
@@ -362,10 +361,10 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                     send_uptime_data ~logger ~interruptor ~submitter_keypair
                       ~url ~state_hash ~produced:false block_data ) ) )
 
-let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
-    ~time_controller ~block_produced_bvar ~uptime_submitter_keypair
-    ~get_next_producer_timing ~get_snark_work_fee ~get_peer
-    ~graphql_control_port ~built_with_commit_sha =
+let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
+    ~protocol_constants ~transition_frontier ~time_controller
+    ~block_produced_bvar ~uptime_submitter_keypair ~get_next_producer_timing
+    ~get_snark_work_fee ~get_peer ~graphql_control_port ~built_with_commit_sha =
   match uptime_url with
   | None ->
       [%log info] "Not running uptime service, no URL given" ;
@@ -377,10 +376,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
         Option.value_exn snark_worker_opt
       in
       let slot_duration_ms =
-        Consensus.Configuration.t
-          ~constraint_constants:
-            Genesis_constants_compiled.Constraint_constants.t
-          ~protocol_constants:Genesis_constants_compiled.t.protocol
+        Consensus.Configuration.t ~constraint_constants ~protocol_constants
         |> Consensus.Configuration.slot_duration |> Float.of_int
       in
       let make_slots_span min =
@@ -468,9 +464,9 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                     "Uptime service will attempt to send a block and SNARK work" ;
                   let snark_work_fee = get_snark_work_fee () in
                   send_block_and_transaction_snark ~logger ~interruptor ~url
-                    ~snark_worker ~transition_frontier ~peer_id
-                    ~submitter_keypair ~snark_work_fee ~graphql_control_port
-                    ~built_with_commit_sha
+                    ~constraint_constants ~snark_worker ~transition_frontier
+                    ~peer_id ~submitter_keypair ~snark_work_fee
+                    ~graphql_control_port ~built_with_commit_sha
                 in
                 match get_next_producer_time_opt () with
                 | None ->

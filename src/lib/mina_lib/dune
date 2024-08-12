@@ -50,6 +50,7 @@
    transition_router
    sync_handler
    genesis_constants
+   genesis_constants.compiled
    block_producer
    mina_networking
    consensus

@@ -13,19 +13,18 @@ module Worker_state = struct
   end
 
   (* bin_io required by rpc_parallel *)
-  type init_arg = Logger.Stable.Latest.t [@@deriving bin_io_unversioned]
+  type init_arg =
+    Logger.Stable.Latest.t * Genesis_constants.Constraint_constants.t
+  [@@deriving bin_io_unversioned]
 
   type t = (module S)
 
-  let create () : t Deferred.t =
+  let create ~constraint_constants () : t Deferred.t =
     Deferred.return
       (let module M = struct
          let perform_single (message, single_spec) =
            let%bind (worker_state : Prod.Worker_state.t) =
-             Prod.Worker_state.create
-               ~constraint_constants:
-                 Genesis_constants_compiled.Constraint_constants.t
-               ~proof_level:Full ()
+             Prod.Worker_state.create ~constraint_constants ~proof_level:Full ()
            in
            Prod.perform_single worker_state ~message single_spec
        end in
@@ -78,9 +77,9 @@ module Worker = struct
               , perform_single )
         }
 
-      let init_worker_state logger =
+      let init_worker_state (logger, constraint_constants) =
         [%log info] "Uptime SNARK worker started" ;
-        Worker_state.create ()
+        Worker_state.create ~constraint_constants ()
 
       let init_connection_state ~connection:_ ~worker_state:_ () = Deferred.unit
     end
@@ -95,7 +94,7 @@ type t =
   ; logger : Logger.Stable.Latest.t
   }
 
-let create ~logger ~pids : t Deferred.t =
+let create ~logger ~constraint_constants ~pids : t Deferred.t =
   let on_failure err =
     [%log error] "Uptime service SNARK worker process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
@@ -105,7 +104,7 @@ let create ~logger ~pids : t Deferred.t =
   let%map connection, process =
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
       ~on_failure ~shutdown_on:Connection_closed ~connection_state_init_arg:()
-      logger
+      (logger, constraint_constants)
   in
   [%log info]
     "Daemon started process of kind $process_kind with pid \

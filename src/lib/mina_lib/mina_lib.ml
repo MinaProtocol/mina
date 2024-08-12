@@ -1369,6 +1369,8 @@ let start ~commit_id t =
   Uptime_service.start ~logger:t.config.logger ~uptime_url:t.config.uptime_url
     ~snark_worker_opt:t.processes.uptime_snark_worker_opt
     ~transition_frontier:t.components.transition_frontier
+    ~constraint_constants:t.config.precomputed_values.constraint_constants
+    ~protocol_constants:t.config.precomputed_values.genesis_constants.protocol
     ~time_controller:t.config.time_controller
     ~block_produced_bvar:t.components.block_produced_bvar
     ~uptime_submitter_keypair:t.config.uptime_submitter_keypair
@@ -1606,6 +1608,8 @@ let create ~commit_id ?wallets (config : Config.t) =
                     O1trace.thread "manage_uptime_snark_worker_subprocess"
                       (fun () ->
                         Uptime_service.Uptime_snark_worker.create
+                          ~constraint_constants:
+                            config.precomputed_values.constraint_constants
                           ~logger:config.logger ~pids:config.pids ) )
                 >>| Result.ok )
           in
