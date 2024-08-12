@@ -1797,7 +1797,9 @@ let compile_time_constants =
          let open Async in
          let%map ({ consensus_constants; _ } as precomputed_values), _ =
            config_file |> Genesis_ledger_helper.load_config_json >>| Or_error.ok
-           >>| Option.value ~default:(`Assoc [])
+           >>| Option.value
+                 ~default:
+                   (`Assoc [ ("ledger", `Assoc [ ("accounts", `List []) ]) ])
            >>| Runtime_config.of_yojson >>| Result.ok
            >>| Option.value ~default:Runtime_config.default
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
