@@ -32,6 +32,7 @@
    signature_lib
    mina_base
    genesis_constants
+   genesis_constants.compiled
    cache_dir
    coda_genesis_proof
    currency

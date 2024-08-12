@@ -5,9 +5,9 @@ include T
 let hashes =
   lazy
     (let constraint_constants =
-       Genesis_constants_compiled.Constraint_constants.t
+       Genesis_constants.For_unit_tests.Constraint_constants.t
      in
-     let proof_level = Genesis_constants_compiled.Proof_level.t in
+     let proof_level = Genesis_constants.Proof_level.Full in
      let ts =
        Transaction_snark.constraint_system_digests ~constraint_constants ()
      in
