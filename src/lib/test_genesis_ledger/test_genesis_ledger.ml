@@ -1,5 +1,5 @@
 include Genesis_ledger.Make (struct
-  include (val Genesis_ledger.fetch_ledger_exn Node_config.genesis_ledger)
+  include (val Genesis_ledger.fetch_ledger_exn "test")
 
   let directory = `Ephemeral
 

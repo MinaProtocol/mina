@@ -1039,7 +1039,7 @@ module AccountObj = struct
       let%bind receipt_chain_hash = receipt_chain_hash in
       let%bind voting_for = voting_for in
       let%map permissions = permissions in
-      { Account.Poly.public_key
+      { Account.public_key
       ; token_id
       ; token_symbol
       ; nonce
@@ -1053,7 +1053,7 @@ module AccountObj = struct
       }
 
     let of_full_account ?breadcrumb
-        { Account.Poly.public_key
+        { Account.public_key
         ; token_id
         ; token_symbol
         ; nonce
