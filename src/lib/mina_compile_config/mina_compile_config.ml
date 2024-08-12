@@ -46,7 +46,3 @@ let zkapp_cmd_limit = Node_config.zkapp_cmd_limit
 let zkapp_cmd_limit_hardcap = Node_config.zkapp_cmd_limit_hardcap
 
 let zkapps_disabled = Node_config.zkapps_disabled
-
-let slot_tx_end : int option = Node_config.slot_tx_end
-
-let slot_chain_end : int option = Node_config.slot_chain_end

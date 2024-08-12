@@ -73,8 +73,6 @@
 [%%undef fork_state_hash]
 [%%undef fork_global_slot_since_genesis]
 [%%undef zkapp_cmd_limit]
-[%%undef slot_tx_end]
-[%%undef slot_chain_end]
 (*END src/config/fork.mlh*)
 
 
@@ -86,6 +84,4 @@
 [%%define compaction_interval 360000]
 [%%define vrf_poll_interval 5000]
 [%%define zkapp_cmd_limit 24]
-[%%undef slot_tx_end]
-[%%undef slot_chain_end]
 [%%undef scan_state_transaction_capacity_log_2]

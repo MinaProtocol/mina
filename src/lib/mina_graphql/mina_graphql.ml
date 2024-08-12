@@ -2388,8 +2388,7 @@ struct
                   Deferred.Result.fail "Daemon is bootstrapping"
               | `Active breadcrumb -> (
                   let txn_stop_slot_opt =
-                    Runtime_config.slot_tx_end_or_default runtime_config
-                      Mina_compile_config.slot_tx_end
+                    Runtime_config.slot_tx_end runtime_config
                   in
                   match txn_stop_slot_opt with
                   | None ->

@@ -1592,11 +1592,10 @@ let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
       }
     ~proof:(Proof_keys.make ~fork ()) ()
 
-let slot_tx_end_or_default, slot_chain_end_or_default =
-  let f get_runtime t compile =
-    Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
-    @@ Option.value_map t.daemon ~default:compile ~f:(fun daemon ->
-           Option.merge compile ~f:(fun _c r -> r) @@ get_runtime daemon )
+let slot_tx_end, slot_chain_end =
+  let f get_runtime t =
+    let open Option.Let_syntax in
+    t.daemon >>= get_runtime >>| Mina_numbers.Global_slot_since_hard_fork.of_int
   in
   (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
 

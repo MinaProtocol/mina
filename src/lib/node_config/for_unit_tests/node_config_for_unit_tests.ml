@@ -65,8 +65,4 @@ let (vrf_poll_interval : int) = (0 : int)
 
 let zkapp_cmd_limit = None
 
-let slot_tx_end : int option = None
-
-let slot_chain_end : int option = None
-
 let scan_state_tps_goal_x10 : int option = None

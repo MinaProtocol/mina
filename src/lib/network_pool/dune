@@ -21,7 +21,6 @@
    integers
    ;; local libraries
    bounded_types
-   mina_compile_config
    mina_generators
    sgn
    sgn_type

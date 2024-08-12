@@ -700,12 +700,10 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
         [%log info] "Pausing block production while bootstrapping"
       in
       let slot_tx_end =
-        Runtime_config.slot_tx_end_or_default precomputed_values.runtime_config
-          Mina_compile_config.slot_tx_end
+        Runtime_config.slot_tx_end precomputed_values.runtime_config
       in
       let slot_chain_end =
-        Runtime_config.slot_chain_end_or_default
-          precomputed_values.runtime_config Mina_compile_config.slot_chain_end
+        Runtime_config.slot_chain_end precomputed_values.runtime_config
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
       let produce ivar (scheduled_time, block_data, winner_pubkey) =
