@@ -9,13 +9,11 @@ open Mina_base
 module Ledger = Mina_ledger.Ledger
 include User_command.Gen
 
-(* using Precomputed_values depth introduces a cyclic dependency *)
-let ledger_depth = Node_config.ledger_depth
-
 let zkapp_command_with_ledger ?(ledger_init_state : Ledger.init_state option)
     ?num_keypairs ?max_account_updates ?max_token_updates ?account_state_tbl ?vk
-    ?failure ~(genesis_constants : Genesis_constants.t) ~constraint_constants ()
-    =
+    ?failure ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) () =
+  let ledger_depth = constraint_constants.ledger_depth in
   let open Quickcheck.Let_syntax in
   let open Signature_lib in
   (* Need a fee payer keypair, a keypair for the "balancing" account (so that the balance changes
