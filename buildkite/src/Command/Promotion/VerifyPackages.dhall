@@ -95,7 +95,7 @@ let verifyPackagesToDockerSpecs
                                           (     \(name : Text)
                                             ->  { name = name
                                                 , key =
-                                                    "add-tag-${Artifact.lowerName
+                                                    "add-tag-to-${Artifact.lowerName
                                                                  docker}-${DebianVersions.lowerName
                                                                              codename}-docker"
                                                 }
