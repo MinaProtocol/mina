@@ -93,7 +93,7 @@ in  Pipeline.build
         , name = "AutoPromoteNightly"
         }
       , steps =
-          # PromotePackages.promoteSteps promoteDebiansSpecs promoteDockersSpecs
+          PromotePackages.promoteSteps promoteDebiansSpecs promoteDockersSpecs
           # VerifyPackages.verificationSteps
               verifyDebiansSpecs
               verifyDockersSpecs
