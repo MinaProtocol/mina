@@ -32,7 +32,7 @@ let promotePackages =
         , DebianPackage.Type.Archive
         ]
       , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
-      , version = "\\\$MINA_DEB_VERSION"
+      , version = "3.0.0-dkijania-trim-release-pipeline-e0ad31c"
       , architecture = "amd64"
       , new_version = "\\\$(date \"+%Y%m%d\")"
       , profile = Profiles.Type.Standard
@@ -67,7 +67,7 @@ let verifyPackages =
         , DebianVersions.DebVersion.Buster
         ]
       , channel = DebianChannel.Type.Nightly
-      , tag = "\\\$MINA_DOCKER_TAG"
+      , tag = "nightly"
       , remove_profile_from_name = True
       , published = False
       }
