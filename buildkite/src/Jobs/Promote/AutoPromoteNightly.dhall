@@ -1,5 +1,7 @@
 let S = ../../Lib/SelectFiles.dhall
 
+let Cmd = ../../Lib/Cmds.dhall
+
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
@@ -32,7 +34,7 @@ let promotePackages =
       , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
       , version = "\\\$MINA_DEB_VERSION"
       , architecture = "amd64"
-      , new_version = "\\\$CURRENT_DATE"
+      , new_version = "\\\$(date \"+%Y%m%d\")"
       , profile = Profiles.Type.Standard
       , network = Network.Type.Devnet
       , codenames =
@@ -56,7 +58,7 @@ let verifyPackages =
         , DebianPackage.Type.Archive
         ]
       , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
-      , new_version = "\\\$CURRENT_DATE"
+      , new_version = "\\\$(date \"+%Y%m%d\")"
       , profile = Profiles.Type.Standard
       , network = Network.Type.Devnet
       , codenames =
@@ -91,7 +93,7 @@ in  Pipeline.build
         , name = "AutoPromoteNightly"
         }
       , steps =
-            PromotePackages.promoteSteps promoteDebiansSpecs promoteDockersSpecs
+          # PromotePackages.promoteSteps promoteDebiansSpecs promoteDockersSpecs
           # VerifyPackages.verificationSteps
               verifyDebiansSpecs
               verifyDockersSpecs
