@@ -92,9 +92,8 @@ let promotePackagesToDebianSpecs
                                 , step_key =
                                     "promote-debian-${Package.lowerName
                                                         debian}-${DebianVersions.lowerName
-                                                                    codename}-from-${DebianChannel.lowerName
-                                                                                       promote_packages.from_channel}-to-${DebianChannel.lowerName
-                                                                                                                             promote_packages.to_channel}"
+                                                                    codename}-to-${DebianChannel.lowerName
+                                                                                     promote_packages.to_channel}"
                                 }
                           )
                           promote_packages.codenames

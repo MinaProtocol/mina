@@ -61,9 +61,9 @@ let module =
                     in  { line =
                             "docker run -it --rm --entrypoint /bin/bash --init --volume ${sharedDir}:/shared --volume ${outerDir}:/workdir --workdir /workdir${envVars}${      if docker.privileged
 
-                                                                                                                                                                       then  " --privileged"
+                                                                                                                                                                         then  " --privileged"
 
-                                                                                                                                                                       else  ""} ${docker.image} -c '${inner.line}'"
+                                                                                                                                                                         else  ""} ${docker.image} -c '${inner.line}'"
                         , readable =
                             Optional/map
                               Text

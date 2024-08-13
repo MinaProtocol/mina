@@ -1,7 +1,5 @@
 let S = ../../Lib/SelectFiles.dhall
 
-let Cmd = ../../Lib/Cmds.dhall
-
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
@@ -93,7 +91,7 @@ in  Pipeline.build
         , name = "AutoPromoteNightly"
         }
       , steps =
-          PromotePackages.promoteSteps promoteDebiansSpecs promoteDockersSpecs
+            PromotePackages.promoteSteps promoteDebiansSpecs promoteDockersSpecs
           # VerifyPackages.verificationSteps
               verifyDebiansSpecs
               verifyDockersSpecs

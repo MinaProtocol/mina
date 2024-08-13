@@ -72,7 +72,7 @@ let promoteDockerStep =
                 , commands =
                   [ Cmd.run
                       ". ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/promote-docker.sh --name ${Artifact.dockerName
-                                                                        spec.name} --version ${old_tag} --tag ${new_tag} ${publish}"
+                                                                                                                        spec.name} --version ${old_tag} --tag ${new_tag} ${publish}"
                   ]
                 , label = "Docker: ${spec.step_key}"
                 , key = spec.step_key

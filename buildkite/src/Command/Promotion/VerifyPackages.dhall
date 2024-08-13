@@ -154,8 +154,8 @@ let verifyPackagesToDebianSpecs
                                                 , key =
                                                     "promote-debian-${Package.lowerName
                                                                         debian}-${DebianVersions.lowerName
-                                                                                    codename}-${DebianChannel.lowerName
-                                                                                                  verify_packages.channel}"
+                                                                                    codename}-to-${DebianChannel.lowerName
+                                                                                                     verify_packages.channel}"
                                                 }
                                           )
                                           verify_packages.promote_step_name
@@ -163,8 +163,8 @@ let verifyPackagesToDebianSpecs
                                 , step_key =
                                     "verify-promote-debian-${Package.lowerName
                                                                debian}-${DebianVersions.lowerName
-                                                                           codename}-${DebianChannel.lowerName
-                                                                                         verify_packages.channel}"
+                                                                           codename}-to-${DebianChannel.lowerName
+                                                                                            verify_packages.channel}"
                                 }
                           )
                           verify_packages.codenames
