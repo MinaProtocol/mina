@@ -2,7 +2,7 @@
 
 # Helper script to include when building deb archives.
 
-echo "--- Setting up the envrionment to build debian packages..."
+echo "--- Setting up the environment to build debian packages..."
 
 set -euo pipefail
 
@@ -54,19 +54,19 @@ esac
 # Add suffix to debian to distinguish different profiles (mainnet/devnet/lightnet)
 case "${DUNE_PROFILE}" in
   devnet|mainnet)
-    MINA_DEB_NAME="mina-berkeley"
+    MINA_DEB_NAME="mina-devnet"
     DEB_SUFFIX=""
    ;;
   *)
     # use dune profile as suffix but replace underscore to dashes so deb builder won't complain
     _SUFFIX=${DUNE_PROFILE//_/-}
-    MINA_DEB_NAME="mina-berkeley-${_SUFFIX}"
+    MINA_DEB_NAME="mina-devnet-${_SUFFIX}"
     DEB_SUFFIX="-${_SUFFIX}"
     ;;
 esac
 
 
-#ADd suffix to debian to distinguish instrumented packages
+#Add suffix to debian to distinguish instrumented packages
 if [[ -v DUNE_INSTRUMENT_WITH ]]; then
     INSTRUMENTED_SUFFIX=instrumented
     MINA_DEB_NAME="${MINA_DEB_NAME}-${INSTRUMENTED_SUFFIX}"
@@ -296,28 +296,13 @@ build_daemon_devnet_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building testnet signatures deb without keys:"
 
-  create_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
+  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network'
 
   copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
 
-  build_deb mina-devnet
+  build_deb "${MINA_DEB_NAME}"
 }
 ##################################### END DEVNET PACKAGE #######################################
-
-##################################### BERKELEY PACKAGE #######################################
-build_daemon_berkeley_deb() {
-  
-  echo "------------------------------------------------------------"
-  echo "--- Building Mina Berkeley testnet signatures deb without keys:"
-
-  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
-
-  copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
-
-  build_deb "${MINA_DEB_NAME}"
-
-}
-##################################### END BERKELEY PACKAGE #######################################
 
 ##################################### ARCHIVE PACKAGE ##########################################
 build_archive_deb () {
