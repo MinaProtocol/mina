@@ -317,7 +317,8 @@
           # Granular nix
           inherit (ocamlPackages)
             src exes all all-tested pkgs all-exes files tested info
-            dune-description base-libs;
+            dune-description base-libs external-libs;
+          # ^ TODO move elsewhere, external-libs isn't a package
           # TODO consider the following: inherit (ocamlPackages) default;
           granular = ocamlPackages.default;
           default = ocamlPackages.mina;

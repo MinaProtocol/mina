@@ -457,7 +457,7 @@ let
         dune exec --profile=dev src/app/reformat/reformat.exe -- -path . -check
       '';
 
-      inherit dune-description base-libs;
+      inherit dune-description base-libs external-libs;
     };
 in scope.overrideScope'
 (pkgs.lib.composeManyExtensions ([ overlay granularOverlay ]))
