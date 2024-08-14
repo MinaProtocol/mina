@@ -33,10 +33,7 @@
 
 
 (*BEGIN src/config/debug_level/some.mlh*)
-[%%define debug_logs false]
-[%%define call_logger false]
 [%%define cache_exceptions true]
-[%%define record_async_backtraces false]
 (*END src/config/debug_level/some.mlh*)
 
 
@@ -77,15 +74,10 @@
 [%%define supercharged_coinbase_factor 1]
 (*END src/config/supercharged_coinbase_factor/one.mlh*)
 
-[%%define time_offsets true]
 [%%define plugins true]
 [%%define genesis_ledger "test"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
 [%%define block_window_duration 2000]
-[%%define integration_tests true]
-[%%define force_updates false]
-[%%define download_snark_keys false]
-[%%define generate_genesis_proof false]
 [%%define itn_features true]
 [%%define print_versioned_types false]
 [%%define test_full_epoch false]

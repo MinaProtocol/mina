@@ -22,13 +22,7 @@ val scan_state_transaction_capacity_log_2 : int option
 
 val scan_state_work_delay : int
 
-val debug_logs : bool
-
-val call_logger : bool
-
 val cache_exceptions : bool
-
-val record_async_backtraces : bool
 
 val proof_level : string
 
@@ -50,23 +44,11 @@ val protocol_version_patch : int
 
 val supercharged_coinbase_factor : int
 
-val time_offsets : bool
-
 val plugins : bool
-
-val genesis_ledger : string
 
 val genesis_state_timestamp : string
 
 val block_window_duration : int
-
-val integration_tests : bool
-
-val force_updates : bool
-
-val download_snark_keys : bool
-
-val generate_genesis_proof : bool
 
 val itn_features : bool
 
