@@ -16,12 +16,8 @@ if [ $# -eq 0 ]
     build_keypair_deb
     build_archive_deb
     build_batch_txn_deb
-    build_daemon_berkeley_deb
-    build_daemon_mainnet_deb
-    build_daemon_devnet_deb
-    build_rosetta_berkeley_deb
-    build_rosetta_mainnet_deb
-    build_rosetta_devnet_deb
+    build_mainnet_daemon_deb
+    build_devnet_daemon_deb
     build_test_executive_deb
     build_functional_test_suite_deb
     build_zkapp_test_transaction_deb

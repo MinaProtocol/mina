@@ -52,7 +52,7 @@ let MinaBuildSpec =
           , debVersion = DebianVersions.DebVersion.Bullseye
           , profile = Profiles.Type.Standard
           , buildFlags = BuildFlags.Type.None
-          , networks = [ Network.Type.Berkeley ]
+          , networks = [ Network.Type.Devnet ]
           , toolchainSelectMode = Toolchain.SelectionMode.ByDebian
           , mode = PipelineMode.Type.PullRequest
           , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
@@ -151,7 +151,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = "mina-batch-txn"
-                    , network = "berkeley"
+                    , network = "devnet"
                     , deb_codename = "${DebianVersions.lowerName debVersion}"
                     , deb_profile = profile
                     , build_flags = buildFlags
@@ -181,7 +181,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = "mina-rosetta"
-                    , network = "berkeley"
+                    , network = "devnet"
                     , build_flags = buildFlags
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = profile
@@ -220,7 +220,7 @@ let docker_step
                                         debVersion}${Profiles.toLabelSegment
                                                        profile}${BuildFlags.toLabelSegment
                                                                    buildFlags}--docker-image"
-                    , network = "berkeley"
+                    , network = "devnet"
                     }
                   ]
                 }
