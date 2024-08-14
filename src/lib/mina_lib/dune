@@ -57,7 +57,6 @@
    o1trace
    unix_timestamp
    filtered_external_transition
-   mina_version
    pipe_lib
    user_command_input
    logger

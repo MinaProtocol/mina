@@ -42,13 +42,7 @@ let scan_state_transaction_capacity_log_2 =
 
 [%%inject "scan_state_work_delay", scan_state_work_delay]
 
-[%%inject "debug_logs", debug_logs]
-
-[%%inject "call_logger", call_logger]
-
 [%%inject "cache_exceptions", cache_exceptions]
-
-[%%inject "record_async_backtraces", record_async_backtraces]
 
 [%%inject "proof_level", proof_level]
 
@@ -70,23 +64,11 @@ let scan_state_transaction_capacity_log_2 =
 
 [%%inject "supercharged_coinbase_factor", supercharged_coinbase_factor]
 
-[%%inject "time_offsets", time_offsets]
-
 [%%inject "plugins", plugins]
-
-[%%inject "genesis_ledger", genesis_ledger]
 
 [%%inject "genesis_state_timestamp", genesis_state_timestamp]
 
 [%%inject "block_window_duration", block_window_duration]
-
-[%%inject "integration_tests", integration_tests]
-
-[%%inject "force_updates", force_updates]
-
-[%%inject "download_snark_keys", download_snark_keys]
-
-[%%inject "generate_genesis_proof", generate_genesis_proof]
 
 [%%inject "itn_features", itn_features]
 
