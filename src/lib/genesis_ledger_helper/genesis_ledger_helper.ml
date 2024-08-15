@@ -320,7 +320,7 @@ module Ledger = struct
       | Some version ->
           List.map accounts_with_keys ~f:(fun (key, account) ->
               let patched_account =
-                Mina_base.Account.Poly.
+                Mina_base.Account.
                   { account with
                     permissions =
                       Mina_base.Permissions.Poly.
@@ -729,9 +729,6 @@ module Genesis_proof = struct
     `String (Sexp.to_string (Pickles.Verification_key.Id.sexp_of_t x))
 
   let load_or_generate ~genesis_dir ~logger (inputs : Genesis_proof.Inputs.t) =
-    let proof_needed =
-      match inputs.proof_level with Full -> true | _ -> false
-    in
     let b, id =
       match (inputs.blockchain_proof_system_id, inputs.proof_level) with
       | Some id, _ ->
@@ -750,26 +747,6 @@ module Genesis_proof = struct
         ~state_hash:
           (State_hash.With_state_hashes.state_hash
              inputs.protocol_state_with_hashes )
-    in
-    let use_precomputed_values base_hash =
-      match Precomputed_values.compiled with
-      | Some _ when not proof_needed ->
-          true
-      | Some compiled -> (
-          let compiled = Lazy.force compiled in
-          match compiled.proof_data with
-          | Some proof_data ->
-              let compiled_base_hash =
-                Base_hash.create ~id:proof_data.blockchain_proof_system_id
-                  ~state_hash:
-                    (State_hash.With_state_hashes.state_hash
-                       compiled.protocol_state_with_hashes )
-              in
-              Base_hash.equal base_hash compiled_base_hash
-          | None ->
-              false )
-      | None ->
-          false
     in
     let%bind found_proof =
       match%bind find_file ~logger ~base_hash ~genesis_dir with
@@ -831,54 +808,6 @@ module Genesis_proof = struct
     match found_proof with
     | Some found_proof ->
         return (Ok found_proof)
-    | None when use_precomputed_values base_hash ->
-        let compiled =
-          Lazy.force (Option.value_exn Precomputed_values.compiled)
-        in
-        let proof_data = Option.value_exn compiled.proof_data in
-        let compiled_base_hash =
-          Base_hash.create ~id:proof_data.blockchain_proof_system_id
-            ~state_hash:
-              (State_hash.With_state_hashes.state_hash
-                 compiled.protocol_state_with_hashes )
-        in
-        [%log info]
-          "Base hash $computed_hash matches compile-time $compiled_hash, using \
-           precomputed genesis proof"
-          ~metadata:
-            [ ("computed_hash", Base_hash.to_yojson base_hash)
-            ; ("compiled_hash", Base_hash.to_yojson compiled_base_hash)
-            ] ;
-        let filename = genesis_dir ^/ filename ~base_hash in
-        let values =
-          { Genesis_proof.runtime_config = inputs.runtime_config
-          ; constraint_constants = inputs.constraint_constants
-          ; proof_level = inputs.proof_level
-          ; genesis_constants = inputs.genesis_constants
-          ; genesis_ledger = inputs.genesis_ledger
-          ; genesis_epoch_data = inputs.genesis_epoch_data
-          ; consensus_constants = inputs.consensus_constants
-          ; protocol_state_with_hashes = inputs.protocol_state_with_hashes
-          ; constraint_system_digests = compiled.constraint_system_digests
-          ; proof_data = Some proof_data
-          ; genesis_body_reference = inputs.genesis_body_reference
-          }
-        in
-        let%map () =
-          match%map store ~filename proof_data.genesis_proof with
-          | Ok () ->
-              [%log info] "Compile-time genesis proof written to $path"
-                ~metadata:[ ("path", `String filename) ]
-          | Error err ->
-              [%log warn]
-                "Compile-time genesis proof could not be written to $path: \
-                 $error"
-                ~metadata:
-                  [ ("path", `String filename)
-                  ; ("error", Error_json.error_to_yojson err)
-                  ]
-        in
-        Ok (values, filename)
     | None ->
         [%log info]
           "No genesis proof file was found for $base_hash, generating a new \
