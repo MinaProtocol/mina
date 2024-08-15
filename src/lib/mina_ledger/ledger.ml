@@ -316,6 +316,8 @@ module Ledger_inner = struct
   (* shadows definition in MaskedLedger, extra assurance hash is of right type  *)
   let merkle_root t =
     Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
+  
+  let merkle_path t loc = merkle_path t loc
 
   let get_or_create ledger account_id =
     let open Or_error.Let_syntax in

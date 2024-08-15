@@ -769,7 +769,7 @@ let snarked_ledger_state :
 
 let snarked_ledger_account_membership_proof :
     (* TODO: fix this type definition *)
-    (Mina_lib.t, Mina_state.Snarked_ledger_state.t option) typ =
+    (Mina_lib.t, (Balance.t * Account_timing.t * Account.Nonce.t, string) result option) typ =
   failwith "TODO"
 
 let blockchain_state :
