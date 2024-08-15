@@ -417,7 +417,7 @@ module Mutations = struct
         *)
         List.iter accounts ~f:(fun account ->
             let pk = Account.public_key account in
-            let token = Account.token account in
+            let token = Account.token_id account in
             let account_id = Account_id.create pk token in
             match Ledger.get_or_create_account ledger account_id account with
             | Ok (`Added, _loc) ->

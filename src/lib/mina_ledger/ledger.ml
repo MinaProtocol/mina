@@ -73,11 +73,11 @@ module Ledger_inner = struct
 
         let identifier = Account.identifier
 
-        let balance Account.Poly.{ balance; _ } = balance
+        let balance Account.{ balance; _ } = balance
 
         let empty = Account.empty
 
-        let token = Account.Poly.token_id
+        let token = Account.token_id
       end
     end]
 
