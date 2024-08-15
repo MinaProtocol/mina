@@ -6,8 +6,6 @@
 
 let curve_size = Node_config.curve_size
 
-let genesis_ledger = Node_config.genesis_ledger
-
 let default_transaction_fee_string = Node_config.default_transaction_fee
 
 let default_snark_worker_fee_string = Node_config.default_snark_worker_fee
@@ -27,8 +25,6 @@ let rpc_handshake_timeout_sec = 60.0
 let rpc_heartbeat_timeout_sec = 60.0
 
 let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
-
-let generate_genesis_proof = Node_config.generate_genesis_proof
 
 (** limits on Zkapp_command.t size
     10.26*np + 10.08*n2 + 9.14*n1 < 69.45
