@@ -767,6 +767,11 @@ let snarked_ledger_state :
           ~resolve:(fun _ ({ sok_digest = _; _ } : _ M.t) -> None)
       ] )
 
+let snarked_ledger_account_membership_proof :
+    (* TODO: fix this type definition *)
+    (Mina_lib.t, Mina_state.Snarked_ledger_state.t option) typ =
+  failwith "TODO"
+
 let blockchain_state :
     ( Mina_lib.t
     , (Mina_state.Blockchain_state.Value.t * State_hash.t) option )

@@ -2196,6 +2196,26 @@ struct
         let (module S) = Mina_lib.work_selection_method mina in
         S.pending_work_statements ~snark_pool ~fee_opt snark_job_state )
 
+  let snarked_ledger_account_membership =
+    field "snarkedLedgerAccountMembership"
+      ~doc:
+        "obtain a membership proof for an account in the snarked ledger along \
+         with the account's balance, timing information, and nonce"
+      ~args:
+        Arg.
+          [ arg "publicKey" ~doc:"Public key of account to check"
+              ~typ:(non_null Types.Input.PublicKey.arg_typ)
+          ; arg "token" ~doc:"Token id of the account to check"
+              ~typ:Types.Input.TokenId.arg_typ
+          ; arg "snarked_ledger_hash" ~doc:"Hash of the snarked ledger to check"
+              ~typ:(non_null Types.Input.SnarkedLedgerHash.arg_typ)
+          ]
+      ~typ:(non_null Types.snarked_ledger_account_membership_proof)
+      ~resolve:(fun { ctx = mina; _ } () pk ->
+        let _ = pk in
+        let _ = mina in
+        failwith "Not implemented" )
+
   let genesis_constants =
     field "genesisConstants"
       ~doc:
