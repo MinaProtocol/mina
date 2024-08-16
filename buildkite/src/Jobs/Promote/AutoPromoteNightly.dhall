@@ -1,3 +1,9 @@
+-- Auto Promote Nightly is job which should be either used just after nightly run or in separate pipeline
+-- Small trick to allow manual override of source version which is about to be promoted
+-- If FROM_VERSION_MANUAL is set the used it.
+-- Otherwise use MINA_DEB_VERSION which is set in export-git-env-vars.sh file
+
+
 let S = ../../Lib/SelectFiles.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
@@ -30,7 +36,6 @@ let promotePackages =
         , DebianPackage.Type.Archive
         ]
       , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
-      -- Docker plugin specific settings for commands
       , version = "\\\${FROM_VERSION_MANUAL:-\\\${MINA_DEB_VERSION}}"
       , architecture = "amd64"
       , new_version = "\\\$(date \"+%Y%m%d\")"
