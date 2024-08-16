@@ -30,7 +30,8 @@ let promotePackages =
         , DebianPackage.Type.Archive
         ]
       , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
-      , version = "\\\${FROM_VERSION_MANUAL}"
+      -- Docker plugin specific settings for commands
+      , version = "\\\${FROM_VERSION_MANUAL:-${MINA_DEB_VERSION}}"
       , architecture = "amd64"
       , new_version = "\\\$(date \"+%Y%m%d\")"
       , profile = Profiles.Type.Standard
@@ -43,7 +44,7 @@ let promotePackages =
       , from_channel = DebianChannel.Type.Unstable
       , to_channel = DebianChannel.Type.Nightly
       , tag = "nightly"
-      , remove_profile_from_name = True
+      , remove_profile_from_name = False
       , publish = False
       }
 
@@ -66,7 +67,7 @@ let verifyPackages =
         ]
       , channel = DebianChannel.Type.Nightly
       , tag = "nightly"
-      , remove_profile_from_name = True
+      , remove_profile_from_name = False
       , published = False
       }
 
