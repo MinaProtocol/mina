@@ -1,5 +1,9 @@
 let B = ../../External/Buildkite.dhall
 
+let Prelude = ../../External/Prelude.dhall
+
+let List/map = Prelude.List.map
+
 let B/If = B.definitions/commandStep/properties/if/Type
 
 let Network = ../../Constants/Network.dhall
@@ -23,7 +27,7 @@ let PromoteDockerSpec =
           , version : Text
           , profile : Profiles.Type
           , codename : DebianVersions.DebVersion
-          , new_tag : Text
+          , new_tags : List Text
           , network : Network.Type
           , step_key : Text
           , if : Optional B/If
@@ -34,7 +38,7 @@ let PromoteDockerSpec =
           { deps = [] : List Command.TaggedKey.Type
           , name = Artifact.Type.Daemon
           , version = ""
-          , new_tag = ""
+          , new_tags = [] : List Text
           , step_key = "promote-docker"
           , profile = Profiles.Type.Standard
           , network = Network.Type.Berkeley
@@ -56,24 +60,31 @@ let promoteDockerStep =
                   spec.network
                   False
 
-          let new_tag =
-                Artifact.dockerTag
-                  spec.name
-                  spec.new_tag
-                  spec.codename
-                  spec.profile
-                  spec.network
-                  spec.remove_profile_from_name
-
           let publish = if spec.publish then "-p" else ""
+
+          let commands =
+                List/map
+                  Text
+                  Cmd.Type
+                  (     \(tag : Text)
+                    ->  let new_tag =
+                              Artifact.dockerTag
+                                spec.name
+                                tag
+                                spec.codename
+                                spec.profile
+                                spec.network
+                                spec.remove_profile_from_name
+
+                        in  Cmd.run
+                              ". ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/promote-docker.sh --name ${Artifact.dockerName
+                                                                                                                                spec.name} --version ${old_tag} --tag ${new_tag} ${publish}"
+                  )
+                  spec.new_tags
 
           in  Command.build
                 Command.Config::{
-                , commands =
-                  [ Cmd.run
-                      ". ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/promote-docker.sh --name ${Artifact.dockerName
-                                                                                                                        spec.name} --version ${old_tag} --tag ${new_tag} ${publish}"
-                  ]
+                , commands = commands
                 , label = "Docker: ${spec.step_key}"
                 , key = spec.step_key
                 , target = Size.XLarge

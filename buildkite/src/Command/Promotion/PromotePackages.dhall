@@ -37,14 +37,14 @@ let PromotePackagesSpec =
           { debians : List Package.Type
           , dockers : List Artifact.Type
           , version : Text
-          , new_version : Text
+          , new_debian_version : Text
           , architecture : Text
           , profile : Profiles.Type
           , network : Network.Type
           , codenames : List DebianVersions.DebVersion
           , from_channel : DebianChannel.Type
           , to_channel : DebianChannel.Type
-          , tag : Text
+          , new_tags : List Text
           , remove_profile_from_name : Bool
           , publish : Bool
           }
@@ -52,14 +52,14 @@ let PromotePackagesSpec =
           { debians = [] : List Package.Type
           , dockers = [] : List Artifact.Type
           , version = ""
-          , new_version = ""
+          , new_debian_version = ""
           , architecture = "amd64"
           , profile = Profiles.Type.Standard
           , network = Network.Type.Mainnet
           , codenames = [] : List DebianVersions.DebVersion
           , from_channel = DebianChannel.Type.Unstable
           , to_channel = DebianChannel.Type.Nightly
-          , tag = ""
+          , new_tags = [] : List Text
           , remove_profile_from_name = False
           , publish = False
           }
@@ -81,7 +81,8 @@ let promotePackagesToDebianSpecs
                                 , profile = promote_packages.profile
                                 , package = debian
                                 , version = promote_packages.version
-                                , new_version = promote_packages.new_version
+                                , new_version =
+                                    promote_packages.new_debian_version
                                 , architecture = promote_packages.architecture
                                 , network = promote_packages.network
                                 , codename = codename
@@ -127,7 +128,7 @@ let promotePackagesToDockerSpecs
                                 , name = docker
                                 , version = promote_artifacts.version
                                 , codename = codename
-                                , new_tag = promote_artifacts.new_version
+                                , new_tags = promote_artifacts.new_tags
                                 , network = promote_artifacts.network
                                 , publish = promote_artifacts.publish
                                 , remove_profile_from_name =

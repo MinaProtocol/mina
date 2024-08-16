@@ -41,12 +41,12 @@ let VerifyPackagesSpec =
           { promote_step_name : Optional Text
           , debians : List Package.Type
           , dockers : List Artifact.Type
-          , new_version : Text
+          , new_debian_version : Text
           , profile : Profiles.Type
           , network : Network.Type
           , codenames : List DebianVersions.DebVersion
           , channel : DebianChannel.Type
-          , tag : Text
+          , new_tags : List Text
           , remove_profile_from_name : Bool
           , published : Bool
           }
@@ -54,12 +54,12 @@ let VerifyPackagesSpec =
           { promote_step_name = None
           , debians = [] : List Package.Type
           , dockers = [] : List Artifact.Type
-          , new_version = "\\\\\$MINA_DEB_VERSION"
+          , new_debian_version = "\\\\\$MINA_DEB_VERSION"
           , profile = Profiles.Type.Standard
           , network = Network.Type.Mainnet
           , codenames = [] : List DebianVersions.DebVersion
           , channel = DebianChannel.Type.Nightly
-          , tag = "\\\\\$MINA_DOCKER_TAG"
+          , new_tags = [] : List Text
           , remove_profile_from_name = False
           , published = False
           }
@@ -81,7 +81,7 @@ let verifyPackagesToDockerSpecs
                                 , profile = verify_packages.profile
                                 , name = docker
                                 , codename = codename
-                                , new_tag = verify_packages.new_version
+                                , new_tags = verify_packages.new_tags
                                 , network = verify_packages.network
                                 , publish = verify_packages.published
                                 , remove_profile_from_name =
@@ -137,7 +137,8 @@ let verifyPackagesToDebianSpecs
                             ->  PromoteDebian.PromoteDebianSpec::{
                                 , profile = verify_packages.profile
                                 , package = debian
-                                , new_version = verify_packages.new_version
+                                , new_version =
+                                    verify_packages.new_debian_version
                                 , network = verify_packages.network
                                 , codename = codename
                                 , to_channel = verify_packages.channel
