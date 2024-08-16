@@ -31,7 +31,7 @@ let promotePackages =
         ]
       , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
       -- Docker plugin specific settings for commands
-      , version = "\\\${FROM_VERSION_MANUAL:-${MINA_DEB_VERSION}}"
+      , version = "\\\${FROM_VERSION_MANUAL:-\\\${MINA_DEB_VERSION}}"
       , architecture = "amd64"
       , new_version = "\\\$(date \"+%Y%m%d\")"
       , profile = Profiles.Type.Standard
