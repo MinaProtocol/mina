@@ -39,7 +39,7 @@ let promotePackages =
       , version = "\\\${FROM_VERSION_MANUAL:-\\\${MINA_DEB_VERSION}}"
       , architecture = "amd64"
       , new_debian_version =
-          "\\\${BUILDKITE_BRANCH:-compatible}-\\\$(date \"+%Y%m%d\")"
+          "compatible-\\\$(date \"+%Y%m%d\")"
       , profile = Profiles.Type.Standard
       , network = Network.Type.Devnet
       , codenames =
@@ -50,8 +50,8 @@ let promotePackages =
       , from_channel = DebianChannel.Type.Unstable
       , to_channel = DebianChannel.Type.Nightly
       , new_tags =
-        [ "latest-\\\${BUILDKITE_BRANCH:-compatible}-nightly"
-        , "\\\${BUILDKITE_BRANCH:-compatible}-nightly-\\\$(date \"+%Y%m%d\")"
+        [ "latest-compatible-nightly"
+        , "compatible-nightly-\\\$(date \"+%Y%m%d\")"
         ]
       , remove_profile_from_name = False
       , publish = False
@@ -67,7 +67,7 @@ let verifyPackages =
         ]
       , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
       , new_debian_version =
-          "\\\${BUILDKITE_BRANCH:-compatible}-\\\$(date \"+%Y%m%d\")"
+          "compatible-\\\$(date \"+%Y%m%d\")"
       , profile = Profiles.Type.Standard
       , network = Network.Type.Devnet
       , codenames =
@@ -77,8 +77,8 @@ let verifyPackages =
         ]
       , channel = DebianChannel.Type.Nightly
       , new_tags =
-        [ "latest-\\\${BUILDKITE_BRANCH:-compatible}-nightly"
-        , "\\\${BUILDKITE_BRANCH:-compatible}-nightly-\\\$(date \"+%Y%m%d\")"
+        [ "latest-compatible-nightly"
+        , "compatible-nightly-\\\$(date \"+%Y%m%d\")"
         ]
       , remove_profile_from_name = False
       , published = False
