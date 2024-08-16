@@ -30,7 +30,7 @@ let promotePackages =
         , DebianPackage.Type.Archive
         ]
       , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
-      , version = "\\\${FROM_VERSION:-${MINA_DEB_VERSION}}"
+      , version = "\\\${FROM_VERSION}"
       , architecture = "amd64"
       , new_version = "\\\$(date \"+%Y%m%d\")"
       , profile = Profiles.Type.Standard
