@@ -30,7 +30,7 @@ let promotePackages =
         , DebianPackage.Type.Archive
         ]
       , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
-      , version = "3.0.0-dkijania-trim-release-pipeline-e0ad31c"
+      , version = "\\\${FROM_VERSION:-${MINA_DEB_VERSION}}"
       , architecture = "amd64"
       , new_version = "\\\$(date \"+%Y%m%d\")"
       , profile = Profiles.Type.Standard
