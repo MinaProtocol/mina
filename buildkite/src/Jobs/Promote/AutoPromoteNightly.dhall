@@ -38,8 +38,7 @@ let promotePackages =
       , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
       , version = "\\\${FROM_VERSION_MANUAL:-\\\${MINA_DEB_VERSION}}"
       , architecture = "amd64"
-      , new_debian_version =
-          "\\\$(date \"+%Y%m%d\")-compatible"
+      , new_debian_version = "\\\$(date \"+%Y%m%d\")"
       , profile = Profiles.Type.Standard
       , network = Network.Type.Devnet
       , codenames =
@@ -48,7 +47,7 @@ let promotePackages =
         , DebianVersions.DebVersion.Buster
         ]
       , from_channel = DebianChannel.Type.Unstable
-      , to_channel = DebianChannel.Type.Nightly
+      , to_channel = DebianChannel.Type.NightlyCompatible
       , new_tags =
         [ "latest-compatible-nightly"
         , "compatible-nightly-\\\$(date \"+%Y%m%d\")"
@@ -66,8 +65,7 @@ let verifyPackages =
         , DebianPackage.Type.Archive
         ]
       , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
-      , new_debian_version =
-          "\\\$(date \"+%Y%m%d\")-compatible"
+      , new_debian_version = "\\\$(date \"+%Y%m%d\")"
       , profile = Profiles.Type.Standard
       , network = Network.Type.Devnet
       , codenames =
@@ -75,7 +73,7 @@ let verifyPackages =
         , DebianVersions.DebVersion.Focal
         , DebianVersions.DebVersion.Buster
         ]
-      , channel = DebianChannel.Type.Nightly
+      , channel = DebianChannel.Type.NightlyCompatible
       , new_tags =
         [ "latest-compatible-nightly"
         , "compatible-nightly-\\\$(date \"+%Y%m%d\")"
