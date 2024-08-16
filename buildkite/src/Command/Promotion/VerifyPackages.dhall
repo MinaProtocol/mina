@@ -96,8 +96,8 @@ let verifyPackagesToDockerSpecs
                                             ->  { name = name
                                                 , key =
                                                     "add-tag-to-${Artifact.lowerName
-                                                                 docker}-${DebianVersions.lowerName
-                                                                             codename}-docker"
+                                                                    docker}-${DebianVersions.lowerName
+                                                                                codename}-docker"
                                                 }
                                           )
                                           verify_packages.promote_step_name
