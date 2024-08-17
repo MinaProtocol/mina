@@ -1,4 +1,7 @@
 #!/bin/bash
+set -euox pipefail
+
+
 
 BUILD_URL=${BUILD_URL:-"local build from '$(hostname)' host"}
 MINA_DEB_CODENAME=${MINA_DEB_CODENAME:-"bullseye"}
@@ -9,15 +12,11 @@ MINA_DEB_RELEASE=${MINA_DEB_RELEASE:-"unstable"}
 
 echo "--- Setting up the envrionment to build debian packages..."
 
-set -euo pipefail
-
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd "${SCRIPTPATH}/../../_build"
 
 GITHASH=$(git rev-parse --short=7 HEAD)
 GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
-
-cd "${SCRIPTPATH}/../../_build"
 
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
