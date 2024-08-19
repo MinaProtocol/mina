@@ -1,5 +1,5 @@
 use crate::wasm_vector::WasmVector;
-use ark_ec::AffineCurve;
+use ark_ec::AffineRepr;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use array_init::array_init;
@@ -954,7 +954,7 @@ macro_rules! impl_verification_key {
             #[wasm_bindgen]
             pub fn [<$name:snake _dummy>]() -> WasmPlonkVerifierIndex {
                 fn comm() -> $WasmPolyComm {
-                    let g: $WasmG = $G::prime_subgroup_generator().into();
+                    let g: $WasmG = $G::generator().into();
                     $WasmPolyComm {
                         shifted: None,
                         unshifted: vec![g].into(),

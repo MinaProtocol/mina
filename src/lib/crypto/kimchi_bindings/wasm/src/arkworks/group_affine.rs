@@ -53,13 +53,21 @@ impl From<&AffineVesta> for WasmGVesta {
 
 impl From<WasmGVesta> for AffineVesta {
     fn from(point: WasmGVesta) -> Self {
-        AffineVesta::new(point.x.into(), point.y.into(), point.infinity)
+        AffineVesta {
+            x: point.x.into(),
+            y: point.y.into(),
+            infinity: point.infinity,
+        }
     }
 }
 
 impl From<&WasmGVesta> for AffineVesta {
     fn from(point: &WasmGVesta) -> Self {
-        AffineVesta::new(point.x.into(), point.y.into(), point.infinity)
+        AffineVesta {
+            x: point.x.into(),
+            y: point.y.into(),
+            infinity: point.infinity,
+        }
     }
 }
 
@@ -87,13 +95,21 @@ impl From<&AffinePallas> for WasmGPallas {
 
 impl From<WasmGPallas> for AffinePallas {
     fn from(point: WasmGPallas) -> Self {
-        AffinePallas::new(point.x.into(), point.y.into(), point.infinity)
+        AffinePallas {
+            x: point.x.into(),
+            y: point.y.into(),
+            infinity: point.infinity,
+        }
     }
 }
 
 impl From<&WasmGPallas> for AffinePallas {
     fn from(point: &WasmGPallas) -> Self {
-        AffinePallas::new(point.x.into(), point.y.into(), point.infinity)
+        AffinePallas {
+            x: point.x.into(),
+            y: point.y.into(),
+            infinity: point.infinity,
+        }
     }
 }
 
