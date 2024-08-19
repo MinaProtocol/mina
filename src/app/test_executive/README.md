@@ -133,7 +133,7 @@ Running it directly in the terminal is not the most recommended method, but it i
 
 There are several ways to run Lucy: 
 1. Running the mina-test-executive package directly from command line.  (not particularly recommended but it'll be fine)
-2. Running from the pre-built docker container.  (most recommended method)
+2. Running from the pre-built debian package.  (most recommended method)
 3. compiling from source code, then running what you compiled.  (if you want to modify or extend existing tests, or write new tests, then you will need to do this)
 
 We will go over each method in turn.
@@ -178,41 +178,6 @@ mina-test-executive cloud $TEST_NAME --mina-image $MINA_IMAGE --archive-image $A
 ```
 
 If you prefer, it is also idiomatic to just manually edit and execute the `mina-test-executive` line instead of exporting the env vars.
-
-
-#### Run Lucy in dockerized form
-
-If you don't need to write your own tests and simply wish to run existing tests, the recommended way to run Lucy is to use docker.  It's more encapsulated than downloading the `mina-test-executive` package with `apt`.  All necessary infrastructure and terraform files are baked directly into the image, so it won't matter where you run the docker image from.
-
-All docker images for Lucy are in the [mina-test-executive GCR page](https://console.cloud.google.com/gcr/images/o1labs-192920/global/mina-test-executive).  Click the link and pick a version of the test_executive image.  The short-hash in the tag refers to the git hash that the test executive is compiled off of.  The debian version doesn't really matter, it's simply the debian version of the image (it doesn't need to match your machine).
-
-Once you've picked an image, pull it with:
-
-```
-docker pull gcr.io/o1labs-192920/mina-test-executive@sha256:92c8f0315b53edfba0d885fdc12928e2a91811928ce751b65f943811c0c84463
-```
-
-(Replace the GCR url with the url of your choice.)
-
-Once the image is downloaded, you can run it with the following idiomatic command (from any directory):
-
-```
-docker run \
---env TEST_NAME=<name of test> \
---env MINA_IMAGE=minaprotocol/mina-daemon:1.3.2beta2-compatible-b8ce9fb-bullseye-devnet \
---env ARCHIVE_IMAGE=minaprotocol/mina-archive:1.3.2beta2-compatible-b8ce9fb-bullseye \
---env DEBUG_BOOL=false \
---mount "type=bind,source=/<path to service account keyfile>/o1labs-gcp-192920-cd2c1759278d.json,dst=/keys/o1labs-gcp-192920-cd2c1759278d.json,readonly" \
---env GOOGLE_APPLICATION_CREDENTIALS=/keys/o1labs-gcp-192920-cd2c1759278d.json \
---env GCLOUD_API_KEY \
-gcr.io/o1labs-192920/mina-test-executive@sha256:92c8f0315b53edfba0d885fdc12928e2a91811928ce751b65f943811c0c84463
-
-```
-
-As you'll notice, the env vars `TEST_NAME`, `MINA_IMAGE`, `ARCHIVE_IMAGE`, `DEBUG_BOOL` are the same as the flags and arguments that you'd put into the idiomatic command that you'd be using if you were directly running mina-test-executive in your terminal.  Refer to the section [`mina-test-executive` command line breakdown](README.md#mina-test-executive-command-line-breakdown) for a detailed explaination of the arguments and flags.
-
-The env vars `GOOGLE_APPLICATION_CREDENTIALS`, `GCLOUD_API_KEY`, are the same GCP access credentials environment variables that you set up in the earlier section of this readme [GCP credentials and infrastructure related env vars](README.md#gcp-credentials-and-infrastructure-related-env-vars).  The `--mount` argument simply tells docker to put the keyfile of the service account onto the file system inside of the container, so that processes running inside the container can access the keyfile.  The env var `GOOGLE_APPLICATION_CREDENTIALS` is to be set to the path to the keyfile inside the container, not the path to the keyfile on the host machine, so unless you've modified other things there's no need to modify it.
-
 
 #### Compile Lucy from source
 
