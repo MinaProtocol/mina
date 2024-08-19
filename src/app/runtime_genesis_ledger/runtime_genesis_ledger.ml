@@ -13,10 +13,6 @@ module Hash_json = struct
   type t = { ledger : Hashes.t; epoch_data : epoch_data } [@@deriving to_yojson]
 end
 
-let ledger_depth =
-  (Lazy.force Precomputed_values.compiled_inputs).constraint_constants
-    .ledger_depth
-
 let logger = Logger.create ()
 
 let load_ledger (accounts : Runtime_config.Accounts.t) =
@@ -26,7 +22,7 @@ let load_ledger (accounts : Runtime_config.Accounts.t) =
   in
   let packed =
     Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-      ~depth:ledger_depth
+      ~depth:Genesis_constants_compiled.Constraint_constants.t.ledger_depth
       (lazy accounts)
   in
   Lazy.force (Genesis_ledger.Packed.t packed)
