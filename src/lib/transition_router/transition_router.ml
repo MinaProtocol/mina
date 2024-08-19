@@ -514,10 +514,9 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
     ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~is_seed ~is_demo_mode ~time_controller ~consensus_local_state
     ~persistent_root_location ~persistent_frontier_location
-    ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~network_transition_reader
-    ~producer_transition_reader
-    ~most_recent_valid_block:
-      (most_recent_valid_block_reader, most_recent_valid_block_writer)
+    ~get_current_frontier ~frontier_broadcast_writer:frontier_w
+    ~network_transition_reader ~producer_transition_reader
+    ~get_most_recent_valid_block ~most_recent_valid_block_writer
     ~get_completed_work ~catchup_mode ~notify_online () =
   let open Context in
   [%log info] "Starting transition router" ;
@@ -577,9 +576,28 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
               ~valid_cb ~pipe_name:name ~logger )
           ()
       in
-      Initial_validator.run ~logger ~trust_system ~verifier
-        ~transition_reader:network_transition_reader ~valid_transition_writer
-        ~initialization_finish_signal ~precomputed_values ;
+      let () =
+        let initial_validate =
+          unstage
+            (Initial_validator.validate ~logger ~trust_system ~verifier
+               ~initialization_finish_signal ~precomputed_values )
+        in
+        O1trace.background_thread "initially_validate_blocks" (fun () ->
+            Pipe_lib.Strict_pipe.Reader.iter network_transition_reader
+              ~f:(fun
+                   ( `Transition transition_env
+                   , `Time_received time_received
+                   , `Valid_cb valid_cb )
+                 ->
+                match%map
+                  initial_validate ~transition_env ~time_received ~valid_cb
+                with
+                | Ok valid_transition ->
+                    Pipe_lib.Strict_pipe.Writer.write valid_transition_writer
+                      valid_transition
+                | Error () ->
+                    () ) )
+      in
       let persistent_frontier =
         Transition_frontier.Persistent_frontier.create ~logger ~verifier
           ~time_controller ~directory:persistent_frontier_location
@@ -610,9 +628,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
              let incoming_transition =
                Envelope.Incoming.data enveloped_transition
              in
-             let current_transition =
-               Broadcast_pipe.Reader.peek most_recent_valid_block_reader
-             in
+             let current_transition = get_most_recent_valid_block () in
              if
                Consensus.Hooks.equal_select_status `Take
                  (Consensus.Hooks.select
@@ -636,7 +652,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                   let incoming_transition =
                     Envelope.Incoming.data enveloped_transition
                   in
-                  match Broadcast_pipe.Reader.peek frontier_r with
+                  match get_current_frontier () with
                   | Some frontier ->
                       if
                         is_transition_for_bootstrap

@@ -336,18 +336,18 @@ module type Transition_router_intf = sig
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root_location:string
     -> persistent_frontier_location:string
-    -> frontier_broadcast_pipe:
-         transition_frontier option Pipe_lib.Broadcast_pipe.Reader.t
-         * transition_frontier option Pipe_lib.Broadcast_pipe.Writer.t
+    -> get_current_frontier:(unit -> transition_frontier option)
+    -> frontier_broadcast_writer:
+         transition_frontier option Pipe_lib.Broadcast_pipe.Writer.t
     -> network_transition_reader:
          ( [ `Transition of Mina_block.t Envelope.Incoming.t ]
          * [ `Time_received of Block_time.t ]
          * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
          Strict_pipe.Reader.t
     -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
-    -> most_recent_valid_block:
-         Mina_block.initial_valid_block Broadcast_pipe.Reader.t
-         * Mina_block.initial_valid_block Broadcast_pipe.Writer.t
+    -> get_most_recent_valid_block:(unit -> Mina_block.initial_valid_block)
+    -> most_recent_valid_block_writer:
+         Mina_block.initial_valid_block Broadcast_pipe.Writer.t
     -> get_completed_work:
          (   Transaction_snark_work.Statement.t
           -> Transaction_snark_work.Checked.t option )

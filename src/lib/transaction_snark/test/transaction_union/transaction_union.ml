@@ -144,8 +144,7 @@ let%test_module "Transaction union tests" =
           in
           let supply_increase =
             Mina_ledger.Ledger.Transaction_applied.supply_increase
-              ~constraint_constants
-              applied_transaction
+              ~constraint_constants applied_transaction
             |> Or_error.ok_exn
           in
           Transaction_snark.check_transaction txn_in_block
