@@ -210,7 +210,7 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
   else Some (report_file, temp_config)
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
-let setup_local_server ?(client_trustlist = []) ?rest_server_port
+let setup_local_server ~genesis_config ?(client_trustlist = []) ?rest_server_port
     ?limited_graphql_port ?itn_graphql_port ?auth_keys
     ?(open_limited_graphql_port = false) ?(insecure_rest_server = false) mina =
   let client_trustlist =
@@ -544,7 +544,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             ~bind_to_address:
               Tcp.Bind_to_address.(
                 if insecure_rest_server then All_addresses else Localhost)
-            ~schema:(Mina_graphql.schema ~commit_id:Mina_version.commit_id)
+            ~schema:(Mina_graphql.schema ~genesis_config ~commit_id:Mina_version.commit_id)
             ~server_description:"GraphQL server" ~require_auth:false
             rest_server_port ) ) ;
   (* Second graphql server with limited queries exposed *)
@@ -569,7 +569,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 Tcp.Bind_to_address.(
                   if insecure_rest_server then All_addresses else Localhost)
               ~schema:
-                (Mina_graphql.schema_itn ~commit_id:Mina_version.commit_id)
+                (Mina_graphql.schema_itn ~genesis_config ~commit_id:Mina_version.commit_id)
               ~server_description:"GraphQL server for ITN queries"
               ~require_auth:true rest_server_port ) ) ;
   let where_to_listen =

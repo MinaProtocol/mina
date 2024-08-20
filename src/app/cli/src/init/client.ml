@@ -501,7 +501,7 @@ let batch_send_payments =
 let transaction_id_to_string id =
   Yojson.Basic.to_string (Graphql_lib.Scalars.TransactionId.serialize id)
 
-let send_payment_graphql =
+let send_payment_graphql ~(genesis_config : Genesis_constants_compiled.t) =
   let open Command.Param in
   let open Cli_lib.Arg_type in
   let receiver_flag =
@@ -517,7 +517,7 @@ let send_payment_graphql =
     Args.zip3
       (Cli_lib.Flag.signed_command_common
          ~minimum_user_command_fee:
-           Genesis_constants_compiled.t.minimum_user_command_fee
+           genesis_config.genesis_constants.minimum_user_command_fee
          ~default_transaction_fee:
            (Currency.Fee.of_mina_string_exn
               Mina_compile_config.default_transaction_fee_string ) )
@@ -541,7 +541,7 @@ let send_payment_graphql =
          printf "Dispatched payment with ID %s\n"
            (transaction_id_to_string response.sendPayment.payment.id) ) )
 
-let delegate_stake_graphql =
+let delegate_stake_graphql ~(genesis_config : Genesis_constants_compiled.t)=
   let open Command.Param in
   let open Cli_lib.Arg_type in
   let receiver_flag =
@@ -553,7 +553,7 @@ let delegate_stake_graphql =
     Args.zip2
       (Cli_lib.Flag.signed_command_common
          ~minimum_user_command_fee:
-           Genesis_constants_compiled.t.minimum_user_command_fee
+           genesis_config.genesis_constants.minimum_user_command_fee
          ~default_transaction_fee:
            (Currency.Fee.of_mina_string_exn
               Mina_compile_config.default_transaction_fee_string ) )
@@ -810,7 +810,7 @@ let export_ledger =
          in
          response >>= handle_export_ledger_response ~json:(not plaintext) ) )
 
-let hash_ledger =
+let hash_ledger ~(genesis_config : Genesis_constants_compiled.t) =
   let open Command.Let_syntax in
   Command.async
     ~summary:
@@ -823,8 +823,7 @@ let hash_ledger =
      and plaintext = Cli_lib.Flag.plaintext in
      fun () ->
        let process_accounts accounts =
-         let constraint_constants =
-           Genesis_constants_compiled.Constraint_constants.t
+         let constraint_constants = genesis_config.constraint_constants
          in
          let packed_ledger =
            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
@@ -923,13 +922,12 @@ let currency_in_ledger =
                err ;
              ignore (exit 1 : 'a Deferred.t) )
 
-let constraint_system_digests =
+let constraint_system_digests ~(genesis_config : Genesis_constants_compiled.t)=
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
          (* TODO: Allow these to be configurable. *)
-         let proof_level = Genesis_constants_compiled.Proof_level.t in
-         let constraint_constants =
-           Genesis_constants_compiled.Constraint_constants.t
+         let proof_level = genesis_config.proof_level in
+         let constraint_constants = genesis_config.constraint_constants
          in
          let all =
            Transaction_snark.constraint_system_digests ~constraint_constants ()
@@ -1793,7 +1791,7 @@ let add_peers_graphql =
                   ; peer_id = peer.peerId
                   } ) ) ) )
 
-let compile_time_constants =
+let compile_time_constants ~genesis_config =
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
     (Command.Param.return (fun () ->
@@ -1820,7 +1818,7 @@ let compile_time_constants =
            >>| Option.value ~default:Runtime_config.default
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
                  ~logger:(Logger.null ()) ~proof_level:None
-                 ~compiled:(module Genesis_constants_compiled)
+                 ~genesis_config
            >>| Or_error.ok_exn
          in
          let all_constants =
@@ -2268,7 +2266,7 @@ let signature_kind =
        in
        Core.print_endline signature_kind_string )
 
-let itn_create_accounts =
+let itn_create_accounts ~genesis_config =
   Command.async ~summary:"Fund new accounts for incentivized testnet"
     (let open Command.Param in
     let privkey_path = Cli_lib.Flag.privkey_read_path in
@@ -2291,7 +2289,7 @@ let itn_create_accounts =
         (required int)
     in
     let args = Args.zip5 privkey_path key_prefix num_accounts fee amount in
-    Cli_lib.Background_daemon.rpc_init args ~f:Itn.create_accounts)
+    Cli_lib.Background_daemon.rpc_init args ~f:(Itn.create_accounts ~genesis_config))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -2349,13 +2347,13 @@ let accounts =
     ; ("lock", lock_account)
     ]
 
-let client =
+let client ~genesis_config =
   Command.group ~summary:"Lightweight client commands"
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance_graphql)
     ; ("get-tokens", get_tokens_graphql)
-    ; ("send-payment", send_payment_graphql)
-    ; ("delegate-stake", delegate_stake_graphql)
+    ; ("send-payment", send_payment_graphql ~genesis_config)
+    ; ("delegate-stake", delegate_stake_graphql ~genesis_config)
     ; ("cancel-transaction", cancel_transaction_graphql)
     ; ("set-snark-worker", set_snark_worker)
     ; ("set-snark-work-fee", set_snark_work_fee)
@@ -2373,7 +2371,7 @@ let client_trustlist_group =
     ; ("remove", trustlist_remove)
     ]
 
-let advanced =
+let advanced ~(genesis_config : Genesis_constants_compiled.t)  =
   let cmds0 =
     [ ("get-nonce", get_nonce_cmd)
     ; ("client-trustlist", client_trustlist_group)
@@ -2385,7 +2383,7 @@ let advanced =
     ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
-    ; ("constraint-system-digests", constraint_system_digests)
+    ; ("constraint-system-digests", constraint_system_digests ~genesis_config)
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
     ; ("start-internal-tracing", start_internal_tracing)
@@ -2395,7 +2393,7 @@ let advanced =
     ; ("pooled-zkapp-commands", pooled_zkapp_commands)
     ; ("snark-pool-list", snark_pool_list)
     ; ("pending-snark-work", pending_snark_work)
-    ; ("compile-time-constants", compile_time_constants)
+    ; ("compile-time-constants", compile_time_constants ~genesis_config)
     ; ("node-status", node_status)
     ; ("visualization", Visualization.command_group)
     ; ("verify-receipt", verify_receipt)
@@ -2413,25 +2411,23 @@ let advanced =
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
     ; ("chain-id-inputs", chain_id_inputs)
     ; ("runtime-config", runtime_config)
-    ; ( "vrf"
-      , Cli_lib.Commands.Vrf.command_group
-          ~constraint_constants:
-            Genesis_constants_compiled.Constraint_constants.t )
+    ; ( "vrf", Cli_lib.Commands.Vrf.command_group
+          ~constraint_constants:genesis_config.constraint_constants)
     ; ("thread-graph", thread_graph)
     ; ("print-signature-kind", signature_kind)
     ]
   in
   let cmds =
     if Mina_compile_config.itn_features then
-      ("itn-create-accounts", itn_create_accounts) :: cmds0
+      ("itn-create-accounts", itn_create_accounts ~genesis_config) :: cmds0
     else cmds0
   in
   Command.group ~summary:"Advanced client commands" cmds
 
-let ledger =
+let ledger ~genesis_config =
   Command.group ~summary:"Ledger commands"
     [ ("export", export_ledger)
-    ; ("hash", hash_ledger)
+    ; ("hash", hash_ledger ~genesis_config)
     ; ("currency", currency_in_ledger)
     ]
 
