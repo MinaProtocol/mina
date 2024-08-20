@@ -2736,6 +2736,7 @@ struct
     ; trust_status_all
     ; snark_pool
     ; pending_snark_work
+    ; snarked_ledger_account_membership
     ; genesis_constants
     ; time_offset
     ; validate_payment
