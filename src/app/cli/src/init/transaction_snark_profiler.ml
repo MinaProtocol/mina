@@ -3,20 +3,20 @@ open Snark_profiler_lib
 
 let name = "transaction-snark-profiler"
 
-let run ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_updates
+let run ~genesis_config ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_updates
     ?min_num_updates repeats preeval use_zkapps : unit =
   let logger = Logger.null () in
   let print n msg = printf !"[%i] %s\n%!" n msg in
   if use_zkapps then (
     let ledger, transactions =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          create_ledger_and_zkapps ?min_num_updates ~max_num_updates () )
+          create_ledger_and_zkapps ~genesis_config ?min_num_updates ~max_num_updates () )
     in
     Parallel.init_master () ;
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~commit_id:Mina_version.commit_id ~logger ~proof_level
-            ~constraint_constants ~conf_dir:None
+          Verifier.create ~commit_id:Mina_version.commit_id ~logger ~proof_level:genesis_config.proof_level
+            ~constraint_constants:genesis_config.constraint_constants ~conf_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ())
             () )
     in
@@ -33,7 +33,7 @@ let run ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_updates
     go repeats )
   else
     let ledger, transactions =
-      create_ledger_and_transactions num_transactions
+      create_ledger_and_transactions ~genesis_config num_transactions
     in
     let sparse_ledger =
       Mina_ledger.Sparse_ledger.of_ledger_subset_exn ledger
@@ -55,41 +55,39 @@ let run ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_updates
     in
     go repeats
 
-let dry ~max_num_updates ?min_num_updates num_transactions repeats preeval
+let dry ~genesis_config ~max_num_updates ?min_num_updates num_transactions repeats preeval
     use_zkapps () =
   let zkapp_profiler ~verifier:_ _ _ =
     failwith "Can't check base SNARKs on zkApps"
   in
   Test_util.with_randomness 123456789 (fun () ->
-      run ~user_command_profiler:check_base_snarks ~zkapp_profiler
+      run ~genesis_config ~user_command_profiler:(check_base_snarks ~genesis_config) ~zkapp_profiler
         num_transactions ~max_num_updates ?min_num_updates repeats preeval
         use_zkapps )
 
-let witness ~max_num_updates ?min_num_updates num_transactions repeats preeval
+let witness ~genesis_config ~max_num_updates ?min_num_updates num_transactions repeats preeval
     use_zkapps () =
   let zkapp_profiler ~verifier:_ _ _ =
     failwith "Can't generate witnesses for base SNARKs on zkApps"
   in
   Test_util.with_randomness 123456789 (fun () ->
-      run ~user_command_profiler:generate_base_snarks_witness ~zkapp_profiler
+      run ~genesis_config ~user_command_profiler:(generate_base_snarks_witness ~genesis_config) ~zkapp_profiler
         num_transactions ~max_num_updates ?min_num_updates repeats preeval
         use_zkapps )
 
-let main ~max_num_updates ?min_num_updates num_transactions repeats preeval
+let main ~(genesis_config : Genesis_constants_compiled.t) ~max_num_updates ?min_num_updates num_transactions repeats preeval
     use_zkapps () =
   Test_util.with_randomness 123456789 (fun () ->
       let module T = Transaction_snark.Make (struct
-        let constraint_constants =
-          Genesis_constants_compiled.Constraint_constants.t
-
-        let proof_level = Genesis_constants.Proof_level.Full
+        let constraint_constants = genesis_config.constraint_constants
+        let proof_level = genesis_config.proof_level
       end) in
-      run
-        ~user_command_profiler:(profile_user_command (module T))
-        ~zkapp_profiler:profile_zkapps num_transactions ~max_num_updates
+      run 
+        ~genesis_config ~user_command_profiler:(profile_user_command ~genesis_config (module T))
+        ~zkapp_profiler:(profile_zkapps ~genesis_config) num_transactions ~max_num_updates
         ?min_num_updates repeats preeval use_zkapps )
 
-let command =
+let command ~genesis_config =
   let open Command.Let_syntax in
   Command.basic ~summary:"transaction snark profiler"
     (let%map_open n =
@@ -162,11 +160,11 @@ let command =
          exit 1 ) ) ;
      let repeats = Option.value repeats ~default:1 in
      if witness_only then
-       witness ~max_num_updates ?min_num_updates num_transactions repeats
+       witness ~genesis_config ~max_num_updates ?min_num_updates num_transactions repeats
          preeval use_zkapps
      else if check_only then
-       dry ~max_num_updates ?min_num_updates num_transactions repeats preeval
+       dry ~genesis_config ~max_num_updates ?min_num_updates num_transactions repeats preeval
          use_zkapps
      else
-       main ~max_num_updates ?min_num_updates num_transactions repeats preeval
+       main ~genesis_config ~max_num_updates ?min_num_updates num_transactions repeats preeval
          use_zkapps )
