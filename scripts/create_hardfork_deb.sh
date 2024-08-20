@@ -55,6 +55,8 @@ build_deb "${NETWORK_TAG}"
 build_logproc_deb
 $BUILD_KEYPAIR_DEB && MINA_BUILD_MAINNET=1 build_keypair_deb
 build_archive_deb
+build_rosetta_mainnet_deb
+build_rosetta_devnet_deb
 build_batch_txn_deb
 build_test_executive_deb
 build_functional_test_suite_deb
