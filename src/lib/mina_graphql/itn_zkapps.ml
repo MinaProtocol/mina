@@ -153,7 +153,7 @@ let insert_account_queue ~account_queue ~account_queue_size ~account_state_tbl
       ~data:(a, role)
   else ()
 
-let send_zkapps ~(config:Genesis_constants_compiled.t) ~fee_payer_array ~tm_end ~scheduler_tbl
+let send_zkapps ~(genesis_config:Genesis_constants_compiled.t) ~fee_payer_array ~tm_end ~scheduler_tbl
     ~uuid ~keymap ~unused_pks ~stop_signal ~mina ~zkapp_command_details
     ~wait_span ~logger ~account_state_tbl init_tm_next init_counter =
   let wait_span_ms = Time.Span.to_ms wait_span |> int_of_float in
@@ -177,7 +177,7 @@ let send_zkapps ~(config:Genesis_constants_compiled.t) ~fee_payer_array ~tm_end 
     `Repeat (next_tm_next, counter + 1)
   in
   let `VK vk, `Prover prover =
-    Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants:config.constraint_constants ()
+    Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants:genesis_config.constraint_constants ()
   in
   let%bind.Deferred vk = vk in
   let account_queue = Queue.create () in
@@ -252,8 +252,8 @@ let send_zkapps ~(config:Genesis_constants_compiled.t) ~fee_payer_array ~tm_end 
                    ~limited:true ~fee_payer_keypair:fee_payer ~keymap
                    ~account_state_tbl ~generate_new_accounts ~ledger ~vk
                    ~available_public_keys:unused_pks
-                   ~genesis_constants:config.genesis_constants
-                   ~constraint_constants:config.constraint_constants ())
+                   ~genesis_constants:genesis_config.genesis_constants
+                   ~constraint_constants:genesis_config.constraint_constants ())
                ~size:1
                ~random:(Splittable_random.State.create Random.State.default)
     in

@@ -391,7 +391,7 @@ module Mutations = struct
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
-  let mock_zkapp_command mina zkapp_command :
+  let mock_zkapp_command mina ~(genesis_config : Genesis_constants_compiled.t) zkapp_command :
       ( (Zkapp_command.t, Transaction_hash.t) With_hash.t
         Types.Zkapp_command.With_status.t
       , string )
@@ -407,8 +407,7 @@ module Mutations = struct
           |> Staged_ledger.ledger
         in
         let%bind accounts = Ledger.to_list best_tip_ledger in
-        let constraint_constants =
-          Genesis_constants_compiled.Constraint_constants.t
+        let constraint_constants = genesis_config.constraint_constants
         in
         let depth = constraint_constants.ledger_depth in
         let ledger = Ledger.create_ephemeral ~depth () in
@@ -503,7 +502,7 @@ module Mutations = struct
         "Couldn't find an unlocked key for specified `sender`. Did you unlock \
          the account you're making a transaction from?"
 
-  let create_user_command_input ~fee ~fee_payer_pk ~nonce_opt ~valid_until ~memo
+  let create_user_command_input ~(genesis_config : Genesis_constants_compiled.t)  ~fee ~fee_payer_pk ~nonce_opt ~valid_until ~memo
       ~signer ~body ~sign_choice : (User_command_input.t, string) result =
     let open Result.Let_syntax in
     (* TODO: We should put a more sensible default here. *)
@@ -515,7 +514,7 @@ module Mutations = struct
         ~error:(sprintf "Invalid `fee` provided.")
     in
     let%bind () =
-      let minimum_fee = Genesis_constants_compiled.t.minimum_user_command_fee in
+      let minimum_fee = genesis_config.genesis_constants.minimum_user_command_fee in
       Result.ok_if_true
         Currency.Fee.(fee >= minimum_fee)
         ~error:
@@ -535,23 +534,23 @@ module Mutations = struct
     User_command_input.create ~signer ~fee ~fee_payer_pk ?nonce:nonce_opt
       ~valid_until ~memo ~body ~sign_choice ()
 
-  let make_signed_user_command ~signature ~nonce_opt ~signer ~memo ~fee
+  let make_signed_user_command ~genesis_config ~signature ~nonce_opt ~signer ~memo ~fee
       ~fee_payer_pk ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
     let%bind signature = signature |> Deferred.return in
     let%map user_command_input =
-      create_user_command_input ~nonce_opt ~signer ~memo ~fee ~fee_payer_pk
+      create_user_command_input ~genesis_config ~nonce_opt ~signer ~memo ~fee ~fee_payer_pk
         ~valid_until ~body
         ~sign_choice:(User_command_input.Sign_choice.Signature signature)
       |> Deferred.return
     in
     user_command_input
 
-  let send_signed_user_command ~signature ~mina ~nonce_opt ~signer ~memo ~fee
+  let send_signed_user_command ~genesis_config ~signature ~mina ~nonce_opt ~signer ~memo ~fee
       ~fee_payer_pk ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
     let%bind user_command_input =
-      make_signed_user_command ~signature ~nonce_opt ~signer ~memo ~fee
+      make_signed_user_command ~genesis_config ~signature ~nonce_opt ~signer ~memo ~fee
         ~fee_payer_pk ~valid_until ~body
     in
     let%map cmd = send_user_command mina user_command_input in
@@ -560,7 +559,7 @@ module Mutations = struct
         ; hash = Transaction_hash.hash_command (Signed_command cmd)
         } )
 
-  let send_unsigned_user_command ~mina ~nonce_opt ~signer ~memo ~fee
+  let send_unsigned_user_command ~mina ~(genesis_config: Genesis_constants_compiled.t)  ~nonce_opt ~signer ~memo ~fee
       ~fee_payer_pk ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
     let%bind user_command_input =
@@ -572,7 +571,7 @@ module Mutations = struct
         | `Hd_index hd_index ->
             Hd_index hd_index
       in
-      create_user_command_input ~nonce_opt ~signer ~memo ~fee ~fee_payer_pk
+      create_user_command_input ~genesis_config ~nonce_opt ~signer ~memo ~fee ~fee_payer_pk
         ~valid_until ~body ~sign_choice)
       |> Deferred.return
     in
@@ -587,7 +586,7 @@ module Mutations = struct
     let Config.{ conf_dir; _ } = Mina_lib.config mina in
     Conf_dir.export_logs_to_tar ?basename:basename_opt ~conf_dir
 
-  let send_delegation =
+  let send_delegation ~genesis_config =
     io_field "sendDelegation"
       ~doc:"Change your delegate by sending a transaction"
       ~typ:(non_null Types.Payload.send_delegation)
@@ -604,16 +603,16 @@ module Mutations = struct
         in
         match signature with
         | None ->
-            send_unsigned_user_command ~mina ~nonce_opt ~signer:from ~memo ~fee
+            send_unsigned_user_command ~mina ~genesis_config ~nonce_opt ~signer:from ~memo ~fee
               ~fee_payer_pk:from ~valid_until ~body
             |> Deferred.Result.map ~f:Types.User_command.mk_user_command
         | Some signature ->
             let%bind signature = signature |> Deferred.return in
-            send_signed_user_command ~mina ~nonce_opt ~signer:from ~memo ~fee
+            send_signed_user_command ~mina ~genesis_config ~nonce_opt ~signer:from ~memo ~fee
               ~fee_payer_pk:from ~valid_until ~body ~signature
             |> Deferred.Result.map ~f:Types.User_command.mk_user_command )
 
-  let send_payment =
+  let send_payment ~genesis_config =
     io_field "sendPayment" ~doc:"Send a payment"
       ~typ:(non_null Types.Payload.send_payment)
       ~args:
@@ -630,11 +629,11 @@ module Mutations = struct
         in
         match signature with
         | None ->
-            send_unsigned_user_command ~mina ~nonce_opt ~signer:from ~memo ~fee
+            send_unsigned_user_command ~mina ~genesis_config ~nonce_opt ~signer:from ~memo ~fee
               ~fee_payer_pk:from ~valid_until ~body
             |> Deferred.Result.map ~f:Types.User_command.mk_user_command
         | Some signature ->
-            send_signed_user_command ~mina ~nonce_opt ~signer:from ~memo ~fee
+            send_signed_user_command ~mina ~genesis_config ~nonce_opt ~signer:from ~memo ~fee
               ~fee_payer_pk:from ~valid_until ~body ~signature
             |> Deferred.Result.map ~f:Types.User_command.mk_user_command )
 
@@ -650,10 +649,10 @@ module Mutations = struct
     make_zkapp_endpoint ~name:"sendZkapp" ~doc:"Send a zkApp transaction"
       ~f:Zkapps.send_zkapp_command
 
-  let mock_zkapp =
+  let mock_zkapp ~genesis_config =
     make_zkapp_endpoint ~name:"mockZkapp"
       ~doc:"Mock a zkApp transaction, no effect on blockchain"
-      ~f:mock_zkapp_command
+      ~f:(mock_zkapp_command ~genesis_config)
 
   let internal_send_zkapp =
     io_field "internalSendZkapp"
@@ -669,7 +668,7 @@ module Mutations = struct
       ~resolve:(fun { ctx = mina; _ } () zkapp_commands ->
         internal_send_zkapp_commands mina zkapp_commands )
 
-  let send_test_payments =
+  let send_test_payments ~genesis_config =
     io_field "sendTestPayments" ~doc:"Send a series of test payments"
       ~typ:(non_null int)
       ~args:
@@ -713,7 +712,7 @@ module Mutations = struct
             Secrets.Wallets.import_keypair (Mina_lib.wallets mina) kp
               ~password:dumb_password
           in
-          send_unsigned_user_command ~mina ~nonce_opt:None ~signer:source_pk
+          send_unsigned_user_command ~mina ~genesis_config ~nonce_opt:None ~signer:source_pk
             ~memo:(Some memo) ~fee ~fee_payer_pk:source_pk ~valid_until:None
             ~body
           |> Deferred.Result.map ~f:(const 0)
@@ -960,7 +959,7 @@ module Mutations = struct
         in
         () )
 
-  let commands =
+  let commands ~genesis_config =
     [ add_wallet
     ; start_filtered_log
     ; create_account
@@ -974,11 +973,11 @@ module Mutations = struct
     ; reload_accounts
     ; import_account
     ; reload_wallets
-    ; send_payment
-    ; send_test_payments
-    ; send_delegation
+    ; send_payment ~genesis_config
+    ; send_test_payments ~genesis_config
+    ; send_delegation ~genesis_config
     ; send_zkapp
-    ; mock_zkapp
+    ; mock_zkapp ~genesis_config
     ; internal_send_zkapp
     ; export_logs
     ; set_coinbase_receiver
@@ -997,7 +996,7 @@ module Mutations = struct
     let scheduler_tbl : unit Async_kernel.Ivar.t Uuid.Table.t =
       Uuid.Table.create ()
 
-    let schedule_payments =
+    let schedule_payments ~genesis_config =
       io_field "schedulePayments"
         ~args:
           Arg.
@@ -1136,7 +1135,7 @@ module Mutations = struct
                 ] ;
             let fee = Currency.Fee.to_uint64 fee in
             match%map
-              send_signed_user_command ~mina ~nonce_opt:(Some nonce)
+              send_signed_user_command ~mina ~genesis_config ~nonce_opt:(Some nonce)
                 ~signer:source_pk ~memo:(Some memo) ~fee ~fee_payer_pk:source_pk
                 ~valid_until ~body ~signature
             with
@@ -1189,7 +1188,7 @@ module Mutations = struct
           don't_wait_for @@ go 0 tm_next ;
           Ok (Uuid.to_string uuid) )
 
-    let schedule_zkapp_commands =
+    let schedule_zkapp_commands ~genesis_config =
       io_field "scheduleZkappCommands"
         ~args:
           Arg.
@@ -1315,8 +1314,8 @@ module Mutations = struct
                   in
                   let tm_next = Time.add (Time.now ()) wait_span in
                   don't_wait_for
-                  @@ Itn_zkapps.send_zkapps ~fee_payer_array
-                       ~constraint_constants ~scheduler_tbl ~uuid ~keymap
+                  @@ Itn_zkapps.send_zkapps ~genesis_config ~fee_payer_array
+                       ~scheduler_tbl ~uuid ~keymap
                        ~unused_pks ~stop_signal ~mina ~zkapp_command_details
                        ~wait_span ~logger ~tm_end ~account_state_tbl tm_next
                        (List.length zkapp_account_keypairs) ) ;
@@ -1580,9 +1579,9 @@ module Mutations = struct
           Block_producer.zkapp_cmd_limit := limit ;
           limit )
 
-    let commands =
-      [ schedule_payments
-      ; schedule_zkapp_commands
+    let commands ~genesis_config =
+      [ schedule_payments ~genesis_config
+      ; schedule_zkapp_commands ~genesis_config
       ; stop_scheduled_transactions
       ; update_gating
       ; flush_internal_logs
@@ -2230,7 +2229,7 @@ struct
         let%map config = Mina_networking.connection_gating_config net in
         Ok config )
 
-  let validate_payment =
+  let validate_payment ~genesis_config =
     io_field "validatePayment"
       ~doc:"Validate the format and signature of a payment" ~typ:(non_null bool)
       ~args:
@@ -2254,7 +2253,7 @@ struct
               Deferred.Result.fail "Signature field is missing"
         in
         let%bind user_command_input =
-          Mutations.make_signed_user_command ~nonce_opt ~signer:from ~memo ~fee
+          Mutations.make_signed_user_command ~genesis_config ~nonce_opt ~signer:from ~memo ~fee
             ~fee_payer_pk:from ~valid_until ~body ~signature
         in
         let%map user_command, _ =
@@ -2656,7 +2655,7 @@ struct
             Mina_state.Protocol_state.value_to_yojson protocol_state
             |> Yojson.Safe.to_string )
 
-  let commands =
+  let commands ~genesis_config =
     [ sync_status
     ; daemon_status
     ; version
@@ -2684,7 +2683,7 @@ struct
     ; pending_snark_work
     ; genesis_constants
     ; time_offset
-    ; validate_payment
+    ; validate_payment ~genesis_config
     ; evaluate_vrf
     ; check_vrf
     ; runtime_config
@@ -2754,12 +2753,12 @@ struct
   end
 end
 
-let schema ~commit_id =
+let schema ~genesis_config ~commit_id =
   let module Q = Queries (struct
     let commit_id = commit_id
   end) in
   Graphql_async.Schema.(
-    schema Q.commands ~mutations:Mutations.commands
+    schema (Q.commands ~genesis_config) ~mutations:(Mutations.commands ~genesis_config)
       ~subscriptions:Subscriptions.commands)
 
 let schema_limited ~commit_id =
@@ -2772,11 +2771,11 @@ let schema_limited ~commit_id =
       [ Q.daemon_status; Q.block; Q.version ]
       ~mutations:[] ~subscriptions:[])
 
-let schema_itn ~commit_id : (bool * Mina_lib.t) Schema.schema =
+let schema_itn ~genesis_config ~commit_id : (bool * Mina_lib.t) Schema.schema =
   let module Q = Queries (struct
     let commit_id = commit_id
   end) in
   if Mina_compile_config.itn_features then
     Graphql_async.Schema.(
-      schema Q.Itn.commands ~mutations:Mutations.Itn.commands ~subscriptions:[])
+      schema Q.Itn.commands ~mutations:(Mutations.Itn.commands ~genesis_config) ~subscriptions:[])
   else Graphql_async.Schema.(schema [] ~mutations:[] ~subscriptions:[])
