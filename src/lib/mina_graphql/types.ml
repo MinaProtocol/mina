@@ -767,10 +767,35 @@ let snarked_ledger_state :
           ~resolve:(fun _ ({ sok_digest = _; _ } : _ M.t) -> None)
       ] )
 
-let snarked_ledger_account_membership_proof :
-    (* TODO: fix this type definition *)
-    (Mina_lib.t, (Balance.t * Account_timing.t * Account.Nonce.t, string) result option) typ =
-  failwith "TODO"
+module SnarkedLedgerMembership = struct
+  type t =
+    { account_balance : Currency.Balance.t
+    ; timing_info : Account_timing.t
+    ; nonce : Account.Nonce.t
+    ; proof : Ledger.path
+    }
+
+  let obj =
+    obj "MembershipInfo" ~fields:(fun _ ->
+        [ field "accountBalance"
+            ~args:Arg.[]
+            ~doc:"Account balance" ~typ:(non_null balance)
+            ~resolve:(fun _ { account_balance; _ } -> account_balance)
+        ; field "timingInfo"
+            ~args:Arg.[]
+            ~doc:"Account timing info" ~typ:(non_null account_timing)
+            ~resolve:(fun _ { timing_info; _ } -> timing_info)
+        ; field "nonce"
+            ~args:Arg.[]
+            ~doc:"Account nonce" ~typ:(non_null uint32)
+            ~resolve:(fun _ { nonce; _ } -> Account.Nonce.to_uint32 nonce)
+        ; field "proof"
+            ~args:Arg.[]
+            ~doc:"Membership proof"
+            ~typ:(list (non_null merkle_path_element))
+            ~resolve:(fun _ { proof; _ } -> Some proof)
+        ] )
+end
 
 let blockchain_state :
     ( Mina_lib.t
