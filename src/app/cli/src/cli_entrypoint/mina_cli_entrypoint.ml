@@ -49,7 +49,7 @@ let plugin_flag =
          times"
   else Command.Param.return []
 
-let load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level config_files =
+let load_config_files ~logger ~genesis_config ~conf_dir ~genesis_dir ~proof_level config_files =
   let%bind config_jsons =
     let config_files_paths =
       List.map config_files ~f:(fun (config_file, _) -> `String config_file)
@@ -99,7 +99,7 @@ let load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level config_files =
   let%bind precomputed_values =
     match%map
       Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
-        ~compiled:(module Genesis_constants_compiled)
+        ~genesis_config
         ~proof_level config
     with
     | Ok (precomputed_values, _) ->
@@ -137,7 +137,7 @@ let load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level config_files =
   in
   return (precomputed_values, config_jsons, config)
 
-let setup_daemon logger =
+let setup_daemon logger ~genesis_config=
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
   let receiver_key_warning = Cli_lib.Default.receiver_key_warning in
@@ -767,7 +767,7 @@ let setup_daemon logger =
           in
           let%bind precomputed_values, config_jsons, config =
             load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level
-              config_files
+              config_files ~genesis_config
           in
           let rev_daemon_configs =
             List.rev_filter_map config_jsons
@@ -1438,7 +1438,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
              (Mina_lib.validated_transitions mina)
              ~f:ignore ) ;
-        Mina_run.setup_local_server ?client_trustlist ~rest_server_port
+        Mina_run.setup_local_server ?client_trustlist ~genesis_config ~rest_server_port
           ~insecure_rest_server ~open_limited_graphql_port ?limited_graphql_port
           ?itn_graphql_port ?auth_keys:itn_keys mina ;
         let%bind () =
@@ -1457,9 +1457,9 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         let () = Mina_plugins.init_plugins ~logger mina plugins in
         return mina )
 
-let daemon logger =
+let daemon logger ~genesis_config =
   Command.async ~summary:"Mina daemon"
-    (Command.Param.map (setup_daemon logger) ~f:(fun setup_daemon () ->
+    (Command.Param.map (setup_daemon logger ~genesis_config) ~f:(fun setup_daemon () ->
          (* Immediately disable updating the time offset. *)
          Block_time.Controller.disable_setting_offset () ;
          let%bind coda = setup_daemon () in
@@ -1467,7 +1467,7 @@ let daemon logger =
          [%log info] "Daemon ready. Clients can now connect" ;
          Async.never () ) )
 
-let replay_blocks logger =
+let replay_blocks logger ~genesis_config =
   let replay_flag =
     let open Command.Param in
     flag "--blocks-filename" ~aliases:[ "-blocks-filename" ] (required string)
@@ -1479,7 +1479,7 @@ let replay_blocks logger =
       ~doc:"json|sexp The format to read lines of the file in (default: json)"
   in
   Command.async ~summary:"Start mina daemon with blocks replayed from a file"
-    (Command.Param.map3 replay_flag read_kind (setup_daemon logger)
+    (Command.Param.map3 replay_flag read_kind (setup_daemon logger ~genesis_config)
        ~f:(fun blocks_filename read_kind setup_daemon () ->
          (* Enable updating the time offset. *)
          Block_time.Controller.enable_setting_offset () ;
@@ -1678,10 +1678,12 @@ let snark_hashes =
         if json then print (Yojson.Safe.to_string (Hashes.to_yojson hashes))
         else List.iter hashes ~f:print]
 
-let internal_commands logger =
+let internal_commands logger ~(genesis_config : Genesis_constants_compiled.t) =
+  let constraint_constants = genesis_config.constraint_constants in
+  let proof_level = genesis_config.proof_level in
   [ ( Snark_worker.Intf.command_name
-    , Snark_worker.command ~proof_level:Genesis_constants_compiled.Proof_level.t
-        ~constraint_constants:Genesis_constants_compiled.Constraint_constants.t
+    , Snark_worker.command ~proof_level
+        ~constraint_constants
     )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
@@ -1696,9 +1698,8 @@ let internal_commands logger =
                  [%log info] "Prover state being logged to %s" conf_dir ;
                  let%bind prover =
                    Prover.create ~commit_id:Mina_version.commit_id ~logger
-                     ~proof_level:Genesis_constants_compiled.Proof_level.t
-                     ~constraint_constants:
-                       Genesis_constants_compiled.Constraint_constants.t
+                     ~proof_level
+                     ~constraint_constants
                      ~pids:(Pid.Table.create ()) ~conf_dir ()
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
@@ -1724,9 +1725,9 @@ let internal_commands logger =
           | `Ok sexp -> (
               let%bind worker_state =
                 Snark_worker.Prod.Inputs.Worker_state.create
-                  ~proof_level:Genesis_constants_compiled.Proof_level.t
-                  ~constraint_constants:
-                    Genesis_constants_compiled.Constraint_constants.t ()
+                  ~proof_level
+                  ~constraint_constants
+                  ()
               in
               let sok_message =
                 { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
@@ -1840,9 +1841,8 @@ let internal_commands logger =
           in
           let%bind verifier =
             Verifier.create ~commit_id:Mina_version.commit_id ~logger
-              ~proof_level:Genesis_constants_compiled.Proof_level.t
-              ~constraint_constants:
-                Genesis_constants_compiled.Constraint_constants.t
+              ~proof_level
+              ~constraint_constants
               ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir) ()
           in
           let%bind result =
@@ -1898,7 +1898,7 @@ let internal_commands logger =
               () ) ;
           Deferred.return ()) )
   ; ("dump-type-shapes", dump_type_shapes)
-  ; ("replay-blocks", replay_blocks logger)
+  ; ("replay-blocks", replay_blocks logger ~genesis_config)
   ; ("audit-type-shapes", audit_type_shapes)
   ; ( "test-genesis-block-generation"
     , Command.async ~summary:"Generate a genesis proof"
@@ -1929,7 +1929,7 @@ let internal_commands logger =
                 (config_file, `Must_exist) )
           in
           let%bind precomputed_values, _config_jsons, _config =
-            load_config_files ~logger ~conf_dir ~genesis_dir
+            load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_config
               ~proof_level:(Some proof_level) config_files
           in
           let pids = Child_processes.Termination.create_pid_table () in
@@ -1956,17 +1956,17 @@ let internal_commands logger =
               exit 1) )
   ]
 
-let mina_commands logger =
+let mina_commands logger ~genesis_config =
   [ ("accounts", Client.accounts)
-  ; ("daemon", daemon logger)
-  ; ("client", Client.client)
-  ; ("advanced", Client.advanced)
-  ; ("ledger", Client.ledger)
+  ; ("daemon", daemon logger ~genesis_config)
+  ; ("client", Client.client ~genesis_config)
+  ; ("advanced", Client.advanced ~genesis_config)
+  ; ("ledger", Client.ledger ~genesis_config)
   ; ("libp2p", Client.libp2p)
   ; ( "internal"
-    , Command.group ~summary:"Internal commands" (internal_commands logger) )
+    , Command.group ~summary:"Internal commands" (internal_commands logger ~genesis_config) )
   ; (Parallel.worker_command_name, Parallel.worker_command)
-  ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
+  ; ("transaction-snark-profiler", Transaction_snark_profiler.command ~genesis_config)
   ]
 
 let print_version_help coda_exe version =
@@ -2002,9 +2002,10 @@ let () =
    | [| _mina_exe; version |] when is_version_cmd version ->
        Mina_version.print_version ()
    | _ ->
+    let genesis_config = Genesis_constants_compiled.compiled_config in
        Command.run
          (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
-            (mina_commands logger) ) ) ;
+            (mina_commands logger ~genesis_config) ) ) ;
   Core.exit 0
 
 let linkme = ()
