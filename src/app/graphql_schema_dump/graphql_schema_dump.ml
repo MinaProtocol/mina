@@ -102,7 +102,7 @@ let () =
   let res =
     Async.Thread_safe.block_on_async_exn (fun () ->
         Graphql_async.Schema.execute
-          (Mina_graphql.schema ~genesis_config:Genesis_constants_compiled.compiled_config ~commit_id:Mina_version.commit_id)
+          (Mina_graphql.schema ~commit_id:Mina_version.commit_id)
           fake_mina_lib introspection_query )
   in
   let response =

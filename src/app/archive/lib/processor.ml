@@ -4729,7 +4729,7 @@ let run pool reader ~genesis_constants ~constraint_constants ~logger
 
 (* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
-    ~(genesis_config : Genesis_constants_compiled.t)
+    ~(genesis_constants : Genesis_constants.t) ~(constraint_constants: Genesis_constants.Constraint_constants.t)
     pool =
   match runtime_config_opt with
   | None ->
@@ -4738,15 +4738,13 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
       let%bind precomputed_values =
         match%map
           Genesis_ledger_helper.init_from_config_file ~logger ~proof_level:None
-            ~genesis_config runtime_config
+            ~genesis_constants ~constraint_constants runtime_config
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
         | Error err ->
             failwithf "Could not get precomputed values, error: %s"
               (Error.to_string_hum err) ()
-      in
-      let constraint_constants = genesis_config.constraint_constants
       in
       let ledger =
         Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
@@ -4871,7 +4869,7 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
       go ()
 
 (* for running the archive process *)
-let setup_server ~(genesis_config : Genesis_constants_compiled.t) ~metrics_server_port
+let setup_server ~(genesis_constants : Genesis_constants.t) ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~metrics_server_port
     ~logger ~postgres_address ~server_port ~delete_older_than
     ~runtime_config_opt ~missing_blocks_width =
   let where_to_listen =
@@ -4902,11 +4900,8 @@ let setup_server ~(genesis_config : Genesis_constants_compiled.t) ~metrics_serve
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
-      let genesis_constants = genesis_config.genesis_constants in
-      let constraint_constants = genesis_config.constraint_constants
-      in
       let%bind () =
-        add_genesis_accounts pool ~logger ~genesis_config ~runtime_config_opt
+        add_genesis_accounts pool ~logger ~genesis_constants ~constraint_constants ~runtime_config_opt
       in
       run ~constraint_constants
           ~genesis_constants
@@ -4917,7 +4912,7 @@ let setup_server ~(genesis_config : Genesis_constants_compiled.t) ~metrics_serve
         ~f:(fun precomputed_block ->
           match%map
             add_block_aux_precomputed ~logger ~pool 
-              ~genesis_constants:genesis_config.genesis_constants
+              ~genesis_constants
               ~constraint_constants ~delete_older_than precomputed_block
           with
           | Error e ->
@@ -4935,7 +4930,7 @@ let setup_server ~(genesis_config : Genesis_constants_compiled.t) ~metrics_serve
       Strict_pipe.Reader.iter extensional_block_reader
         ~f:(fun extensional_block ->
           match%map
-            add_block_aux_extensional ~genesis_constants:genesis_config.genesis_constants ~logger ~pool
+            add_block_aux_extensional ~genesis_constants ~logger ~pool
               ~delete_older_than extensional_block
           with
           | Error e ->

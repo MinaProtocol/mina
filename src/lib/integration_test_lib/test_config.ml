@@ -134,10 +134,10 @@ let default =
   ; network_id = None
   }
 
-let transaction_capacity_log_2 (config : t) =
+let transaction_capacity_log_2 ~(constraint_constants : Genesis_constants.Constraint_constants.t) (config : t) =
   match config.proof_config.transaction_capacity with
   | None ->
-      Genesis_constants_compiled.Constraint_constants.t
+      constraint_constants
         .transaction_capacity_log_2
   | Some (Log_2 i) ->
       i
@@ -146,7 +146,7 @@ let transaction_capacity_log_2 (config : t) =
       let block_window_duration_ms =
         Option.value
           ~default:
-            Genesis_constants_compiled.Constraint_constants.t
+            constraint_constants
               .block_window_duration_ms
           config.proof_config.block_window_duration_ms
       in
@@ -165,24 +165,24 @@ let transaction_capacity_log_2 (config : t) =
       *)
       1 + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
 
-let transaction_capacity config =
-  let i = transaction_capacity_log_2 config in
+let transaction_capacity ~constraint_constants config =
+  let i = transaction_capacity_log_2 ~constraint_constants config in
   Int.pow 2 i
 
-let blocks_for_first_ledger_proof (config : t) =
+let blocks_for_first_ledger_proof ~(constraint_constants : Genesis_constants.Constraint_constants.t) (config : t) =
   let work_delay =
     Option.value
-      ~default:Genesis_constants_compiled.Constraint_constants.t.work_delay
+      ~default:constraint_constants.work_delay
       config.proof_config.work_delay
   in
   let transaction_capacity_log_2 = transaction_capacity_log_2 config in
-  ((work_delay + 1) * (transaction_capacity_log_2 + 1)) + 1
+  ((work_delay + 1) * (transaction_capacity_log_2 ~constraint_constants + 1)) + 1
 
 let slots_for_blocks blocks =
   (*Given 0.75 slots are filled*)
   Float.round_up (Float.of_int blocks *. 4.0 /. 3.0) |> Float.to_int
 
-let transactions_needed_for_ledger_proofs ?(num_proofs = 1) config =
-  let transactions_per_block = transaction_capacity config in
-  (blocks_for_first_ledger_proof config * transactions_per_block)
+let transactions_needed_for_ledger_proofs ?(num_proofs = 1) ~constraint_constants config =
+  let transactions_per_block = transaction_capacity ~constraint_constants config in
+  (blocks_for_first_ledger_proof ~constraint_constants config * transactions_per_block)
   + (transactions_per_block * (num_proofs - 1))

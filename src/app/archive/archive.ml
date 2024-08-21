@@ -13,4 +13,4 @@ let () =
       Mina_version.print_version ()
   | _ ->
       Command.run
-        (Command.group ~summary:"Archive node commands" Archive_cli.commands)
+        (Command.group ~summary:"Archive node commands" @@ Archive_cli.commands)

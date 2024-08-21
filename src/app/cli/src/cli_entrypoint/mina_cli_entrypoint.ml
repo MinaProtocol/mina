@@ -49,7 +49,7 @@ let plugin_flag =
          times"
   else Command.Param.return []
 
-let load_config_files ~logger ~genesis_config ~conf_dir ~genesis_dir ~proof_level config_files =
+let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir ~genesis_dir ~proof_level config_files =
   let%bind config_jsons =
     let config_files_paths =
       List.map config_files ~f:(fun (config_file, _) -> `String config_file)
@@ -99,8 +99,10 @@ let load_config_files ~logger ~genesis_config ~conf_dir ~genesis_dir ~proof_leve
   let%bind precomputed_values =
     match%map
       Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
-        ~genesis_config
-        ~proof_level config
+        ~genesis_constants
+        ~constraint_constants
+        ~proof_level 
+        config
     with
     | Ok (precomputed_values, _) ->
         precomputed_values
@@ -137,7 +139,7 @@ let load_config_files ~logger ~genesis_config ~conf_dir ~genesis_dir ~proof_leve
   in
   return (precomputed_values, config_jsons, config)
 
-let setup_daemon logger ~genesis_config=
+let setup_daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
   let receiver_key_warning = Cli_lib.Default.receiver_key_warning in
@@ -765,9 +767,14 @@ let setup_daemon logger ~genesis_config=
             @ List.map config_files ~f:(fun config_file ->
                   (config_file, `Must_exist) )
           in
+          let genesis_constants = Genesis_constants_compiled.compiled_config.genesis_constants in
+          let constraint_constants = Genesis_constants_compiled.compiled_config.constraint_constants in
+          let proof_level = 
+            Option.value ~default:Genesis_constants_compiled.compiled_config.proof_level proof_level
+          in
           let%bind precomputed_values, config_jsons, config =
             load_config_files ~logger ~conf_dir ~genesis_dir ~proof_level
-              config_files ~genesis_config
+              config_files ~genesis_constants ~constraint_constants
           in
           let rev_daemon_configs =
             List.rev_filter_map config_jsons
@@ -1438,7 +1445,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
              (Mina_lib.validated_transitions mina)
              ~f:ignore ) ;
-        Mina_run.setup_local_server ?client_trustlist ~genesis_config ~rest_server_port
+        Mina_run.setup_local_server ?client_trustlist ~rest_server_port
           ~insecure_rest_server ~open_limited_graphql_port ?limited_graphql_port
           ?itn_graphql_port ?auth_keys:itn_keys mina ;
         let%bind () =
@@ -1457,9 +1464,9 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         let () = Mina_plugins.init_plugins ~logger mina plugins in
         return mina )
 
-let daemon logger ~genesis_config =
+let daemon logger =
   Command.async ~summary:"Mina daemon"
-    (Command.Param.map (setup_daemon logger ~genesis_config) ~f:(fun setup_daemon () ->
+    (Command.Param.map (setup_daemon logger) ~f:(fun setup_daemon () ->
          (* Immediately disable updating the time offset. *)
          Block_time.Controller.disable_setting_offset () ;
          let%bind coda = setup_daemon () in
@@ -1467,7 +1474,7 @@ let daemon logger ~genesis_config =
          [%log info] "Daemon ready. Clients can now connect" ;
          Async.never () ) )
 
-let replay_blocks logger ~genesis_config =
+let replay_blocks logger =
   let replay_flag =
     let open Command.Param in
     flag "--blocks-filename" ~aliases:[ "-blocks-filename" ] (required string)
@@ -1479,7 +1486,7 @@ let replay_blocks logger ~genesis_config =
       ~doc:"json|sexp The format to read lines of the file in (default: json)"
   in
   Command.async ~summary:"Start mina daemon with blocks replayed from a file"
-    (Command.Param.map3 replay_flag read_kind (setup_daemon logger ~genesis_config)
+    (Command.Param.map3 replay_flag read_kind (setup_daemon logger)
        ~f:(fun blocks_filename read_kind setup_daemon () ->
          (* Enable updating the time offset. *)
          Block_time.Controller.enable_setting_offset () ;
@@ -1678,12 +1685,9 @@ let snark_hashes =
         if json then print (Yojson.Safe.to_string (Hashes.to_yojson hashes))
         else List.iter hashes ~f:print]
 
-let internal_commands logger ~(genesis_config : Genesis_constants_compiled.t) =
-  let constraint_constants = genesis_config.constraint_constants in
-  let proof_level = genesis_config.proof_level in
+let internal_commands logger =
   [ ( Snark_worker.Intf.command_name
-    , Snark_worker.command ~proof_level
-        ~constraint_constants
+    , Snark_worker.command
     )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
@@ -1691,6 +1695,8 @@ let internal_commands logger ~(genesis_config : Genesis_constants_compiled.t) =
         ~summary:"Run prover on a sexp provided on a single line of stdin"
         (Command.Param.return (fun () ->
              let logger = Logger.create () in
+             let constraint_constants = Genesis_constants_compiled.compiled_config.constraint_constants in
+             let proof_level = Genesis_constants_compiled.compiled_config.proof_level in
              Parallel.init_master () ;
              match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
              | `Ok sexp ->
@@ -1716,6 +1722,8 @@ let internal_commands logger ~(genesis_config : Genesis_constants_compiled.t) =
         fun () ->
           let open Deferred.Let_syntax in
           let logger = Logger.create () in
+          let constraint_constants = Genesis_constants_compiled.compiled_config.constraint_constants in
+          let proof_level = Genesis_constants_compiled.compiled_config.proof_level in
           Parallel.init_master () ;
           match%bind
             Reader.with_file filename ~f:(fun reader ->
@@ -1765,6 +1773,8 @@ let internal_commands logger ~(genesis_config : Genesis_constants_compiled.t) =
         fun () ->
           let open Async in
           let logger = Logger.create () in
+          let constraint_constants = Genesis_constants_compiled.compiled_config.constraint_constants in
+          let proof_level = Genesis_constants_compiled.compiled_config.proof_level in
           Parallel.init_master () ;
           let%bind conf_dir = Unix.mkdtemp "/tmp/mina-verifier" in
           let mode =
@@ -1898,7 +1908,7 @@ let internal_commands logger ~(genesis_config : Genesis_constants_compiled.t) =
               () ) ;
           Deferred.return ()) )
   ; ("dump-type-shapes", dump_type_shapes)
-  ; ("replay-blocks", replay_blocks logger ~genesis_config)
+  ; ("replay-blocks", replay_blocks logger)
   ; ("audit-type-shapes", audit_type_shapes)
   ; ( "test-genesis-block-generation"
     , Command.async ~summary:"Generate a genesis proof"
@@ -1923,14 +1933,16 @@ let internal_commands logger ~(genesis_config : Genesis_constants_compiled.t) =
           Parallel.init_master () ;
           let logger = Logger.create () in
           let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
+          let genesis_constants = Genesis_constants_compiled.compiled_config.genesis_constants in
+          let constraint_constants = Genesis_constants_compiled.compiled_config.constraint_constants in
           let proof_level = Genesis_constants.Proof_level.Full in
           let config_files =
             List.map config_files ~f:(fun config_file ->
                 (config_file, `Must_exist) )
           in
           let%bind precomputed_values, _config_jsons, _config =
-            load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_config
-              ~proof_level:(Some proof_level) config_files
+            load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants ~constraint_constants
+              ~proof_level config_files
           in
           let pids = Child_processes.Termination.create_pid_table () in
           let%bind prover =
@@ -1956,17 +1968,17 @@ let internal_commands logger ~(genesis_config : Genesis_constants_compiled.t) =
               exit 1) )
   ]
 
-let mina_commands logger ~genesis_config =
+let mina_commands logger =
   [ ("accounts", Client.accounts)
-  ; ("daemon", daemon logger ~genesis_config)
-  ; ("client", Client.client ~genesis_config)
-  ; ("advanced", Client.advanced ~genesis_config)
-  ; ("ledger", Client.ledger ~genesis_config)
+  ; ("daemon", daemon logger)
+  ; ("client", Client.client)
+  ; ("advanced", Client.advanced)
+  ; ("ledger", Client.ledger)
   ; ("libp2p", Client.libp2p)
   ; ( "internal"
-    , Command.group ~summary:"Internal commands" (internal_commands logger ~genesis_config) )
+    , Command.group ~summary:"Internal commands" (internal_commands logger) )
   ; (Parallel.worker_command_name, Parallel.worker_command)
-  ; ("transaction-snark-profiler", Transaction_snark_profiler.command ~genesis_config)
+  ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
   ]
 
 let print_version_help coda_exe version =
@@ -2002,10 +2014,9 @@ let () =
    | [| _mina_exe; version |] when is_version_cmd version ->
        Mina_version.print_version ()
    | _ ->
-    let genesis_config = Genesis_constants_compiled.compiled_config in
        Command.run
          (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
-            (mina_commands logger ~genesis_config) ) ) ;
+            (mina_commands logger) ) ) ;
   Core.exit 0
 
 let linkme = ()

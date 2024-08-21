@@ -218,6 +218,7 @@ let blockchain_snark_state (inputs : Inputs.t) :
   end) in
   ((module T), (module B))
 
+(*
 let create_values txn b (t : Inputs.t) =
   let%bind.Async.Deferred (), (), genesis_proof = base_proof b t in
   let%map.Async.Deferred blockchain_proof_system_id =
@@ -236,6 +237,7 @@ let create_values txn b (t : Inputs.t) =
   ; constraint_system_digests = digests txn b
   ; proof_data = Some { blockchain_proof_system_id; genesis_proof }
   }
+*)
 
 let create_values_no_proof (t : Inputs.t) =
   { runtime_config = t.runtime_config

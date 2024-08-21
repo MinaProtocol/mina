@@ -4,7 +4,7 @@ open Core_kernel
 open Async
 open Archive_lib
 
-let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
+let main ~(genesis_config : Genesis_constants_compiled.t) ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
     ~log_successes ~files () =
   let output_file_line path =
     match path with
@@ -59,9 +59,8 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
         in
         make_add_block of_yojson
           (Processor.add_block_aux_precomputed
-             ~genesis_constants:Genesis_constants_compiled.t
-             ~constraint_constants:
-               Genesis_constants_compiled.Constraint_constants.t ~logger ~pool
+             ~genesis_constants:genesis_config.genesis_constants
+             ~constraint_constants:genesis_config.constraint_constants ~logger ~pool
              ~delete_older_than:None )
       in
       let add_extensional_block =
@@ -77,7 +76,7 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
         in
         make_add_block of_yojson
           (Processor.add_block_aux_extensional
-             ~genesis_constants:Genesis_constants_compiled.t ~logger ~pool
+             ~genesis_constants:genesis_config.genesis_constants ~logger ~pool
              ~delete_older_than:None )
       in
       Deferred.List.iter files ~f:(fun file ->
@@ -103,6 +102,7 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
 
 let () =
   Command.(
+    let genesis_config = Genesis_constants_compiled.compiled_config in
     run
       (let open Let_syntax in
       async ~summary:"Write blocks to an archive database"
@@ -134,5 +134,5 @@ let () =
                 processed successfully"
              (Flag.optional_with_default true Param.bool)
          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
-         main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
+         main ~genesis_config ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
            ~log_successes ~files )))

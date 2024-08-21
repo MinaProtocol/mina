@@ -340,7 +340,7 @@ module Make (Inputs : Intf.Inputs_intf) :
     in
     go ()
 
-  let command_from_rpcs ~proof_level:default_proof_level ~constraint_constants
+  let command_from_rpcs
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
         with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
     Command.async ~summary:"Snark worker"
@@ -364,6 +364,10 @@ module Make (Inputs : Intf.Inputs_intf) :
         let logger =
           Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
         in
+        let constraint_constants = Genesis_constants_compiled.compiled_config.constraint_constants in
+        let proof_level =
+          Option.value ~default:Genesis_constants_compiled.compiled_config.proof_level proof_level
+        in
         Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
             let logrotate_max_size = 1024 * 10 in
             let logrotate_num_rotate = 1 in
@@ -377,9 +381,6 @@ module Make (Inputs : Intf.Inputs_intf) :
             [%log info]
               !"Received signal to terminate. Aborting snark worker process" ;
             Core.exit 0 ) ;
-        let proof_level =
-          Option.value ~default:default_proof_level proof_level
-        in
         main
           (module Rpcs_versioned)
           ~logger ~proof_level ~constraint_constants daemon_port

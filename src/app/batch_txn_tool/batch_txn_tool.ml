@@ -309,7 +309,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
 
   return ()
 
-let output_there_and_back_cmds =
+let output_there_and_back_cmds ~(genesis_constants : Genesis_constants.t) =
   let open Command.Let_syntax in
   Command.async
     ~summary:
@@ -401,7 +401,7 @@ let output_there_and_back_cmds =
        in
        Cli_lib.Flag.fee_common
          ~minimum_user_command_fee:
-           Genesis_constants_compiled.t.minimum_user_command_fee
+           genesis_constants.minimum_user_command_fee
          ~default_transaction_fee:default
      in
      there_and_back_again ~num_txn_per_acct ~txns_per_block ~txn_fee_option
@@ -411,10 +411,11 @@ let output_there_and_back_cmds =
        ~graphql_target_node_option ~minimum_user_command_fee )
 
 let () =
+  let genesis_constants = Genesis_constants_compiled.compiled_config.genesis_constants in
   Command.run
     (Command.group
        ~summary:"Generate public keys for sending batches of transactions"
        [ ("gen-keys", output_keys)
        ; ("gen-txns", output_cmds)
-       ; ("gen-there-and-back-txns", output_there_and_back_cmds)
+       ; ("gen-there-and-back-txns", output_there_and_back_cmds ~genesis_constants)
        ] )
