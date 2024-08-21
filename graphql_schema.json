@@ -6477,7 +6477,7 @@
           "fields": [
             {
               "name": "accountBalance",
-              "description": "Account balance",
+              "description": "Account balance for a pk and token pair",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6492,7 +6492,7 @@
               "deprecationReason": null
             },
             {
-              "name": "timingInfo",
+              "name": "timingInfo related to the account",
               "description": "Account timing info",
               "args": [],
               "type": {
@@ -6508,7 +6508,7 @@
               "deprecationReason": null
             },
             {
-              "name": "nonce",
+              "name": "current nonce related to the account",
               "description": "Account nonce",
               "args": [],
               "type": {
@@ -6524,19 +6524,23 @@
               "deprecationReason": null
             },
             {
-              "name": "proof",
-              "description": "Membership proof",
+              "name": "merklePath",
+              "description": "Membership proof in the snarked ledger",
               "args": [],
               "type": {
-                "kind": "LIST",
+                "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "NON_NULL",
+                  "kind": "LIST",
                   "name": null,
                   "ofType": {
-                    "kind": "OBJECT",
-                    "name": "MerklePathElement",
-                    "ofType": null
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "MerklePathElement",
+                      "ofType": null
+                    }
                   }
                 }
               },

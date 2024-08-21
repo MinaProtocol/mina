@@ -779,19 +779,19 @@ module SnarkedLedgerMembership = struct
     obj "MembershipInfo" ~fields:(fun _ ->
         [ field "accountBalance"
             ~args:Arg.[]
-            ~doc:"Account balance" ~typ:(non_null balance)
+            ~doc:"Account balance for a pk and token pair" ~typ:(non_null balance)
             ~resolve:(fun _ { account_balance; _ } -> account_balance)
-        ; field "timingInfo"
+        ; field "timingInfo related to the account"
             ~args:Arg.[]
             ~doc:"Account timing info" ~typ:(non_null account_timing)
             ~resolve:(fun _ { timing_info; _ } -> timing_info)
-        ; field "nonce"
+        ; field "current nonce related to the account"
             ~args:Arg.[]
             ~doc:"Account nonce" ~typ:(non_null uint32)
             ~resolve:(fun _ { nonce; _ } -> Account.Nonce.to_uint32 nonce)
-        ; field "proof"
+        ; field "merklePath"
             ~args:Arg.[]
-            ~doc:"Membership proof"
+            ~doc:"Membership proof in the snarked ledger"
             ~typ:(non_null (list (non_null merkle_path_element)))
             ~resolve:(fun _ { proof; _ } -> proof)
         ] )
